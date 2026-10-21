@@ -58,9 +58,16 @@ func (c *cli) reportAstroBuild(r cliout.Renderer, res astroBuildWrite) {
 	if res.pinsErr != nil {
 		emitWarning(r, event{Event: "warning", Text: res.pinsErr.Error()})
 	}
-	if res.pinsRefused {
+	if res.refused.Pins {
 		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf(
 			"%s holds no package to the versions the runtime image ships: its [tool.uv] is an inline table, which cannot hold the comments that mark them. Write it as a [tool.uv] table to have them", manifest.Marker)})
+	}
+	if res.groupErr != nil {
+		emitWarning(r, event{Event: "warning", Text: res.groupErr.Error()})
+	}
+	if res.refused.Group {
+		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf(
+			"%s lists none of the packages the runtime image installs: its [dependency-groups] is an inline table, which cannot hold the comments that head them. Write it as a [dependency-groups] table to have them", manifest.Marker)})
 	}
 	if res.writeErr != nil {
 		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf("could not update %s for Astronomer's build of Airflow: %v", manifest.Marker, res.writeErr)})
@@ -70,6 +77,15 @@ func (c *cli) reportAstroBuild(r cliout.Renderer, res astroBuildWrite) {
 		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] now installs Astronomer's Airflow %s\n", manifest.Marker, res.build.Airflow)
 	case res.airflowChanged:
 		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer points Airflow at Astronomer's index\n", manifest.Marker)
+	}
+	if res.groupChanged {
+		if n := len(res.groupAfter); n > 0 {
+			fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s now installs the %d packages Astro Runtime %s installs\n",
+				manifest.Marker, manifest.RuntimeGroupName, n, res.groupAfterBuild)
+			c.reportGroupLeftOut(res)
+		} else {
+			fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s is gone: there is no runtime image to match\n", manifest.Marker, manifest.RuntimeGroupName)
+		}
 	}
 	if res.pinsChanged {
 		if res.beforeBuild != "" && res.after.RuntimeBuild != "" && res.beforeBuild != res.after.RuntimeBuild {
@@ -84,6 +100,17 @@ func (c *cli) reportAstroBuild(r cliout.Renderer, res astroBuildWrite) {
 		} else {
 			fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer holds packages to an Astro Runtime's versions\n", manifest.Marker)
 		}
+	}
+}
+
+// reportGroupLeftOut says which of the image's packages the runtime group left
+// out, and why: it, or a package it pulls in, would have to build from source
+// on a platform a project runs on. Docker mode still has them, and uv add
+// installs one where its build works.
+func (c *cli) reportGroupLeftOut(res astroBuildWrite) {
+	for _, l := range res.groupLeftOut {
+		fmt.Fprintf(c.d.Stderr, "%s: %s leaves out %s, which the runtime image has: %s on Python %s. Docker mode still has it; uv add %s installs it anyway\n",
+			manifest.Marker, manifest.RuntimeGroupName, l.Name, l.Why, res.after.RuntimePython, l.Name)
 	}
 }
 
@@ -120,9 +147,22 @@ type astroBuildWrite struct {
 	// write, "" for none.
 	beforeBuild string
 	// pinsErr says what happened to the runtime pins, when it is worth a
-	// warning, and pinsRefused that they could not be written at all.
-	pinsErr     error
-	pinsRefused bool
+	// warning, and refused which of the pins and the runtime group could not
+	// be written at all.
+	pinsErr error
+	refused scaffold.Refused
+	// pinsCutoff says the runtime pins came out for a cutoff, which keeps the
+	// runtime group (runtimeGroup).
+	pinsCutoff bool
+	// groupErr says why the runtime group was not brought up to date, when it
+	// is worth a warning. groupChanged says the write changed it, groupAfter
+	// and groupAfterBuild are it as the write left it, and groupLeftOut the
+	// image's packages it leaves out for having no wheel here.
+	groupErr        error
+	groupChanged    bool
+	groupAfter      []string
+	groupAfterBuild string
+	groupLeftOut    []runtimecatalog.LeftOut
 }
 
 // runtimeImage is the build and Python scaffold.RuntimeBuildFor names for a
@@ -169,19 +209,22 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 	if res.lookupErr != nil && !errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild) && !stalePin(m) {
 		res.build = recordedAstroBuild(m)
 		pins := c.runtimePins(ctx, dir, m, image, &res)
+		group := c.runtimeGroup(ctx, pins, &res)
 		changed, writeErr := watchManifest(dir, func(wrap func(run func() error) error) error {
 			var err error
-			res.pinsRefused, err = scaffold.SetRuntimePins(dir, wrap, pins)
+			res.refused, err = scaffold.SetRuntimePins(dir, wrap, pins, group)
 			return err
 		})
 		res.writeErr = writeErr
 		res.compare(m, path)
-		// Only the runtime pins were written, so whatever changed is theirs:
-		// the comments around them, when their lines are the same.
-		res.airflowChanged, res.pinsChanged = false, res.pinsChanged || changed
+		// Only the runtime pins and the runtime group were written, so
+		// whatever else changed is the pins': the comments around them, when
+		// their lines are the same.
+		res.airflowChanged, res.pinsChanged = false, res.pinsChanged || (changed && !res.groupChanged)
 		return res
 	}
 	pins := c.runtimePins(ctx, dir, m, image, &res)
+	group := c.runtimeGroup(ctx, pins, &res)
 	switch {
 	case pins != nil:
 		res.build = imageAirflowBuild(res.build, pins.Pins)
@@ -192,15 +235,15 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 	}
 	changed, writeErr := watchManifest(dir, func(wrap func(run func() error) error) error {
 		var err error
-		res.pinsRefused, err = scaffold.SetAstroBuild(dir, wrap, res.build, pins)
+		res.refused, err = scaffold.SetAstroBuild(dir, wrap, res.build, pins, group)
 		return err
 	})
 	res.writeErr = writeErr
 	res.compare(m, path)
-	// A write that changed neither the Airflow pins nor the runtime pins
-	// repaired another of the settings that hold Airflow to the build: the
-	// index, its sources, or exclude-newer-package.
-	res.airflowChanged = res.airflowChanged || (changed && !res.pinsChanged)
+	// A write that changed neither the Airflow pins, the runtime pins nor the
+	// runtime group repaired another of the settings that hold Airflow to the
+	// build: the index, its sources, or exclude-newer-package.
+	res.airflowChanged = res.airflowChanged || (changed && !res.pinsChanged && !res.groupChanged)
 	return res
 }
 
@@ -241,6 +284,8 @@ func (res *astroBuildWrite) compare(before *manifest.Manifest, path string) {
 	res.airflowChanged = !reflect.DeepEqual(airflowSettings(before), airflowSettings(after))
 	res.pinsChanged = before.UV.RuntimeBuild != after.UV.RuntimeBuild || before.UV.RuntimePython != after.UV.RuntimePython ||
 		!slices.Equal(before.UV.RuntimePins, after.UV.RuntimePins)
+	res.groupAfter, res.groupAfterBuild = after.RuntimeGroup, after.RuntimeGroupBuild
+	res.groupChanged = before.RuntimeGroupBuild != after.RuntimeGroupBuild || !slices.Equal(before.RuntimeGroup, after.RuntimeGroup)
 }
 
 // runtimeImage resolves the image the project in dir builds on: for its
@@ -283,7 +328,10 @@ func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest,
 	switch {
 	case c.d.RuntimePins == nil:
 		return nil
-	case m.UV.ExcludeNewer != "", res.build.Airflow == "", errors.Is(image.err, scaffold.ErrNoRuntimeBuild):
+	case m.UV.ExcludeNewer != "":
+		res.pinsCutoff = true
+		return none
+	case res.build.Airflow == "", errors.Is(image.err, scaffold.ErrNoRuntimeBuild):
 		return none
 	case image.err != nil, image.python == "":
 		// The build cannot be told, for want of a catalog. The pins there stay
@@ -308,7 +356,10 @@ func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest,
 		freeze, err = c.d.RuntimePins(ctx, image.build, image.python)
 	}
 	switch {
-	case errors.Is(err, runtimecatalog.ErrFreezeNotPublished), errors.Is(err, runtimecatalog.ErrPinnedResolution):
+	case errors.Is(err, runtimecatalog.ErrPinnedResolution):
+		res.pinsCutoff = true
+		return none
+	case errors.Is(err, runtimecatalog.ErrFreezeNotPublished):
 		return none
 	case err != nil && m.UV.RuntimeBuild == image.build && m.UV.RuntimePython == image.python:
 		res.pinsErr = fmt.Errorf("%s keeps its runtime pins: could not read what Astro Runtime %s ships: %w", manifest.Marker, image.build, err)
@@ -380,6 +431,32 @@ func keepRecordedPins(m *manifest.Manifest, res *astroBuildWrite, kept string, d
 	res.build = recorded
 	res.pinsErr = fmt.Errorf("%s keeps the runtime pins of Astro Runtime %s: %s", manifest.Marker, m.UV.RuntimeBuild, kept)
 	return nil
+}
+
+// runtimeGroup is the astro-runtime dependency group to write beside pins,
+// the runtime pins runtimePins decided on, and follows their decision: pins
+// written are of one build and Python, and the group is that image's
+// top-level packages, read from the same list; pins taken out take the group
+// out; pins kept as they are keep it. The one exception is a cutoff, which
+// takes the pins out and keeps the group: it holds names alone, which any
+// cutoff resolves.
+//
+// A list of top-level packages that cannot be had keeps the group as it is,
+// and res.groupErr says why.
+func (c *cli) runtimeGroup(ctx context.Context, pins *scaffold.RuntimePins, res *astroBuildWrite) *scaffold.RuntimeGroup {
+	switch {
+	case c.d.RuntimeRoots == nil, pins == nil, res.pinsCutoff:
+		return nil
+	case pins.Build == "":
+		return &scaffold.RuntimeGroup{}
+	}
+	roots, err := c.d.RuntimeRoots(ctx, pins.Build, pins.Python, pins.Pins)
+	if err != nil {
+		res.groupErr = fmt.Errorf("%s keeps its %s dependency group as it is: %w", manifest.Marker, manifest.RuntimeGroupName, err)
+		return nil
+	}
+	res.groupLeftOut = roots.LeftOut
+	return &scaffold.RuntimeGroup{Build: pins.Build, Names: roots.Names}
 }
 
 // releaseIn is the release, without its +astro build, that freeze pins dist

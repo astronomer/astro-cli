@@ -164,6 +164,15 @@ type Deps struct {
 	// so a test runs no uv. nil relocks nothing and says to run it.
 	Relock func(ctx context.Context, dir string) error
 
+	// RuntimeRoots reads the top-level packages of one Astro Runtime build's
+	// image running python, whose package list (the one RuntimePins read) is
+	// freeze, which init and a start write into the astro-runtime dependency
+	// group (scaffold.RuntimeGroup). Production reads the published list, or
+	// works it out from freeze once and keeps it, through
+	// runtimecatalog.RuntimeRoots. A seam so a test never reaches the network
+	// or runs uv; nil leaves the group as it is.
+	RuntimeRoots func(ctx context.Context, build, python string, freeze []string) (runtimecatalog.Roots, error)
+
 	// RuntimeCatalog reads the runtime catalog for an edit that moves the
 	// Airflow pin, which uses it to move requires-python and [tool.astro]
 	// runtime with the pin. nil, or a nil result, means no catalog: the edit
@@ -245,6 +254,7 @@ func NewDeps() Deps {
 		AstroBuild:       runtimecatalog.AstroBuild,
 		RuntimePins:      runtimecatalog.RuntimePins,
 		Relock:           uvRelock,
+		RuntimeRoots:     runtimecatalog.RuntimeRoots,
 		RuntimeCatalog:   runtimecatalog.Catalog,
 		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(airflowPin)(ctx)

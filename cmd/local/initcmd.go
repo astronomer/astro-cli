@@ -116,20 +116,26 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// After the manifest is written rather than inside scaffold.Plan, which
 	// stays offline. A lookup that fails is not reported here, since init has
 	// no to-do in it: `astro local start` makes the same lookup and says what
-	// it found.
+	// it found. What the runtime group left out is said here, though: a start
+	// says it only when the group changes, which after a first init it does
+	// not.
 	build := c.writeAstroBuild(ctx, res.Dir)
 	if res.Existing {
 		// Bringing a project up to date is where a Docker-only project moves
 		// to a newer runtime build, so it says what moved, and the lock
-		// follows the pins.
+		// follows the pins and the runtime group.
 		// On stderr as text in either format: init's stdout is its one result.
 		notes := cliout.Renderer{Format: cliout.FormatText, Out: c.d.Stderr}
 		c.reportAstroBuild(notes, build)
 		c.relockAfterInit(ctx, notes, res.Dir, build)
 		// The refresh changed the manifest, so the project was not up to date.
-		if (build.pinsChanged || build.airflowChanged) && !slices.Contains(res.Updated, manifest.Marker) {
+		if (build.pinsChanged || build.airflowChanged || build.groupChanged) && !slices.Contains(res.Updated, manifest.Marker) {
 			res.Updated = append(res.Updated, manifest.Marker)
 		}
+	}
+	// reportAstroBuild already said it when the group changed.
+	if !res.Existing || !build.groupChanged {
+		c.reportGroupLeftOut(build)
 	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
@@ -143,7 +149,7 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 // versions over the new one. With no uv to run, it says to run it. A project
 // with no uv.lock has nothing to follow.
 func (c *cli) relockAfterInit(ctx context.Context, r cliout.Renderer, dir string, build astroBuildWrite) {
-	if !build.pinsChanged && !build.airflowChanged {
+	if !build.pinsChanged && !build.airflowChanged && !build.groupChanged {
 		return
 	}
 	if _, err := os.Stat(filepath.Join(dir, "uv.lock")); err != nil {
