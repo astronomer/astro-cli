@@ -150,17 +150,34 @@ func RuntimeGroupComments(build string) []string {
 	}
 }
 
-// runtimeGroupOf is RuntimeGroupName's names out of [dependency-groups] as it
-// decoded, nil when it is not there or is not a list.
-func runtimeGroupOf(groups map[string]any) []string {
+// runtimeGroupHeaderRe reads the build back out of the first of
+// RuntimeGroupComments.
+var runtimeGroupHeaderRe = regexp.MustCompile(`^Astro Runtime (\S+) installs these`)
+
+var runtimeGroupKey = []string{"dependency-groups", RuntimeGroupName}
+
+// runtimeGroupOf is RuntimeGroupName out of a manifest's bytes, given
+// [dependency-groups] as it decoded: the build its heading comment names, ""
+// when there is none, and its names, nil when it is not there or is not a
+// list.
+func runtimeGroupOf(data []byte, groups map[string]any) (build string, names []string) {
 	list, _ := groups[RuntimeGroupName].([]any)
-	var names []string
 	for _, v := range list {
 		if s, isString := v.(string); isString {
 			names = append(names, s)
 		}
 	}
-	return names
+	if len(names) == 0 {
+		return "", nil
+	}
+	for _, l := range tomledit.ArrayLines(data, runtimeGroupKey, list) {
+		if c, ok := l.(tomledit.Comment); ok {
+			if m := runtimeGroupHeaderRe.FindStringSubmatch(string(c)); m != nil {
+				return m[1], names
+			}
+		}
+	}
+	return "", names
 }
 
 // ProjectConstraints are the constraints the project states for itself:

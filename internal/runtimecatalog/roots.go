@@ -49,46 +49,75 @@ var rootsBaseURL = "https://cdn.astronomer.io/runtime-roots"
 
 const (
 	// rootsCacheDir keeps the published lists, named as the CDN path is, and
-	// the 404s for them; rootsComputedDir keeps the lists worked out here.
+	// the 404s for them; rootsComputedDir keeps the lists worked out here;
+	// rootsFailedDir remembers a list that could not be had, for
+	// rootsFailedTTL.
 	rootsCacheDir    = "runtime-roots"
 	rootsComputedDir = "runtime-roots-computed"
-	// rootsWorkDir is where the scratch project is resolved, removed after.
+	rootsFailedDir   = "runtime-roots-failed"
+	// rootsWorkDir holds the scratch projects, each in a directory of its
+	// own, removed after.
 	rootsWorkDir = "runtime-roots-work"
-	// rootsLockTimeout bounds the scratch resolution: about 190 exact pins
-	// whose metadata a cold uv cache downloads once.
-	rootsLockTimeout = 3 * time.Minute
+	// rootsBudget bounds one RuntimeRoots: the published list, a scratch
+	// resolution of about 190 exact pins whose metadata a cold uv cache
+	// downloads once, and the index pages the platforms are read from.
+	rootsBudget = 3 * time.Minute
+	// rootsFailedTTL is how long a list that could not be had stays so: long
+	// enough that a blocked network does not run a resolution on every
+	// start, short enough to try again within the day.
+	rootsFailedTTL = time.Hour
 	// rootsProject names the scratch project, so its own edges are told
 	// apart from the image's in the lockfile.
 	rootsProject = "astro-runtime-roots"
 )
 
-// RuntimeRoots returns the top-level packages of runtime build's image
-// running python, as normalized distribution names, sorted, less Airflow,
-// pip and Astronomer's own: the published list when there is one, else the
-// one worked out from the build's freeze (RuntimePins) and kept.
+// Roots are what RuntimeRoots found: the entries the astro-runtime group
+// lists, sorted, a package limited to some platforms by a marker; and the
+// top-level packages left out for having no wheel for any platform an Astro
+// project runs on (wheelPlatforms).
+type Roots struct {
+	Names, LeftOut []string
+}
+
+// RuntimeRoots returns the top-level packages of runtime build's image running
+// python, whose freeze, the pins RuntimePins read for it, is freeze: the
+// published list when there is one, else the one worked out from freeze and
+// kept, less Airflow, pip and Astronomer's platform packages, each limited to
+// the platforms it has a wheel for.
 //
-// It says why it has nothing as RuntimePins does: ErrFreezeNotPublished for
-// a build with no freeze, ErrPinnedResolution under a UV_EXCLUDE_NEWER cutoff,
-// any other error when neither the list nor the freeze could be read or
-// resolved.
-func RuntimeRoots(ctx context.Context, build, python string) ([]string, error) {
-	if strings.TrimSpace(os.Getenv("UV_EXCLUDE_NEWER")) != "" {
-		return nil, ErrPinnedResolution
-	}
+// A list that could not be had (no network, uv failing) is an error, and the
+// error is remembered for rootsFailedTTL, so a start that cannot reach the
+// network waits once, not every time.
+func RuntimeRoots(ctx context.Context, build, python string, freeze []string) (Roots, error) {
 	if !freezeNamePart.MatchString(build) || !freezeNamePart.MatchString(python) {
-		return nil, fmt.Errorf("%w: build %q, Python %q", ErrFreezeNotPublished, build, python)
+		return Roots{}, fmt.Errorf("%w: build %q, Python %q", ErrFreezeNotPublished, build, python)
 	}
-	// The freeze says which version of each the image has, which the
-	// platforms are judged by, and is what a list is worked out from.
-	pins, err := RuntimePins(ctx, build, python)
+	name := freezeName(build, python)
+	failed := cacheDir(rootsFailedDir)
+	if failed != "" {
+		path := filepath.Join(failed, name)
+		if info, err := os.Stat(path); err == nil && time.Since(info.ModTime()) < rootsFailedTTL {
+			data, _ := os.ReadFile(path) //nolint:errcheck // an unreadable note says only that it failed
+			return Roots{}, fmt.Errorf("working out what Astro Runtime %s installs failed less than an hour ago, and is not tried again until then: %s", build, strings.TrimSpace(string(data)))
+		}
+	}
+	ctx, cancel := context.WithTimeout(ctx, rootsBudget)
+	defer cancel()
+	roots, err := rootsFor(ctx, build, python, freeze)
+	var out Roots
+	if err == nil {
+		out, err = withPlatforms(ctx, roots, freeze, python)
+	}
 	if err != nil {
-		return nil, err
+		if failed != "" && os.MkdirAll(failed, freezeDirPerm) == nil {
+			_ = fsatomic.WriteFile(filepath.Join(failed, name), []byte(err.Error()+"\n"), freezeFilePerm) //nolint:errcheck // a note that cannot be written only means trying again sooner
+		}
+		return Roots{}, err
 	}
-	roots, err := rootsFor(ctx, build, python, pins)
-	if err != nil {
-		return nil, err
+	if failed != "" {
+		_ = os.Remove(filepath.Join(failed, name)) //nolint:errcheck // a stale note expires on its own
 	}
-	return withPlatforms(ctx, roots, pins, python)
+	return out, nil
 }
 
 // rootsFor is the published list of build and python, else the one worked out
@@ -102,7 +131,7 @@ func rootsFor(ctx context.Context, build, python string, pins []string) ([]strin
 	if data, _ := cachedFreeze(computed, name); data != nil { //nolint:errcheck // a computed list has no 404 to remember
 		return rootsOf(data), nil
 	}
-	roots, err := computeRoots(ctx, python, pins)
+	roots, err := computeRoots(ctx, build, python, pins)
 	if err != nil {
 		return nil, fmt.Errorf("working out what Astro Runtime %s installs: %w", build, err)
 	}
@@ -148,10 +177,6 @@ func rootsOf(data []byte) []string {
 	return roots
 }
 
-// airflowDists are the distributions the project lists itself, which are no
-// part of the list.
-var airflowDists = []string{runtimeversions.DistAirflow, runtimeversions.DistCore, runtimeversions.DistTaskSDK}
-
 // dagFacingAstronomer is the one astronomer-* package a DAG imports:
 // astronomer-providers' operators and sensors. The others plug into Airflow
 // itself (the executor, logging, the FAB security manager, the version check,
@@ -161,7 +186,7 @@ const dagFacingAstronomer = "astronomer-providers"
 // rootCandidate reports whether dist, normalized, can be one of the
 // RuntimeRoots: not Airflow, pip or one of Astronomer's platform packages.
 func rootCandidate(dist string) bool {
-	return dist != "" && dist != "pip" && !slices.Contains(airflowDists, dist) &&
+	return dist != "" && dist != "pip" && !slices.Contains(runtimeversions.AirflowDists(), dist) &&
 		(!strings.HasPrefix(dist, "astronomer-") || dist == dagFacingAstronomer)
 }
 
@@ -170,33 +195,36 @@ func rootCandidate(dist string) bool {
 // other +astro build, which only Astronomer's index serves) and holds each to
 // the freeze's version, then reads which of them no package in the resolution
 // requires, through a dependency or one of its extras.
-func computeRoots(ctx context.Context, python string, pins []string) ([]string, error) {
+//
+// The project sits in a directory made for this call alone, so two at once
+// never read each other's lockfile. uv reads the user's own configuration, so
+// a mirror they resolve through serves this too.
+func computeRoots(ctx context.Context, build, python string, pins []string) ([]string, error) {
 	root := cacheDir("")
 	if root == "" {
 		return nil, errors.New("there is no cache directory to resolve in")
 	}
-	work := filepath.Join(root, rootsWorkDir, "python-"+python)
-	if err := os.RemoveAll(work); err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(work, freezeDirPerm); err != nil {
-		return nil, err
-	}
-	defer func() { _ = os.RemoveAll(work) }() //nolint:errcheck // a scratch directory left behind is removed on the next run
 	candidates, deps := rootsProjectDeps(pins)
 	if len(candidates) == 0 {
 		return nil, errors.New("its freeze lists no package to resolve")
 	}
-	if err := os.WriteFile(filepath.Join(work, manifest.Marker), rootsPyproject(python, deps, pins), freezeFilePerm); err != nil {
+	parent := filepath.Join(root, rootsWorkDir)
+	if err := os.MkdirAll(parent, freezeDirPerm); err != nil {
 		return nil, err
 	}
-	client, err := uv.New(ctx, uv.Options{CacheDir: filepath.Join(root, "uv"), NoConfig: true})
+	work, err := os.MkdirTemp(parent, build+"-python-"+python+"-")
 	if err != nil {
 		return nil, err
 	}
-	lockCtx, cancel := context.WithTimeout(ctx, rootsLockTimeout)
-	defer cancel()
-	if err := client.Lock(lockCtx, work, uv.Stdio{}); err != nil {
+	defer func() { _ = os.RemoveAll(work) }() //nolint:errcheck // a scratch directory left behind is only disk
+	if err := os.WriteFile(filepath.Join(work, manifest.Marker), rootsPyproject(python, deps, pins), freezeFilePerm); err != nil {
+		return nil, err
+	}
+	client, err := uv.New(ctx, uv.Options{CacheDir: filepath.Join(root, "uv")})
+	if err != nil {
+		return nil, err
+	}
+	if err := client.Lock(ctx, work, uv.Stdio{}); err != nil {
 		return nil, err
 	}
 	lock, err := os.ReadFile(filepath.Join(work, "uv.lock"))
@@ -211,10 +239,11 @@ func computeRoots(ctx context.Context, python string, pins []string) ([]string, 
 // Airflow distributions the freeze has, whose sources name Astronomer's index
 // and apply to direct dependencies alone.
 func rootsProjectDeps(pins []string) (candidates, deps []string) {
+	airflow := runtimeversions.AirflowDists()
 	for _, pin := range pins {
 		name := manifest.DistName(pin)
 		switch {
-		case slices.Contains(airflowDists, name):
+		case slices.Contains(airflow, name):
 			deps = append(deps, name)
 		case rootCandidate(name) && !strings.Contains(pin, "+astro."):
 			candidates = append(candidates, name)
@@ -244,7 +273,7 @@ func rootsPyproject(python string, deps, pins []string) []byte {
 	list("environments", []string{"sys_platform == 'linux'"})
 	b.WriteString("\n[[tool.uv.index]]\nname = \"astronomer\"\nurl = " + strconv.Quote(runtimeversions.PublicIndexURL()) + "\nexplicit = true\n")
 	b.WriteString("\n[tool.uv.sources]\n")
-	for _, d := range airflowDists {
+	for _, d := range runtimeversions.AirflowDists() {
 		if slices.Contains(deps, d) {
 			b.WriteString(strconv.Quote(d) + " = { index = \"astronomer\" }\n")
 		}

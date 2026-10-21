@@ -88,11 +88,6 @@ func setRuntimeGroup(ed tomledit.Editor, g *RuntimeGroup) (refused bool, err err
 	if exists && reflect.DeepEqual(out, current) {
 		return false, nil
 	}
-	if !exists {
-		if err := ensureDevGroup(ed); err != nil {
-			return false, err
-		}
-	}
 	if err := ed.Set(runtimeGroupKey, out); err != nil {
 		if errors.Is(err, tomledit.ErrCommentsUnsupported) {
 			return true, nil
@@ -100,6 +95,10 @@ func setRuntimeGroup(ed tomledit.Editor, g *RuntimeGroup) (refused bool, err err
 		return false, err
 	}
 	if !exists {
+		// Only now the group is there: a refused one leaves no dev group behind.
+		if err := ensureDevGroup(ed); err != nil {
+			return false, err
+		}
 		return false, addDefaultGroup(ed)
 	}
 	return false, nil

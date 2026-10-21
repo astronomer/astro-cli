@@ -55,8 +55,8 @@ type pinsRun struct {
 	// roots and rootsErr answer the runtime group's list; with neither set
 	// there is no list to ask (Deps.RuntimeRoots nil), and the group is left
 	// alone.
-	roots    []string
-	rootsErr error
+	roots, leftOut []string
+	rootsErr       error
 }
 
 // pinsResult is what a pinsRun left: the manifest, what it printed, and what
@@ -64,6 +64,8 @@ type pinsRun struct {
 type pinsResult struct {
 	manifest, out                        string
 	lookupAsked, freezeAsked, rootsAsked []string
+	// rootsFreeze is the package list the roots were asked with.
+	rootsFreeze []string
 }
 
 func (p pinsRun) start(t *testing.T) pinsResult {
@@ -109,9 +111,10 @@ func (p pinsRun) start(t *testing.T) pinsResult {
 		return p.freeze, p.freezeErr
 	}
 	if p.roots != nil || p.rootsErr != nil {
-		d.RuntimeRoots = func(_ context.Context, build, python string) ([]string, error) {
+		d.RuntimeRoots = func(_ context.Context, build, python string, freeze []string) (runtimecatalog.Roots, error) {
 			res.rootsAsked = append(res.rootsAsked, build, python)
-			return p.roots, p.rootsErr
+			res.rootsFreeze = freeze
+			return runtimecatalog.Roots{Names: p.roots, LeftOut: p.leftOut}, p.rootsErr
 		}
 	}
 	_ = execute(t, d, "local", "start")

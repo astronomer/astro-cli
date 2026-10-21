@@ -2,6 +2,7 @@ package local
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -11,12 +12,13 @@ import (
 var roots339 = []string{"apache-airflow-providers-celery", "pandas-market-calendars", "statsd"}
 
 // A start writes the image's top-level packages into the astro-runtime group,
-// of the build and Python the runtime pins are of, puts the group in
-// default-groups, and says so once.
+// of the build and Python the runtime pins are of, read from the package list
+// the pins read, puts the group in default-groups, and says so once, with
+// what it left out for want of a wheel.
 func TestStartWritesTheRuntimeGroup(t *testing.T) {
-	r := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t)
-	if strings.Join(r.rootsAsked, " ") != "3.3-9 3.12" {
-		t.Errorf("roots asked for %q, want the pins' build and Python", r.rootsAsked)
+	r := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339, leftOut: []string{"mysqlclient"}}.start(t)
+	if strings.Join(r.rootsAsked, " ") != "3.3-9 3.12" || !slices.Equal(r.rootsFreeze, freeze339) {
+		t.Errorf("roots asked for %q with %q, want the pins' build, Python and package list", r.rootsAsked, r.rootsFreeze)
 	}
 	for _, want := range []string{
 		"[dependency-groups]",
@@ -28,8 +30,13 @@ func TestStartWritesTheRuntimeGroup(t *testing.T) {
 			t.Errorf("manifest lacks %q:\n%s", want, r.manifest)
 		}
 	}
-	if !strings.Contains(r.out, "astro-runtime now installs the 3 packages Astro Runtime 3.3-9 installs") {
-		t.Errorf("the start did not say it wrote the group:\n%s", r.out)
+	for _, want := range []string{
+		"astro-runtime now installs the 3 packages Astro Runtime 3.3-9 installs",
+		"left out of astro-runtime, with no wheel for Linux or Apple silicon macOS on Python 3.12 (Docker mode still has them): mysqlclient",
+	} {
+		if !strings.Contains(r.out, want) {
+			t.Errorf("the start did not say %q:\n%s", want, r.out)
+		}
 	}
 	again := pinsRun{src: r.manifest, build: build332, freeze: freeze339, roots: roots339}.start(t)
 	if again.manifest != r.manifest || strings.Contains(again.out, "astro-runtime now installs") {
@@ -50,7 +57,8 @@ func TestStartRefreshesTheRuntimeGroupWithoutTheIndex(t *testing.T) {
 	}
 }
 
-// A list that cannot be worked out leaves the group as it is, with a warning.
+// A list of top-level packages that cannot be had leaves the group as it is,
+// with a warning.
 func TestStartKeepsTheRuntimeGroupWhenTheListCannotBeRead(t *testing.T) {
 	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
 	r := pinsRun{src: written, build: build332, freeze: freeze339, rootsErr: errors.New("uv lock failed")}.start(t)
@@ -62,16 +70,38 @@ func TestStartKeepsTheRuntimeGroupWhenTheListCannotBeRead(t *testing.T) {
 	}
 }
 
-// A build that publishes no freeze has no list: the group goes, with its place
-// in default-groups.
+// Pins kept as they are, their own build's list unreadable, keep the group as
+// it is too, without asking for its list.
+func TestStartKeepsTheRuntimeGroupWithThePins(t *testing.T) {
+	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
+	r := pinsRun{src: written, build: build332, freezeErr: errors.New("dial tcp: no route to host"), roots: []string{"statsd"}}.start(t)
+	if r.manifest != written || len(r.rootsAsked) != 0 {
+		t.Errorf("the group changed (roots asked %q) beside pins kept as they are:\n%s", r.rootsAsked, r.manifest)
+	}
+}
+
+// A build that publishes no package list takes the pins out, and the group
+// with them, with its place in default-groups.
 func TestStartTakesOutTheRuntimeGroupOfABuildWithNoList(t *testing.T) {
 	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
-	r := pinsRun{src: written, build: build332, freezeErr: runtimecatalog.ErrFreezeNotPublished, rootsErr: runtimecatalog.ErrFreezeNotPublished}.start(t)
-	if strings.Contains(r.manifest, "astro-runtime") || strings.Contains(r.manifest, "dependency-groups") {
-		t.Errorf("the group stayed for a build with no list:\n%s", r.manifest)
+	r := pinsRun{src: written, build: build332, freezeErr: runtimecatalog.ErrFreezeNotPublished, roots: roots339}.start(t)
+	if strings.Contains(r.manifest, "astro-runtime") || strings.Contains(r.manifest, "dependency-groups") || len(r.rootsAsked) != 0 {
+		t.Errorf("the group stayed (roots asked %q) for a build with no list:\n%s", r.rootsAsked, r.manifest)
 	}
 	if !strings.Contains(r.out, "astro-runtime is gone") {
 		t.Errorf("the start did not say it took the group out:\n%s", r.out)
+	}
+}
+
+// A list whose Airflow is another release than the Airflow pin's takes the
+// pins out, and the group with them: both would be of an image the project
+// does not build on.
+func TestStartTakesOutTheRuntimeGroupWithThePinsOfAnotherRelease(t *testing.T) {
+	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
+	other := []string{"apache-airflow==3.3.1+astro.1", "pandas==2.2.3"}
+	r := pinsRun{src: written, build: build332, freeze: other, roots: roots339}.start(t)
+	if strings.Contains(r.manifest, "astro-runtime") || len(r.rootsAsked) != 0 {
+		t.Errorf("the group stayed (roots asked %q) beside pins of another release:\n%s", r.rootsAsked, r.manifest)
 	}
 }
 

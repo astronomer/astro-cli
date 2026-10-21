@@ -73,14 +73,14 @@ func TestTheRuntimeGroupIsWrittenAndInstalledByDefault(t *testing.T) {
 	// uv refuses a default-groups naming a group the project does not define,
 	// so the dev group it installs by default is defined, empty.
 	want := `[dependency-groups]
-dev = []
 astro-runtime = [
     # Astro Runtime 3.3-9 installs these, so the local environment has what the image has.
     # astro writes them. To choose a version yourself, list the package in [project] dependencies.
     'apache-airflow-providers-celery',
     'pandas-market-calendars',
     'psycopg2-binary',
-]`
+]
+dev = []`
 	assert.Contains(t, out, want)
 	assert.Equal(t, []string{"apache-airflow-providers-celery", "pandas-market-calendars", "psycopg2-binary"}, m.RuntimeGroup)
 	assert.Equal(t, []any{"dev", "astro-runtime"}, defaultGroups(t, out))
@@ -167,12 +167,14 @@ func TestSetRuntimePinsPrunesTheGroup(t *testing.T) {
 // so it is refused and the document left as it was there.
 func TestTheRuntimeGroupIsRefusedInAnInlineTable(t *testing.T) {
 	src := astroHead + "\n[tool]\nfoo = 1\n"
-	src = strings.Replace(src, "[project]\n", "dependency-groups = { dev = ['pytest'] }\n\n[project]\n", 1)
+	src = strings.Replace(src, "[project]\n", "dependency-groups = { lint = ['ruff'] }\n\n[project]\n", 1)
 	dir := projectWith(t, src)
 	refused, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, nil, group339)
 	require.NoError(t, err)
 	assert.True(t, refused.Group)
 	out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
-	assert.NotContains(t, string(out), "astro-runtime")
+	// Nothing the group would have needed is left behind: no default-groups,
+	// no empty dev group.
+	assert.Equal(t, src, string(out))
 }

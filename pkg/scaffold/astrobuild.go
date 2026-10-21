@@ -64,7 +64,7 @@ var (
 	sourcesKey      = []string{"tool", "uv", "sources"}
 	excludeNewerPkg = []string{"tool", "uv", "exclude-newer-package"}
 	projectDepsKey  = []string{"project", "dependencies"}
-	astroDists      = []string{runtimeversions.DistAirflow, runtimeversions.DistCore, runtimeversions.DistTaskSDK}
+	astroDists      = runtimeversions.AirflowDists()
 )
 
 // SetAstroBuild writes b into the manifest in dir, through EditManifest: the
