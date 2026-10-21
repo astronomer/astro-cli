@@ -88,6 +88,11 @@ type Options struct {
 	// working.
 	HermeticEnv bool
 
+	// Env are KEY=value variables every invocation gets on top of the
+	// inherited environment: MACOSX_DEPLOYMENT_TARGET, say, for a resolve
+	// that targets macOS with --python-platform.
+	Env []string
+
 	// OnCertFallback, when set, is called after an invocation that only
 	// succeeded once it was retried against the platform certificate store
 	// (see command). The operation worked, so this is diagnostics rather than

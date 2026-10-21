@@ -37,53 +37,45 @@ var uvDefaultGroups = []any{"dev"}
 // setRuntimeGroup writes g as the astro-runtime group, less the packages the
 // project lists itself (listedPackages), which choose their own version, and
 // Airflow's, which it lists already. nil g is not known: the group stays, less
-// what the project now lists. A group with nothing left is taken out, with
-// its place in default-groups.
+// what the project now lists.
 //
-// A group the project did not have joins default-groups, so uv installs it. One
-// it had stays as default-groups has it: a project that took it out of there
-// wants the group written and not installed. refused reports a group not
-// written because its table cannot hold the comments that head it (an inline
-// [dependency-groups]).
+// The group is never taken out. One with nothing left in it stays, empty, under
+// comments that say so (manifest.RuntimeGroupEmptyComments): a project that
+// took it out of default-groups keeps that choice when the group fills again.
+// A group is created, and joins default-groups so uv installs it, only with
+// packages in it; one the project had stays as default-groups has it. refused
+// reports a group not written because its table cannot hold the comments that
+// head it (an inline [dependency-groups]).
 func setRuntimeGroup(ed tomledit.Editor, g *RuntimeGroup) (refused bool, err error) {
 	current, exists := tomledit.GetLines(ed, runtimeGroupKey)
 	listed := listedPackages(ed)
 	var out []any
 	if g == nil {
+		if !exists {
+			return false, nil
+		}
 		for _, v := range current {
 			if s, isString := v.(string); isString && listed[manifest.DistName(s)] {
 				continue
 			}
 			out = append(out, v)
 		}
-	} else {
-		var entries []string
-		seen := map[string]bool{}
-		for _, n := range g.Names {
-			name := manifest.DistName(n)
-			if listed[name] || slices.Contains(astroDists, name) || seen[name] {
-				continue
-			}
-			seen[name] = true
-			// A marker limits the package to the platforms it has a wheel for.
-			if _, marker, ok := strings.Cut(n, ";"); ok {
-				name += "; " + strings.TrimSpace(marker)
-			}
-			entries = append(entries, name)
+		if !slices.ContainsFunc(out, isEntry) {
+			out = emptyGroup()
 		}
-		slices.SortFunc(entries, func(a, b string) int { return strings.Compare(manifest.DistName(a), manifest.DistName(b)) })
-		if len(entries) > 0 {
+	} else {
+		entries := groupEntries(g.Names, listed)
+		switch {
+		case len(entries) > 0:
 			for _, c := range manifest.RuntimeGroupComments(g.Build) {
 				out = append(out, tomledit.Comment(c))
 			}
 			out = append(out, asAny(entries)...)
+		case !exists:
+			return false, nil
+		default:
+			out = emptyGroup()
 		}
-	}
-	if !slices.ContainsFunc(out, func(v any) bool { _, isString := v.(string); return isString }) {
-		if exists {
-			removeRuntimeGroup(ed)
-		}
-		return false, nil
 	}
 	if exists && reflect.DeepEqual(out, current) {
 		return false, nil
@@ -104,34 +96,39 @@ func setRuntimeGroup(ed tomledit.Editor, g *RuntimeGroup) (refused bool, err err
 	return false, nil
 }
 
-// removeRuntimeGroup takes the astro-runtime group out, with its place in
-// default-groups (which uv refuses to name a group that is not there), and
-// [dependency-groups] when nothing else is in it.
-func removeRuntimeGroup(ed tomledit.Editor) {
-	ed.Delete(runtimeGroupKey)
-	current, _ := ed.Get(defaultGroupsKey)
-	if list, isList := current.([]any); isList {
-		if at := slices.Index(list, any(manifest.RuntimeGroupName)); at >= 0 {
-			ed.Delete(append(slices.Clone(defaultGroupsKey), strconv.Itoa(at)))
-			list = slices.Delete(slices.Clone(list), at, at+1)
+// groupEntries are names as the group lists them: normalized, a marker kept,
+// sorted by name, less what the project lists and Airflow.
+func groupEntries(names []string, listed map[string]bool) []string {
+	var entries []string
+	seen := map[string]bool{}
+	for _, n := range names {
+		name := manifest.DistName(n)
+		if listed[name] || slices.Contains(astroDists, name) || seen[name] {
+			continue
 		}
-		// What is left is uv's own default, so the key says nothing, and an
-		// empty dev group, which ensureDevGroup may have written for it, says
-		// nothing either.
-		if reflect.DeepEqual(list, uvDefaultGroups) {
-			ed.Delete(defaultGroupsKey)
-			if dev, ok := ed.Get(devGroupKey); ok {
-				if l, isList := dev.([]any); isList && len(l) == 0 {
-					ed.Delete(devGroupKey)
-				}
-			}
+		seen[name] = true
+		// A marker limits the package to the platforms it installs on.
+		if _, marker, ok := strings.Cut(n, ";"); ok {
+			name += "; " + strings.TrimSpace(marker)
 		}
+		entries = append(entries, name)
 	}
-	if groups, ok := ed.Get(dependencyGroupsKey); ok {
-		if m, isTable := groups.(map[string]any); isTable && len(m) == 0 {
-			ed.Delete(dependencyGroupsKey)
-		}
+	slices.SortFunc(entries, func(a, b string) int { return strings.Compare(manifest.DistName(a), manifest.DistName(b)) })
+	return entries
+}
+
+// emptyGroup is the group with nothing in it: its comments alone.
+func emptyGroup() []any {
+	var out []any
+	for _, c := range manifest.RuntimeGroupEmptyComments() {
+		out = append(out, tomledit.Comment(c))
 	}
+	return out
+}
+
+func isEntry(v any) bool {
+	_, isString := v.(string)
+	return isString
 }
 
 // devGroupKey is the group `uv add --dev` writes, uv's own default.

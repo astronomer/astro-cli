@@ -127,6 +127,18 @@ func (c *Client) PipCompileIn(ctx context.Context, dir, constraint, pythonVersio
 	return asResolution("pip compile", c.fetch(ctx, dir, stdio, args...))
 }
 
+// PipCompileOut runs `uv pip compile -` from dir with input, one requirement a
+// line, on stdin and args after it, and returns what it compiled: the
+// requirements file, written to stdout. A resolve with no answer, a wheel
+// --only-binary demands that does not exist among them, is *ResolutionError;
+// any other error is uv not running, the network, or ctx.
+func (c *Client) PipCompileOut(ctx context.Context, dir string, input, args []string) (string, error) {
+	var out bytes.Buffer
+	stdio := Stdio{In: strings.NewReader(strings.Join(input, "\n") + "\n"), Out: &out}
+	err := c.fetch(ctx, dir, stdio, append([]string{"pip", "compile", "-", "--no-header", "--quiet"}, args...)...)
+	return out.String(), asResolution("pip compile", err)
+}
+
 // Sync makes <project>/.venv match the project's lockfile, locking first
 // when the lockfile is missing or stale — so it too can fail with
 // *ResolutionError. python is as for Venv.
@@ -505,6 +517,7 @@ func (c *Client) childEnv() []string {
 		}
 		out = append(out, kv)
 	}
+	out = append(out, c.opts.Env...)
 	return append(out, "UV_CACHE_DIR="+c.opts.CacheDir)
 }
 

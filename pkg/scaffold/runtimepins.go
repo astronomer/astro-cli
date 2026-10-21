@@ -220,7 +220,8 @@ func SetRuntimePins(dir string, wrap func(run func() error) error, pins *Runtime
 		lines, _ := tomledit.GetLines(ed, constraintsKey)
 		head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
 		var editErr error
-		if refused.Pins, editErr = writeRuntimePins(ed, lines, head, current, tail, pins); editErr != nil {
+		if refused.Pins, editErr = writeRuntimePins(ed, lines, head, current, tail, pins); editErr != nil || refused.Pins {
+			// Refused pins leave no group either (SetAstroBuild).
 			return editErr
 		}
 		refused.Group, editErr = setRuntimeGroup(ed, group)

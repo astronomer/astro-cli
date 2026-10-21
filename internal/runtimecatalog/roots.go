@@ -2,17 +2,15 @@ package runtimecatalog
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
-
-	"github.com/pelletier/go-toml/v2"
 
 	"github.com/astronomer/astro-cli/pkg/fsatomic"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -32,63 +30,105 @@ import (
 //
 //	https://cdn.astronomer.io/runtime-roots/runtime-<build>-python-<python>.txt
 //
-// Until a build has that file they are worked out here from its freeze:
-// resolved once in a scratch project, and the ones no other package of the
-// image requires taken from the lockfile's graph. Either answer is of one
-// build and never changes, so it is kept under the cache root without an
-// expiry.
+// Until a build has that file, uv works them out from its freeze: one
+// `uv pip compile` of every candidate, held to the freeze, whose annotations
+// say which of them another one pulls in.
+//
+// Each is then listed only for the platforms an Astro project locks for where
+// uv installs it, and everything it pulls in, from wheels alone: the image
+// builds a package from source when it has to, with libraries a laptop may
+// lack (mysqlclient has no wheel but Windows'). uv decides that too, a
+// `uv pip compile --only-binary` per package and platform, so its rules for
+// tags, markers and pure-Python wheels are the ones applied. What Airflow
+// pulls in is left to build, since the project installs Airflow anyway.
 //
 // Left out, either way: Airflow itself, which the project lists already; pip;
 // and Astronomer's platform packages (astronomer-* but astronomer-providers:
 // the executor, logging, the FAB security manager, runtime extensions), which
-// plug into Airflow rather than into a DAG, and some of which come from an
-// index the project reads for Airflow alone.
+// plug into Airflow rather than into a DAG.
+//
+// Every answer is of one build, Python and platform, which never change, so
+// it is kept under the cache root without an expiry: a resolution uv says has
+// no answer included. A failure to ask (the network, uv itself) is not kept,
+// and is remembered for rootsFailedTTL so a blocked network costs one wait.
 
 // rootsBaseURL is where the published lists are served. A variable so a test
 // can point it at a local server.
 var rootsBaseURL = "https://cdn.astronomer.io/runtime-roots"
 
+// pipCompile runs `uv pip compile` (uv.Client.PipCompileOut) from dir. A
+// variable so a test answers without uv.
+var pipCompile = func(ctx context.Context, dir string, input, args []string) (string, error) {
+	root := cacheDir("")
+	if root == "" {
+		return "", errors.New("there is no cache directory for uv")
+	}
+	client, err := uv.New(ctx, uv.Options{CacheDir: filepath.Join(root, "uv"), Env: []string{macOSTarget}})
+	if err != nil {
+		return "", err
+	}
+	return client.PipCompileOut(ctx, dir, input, args)
+}
+
 const (
 	// rootsCacheDir keeps the published lists, named as the CDN path is, and
-	// the 404s for them; rootsComputedDir keeps the lists worked out here;
-	// rootsFailedDir remembers a list that could not be had, for
-	// rootsFailedTTL.
+	// the 404s for them; rootsComputedDir the lists worked out here;
+	// rootsChecksDir what uv said of each package on each platform;
+	// rootsFailedDir a list that could not be had, for rootsFailedTTL.
 	rootsCacheDir    = "runtime-roots"
 	rootsComputedDir = "runtime-roots-computed"
+	rootsChecksDir   = "runtime-roots-checks"
 	rootsFailedDir   = "runtime-roots-failed"
-	// rootsWorkDir holds the scratch projects, each in a directory of its
-	// own, removed after.
+	// rootsWorkDir holds a directory per call, for the constraints file.
 	rootsWorkDir = "runtime-roots-work"
-	// rootsBudget bounds one RuntimeRoots: the published list, a scratch
-	// resolution of about 190 exact pins whose metadata a cold uv cache
-	// downloads once, and the index pages the platforms are read from.
+	// rootsBudget bounds one RuntimeRoots.
 	rootsBudget = 3 * time.Minute
-	// rootsFailedTTL is how long a list that could not be had stays so: long
-	// enough that a blocked network does not run a resolution on every
-	// start, short enough to try again within the day.
+	// rootsFailedTTL is how long a list that could not be had stays so.
 	rootsFailedTTL = time.Hour
-	// rootsProject names the scratch project, so its own edges are told
-	// apart from the image's in the lockfile.
-	rootsProject = "astro-runtime-roots"
+	// rootsConcurrency bounds the uv runs at once.
+	rootsConcurrency = 8
 )
+
+// rootsPlatforms are the platforms an Astro project locks for
+// (scaffold.AstroEnvironments, Linux on both machines), as uv names them for
+// --python-platform, with the marker that limits a package to each. Linux is
+// glibc 2.28, the oldest the runtime images run on.
+var rootsPlatforms = []struct {
+	uv, name, marker string
+}{
+	{"x86_64-manylinux_2_28", "Linux x86_64", "sys_platform == 'linux' and platform_machine == 'x86_64'"},
+	{"aarch64-manylinux_2_28", "Linux aarch64", "sys_platform == 'linux' and platform_machine == 'aarch64'"},
+	{"aarch64-apple-darwin", "macOS arm64", "sys_platform == 'darwin' and platform_machine == 'arm64'"},
+}
+
+// macOSTarget is the macOS a resolve for aarch64-apple-darwin targets. uv's
+// default for it is older than the wheels many packages publish for Apple
+// silicon now (psycopg2-binary's are macosx_14_0), which would read as no
+// wheel; macOS 14 is the oldest an Apple-silicon Mac most likely runs.
+const macOSTarget = "MACOSX_DEPLOYMENT_TARGET=14.0"
 
 // Roots are what RuntimeRoots found: the entries the astro-runtime group
 // lists, sorted, a package limited to some platforms by a marker; and the
-// top-level packages left out, with why (withPlatforms).
+// top-level packages left out, with why.
 type Roots struct {
 	Names   []string
 	LeftOut []LeftOut
 }
 
-// RuntimeRoots returns the top-level packages of runtime build's image running
-// python, whose freeze, the pins RuntimePins read for it, is freeze: the
-// published list when there is one, else the one worked out from freeze and
-// kept, less Airflow, pip and Astronomer's platform packages, each limited to
-// the platforms it has a wheel for.
+// LeftOut is one of an image's top-level packages the astro-runtime group
+// leaves out, and why, in uv's words.
+type LeftOut struct {
+	Name, Why string
+}
+
+// RuntimeRoots returns the top-level packages of runtime build's image, as the
+// astro-runtime group lists them for a project that runs python. freeze is the
+// package list RuntimePins read for the build.
 //
-// A list that could not be had (no network, uv failing) is an error, and the
-// error is remembered for rootsFailedTTL, so a start that cannot reach the
-// network waits once, not every time.
+// A list that could not be had is an error. A failure of the whole
+// computation (not a cancelled or timed-out ctx) is remembered for
+// rootsFailedTTL, so a start that cannot reach the network waits once, not
+// every time.
 func RuntimeRoots(ctx context.Context, build, python string, freeze []string) (Roots, error) {
 	if !freezeNamePart.MatchString(build) || !freezeNamePart.MatchString(python) {
 		return Roots{}, fmt.Errorf("%w: build %q, Python %q", ErrFreezeNotPublished, build, python)
@@ -102,68 +142,134 @@ func RuntimeRoots(ctx context.Context, build, python string, freeze []string) (R
 			return Roots{}, fmt.Errorf("working out what Astro Runtime %s installs failed less than an hour ago, and is not tried again until then: %s", build, strings.TrimSpace(string(data)))
 		}
 	}
-	ctx, cancel := context.WithTimeout(ctx, rootsBudget)
+	budget, cancel := context.WithTimeout(ctx, rootsBudget)
 	defer cancel()
-	roots, closures, err := rootsFor(ctx, build, python, freeze)
-	var out Roots
-	if err == nil {
-		out, err = withPlatforms(ctx, roots, closures, freeze, python)
-	}
-	if err != nil {
-		if failed != "" && os.MkdirAll(failed, freezeDirPerm) == nil {
-			_ = fsatomic.WriteFile(filepath.Join(failed, name), []byte(err.Error()+"\n"), freezeFilePerm) //nolint:errcheck // a note that cannot be written only means trying again sooner
+	out, err := runtimeRoots(budget, build, python, freeze)
+	switch {
+	case err == nil:
+		if failed != "" {
+			_ = os.Remove(filepath.Join(failed, name)) //nolint:errcheck // a stale note expires on its own
 		}
+	case ctx.Err() == nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) && failed != "" && os.MkdirAll(failed, freezeDirPerm) == nil:
+		_ = fsatomic.WriteFile(filepath.Join(failed, name), []byte(err.Error()+"\n"), freezeFilePerm) //nolint:errcheck // a note that cannot be written only means trying again sooner
+	}
+	return out, err
+}
+
+func runtimeRoots(ctx context.Context, build, python string, freeze []string) (Roots, error) {
+	root := cacheDir("")
+	if root == "" {
+		return Roots{}, errors.New("there is no cache directory to work in")
+	}
+	parent := filepath.Join(root, rootsWorkDir)
+	if err := os.MkdirAll(parent, freezeDirPerm); err != nil {
 		return Roots{}, err
 	}
-	if failed != "" {
-		_ = os.Remove(filepath.Join(failed, name)) //nolint:errcheck // a stale note expires on its own
-	}
-	return out, nil
-}
-
-// rootGraph is what the scratch resolution says of an image's top-level
-// packages: which they are, and what each pulls in (its closure, the package
-// itself left out), as kept under rootsComputedDir.
-type rootGraph struct {
-	Roots    []string            `json:"roots"`
-	Closures map[string][]string `json:"closures"`
-}
-
-// rootsFor is the published list of build and python, else the one worked out
-// from pins, and what each of them pulls in, which only the scratch
-// resolution can say: it is worked out once per build and Python and kept,
-// a published list or not.
-func rootsFor(ctx context.Context, build, python string, pins []string) (roots []string, closures map[string][]string, err error) {
-	name := freezeName(build, python)
-	graph, err := computedGraph(ctx, build, python, pins)
+	work, err := os.MkdirTemp(parent, build+"-python-"+python+"-")
 	if err != nil {
-		return nil, nil, err
+		return Roots{}, err
 	}
-	if published, ok := publishedRoots(ctx, cacheDir(rootsCacheDir), name); ok {
-		return published, graph.Closures, nil
+	defer func() { _ = os.RemoveAll(work) }() //nolint:errcheck // a work directory left behind is only disk
+	if err := os.WriteFile(filepath.Join(work, "constraints.txt"), []byte(strings.Join(freeze, "\n")+"\n"), freezeFilePerm); err != nil {
+		return Roots{}, err
 	}
-	return graph.Roots, graph.Closures, nil
+	r := rootsRun{work: work, python: python, key: build + "-python-" + python, freeze: freeze}
+	roots, err := r.roots(ctx, freezeName(build, python))
+	if err != nil {
+		return Roots{}, fmt.Errorf("working out what Astro Runtime %s installs: %w", build, err)
+	}
+	return r.withPlatforms(ctx, roots)
 }
 
-// computedGraph is the rootGraph of build and python, from the cache, else
-// worked out from pins and kept.
-func computedGraph(ctx context.Context, build, python string, pins []string) (rootGraph, error) {
-	dir := cacheDir(rootsComputedDir)
-	path := filepath.Join(dir, freezeName(build, python)+".json")
-	var graph rootGraph
-	if dir != "" {
-		if data, err := os.ReadFile(path); err == nil && json.Unmarshal(data, &graph) == nil && len(graph.Roots) > 0 {
-			return graph, nil
+// rootsRun is one RuntimeRoots: its work directory, the Python, the cache key
+// of its build and Python, and the build's freeze.
+type rootsRun struct {
+	work, python, key string
+	freeze            []string
+}
+
+// args are what every `uv pip compile` of r takes: the Python, the freeze as
+// constraints, and Astronomer's index for its builds of Airflow, which uv
+// reads before the default one.
+func (r rootsRun) args(platform string) []string {
+	return []string{
+		"--python-version", r.python, "--python-platform", platform,
+		"--constraint", "constraints.txt", "--extra-index-url", runtimeversions.PublicIndexURL(),
+	}
+}
+
+// roots is the published list named name, else the one uv works out, kept.
+func (r rootsRun) roots(ctx context.Context, name string) ([]string, error) {
+	if roots, ok := publishedRoots(ctx, cacheDir(rootsCacheDir), name); ok {
+		return roots, nil
+	}
+	computed := cacheDir(rootsComputedDir)
+	if data, _ := cachedFreeze(computed, name); data != nil { //nolint:errcheck // a computed list has no 404 to remember
+		return rootsOf(data), nil
+	}
+	candidates, airflow := rootsCandidates(r.freeze)
+	if len(candidates) == 0 {
+		return nil, errors.New("its freeze lists no package to resolve")
+	}
+	out, err := pipCompile(ctx, r.work, slices.Concat(candidates, airflow),
+		append(r.args(rootsPlatforms[0].uv), "--annotation-style", "line"))
+	if err != nil {
+		return nil, err
+	}
+	roots := rootsFromCompile(out, candidates, airflow)
+	if len(roots) == 0 {
+		return nil, errors.New("uv's resolution left no top-level package")
+	}
+	if computed != "" && os.MkdirAll(computed, freezeDirPerm) == nil {
+		_ = fsatomic.WriteFile(filepath.Join(computed, name), []byte(strings.Join(roots, "\n")+"\n"), freezeFilePerm) //nolint:errcheck // a cache that cannot be written is not a failure
+	}
+	return roots, nil
+}
+
+// rootsCandidates are the freeze's packages the roots are chosen from
+// (rootCandidate, less any other +astro build, which only Astronomer's index
+// serves), and the Airflow distributions it has.
+func rootsCandidates(freeze []string) (candidates, airflow []string) {
+	dists := runtimeversions.AirflowDists()
+	for _, pin := range freeze {
+		name := manifest.DistName(pin)
+		switch {
+		case slices.Contains(dists, name):
+			airflow = append(airflow, name)
+		case rootCandidate(name) && !strings.Contains(pin, "+astro."):
+			candidates = append(candidates, name)
 		}
 	}
-	graph, err := computeRoots(ctx, build, python, pins)
-	if err != nil {
-		return rootGraph{}, fmt.Errorf("working out what Astro Runtime %s installs: %w", build, err)
+	slices.Sort(candidates)
+	return slices.Compact(candidates), airflow
+}
+
+// rootsFromCompile reads the candidates no other one, and no Airflow
+// distribution, pulls in from a `uv pip compile --annotation-style line`: a
+// line is "name==version  # via a, b, -c constraints.txt".
+func rootsFromCompile(out string, candidates, airflow []string) []string {
+	pulledIn := map[string]bool{}
+	for _, line := range strings.Split(out, "\n") {
+		req, via, ok := strings.Cut(line, "# via ")
+		if !ok {
+			continue
+		}
+		name := manifest.DistName(strings.TrimSpace(req))
+		for _, parent := range strings.Split(via, ",") {
+			parent = strings.TrimSpace(parent)
+			if p := manifest.DistName(parent); !strings.HasPrefix(parent, "-") && p != name &&
+				(slices.Contains(candidates, p) || slices.Contains(airflow, p)) {
+				pulledIn[name] = true
+			}
+		}
 	}
-	if data, err := json.Marshal(graph); err == nil && dir != "" && os.MkdirAll(dir, freezeDirPerm) == nil {
-		_ = fsatomic.WriteFile(path, data, freezeFilePerm) //nolint:errcheck // a cache that cannot be written is not a failure
+	var roots []string
+	for _, c := range candidates {
+		if !pulledIn[c] {
+			roots = append(roots, c)
+		}
 	}
-	return graph, nil
+	return roots
 }
 
 // publishedRoots is the published list for name, from the cache under dir or
@@ -186,7 +292,7 @@ func publishedRoots(ctx context.Context, dir, name string) ([]string, bool) {
 }
 
 // rootsOf reads a list of top-level packages, `pip freeze` lines or bare
-// names, into the names RuntimeRoots returns.
+// names, into the names RuntimeRoots starts from.
 func rootsOf(data []byte) []string {
 	dists, err := parseFreeze(data)
 	if err != nil {
@@ -215,209 +321,160 @@ func rootCandidate(dist string) bool {
 		(!strings.HasPrefix(dist, "astronomer-") || dist == dagFacingAstronomer)
 }
 
-// computeRoots works out the top-level packages of a freeze: it resolves a
-// scratch project that depends on every candidate (rootCandidate, less any
-// other +astro build, which only Astronomer's index serves) and holds each to
-// the freeze's version, then reads which of them no package in the resolution
-// requires, through a dependency or one of its extras.
-//
-// The project sits in a directory made for this call alone, so two at once
-// never read each other's lockfile. uv reads the user's own configuration, so
-// a mirror they resolve through serves this too.
-func computeRoots(ctx context.Context, build, python string, pins []string) (rootGraph, error) {
-	root := cacheDir("")
-	if root == "" {
-		return rootGraph{}, errors.New("there is no cache directory to resolve in")
-	}
-	candidates, deps := rootsProjectDeps(pins)
-	if len(candidates) == 0 {
-		return rootGraph{}, errors.New("its freeze lists no package to resolve")
-	}
-	parent := filepath.Join(root, rootsWorkDir)
-	if err := os.MkdirAll(parent, freezeDirPerm); err != nil {
-		return rootGraph{}, err
-	}
-	work, err := os.MkdirTemp(parent, build+"-python-"+python+"-")
-	if err != nil {
-		return rootGraph{}, err
-	}
-	defer func() { _ = os.RemoveAll(work) }() //nolint:errcheck // a scratch directory left behind is only disk
-	if err := os.WriteFile(filepath.Join(work, manifest.Marker), rootsPyproject(python, deps, pins), freezeFilePerm); err != nil {
-		return rootGraph{}, err
-	}
-	client, err := uv.New(ctx, uv.Options{CacheDir: filepath.Join(root, "uv")})
-	if err != nil {
-		return rootGraph{}, err
-	}
-	if err := client.Lock(ctx, work, uv.Stdio{}); err != nil {
-		return rootGraph{}, err
-	}
-	lock, err := os.ReadFile(filepath.Join(work, "uv.lock"))
-	if err != nil {
-		return rootGraph{}, err
-	}
-	return rootsFromLock(lock, candidates)
-}
-
-// rootsProjectDeps splits a freeze's pins into the candidates the roots are
-// chosen from and the scratch project's dependencies: the candidates and the
-// Airflow distributions the freeze has, whose sources name Astronomer's index
-// and apply to direct dependencies alone.
-func rootsProjectDeps(pins []string) (candidates, deps []string) {
-	airflow := runtimeversions.AirflowDists()
-	for _, pin := range pins {
-		name := manifest.DistName(pin)
-		switch {
-		case slices.Contains(airflow, name):
-			deps = append(deps, name)
-		case rootCandidate(name) && !strings.Contains(pin, "+astro."):
-			candidates = append(candidates, name)
+// withPlatforms is roots as the group lists them: each for the platforms uv
+// installs it on from wheels alone, by a marker when that is not all of them;
+// left out, with uv's reason, when it is none.
+func (r rootsRun) withPlatforms(ctx context.Context, roots []string) (Roots, error) {
+	// What Airflow pulls in on each platform may build from source: the
+	// project installs it anyway.
+	exempt := make([][]string, len(rootsPlatforms))
+	for i, p := range rootsPlatforms {
+		var err error
+		if exempt[i], err = r.airflowPulls(ctx, p.uv); err != nil {
+			return Roots{}, err
 		}
 	}
-	slices.Sort(candidates)
-	candidates = slices.Compact(candidates)
-	return candidates, slices.Concat(candidates, deps)
-}
-
-// rootsPyproject is the scratch project's pyproject.toml: deps, held to pins
-// on the image's Python and platform, Airflow from Astronomer's index.
-func rootsPyproject(python string, deps, pins []string) []byte {
-	var b strings.Builder
-	list := func(key string, values []string) {
-		b.WriteString(key + " = [\n")
-		for _, v := range values {
-			b.WriteString("    " + strconv.Quote(v) + ",\n")
-		}
-		b.WriteString("]\n")
+	type answer struct {
+		ok  bool
+		why string
+		err error
 	}
-	b.WriteString("[project]\nname = " + strconv.Quote(rootsProject) + "\nversion = \"0\"\n")
-	b.WriteString("requires-python = " + strconv.Quote("=="+python+".*") + "\n")
-	list("dependencies", deps)
-	b.WriteString("\n[tool.uv]\n")
-	list("constraint-dependencies", pins)
-	list("environments", []string{"sys_platform == 'linux'"})
-	b.WriteString("\n[[tool.uv.index]]\nname = \"astronomer\"\nurl = " + strconv.Quote(runtimeversions.PublicIndexURL()) + "\nexplicit = true\n")
-	b.WriteString("\n[tool.uv.sources]\n")
-	for _, d := range runtimeversions.AirflowDists() {
-		if slices.Contains(deps, d) {
-			b.WriteString(strconv.Quote(d) + " = { index = \"astronomer\" }\n")
+	answers := make([][]answer, len(roots))
+	sem := make(chan struct{}, rootsConcurrency)
+	var wg sync.WaitGroup
+	for i, root := range roots {
+		answers[i] = make([]answer, len(rootsPlatforms))
+		for j, p := range rootsPlatforms {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				ok, why, err := r.installsFromWheels(ctx, root, p.uv, exempt[j])
+				answers[i][j] = answer{ok, why, err}
+			}()
 		}
 	}
-	return []byte(b.String())
-}
-
-// lockPackage is the part of a uv.lock [[package]] entry the graph needs.
-type lockPackage struct {
-	Name         string                      `toml:"name"`
-	Dependencies []lockDependency            `toml:"dependencies"`
-	Optional     map[string][]lockDependency `toml:"optional-dependencies"`
-}
-
-type lockDependency struct {
-	Name  string   `toml:"name"`
-	Extra []string `toml:"extra"`
-}
-
-// rootsFromLock reads a scratch project's uv.lock: the candidates no other
-// package in it requires, through a dependency, or through an extra a
-// dependency names, which installs that extra's packages too; and what each
-// candidate pulls in, the same way, less Airflow and what it pulls in, which
-// the project installs anyway. The scratch project's own edges, to every
-// candidate, are not counted. The resolution is for Linux, the image's
-// platform, so a dependency only another platform needs is not in it.
-func rootsFromLock(data []byte, candidates []string) (rootGraph, error) {
-	var lock struct {
-		Package []lockPackage `toml:"package"`
-	}
-	if err := toml.Unmarshal(data, &lock); err != nil {
-		return rootGraph{}, fmt.Errorf("reading the scratch project's uv.lock: %w", err)
-	}
-	g := lockGraph{}
-	for _, p := range lock.Package {
-		g[manifest.DistName(p.Name)] = p
-	}
-	required := g.required()
-	airflow := g.airflow()
-	graph := rootGraph{Closures: map[string][]string{}}
-	for _, c := range candidates {
-		if required[c] {
-			continue
-		}
-		graph.Roots = append(graph.Roots, c)
-		into := map[string]bool{}
-		g.reach(g[c].Dependencies, into, map[string]bool{})
-		closure := []string{}
-		for name := range into {
-			if name != c && !airflow[name] {
-				closure = append(closure, name)
-			}
-		}
-		slices.Sort(closure)
-		graph.Closures[c] = closure
-	}
-	if len(graph.Roots) == 0 {
-		return rootGraph{}, errors.New("the resolution left no top-level package")
-	}
-	return graph, nil
-}
-
-// lockGraph is a uv.lock's packages, by normalized name.
-type lockGraph map[string]lockPackage
-
-// required is every package another package in g names, directly or through
-// the extras it names, which install that extra's packages too; the scratch
-// project's own edges are not counted.
-func (g lockGraph) required() map[string]bool {
-	required, followed := map[string]bool{}, map[string]bool{}
-	var require func(deps []lockDependency)
-	require = func(deps []lockDependency) {
-		for _, d := range deps {
-			name := manifest.DistName(d.Name)
-			required[name] = true
-			for _, extra := range d.Extra {
-				// An extra can name the package's own extras, so each is
-				// followed once.
-				if key := name + "[" + extra + "]"; !followed[key] {
-					followed[key] = true
-					require(g[name].Optional[extra])
+	wg.Wait()
+	var out Roots
+	for i, root := range roots {
+		var markers, missing []string
+		why := ""
+		for j, a := range answers[i] {
+			switch {
+			case a.err != nil:
+				return Roots{}, fmt.Errorf("asking uv whether %s installs from wheels on %s: %w", root, rootsPlatforms[j].name, a.err)
+			case a.ok:
+				markers = append(markers, rootsPlatforms[j].marker)
+			default:
+				missing = append(missing, rootsPlatforms[j].name)
+				if why == "" {
+					why = a.why
 				}
 			}
 		}
-	}
-	for name, p := range g {
-		if name != rootsProject {
-			require(p.Dependencies)
+		switch {
+		case len(missing) == 0:
+			out.Names = append(out.Names, root)
+		case len(markers) == 0:
+			out.LeftOut = append(out.LeftOut, LeftOut{Name: root, Why: why + " on " + strings.Join(missing, ", ") + " (Python " + r.python + ")"})
+		case len(markers) == 1:
+			out.Names = append(out.Names, root+"; "+markers[0])
+		default:
+			out.Names = append(out.Names, root+"; ("+strings.Join(markers, ") or (")+")")
 		}
 	}
-	return required
+	return out, nil
 }
 
-// reach adds to into everything deps pull in, through dependencies and the
-// extras they name, each extra followed once.
-func (g lockGraph) reach(deps []lockDependency, into, followed map[string]bool) {
-	for _, d := range deps {
-		name := manifest.DistName(d.Name)
-		if !into[name] {
-			into[name] = true
-			g.reach(g[name].Dependencies, into, followed)
+// airflowPulls is what the freeze's Airflow pulls in on platform, kept.
+func (r rootsRun) airflowPulls(ctx context.Context, platform string) ([]string, error) {
+	path := r.checkPath("airflow@" + platform)
+	if data, err := readAnswer(path); err == nil {
+		return strings.Fields(string(data)), nil
+	}
+	_, airflow := rootsCandidates(r.freeze)
+	if len(airflow) == 0 {
+		return nil, nil
+	}
+	out, err := pipCompile(ctx, r.work, airflow, r.args(platform))
+	if err != nil {
+		return nil, fmt.Errorf("resolving Airflow for %s: %w", platform, err)
+	}
+	var names []string
+	for _, line := range strings.Split(out, "\n") {
+		if name := manifest.DistName(strings.TrimSpace(line)); name != "" && !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			names = append(names, name)
 		}
-		for _, extra := range d.Extra {
-			if key := name + "[" + extra + "]"; !followed[key] {
-				followed[key] = true
-				g.reach(g[name].Optional[extra], into, followed)
+	}
+	keep(path, strings.Join(names, "\n"))
+	return names, nil
+}
+
+// wheelsRequiredRe reads the package uv names when --only-binary leaves it no
+// wheel to install.
+var wheelsRequiredRe = regexp.MustCompile("Wheels are required for `([^`]+)`")
+
+// installsFromWheels reports whether uv installs root on platform, with all it
+// pulls in, from wheels alone, where exempt (what Airflow pulls in) may build:
+// every other package of the freeze is held to wheels. why is uv's reason
+// when it does not. An answer, either way, is kept; a failure to ask is an
+// error.
+func (r rootsRun) installsFromWheels(ctx context.Context, root, platform string, exempt []string) (ok bool, why string, err error) {
+	path := r.checkPath(root + "@" + platform)
+	if data, err := readAnswer(path); err == nil {
+		answer := strings.TrimSpace(string(data))
+		return answer == "ok", strings.TrimPrefix(answer, "no: "), nil
+	}
+	args := r.args(platform)
+	for _, pin := range r.freeze {
+		if name := manifest.DistName(pin); !slices.Contains(exempt, name) {
+			args = append(args, "--only-binary", name)
+		}
+	}
+	_, err = pipCompile(ctx, r.work, []string{root}, args)
+	var resolution *uv.ResolutionError
+	switch {
+	case err == nil:
+		keep(path, "ok")
+		return true, "", nil
+	case errors.As(err, &resolution):
+		why = "uv cannot install it from wheels"
+		if m := wheelsRequiredRe.FindStringSubmatch(resolution.Stderr); m != nil {
+			if m[1] == root {
+				why = "it has no wheel"
+			} else {
+				why = "it pulls in " + m[1] + ", which has no wheel"
 			}
 		}
+		keep(path, "no: "+why)
+		return false, why, nil
+	default:
+		return false, "", err
 	}
 }
 
-// airflow is the Airflow distributions in g and everything they pull in.
-func (g lockGraph) airflow() map[string]bool {
-	airflow := map[string]bool{}
-	for _, d := range runtimeversions.AirflowDists() {
-		if p, ok := g[d]; ok {
-			airflow[d] = true
-			g.reach(p.Dependencies, airflow, map[string]bool{})
-		}
+// checkPath is where an answer of r named name is kept, "" for no cache.
+func (r rootsRun) checkPath(name string) string {
+	dir := cacheDir(rootsChecksDir)
+	if dir == "" {
+		return ""
 	}
-	return airflow
+	return filepath.Join(dir, r.key, name)
+}
+
+// readAnswer reads a kept answer; with no cache (path "") there is none.
+func readAnswer(path string) ([]byte, error) {
+	if path == "" {
+		return nil, os.ErrNotExist
+	}
+	return os.ReadFile(path)
+}
+
+// keep writes an answer to path, atomically, unless there is no cache. A
+// cache that cannot be written is not a failure.
+func keep(path, answer string) {
+	if path != "" && os.MkdirAll(filepath.Dir(path), freezeDirPerm) == nil {
+		_ = fsatomic.WriteFile(path, []byte(answer+"\n"), freezeFilePerm) //nolint:errcheck // see above
+	}
 }
