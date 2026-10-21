@@ -134,8 +134,8 @@ const (
 // stage, from the project as its context: pyproject.toml, uv.lock when there is
 // one, and the helper at InstallHelperPath. The wildcard is how uv.lock stays
 // optional; Docker's BuildKit and its legacy builder both copy nothing for a
-// wildcard that matches nothing, but Buildah has refused one, so a project
-// built with Podman keeps a uv.lock, or takes uv.lock* out of the line.
+// wildcard that matches nothing, and so does Podman 5.8 (Buildah 1.43); an
+// older Buildah is untested.
 const ProjectInputs = pyprojectName + " " + uvLockName + "* " + InstallHelperPath
 
 // InstallStage is the name InstallDockerfile gives the helper's stage.

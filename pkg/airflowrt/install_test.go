@@ -17,11 +17,17 @@ var helperContentAtVersion = map[int]string{
 	1: "b21a2237f2142b9bb010dd1dbe211ab9a9ce3f5c2f567e64a668315bd0ca326d",
 	// Writes its outputs with LF line endings on every host.
 	2: "e2c1f44df4ed6b3cc93e73e45473fc4b9549322b876962fe29fa62f9e36846a7",
-	// The image's Airflow checked against uv.lock's, by release.
-	3: "68adef753228f7ebe8682da4cdd11cee59875517ac55071c59ebd7d6f6243630",
-	// The astro-runtime dependency group does not count as the project naming
-	// a base image package.
-	5: "f6f03bde50e3785cfa0c7bb8db5c86c9e51b6ae597b04b9bd90d4fa1aca6caaa",
+	// Compares a lock's recorded constraints by name and specifier, and reads
+	// python_version == 'X.Y' as python_full_version == 'X.Y.*'. (This branch's
+	// own version 3, checking the image's Airflow against uv.lock's by release,
+	// was 68adef75...; it never reached a release, and 4 carries both.)
+	3: "72b26579905db375023b6b1e60149e277de2aecb385fdf5822bb23019a785f64",
+	// Both: the image's Airflow checked against uv.lock's by release, and the
+	// lock's constraints compared by meaning.
+	4: "1b51bc76862c3eac04d849400c1fa85a6a8e0de18d0b16034af3b2e68cd28538",
+	// 4, and the astro-runtime dependency group not counted as the project
+	// naming a base image package.
+	5: "9e63e4d8a11522988c9bc9639325f7ed479dc4429cd3dd0646c56aaeffe2913e",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {

@@ -100,7 +100,7 @@ func runHelper(t *testing.T, dir string, r helperRun) helperOutput {
 		require.NoError(t, err, name)
 		return string(data)
 	}
-	return helperOutput{read(requirementsName), read(packagesName), read(lockConstraintsName), stderr.String()}
+	return helperOutput{read(requirementsName), read(packagesName), read(lockConstraintsName), strings.ReplaceAll(stderr.String(), "\r\n", "\n")}
 }
 
 // withoutPackaging runs the helper as on a Python whose packaging it cannot
@@ -539,7 +539,7 @@ for line in sys.stdin.read().splitlines():
 	cmd.Stdin = strings.NewReader(input.String())
 	got, err := cmd.Output()
 	require.NoError(t, err)
-	lines := strings.Split(strings.TrimSpace(string(got)), "\n")
+	lines := strings.Split(strings.ReplaceAll(strings.TrimSpace(string(got)), "\r\n", "\n"), "\n")
 	require.Len(t, lines, len(cases))
 	for i, c := range cases {
 		assert.Equal(t, c.want, lines[i], c.marker)
@@ -833,4 +833,42 @@ func TestBuildDropsAFindLinksFileTheProjectCarries(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(ctxDir, filepath.FromSlash(generatedInputsDir), installFindLinksName))
 	reqs, _, _ := installLists(t, ctxDir)
 	assert.Equal(t, "pandas\n", reqs)
+}
+
+// The runtime pins `astro init` writes (B's freeze pins) carry a marker in
+// python_version form, and uv records each in its [manifest] in
+// python_full_version form. The two mean the same, so a lock uv just made
+// is fresh: the regression is every build installing unpinned. A marker that
+// means something else is still a change. A compound marker, which uv may
+// regroup, is not compared, so it never calls the lock stale.
+func TestInstallHelperReadsUvsSpellingOfARuntimePinsMarker(t *testing.T) {
+	pyproject, lock := lockProject([]string{"pandas"}, lockEntry("pandas", "3.0.6"))
+	lock = strings.Replace(lock, "version = 1\n", "version = 1\n\n[manifest]\nconstraints = [\n"+
+		`    { name = "a2wsgi", marker = "python_full_version == '3.14.*'", specifier = "==1.10.10" },`+"\n"+
+		`    { name = "aiofiles", marker = "python_full_version == '3.14.*'", specifier = "==24.1.0" },`+"\n"+
+		`    { name = "sqlalchemy", marker = "python_full_version != '3.13.*'", specifier = "==2.0.50" },`+"\n"+
+		"]\n", 1)
+	for name, tc := range map[string]struct {
+		pins  string
+		stale bool
+	}{
+		"python_version as astro writes it":    {`'a2wsgi==1.10.10; python_version == "3.14"', 'aiofiles==24.1.0; python_version == "3.14"', "SQLAlchemy==2.0.50 ; python_version != '3.13'"`, false},
+		"python_full_version as uv records it": {`"a2wsgi==1.10.10; python_full_version == '3.14.*'", "aiofiles==24.1.0; python_full_version == '3.14.*'", "sqlalchemy==2.0.50; python_full_version != '3.13.*'"`, false},
+		"another Python":                       {`'a2wsgi==1.10.10; python_version == "3.13"', 'aiofiles==24.1.0; python_version == "3.14"', "SQLAlchemy==2.0.50 ; python_version != '3.13'"`, true},
+		"another version":                      {`'a2wsgi==1.10.11; python_version == "3.14"', 'aiofiles==24.1.0; python_version == "3.14"', "SQLAlchemy==2.0.50 ; python_version != '3.13'"`, true},
+		"a compound marker, not compared":      {`'a2wsgi==1.10.10; python_version == "3.14" and sys_platform == "linux"', 'aiofiles==24.1.0; python_version == "3.14"', "SQLAlchemy==2.0.50 ; python_version != '3.13'"`, false},
+	} {
+		for mode, env := range map[string][]string{"packaging": nil, "own evaluator": withoutPackaging} {
+			t.Run(name+"/"+mode, func(t *testing.T) {
+				out := runHelper(t, helperProject(t, pyproject+"\n[tool.uv]\nconstraint-dependencies = ["+tc.pins+"]\n", lock), helperRun{env: env})
+				if tc.stale {
+					assert.Contains(t, out.stderr, "it was resolved under other [tool.uv] constraint-dependencies")
+					assert.Empty(t, out.constraints)
+					return
+				}
+				assert.Empty(t, out.stderr)
+				assert.Contains(t, out.constraints, "pandas==3.0.6")
+			})
+		}
+	}
 }
