@@ -229,18 +229,18 @@ On Astro Private Cloud the same spellings give way. The new spellings have no sh
 
 ## Installing v2
 
-Until v2 has a stable release, it's published as GitHub pre-releases, and the installer and Homebrew install 1.x by default. Pass `v2` to the installer for the newest v2 release, the newest stable one once there is one:
+Until v2 has a stable release, it's published as GitHub pre-releases, and the installer and Homebrew install 1.x by default. Pass `v2` to the installer for the newest v2 release, the newest stable one once there is one. To replace 1.x, install with `sudo`:
 
 ```sh
 curl -sSL install.astronomer.io | sudo bash -s -- v2
 ```
 
-That installs into `/usr/local/bin`, replacing a 1.x `astro` there. Running it again without `-- v2` puts 1.x back.
+That installs into `/usr/local/bin`, where the installer put 1.x, and replaces it there. Running it again without `-- v2` puts 1.x back. Without `sudo` the installer writes to `~/.local/bin` instead and leaves the 1.x `astro` in `/usr/local/bin`, which usually comes first on your PATH, so `astro` would still run 1.x. The installer warns when that happens.
 
-To keep 1.x where it is, install v2 into its own directory by running the installer script directly with `-b`:
+To keep 1.x and run v2 beside it, install v2 without `sudo` into a directory of its own with `ASTRO_INSTALL_DIR`:
 
 ```sh
-curl -sSL https://raw.githubusercontent.com/astronomer/astro-cli/main/godownloader.sh | bash -s -- -b ~/astro-v2 v2
+curl -sSL install.astronomer.io | ASTRO_INSTALL_DIR="$HOME/astro-v2" bash -s -- v2
 ~/astro-v2/astro version
 ```
 
