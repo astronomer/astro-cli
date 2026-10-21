@@ -136,8 +136,10 @@ func TestRuntimeRootsSaysWhatARootPullsIn(t *testing.T) {
 	f.install(t)
 	got, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
 	require.NoError(t, err)
-	assert.Equal(t, []LeftOut{{Name: "apache-airflow-providers-mysql",
-		Why: "it pulls in mysqlclient, which has no wheel on Linux x86_64, Linux aarch64, macOS arm64 (Python 3.14)"}}, got.LeftOut)
+	assert.Equal(t, []LeftOut{{
+		Name: "apache-airflow-providers-mysql",
+		Why:  "it pulls in mysqlclient, which has no wheel on Linux x86_64, Linux aarch64, macOS arm64 (Python 3.14)",
+	}}, got.LeftOut)
 }
 
 // Without a published list, uv works the roots out: the candidates whose
