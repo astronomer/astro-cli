@@ -413,7 +413,8 @@ func (r rootsRun) airflowPulls(ctx context.Context, platform string) ([]string, 
 
 // wheelsRequiredRe reads the package uv names when --only-binary leaves it no
 // wheel to install.
-var wheelsRequiredRe = regexp.MustCompile("Wheels are required for `([^`]+)`")
+// The backtick uv puts around the name is \x60 here.
+var wheelsRequiredRe = regexp.MustCompile(`Wheels are required for \x60([^\x60]+)\x60`)
 
 // installsFromWheels reports whether uv installs root on platform, with all it
 // pulls in, from wheels alone, where exempt (what Airflow pulls in) may build:
