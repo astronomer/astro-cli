@@ -16,7 +16,8 @@ var roots339 = []string{"apache-airflow-providers-celery", "pandas-market-calend
 // the pins read, puts the group in default-groups, and says so once, with
 // what it left out for want of a wheel.
 func TestStartWritesTheRuntimeGroup(t *testing.T) {
-	r := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339, leftOut: []string{"mysqlclient"}}.start(t)
+	leftOut := []runtimecatalog.LeftOut{{Name: "apache-airflow-providers-mysql", Why: "it pulls in mysqlclient, which has no wheel for Linux x86_64, Linux aarch64"}}
+	r := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339, leftOut: leftOut}.start(t)
 	if strings.Join(r.rootsAsked, " ") != "3.3-9 3.12" || !slices.Equal(r.rootsFreeze, freeze339) {
 		t.Errorf("roots asked for %q with %q, want the pins' build, Python and package list", r.rootsAsked, r.rootsFreeze)
 	}
@@ -32,7 +33,7 @@ func TestStartWritesTheRuntimeGroup(t *testing.T) {
 	}
 	for _, want := range []string{
 		"astro-runtime now installs the 3 packages Astro Runtime 3.3-9 installs",
-		"left out of astro-runtime, with no wheel for Linux or Apple silicon macOS on Python 3.12 (Docker mode still has them): mysqlclient",
+		"astro-runtime leaves out apache-airflow-providers-mysql, which the runtime image has: it pulls in mysqlclient, which has no wheel for Linux x86_64, Linux aarch64 on Python 3.12. Docker mode still has it; uv add apache-airflow-providers-mysql installs it anyway",
 	} {
 		if !strings.Contains(r.out, want) {
 			t.Errorf("the start did not say %q:\n%s", want, r.out)

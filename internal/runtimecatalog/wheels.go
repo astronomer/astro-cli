@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,8 +41,9 @@ const (
 	// for wheelsPartialTTL otherwise, since a missing wheel can be uploaded.
 	wheelsCacheDir   = "runtime-wheels"
 	wheelsPartialTTL = 7 * 24 * time.Hour
-	// wheelsMaxBytes caps one project's index page.
-	wheelsMaxBytes = 8 << 20
+	// wheelsMaxBytes caps one project's index page. A project with many wheels
+	// a release has a big one: pydantic-core's JSON page is about 10 MB.
+	wheelsMaxBytes = 64 << 20
 )
 
 // The platforms an Astro project locks for, as bits of what a version covers.
@@ -64,48 +66,116 @@ var platformMarkers = []struct {
 	{darwinArm, "sys_platform == 'darwin' and platform_machine == 'arm64'"},
 }
 
-// withPlatforms is roots as the group lists them, each limited by a marker to
-// the platforms its version (from pins) has a wheel for on python, and the
-// ones left out for covering none. A root pins has no version for is listed
-// as it is. Any index page that cannot be read fails the whole list, which
+// LeftOut is one of an image's top-level packages the astro-runtime group
+// leaves out, and why: it, or a package it pulls in, has no wheel for a
+// platform an Astro project runs on.
+type LeftOut struct {
+	Name, Why string
+}
+
+// wheelsConcurrency bounds the index requests in flight at once.
+const wheelsConcurrency = 16
+
+// withPlatforms is roots as the group lists them. A root whose closure, the
+// packages it pulls in (closures), has one with no wheel for a platform is
+// left out, as the image builds that package from source with libraries a
+// laptop may lack: providers-mysql pulls in mysqlclient on Linux, which has no
+// Linux wheel. A root that is short of a platform by its own wheels alone is
+// limited to the ones it has by a marker; with none, it is left out too.
+// Versions come from pins; a package pins has none for is taken to install
+// anywhere. Any index page that cannot be read fails the whole list, which
 // keeps the group as it was rather than one short of a package.
-func withPlatforms(ctx context.Context, roots, pins []string, python string) (Roots, error) {
+func withPlatforms(ctx context.Context, roots []string, closures map[string][]string, pins []string, python string) (Roots, error) {
 	versions := map[string]string{}
 	for _, pin := range pins {
 		if name, v, ok := strings.Cut(pin, "=="); ok {
 			versions[manifest.DistName(name)] = strings.TrimSpace(v)
 		}
 	}
-	where := make([]int, len(roots))
-	errs := make([]error, len(roots))
+	var names []string
+	for _, root := range roots {
+		names = append(names, root)
+		names = append(names, closures[root]...)
+	}
+	slices.Sort(names)
+	names = slices.Compact(names)
+	where, err := platformsOf(ctx, names, versions, python)
+	if err != nil {
+		return Roots{}, err
+	}
+	var out Roots
+	for _, root := range roots {
+		if dep, missing := shortOf(closures[root], where); dep != "" {
+			out.LeftOut = append(out.LeftOut, LeftOut{Name: root, Why: "it pulls in " + dep + ", which has no wheel for " + platformNames(missing)})
+			continue
+		}
+		switch w := where[root]; w {
+		case everyPlatform:
+			out.Names = append(out.Names, root)
+		case 0:
+			out.LeftOut = append(out.LeftOut, LeftOut{Name: root, Why: "it has no wheel for " + platformNames(everyPlatform)})
+		default:
+			out.Names = append(out.Names, root+"; "+platformMarker(w))
+		}
+	}
+	return out, nil
+}
+
+// platformsOf is what each of names covers, its version from versions, read
+// with at most wheelsConcurrency requests at once.
+func platformsOf(ctx context.Context, names []string, versions map[string]string, python string) (map[string]int, error) {
+	where := map[string]int{}
+	var mu sync.Mutex
+	var firstErr error
+	sem := make(chan struct{}, wheelsConcurrency)
 	var wg sync.WaitGroup
-	for i, root := range roots {
-		v, ok := versions[root]
+	for _, name := range names {
+		v, ok := versions[name]
 		if !ok {
-			where[i] = everyPlatform
+			where[name] = everyPlatform
 			continue
 		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			where[i], errs[i] = wheelsOf(ctx, root, v, python)
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			w, err := wheelsOf(ctx, name, v, python)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil && firstErr == nil {
+				firstErr = fmt.Errorf("reading which platforms %s has wheels for: %w", name, err)
+			}
+			where[name] = w
 		}()
 	}
 	wg.Wait()
-	var out Roots
-	for i, root := range roots {
-		switch {
-		case errs[i] != nil:
-			return Roots{}, fmt.Errorf("reading which platforms %s has wheels for: %w", root, errs[i])
-		case where[i] == everyPlatform:
-			out.Names = append(out.Names, root)
-		case where[i] == 0:
-			out.LeftOut = append(out.LeftOut, root)
-		default:
-			out.Names = append(out.Names, root+"; "+platformMarker(where[i]))
+	return where, firstErr
+}
+
+// shortOf is the first of closure, in order, that does not cover every
+// platform, and the platforms it misses; "" when all of them do.
+func shortOf(closure []string, where map[string]int) (dep string, missing int) {
+	for _, d := range closure {
+		if w := where[d]; w != everyPlatform {
+			return d, everyPlatform &^ w
 		}
 	}
-	return out, nil
+	return "", 0
+}
+
+// platformNames names the platforms in bits, for a message.
+func platformNames(bits int) string {
+	var names []string
+	for _, p := range []struct {
+		bit  int
+		name string
+	}{{linuxX86, "Linux x86_64"}, {linuxArm, "Linux aarch64"}, {darwinArm, "macOS arm64"}} {
+		if bits&p.bit != 0 {
+			names = append(names, p.name)
+		}
+	}
+	return strings.Join(names, ", ")
 }
 
 // platformMarker is the marker that limits a package to the platforms where
@@ -182,9 +252,14 @@ func indexFiles(ctx context.Context, dist string) ([]string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("reading the index page of %s: %s", dist, resp.Status)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, wheelsMaxBytes))
+	// One byte past the cap, so a page the cap would cut short is refused
+	// rather than read as a shorter one.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, wheelsMaxBytes+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(body) > wheelsMaxBytes {
+		return nil, fmt.Errorf("reading the index page of %s: larger than %d bytes", dist, wheelsMaxBytes)
 	}
 	if strings.Contains(resp.Header.Get("Content-Type"), "html") {
 		var files []string

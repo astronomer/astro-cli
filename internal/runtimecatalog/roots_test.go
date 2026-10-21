@@ -2,10 +2,12 @@ package runtimecatalog
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -57,6 +59,17 @@ var pypi339 = map[string]string{
 	"/simple/sdistonly/":  indexPage("sdistonly-2.0.tar.gz"),
 }
 
+// graph339 is the computed graph of 3.3-9 on Python 3.14, kept where
+// computedGraph looks for it, so no test runs uv.
+func graph339(t *testing.T, roots []string, closures map[string][]string) {
+	t.Helper()
+	dir := filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", rootsComputedDir)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	data, err := json.Marshal(rootGraph{Roots: roots, Closures: closures})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "runtime-3.3-9-python-3.14.txt.json"), data, 0o600))
+}
+
 // served is pypi339 with more beside it.
 func served(more map[string]string) map[string]string {
 	out := map[string]string{}
@@ -80,10 +93,11 @@ func TestRuntimeRootsReadsThePublishedList(t *testing.T) {
 		"/runtime-roots/runtime-3.3-9-python-3.14.txt": "statsd==4.0.1\nPsycopg2_Binary==2.9.12\npip==26.2.1\nmysqlclient==2.2.8\nlinuxonly==1.0\nsdistonly==2.0\n" +
 			"astronomer-runtime-extensions==1.0.0\napache-airflow==3.3.2+astro.2\napache-airflow-providers-celery==3.24.1\n",
 	}))
+	graph339(t, []string{"statsd"}, nil)
 	got, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339py314)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"apache-airflow-providers-celery", "linuxonly; " + linuxMarker, "psycopg2-binary", "sdistonly", "statsd"}, got.Names)
-	assert.Equal(t, []string{"mysqlclient"}, got.LeftOut)
+	assert.Equal(t, []LeftOut{{Name: "mysqlclient", Why: "it has no wheel for Linux x86_64, Linux aarch64, macOS arm64"}}, got.LeftOut)
 	_, err = os.Stat(filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", rootsCacheDir, "runtime-3.3-9-python-3.14.txt"))
 	assert.NoError(t, err, "the published list is kept")
 }
@@ -92,12 +106,33 @@ func TestRuntimeRootsReadsThePublishedList(t *testing.T) {
 // to resolve again.
 func TestRuntimeRootsUsesAComputedList(t *testing.T) {
 	rootsServer(t, served(nil))
-	dir := filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", rootsComputedDir)
-	require.NoError(t, os.MkdirAll(dir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "runtime-3.3-9-python-3.14.txt"), []byte("kubernetes\nstatsd\n"), 0o600))
+	graph339(t, []string{"kubernetes", "statsd"}, nil)
 	got, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339py314)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"kubernetes", "statsd"}, got.Names)
+}
+
+// A root that pulls in a package with no wheel for a platform is left out,
+// whatever its own wheels: the image builds that package from source, with
+// libraries a laptop may lack. providers-mysql pulls in mysqlclient on Linux,
+// whose wheels are Windows'. One whose dependencies are pure Python, or
+// publish no wheel at all, stays.
+func TestRuntimeRootsLeavesOutWhatPullsInAPackageWithNoWheel(t *testing.T) {
+	rootsServer(t, served(map[string]string{
+		"/simple/apache-airflow-providers-mysql/": indexPage("apache_airflow_providers_mysql-6.4.0-py3-none-any.whl"),
+	}))
+	freeze := append(slices.Clone(freeze339py314), "apache-airflow-providers-mysql==6.4.0")
+	graph339(t, []string{"apache-airflow-providers-mysql", "kubernetes", "statsd"}, map[string][]string{
+		"apache-airflow-providers-mysql": {"mysqlclient", "statsd"},
+		"kubernetes":                     {"sdistonly", "statsd"},
+	})
+	got, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"kubernetes", "statsd"}, got.Names)
+	assert.Equal(t, []LeftOut{{
+		Name: "apache-airflow-providers-mysql",
+		Why:  "it pulls in mysqlclient, which has no wheel for Linux x86_64, Linux aarch64, macOS arm64",
+	}}, got.LeftOut)
 }
 
 // A package whose index page cannot be read leaves the whole list unknown,
@@ -107,6 +142,7 @@ func TestRuntimeRootsRemembersAFailure(t *testing.T) {
 	files := served(map[string]string{"/runtime-roots/runtime-3.3-9-python-3.14.txt": "statsd==4.0.1\nkubernetes==33.0.0\n"})
 	delete(files, "/simple/kubernetes/")
 	hits := rootsServer(t, files)
+	graph339(t, []string{"kubernetes", "statsd"}, nil)
 	_, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339py314)
 	require.ErrorContains(t, err, "reading which platforms kubernetes has wheels for")
 	before := hits.Load()
@@ -196,7 +232,12 @@ name = "apache-airflow-core"
 version = "3.3.2+astro.2"
 dependencies = [
     { name = "uvicorn", extra = ["standard"] },
+    { name = "lazy-object-proxy" },
 ]
+
+[[package]]
+name = "lazy-object-proxy"
+version = "1.10.0"
 
 [[package]]
 name = "uvicorn"
@@ -216,6 +257,7 @@ name = "celery"
 version = "5.5.0"
 dependencies = [
     { name = "kombu" },
+    { name = "apache-airflow-core" },
 ]
 
 [package.optional-dependencies]
@@ -238,7 +280,11 @@ version = "6.4.0"
 	got, err := rootsFromLock([]byte(lock), []string{"celery", "httptools", "kubernetes", "redis", "uvicorn"})
 	require.NoError(t, err)
 	// celery's redis extra is named by nothing here, so redis is a root.
-	assert.Equal(t, []string{"celery", "kubernetes", "redis"}, got)
+	assert.Equal(t, []string{"celery", "kubernetes", "redis"}, got.Roots)
+	// celery's closure leaves out Airflow core and what it pulls in
+	// (lazy-object-proxy, uvicorn and its extras), which the project
+	// installs anyway.
+	assert.Equal(t, map[string][]string{"celery": {"kombu"}, "kubernetes": {}, "redis": {}}, got.Closures)
 }
 
 // A wheel covers the platforms its tag says, on a Python its tags fit: py3,

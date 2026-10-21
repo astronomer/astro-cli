@@ -2,6 +2,7 @@ package runtimecatalog
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -73,10 +74,10 @@ const (
 
 // Roots are what RuntimeRoots found: the entries the astro-runtime group
 // lists, sorted, a package limited to some platforms by a marker; and the
-// top-level packages left out for having no wheel for any platform an Astro
-// project runs on (wheelPlatforms).
+// top-level packages left out, with why (withPlatforms).
 type Roots struct {
-	Names, LeftOut []string
+	Names   []string
+	LeftOut []LeftOut
 }
 
 // RuntimeRoots returns the top-level packages of runtime build's image running
@@ -103,10 +104,10 @@ func RuntimeRoots(ctx context.Context, build, python string, freeze []string) (R
 	}
 	ctx, cancel := context.WithTimeout(ctx, rootsBudget)
 	defer cancel()
-	roots, err := rootsFor(ctx, build, python, freeze)
+	roots, closures, err := rootsFor(ctx, build, python, freeze)
 	var out Roots
 	if err == nil {
-		out, err = withPlatforms(ctx, roots, freeze, python)
+		out, err = withPlatforms(ctx, roots, closures, freeze, python)
 	}
 	if err != nil {
 		if failed != "" && os.MkdirAll(failed, freezeDirPerm) == nil {
@@ -120,25 +121,49 @@ func RuntimeRoots(ctx context.Context, build, python string, freeze []string) (R
 	return out, nil
 }
 
+// rootGraph is what the scratch resolution says of an image's top-level
+// packages: which they are, and what each pulls in (its closure, the package
+// itself left out), as kept under rootsComputedDir.
+type rootGraph struct {
+	Roots    []string            `json:"roots"`
+	Closures map[string][]string `json:"closures"`
+}
+
 // rootsFor is the published list of build and python, else the one worked out
-// from pins, kept once worked out.
-func rootsFor(ctx context.Context, build, python string, pins []string) ([]string, error) {
+// from pins, and what each of them pulls in, which only the scratch
+// resolution can say: it is worked out once per build and Python and kept,
+// a published list or not.
+func rootsFor(ctx context.Context, build, python string, pins []string) (roots []string, closures map[string][]string, err error) {
 	name := freezeName(build, python)
-	if roots, ok := publishedRoots(ctx, cacheDir(rootsCacheDir), name); ok {
-		return roots, nil
-	}
-	computed := cacheDir(rootsComputedDir)
-	if data, _ := cachedFreeze(computed, name); data != nil { //nolint:errcheck // a computed list has no 404 to remember
-		return rootsOf(data), nil
-	}
-	roots, err := computeRoots(ctx, build, python, pins)
+	graph, err := computedGraph(ctx, build, python, pins)
 	if err != nil {
-		return nil, fmt.Errorf("working out what Astro Runtime %s installs: %w", build, err)
+		return nil, nil, err
 	}
-	if computed != "" && os.MkdirAll(computed, freezeDirPerm) == nil {
-		_ = fsatomic.WriteFile(filepath.Join(computed, name), []byte(strings.Join(roots, "\n")+"\n"), freezeFilePerm) //nolint:errcheck // a cache that cannot be written is not a failure
+	if published, ok := publishedRoots(ctx, cacheDir(rootsCacheDir), name); ok {
+		return published, graph.Closures, nil
 	}
-	return roots, nil
+	return graph.Roots, graph.Closures, nil
+}
+
+// computedGraph is the rootGraph of build and python, from the cache, else
+// worked out from pins and kept.
+func computedGraph(ctx context.Context, build, python string, pins []string) (rootGraph, error) {
+	dir := cacheDir(rootsComputedDir)
+	path := filepath.Join(dir, freezeName(build, python)+".json")
+	var graph rootGraph
+	if dir != "" {
+		if data, err := os.ReadFile(path); err == nil && json.Unmarshal(data, &graph) == nil && len(graph.Roots) > 0 {
+			return graph, nil
+		}
+	}
+	graph, err := computeRoots(ctx, build, python, pins)
+	if err != nil {
+		return rootGraph{}, fmt.Errorf("working out what Astro Runtime %s installs: %w", build, err)
+	}
+	if data, err := json.Marshal(graph); err == nil && dir != "" && os.MkdirAll(dir, freezeDirPerm) == nil {
+		_ = fsatomic.WriteFile(path, data, freezeFilePerm) //nolint:errcheck // a cache that cannot be written is not a failure
+	}
+	return graph, nil
 }
 
 // publishedRoots is the published list for name, from the cache under dir or
@@ -199,37 +224,37 @@ func rootCandidate(dist string) bool {
 // The project sits in a directory made for this call alone, so two at once
 // never read each other's lockfile. uv reads the user's own configuration, so
 // a mirror they resolve through serves this too.
-func computeRoots(ctx context.Context, build, python string, pins []string) ([]string, error) {
+func computeRoots(ctx context.Context, build, python string, pins []string) (rootGraph, error) {
 	root := cacheDir("")
 	if root == "" {
-		return nil, errors.New("there is no cache directory to resolve in")
+		return rootGraph{}, errors.New("there is no cache directory to resolve in")
 	}
 	candidates, deps := rootsProjectDeps(pins)
 	if len(candidates) == 0 {
-		return nil, errors.New("its freeze lists no package to resolve")
+		return rootGraph{}, errors.New("its freeze lists no package to resolve")
 	}
 	parent := filepath.Join(root, rootsWorkDir)
 	if err := os.MkdirAll(parent, freezeDirPerm); err != nil {
-		return nil, err
+		return rootGraph{}, err
 	}
 	work, err := os.MkdirTemp(parent, build+"-python-"+python+"-")
 	if err != nil {
-		return nil, err
+		return rootGraph{}, err
 	}
 	defer func() { _ = os.RemoveAll(work) }() //nolint:errcheck // a scratch directory left behind is only disk
 	if err := os.WriteFile(filepath.Join(work, manifest.Marker), rootsPyproject(python, deps, pins), freezeFilePerm); err != nil {
-		return nil, err
+		return rootGraph{}, err
 	}
 	client, err := uv.New(ctx, uv.Options{CacheDir: filepath.Join(root, "uv")})
 	if err != nil {
-		return nil, err
+		return rootGraph{}, err
 	}
 	if err := client.Lock(ctx, work, uv.Stdio{}); err != nil {
-		return nil, err
+		return rootGraph{}, err
 	}
 	lock, err := os.ReadFile(filepath.Join(work, "uv.lock"))
 	if err != nil {
-		return nil, err
+		return rootGraph{}, err
 	}
 	return rootsFromLock(lock, candidates)
 }
@@ -293,24 +318,45 @@ type lockDependency struct {
 	Extra []string `toml:"extra"`
 }
 
-// rootsFromLock reads a scratch project's uv.lock and returns the candidates
-// no other package in it requires: through a dependency, or through an extra
-// a dependency names, which installs that extra's packages too. The scratch
-// project's own edges, to every candidate, are not counted.
-func rootsFromLock(data []byte, candidates []string) ([]string, error) {
+// rootsFromLock reads a scratch project's uv.lock: the candidates no other
+// package in it requires, through a dependency, or through an extra a
+// dependency names, which installs that extra's packages too; and what each
+// candidate pulls in, the same way, less Airflow and what it pulls in, which
+// the project installs anyway. The scratch project's own edges, to every
+// candidate, are not counted. The resolution is for Linux, the image's
+// platform, so a dependency only another platform needs is not in it.
+func rootsFromLock(data []byte, candidates []string) (rootGraph, error) {
 	var lock struct {
 		Package []lockPackage `toml:"package"`
 	}
 	if err := toml.Unmarshal(data, &lock); err != nil {
-		return nil, fmt.Errorf("reading the scratch project's uv.lock: %w", err)
+		return rootGraph{}, fmt.Errorf("reading the scratch project's uv.lock: %w", err)
 	}
-	optional := map[string]map[string][]lockDependency{}
+	packages := map[string]lockPackage{}
 	for _, p := range lock.Package {
-		optional[manifest.DistName(p.Name)] = p.Optional
+		packages[manifest.DistName(p.Name)] = p
 	}
-	required := map[string]bool{}
-	// An extra can name the package's own extras, so each is followed once.
-	followed := map[string]bool{}
+	// reach adds to into what deps pull in, following each extra once: an
+	// extra can name the package's own extras.
+	var reach func(deps []lockDependency, into map[string]bool, followed map[string]bool)
+	reach = func(deps []lockDependency, into map[string]bool, followed map[string]bool) {
+		for _, d := range deps {
+			name := manifest.DistName(d.Name)
+			if !into[name] {
+				into[name] = true
+				reach(packages[name].Dependencies, into, followed)
+			}
+			for _, extra := range d.Extra {
+				if key := name + "[" + extra + "]"; !followed[key] {
+					followed[key] = true
+					reach(packages[name].Optional[extra], into, followed)
+				}
+			}
+		}
+	}
+	// require marks what deps name directly, and through the extras they
+	// name, which install that extra's packages too.
+	required, followed := map[string]bool{}, map[string]bool{}
 	var require func(deps []lockDependency)
 	require = func(deps []lockDependency) {
 		for _, d := range deps {
@@ -319,7 +365,7 @@ func rootsFromLock(data []byte, candidates []string) ([]string, error) {
 			for _, extra := range d.Extra {
 				if key := name + "[" + extra + "]"; !followed[key] {
 					followed[key] = true
-					require(optional[name][extra])
+					require(packages[name].Optional[extra])
 				}
 			}
 		}
@@ -329,14 +375,35 @@ func rootsFromLock(data []byte, candidates []string) ([]string, error) {
 			require(p.Dependencies)
 		}
 	}
-	var roots []string
-	for _, c := range candidates {
-		if !required[c] {
-			roots = append(roots, c)
+	// What Airflow pulls in is installed whatever the group says, since the
+	// project lists Airflow: a root's closure is what it adds to that.
+	airflow := map[string]bool{}
+	for _, d := range runtimeversions.AirflowDists() {
+		if _, ok := packages[d]; ok {
+			airflow[d] = true
+			reach(packages[d].Dependencies, airflow, map[string]bool{})
 		}
 	}
-	if len(roots) == 0 {
-		return nil, errors.New("the resolution left no top-level package")
+	graph := rootGraph{Closures: map[string][]string{}}
+	for _, c := range candidates {
+		if required[c] {
+			continue
+		}
+		graph.Roots = append(graph.Roots, c)
+		into := map[string]bool{}
+		reach(packages[c].Dependencies, into, map[string]bool{})
+		delete(into, c)
+		closure := make([]string, 0, len(into))
+		for name := range into {
+			if !airflow[name] {
+				closure = append(closure, name)
+			}
+		}
+		slices.Sort(closure)
+		graph.Closures[c] = closure
 	}
-	return roots, nil
+	if len(graph.Roots) == 0 {
+		return rootGraph{}, errors.New("the resolution left no top-level package")
+	}
+	return graph, nil
 }

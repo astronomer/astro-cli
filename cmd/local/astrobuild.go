@@ -89,12 +89,13 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 }
 
 // reportGroupLeftOut says which of the image's packages the runtime group left
-// out for want of a wheel on the platforms a project runs on, when it left
-// any out.
+// out, and why: it, or a package it pulls in, would have to build from source
+// on a platform a project runs on. Docker mode still has them, and uv add
+// installs one where its build works.
 func (c *cli) reportGroupLeftOut(res astroBuildWrite) {
-	if len(res.groupLeftOut) > 0 {
-		fmt.Fprintf(c.d.Stderr, "%s: left out of %s, with no wheel for Linux or Apple silicon macOS on Python %s (Docker mode still has them): %s\n",
-			manifest.Marker, manifest.RuntimeGroupName, res.after.RuntimePython, strings.Join(res.groupLeftOut, ", "))
+	for _, l := range res.groupLeftOut {
+		fmt.Fprintf(c.d.Stderr, "%s: %s leaves out %s, which the runtime image has: %s on Python %s. Docker mode still has it; uv add %s installs it anyway\n",
+			manifest.Marker, manifest.RuntimeGroupName, l.Name, l.Why, res.after.RuntimePython, l.Name)
 	}
 }
 
@@ -148,7 +149,7 @@ type astroBuildWrite struct {
 	groupChanged    bool
 	groupAfter      []string
 	groupAfterBuild string
-	groupLeftOut    []string
+	groupLeftOut    []runtimecatalog.LeftOut
 }
 
 // runtimeImage is the build and Python scaffold.RuntimeBuildFor names for a

@@ -55,8 +55,9 @@ type pinsRun struct {
 	// roots and rootsErr answer the runtime group's list; with neither set
 	// there is no list to ask (Deps.RuntimeRoots nil), and the group is left
 	// alone.
-	roots, leftOut []string
-	rootsErr       error
+	roots    []string
+	leftOut  []runtimecatalog.LeftOut
+	rootsErr error
 }
 
 // pinsResult is what a pinsRun left: the manifest, what it printed, and what
