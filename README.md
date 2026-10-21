@@ -149,6 +149,18 @@ curl -sSL install.astronomer.io | bash -s -- v1.1.0
 
 As with the latest version, this installs into `~/.local/bin`. Use `| sudo bash -s -- v1.1.0` for a system-wide install into `/usr/local/bin`, or set `ASTRO_INSTALL_DIR` to choose the directory.
 
+The version can take any of these forms, with or without the leading `v`:
+
+- `v1.46.1` (or `1.46.1`) installs exactly that release. A pre-release such as `v1.47.0-rc.1` works the same way.
+- `v1.46` (or `1.46`) installs the highest 1.46.x release.
+- `v1` (or `1`) installs the highest 1.x release.
+
+A partial version takes the highest stable release, or the highest pre-release while there is no stable one. Among pre-releases the highest by semver wins, so a release candidate outranks nightlies; pass an exact tag to install a specific nightly. A release counts once its checksums are uploaded, and a release marked as a pre-release on GitHub counts as a pre-release even if its tag has no suffix. The installer checks at most the 5 highest tags in each tier, stable first and then pre-release. When it finds nothing to install, it stops and names the tags it tried. A stable tag that is still uploading never lets it fall back to a pre-release. For example, to install the newest 1.46 patch release:
+
+```sh
+curl -sSL install.astronomer.io | bash -s -- v1.46
+```
+
 Every release also publishes an `install.sh` asset. That copy installs the release it ships with and no other, so the URL itself names the version. Use it in a Dockerfile or a CI job, where a pinned URL is easier to audit than a flag:
 
 ```sh

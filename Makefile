@@ -21,6 +21,10 @@ build:
 test:
 	go test -count=1 -cover -coverprofile=coverage.txt -covermode=atomic ./... -test.v
 
+# Version resolution in godownloader.sh, against a stubbed GitHub API
+test-installer:
+	bash scripts/test-godownloader.sh
+
 temp-astro:
 	cd $(shell mktemp -d) && ${PWD}/astro dev init
 

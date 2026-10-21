@@ -69,6 +69,9 @@ jobs:
           HOUSTON_HOST: houston
         run: make test
 
+      - name: Test the installer's version resolution
+        run: make test-installer
+
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2
         continue-on-error: true
