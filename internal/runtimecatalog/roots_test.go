@@ -22,35 +22,42 @@ import (
 // call holds to wheels. It counts the calls, and keeps every package any call
 // held to wheels.
 type fakeUV struct {
-	calls  atomic.Int32
-	answer func(input []string, platform string, annotated bool, held []string) (string, error)
-	mu     sync.Mutex
-	held   []string
+	calls, clients atomic.Int32
+	answer         func(input []string, python, platform string, annotated bool, held []string) (string, error)
+	mu             sync.Mutex
+	held           []string
 }
 
 func (f *fakeUV) install(t *testing.T) {
 	t.Helper()
-	old := pipCompile
-	pipCompile = func(_ context.Context, _ string, input, args []string) (string, error) {
-		f.calls.Add(1)
-		platform, annotated := "", false
-		var held []string
-		for i, a := range args {
-			switch a {
-			case "--python-platform":
-				platform = args[i+1]
-			case "--annotation-style":
-				annotated = true
-			case "--only-binary":
-				held = append(held, args[i+1])
-			}
-		}
-		f.mu.Lock()
-		f.held = append(f.held, held...)
-		f.mu.Unlock()
-		return f.answer(input, platform, annotated, held)
+	old := newCompiler
+	newCompiler = func(context.Context) (compileFunc, error) {
+		f.clients.Add(1)
+		return f.compile, nil
 	}
-	t.Cleanup(func() { pipCompile = old })
+	t.Cleanup(func() { newCompiler = old })
+}
+
+func (f *fakeUV) compile(_ context.Context, _ string, input, args []string) (string, error) {
+	f.calls.Add(1)
+	python, platform, annotated := "", "", false
+	var held []string
+	for i, a := range args {
+		switch a {
+		case "--python-version":
+			python = args[i+1]
+		case "--python-platform":
+			platform = args[i+1]
+		case "--annotation-style":
+			annotated = true
+		case "--only-binary":
+			held = append(held, args[i+1])
+		}
+	}
+	f.mu.Lock()
+	f.held = append(f.held, held...)
+	f.mu.Unlock()
+	return f.answer(input, python, platform, annotated, held)
 }
 
 // noWheel is uv's answer when --only-binary leaves dist no wheel.
@@ -70,7 +77,7 @@ var freeze339 = []string{
 // only wheels are Windows' (native); linuxonly has none for macOS;
 // providers-google pulls in json-merge-patch, which publishes no wheel at all
 // (pure Python, built from source).
-func answers339(input []string, platform string, _ bool, held []string) (string, error) {
+func answers339(input []string, _, platform string, _ bool, held []string) (string, error) {
 	if slices.Contains(input, "apache-airflow") {
 		return "apache-airflow==3.3.2+astro.2\napache-airflow-core==3.3.2+astro.2\nlazy-object-proxy==1.10.0\n", nil
 	}
@@ -130,22 +137,24 @@ func TestRuntimeRootsListsEachForThePlatformsItInstallsOn(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"apache-airflow-providers-google", "apache-airflow-providers-mysql; " + darwinMarker, "linuxonly; " + linuxMarker, "statsd"}, got.Names)
 	assert.Equal(t, []LeftOut{{Name: "mysqlclient", Why: "it has no wheel on Linux x86_64, Linux aarch64, macOS arm64 (Python 3.14)"}}, got.LeftOut)
+	assert.Equal(t, int32(1), f.clients.Load(), "one uv client for the whole run")
 	assert.NotContains(t, f.held, "lazy-object-proxy", "what Airflow pulls in may build")
 	assert.Contains(t, f.held, "mysqlclient")
 
-	// Every answer is kept: a second call asks uv nothing.
+	// Every answer is kept: a second call asks uv nothing, nor makes a client.
 	before := f.calls.Load()
 	again, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
 	require.NoError(t, err)
 	assert.Equal(t, got, again)
 	assert.Equal(t, before, f.calls.Load())
+	assert.Equal(t, int32(1), f.clients.Load())
 }
 
 // The reason names the package a root pulls in when that is what has no
 // wheel.
 func TestRuntimeRootsSaysWhatARootPullsIn(t *testing.T) {
 	rootsServer(t, map[string]string{published339: "apache-airflow-providers-mysql\n"})
-	f := &fakeUV{answer: func(input []string, platform string, _ bool, _ []string) (string, error) {
+	f := &fakeUV{answer: func(input []string, _, platform string, _ bool, _ []string) (string, error) {
 		if slices.Contains(input, "apache-airflow") {
 			return "", nil
 		}
@@ -167,7 +176,7 @@ func TestRuntimeRootsSaysWhatARootPullsIn(t *testing.T) {
 // via-list names no other candidate and no Airflow distribution, kept.
 func TestRuntimeRootsWorksOutTheList(t *testing.T) {
 	rootsServer(t, map[string]string{})
-	f := &fakeUV{answer: func(input []string, platform string, annotated bool, held []string) (string, error) {
+	f := &fakeUV{answer: func(input []string, python, platform string, annotated bool, held []string) (string, error) {
 		if annotated {
 			return "apache-airflow==3.3.2+astro.2\n" +
 				"lazy-object-proxy==1.10.0    # via apache-airflow, -c constraints.txt\n" +
@@ -178,7 +187,7 @@ func TestRuntimeRootsWorksOutTheList(t *testing.T) {
 				"apache-airflow-providers-google==10.26.0  # via -c constraints.txt\n" +
 				"json-merge-patch==0.2        # via apache-airflow-providers-google, -c constraints.txt\n", nil
 		}
-		return answers339(input, platform, false, held)
+		return answers339(input, python, platform, false, held)
 	}}
 	f.install(t)
 	got, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
@@ -194,7 +203,7 @@ func TestRuntimeRootsWorksOutTheList(t *testing.T) {
 // an answer.
 func TestRuntimeRootsRemembersAFailure(t *testing.T) {
 	rootsServer(t, map[string]string{published339: "statsd\n"})
-	f := &fakeUV{answer: func([]string, string, bool, []string) (string, error) {
+	f := &fakeUV{answer: func([]string, string, string, bool, []string) (string, error) {
 		return "", errors.New("dial tcp: no route to host")
 	}}
 	f.install(t)
@@ -206,11 +215,21 @@ func TestRuntimeRootsRemembersAFailure(t *testing.T) {
 	assert.Equal(t, before, f.calls.Load())
 }
 
+// uv 0.11 names the package with no wheel in its hint, and in the solver's
+// own words, either of which is read.
+func TestMissingWheel(t *testing.T) {
+	both := "  × No solution found when resolving dependencies:\n  ╰─▶ Because mysqlclient==2.2.6 has no usable wheels and you require\n" +
+		"      hint: Wheels are required for \x60mysqlclient\x60 because building from source"
+	assert.Equal(t, "mysqlclient", missingWheel(both))
+	assert.Equal(t, "json-merge-patch", missingWheel("Because json-merge-patch==0.2 has no usable wheels and you require it"))
+	assert.Empty(t, missingWheel("Because you require foo>=2 and foo<2, we can conclude"))
+}
+
 // A canceled start is not a failure to remember.
 func TestRuntimeRootsDoesNotRememberACancelledStart(t *testing.T) {
 	rootsServer(t, map[string]string{published339: "statsd\n"})
 	ctx, cancel := context.WithCancel(context.Background())
-	f := &fakeUV{answer: func([]string, string, bool, []string) (string, error) { cancel(); return "", context.Canceled }}
+	f := &fakeUV{answer: func([]string, string, string, bool, []string) (string, error) { cancel(); return "", context.Canceled }}
 	f.install(t)
 	_, err := RuntimeRoots(ctx, "3.3-9", "3.14", freeze339)
 	require.Error(t, err)
@@ -229,4 +248,54 @@ func TestRootsCandidates(t *testing.T) {
 	})
 	assert.Equal(t, []string{"astronomer-providers", "pandas", "statsd"}, candidates)
 	assert.Equal(t, []string{"apache-airflow", "apache-airflow-task-sdk"}, airflow)
+}
+
+// checkAnswer is what the cache holds for name, of 3.3-9 on Python 3.14.
+func checkAnswer(t *testing.T, name string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", rootsChecksDir, "3.3-9-python-3.14", name))
+	require.NoError(t, err)
+	return string(data)
+}
+
+// A package with wheels for an older Python but none for the project's is
+// native, not built for this Python yet: the root that pulls it in stays out,
+// and that answer expires, since the wheel can come. One uv refuses for
+// another reason than a missing wheel is kept for an hour only; a missing
+// wheel, for good.
+func TestRuntimeRootsKeepsAnAnswerThatCanChangeForAWhile(t *testing.T) {
+	rootsServer(t, map[string]string{published339: "oldbuilt-user\nweird\nmysqlclient\n"})
+	f := &fakeUV{answer: func(input []string, python, platform string, _ bool, held []string) (string, error) {
+		switch {
+		case slices.Contains(input, "apache-airflow"):
+			return "", nil
+		case input[0] == "oldbuilt-user", input[0] == "oldbuilt" && python == "3.14":
+			return "", noWheel("oldbuilt")
+		case input[0] == "weird":
+			return "", &uv.ResolutionError{Stderr: "× No solution found: weird requires something else"}
+		}
+		return answers339(input, python, platform, false, held)
+	}}
+	f.install(t)
+	freeze := append(slices.Clone(freeze339), "oldbuilt-user==1.0", "oldbuilt==1.0", "weird==1.0")
+	got, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze)
+	require.NoError(t, err)
+	assert.Empty(t, got.Names)
+	assert.Contains(t, checkAnswer(t, "oldbuilt-user@aarch64-apple-darwin"), "expires ")
+	assert.Contains(t, checkAnswer(t, "source-only@oldbuilt"), "later\nexpires ")
+	assert.Contains(t, checkAnswer(t, "weird@aarch64-apple-darwin"), "expires ")
+	assert.NotContains(t, checkAnswer(t, "mysqlclient@aarch64-apple-darwin"), "expires ")
+}
+
+// The budget running out while the caller still waits is a failure to
+// remember, as the network failing is: a blackholed network costs one wait an
+// hour.
+func TestRuntimeRootsRemembersARunOutBudget(t *testing.T) {
+	rootsServer(t, map[string]string{published339: "statsd\n"})
+	f := &fakeUV{answer: func([]string, string, string, bool, []string) (string, error) { return "", context.DeadlineExceeded }}
+	f.install(t)
+	_, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
+	require.Error(t, err)
+	_, err = os.Stat(filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", rootsFailedDir, "runtime-3.3-9-python-3.14.txt"))
+	assert.NoError(t, err)
 }

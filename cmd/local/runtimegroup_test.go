@@ -1,6 +1,7 @@
 package local
 
 import (
+	"bytes"
 	"errors"
 	"slices"
 	"strings"
@@ -42,6 +43,25 @@ func TestStartWritesTheRuntimeGroup(t *testing.T) {
 	again := pinsRun{src: r.manifest, build: build332, freeze: freeze339, roots: roots339}.start(t)
 	if again.manifest != r.manifest || strings.Contains(again.out, "astro-runtime now installs") {
 		t.Errorf("a second start with the same build changed the group:\n%s", again.out)
+	}
+}
+
+// What the group left out is said only of a group that was written: not of
+// one refused, or a write that failed.
+func TestTheLeftOutNoteNeedsTheGroupWritten(t *testing.T) {
+	d, _ := testDeps(t)
+	stderr := &bytes.Buffer{}
+	d.Stderr = stderr
+	c := &cli{d: d}
+	res := astroBuildWrite{groupLeftOut: []runtimecatalog.LeftOut{{Name: "mysqlclient", Why: "it has no wheel"}}}
+	c.reportGroupLeftOut(res)
+	if stderr.Len() != 0 {
+		t.Errorf("a group not written was reported:\n%s", stderr)
+	}
+	res.groupWritten = true
+	c.reportGroupLeftOut(res)
+	if !strings.Contains(stderr.String(), "astro-runtime leaves out mysqlclient") {
+		t.Errorf("a written group's left-out package was not reported:\n%s", stderr)
 	}
 }
 

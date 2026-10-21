@@ -56,18 +56,24 @@ import (
 // can point it at a local server.
 var rootsBaseURL = "https://cdn.astronomer.io/runtime-roots"
 
-// pipCompile runs `uv pip compile` (uv.Client.PipCompileOut) from dir. A
-// variable so a test answers without uv.
-var pipCompile = func(ctx context.Context, dir string, input, args []string) (string, error) {
+// compileFunc runs `uv pip compile` from dir: input on stdin, args after it.
+type compileFunc func(ctx context.Context, dir string, input, args []string) (string, error)
+
+// newCompiler makes the compileFunc one RuntimeRoots uses for all its runs: one
+// uv client (uv.Client.PipCompileOut), with the macOS target every resolve for
+// Apple silicon needs. A variable so a test answers without uv.
+var newCompiler = func(ctx context.Context) (compileFunc, error) {
 	root := cacheDir("")
 	if root == "" {
-		return "", errors.New("there is no cache directory for uv")
+		return nil, errors.New("there is no cache directory for uv")
 	}
 	client, err := uv.New(ctx, uv.Options{CacheDir: filepath.Join(root, "uv")})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return client.PipCompileOut(ctx, dir, input, args, []string{macOSTarget})
+	return func(ctx context.Context, dir string, input, args []string) (string, error) {
+		return client.PipCompileOut(ctx, dir, input, args, []string{macOSTarget})
+	}, nil
 }
 
 const (
@@ -126,9 +132,9 @@ type LeftOut struct {
 // package list RuntimePins read for the build.
 //
 // A list that could not be had is an error. A failure of the whole
-// computation (not a canceled or timed-out ctx) is remembered for
-// rootsFailedTTL, so a start that cannot reach the network waits once, not
-// every time.
+// computation, rootsBudget running out included, is remembered for
+// rootsFailedTTL, so a start that cannot reach the network waits once an hour,
+// not every time; only the caller's own ctx ending is not.
 func RuntimeRoots(ctx context.Context, build, python string, freeze []string) (Roots, error) {
 	if !freezeNamePart.MatchString(build) || !freezeNamePart.MatchString(python) {
 		return Roots{}, fmt.Errorf("%w: build %q, Python %q", ErrFreezeNotPublished, build, python)
@@ -150,7 +156,7 @@ func RuntimeRoots(ctx context.Context, build, python string, freeze []string) (R
 		if failed != "" {
 			_ = os.Remove(filepath.Join(failed, name)) //nolint:errcheck // a stale note expires on its own
 		}
-	case ctx.Err() == nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) && failed != "" && os.MkdirAll(failed, freezeDirPerm) == nil:
+	case ctx.Err() == nil && failed != "" && os.MkdirAll(failed, freezeDirPerm) == nil:
 		_ = fsatomic.WriteFile(filepath.Join(failed, name), []byte(err.Error()+"\n"), freezeFilePerm) //nolint:errcheck // a note that cannot be written only means trying again sooner
 	}
 	return out, err
@@ -173,7 +179,12 @@ func runtimeRoots(ctx context.Context, build, python string, freeze []string) (R
 	if err := os.WriteFile(filepath.Join(work, "constraints.txt"), []byte(strings.Join(freeze, "\n")+"\n"), freezeFilePerm); err != nil {
 		return Roots{}, err
 	}
-	r := rootsRun{work: work, python: python, key: build + "-python-" + python, freeze: freeze}
+	var compiler compileFunc
+	var compilerErr error
+	r := rootsRun{
+		work: work, python: python, key: build + "-python-" + python, freeze: freeze,
+		once: &sync.Once{}, compiler: &compiler, compilerErr: &compilerErr,
+	}
 	roots, err := r.roots(ctx, freezeName(build, python))
 	if err != nil {
 		return Roots{}, fmt.Errorf("working out what Astro Runtime %s installs: %w", build, err)
@@ -182,10 +193,23 @@ func runtimeRoots(ctx context.Context, build, python string, freeze []string) (R
 }
 
 // rootsRun is one RuntimeRoots: its work directory, the Python, the cache key
-// of its build and Python, and the build's freeze.
+// of its build and Python, the build's freeze for that Python, and its uv,
+// made the first time an answer is not kept already.
 type rootsRun struct {
 	work, python, key string
 	freeze            []string
+	once              *sync.Once
+	compiler          *compileFunc
+	compilerErr       *error
+}
+
+// compile runs `uv pip compile` through the run's one uv client.
+func (r rootsRun) compile(ctx context.Context, input, args []string) (string, error) {
+	r.once.Do(func() { *r.compiler, *r.compilerErr = newCompiler(ctx) })
+	if *r.compilerErr != nil {
+		return "", *r.compilerErr
+	}
+	return (*r.compiler)(ctx, r.work, input, args)
 }
 
 // args are what every `uv pip compile` of r takes: the Python, the freeze as
@@ -211,7 +235,7 @@ func (r rootsRun) roots(ctx context.Context, name string) ([]string, error) {
 	if len(candidates) == 0 {
 		return nil, errors.New("its freeze lists no package to resolve")
 	}
-	out, err := pipCompile(ctx, r.work, slices.Concat(candidates, airflow),
+	out, err := r.compile(ctx, slices.Concat(candidates, airflow),
 		append(r.args(rootsPlatforms[0].uv), "--annotation-style", "line"))
 	if err != nil {
 		return nil, err
@@ -397,7 +421,7 @@ func (r rootsRun) airflowPulls(ctx context.Context, platform string) ([]string, 
 	if len(airflow) == 0 {
 		return nil, nil
 	}
-	out, err := pipCompile(ctx, r.work, airflow, r.args(platform))
+	out, err := r.compile(ctx, airflow, r.args(platform))
 	if err != nil {
 		return nil, fmt.Errorf("resolving Airflow for %s: %w", platform, err)
 	}
@@ -407,33 +431,52 @@ func (r rootsRun) airflowPulls(ctx context.Context, platform string) ([]string, 
 			names = append(names, name)
 		}
 	}
-	keep(path, strings.Join(names, "\n"))
+	keep(path, strings.Join(names, " "), 0)
 	return names, nil
 }
 
-// wheelsRequiredRe reads the package uv names when --only-binary leaves it no
-// wheel to install.
-// The backtick uv puts around the name is \x60 here.
-var wheelsRequiredRe = regexp.MustCompile(`Wheels are required for \x60([^\x60]+)\x60`)
+// missingWheelRes read the package uv names when --only-binary leaves it no
+// wheel to install, as uv 0.11 says it: its hint, "Wheels are required for
+// `X` because building from source is disabled", and the solver's own "X==v
+// has no usable wheels" should the hint's wording change. The backtick uv puts
+// around the name is \x60 here.
+var missingWheelRes = []*regexp.Regexp{
+	regexp.MustCompile(`Wheels are required for \x60([^\x60]+)\x60`),
+	regexp.MustCompile(`([A-Za-z0-9][A-Za-z0-9._-]*)==\S+ has no usable wheels`),
+}
+
+// missingWheel is the package uv's stderr names for want of a wheel, or "".
+func missingWheel(stderr string) string {
+	for _, re := range missingWheelRes {
+		if m := re.FindStringSubmatch(stderr); m != nil {
+			return m[1]
+		}
+	}
+	return ""
+}
 
 // installsFromWheels reports whether uv installs root on platform, with all it
 // pulls in, from wheels alone, where exempt (what Airflow pulls in) may build:
 // every other package of the freeze is held to wheels. why is uv's reason
-// when it does not. An answer, either way, is kept; a failure to ask is an
-// error.
+// when it does not. A failure to ask is an error.
 //
 // A package uv names for want of a wheel that publishes none at all, for any
-// platform (sourceOnly), is taken for pure Python, which builds anywhere: it
-// is let build, and the root asked again, up to rootsRetries times. One that
-// has wheels somewhere (mysqlclient's are Windows') is native, and the root
-// stays out.
+// Python or platform (sourceOnly), is taken for pure Python, which builds
+// anywhere: it is let build, and the root asked again, up to rootsRetries
+// times. One that has wheels somewhere (mysqlclient's are Windows') is native,
+// and the root stays out.
+//
+// The answer is kept for good when it cannot change: it installs, or uv says
+// a wheel it needs does not exist. A wheel that exists for an older Python but
+// not this one may yet be built, so that answer is kept for wheelsLaterTTL;
+// any other no answer from uv, for answerTTL.
 func (r rootsRun) installsFromWheels(ctx context.Context, root, platform string, exempt []string) (ok bool, why string, err error) {
 	path := r.checkPath(root + "@" + platform)
-	if data, err := readAnswer(path); err == nil {
-		answer := strings.TrimSpace(string(data))
+	if answer, err := readAnswer(path); err == nil {
 		return answer == "ok", strings.TrimPrefix(answer, "no: "), nil
 	}
 	builds := slices.Clone(exempt)
+	ttl := time.Duration(0)
 	for range rootsRetries {
 		args := r.args(platform)
 		for _, pin := range r.freeze {
@@ -441,69 +484,94 @@ func (r rootsRun) installsFromWheels(ctx context.Context, root, platform string,
 				args = append(args, "--only-binary", name)
 			}
 		}
-		_, err = pipCompile(ctx, r.work, []string{root}, args)
+		_, err = r.compile(ctx, []string{root}, args)
 		var resolution *uv.ResolutionError
 		switch {
 		case err == nil:
-			keep(path, "ok")
+			keep(path, "ok", 0)
 			return true, "", nil
 		case !errors.As(err, &resolution):
 			return false, "", err
 		}
-		m := wheelsRequiredRe.FindStringSubmatch(resolution.Stderr)
-		if m == nil {
-			why = "uv cannot install it from wheels"
+		missing := missingWheel(resolution.Stderr)
+		if missing == "" {
+			why, ttl = "uv cannot install it from wheels", answerTTL
 			break
 		}
-		named := manifest.DistName(m[1])
+		named := manifest.DistName(missing)
 		if named == root {
 			why = "it has no wheel"
 		} else {
 			why = "it pulls in " + named + ", which has no wheel"
 		}
-		source, err := r.sourceOnly(ctx, named)
+		source, later, err := r.sourceOnly(ctx, named)
 		if err != nil {
 			return false, "", err
+		}
+		if later {
+			ttl = wheelsLaterTTL
 		}
 		if !source || slices.Contains(builds, named) {
 			break
 		}
 		builds = append(builds, named)
 	}
-	keep(path, "no: "+why)
+	keep(path, "no: "+why, ttl)
 	return false, why, nil
 }
 
-// rootsRetries bounds the packages installsFromWheels lets build for one root
-// on one platform.
-const rootsRetries = 5
+const (
+	// rootsRetries bounds the packages installsFromWheels lets build for one
+	// root on one platform.
+	rootsRetries = 5
+	// answerTTL keeps a no answer uv gave for another reason than a missing
+	// wheel; wheelsLaterTTL one for a wheel only older Pythons have.
+	answerTTL      = time.Hour
+	wheelsLaterTTL = 7 * 24 * time.Hour
+)
 
 // sourcePlatforms are where sourceOnly looks for a wheel: every platform a
 // project locks for, and Windows, where native packages with no wheel for
 // Linux or macOS (mysqlclient) still publish one.
 var sourcePlatforms = []string{"x86_64-pc-windows-msvc", "x86_64-manylinux_2_28", "aarch64-apple-darwin"}
 
+// sourcePythons are the Pythons sourceOnly asks about besides the project's:
+// a native package publishes wheels for the Pythons it has been built for,
+// which a new Python is not yet among.
+var sourcePythons = []string{"3.12", "3.11"}
+
 // sourceOnly reports whether dist, at the freeze's version, publishes no wheel
-// for any of sourcePlatforms: uv installs it from wheels on none of them.
-// Kept, as the answers are.
-func (r rootsRun) sourceOnly(ctx context.Context, dist string) (bool, error) {
+// at all: uv installs it from wheels on none of sourcePlatforms, for the
+// project's Python or any of sourcePythons. later reports one with wheels for
+// another Python only, not this one: native, and not built for this Python
+// yet, which can change. Kept, the first for good and the second for
+// wheelsLaterTTL.
+func (r rootsRun) sourceOnly(ctx context.Context, dist string) (source, later bool, err error) {
 	path := r.checkPath("source-only@" + dist)
-	if data, err := readAnswer(path); err == nil {
-		return strings.TrimSpace(string(data)) == "yes", nil
+	if answer, err := readAnswer(path); err == nil {
+		return answer == "yes", answer == "later", nil
 	}
-	for _, platform := range sourcePlatforms {
-		_, err := pipCompile(ctx, r.work, []string{dist}, append(r.args(platform), "--only-binary", dist))
-		var resolution *uv.ResolutionError
-		switch {
-		case err == nil:
-			keep(path, "no")
-			return false, nil
-		case !errors.As(err, &resolution):
-			return false, err
+	pythons := slices.Compact(append([]string{r.python}, sourcePythons...))
+	for _, python := range pythons {
+		for _, platform := range sourcePlatforms {
+			args := append(r.args(platform), "--only-binary", dist)
+			args[1] = python
+			_, err := r.compile(ctx, []string{dist}, args)
+			var resolution *uv.ResolutionError
+			switch {
+			case err == nil && python == r.python:
+				keep(path, "no", 0)
+				return false, false, nil
+			case err == nil:
+				keep(path, "later", wheelsLaterTTL)
+				return false, true, nil
+			case !errors.As(err, &resolution):
+				return false, false, err
+			}
 		}
 	}
-	keep(path, "yes")
-	return true, nil
+	keep(path, "yes", 0)
+	return true, false, nil
 }
 
 // checkPath is where an answer of r named name is kept, "" for no cache.
@@ -515,18 +583,35 @@ func (r rootsRun) checkPath(name string) string {
 	return filepath.Join(dir, r.key, name)
 }
 
-// readAnswer reads a kept answer; with no cache (path "") there is none.
-func readAnswer(path string) ([]byte, error) {
+// readAnswer reads a kept answer, unless it has expired; with no cache (path
+// "") there is none.
+func readAnswer(path string) (string, error) {
 	if path == "" {
-		return nil, os.ErrNotExist
+		return "", os.ErrNotExist
 	}
-	return os.ReadFile(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	answer, expires, _ := strings.Cut(strings.TrimSpace(string(data)), "\nexpires ")
+	if expires != "" {
+		at, err := time.Parse(time.RFC3339, strings.TrimSpace(expires))
+		if err != nil || time.Now().After(at) {
+			return "", os.ErrNotExist
+		}
+	}
+	return answer, nil
 }
 
-// keep writes an answer to path, atomically, unless there is no cache. A
-// cache that cannot be written is not a failure.
-func keep(path, answer string) {
-	if path != "" && os.MkdirAll(filepath.Dir(path), freezeDirPerm) == nil {
-		_ = fsatomic.WriteFile(path, []byte(answer+"\n"), freezeFilePerm) //nolint:errcheck // see above
+// keep writes an answer to path, atomically, unless there is no cache: for
+// good, or for ttl when it is not 0. A cache that cannot be written is not a
+// failure.
+func keep(path, answer string, ttl time.Duration) {
+	if path == "" || os.MkdirAll(filepath.Dir(path), freezeDirPerm) != nil {
+		return
 	}
+	if ttl > 0 {
+		answer += "\nexpires " + time.Now().Add(ttl).UTC().Format(time.RFC3339)
+	}
+	_ = fsatomic.WriteFile(path, []byte(answer+"\n"), freezeFilePerm) //nolint:errcheck // see above
 }
