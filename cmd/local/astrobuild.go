@@ -73,10 +73,7 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 		if n := len(res.groupAfter); n > 0 {
 			fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s now installs the %d packages Astro Runtime %s installs\n",
 				manifest.Marker, manifest.RuntimeGroupName, n, res.groupAfterBuild)
-			if len(res.groupLeftOut) > 0 {
-				fmt.Fprintf(c.d.Stderr, "%s: left out of %s, with no wheel for Linux or Apple silicon macOS on Python %s (Docker mode still has them): %s\n",
-					manifest.Marker, manifest.RuntimeGroupName, res.after.RuntimePython, strings.Join(res.groupLeftOut, ", "))
-			}
+			c.reportGroupLeftOut(res)
 		} else {
 			fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s is gone: there is no runtime image to match\n", manifest.Marker, manifest.RuntimeGroupName)
 		}
@@ -88,6 +85,16 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 		} else {
 			fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer holds packages to an Astro Runtime's versions\n", manifest.Marker)
 		}
+	}
+}
+
+// reportGroupLeftOut says which of the image's packages the runtime group left
+// out for want of a wheel on the platforms a project runs on, when it left
+// any out.
+func (c *cli) reportGroupLeftOut(res astroBuildWrite) {
+	if len(res.groupLeftOut) > 0 {
+		fmt.Fprintf(c.d.Stderr, "%s: left out of %s, with no wheel for Linux or Apple silicon macOS on Python %s (Docker mode still has them): %s\n",
+			manifest.Marker, manifest.RuntimeGroupName, res.after.RuntimePython, strings.Join(res.groupLeftOut, ", "))
 	}
 }
 
