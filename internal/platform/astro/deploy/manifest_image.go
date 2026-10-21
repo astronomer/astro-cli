@@ -480,7 +480,7 @@ func (o offeredReleases) BuildsFor(pin string) []string {
 	}
 	var out []string
 	for i := range o {
-		if offeredAsBase(o[i]) && runtimeversions.PinCovers(pin, o[i].AirflowVersion) {
+		if offeredAsBase(&o[i]) && runtimeversions.PinCovers(pin, o[i].AirflowVersion) {
 			out = append(out, o[i].Version)
 		}
 	}
@@ -497,7 +497,7 @@ func (o offeredReleases) NewestFor(pin string) string {
 }
 
 // offeredAsBase reports a release on the stable or deprecated channel.
-func offeredAsBase(r astrov1.RuntimeRelease) bool {
+func offeredAsBase(r *astrov1.RuntimeRelease) bool {
 	return r.Channel == "" || r.Channel == "stable" || r.Channel == "deprecated"
 }
 
@@ -506,9 +506,12 @@ func offeredAsBase(r astrov1.RuntimeRelease) bool {
 // the user's to opt into by [tool.astro] runtime, and a lock made for one does
 // not opt in.
 func (o offeredReleases) Offers(build string) bool {
-	return slices.ContainsFunc(o, func(r astrov1.RuntimeRelease) bool {
-		return r.Version == build && offeredAsBase(r)
-	})
+	for i := range o {
+		if o[i].Version == build && offeredAsBase(&o[i]) {
+			return true
+		}
+	}
+	return false
 }
 
 // astroBase resolves a generated build's runtime base for an Astro deploy:
