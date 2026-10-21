@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
-	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
@@ -225,48 +224,6 @@ func TestStartWritesNoRuntimePinsOfAnotherRelease(t *testing.T) {
 	}
 	if !strings.Contains(r.out, "carries Airflow 3.3.1, and the Airflow requirement holds it to 3.3.2") {
 		t.Errorf("the start did not say why:\n%s", r.out)
-	}
-}
-
-// The check's hint guesses where the pins do not: a FROM built from an
-// argument, or a runtime the catalog does not list, asks about the pin's
-// newest build.
-func TestRuntimeImageOfFallsBackToThePinsNewestBuild(t *testing.T) {
-	c, err := runtimeversions.Parse([]byte(pinsCatalog))
-	if err != nil {
-		t.Fatal(err)
-	}
-	cli := &cli{d: Deps{RuntimeCatalog: func(context.Context) *runtimeversions.Catalog { return c }}}
-	for name, src := range map[string]string{
-		"ARG FROM":         strings.Replace(buildManifest, "[tool.astro]\n", "[tool.astro]\ndockerfile = 'Dockerfile'\n", 1),
-		"unlisted runtime": strings.Replace(buildManifest, "[tool.astro]\n", "[tool.astro]\nruntime = '3.3-99'\n", 1),
-	} {
-		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("ARG BASE\nFROM ${BASE}\n"), 0o600); err != nil {
-				t.Fatal(err)
-			}
-			m, err := manifest.Parse([]byte(src))
-			if err != nil {
-				t.Fatal(err)
-			}
-			build, pythons := cli.runtimeImageOf(context.Background(), dir, m)
-			if build != "3.3-9" || len(pythons) == 0 || pythons[0] != "3.12" {
-				t.Errorf("runtimeImageOf = %q, %v; want the pin's newest build, 3.3-9 on 3.12", build, pythons)
-			}
-		})
-	}
-	// The fallback's Python follows requires-python as a generated image's
-	// does, and the build's default comes next.
-	src := strings.Replace(buildManifest, "requires-python = '>=3.12'", "requires-python = '>=3.13'", 1)
-	src = strings.Replace(src, "[tool.astro]\n", "[tool.astro]\nruntime = '3.3-99'\n", 1)
-	m, err := manifest.Parse([]byte(src))
-	if err != nil {
-		t.Fatal(err)
-	}
-	build, pythons := cli.runtimeImageOf(context.Background(), t.TempDir(), m)
-	if build != "3.3-9" || len(pythons) < 2 || pythons[0] != "3.13" || pythons[1] != "3.12" {
-		t.Errorf("runtimeImageOf = %q, %v; want 3.3-9 on 3.13, then its default 3.12", build, pythons)
 	}
 }
 

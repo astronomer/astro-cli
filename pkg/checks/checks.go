@@ -163,11 +163,6 @@ type Finding struct {
 	Key     string `json:"key,omitempty"`
 	// Message carries an import error's text.
 	Message string `json:"message,omitempty"`
-	// Hint is what to do about the finding, when the caller knows more than
-	// the parse did: an import error for a package the runtime image ships but
-	// the project does not depend on gets the `uv add` that fixes it. This
-	// package never sets it.
-	Hint string `json:"hint,omitempty"`
 	// ParseSeconds and ThresholdSeconds describe a slow-parse finding.
 	ParseSeconds     float64 `json:"parse_time_seconds,omitempty"`
 	ThresholdSeconds float64 `json:"threshold_seconds,omitempty"`

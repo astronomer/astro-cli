@@ -2,8 +2,6 @@ package scaffold
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -108,26 +106,10 @@ var (
 	uvDevDepsKey        = []string{"tool", "uv", "dev-dependencies"}
 )
 
-// ListedPackages are the distributions the project in dir lists to install,
+// listedPackages are the distributions the project lists to install,
 // normalized (manifest.DistName): [project] dependencies,
 // [project.optional-dependencies], [dependency-groups] and the [tool.uv]
-// dev-dependencies older uv wrote. The manifest carries only the first, so
-// the file is read here; one rule for the runtime pins, which leave these to
-// the project, and for `astro local check`'s hint, which does not ask the
-// project to add one of them.
-func ListedPackages(dir string) (map[string]bool, error) {
-	data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
-	if err != nil {
-		return nil, err
-	}
-	ed, err := tomledit.NewSurgical(data)
-	if err != nil {
-		return nil, err
-	}
-	return listedPackages(ed), nil
-}
-
-// listedPackages is ListedPackages for a document already open.
+// dev-dependencies older uv wrote.
 func listedPackages(ed tomledit.Editor) map[string]bool {
 	listed := map[string]bool{}
 	addAll := func(list []any) {
@@ -224,8 +206,7 @@ var errRuntimeUnknown = errors.New("which Astro Runtime this project builds on c
 // ErrNoRuntimeBuild means the project has no build; any other error means it
 // cannot be told, as without a catalog (c nil) and no build named. One
 // answer for every caller that asks which image a project builds on: the
-// runtime pins, and `astro local check`'s hint about a package the image
-// ships.
+// runtime pins, and the Airflow lookup a declared Dockerfile's build names.
 func RuntimeBuildFor(dir string, m *manifest.Manifest, c *runtimeversions.Catalog) (build, python string, err error) {
 	if path := dockerfilePath(dir, m); path != "" {
 		return dockerfileRuntimeBuild(airflowrt.ReadDeclaredBase(path), c)
