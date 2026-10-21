@@ -410,7 +410,7 @@ func (r *rootsRun) withPlatforms(ctx context.Context, roots []string) (Roots, er
 func (r *rootsRun) airflowPulls(ctx context.Context, platform string) ([]string, error) {
 	path := r.checkPath("airflow@" + platform)
 	if data, err := readAnswer(path); err == nil {
-		return strings.Fields(string(data)), nil
+		return strings.Fields(data), nil
 	}
 	_, airflow := rootsCandidates(r.freeze)
 	if len(airflow) == 0 {
