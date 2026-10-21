@@ -19,6 +19,9 @@ var helperContentAtVersion = map[int]string{
 	2: "e2c1f44df4ed6b3cc93e73e45473fc4b9549322b876962fe29fa62f9e36846a7",
 	// The image's Airflow checked against uv.lock's, by release.
 	3: "68adef753228f7ebe8682da4cdd11cee59875517ac55071c59ebd7d6f6243630",
+	// The astro-runtime dependency group does not count as the project naming
+	// a base image package.
+	5: "f6f03bde50e3785cfa0c7bb8db5c86c9e51b6ae597b04b9bd90d4fa1aca6caaa",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {

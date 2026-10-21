@@ -1,5 +1,5 @@
 # Written by the Astro CLI. Do not edit: `astro init` replaces this file.
-# astro-install-helper: 3
+# astro-install-helper: 5
 #
 # Turns the project's pyproject.toml, and its uv.lock when there is one, into
 # the files the Astro Runtime image's install steps read: requirements.txt,
@@ -69,6 +69,10 @@ TASK_SDK = "apache-airflow-task-sdk"
 AIRFLOW_DISTS = (AIRFLOW, AIRFLOW_CORE, TASK_SDK)
 
 GIT_PACKAGE = "git"
+
+# The [dependency-groups] group astro writes with the runtime image's own
+# packages, normalized as PEP 735 group names compare.
+RUNTIME_GROUP = "astro-runtime"
 
 
 def warn(msg):
@@ -280,12 +284,16 @@ class Manifest:
         self.stated = strings(project.get("dependencies"))
         # Every distribution the project names itself, in its dependencies,
         # its optional dependencies or a dependency group: the ones the lock
-        # may move off the base image's versions.
+        # may move off the base image's versions. The astro-runtime group is
+        # not the project's naming: astro writes it, listing what the image
+        # ships so a local environment has it too, and those stay as the
+        # image has them.
         named = list(self.stated)
         for extra in (project.get("optional-dependencies") or {}).values():
             named += strings(extra)
-        for group in (pyproject.get("dependency-groups") or {}).values():
-            named += strings(group)
+        for group, entries in (pyproject.get("dependency-groups") or {}).items():
+            if norm(group) != RUNTIME_GROUP:
+                named += strings(entries)
         self.named = {dist_name(d) for d in named}
         self.constraint_dependencies = strings(uv.get("constraint-dependencies"))
         self.override_dependencies = strings(uv.get("override-dependencies"))

@@ -693,6 +693,25 @@ func TestInstallHelperLeavesTheBaseImagesPackages(t *testing.T) {
 	}
 }
 
+// The astro-runtime dependency group is astro's, listing what the image ships
+// so a local environment has it too: a base package named only there is not
+// the project's naming, and stays at the base image's version. The same
+// package in a group of the project's own is the project's, and is pinned.
+// The group name compares as PEP 735 normalizes it.
+func TestInstallHelperDoesNotCountTheRuntimeGroupAsNaming(t *testing.T) {
+	for _, group := range []string{"astro-runtime", "Astro_Runtime"} {
+		t.Run(group, func(t *testing.T) {
+			pyproject, lock := lockProject([]string{"requests"}, lockEntry("requests", "2.33.0")+
+				lockEntry("pandas", "2.2.3")+lockEntry("pytest", "8.4.2"))
+			pyproject += "\n[dependency-groups]\n" + group + " = ['pandas', 'pytest']\ndev = ['pytest']\n"
+			out := runHelper(t, helperProject(t, pyproject, lock),
+				helperRun{env: []string{"ASTRO_INSTALL_PROJECT_BASE_INSTALLED=pandas,pytest,requests"}})
+			assert.Equal(t, "# Generated from uv.lock by .astro/install-project.py.\npytest==8.4.2\nrequests==2.33.0\n", out.constraints,
+				"pandas is named only in the runtime group, so it stays the base's; pytest is in dev too, and requests is a dependency")
+		})
+	}
+}
+
 // A project that keeps its files read-only ships them read-only into the
 // context, and the build still writes its own install inputs over them.
 func TestBuildReplacesReadOnlyProjectFiles(t *testing.T) {
