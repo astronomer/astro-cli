@@ -47,13 +47,18 @@ type pinsRun struct {
 	freeze               []string
 	// noCatalog has the runtime catalog unreadable.
 	noCatalog bool
+	// roots and rootsErr answer the runtime group's list; with neither set
+	// there is no list to ask (Deps.RuntimeRoots nil), and the group is left
+	// alone.
+	roots    []string
+	rootsErr error
 }
 
 // pinsResult is what a pinsRun left: the manifest, what it printed, and what
 // the build lookup and the package list were asked.
 type pinsResult struct {
-	manifest, out            string
-	lookupAsked, freezeAsked []string
+	manifest, out                        string
+	lookupAsked, freezeAsked, rootsAsked []string
 }
 
 func (p pinsRun) start(t *testing.T) pinsResult {
@@ -90,6 +95,12 @@ func (p pinsRun) start(t *testing.T) pinsResult {
 	d.RuntimePins = func(_ context.Context, build, python string) ([]string, error) {
 		res.freezeAsked = append(res.freezeAsked, build, python)
 		return p.freeze, p.freezeErr
+	}
+	if p.roots != nil || p.rootsErr != nil {
+		d.RuntimeRoots = func(_ context.Context, build, python string) ([]string, error) {
+			res.rootsAsked = append(res.rootsAsked, build, python)
+			return p.roots, p.rootsErr
+		}
 	}
 	_ = execute(t, d, "local", "start")
 	data, err := os.ReadFile(path)

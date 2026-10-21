@@ -108,8 +108,9 @@ var (
 
 // listedPackages are the distributions the project lists to install,
 // normalized (manifest.DistName): [project] dependencies,
-// [project.optional-dependencies], [dependency-groups] and the [tool.uv]
-// dev-dependencies older uv wrote.
+// [project.optional-dependencies], [dependency-groups] but the astro-runtime
+// group astro writes (RuntimeGroup), and the [tool.uv] dev-dependencies older
+// uv wrote.
 func listedPackages(ed tomledit.Editor) map[string]bool {
 	listed := map[string]bool{}
 	addAll := func(list []any) {
@@ -129,7 +130,13 @@ func listedPackages(ed tomledit.Editor) map[string]bool {
 	for _, key := range [][]string{optionalDepsKey, dependencyGroupsKey} {
 		tables, _ := ed.Get(key)
 		groups, _ := tables.(map[string]any)
-		for _, group := range groups {
+		for name, group := range groups {
+			// The runtime group is astro's list of what the image has, not the
+			// project's: counted, it would take every runtime pin out of its
+			// own packages.
+			if slices.Equal(key, dependencyGroupsKey) && name == manifest.RuntimeGroupName {
+				continue
+			}
 			list, _ := group.([]any)
 			addAll(list)
 		}
@@ -155,12 +162,16 @@ func ownPackages(ed tomledit.Editor, constraints []any) map[string]bool {
 }
 
 // PruneRuntimePins takes out of the runtime pins in the manifest in dir any
-// package the project now names itself (ownPackages), and changes nothing
-// else. It needs no lookup, so it runs when the build cannot be looked up
-// too: after `uv add --frozen 'pandas>=3'`, a start with Astronomer's index
-// out of reach must still let pandas go, or uv has nothing to lock.
+// package the project now names itself (ownPackages), and out of the
+// astro-runtime group any it now lists, and changes nothing else. It needs no
+// lookup, so it runs when the build cannot be looked up too: after
+// `uv add --frozen 'pandas>=3'`, a start with Astronomer's index out of reach
+// must still let pandas go, or uv has nothing to lock.
 func PruneRuntimePins(dir string, wrap func(run func() error) error) error {
 	return EditManifest(dir, wrap, func(_ *manifest.Manifest, ed tomledit.Editor) error {
+		if _, err := setRuntimeGroup(ed, nil); err != nil {
+			return err
+		}
 		lines, _ := tomledit.GetLines(ed, constraintsKey)
 		head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
 		if len(current) == 0 {

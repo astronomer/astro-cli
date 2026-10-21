@@ -29,8 +29,8 @@ var freeze339 = &RuntimePins{Build: "3.3-9", Python: "3.12", Pins: []string{
 // setBuild is SetAstroBuild with no wrap, for a test that expects the pins
 // written whenever they are given.
 func setBuild(dir string, b runtimeversions.AstroBuild, pins *RuntimePins) error {
-	refused, err := SetAstroBuild(dir, nil, b, pins)
-	if err == nil && refused {
+	refused, err := SetAstroBuild(dir, nil, b, pins, nil)
+	if err == nil && refused.Pins {
 		return errors.New("the runtime pins were refused")
 	}
 	return err
@@ -176,9 +176,9 @@ func TestPruneRuntimePinsDropsWhatTheProjectNowLists(t *testing.T) {
 func TestPinsAreRefusedWhereTheyCannotBeMarked(t *testing.T) {
 	src := strings.Replace(astroHead, "[tool.astro]\n", "[tool.astro]\n\n[tool]\nuv = { constraint-dependencies = ['numpy<3'] }\n", 1)
 	dir := projectWith(t, src)
-	refused, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, freeze339)
+	refused, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, freeze339, nil)
 	require.NoError(t, err)
-	assert.True(t, refused)
+	assert.True(t, refused.Pins)
 	out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "numpy<3")

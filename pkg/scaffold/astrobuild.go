@@ -76,15 +76,29 @@ var (
 // pins are the runtime pins to write in place of the ones there. nil means
 // they are not known (no network, say): the ones there stay, less any package
 // the project now lists or constrains itself.
+// group is the astro-runtime dependency group to write in place of the one
+// there (setRuntimeGroup), nil when it is not known, as with pins.
 //
-// pinsRefused reports runtime pins that were not written because the array
-// cannot hold the comments that mark them: a [tool.uv] written as an inline
-// table. The rest was written; the caller says why the pins were not.
-func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, pins *RuntimePins) (pinsRefused bool, err error) {
+// The Refused it returns reports runtime pins, or a group, that were not
+// written because the array cannot hold the comments that mark them: a
+// [tool.uv], or a [dependency-groups], written as an inline table. The rest
+// was written; the caller says why those were not.
+func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, pins *RuntimePins, group *RuntimeGroup) (refused Refused, err error) {
 	err = EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		return setAstroBuild(before, ed, b, pins, &pinsRefused)
+		if err := setAstroBuild(before, ed, b, pins, &refused.Pins); err != nil {
+			return err
+		}
+		var err error
+		refused.Group, err = setRuntimeGroup(ed, group)
+		return err
 	})
-	return pinsRefused, err
+	return refused, err
+}
+
+// Refused says which of the runtime pins and the astro-runtime group
+// SetAstroBuild could not write for want of a table that holds comments.
+type Refused struct {
+	Pins, Group bool
 }
 
 func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, pins *RuntimePins, pinsRefused *bool) error {

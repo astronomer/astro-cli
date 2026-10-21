@@ -124,6 +124,45 @@ func runtimePinsOf(data []byte, constraints []string) (build, python string, pin
 	return build, python, pins
 }
 
+// RuntimeGroupName is the [dependency-groups] group astro writes the top-level
+// packages of the project's Astro Runtime image into, and adds to [tool.uv]
+// default-groups, so `uv sync`, `uv run` and standalone mode install what the
+// image has:
+//
+//	[dependency-groups]
+//	astro-runtime = [
+//	    # Astro Runtime 3.3-9 installs these, so the local environment has what the image has.
+//	    # astro writes them. To choose a version yourself, list the package in [project] dependencies.
+//	    "apache-airflow-providers-celery",
+//	    …
+//	]
+//
+// Names only: the runtime pins hold each, and what it pulls in, to the image's
+// version.
+const RuntimeGroupName = "astro-runtime"
+
+// RuntimeGroupComments are the comment lines that head the runtime group of
+// build.
+func RuntimeGroupComments(build string) []string {
+	return []string{
+		"Astro Runtime " + build + " installs these, so the local environment has what the image has.",
+		"astro writes them. To choose a version yourself, list the package in [project] dependencies.",
+	}
+}
+
+// runtimeGroupOf is RuntimeGroupName's names out of [dependency-groups] as it
+// decoded, nil when it is not there or is not a list.
+func runtimeGroupOf(groups map[string]any) []string {
+	list, _ := groups[RuntimeGroupName].([]any)
+	var names []string
+	for _, v := range list {
+		if s, isString := v.(string); isString {
+			names = append(names, s)
+		}
+	}
+	return names
+}
+
 // ProjectConstraints are the constraints the project states for itself:
 // ConstraintDependencies without the AstroPin entries (WithoutAstroPins) and
 // without the runtime pins, for an environment that runs neither Astronomer's

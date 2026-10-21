@@ -665,6 +665,31 @@ A standalone `astro local start` and `astro init` keep the runtime pins current 
 - the Airflow pin moved while Astronomer's index cannot be read, which takes the Airflow build pins out too;
 - under a cutoff, a `UV_EXCLUDE_NEWER` or the project's own `exclude-newer`, since the list is of the present and pins newer than the cutoff would leave uv nothing to lock.
 
+### The runtime image's packages: the `astro-runtime` group
+
+The runtime image installs more than Airflow: providers, database drivers, `redis`, `gunicorn`, `pytest`, and with them pandas, numpy, kubernetes and the rest of what they pull in. A DAG that imports one works on a Deployment and in Docker mode without the project listing it. So that it works in standalone mode too, `astro init` and a standalone `astro local start` write the image's top-level packages, the ones nothing else it installs requires, into a dependency group of their own, and add it to `default-groups`, which `uv sync`, `uv run` and standalone mode install:
+
+```toml
+[dependency-groups]
+astro-runtime = [
+    # Astro Runtime 3.3-9 installs these, so the local environment has what the image has.
+    # astro writes them. To choose a version yourself, list the package in [project] dependencies.
+    'aiofiles',
+    'apache-airflow-providers-celery',
+    …
+]
+
+[tool.uv]
+default-groups = ['dev', 'astro-runtime']
+```
+
+- **Names only.** The runtime pins hold each one, and everything it pulls in, to the image's version, so the local environment has the image's packages at the image's versions. The image itself has them already, so the group changes nothing a build installs.
+- **The list** is the one Astronomer publishes for the build and Python (`https://cdn.astronomer.io/runtime-roots/runtime-<build>-python-<python>.txt`). For a build that does not publish one yet, the CLI works it out once from the build's package list: it resolves the list in a scratch project under its cache and keeps the packages no other one requires, then keeps the answer for that build. Left out either way: Airflow, which the project lists; pip; and Astronomer's platform packages, every `astronomer-*` but `astronomer-providers` (the executor, logging, the FAB security manager, the version check, runtime extensions), which plug into Airflow itself rather than into a DAG.
+- **Only where it installs.** The image builds a package from source when it has to, with system libraries a laptop may lack: `mysqlclient` publishes no wheel but Windows', and building it needs MySQL's client library. So each package is listed for the platforms PyPI has a wheel of its version for, on the image's Python: everywhere, or with a `sys_platform == 'linux'` or `'darwin'` marker, or not at all. Docker mode and a deployment still have it.
+- **A package you list yourself** in `dependencies`, an extra or another group leaves the group, and takes the version your requirement asks for.
+- **To go without the group**, take `astro-runtime` out of `default-groups`. The CLI keeps the group current and leaves `default-groups` as you set it. A project whose `default-groups` is `'all'` installs it anyway.
+- **It follows the runtime pins:** written for the same build, refreshed when that build changes, and taken out (with its place in `default-groups`) when the runtime has no package list, as Airflow 2 before 11.0.0. Under a cutoff, where the pins come out, the group stays as it is: it holds names alone, which any cutoff resolves. When the list cannot be read or worked out, the group stays as it is, with a warning. A `[dependency-groups]` written as an inline table cannot hold its comments, so it gets no group, with a warning.
+
 To add a dependency, run `uv add <package>`. It keeps the pins, and a running standalone Airflow picks the package up. A package the image ships locks at the image's version. To take a different one, say `pandas>=3` where the image ships pandas 2, `uv add` refuses, because the runtime pin holds pandas: run `uv add --frozen 'pandas>=3'`, which writes the requirement without locking, and then `astro local start`, which takes out the pin and syncs. The image then installs your version over its own.
 
 ### Private packages without a Dockerfile
