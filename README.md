@@ -87,7 +87,22 @@ winget install -e --id Astronomer.Astro
 #### Linux
 
 ```sh
+curl -sSL install.astronomer.io | bash -s
+```
+
+This installs `astro` into `~/.local/bin` (or `$XDG_BIN_HOME` if you set it) and needs no root. If that directory is not on your `PATH`, the installer prints the line to add to your shell profile.
+
+To install system-wide into `/usr/local/bin` instead, run the installer with `sudo`:
+
+```sh
 curl -sSL install.astronomer.io | sudo bash -s
+```
+
+To pick another directory, set `ASTRO_INSTALL_DIR`. With `sudo`, set it after `sudo`, because `sudo` drops your environment:
+
+```sh
+curl -sSL install.astronomer.io | ASTRO_INSTALL_DIR="$HOME/bin" bash -s
+curl -sSL install.astronomer.io | sudo ASTRO_INSTALL_DIR=/opt/bin bash -s
 ```
 
 ### Specific version
@@ -129,10 +144,22 @@ winget install -e --id Astronomer.Astro -v 1.6.0
 To install a specific version of the CLI, specify the version number as a flag at the end of the command. For example, to install v1.1.0 of the CLI, you would run:
 
 ```sh
-curl -sSL install.astronomer.io | sudo bash -s -- v1.1.0
+curl -sSL install.astronomer.io | bash -s -- v1.1.0
 ```
 
-The leading `v` is optional. A partial version installs the highest release under it: `v1.46` the highest 1.46.x, `v1` the highest 1.x. Either one takes the highest stable release, or the highest pre-release while there is no stable one.
+As with the latest version, this installs into `~/.local/bin`. Use `| sudo bash -s -- v1.1.0` for a system-wide install into `/usr/local/bin`, or set `ASTRO_INSTALL_DIR` to choose the directory.
+
+The version can take any of these forms, with or without the leading `v`:
+
+- `v1.46.1` (or `1.46.1`) installs exactly that release. A pre-release such as `v1.47.0-rc.1` works the same way.
+- `v1.46` (or `1.46`) installs the highest 1.46.x release.
+- `v1` (or `1`) installs the highest 1.x release.
+
+A partial version takes the highest stable release, or the highest pre-release while there is no stable one. For example, to install the newest 1.46 patch release:
+
+```sh
+curl -sSL install.astronomer.io | bash -s -- v1.46
+```
 
 Every release also publishes an `install.sh` asset. That copy installs the release it ships with and no other, so the URL itself names the version. Use it in a Dockerfile or a CI job, where a pinned URL is easier to audit than a flag:
 
@@ -144,13 +171,11 @@ curl -sSL https://github.com/astronomer/astro-cli/releases/download/v1.45.0/inst
 curl -sSL https://github.com/astronomer/astro-cli/releases/latest/download/install.sh | sudo bash -s -- -b /usr/local/bin
 ```
 
+To install without `sudo`, pass a directory you can write to, such as `-b ~/.local/bin`.
+
 Do not fetch `godownloader.sh` from a Git tag. That copy carries the version that was current when the release branch was cut, which is the release before the tag. Use the `install.sh` asset to pin a version.
 
-> If you receive a `mkdir` error during installation, download and run the [godownloader](https://raw.githubusercontent.com/astronomer/astro-cli/main/godownloader.sh) script locally using:
->
->```sh
->$ cat godownloader.sh | bash -s -- -b /usr/local/bin
->```
+> If the install directory is missing or not writable, the installer says so and names the directory. Set `ASTRO_INSTALL_DIR` to install somewhere else, or run it with `sudo` for `/usr/local/bin`.
 
 #### Troubleshoot installation issues
 

@@ -560,7 +560,10 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	if clusterID != "" {
-		appConfig, _ = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: clusterID, WorkspaceUUID: ws})
+		appConfig, err = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: clusterID, WorkspaceUUID: ws})
+		if err != nil {
+			return fmt.Errorf("failed to get app config: %w", err)
+		}
 	}
 
 	// Silence Usage as we have now validated command input
