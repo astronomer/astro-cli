@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	sa "github.com/astronomer/astro-cli/internal/platform/apc/service_account"
 )
@@ -14,12 +15,12 @@ import (
 var (
 	workspaceSAUserID   string
 	workspaceSACategory string
-	workspaceSALabel    string
+	workspaceSAName     string
 	workspaceSARole     string
 
 	workspaceSaCreateExample = `
   # Create a service account in a Workspace
-  astro workspace service-account create --workspace <WORKSPACE_ID> --label my_label \
+  astro workspace service-account create --workspace <WORKSPACE_ID> --name my_label \
     --role WORKSPACE_EDITOR
 `
 	workspaceSaListExample = `
@@ -57,9 +58,11 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command {
 	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
 	cmd.Flags().StringVarP(&workspaceSAUserID, "user-id", "u", "", "ID of the user you want to link this service account to")
 	cmd.Flags().StringVarP(&workspaceSACategory, "category", "c", "default", "Category of the new service account")
-	cmd.Flags().StringVarP(&workspaceSALabel, "label", "l", "", "Label of the new service account")
+	// --name, as an Astro API token's; 1.x's --label, -l, is its alias.
+	cmd.Flags().StringVarP(&workspaceSAName, "name", "n", "", "Name of the new service account")
+	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 	cmd.Flags().StringVarP(&workspaceSARole, "role", "r", houston.WorkspaceViewerRole, "Role (permissions) attached to the created service account")
-	_ = cmd.MarkFlagRequired("label") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("name") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -114,7 +117,7 @@ func workspaceSaCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	created, err := sa.CreateUsingWorkspaceUUID(ws, workspaceSALabel, workspaceSACategory, workspaceSARole, houstonClient)
+	created, err := sa.CreateUsingWorkspaceUUID(ws, workspaceSAName, workspaceSACategory, workspaceSARole, houstonClient)
 	if err != nil {
 		return err
 	}

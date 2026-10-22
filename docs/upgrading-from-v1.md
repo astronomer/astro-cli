@@ -189,7 +189,7 @@ On Astro Private Cloud the same spellings give way. `--deployment` and `--worksp
 | `--workspace-id`, `-w` | `--workspace` | the `astro workspace user` and `astro workspace service-account` commands |
 | `--deployment-id`, `-d` | `--deployment` | `astro deployment unadopt`, `airflow upgrade`, `runtime upgrade` / `migrate`, the `astro deployment service-account` commands |
 | `--deployment-id` | `--deployment` | the `astro deployment user` and `astro deployment team` commands |
-| `--label`, `-l` | `--name`, `-n` | `astro workspace create` / `update` |
+| `--label`, `-l` | `--name`, `-n` | `astro workspace create` / `update`, and `astro workspace service-account create` and `astro deployment service-account create`, as an Astro API token is named |
 | `--label`, `-l` | `--name`, `-n` | `astro deployment create` / `update` / `adopt` (where 1.x's `-n` on create and update was `--nfs-location`, and 1.x's `--name` on adopt was the custom resource's: see below) |
 | `--search`, `-s` | `--keyword`, `-k` | 1.x's `astro deployment logs scheduler` / `webserver` / `workers`, which still run, hidden (`astro deployment logs` takes `--keyword` alone) |
 
