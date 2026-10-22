@@ -342,6 +342,20 @@ func (s *Suite) TestDeploymentCreateCommandAppConfigLookupFails() {
 	api.AssertNotCalled(s.T(), "CreateDeployment", mock.Anything)
 }
 
+func (s *Suite) TestDeploymentCreateCommandNoAppConfig() {
+	previousAppConfig, previousClient := appConfig, houstonClient
+	defer func() { appConfig, houstonClient = previousAppConfig, previousClient }()
+	appConfig = nil
+
+	api := new(mocks.ClientInterface)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
+
+	houstonClient = api
+	_, err := execDeploymentCmd("create", "--label=new-deployment-name", "--executor=celery")
+	s.ErrorIs(err, errNoAppConfig)
+	api.AssertNotCalled(s.T(), "CreateDeployment", mock.Anything)
+}
+
 func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 	s.Run("user should not be prompted if deployment type is not dag_deploy", func() {
 		appConfig = &houston.AppConfig{
