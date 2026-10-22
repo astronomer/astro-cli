@@ -133,6 +133,9 @@ func TestWorkspaceTokenAddAndRemovePickInTheWorkspaceTheyArePointedAt(t *testing
 	}
 	client := func(t *testing.T, ws string) *astrov1_mocks.ClientWithResponsesInterface {
 		t.Helper()
+		// A token id an earlier test's argument left in the package would
+		// skip the lookup by name these cases are about.
+		tokenID, orgTokenID, workspaceTokenID = "", "", ""
 		mc := new(astrov1_mocks.ClientWithResponsesInterface)
 		mc.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, inWS(ws)).Return(listTokensResp(wsTok), nil).Once()
 		mc.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, wsTok.Id).Return(getTokenResp(wsTok), nil).Once()
@@ -175,6 +178,7 @@ func TestWorkspaceTokenAddAndRemovePickInTheWorkspaceTheyArePointedAt(t *testing
 	t.Run("a token given by name with no workspace anywhere says to pass one", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		noWorkspaceContext(t)
+		tokenID, orgTokenID, workspaceTokenID = "", "", ""
 		astroV1Client = new(astrov1_mocks.ClientWithResponsesInterface) // asked nothing
 		for _, verb := range [][]string{{"add", "--role", "DEPLOYMENT_ADMIN"}, {"remove"}} {
 			args := append([]string{"token", "workspace-token", verb[0], "--workspace-token-name", wsTok.Name, "--deployment", otherDep}, verb[1:]...)
