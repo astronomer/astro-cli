@@ -72,6 +72,24 @@ func TestWorkspaceNameFlag(t *testing.T) {
 // here was --nfs-location, which keeps its long spelling); adopt's 1.x --name,
 // the custom resource's, is --cr-name's alias, and the adopted Deployment's
 // name keeps --label.
+// What --name refuses as an NFS location, and what it takes as a name.
+func TestNFSShapedName(t *testing.T) {
+	for v, nfs := range map[string]bool{
+		"10.0.0.5:/dags":         true,
+		"nfs.corp:/airflow/dags": true,
+		"filer-01:/":             true,
+		"[fd00::5]:/dags":        true,
+		"prod":                   false,
+		"Team A: prod":           false,
+		"https://wiki/team-a":    false,
+		"10.0.0.5:dags":          false,
+		"a/b:/c":                 false,
+		"":                       false,
+	} {
+		assert.Equal(t, nfs, nfsShaped.MatchString(v), v)
+	}
+}
+
 func TestDeploymentNameFlag(t *testing.T) {
 	for _, args := range [][]string{
 		{"--name", "alpha"}, {"-n", "alpha"}, {"--label", "alpha"}, {"-l", "alpha"}, {"--name", "alpha", "--label", "alpha"},
@@ -123,11 +141,24 @@ func TestDeploymentNameFlag(t *testing.T) {
 		}
 	})
 
-	t.Run("a 1.x create passing the mount as -n beside -l is refused", func(t *testing.T) {
-		api := newAPCClient()
-		run := runAPC(t, api, "", "deployment", "create", "--cluster-id", "cl-1", "-l", "prod", "-n", "10.0.0.5:/dags")
-		assert.NotEqual(t, 0, run.code)
-		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
+	// 1.x's create needed -l, so this is how a 1.x line passing the mount
+	// looks: the refusal is the one naming --nfs-location, not --name and
+	// --label disagreeing, which would say to keep the mount as the name.
+	t.Run("a 1.x line passing the mount as -n beside -l is refused, naming --nfs-location", func(t *testing.T) {
+		for _, args := range [][]string{
+			{"deployment", "create", "--cluster-id", "cl-1", "-l", "prod", "-n", "10.0.0.5:/dags"},
+			{"deployment", "create", "--cluster-id", "cl-1", "-n", "10.0.0.5:/dags", "-l", "prod"},
+			{"deployment", "update", "dep-ac", "-l", "prod", "-n", "[fd00::5]:/dags"},
+		} {
+			api := newAPCClient()
+			run := runAPC(t, api, "", args...)
+			assert.Equal(t, 2, run.code, "%v", args)
+			require.Error(t, run.err, "%v", args)
+			assert.Contains(t, run.err.Error(), "the NFS volume to mount is --nfs-location", "%v", args)
+			assert.NotContains(t, run.err.Error(), "disagree", "%v", args)
+			api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
+			api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
+		}
 	})
 
 	t.Run("create: neither is the required-flag error, naming --name", func(t *testing.T) {

@@ -252,9 +252,8 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	// -n, as on Astro: 1.x's -n here was --nfs-location, which now has no
-	// shorthand, and refuseNFSShapedName catches a 1.x line passing the mount.
-	cmd.Flags().StringVarP(&deploymentCreateLabel, "name", "n", "", "Name of your deployment")
-	utils.AddAlias(cmd.Flags(), "label", "l", "name")
+	// shorthand, and deploymentName refuses a 1.x line passing the mount.
+	addDeploymentNameFlag(cmd, &deploymentCreateLabel, "Name of your deployment")
 	cmd.Flags().StringVarP(&executor, "executor", "e", celeryExecutorArg, "The executor used in your Airflow deployment, one of: local, celery, or kubernetes (or Astro's LocalExecutor, CeleryExecutor, KubernetesExecutor)")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired Airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
@@ -496,8 +495,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 
 	cmd.Flags().StringVarP(&deploymentUpdateDescription, "description", "d", "", "Set description to update in deployment")
 	// -n, as on Astro: see create.
-	cmd.Flags().StringVarP(&deploymentUpdateLabel, "name", "n", "", "The new name for the deployment")
-	utils.AddAlias(cmd.Flags(), "label", "l", "name")
+	addDeploymentNameFlag(cmd, &deploymentUpdateLabel, "The new name for the deployment")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -599,25 +597,38 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nfsShaped matches an NFS location, <host>:/<path>, which no Deployment
-// name looks like.
-var nfsShaped = regexp.MustCompile(`^[^\s/:]+:/`)
+// nfsShaped matches an NFS location as --nfs-location takes it, <host>:/<path>,
+// the host a name or address, or an IPv6 one in brackets. A URL's :// is not
+// one: the path after :/ starts with no second slash.
+var nfsShaped = regexp.MustCompile(`^(\[[0-9A-Fa-f:.]+\]|[^\s/:\[\]]+):/([^/]|$)`)
 
-// refuseNFSShapedName refuses a --name that is an NFS location. -n was 1.x's
-// --nfs-location on create and update and is --name in v2, so a 1.x line
-// passing the mount with -n would otherwise name the Deployment after it.
-func refuseNFSShapedName(name string) error {
-	if !nfsShaped.MatchString(name) {
-		return nil
+// deploymentName is --name on deployment create and update, which refuses an
+// NFS location. -n was 1.x's --nfs-location there and is --name in v2, so a
+// 1.x line passing the mount with -n would otherwise name the Deployment
+// after it. It refuses as the line is parsed, ahead of the check that --name
+// and 1.x's --label agree, so the refusal is the one that says what -n is now.
+type deploymentName struct{ to *string }
+
+func (n deploymentName) String() string { return *n.to }
+func (n deploymentName) Type() string   { return "string" }
+func (n deploymentName) Set(v string) error {
+	if nfsShaped.MatchString(v) {
+		return fmt.Errorf("it is an NFS location: -n is --name in v2, and the NFS volume to mount is --nfs-location")
 	}
-	return cliout.Usage(fmt.Errorf("--name %q is an NFS location: -n is --name in v2, and the NFS volume to mount is --nfs-location", name))
+	*n.to = v
+	return nil
+}
+
+// addDeploymentNameFlag registers --name, -n, on cmd, read into to, with
+// 1.x's --label, -l, as its hidden alias.
+func addDeploymentNameFlag(cmd *cobra.Command, to *string, usage string) {
+	*to = ""
+	cmd.Flags().VarP(deploymentName{to: to}, "name", "n", usage)
+	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 }
 
 func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
-	if err := refuseNFSShapedName(deploymentCreateLabel); err != nil {
-		return err
-	}
 
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -934,9 +945,6 @@ func confirmDagDeploymentTypeChange(current, next string) (bool, error) {
 func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 	if err := requireDeployment(cmd); err != nil {
-		return err
-	}
-	if err := refuseNFSShapedName(deploymentUpdateLabel); err != nil {
 		return err
 	}
 
