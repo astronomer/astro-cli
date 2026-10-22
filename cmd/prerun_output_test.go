@@ -43,10 +43,14 @@ func TestPreRunLeavesJSONStdoutAlone(t *testing.T) {
 		// ok is whether the command succeeds; each publishes one object
 		// either way.
 		ok bool
+		// fails is that the command must not succeed.
+		fails bool
 		// stderrHas is a note the pre-run makes, on stderr.
 		stderrHas string
 		// stderrLacks is one it must not make: no login check ran.
 		stderrLacks string
+		// status is what the API answers, 401 when unset.
+		status int
 	}{
 		// The case that printed "Using an Astro API Token" on stdout ahead
 		// of the object: a command the login check does not exempt, which
@@ -56,7 +60,11 @@ func TestPreRunLeavesJSONStdoutAlone(t *testing.T) {
 		// With debug logs on, the pre-run logs the token and the login
 		// check's failure, on stderr.
 		{name: "an API token, with debug logs", apiToken: true, args: []string{"probe", "-o", "json", "--verbosity", "debug"}, stderrHas: "Using an Astro API Token"},
-		{name: "an API token, auth token", apiToken: true, args: []string{"auth", "token", "-o", "json"}, ok: true},
+		// auth token prints the token without its organization, so an API that
+		// is down does not stop it; one that refuses the token does, since the
+		// token it would print no longer works.
+		{name: "an API token, auth token", apiToken: true, args: []string{"auth", "token", "-o", "json"}, ok: true, status: http.StatusServiceUnavailable},
+		{name: "a refused API token, auth token", apiToken: true, args: []string{"auth", "token", "-o", "json"}, fails: true},
 		{name: "an API token, telemetry", apiToken: true, args: []string{"telemetry", "-o", "json"}, ok: true, stderrLacks: "Using an Astro API Token"},
 		// With no login, a command that logs in reaches the login flow:
 		// cmd/astro's TestSetupHandsTheLoginFlowStderr and the auth
@@ -74,8 +82,12 @@ func TestPreRunLeavesJSONStdoutAlone(t *testing.T) {
 			t.Cleanup(func() { logger.SetLevel(level) })
 			// The API, and the login's auth config, answer 401: what the
 			// pre-run says on the way is the point, not that it succeeds.
+			status := http.StatusUnauthorized
+			if tc.status != 0 {
+				status = tc.status
+			}
 			api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(http.StatusUnauthorized)
+				w.WriteHeader(status)
 			}))
 			t.Cleanup(api.Close)
 			require.NoError(t, config.CFG.AstroLocalCoreURL.SetHomeString(api.URL))
@@ -112,6 +124,9 @@ func TestPreRunLeavesJSONStdoutAlone(t *testing.T) {
 			assert.False(t, dec.More(), "more than one json value on stdout: %q", stdout)
 			if tc.ok {
 				assert.NoError(t, runErr, "stdout: %q\nstderr: %q", stdout, stderr)
+			}
+			if tc.fails {
+				assert.Error(t, runErr, "stdout: %q", stdout)
 			}
 			if tc.stderrHas != "" {
 				assert.Contains(t, stderr, tc.stderrHas)
