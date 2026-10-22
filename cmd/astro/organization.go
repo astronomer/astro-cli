@@ -538,8 +538,13 @@ func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 	}
 
 	r, err := team.Delete(id, forceTeam, astroV1Client)
-	if err != nil || r == nil {
+	if err != nil {
 		return err
+	}
+	if r == nil {
+		// Declined: say so, as a declined Workspace delete does.
+		fmt.Fprintln(out, "Canceling team deletion")
+		return nil
 	}
 	return renderLines(organizationTeamOutput, out, r, fmt.Sprintf("Astro Team %s was successfully deleted", r.Name))
 }

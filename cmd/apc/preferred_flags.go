@@ -181,6 +181,12 @@ func argOrFlag(flag, what string) cobra.PositionalArgs {
 		if err := utils.RefuseDisagreeingArg(args, what, flag, f.Value.String()); err != nil {
 			return err
 		}
+		// Only a run hands the argument on: a check of an example line
+		// (cmd/help_lint_test.go) judges the arguments without parsing
+		// this command's flags, and must leave them as they were.
+		if !cmd.Flags().Parsed() {
+			return nil
+		}
 		return cmd.Flags().Set(flag, args[0])
 	}
 }

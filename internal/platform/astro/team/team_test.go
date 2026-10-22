@@ -586,8 +586,8 @@ func (s *Suite) TestDelete() {
 	s.Run("a question that may not be asked is refused, naming --yes", func() {
 		restore := input.SetGuard(func() string { return "with --output json it cannot" })
 		defer restore()
+		// Refused before the team is read: the mock expects nothing.
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		got, err := Delete(team1.Id, false, mockClient)
 		s.True(input.IsRequired(err), "got %v", err)
 		s.ErrorContains(err, "--yes")
@@ -609,7 +609,8 @@ func (s *Suite) TestDelete() {
 		defer restore()
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseOK, nil).Once()
-		got, err := Delete("", false, mockClient)
+		// --yes, so the picker is what refuses, not the confirmation.
+		got, err := Delete("", true, mockClient)
 		s.True(input.IsRequired(err), "got %v", err)
 		s.Nil(got)
 	})

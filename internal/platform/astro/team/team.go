@@ -533,6 +533,13 @@ func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemov
 	if err != nil {
 		return nil, err
 	}
+	// A run that cannot ask is refused before anything is listed or read:
+	// the question it would end on is one only --yes answers.
+	if !force {
+		if err := input.MayAsk("", input.About("confirmation to delete the team"), input.AnsweredBy("--yes")); err != nil {
+			return nil, err
+		}
+	}
 
 	var team astrov1.Team
 	if id == "" {
