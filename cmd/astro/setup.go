@@ -36,6 +36,9 @@ var (
 	parseAPIToken         = util.ParseAPIToken
 	errNotAPIToken        = errors.New("the API token given does not appear to be an Astro API Token")
 	errExpiredAPIToken    = errors.New("the API token given has expired")
+	// ErrAPITokenOrganization is returned when the organization of an accepted
+	// API token can't be looked up, which leaves the context without one.
+	ErrAPITokenOrganization = errors.New("cannot look up the organization of the API token")
 )
 
 const (
@@ -110,6 +113,13 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	if isAuthTokenCmd(cmd) {
 		// Quietly: the command's output is the token alone.
 		_, err := ensureEnvCredentials(true, astroV1Client)
+		// An API token is saved before its organization is looked up, and
+		// printing it needs no organization, so a failed lookup does not stop
+		// this command as it stops the others.
+		if errors.Is(err, ErrAPITokenOrganization) {
+			logger.Debug(err)
+			return nil
+		}
 		return err
 	}
 
@@ -574,7 +584,7 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 
 	orgs, err := organization.ListOrganizations(astroV1Client)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("%w: %w", ErrAPITokenOrganization, err)
 	}
 
 	org := orgs[0]
