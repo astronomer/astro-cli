@@ -348,6 +348,19 @@ func runtimeImageFor(t *testing.T, p *project) string {
 	return "astrocrpublic.azurecr.io/runtime:" + version
 }
 
+// runtimeBaseImageFor is the image a generated build of p starts FROM: the
+// -base tag the runtime publishes beside runtimeImageFor's, in the same
+// repository, which is that image without its ONBUILD triggers.
+//
+// Spelled here from the registry's naming rather than taken from
+// airflowrt.BaseOf or pkg/imagebuild, which apply the same rule: this module
+// imports nothing under test (doc.go), and a suffix rule shared with the code
+// it checks would agree with that code whatever the registry publishes.
+func runtimeBaseImageFor(t *testing.T, p *project) string {
+	t.Helper()
+	return runtimeImageFor(t, p) + "-base"
+}
+
 // A Dockerfile that cannot build says so, and leaves nothing behind.
 //
 // The build runs before any container is created, so what this asserts is that

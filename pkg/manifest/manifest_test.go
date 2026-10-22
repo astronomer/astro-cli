@@ -1624,6 +1624,24 @@ func TestLoadReadsTheUVTablesAnAstroBuildWrites(t *testing.T) {
 	}
 }
 
+// IndexPagesFor keeps the page of a source only when a requirement names its
+// package, matching names as uv does: a generated image installs without
+// Airflow, so the Airflow sources `astro init` writes reach no page.
+func TestIndexPagesForKeepsOnlyTheSourcesOfTheGivenRequirements(t *testing.T) {
+	u := UV{Sources: map[string]string{
+		"apache-airflow":      "https://pip.astronomer.io/v2/",
+		"apache-airflow-core": "https://pip.astronomer.io/v2/",
+		"Private_Lib":         "https://pypi.acme.example/simple/",
+	}}
+	if got := u.IndexPagesFor([]string{"pandas", "apache-airflow-providers-amazon"}); len(got) != 0 {
+		t.Errorf("IndexPagesFor(no sourced requirement) = %#v, want none", got)
+	}
+	want := []string{"https://pypi.acme.example/simple/Private_Lib/"}
+	if got := u.IndexPagesFor([]string{"private-lib[extra]>=1", "pandas"}); !reflect.DeepEqual(got, want) {
+		t.Errorf("IndexPagesFor = %#v, want %#v", got, want)
+	}
+}
+
 // [tool.uv] is uv's table, so a shape uv would reject is uv's to report: the
 // project still loads, and astro reads no constraints from it.
 func TestLoadIgnoresAUVTableOfTheWrongShape(t *testing.T) {

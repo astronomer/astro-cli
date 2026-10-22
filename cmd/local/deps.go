@@ -478,6 +478,7 @@ func (b imageBuilder) Request(ctx context.Context, m imagebuild.ManifestBuild) (
 		Dockerfile:   req.Dockerfile,
 		Context:      req.Context,
 		Dependencies: req.Dependencies,
+		FindLinks:    req.FindLinks,
 		Packages:     req.Packages,
 	}, nil
 }
@@ -501,6 +502,7 @@ func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb loca
 		Secrets:      req.Secrets,
 		Tag:          req.Tag,
 		Dependencies: req.Dependencies,
+		FindLinks:    req.FindLinks,
 		Packages:     req.Packages,
 		Bin:          req.Bin,
 		Env:          req.Env,

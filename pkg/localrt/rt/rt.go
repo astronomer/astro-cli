@@ -75,10 +75,14 @@ type Plan struct {
 	// manifest — but docker mode installs these into the runtime image so
 	// both modes run Airflow against the same set of packages.
 	Dependencies []string
+	// FindLinks are the per-package index pages a generated image's install
+	// searches besides PyPI (ManifestBuild.FindLinks). Standalone ignores
+	// them: uv reads [tool.uv.sources] from the manifest.
+	FindLinks []string
 	// Packages is the project's [tool.astro] packages, the OS (apt) packages
 	// it needs at the system level. Docker mode bakes them into the runtime
-	// image through the ONBUILD packages.txt step; standalone mode has no
-	// image and cannot honor them; StandaloneOmissions reports them.
+	// image through the generated build's packages.txt step; standalone mode
+	// has no image and cannot honor them; StandaloneOmissions reports them.
 	Packages []string
 	// Dockerfile is a project-relative path to the project's own Dockerfile,
 	// set when the manifest declared one ("tier 3" in the project design: the

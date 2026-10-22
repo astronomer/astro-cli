@@ -71,10 +71,11 @@ type Request struct {
 	// build-secrets, as util.ResolveProjectBuildSecrets picked them.
 	//
 	// Only a project that declared its own Dockerfile can use one: a generated
-	// build's Dockerfile is `FROM <base>` and the install happens in the runtime
-	// image's ONBUILD triggers, so there is no RUN of the project's for a secret
-	// to be mounted into. cmd/astro refuses a --build-secret for any other
-	// project rather than accepting secrets nothing could read.
+	// build's Dockerfile is imagebuild's, whose one RUN that reads a secret is
+	// the Python install, mounting the netrc one, so there is no RUN of the
+	// project's for a secret to be mounted into. cmd/astro refuses a
+	// --build-secret for any other project rather than accepting secrets
+	// nothing could read.
 	BuildSecrets []string
 	// Description is recorded on the deploy.
 	Description string

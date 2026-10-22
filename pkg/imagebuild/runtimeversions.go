@@ -21,9 +21,11 @@ import (
 // stays as it is. The catalog itself, its cache and its fallback to a stale
 // copy belong to pkg/runtimeversions.
 //
-// The Airflow 2 images answer to the same ONBUILD contract the build already
-// relies on: COPY packages.txt, install-system-packages, COPY requirements.txt,
-// install-python-dependencies. Nothing else about the build changes.
+// The Airflow 2 images publish a -base tag beside each runtime tag, as the
+// Airflow 3 ones do, so a generated build starts FROM it the same way
+// (generatedDockerfile, which also covers the 9.x and 10.x images that
+// install inline rather than through the runtime's scripts). Nothing else
+// about the build changes.
 
 const (
 	// airflow2ImageRepo hosts the Astro Runtime images for Airflow 2.

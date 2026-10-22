@@ -299,6 +299,48 @@ func TestAstroBuildTagIsContentAddressed(t *testing.T) {
 	edited, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
 	assert.NotEqual(t, first.Image, edited.Image, "an edited project file moves the tag")
+
+	// A source routing a dependency to an index changes where the install
+	// looks, so it moves the tag too; one for a package nothing installs does
+	// not.
+	withLib := func(sources map[string]string) string {
+		t.Helper()
+		req := testRequest(t)
+		req.Manifest.Project.Dependencies = append(req.Manifest.Project.Dependencies, "private-lib")
+		req.Manifest.UV.Sources = sources
+		res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+		require.NoError(t, err)
+		return res.Image
+	}
+	plain := withLib(nil)
+	assert.NotEqual(t, plain, withLib(map[string]string{"private-lib": "https://pypi.acme.example/simple/"}), "an index source moves the tag")
+	assert.Equal(t, plain, withLib(map[string]string{"apache-airflow": "https://pip.astronomer.io/v2/"}), "a source the image never installs does not")
+}
+
+// A generated build's Dockerfile and find-links are part of its address: the
+// same inputs over another recipe, or reading another index page, are another
+// image. A declared Dockerfile is addressed by its own bytes and reads no
+// find-links, so neither moves its tag.
+func TestContentHashCoversTheGeneratedRecipeAndFindLinks(t *testing.T) {
+	const base = "astrocrpublic.azurecr.io/runtime:3.1-2"
+	hash := func(recipe string, findLinks []string, df declaredDockerfile) string {
+		t.Helper()
+		h, err := contentHash(base, "linux/amd64", recipe, []string{"pandas"}, findLinks, nil, "", df)
+		require.NoError(t, err)
+		return h
+	}
+	page := []string{"https://pypi.acme.example/simple/private-lib/"}
+
+	assert.NotEqual(t, hash("recipe one", nil, declaredDockerfile{}), hash("recipe two", nil, declaredDockerfile{}),
+		"a changed generated recipe moves the tag")
+	assert.NotEqual(t, hash("recipe", nil, declaredDockerfile{}), hash("recipe", page, declaredDockerfile{}),
+		"a find-links page moves a generated build's tag")
+
+	df := filepath.Join(t.TempDir(), "Dockerfile")
+	require.NoError(t, os.WriteFile(df, []byte("FROM scratch\n"), 0o600))
+	declared := declaredDockerfile{rel: "Dockerfile", abs: df}
+	assert.Equal(t, hash("", nil, declared), hash("", page, declared),
+		"a declared Dockerfile reads no find-links, so they do not move its tag")
 }
 
 func TestAstroBuildTagOverrideSkipsLatest(t *testing.T) {

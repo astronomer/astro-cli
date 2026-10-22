@@ -1,8 +1,8 @@
 // Package imagebuild builds a deployable Airflow image from a manifest's
 // fields. It assembles a small build context (requirements.txt, packages.txt)
-// over Astronomer's runtime base image and runs the container build, leaning
-// on the runtime image's ONBUILD triggers to install the project's
-// dependencies and OS packages — the same path `astro dev` builds through.
+// and builds it over the runtime's -base image, the build without ONBUILD
+// triggers, with the install steps those triggers would run written out in the
+// Dockerfile it generates (generatedDockerfile).
 //
 // A project may instead declare its own Dockerfile in the manifest, which the
 // project design calls tier 3: the escape hatch for multi-stage builds and
@@ -137,16 +137,23 @@ var ErrDockerfileNotAFile = errors.New("not a file")
 var ErrDockerfileBuild = errors.New("building the project's Dockerfile failed; see the build output above")
 
 const (
-	// dockerfileName is the one-line `FROM <base>` Dockerfile the build runs;
-	// the runtime image's ONBUILD triggers do the install.
+	// dockerfileName is the Dockerfile a generated build runs
+	// (generatedDockerfile).
 	dockerfileName = "Dockerfile.astro-local"
 	// buildContextDir is the sub-directory of a Request's WorkDir that holds
-	// the build context — the two files the ONBUILD triggers copy.
+	// the build context: the two files the install steps copy, and the
+	// project's files when the image ships.
 	buildContextDir = "deps-build"
-	// requirementsName and packagesName are the fixed names the runtime image's
-	// ONBUILD triggers copy from the build context.
+	// requirementsName and packagesName are the names the runtime's install
+	// scripts read from their working directory.
 	requirementsName = "requirements.txt"
 	packagesName     = "packages.txt"
+	// baseTagSuffix turns a runtime tag into its -base tag (3.1-5 to
+	// 3.1-5-base, 12.6.0-python-3.11 to 12.6.0-python-3.11-base), the same
+	// image without the ONBUILD triggers. The runtime publishes one beside
+	// every tag, in the same repository: scripts/check-runtime-base-tags.sh
+	// checks each one the CLI can pick.
+	baseTagSuffix = "-base"
 	// contextDirPerm is owner-only, matching internal/localstate.
 	contextDirPerm = 0o700
 )
@@ -185,17 +192,20 @@ type Request struct {
 	// under; the caller owns its location and lifetime. Unused in Dockerfile
 	// mode, which writes nothing.
 	WorkDir string
-	// BaseImage is the resolved runtime image the build starts FROM
-	// (astrocrpublic.azurecr.io/runtime:<version>). Empty in Dockerfile mode:
-	// the project's own file declares what it builds on.
+	// BaseImage is the resolved runtime image the build is of
+	// (astrocrpublic.azurecr.io/runtime:<version>). The build starts FROM its
+	// -base tag (baseTagSuffix); BaseImage itself stays the runtime's own tag,
+	// which is what callers parse the runtime version out of and name in
+	// messages. Empty in Dockerfile mode: the project's own file declares what
+	// it builds on.
 	BaseImage string
 	// Secrets are docker build --secret specs ("id=mysecret[,src=/local/secret]"
 	// or "id=mysecret,env=ENV_VAR"),
 	// one per entry, forwarded verbatim in the order given.
 	//
-	// A generated build forwards only the manifest.RuntimeSecretID spec: its
-	// Dockerfile is `FROM <base>`, and the runtime image's install step, which
-	// mounts that one secret, is the only step it runs.
+	// A generated build forwards only the manifest.RuntimeSecretID spec: the
+	// one RUN that can read a secret is the Python install, which mounts that
+	// one when it is given, and mounts nothing otherwise.
 	//
 	// The SPEC is forwarded, never a secret value: docker reads the value itself
 	// from the src file or the named env var. So these strings are safe in a
@@ -211,8 +221,8 @@ type Request struct {
 	// context, because a multi-stage build COPYs from the repo. The generated
 	// mode's context is synthetic: the generated requirements.txt and
 	// packages.txt, plus, for an image that ships, a filtered copy of the
-	// project (ProjectFiles), which the runtime image's ONBUILD `COPY . .`
-	// lays down after both installs.
+	// project (ProjectFiles), which the generated Dockerfile's `COPY . .` lays
+	// down after both installs.
 	//
 	// Dependencies and Packages are ignored here rather than rejected. A caller
 	// reading a manifest has them populated whichever tier the project
@@ -224,6 +234,12 @@ type Request struct {
 	// Dependencies are the manifest's Python dependencies (PEP 508);
 	// apache-airflow is dropped, since the runtime base already provides it.
 	Dependencies []string
+	// FindLinks are pages the Python install searches besides PyPI, written
+	// into the generated requirements.txt as --find-links lines: the
+	// per-package pages of the indexes a [tool.uv.sources] entry routes a
+	// dependency to (manifest.UV.IndexPages), which the install cannot read
+	// from pyproject.toml. Ignored in Dockerfile mode.
+	FindLinks []string
 	// Packages are the manifest's OS (apt) package names.
 	Packages []string
 	// ProjectFiles is the project directory whose files a generated build
@@ -308,10 +324,10 @@ func (execCommander) RunIn(ctx context.Context, dir string, extraEnv []string, s
 // Two modes. With req.Dockerfile set the project's own file is the build, and it
 // is run as-is against the project as context (see the field's doc for why they
 // share so little). Otherwise the request's dependencies and OS packages are
-// installed into a layer over its base image through the runtime image's ONBUILD
-// triggers, with the project's files over them when the request carries
-// ProjectFiles. With nothing to install, no project files and no labels it
-// builds nothing and returns the base image unchanged (the fast path).
+// installed into a layer over its base's -base image (generatedDockerfile),
+// with the project's files over them when the request carries ProjectFiles.
+// With nothing to install, no project files and no labels it builds nothing
+// and returns the -base image unchanged (the fast path).
 //
 // Build output streams to cb.OnLine (component "build") as lines, unless
 // req.Stdout or req.Stderr is set, in which case that stream goes to it raw;
@@ -355,12 +371,14 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 	}
 
 	deps := runtimeDeps(req.Dependencies)
+	from := baseOf(req.BaseImage)
 	// The base image already provides Airflow, so a project with nothing beyond
-	// Airflow and no OS packages needs no build and runs the base as-is.
+	// Airflow and no OS packages needs no build and runs the base as-is: the
+	// -base image, so a project pulls one tag whether it builds or not.
 	// An image carrying the project's files, or labels of its own, is never
 	// the bare base.
 	if fastPath && len(deps) == 0 && len(req.Packages) == 0 && req.ProjectFiles == "" && len(req.Labels) == 0 {
-		return req.BaseImage, nil
+		return from, nil
 	}
 
 	contextDir := filepath.Join(req.WorkDir, buildContextDir)
@@ -379,10 +397,11 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 			return "", err
 		}
 	}
-	// requirements.txt carries the deps; packages.txt carries the OS packages,
-	// one apt name per line. Both must exist even when empty, or the image's
-	// `ONBUILD COPY <file> .` fails, so an empty list still writes the file.
-	if err := os.WriteFile(filepath.Join(contextDir, requirementsName), []byte(strings.Join(deps, "\n")+"\n"), filePermRW); err != nil {
+	// requirements.txt carries the deps, after any --find-links lines;
+	// packages.txt carries the OS packages, one apt name per line. Both must
+	// exist even when empty, or the generated Dockerfile's `COPY <file> .`
+	// fails, so an empty list still writes the file.
+	if err := os.WriteFile(filepath.Join(contextDir, requirementsName), requirementsFile(deps, req.FindLinks), filePermRW); err != nil {
 		return "", fmt.Errorf("writing the generated requirements file: %w", err)
 	}
 	var packagesData []byte
@@ -392,11 +411,10 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 	if err := os.WriteFile(filepath.Join(contextDir, packagesName), packagesData, filePermRW); err != nil {
 		return "", fmt.Errorf("writing the generated packages file: %w", err)
 	}
-	// The Dockerfile is only `FROM <base>`; the ONBUILD triggers do the
-	// install. It sits outside the context so the trailing `COPY . .` does not
-	// bake it in.
+	// The Dockerfile sits outside the context so the trailing `COPY . .` does
+	// not bake it in.
 	dfPath := filepath.Join(req.WorkDir, dockerfileName)
-	if err := os.WriteFile(dfPath, []byte("FROM "+req.BaseImage+"\n"), filePermRW); err != nil {
+	if err := os.WriteFile(dfPath, []byte(generatedDockerfile(from, len(req.buildSecrets()) > 0)), filePermRW); err != nil {
 		return "", fmt.Errorf("writing %s: %w", dfPath, err)
 	}
 
@@ -462,11 +480,7 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 		if req.Dockerfile != "" {
 			return "", fmt.Errorf("%w: %w", ErrDockerfileBuild, err)
 		}
-		err = fmt.Errorf("installing the project's dependencies into the runtime image failed; see the build output above: %w", err)
-		if len(req.buildSecrets()) > 0 && !b.mountsRuntimeSecret(ctx, req) {
-			err = fmt.Errorf("%w. The runtime image %s does not mount the %s build secret while it installs requirements; build from a newer runtime, or declare a dockerfile that mounts it", err, req.BaseImage, manifest.RuntimeSecretID)
-		}
-		return "", err
+		return "", fmt.Errorf("installing the project's dependencies into the runtime image failed; see the build output above: %w", err)
 	}
 	return req.Tag, nil
 }
@@ -491,10 +505,10 @@ func absPaths(req Request) (Request, error) {
 }
 
 // buildSecrets are the Secrets the build can read. A declared Dockerfile
-// mounts whichever it names. A generated build's Dockerfile is `FROM <base>`,
-// and the only step that runs is the runtime image's install, which mounts
-// manifest.RuntimeSecretID alone, so any other secret is dropped rather than
-// handed to docker, which would read its source for nothing.
+// mounts whichever it names. A generated build's Dockerfile mounts
+// manifest.RuntimeSecretID alone (generatedDockerfile), and only when this
+// returns it, so any other secret is dropped rather than handed to docker,
+// which would read its source for nothing.
 func (r *Request) buildSecrets() []string {
 	if r.FromDeclaredDockerfile() {
 		return r.Secrets
@@ -508,15 +522,96 @@ func (r *Request) buildSecrets() []string {
 	return out
 }
 
-// mountsRuntimeSecret reports whether the runtime base's build triggers mount
-// manifest.RuntimeSecretID; runtime images older than the mount install
-// without it. A base that cannot be read is given the benefit of the doubt.
-func (b *Builder) mountsRuntimeSecret(ctx context.Context, req Request) bool {
-	var out strings.Builder
-	if err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: &out}, req.Bin, "image", "inspect", "--format", "{{json .Config.OnBuild}}", req.BaseImage); err != nil {
-		return true
+// baseOf is the image a generated build starts FROM for the runtime base ref:
+// its -base tag, the same image as the runtime's tag without the ONBUILD
+// triggers, whose steps generatedDockerfile writes out instead. It is the one
+// place the suffix is added, after whichever rule resolved the base (the
+// catalog, a platform's offer, a [tool.astro] runtime), so every caller of
+// Build gets it. A ref already on a -base tag is returned as it is.
+func baseOf(ref string) string {
+	if strings.HasSuffix(ref, baseTagSuffix) {
+		return ref
 	}
-	return strings.Contains(out.String(), "id="+manifest.RuntimeSecretID)
+	return ref + baseTagSuffix
+}
+
+// GeneratedDockerfile is the Dockerfile a generated build over the runtime
+// base baseImage runs (Request.BaseImage, before baseOf), with the netrc
+// secret mounted into the Python install when mountNetrc is set, as Build
+// sets it when the request carries that secret. It is for a caller that
+// addresses the image by what builds it (`astro package astro`'s content tag
+// hashes it, so a change to the recipe is a change to the tag), or that
+// writes the same steps into a Dockerfile of its own.
+func GeneratedDockerfile(baseImage string, mountNetrc bool) string {
+	return generatedDockerfile(baseOf(baseImage), mountNetrc)
+}
+
+// generatedDockerfile is the Dockerfile a generated build runs over from, the
+// -base image. Its steps are the ones the runtime's ONBUILD tag runs as
+// triggers (astro-runtime's image/Dockerfile.onbuild), in the same order and
+// as the same users, so the image is the one the ONBUILD tag would build:
+// the OS packages, then the Python dependencies under the runtime's
+// constraints, then the context's files owned by astro.
+//
+// Written out rather than inherited for two reasons. The trigger list has
+// changed across runtimes (the netrc mount is in 3.3-9 but not 3.1-12 or
+// 12.6.0), so a build inherited whichever list its base happened to carry;
+// written here, every runtime installs the same way, and the netrc secret
+// reaches the install on all of them. And a Dockerfile that states its
+// install is one `docker build` runs as written, with nothing happening at
+// FROM that the file does not show.
+//
+// The netrc mount is written only when mountNetrc is set, which Build sets
+// when the request carries that secret. RUN --mount needs BuildKit (Docker)
+// or Buildah 1.21 (Podman 3.2), so a build with no secret to mount keeps to
+// a plain RUN, which the legacy builder and an older Podman also run. The
+// runtime's own 3.3-9 trigger mounts it unconditionally; a build that took
+// that trigger needed BuildKit whether it had a secret or not.
+//
+// Each install runs the runtime's own script, so the runtime's constraints
+// file and its choice of installer (uv, or pip with ASTRO_RUNTIME_USE_PIP)
+// still apply. Runtimes before 11.0.0 ship no scripts: their triggers run
+// the apt install and `pip install -r` inline, so each step falls back to
+// that command where the script is missing. The inline triggers also refused
+// an apache-airflow pin, which runtimeDeps has already removed. The test is
+// POSIX, since a runtime's SHELL is not the same on every line.
+func generatedDockerfile(from string, mountNetrc bool) string {
+	run := "RUN "
+	if mountNetrc {
+		run = "RUN --mount=type=secret,id=" + manifest.RuntimeSecretID + ",target=/root/.netrc,required=false "
+	}
+	return "FROM " + from + "\n" +
+		"COPY " + packagesName + " .\n" +
+		"USER root\n" +
+		"RUN if [ -x " + installSystemPackages + " ]; then " + installSystemPackages + "; " +
+		"elif [ -s " + packagesName + " ]; then apt-get update && cat " + packagesName + " | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n" +
+		"COPY " + requirementsName + " .\n" +
+		run +
+		"if [ -x " + installPythonDependencies + " ]; then " + installPythonDependencies + "; " +
+		"else pip install --no-cache-dir --root-user-action=ignore -r " + requirementsName + "; fi\n" +
+		"USER astro\n" +
+		"COPY --chown=astro:0 . .\n"
+}
+
+// The runtime's install scripts, from runtime 11.0.0 on: one installs
+// packages.txt with apt, the other requirements.txt with uv under the
+// runtime's constraints file.
+const (
+	installSystemPackages     = "/usr/local/bin/install-system-packages"
+	installPythonDependencies = "/usr/local/bin/install-python-dependencies"
+)
+
+// requirementsFile is the generated requirements.txt: a --find-links line for
+// each page in findLinks, then the dependencies, one per line. The runtime's
+// install reads the file with uv pip install -r (pip with
+// ASTRO_RUNTIME_USE_PIP), and both take --find-links in a requirements file.
+func requirementsFile(deps, findLinks []string) []byte {
+	lines := make([]string, 0, len(findLinks)+len(deps))
+	for _, l := range findLinks {
+		lines = append(lines, "--find-links "+l)
+	}
+	lines = append(lines, deps...)
+	return []byte(strings.Join(lines, "\n") + "\n")
 }
 
 // shouldPull reports whether the build may force-refresh its base images.
@@ -632,8 +727,8 @@ const gitPackage = "git"
 // withGitForVCSDeps adds git to the OS packages when a dependency is a git
 // direct reference (`name @ git+https://…`, which is what a [tool.uv.sources]
 // git source becomes in requirements.txt). The runtime image ships no git, so
-// uv fails such an install with "Git executable not found"; the image's
-// ONBUILD steps install packages.txt before requirements.txt, so listing git
+// uv fails such an install with "Git executable not found"; the generated
+// Dockerfile installs packages.txt before requirements.txt, so listing git
 // there is enough. packages is never modified.
 //
 // Only https sources are served by this: an ssh one also needs an ssh client

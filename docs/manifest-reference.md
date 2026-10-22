@@ -202,7 +202,7 @@ RUN --mount=type=secret,id=netrc,target=/root/.netrc pip install -r private-requ
 astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT
 ```
 
-Without the flag, each of these commands reads `BUILD_SECRET_INPUT`, one secret per line, the way `astro deploy` does. Without either, they use [`build-secrets`](#build-secrets), so a project whose build always needs a secret can declare it once. The CLI passes on only the spec and Docker reads the value itself, so the CLI never writes the value to disk. For that reason, a flag or `BUILD_SECRET_INPUT` has to be given again on each later start or restart that builds the image. A generated image installs your dependencies through the runtime image, which mounts only a `netrc` secret, so a flag with any other id is refused there rather than accepted and dropped. A `BUILD_SECRET_INPUT` line with another id is dropped for a generated image, since a CI runner may set the variable for every job. `astro package` refuses it for a bucket target too. Standalone mode builds no image, so it warns and starts without the secret.
+Without the flag, each of these commands reads `BUILD_SECRET_INPUT`, one secret per line, the way `astro deploy` does. Without either, they use [`build-secrets`](#build-secrets), so a project whose build always needs a secret can declare it once. The CLI passes on only the spec and Docker reads the value itself, so the CLI never writes the value to disk. For that reason, a flag or `BUILD_SECRET_INPUT` has to be given again on each later start or restart that builds the image. A generated image's build mounts only a `netrc` secret, while it installs your dependencies, so a flag with any other id is refused there rather than accepted and dropped. A `BUILD_SECRET_INPUT` line with another id is dropped for a generated image, since a CI runner may set the variable for every job. `astro package` refuses it for a bucket target too. Standalone mode builds no image, so it warns and starts without the secret.
 
 Before each of these commands builds, it reads the Dockerfile for `RUN --mount=type=secret` steps. For each secret id that no flag, `BUILD_SECRET_INPUT` line or `build-secrets` entry supplies, it prints a warning that names the id, the line and the flag. It is a warning and not a refusal, because a secret mount is optional unless it sets `required=true`. If the build then fails, the build output has usually pushed the warning out of sight, so the final error names the missing ids and the flag again.
 
@@ -648,7 +648,7 @@ To add a dependency, run `uv add <package>`. It keeps the pins, and a running st
 
 `uv add git+https://github.com/acme/private-lib.git` adds `private-lib` to `dependencies` and its repository to `[tool.uv.sources]`. Standalone mode installs it through uv. A generated image and a check environment cannot read `[tool.uv.sources]`, so the CLI writes a dependency whose source is a git repository or a URL as a direct reference, `private-lib @ git+https://github.com/acme/private-lib.git@<rev>`, with the source's `rev`, `tag` or `branch` and its `subdirectory`. A version on the dependency is dropped, since a direct reference cannot carry one. A source limited by `marker`, `extra` or `group`, a `path` and a `workspace` member are left as the bare name.
 
-To install from a private repository, give the build a `netrc` secret. The runtime image mounts it as `/root/.netrc` while it installs your requirements, and git reads its credentials from there:
+To install from a private repository, give the build a `netrc` secret. The generated build mounts it as `/root/.netrc` while it installs your requirements, and git reads its credentials from there:
 
 ```toml
 [project]
@@ -662,7 +662,9 @@ build-secrets = ['id=netrc,env=NETRC_CONTENT']
 private-lib = { git = "https://github.com/acme/private-lib.git", rev = "4bfeaf8" }
 ```
 
-Set `NETRC_CONTENT` to a netrc entry, such as `machine github.com login x-access-token password <token>`. List `git` in [`packages`](#packages) if the runtime image does not have it. Runtime images older than the `netrc` mount install without the secret; when such a build fails, the error names the runtime image and says so.
+Set `NETRC_CONTENT` to a netrc entry, such as `machine github.com login x-access-token password <token>`. List `git` in [`packages`](#packages) if the runtime image does not have it. The mount is the generated build's own step, so it works on every runtime, including those whose own `ONBUILD` install never mounted it. It is written only when the build has the secret, and then needs BuildKit under Docker, or Podman 3.2 or later.
+
+A source that names an index, `private-lib = { index = "acme" }` with a `[[tool.uv.index]]` named `acme`, reaches a generated image as a `--find-links` line for that package's page on the index (`<url>/private-lib/`), the way `astro local check` passes it. Only a source for a package the image installs does: the Airflow sources `astro init` writes add none, since the runtime image already is Airflow. The install reads the page besides PyPI rather than instead of it, so a package with the same name on PyPI is a candidate too; uv's own source pins the package to the index, and the image cannot. An index behind a login takes the same `netrc` secret.
 
 `astro local check` builds its check environments outside the project, where uv cannot see the table, so it passes `constraint-dependencies` and the source index pages to them itself, and a check resolves the way the project does. A check against MWAA or Composer leaves out the `+astro` pins: those platforms run Apache's own Airflow.
 

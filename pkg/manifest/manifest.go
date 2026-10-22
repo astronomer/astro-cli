@@ -105,9 +105,31 @@ type UV struct {
 // files, so passing it as find-links scopes the index to that package the way
 // the source does.
 func (u UV) IndexPages() []string {
+	return u.indexPages(func(string) bool { return true })
+}
+
+// IndexPagesFor is IndexPages for the sources of deps alone: the page of each
+// package a requirement in deps names, matched by distribution name
+// (DistName). An install that never asks for a package has no use for its
+// index, and reading the page anyway makes the install reach that index: a
+// generated image installs deps without Airflow (WithoutAirflow), so the
+// pages of the Airflow sources `astro init` writes are left out, and a build
+// host that cannot reach Astronomer's index still builds.
+func (u UV) IndexPagesFor(deps []string) []string {
+	wanted := make(map[string]bool, len(deps))
+	for _, d := range deps {
+		wanted[DistName(d)] = true
+	}
+	return u.indexPages(func(pkg string) bool { return wanted[DistName(pkg)] })
+}
+
+// indexPages are the pages of the sources whose package keep accepts.
+func (u UV) indexPages(keep func(pkg string) bool) []string {
 	pkgs := make([]string, 0, len(u.Sources))
 	for pkg := range u.Sources {
-		pkgs = append(pkgs, pkg)
+		if keep(pkg) {
+			pkgs = append(pkgs, pkg)
+		}
 	}
 	sort.Strings(pkgs)
 	pages := make([]string, 0, len(pkgs))
