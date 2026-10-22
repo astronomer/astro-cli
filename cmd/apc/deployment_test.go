@@ -1046,7 +1046,7 @@ func (s *Suite) TestDeploymentAdopt() {
 			expectedError string
 		}{
 			{cmdArgs: []string{"adopt", "--name=prod-airflow-4", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "cluster-id" not set`},
-			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "name" not set`},
+			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "cr-name" not set`},
 			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--name=prod-airflow-4"}, expectedError: `required flag(s) "namespace" not set`},
 		}
 		for _, tt := range myTests {

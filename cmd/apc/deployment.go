@@ -83,46 +83,46 @@ var (
 	adoptAcceptIncompatibilities bool
 
 	deploymentAdoptExample = `  # Adopt an Airflow custom resource into the current Workspace
-  astro deployment adopt --cluster-id=<CLUSTER_ID> --name=<CR_NAME> --namespace=<CR_NAMESPACE>
+  astro deployment adopt --cluster-id=<CLUSTER_ID> --cr-name=<CR_NAME> --namespace=<CR_NAMESPACE>
 
   # Adopt it into another Workspace
-  astro deployment adopt --cluster-id=<CLUSTER_ID> --name=<CR_NAME> --namespace=<CR_NAMESPACE> \
+  astro deployment adopt --cluster-id=<CLUSTER_ID> --cr-name=<CR_NAME> --namespace=<CR_NAMESPACE> \
     --workspace=<WORKSPACE_ID>`
 	deploymentUnadoptExample = `  # Release an adopted Deployment
   astro deployment unadopt --deployment=<DEPLOYMENT_ID>`
 	deploymentCreateExample = `  # Create a Deployment with the Celery executor
-  astro deployment create --label=my-deployment
+  astro deployment create --name=my-deployment
 
   # Create one with the Kubernetes executor and an Airflow version
-  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1
+  astro deployment create --name=my-deployment --executor=kubernetes --airflow-version=2.4.1
 
   # Create one on Astronomer Runtime
-  astro deployment create --label=my-deployment --executor=kubernetes --runtime-version=6.0.1`
+  astro deployment create --name=my-deployment --executor=kubernetes --runtime-version=6.0.1`
 	deploymentCreateExampleAPCV1 = `  # Create a Deployment with the Celery executor
-  astro deployment create --label=my-deployment --cluster-id=<CLUSTER_ID>
+  astro deployment create --name=my-deployment --cluster-id=<CLUSTER_ID>
 
   # Create one with the Kubernetes executor and an Airflow version
-  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 \
+  astro deployment create --name=my-deployment --executor=kubernetes --airflow-version=2.4.1 \
     --cluster-id=<CLUSTER_ID>
 
   # Create one on Astronomer Runtime
-  astro deployment create --label=my-deployment --executor=kubernetes --runtime-version=6.0.1 \
+  astro deployment create --name=my-deployment --executor=kubernetes --runtime-version=6.0.1 \
     --cluster-id=<CLUSTER_ID>`
 	createExampleOperatorMode = `
 
   # Create an operator-managed Deployment
-  astro deployment create --label=my-deployment --executor=kubernetes --cluster-id=<CLUSTER_ID> \
+  astro deployment create --name=my-deployment --executor=kubernetes --cluster-id=<CLUSTER_ID> \
     --mode=operator`
 
 	createExampleDagDeployment = `
 
   # Create one that reads its Dags from an NFS volume
-  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 \
+  astro deployment create --name=my-deployment --executor=kubernetes --airflow-version=2.4.1 \
     --dag-deployment-type=volume --nfs-location=<IP>:/<PATH>`
 	createExampleDagDeploymentAPCV1 = `
 
   # Create one that reads its Dags from an NFS volume
-  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 \
+  astro deployment create --name=my-deployment --executor=kubernetes --airflow-version=2.4.1 \
     --dag-deployment-type=volume --nfs-location=<IP>:/<PATH> --cluster-id=<CLUSTER_ID>`
 
 	deploymentAirflowUpgradeExample = `  # Start upgrading a Deployment's Airflow
@@ -250,7 +250,9 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "", "", "Add desired Astronomer Runtime version: e.g: 4.2.2 or 5.0.0")
 	}
 
-	cmd.Flags().StringVarP(&deploymentCreateLabel, "label", "l", "", "Label of your deployment")
+	// No shorthand: -n is 1.x's --nfs-location here.
+	cmd.Flags().StringVar(&deploymentCreateLabel, "name", "", "Name of your deployment")
+	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 	cmd.Flags().StringVarP(&executor, "executor", "e", celeryExecutorArg, "The executor used in your Airflow deployment, one of: local, celery, or kubernetes (or Astro's LocalExecutor, CeleryExecutor, KubernetesExecutor)")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired Airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
@@ -266,7 +268,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVarP(&deploymentMode, "mode", "", "", "Deployment mode, one of: helm (default), operator")
 		cmd.Example += createExampleOperatorMode
 	}
-	_ = cmd.MarkFlagRequired("label") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("name") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -375,15 +377,19 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "ID of the cluster the Airflow custom resource is running on")
-	cmd.Flags().StringVarP(&adoptName, "name", "", "", "Name (metadata.name) of the existing Airflow custom resource (CR)")
+	// 1.x's --name here is the custom resource's, so it cannot become the
+	// Deployment's name as on create: it stays, hidden, an alias of --cr-name,
+	// and the Deployment's name keeps its 1.x spelling, --label.
+	cmd.Flags().StringVar(&adoptName, "cr-name", "", "Name (metadata.name) of the existing Airflow custom resource (CR)")
+	utils.AddAlias(cmd.Flags(), "name", "", "cr-name")
 	cmd.Flags().StringVarP(&adoptNamespace, "namespace", "", "", "Kubernetes namespace of the existing Airflow custom resource (CR)")
-	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; if omitted, APC defaults it to the --name value")
+	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; if omitted, APC defaults it to the --cr-name value")
 	cmd.Flags().StringVarP(&adoptDescription, "description", "d", "", "Description for the adopted Deployment")
 	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through APC logging")
 	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
 	cmd.Flags().BoolVarP(&adoptAcceptIncompatibilities, "accept-incompatibilities", "", true, "Adopt even if the custom resource has fields with no APC representation")
 	_ = cmd.MarkFlagRequired("cluster-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	_ = cmd.MarkFlagRequired("name")       //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("cr-name")    //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	_ = cmd.MarkFlagRequired("namespace")  //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -433,11 +439,11 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	example := `  # Change a Deployment's executor
   astro deployment update <DEPLOYMENT_ID> --executor=celery
 
-  # Change its label
-  astro deployment update <DEPLOYMENT_ID> --label=my-deployment
+  # Change its name
+  astro deployment update <DEPLOYMENT_ID> --name=my-deployment
 
-  # Change the label of the one a link of this project names
-  astro deployment update --deployment <LINK_NAME> --label=my-deployment`
+  # Change the name of the one a link of this project names
+  astro deployment update --deployment <LINK_NAME> --name=my-deployment`
 	updateExampleDagDeployment := `
 
   # Read its Dags from an NFS volume
@@ -487,7 +493,9 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&deploymentUpdateDescription, "description", "d", "", "Set description to update in deployment")
-	cmd.Flags().StringVarP(&deploymentUpdateLabel, "label", "l", "", "Set label to update in deployment")
+	// No shorthand: -n is 1.x's --nfs-location here.
+	cmd.Flags().StringVar(&deploymentUpdateLabel, "name", "", "The new name for the deployment")
+	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd

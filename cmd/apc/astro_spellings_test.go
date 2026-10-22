@@ -68,6 +68,91 @@ func TestWorkspaceNameFlag(t *testing.T) {
 	}
 }
 
+// deployment create and update take --name, as Astro's do, with no shorthand
+// (-n is 1.x's --nfs-location); adopt's 1.x --name, the custom resource's, is
+// --cr-name's alias, and the adopted Deployment's name keeps --label.
+func TestDeploymentNameFlag(t *testing.T) {
+	for _, args := range [][]string{
+		{"--name", "alpha"}, {"--label", "alpha"}, {"-l", "alpha"}, {"--name", "alpha", "--label", "alpha"},
+	} {
+		t.Run("create "+args[0], func(t *testing.T) {
+			api := newAPCClient()
+			api.On("CreateDeployment", mock.MatchedBy(func(v map[string]interface{}) bool { return v["label"] == "alpha" })).Return(&runtimeDep, nil).Once()
+			run := runAPC(t, api, "", append([]string{"deployment", "create", "--cluster-id", "cl-1"}, args...)...)
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+			api.AssertExpectations(t)
+		})
+		t.Run("update "+args[0], func(t *testing.T) {
+			api := newAPCClient()
+			api.On("GetDeployment", "dep-ac").Return(&certifiedDep, nil)
+			api.On("UpdateDeployment", mock.MatchedBy(func(v map[string]interface{}) bool {
+				p, ok := v["payload"].(map[string]string)
+				return ok && p["label"] == "alpha"
+			})).Return(&certifiedDep, nil).Once()
+			run := runAPC(t, api, "", append([]string{"deployment", "update", "dep-ac"}, args...)...)
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+			api.AssertExpectations(t)
+		})
+	}
+
+	t.Run("create: the two spellings disagreeing is refused", func(t *testing.T) {
+		api := newAPCClient()
+		run := runAPC(t, api, "", "deployment", "create", "--cluster-id", "cl-1", "--name", "alpha", "--label", "beta")
+		assert.NotEqual(t, 0, run.code)
+		require.Error(t, run.err)
+		assert.Contains(t, run.err.Error(), "disagree")
+		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
+	})
+
+	t.Run("create: neither is the required-flag error, naming --name", func(t *testing.T) {
+		api := newAPCClient()
+		run := runAPC(t, api, "", "deployment", "create", "--cluster-id", "cl-1")
+		assert.NotEqual(t, 0, run.code)
+		require.Error(t, run.err)
+		assert.Contains(t, run.err.Error(), `required flag(s) "name" not set`)
+	})
+
+	t.Run("update: --label \"\" changes nothing, as in 1.x", func(t *testing.T) {
+		api := newAPCClient()
+		api.On("GetDeployment", "dep-ac").Return(&certifiedDep, nil)
+		api.On("UpdateDeployment", mock.MatchedBy(func(v map[string]interface{}) bool {
+			p, _ := v["payload"].(map[string]string)
+			_, renamed := p["label"]
+			return !renamed
+		})).Return(&certifiedDep, nil).Once()
+		run := runAPC(t, api, "", "deployment", "update", "dep-ac", "--label", "", "--description", "d")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		api.AssertExpectations(t)
+	})
+
+	for _, args := range [][]string{{"--cr-name", "cr"}, {"--name", "cr"}} {
+		t.Run("adopt "+args[0]+" names the custom resource", func(t *testing.T) {
+			api := newAPCClient()
+			api.On("AdoptDeployment", mock.MatchedBy(func(r *houston.AdoptDeploymentRequest) bool {
+				return r.CRName == "cr" && r.Label == "shown"
+			})).Return(&houston.Deployment{ID: "adopted"}, nil).Once()
+			run := runAPC(t, api, "", append([]string{"deployment", "adopt", "--cluster-id", "cl-1", "--namespace", "ns", "--label", "shown"}, args...)...)
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+			api.AssertExpectations(t)
+		})
+	}
+
+	for _, sub := range []string{"create", "update"} {
+		t.Run(sub+" help shows --name only", func(t *testing.T) {
+			run := runAPC(t, newAPCClient(), "", "deployment", sub, "--help")
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+			assert.Contains(t, run.stdout, "--name")
+			assert.NotContains(t, run.stdout, "--label")
+		})
+	}
+	t.Run("adopt help shows --cr-name, not --name", func(t *testing.T) {
+		run := runAPC(t, newAPCClient(), "", "deployment", "adopt", "--help")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		assert.Contains(t, run.stdout, "--cr-name")
+		assert.NotContains(t, run.stdout, "--name ")
+	})
+}
+
 func TestDeploymentLogsKeywordFlag(t *testing.T) {
 	searched := func(term string) any {
 		return mock.MatchedBy(func(r houston.ListDeploymentLogsRequest) bool { return r.Search == term })

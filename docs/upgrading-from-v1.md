@@ -190,6 +190,8 @@ On Astro Private Cloud the same spellings give way. The new spellings have no sh
 | `--deployment-id`, `-d` | `--deployment` | `astro deployment unadopt`, `airflow upgrade`, `runtime upgrade` / `migrate`, the `astro deployment service-account` commands |
 | `--deployment-id` | `--deployment` | the `astro deployment user` and `astro deployment team` commands |
 | `--label`, `-l` | `--name`, `-n` | `astro workspace create` / `update` |
+| `--label`, `-l` | `--name`, with no shorthand: `-n` is `--nfs-location` there | `astro deployment create` / `update` |
+| `--name` | `--cr-name` | `astro deployment adopt`, where 1.x's `--name` is the custom resource's `metadata.name`, and still means it; the adopted Deployment's name keeps its 1.x spelling, `--label` |
 | `--search`, `-s` | `--keyword`, `-k` | 1.x's `astro deployment logs scheduler` / `webserver` / `workers`, which still run, hidden (`astro deployment logs` takes `--keyword` alone) |
 
 `--deployment` there takes an `apc` link name of the project around the working directory, as `astro deploy` does (on the context's domain), or a Deployment id; `--deployment-id` and `-d` are an id, whatever it looks like, as in 1.x. `astro deployment update`, `delete`, `hibernate`, `wake-up` and `logs` take `--deployment` too, beside the Deployment-id argument, which is unchanged; given both, they must name the same Deployment. A `delete` named by a link says which Deployment the link names before it asks. `--role` has `-r` on `astro deployment user add` / `update`, `astro deployment team add` / `update`, `astro workspace team add` / `update` and `astro workspace user update`; `astro deployment adopt`'s `--description` has `-d`. On Astro, `astro deploy`'s `--output` has `-o`, as Astro Private Cloud's had.
