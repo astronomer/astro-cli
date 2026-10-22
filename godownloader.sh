@@ -323,21 +323,53 @@ github_release() {
   test -z "$version" && return 1
   echo "$version"
 }
-# Returns 0 on a 200, 2 on a 404, and 1, having said why, on anything else.
-# GITHUB_TOKEN, when set, lifts the API's limit of 60 unauthenticated requests an hour
-github_api() {
-  if ! is_command curl; then
-    log_crit "curl is required to look up versions on GitHub"
-    return 1
-  fi
+# github_api_curl and github_api_wget fetch a URL into body and its HTTP status
+# into code, empty when no answer came. headers holds what the client printed
+# besides the body, the response headers among it, if anything.
+github_api_curl() {
   # curl still prints the code (000) when it exits non-zero for no answer.
   if [ -n "${GITHUB_TOKEN:-}" ]; then
-    resp=$(curl -s -w '%{http_code}' -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/$1") || true
+    resp=$(curl -s -w '%{http_code}' -H "Authorization: Bearer ${GITHUB_TOKEN}" "$1") || true
   else
-    resp=$(curl -s -w '%{http_code}' "https://api.github.com/$1") || true
+    resp=$(curl -s -w '%{http_code}' "$1") || true
   fi
   code=$(printf '%s' "$resp" | tail -c 3)
   body=${resp%???}
+  headers=
+}
+# wget -S writes the response headers to stderr and on an error exits non-zero
+# without saving the body. GNU wget and wget2 still write every header then,
+# busybox only the status line: "HTTP/1.1 404 Not Found", or ":status: 404"
+# from wget2. None writes one when there is no answer. No -q: wget2's hides
+# the headers too. The body goes to a fresh file: busybox leaves -O's file
+# untouched on an error.
+github_api_wget() {
+  tmp=$(mktemp)
+  rc=0
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    headers=$(wget -S --header "Authorization: Bearer ${GITHUB_TOKEN}" -O "$tmp" "$1" 2>&1) || rc=$?
+  else
+    headers=$(wget -S -O "$tmp" "$1" 2>&1) || rc=$?
+  fi
+  # The last status line, after any redirect.
+  code=$(printf '%s\n' "$headers" | awk '$1 ~ /^HTTP\// || $1 == ":status:" { c = $2 } END { print c }')
+  if [ "$rc" -eq 0 ]; then
+    code=200
+  fi
+  body=$(cat "$tmp")
+  rm -f "$tmp"
+}
+# Returns 0 on a 200, 2 on a 404, and 1, having said why, on anything else.
+# GITHUB_TOKEN, when set, lifts the API's limit of 60 unauthenticated requests an hour
+github_api() {
+  if is_command curl; then
+    github_api_curl "https://api.github.com/$1"
+  elif is_command wget; then
+    github_api_wget "https://api.github.com/$1"
+  else
+    log_crit "curl or wget is required to look up versions on GitHub"
+    return 1
+  fi
   case "$code" in
     200)
       # printf, not echo: dash's echo expands the backslashes in a release body.
@@ -346,14 +378,22 @@ github_api() {
       ;;
     404) return 2 ;;
     000 | '')
-      log_crit "could not reach GitHub (api.github.com) for $1; check the network connection, DNS and any proxy settings"
+      # wget's last word says why: DNS, TLS, a proxy, busybox without ssl_client.
+      why=$(printf '%s\n' "$headers" | sed '/^[[:space:]]*$/d' | tail -n 1)
+      log_crit "could not reach GitHub (api.github.com) for $1${why:+ ($why)}; check the network connection, DNS and any proxy settings"
       return 1
       ;;
   esac
-  case "$body" in
-    *"rate limit exceeded"*) log_crit "GitHub API rate limit exceeded; set GITHUB_TOKEN or try again later" ;;
-    *) log_crit "GitHub API answered HTTP ${code} for $1" ;;
-  esac
+  # curl has the body to say so, GNU wget and wget2 only the headers, busybox
+  # wget neither.
+  if printf '%s\n' "$body" | grep -q 'rate limit exceeded' ||
+    printf '%s\n' "$headers" | grep -qiE '^ *x-ratelimit-remaining: *0([^0-9]|$)'; then
+    log_crit "GitHub API rate limit exceeded; set GITHUB_TOKEN or try again later"
+  elif [ -z "$body" ] && { [ "$code" = 403 ] || [ "$code" = 429 ]; }; then
+    log_crit "GitHub API answered HTTP ${code} for $1; if that is its rate limit, set GITHUB_TOKEN or try again later"
+  else
+    log_crit "GitHub API answered HTTP ${code} for $1"
+  fi
   return 1
 }
 is_version_prefix() {
