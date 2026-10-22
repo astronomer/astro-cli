@@ -195,7 +195,26 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	}
 
 	applyPreferredFlagsIn(cmd)
+	// After applyPreferredFlagsIn, so it runs ahead of it: see
+	// refuseOneXAdoptName.
+	if adopt, _, err := cmd.Find([]string{"adopt"}); err == nil && adopt.Name() == "adopt" {
+		utils.BeforeArgs(adopt, refuseOneXAdoptName)
+	}
 	return cmd
+}
+
+// refuseOneXAdoptName refuses an adopt that names no custom resource but
+// gives --name or 1.x's --label: 1.x's --name was the custom resource's, and
+// in v2 it is the adopted Deployment's, as on create, so a 1.x line names no
+// custom resource. It runs ahead of the reconciliation of --name with
+// --label, whose refusal of a 1.x line giving both would say to keep the
+// custom resource's name as the Deployment's.
+func refuseOneXAdoptName(cmd *cobra.Command, _ []string) error {
+	fs := cmd.Flags()
+	if fs.Changed("cr-name") || !(fs.Changed("name") || fs.Changed("label")) {
+		return nil
+	}
+	return cliout.Usage(errors.New("name the custom resource with --cr-name: --name is the adopted Deployment's name in v2, as on create, where 1.x's --name was the custom resource's"))
 }
 
 func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
@@ -378,13 +397,13 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "ID of the cluster the Airflow custom resource is running on")
-	// 1.x's --name here is the custom resource's, so it cannot become the
-	// Deployment's name as on create: it stays, hidden, an alias of --cr-name,
-	// and the Deployment's name keeps its 1.x spelling, --label.
+	// --name is the Deployment's, as on create, with 1.x's --label its alias.
+	// 1.x's --name was the custom resource's, which is --cr-name now, and
+	// required: a 1.x line names none, and refuseOneXAdoptName says why.
 	cmd.Flags().StringVar(&adoptName, "cr-name", "", "Name (metadata.name) of the existing Airflow custom resource (CR)")
-	utils.AddAlias(cmd.Flags(), "name", "", "cr-name")
 	cmd.Flags().StringVarP(&adoptNamespace, "namespace", "", "", "Kubernetes namespace of the existing Airflow custom resource (CR)")
-	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; if omitted, APC defaults it to the --cr-name value")
+	cmd.Flags().StringVarP(&adoptLabel, "name", "n", "", "Name of the adopted Deployment (default: the --cr-name value)")
+	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 	cmd.Flags().StringVarP(&adoptDescription, "description", "d", "", "Description for the adopted Deployment")
 	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through APC logging")
 	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")

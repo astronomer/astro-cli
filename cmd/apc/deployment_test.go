@@ -997,7 +997,7 @@ func (s *Suite) TestDeploymentAdopt() {
 		}).Return(mockAdoptedDeployment, nil)
 
 		houstonClient = api
-		output, err := execDeploymentCmd("adopt", "--cluster-id=cluster-test-id", "--name=prod-airflow-4", "--namespace=airflow-prod4")
+		output, err := execDeploymentCmd("adopt", "--cluster-id=cluster-test-id", "--cr-name=prod-airflow-4", "--namespace=airflow-prod4")
 		s.NoError(err)
 		s.Contains(output, expectedOut)
 		s.Contains(output, mockAdoptedDeployment.ReleaseName)
@@ -1024,7 +1024,7 @@ func (s *Suite) TestDeploymentAdopt() {
 			"adopt",
 			"--workspace-id=some-other-workspace-id",
 			"--cluster-id=cluster-test-id",
-			"--name=prod-airflow-4",
+			"--cr-name=prod-airflow-4",
 			"--namespace=airflow-prod4",
 			"--label=My Adopted Deployment",
 			"--description=adopted from standalone operator",
@@ -1045,9 +1045,9 @@ func (s *Suite) TestDeploymentAdopt() {
 			cmdArgs       []string
 			expectedError string
 		}{
-			{cmdArgs: []string{"adopt", "--name=prod-airflow-4", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "cluster-id" not set`},
+			{cmdArgs: []string{"adopt", "--cr-name=prod-airflow-4", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "cluster-id" not set`},
 			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "cr-name" not set`},
-			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--name=prod-airflow-4"}, expectedError: `required flag(s) "namespace" not set`},
+			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--cr-name=prod-airflow-4"}, expectedError: `required flag(s) "namespace" not set`},
 		}
 		for _, tt := range myTests {
 			houstonClient = api
@@ -1062,7 +1062,7 @@ func (s *Suite) TestDeploymentAdopt() {
 		api.On("AdoptDeployment", mock.Anything).Return(nil, errMockHouston)
 
 		houstonClient = api
-		_, err := execDeploymentCmd("adopt", "--cluster-id=cluster-test-id", "--name=prod-airflow-4", "--namespace=airflow-prod4")
+		_, err := execDeploymentCmd("adopt", "--cluster-id=cluster-test-id", "--cr-name=prod-airflow-4", "--namespace=airflow-prod4")
 		s.EqualError(err, errMockHouston.Error())
 	})
 }

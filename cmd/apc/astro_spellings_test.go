@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
 )
 
 // APC takes Astro's spellings where 1.x had its own: the Astro spelling is
@@ -68,10 +69,6 @@ func TestWorkspaceNameFlag(t *testing.T) {
 	}
 }
 
-// deployment create and update take --name and -n, as Astro's do (1.x's -n
-// here was --nfs-location, which keeps its long spelling); adopt's 1.x --name,
-// the custom resource's, is --cr-name's alias, and the adopted Deployment's
-// name keeps --label.
 // What --name refuses as an NFS location, and what it takes as a name.
 func TestNFSShapedName(t *testing.T) {
 	for v, nfs := range map[string]bool{
@@ -90,6 +87,10 @@ func TestNFSShapedName(t *testing.T) {
 	}
 }
 
+// deployment create, update and adopt take the Deployment's name as --name
+// and -n, as Astro's do, with 1.x's --label and -l as its alias. 1.x's -n on
+// create and update was --nfs-location, which keeps its long spelling, and
+// 1.x's --name on adopt was the custom resource's, which is --cr-name.
 func TestDeploymentNameFlag(t *testing.T) {
 	for _, args := range [][]string{
 		{"--name", "alpha"}, {"-n", "alpha"}, {"--label", "alpha"}, {"-l", "alpha"}, {"--name", "alpha", "--label", "alpha"},
@@ -182,19 +183,55 @@ func TestDeploymentNameFlag(t *testing.T) {
 		api.AssertExpectations(t)
 	})
 
-	for _, args := range [][]string{{"--cr-name", "cr"}, {"--name", "cr"}} {
-		t.Run("adopt "+args[0]+" names the custom resource", func(t *testing.T) {
-			api := newAPCClient()
-			api.On("AdoptDeployment", mock.MatchedBy(func(r *houston.AdoptDeploymentRequest) bool {
-				return r.CRName == "cr" && r.Label == "shown"
-			})).Return(&houston.Deployment{ID: "adopted"}, nil).Once()
-			run := runAPC(t, api, "", append([]string{"deployment", "adopt", "--cluster-id", "cl-1", "--namespace", "ns", "--label", "shown"}, args...)...)
+	adopts := func(label string) *mocks.ClientInterface {
+		api := newAPCClient()
+		api.On("AdoptDeployment", mock.MatchedBy(func(r *houston.AdoptDeploymentRequest) bool {
+			return r.CRName == "cr" && r.Label == label
+		})).Return(&houston.Deployment{ID: "adopted"}, nil).Once()
+		return api
+	}
+	adopt := []string{"deployment", "adopt", "--cluster-id", "cl-1", "--namespace", "ns", "--cr-name", "cr"}
+	for _, args := range [][]string{{"--name", "shown"}, {"-n", "shown"}, {"--label", "shown"}, {"-l", "shown"}} {
+		t.Run("adopt "+args[0]+" names the Deployment, --cr-name the custom resource", func(t *testing.T) {
+			api := adopts("shown")
+			run := runAPC(t, api, "", append(append([]string{}, adopt...), args...)...)
 			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 			api.AssertExpectations(t)
 		})
 	}
+	t.Run("adopt with no --name leaves the name to APC, the custom resource's", func(t *testing.T) {
+		api := adopts("")
+		run := runAPC(t, api, "", adopt...)
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		api.AssertExpectations(t)
+	})
 
-	for _, sub := range []string{"create", "update"} {
+	// 1.x's adopt named the custom resource with --name: such a line names
+	// none now, and is refused saying so, with --label beside it too, ahead
+	// of --name and --label disagreeing.
+	t.Run("a 1.x adopt naming the custom resource with --name is refused, naming --cr-name", func(t *testing.T) {
+		for _, args := range [][]string{
+			{"--name", "cr"},
+			{"--name", "cr", "--label", "shown"},
+			{"-l", "shown", "--name", "cr"},
+		} {
+			api := newAPCClient()
+			run := runAPC(t, api, "", append([]string{"deployment", "adopt", "--cluster-id", "cl-1", "--namespace", "ns"}, args...)...)
+			assert.Equal(t, 2, run.code, "%v", args)
+			require.Error(t, run.err, "%v", args)
+			assert.Contains(t, run.err.Error(), "name the custom resource with --cr-name: --name is the adopted Deployment's name in v2", "%v", args)
+			assert.NotContains(t, run.err.Error(), "disagree", "%v", args)
+			api.AssertNotCalled(t, "AdoptDeployment", mock.Anything)
+		}
+	})
+
+	t.Run("adopt naming nothing is the required-flag error, naming --cr-name", func(t *testing.T) {
+		run := runAPC(t, newAPCClient(), "", "deployment", "adopt", "--cluster-id", "cl-1", "--namespace", "ns")
+		require.Error(t, run.err)
+		assert.Contains(t, run.err.Error(), `required flag(s) "cr-name" not set`)
+	})
+
+	for _, sub := range []string{"create", "update", "adopt"} {
 		t.Run(sub+" help shows --name only", func(t *testing.T) {
 			run := runAPC(t, newAPCClient(), "", "deployment", sub, "--help")
 			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
@@ -202,12 +239,6 @@ func TestDeploymentNameFlag(t *testing.T) {
 			assert.NotContains(t, run.stdout, "--label")
 		})
 	}
-	t.Run("adopt help shows --cr-name, not --name", func(t *testing.T) {
-		run := runAPC(t, newAPCClient(), "", "deployment", "adopt", "--help")
-		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-		assert.Contains(t, run.stdout, "--cr-name")
-		assert.NotContains(t, run.stdout, "--name ")
-	})
 }
 
 func TestDeploymentLogsKeywordFlag(t *testing.T) {
