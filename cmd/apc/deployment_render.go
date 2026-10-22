@@ -348,11 +348,16 @@ func emitVersionChange(r cliout.Renderer, kind versionChangeKind, c *deployment.
 
 // emitLogEntry publishes one log record. follow says it came from a
 // subscription, whose records have always printed without a line break of
-// their own.
-func emitLogEntry(r cliout.Renderer, component string, l houston.DeploymentLog, follow bool) error {
+// their own. named says it is among several components' records, and in text
+// it is followed by its component, as Astro's logs are by their source.
+func emitLogEntry(r cliout.Renderer, component string, l houston.DeploymentLog, follow, named bool) error {
 	return r.EmitEvent(logEntryJSON{Component: component, Timestamp: l.CreatedAt, Message: l.Log}, func(w io.Writer) error {
-		if follow {
+		switch {
+		case follow:
 			_, err := fmt.Fprint(w, l.Log)
+			return err
+		case named:
+			_, err := fmt.Fprintf(w, "%s %s\n", l.Log, component)
 			return err
 		}
 		_, err := fmt.Fprintln(w, l.Log)

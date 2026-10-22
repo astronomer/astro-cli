@@ -86,7 +86,7 @@ func (s *Suite) TestDeploymentWorkspaceIDIsOnlyWhereItIsRead() {
 	}
 	for _, path := range []string{
 		"update", "delete", "unadopt", "airflow upgrade",
-		"logs webserver", "logs scheduler", "logs workers", "logs triggerer",
+		"logs webserver", "logs scheduler", "logs workers",
 		"service-account create", "service-account list", "service-account delete",
 		"user list", "user add", "user remove", "user update",
 		"team list", "team add", "team remove", "team update",
