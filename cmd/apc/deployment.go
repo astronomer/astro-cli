@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -235,7 +236,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		} else {
 			cmd.Example += createExampleDagDeployment
 		}
-		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS volume to mount, as <IP>:/<path>, without the nfs:// prefix the CLI adds")
+		cmd.Flags().StringVar(&nfsLocation, "nfs-location", "", "NFS volume to mount, as <IP>:/<path>, without the nfs:// prefix the CLI adds")
 	}
 
 	if gitSyncDAGDeploymentEnabled {
@@ -250,8 +251,9 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "", "", "Add desired Astronomer Runtime version: e.g: 4.2.2 or 5.0.0")
 	}
 
-	// No shorthand: -n is 1.x's --nfs-location here.
-	cmd.Flags().StringVar(&deploymentCreateLabel, "name", "", "Name of your deployment")
+	// -n, as on Astro: 1.x's -n here was --nfs-location, which now has no
+	// shorthand, and refuseNFSShapedName catches a 1.x line passing the mount.
+	cmd.Flags().StringVarP(&deploymentCreateLabel, "name", "n", "", "Name of your deployment")
 	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 	cmd.Flags().StringVarP(&executor, "executor", "e", celeryExecutorArg, "The executor used in your Airflow deployment, one of: local, celery, or kubernetes (or Astro's LocalExecutor, CeleryExecutor, KubernetesExecutor)")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired Airflow version parameter: e.g: 1.10.5 or 1.10.7")
@@ -480,7 +482,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 
 	if nfsMountDAGDeploymentEnabled {
 		cmd.Example += updateExampleDagDeployment
-		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS volume to mount, as <IP>:/<path>, without the nfs:// prefix the CLI adds")
+		cmd.Flags().StringVar(&nfsLocation, "nfs-location", "", "NFS volume to mount, as <IP>:/<path>, without the nfs:// prefix the CLI adds")
 	}
 
 	if triggererEnabled {
@@ -493,8 +495,8 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&deploymentUpdateDescription, "description", "d", "", "Set description to update in deployment")
-	// No shorthand: -n is 1.x's --nfs-location here.
-	cmd.Flags().StringVar(&deploymentUpdateLabel, "name", "", "The new name for the deployment")
+	// -n, as on Astro: see create.
+	cmd.Flags().StringVarP(&deploymentUpdateLabel, "name", "n", "", "The new name for the deployment")
 	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
@@ -597,8 +599,25 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+// nfsShaped matches an NFS location, <host>:/<path>, which no Deployment
+// name looks like.
+var nfsShaped = regexp.MustCompile(`^[^\s/:]+:/`)
+
+// refuseNFSShapedName refuses a --name that is an NFS location. -n was 1.x's
+// --nfs-location on create and update and is --name in v2, so a 1.x line
+// passing the mount with -n would otherwise name the Deployment after it.
+func refuseNFSShapedName(name string) error {
+	if !nfsShaped.MatchString(name) {
+		return nil
+	}
+	return cliout.Usage(fmt.Errorf("--name %q is an NFS location: -n is --name in v2, and the NFS volume to mount is --nfs-location", name))
+}
+
 func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
+	if err := refuseNFSShapedName(deploymentCreateLabel); err != nil {
+		return err
+	}
 
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -915,6 +934,9 @@ func confirmDagDeploymentTypeChange(current, next string) (bool, error) {
 func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 	if err := requireDeployment(cmd); err != nil {
+		return err
+	}
+	if err := refuseNFSShapedName(deploymentUpdateLabel); err != nil {
 		return err
 	}
 

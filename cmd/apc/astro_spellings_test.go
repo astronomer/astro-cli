@@ -68,12 +68,13 @@ func TestWorkspaceNameFlag(t *testing.T) {
 	}
 }
 
-// deployment create and update take --name, as Astro's do, with no shorthand
-// (-n is 1.x's --nfs-location); adopt's 1.x --name, the custom resource's, is
-// --cr-name's alias, and the adopted Deployment's name keeps --label.
+// deployment create and update take --name and -n, as Astro's do (1.x's -n
+// here was --nfs-location, which keeps its long spelling); adopt's 1.x --name,
+// the custom resource's, is --cr-name's alias, and the adopted Deployment's
+// name keeps --label.
 func TestDeploymentNameFlag(t *testing.T) {
 	for _, args := range [][]string{
-		{"--name", "alpha"}, {"--label", "alpha"}, {"-l", "alpha"}, {"--name", "alpha", "--label", "alpha"},
+		{"--name", "alpha"}, {"-n", "alpha"}, {"--label", "alpha"}, {"-l", "alpha"}, {"--name", "alpha", "--label", "alpha"},
 	} {
 		t.Run("create "+args[0], func(t *testing.T) {
 			api := newAPCClient()
@@ -101,6 +102,31 @@ func TestDeploymentNameFlag(t *testing.T) {
 		assert.NotEqual(t, 0, run.code)
 		require.Error(t, run.err)
 		assert.Contains(t, run.err.Error(), "disagree")
+		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
+	})
+
+	// 1.x's -n was the NFS mount. A 1.x line passing it is refused, not
+	// taken as the Deployment's name.
+	t.Run("an NFS location given as the name is refused, naming --nfs-location", func(t *testing.T) {
+		for _, args := range [][]string{
+			{"deployment", "update", "dep-ac", "-n", "10.0.0.5:/dags"},
+			{"deployment", "create", "--cluster-id", "cl-1", "--name", "nfs.corp:/airflow/dags"},
+		} {
+			api := newAPCClient()
+			api.On("GetDeployment", "dep-ac").Return(&certifiedDep, nil).Maybe()
+			run := runAPC(t, api, "", args...)
+			assert.Equal(t, 2, run.code, "%v", args)
+			require.Error(t, run.err, "%v", args)
+			assert.Contains(t, run.err.Error(), "is an NFS location: -n is --name in v2, and the NFS volume to mount is --nfs-location", "%v", args)
+			api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
+			api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
+		}
+	})
+
+	t.Run("a 1.x create passing the mount as -n beside -l is refused", func(t *testing.T) {
+		api := newAPCClient()
+		run := runAPC(t, api, "", "deployment", "create", "--cluster-id", "cl-1", "-l", "prod", "-n", "10.0.0.5:/dags")
+		assert.NotEqual(t, 0, run.code)
 		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
 	})
 
@@ -141,7 +167,7 @@ func TestDeploymentNameFlag(t *testing.T) {
 		t.Run(sub+" help shows --name only", func(t *testing.T) {
 			run := runAPC(t, newAPCClient(), "", "deployment", sub, "--help")
 			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-			assert.Contains(t, run.stdout, "--name")
+			assert.Contains(t, run.stdout, "-n, --name")
 			assert.NotContains(t, run.stdout, "--label")
 		})
 	}
