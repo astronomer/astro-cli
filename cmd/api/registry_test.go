@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 )
 
 func TestNewRegistryCmd_SubcommandsRegistered(t *testing.T) {
@@ -21,6 +23,13 @@ func TestNewRegistryCmd_SubcommandsRegistered(t *testing.T) {
 
 	assert.Contains(t, names, "ls")
 	assert.Contains(t, names, "describe")
+}
+
+// The registry is public, so the root's login check leaves the family alone
+// (the annotation reaches ls and describe through their parent).
+func TestNewRegistryCmd_NeedsNoLogin(t *testing.T) {
+	cmd := NewRegistryCmd(&bytes.Buffer{})
+	assert.Equal(t, "true", cmd.Annotations[astroCmd.NoLoginAnnotation])
 }
 
 func TestNewRegistryCmd_Flags(t *testing.T) {

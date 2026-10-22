@@ -72,4 +72,46 @@ func TestWithRateLimitRetries(t *testing.T) {
 		_, err = WithRateLimitRetries(&http.Client{}).Do(req) //nolint:bodyclose // a canceled request returns no response to close
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
 	})
+
+	t.Run("caps the wait a Retry-After asks for", func(t *testing.T) {
+		origCap := rateLimitWaitCap
+		rateLimitWaitCap = time.Millisecond
+		t.Cleanup(func() { rateLimitWaitCap = origCap })
+		var calls atomic.Int32
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			if calls.Add(1) == 1 {
+				w.Header().Set("Retry-After", "3600")
+				w.WriteHeader(http.StatusTooManyRequests)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		t.Cleanup(srv.Close)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL, http.NoBody)
+		require.NoError(t, err)
+		resp, err := WithRateLimitRetries(&http.Client{}).Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("leaves the wrapped transport's idle connections alone", func(t *testing.T) {
+		srv, _ := serve(t, http.StatusTooManyRequests)
+		transport := &closeCounter{RoundTripper: http.DefaultTransport}
+		resp, err := WithRateLimitRetries(&http.Client{Transport: transport}).Get(srv.URL)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
+		assert.Zero(t, transport.closes.Load())
+	})
 }
+
+// closeCounter counts the calls to close its idle connections.
+type closeCounter struct {
+	http.RoundTripper
+	closes atomic.Int32
+}
+
+func (c *closeCounter) CloseIdleConnections() { c.closes.Add(1) }
