@@ -96,7 +96,7 @@ func TestDeploymentLogsPicksComponentsAsAstroDoes(t *testing.T) {
 		run := runAPC(t, api, "", "deployment", "logs", "dep-1", "--component", "ApiServer")
 		assert.Equal(t, 2, run.code)
 		require.Error(t, run.err)
-		assert.Contains(t, run.err.Error(), `--component "ApiServer" is not a component this platform logs: use webserver, scheduler, worker (or workers), triggerer`)
+		assert.Contains(t, run.err.Error(), `--component "ApiServer" is not a component this platform logs: use webserver, scheduler, worker or workers, triggerer`)
 		api.AssertNotCalled(t, "ListDeploymentLogs", mock.Anything)
 	})
 
@@ -140,6 +140,7 @@ func TestDeploymentLogsPicksComponentsAsAstroDoes(t *testing.T) {
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		assert.Contains(t, run.stdout, "--scheduler")
 		assert.Contains(t, run.stdout, "--component")
+		assert.Contains(t, run.stdout, "(webserver, scheduler, worker or workers, triggerer)", "Houston's name beside the flag's")
 		assert.NotContains(t, run.stdout, "Available Commands")
 	})
 }

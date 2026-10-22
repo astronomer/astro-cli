@@ -58,6 +58,12 @@ var logComponentNames = map[string]string{
 	"triggerers": logTriggerer,
 }
 
+// logComponentNamesProse is the --component names the platform takes, for
+// help and refusals: Houston's worker beside the flag's workers.
+func logComponentNamesProse(triggerer bool) string {
+	return strings.Replace(strings.Join(allLogComponents(triggerer), ", "), logWorker, logWorker+" or "+logWorkers, 1)
+}
+
 // logComponentFlag is the flag that picks component.
 func logComponentFlag(component string) string {
 	if component == logWorker {
@@ -101,12 +107,10 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&logsWebserver, "webserver", false, "Show logs from the webserver")
 	cmd.Flags().BoolVar(&logsScheduler, "scheduler", false, "Show logs from the scheduler")
 	cmd.Flags().BoolVar(&logsWorkers, logWorkers, false, "Show logs from the workers")
-	names := "webserver, scheduler, worker"
 	if triggerer {
 		cmd.Flags().BoolVar(&logsTriggerer, "triggerer", false, "Show logs from the triggerer")
-		names += ", triggerer"
 	}
-	cmd.Flags().StringSliceVar(&logsComponents, "component", nil, "Show logs from a component by name ("+names+"), repeatable or comma-separated, instead of a flag such as --scheduler")
+	cmd.Flags().StringSliceVar(&logsComponents, "component", nil, "Show logs from a component by name ("+logComponentNamesProse(triggerer)+"), repeatable or comma-separated, instead of a flag such as --scheduler")
 
 	cmd.AddCommand(
 		newComponentLogsCmd(out, "webserver", []string{"web", "w"}, logWebserver),
@@ -176,8 +180,7 @@ func pickLogComponents(triggerer bool) ([]string, error) {
 		}
 		c, ok := logComponentNames[strings.ToLower(typed)]
 		if !ok || (c == logTriggerer && !triggerer) {
-			names := strings.Replace(strings.Join(allLogComponents(triggerer), ", "), logWorker, logWorker+" (or "+logWorkers+")", 1)
-			return nil, cliout.Usage(fmt.Errorf("--component %q is not a component this platform logs: use %s", typed, names))
+			return nil, cliout.Usage(fmt.Errorf("--component %q is not a component this platform logs: use %s", typed, logComponentNamesProse(triggerer)))
 		}
 		on[c] = true
 	}
