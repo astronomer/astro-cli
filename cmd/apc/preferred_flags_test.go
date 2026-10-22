@@ -186,7 +186,7 @@ var workspaceFlagCommands = []struct {
 }{
 	{[]string{"deployment", "create", "--label", "l", "--cluster-id", "c"}, ""},
 	{[]string{"deployment", "list"}, ""},
-	{[]string{"deployment", "adopt", "--cluster-id", "c", "--name", "n", "--namespace", "ns"}, ""},
+	{[]string{"deployment", "adopt", "--cluster-id", "c", "--cr-name", "n", "--namespace", "ns"}, ""},
 	{[]string{"workspace", "user", "add", "--email", "a@example.com"}, "w"},
 	{[]string{"workspace", "user", "update", "a@example.com"}, "w"},
 	{[]string{"workspace", "user", "remove", "a@example.com"}, "w"},
@@ -441,7 +441,7 @@ func TestRoleAndDescriptionShorthands(t *testing.T) {
 	got, err = reach(t, "workspace", "user", "update", "a@example.com", "-r", "WORKSPACE_ADMIN")
 	require.NoError(t, err)
 	assert.Equal(t, "WORKSPACE_ADMIN", got.workspaceRole)
-	got, err = reach(t, "deployment", "adopt", "--cluster-id", "c", "--name", "n", "--namespace", "ns", "-d", "adopted")
+	got, err = reach(t, "deployment", "adopt", "--cluster-id", "c", "--cr-name", "n", "--namespace", "ns", "-d", "adopted")
 	require.NoError(t, err)
 	assert.Equal(t, "adopted", got.adoptDescription)
 }
