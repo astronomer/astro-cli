@@ -81,6 +81,16 @@ func TestDeploymentLogsPicksComponentsAsAstroDoes(t *testing.T) {
 		api.AssertExpectations(t)
 	})
 
+	t.Run("--component skips empty names, as a trailing comma leaves", func(t *testing.T) {
+		api := newAPCClient()
+		logsOf(api, "scheduler", "01")
+
+		run := runAPC(t, api, "", "deployment", "logs", "dep-1", "--component", ",scheduler, ", "-o", "json")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		assert.Len(t, decodeLines[logEntryJSON](t, run.stdout), 1, "the scheduler alone, not every component")
+		api.AssertExpectations(t)
+	})
+
 	t.Run("an unknown --component is a usage error, before any request", func(t *testing.T) {
 		api := newAPCClient()
 		run := runAPC(t, api, "", "deployment", "logs", "dep-1", "--component", "apiserver")
