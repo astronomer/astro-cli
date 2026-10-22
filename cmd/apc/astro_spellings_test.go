@@ -73,11 +73,14 @@ func TestWorkspaceNameFlag(t *testing.T) {
 func TestNFSShapedName(t *testing.T) {
 	for v, nfs := range map[string]bool{
 		"10.0.0.5:/dags":         true,
+		"nfs://10.0.0.5:/dags":   true,
 		"nfs.corp:/airflow/dags": true,
-		"filer-01:/":             true,
 		"[fd00::5]:/dags":        true,
+		"10.0.0.5:/":             true,
 		"prod":                   false,
 		"Team A: prod":           false,
+		"etl:/daily":             false,
+		"filer-01:/dags":         false,
 		"https://wiki/team-a":    false,
 		"10.0.0.5:dags":          false,
 		"a/b:/c":                 false,
@@ -129,6 +132,7 @@ func TestDeploymentNameFlag(t *testing.T) {
 	t.Run("an NFS location given as the name is refused, naming --nfs-location", func(t *testing.T) {
 		for _, args := range [][]string{
 			{"deployment", "update", "dep-ac", "-n", "10.0.0.5:/dags"},
+			{"deployment", "update", "dep-ac", "-n", "nfs://10.0.0.5:/dags"},
 			{"deployment", "create", "--cluster-id", "cl-1", "--name", "nfs.corp:/airflow/dags"},
 		} {
 			api := newAPCClient()
@@ -136,10 +140,35 @@ func TestDeploymentNameFlag(t *testing.T) {
 			run := runAPC(t, api, "", args...)
 			assert.Equal(t, 2, run.code, "%v", args)
 			require.Error(t, run.err, "%v", args)
-			assert.Contains(t, run.err.Error(), "is an NFS location: -n is --name in v2, and the NFS volume to mount is --nfs-location", "%v", args)
+			assert.Contains(t, run.err.Error(), "it is an NFS location: the NFS volume to mount is --nfs-location, and --name (-n) is the Deployment's name in v2", "%v", args)
 			api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
 			api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
 		}
+	})
+
+	// Given through 1.x's --label, it is refused as given: a usage error
+	// naming the spelling typed.
+	t.Run("an NFS location given as -l is a usage error naming -l's --label", func(t *testing.T) {
+		api := newAPCClient()
+		run := runAPC(t, api, "", "deployment", "create", "--cluster-id", "cl-1", "-l", "10.0.0.5:/dags")
+		assert.Equal(t, 2, run.code)
+		require.Error(t, run.err)
+		assert.Contains(t, run.err.Error(), `--label: invalid argument "10.0.0.5:/dags" for "-n, --name" flag: it is an NFS location`)
+		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
+	})
+
+	// 1.x's --label took any name, so --name does: only what is shaped as an
+	// NFS location is refused.
+	t.Run("a name with :/ in it that is no NFS location is taken", func(t *testing.T) {
+		api := newAPCClient()
+		api.On("GetDeployment", "dep-ac").Return(&certifiedDep, nil)
+		api.On("UpdateDeployment", mock.MatchedBy(func(v map[string]interface{}) bool {
+			p, ok := v["payload"].(map[string]string)
+			return ok && p["label"] == "etl:/daily"
+		})).Return(&certifiedDep, nil).Once()
+		run := runAPC(t, api, "", "deployment", "update", "dep-ac", "--name", "etl:/daily")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		api.AssertExpectations(t)
 	})
 
 	// 1.x's create needed -l, so this is how a 1.x line passing the mount
@@ -225,10 +254,14 @@ func TestDeploymentNameFlag(t *testing.T) {
 		}
 	})
 
-	t.Run("adopt naming nothing is the required-flag error, naming --cr-name", func(t *testing.T) {
-		run := runAPC(t, newAPCClient(), "", "deployment", "adopt", "--cluster-id", "cl-1", "--namespace", "ns")
-		require.Error(t, run.err)
-		assert.Contains(t, run.err.Error(), `required flag(s) "cr-name" not set`)
+	// No --name typed, so nothing to say about what it means now: the error is
+	// the one naming the flag missing, --label alone given or not.
+	t.Run("adopt naming no custom resource and no --name is the required-flag error", func(t *testing.T) {
+		for _, args := range [][]string{{}, {"-l", "shown"}} {
+			run := runAPC(t, newAPCClient(), "", append([]string{"deployment", "adopt", "--cluster-id", "cl-1", "--namespace", "ns"}, args...)...)
+			require.Error(t, run.err, "%v", args)
+			assert.Contains(t, run.err.Error(), `required flag(s) "cr-name" not set`, "%v", args)
+		}
 	})
 
 	for _, sub := range []string{"create", "update", "adopt"} {

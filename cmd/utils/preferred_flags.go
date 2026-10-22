@@ -94,7 +94,11 @@ func ApplyAliases(fs *pflag.FlagSet) error {
 				err = cliout.Usage(fmt.Errorf("--%s %q and --%s %q disagree: pass only --%s", p, v, f.Name, f.Value.String(), p))
 			}
 		case !pf.Changed:
-			err = fs.Set(p, f.Value.String())
+			// A value the flag refuses is refused as given: a usage error,
+			// led by the spelling typed, before pflag's naming of the flag.
+			if setErr := fs.Set(p, f.Value.String()); setErr != nil {
+				err = cliout.Usage(fmt.Errorf("--%s: %w", f.Name, setErr))
+			}
 		}
 	})
 	return err

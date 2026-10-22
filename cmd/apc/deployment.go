@@ -41,8 +41,8 @@ var (
 	cancel                      bool
 	executor                    string
 	airflowVersion              string
-	deploymentCreateLabel       string
-	deploymentUpdateLabel       string
+	deploymentCreateName        string
+	deploymentUpdateName        string
 	deploymentUpdateDescription string
 	// have to use two different executor flags for create and update commands otherwise both commands override this value
 	executorUpdate          string
@@ -75,9 +75,9 @@ var (
 	hibernateForDuration string
 	hibernateRemove      bool
 
-	adoptName                    string
+	adoptCRName                  string
 	adoptNamespace               string
-	adoptLabel                   string
+	adoptDeploymentName          string
 	adoptDescription             string
 	adoptUseApcLogging           bool
 	adoptUseApcRegistry          bool
@@ -177,6 +177,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	// deployment command, through this group, and no other one read it: those
 	// keep it, hidden and read by nothing, so a 1.x script passing it keeps
 	// working. hibernate and wake-up are newer than 1.x, so they take none.
+	var adopt *cobra.Command
 	for _, c := range cmd.Commands() {
 		switch c.Name() {
 		case "create":
@@ -184,6 +185,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		case "list":
 			addWorkspaceFlag(c.Flags(), "Workspace whose Deployments to list (default: the current context's)", "")
 		case "adopt":
+			adopt = c
 			addWorkspaceFlag(c.Flags(), "Workspace to adopt the Deployment into (default: the current context's)", "")
 		case "update", "delete", "unadopt", "logs", "service-account", "user", "team", "airflow", "runtime":
 			fs := c.Flags()
@@ -195,23 +197,25 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	}
 
 	applyPreferredFlagsIn(cmd)
-	// After applyPreferredFlagsIn, so it runs ahead of it: see
-	// refuseOneXAdoptName.
-	if adopt, _, err := cmd.Find([]string{"adopt"}); err == nil && adopt.Name() == "adopt" {
+	// BeforeArgs runs the hook installed last first, so this one, installed
+	// after applyPreferredFlagsIn, runs ahead of it: see refuseOneXAdoptName.
+	// TestDeploymentNameFlag's 1.x adopt lines fail if the order turns round.
+	if adopt != nil {
 		utils.BeforeArgs(adopt, refuseOneXAdoptName)
 	}
 	return cmd
 }
 
-// refuseOneXAdoptName refuses an adopt that names no custom resource but
-// gives --name or 1.x's --label: 1.x's --name was the custom resource's, and
-// in v2 it is the adopted Deployment's, as on create, so a 1.x line names no
-// custom resource. It runs ahead of the reconciliation of --name with
-// --label, whose refusal of a 1.x line giving both would say to keep the
-// custom resource's name as the Deployment's.
+// refuseOneXAdoptName refuses an adopt that gives --name but names no custom
+// resource: 1.x's --name was the custom resource's, and in v2 it is the
+// adopted Deployment's, as on create, so such a line is a 1.x one. It runs
+// ahead of the reconciliation of --name with 1.x's --label, whose refusal of
+// a 1.x line giving both would say to keep the custom resource's name as the
+// Deployment's. A line giving --label alone names no custom resource either,
+// and cobra's required-flag error says so.
 func refuseOneXAdoptName(cmd *cobra.Command, _ []string) error {
 	fs := cmd.Flags()
-	if fs.Changed("cr-name") || !(fs.Changed("name") || fs.Changed("label")) {
+	if fs.Changed("cr-name") || !fs.Changed("name") {
 		return nil
 	}
 	return cliout.Usage(errors.New("name the custom resource with --cr-name: --name is the adopted Deployment's name in v2, as on create, where 1.x's --name was the custom resource's"))
@@ -272,7 +276,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 	// -n, as on Astro: 1.x's -n here was --nfs-location, which now has no
 	// shorthand, and deploymentName refuses a 1.x line passing the mount.
-	addDeploymentNameFlag(cmd, &deploymentCreateLabel, "Name of your deployment")
+	addDeploymentNameFlag(cmd, &deploymentCreateName, "Name of your deployment", true)
 	cmd.Flags().StringVarP(&executor, "executor", "e", celeryExecutorArg, "The executor used in your Airflow deployment, one of: local, celery, or kubernetes (or Astro's LocalExecutor, CeleryExecutor, KubernetesExecutor)")
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired Airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
@@ -400,10 +404,9 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 	// --name is the Deployment's, as on create, with 1.x's --label its alias.
 	// 1.x's --name was the custom resource's, which is --cr-name now, and
 	// required: a 1.x line names none, and refuseOneXAdoptName says why.
-	cmd.Flags().StringVar(&adoptName, "cr-name", "", "Name (metadata.name) of the existing Airflow custom resource (CR)")
+	cmd.Flags().StringVar(&adoptCRName, "cr-name", "", "Name (metadata.name) of the existing Airflow custom resource (CR)")
 	cmd.Flags().StringVarP(&adoptNamespace, "namespace", "", "", "Kubernetes namespace of the existing Airflow custom resource (CR)")
-	cmd.Flags().StringVarP(&adoptLabel, "name", "n", "", "Name of the adopted Deployment (default: the --cr-name value)")
-	utils.AddAlias(cmd.Flags(), "label", "l", "name")
+	addDeploymentNameFlag(cmd, &adoptDeploymentName, "Name of the adopted Deployment (default: the --cr-name value)", false)
 	cmd.Flags().StringVarP(&adoptDescription, "description", "d", "", "Description for the adopted Deployment")
 	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through APC logging")
 	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
@@ -514,7 +517,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 
 	cmd.Flags().StringVarP(&deploymentUpdateDescription, "description", "d", "", "Set description to update in deployment")
 	// -n, as on Astro: see create.
-	addDeploymentNameFlag(cmd, &deploymentUpdateLabel, "The new name for the deployment")
+	addDeploymentNameFlag(cmd, &deploymentUpdateName, "The new name for the deployment", true)
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -617,32 +620,39 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 }
 
 // nfsShaped matches an NFS location as --nfs-location takes it, <host>:/<path>,
-// the host a name or address, or an IPv6 one in brackets. A URL's :// is not
-// one: the path after :/ starts with no second slash.
-var nfsShaped = regexp.MustCompile(`^(\[[0-9A-Fa-f:.]+\]|[^\s/:\[\]]+):/([^/]|$)`)
+// with or without the nfs:// the CLI adds, the host an IPv4 address, an IPv6
+// one in brackets or a dotted host name. That is narrower than every NFS
+// location, so that a Deployment name such as etl:/daily, which 1.x's --label
+// took, is not one: a host name with no dot, or a URL's ://, is a name.
+var nfsShaped = regexp.MustCompile(`^(nfs://)?(\[[0-9A-Fa-f:.]+\]|[0-9]{1,3}(\.[0-9]{1,3}){3}|[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+):/([^/]|$)`)
 
-// deploymentName is --name on deployment create and update, which refuses an
-// NFS location. -n was 1.x's --nfs-location there and is --name in v2, so a
-// 1.x line passing the mount with -n would otherwise name the Deployment
-// after it. It refuses as the line is parsed, ahead of the check that --name
-// and 1.x's --label agree, so the refusal is the one that says what -n is now.
-type deploymentName struct{ to *string }
+// deploymentName is --name on the deployment commands that name one. With
+// refuseNFS, on create and update, it refuses an NFS location: -n was 1.x's
+// --nfs-location there and is --name in v2, so a 1.x line passing the mount
+// with -n would otherwise name the Deployment after it. It refuses as the
+// line is parsed, ahead of the check that --name and 1.x's --label agree, so
+// the refusal is the one that says where the mount goes now.
+type deploymentName struct {
+	to        *string
+	refuseNFS bool
+}
 
 func (n deploymentName) String() string { return *n.to }
 func (n deploymentName) Type() string   { return "string" }
 func (n deploymentName) Set(v string) error {
-	if nfsShaped.MatchString(v) {
-		return fmt.Errorf("it is an NFS location: -n is --name in v2, and the NFS volume to mount is --nfs-location")
+	if n.refuseNFS && nfsShaped.MatchString(v) {
+		return errors.New("it is an NFS location: the NFS volume to mount is --nfs-location, and --name (-n) is the Deployment's name in v2")
 	}
 	*n.to = v
 	return nil
 }
 
-// addDeploymentNameFlag registers --name, -n, on cmd, read into to, with
-// 1.x's --label, -l, as its hidden alias.
-func addDeploymentNameFlag(cmd *cobra.Command, to *string, usage string) {
+// addDeploymentNameFlag registers the Deployment's name on cmd as --name, -n,
+// read into to, with 1.x's --label, -l, as its hidden alias. refuseNFS says
+// whether 1.x's -n there was --nfs-location (deploymentName).
+func addDeploymentNameFlag(cmd *cobra.Command, to *string, usage string, refuseNFS bool) {
 	*to = ""
-	cmd.Flags().VarP(deploymentName{to: to}, "name", "n", usage)
+	cmd.Flags().VarP(deploymentName{to: to, refuseNFS: refuseNFS}, "name", "n", usage)
 	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 }
 
@@ -711,7 +721,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		}
 	}
 	req := &deployment.CreateDeploymentRequest{
-		Label:             deploymentCreateLabel,
+		Label:             deploymentCreateName,
 		WS:                ws,
 		ReleaseName:       releaseName,
 		CloudRole:         cloudRole,
@@ -878,8 +888,8 @@ func deploymentAdopt(cmd *cobra.Command, out io.Writer) error {
 		WorkspaceID:             ws,
 		ClusterID:               clusterID,
 		CRNamespace:             adoptNamespace,
-		CRName:                  adoptName,
-		Label:                   adoptLabel,
+		CRName:                  adoptCRName,
+		Label:                   adoptDeploymentName,
 		Description:             adoptDescription,
 		UseApcLogging:           adoptUseApcLogging,
 		UseApcRegistry:          adoptUseApcRegistry,
@@ -971,8 +981,8 @@ func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string,
 	if deploymentUpdateDescription != "" {
 		argsMap["description"] = deploymentUpdateDescription
 	}
-	if deploymentUpdateLabel != "" {
-		argsMap["label"] = deploymentUpdateLabel
+	if deploymentUpdateName != "" {
+		argsMap["label"] = deploymentUpdateName
 	}
 
 	// Silence Usage as we have now validated command input
