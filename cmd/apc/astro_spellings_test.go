@@ -274,6 +274,73 @@ func TestDeploymentNameFlag(t *testing.T) {
 	}
 }
 
+// service-account create names the account with --name and -n, as Astro's
+// API tokens are named, with 1.x's --label and -l as its alias.
+func TestServiceAccountNameFlag(t *testing.T) {
+	named := func(name string) any {
+		return mock.MatchedBy(func(r *houston.CreateServiceAccountRequest) bool { return r.Label == name })
+	}
+	for _, c := range []struct {
+		scope  string
+		args   []string
+		method string
+		ret    any
+	}{
+		{"workspace", []string{"workspace", "service-account", "create", "--workspace", "ws-1"}, "CreateWorkspaceServiceAccount", &houston.WorkspaceServiceAccount{ServiceAccount: createdSA}},
+		{"deployment", []string{"deployment", "service-account", "create", "--deployment", "dep-1"}, "CreateDeploymentServiceAccount", &houston.DeploymentServiceAccount{ServiceAccount: createdSA}},
+	} {
+		for _, given := range [][]string{
+			{"--name", "ci"},
+			{"-n", "ci"},
+			{"--label", "ci"},
+			{"-l", "ci"},
+			{"--name", "ci", "--label", "ci"},
+			{"-n", "ci", "-l", "ci"},
+		} {
+			t.Run(c.scope+" "+strings.Join(given, " "), func(t *testing.T) {
+				api := newAPCClient()
+				api.On(c.method, named("ci")).Return(c.ret, nil).Once()
+				run := runAPC(t, api, "", append(append([]string{}, c.args...), given...)...)
+				require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+				api.AssertExpectations(t)
+			})
+		}
+		for _, given := range [][]string{{"--name", "ci", "--label", "other"}, {"-n", "ci", "-l", "other"}} {
+			t.Run(c.scope+": "+strings.Join(given, " ")+" disagreeing is refused", func(t *testing.T) {
+				api := newAPCClient()
+				run := runAPC(t, api, "", append(append([]string{}, c.args...), given...)...)
+				assert.NotEqual(t, 0, run.code)
+				require.Error(t, run.err)
+				assert.Contains(t, run.err.Error(), "disagree")
+				api.AssertNotCalled(t, c.method, mock.Anything)
+			})
+		}
+		// An unset variable is no name: refused, not an account named "" with
+		// a live API key, whichever spelling handed it on.
+		for _, given := range [][]string{{"--name", ""}, {"--label", ""}, {"-l", ""}} {
+			t.Run(c.scope+": "+strings.Join(given, " ")+`"" is refused`, func(t *testing.T) {
+				api := newAPCClient()
+				run := runAPC(t, api, "", append(append([]string{}, c.args...), given...)...)
+				assert.Equal(t, 2, run.code)
+				require.Error(t, run.err)
+				assert.Contains(t, run.err.Error(), "a service account needs a name: --name cannot be empty")
+				api.AssertNotCalled(t, c.method, mock.Anything)
+			})
+		}
+		t.Run(c.scope+": neither is the required-flag error, naming --name", func(t *testing.T) {
+			run := runAPC(t, newAPCClient(), "", c.args...)
+			require.Error(t, run.err)
+			assert.Contains(t, run.err.Error(), `required flag(s) "name" not set`)
+		})
+		t.Run(c.scope+": help shows --name only", func(t *testing.T) {
+			run := runAPC(t, newAPCClient(), "", c.scope, "service-account", "create", "--help")
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+			assert.Contains(t, run.stdout, "-n, --name")
+			assert.NotContains(t, run.stdout, "--label")
+		})
+	}
+}
+
 func TestDeploymentLogsKeywordFlag(t *testing.T) {
 	searched := func(term string) any {
 		return mock.MatchedBy(func(r houston.ListDeploymentLogsRequest) bool { return r.Search == term })

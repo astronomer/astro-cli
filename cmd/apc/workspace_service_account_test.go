@@ -49,6 +49,9 @@ func (s *Suite) TestWorkspaceSaCreate() {
 	currentClient := houstonClient
 	houstonClient = houstonMock
 	defer func() { houstonClient = currentClient }()
+	// As --name does: a service account needs one.
+	workspaceSAName = "ci"
+	defer func() { workspaceSAName = "" }()
 	workspaceSARole = houston.WorkspaceAdminRole
 	houstonMock.On("CreateWorkspaceServiceAccount", mock.Anything).Return(&houston.WorkspaceServiceAccount{}, nil).Once()
 
