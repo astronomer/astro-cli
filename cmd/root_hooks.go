@@ -17,6 +17,8 @@ import (
 	"github.com/astronomer/astro-cli/version"
 )
 
+var cloudSetup = cloudCmd.Setup
+
 // SetupLogging is a pre-run hook shared between APC & cloud
 // setting up log verbosity.
 func SetupLogging(_ *cobra.Command, _ []string) error {
@@ -39,13 +41,18 @@ func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobr
 			}
 		}
 		if context.IsCloudContext() {
-			err := cloudCmd.Setup(cmd, astroV1Client)
+			err := cloudSetup(cmd, astroV1Client)
 			if err != nil {
 				if strings.Contains(err.Error(), "token is invalid or malformed") {
 					return errors.New("API Token is invalid or malformed") //nolint
 				}
 				if strings.Contains(err.Error(), "the API token given has expired") {
 					return errors.New("API Token is expired") //nolint
+				}
+				// Carrying on without the organization would send its requests to
+				// an empty one, and fail with an error that hides this one.
+				if errors.Is(err, cloudCmd.ErrAPITokenOrganization) {
+					return err
 				}
 				apcCmd.InitDebugLogs = append(apcCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
 			}
