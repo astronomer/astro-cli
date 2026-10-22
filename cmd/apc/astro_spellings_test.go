@@ -1,6 +1,7 @@
 package apc
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -100,9 +101,10 @@ func TestDeploymentLogsKeywordFlag(t *testing.T) {
 		api.AssertNotCalled(t, "ListDeploymentLogs", mock.Anything)
 	})
 
-	for _, component := range []string{"scheduler", "webserver", "workers", "triggerer"} {
-		t.Run(component+" help shows --keyword only", func(t *testing.T) {
-			run := runAPC(t, newAPCClient(), "", "deployment", "logs", component, "--help")
+	// logs itself, and 1.x's hidden subcommands.
+	for _, path := range [][]string{{"logs"}, {"logs", "scheduler"}, {"logs", "webserver"}, {"logs", "workers"}} {
+		t.Run(strings.Join(path, " ")+" help shows --keyword only", func(t *testing.T) {
+			run := runAPC(t, newAPCClient(), "", append(append([]string{"deployment"}, path...), "--help")...)
 			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 			assert.Contains(t, run.stdout, "--keyword")
 			assert.NotContains(t, run.stdout, "--search")

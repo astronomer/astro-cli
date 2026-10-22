@@ -259,7 +259,7 @@ var deploymentArgCommands = [][]string{
 	{"deployment", "logs", "webserver"},
 	{"deployment", "logs", "scheduler"},
 	{"deployment", "logs", "workers"},
-	{"deployment", "logs", "triggerer"},
+	{"deployment", "logs"},
 }
 
 // The argument and --deployment each name the Deployment; given both, they
