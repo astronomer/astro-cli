@@ -506,20 +506,23 @@ func newTeamDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete [TEAM_ID]",
 		Aliases: []string{"de"},
 		Short:   "Delete an Astro Team",
-		Long:    "Permanently delete a team. All Workspace and Deployment role bindings for the team are removed, and members lose any access they had through the team (but keep directly assigned roles). This action cannot be undone.",
+		Long:    "Permanently delete a team. All Workspace and Deployment role bindings for the team are removed, and members lose any access they had through the team (but keep directly assigned roles). This action cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Args:    cobra.MaximumNArgs(1),
 		Example: `
-  # Delete a team by its ID
+  # Delete a team by its ID, after confirming
   astro organization team delete <TEAM_ID>
 
   # Choose the team to delete from a list
   astro organization team delete
+
+  # Delete a team without being asked
+  astro organization team delete <TEAM_ID> --yes
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return teamDelete(cmd, out, args)
 		},
 	}
-	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation on an IDP-managed team")
+	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation before deleting the team")
 	return cmd
 }
 

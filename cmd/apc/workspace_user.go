@@ -43,14 +43,15 @@ func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 
 func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "add",
+		Use:   "add [EMAIL]",
 		Short: "Add a User to a Workspace",
-		Long:  "Add a User to a Workspace",
+		Long:  "Add a User to a Workspace, named by their email as the argument or with --email",
+		Args:  argOrFlag("email", "email"),
 		Example: `  # Add a user to the current Workspace as a viewer
-  astro workspace user add --email user@company.com
+  astro workspace user add user@company.com
 
   # Add a user to another Workspace as an editor
-  astro workspace user add --email user@company.com --role WORKSPACE_EDITOR \
+  astro workspace user add user@company.com --role WORKSPACE_EDITOR \
     --workspace <WORKSPACE_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserAdd(cmd, out)

@@ -16,10 +16,10 @@ var deploymentRole string
 
 const (
 	deploymentTeamAddExample = `  # Give a Workspace team viewer access to a Deployment
-  astro deployment team add --deployment=<DEPLOYMENT_ID> --team-id=<TEAM_ID>
+  astro deployment team add <TEAM_ID> --deployment=<DEPLOYMENT_ID>
 
   # Give it another role
-  astro deployment team add --deployment=<DEPLOYMENT_ID> --team-id=<TEAM_ID> \
+  astro deployment team add <TEAM_ID> --deployment=<DEPLOYMENT_ID> \
     --role=DEPLOYMENT_EDITOR`
 	deploymentTeamRemoveExample = `  # Remove a team's access to a Deployment
   astro deployment team remove <TEAM_ID> --deployment=<DEPLOYMENT_ID>`
@@ -52,9 +52,10 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the Workspace twin differs in its flags and its role
 	cmd := &cobra.Command{
-		Use:     "add",
+		Use:     "add [TEAM_ID]",
 		Short:   "Add a team to a deployment",
-		Long:    "Add a team to a deployment",
+		Long:    "Add a team to a deployment, named by its id as the argument or with --team-id",
+		Args:    argOrFlag("team-id", "team"),
 		Example: deploymentTeamAddExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentTeamAdd(cmd, out, args)

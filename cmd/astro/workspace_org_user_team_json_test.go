@@ -290,10 +290,11 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 			check:   empty,
 			wantErr: "requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ",
 		},
-		{name: "delete", root: newOrganizationCmd, client: with(teams, deletesTeam("team-eng")), args: []string{"organization", "team", "delete", "team-eng"}, check: says("Astro Team Engineering was successfully deleted")},
-		{name: "delete through the picker", root: newOrganizationCmd, client: with(teams, deletesTeam("team-eng")), answers: "1\n", args: []string{"organization", "team", "delete"}, check: says("Please select a team:", "> Astro Team Engineering was successfully deleted")},
+		{name: "delete", root: newOrganizationCmd, client: with(teams, deletesTeam("team-eng")), args: []string{"organization", "team", "delete", "team-eng", "--yes"}, check: says("Astro Team Engineering was successfully deleted")},
+		{name: "delete through the picker", root: newOrganizationCmd, client: with(teams, deletesTeam("team-eng")), answers: "1\n", args: []string{"organization", "team", "delete", "--yes"}, check: says("Please select a team:", "> Astro Team Engineering was successfully deleted")},
+		{name: "delete declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "delete", "team-eng"}, check: says("Are you sure you want to delete the Engineering team? This cannot be undone. (y/n)")},
 		{name: "delete an IdP team --yes", root: newOrganizationCmd, client: with(teams, deletesTeam("team-idp")), args: []string{"organization", "team", "delete", "team-idp", "--yes"}, check: says("Astro Team Okta Ops was successfully deleted")},
-		{name: "delete an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "delete", "team-idp"}, check: says("Are you sure you want to continue the operation? (y/n)")},
+		{name: "delete an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "delete", "team-idp"}, check: says("This is an IDP-managed team.", "Are you sure you want to delete the Okta Ops team? This cannot be undone. (y/n)")},
 		{name: "delete with no teams", root: newOrganizationCmd, client: with(noTeams), args: []string{"organization", "team", "delete"}, check: empty, wantErr: "no teams found in your organization"},
 		// The user is named by email, and the line ends with the team's name.
 		{name: "user add", root: newOrganizationCmd, client: with(teams, addsMember("team-eng")), args: []string{"organization", "team", "user", "add", "--team-id", "team-eng", "--user-id", "user-bob"}, check: func(t *testing.T, out string) {
@@ -451,7 +452,7 @@ func TestWorkspaceOrganizationTeamJSON(t *testing.T) {
 		},
 		{
 			name: "delete", root: newOrganizationCmd, client: with(teams, deletesTeam("team-eng")),
-			args:  []string{"organization", "team", "delete", "team-eng"},
+			args:  []string{"organization", "team", "delete", "team-eng", "--yes"},
 			check: jsonIs(map[string]any{"id": "team-eng", "name": "Engineering", "organization_id": "test-org-id", "action": "deleted"}),
 		},
 		{
@@ -543,6 +544,7 @@ func TestWorkspaceOrganizationUserTeamJSONNeverAsks(t *testing.T) {
 		{"org team update of an IdP team without --yes", org, []string{"organization", "team", "update", "team-idp", "--description", "d"}, "pass --yes"},
 		{"org team delete naming no team", org, []string{"organization", "team", "delete"}, "pass the team ID as an argument"},
 		{"org team delete of an IdP team without --yes", org, []string{"organization", "team", "delete", "team-idp"}, "pass --yes"},
+		{"org team delete without --yes", org, []string{"organization", "team", "delete", "team-eng"}, "pass --yes"},
 		{"org team user add naming no team", org, []string{"organization", "team", "user", "add", "--user-id", "user-bob"}, "pass --team-id"},
 		{"org team user add naming no user", org, []string{"organization", "team", "user", "add", "--team-id", "team-eng"}, "pass --user-id"},
 		{"org team user add to an IdP team without --yes", org, []string{"organization", "team", "user", "add", "--team-id", "team-idp", "--user-id", "user-bob"}, "pass --yes"},

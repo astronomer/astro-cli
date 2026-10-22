@@ -74,6 +74,9 @@ func (s *Suite) TestWorkspaceSaDelete() {
 	workspaceSARole = houston.WorkspaceAdminRole
 	houstonMock.On("DeleteWorkspaceServiceAccount", mock.Anything).Return(&houston.ServiceAccount{}, nil).Once()
 
+	// As --yes does: the question is the command's, and tested there.
+	skipPrompt = true
+	defer func() { skipPrompt = false }()
 	err := workspaceSaDelete(&cobra.Command{}, buf, []string{saID})
 	s.NoError(err)
 

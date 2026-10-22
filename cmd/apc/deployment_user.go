@@ -24,10 +24,10 @@ var (
   # Search them by email
   astro deployment user list --deployment=<DEPLOYMENT_ID> --email=<EMAIL>`
 	deploymentUserCreateExample = `  # Give a Workspace user viewer access to a Deployment
-  astro deployment user add --deployment=<DEPLOYMENT_ID> --email=<EMAIL>
+  astro deployment user add <EMAIL> --deployment=<DEPLOYMENT_ID>
 
   # Give them another role
-  astro deployment user add --deployment=<DEPLOYMENT_ID> --email=<EMAIL> --role=DEPLOYMENT_EDITOR`
+  astro deployment user add <EMAIL> --deployment=<DEPLOYMENT_ID> --role=DEPLOYMENT_EDITOR`
 	deploymentUserRemoveExample = `  # Remove a user's access to a Deployment
   astro deployment user remove <EMAIL> --deployment=<DEPLOYMENT_ID>`
 	deploymentUserUpdateExample = `  # Change a user's role in a Deployment
@@ -71,9 +71,10 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "add",
+		Use:     "add [EMAIL]",
 		Short:   "Add a user to a Deployment",
-		Long:    "Add a user to a Deployment",
+		Long:    "Add a user to a Deployment, named by their email as the argument or with --email",
+		Args:    argOrFlag("email", "email"),
 		Example: deploymentUserCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentUserAdd(cmd, out)

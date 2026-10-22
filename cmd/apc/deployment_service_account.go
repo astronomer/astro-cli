@@ -24,8 +24,11 @@ var (
     --role=DEPLOYMENT_EDITOR`
 	deploymentSaListExample = `  # List a Deployment's service accounts
   astro deployment service-account list --deployment=<DEPLOYMENT_ID>`
-	deploymentSaDeleteExample = `  # Delete a service account from a Deployment
-  astro deployment service-account delete <SERVICE_ACCOUNT_ID> --deployment=<DEPLOYMENT_ID>`
+	deploymentSaDeleteExample = `  # Delete a service account from a Deployment, after you confirm
+  astro deployment service-account delete <SERVICE_ACCOUNT_ID> --deployment=<DEPLOYMENT_ID>
+
+  # Delete it without the confirmation, from a script
+  astro deployment service-account delete <SERVICE_ACCOUNT_ID> --deployment=<DEPLOYMENT_ID> --yes`
 )
 
 // deploymentSAFlagUsage is --deployment's help on the commands that manage
@@ -90,7 +93,7 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete <SERVICE_ACCOUNT_ID>",
 		Aliases: []string{"de"},
 		Short:   "Delete a service account in the APC platform",
-		Long:    "Delete a service account in the APC platform",
+		Long:    "Delete a service account in the APC platform. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Example: deploymentSaDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -99,9 +102,18 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 	}
 	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addYesFlag(cmd, "Don't ask for confirmation before deleting the service account")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
+
+// serviceAccountDeleteQuestion is what a service-account delete asks before
+// it deletes id, and serviceAccountDeleteCanceled what it says when told no.
+func serviceAccountDeleteQuestion(id string) string {
+	return fmt.Sprintf("\nAre you sure you want to delete service account %s? This cannot be undone.", id)
+}
+
+const serviceAccountDeleteCanceled = "Canceling service account deletion"
 
 func deploymentSaCreate(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
@@ -132,6 +144,10 @@ func deploymentSaDelete(cmd *cobra.Command, args []string, out io.Writer) error 
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	ok, err := confirmRemoval(out, serviceAccountDeleteQuestion(args[0]), serviceAccountDeleteCanceled)
+	if err != nil || !ok {
+		return err
+	}
 	deleted, err := sa.DeleteUsingDeploymentUUID(args[0], deploymentID, houstonClient)
 	if err != nil {
 		return err

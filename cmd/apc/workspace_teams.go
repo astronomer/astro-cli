@@ -16,7 +16,7 @@ var (
 
 	workspaceTeamAddExample = `
   # Add a team to a Workspace as an editor
-  astro workspace team add --workspace <WORKSPACE_ID> --team-id <TEAM_ID> --role WORKSPACE_EDITOR
+  astro workspace team add <TEAM_ID> --workspace <WORKSPACE_ID> --role WORKSPACE_EDITOR
 `
 	workspaceTeamRemoveExample = `
   astro workspace team remove <TEAM_ID> --workspace <WORKSPACE_ID>
@@ -48,9 +48,10 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 
 func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the Deployment twin differs in its flags and its role
 	cmd := &cobra.Command{
-		Use:     "add",
+		Use:     "add [TEAM_ID]",
 		Short:   "Add a Team to a Workspace",
-		Long:    "Add a Team to a Workspace",
+		Long:    "Add a Team to a Workspace, named by its id as the argument or with --team-id",
+		Args:    argOrFlag("team-id", "team"),
 		Example: workspaceTeamAddExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceTeamAdd(cmd, out, args)

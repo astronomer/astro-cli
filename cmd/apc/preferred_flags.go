@@ -163,3 +163,24 @@ func resolveDeployment(cmd *cobra.Command, name string) (id, link string, err er
 	}
 	return target.DeploymentID, target.LinkName, nil
 }
+
+// argOrFlag is the argument check of a command that takes what flag holds as
+// its argument too, as Astro's command takes it (what names it in a
+// refusal): at most one argument, handed to flag, so a required check on
+// flag is met by either, and given with flag, the two must agree. Given
+// neither, flag's required check refuses the run as it always has.
+func argOrFlag(flag, what string) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if err := cobra.MaximumNArgs(1)(cmd, args); err != nil {
+			return err
+		}
+		if len(args) == 0 {
+			return nil
+		}
+		f := cmd.Flags().Lookup(flag)
+		if err := utils.RefuseDisagreeingArg(args, what, flag, f.Value.String()); err != nil {
+			return err
+		}
+		return cmd.Flags().Set(flag, args[0])
+	}
+}
