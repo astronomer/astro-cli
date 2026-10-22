@@ -47,14 +47,23 @@ var (
 	subscribeLogs = deployment.SubscribeDeploymentLog
 )
 
-// The --component names, as Houston spells them, with workers too, as the
-// flag spells it.
+// The --component names, as Houston spells them, with workers and
+// triggerers too, as the flag and an earlier v2's subcommand spelled them.
 var logComponentNames = map[string]string{
 	logWebserver: logWebserver,
 	logScheduler: logScheduler,
 	logWorker:    logWorker,
 	logWorkers:   logWorker,
 	logTriggerer: logTriggerer,
+	"triggerers": logTriggerer,
+}
+
+// logComponentFlag is the flag that picks component.
+func logComponentFlag(component string) string {
+	if component == logWorker {
+		return logWorkers
+	}
+	return component
 }
 
 // newLogsCmd is astro deployment logs [DEPLOYMENT_ID], shaped as Astro's:
@@ -78,7 +87,7 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 
   # Show the logs of the Deployment a link of this project names
   astro deployment logs --deployment <LINK_NAME>`,
-		Args: cobra.MaximumNArgs(1),
+		Args: logsArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			components, err := pickLogComponents(triggerer)
 			if err != nil {
@@ -141,19 +150,34 @@ func addLogsFlags(cmd *cobra.Command, oneX bool) {
 	cliout.AddOutputFlag(cmd, &logsOutput)
 }
 
+// logsArgs refuses a component named where the Deployment goes, as 1.x's
+// layout and an earlier v2's logs triggerer named one: taken for a Deployment
+// id, it would ask Houston about a Deployment called triggerer. Otherwise it
+// takes at most the Deployment.
+func logsArgs(cmd *cobra.Command, args []string) error {
+	if len(args) > 0 {
+		if c, ok := logComponentNames[strings.ToLower(args[0])]; ok {
+			flag := logComponentFlag(c)
+			return cliout.Usage(fmt.Errorf("%q names a component, not a Deployment: pick it with --%s, as in %s <DEPLOYMENT_ID> --%s", args[0], flag, cmd.CommandPath(), flag))
+		}
+	}
+	return cobra.MaximumNArgs(1)(cmd, args)
+}
+
 // pickLogComponents is the components the flags name, in Houston's
 // spelling, once each, or every one the platform logs when none does.
 // triggerer says whether it has a triggerer.
 func pickLogComponents(triggerer bool) ([]string, error) {
 	on := map[string]bool{logWebserver: logsWebserver, logScheduler: logsScheduler, logWorker: logsWorkers, logTriggerer: logsTriggerer}
-	for _, name := range logsComponents {
-		name = strings.ToLower(strings.TrimSpace(name))
-		if name == "" {
+	for _, typed := range logsComponents {
+		typed = strings.TrimSpace(typed)
+		if typed == "" {
 			continue
 		}
-		c, ok := logComponentNames[name]
+		c, ok := logComponentNames[strings.ToLower(typed)]
 		if !ok || (c == logTriggerer && !triggerer) {
-			return nil, cliout.Usage(fmt.Errorf("--component %q is not a component this platform logs: use %s", name, strings.Join(allLogComponents(triggerer), ", ")))
+			names := strings.Replace(strings.Join(allLogComponents(triggerer), ", "), logWorker, logWorker+" (or "+logWorkers+")", 1)
+			return nil, cliout.Usage(fmt.Errorf("--component %q is not a component this platform logs: use %s", typed, names))
 		}
 		on[c] = true
 	}
@@ -207,7 +231,7 @@ func showLogs(cmd *cobra.Command, components []string, out io.Writer) error {
 		return err
 	}
 	for i := range logs {
-		if err := emitLogEntry(r, logs[i].Component, logs[i].DeploymentLog, false, len(components) > 1); err != nil {
+		if err := emitLogEntry(r, logs[i].Component, logs[i], false, len(components) > 1); err != nil {
 			return err
 		}
 	}

@@ -93,11 +93,23 @@ func TestDeploymentLogsPicksComponentsAsAstroDoes(t *testing.T) {
 
 	t.Run("an unknown --component is a usage error, before any request", func(t *testing.T) {
 		api := newAPCClient()
-		run := runAPC(t, api, "", "deployment", "logs", "dep-1", "--component", "apiserver")
+		run := runAPC(t, api, "", "deployment", "logs", "dep-1", "--component", "ApiServer")
 		assert.Equal(t, 2, run.code)
 		require.Error(t, run.err)
-		assert.Contains(t, run.err.Error(), `--component "apiserver" is not a component this platform logs: use webserver, scheduler, worker, triggerer`)
+		assert.Contains(t, run.err.Error(), `--component "ApiServer" is not a component this platform logs: use webserver, scheduler, worker (or workers), triggerer`)
 		api.AssertNotCalled(t, "ListDeploymentLogs", mock.Anything)
+	})
+
+	// Taken for a Deployment id, a component would be asked about as one.
+	t.Run("a component where the Deployment goes is refused, naming its flag", func(t *testing.T) {
+		for _, args := range [][]string{{"triggerer", "dep-1"}, {"triggerer"}, {"Triggerers", "dep-1"}} {
+			api := newAPCClient()
+			run := runAPC(t, api, "", append([]string{"deployment", "logs"}, args...)...)
+			assert.Equal(t, 2, run.code, "%v", args)
+			require.Error(t, run.err, "%v", args)
+			assert.Contains(t, run.err.Error(), "names a component, not a Deployment: pick it with --triggerer", "%v", args)
+			api.AssertNotCalled(t, "ListDeploymentLogs", mock.Anything)
+		}
 	})
 
 	t.Run("with no triggerer, none named is the rest, and the triggerer is refused", func(t *testing.T) {

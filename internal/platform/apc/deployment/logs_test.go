@@ -80,18 +80,37 @@ func (s *Suite) TestLogs() {
 		api.AssertExpectations(s.T())
 	})
 
-	s.Run("a record with no time it can read keeps its place ahead of the rest", func() {
+	s.Run("one component keeps Houston's order, whatever its times", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListDeploymentLogs", of("scheduler")).Return([]houston.DeploymentLog{
-			{CreatedAt: "2026-01-01T00:00:01Z", Log: "timed"},
+			{CreatedAt: "2026-01-01T00:00:02Z", Log: "newer", Component: "scheduler-0"},
+			{CreatedAt: "2026-01-01T00:00:01Z", Log: "older"},
 			{CreatedAt: "", Log: "untimed"},
 		}, nil).Once()
 
 		logs, err := Logs("dep", []string{"scheduler"}, "", 0, api)
 		s.NoError(err)
+		var got []string
+		for _, l := range logs {
+			got = append(got, l.Component+":"+l.Log)
+		}
+		s.Equal([]string{"scheduler:newer", "scheduler:older", "scheduler:untimed"}, got, "the component asked for, in Houston's order")
+	})
+
+	s.Run("several with a time it cannot read are left one component after another", func() {
+		api := new(mocks.ClientInterface)
+		api.On("ListDeploymentLogs", of("scheduler")).Return([]houston.DeploymentLog{
+			{CreatedAt: "2026-01-01T00:00:03Z", Log: "s1"},
+		}, nil).Once()
+		api.On("ListDeploymentLogs", of("worker")).Return([]houston.DeploymentLog{
+			{CreatedAt: "1767225601000", Log: "w1"},
+		}, nil).Once()
+
+		logs, err := Logs("dep", []string{"scheduler", "worker"}, "", 0, api)
+		s.NoError(err)
 		s.Require().Len(logs, 2)
-		s.Equal("untimed", logs[0].Log)
-		s.Equal("timed", logs[1].Log)
+		s.Equal("s1", logs[0].Log)
+		s.Equal("w1", logs[1].Log)
 	})
 
 	s.Run("a component's failure is the answer", func() {
