@@ -72,7 +72,7 @@ jobs:
       - name: Test the installer's version resolution
         run: make test-installer
 
-      - name: Test the installer's version resolution under busybox
+      - name: Test the installer's version resolution under busybox's sh, awk, sed and sort
         run: make test-installer-alpine
 
       - name: Upload coverage to Coveralls

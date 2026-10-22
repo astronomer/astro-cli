@@ -185,15 +185,17 @@ for arg in "$@"; do
 done
 exec "$STUB_SERVE" "$url"
 EOF
-# wget -q -S [--header H] -O FILE URL, as GNU wget or, with STUB_WGET=busybox,
-# as busybox wget. Both write the status line to stderr and, on an error, exit
-# non-zero without the body; GNU wget writes the headers too, busybox only the
-# status line and its own complaint.
+# wget [-q] -S [--header H] -O FILE URL, as GNU wget, or as busybox wget or
+# wget2 when STUB_WGET says so, writing to stderr what each does. On an error
+# each exits non-zero without the body. GNU wget writes every header, as
+# "  HTTP/1.1 404 Not Found" and the rest; busybox only that status line;
+# wget2 every header, as ":status: 404" and the rest, and with -q nothing.
 cat >"$work/wget/wget" <<'EOF'
 #!/bin/sh
-url= out=
+url= out= quiet=
 while [ $# -gt 0 ]; do
   case "$1" in
+    -q) quiet=1 ;;
     -O)
       out=$2
       shift
@@ -206,35 +208,67 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+if [ "$STUB_WGET" = wget2 ] && [ -n "$quiet" ]; then
+  exec 2>/dev/null
+fi
 resp=$("$STUB_SERVE" "$url")
 code=$(printf '%s' "$resp" | tail -c 3)
 case "$code" in
-  000)
-    if [ "$STUB_WGET" = busybox ]; then
-      echo "wget: bad address 'api.github.com'" >&2
-      exit 1
-    fi
-    exit 4
-    ;;
   200) reason=OK ;;
   403) reason=Forbidden ;;
   404) reason='Not Found' ;;
   *) reason=Error ;;
 esac
-echo "  HTTP/1.1 $code $reason" >&2
-if [ "$code" = 200 ]; then
-  echo "  Content-Type: application/json; charset=utf-8" >&2
-  printf '%s' "${resp%???}" >"$out"
-  exit 0
-fi
-if [ "$STUB_WGET" = busybox ]; then
-  echo "wget: server returned error: HTTP/1.1 $code $reason" >&2
-  exit 1
-fi
-echo "  Content-Type: application/json; charset=utf-8" >&2
-if [ "$code" = 403 ]; then echo "  x-ratelimit-remaining: 0" >&2; fi
-: >"$out"
-exit 8
+case "$STUB_WGET" in
+  busybox)
+    if [ "$code" = 000 ]; then
+      echo "wget: bad address 'api.github.com'" >&2
+      exit 1
+    fi
+    echo "Connecting to api.github.com (192.0.2.1:443)" >&2
+    echo "  HTTP/1.1 $code $reason" >&2
+    if [ "$code" != 200 ]; then
+      echo "wget: server returned error: HTTP/1.1 $code $reason" >&2
+      exit 1
+    fi
+    echo "  Content-Type: application/json; charset=utf-8" >&2
+    ;;
+  wget2)
+    if [ "$code" = 000 ]; then
+      echo "Failed to resolve 'api.github.com' (Name or service not known)" >&2
+      exit 4
+    fi
+    echo "[0] Downloading '$url' ..." >&2
+    echo "# got header 1024 bytes:" >&2
+    echo ":status: $code" >&2
+    echo "content-type: application/json; charset=utf-8" >&2
+    if [ "$code" = 403 ]; then echo "x-ratelimit-remaining: 0" >&2; fi
+    echo >&2
+    if [ "$code" != 200 ]; then
+      echo "HTTP ERROR response $code  [$url]" >&2
+      exit 8
+    fi
+    echo "HTTP response 200  [$url]" >&2
+    ;;
+  *)
+    echo "--2026-10-21 12:00:00--  $url" >&2
+    if [ "$code" = 000 ]; then
+      echo "Resolving api.github.com (api.github.com)... failed: Name or service not known." >&2
+      echo "wget: unable to resolve host address 'api.github.com'" >&2
+      exit 4
+    fi
+    echo "HTTP request sent, awaiting response... " >&2
+    echo "  HTTP/1.1 $code $reason" >&2
+    echo "  Content-Type: application/json; charset=utf-8" >&2
+    if [ "$code" = 403 ]; then echo "  x-ratelimit-remaining: 0" >&2; fi
+    if [ "$code" != 200 ]; then
+      echo "2026-10-21 12:00:00 ERROR $code: $reason." >&2
+      : >"$out"
+      exit 8
+    fi
+    ;;
+esac
+printf '%s' "${resp%???}" >"$out"
 EOF
 # linux/amd64 unless STUB_ARCH says otherwise, so a host that is darwin/arm64
 # does not refuse v0.6.
@@ -274,7 +308,7 @@ if command -v dash >/dev/null; then
 fi
 
 # The HTTP client the installer finds: curl, or, with no curl on PATH, GNU
-# wget (wget) or busybox wget (wget-busybox).
+# wget (wget), busybox wget (wget-busybox) or wget2 (wget2).
 transport=curl
 
 # resolve SHELL ARG runs the installer and prints the tag it resolved, or
@@ -284,6 +318,7 @@ resolve() {
   case "$transport" in
     wget) path=$work/wget:$work/stub:$work/nohttp ;;
     wget-busybox) path=$work/wget:$work/stub:$work/nohttp flavor=busybox ;;
+    wget2) path=$work/wget:$work/stub:$work/nohttp flavor=wget2 ;;
   esac
   rm -f "$api/requests"
   PATH="$path" STUB_API="$api" STUB_SERVE="$work/serve" STUB_WGET="$flavor" TMPDIR="$work/tmp" \
@@ -420,27 +455,34 @@ token_sent() {
 }
 token_sent
 
-# Without curl the API is asked through wget, GNU or busybox. Their answers
-# differ only on an error: GNU wget keeps the headers and busybox only the
-# status line, so a 403 is the rate limit to one and a guess to the other.
-for transport in wget wget-busybox; do
+# Without curl the API is asked through wget: GNU, busybox or wget2. Their
+# answers differ only on an error: GNU wget and wget2 keep the headers and
+# busybox only the status line, so a 403 is the rate limit to two of them and
+# a guess to busybox.
+for transport in wget wget-busybox wget2; do
   check v1.46.0 v1.46.0 1
   check v1.46.9 v1.46 3
   check v11.1.0-rc.1 v11 7
   check '' v1.99.0 1
   check '' v9 1 'no tag starts with v9.'
   echo 403 >"$api/status-tags-v1.46.10"
-  if [ "$transport" = wget ]; then
-    check '' v1.46 2 'rate limit exceeded; set GITHUB_TOKEN'
-  else
+  if [ "$transport" = wget-busybox ]; then
     check '' v1.46 2 'HTTP 403 for repos/astronomer/astro-cli/releases/tags/v1.46.10; if that is its rate limit, set GITHUB_TOKEN'
+  else
+    check '' v1.46 2 'rate limit exceeded; set GITHUB_TOKEN'
   fi
   rm "$api/status-tags-v1.46.10"
   echo 502 >"$api/status-tags-v1.46.0"
   check '' v1.46.0 1 'HTTP 502'
   rm "$api/status-tags-v1.46.0"
+  # No answer, and wget's own reason comes along.
   echo 000 >"$api/status-refs-v1.46."
-  check '' v1.46 1 'could not reach GitHub (api.github.com)'
+  case "$transport" in
+    wget) why="wget: unable to resolve host address 'api.github.com'" ;;
+    wget-busybox) why="wget: bad address 'api.github.com'" ;;
+    wget2) why="Failed to resolve 'api.github.com' (Name or service not known)" ;;
+  esac
+  check '' v1.46 1 "could not reach GitHub (api.github.com) for repos/astronomer/astro-cli/git/matching-refs/tags/v1.46. ($why); check"
   rm "$api/status-refs-v1.46."
   token_sent
 done
