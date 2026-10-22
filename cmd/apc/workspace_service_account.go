@@ -85,13 +85,18 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete <SERVICE_ACCOUNT_ID>",
 		Aliases: []string{"de"},
 		Short:   "Delete a service account in the APC platform",
-		Long:    "Delete a service account in the APC platform",
+		Long:    "Delete a service account in the APC platform. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Args:    cobra.ExactArgs(1),
-		Example: `  astro workspace service-account delete <SERVICE_ACCOUNT_ID>`,
+		Example: `  # Delete a service account from the current Workspace, after you confirm
+  astro workspace service-account delete <SERVICE_ACCOUNT_ID>
+
+  # Delete it without the confirmation, from a script
+  astro workspace service-account delete <SERVICE_ACCOUNT_ID> --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaDelete(cmd, out, args)
 		},
 	}
+	addYesFlag(cmd, "Don't ask for confirmation before deleting the service account")
 	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
 	addAccessOutputFlag(cmd)
 	return cmd
@@ -141,6 +146,10 @@ func workspaceSaDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	ok, err := confirmRemoval(out, serviceAccountDeleteQuestion(args[0]), serviceAccountDeleteCanceled)
+	if err != nil || !ok {
+		return err
+	}
 	deleted, err := sa.DeleteUsingWorkspaceUUID(args[0], ws, houstonClient)
 	if err != nil {
 		return err

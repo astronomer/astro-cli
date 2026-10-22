@@ -62,7 +62,7 @@ func (s *Suite) TestDeploymentSaDeleteRootCommand() {
 	api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: "1234", ServiceAccountID: mockDeploymentSA.ID}).Return(mockDeploymentSA, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
-	output, err := execDeploymentCmd("service-account", "delete", mockDeploymentSA.ID, "--deployment-id=1234")
+	output, err := execDeploymentCmd("service-account", "delete", mockDeploymentSA.ID, "--deployment-id=1234", "--yes")
 	s.NoError(err)
 	s.Contains(output, "Service Account my_label (q1w2e3r4t5y6u7i8o9p0) successfully deleted")
 }

@@ -160,10 +160,18 @@ func ApplyPreferredFlags(cmd *cobra.Command, args []string, resolve Resolver) er
 // word. same are other values the argument agrees with, such as the
 // Deployment id flag resolved to.
 func RefuseDisagreeingDeployment(args []string, flag string, same ...string) error {
-	if len(args) == 0 || flag == "" || args[0] == flag || slices.Contains(same, args[0]) {
+	return RefuseDisagreeingArg(args, "Deployment", "deployment", flag, same...)
+}
+
+// RefuseDisagreeingArg refuses a command line that gives one value twice, as
+// the argument (args[0], what it names) and as --name (value, as typed),
+// differently: it would act on one of them without a word. same are other
+// values the argument agrees with.
+func RefuseDisagreeingArg(args []string, what, name, value string, same ...string) error {
+	if len(args) == 0 || value == "" || args[0] == value || slices.Contains(same, args[0]) {
 		return nil
 	}
-	return cliout.Usage(fmt.Errorf("the Deployment argument %q and --deployment %q disagree: pass only one", args[0], flag))
+	return cliout.Usage(fmt.Errorf("the %s argument %q and --%s %q disagree: pass only one", what, args[0], name, value))
 }
 
 // AddWorkspaceFlag registers --workspace on fs, read into to, with the

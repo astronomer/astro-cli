@@ -526,12 +526,19 @@ func GetOrgTeams(client astrov1.APIClient) ([]astrov1.Team, error) {
 }
 
 // Delete deletes the team with id, or the one picked when id is "", and
-// returns which team it deleted. It returns nil, and deletes nothing, when
-// the team is IdP-managed and the person declines to go on.
+// returns which team it deleted, asking first unless force. It returns nil,
+// and deletes nothing, when the person declines.
 func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemoval, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
+	}
+	// A run that cannot ask is refused before anything is listed or read:
+	// the question it would end on is one only --yes answers.
+	if !force {
+		if err := input.MayAsk("", input.About("confirmation to delete the team"), input.AnsweredBy("--yes")); err != nil {
+			return nil, err
+		}
 	}
 
 	var team astrov1.Team
@@ -556,8 +563,14 @@ func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemov
 			return nil, ErrTeamNotFound
 		}
 	}
-	if team.IsIdpManaged {
-		y, err := confirmOperation(force)
+	// Every team is asked about, as a Workspace is: a deleted team cannot
+	// be brought back, and an IdP-managed one says so too.
+	if !force {
+		question := fmt.Sprintf("\nAre you sure you want to delete the %s team? This cannot be undone.", ansi.Bold(team.Name))
+		if team.IsIdpManaged {
+			question = "\nThis is an IDP-managed team." + question
+		}
+		y, err := input.Confirm(question, input.AnsweredBy("--yes"))
 		if err != nil {
 			return nil, err
 		}

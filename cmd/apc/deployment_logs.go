@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 )
@@ -36,7 +37,7 @@ var (
   astro deployment logs webserver example-deployment-uuid
 
   # Follow worker logs from the last 5 minutes that match a search term
-  astro deployment logs workers example-deployment-uuid --follow --search "some search terms"
+  astro deployment logs workers example-deployment-uuid --follow --keyword "some search terms"
 
   # Return logs from airflow webserver for last 25 min.
   astro deployment logs webserver example-deployment-uuid --since 25m
@@ -80,7 +81,7 @@ func newWebserverLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the du
   astro deployment logs webserver <DEPLOYMENT_ID> --since 25m
 
   # Follow new ones that contain a search term
-  astro deployment logs webserver <DEPLOYMENT_ID> --follow --search "some search terms"
+  astro deployment logs webserver <DEPLOYMENT_ID> --follow --keyword "some search terms"
 
   # Show those of the Deployment a link of this project names
   astro deployment logs webserver --deployment <LINK_NAME>`,
@@ -90,7 +91,8 @@ func newWebserverLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the du
 		},
 	}
 	addDeploymentArgFlag(cmd)
-	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
+	cmd.Flags().StringVarP(&search, "keyword", "k", "", "Show only the log lines that contain this keyword")
+	utils.AddAlias(cmd.Flags(), "search", "s", "keyword")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
 	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only logs from the moment it starts")
 	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
@@ -108,7 +110,7 @@ func newSchedulerLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the du
   astro deployment logs scheduler <DEPLOYMENT_ID> --since 25m
 
   # Follow new ones that contain a search term
-  astro deployment logs scheduler <DEPLOYMENT_ID> --follow --search "some search terms"
+  astro deployment logs scheduler <DEPLOYMENT_ID> --follow --keyword "some search terms"
 
   # Show those of the Deployment a link of this project names
   astro deployment logs scheduler --deployment <LINK_NAME>`,
@@ -118,7 +120,8 @@ func newSchedulerLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the du
 		},
 	}
 	addDeploymentArgFlag(cmd)
-	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
+	cmd.Flags().StringVarP(&search, "keyword", "k", "", "Show only the log lines that contain this keyword")
+	utils.AddAlias(cmd.Flags(), "search", "s", "keyword")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
 	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only logs from the moment it starts")
 	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
@@ -136,7 +139,7 @@ func newWorkersLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the dupl
   astro deployment logs workers <DEPLOYMENT_ID> --since 25m
 
   # Follow new ones that contain a search term
-  astro deployment logs workers <DEPLOYMENT_ID> --follow --search "some search terms"
+  astro deployment logs workers <DEPLOYMENT_ID> --follow --keyword "some search terms"
 
   # Show those of the Deployment a link of this project names
   astro deployment logs workers --deployment <LINK_NAME>`,
@@ -146,7 +149,8 @@ func newWorkersLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the dupl
 		},
 	}
 	addDeploymentArgFlag(cmd)
-	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
+	cmd.Flags().StringVarP(&search, "keyword", "k", "", "Show only the log lines that contain this keyword")
+	utils.AddAlias(cmd.Flags(), "search", "s", "keyword")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
 	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only logs from the moment it starts")
 	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
@@ -155,7 +159,7 @@ func newWorkersLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the dupl
 	return cmd
 }
 
-func newTriggererLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the duplication is acceptable here
+func newTriggererLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "triggerer [DEPLOYMENT_ID]",
 		Aliases: []string{"triggerers", "trg"},
@@ -165,7 +169,7 @@ func newTriggererLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the du
   astro deployment logs triggerer <DEPLOYMENT_ID> --since 25m
 
   # Follow new ones that contain a search term
-  astro deployment logs triggerer <DEPLOYMENT_ID> --follow --search "some search terms"
+  astro deployment logs triggerer <DEPLOYMENT_ID> --follow --keyword "some search terms"
 
   # Show those of the Deployment a link of this project names
   astro deployment logs triggerer --deployment <LINK_NAME>`,
@@ -175,7 +179,8 @@ func newTriggererLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the du
 		},
 	}
 	addDeploymentArgFlag(cmd)
-	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
+	// 1.x had no triggerer logs, so no --search to keep here.
+	cmd.Flags().StringVarP(&search, "keyword", "k", "", "Show only the log lines that contain this keyword")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
 	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only logs from the moment it starts")
 	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())

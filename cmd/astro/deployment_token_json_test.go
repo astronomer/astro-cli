@@ -167,8 +167,10 @@ func execAstroCmd(t *testing.T, client astrov1.APIClient, answers string, newRoo
 	astroV1Client = client
 	t.Cleanup(func() { astroV1Client = prevClient })
 	// The token ids are package variables a positional argument sets and no
-	// flag registration resets, so one run's id would answer the next.
+	// flag registration resets, so one run's id would answer the next: clear
+	// what an earlier run left, and what this one leaves for the next test.
 	tokenID, orgTokenID, workspaceTokenID = "", "", ""
+	t.Cleanup(func() { tokenID, orgTokenID, workspaceTokenID = "", "", "" })
 	// --workspace-id, and deploy when it resolves one, set the
 	// package's workspaceID, which coalesceWorkspace reads before the context.
 	// Clear what an earlier run left, and what this one leaves.
