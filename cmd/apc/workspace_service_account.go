@@ -20,7 +20,7 @@ var (
 
 	workspaceSaCreateExample = `
   # Create a service account in a Workspace
-  astro workspace service-account create --workspace <WORKSPACE_ID> --name my_label \
+  astro workspace service-account create --workspace <WORKSPACE_ID> --name ci-deployer \
     --role WORKSPACE_EDITOR
 `
 	workspaceSaListExample = `
@@ -107,6 +107,9 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 
 func workspaceSaCreate(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
+	if workspaceSAName == "" {
+		return errServiceAccountNameEmpty
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err

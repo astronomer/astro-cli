@@ -1,6 +1,7 @@
 package apc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -18,10 +19,10 @@ var (
 	deploymentSACreateRole     string
 
 	deploymentSaCreateExample = `  # Create a service account that can view a Deployment
-  astro deployment service-account create --deployment=<DEPLOYMENT_ID> --name=my_label
+  astro deployment service-account create --deployment=<DEPLOYMENT_ID> --name=ci-deployer
 
   # Create one that can edit it
-  astro deployment service-account create --deployment=<DEPLOYMENT_ID> --name=my_label \
+  astro deployment service-account create --deployment=<DEPLOYMENT_ID> --name=ci-deployer \
     --role=DEPLOYMENT_EDITOR`
 	deploymentSaListExample = `  # List a Deployment's service accounts
   astro deployment service-account list --deployment=<DEPLOYMENT_ID>`
@@ -31,6 +32,11 @@ var (
   # Delete it without the confirmation, from a script
   astro deployment service-account delete <SERVICE_ACCOUNT_ID> --deployment=<DEPLOYMENT_ID> --yes`
 )
+
+// errServiceAccountNameEmpty refuses a service account named "": --name or
+// 1.x's --label given as an unset variable would otherwise create one with no
+// name and a live API key, as workspace create refuses a workspace with none.
+var errServiceAccountNameEmpty = cliout.Usage(errors.New("a service account needs a name: --name cannot be empty"))
 
 // deploymentSAFlagUsage is --deployment's help on the commands that manage
 // a Deployment's service accounts.
@@ -120,6 +126,9 @@ const serviceAccountDeleteCanceled = "Canceling service account deletion"
 
 func deploymentSaCreate(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
+	if deploymentSACreateName == "" {
+		return errServiceAccountNameEmpty
+	}
 	if err := validateDeploymentRole(deploymentSACreateRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
