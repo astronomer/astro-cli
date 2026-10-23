@@ -33,6 +33,24 @@ func TestRequirementAdmits(t *testing.T) {
 		{"x @ https://h/x.whl", "1.0", false, false},
 		{"x===1.0", "1.0", false, false},
 		{"x>=1", "not a version", false, false},
+		// Epochs, which the library reads.
+		{"x>=1!1.0", "1!2.0", true, true},
+		{"x>=1!1.0", "2.0", false, true},
+		{"x<1!0", "2026.7", true, true},
+		// Pre-, post- and dev releases.
+		{"x>=1.0rc1", "1.0rc2", true, true},
+		{"x<1.0", "1.0rc1", false, true},
+		{"x>=1.0.dev0", "1.0", true, true},
+		{"x<1.0.dev0", "1.0a1", false, true},
+		{"x==1.0.post1", "1.0.post1", true, true},
+		{"x>=1.0.post1", "1.0", false, true},
+		// Local versions: a specifier without one compares the public part.
+		{"x==1.0", "1.0+astro.2", true, true},
+		{"x>1.0", "1.0+astro.2", false, true},
+		{"x==1.0+astro.1", "1.0+astro.2", false, true},
+		{"x==1.0.*", "1.0.3+astro.1", true, true},
+		// Not PEP 508: the library's "||".
+		{"x>=3 || <2", "1.0", false, false},
 	} {
 		admits, known := RequirementAdmits(tc.req, tc.version)
 		if admits != tc.admits || known != tc.known {
