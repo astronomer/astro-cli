@@ -26,28 +26,6 @@ func TestImagePythonOf(t *testing.T) {
 	}
 }
 
-// An Astronomer build of Airflow pinned in constraint-dependencies is covered
-// while the pin admits its release; other lines, and none, are no
-// disagreement.
-func TestAstroBuildCovered(t *testing.T) {
-	for _, tt := range []struct {
-		pin         string
-		constraints []string
-		want        bool
-	}{
-		{"3.3", []string{"apache-airflow==3.3.2+astro.2", "apache-airflow-task-sdk==1.3.2+astro.1"}, true},
-		{"3.3.2", []string{"Apache_Airflow==3.3.2+astro.2"}, true},
-		{"3.4", []string{"apache-airflow==3.3.2+astro.2"}, false},
-		{"2.11", []string{"apache-airflow==2.10.4+astro.1"}, false},
-		{"3.4", []string{"apache-airflow==3.3.2", "sqlalchemy<2.1"}, true},
-		{"3.4", nil, true},
-	} {
-		if got := AstroBuildCovered(tt.pin, tt.constraints); got != tt.want {
-			t.Errorf("AstroBuildCovered(%q, %q) = %v, want %v", tt.pin, tt.constraints, got, tt.want)
-		}
-	}
-}
-
 // A newer build is the newest published for the pin, when it is newer than
 // the one given; none when that is already the newest, or newer than any.
 func TestNewerBuildFor(t *testing.T) {

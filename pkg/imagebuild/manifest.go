@@ -66,7 +66,7 @@ func lockedRuntime(m *manifest.Manifest) string {
 	if t, ok := manifest.ParseRuntimeTag(build); !ok || !t.Build || !t.Agrees(pin) {
 		return ""
 	}
-	if !runtimeversions.AstroBuildCovered(pin, m.UV.ConstraintDependencies) {
+	if !manifest.AstroBuildCovered(pin, m.UV.ConstraintDependencies) {
 		return ""
 	}
 	return build

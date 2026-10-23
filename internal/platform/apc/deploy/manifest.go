@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
@@ -547,7 +548,7 @@ func (l listedReleases) BuildsFor(pin string) []string {
 	}
 	var out []string
 	for i := range l {
-		if runtimeversions.PinCovers(pin, l[i].AirflowVersion) {
+		if manifest.PinCovers(pin, l[i].AirflowVersion) {
 			out = append(out, l[i].Version)
 		}
 	}

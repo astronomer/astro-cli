@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	pep440 "github.com/aquasecurity/go-pep440-version"
+
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
@@ -122,7 +124,7 @@ func (c *cli) reportGroupLeftOut(res astroBuildWrite) {
 // could not be read. Such a build pin makes the project unsatisfiable, so it
 // is taken out without a lookup, and Airflow comes from PyPI until one works.
 func stalePin(m *manifest.Manifest) bool {
-	return !runtimeversions.AstroBuildCovered(m.Airflow().Pin, m.UV.ConstraintDependencies)
+	return !manifest.AstroBuildCovered(m.Airflow().Pin, m.UV.ConstraintDependencies)
 }
 
 // astroBuildWrite is what writeAstroBuild did, for its caller to report.
@@ -336,7 +338,7 @@ func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest,
 		// while the Airflow they were written beside is one the pin still
 		// covers; a pin that moved off it leaves them another Airflow's.
 		recorded := releaseIn(m.UV.ConstraintDependencies, runtimeversions.DistAirflow)
-		if m.UV.RuntimeBuild != "" && recorded != "" && !runtimeversions.PinCovers(m.Airflow().Pin, recorded) {
+		if m.UV.RuntimeBuild != "" && recorded != "" && !manifest.PinCovers(m.Airflow().Pin, recorded) {
 			res.pinsErr = fmt.Errorf("%s holds no runtime pins: those of Astro Runtime %s are of Airflow %s, which the Airflow requirement no longer covers, and which build carries the new one cannot be told without the runtime catalog",
 				manifest.Marker, m.UV.RuntimeBuild, recorded)
 			return none
@@ -419,7 +421,7 @@ func (c *cli) pinsOfRelease(ctx context.Context, dir string, m *manifest.Manifes
 // pins there, they come out, with dropped as the warning.
 func keepRecordedPins(m *manifest.Manifest, res *astroBuildWrite, kept string, dropped error) *scaffold.RuntimePins {
 	recorded := recordedAstroBuild(m)
-	if m.UV.RuntimeBuild == "" || recorded.Airflow == "" || !runtimeversions.PinCovers(m.Airflow().Pin, recorded.Airflow) {
+	if m.UV.RuntimeBuild == "" || recorded.Airflow == "" || !manifest.PinCovers(m.Airflow().Pin, recorded.Airflow) {
 		res.pinsErr = dropped
 		return &scaffold.RuntimePins{}
 	}
@@ -471,11 +473,14 @@ func releaseIn(freeze []string, dist string) string {
 	return ""
 }
 
-// astroRelease is a version without its +astro build: 3.3.2 for
-// 3.3.2+astro.2.
+// astroRelease is a version's public part, without its +astro build: 3.3.2
+// for 3.3.2+astro.2. "" for a version PEP 440 does not spell.
 func astroRelease(version string) string {
-	release, _, _ := strings.Cut(strings.TrimSpace(version), "+")
-	return release
+	v, err := pep440.Parse(strings.TrimSpace(version))
+	if err != nil {
+		return ""
+	}
+	return v.Public()
 }
 
 // imageAirflowBuild is b with the Airflow and Task SDK builds the image's
@@ -500,11 +505,12 @@ func imageAirflowBuild(b runtimeversions.AstroBuild, freeze []string) runtimever
 }
 
 // sameRelease reports two +astro builds of one release: 3.3.2+astro.1 and
-// 3.3.2+astro.2.
+// 3.3.2+astro.2, one public version with an astro local part each.
 func sameRelease(a, b string) bool {
-	ra, _, oka := strings.Cut(a, "+astro.")
-	rb, _, okb := strings.Cut(b, "+astro.")
-	return oka && okb && ra == rb
+	va, errA := pep440.Parse(strings.TrimSpace(a))
+	vb, errB := pep440.Parse(strings.TrimSpace(b))
+	return errA == nil && errB == nil && va.Public() == vb.Public() &&
+		strings.HasPrefix(va.Local(), "astro.") && strings.HasPrefix(vb.Local(), "astro.")
 }
 
 // airflowSettings are the parts of a manifest SetAstroBuild changes to hold

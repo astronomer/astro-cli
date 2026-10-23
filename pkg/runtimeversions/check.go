@@ -107,7 +107,7 @@ func (c *Catalog) CheckRuntime(runtime, airflowPin string) []Finding {
 			"the runtime catalog lists no build %s, so the Airflow it carries was not checked against the requirement's %s", runtime, airflowPin)}}
 	}
 	var out []Finding
-	if !PinCovers(airflowPin, r.AirflowVersion) {
+	if !pinCovers(airflowPin, r.AirflowVersion) {
 		out = append(out, c.disagreement(&r, airflowPin))
 	}
 	if r.Yanked {
