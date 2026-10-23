@@ -27,7 +27,8 @@ func fullManifest() *manifest.Manifest {
 			Packages:   []string{"libpq-dev"},
 		},
 		UV: manifest.UV{
-			Sources: map[string]string{"private-lib": "https://pypi.acme.example/simple/"},
+			Sources:      map[string]string{"private-lib": "https://pypi.acme.example/simple/"},
+			RuntimeBuild: "3.1-1",
 		},
 	}
 }
@@ -53,6 +54,7 @@ func TestManifestBuildOf(t *testing.T) {
 		ProjectDir:     "/project",
 		AirflowVersion: "3.1",
 		Runtime:        "3.1-2",
+		LockedRuntime:  "3.1-1",
 		RequiresPython: "==3.13.*",
 		Dockerfile:     "docker/Dockerfile",
 		Dependencies:   []string{"apache-airflow==3.1.*", "pandas", "private-lib"},
@@ -61,6 +63,38 @@ func TestManifestBuildOf(t *testing.T) {
 	}, ManifestBuildOf("/project", fullManifest()))
 
 	assert.Equal(t, ManifestBuild{ProjectDir: "/project"}, ManifestBuildOf("/project", nil))
+}
+
+// The build the runtime pins were taken from is carried while its tag agrees
+// with the Airflow pin, and dropped once the pin has moved to another series
+// or generation: the pins wait for their next refresh, and the base follows
+// the pin.
+func TestManifestBuildOfCarriesTheLocksBuildWhileItFitsThePin(t *testing.T) {
+	for _, tt := range []struct {
+		pin, build, airflowBuild, want string
+	}{
+		{"apache-airflow==3.3.*", "3.3-9", "", "3.3-9"},
+		{"apache-airflow==3.3.2", "3.3-9", "", "3.3-9"},
+		{"apache-airflow==3.4.*", "3.3-9", "", ""},
+		{"apache-airflow==2.10.*", "3.3-9", "", ""},
+		{"apache-airflow==2.10.*", "12.6.0", "", "12.6.0"},
+		{"apache-airflow==3.3.*", "3.3", "", ""},
+		// The Astronomer build of Airflow pinned beside the runtime pins names
+		// the release, which an Airflow 2 build's tag cannot.
+		{"apache-airflow==2.10.*", "12.6.0", "apache-airflow==2.10.4+astro.1", "12.6.0"},
+		{"apache-airflow==2.11.*", "12.6.0", "apache-airflow==2.10.4+astro.1", ""},
+		{"apache-airflow==3.3.1", "3.3-9", "apache-airflow==3.3.2+astro.2", ""},
+		{"apache-airflow==3.3.2", "3.3-9", "apache-airflow==3.3.2+astro.2", "3.3-9"},
+	} {
+		m := &manifest.Manifest{
+			Project: manifest.Project{Name: "p", Dependencies: []string{tt.pin}},
+			UV:      manifest.UV{RuntimeBuild: tt.build},
+		}
+		if tt.airflowBuild != "" {
+			m.UV.ConstraintDependencies = []string{tt.airflowBuild}
+		}
+		assert.Equal(t, tt.want, ManifestBuildOf("/project", m).LockedRuntime, "%s with %s %s", tt.pin, tt.build, tt.airflowBuild)
+	}
 }
 
 // The [tool.uv] settings `astro init` writes route Airflow, its core and its

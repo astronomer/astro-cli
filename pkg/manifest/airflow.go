@@ -144,6 +144,41 @@ func AstroPin(spec string) bool {
 	return false
 }
 
+// PinCovers reports whether an Airflow release satisfies a pin that may name
+// fewer segments than the release does: "3.3" covers "3.3.2", "3.3.2" covers
+// "3.3.2", and neither covers "3.4.0" or "3.30.0". It is whether
+// apache-airflow==<pin>.* admits the release, as PEP 440 matches a prefix
+// (RequirementAdmits), so a local version is compared without its local
+// label: Astronomer's build "3.3.2+astro.2" is release 3.3.2. A pin or a
+// release PEP 440 does not spell covers nothing.
+func PinCovers(pin, release string) bool {
+	pin = strings.TrimSpace(pin)
+	if pin == "" {
+		return false
+	}
+	admits, known := RequirementAdmits(airflowDist+"=="+pin+".*", strings.TrimSpace(release))
+	return known && admits
+}
+
+// AstroBuildCovered reports whether every Astronomer build of Airflow pinned
+// in constraints ([tool.uv] constraint-dependencies, the AstroPin
+// "apache-airflow==X.Y.Z+astro.N" line) carries a release the Airflow pin
+// still covers. With none pinned there is nothing to disagree, and it is true.
+// False is a pin that moved since the build was written: the build, and what
+// was written beside it, belong to an Airflow the project no longer asks for.
+func AstroBuildCovered(pin string, constraints []string) bool {
+	for _, c := range constraints {
+		if !AstroPin(c) || DistName(c) != airflowDist {
+			continue
+		}
+		_, version, _ := strings.Cut(c, "==")
+		if !PinCovers(pin, version) {
+			return false
+		}
+	}
+	return true
+}
+
 // WithoutAstroPins returns constraints without the AstroPin entries, for an
 // environment that runs Apache's own Airflow: MWAA's, or Composer's.
 func WithoutAstroPins(constraints []string) []string {

@@ -48,6 +48,12 @@ type Manifest struct {
 	Project Project
 	Astro   Astro
 	UV      UV
+	// RuntimeGroup is the [dependency-groups] group astro writes the runtime
+	// image's top-level packages into (RuntimeGroupName): its names, in order,
+	// nil when there is none. RuntimeGroupBuild is the build its heading
+	// comment names.
+	RuntimeGroup      []string
+	RuntimeGroupBuild string
 	// Warnings are findings that do not stop a load, sorted like the problems
 	// of a ValidationError: today, a [tool.astro.targets.<name>] key nothing
 	// reads. A caller shows them where it would show the manifest's errors.
@@ -97,6 +103,15 @@ type UV struct {
 	// DirectURLs maps a package to the PEP 508 URL its [tool.uv.sources]
 	// entry stands for, for the entries that name a git repository or a URL.
 	DirectURLs map[string]string
+	// RuntimePins are the entries of ConstraintDependencies astro wrote from
+	// an Astro Runtime image's package list (RuntimePinsComments), in order.
+	RuntimePins []string
+	// RuntimeBuild and RuntimePython name the build and the Python the
+	// runtime pins are of: "3.3-9" and "3.12". Empty when there are none.
+	RuntimeBuild, RuntimePython string
+	// ExcludeNewer is [tool.uv] exclude-newer as written: a date, a time or
+	// a duration such as "1 week". Empty when the project sets none.
+	ExcludeNewer string
 }
 
 // IndexPages are the per-package pages of the indexes Sources names, the
@@ -104,6 +119,8 @@ type UV struct {
 // project, where uv cannot read [tool.uv.sources]: a page lists one package's
 // files, so passing it as find-links scopes the index to that package the way
 // the source does.
+//
+//nolint:gocritic // a value receiver, as Astro Desktop calls it: UV outgrew the hugeParam limit after this shipped
 func (u UV) IndexPages() []string {
 	return u.indexPages(func(string) bool { return true })
 }
@@ -115,6 +132,8 @@ func (u UV) IndexPages() []string {
 // generated image installs deps without Airflow (WithoutAirflow), so the
 // pages of the Airflow sources `astro init` writes are left out, and a build
 // host that cannot reach Astronomer's index still builds.
+//
+//nolint:gocritic // a value receiver, as IndexPages has: pkg/manifest is Astro Desktop API
 func (u UV) IndexPagesFor(deps []string) []string {
 	wanted := make(map[string]bool, len(deps))
 	for _, d := range deps {
@@ -124,6 +143,8 @@ func (u UV) IndexPagesFor(deps []string) []string {
 }
 
 // indexPages are the pages of the sources whose package keep accepts.
+//
+//nolint:gocritic // a value receiver, as its callers have
 func (u UV) indexPages(keep func(pkg string) bool) []string {
 	pkgs := make([]string, 0, len(u.Sources))
 	for pkg := range u.Sources {
@@ -683,6 +704,8 @@ func parse(data []byte, repair bool) (*Manifest, error) {
 
 	p := &parser{}
 	m := &Manifest{Astro: p.astro(*f.Tool.Astro), UV: uvTable(f.Tool.UV)}
+	m.UV.RuntimeBuild, m.UV.RuntimePython, m.UV.RuntimePins = runtimePinsOf(data, m.UV.ConstraintDependencies)
+	m.RuntimeGroupBuild, m.RuntimeGroup = runtimeGroupOf(data, f.DependencyGroups)
 	if f.Project != nil {
 		m.Project = Project{
 			Name:           f.Project.Name,
@@ -734,6 +757,10 @@ func uvTable(t map[string]any) UV {
 	out := UV{
 		ConstraintDependencies: stringList(t["constraint-dependencies"]),
 		Environments:           stringList(t["environments"]),
+	}
+	if v, ok := t["exclude-newer"]; ok && v != nil {
+		// A string as uv documents it, or a TOML date written bare.
+		out.ExcludeNewer = strings.TrimSpace(fmt.Sprint(v))
 	}
 	urls := map[string]string{}
 	indexes, _ := t["index"].([]any)
@@ -1436,6 +1463,9 @@ func (p *parser) validate(m *Manifest) {
 type wireFile struct {
 	Project *wireProject `toml:"project"`
 	Tool    wireTool     `toml:"tool"`
+	// DependencyGroups is plain data for the reason UV is: astro reads one
+	// group of it (RuntimeGroup) and owns none of the rest.
+	DependencyGroups map[string]any `toml:"dependency-groups"`
 }
 
 // Astro is a pointer so that a present-but-empty [tool.astro] is told apart

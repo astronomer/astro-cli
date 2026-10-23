@@ -1,5 +1,5 @@
 # Written by the Astro CLI. Do not edit: `astro init` replaces this file.
-# astro-install-helper: 3
+# astro-install-helper: 6
 #
 # Turns the project's pyproject.toml, and its uv.lock when there is one, into
 # the files the Astro Runtime image's install steps read: requirements.txt,
@@ -69,6 +69,10 @@ TASK_SDK = "apache-airflow-task-sdk"
 AIRFLOW_DISTS = (AIRFLOW, AIRFLOW_CORE, TASK_SDK)
 
 GIT_PACKAGE = "git"
+
+# The [dependency-groups] group astro writes with the runtime image's own
+# packages, normalized as PEP 735 group names compare.
+RUNTIME_GROUP = "astro-runtime"
 
 
 def warn(msg):
@@ -280,12 +284,16 @@ class Manifest:
         self.stated = strings(project.get("dependencies"))
         # Every distribution the project names itself, in its dependencies,
         # its optional dependencies or a dependency group: the ones the lock
-        # may move off the base image's versions.
+        # may move off the base image's versions. The astro-runtime group is
+        # not the project's naming: astro writes it, listing what the image
+        # ships so a local environment has it too, and those stay as the
+        # image has them.
         named = list(self.stated)
         for extra in (project.get("optional-dependencies") or {}).values():
             named += strings(extra)
-        for group in (pyproject.get("dependency-groups") or {}).values():
-            named += strings(group)
+        for group, entries in (pyproject.get("dependency-groups") or {}).items():
+            if norm(group) != RUNTIME_GROUP:
+                named += strings(entries)
         self.named = {dist_name(d) for d in named}
         self.constraint_dependencies = strings(uv.get("constraint-dependencies"))
         self.override_dependencies = strings(uv.get("override-dependencies"))
@@ -804,6 +812,96 @@ def base_installed():
     return {norm(d.metadata["Name"]) for d in metadata.distributions() if d.metadata["Name"]}
 
 
+def base_airflow():
+    """The Airflow release this image has installed, or None when it cannot
+    tell. The CLI's tests name it in ASTRO_INSTALL_PROJECT_BASE_AIRFLOW; a test
+    that names the base's packages without it has no Airflow to compare."""
+    if "ASTRO_INSTALL_PROJECT_BASE_AIRFLOW" in os.environ:
+        return os.environ["ASTRO_INSTALL_PROJECT_BASE_AIRFLOW"].strip() or None
+    if "ASTRO_INSTALL_PROJECT_BASE_INSTALLED" in os.environ:
+        return None
+    try:
+        from importlib import metadata
+
+        return metadata.version(AIRFLOW)
+    except Exception:
+        return None
+
+
+def locked_airflow(lock):
+    """The Airflow release uv.lock resolved for this interpreter, or None when
+    it holds none, or more than one."""
+    versions = {
+        p.get("version")
+        for p in lock.get("package") or []
+        if norm(p.get("name", "")) == AIRFLOW and p.get("version") and applies(p.get("resolution-markers"))
+    }
+    return next(iter(versions)) if len(versions) == 1 else None
+
+
+# The comment astro writes above the runtime pins in [tool.uv]
+# constraint-dependencies, naming the build they came from.
+RUNTIME_PINS_HEADER = re.compile(r"^\s*#\s*Astro Runtime (\S+) \(Python \d+\.\d+\) ships these versions")
+TABLE_HEADER = re.compile(r"^\s*\[\s*([^\[\]]+?)\s*\]\s*(#.*)?$")
+CONSTRAINTS_KEY = re.compile(r"^\s*constraint-dependencies\s*=\s*\[")
+QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
+
+
+def pinned_runtime(pyproject_text):
+    """The Astro Runtime build the project's runtime pins were taken from, as
+    the comment astro writes above them names it, or None. Comments are not in
+    what tomllib reads, so this finds the [tool.uv] table's
+    constraint-dependencies array in the text, and reads the comment from that
+    array alone: the same words anywhere else in the file are not it."""
+    table, inside, depth = None, False, 0
+    for line in pyproject_text.splitlines():
+        if not inside:
+            header = TABLE_HEADER.match(line)
+            if header:
+                table = header.group(1).replace(" ", "")
+                continue
+            if table == "tool.uv" and CONSTRAINTS_KEY.match(line):
+                inside, depth = True, 0
+            else:
+                continue
+        # Brackets and #s inside a string ('pkg[extra]', a URL's #sha256) are
+        # not the array's.
+        code = QUOTED.sub("", line).split("#", 1)[0]
+        depth += code.count("[") - code.count("]")
+        m = RUNTIME_PINS_HEADER.match(line)
+        if m:
+            return m.group(1)
+        if depth <= 0:
+            return None
+    return None
+
+
+def public_release(version):
+    """The release a version names, without its local label: 3.3.2+astro.2 and
+    3.3.2 are both 3.3.2. Astronomer's builds of one release differ only in
+    that label, and an image's Airflow from PyPI has none, so neither is a
+    different Airflow from the lock's."""
+    return version.strip().split("+", 1)[0].lower()
+
+
+def airflow_mismatch(lock, installed, runtime):
+    """A warning when uv.lock was made for another Airflow than this image
+    runs, or None. The lock's versions still install: a build on another runtime
+    than the lock's (a floating FROM, a deploy onto the build a Deployment
+    offers) is allowed, and said."""
+    locked = locked_airflow(lock)
+    if not locked or not installed or public_release(locked) == public_release(installed):
+        return None
+    made_for = "Airflow %s" % locked
+    if runtime:
+        made_for += " (Astro Runtime %s)" % runtime
+    return (
+        "uv.lock was made for %s, and this image has Airflow %s, so the lock's versions install over another runtime than "
+        "the one they were resolved for: build FROM the runtime the lock was made for, or run `astro init`, which moves "
+        "the runtime pins and relocks" % (made_for, installed.strip())
+    )
+
+
 def write(path, lines):
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines) + "\n" if lines else "")
@@ -825,7 +923,8 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     with open(os.path.join(args.project, "pyproject.toml"), "rb") as f:
-        manifest = Manifest(tomllib.load(f))
+        pyproject = f.read()
+    manifest = Manifest(tomllib.loads(pyproject.decode("utf-8")))
 
     lock = None
     lock_path = os.path.join(args.project, "uv.lock")
@@ -833,12 +932,20 @@ def main(argv=None):
         try:
             base = base_installed()
             with open(lock_path, "rb") as f:
-                lock = Lock(tomllib.load(f), manifest, runtime_constrained(args.runtime_constraints), base)
-            if lock.elsewhere:
-                warn("uv.lock took %s from an index other than PyPI, which the image does not read; installing them unpinned" % ", ".join(lock.elsewhere))
+                lock_data = tomllib.load(f)
+            lock = Lock(lock_data, manifest, runtime_constrained(args.runtime_constraints), base)
             if lock.stale:
-                warn("uv.lock is out of date with pyproject.toml (%s); run `uv lock`; installing pyproject.toml's dependencies unpinned" % lock.stale)
+                warn("uv.lock is out of date with pyproject.toml (%s); run `astro init`, which relocks; installing pyproject.toml's dependencies unpinned" % lock.stale)
                 lock = None
+            else:
+                if lock.elsewhere:
+                    warn("uv.lock took %s from an index other than PyPI, which the image does not read; installing them unpinned" % ", ".join(lock.elsewhere))
+                # Every build checks it, `docker build .` included: the lock is
+                # for one runtime's Airflow, and this image may be another's. A
+                # lock set aside as out of date installs nothing it says.
+                mismatch = airflow_mismatch(lock_data, base_airflow(), pinned_runtime(pyproject.decode("utf-8", "replace")))
+                if mismatch:
+                    warn(mismatch)
         except Exception as e:  # a lock this cannot read installs as no lock
             warn("uv.lock could not be read (%s); installing pyproject.toml's dependencies unpinned" % e)
             lock = None

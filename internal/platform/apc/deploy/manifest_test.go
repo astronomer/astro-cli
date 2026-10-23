@@ -352,6 +352,31 @@ func TestDeployManifestImageRefusesADeploymentOutsideTheWorkspace(t *testing.T) 
 
 // The base a generated build starts FROM: the manifest's runtime, else the
 // newest build Houston lists for the pin, by local Docker mode's rule; an
+// The build the lock was made for, listed by Houston, builds when
+// requires-python admits one of its Pythons; when it admits none, the image
+// builds on the next build Houston lists that ships one, with a warning naming
+// both, as on Astro.
+func TestHoustonBaseGivesWayWhenTheLocksBuildShipsNoAdmittedPython(t *testing.T) {
+	opts := runtimeversions.Options{CacheDir: t.TempDir(), Timeout: time.Nanosecond}
+	require.NoError(t, os.WriteFile(runtimeversions.CachePath(opts.CacheDir), []byte(`{"runtimeVersionsV3": {
+		"3.1-4": {"metadata": {"airflowVersion": "3.1.8", "channel": "stable", "releaseDate": "2025-01-01", "pythonVersions": ["3.12", "3.13"], "defaultPythonVersion": "3.12"}},
+		"3.1-5": {"metadata": {"airflowVersion": "3.1.8", "channel": "stable", "releaseDate": "2025-06-01", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}}}}`), 0o600))
+	listed := listedReleases{{Version: "3.1-4", AirflowVersion: "3.1.8"}, {Version: "3.1-5", AirflowVersion: "3.1.8"}}
+
+	got, err := houstonBase(listed, opts, nil)(context.Background(), imagebuild.ManifestBuild{AirflowVersion: "3.1", LockedRuntime: "3.1-5", RequiresPython: ">=3.12"})
+	require.NoError(t, err)
+	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1-5", got)
+
+	var warnings []string
+	got, err = houstonBase(listed, opts, func(s string) { warnings = append(warnings, s) })(context.Background(),
+		imagebuild.ManifestBuild{AirflowVersion: "3.1", LockedRuntime: "3.1-5", RequiresPython: ">=3.13"})
+	require.NoError(t, err)
+	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1-4-python-3.13", got)
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "uv.lock was made for Astro Runtime 3.1-5")
+	assert.Contains(t, warnings[0], "3.1-4")
+}
+
 // Airflow 3 pin Houston lists nothing for builds on its series tag, and an
 // Airflow 2 one on the public catalog's newest, refused with the fix when
 // that cannot be read either.
@@ -373,7 +398,7 @@ func TestHoustonBase(t *testing.T) {
 		{"Airflow 2 below 2.7", imagebuild.ManifestBuild{AirflowVersion: "2.6"}, houston.RuntimeReleases{{Version: "8.8.0", AirflowVersion: "2.6.3"}}, "", "needs Airflow 2.7 or later"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := houstonBase(listedReleases(tc.listed), offline)(context.Background(), tc.build)
+			got, err := houstonBase(listedReleases(tc.listed), offline, nil)(context.Background(), tc.build)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)

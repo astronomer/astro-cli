@@ -114,18 +114,42 @@ func checkManifest(ctx context.Context, req Request, airflow manifest.Airflow) (
 // the package, and what the catalog warns about comes back to ride on the
 // result.
 func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflow) ([]string, error) {
-	if req.CheckRuntime == nil || airflow.Runtime == "" {
+	// The build the image starts FROM: [tool.astro] runtime, else the build the
+	// runtime pins were taken from, held to the same check.
+	build, locked := airflow.Runtime, false
+	if build == "" && req.Manifest.Astro.Dockerfile == "" {
+		build, locked = imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest).LockedRuntime, true
+	}
+	if req.CheckRuntime == nil || build == "" {
 		return nil, nil
 	}
-	found, err := req.CheckRuntime(ctx, airflow.Runtime, airflow.Pin)
+	found, err := req.CheckRuntime(ctx, build, airflow.Pin)
 	if err != nil {
+		if locked {
+			return nil, fmt.Errorf("the runtime pins' build, Astro Runtime %s, which the image builds on: %w; run astro init to move them to another build", build, err)
+		}
 		return nil, err
 	}
 	var warnings []string
 	for _, f := range found {
+		if locked {
+			warnings = append(warnings, fmt.Sprintf("the runtime pins' build, Astro Runtime %s, which the image builds on: %s", build, f.Message))
+			continue
+		}
 		warnings = append(warnings, f.Message)
 	}
 	return warnings, nil
+}
+
+// lockedRuntimeNotices are what the package says about the build the
+// project's lock was made for, as the image resolved it: a newer one is
+// available, or requires-python sent it to the series' newest
+// (imagebuild.LockedRuntimeNotices). None without a catalog.
+func lockedRuntimeNotices(ctx context.Context, req Request, mb imagebuild.ManifestBuild) []string {
+	if req.RuntimeCatalog == nil {
+		return nil
+	}
+	return imagebuild.LockedRuntimeNotices(mb, req.RuntimeCatalog(ctx))
 }
 
 func runtimeCatalog(ctx context.Context, req Request) func() *runtimeversions.Catalog {
@@ -186,10 +210,12 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// Which image the manifest builds is imagebuild's rule, the one deploy
 	// follows too, so the artifact is the image a deploy of the same project
 	// would build.
-	breq, err := imagebuild.ForManifest(imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest), runtimeCatalog(ctx, req))
+	mb := imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest)
+	breq, err := imagebuild.ForManifest(mb, runtimeCatalog(ctx, req))
 	if err != nil {
 		return Result{}, err
 	}
+	warnings = append(warnings, lockedRuntimeNotices(ctx, req, mb)...)
 	declared := breq.Dockerfile
 	missingSecrets, err := checkSecrets(req, cb)
 	if err != nil {

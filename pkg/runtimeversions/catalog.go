@@ -236,13 +236,15 @@ func (c *Catalog) NewestPublishedRuntimeFor(airflowPin string) (string, bool) {
 
 // AirflowFor is the exact Airflow a deployment of this project runs: the one
 // the runtime build carries when the manifest names one, and otherwise the one
-// the newest build of the pin carries, which is what the series image tag
-// resolves to.
+// the newest published build of the pin carries, which is what the series
+// image tag resolves to. A build the catalog dates after today has no image
+// yet, so it is not counted: the build a project's runtime pins are of
+// (NewestPublishedRuntimeFor) and the Airflow it is held to are one.
 func (c *Catalog) AirflowFor(airflowPin, runtime string) (string, bool) {
 	tag := runtime
 	if tag == "" {
 		var ok bool
-		if tag, ok = c.NewestRuntimeFor(airflowPin); !ok {
+		if tag, ok = c.NewestPublishedRuntimeFor(airflowPin); !ok {
 			return "", false
 		}
 	}
@@ -277,9 +279,14 @@ func (r *Runtime) scheduled() bool {
 }
 
 // pinCovers reports whether an Airflow release satisfies a pin that may name
-// fewer segments than the release does.
+// fewer segments than the release does, without the release's local label.
+// The catalog's own matching: its releases are public versions ("3.3.2"),
+// for which this prefix rule and PEP 440's agree. Outside this module the
+// rule is manifest.PinCovers, which compares the PEP 440 way; this module
+// keeps to the standard library, so it does not.
 func pinCovers(pin, release string) bool {
 	pin = strings.TrimSpace(pin)
+	release, _, _ = strings.Cut(strings.TrimSpace(release), "+")
 	return pin != "" && (release == pin || strings.HasPrefix(release, pin+"."))
 }
 

@@ -18,8 +18,19 @@ var helperContentAtVersion = map[int]string{
 	// Writes its outputs with LF line endings on every host.
 	2: "e2c1f44df4ed6b3cc93e73e45473fc4b9549322b876962fe29fa62f9e36846a7",
 	// Compares a lock's recorded constraints by name and specifier, and reads
-	// python_version == 'X.Y' as python_full_version == 'X.Y.*'.
+	// python_version == 'X.Y' as python_full_version == 'X.Y.*'. (This branch's
+	// own version 3, checking the image's Airflow against uv.lock's by release,
+	// was 68adef75...; it never reached a release, and 4 carries both.)
 	3: "72b26579905db375023b6b1e60149e277de2aecb385fdf5822bb23019a785f64",
+	// Both: the image's Airflow checked against uv.lock's by release, and the
+	// lock's constraints compared by meaning.
+	4: "1b51bc76862c3eac04d849400c1fa85a6a8e0de18d0b16034af3b2e68cd28538",
+	// 4, and the astro-runtime dependency group not counted as the project
+	// naming a base image package.
+	5: "9e63e4d8a11522988c9bc9639325f7ed479dc4429cd3dd0646c56aaeffe2913e",
+	// The Airflow comparison runs only on a lock that is not stale, reads the
+	// pins' build from the [tool.uv] pins header alone, and names astro init.
+	6: "80b93403892ef730f62f9a4a698e03c0b46b5f653c112f77ec0fe7d480853253",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {

@@ -68,6 +68,13 @@ type ManifestBuild struct {
 	// of AirflowVersion's series, or "" for none. The manifest never sets it
 	// beside a Dockerfile.
 	Runtime string
+	// LockedRuntime is the runtime build the project's runtime pins were
+	// taken from (manifest UV.RuntimeBuild), the build its uv.lock was made
+	// for, or "" for none. With Runtime empty, a local or packaged generated
+	// image starts FROM it instead of the newest build of the series, and a
+	// deploy prefers it when the Deployment offers it. Unused when a
+	// Dockerfile is declared, whose FROM names the build.
+	LockedRuntime string
 	// RequiresPython is [project] requires-python. A generated image runs the
 	// newest Python of its runtime build that it admits, preferring the
 	// build's default (imagebuild.RuntimeImageForPython).
@@ -94,6 +101,7 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 		ProjectDir:     projectDir,
 		AirflowVersion: p.AirflowVersion,
 		Runtime:        p.Runtime,
+		LockedRuntime:  p.LockedRuntime,
 		RequiresPython: p.RequiresPython,
 		Dockerfile:     p.Dockerfile,
 		Dependencies:   p.Dependencies,
@@ -108,6 +116,7 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 func (p *Plan) SetManifestBuild(mb ManifestBuild) {
 	p.AirflowVersion = mb.AirflowVersion
 	p.Runtime = mb.Runtime
+	p.LockedRuntime = mb.LockedRuntime
 	p.RequiresPython = mb.RequiresPython
 	p.Dockerfile = mb.Dockerfile
 	p.Dependencies = mb.Dependencies

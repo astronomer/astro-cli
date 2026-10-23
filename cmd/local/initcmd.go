@@ -2,18 +2,23 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
+	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/secrets"
+	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
 // NewInitCmd builds the root-level `astro init`. The same constructor backs
@@ -39,7 +44,8 @@ func newInitCmd(c *cli) *cobra.Command {
 			"except requirements.txt and packages.txt when a Dockerfile left on its ONBUILD tag still installs them, and other files already there are kept. " +
 			"What init could not carry over, such as a requirements.txt line that is not a plain requirement, is listed at the end, to move across by hand.\n\n" +
 			"Run in a project that is already an Astro project, it brings what astro writes there up to date and changes nothing else: " +
-			"a declared Dockerfile still on an ONBUILD tag is moved onto its -base image as a conversion would, and the .astro/install-project.py it runs is written or refreshed.",
+			"a declared Dockerfile still on an ONBUILD tag is moved onto its -base image as a conversion would, the .astro/install-project.py it runs is written or refreshed, " +
+			"and the runtime pins in [tool.uv] move to the newest Astro Runtime build, with uv lock run so uv.lock follows them.",
 		Example: "  # Make the current directory an Astro project\n" +
 			"  astro init\n\n" +
 			"  # Create a new project in its own directory, pinned to Airflow 3.1\n" +
@@ -110,11 +116,79 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// After the manifest is written rather than inside scaffold.Plan, which
 	// stays offline. A lookup that fails is not reported here, since init has
 	// no to-do in it: `astro local start` makes the same lookup and says what
-	// it found.
-	c.writeAstroBuild(ctx, res.Dir)
+	// it found. What the runtime group left out is said here, though: a start
+	// says it only when the group changes, which after a first init it does
+	// not.
+	build := c.writeAstroBuild(ctx, res.Dir)
+	// On stderr as text in either format: init's stdout is its one result.
+	notes := cliout.Renderer{Format: cliout.FormatText, Out: c.d.Stderr}
+	if res.Existing {
+		// Bringing a project up to date is where a Docker-only project moves
+		// to a newer runtime build, so it says what moved.
+		c.reportAstroBuild(notes, build)
+		// The refresh changed the manifest, so the project was not up to date.
+		if (build.pinsChanged || build.airflowChanged || build.groupChanged) && !slices.Contains(res.Updated, manifest.Marker) {
+			res.Updated = append(res.Updated, manifest.Marker)
+		}
+	}
+	// A uv.lock already there, in a project this run adopted or converted as
+	// in one it brought up to date, was resolved without what init just
+	// wrote into [tool.uv], so it follows.
+	c.relockAfterInit(ctx, notes, res.Dir, build)
+	// reportAstroBuild already said it when the group changed.
+	if !res.Existing || !build.groupChanged {
+		c.reportGroupLeftOut(build)
+	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
 	})
+}
+
+// relockAfterInit runs `uv lock` in a project that has a uv.lock, so the lock
+// follows pyproject.toml as init left it: the runtime pins or the Airflow
+// build may have moved, and the images install the lock's versions and build
+// on the runtime the pins name, so a lock still resolved for the old build
+// would install that build's versions over the new one. It runs whether or not
+// init changed [tool.uv], which is what makes "run astro init" the one advice
+// for a lock that is out of date; uv lock leaves a lock that is not as it is.
+// With no uv to run, it says to run it when [tool.uv] changed. A project with
+// no uv.lock has nothing to follow.
+func (c *cli) relockAfterInit(ctx context.Context, r cliout.Renderer, dir string, build astroBuildWrite) {
+	if _, err := os.Stat(filepath.Join(dir, "uv.lock")); err != nil {
+		return
+	}
+	changed := build.pinsChanged || build.airflowChanged || build.groupChanged
+	stale := fmt.Sprintf("uv.lock was resolved before %s's [tool.uv] changed: run uv lock so it follows", manifest.Marker)
+	if c.d.Relock == nil {
+		if changed {
+			emitWarning(r, event{Event: "warning", Text: stale})
+		}
+		return
+	}
+	switch err := c.d.Relock(ctx, dir); {
+	case errors.Is(err, uv.ErrNotFound):
+		if changed {
+			emitWarning(r, event{Event: "warning", Text: stale + ", once uv is installed"})
+		}
+	case err != nil:
+		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf("uv.lock could not be brought up to date with %s: uv lock failed: %v", manifest.Marker, err)})
+	case changed:
+		fmt.Fprintf(c.d.Stderr, "uv.lock: relocked for %s's [tool.uv]\n", manifest.Marker)
+	}
+}
+
+// uvRelock is Deps.Relock in production: uv lock in dir, with the uv and the
+// cache standalone mode uses.
+func uvRelock(ctx context.Context, dir string) error {
+	root, err := localrt.CacheRoot()
+	if err != nil {
+		return err
+	}
+	client, err := uv.New(ctx, uv.Options{CacheDir: filepath.Join(root, "uv")})
+	if err != nil {
+		return err
+	}
+	return client.Lock(ctx, dir, uv.Stdio{})
 }
 
 // nextStart is the start command to suggest once init is done. Standalone

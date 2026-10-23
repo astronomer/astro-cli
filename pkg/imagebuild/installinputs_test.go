@@ -301,6 +301,76 @@ func lockProject(deps []string, packages string) (pyproject, lock string) {
 	return pyproject, lock
 }
 
+// Every build checks the lock's Airflow against the image's, `docker build .`
+// included: a lock made for another runtime's Airflow is said in the build
+// output, naming the runtime the pins came from when pyproject.toml records
+// it, and the build goes on with the lock's versions. A lock for this image's
+// Airflow, a lock holding no Airflow, and an image whose Airflow cannot be
+// read say nothing.
+func TestInstallHelperSaysWhenTheLockIsForAnotherAirflow(t *testing.T) {
+	pyproject, lock := lockProject([]string{"apache-airflow==3.3.*", "pandas"},
+		lockEntry("pandas", "2.2.3")+lockEntry("apache-airflow", "3.3.2+astro.2"))
+	pins := "\n[tool.uv]\nconstraint-dependencies = [\n" +
+		"    # Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.\n" +
+		"    \"pandas==2.2.3; python_version == '3.12'\",\n]\n"
+	// The lock uv made under those pins records them, so it is not stale.
+	pinnedLock := strings.Replace(lock, "version = 1\n", "version = 1\n\n[manifest]\nconstraints = [\n"+
+		`    { name = "pandas", marker = "python_full_version == '3.12.*'", specifier = "==2.2.3" },`+"\n]\n", 1)
+
+	for _, tt := range []struct {
+		name, pyproject, lock, installed string
+		want                             []string
+	}{
+		{name: "same airflow", pyproject: pyproject, lock: lock, installed: "3.3.2+astro.2"},
+		// One release: another Astronomer build of it, or PyPI's, is no other Airflow.
+		{name: "same release, another astro build", pyproject: pyproject, lock: lock, installed: "3.3.2+astro.3"},
+		{name: "same release from pypi", pyproject: pyproject, lock: lock, installed: "3.3.2"},
+		{
+			name: "another airflow, runtime named", pyproject: pyproject + pins, lock: pinnedLock, installed: "3.3.3+astro.1",
+			want: []string{"uv.lock was made for Airflow 3.3.2+astro.2 (Astro Runtime 3.3-9)", "this image has Airflow 3.3.3+astro.1", "run `astro init`, which moves the runtime pins and relocks"},
+		},
+		{
+			name: "another airflow, no pins", pyproject: pyproject, lock: lock, installed: "3.3.3+astro.1",
+			want: []string{"uv.lock was made for Airflow 3.3.2+astro.2,", "this image has Airflow 3.3.3+astro.1"},
+		},
+		{name: "image airflow unknown", pyproject: pyproject, lock: lock},
+		{name: "no airflow in the lock", pyproject: pyproject, lock: strings.Replace(lock, lockEntry("apache-airflow", "3.3.2+astro.2"), "", 1), installed: "3.3.3+astro.1"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			out := runHelper(t, helperProject(t, tt.pyproject, tt.lock), helperRun{env: []string{"ASTRO_INSTALL_PROJECT_BASE_AIRFLOW=" + tt.installed}})
+			if len(tt.want) == 0 {
+				assert.NotContains(t, out.stderr, "was made for")
+			}
+			for _, s := range tt.want {
+				assert.Contains(t, out.stderr, s)
+			}
+			// The build goes on with the lock's versions either way.
+			assert.Contains(t, out.constraints, "pandas==2.2.3")
+		})
+	}
+
+	// A lock set aside as out of date installs nothing it says, so its Airflow
+	// is not compared: the warning is the staleness, naming astro init.
+	out := runHelper(t, helperProject(t, pyproject+pins, lock), helperRun{env: []string{"ASTRO_INSTALL_PROJECT_BASE_AIRFLOW=3.3.3+astro.1"}})
+	assert.NotContains(t, out.stderr, "was made for")
+	assert.Contains(t, out.stderr, "out of date with pyproject.toml")
+	assert.Contains(t, out.stderr, "run `astro init`, which relocks")
+}
+
+// The runtime pins' build is read from the comment astro writes inside the
+// [tool.uv] constraint-dependencies array, and nowhere else: the same words
+// elsewhere in pyproject.toml, or a pins array of another table, are not it.
+func TestInstallHelperReadsThePinsBuildFromThePinsHeaderOnly(t *testing.T) {
+	pyproject, lock := lockProject([]string{"apache-airflow==3.3.*", "pandas"},
+		lockEntry("pandas", "2.2.3")+lockEntry("apache-airflow", "3.3.2+astro.2"))
+	elsewhere := "\n# Astro Runtime 9.9-9 (Python 3.12) ships these versions\n[tool.other]\nconstraint-dependencies = [\n" +
+		"    # Astro Runtime 8.8-8 (Python 3.12) ships these versions\n]\n"
+	out := runHelper(t, helperProject(t, pyproject+elsewhere, lock), helperRun{env: []string{"ASTRO_INSTALL_PROJECT_BASE_AIRFLOW=3.3.3+astro.1"}})
+	assert.Contains(t, out.stderr, "uv.lock was made for Airflow 3.3.2+astro.2, and")
+	assert.NotContains(t, out.stderr, "9.9-9")
+	assert.NotContains(t, out.stderr, "8.8-8")
+}
+
 // The registry entry of a package in a uv.lock.
 func lockEntry(name, version string) string {
 	return "[[package]]\nname = \"" + name + "\"\nversion = \"" + version + "\"\nsource = { registry = \"https://pypi.org/simple\" }\n\n"
@@ -639,6 +709,25 @@ func TestInstallHelperLeavesTheBaseImagesPackages(t *testing.T) {
 			out := runHelper(t, dir, helperRun{runtimeConstraints: constraints, env: base})
 			assert.Equal(t, want, out.constraints,
 				"six and tzdata are the base's and not the project's; pandas, python-dateutil and pytz are the project's own; numpy is not in the base")
+		})
+	}
+}
+
+// The astro-runtime dependency group is astro's, listing what the image ships
+// so a local environment has it too: a base package named only there is not
+// the project's naming, and stays at the base image's version. The same
+// package in a group of the project's own is the project's, and is pinned.
+// The group name compares as PEP 735 normalizes it.
+func TestInstallHelperDoesNotCountTheRuntimeGroupAsNaming(t *testing.T) {
+	for _, group := range []string{"astro-runtime", "Astro_Runtime"} {
+		t.Run(group, func(t *testing.T) {
+			pyproject, lock := lockProject([]string{"requests"}, lockEntry("requests", "2.33.0")+
+				lockEntry("pandas", "2.2.3")+lockEntry("pytest", "8.4.2"))
+			pyproject += "\n[dependency-groups]\n" + group + " = ['pandas', 'pytest']\ndev = ['pytest']\n"
+			out := runHelper(t, helperProject(t, pyproject, lock),
+				helperRun{env: []string{"ASTRO_INSTALL_PROJECT_BASE_INSTALLED=pandas,pytest,requests"}})
+			assert.Equal(t, "# Generated from uv.lock by .astro/install-project.py.\npytest==8.4.2\nrequests==2.33.0\n", out.constraints,
+				"pandas is named only in the runtime group, so it stays the base's; pytest is in dev too, and requests is a dependency")
 		})
 	}
 }
