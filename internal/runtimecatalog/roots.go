@@ -56,6 +56,22 @@ import (
 // can point it at a local server.
 var rootsBaseURL = "https://cdn.astronomer.io/runtime-roots"
 
+// RootsURLEnv points the published lists at a mirror, for a machine that
+// cannot reach Astronomer's CDN, as FreezeURLEnv does the freeze files. The
+// lists are looked for under it by the CDN's names,
+// runtime-<build>-python-<python>.txt. Without one, or without a list there,
+// uv works the list out from the freeze, as for an unpublished build.
+const RootsURLEnv = "ASTRO_RUNTIME_ROOTS_URL"
+
+// rootsBase is the address published lists are read from: RootsURLEnv when it
+// is set, else rootsBaseURL.
+func rootsBase() string {
+	if u := strings.TrimSpace(os.Getenv(RootsURLEnv)); u != "" {
+		return strings.TrimSuffix(u, "/")
+	}
+	return rootsBaseURL
+}
+
 // compileFunc runs `uv pip compile` from dir: input on stdin, args after it.
 type compileFunc func(ctx context.Context, dir string, input, args []string) (string, error)
 
@@ -302,7 +318,7 @@ func publishedRoots(ctx context.Context, dir, name string) ([]string, bool) {
 	if data == nil {
 		fetchCtx, cancel := context.WithTimeout(ctx, freezeTimeout)
 		defer cancel()
-		if data, err = fetchAndKeep(fetchCtx, rootsBaseURL, dir, name); err != nil {
+		if data, err = fetchAndKeep(fetchCtx, rootsBase(), dir, name); err != nil {
 			return nil, false
 		}
 	}

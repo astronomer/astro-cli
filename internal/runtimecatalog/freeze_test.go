@@ -30,6 +30,7 @@ func freezeServer(t *testing.T, files map[string]string) (*httptest.Server, *ato
 	t.Helper()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	t.Setenv("UV_EXCLUDE_NEWER", "")
+	t.Setenv(FreezeURLEnv, "")
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
@@ -134,6 +135,24 @@ func TestRuntimePinsRefusesAPageWithNoPackages(t *testing.T) {
 	_, err := RuntimePins(context.Background(), "3.3-9", "3.12")
 	assert.Error(t, err)
 	assert.NoFileExists(t, cachedCopy("runtime-3.3-9-python-3.12.txt"))
+}
+
+// ASTRO_RUNTIME_FREEZE_URL points the reads at a mirror, and an error names
+// the mirror without the credentials its address carries.
+func TestRuntimePinsReadsAMirror(t *testing.T) {
+	srv, hits := freezeServer(t, map[string]string{"/mirror/runtime-3.3-9-python-3.12.txt": sampleFreeze})
+	t.Setenv(FreezeURLEnv, srv.URL+"/mirror/")
+	got, err := RuntimePins(context.Background(), "3.3-9", "3.12")
+	require.NoError(t, err)
+	assert.Len(t, got, 3)
+	assert.Equal(t, int32(1), hits.Load())
+
+	srv.Close()
+	t.Setenv(FreezeURLEnv, strings.Replace(srv.URL, "http://", "http://user:s3cret@", 1)+"/mirror")
+	_, err = RuntimePins(context.Background(), "3.3-10", "3.12")
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "s3cret")
+	assert.NotContains(t, err.Error(), "user")
 }
 
 // A build or Python becomes part of a URL and a file name, so one that could

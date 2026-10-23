@@ -10,13 +10,18 @@ import (
 // admits version, a release a constraint pins it to: "pandas" and
 // "pandas>=2.3" admit 2.3.3, "pandas>=3" does not.
 //
+// An environment marker is left out: the specifier is judged as if it
+// applied everywhere. A caller weighing a pin that carries a marker of its
+// own (a runtime pin's python_version) gets the answer for where both apply,
+// and where they do not, the requirement only bounds more than it needs to.
+//
 // known is false when the requirement says more than this reads with
-// certainty, and then admits says nothing: an environment marker, which
-// limits it to some installs; a direct reference ("name @ url"); "===",
-// which PEP 440 defines on the string as written, where the library compares
-// its normalized form; or a specifier or version, on either side, PEP 440
-// does not spell. A caller that cannot tell treats the version as excluded,
-// which is the safe answer for a pin: without it uv resolves freely.
+// certainty, and then admits says nothing: a direct reference ("name @ url");
+// "===", which PEP 440 defines on the string as written, where the library
+// compares its normalized form; or a specifier or version, on either side,
+// PEP 440 does not spell. A caller that cannot tell treats the version as
+// excluded, which is the safe answer for a pin: without it uv resolves
+// freely.
 //
 // The comparison is PEP 440's, as github.com/aquasecurity/go-pep440-version
 // implements it: epochs, pre-, post- and dev releases, wildcards, "~=", and
@@ -43,12 +48,13 @@ func RequirementAdmits(req, version string) (admits, known bool) {
 }
 
 // requirementSpecifier is the version specifier of a requirement, "" for one
-// with none. ok is false for a requirement this does not read with
-// certainty: one with a marker, a direct reference, "===", or the library's
-// "||", which PEP 508 does not have.
+// with none, its environment marker left out. ok is false for a requirement
+// this does not read with certainty: a direct reference, "===", or the
+// library's "||", which PEP 508 does not have.
 func requirementSpecifier(req string) (string, bool) {
-	s := strings.TrimSpace(req)
-	if strings.ContainsAny(s, ";@") || strings.Contains(s, "===") || strings.Contains(s, "||") {
+	s, _, _ := strings.Cut(req, ";")
+	s = strings.TrimSpace(s)
+	if strings.Contains(s, "@") || strings.Contains(s, "===") || strings.Contains(s, "||") {
 		return "", false
 	}
 	end := strings.IndexAny(s, " \t[<>=!~(")

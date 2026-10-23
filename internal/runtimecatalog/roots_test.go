@@ -215,6 +215,18 @@ func TestRuntimeRootsRemembersAFailure(t *testing.T) {
 	assert.Equal(t, before, f.calls.Load())
 }
 
+// ASTRO_RUNTIME_ROOTS_URL points the published lists at a mirror, read by the
+// CDN's file names.
+func TestRuntimeRootsReadsTheListFromAMirror(t *testing.T) {
+	rootsServer(t, map[string]string{"/mirror/roots/runtime-3.3-9-python-3.14.txt": "statsd\n"})
+	t.Setenv(RootsURLEnv, strings.TrimSuffix(rootsBaseURL, "/runtime-roots")+"/mirror/roots/")
+	f := &fakeUV{answer: answers339}
+	f.install(t)
+	got, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"statsd"}, got.Names)
+}
+
 // uv 0.11 names the package with no wheel in its hint, and in the solver's
 // own words, either of which is read.
 func TestMissingWheel(t *testing.T) {
