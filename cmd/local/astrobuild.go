@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	pep440 "github.com/aquasecurity/go-pep440-version"
+
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
@@ -90,9 +92,11 @@ func stalePin(m *manifest.Manifest) bool {
 	return false
 }
 
-// pinCovers reports whether an Airflow pin ("3.3", "3.3.2") covers a release.
+// pinCovers reports whether an Airflow pin ("3.3", "3.3.2") covers a release:
+// whether apache-airflow==<pin>.* admits it, as PEP 440 matches a prefix.
 func pinCovers(pin, release string) bool {
-	return release == pin || strings.HasPrefix(release, pin+".")
+	admits, known := manifest.RequirementAdmits(runtimeversions.DistAirflow+"=="+pin+".*", release)
+	return known && admits
 }
 
 // astroBuildWrite is what writeAstroBuild did, for its caller to report.
@@ -325,11 +329,14 @@ func releaseIn(freeze []string, dist string) string {
 	return ""
 }
 
-// astroRelease is a version without its +astro build: 3.3.2 for
-// 3.3.2+astro.2.
+// astroRelease is a version's public part, without its +astro build: 3.3.2
+// for 3.3.2+astro.2. "" for a version PEP 440 does not spell.
 func astroRelease(version string) string {
-	release, _, _ := strings.Cut(strings.TrimSpace(version), "+")
-	return release
+	v, err := pep440.Parse(strings.TrimSpace(version))
+	if err != nil {
+		return ""
+	}
+	return v.Public()
 }
 
 // imageAirflowBuild is b with the Airflow and Task SDK builds the image's
@@ -354,11 +361,12 @@ func imageAirflowBuild(b runtimeversions.AstroBuild, freeze []string) runtimever
 }
 
 // sameRelease reports two +astro builds of one release: 3.3.2+astro.1 and
-// 3.3.2+astro.2.
+// 3.3.2+astro.2, one public version with an astro local part each.
 func sameRelease(a, b string) bool {
-	ra, _, oka := strings.Cut(a, "+astro.")
-	rb, _, okb := strings.Cut(b, "+astro.")
-	return oka && okb && ra == rb
+	va, errA := pep440.Parse(strings.TrimSpace(a))
+	vb, errB := pep440.Parse(strings.TrimSpace(b))
+	return errA == nil && errB == nil && va.Public() == vb.Public() &&
+		strings.HasPrefix(va.Local(), "astro.") && strings.HasPrefix(vb.Local(), "astro.")
 }
 
 // airflowSettings are the parts of a manifest SetAstroBuild changes to hold

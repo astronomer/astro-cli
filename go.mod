@@ -32,6 +32,7 @@ require (
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.7.0
+	github.com/aquasecurity/go-pep440-version v0.0.1
 	github.com/astronomer/astro-cli/pkg/airflowapi v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/airflowenv v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000
@@ -74,6 +75,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.21.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.12.0 // indirect
+	github.com/aquasecurity/go-version v0.0.1 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.42.1 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.32.17 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.16 // indirect
@@ -127,6 +129,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect
+	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
 
