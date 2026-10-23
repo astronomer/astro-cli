@@ -39,9 +39,12 @@ import (
 // numba<0.63) drag a shared dependency back to a release whose sdist does not
 // build.
 //
-// The runtime image's constraints also pin SQLAlchemy, but nothing published
-// says to which release short of pulling the image, so that line is left out
-// rather than guessed.
+// The rest of constraint-dependencies holds the runtime pins (RuntimePins):
+// every other distribution the image ships, at its version, from the package
+// list Astronomer publishes for each build and Python
+// (the CLI's runtimecatalog.RuntimePins). Without them a lockfile takes the newest of
+// each, so standalone ran SQLAlchemy 2.1 beside an Airflow whose image holds
+// it to 2.0, and newer releases of most of what Airflow imports.
 
 // astroIndexName names the [[tool.uv.index]] entry this file writes.
 const astroIndexName = "astronomer"
@@ -69,13 +72,22 @@ var (
 // zero b takes out what an earlier one wrote, for an Airflow Astronomer has no
 // build of, which then comes from PyPI. It leaves every other [tool.uv] key,
 // and every comment, as it was.
-func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild) error {
-	return EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		return setAstroBuild(before, ed, b)
+//
+// pins are the runtime pins to write in place of the ones there. nil means
+// they are not known (no network, say): the ones there stay, less any the project
+// now gives a version they do not meet.
+//
+// pinsRefused reports runtime pins that were not written because the array
+// cannot hold the comments that mark them: a [tool.uv] written as an inline
+// table. The rest was written; the caller says why the pins were not.
+func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, pins *RuntimePins) (pinsRefused bool, err error) {
+	err = EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
+		return setAstroBuild(before, ed, b, pins, &pinsRefused)
 	})
+	return pinsRefused, err
 }
 
-func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild) error {
+func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, pins *RuntimePins, pinsRefused *bool) error {
 	dists := b.Dists()
 	if b.Airflow == "" {
 		dists = nil
@@ -83,9 +95,11 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 	if err := checkNotTheUsers(ed, dists); err != nil {
 		return err
 	}
-	if err := setAstroPins(ed, b, dists); err != nil {
+	refused, err := setAstroPins(ed, b, dists, pins)
+	if err != nil {
 		return err
 	}
+	*pinsRefused = refused
 	if err := setAstroSources(ed, dists); err != nil {
 		return err
 	}
@@ -163,30 +177,49 @@ func checkNotTheUsers(ed tomledit.Editor, dists []string) error {
 	return nil
 }
 
-// setAstroPins replaces the constraints an earlier build wrote with b's,
-// keeping the project's own. A constraint is the build's when it names one of
-// the rebuilt distributions at an +astro version.
-func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string) error {
-	current, _ := ed.Get(constraintsKey)
-	list, _ := current.([]any)
-	var kept []any
-	for _, v := range list {
-		if s, _ := v.(string); manifest.AstroPin(s) {
-			continue
-		}
-		kept = append(kept, v)
-	}
+// setAstroPins replaces the constraints an earlier build wrote with b's, and
+// the runtime pins with pins, keeping the project's own and their comments. A
+// constraint is the build's when it names one of the rebuilt distributions at
+// an +astro version, and a runtime pin when it follows the comment that heads
+// them (manifest.RuntimePinsIn).
+//
+// The project's constraints ahead of the runtime pins and after them both stay
+// where they are. refused reports runtime pins left out because the array
+// cannot carry the comments that mark them (tomledit.ErrCommentsUnsupported);
+// the rest is written.
+func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, pins *RuntimePins) (refused bool, err error) {
+	lines, _ := tomledit.GetLines(ed, constraintsKey)
+	head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
+	head, tail = withoutAstroPins(head), withoutAstroPins(tail)
 	if len(dists) > 0 {
-		kept = append(kept, asAny(b.Pins())...)
+		head = append(head, asAny(b.Pins())...)
 	}
-	if reflect.DeepEqual(kept, list) {
-		return nil
-	}
-	if len(kept) == 0 {
+	return writeRuntimePins(ed, lines, head, current, tail, pins)
+}
+
+// setConstraints writes lines as constraint-dependencies, comments included,
+// so comments that lines leave out go even when the values stay the same (the
+// heading and end of runtime pins whose every pin was deleted), or takes the
+// key out when they hold no constraint, comments alone being nothing to keep.
+func setConstraints(ed tomledit.Editor, lines []any) error {
+	if !slices.ContainsFunc(lines, func(v any) bool { _, isComment := v.(tomledit.Comment); return !isComment }) {
 		ed.Delete(constraintsKey)
 		return nil
 	}
-	return ed.Set(constraintsKey, kept)
+	return tomledit.SetLines(ed, constraintsKey, lines)
+}
+
+// withoutAstroPins is lines without the constraints that hold Airflow to a
+// build (manifest.AstroPin), which setAstroPins writes again.
+func withoutAstroPins(lines []any) []any {
+	var out []any
+	for _, v := range lines {
+		if s, _ := v.(string); manifest.AstroPin(s) {
+			continue
+		}
+		out = append(out, v)
+	}
+	return out
 }
 
 // setAstroSources points each rebuilt distribution at the index, and takes

@@ -150,6 +150,14 @@ type Deps struct {
 	// the network; nil writes nothing.
 	AstroBuild func(ctx context.Context, airflowPin, runtime string) (runtimeversions.AstroBuild, error)
 
+	// RuntimePins reads the name==version lines of one Astro Runtime build's
+	// image running python, which init and a start write into [tool.uv] as
+	// the runtime pins (scaffold.RuntimePins). Production reads the build's
+	// freeze file from Astronomer's CDN, cached, through
+	// runtimecatalog.RuntimePins. A seam so a test never reaches the network;
+	// nil leaves the runtime pins as they are.
+	RuntimePins func(ctx context.Context, build, python string) ([]string, error)
+
 	// RuntimeCatalog reads the runtime catalog for an edit that moves the
 	// Airflow pin, which uses it to move requires-python and [tool.astro]
 	// runtime with the pin. nil, or a nil result, means no catalog: the edit
@@ -229,6 +237,7 @@ func NewDeps() Deps {
 		AirflowDefault:   catalogDefault,
 		RuntimeCheck:     runtimecatalog.CheckRuntime,
 		AstroBuild:       runtimecatalog.AstroBuild,
+		RuntimePins:      runtimecatalog.RuntimePins,
 		RuntimeCatalog:   runtimecatalog.Catalog,
 		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(airflowPin)(ctx)

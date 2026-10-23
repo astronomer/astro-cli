@@ -31,6 +31,9 @@ func (s *surgical) Get(key []string) (any, bool) {
 }
 
 func (s *surgical) Set(key []string, value any) error {
+	if _, isComment := value.(Comment); isComment {
+		return &KeyError{Key: key, Reason: "a comment is written as an element of an array, not on its own"}
+	}
 	done, err := s.setArray(key, value)
 	if !done && err == nil {
 		err = s.doc.Set(key, value)

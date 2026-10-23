@@ -32,7 +32,12 @@ require (
 	github.com/astronomer/astro-cli/pkg/manifest v0.0.0-00010101000000-000000000000
 )
 
-require github.com/pelletier/go-toml/v2 v2.4.4-0.20260718201843-686c980c4758 // indirect
+require (
+	github.com/aquasecurity/go-pep440-version v0.0.1 // indirect
+	github.com/aquasecurity/go-version v0.0.1 // indirect
+	github.com/pelletier/go-toml/v2 v2.4.4-0.20260718201843-686c980c4758 // indirect
+	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
+)
 
 replace github.com/astronomer/astro-cli/pkg/airflowapi => ../airflowapi
 
