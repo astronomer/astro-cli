@@ -1,6 +1,7 @@
 package apc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -59,6 +60,10 @@ var (
 	desiredRuntimeVersion   string
 	clusterID               string
 	deploymentMode          string
+
+	// errNoAppConfig is a create with no platform settings to read: the
+	// lookup when the tree was built failed, and none was asked for since.
+	errNoAppConfig = errors.New("could not read this platform's settings for a new Deployment; check your login and try again")
 
 	hibernateUntil       string
 	hibernateForDuration string
@@ -564,6 +569,9 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("failed to get app config: %w", err)
 		}
+	}
+	if appConfig == nil {
+		return errNoAppConfig
 	}
 
 	// Silence Usage as we have now validated command input
