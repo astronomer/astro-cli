@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -36,6 +37,32 @@ import (
 // freezeBaseURL is where the freeze files are served. A variable so a test can
 // point it at a local server.
 var freezeBaseURL = "https://cdn.astronomer.io/runtime-freeze"
+
+// FreezeURLEnv overrides freezeBaseURL, for a mirror or an air-gapped
+// network, as ASTRO_RUNTIME_VERSIONS_URL does the catalog's address and
+// ASTRO_AIRFLOW_INDEX_URL the index's. The files are looked for under it by
+// the CDN's names, runtime-<build>-python-<python>.txt.
+const FreezeURLEnv = "ASTRO_RUNTIME_FREEZE_URL"
+
+// freezeBase is the address freeze files are read from: FreezeURLEnv when it
+// is set, else freezeBaseURL.
+func freezeBase() string {
+	if u := strings.TrimSpace(os.Getenv(FreezeURLEnv)); u != "" {
+		return strings.TrimSuffix(u, "/")
+	}
+	return freezeBaseURL
+}
+
+// withoutUser is rawURL without its user and password, for an address an
+// error prints: a mirror's address can carry its credentials.
+func withoutUser(rawURL string) string {
+	u, err := neturl.Parse(rawURL)
+	if err != nil || u.User == nil {
+		return rawURL
+	}
+	u.User = nil
+	return u.String()
+}
 
 const (
 	// freezeCacheDir is the directory under the cache root the copies sit in,
@@ -143,7 +170,7 @@ func cachedFreeze(dir, name string) ([]byte, error) {
 // the file, or that there is none. A cache that cannot be written is not a
 // failure: the read worked.
 func fetchAndKeep(ctx context.Context, dir, name string) ([]byte, error) {
-	data, err := fetchFreeze(ctx, freezeBaseURL+"/"+name)
+	data, err := fetchFreeze(ctx, freezeBase()+"/"+name)
 	if dir == "" || (err != nil && !errors.Is(err, ErrFreezeNotPublished)) || os.MkdirAll(dir, freezeDirPerm) != nil {
 		return data, err
 	}
@@ -157,41 +184,49 @@ func fetchAndKeep(ctx context.Context, dir, name string) ([]byte, error) {
 
 // fetchFreeze reads one freeze file from the CDN and returns its bytes. Only a
 // whole, parseable file with a package in it comes back, so nothing short of
-// one is ever cached.
+// one is ever cached. An error names the address without its user and
+// password.
 func fetchFreeze(ctx context.Context, url string) ([]byte, error) {
+	shown := withoutUser(url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading %s: the address does not parse", shown)
 	}
 	req.Header.Set("User-Agent", "astro-cli/"+version.Current())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		// The client's error names the address as requested; this names it
+		// redacted, and keeps the cause.
+		var urlErr *neturl.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		return nil, fmt.Errorf("reading %s: %w", shown, err)
 	}
 	defer resp.Body.Close()
 	switch {
 	case resp.StatusCode == http.StatusNotFound:
 		return nil, ErrFreezeNotPublished
 	case resp.StatusCode != http.StatusOK:
-		return nil, fmt.Errorf("reading %s: %s", url, resp.Status)
+		return nil, fmt.Errorf("reading %s: %s", shown, resp.Status)
 	}
 	// One byte past the cap, so a file the cap would cut short is refused
 	// rather than read as a shorter freeze.
 	data, err := io.ReadAll(io.LimitReader(resp.Body, freezeMaxBytes+1))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading %s: %w", shown, err)
 	}
 	if len(data) > freezeMaxBytes {
-		return nil, fmt.Errorf("reading %s: larger than %d bytes", url, freezeMaxBytes)
+		return nil, fmt.Errorf("reading %s: larger than %d bytes", shown, freezeMaxBytes)
 	}
 	dists, err := parseFreeze(data)
 	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", url, err)
+		return nil, fmt.Errorf("reading %s: %w", shown, err)
 	}
 	if len(dists) == 0 {
 		// A 200 with no requirement in it is a captive portal or an error page,
 		// not a freeze, and caching it would answer every later read wrongly.
-		return nil, fmt.Errorf("reading %s: no packages in the response", url)
+		return nil, fmt.Errorf("reading %s: no packages in the response", shown)
 	}
 	return data, nil
 }

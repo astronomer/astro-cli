@@ -29,7 +29,10 @@ func TestRequirementAdmits(t *testing.T) {
 		{"x==1.0", "1.0.0", true, true},
 		{"x<=2026.7", "2026.7.22", false, true},
 		{"x>=1", "1.2.3+astro.1", true, true},
-		{"x>=3; python_version < '3.11'", "2.0", false, false},
+		// A marker is left out: the specifier is judged on its own.
+		{"x>=3; python_version < '3.11'", "2.0", false, true},
+		{"tomli>=1; python_version < \"3.11\"", "2.2.1", true, true},
+		{"x @ https://h/x.whl ; sys_platform == 'linux'", "1.0", false, false},
 		{"x @ https://h/x.whl", "1.0", false, false},
 		{"x===1.0", "1.0", false, false},
 		{"x>=1", "not a version", false, false},

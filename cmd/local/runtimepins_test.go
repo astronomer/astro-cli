@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
@@ -59,6 +60,7 @@ type pinsRun struct {
 type pinsResult struct {
 	manifest, out            string
 	lookupAsked, freezeAsked []string
+	catalogReads             int
 }
 
 func (p pinsRun) start(t *testing.T) pinsResult {
@@ -91,6 +93,7 @@ func (p pinsRun) start(t *testing.T) pinsResult {
 		t.Fatal(err)
 	}
 	d.RuntimeCatalog = func(context.Context) *runtimeversions.Catalog {
+		res.catalogReads++
 		if p.noCatalog {
 			return nil
 		}
@@ -176,6 +179,20 @@ func TestStartHoldsNoRuntimePinsUnderTheProjectsCutoff(t *testing.T) {
 	r := pinsRun{src: src, build: build332, freeze: freeze339}.start(t)
 	if len(r.freezeAsked) != 0 || strings.Contains(r.manifest, "Astro Runtime") || strings.Contains(r.manifest, "pandas==") {
 		t.Errorf("the list was read (%q), or its pins kept, under the project's cutoff:\n%s", r.freezeAsked, r.manifest)
+	}
+	// Nothing is resolved for pins there will not be. (The start's plan
+	// reads the catalog for the venv's Python on its own, after this.)
+	cutoffReads := r.catalogReads
+	plain := pinsRun{src: written, build: build332, freeze: freeze339}.start(t)
+	if cutoffReads >= plain.catalogReads {
+		t.Errorf("catalog read %d times under a cutoff, %d without: the cutoff should spare the pins' read", cutoffReads, plain.catalogReads)
+	}
+
+	// UV_EXCLUDE_NEWER is a cutoff too, a duration as well as a date.
+	t.Setenv("UV_EXCLUDE_NEWER", "1 week")
+	r = pinsRun{src: written, build: build332, freeze: freeze339}.start(t)
+	if len(r.freezeAsked) != 0 || strings.Contains(r.manifest, "pandas==") {
+		t.Errorf("the list was read (%q), or its pins kept, under UV_EXCLUDE_NEWER:\n%s", r.freezeAsked, r.manifest)
 	}
 }
 
@@ -265,8 +282,9 @@ const patchCatalog = `{"runtimeVersionsV3": {
 
 // A patch pin's pins are of its build, on the Python the project runs, which
 // the series' newest build decides (3.13 here): the venv and the image run
-// it. When the build publishes no list for that Python, its own Python's
-// list is used, with a warning.
+// it. When the build publishes no list for that Python there are none, since
+// pins of another Python carry a marker the venv never matches, and the start
+// says why.
 func TestAPatchPinsPinsAreOfThePythonTheProjectRuns(t *testing.T) {
 	build331 := runtimeversions.AstroBuild{Index: build332.Index, Airflow: "3.3.1+astro.1", TaskSDK: "1.3.1+astro.1"}
 	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.1", 1)
@@ -283,11 +301,40 @@ func TestAPatchPinsPinsAreOfThePythonTheProjectRuns(t *testing.T) {
 		}
 		return list, nil
 	}}.start(t)
-	if !strings.Contains(r.manifest, "# Astro Runtime 3.3-8 (Python 3.12)") {
-		t.Errorf("no fallback to the build's own Python:\n%s", r.manifest)
+	if strings.Contains(r.manifest, "Astro Runtime") || strings.Contains(r.manifest, "pandas==") {
+		t.Errorf("pins of a Python the project does not run:\n%s", r.manifest)
 	}
-	if !strings.Contains(r.out, "publishes no package list for Python 3.13, the one this project runs") {
-		t.Errorf("the start did not say it fell back:\n%s", r.out)
+	if strings.Join(r.freezeAsked, " ") != "3.3-8 3.13" {
+		t.Errorf("asked %q; want 3.3-8 on 3.13 alone, no second read", r.freezeAsked)
+	}
+	if !strings.Contains(r.out, "Astro Runtime 3.3-8 publishes no package list for Python 3.13, the one this project runs") {
+		t.Errorf("the start did not say why:\n%s", r.out)
+	}
+}
+
+// A write the manifest cannot be read back after says only that it changed
+// the file, rather than which part it guessed.
+func TestCompareWithoutTheManifestSaysOnlyItUpdated(t *testing.T) {
+	var res astroBuildWrite
+	res.compare(&manifest.Manifest{}, filepath.Join(t.TempDir(), "pyproject.toml"), true, false)
+	if !res.updated || res.airflowChanged || res.pinsChanged {
+		t.Errorf("updated %v, airflowChanged %v, pinsChanged %v; want updated alone", res.updated, res.airflowChanged, res.pinsChanged)
+	}
+}
+
+// Astronomer's index has no build of the pin, so Airflow comes from PyPI,
+// but the runtime build carries the release the pin covers: its pins apply.
+// They do not when the build carries another.
+func TestStartWritesRuntimePinsWhenAirflowComesFromPyPI(t *testing.T) {
+	r := pinsRun{src: buildManifest, lookupErr: runtimeversions.ErrNoAstroBuild, freeze: freeze339}.start(t)
+	if !strings.Contains(r.manifest, "# Astro Runtime 3.3-9 (Python 3.12)") || strings.Contains(r.manifest, "+astro.") {
+		t.Errorf("want the build's pins and no Astronomer Airflow:\n%s", r.manifest)
+	}
+
+	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.5", 1)
+	r = pinsRun{src: src, lookupErr: runtimeversions.ErrNoAstroBuild, freeze: freeze339}.start(t)
+	if strings.Contains(r.manifest, "Astro Runtime") {
+		t.Errorf("pins of Airflow 3.3.2 beside apache-airflow==3.3.5:\n%s", r.manifest)
 	}
 }
 
