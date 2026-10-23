@@ -108,10 +108,9 @@ var (
 
 // projectRequirements are what the project says of the versions of the
 // packages it names, by distribution (manifest.DistName): every requirement
-// it lists in [project] dependencies, [project.optional-dependencies],
-// [dependency-groups] and the [tool.uv] dev-dependencies older uv wrote, and
-// its own lines of constraint-dependencies; and the packages [tool.uv]
-// override-dependencies names, which replace any other requirement.
+// it lists (listedRequirements), and its own lines of constraint-dependencies;
+// and the packages [tool.uv] override-dependencies names, which replace any
+// other requirement.
 type projectRequirements struct {
 	requirements map[string][]string
 	overrides    map[string]bool
@@ -142,17 +141,19 @@ func (r projectRequirements) excludes(pin string) bool {
 	return false
 }
 
-// ownRequirements reads projectRequirements out of the manifest open in ed,
-// with constraints, the project's own lines of constraint-dependencies.
-func ownRequirements(ed tomledit.Editor, constraints []any) projectRequirements {
-	r := projectRequirements{requirements: map[string][]string{}, overrides: map[string]bool{}}
+// listedRequirements are the requirements the project lists to install, by
+// distribution: [project] dependencies, [project.optional-dependencies],
+// [dependency-groups] but the astro-runtime group astro writes
+// (RuntimeGroup), and the [tool.uv] dev-dependencies older uv wrote.
+func listedRequirements(ed tomledit.Editor) map[string][]string {
+	listed := map[string][]string{}
 	addAll := func(list []any) {
 		for _, v := range list {
 			// A dependency group can include another, as a table; that one is
 			// read where it is defined.
 			if s, isString := v.(string); isString {
 				name := manifest.DistName(s)
-				r.requirements[name] = append(r.requirements[name], s)
+				listed[name] = append(listed[name], s)
 			}
 		}
 	}
@@ -164,12 +165,39 @@ func ownRequirements(ed tomledit.Editor, constraints []any) projectRequirements 
 	for _, key := range [][]string{optionalDepsKey, dependencyGroupsKey} {
 		tables, _ := ed.Get(key)
 		groups, _ := tables.(map[string]any)
-		for _, group := range groups {
+		for name, group := range groups {
+			// The runtime group is astro's list of what the image has, not the
+			// project's: counted, it would hold every package in it to the
+			// project's own version, and take its runtime pin out.
+			if slices.Equal(key, dependencyGroupsKey) && name == manifest.RuntimeGroupName {
+				continue
+			}
 			list, _ := group.([]any)
 			addAll(list)
 		}
 	}
-	addAll(constraints)
+	return listed
+}
+
+// listedPackages are the distributions listedRequirements names.
+func listedPackages(ed tomledit.Editor) map[string]bool {
+	listed := map[string]bool{}
+	for name := range listedRequirements(ed) {
+		listed[name] = true
+	}
+	return listed
+}
+
+// ownRequirements reads projectRequirements out of the manifest open in ed,
+// with constraints, the project's own lines of constraint-dependencies.
+func ownRequirements(ed tomledit.Editor, constraints []any) projectRequirements {
+	r := projectRequirements{requirements: listedRequirements(ed), overrides: map[string]bool{}}
+	for _, v := range constraints {
+		if s, isString := v.(string); isString {
+			name := manifest.DistName(s)
+			r.requirements[name] = append(r.requirements[name], s)
+		}
+	}
 	overrides, _ := ed.Get(overrideDepsKey)
 	list, _ := overrides.([]any)
 	for _, v := range list {
@@ -181,20 +209,25 @@ func ownRequirements(ed tomledit.Editor, constraints []any) projectRequirements 
 }
 
 // SetRuntimePins writes pins as the runtime pins of the manifest in dir, as
-// SetAstroBuild does, and changes nothing else: for a start that cannot reach
-// Astronomer's index, which leaves the Airflow build as it is, but can still
-// apply what needs no index. nil keeps the pins there, less any the project
-// now gives a version they do not meet: after `uv add --frozen 'pandas>=3'`,
-// pandas still goes, or uv has nothing to lock.
-func SetRuntimePins(dir string, wrap func(run func() error) error, pins *RuntimePins) (pinsRefused bool, err error) {
+// SetAstroBuild does, and group as its astro-runtime group, and changes
+// nothing else: for a start that cannot reach Astronomer's index, which leaves
+// the Airflow build as it is, but can still apply what needs no index. nil
+// keeps the pins there, less any the project now gives a version they do not
+// meet: after `uv add --frozen 'pandas>=3'`, pandas still goes, or uv has
+// nothing to lock. nil group keeps the group, less what the project now lists.
+func SetRuntimePins(dir string, wrap func(run func() error) error, pins *RuntimePins, group *RuntimeGroup) (refused Refused, err error) {
 	err = EditManifest(dir, wrap, func(_ *manifest.Manifest, ed tomledit.Editor) error {
 		lines, _ := tomledit.GetLines(ed, constraintsKey)
 		head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
 		var editErr error
-		pinsRefused, editErr = writeRuntimePins(ed, lines, head, current, tail, pins)
+		if refused.Pins, editErr = writeRuntimePins(ed, lines, head, current, tail, pins); editErr != nil || refused.Pins {
+			// Refused pins leave no group either (SetAstroBuild).
+			return editErr
+		}
+		refused.Group, editErr = setRuntimeGroup(ed, group)
 		return editErr
 	})
-	return pinsRefused, err
+	return refused, err
 }
 
 // writeRuntimePins writes constraint-dependencies as head, the runtime pins

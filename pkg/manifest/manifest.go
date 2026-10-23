@@ -48,6 +48,12 @@ type Manifest struct {
 	Project Project
 	Astro   Astro
 	UV      UV
+	// RuntimeGroup is the [dependency-groups] group astro writes the runtime
+	// image's top-level packages into (RuntimeGroupName): its names, in order,
+	// nil when there is none. RuntimeGroupBuild is the build its heading
+	// comment names.
+	RuntimeGroup      []string
+	RuntimeGroupBuild string
 	// Warnings are findings that do not stop a load, sorted like the problems
 	// of a ValidationError: today, a [tool.astro.targets.<name>] key nothing
 	// reads. A caller shows them where it would show the manifest's errors.
@@ -673,6 +679,7 @@ func parse(data []byte, repair bool) (*Manifest, error) {
 	p := &parser{}
 	m := &Manifest{Astro: p.astro(*f.Tool.Astro), UV: uvTable(f.Tool.UV)}
 	m.UV.RuntimeBuild, m.UV.RuntimePython, m.UV.RuntimePins = runtimePinsOf(data, m.UV.ConstraintDependencies)
+	m.RuntimeGroupBuild, m.RuntimeGroup = runtimeGroupOf(data, f.DependencyGroups)
 	if f.Project != nil {
 		m.Project = Project{
 			Name:           f.Project.Name,
@@ -1430,6 +1437,9 @@ func (p *parser) validate(m *Manifest) {
 type wireFile struct {
 	Project *wireProject `toml:"project"`
 	Tool    wireTool     `toml:"tool"`
+	// DependencyGroups is plain data for the reason UV is: astro reads one
+	// group of it (RuntimeGroup) and owns none of the rest.
+	DependencyGroups map[string]any `toml:"dependency-groups"`
 }
 
 // Astro is a pointer so that a present-but-empty [tool.astro] is told apart

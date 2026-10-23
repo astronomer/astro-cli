@@ -64,7 +64,7 @@ var (
 	sourcesKey      = []string{"tool", "uv", "sources"}
 	excludeNewerPkg = []string{"tool", "uv", "exclude-newer-package"}
 	projectDepsKey  = []string{"project", "dependencies"}
-	astroDists      = []string{runtimeversions.DistAirflow, runtimeversions.DistCore, runtimeversions.DistTaskSDK}
+	astroDists      = runtimeversions.AirflowDists()
 )
 
 // SetAstroBuild writes b into the manifest in dir, through EditManifest: the
@@ -75,16 +75,35 @@ var (
 //
 // pins are the runtime pins to write in place of the ones there. nil means
 // they are not known (no network, say): the ones there stay, less any the project
-// now gives a version they do not meet.
+// now gives a version they do not meet. group is the astro-runtime dependency
+// group to write in place of the one there (setRuntimeGroup), nil when it is
+// not known, as with pins.
 //
-// pinsRefused reports runtime pins that were not written because the array
-// cannot hold the comments that mark them: a [tool.uv] written as an inline
-// table. The rest was written; the caller says why the pins were not.
-func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, pins *RuntimePins) (pinsRefused bool, err error) {
+// The Refused it returns reports runtime pins, or a group, that were not
+// written because the array cannot hold the comments that mark them: a
+// [tool.uv], or a [dependency-groups], written as an inline table. The rest
+// was written; the caller says why those were not.
+func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, pins *RuntimePins, group *RuntimeGroup) (refused Refused, err error) {
 	err = EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		return setAstroBuild(before, ed, b, pins, &pinsRefused)
+		if err := setAstroBuild(before, ed, b, pins, &refused.Pins); err != nil {
+			return err
+		}
+		if refused.Pins {
+			// Without the pins the group's packages would lock unpinned, newer
+			// than the image's: no group either.
+			return nil
+		}
+		var err error
+		refused.Group, err = setRuntimeGroup(ed, group)
+		return err
 	})
-	return pinsRefused, err
+	return refused, err
+}
+
+// Refused says which of the runtime pins and the astro-runtime group
+// SetAstroBuild could not write for want of a table that holds comments.
+type Refused struct {
+	Pins, Group bool
 }
 
 func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, pins *RuntimePins, pinsRefused *bool) error {

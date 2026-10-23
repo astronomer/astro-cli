@@ -123,7 +123,7 @@ func RuntimePins(ctx context.Context, build, python string) ([]string, error) {
 	if data == nil {
 		fetchCtx, cancel := context.WithTimeout(ctx, freezeTimeout)
 		defer cancel()
-		if data, err = fetchAndKeep(fetchCtx, dir, name); err != nil {
+		if data, err = fetchAndKeep(fetchCtx, freezeBase(), dir, name); err != nil {
 			return nil, err
 		}
 	}
@@ -139,11 +139,17 @@ func freezeName(build, python string) string {
 // freezeDir is where freeze copies are kept: freezeCacheDir under the cache
 // root, or "" for no cache when there is no root.
 func freezeDir() string {
+	return cacheDir(freezeCacheDir)
+}
+
+// cacheDir is sub under the cache root, or "" for no cache when there is no
+// root.
+func cacheDir(sub string) string {
 	root, err := localrt.CacheRoot()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(root, freezeCacheDir)
+	return filepath.Join(root, sub)
 }
 
 // cachedFreeze is what the cache under dir knows of name: the bytes of a
@@ -166,11 +172,11 @@ func cachedFreeze(dir, name string) ([]byte, error) {
 	return nil, nil
 }
 
-// fetchAndKeep fetches name from the CDN and keeps what it learned under dir:
-// the file, or that there is none. A cache that cannot be written is not a
-// failure: the read worked.
-func fetchAndKeep(ctx context.Context, dir, name string) ([]byte, error) {
-	data, err := fetchFreeze(ctx, freezeBase()+"/"+name)
+// fetchAndKeep fetches name from the directory at base (freezeBase, or
+// rootsBase) and keeps what it learned under dir: the file, or that there is
+// none. A cache that cannot be written is not a failure: the read worked.
+func fetchAndKeep(ctx context.Context, base, dir, name string) ([]byte, error) {
+	data, err := fetchFreeze(ctx, base+"/"+name)
 	if dir == "" || (err != nil && !errors.Is(err, ErrFreezeNotPublished)) || os.MkdirAll(dir, freezeDirPerm) != nil {
 		return data, err
 	}

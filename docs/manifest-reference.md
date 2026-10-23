@@ -665,6 +665,32 @@ A standalone `astro local start` and `astro init` keep the runtime pins current 
 - the Airflow pin moved while Astronomer's index cannot be read, which takes the Airflow build pins out too;
 - under a cutoff, a `UV_EXCLUDE_NEWER` or the project's own `exclude-newer`, since the list is of the present and pins newer than the cutoff would leave uv nothing to lock.
 
+### The runtime image's packages: the `astro-runtime` group
+
+The runtime image installs more than Airflow: providers, database drivers, `redis`, `gunicorn`, `pytest`, and with them pandas, numpy, kubernetes and the rest of what they pull in. A DAG that imports one works on a Deployment and in Docker mode without the project listing it. So that it works in standalone mode too, `astro init` and a standalone `astro local start` write the image's top-level packages, the ones nothing else it installs requires, into a dependency group of their own, and add it to `default-groups`, which `uv sync`, `uv run` and standalone mode install:
+
+```toml
+[dependency-groups]
+astro-runtime = [
+    # Astro Runtime 3.3-9 installs these, so the local environment has what the image has.
+    # astro writes them. To choose a version yourself, list the package in [project] dependencies.
+    'aiofiles',
+    'apache-airflow-providers-celery',
+    …
+]
+
+[tool.uv]
+default-groups = ['dev', 'astro-runtime']
+```
+
+- **Names only.** The runtime pins hold each one, and everything it pulls in, to the image's version, so the local environment has the image's packages at the image's versions. The image itself has them already, so the group changes nothing a build installs.
+- **The list** is the one Astronomer publishes for the build and Python (`https://cdn.astronomer.io/runtime-roots/runtime-<build>-python-<python>.txt`; set `ASTRO_RUNTIME_ROOTS_URL` to read the same file names from a mirror, or to an address that does not answer to stop the request). For a build that does not publish one yet, uv works it out: one `uv pip compile` of the build's packages, held to its versions, whose annotations say which of them another one pulls in. Left out either way: Airflow, which the project lists; pip; and Astronomer's platform packages, every `astronomer-*` but `astronomer-providers` (the executor, logging, the FAB security manager, the version check, runtime extensions), which plug into Airflow itself rather than into a DAG.
+- **Only where it installs.** The image builds a package from source when it has to, with system libraries a laptop may lack: `mysqlclient` publishes no wheel but Windows', and building it needs MySQL's client library. So uv decides, per package and per platform an Astro project locks for (Linux on x86_64 and aarch64, macOS on Apple silicon), whether it installs with everything it pulls in from wheels alone, on the Python the project runs: a `uv pip compile --only-binary` of the package, with the build's versions. What Airflow pulls in may build, since the project installs Airflow anyway. A package that publishes no wheel at all, for any platform (Windows included) or Python, is taken for pure Python and let build: `json-merge-patch`, which `apache-airflow-providers-google` pulls in, is one. One with wheels somewhere but not for a platform here is native, and holds the package that pulls it in out; one with wheels only for older Pythons is native too, not built for this Python yet, and is asked about again after a week. A package that installs everywhere is listed as it is, one that installs on some platforms with a marker naming exactly those, and one that installs on none is left out: `astro init` and a start that changes the group say which and give uv's reason (`apache-airflow-providers-mysql` pulls in `mysqlclient`, which has no wheel on Linux), and `uv add <name>` installs it anyway, on a machine where its build works. Docker mode and a deployment still have every package.
+- **Kept per build.** Every answer, the list and each package's platforms, is of one build and Python and never changes, so it is kept in the CLI's cache. uv runs with your own configuration, so a mirror you resolve through serves it. The first start on a build asks uv about each package, a few seconds; later ones ask nothing. When uv cannot be asked (no network), the group stays as it is, with a warning, and the CLI does not try again for an hour.
+- **A package you list yourself** in `dependencies`, an extra or another group leaves the group: the project installs it itself. Its runtime pin stays while your requirement admits the image's version.
+- **To go without the group**, take `astro-runtime` out of `default-groups`. The CLI keeps the group current and never puts it back in `default-groups`: it adds it there only when it creates the group. A project whose `default-groups` is `'all'` installs it anyway.
+- **It follows the runtime pins.** Pins written are of one build and Python, and the group is that image's packages, read from the same list. Pins taken out empty the group: a runtime with no package list (Airflow 2 before 11.0.0), a list of another Airflow release, or a new build whose list cannot be read. The group is never taken out: an empty one stays, under comments that say none of the image's packages apply, so a choice made in `default-groups` stays with it, and a project that never had a group gets none. Pins kept as they are keep the group. The one exception is a cutoff, a `UV_EXCLUDE_NEWER` or the project's own `exclude-newer`: the pins come out and the group stays as it is, since it holds names alone, which any cutoff resolves. Runtime pins the project's `[tool.uv]` cannot hold (an inline table) leave no group either, since its packages would lock unpinned; a `[dependency-groups]` written as an inline table cannot hold the group's comments, so it gets none. Both say so.
+
 To add a dependency, run `uv add <package>`. It keeps the pins, and a running standalone Airflow picks the package up. A package the image ships locks at the image's version, and keeps its pin, since the bound `uv add` writes admits it. To take a different one, say `pandas>=3` where the image ships pandas 2, `uv add` refuses, because the runtime pin holds pandas: run `uv add --frozen 'pandas>=3'`, which writes the requirement without locking, and then `astro local start`, which takes out the pin and syncs. The image then installs your version over its own.
 
 ### Private packages without a Dockerfile

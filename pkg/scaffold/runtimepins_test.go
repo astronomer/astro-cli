@@ -29,8 +29,8 @@ var freeze339 = &RuntimePins{Build: "3.3-9", Python: "3.12", Pins: []string{
 // setBuild is SetAstroBuild with no wrap, for a test that expects the pins
 // written whenever they are given.
 func setBuild(dir string, b runtimeversions.AstroBuild, pins *RuntimePins) error {
-	refused, err := SetAstroBuild(dir, nil, b, pins)
-	if err == nil && refused {
+	refused, err := SetAstroBuild(dir, nil, b, pins, nil)
+	if err == nil && refused.Pins {
 		return errors.New("the runtime pins were refused")
 	}
 	return err
@@ -177,7 +177,7 @@ func TestSetRuntimePinsDropsWhatTheProjectNowExcludes(t *testing.T) {
 	}{{"pandas>=2.2.3", true}, {"pandas", true}, {"pandas>=3", false}} {
 		added := strings.Replace(written, "'apache-airflow==3.3.*',", "'apache-airflow==3.3.*',\n    '"+tc.requirement+"',", 1)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(added), 0o600))
-		_, err := SetRuntimePins(dir, nil, nil)
+		_, err := SetRuntimePins(dir, nil, nil, nil)
 		require.NoError(t, err)
 		out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 		require.NoError(t, err)
@@ -201,7 +201,7 @@ func TestEmptiedPinsLoseTheirComments(t *testing.T) {
 		}
 	}
 	require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(strings.Join(kept, "\n")), 0o600))
-	_, err := SetRuntimePins(dir, nil, nil)
+	_, err := SetRuntimePins(dir, nil, nil, nil)
 	require.NoError(t, err)
 	out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
@@ -217,9 +217,9 @@ func TestEmptiedPinsLoseTheirComments(t *testing.T) {
 func TestPinsAreRefusedWhereTheyCannotBeMarked(t *testing.T) {
 	src := strings.Replace(astroHead, "[tool.astro]\n", "[tool.astro]\n\n[tool]\nuv = { constraint-dependencies = ['numpy<3'] }\n", 1)
 	dir := projectWith(t, src)
-	refused, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, freeze339)
+	refused, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, freeze339, nil)
 	require.NoError(t, err)
-	assert.True(t, refused)
+	assert.True(t, refused.Pins)
 	out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "numpy<3")
