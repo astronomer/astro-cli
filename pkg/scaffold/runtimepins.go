@@ -2,7 +2,10 @@ package scaffold
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -12,87 +15,264 @@ import (
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
-// RuntimePins are the versions the image of one Astro Runtime build ships, as
-// SetAstroBuild writes them into [tool.uv] constraint-dependencies: between
-// the comments manifest.RuntimePinsComments and manifest.RuntimePinsEnd, one
-// name==version a line, sorted by name, each limited to the image's Python
-// (manifest.RuntimePin).
+// RuntimePins are the versions the image of one Astro Runtime build ships,
+// which a project's uv.lock is seeded with: the lock is resolved once with
+// them as constraints, in a scratch copy of the project (SeedManifest), and uv
+// keeps every version it chose as the lock's preferences from then on. None
+// of them is written into pyproject.toml; the manifest records only which
+// build and Python the lock was seeded from (Seed, manifest.SeedRecord).
 //
-// They hold every package the project's lockfile shares with the image to the
-// image's version on the image's Python, so standalone mode, `uv run` and the
-// lockfile a build installs from all resolve what a deployment runs. A
-// constraint adds no package, so the image's packages the project does not
-// use stay out of it.
+// Seeded so, every package the project's lockfile shares with the image is at
+// the image's version on the image's Python, and standalone mode, `uv run`
+// and the lockfile a build installs from all resolve what a deployment runs.
+// A constraint adds no package, so the image's packages the project does not
+// use stay out of the lock.
 type RuntimePins struct {
 	// Build and Python are the image's: "3.3-9" and "3.12".
 	Build, Python string
 	// Pins are the image's distributions, name==version, as the CLI's
 	// runtimecatalog.RuntimePins reads them from the build's freeze. None
-	// means there are none to write, and any runtime pins there are taken
-	// out.
+	// means there is nothing to seed, and the record of an earlier seed is
+	// taken out.
 	Pins []string
 }
 
-// lines are the pins as SetAstroBuild writes them, between the comments that
-// head them and manifest.RuntimePinsEnd, less the ones it never writes: a
-// package the project gives a version the image's does not meet (own), which
-// is its to choose; Airflow, the Task SDK and core, which b's pins hold; and
-// any other of Astronomer's own builds (an +astro local version), which come
-// from an index the project reads for Airflow alone. None at all when nothing
-// is left.
-func (p *RuntimePins) lines(own projectRequirements) []any {
-	var pins []string
+// constraints are the pins as the scratch copy of a seed states them, less
+// the ones it never states: a package the project gives a version the
+// image's does not meet (own), which is its to choose; Airflow, the Task SDK
+// and core, which the Airflow build pins hold; and any other of Astronomer's
+// own builds (an +astro local version), which come from an index the project
+// reads for Airflow alone. Each is limited to the image's Python: a lockfile
+// resolves for every Python requires-python allows, and the image's versions
+// are of one (numpy 2.3 needs Python 3.11, so held on every Python it leaves
+// a project that allows 3.10 nothing to lock there).
+func (p *RuntimePins) constraints(own projectRequirements) []string {
+	var out []string
 	for _, pin := range p.Pins {
 		name := manifest.DistName(pin)
 		if own.excludes(pin) || slices.Contains(astroDists, name) || strings.Contains(pin, "+astro.") {
 			continue
 		}
-		pins = append(pins, pin)
+		out = append(out, pin+"; python_version == '"+p.Python+"'")
 	}
-	if len(pins) == 0 {
-		return nil
-	}
-	slices.SortStableFunc(pins, func(a, b string) int {
+	slices.SortStableFunc(out, func(a, b string) int {
 		return strings.Compare(manifest.DistName(a), manifest.DistName(b))
 	})
-	var out []any
-	for _, c := range manifest.RuntimePinsComments(p.Build, p.Python) {
-		out = append(out, tomledit.Comment(c))
-	}
-	for _, pin := range pins {
-		out = append(out, manifest.RuntimePin(pin, p.Python))
-	}
-	return append(out, tomledit.Comment(manifest.RuntimePinsEnd))
+	return out
 }
 
-// keptRuntimePins are the runtime pins already there, as manifest.RuntimePinsIn
-// split them off, kept when the new ones are not known, less any the project
-// now gives a version they do not meet (own): `uv add --frozen 'pandas>=3'`
-// takes pandas over at the next write, online or not. A block written without
-// the end comment gains it.
-func keptRuntimePins(current []any, own projectRequirements) []any {
+// Seed is the build and the Python a lock was seeded from, which
+// SetAstroBuild records in the manifest (manifest.SeedRecord). A zero Seed
+// takes the record out.
+type Seed struct {
+	Build, Python string
+}
+
+// ErrSeedWorkspace reports a project that is a uv workspace, whose lock
+// covers members a scratch copy of the root does not have.
+var ErrSeedWorkspace = errors.New("this project is a uv workspace, whose lock astro does not seed")
+
+// SeedManifest is the manifest in dir as the scratch copy that seeds its lock
+// resolves it: pyproject.toml with pins's constraints added to [tool.uv]
+// constraint-dependencies, and every [tool.uv.sources] path made absolute,
+// since the copy sits elsewhere. n is how many constraints it added; none
+// means there is nothing to seed. The project's own file is not touched.
+func SeedManifest(dir string, pins *RuntimePins) (out []byte, n int, err error) {
+	src, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	if err != nil {
+		return nil, 0, err
+	}
+	ed, err := tomledit.NewSurgical(src)
+	if err != nil {
+		return nil, 0, err
+	}
+	if _, ok := ed.Get([]string{"tool", "uv", "workspace"}); ok {
+		return nil, 0, ErrSeedWorkspace
+	}
+	lines, _ := tomledit.GetLines(ed, constraintsKey)
+	project := projectConstraints(lines)
+	added := pins.constraints(ownRequirements(ed, project))
+	if len(added) == 0 {
+		return nil, 0, nil
+	}
+	values, _ := ed.Get(constraintsKey)
+	current, _ := values.([]any)
+	for _, c := range added {
+		current = append(current, c)
+	}
+	// The copy is thrown away, so the comments the array holds need not be
+	// kept: a plain Set of the values writes them as uv reads them.
+	if err := ed.Set(constraintsKey, current); err != nil {
+		return nil, 0, err
+	}
+	if err := absoluteSourcePaths(ed, dir); err != nil {
+		return nil, 0, err
+	}
+	out, err = ed.Bytes()
+	return out, len(added), err
+}
+
+// absoluteSourcePaths makes every relative path a [tool.uv.sources] entry
+// names absolute against dir. A source given as a list of alternatives is
+// left as it is; a lock of it may then fail in the copy, which leaves the
+// project's lock unseeded rather than wrong.
+func absoluteSourcePaths(ed tomledit.Editor, dir string) error {
+	sources, _ := ed.Get(sourcesKey)
+	table, _ := sources.(map[string]any)
+	for pkg, v := range table {
+		entry, _ := v.(map[string]any)
+		path, isString := entry["path"].(string)
+		if !isString || filepath.IsAbs(path) {
+			continue
+		}
+		key := append(slices.Clone(sourcesKey), pkg, "path")
+		if err := ed.Set(key, filepath.ToSlash(filepath.Join(dir, filepath.FromSlash(path)))); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SetSeedRecord records seed in the manifest in dir, as SetAstroBuild does,
+// and changes nothing else: for a start that cannot reach Astronomer's index,
+// which leaves the Airflow build as it is. refused reports a record not
+// written because the array cannot hold a comment (a [tool.uv] written as an
+// inline table).
+func SetSeedRecord(dir string, wrap func(run func() error) error, seed Seed) (refused bool, err error) {
+	err = EditManifest(dir, wrap, func(_ *manifest.Manifest, ed tomledit.Editor) error {
+		lines, _ := tomledit.GetLines(ed, constraintsKey)
+		var astroPins []any
+		for _, v := range lines {
+			if s, isString := v.(string); isString && manifest.AstroPin(s) {
+				astroPins = append(astroPins, s)
+			}
+		}
+		var editErr error
+		refused, editErr = writeConstraints(ed, lines, withoutAstroManaged(lines), astroPins, &seed)
+		return editErr
+	})
+	return refused, err
+}
+
+// writeConstraints writes constraint-dependencies as the project's own lines,
+// then astroPins, then the seed record: seed's when seed is not nil (none for a
+// zero Seed), else the one lines holds. lines is the array as it stands.
+// refused reports a record left out because the array cannot carry a comment
+// (tomledit.ErrCommentsUnsupported); the rest is written.
+func writeConstraints(ed tomledit.Editor, lines, own, astroPins []any, seed *Seed) (refused bool, err error) {
+	var record []any
+	switch {
+	case seed == nil:
+		record = seedRecordIn(lines)
+	case seed.Build != "":
+		record = []any{tomledit.Comment(manifest.SeedRecord(seed.Build, seed.Python))}
+	}
+	out := slices.Concat(own, astroPins, record)
+	if reflect.DeepEqual(out, lines) {
+		return false, nil
+	}
+	err = setConstraints(ed, out)
+	if errors.Is(err, tomledit.ErrCommentsUnsupported) && len(record) > 0 {
+		return true, setConstraints(ed, slices.Concat(own, astroPins))
+	}
+	return false, err
+}
+
+// seedRecordIn is the seed record among lines, as a one-line list, or none.
+func seedRecordIn(lines []any) []any {
+	for _, l := range lines {
+		if c, isComment := l.(tomledit.Comment); isComment {
+			if _, _, ok := manifest.IsSeedRecord(string(c)); ok {
+				return []any{c}
+			}
+		}
+	}
+	return nil
+}
+
+// withoutAstroManaged is constraint-dependencies without what astro writes
+// there: the constraints that hold Airflow to a build (manifest.AstroPin),
+// the seed record, and the runtime pins an older astro wrote (legacyPins).
+// What is left is the project's own, comments included.
+func withoutAstroManaged(lines []any) []any {
 	var out []any
-	values := 0
-	ended := false
-	for _, v := range current {
+	for _, v := range legacyPins(lines) {
 		switch v := v.(type) {
 		case string:
-			if own.excludes(v) {
+			if manifest.AstroPin(v) {
 				continue
 			}
-			values++
 		case tomledit.Comment:
-			ended = ended || string(v) == manifest.RuntimePinsEnd
+			if _, _, ok := manifest.IsSeedRecord(string(v)); ok {
+				continue
+			}
 		}
 		out = append(out, v)
 	}
-	if values == 0 {
-		return nil
-	}
-	if !ended {
-		out = append(out, tomledit.Comment(manifest.RuntimePinsEnd))
+	return out
+}
+
+// projectConstraints are the project's own constraints among lines, the
+// values withoutAstroManaged leaves.
+func projectConstraints(lines []any) []any {
+	var out []any
+	for _, v := range withoutAstroManaged(lines) {
+		if s, isString := v.(string); isString {
+			out = append(out, s)
+		}
 	}
 	return out
+}
+
+// An older astro wrote the runtime pins themselves into constraint-dependencies,
+// between a heading comment and an end comment:
+//
+//	# Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.
+//	# astro writes them. To choose a version yourself, give the package a bound the image's version doesn't meet.
+//	"a2wsgi==1.10.10; python_version == '3.12'",
+//	…
+//	# End of what astro writes. Constraints below this line are yours.
+//
+// A seeded lock replaces them, and the next write takes them out.
+var (
+	legacyPinsHeadRe = regexp.MustCompile(`^Astro Runtime \S+ \(Python \d+\.\d+\) ships these versions`)
+	legacyPinRe      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*==[^\s;,@]+(\s*;\s*python_version\s*==\s*['"]\d+\.\d+['"])?$`)
+)
+
+const legacyPinsEnd = "End of what astro writes. Constraints below this line are yours."
+
+// legacyPins is lines without an older astro's runtime pins: from the heading
+// comment to the end comment, or, with no end comment, through the comments
+// after the heading and the name==version lines after them.
+func legacyPins(lines []any) []any {
+	start := slices.IndexFunc(lines, func(l any) bool {
+		c, isComment := l.(tomledit.Comment)
+		return isComment && legacyPinsHeadRe.MatchString(string(c))
+	})
+	if start < 0 {
+		return lines
+	}
+	end := slices.IndexFunc(lines[start:], func(l any) bool {
+		c, isComment := l.(tomledit.Comment)
+		return isComment && string(c) == legacyPinsEnd
+	})
+	if end >= 0 {
+		return slices.Concat(lines[:start], lines[start+end+1:])
+	}
+	i := start + 1
+	for i < len(lines) {
+		if _, isComment := lines[i].(tomledit.Comment); !isComment {
+			break
+		}
+		i++
+	}
+	for i < len(lines) {
+		if s, isString := lines[i].(string); !isString || !legacyPinRe.MatchString(strings.TrimSpace(s)) {
+			break
+		}
+		i++
+	}
+	return slices.Concat(lines[:start], lines[i:])
 }
 
 // Where a project names packages beyond [project] dependencies: tables of
@@ -110,7 +290,7 @@ var (
 // packages it names, by distribution (manifest.DistName): every requirement
 // it lists in [project] dependencies, [project.optional-dependencies],
 // [dependency-groups] and the [tool.uv] dev-dependencies older uv wrote, and
-// its own lines of constraint-dependencies; and the packages [tool.uv]
+// its own constraint-dependencies; and the packages [tool.uv]
 // override-dependencies names, which replace any other requirement.
 type projectRequirements struct {
 	requirements map[string][]string
@@ -118,12 +298,12 @@ type projectRequirements struct {
 }
 
 // excludes reports whether the project chooses a version of pin's package
-// that pin's does not meet, so the pin would leave uv nothing to lock: an
-// override of the package, or a requirement whose specifier excludes the
-// pinned version (manifest.RequirementAdmits). "pandas" and "pandas>=2.3", as
-// `uv add pandas` writes it, admit pandas 2.3.3 and keep the pin;
-// "pandas>=3" takes it out. A requirement that cannot be read for certain
-// takes it out too, which leaves uv to resolve as it would without it.
+// that pin's does not meet, so seeding with the pin would leave uv nothing
+// to lock: an override of the package, or a requirement whose specifier
+// excludes the pinned version (manifest.RequirementAdmits). "pandas" and
+// "pandas>=2.3", as `uv add pandas` writes it, admit pandas 2.3.3 and keep
+// the pin; "pandas>=3" leaves it out. A requirement that cannot be read for
+// certain leaves it out too, which leaves uv to resolve as it would without it.
 func (r projectRequirements) excludes(pin string) bool {
 	name := manifest.DistName(pin)
 	if r.overrides[name] {
@@ -143,7 +323,7 @@ func (r projectRequirements) excludes(pin string) bool {
 }
 
 // ownRequirements reads projectRequirements out of the manifest open in ed,
-// with constraints, the project's own lines of constraint-dependencies.
+// with constraints, the project's own constraint-dependencies.
 func ownRequirements(ed tomledit.Editor, constraints []any) projectRequirements {
 	r := projectRequirements{requirements: map[string][]string{}, overrides: map[string]bool{}}
 	addAll := func(list []any) {
@@ -180,58 +360,43 @@ func ownRequirements(ed tomledit.Editor, constraints []any) projectRequirements 
 	return r
 }
 
-// SetRuntimePins writes pins as the runtime pins of the manifest in dir, as
-// SetAstroBuild does, and changes nothing else: for a start that cannot reach
-// Astronomer's index, which leaves the Airflow build as it is, but can still
-// apply what needs no index. nil keeps the pins there, less any the project
-// now gives a version they do not meet: after `uv add --frozen 'pandas>=3'`,
-// pandas still goes, or uv has nothing to lock.
-func SetRuntimePins(dir string, wrap func(run func() error) error, pins *RuntimePins) (pinsRefused bool, err error) {
-	err = EditManifest(dir, wrap, func(_ *manifest.Manifest, ed tomledit.Editor) error {
-		lines, _ := tomledit.GetLines(ed, constraintsKey)
-		head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
-		var editErr error
-		pinsRefused, editErr = writeRuntimePins(ed, lines, head, current, tail, pins)
-		return editErr
-	})
-	return pinsRefused, err
-}
-
-// writeRuntimePins writes constraint-dependencies as head, the runtime pins
-// and tail, the pins being pins or, when nil, the current ones kept; lines is
-// the array as it stands. refused reports pins left out because the array
-// cannot carry the comments that mark them (tomledit.ErrCommentsUnsupported).
-func writeRuntimePins(ed tomledit.Editor, lines, head, current, tail []any, pins *RuntimePins) (refused bool, err error) {
-	own := ownRequirements(ed, slices.Concat(head, tail))
-	var managed []any
-	if pins == nil {
-		managed = keptRuntimePins(current, own)
-	} else {
-		managed = pins.lines(own)
+// Excludes reports whether the project in dir chooses a version of pin's
+// package (name==version) that pin's does not meet: the packages a seed
+// leaves to the project, so a lock that differs from the image there differs
+// by the project's own choice. false when the manifest cannot be read.
+func Excludes(dir string, pins []string) map[string]bool {
+	out := map[string]bool{}
+	src, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	if err != nil {
+		return out
 	}
-	out := slices.Concat(head, managed, tail)
-	if reflect.DeepEqual(out, lines) {
-		return false, nil
+	ed, err := tomledit.NewSurgical(src)
+	if err != nil {
+		return out
 	}
-	err = setConstraints(ed, out)
-	if errors.Is(err, tomledit.ErrCommentsUnsupported) && len(managed) > 0 {
-		return true, setConstraints(ed, slices.Concat(head, tail))
+	lines, _ := tomledit.GetLines(ed, constraintsKey)
+	own := ownRequirements(ed, projectConstraints(lines))
+	for _, pin := range pins {
+		if own.excludes(pin) {
+			out[manifest.DistName(pin)] = true
+		}
 	}
-	return false, err
+	return out
 }
 
 // ErrNoRuntimeBuild reports a project whose image is no Astro Runtime build
 // the catalog has: a declared Dockerfile on another image, or an Airflow pin
-// no published build carries. Such a project has no runtime pins.
+// no published build carries. Such a project's lock is not seeded.
 var ErrNoRuntimeBuild = errors.New("this project builds on no Astro Runtime the catalog lists")
 
 // errRuntimeUnknown reports a project whose build, or whose image's Python,
 // cannot be told here: no catalog, or a Dockerfile whose FROM is built from a
-// build argument or pinned by digest. Its runtime pins are left as they are.
+// build argument or pinned by digest. Its lock and its record are left as
+// they are.
 var errRuntimeUnknown = errors.New("which Astro Runtime this project builds on cannot be told")
 
 // RuntimeBuildFor is the Astro Runtime build a project's image is built from,
-// and the Python that image runs: the build its runtime pins are of. It is
+// and the Python that image runs: the build its lock is seeded from. It is
 // named in one place, by the first of these that applies:
 //
 //   - a declared Dockerfile's FROM: its exact build, or for a floating tag
@@ -240,13 +405,13 @@ var errRuntimeUnknown = errors.New("which Astro Runtime this project builds on c
 //   - [tool.astro] runtime;
 //   - the Airflow pin: the newest published build carrying a release the pin
 //     covers, an exact patch when the pin names one. That is the release
-//     runtimeversions.LookupAstroBuild holds Airflow to, so the runtime pins
-//     and the Airflow pin are of one release.
+//     runtimeversions.LookupAstroBuild holds Airflow to, so the seed and
+//     the Airflow pin are of one release.
 //
 // For the last two the Python is the one the project's standalone venv and
 // its generated image run (runtimeversions.ProjectPython, which the venv's
 // StandalonePython and the image's RuntimeImageForPython both follow), so the
-// pins hold the Python the project runs: for a patch pin, whose build is not
+// seed holds the Python the project runs: for a patch pin, whose build is not
 // the series' newest, that can be a Python the build is not the default of,
 // and the caller reads the build's freeze for it. Where ProjectPython has no
 // answer (an Airflow 2 pin, no requires-python), it is the build's own
@@ -256,7 +421,7 @@ var errRuntimeUnknown = errors.New("which Astro Runtime this project builds on c
 // ErrNoRuntimeBuild means the project has no build; any other error means it
 // cannot be told, as without a catalog (c nil) and no build named. One
 // answer for every caller that asks which image a project builds on: the
-// runtime pins, and the Airflow lookup a declared Dockerfile's build names.
+// seed, and the Airflow lookup a declared Dockerfile's build names.
 func RuntimeBuildFor(dir string, m *manifest.Manifest, c *runtimeversions.Catalog) (build, python string, err error) {
 	if path := dockerfilePath(dir, m); path != "" {
 		return dockerfileRuntimeBuild(airflowrt.ReadDeclaredBase(path), c)

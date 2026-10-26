@@ -103,8 +103,9 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// After the manifest is written rather than inside scaffold.Plan, which
 	// stays offline. A lookup that fails is not reported here, since init has
 	// no to-do in it: `astro local start` makes the same lookup and says what
-	// it found.
-	c.writeAstroBuild(ctx, res.Dir)
+	// it found. The seed of uv.lock is: init is where it is made, and the
+	// command a start's notice names to make it again.
+	c.reportSeed(r, c.writeAstroBuild(ctx, res.Dir, true))
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
 	})

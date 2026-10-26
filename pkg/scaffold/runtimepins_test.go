@@ -26,24 +26,6 @@ var freeze339 = &RuntimePins{Build: "3.3-9", Python: "3.12", Pins: []string{
 	"a2wsgi==1.10.10",
 }}
 
-// setBuild is SetAstroBuild with no wrap, for a test that expects the pins
-// written whenever they are given.
-func setBuild(dir string, b runtimeversions.AstroBuild, pins *RuntimePins) error {
-	refused, err := SetAstroBuild(dir, nil, b, pins)
-	if err == nil && refused {
-		return errors.New("the runtime pins were refused")
-	}
-	return err
-}
-
-func writePins(t *testing.T, dir string, b runtimeversions.AstroBuild, pins *RuntimePins) string {
-	t.Helper()
-	require.NoError(t, setBuild(dir, b, pins))
-	out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
-	require.NoError(t, err)
-	return string(out)
-}
-
 func projectWith(t *testing.T, src string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -51,192 +33,185 @@ func projectWith(t *testing.T, src string) string {
 	return dir
 }
 
-func TestTheRuntimePinsAreWrittenBetweenTheirComments(t *testing.T) {
-	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'Pandas>=3']", 1) +
-		"\n[tool.uv]\nconstraint-dependencies = ['protobuf>=7']\n"
-	dir := projectWith(t, src)
-	out := writePins(t, dir, build332, freeze339)
+// setBuild is SetAstroBuild with no wrap, keeping the seed record, for a test
+// of the Airflow build's settings alone.
+func setBuild(dir string, b runtimeversions.AstroBuild) error {
+	refused, err := SetAstroBuild(dir, nil, b, nil)
+	if err == nil && refused {
+		return errors.New("the seed record was refused")
+	}
+	return err
+}
 
-	want := `constraint-dependencies = [
-    'protobuf>=7',
-    'apache-airflow==3.3.2+astro.1',
-    'apache-airflow-task-sdk==1.3.2+astro.1',
-    # Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.
-    # astro writes them. To choose a version yourself, give the package a bound the image's version doesn't meet.
-    "a2wsgi==1.10.10; python_version == '3.12'",
-    "SQLAlchemy==2.0.50; python_version == '3.12'",
-    "zipp==4.1.0; python_version == '3.12'",
-    # End of what astro writes. Constraints below this line are yours.
-]`
-	assert.Contains(t, out, want,
-		"the project's pandas and protobuf are its own, Airflow's are the build's pins, and an +astro build is not PyPI's")
-
-	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+// seedFor is SeedManifest's scratch manifest for dir, read back as the
+// constraints it states.
+func seedFor(t *testing.T, dir string, pins *RuntimePins) (constraints []string, n int) {
+	t.Helper()
+	out, n, err := SeedManifest(dir, pins)
 	require.NoError(t, err)
-	assert.Equal(t, "3.3-9", m.UV.RuntimeBuild)
+	if out == nil {
+		return nil, n
+	}
+	m, err := manifest.Parse(out)
+	require.NoError(t, err)
+	return m.UV.ConstraintDependencies, n
+}
+
+// The scratch copy states the image's versions, each limited to its Python,
+// beside the project's own constraints and Airflow's build pins, and leaves
+// out what a seed never holds: Airflow itself, Astronomer's own builds, and a
+// package the project gives a version the image's does not meet.
+func TestSeedManifestStatesTheImagesVersions(t *testing.T) {
+	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'Pandas>=3']", 1) +
+		"\n[tool.uv]\nconstraint-dependencies = ['protobuf>=7', 'apache-airflow==3.3.2+astro.1']\n"
+	dir := projectWith(t, src)
+	got, n := seedFor(t, dir, freeze339)
 	assert.Equal(t, []string{
+		"protobuf>=7",
+		"apache-airflow==3.3.2+astro.1",
 		"a2wsgi==1.10.10; python_version == '3.12'",
 		"SQLAlchemy==2.0.50; python_version == '3.12'",
 		"zipp==4.1.0; python_version == '3.12'",
-	}, m.UV.RuntimePins, "each pin holds the image's Python alone, so a Python requires-python allows beside it still locks")
-
-	again := writePins(t, dir, build332, freeze339)
-	assert.Equal(t, out, again, "the same build and pins change nothing")
+	}, got)
+	assert.Equal(t, 3, n)
+	assert.Equal(t, src, readManifest(t, dir), "the project's own manifest is not touched")
 }
 
-func TestANewBuildReplacesTheRuntimePins(t *testing.T) {
-	dir := projectWith(t, astroHead)
-	writePins(t, dir, build332, freeze339)
-	out := writePins(t, dir, build332, &RuntimePins{Build: "3.3-10", Python: "3.13", Pins: []string{"apache-airflow==3.3.3+astro.1", "zipp==4.2.0"}})
-	assert.Contains(t, out, "# Astro Runtime 3.3-10 (Python 3.13) ships these versions")
-	assert.Contains(t, out, "zipp==4.2.0;")
-	assert.NotContains(t, out, "3.3-9")
-	assert.NotContains(t, out, "a2wsgi", "a package the new build does not ship has no pin")
-}
-
-// Not known (offline, say): the pins stay, but one the project has since
-// listed is its own. That is how `uv add --frozen 'pandas>=3'` gets past a
-// pin uv would not lock beside.
-func TestUnknownPinsStayLessTheProjectsOwn(t *testing.T) {
-	dir := projectWith(t, astroHead)
-	writePins(t, dir, build332, freeze339)
-	data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
-	require.NoError(t, err)
-	added := strings.Replace(string(data), "'apache-airflow==3.3.*',", "'apache-airflow==3.3.*',\n    'pandas>=3',", 1)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(added), 0o600))
-
-	out := writePins(t, dir, build332, nil)
-	assert.Contains(t, out, "# Astro Runtime 3.3-9 (Python 3.12) ships these versions")
-	assert.Contains(t, out, "zipp==4.1.0;")
-	assert.NotContains(t, out, "pandas==2.2.3")
-}
-
-// A constraint the project adds after the pins, as anyone appending to the
-// array does, is its own: a refresh keeps it, after the pins, and it takes
-// that package's pin out.
-func TestAConstraintAppendedAfterThePinsStays(t *testing.T) {
-	dir := projectWith(t, astroHead)
-	written := writePins(t, dir, build332, freeze339)
-	appended := strings.Replace(written, "    # End of what astro writes. Constraints below this line are yours.\n",
-		"    # End of what astro writes. Constraints below this line are yours.\n    'zipp>=5',\n    'numpy==2.3.0',\n", 1)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(appended), 0o600))
-
-	for _, pins := range []*RuntimePins{freeze339, nil} {
-		out := writePins(t, dir, build332, pins)
-		assert.Contains(t, out, "Constraints below this line are yours.\n    'zipp>=5',\n    'numpy==2.3.0',\n]")
-		assert.NotContains(t, out, "zipp==4.1.0;", "the project constrains zipp itself")
-	}
-}
-
-// A block written without the end comment, as before it existed, ends at its
-// last pin: a constraint after it is not taken for one, and the block gains
-// the comment.
-func TestABlockWithoutItsEndKeepsWhatFollows(t *testing.T) {
-	src := astroHead + "\n[tool.uv]\nconstraint-dependencies = [\n" +
-		"    # Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.\n" +
-		"    'a2wsgi==1.10.10',\n    'numpy<3',\n]\n"
-	dir := projectWith(t, src)
-	out := writePins(t, dir, build332, nil)
-	assert.Contains(t, out, "'a2wsgi==1.10.10',\n    # End of what astro writes. Constraints below this line are yours.\n    'numpy<3',\n]")
-}
-
-// A package in a dependency group or an extra is the project's to version
-// too: `uv add --dev 'pytest>=9'` must lock where the image ships pytest 8.
-// A package the project names keeps its pin while what the project says of it
-// admits the image's version, wherever it says it: dependencies, extras,
-// dependency groups, the dev-dependencies older uv wrote, and its own
-// constraints. It loses the pin to a bound the version does not meet, and to
-// an override, which replaces any requirement.
 func TestThePinOfAPackageTheProjectNamesFollowsItsRequirement(t *testing.T) {
-	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'pandas>=2.2', 'numpy>=3']", 1) +
+	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'pandas>=2.2', 'numpy>=3', \"tomli>=1; python_version < '3.11'\"]", 1) +
 		"\n[project.optional-dependencies]\nplot = ['zipp', 'matplotlib<3']\n\n[dependency-groups]\ndev = ['pytest>=9', {include-group = 'lint'}]\nlint = ['a2wsgi']\n" +
 		"\n[tool.uv]\noverride-dependencies = ['protobuf>=6']\ndev-dependencies = ['ruff']\nconstraint-dependencies = ['SQLAlchemy<2.1']\n"
 	dir := projectWith(t, src)
-	out := writePins(t, dir, build332, &RuntimePins{Build: "3.3-9", Python: "3.12", Pins: []string{
+	got, _ := seedFor(t, dir, &RuntimePins{Build: "3.3-9", Python: "3.12", Pins: []string{
 		"pandas==2.2.3", "numpy==2.3.0", "zipp==4.1.0", "matplotlib==3.10.0", "pytest==8.4.0", "a2wsgi==1.10.10",
-		"protobuf==6.33.6", "ruff==0.14.0", "SQLAlchemy==2.0.50",
+		"protobuf==6.33.6", "ruff==0.14.0", "SQLAlchemy==2.0.50", "tomli==2.3.0",
 	}})
-	for _, kept := range []string{"pandas==", "zipp==", "a2wsgi==", "ruff==", "SQLAlchemy==2.0.50;"} {
-		assert.Contains(t, out, kept, "the project's requirement admits the image's version")
+	joined := strings.Join(got, "\n")
+	for _, kept := range []string{"pandas==", "zipp==", "a2wsgi==", "ruff==", "SQLAlchemy==2.0.50;", "tomli=="} {
+		assert.Contains(t, joined, kept, "the project's requirement admits the image's version")
 	}
 	for _, dropped := range []string{"numpy==", "matplotlib==", "pytest==", "protobuf=="} {
-		assert.NotContains(t, out, dropped, "excluded by the project's requirement, or overridden")
+		assert.NotContains(t, joined, dropped, "excluded by the project's requirement, or overridden")
 	}
 }
 
-// SetRuntimePins with no new pins needs no lookup: a package the project now
-// gives a bound the image's version does not meet loses its pin, and nothing
-// else changes. `uv add pandas` writes a bound the image's pandas meets, and
-// keeps it.
-func TestSetRuntimePinsDropsWhatTheProjectNowExcludes(t *testing.T) {
+// Nothing left to seed with: no scratch manifest at all.
+func TestSeedManifestWithNothingToSeed(t *testing.T) {
 	dir := projectWith(t, astroHead)
-	written := writePins(t, dir, build332, freeze339)
-	for _, tc := range []struct {
-		requirement string
-		keeps       bool
-	}{{"pandas>=2.2.3", true}, {"pandas", true}, {"pandas>=3", false}} {
-		added := strings.Replace(written, "'apache-airflow==3.3.*',", "'apache-airflow==3.3.*',\n    '"+tc.requirement+"',", 1)
-		require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(added), 0o600))
-		_, err := SetRuntimePins(dir, nil, nil)
-		require.NoError(t, err)
-		out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
-		require.NoError(t, err)
-		want := added
-		if !tc.keeps {
-			want = strings.Replace(added, "    \"pandas==2.2.3; python_version == '3.12'\",\n", "", 1)
-		}
-		assert.Equal(t, want, string(out), tc.requirement)
-	}
+	out, n, err := SeedManifest(dir, &RuntimePins{Build: "10.5.0", Python: "3.11"})
+	require.NoError(t, err)
+	assert.Nil(t, out)
+	assert.Zero(t, n)
 }
 
-// After every pin line is deleted by hand, the heading and end comments go
-// with them at the next write, though the values are the same.
-func TestEmptiedPinsLoseTheirComments(t *testing.T) {
+// The copy sits elsewhere, so a path source is made absolute against the
+// project; a workspace is not seeded at all.
+func TestSeedManifestMakesSourcePathsAbsolute(t *testing.T) {
+	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'mylib']", 1) +
+		"\n[tool.uv.sources]\nmylib = { path = 'libs/mylib' }\nother = { path = '/opt/other' }\n"
+	dir := projectWith(t, src)
+	out, _, err := SeedManifest(dir, freeze339)
+	require.NoError(t, err)
+	assert.Contains(t, string(out), filepath.ToSlash(filepath.Join(dir, "libs", "mylib")))
+	assert.Contains(t, string(out), "'/opt/other'")
+
+	ws := projectWith(t, astroHead+"\n[tool.uv.workspace]\nmembers = ['packages/*']\n")
+	_, _, err = SeedManifest(ws, freeze339)
+	assert.ErrorIs(t, err, ErrSeedWorkspace)
+}
+
+// The record follows Airflow's build pins and the project's own constraints;
+// nil keeps it, a zero Seed takes it out.
+func TestSetAstroBuildWritesTheSeedRecord(t *testing.T) {
+	dir := projectWith(t, astroHead+"\n[tool.uv]\nconstraint-dependencies = ['numpy<3']\n")
+	_, err := SetAstroBuild(dir, nil, build332, &Seed{Build: "3.3-9", Python: "3.12"})
+	require.NoError(t, err)
+	want := `constraint-dependencies = [
+    'numpy<3',
+    'apache-airflow==3.3.2+astro.1',
+    'apache-airflow-task-sdk==1.3.2+astro.1',
+    # astro seeded uv.lock from Astro Runtime 3.3-9 (Python 3.12). Run astro init to seed it again.
+]`
+	assert.Contains(t, readManifest(t, dir), want)
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.Equal(t, "3.3-9", m.UV.RuntimeBuild)
+	assert.Equal(t, "3.12", m.UV.RuntimePython)
+
+	before := readManifest(t, dir)
+	_, err = SetAstroBuild(dir, nil, build332, nil)
+	require.NoError(t, err)
+	assert.Equal(t, before, readManifest(t, dir), "nil keeps the record")
+
+	_, err = SetSeedRecord(dir, nil, Seed{})
+	require.NoError(t, err)
+	out := readManifest(t, dir)
+	assert.NotContains(t, out, "astro seeded")
+	assert.Contains(t, out, "'apache-airflow==3.3.2+astro.1'")
+}
+
+// With no Astronomer build of Airflow, the record still has an array to sit
+// in, with no constraint in it.
+func TestTheSeedRecordAloneKeepsTheArray(t *testing.T) {
 	dir := projectWith(t, astroHead)
-	written := writePins(t, dir, build332, freeze339)
-	var kept []string
-	for _, line := range strings.Split(written, "\n") {
-		if !strings.Contains(line, "; python_version == '3.12'") {
-			kept = append(kept, line)
-		}
-	}
-	require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(strings.Join(kept, "\n")), 0o600))
-	_, err := SetRuntimePins(dir, nil, nil)
+	_, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, &Seed{Build: "3.3-9", Python: "3.12"})
 	require.NoError(t, err)
-	out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
-	assert.NotContains(t, string(out), "Astro Runtime")
-	assert.NotContains(t, string(out), "End of what astro writes")
-	assert.Contains(t, string(out), "'apache-airflow==3.3.2+astro.1'")
+	assert.Equal(t, "3.3-9", m.UV.RuntimeBuild)
+	assert.Empty(t, m.UV.ConstraintDependencies)
+
+	_, err = SetSeedRecord(dir, nil, Seed{})
+	require.NoError(t, err)
+	assert.NotContains(t, readManifest(t, dir), "constraint-dependencies")
 }
 
-// A [tool.uv] written as an inline table cannot hold the comments that mark
-// the pins, so they are refused, rather than written as lines nothing tells
-// from the project's. (Astronomer's index cannot be written into one either,
-// which SetAstroBuild already refuses, so the build here is none.)
-func TestPinsAreRefusedWhereTheyCannotBeMarked(t *testing.T) {
+// The runtime pins an older astro wrote come out at the next write, with
+// their comments, and the project's own lines after them stay.
+func TestTheRuntimePinsOfAnOlderAstroAreTakenOut(t *testing.T) {
+	block := "    # Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.\n" +
+		"    # astro writes them. To choose a version yourself, give the package a bound the image's version doesn't meet.\n" +
+		"    \"a2wsgi==1.10.10; python_version == '3.12'\",\n" +
+		"    \"zipp==4.1.0; python_version == '3.12'\",\n"
+	for name, end := range map[string]string{
+		"ended":     "    # End of what astro writes. Constraints below this line are yours.\n",
+		"not ended": "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			src := astroHead + "\n[tool.uv]\nconstraint-dependencies = [\n    'numpy<3',\n    'apache-airflow==3.3.2+astro.1',\n" + block + end + "    'urllib3<3',\n]\n"
+			dir := projectWith(t, src)
+			_, err := SetAstroBuild(dir, nil, build332, &Seed{Build: "3.3-9", Python: "3.12"})
+			require.NoError(t, err)
+			out := readManifest(t, dir)
+			for _, gone := range []string{"ships these versions", "a2wsgi", "zipp", "End of what astro writes"} {
+				assert.NotContains(t, out, gone)
+			}
+			for _, kept := range []string{"'numpy<3'", "'urllib3<3'", "# astro seeded uv.lock from Astro Runtime 3.3-9"} {
+				assert.Contains(t, out, kept)
+			}
+		})
+	}
+}
+
+// A [tool.uv] written as an inline table cannot hold the record, so it is
+// refused, and the rest is written.
+func TestTheSeedRecordIsRefusedWhereItCannotBeWritten(t *testing.T) {
 	src := strings.Replace(astroHead, "[tool.astro]\n", "[tool.astro]\n\n[tool]\nuv = { constraint-dependencies = ['numpy<3'] }\n", 1)
 	dir := projectWith(t, src)
-	refused, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, freeze339)
+	refused, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, &Seed{Build: "3.3-9", Python: "3.12"})
 	require.NoError(t, err)
 	assert.True(t, refused)
-	out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
-	require.NoError(t, err)
-	assert.Contains(t, string(out), "numpy<3")
-	assert.NotContains(t, string(out), "zipp")
+	out := readManifest(t, dir)
+	assert.Contains(t, out, "numpy<3")
+	assert.NotContains(t, out, "astro seeded")
 }
 
-func TestNoPublishedListTakesThePinsOut(t *testing.T) {
-	dir := projectWith(t, astroHead)
-	writePins(t, dir, build332, freeze339)
-	out := writePins(t, dir, build332, &RuntimePins{Build: "10.5.0", Python: "3.11"})
-	assert.NotContains(t, out, "Astro Runtime")
-	assert.NotContains(t, out, "zipp")
-	assert.Contains(t, out, "'apache-airflow==3.3.2+astro.1'")
-
-	// No build at all either: the whole array goes, as it did.
-	out = writePins(t, dir, runtimeversions.AstroBuild{}, &RuntimePins{})
-	assert.NotContains(t, out, "constraint-dependencies")
+func TestExcludes(t *testing.T) {
+	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'pandas>=3', 'zipp']", 1)
+	dir := projectWith(t, src)
+	got := Excludes(dir, []string{"pandas==2.2.3", "zipp==4.1.0", "SQLAlchemy==2.0.50"})
+	assert.Equal(t, map[string]bool{"pandas": true}, got)
+	assert.Empty(t, Excludes(filepath.Join(dir, "missing"), []string{"pandas==2.2.3"}))
 }
 
 const pinsCatalog = `{"runtimeVersionsV3": {
