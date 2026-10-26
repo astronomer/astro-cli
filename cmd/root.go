@@ -234,7 +234,7 @@ var commandGroups = []struct {
 	title string
 	names []string
 }{
-	{groupDevelop, "Develop locally:", []string{"init", "local", "start", "stop", "logs"}},
+	{groupDevelop, "Develop locally:", []string{"init", "project", "local", "start", "stop", "logs"}},
 	{groupInspect, "Inspect Airflow:", []string{"af", "use", "link", "api"}},
 	{groupShip, "Ship:", []string{"package", "deploy", "remote"}},
 	{groupManage, "Manage Astro:", []string{

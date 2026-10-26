@@ -88,6 +88,12 @@ var publishedPayloads = []schemaCase{
 	{"use-listing", useListing{}},
 	{"use-link-row", useLinkRow{}},
 	{"link-result", linkResult{}},
+	// `astro project inspect --output json` publishes project-view, and the
+	// two below are its deployments and pools entries, pinned on their own
+	// so a change to a link's or a pool's shape shows in a golden of its own.
+	{"project-view", projectView{}},
+	{"project-link", projectLink{}},
+	{"project-pool", projectPool{}},
 	{"error", cliout.ErrorObject{}},
 	{"event", event{}},
 	{"open-url", urlResult{}},

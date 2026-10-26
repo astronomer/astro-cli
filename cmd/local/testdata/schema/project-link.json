@@ -1,0 +1,11 @@
+{
+  "kind": "x",
+  "target": "x",
+  "workspace": "x",
+  "deployment": "x",
+  "environment": "x",
+  "url": "x",
+  "domain": "x",
+  "auth_method": "x",
+  "default": true
+}
