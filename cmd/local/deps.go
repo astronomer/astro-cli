@@ -158,8 +158,9 @@ type Deps struct {
 	// nil leaves the lock and its record as they are.
 	RuntimePins func(ctx context.Context, build, python string) ([]string, error)
 
-	// Lock runs `uv lock` in dir: twice for a seed, once in a scratch copy
-	// with the image's versions and once in the project (seedLock).
+	// Lock runs `uv lock` in dir: twice for a seed, once with the image's
+	// versions added to the project's pyproject.toml and once without
+	// (seedLock).
 	// Production runs the uv the CLI finds (lockProject). A seam so a test
 	// needs no uv; nil seeds nothing.
 	Lock func(ctx context.Context, dir string) error

@@ -36,7 +36,7 @@ func projectWith(t *testing.T, src string) string {
 // setBuild is SetAstroBuild with no wrap, keeping the seed record, for a test
 // of the Airflow build's settings alone.
 func setBuild(dir string, b runtimeversions.AstroBuild) error {
-	refused, err := SetAstroBuild(dir, nil, b, nil)
+	refused, err := SetAstroBuildSeed(dir, nil, b, nil)
 	if err == nil && refused {
 		return errors.New("the seed record was refused")
 	}
@@ -104,27 +104,41 @@ func TestSeedManifestWithNothingToSeed(t *testing.T) {
 	assert.Zero(t, n)
 }
 
-// The copy sits elsewhere, so a path source is made absolute against the
-// project; a workspace is not seeded at all.
-func TestSeedManifestMakesSourcePathsAbsolute(t *testing.T) {
+// The seed locks the project in place, so its sources stay as they are
+// written, relative paths and all, and a workspace's root is seeded too. The
+// runtime pins an older astro wrote never reach the seed.
+func TestSeedManifestLeavesTheProjectAsItIsWritten(t *testing.T) {
 	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'mylib']", 1) +
-		"\n[tool.uv.sources]\nmylib = { path = 'libs/mylib' }\nother = { path = '/opt/other' }\n"
+		"\n[tool.uv.sources]\nmylib = { path = 'libs/mylib' }\n"
 	dir := projectWith(t, src)
 	out, _, err := SeedManifest(dir, freeze339)
 	require.NoError(t, err)
-	assert.Contains(t, string(out), filepath.ToSlash(filepath.Join(dir, "libs", "mylib")))
-	assert.Contains(t, string(out), "'/opt/other'")
+	assert.Contains(t, string(out), "'libs/mylib'")
 
 	ws := projectWith(t, astroHead+"\n[tool.uv.workspace]\nmembers = ['packages/*']\n")
-	_, _, err = SeedManifest(ws, freeze339)
-	assert.ErrorIs(t, err, ErrSeedWorkspace)
+	_, n, err := SeedManifest(ws, freeze339)
+	require.NoError(t, err)
+	assert.Positive(t, n)
+
+	legacy := projectWith(t, astroHead+"\n[tool.uv]\nconstraint-dependencies = [\n"+
+		"    'apache-airflow==3.3.2+astro.1',\n"+
+		"    # Astro Runtime 3.3-8 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.\n"+
+		"    \"zipp==3.0.0; python_version == '3.12'\",\n"+
+		"    # End of what astro writes. Constraints below this line are yours.\n"+
+		"    'numpy<3',\n]\n")
+	out, _, err = SeedManifest(legacy, freeze339)
+	require.NoError(t, err)
+	assert.NotContains(t, string(out), "zipp==3.0.0")
+	assert.Contains(t, string(out), "zipp==4.1.0")
+	assert.Contains(t, string(out), "numpy<3")
+	assert.Contains(t, string(out), "apache-airflow==3.3.2+astro.1")
 }
 
 // The record follows Airflow's build pins and the project's own constraints;
 // nil keeps it, a zero Seed takes it out.
 func TestSetAstroBuildWritesTheSeedRecord(t *testing.T) {
 	dir := projectWith(t, astroHead+"\n[tool.uv]\nconstraint-dependencies = ['numpy<3']\n")
-	_, err := SetAstroBuild(dir, nil, build332, &Seed{Build: "3.3-9", Python: "3.12"})
+	_, err := SetAstroBuildSeed(dir, nil, build332, &Seed{Build: "3.3-9", Python: "3.12"})
 	require.NoError(t, err)
 	want := `constraint-dependencies = [
     'numpy<3',
@@ -139,11 +153,11 @@ func TestSetAstroBuildWritesTheSeedRecord(t *testing.T) {
 	assert.Equal(t, "3.12", m.UV.RuntimePython)
 
 	before := readManifest(t, dir)
-	_, err = SetAstroBuild(dir, nil, build332, nil)
+	_, err = SetAstroBuildSeed(dir, nil, build332, nil)
 	require.NoError(t, err)
 	assert.Equal(t, before, readManifest(t, dir), "nil keeps the record")
 
-	_, err = SetSeedRecord(dir, nil, Seed{})
+	_, err = SetSeedRecord(dir, nil, &Seed{})
 	require.NoError(t, err)
 	out := readManifest(t, dir)
 	assert.NotContains(t, out, "astro seeded")
@@ -154,14 +168,14 @@ func TestSetAstroBuildWritesTheSeedRecord(t *testing.T) {
 // in, with no constraint in it.
 func TestTheSeedRecordAloneKeepsTheArray(t *testing.T) {
 	dir := projectWith(t, astroHead)
-	_, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, &Seed{Build: "3.3-9", Python: "3.12"})
+	_, err := SetAstroBuildSeed(dir, nil, runtimeversions.AstroBuild{}, &Seed{Build: "3.3-9", Python: "3.12"})
 	require.NoError(t, err)
 	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.Equal(t, "3.3-9", m.UV.RuntimeBuild)
 	assert.Empty(t, m.UV.ConstraintDependencies)
 
-	_, err = SetSeedRecord(dir, nil, Seed{})
+	_, err = SetSeedRecord(dir, nil, &Seed{})
 	require.NoError(t, err)
 	assert.NotContains(t, readManifest(t, dir), "constraint-dependencies")
 }
@@ -180,7 +194,7 @@ func TestTheRuntimePinsOfAnOlderAstroAreTakenOut(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			src := astroHead + "\n[tool.uv]\nconstraint-dependencies = [\n    'numpy<3',\n    'apache-airflow==3.3.2+astro.1',\n" + block + end + "    'urllib3<3',\n]\n"
 			dir := projectWith(t, src)
-			_, err := SetAstroBuild(dir, nil, build332, &Seed{Build: "3.3-9", Python: "3.12"})
+			_, err := SetAstroBuildSeed(dir, nil, build332, &Seed{Build: "3.3-9", Python: "3.12"})
 			require.NoError(t, err)
 			out := readManifest(t, dir)
 			for _, gone := range []string{"ships these versions", "a2wsgi", "zipp", "End of what astro writes"} {
@@ -198,7 +212,7 @@ func TestTheRuntimePinsOfAnOlderAstroAreTakenOut(t *testing.T) {
 func TestTheSeedRecordIsRefusedWhereItCannotBeWritten(t *testing.T) {
 	src := strings.Replace(astroHead, "[tool.astro]\n", "[tool.astro]\n\n[tool]\nuv = { constraint-dependencies = ['numpy<3'] }\n", 1)
 	dir := projectWith(t, src)
-	refused, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, &Seed{Build: "3.3-9", Python: "3.12"})
+	refused, err := SetAstroBuildSeed(dir, nil, runtimeversions.AstroBuild{}, &Seed{Build: "3.3-9", Python: "3.12"})
 	require.NoError(t, err)
 	assert.True(t, refused)
 	out := readManifest(t, dir)
@@ -206,12 +220,18 @@ func TestTheSeedRecordIsRefusedWhereItCannotBeWritten(t *testing.T) {
 	assert.NotContains(t, out, "astro seeded")
 }
 
-func TestExcludes(t *testing.T) {
+// SeededPins are what the seed states, by the same filter: less a version the
+// project chooses itself, Airflow's distributions by name, and Astronomer's
+// own builds.
+func TestSeededPins(t *testing.T) {
 	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'pandas>=3', 'zipp']", 1)
 	dir := projectWith(t, src)
-	got := Excludes(dir, []string{"pandas==2.2.3", "zipp==4.1.0", "SQLAlchemy==2.0.50"})
-	assert.Equal(t, map[string]bool{"pandas": true}, got)
-	assert.Empty(t, Excludes(filepath.Join(dir, "missing"), []string{"pandas==2.2.3"}))
+	pins := &RuntimePins{Build: "3.3-9", Python: "3.12", Pins: []string{
+		"pandas==2.2.3", "zipp==4.1.0", "SQLAlchemy==2.0.50",
+		"apache-airflow-task-sdk==1.3.2", "astronomer-providers-logging==1.6.8+astro.1",
+	}}
+	assert.Equal(t, []string{"SQLAlchemy==2.0.50", "zipp==4.1.0"}, SeededPins(dir, pins))
+	assert.Empty(t, SeededPins(filepath.Join(dir, "missing"), pins))
 }
 
 const pinsCatalog = `{"runtimeVersionsV3": {

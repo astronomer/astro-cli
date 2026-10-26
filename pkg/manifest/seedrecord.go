@@ -9,8 +9,8 @@ import (
 
 // astro seeds a project's uv.lock with the versions an Astro Runtime image
 // ships: it resolves the lock once with the image's versions as constraints,
-// in a scratch copy of the project, and uv keeps them from then on as its
-// lock's preferences. pyproject.toml holds none of them. What it does hold is
+// added to the project's pyproject.toml for that one lock, and uv keeps them
+// from then on as its lock's preferences. pyproject.toml holds none of them. What it does hold is
 // one comment in [tool.uv] constraint-dependencies saying which build and
 // Python the lock was seeded from:
 //

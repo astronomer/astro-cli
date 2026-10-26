@@ -40,7 +40,7 @@ import (
 // build.
 //
 // The rest of what the image ships is held in the lock, not here: astro
-// seeds uv.lock with the image's versions (RuntimePins, SeedManifest), and
+// seeds uv.lock with the image's versions in place (RuntimePins, SeedManifest), and
 // constraint-dependencies records only which build and Python it seeded from
 // (Seed). Without that a lockfile takes the newest of each, so standalone ran
 // SQLAlchemy 2.1 beside an Airflow whose image holds it to 2.0, and newer
@@ -71,17 +71,22 @@ var (
 // [tool.uv] settings above, and the two distributions sources need listed. A
 // zero b takes out what an earlier one wrote, for an Airflow Astronomer has no
 // build of, which then comes from PyPI. It leaves every other [tool.uv] key,
-// and every comment, as it was.
-//
-// seed is the record of the build and Python the project's uv.lock was seeded
-// from, written in place of the one there: nil keeps it, a zero Seed takes it
-// out. Runtime pins an older astro wrote into constraint-dependencies are
-// taken out either way.
+// and every comment, as it was, the record of a seed included
+// (SetAstroBuildSeed).
+func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild) error {
+	_, err := SetAstroBuildSeed(dir, wrap, b, nil)
+	return err
+}
+
+// SetAstroBuildSeed is SetAstroBuild with seed, the record of the build and
+// Python the project's uv.lock was seeded from, written in place of the one
+// there: nil keeps it, a zero Seed takes it out. Runtime pins an older astro
+// wrote into constraint-dependencies are taken out either way.
 //
 // refused reports a record that was not written because the array cannot
 // hold a comment: a [tool.uv] written as an inline table. The rest was
 // written; the caller says why the record was not.
-func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, seed *Seed) (refused bool, err error) {
+func SetAstroBuildSeed(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, seed *Seed) (refused bool, err error) {
 	err = EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
 		return setAstroBuild(before, ed, b, seed, &refused)
 	})
