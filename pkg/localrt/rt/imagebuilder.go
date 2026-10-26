@@ -68,7 +68,7 @@ type ManifestBuild struct {
 	// of AirflowVersion's series, or "" for none. The manifest never sets it
 	// beside a Dockerfile.
 	Runtime string
-	// LockedRuntime is the runtime build the project's runtime pins were
+	// LockedRuntime is the runtime build the project's uv.lock was seeded
 	// taken from (manifest UV.RuntimeBuild), the build its uv.lock was made
 	// for, or "" for none. With Runtime empty, a local or packaged generated
 	// image starts FROM it instead of the newest build of the series, and a

@@ -65,10 +65,10 @@ func TestManifestBuildOf(t *testing.T) {
 	assert.Equal(t, ManifestBuild{ProjectDir: "/project"}, ManifestBuildOf("/project", nil))
 }
 
-// The build the runtime pins were taken from is carried while its tag agrees
-// with the Airflow pin, and dropped once the pin has moved to another series
-// or generation: the pins wait for their next refresh, and the base follows
-// the pin.
+// The build uv.lock was seeded from is carried while its tag agrees with the
+// Airflow pin, and dropped once the pin has moved to another series or
+// generation: the seed waits for its next refresh, and the base follows the
+// pin.
 func TestManifestBuildOfCarriesTheLocksBuildWhileItFitsThePin(t *testing.T) {
 	for _, tt := range []struct {
 		pin, build, airflowBuild, want string
@@ -79,7 +79,7 @@ func TestManifestBuildOfCarriesTheLocksBuildWhileItFitsThePin(t *testing.T) {
 		{"apache-airflow==2.10.*", "3.3-9", "", ""},
 		{"apache-airflow==2.10.*", "12.6.0", "", "12.6.0"},
 		{"apache-airflow==3.3.*", "3.3", "", ""},
-		// The Astronomer build of Airflow pinned beside the runtime pins names
+		// The Astronomer build of Airflow pinned beside the seed names
 		// the release, which an Airflow 2 build's tag cannot.
 		{"apache-airflow==2.10.*", "12.6.0", "apache-airflow==2.10.4+astro.1", "12.6.0"},
 		{"apache-airflow==2.11.*", "12.6.0", "apache-airflow==2.10.4+astro.1", ""},

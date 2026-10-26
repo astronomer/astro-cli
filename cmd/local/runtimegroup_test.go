@@ -13,18 +13,18 @@ import (
 var roots339 = []string{"apache-airflow-providers-celery", "pandas-market-calendars", "statsd"}
 
 // A start writes the image's top-level packages into the astro-runtime group,
-// of the build and Python the runtime pins are of, read from the package list
-// the pins read, puts the group in default-groups, and says so once, with
-// what it left out for want of a wheel.
+// of the build and Python the lock is seeded from, read from the package list
+// the seed reads, puts the group in default-groups, records the seed first in
+// it, and says so once, with what it left out for want of a wheel.
 func TestStartWritesTheRuntimeGroup(t *testing.T) {
 	leftOut := []runtimecatalog.LeftOut{{Name: "apache-airflow-providers-mysql", Why: "it pulls in mysqlclient, which has no wheel on Linux x86_64, Linux aarch64 (Python 3.12)"}}
 	r := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339, leftOut: leftOut}.start(t)
 	if strings.Join(r.rootsAsked, " ") != "3.3-9 3.12" || !slices.Equal(r.rootsFreeze, freeze339) {
-		t.Errorf("roots asked for %q with %q, want the pins' build, Python and package list", r.rootsAsked, r.rootsFreeze)
+		t.Errorf("roots asked for %q with %q, want the seed's build, Python and package list", r.rootsAsked, r.rootsFreeze)
 	}
 	for _, want := range []string{
 		"[dependency-groups]",
-		"# Astro Runtime 3.3-9 installs these",
+		"    # astro seeded uv.lock from Astro Runtime 3.3-9 (Python 3.12).",
 		"'pandas-market-calendars'",
 		"'astro-runtime'",
 	} {
@@ -40,7 +40,7 @@ func TestStartWritesTheRuntimeGroup(t *testing.T) {
 			t.Errorf("the start did not say %q:\n%s", want, r.out)
 		}
 	}
-	again := pinsRun{src: r.manifest, build: build332, freeze: freeze339, roots: roots339}.start(t)
+	again := pinsRun{src: r.manifest, files: map[string]string{"uv.lock": r.lock}, build: build332, freeze: freeze339, roots: roots339}.start(t)
 	if again.manifest != r.manifest || strings.Contains(again.out, "astro-runtime now installs") {
 		t.Errorf("a second start with the same build changed the group:\n%s", again.out)
 	}
@@ -66,12 +66,16 @@ func TestTheLeftOutNoteNeedsTheGroupWritten(t *testing.T) {
 }
 
 // A start that cannot reach Astronomer's index keeps the Airflow build, and
-// still brings the group up to date, which needs no index.
+// still brings the group up to date, which needs no index, and seeds the
+// lock again for the packages new in it.
 func TestStartRefreshesTheRuntimeGroupWithoutTheIndex(t *testing.T) {
-	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
-	r := pinsRun{src: written, lookupErr: errors.New("dial tcp: no route to host"), freeze: freeze339, roots: []string{"statsd"}}.start(t)
+	first := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t)
+	r := pinsRun{src: first.manifest, files: map[string]string{"uv.lock": first.lock}, lookupErr: errors.New("dial tcp: no route to host"), freeze: freeze339, roots: []string{"statsd", "pandas"}}.start(t)
 	if !strings.Contains(r.manifest, "'statsd'") || strings.Contains(r.manifest, "'pandas-market-calendars'") {
 		t.Errorf("the group was not refreshed without the index:\n%s", r.manifest)
+	}
+	if r.uv.scratchLocks != 1 {
+		t.Errorf("a group with new packages in it did not seed the lock again (scratch locks %d)", r.uv.scratchLocks)
 	}
 	if !strings.Contains(r.manifest, "'apache-airflow==3.3.2+astro.2'") {
 		t.Errorf("the Airflow build did not stay:\n%s", r.manifest)
@@ -81,8 +85,9 @@ func TestStartRefreshesTheRuntimeGroupWithoutTheIndex(t *testing.T) {
 // A list of top-level packages that cannot be had leaves the group as it is,
 // with a warning.
 func TestStartKeepsTheRuntimeGroupWhenTheListCannotBeRead(t *testing.T) {
-	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
-	r := pinsRun{src: written, build: build332, freeze: freeze339, rootsErr: errors.New("uv lock failed")}.start(t)
+	first := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t)
+	written := first.manifest
+	r := pinsRun{src: written, files: map[string]string{"uv.lock": first.lock}, build: build332, freeze: freeze339, rootsErr: errors.New("uv lock failed")}.start(t)
 	if r.manifest != written {
 		t.Errorf("an unreadable list changed the group:\n%s", r.manifest)
 	}
@@ -91,23 +96,23 @@ func TestStartKeepsTheRuntimeGroupWhenTheListCannotBeRead(t *testing.T) {
 	}
 }
 
-// Pins kept as they are, their own build's list unreadable, keep the group as
+// A seed kept as it is, its own build's list unreadable, keeps the group as
 // it is too, without asking for its list.
 func TestStartKeepsTheRuntimeGroupWithThePins(t *testing.T) {
 	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
 	r := pinsRun{src: written, build: build332, freezeErr: errors.New("dial tcp: no route to host"), roots: []string{"statsd"}}.start(t)
 	if r.manifest != written || len(r.rootsAsked) != 0 {
-		t.Errorf("the group changed (roots asked %q) beside pins kept as they are:\n%s", r.rootsAsked, r.manifest)
+		t.Errorf("the group changed (roots asked %q) beside a seed kept as it is:\n%s", r.rootsAsked, r.manifest)
 	}
 }
 
-// A build that publishes no package list takes the pins out, and empties the
-// group, which stays with its place in default-groups.
+// A build that publishes no package list seeds nothing, takes the record out,
+// and empties the group, which stays with its place in default-groups.
 func TestStartEmptiesTheRuntimeGroupOfABuildWithNoList(t *testing.T) {
 	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
 	r := pinsRun{src: written, build: build332, freezeErr: runtimecatalog.ErrFreezeNotPublished, roots: roots339}.start(t)
-	if !emptied(r.manifest) || len(r.rootsAsked) != 0 {
-		t.Errorf("the group was not emptied (roots asked %q) for a build with no list:\n%s", r.rootsAsked, r.manifest)
+	if !emptied(r.manifest) || len(r.rootsAsked) != 0 || strings.Contains(r.manifest, "astro seeded") {
+		t.Errorf("the group was not emptied, or its record kept (roots asked %q), for a build with no list:\n%s", r.rootsAsked, r.manifest)
 	}
 	if !strings.Contains(r.out, "astro-runtime now lists none of a runtime image's packages") {
 		t.Errorf("the start did not say it emptied the group:\n%s", r.out)
@@ -115,26 +120,24 @@ func TestStartEmptiesTheRuntimeGroupOfABuildWithNoList(t *testing.T) {
 }
 
 // A list whose Airflow is another release than the Airflow pin's, for a
-// runtime the user named, takes the pins out, and empties the group: both
-// would be of an image the project does not build on. With no build named,
-// the pins there are kept, and the group with them.
+// runtime the user named, seeds nothing and empties the group: both would be
+// of an image the project does not build on. With no build named, the seed
+// there is kept, and the group with it.
 func TestStartEmptiesTheRuntimeGroupWithThePinsOfAnotherRelease(t *testing.T) {
-	// A runtime the user named, carrying another release than the requirement,
-	// takes the pins out, and empties the group.
+	other := []string{"apache-airflow==3.3.1+astro.1", "pandas==2.2.3"}
 	named := strings.Replace(buildManifest, "[tool.astro]\n", "[tool.astro]\nruntime = '3.3-9'\n", 1)
 	written := pinsRun{src: named, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
-	other := []string{"apache-airflow==3.3.1+astro.1", "pandas==2.2.3"}
 	r := pinsRun{src: written, build: build332, freeze: other, roots: roots339}.start(t)
 	if !emptied(r.manifest) || len(r.rootsAsked) != 0 {
-		t.Errorf("the group was not emptied (roots asked %q) beside pins of another release:\n%s", r.rootsAsked, r.manifest)
+		t.Errorf("the group was not emptied (roots asked %q) for another release's list:\n%s", r.rootsAsked, r.manifest)
 	}
 
 	// With no build named, the lookup and the list disagree on their own: the
-	// pins there stay, and the group with them.
+	// seed there stays, and the group with it.
 	written = pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
 	r = pinsRun{src: written, build: build332, freeze: other, roots: roots339}.start(t)
-	if !strings.Contains(r.manifest, "# Astro Runtime 3.3-9 installs these") || len(r.rootsAsked) != 0 {
-		t.Errorf("kept pins did not keep the group (roots asked %q):\n%s", r.rootsAsked, r.manifest)
+	if !strings.Contains(r.manifest, "astro seeded uv.lock from Astro Runtime 3.3-9") || !strings.Contains(r.manifest, "'pandas-market-calendars'") || len(r.rootsAsked) != 0 {
+		t.Errorf("a kept seed did not keep the group (roots asked %q):\n%s", r.rootsAsked, r.manifest)
 	}
 }
 
@@ -144,8 +147,8 @@ func emptied(manifest string) bool {
 		strings.Contains(manifest, "'astro-runtime'")
 }
 
-// Under the project's own cutoff the pins come out, and the group, names
-// alone, stays as it was: any cutoff resolves a name.
+// Under the project's own cutoff nothing is seeded and the record comes out,
+// and the group, names alone, stays as it was: any cutoff resolves a name.
 func TestStartKeepsTheRuntimeGroupUnderTheProjectsCutoff(t *testing.T) {
 	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
 	src := strings.Replace(written, "[tool.uv]\n", "[tool.uv]\nexclude-newer = \"1 week\"\n", 1)
@@ -153,39 +156,32 @@ func TestStartKeepsTheRuntimeGroupUnderTheProjectsCutoff(t *testing.T) {
 	if len(r.rootsAsked) != 0 || !strings.Contains(r.manifest, "'pandas-market-calendars'") {
 		t.Errorf("the list was read (%q), or the group dropped, under the project's cutoff:\n%s", r.rootsAsked, r.manifest)
 	}
-	if strings.Contains(r.manifest, "pandas==") {
-		t.Errorf("the runtime pins stayed under the cutoff:\n%s", r.manifest)
+	if strings.Contains(r.manifest, "astro seeded") {
+		t.Errorf("the record stayed under the cutoff:\n%s", r.manifest)
 	}
 }
 
-// The group follows what happens to the runtime pins. A new build whose list
-// cannot be read keeps the pins of the build there, and the group with them.
-// astro init in a project that already is one moves the pins to the newest
-// build, the group with them, and relocks so uv.lock follows both.
-func TestTheRuntimeGroupFollowsKeptAndMovedPins(t *testing.T) {
-	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
-	older := strings.NewReplacer(
-		"# Astro Runtime 3.3-9 (Python 3.12)", "# Astro Runtime 3.3-8 (Python 3.12)",
-		"# Astro Runtime 3.3-9 installs these", "# Astro Runtime 3.3-8 installs these",
-	).Replace(written)
+// The group follows what happens to the seed. A new build whose list cannot
+// be read keeps the seed of the build there, and the group with it. astro
+// init in a project that already is one seeds from the newest build, the
+// group with it.
+func TestTheRuntimeGroupFollowsKeptAndMovedSeeds(t *testing.T) {
+	first := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t)
+	older := strings.Replace(first.manifest, "Astro Runtime 3.3-9 (Python 3.12)", "Astro Runtime 3.3-8 (Python 3.12)", 1)
 
-	kept := pinsRun{src: older, build: build332, freezeErr: errors.New("offline"), roots: []string{"statsd"}}.start(t)
-	for _, want := range []string{"# Astro Runtime 3.3-8 (Python 3.12)", "# Astro Runtime 3.3-8 installs these", "'pandas-market-calendars'"} {
+	kept := pinsRun{src: older, files: map[string]string{"uv.lock": first.lock}, build: build332, freezeErr: errors.New("offline"), roots: []string{"statsd"}}.start(t)
+	for _, want := range []string{"Astro Runtime 3.3-8 (Python 3.12)", "'pandas-market-calendars'"} {
 		if !strings.Contains(kept.manifest, want) {
-			t.Errorf("kept pins did not keep the group (%q missing):\n%s", want, kept.manifest)
+			t.Errorf("a kept seed did not keep the group (%q missing):\n%s", want, kept.manifest)
 		}
 	}
 
-	var relocked int
-	moved := pinsRun{
-		src: older, build: build332, freeze: freeze339, roots: []string{"statsd"}, args: []string{"init"},
-		relock: func(string) error { relocked++; return nil }, files: map[string]string{"uv.lock": "version = 1\n"},
-	}.start(t)
-	if !strings.Contains(moved.manifest, "# Astro Runtime 3.3-9 installs these") || !strings.Contains(moved.manifest, "'statsd'") ||
+	moved := pinsRun{src: older, files: map[string]string{"uv.lock": first.lock}, build: build332, freeze: freeze339, roots: []string{"statsd"}, args: []string{"init"}}.start(t)
+	if !strings.Contains(moved.manifest, "Astro Runtime 3.3-9 (Python 3.12)") || !strings.Contains(moved.manifest, "'statsd'") ||
 		strings.Contains(moved.manifest, "'pandas-market-calendars'") {
-		t.Errorf("init did not move the group with the pins:\n%s", moved.manifest)
+		t.Errorf("init did not move the group with the seed:\n%s", moved.manifest)
 	}
-	if relocked != 1 {
-		t.Errorf("uv lock ran %d times after init moved the pins and the group, want once", relocked)
+	if moved.uv.scratchLocks != 1 {
+		t.Errorf("init seeded %d times, want once", moved.uv.scratchLocks)
 	}
 }

@@ -200,15 +200,15 @@ func TestStartChecksTheRuntimeBuildInDockerModeOnly(t *testing.T) {
 	}
 }
 
-// lockedPins is a [tool.uv] whose runtime pins name 3.1-12, with no
+// lockedPins is a project whose uv.lock was seeded from 3.1-12, with no
 // [tool.astro] runtime: the build a Docker-mode start and a package build on.
 const lockedPins = "\n[tool.uv]\nconstraint-dependencies = [\n" +
-	"    'apache-airflow==3.1.8+astro.1',\n" +
-	"    # Astro Runtime 3.1-12 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.\n" +
-	"    \"pandas==2.2.3; python_version == '3.12'\",\n" +
-	"    # End of what astro writes. Constraints below this line are yours.\n]\n"
+	"    'apache-airflow==3.1.8+astro.1',\n]\n" +
+	"\n[dependency-groups]\nastro-runtime = [\n" +
+	"    # astro seeded uv.lock from Astro Runtime 3.1-12 (Python 3.12). Run astro init to seed it again.\n" +
+	"    'pandas',\n]\n"
 
-// With no [tool.astro] runtime, the build the runtime pins name is the one the
+// With no [tool.astro] runtime, the build uv.lock was seeded from is the one the
 // image starts FROM, so a Docker-mode start and a package hold it to the
 // catalog as they would a named runtime: a yanked one is warned about, naming
 // the pins, and a refusal says to move them with astro init.
@@ -224,7 +224,7 @@ func TestTheRuntimePinsBuildIsCheckedLikeANamedRuntime(t *testing.T) {
 	if len(rec.calls) != 1 || rec.calls[0] != [2]string{"3.1-12", "3.1"} {
 		t.Errorf("calls = %v, want one for the pins' 3.1-12 against 3.1", rec.calls)
 	}
-	if !strings.Contains(stdout.String(), "the runtime pins' build, Astro Runtime 3.1-12, which the image builds on: runtime 3.1-12 is yanked") {
+	if !strings.Contains(stdout.String(), "the build uv.lock was seeded from, Astro Runtime 3.1-12, which the image builds on: runtime 3.1-12 is yanked") {
 		t.Errorf("the warning did not name the pins' build: %q", stdout.String())
 	}
 

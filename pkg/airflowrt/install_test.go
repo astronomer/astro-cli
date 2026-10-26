@@ -31,6 +31,10 @@ var helperContentAtVersion = map[int]string{
 	// The Airflow comparison runs only on a lock that is not stale, reads the
 	// pins' build from the [tool.uv] pins header alone, and names astro init.
 	6: "80b93403892ef730f62f9a4a698e03c0b46b5f653c112f77ec0fe7d480853253",
+	// Reads the build uv.lock was seeded from out of the record astro writes
+	// first in the [dependency-groups] astro-runtime group, and names astro
+	// init as what seeds the lock again.
+	7: "f75055dd939d1db94bac3940afb66b3a8e0a65ae13c38138f34098b7fab96b68",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {

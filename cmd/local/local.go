@@ -319,7 +319,7 @@ func schedulesOn(p localrt.Plan, mode localrt.Mode) bool {
 const runtimeKey = "tool.astro.runtime"
 
 // checkRuntimeBuild holds a Docker-mode start's runtime build, [tool.astro]
-// runtime or else the build its runtime pins name (Plan.LockedRuntime), to
+// runtime or else the build its uv.lock was seeded from (Plan.LockedRuntime), to
 // the pin with the runtime catalog (Deps.RuntimeCheck), before anything
 // starts: a build of another Airflow series refuses the start, and a yanked
 // build, one whose exact Airflow the pin excludes, or one the check could not
@@ -328,7 +328,7 @@ const runtimeKey = "tool.astro.runtime"
 // declared Dockerfile never has one beside it.
 func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localrt.Plan) error {
 	// The build the image starts FROM: [tool.astro] runtime, else the build the
-	// runtime pins were taken from (the lock's), which a yanked build is held
+	// lock was seeded from, which a yanked build is held
 	// to the same way.
 	build, key := p.Runtime, runtimeKey
 	if build == "" {
@@ -341,7 +341,7 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localr
 	for _, w := range warnings {
 		text := w.Message
 		if p.Runtime == "" {
-			text = fmt.Sprintf("the runtime pins' build, Astro Runtime %s, which the image builds on: %s", build, w.Message)
+			text = fmt.Sprintf("the build uv.lock was seeded from, Astro Runtime %s, which the image builds on: %s", build, w.Message)
 		}
 		emitWarning(r, event{
 			Event:  "warning",
@@ -351,7 +351,7 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localr
 		})
 	}
 	if err != nil && p.Runtime == "" {
-		return fmt.Errorf("the runtime pins' build, Astro Runtime %s, which the image builds on: %w; run astro init to move them to another build", build, err)
+		return fmt.Errorf("the build uv.lock was seeded from, Astro Runtime %s, which the image builds on: %w; run astro init to seed it from another build", build, err)
 	}
 	return err
 }

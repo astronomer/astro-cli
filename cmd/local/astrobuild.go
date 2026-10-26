@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
 // refreshAstroBuild brings the [tool.uv] settings that hold a project to
@@ -25,8 +26,8 @@ import (
 // build, before a standalone start syncs the environment from them
 // (scaffold.SetAstroBuild). `astro init` writes them; this keeps them right
 // after the pin moves, a new build ships, or a project predates them. Docker
-// mode does not refresh them, but builds on the runtime build they record
-// (imagebuild.ManifestBuild.LockedRuntime), and installs the lock they shape,
+// mode does not refresh them, but builds on the runtime build the seed records
+// (imagebuild.ManifestBuild.LockedRuntime), and installs the lock it seeded,
 // so it follows this refresh on its next build.
 //
 // Never fails a start. A manifest that does not load is plan.Build's to report.
@@ -39,13 +40,13 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 	if err != nil {
 		return
 	}
-	c.reportAstroBuild(r, c.writeAstroBuild(ctx, proj.Dir))
+	c.reportAstroBuild(r, c.writeAstroBuild(ctx, proj.Dir, false))
 }
 
 // reportAstroBuild says what writeAstroBuild did: warnings for what it could
-// not do, and a line for each part of [tool.uv] it changed. A standalone start
-// reports every refresh; astro init, the refresh of a project that already was
-// one.
+// not do, and a line for each part of the manifest it changed. A standalone
+// start reports every refresh; astro init, the refresh of a project that
+// already was one.
 func (c *cli) reportAstroBuild(r cliout.Renderer, res astroBuildWrite) {
 	switch {
 	case errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild):
@@ -58,20 +59,6 @@ func (c *cli) reportAstroBuild(r cliout.Renderer, res astroBuildWrite) {
 		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf(
 			"could not check %s against Astronomer's newest build of Airflow, so it is used as it stands: %v", manifest.Marker, res.lookupErr)})
 	}
-	if res.pinsErr != nil {
-		emitWarning(r, event{Event: "warning", Text: res.pinsErr.Error()})
-	}
-	if res.refused.Pins {
-		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf(
-			"%s holds no package to the versions the runtime image ships: its [tool.uv] is an inline table, which cannot hold the comments that mark them. Write it as a [tool.uv] table to have them", manifest.Marker)})
-	}
-	if res.groupErr != nil {
-		emitWarning(r, event{Event: "warning", Text: res.groupErr.Error()})
-	}
-	if res.refused.Group {
-		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf(
-			"%s lists none of the packages the runtime image installs: its [dependency-groups] is an inline table, which cannot hold the comments that head them. Write it as a [dependency-groups] table to have them", manifest.Marker)})
-	}
 	if res.writeErr != nil {
 		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf("could not update %s for Astronomer's build of Airflow: %v", manifest.Marker, res.writeErr)})
 	}
@@ -83,28 +70,49 @@ func (c *cli) reportAstroBuild(r cliout.Renderer, res astroBuildWrite) {
 	case res.airflowChanged:
 		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer points Airflow at Astronomer's index\n", manifest.Marker)
 	}
+	c.reportSeed(r, res)
+}
+
+// reportSeed says what writeAstroBuild did with the project's astro-runtime
+// group and its uv.lock: wrote the group, seeded the lock, found it apart
+// from the image, or could not, and why. For a start, and for init, which
+// has no to-do list of its own for it.
+func (c *cli) reportSeed(r cliout.Renderer, res astroBuildWrite) {
+	if res.seedWarn != nil {
+		emitWarning(r, event{Event: "warning", Text: res.seedWarn.Error()})
+	}
+	if res.groupErr != nil {
+		emitWarning(r, event{Event: "warning", Text: res.groupErr.Error()})
+	}
+	if res.refused {
+		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf(
+			"%s lists none of the packages the runtime image installs, and does not record which Astro Runtime uv.lock was seeded from: its [dependency-groups] is an inline table, which cannot hold the comments that head them. Write it as a [dependency-groups] table to have them", manifest.Marker)})
+	}
 	if res.groupChanged {
 		if n := len(res.groupAfter); n > 0 {
 			fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s now installs the %d packages Astro Runtime %s installs\n",
-				manifest.Marker, manifest.RuntimeGroupName, n, res.groupAfterBuild)
-			c.reportGroupLeftOut(res)
+				manifest.Marker, manifest.RuntimeGroupName, n, res.groupBuild)
 		} else {
 			fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s now lists none of a runtime image's packages: none apply to this project\n", manifest.Marker, manifest.RuntimeGroupName)
 		}
 	}
-	if res.pinsChanged {
-		if res.beforeBuild != "" && res.after.RuntimeBuild != "" && res.beforeBuild != res.after.RuntimeBuild {
-			// Docker mode, a package and a deploy build on the build the pins
-			// name, so they follow on their next build.
-			fmt.Fprintf(c.d.Stderr, "%s: runtime pins moved from Astro Runtime %s to %s; Docker mode and astro package astro build on %s from now on, and astro deploy does once the Deployment offers it\n",
-				manifest.Marker, res.beforeBuild, res.after.RuntimeBuild, res.after.RuntimeBuild)
-		}
-		if res.after.RuntimeBuild != "" {
-			fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] now holds %d packages to the versions Astro Runtime %s (Python %s) ships\n",
-				manifest.Marker, len(res.after.RuntimePins), res.after.RuntimeBuild, res.after.RuntimePython)
-		} else {
-			fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer holds packages to an Astro Runtime's versions\n", manifest.Marker)
-		}
+	if res.groupChanged || res.seeded > 0 {
+		c.reportGroupLeftOut(res)
+	}
+	if res.seeded > 0 && res.beforeBuild != "" && res.beforeBuild != res.seed.Build {
+		// Docker mode, a package and a deploy build on the build the seed
+		// records, so they follow on their next build.
+		fmt.Fprintf(c.d.Stderr, "uv.lock: seeded from Astro Runtime %s now, not %s; Docker mode and astro package astro build on %s from now on, and astro deploy does once the Deployment offers it\n",
+			res.seed.Build, res.beforeBuild, res.seed.Build)
+	}
+	switch {
+	case res.seeded > 0:
+		fmt.Fprintf(c.d.Stderr, "uv.lock: seeded with the versions Astro Runtime %s (Python %s) ships (%d packages)\n",
+			res.seed.Build, res.seed.Python, res.seeded)
+	case res.drift > 0:
+		fmt.Fprintf(c.d.Stderr, "uv.lock: %d packages differ from Astro Runtime %s; run astro init to re-seed\n", res.drift, res.driftBuild)
+	case res.recordChanged && res.after.RuntimeBuild == "":
+		fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s no longer records an Astro Runtime uv.lock was seeded from\n", manifest.Marker, manifest.RuntimeGroupName)
 	}
 }
 
@@ -136,37 +144,42 @@ type astroBuildWrite struct {
 	build     runtimeversions.AstroBuild
 	lookupErr error
 	writeErr  error
-	// airflowChanged and pinsChanged say which part of [tool.uv] the write
-	// changed: the settings that hold Airflow to the build, or the runtime
-	// pins. after is [tool.uv] as the write left it.
-	airflowChanged, pinsChanged bool
-	after                       manifest.UV
-	// beforeBuild is the runtime build the pins were taken from before the
+	// airflowChanged, recordChanged and groupChanged say which part of the
+	// manifest the write changed: the settings that hold Airflow to the
+	// build, the record of the seed, or the astro-runtime group. after is
+	// [tool.uv] as the write left it, and groupAfter the group.
+	airflowChanged, recordChanged, groupChanged bool
+	after                                       manifest.UV
+	groupAfter                                  []string
+	// beforeBuild is the runtime build the lock was seeded from before the
 	// write, "" for none.
 	beforeBuild string
-	// pinsErr says what happened to the runtime pins, when it is worth a
-	// warning, and refused which of the pins and the runtime group could not
-	// be written at all.
-	pinsErr error
-	refused scaffold.Refused
+	// seeded is how many of the image's versions the lock was seeded with,
+	// and seed the build and Python they were; drift how many the lock holds
+	// apart from driftBuild's, when it was not seeded.
+	seeded     int
+	seed       scaffold.Seed
+	drift      int
+	driftBuild string
+	// seedWarn says what happened to the seed, when it is worth a warning,
+	// and refused that the group, which holds its record, could not be
+	// written at all.
+	seedWarn error
+	refused  bool
+	// cutoff says nothing is seeded for a cutoff, which keeps the runtime
+	// group (runtimeGroup).
+	cutoff bool
+	// groupWritten says the runtime group decided on was written, and
+	// groupBuild is the build it is of. groupErr says why the group was not
+	// brought up to date, when it is worth a warning, and groupLeftOut the
+	// image's packages it leaves out for having no wheel here.
+	groupWritten bool
+	groupBuild   string
+	groupErr     error
+	groupLeftOut []runtimecatalog.LeftOut
 	// updated is a write that changed the file, which could not be read back
 	// to say what changed.
 	updated bool
-	// pinsCutoff says the runtime pins came out for a cutoff, which keeps the
-	// runtime group (runtimeGroup).
-	pinsCutoff bool
-	// groupWritten says the runtime group decided on was written: the write
-	// worked, and neither the pins nor the group were refused.
-	groupWritten bool
-	// groupErr says why the runtime group was not brought up to date, when it
-	// is worth a warning. groupChanged says the write changed it, groupAfter
-	// and groupAfterBuild are it as the write left it, and groupLeftOut the
-	// image's packages it leaves out for having no wheel here.
-	groupErr        error
-	groupChanged    bool
-	groupAfter      []string
-	groupAfterBuild string
-	groupLeftOut    []runtimecatalog.LeftOut
 }
 
 // runtimeImage is the build and Python scaffold.RuntimeBuildFor names for a
@@ -184,18 +197,21 @@ type runtimeImage struct {
 }
 
 // writeAstroBuild looks up the build for the manifest in dir and writes it,
-// or takes the settings out when the index has none, with the runtime pins of
-// the image the project builds on (runtimePins). It writes nothing when there
-// is no lookup to make.
+// or takes the settings out when the index has none, and seeds the project's
+// uv.lock with what the image the project builds on ships (runtimePins,
+// seedLock). It writes nothing when there is no lookup to make.
+//
+// init seeds the lock whatever it holds (seed). A start seeds one only when
+// there is none; otherwise it says how many packages the lock holds apart
+// from the image (lockDrift), and leaves it to `astro init` to seed again.
 //
 // When the lookup could not be made and the pin has not moved, the Airflow
-// build stays as the manifest has it, and the runtime pins are still brought
-// up to date (scaffold.SetRuntimePins), which needs no index: a new cutoff, a
-// new FROM or requires-python, and a bound the project now gives a package the image ships.
+// build stays as the manifest has it, and what needs no index still applies:
+// the seed, and its record (scaffold.SetSeedRecord).
 //
 // A declared Dockerfile's FROM names the image, so the lookup holds Airflow
-// to the release that build carries, and both pins are of one image.
-func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
+// to the release that build carries, and both are of one image.
+func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroBuildWrite {
 	if c.d.AstroBuild == nil {
 		return astroBuildWrite{}
 	}
@@ -206,9 +222,9 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 	}
 	airflow := m.Airflow()
 	res := astroBuildWrite{pin: airflow.Pin}
-	// The image is resolved for the runtime pins, and for a declared
-	// Dockerfile's build, which the Airflow lookup is asked about. Under a
-	// cutoff there are no pins to resolve it for (runtimePins).
+	// The image is resolved for the seed, and for a declared Dockerfile's
+	// build, which the Airflow lookup is asked about. Under a cutoff there is
+	// nothing to seed (runtimePins).
 	cutoff := underCutoff(m)
 	image := runtimeImage{err: errNoImage}
 	if (c.d.RuntimePins != nil && !cutoff) || m.Astro.Dockerfile != "" {
@@ -219,58 +235,138 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 		runtime = image.build
 	}
 	res.build, res.lookupErr = c.d.AstroBuild(ctx, airflow.Pin, runtime)
-	if res.lookupErr != nil && !errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild) && !stalePin(m) {
+	offline := res.lookupErr != nil && !errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild) && !stalePin(m)
+	if offline {
 		res.build = recordedAstroBuild(m)
-		pins := c.runtimePins(ctx, dir, m, image, cutoff, &res)
-		group := c.runtimeGroup(ctx, pins, &res)
-		changed, writeErr := watchManifest(dir, func(wrap func(run func() error) error) error {
-			var err error
-			res.refused, err = scaffold.SetRuntimePins(dir, wrap, pins, group)
-			return err
-		})
-		res.writeErr = writeErr
-		res.groupWritten = group != nil && writeErr == nil && !res.refused.Pins && !res.refused.Group
-		// Only the runtime pins and the runtime group were written, so
-		// whatever else changed is the pins': the comments around them, when
-		// their lines are the same.
-		res.compare(m, path, changed, true)
-		return res
 	}
 	pins := c.runtimePins(ctx, dir, m, image, cutoff, &res)
 	group := c.runtimeGroup(ctx, pins, &res)
-	switch {
-	case pins != nil:
-		res.build = imageAirflowBuild(res.build, pins.Pins)
-	case m.UV.RuntimeBuild != "":
-		// The pins stay, so the Airflow build they were written beside does
-		// too: it is the image's, which the index lookup does not know.
-		res.build = imageAirflowBuild(res.build, m.UV.ConstraintDependencies)
+	if !offline {
+		switch {
+		case pins != nil:
+			res.build = imageAirflowBuild(res.build, pins.Pins)
+		case m.UV.RuntimeBuild != "":
+			// The seed stays, so the Airflow build it was made beside does
+			// too: it is the image's, which the index lookup does not know.
+			res.build = imageAirflowBuild(res.build, m.UV.ConstraintDependencies)
+		}
+	}
+	// Nothing to seed takes the record of an earlier seed out; a seed records
+	// itself once the lock holds it.
+	var record *scaffold.Seed
+	if pins != nil && len(pins.Pins) == 0 {
+		record = &scaffold.Seed{}
 	}
 	changed, writeErr := watchManifest(dir, func(wrap func(run func() error) error) error {
 		var err error
-		res.refused, err = scaffold.SetAstroBuild(dir, wrap, res.build, pins, group)
+		if offline {
+			res.refused, err = scaffold.SetRuntimeGroup(dir, wrap, group, record)
+			return err
+		}
+		res.refused, err = scaffold.SetAstroBuild(dir, wrap, res.build, group, record)
 		return err
 	})
 	res.writeErr = writeErr
-	res.groupWritten = group != nil && writeErr == nil && !res.refused.Pins && !res.refused.Group
-	res.compare(m, path, changed, false)
+	res.groupWritten = group != nil && writeErr == nil && !res.refused
+	if writeErr == nil && pins != nil && len(pins.Pins) > 0 {
+		// A group with other packages in it than before has packages the lock
+		// does not hold yet, which only a seed holds to the image's versions.
+		recorded, recordErr := c.applySeed(ctx, dir, m, pins, seed || groupMoved(m, path), &res)
+		changed = changed || recorded
+		if recordErr != nil {
+			res.writeErr = recordErr
+		}
+	}
+	res.compare(m, path, changed, offline)
 	return res
 }
 
+// groupMoved reports a runtime group the manifest at path lists other
+// packages in than before did.
+func groupMoved(before *manifest.Manifest, path string) bool {
+	after, err := manifest.Load(path)
+	return err == nil && !slices.Equal(before.RuntimeGroup, after.RuntimeGroup)
+}
+
+// applySeed seeds the lock of the project in dir with pins, and records the
+// seed, when seed asks or there is no lock; otherwise it counts how far the
+// lock is from pins. It reports whether it changed the manifest.
+func (c *cli) applySeed(ctx context.Context, dir string, m *manifest.Manifest, pins *scaffold.RuntimePins, seed bool, res *astroBuildWrite) (bool, error) {
+	if !seed && hasLock(dir) {
+		if res.drift = lockDrift(dir, pins); res.drift > 0 {
+			res.driftBuild = pins.Build
+		}
+		return false, nil
+	}
+	if c.d.Lock == nil {
+		return false, nil
+	}
+	n, err := c.seedLock(ctx, dir, pins)
+	switch {
+	case errors.Is(err, uv.ErrNotFound):
+		res.seedWarn = fmt.Errorf("uv.lock is not seeded with what Astro Runtime %s ships: uv is not installed", pins.Build)
+		return false, nil
+	case err != nil:
+		res.seedWarn = fmt.Errorf("uv.lock is not seeded with what Astro Runtime %s ships: %w", pins.Build, err)
+		return false, nil
+	case n == 0:
+		return false, nil
+	}
+	res.seeded, res.seed = n, scaffold.Seed{Build: pins.Build, Python: pins.Python}
+	if m.UV.RuntimeBuild == pins.Build && m.UV.RuntimePython == pins.Python {
+		return false, nil
+	}
+	var refused bool
+	changed, err := watchManifest(dir, func(wrap func(run func() error) error) error {
+		var err error
+		refused, err = scaffold.SetRuntimeGroup(dir, wrap, nil, &res.seed)
+		return err
+	})
+	res.refused = res.refused || refused
+	return changed, err
+}
+
+// runtimeGroup is the astro-runtime dependency group to write beside pins,
+// what runtimePins decided the lock is seeded with, and follows their
+// decision: pins of one build and Python give that image's top-level
+// packages, read from the same list; none empty the group; pins kept as they
+// are keep it. The one exception is a cutoff, which seeds nothing and keeps
+// the group: it holds names alone, which any cutoff resolves.
+//
+// A list of top-level packages that cannot be had keeps the group as it is,
+// and res.groupErr says why.
+func (c *cli) runtimeGroup(ctx context.Context, pins *scaffold.RuntimePins, res *astroBuildWrite) *scaffold.RuntimeGroup {
+	switch {
+	case c.d.RuntimeRoots == nil, pins == nil, res.cutoff:
+		return nil
+	case pins.Build == "":
+		return &scaffold.RuntimeGroup{}
+	}
+	// The pins' own Python and list: the group is worked out from the same
+	// list the lock is seeded with.
+	roots, err := c.d.RuntimeRoots(ctx, pins.Build, pins.Python, pins.Pins)
+	if err != nil {
+		res.groupErr = fmt.Errorf("%s keeps its %s dependency group as it is: %w", manifest.Marker, manifest.RuntimeGroupName, err)
+		return nil
+	}
+	res.groupLeftOut, res.groupBuild = roots.LeftOut, pins.Build
+	return &scaffold.RuntimeGroup{Names: roots.Names}
+}
+
 // errNoImage is the runtimeImage of a write that has nothing to resolve it
-// for: under a cutoff, or with no runtime pins to write and no Dockerfile.
+// for: under a cutoff, or with no seed to make and no Dockerfile.
 var errNoImage = errors.New("the runtime image was not resolved")
 
 // underCutoff reports a project uv resolves as of a cutoff: its own [tool.uv]
 // exclude-newer, or UV_EXCLUDE_NEWER, a date or a duration alike. A runtime's
-// package list is of the present, so such a project has no runtime pins.
+// package list is of the present, so such a project's lock is not seeded.
 func underCutoff(m *manifest.Manifest) bool {
 	return m.UV.ExcludeNewer != "" || strings.TrimSpace(os.Getenv("UV_EXCLUDE_NEWER")) != ""
 }
 
 // recordedAstroBuild is the Astronomer build of Airflow the manifest holds
-// the project to now, read from its pins (manifest.AstroPin): what a start
-// that cannot reach the index keeps.
+// the project to now, read from its Airflow pins (manifest.AstroPin): what a
+// start that cannot reach the index keeps.
 func recordedAstroBuild(m *manifest.Manifest) runtimeversions.AstroBuild {
 	var b runtimeversions.AstroBuild
 	for _, c := range m.UV.ConstraintDependencies {
@@ -292,41 +388,37 @@ func recordedAstroBuild(m *manifest.Manifest) runtimeversions.AstroBuild {
 }
 
 // compare reads the manifest at path as the write left it, and says which
-// part of [tool.uv] changed from before: the Airflow pins, and the runtime
-// pins, whose build, Python and count the notice names, which is why this
-// reads the manifest back rather than going by changed, watchManifest's word
-// that the file changed, alone. pinsOnly is a write of the runtime pins
-// alone, so whatever changed is theirs: the comments around them, when their
-// lines are the same.
+// part of [tool.uv] changed from before: the Airflow pins, or the seed's
+// record, whose build the notices name, which is why this reads the manifest
+// back rather than going by changed, watchManifest's word that the file
+// changed, alone. recordOnly is a write of the group and its record alone
+// (a start that cannot reach the index), so nothing else changed.
 //
 // When the file cannot be read back, nothing is attributed: a write that
 // changed it says only that it did (updated).
-func (res *astroBuildWrite) compare(before *manifest.Manifest, path string, changed, pinsOnly bool) {
+func (res *astroBuildWrite) compare(before *manifest.Manifest, path string, changed, recordOnly bool) {
 	after, err := manifest.Load(path)
 	if err != nil {
 		res.updated = changed
 		return
 	}
-	res.after = after.UV
-	res.beforeBuild = before.UV.RuntimeBuild
-	res.airflowChanged = !reflect.DeepEqual(airflowSettings(before), airflowSettings(after))
-	res.pinsChanged = before.UV.RuntimeBuild != after.UV.RuntimeBuild || before.UV.RuntimePython != after.UV.RuntimePython ||
-		!slices.Equal(before.UV.RuntimePins, after.UV.RuntimePins)
-	res.groupAfter, res.groupAfterBuild = after.RuntimeGroup, after.RuntimeGroupBuild
-	res.groupChanged = before.RuntimeGroupBuild != after.RuntimeGroupBuild || !slices.Equal(before.RuntimeGroup, after.RuntimeGroup)
-	if pinsOnly {
-		res.airflowChanged, res.pinsChanged = false, res.pinsChanged || (changed && !res.groupChanged)
+	res.after, res.groupAfter, res.beforeBuild = after.UV, after.RuntimeGroup, before.UV.RuntimeBuild
+	res.recordChanged = before.UV.RuntimeBuild != after.UV.RuntimeBuild || before.UV.RuntimePython != after.UV.RuntimePython
+	res.groupChanged = !slices.Equal(before.RuntimeGroup, after.RuntimeGroup)
+	if recordOnly {
 		return
 	}
-	// A write that changed neither the Airflow pins, the runtime pins nor the
-	// runtime group repaired another of the settings that hold Airflow to the
-	// build: the index, its sources, or exclude-newer-package.
-	res.airflowChanged = res.airflowChanged || (changed && !res.pinsChanged && !res.groupChanged)
+	res.airflowChanged = !reflect.DeepEqual(airflowSettings(before), airflowSettings(after))
+	// A write that changed neither the Airflow pins, the record nor the group
+	// repaired another of the settings that hold Airflow to the build: the
+	// index, its sources, or exclude-newer-package. Taking out the runtime
+	// pins an older astro wrote is such a write too.
+	res.airflowChanged = res.airflowChanged || (changed && !res.recordChanged && !res.groupChanged)
 }
 
-// runtimeImage resolves the image the project in dir builds on: for its
-// runtime pins, and for a declared Dockerfile, the build the Airflow lookup
-// is asked about. A Dockerfile's exact build needs no catalog.
+// runtimeImage resolves the image the project in dir builds on: for the seed
+// of its lock, and for a declared Dockerfile, the build the Airflow lookup is
+// asked about. A Dockerfile's exact build needs no catalog.
 func (c *cli) runtimeImage(ctx context.Context, dir string, m *manifest.Manifest) runtimeImage {
 	var catalog *runtimeversions.Catalog
 	if c.d.RuntimeCatalog != nil {
@@ -340,13 +432,13 @@ func (c *cli) runtimeImage(ctx context.Context, dir string, m *manifest.Manifest
 	return image
 }
 
-// runtimePins are the runtime pins to write for the manifest m: the package
-// list of image's build. None, which takes the pins there out, whenever they
-// would no longer fit:
+// runtimePins are what the lock of the project m describes is seeded with:
+// the package list of image's build. None, which seeds nothing and takes the
+// record of an earlier seed out, whenever they would no longer fit:
 //
-//   - under a cutoff (underCutoff): a list is of the present, and pins newer
-//     than the cutoff would leave uv nothing to lock. Nothing is resolved or
-//     read for them then;
+//   - under a cutoff (underCutoff): a list is of the present, and versions
+//     newer than the cutoff would leave uv nothing to lock. Nothing is
+//     resolved or read for them then;
 //   - the Airflow pin's own build was taken out (moved while the index could
 //     not be read);
 //   - the project builds on no runtime, or its runtime publishes no list for
@@ -354,12 +446,12 @@ func (c *cli) runtimeImage(ctx context.Context, dir string, m *manifest.Manifest
 //   - the list's Airflow is another release than the Airflow pin's, or, with
 //     no Astronomer build of the pin (Airflow then comes from PyPI), one the
 //     pin does not cover;
-//   - the list of a build other than the pins' could not be read.
+//   - the list of a build other than the recorded one could not be read.
 //
-// nil, which leaves them as they are less the project's own packages, only
-// for what passes: the list of the pins' own build and Python could not be
-// read, or the build cannot be told for want of a catalog. res.pinsErr says
-// what happened when it is worth a warning.
+// nil, which leaves the lock and its record as they are, only for what
+// passes: the list of the recorded build and Python could not be read, or the
+// build cannot be told for want of a catalog. res.seedWarn says what happened
+// when it is worth a warning.
 func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest, image runtimeImage, cutoff bool, res *astroBuildWrite) *scaffold.RuntimePins {
 	none := &scaffold.RuntimePins{}
 	noBuild := errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild)
@@ -367,18 +459,18 @@ func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest,
 	case c.d.RuntimePins == nil:
 		return nil
 	case cutoff:
-		res.pinsCutoff = true
+		res.cutoff = true
 		return none
 	case res.build.Airflow == "" && !noBuild, errors.Is(image.err, scaffold.ErrNoRuntimeBuild):
 		return none
 	case image.err != nil, image.python == "":
-		// The build cannot be told, for want of a catalog. The pins there stay
-		// while the Airflow they were written beside is one the pin still
-		// covers; a pin that moved off it leaves them another Airflow's.
+		// The build cannot be told, for want of a catalog. The record stays
+		// while the Airflow it was made beside is one the pin still covers; a
+		// pin that moved off it leaves it another Airflow's.
 		recorded := releaseIn(m.UV.ConstraintDependencies, runtimeversions.DistAirflow)
 		if m.UV.RuntimeBuild != "" && recorded != "" && !manifest.PinCovers(m.Airflow().Pin, recorded) {
-			res.pinsErr = fmt.Errorf("%s holds no runtime pins: those of Astro Runtime %s are of Airflow %s, which the Airflow requirement no longer covers, and which build carries the new one cannot be told without the runtime catalog",
-				manifest.Marker, m.UV.RuntimeBuild, recorded)
+			res.seedWarn = fmt.Errorf("uv.lock is no longer recorded as seeded from Astro Runtime %s: its Airflow %s is one the Airflow requirement no longer covers, and which build carries the new one cannot be told without the runtime catalog",
+				m.UV.RuntimeBuild, recorded)
 			return none
 		}
 		return nil
@@ -386,33 +478,33 @@ func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest,
 	freeze, err := c.d.RuntimePins(ctx, image.build, image.python)
 	switch {
 	case errors.Is(err, runtimecatalog.ErrFreezeNotPublished):
-		// Pins of another Python would carry a marker the venv never
-		// matches, so there are none. Worth saying for a build that ships a
+		// A list of another Python would seed versions of a Python the venv
+		// never runs, so there is none. Worth saying for a build that ships a
 		// list for its own Python (a patch pin's, older than the series'
 		// newest); not for one with none at all.
 		if image.otherPython {
-			res.pinsErr = fmt.Errorf("%s holds no runtime pins: Astro Runtime %s publishes no package list for Python %s, the one this project runs",
-				manifest.Marker, image.build, image.python)
+			res.seedWarn = fmt.Errorf("uv.lock is not seeded: Astro Runtime %s publishes no package list for Python %s, the one this project runs",
+				image.build, image.python)
 		}
 		return none
 	case errors.Is(err, runtimecatalog.ErrPinnedResolution):
-		res.pinsCutoff = true
+		res.cutoff = true
 		return none
 	case err != nil && m.UV.RuntimeBuild == image.build && m.UV.RuntimePython == image.python:
-		res.pinsErr = fmt.Errorf("%s keeps its runtime pins: could not read what Astro Runtime %s ships: %w", manifest.Marker, image.build, err)
+		res.seedWarn = fmt.Errorf("uv.lock stays as it is: could not read what Astro Runtime %s ships: %w", image.build, err)
 		return nil
 	case err != nil:
-		// The build moved on and its list cannot be read yet: the pins there
-		// still describe the build the images use, so they stay while the
-		// requirement covers their Airflow.
-		return keepRecordedPins(m, res,
+		// The build moved on and its list cannot be read yet: the seed there
+		// still describes the build the images use, so it stays while the
+		// requirement covers its Airflow.
+		return keepRecordedSeed(m, res,
 			fmt.Sprintf("could not read what Astro Runtime %s ships: %v", image.build, err),
-			fmt.Errorf("%s holds no runtime pins until what Astro Runtime %s ships can be read: %w", manifest.Marker, image.build, err))
+			fmt.Errorf("uv.lock is not seeded until what Astro Runtime %s ships can be read: %w", image.build, err))
 	}
-	// The Airflow pin and the runtime pins have to be of one release, or the
-	// lock mixes one Airflow with another's dependencies. With no Astronomer
-	// build of the pin, Airflow comes from PyPI at the release the pin covers,
-	// so the build's pins apply while it carries one of those.
+	// The Airflow pin and the seed have to be of one release, or the lock
+	// mixes one Airflow with another's dependencies. With no Astronomer build
+	// of the pin, Airflow comes from PyPI at the release the pin covers, so
+	// the build's list applies while it carries one of those.
 	carried := releaseIn(freeze, runtimeversions.DistAirflow)
 	if noBuild {
 		if carried == "" || !manifest.PinCovers(m.Airflow().Pin, carried) {
@@ -421,23 +513,23 @@ func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest,
 	} else if pinned := astroRelease(res.build.Airflow); carried != "" && carried != pinned {
 		if m.Astro.Dockerfile == "" && m.Airflow().Runtime == "" {
 			// Nothing the user wrote names the build: the lookup and the
-			// catalog's newest build disagree on their own, so the pins
-			// follow the build carrying the release the lookup chose.
+			// catalog's newest build disagree on their own, so the seed
+			// follows the build carrying the release the lookup chose.
 			return c.pinsOfRelease(ctx, dir, m, pinned, res)
 		}
 		// A Dockerfile FROM, or a runtime, the requirement excludes.
-		res.pinsErr = fmt.Errorf("%s holds no runtime pins: Astro Runtime %s carries Airflow %s, and the Airflow requirement holds it to %s; make the two agree",
-			manifest.Marker, image.build, carried, pinned)
+		res.seedWarn = fmt.Errorf("uv.lock is not seeded: Astro Runtime %s carries Airflow %s, and the Airflow requirement holds it to %s; make the two agree",
+			image.build, carried, pinned)
 		return none
 	}
 	return &scaffold.RuntimePins{Build: image.build, Python: image.python, Pins: freeze}
 }
 
-// pinsOfRelease are the runtime pins of the newest published build carrying
-// Airflow release, for a project that names no build itself. With none
-// published yet, the pins there stay while the requirement covers their
-// Airflow, and come out otherwise; either way the warning blames nothing the
-// user wrote.
+// pinsOfRelease is the list of the newest published build carrying Airflow
+// release, to seed with, for a project that names no build itself. With none
+// published yet, the seed there stays while the requirement covers its
+// Airflow, and its record comes out otherwise; either way the warning blames
+// nothing the user wrote.
 func (c *cli) pinsOfRelease(ctx context.Context, dir string, m *manifest.Manifest, release string, res *astroBuildWrite) *scaffold.RuntimePins {
 	var catalog *runtimeversions.Catalog
 	if c.d.RuntimeCatalog != nil {
@@ -455,54 +547,26 @@ func (c *cli) pinsOfRelease(ctx context.Context, dir string, m *manifest.Manifes
 		}
 	}
 	why := fmt.Sprintf("no published Astro Runtime image carries Airflow %s, the build Astronomer's index has for the requirement, yet", release)
-	return keepRecordedPins(m, res, why, fmt.Errorf("%s holds no runtime pins: %s", manifest.Marker, why))
+	return keepRecordedSeed(m, res, why, fmt.Errorf("uv.lock is not seeded: %s", why))
 }
 
-// keepRecordedPins leaves the runtime pins there as they are when the Airflow
-// requirement still covers the Airflow they were written beside, and holds
-// res.build to that Airflow build too, so the lock does not pair one release
-// with another's dependencies. It says why with kept. Otherwise, or with no
-// pins there, they come out, with dropped as the warning.
-func keepRecordedPins(m *manifest.Manifest, res *astroBuildWrite, kept string, dropped error) *scaffold.RuntimePins {
+// keepRecordedSeed leaves the lock and its record as they are when the
+// Airflow requirement still covers the Airflow the lock was seeded beside, and
+// holds res.build to that Airflow build too, so the lock does not pair one
+// release with another's dependencies. It says why with kept. Otherwise, or
+// with no seed recorded, the record comes out, with dropped as the warning.
+func keepRecordedSeed(m *manifest.Manifest, res *astroBuildWrite, kept string, dropped error) *scaffold.RuntimePins {
 	recorded := recordedAstroBuild(m)
 	if m.UV.RuntimeBuild == "" || recorded.Airflow == "" || !manifest.PinCovers(m.Airflow().Pin, recorded.Airflow) {
-		res.pinsErr = dropped
+		res.seedWarn = dropped
 		return &scaffold.RuntimePins{}
 	}
 	if res.build.Index != "" {
 		recorded.Index = res.build.Index
 	}
 	res.build = recorded
-	res.pinsErr = fmt.Errorf("%s keeps the runtime pins of Astro Runtime %s: %s", manifest.Marker, m.UV.RuntimeBuild, kept)
+	res.seedWarn = fmt.Errorf("uv.lock stays seeded from Astro Runtime %s: %s", m.UV.RuntimeBuild, kept)
 	return nil
-}
-
-// runtimeGroup is the astro-runtime dependency group to write beside pins,
-// the runtime pins runtimePins decided on, and follows their decision: pins
-// written are of one build and Python, and the group is that image's
-// top-level packages, read from the same list; pins taken out take the group
-// out; pins kept as they are keep it. The one exception is a cutoff, which
-// takes the pins out and keeps the group: it holds names alone, which any
-// cutoff resolves.
-//
-// A list of top-level packages that cannot be had keeps the group as it is,
-// and res.groupErr says why.
-func (c *cli) runtimeGroup(ctx context.Context, pins *scaffold.RuntimePins, res *astroBuildWrite) *scaffold.RuntimeGroup {
-	switch {
-	case c.d.RuntimeRoots == nil, pins == nil, res.pinsCutoff:
-		return nil
-	case pins.Build == "":
-		return &scaffold.RuntimeGroup{}
-	}
-	// The pins' own Python and list: the group is worked out from the same
-	// list, and kept under its Python.
-	roots, err := c.d.RuntimeRoots(ctx, pins.Build, pins.Python, pins.Pins)
-	if err != nil {
-		res.groupErr = fmt.Errorf("%s keeps its %s dependency group as it is: %w", manifest.Marker, manifest.RuntimeGroupName, err)
-		return nil
-	}
-	res.groupLeftOut = roots.LeftOut
-	return &scaffold.RuntimeGroup{Build: pins.Build, Names: roots.Names}
 }
 
 // releaseIn is the release, without its +astro build, that freeze pins dist
@@ -557,7 +621,7 @@ func sameRelease(a, b string) bool {
 }
 
 // airflowSettings are the parts of a manifest SetAstroBuild changes to hold
-// Airflow to a build, apart from the runtime pins: what "now installs
+// Airflow to a build, apart from the seed's record: what "now installs
 // Astronomer's Airflow" reports a change of.
 func airflowSettings(m *manifest.Manifest) any {
 	var pins []string

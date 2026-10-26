@@ -50,11 +50,11 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 	}
 }
 
-// lockedRuntime is the build m's runtime pins were taken from, the one its
+// lockedRuntime is the build m's uv.lock was seeded from, the one its
 // uv.lock was made for, while it still carries the Airflow the pin asks for: its
 // tag agrees with the pin, and so does the Astronomer build of Airflow pinned
 // beside it, which names the exact release (an Airflow 2 build's tag shows
-// only the generation). A pin moved since the pins were written leaves them to
+// only the generation). A pin moved since the lock was seeded leaves it to
 // the next refresh, and the base to the pin. A [tool.astro] runtime or a
 // declared Dockerfile still decides over it; the resolution, not this,
 // applies that.
@@ -80,7 +80,7 @@ func lockedRuntime(m *manifest.Manifest) string {
 // offers it.
 //
 // A requires-python that admits none of the Pythons the lock's build ships
-// (edited since the pins were written) falls back to the rule without it,
+// (edited since the lock was seeded) falls back to the rule without it,
 // the newest build of the series, rather than failing the build;
 // LockedRuntimeNotices says so.
 func lockedBase(base BaseImageFunc) BaseImageFunc {

@@ -1,5 +1,5 @@
 # Written by the Astro CLI. Do not edit: `astro init` replaces this file.
-# astro-install-helper: 6
+# astro-install-helper: 7
 #
 # Turns the project's pyproject.toml, and its uv.lock when there is one, into
 # the files the Astro Runtime image's install steps read: requirements.txt,
@@ -839,20 +839,21 @@ def locked_airflow(lock):
     return next(iter(versions)) if len(versions) == 1 else None
 
 
-# The comment astro writes above the runtime pins in [tool.uv]
-# constraint-dependencies, naming the build they came from.
-RUNTIME_PINS_HEADER = re.compile(r"^\s*#\s*Astro Runtime (\S+) \(Python \d+\.\d+\) ships these versions")
+# The comment astro writes first in the [dependency-groups] astro-runtime
+# group, naming the build uv.lock was seeded from.
+SEED_RECORD = re.compile(r"^\s*#\s*astro seeded uv\.lock from Astro Runtime (\S+) \(Python \d+\.\d+\)")
 TABLE_HEADER = re.compile(r"^\s*\[\s*([^\[\]]+?)\s*\]\s*(#.*)?$")
-CONSTRAINTS_KEY = re.compile(r"^\s*constraint-dependencies\s*=\s*\[")
+RUNTIME_GROUP_KEY = re.compile(r"^\s*astro-runtime\s*=\s*\[")
 QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
 
 
-def pinned_runtime(pyproject_text):
-    """The Astro Runtime build the project's runtime pins were taken from, as
-    the comment astro writes above them names it, or None. Comments are not in
-    what tomllib reads, so this finds the [tool.uv] table's
-    constraint-dependencies array in the text, and reads the comment from that
-    array alone: the same words anywhere else in the file are not it."""
+def seeded_runtime(pyproject_text):
+    """The Astro Runtime build the project's uv.lock was seeded from, as the
+    record astro writes first in its astro-runtime dependency group names it,
+    or None. Comments are not in what tomllib reads, so this finds the
+    [dependency-groups] table's astro-runtime array in the text, and reads the
+    comment from that array alone: the same words anywhere else in the file
+    are not it."""
     table, inside, depth = None, False, 0
     for line in pyproject_text.splitlines():
         if not inside:
@@ -860,7 +861,7 @@ def pinned_runtime(pyproject_text):
             if header:
                 table = header.group(1).replace(" ", "")
                 continue
-            if table == "tool.uv" and CONSTRAINTS_KEY.match(line):
+            if table == "dependency-groups" and RUNTIME_GROUP_KEY.match(line):
                 inside, depth = True, 0
             else:
                 continue
@@ -868,7 +869,7 @@ def pinned_runtime(pyproject_text):
         # not the array's.
         code = QUOTED.sub("", line).split("#", 1)[0]
         depth += code.count("[") - code.count("]")
-        m = RUNTIME_PINS_HEADER.match(line)
+        m = SEED_RECORD.match(line)
         if m:
             return m.group(1)
         if depth <= 0:
@@ -897,8 +898,8 @@ def airflow_mismatch(lock, installed, runtime):
         made_for += " (Astro Runtime %s)" % runtime
     return (
         "uv.lock was made for %s, and this image has Airflow %s, so the lock's versions install over another runtime than "
-        "the one they were resolved for: build FROM the runtime the lock was made for, or run `astro init`, which moves "
-        "the runtime pins and relocks" % (made_for, installed.strip())
+        "the one they were resolved for: build FROM the runtime the lock was made for, or run `astro init`, which seeds "
+        "the lock again from the newest build" % (made_for, installed.strip())
     )
 
 
@@ -943,7 +944,7 @@ def main(argv=None):
                 # Every build checks it, `docker build .` included: the lock is
                 # for one runtime's Airflow, and this image may be another's. A
                 # lock set aside as out of date installs nothing it says.
-                mismatch = airflow_mismatch(lock_data, base_airflow(), pinned_runtime(pyproject.decode("utf-8", "replace")))
+                mismatch = airflow_mismatch(lock_data, base_airflow(), seeded_runtime(pyproject.decode("utf-8", "replace")))
                 if mismatch:
                     warn(mismatch)
         except Exception as e:  # a lock this cannot read installs as no lock

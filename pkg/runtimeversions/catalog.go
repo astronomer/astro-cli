@@ -238,7 +238,7 @@ func (c *Catalog) NewestPublishedRuntimeFor(airflowPin string) (string, bool) {
 // the runtime build carries when the manifest names one, and otherwise the one
 // the newest published build of the pin carries, which is what the series
 // image tag resolves to. A build the catalog dates after today has no image
-// yet, so it is not counted: the build a project's runtime pins are of
+// yet, so it is not counted: the build a project's lock is seeded from
 // (NewestPublishedRuntimeFor) and the Airflow it is held to are one.
 func (c *Catalog) AirflowFor(airflowPin, runtime string) (string, bool) {
 	tag := runtime

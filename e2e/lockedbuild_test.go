@@ -13,12 +13,12 @@ import (
 	"time"
 )
 
-// A packaged image starts FROM the runtime build the project's pins name, not
-// from the series tag.
+// A packaged image starts FROM the runtime build the project's uv.lock was
+// seeded from, not from the series tag.
 //
-// The runtime pins in [tool.uv] constraint-dependencies record the build they
-// were taken from, the one uv.lock was made for, and every image is meant to
-// be that build: otherwise the series tag moves on to a newer build and the
+// The record astro writes first in the [dependency-groups] astro-runtime group
+// names the build the lock was seeded from, and every image is meant to be
+// that build: otherwise the series tag moves on to a newer build and the
 // image installs the lock's versions over a runtime they were not resolved
 // for. So the build has to start FROM <build>-base, and the case reads that
 // off the build's own log, where the base is named.
@@ -26,7 +26,7 @@ import (
 // The build named is the series' newest published one, which is the image the
 // series tag serves today: the layers are the ones every other tier 3 case
 // pulls, and only the tag differs, which is the thing under test.
-func TestAPackagedImageBuildsOnTheBuildThePinsName(t *testing.T) {
+func TestAPackagedImageBuildsOnTheBuildTheLockWasSeededFrom(t *testing.T) {
 	tier(t, 3)
 	p := dockerProject(t, "lockedbuild")
 	needsDocker(t, p)
@@ -36,15 +36,13 @@ func TestAPackagedImageBuildsOnTheBuildThePinsName(t *testing.T) {
 
 	path := filepath.Join(p.Dir, "pyproject.toml")
 	raw := read(t, path)
-	const open = "constraint-dependencies = ["
-	if !strings.Contains(raw, open) {
-		t.Fatalf("init wrote no [tool.uv] constraint-dependencies to name a build in:\n%s", raw)
+	// The suite runs uv under a cutoff, so init seeded nothing and wrote no
+	// group: the record is written here, as a seed of that build would.
+	if strings.Contains(raw, "[dependency-groups]") {
+		t.Fatalf("init wrote a [dependency-groups] under the suite's cutoff:\n%s", raw)
 	}
-	pins := open + "\n" +
-		"    # Astro Runtime " + build + " (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.\n" +
-		"    \"six==1.16.0; python_version == '3.12'\",\n" +
-		"    # End of what astro writes. Constraints below this line are yours.\n"
-	write(t, path, strings.Replace(raw, open, pins, 1))
+	write(t, path, raw+"\n[dependency-groups]\nastro-runtime = [\n"+
+		"    # astro seeded uv.lock from Astro Runtime "+build+" (Python 3.12). Run astro init to seed it again.\n]\n")
 
 	t.Cleanup(func() { removeImagesNamed(t, "astro-package/lockedbuild") })
 	got := p.runSlow("package", "astro", "--output", "json").requireSuccess()
@@ -57,7 +55,7 @@ func TestAPackagedImageBuildsOnTheBuildThePinsName(t *testing.T) {
 	}
 	t.Logf("built FROM %s", exact.FindString(got.output()))
 	if strings.Contains(got.output(), "runtime:"+series+"-base") {
-		t.Errorf("the build started FROM the series tag %s-base, not the build the pins name\n%s", series, got.output())
+		t.Errorf("the build started FROM the series tag %s-base, not the build the lock was seeded from\n%s", series, got.output())
 	}
 }
 

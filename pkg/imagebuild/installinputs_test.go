@@ -303,19 +303,16 @@ func lockProject(deps []string, packages string) (pyproject, lock string) {
 
 // Every build checks the lock's Airflow against the image's, `docker build .`
 // included: a lock made for another runtime's Airflow is said in the build
-// output, naming the runtime the pins came from when pyproject.toml records
-// it, and the build goes on with the lock's versions. A lock for this image's
+// output, naming the runtime the lock was seeded from when pyproject.toml
+// records it, and the build goes on with the lock's versions. A lock for this image's
 // Airflow, a lock holding no Airflow, and an image whose Airflow cannot be
 // read say nothing.
 func TestInstallHelperSaysWhenTheLockIsForAnotherAirflow(t *testing.T) {
 	pyproject, lock := lockProject([]string{"apache-airflow==3.3.*", "pandas"},
 		lockEntry("pandas", "2.2.3")+lockEntry("apache-airflow", "3.3.2+astro.2"))
-	pins := "\n[tool.uv]\nconstraint-dependencies = [\n" +
-		"    # Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.\n" +
-		"    \"pandas==2.2.3; python_version == '3.12'\",\n]\n"
-	// The lock uv made under those pins records them, so it is not stale.
-	pinnedLock := strings.Replace(lock, "version = 1\n", "version = 1\n\n[manifest]\nconstraints = [\n"+
-		`    { name = "pandas", marker = "python_full_version == '3.12.*'", specifier = "==2.2.3" },`+"\n]\n", 1)
+	seeded := "\n[dependency-groups]\nastro-runtime = [\n" +
+		"    # astro seeded uv.lock from Astro Runtime 3.3-9 (Python 3.12). Run astro init to seed it again.\n" +
+		"    'pandas',\n]\n"
 
 	for _, tt := range []struct {
 		name, pyproject, lock, installed string
@@ -326,11 +323,11 @@ func TestInstallHelperSaysWhenTheLockIsForAnotherAirflow(t *testing.T) {
 		{name: "same release, another astro build", pyproject: pyproject, lock: lock, installed: "3.3.2+astro.3"},
 		{name: "same release from pypi", pyproject: pyproject, lock: lock, installed: "3.3.2"},
 		{
-			name: "another airflow, runtime named", pyproject: pyproject + pins, lock: pinnedLock, installed: "3.3.3+astro.1",
-			want: []string{"uv.lock was made for Airflow 3.3.2+astro.2 (Astro Runtime 3.3-9)", "this image has Airflow 3.3.3+astro.1", "run `astro init`, which moves the runtime pins and relocks"},
+			name: "another airflow, runtime named", pyproject: pyproject + seeded, lock: lock, installed: "3.3.3+astro.1",
+			want: []string{"uv.lock was made for Airflow 3.3.2+astro.2 (Astro Runtime 3.3-9)", "this image has Airflow 3.3.3+astro.1", "run `astro init`, which seeds the lock again from the newest build"},
 		},
 		{
-			name: "another airflow, no pins", pyproject: pyproject, lock: lock, installed: "3.3.3+astro.1",
+			name: "another airflow, no record", pyproject: pyproject, lock: lock, installed: "3.3.3+astro.1",
 			want: []string{"uv.lock was made for Airflow 3.3.2+astro.2,", "this image has Airflow 3.3.3+astro.1"},
 		},
 		{name: "image airflow unknown", pyproject: pyproject, lock: lock},
@@ -351,20 +348,22 @@ func TestInstallHelperSaysWhenTheLockIsForAnotherAirflow(t *testing.T) {
 
 	// A lock set aside as out of date installs nothing it says, so its Airflow
 	// is not compared: the warning is the staleness, naming astro init.
-	out := runHelper(t, helperProject(t, pyproject+pins, lock), helperRun{env: []string{"ASTRO_INSTALL_PROJECT_BASE_AIRFLOW=3.3.3+astro.1"}})
+	stale := pyproject + "\n[tool.uv]\nconstraint-dependencies = ['pandas<3']\n" + seeded
+	out := runHelper(t, helperProject(t, stale, lock), helperRun{env: []string{"ASTRO_INSTALL_PROJECT_BASE_AIRFLOW=3.3.3+astro.1"}})
 	assert.NotContains(t, out.stderr, "was made for")
 	assert.Contains(t, out.stderr, "out of date with pyproject.toml")
 	assert.Contains(t, out.stderr, "run `astro init`, which relocks")
 }
 
-// The runtime pins' build is read from the comment astro writes inside the
-// [tool.uv] constraint-dependencies array, and nowhere else: the same words
-// elsewhere in pyproject.toml, or a pins array of another table, are not it.
-func TestInstallHelperReadsThePinsBuildFromThePinsHeaderOnly(t *testing.T) {
+// The build the lock was seeded from is read from the record astro writes
+// first in the [dependency-groups] astro-runtime array, and nowhere else: the
+// same words elsewhere in pyproject.toml, or an astro-runtime array of another
+// table, are not it.
+func TestInstallHelperReadsTheSeededBuildFromTheRuntimeGroupOnly(t *testing.T) {
 	pyproject, lock := lockProject([]string{"apache-airflow==3.3.*", "pandas"},
 		lockEntry("pandas", "2.2.3")+lockEntry("apache-airflow", "3.3.2+astro.2"))
-	elsewhere := "\n# Astro Runtime 9.9-9 (Python 3.12) ships these versions\n[tool.other]\nconstraint-dependencies = [\n" +
-		"    # Astro Runtime 8.8-8 (Python 3.12) ships these versions\n]\n"
+	elsewhere := "\n# astro seeded uv.lock from Astro Runtime 9.9-9 (Python 3.12)\n[tool.other]\nastro-runtime = [\n" +
+		"    # astro seeded uv.lock from Astro Runtime 8.8-8 (Python 3.12)\n]\n"
 	out := runHelper(t, helperProject(t, pyproject+elsewhere, lock), helperRun{env: []string{"ASTRO_INSTALL_PROJECT_BASE_AIRFLOW=3.3.3+astro.1"}})
 	assert.Contains(t, out.stderr, "uv.lock was made for Airflow 3.3.2+astro.2, and")
 	assert.NotContains(t, out.stderr, "9.9-9")

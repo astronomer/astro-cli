@@ -107,7 +107,7 @@ const lockedCatalog = `{"runtimeVersionsV3": {
     "3.3-10": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "pythonVersions": ["3.12", "3.13"], "defaultPythonVersion": "3.12"}}
   }}`
 
-// A requires-python edited since the pins were written, admitting none of the
+// A requires-python edited since the lock was seeded, admitting none of the
 // Pythons the lock's build ships, builds on the newest build of the series as
 // it would with no lock, rather than failing, and the notices say why. With a
 // requires-python the lock's build admits, the notice is that a newer build is

@@ -53,15 +53,12 @@ func TestCheckVenvsCarryTheManifestsConstraints(t *testing.T) {
 }
 
 // A project held to Astronomer's build checks against it: the plain check gets
-// the index pages its sources name, since the scratch venv cannot read them,
-// and the runtime pins. A platform target runs Apache's Airflow beside its own
-// packages, so the pins to the build and to the runtime image are left out.
+// the index pages its sources name, since the scratch venv cannot read them. A
+// platform target runs Apache's Airflow, so the pins to the build are left out.
 func TestCheckVenvsFollowTheAstroBuild(t *testing.T) {
 	const pinned = "[project]\nname = 'demo'\nrequires-python = '>=3.12'\n" +
 		"dependencies = [\"apache-airflow==3.3.*\", \"apache-airflow-core\", \"apache-airflow-task-sdk\"]\n[tool.astro]\n\n" +
-		"[tool.uv]\nconstraint-dependencies = [\n    'pandas<3',\n    'apache-airflow==3.3.2+astro.1',\n    'apache-airflow-task-sdk==1.3.2+astro.1',\n" +
-		"    # Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.\n" +
-		"    'zipp==4.1.0',\n]\n\n" +
+		"[tool.uv]\nconstraint-dependencies = ['pandas<3', 'apache-airflow==3.3.2+astro.1', 'apache-airflow-task-sdk==1.3.2+astro.1']\n\n" +
 		"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\nexplicit = true\n\n" +
 		"[tool.uv.sources]\napache-airflow = { index = 'astronomer' }\napache-airflow-core = { index = 'astronomer' }\napache-airflow-task-sdk = { index = 'astronomer' }\n"
 	for _, tc := range []struct {
@@ -71,7 +68,7 @@ func TestCheckVenvsFollowTheAstroBuild(t *testing.T) {
 	}{
 		{
 			[]string{"local", "check"},
-			[]string{"apache-airflow-task-sdk==1.3.2+astro.1", "apache-airflow==3.3.2+astro.1", "pandas<3", "zipp==4.1.0"},
+			[]string{"apache-airflow-task-sdk==1.3.2+astro.1", "apache-airflow==3.3.2+astro.1", "pandas<3"},
 			[]string{
 				"https://pip.astronomer.io/v2/apache-airflow-core/",
 				"https://pip.astronomer.io/v2/apache-airflow-task-sdk/",

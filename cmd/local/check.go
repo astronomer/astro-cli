@@ -202,10 +202,9 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, env []str
 		DagsDir:     checks.DefaultDagsDir(project),
 		Pin:         m.Airflow().Pin,
 		Deps:        deps,
-		// Without the pins to Astronomer's build of Airflow or to the
-		// runtime image's packages: a platform runs Apache's own Airflow, at
-		// its own version, beside its own packages.
-		Constraints: m.UV.ProjectConstraints(),
+		// Without the pins to Astronomer's build of Airflow: a platform runs
+		// Apache's own, at its own version.
+		Constraints: manifest.WithoutAstroPins(m.UV.ConstraintDependencies),
 		Env:         env,
 	}, prov, c.d.CheckVenv, strict, progress)
 }

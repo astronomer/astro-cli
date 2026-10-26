@@ -35,7 +35,7 @@ const (
 )
 
 // AirflowDists are DistAirflow, DistCore and DistTaskSDK, as a list: the
-// distributions a project lists itself, which the runtime pins and the
+// distributions a project lists itself, which the seed and the
 // astro-runtime group leave out. A copy, so no caller changes another's.
 func AirflowDists() []string {
 	return []string{DistAirflow, DistCore, DistTaskSDK}

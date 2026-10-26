@@ -59,7 +59,7 @@ type Plan struct {
 	// of AirflowVersion's series. Standalone ignores it: it installs the
 	// requirement. The manifest never sets it beside a Dockerfile.
 	Runtime string
-	// LockedRuntime is the runtime build the project's runtime pins were
+	// LockedRuntime is the runtime build the project's uv.lock was seeded
 	// taken from (manifest UV.RuntimeBuild), so the one its uv.lock was made
 	// for, or "" for none. With Runtime empty, Docker mode builds FROM it
 	// rather than the newest build of the series, so the image is the build
