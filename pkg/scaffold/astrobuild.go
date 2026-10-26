@@ -39,12 +39,13 @@ import (
 // numba<0.63) drag a shared dependency back to a release whose sdist does not
 // build.
 //
-// The rest of constraint-dependencies holds the runtime pins (RuntimePins):
-// every other distribution the image ships, at its version, from the package
-// list Astronomer publishes for each build and Python
-// (the CLI's runtimecatalog.RuntimePins). Without them a lockfile takes the newest of
-// each, so standalone ran SQLAlchemy 2.1 beside an Airflow whose image holds
-// it to 2.0, and newer releases of most of what Airflow imports.
+// The rest of what the image ships is held in the lock, not here: astro
+// seeds uv.lock with the image's versions (RuntimePins, SeedManifest), lists
+// the image's top-level packages in the astro-runtime dependency group
+// (RuntimeGroup), and records there which build and Python it seeded from
+// (Seed). Without that a lockfile takes the newest of each, so standalone ran
+// SQLAlchemy 2.1 beside an Airflow whose image holds it to 2.0, and newer
+// releases of most of what Airflow imports.
 
 // astroIndexName names the [[tool.uv.index]] entry this file writes.
 const astroIndexName = "astronomer"
@@ -73,40 +74,29 @@ var (
 // build of, which then comes from PyPI. It leaves every other [tool.uv] key,
 // and every comment, as it was.
 //
-// pins are the runtime pins to write in place of the ones there. nil means
-// they are not known (no network, say): the ones there stay, less any the project
-// now gives a version they do not meet. group is the astro-runtime dependency
-// group to write in place of the one there (setRuntimeGroup), nil when it is
-// not known, as with pins.
+// group is the astro-runtime dependency group to write in place of the one
+// there (setRuntimeGroup), nil when it is not known; seed is the record of
+// the build and Python the project's uv.lock was seeded from, written as the
+// group's first comment: nil keeps it, a zero Seed takes it out. What an
+// older astro wrote into constraint-dependencies (its runtime pins, a seed
+// record) is taken out either way.
 //
-// The Refused it returns reports runtime pins, or a group, that were not
-// written because the array cannot hold the comments that mark them: a
-// [tool.uv], or a [dependency-groups], written as an inline table. The rest
-// was written; the caller says why those were not.
-func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, pins *RuntimePins, group *RuntimeGroup) (refused Refused, err error) {
+// refused reports a group that was not written because its table cannot
+// hold the comments that head it: a [dependency-groups] written as an inline
+// table. The rest was written; the caller says why the group was not.
+func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, group *RuntimeGroup, seed *Seed) (refused bool, err error) {
 	err = EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		if err := setAstroBuild(before, ed, b, pins, &refused.Pins); err != nil {
+		if err := setAstroBuild(before, ed, b); err != nil {
 			return err
 		}
-		if refused.Pins {
-			// Without the pins the group's packages would lock unpinned, newer
-			// than the image's: no group either.
-			return nil
-		}
 		var err error
-		refused.Group, err = setRuntimeGroup(ed, group)
+		refused, err = setRuntimeGroup(ed, group, seed)
 		return err
 	})
 	return refused, err
 }
 
-// Refused says which of the runtime pins and the astro-runtime group
-// SetAstroBuild could not write for want of a table that holds comments.
-type Refused struct {
-	Pins, Group bool
-}
-
-func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, pins *RuntimePins, pinsRefused *bool) error {
+func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild) error {
 	dists := b.Dists()
 	if b.Airflow == "" {
 		dists = nil
@@ -114,11 +104,9 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 	if err := checkNotTheUsers(ed, dists); err != nil {
 		return err
 	}
-	refused, err := setAstroPins(ed, b, dists, pins)
-	if err != nil {
+	if err := setAstroPins(ed, b, dists); err != nil {
 		return err
 	}
-	*pinsRefused = refused
 	if err := setAstroSources(ed, dists); err != nil {
 		return err
 	}
@@ -196,49 +184,29 @@ func checkNotTheUsers(ed tomledit.Editor, dists []string) error {
 	return nil
 }
 
-// setAstroPins replaces the constraints an earlier build wrote with b's, and
-// the runtime pins with pins, keeping the project's own and their comments. A
+// setAstroPins replaces the constraints an earlier build wrote with b's,
+// keeping the project's own constraints and their comments ahead of them. A
 // constraint is the build's when it names one of the rebuilt distributions at
-// an +astro version, and a runtime pin when it follows the comment that heads
-// them (manifest.RuntimePinsIn).
-//
-// The project's constraints ahead of the runtime pins and after them both stay
-// where they are. refused reports runtime pins left out because the array
-// cannot carry the comments that mark them (tomledit.ErrCommentsUnsupported);
-// the rest is written.
-func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, pins *RuntimePins) (refused bool, err error) {
+// an +astro version.
+func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string) error {
 	lines, _ := tomledit.GetLines(ed, constraintsKey)
-	head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
-	head, tail = withoutAstroPins(head), withoutAstroPins(tail)
+	var astroPins []any
 	if len(dists) > 0 {
-		head = append(head, asAny(b.Pins())...)
+		astroPins = asAny(b.Pins())
 	}
-	return writeRuntimePins(ed, lines, head, current, tail, pins)
+	return writeConstraints(ed, lines, withoutAstroManaged(lines), astroPins)
 }
 
 // setConstraints writes lines as constraint-dependencies, comments included,
-// so comments that lines leave out go even when the values stay the same (the
-// heading and end of runtime pins whose every pin was deleted), or takes the
-// key out when they hold no constraint, comments alone being nothing to keep.
+// so comments that lines leave out go even when the values stay the same
+// (what an older astro wrote), or takes the key out when it would hold no
+// constraint: comments alone are nothing to keep.
 func setConstraints(ed tomledit.Editor, lines []any) error {
 	if !slices.ContainsFunc(lines, func(v any) bool { _, isComment := v.(tomledit.Comment); return !isComment }) {
 		ed.Delete(constraintsKey)
 		return nil
 	}
 	return tomledit.SetLines(ed, constraintsKey, lines)
-}
-
-// withoutAstroPins is lines without the constraints that hold Airflow to a
-// build (manifest.AstroPin), which setAstroPins writes again.
-func withoutAstroPins(lines []any) []any {
-	var out []any
-	for _, v := range lines {
-		if s, _ := v.(string); manifest.AstroPin(s) {
-			continue
-		}
-		out = append(out, v)
-	}
-	return out
 }
 
 // setAstroSources points each rebuilt distribution at the index, and takes

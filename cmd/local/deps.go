@@ -151,11 +151,11 @@ type Deps struct {
 	AstroBuild func(ctx context.Context, airflowPin, runtime string) (runtimeversions.AstroBuild, error)
 
 	// RuntimePins reads the name==version lines of one Astro Runtime build's
-	// image running python, which init and a start write into [tool.uv] as
-	// the runtime pins (scaffold.RuntimePins). Production reads the build's
+	// image running python, which init and a start seed the project's
+	// uv.lock with (scaffold.RuntimePins). Production reads the build's
 	// freeze file from Astronomer's CDN, cached, through
 	// runtimecatalog.RuntimePins. A seam so a test never reaches the network;
-	// nil leaves the runtime pins as they are.
+	// nil leaves the lock and its record as they are.
 	RuntimePins func(ctx context.Context, build, python string) ([]string, error)
 
 	// RuntimeRoots reads the top-level packages of one Astro Runtime build's
@@ -166,6 +166,12 @@ type Deps struct {
 	// runtimecatalog.RuntimeRoots. A seam so a test never reaches the network
 	// or runs uv; nil leaves the group as it is.
 	RuntimeRoots func(ctx context.Context, build, python string, freeze []string) (runtimecatalog.Roots, error)
+
+	// Lock runs `uv lock` in dir: twice for a seed, once in a scratch copy
+	// with the image's versions and once in the project (seedLock).
+	// Production runs the uv the CLI finds (lockProject). A seam so a test
+	// needs no uv; nil seeds nothing.
+	Lock func(ctx context.Context, dir string) error
 
 	// RuntimeCatalog reads the runtime catalog for an edit that moves the
 	// Airflow pin, which uses it to move requires-python and [tool.astro]
@@ -248,6 +254,7 @@ func NewDeps() Deps {
 		AstroBuild:       runtimecatalog.AstroBuild,
 		RuntimePins:      runtimecatalog.RuntimePins,
 		RuntimeRoots:     runtimecatalog.RuntimeRoots,
+		Lock:             lockProject,
 		RuntimeCatalog:   runtimecatalog.Catalog,
 		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(airflowPin)(ctx)

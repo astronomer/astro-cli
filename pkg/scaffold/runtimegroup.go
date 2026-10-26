@@ -16,12 +16,10 @@ import (
 // image of one Astro Runtime build installs, which the CLI's
 // runtimecatalog.RuntimeRoots reads. With the group in [tool.uv]
 // default-groups, standalone mode installs them, and with them everything the
-// image has that they pull in, at the versions the runtime pins hold.
+// image has that they pull in, at the versions the lock is seeded with.
 type RuntimeGroup struct {
-	// Build is the image's: "3.3-9".
-	Build string
 	// Names are the image's top-level packages, normalized. None means there
-	// are none, and the group is taken out.
+	// are none, and the group is emptied.
 	Names []string
 }
 
@@ -36,46 +34,46 @@ var uvDefaultGroups = []any{"dev"}
 
 // setRuntimeGroup writes g as the astro-runtime group, less the packages the
 // project lists itself (listedPackages), which choose their own version, and
-// Airflow's, which it lists already. nil g is not known: the group stays, less
-// what the project now lists.
+// Airflow's, which it lists already, with the seed record first: seed's when
+// seed is not nil (none for a zero Seed), else the one there. nil g is not
+// known: the group stays, less what the project now lists.
 //
 // The group is never taken out. One with nothing left in it stays, empty, under
 // comments that say so (manifest.RuntimeGroupEmptyComments): a project that
 // took it out of default-groups keeps that choice when the group fills again.
-// A group is created, and joins default-groups so uv installs it, only with
-// packages in it; one the project had stays as default-groups has it. refused
-// reports a group not written because its table cannot hold the comments that
-// head it (an inline [dependency-groups]).
-func setRuntimeGroup(ed tomledit.Editor, g *RuntimeGroup) (refused bool, err error) {
+// A group is created with packages in it, and then joins default-groups so uv
+// installs it, or with a record alone; one the project had stays as
+// default-groups has it. refused reports a group not written because its
+// table cannot hold the comments that head it (an inline [dependency-groups]).
+func setRuntimeGroup(ed tomledit.Editor, g *RuntimeGroup, seed *Seed) (refused bool, err error) {
 	current, exists := tomledit.GetLines(ed, runtimeGroupKey)
 	listed := listedPackages(ed)
-	var out []any
+	var entries []string
 	if g == nil {
-		if !exists {
-			return false, nil
-		}
 		for _, v := range current {
-			if s, isString := v.(string); isString && listed[manifest.DistName(s)] {
-				continue
+			if s, isString := v.(string); isString && !listed[manifest.DistName(s)] {
+				entries = append(entries, s)
 			}
-			out = append(out, v)
-		}
-		if !slices.ContainsFunc(out, isEntry) {
-			out = emptyGroup()
 		}
 	} else {
-		entries := groupEntries(g.Names, listed)
-		switch {
-		case len(entries) > 0:
-			for _, c := range manifest.RuntimeGroupComments(g.Build) {
-				out = append(out, tomledit.Comment(c))
-			}
-			out = append(out, asAny(entries)...)
-		case !exists:
-			return false, nil
-		default:
-			out = emptyGroup()
-		}
+		entries = groupEntries(g.Names, listed)
+	}
+	var record []any
+	switch {
+	case seed == nil:
+		record = seedRecordIn(current)
+	case seed.Build != "":
+		record = []any{tomledit.Comment(manifest.SeedRecord(seed.Build, seed.Python))}
+	}
+	if !exists && len(entries) == 0 && len(record) == 0 {
+		return false, nil
+	}
+	out := slices.Clone(record)
+	if len(entries) > 0 {
+		out = append(out, tomledit.Comment(manifest.RuntimeGroupComment))
+		out = append(out, asAny(entries)...)
+	} else {
+		out = append(out, emptyGroup()...)
 	}
 	if exists && reflect.DeepEqual(out, current) {
 		return false, nil
@@ -86,7 +84,7 @@ func setRuntimeGroup(ed tomledit.Editor, g *RuntimeGroup) (refused bool, err err
 		}
 		return false, err
 	}
-	if !exists {
+	if !exists && len(entries) > 0 {
 		// Only now the group is there: a refused one leaves no dev group behind.
 		if err := ensureDevGroup(ed); err != nil {
 			return false, err
@@ -124,11 +122,6 @@ func emptyGroup() []any {
 		out = append(out, tomledit.Comment(c))
 	}
 	return out
-}
-
-func isEntry(v any) bool {
-	_, isString := v.(string)
-	return isString
 }
 
 // devGroupKey is the group `uv add --dev` writes, uv's own default.

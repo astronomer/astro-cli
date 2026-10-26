@@ -68,8 +68,8 @@ const (
 	// freezeCacheDir is the directory under the cache root the copies sit in,
 	// named as the CDN path is.
 	freezeCacheDir = "runtime-freeze"
-	// freezeTimeout bounds the request of one RuntimePins: the pins have a
-	// way on without it, and an offline machine should not wait for it.
+	// freezeTimeout bounds the request of one RuntimePins: a start goes on
+	// without a seed, and an offline machine should not wait for it.
 	freezeTimeout = 3 * time.Second
 	// freezeMaxBytes caps the read. A freeze is a few KB.
 	freezeMaxBytes = 1 << 20
@@ -95,18 +95,18 @@ var ErrFreezeNotPublished = errors.New("no freeze file is published for this bui
 
 // ErrPinnedResolution reports a RuntimePins made while UV_EXCLUDE_NEWER holds
 // uv to a cutoff, a date or a duration alike. A freeze is of the present, and
-// pins newer than the cutoff would leave uv nothing to lock, so none is read.
+// versions newer than the cutoff would leave uv nothing to lock, so none is read.
 // A project's own [tool.uv] exclude-newer is the caller's to check, from the
 // manifest.
 var ErrPinnedResolution = errors.New("UV_EXCLUDE_NEWER holds uv to a cutoff, which a runtime's freeze does not follow")
 
 // RuntimePins returns the freeze of runtime build's image running python as
-// the name==version lines it lists, in its order, for the runtime pins init
-// and a start write into [tool.uv] (scaffold.RuntimePins), from the cache when
-// a copy is kept there and from the CDN otherwise.
+// the name==version lines it lists, in its order, which init and a start
+// seed a project's uv.lock with (scaffold.RuntimePins), from the cache when a
+// copy is kept there and from the CDN otherwise.
 //
 // It says why it has nothing: ErrFreezeNotPublished for a build and Python
-// with no file, which takes the pins out; ErrPinnedResolution under a
+// with no file, which seeds nothing; ErrPinnedResolution under a
 // UV_EXCLUDE_NEWER cutoff; any other error when the file could not be read.
 func RuntimePins(ctx context.Context, build, python string) ([]string, error) {
 	if strings.TrimSpace(os.Getenv("UV_EXCLUDE_NEWER")) != "" {
