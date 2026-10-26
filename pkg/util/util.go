@@ -25,6 +25,21 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
+// PermissionID is the id the token's permissions claim carries for kind, as
+// "organizationId:<id>" or "workspaceId:<id>", "" when it names none. Every
+// reader of the claim goes through here, so the login setup and a read of the
+// token's organization cannot drift on its spelling. The last entry of a kind
+// wins, as the login setup has always read it.
+func (c *CustomClaims) PermissionID(kind string) string {
+	id := ""
+	for _, permission := range c.Permissions {
+		if v, ok := strings.CutPrefix(permission, kind+":"); ok {
+			id = v
+		}
+	}
+	return id
+}
+
 func Contains(elems []string, v string) bool {
 	for _, s := range elems {
 		if v == s {

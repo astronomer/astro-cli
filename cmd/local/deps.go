@@ -182,14 +182,14 @@ type Deps struct {
 	// nil reads as nothing set.
 	Legacy1xSetting func(projectDir, key string) (value, file, replacement string)
 
-	// LoginOrganization is the organization of the login a project whose
-	// Astro host is domain would call with ("" for a project that names no
+	// LoginOrganization is the organization of the identity a call on
+	// domain would use, in Session's order ("" for a project that names no
 	// host: the current context's), for `astro project inspect`'s
-	// organization when the manifest names none, chosen the way the
-	// workspace reads choose it (manifest.Astro.WorkspaceOrganization).
-	// Production reads it offline through astrosession.OrganizationFor: an
-	// API token's claims, else the saved login, with no keyring and no API.
-	// A seam because the read touches config/, which this tree never imports;
+	// organization when the manifest names none
+	// (manifest.Astro.WorkspaceOrganization's fallback). Production reads it
+	// offline through astrosession.OrganizationFor: an API token's claims,
+	// else the context saved for the host, with no keyring and no API. A
+	// seam because the read touches config/, which this tree never imports;
 	// nil, or "", reads as unknown.
 	LoginOrganization func(domain string) string
 }

@@ -16,7 +16,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/astronomer/astro-cli/config"
@@ -243,19 +242,23 @@ func save(ctx *config.Context, tok *astroauth.TokenResponse) error {
 	return nil
 }
 
-// OrganizationFor is the organization of the login a project whose Astro host
-// is domain would use, read offline: ASTRO_API_TOKEN's, from the organizationId
-// permission in its claims, else the login saved for domain, else, with an
-// empty domain (a project that names no host), the current context's. It is
-// what `astro project inspect` publishes as the organization when the manifest
-// names none, the way the workspace reads choose it
-// (manifest.Astro.WorkspaceOrganization).
+// OrganizationFor is the organization of the identity BearerFor would call
+// with for a project whose Astro host is domain, read offline: ASTRO_API_TOKEN's,
+// from the organizationId permission in its claims, else the context saved for
+// domain, else, with an empty domain (a project that names no host), the
+// current context's. It is what `astro project inspect` publishes as the
+// organization when the manifest names none
+// (manifest.Astro.WorkspaceOrganization's fallback).
 //
 // It reads the saved contexts without their logins, so it reaches no keyring
-// and asks no API, and "" means none is known. A token in the environment is
-// the identity in use, so one whose claims name no organization reads as none
-// rather than as a saved login's: that login is not the one this run would
-// call with.
+// and asks no API, and "" means none is known. Two consequences of that. A
+// token in the environment is the identity in use, so one whose claims name
+// no organization reads as none rather than as a saved login's: that login is
+// not the one this run would call with. And a context that was logged out of
+// still answers: `astro logout` clears the token and keeps the organization,
+// and without resolving the login the two cannot be told apart. That is the
+// organization the project was last read under, which is still the project's;
+// whether a login is live is the next command's question, not this one's.
 func OrganizationFor(domain string) string {
 	if token, ok := APIToken(); ok {
 		return tokenOrganization(Credential(token))
@@ -280,16 +283,12 @@ func OrganizationFor(domain string) string {
 
 // tokenOrganization is the organization an API token's claims name, from the
 // organizationId permission the platform writes into an organization or
-// workspace token, or "" when the token carries none or does not parse.
+// workspace token, or "" when the token carries none or does not parse. The
+// claim is read as the login setup reads it (util.CustomClaims.PermissionID).
 func tokenOrganization(token string) string {
 	claims, err := util.ParseAPIToken(token)
 	if err != nil {
 		return ""
 	}
-	for _, permission := range claims.Permissions {
-		if org, ok := strings.CutPrefix(permission, "organizationId:"); ok {
-			return org
-		}
-	}
-	return ""
+	return claims.PermissionID("organizationId")
 }

@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 )
 
@@ -34,11 +35,20 @@ heavy = { slots = 2, description = 'big jobs' }
 [tool.astro.env.variables]
 REGION = { type = 'string', default = 'eu-west-1', description = 'where the data is' }
 OPENAI_API_KEY = { secret = true }
+
+# Shown as written, so a quoted key may hold a dot, and an integer above
+# 2^53 has to survive the read.
+[tool.astro.targets.mwaa]
+region = 'eu-west-1'
+"max.bytes" = 9007199254740993
 `
 
-// projectFile writes body as a project's whole pyproject.toml and points the
-// per-project state at scratch dirs, like instanceProject, which writes the
-// preamble itself.
+// projectFile writes body as a project's whole pyproject.toml and isolates
+// the run from the user's machine: the cache root and home at scratch dirs,
+// so the pin and any runtime records land there, and the deployment
+// selection unset. ASTRO_DOMAIN is left alone, since a case may set it
+// before writing its project; a test that asserts the default host clears
+// it itself. instanceProject writes the preamble itself and comes here.
 func projectFile(t *testing.T, body string) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "orders")
@@ -50,7 +60,7 @@ func projectFile(t *testing.T, body string) string {
 	}
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	t.Setenv("ASTRO_HOME", t.TempDir())
-	t.Setenv("ASTRO_DOMAIN", "")
+	t.Setenv(instances.EnvVar, "")
 	return dir
 }
 
@@ -70,6 +80,7 @@ func inspectJSON(t *testing.T, dir string, args ...string) (view projectView, ra
 
 func TestProjectInspectPublishesTheManifestAsTheCLIReadsIt(t *testing.T) {
 	dir := projectFile(t, inspectManifest)
+	t.Setenv("ASTRO_DOMAIN", "")
 	view, raw := inspectJSON(t, dir)
 
 	if view.Path != filepath.Join(dir, "pyproject.toml") {
@@ -126,17 +137,22 @@ func TestProjectInspectPublishesTheManifestAsTheCLIReadsIt(t *testing.T) {
 		t.Errorf("env.variables.REGION = %v, want the declaration as written", region)
 	}
 
-	// What the project does not use is present and empty, never null or
-	// missing, so a reader meets the same keys on every project.
-	for _, key := range []string{`"build_secrets":[]`, `"targets":{}`} {
-		if !strings.Contains(raw, key) {
-			t.Errorf("published object lacks %s:\n%s", key, raw)
-		}
-	}
 	// Omitted only when unset: runtime, dockerfile, organization.
 	for _, key := range []string{`"runtime"`, `"dockerfile"`, `"organization"`} {
 		if strings.Contains(raw, key) {
 			t.Errorf("published object has %s, which the project does not set:\n%s", key, raw)
+		}
+	}
+}
+
+// What a project does not use is present and empty, never null or missing,
+// so a reader meets the same keys on every project.
+func TestProjectInspectPublishesEmptyCollections(t *testing.T) {
+	dir := projectFile(t, instancestest.Preamble)
+	_, raw := inspectJSON(t, dir)
+	for _, key := range []string{`"packages":[]`, `"build_secrets":[]`, `"deployments":{}`, `"env":{}`, `"pools":{}`, `"targets":{}`} {
+		if !strings.Contains(raw, key) {
+			t.Errorf("published object lacks %s:\n%s", key, raw)
 		}
 	}
 }
@@ -183,6 +199,11 @@ func TestProjectInspectKeyPrintsOneValue(t *testing.T) {
 		// keys come out sorted rather than in the view's order.
 		{"a table under json", []string{"--key", "pools", "--output", "json"}, `{"heavy":{"description":"big jobs","slots":2}}`, true},
 		{"an as-written table", []string{"--key", "env.variables.REGION.default"}, "eu-west-1\n", false},
+		// A quoted TOML key holds a dot: the shortest run of parts that
+		// names a key is the key.
+		{"a key with a dot in it", []string{"--key", "targets.mwaa.max.bytes"}, "9007199254740993\n", false},
+		{"an integer above 2^53, bare", []string{"--key", "targets.mwaa.max.bytes", "--output", "json"}, "9007199254740993\n", false},
+		{"an integer above 2^53, in a table", []string{"--key", "targets.mwaa"}, "max.bytes: 9007199254740993\n", true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -257,7 +278,8 @@ func TestProjectInspectResolvesDomainAndOrganization(t *testing.T) {
 		// wantAsked is the domain the login seam is asked for.
 		wantAsked, wantDomain, wantOrg string
 	}{
-		{"the file's host and organization", withHost, "", "org-login", "astronomer-dev.io", "astronomer-dev.io", "org-file"},
+		// The file's organization is the answer, so the login is not asked.
+		{"the file's host and organization", withHost, "", "org-login", "unasked", "astronomer-dev.io", "org-file"},
 		{"a workspace with no host is on astronomer.io", instancestest.Preamble, "", "org-login", "astronomer.io", "astronomer.io", "org-login"},
 		{"ASTRO_DOMAIN stands in for a host", instancestest.Preamble, "astronomer-dev.io", "org-login", "astronomer-dev.io", "astronomer-dev.io", "org-login"},
 		{"no host and no workspace is the current login", noWorkspace, "", "org-login", "", "", "org-login"},

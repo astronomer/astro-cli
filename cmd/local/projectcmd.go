@@ -1,6 +1,7 @@
 package local
 
 import (
+	"bytes"
 	"cmp"
 	"encoding/json"
 	"fmt"
@@ -120,9 +121,9 @@ type projectView struct {
 	// no host and no workspace, which means the current login's.
 	Domain string `json:"domain,omitempty" yaml:"domain,omitempty"`
 	// Organization is the organization the project is read under:
-	// [tool.astro] organization, else that of the login Domain names, from an
-	// API token's claims or the saved login (Deps.LoginOrganization). Empty
-	// when neither is known.
+	// [tool.astro] organization, else that of the identity a call on Domain
+	// would use, an API token's from its claims or the context saved for the
+	// host (Deps.LoginOrganization). Empty when neither is known.
 	Organization string `json:"organization,omitempty" yaml:"organization,omitempty"`
 	// Target is the default target every link inherits: [tool.astro]
 	// target, else astro.
@@ -211,15 +212,20 @@ func (c *cli) projectView() (projectView, error) {
 // own folding, and the three resolutions the view's comments describe.
 func (c *cli) viewOf(path string, m *manifest.Manifest) projectView {
 	a := &m.Astro
-	// The host the project's logins are on. LoginDomain applies no default,
-	// so a project that names no host and no workspace reads as none: its
-	// commands use the current login, whichever host that is.
+	// The host the project's logins are on: with a workspace, the host it is
+	// read from, defaulted; without one, the host the project names, if any.
+	// LoginDomain applies no default, so a project that names no host and no
+	// workspace reads as none: its commands use the current login, whichever
+	// host that is.
 	domain := a.LoginDomain()
-	if domain == "" && a.Workspace != "" {
+	if a.Workspace != "" {
 		domain = a.WorkspaceDomain()
 	}
+	// The login is asked only when the file does not answer: the read is a
+	// config read and a token parse, and WorkspaceOrganization would discard
+	// it.
 	login := ""
-	if c.d.LoginOrganization != nil {
+	if a.Organization == "" && c.d.LoginOrganization != nil {
 		login = c.d.LoginOrganization(domain)
 	}
 	v := projectView{
@@ -284,6 +290,9 @@ func orEmptyTable[V any](m map[string]V) map[string]V {
 // spells it, so one spelling reads the whole object and one value of it. It
 // walks the json encoding rather than the struct, which is what makes the
 // spelling the same and lets a path reach into the tables shown as written.
+// A table shown as written may hold a key with a dot in it (a quoted TOML
+// key), so at each table the shortest run of parts that names a key is the
+// key: targets.mwaa.max.bytes reaches "max.bytes" under mwaa.
 //
 // A key the project does not have is a usage error, exit 2: the command was
 // asked for something it cannot answer, and a script reading the value
@@ -296,31 +305,71 @@ func lookupProjectKey(view *projectView, key string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	// UseNumber keeps an integer's digits: a plain decode holds every number
+	// as a float64 and rounds one above 2^53.
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
 	var node any
-	if err := json.Unmarshal(data, &node); err != nil {
+	if err := dec.Decode(&node); err != nil {
 		return nil, err
 	}
 	parts := strings.Split(key, ".")
-	for i, part := range parts {
+	for i := 0; i < len(parts); {
 		where := strings.Join(parts[:i], ".")
 		table, ok := node.(map[string]any)
 		if !ok {
-			return nil, cliout.Usage(fmt.Errorf("--key %s: %s is a value, not a table, so it has no %s", key, where, part))
+			return nil, cliout.Usage(fmt.Errorf("--key %s: %s is a value, not a table, so it has no %s", key, where, parts[i]))
 		}
-		next, ok := table[part]
-		if ok {
-			node = next
-			continue
+		next, n, found := tableKey(table, parts[i:])
+		if !found {
+			part := parts[i]
+			if i == 0 && slices.Contains(projectViewKeys(), part) {
+				return nil, cliout.Usage(fmt.Errorf("--key %s: this project does not set %s, and nothing supplies one", key, part))
+			}
+			if where == "" {
+				return nil, cliout.Usage(fmt.Errorf("--key %s: no such key. The keys are: %s", key, strings.Join(projectViewKeys(), ", ")))
+			}
+			return nil, cliout.Usage(fmt.Errorf("--key %s: %s has no %s. Its keys are: %s", key, where, part, strings.Join(slices.Sorted(maps.Keys(table)), ", ")))
 		}
-		if i == 0 && slices.Contains(projectViewKeys(), part) {
-			return nil, cliout.Usage(fmt.Errorf("--key %s: this project does not set %s, and nothing supplies one", key, part))
-		}
-		if where == "" {
-			return nil, cliout.Usage(fmt.Errorf("--key %s: no such key. The keys are: %s", key, strings.Join(projectViewKeys(), ", ")))
-		}
-		return nil, cliout.Usage(fmt.Errorf("--key %s: %s has no %s. Its keys are: %s", key, where, part, strings.Join(slices.Sorted(maps.Keys(table)), ", ")))
+		node = next
+		i += n
 	}
-	return node, nil
+	return plainNumbers(node), nil
+}
+
+// tableKey finds the shortest run of parts, joined by dots, that names a key
+// of table: its value, how many parts it took, and whether one did.
+func tableKey(table map[string]any, parts []string) (value any, n int, found bool) {
+	for n = 1; n <= len(parts); n++ {
+		if v, ok := table[strings.Join(parts[:n], ".")]; ok {
+			return v, n, true
+		}
+	}
+	return nil, 0, false
+}
+
+// plainNumbers turns the json.Number a UseNumber decode leaves into an int64
+// where the digits are an integer and a float64 otherwise, in place through
+// tables and lists, so a number prints as written and marshals as one rather
+// than as the quoted string a json.Number would be to the YAML encoder.
+func plainNumbers(v any) any {
+	switch value := v.(type) {
+	case json.Number:
+		if i, err := value.Int64(); err == nil {
+			return i
+		}
+		f, _ := value.Float64() //nolint:errcheck // the decoder produced it, so it parses
+		return f
+	case map[string]any:
+		for k, item := range value {
+			value[k] = plainNumbers(item)
+		}
+	case []any:
+		for i, item := range value {
+			value[i] = plainNumbers(item)
+		}
+	}
+	return v
 }
 
 // projectViewKeys are the top-level keys --output json spells, in the order
@@ -348,9 +397,8 @@ func writeYAML(w io.Writer, v any) error {
 
 // writeProjectValue prints one --key value in text mode: a table or list as
 // YAML, anything else bare on one line, so $(astro project inspect --key
-// organization) holds the value and nothing else. The value comes from the
-// json encoding, so a number is a float64 and prints without an exponent or
-// a trailing .0.
+// organization) holds the value and nothing else. A number that is not an
+// integer (plainNumbers) prints without an exponent.
 func writeProjectValue(w io.Writer, v any) error {
 	switch value := v.(type) {
 	case map[string]any, []any:
