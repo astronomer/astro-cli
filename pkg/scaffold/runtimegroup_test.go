@@ -54,7 +54,7 @@ func defaultGroups(t *testing.T, out string) any {
 
 func writeGroup(t *testing.T, dir string, group *RuntimeGroup, seed *Seed) (string, *manifest.Manifest) {
 	t.Helper()
-	refused, err := SetAstroBuild(dir, nil, build332, group, seed)
+	refused, err := SetAstroBuildSeed(dir, nil, build332, group, seed)
 	require.NoError(t, err)
 	require.False(t, refused)
 	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
@@ -206,7 +206,7 @@ func TestTheRuntimeGroupIsRefusedInAnInlineTable(t *testing.T) {
 	src := astroHead + "\n[tool]\nfoo = 1\n"
 	src = strings.Replace(src, "[project]\n", "dependency-groups = { lint = ['ruff'] }\n\n[project]\n", 1)
 	dir := projectWith(t, src)
-	refused, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, group339, seed339)
+	refused, err := SetAstroBuildSeed(dir, nil, runtimeversions.AstroBuild{}, group339, seed339)
 	require.NoError(t, err)
 	assert.True(t, refused)
 	// Nothing the group would have needed is left behind: no default-groups,

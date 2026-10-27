@@ -85,16 +85,24 @@ func TestRuntimePinsKeepsWhatItRead(t *testing.T) {
 	assert.FileExists(t, cachedCopy("runtime-3.3-9-python-3.12.txt"))
 }
 
-// A freeze is of the present, so under a UV_EXCLUDE_NEWER cutoff, a date or a
-// duration, none is read.
-func TestRuntimePinsUnderAPinnedResolution(t *testing.T) {
-	_, hits := freezeServer(t, map[string]string{"/runtime-freeze/runtime-3.3-9-python-3.12.txt": sampleFreeze})
-	for _, cutoff := range []string{"2026-09-01", "1 week"} {
-		t.Setenv("UV_EXCLUDE_NEWER", cutoff)
-		_, err := RuntimePins(context.Background(), "3.3-9", "3.12")
-		assert.ErrorIs(t, err, ErrPinnedResolution, cutoff)
-	}
-	assert.Equal(t, int32(0), hits.Load())
+// What a mirror answers is kept apart from what the CDN does: a mirror's 404
+// does not answer for the CDN once the mirror is unset, and the CDN's copy
+// does not answer for a mirror.
+func TestAMirrorsAnswersAreKeptApartFromTheCDNs(t *testing.T) {
+	srv, hits := freezeServer(t, map[string]string{"/runtime-freeze/runtime-3.3-9-python-3.12.txt": sampleFreeze})
+	t.Setenv(FreezeURLEnv, srv.URL+"/partial-mirror")
+	_, err := RuntimePins(context.Background(), "3.3-9", "3.12")
+	require.ErrorIs(t, err, ErrFreezeNotPublished)
+
+	t.Setenv(FreezeURLEnv, "")
+	got, err := RuntimePins(context.Background(), "3.3-9", "3.12")
+	require.NoError(t, err, "the mirror's 404 is not the CDN's")
+	assert.Len(t, got, 3)
+
+	t.Setenv(FreezeURLEnv, srv.URL+"/partial-mirror")
+	_, err = RuntimePins(context.Background(), "3.3-9", "3.12")
+	assert.ErrorIs(t, err, ErrFreezeNotPublished, "the CDN's copy is not the mirror's")
+	assert.Equal(t, int32(2), hits.Load(), "the mirror's 404 is remembered for the mirror")
 }
 
 // A 404 is remembered for a day, so a project on a runtime with no freeze does

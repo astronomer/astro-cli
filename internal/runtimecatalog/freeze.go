@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -93,29 +95,21 @@ var freezeNamePart = regexp.MustCompile(`^\d[0-9A-Za-z.+-]*$`)
 // ErrFreezeNotPublished is a 404: this build and Python have no freeze file.
 var ErrFreezeNotPublished = errors.New("no freeze file is published for this build")
 
-// ErrPinnedResolution reports a RuntimePins made while UV_EXCLUDE_NEWER holds
-// uv to a cutoff, a date or a duration alike. A freeze is of the present, and
-// versions newer than the cutoff would leave uv nothing to lock, so none is read.
-// A project's own [tool.uv] exclude-newer is the caller's to check, from the
-// manifest.
-var ErrPinnedResolution = errors.New("UV_EXCLUDE_NEWER holds uv to a cutoff, which a runtime's freeze does not follow")
-
 // RuntimePins returns the freeze of runtime build's image running python as
 // the name==version lines it lists, in its order, which init and a start
 // seed a project's uv.lock with (scaffold.RuntimePins), from the cache when a
-// copy is kept there and from the CDN otherwise.
+// copy is kept there and from the CDN otherwise. Whether a cutoff rules a
+// seed out is the caller's to say (cmd/local's underCutoff), before it asks.
 //
 // It says why it has nothing: ErrFreezeNotPublished for a build and Python
-// with no file, which seeds nothing; ErrPinnedResolution under a
-// UV_EXCLUDE_NEWER cutoff; any other error when the file could not be read.
+// with no file, which seeds nothing; any other error when the file could not
+// be read.
 func RuntimePins(ctx context.Context, build, python string) ([]string, error) {
-	if strings.TrimSpace(os.Getenv("UV_EXCLUDE_NEWER")) != "" {
-		return nil, ErrPinnedResolution
-	}
 	if !freezeNamePart.MatchString(build) || !freezeNamePart.MatchString(python) {
 		return nil, fmt.Errorf("%w: build %q, Python %q", ErrFreezeNotPublished, build, python)
 	}
-	dir, name := freezeDir(), freezeName(build, python)
+	base := freezeBase()
+	dir, name := freezeDir(base), freezeName(build, python)
 	data, err := cachedFreeze(dir, name)
 	if err != nil {
 		return nil, err
@@ -123,7 +117,7 @@ func RuntimePins(ctx context.Context, build, python string) ([]string, error) {
 	if data == nil {
 		fetchCtx, cancel := context.WithTimeout(ctx, freezeTimeout)
 		defer cancel()
-		if data, err = fetchAndKeep(fetchCtx, freezeBase(), dir, name); err != nil {
+		if data, err = fetchAndKeep(fetchCtx, base, dir, name); err != nil {
 			return nil, err
 		}
 	}
@@ -136,20 +130,34 @@ func freezeName(build, python string) string {
 	return "runtime-" + build + "-python-" + python + ".txt"
 }
 
-// freezeDir is where freeze copies are kept: freezeCacheDir under the cache
-// root, or "" for no cache when there is no root.
-func freezeDir() string {
-	return cacheDir(freezeCacheDir)
+// freezeDir is where copies read from base are kept: freezeCacheDir under the
+// cache root, or "" for no cache when there is no root.
+func freezeDir(base string) string {
+	return cacheDirFor(freezeCacheDir, base, freezeBaseURL)
 }
 
 // cacheDir is sub under the cache root, or "" for no cache when there is no
 // root.
 func cacheDir(sub string) string {
+	return cacheDirFor(sub, "", "")
+}
+
+// cacheDirFor is sub under the cache root for what is read from base, or ""
+// for no cache when there is no root. What a mirror (a base other than
+// defaultBase) answers is kept apart, in a directory named by a hash of its
+// address, so its copies and its 404s never answer for the CDN, nor the CDN's
+// for it.
+func cacheDirFor(sub, base, defaultBase string) string {
 	root, err := localrt.CacheRoot()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(root, sub)
+	dir := filepath.Join(root, sub)
+	if base != defaultBase {
+		sum := sha256.Sum256([]byte(base))
+		dir = filepath.Join(dir, "mirror-"+hex.EncodeToString(sum[:6]))
+	}
+	return dir
 }
 
 // cachedFreeze is what the cache under dir knows of name: the bytes of a

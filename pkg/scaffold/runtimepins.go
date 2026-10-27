@@ -17,11 +17,12 @@ import (
 
 // RuntimePins are the versions the image of one Astro Runtime build ships,
 // which a project's uv.lock is seeded with: the lock is resolved once with
-// them as constraints, in a scratch copy of the project (SeedManifest), and uv
-// keeps every version it chose as the lock's preferences from then on. None
-// of them is written into pyproject.toml; the manifest records only which
-// build and Python the lock was seeded from (Seed, manifest.SeedRecord), as
-// the first comment of the astro-runtime dependency group (RuntimeGroup).
+// them as constraints added to the project's pyproject.toml for that one lock
+// (SeedManifest), and uv keeps every version it chose as the lock's
+// preferences from then on. None of them stays in pyproject.toml; the
+// manifest records only which build and Python the lock was seeded from
+// (Seed, manifest.SeedRecord), as the first comment of the astro-runtime
+// dependency group (RuntimeGroup).
 //
 // Seeded so, every package the project's lockfile shares with the image is at
 // the image's version on the image's Python, and standalone mode, `uv run`
@@ -38,28 +39,39 @@ type RuntimePins struct {
 	Pins []string
 }
 
-// constraints are the pins as the scratch copy of a seed states them, less
-// the ones it never states: a package the project gives a version the
-// image's does not meet (own), which is its to choose; Airflow, the Task SDK
-// and core, which the Airflow build pins hold; and any other of Astronomer's
-// own builds (an +astro local version), which come from an index the project
-// reads for Airflow alone. Each is limited to the image's Python: a lockfile
-// resolves for every Python requires-python allows, and the image's versions
-// are of one (numpy 2.3 needs Python 3.11, so held on every Python it leaves
-// a project that allows 3.10 nothing to lock there).
-func (p *RuntimePins) constraints(own projectRequirements) []string {
+// seeds are the pins a seed holds the lock to, name==version, sorted by
+// distribution: the pins less the ones it never states, a package the
+// project gives a version the image's does not meet (own), which is its to
+// choose; Airflow, the Task SDK and core, by name, which the Airflow build
+// pins hold; and any other of Astronomer's own builds (an +astro local
+// version), which come from an index the project reads for Airflow alone.
+// The one filter for what a seed states and what drift counts (SeededPins).
+func (p *RuntimePins) seeds(own projectRequirements) []string {
 	var out []string
 	for _, pin := range p.Pins {
 		name := manifest.DistName(pin)
 		if own.excludes(pin) || slices.Contains(astroDists, name) || strings.Contains(pin, "+astro.") {
 			continue
 		}
-		out = append(out, pin+"; python_version == '"+p.Python+"'")
+		out = append(out, pin)
 	}
 	slices.SortStableFunc(out, func(a, b string) int {
 		return strings.Compare(manifest.DistName(a), manifest.DistName(b))
 	})
 	return out
+}
+
+// constraints are the seeds as the seed states them, each limited to the
+// image's Python: a lockfile resolves for every Python requires-python
+// allows, and the image's versions are of one (numpy 2.3 needs Python 3.11,
+// so held on every Python it leaves a project that allows 3.10 nothing to
+// lock there).
+func (p *RuntimePins) constraints(own projectRequirements) []string {
+	seeds := p.seeds(own)
+	for i, pin := range seeds {
+		seeds[i] = pin + "; python_version == '" + p.Python + "'"
+	}
+	return seeds
 }
 
 // Seed is the build and the Python a lock was seeded from, which
@@ -70,15 +82,14 @@ type Seed struct {
 	Build, Python string
 }
 
-// ErrSeedWorkspace reports a project that is a uv workspace, whose lock
-// covers members a scratch copy of the root does not have.
-var ErrSeedWorkspace = errors.New("this project is a uv workspace, whose lock astro does not seed")
-
-// SeedManifest is the manifest in dir as the scratch copy that seeds its lock
-// resolves it: pyproject.toml with pins's constraints added to [tool.uv]
-// constraint-dependencies, and every [tool.uv.sources] path made absolute,
-// since the copy sits elsewhere. n is how many constraints it added; none
-// means there is nothing to seed. The project's own file is not touched.
+// SeedManifest is the manifest in dir as the seed of its lock resolves it, in
+// place: pyproject.toml with pins's constraints added to [tool.uv]
+// constraint-dependencies, after the project's own and the Airflow build
+// pins, and without what an older astro wrote there (legacyPins). n is how
+// many constraints it added; none means there is nothing to seed. The caller
+// writes it over the project's file for one lock and puts the original back
+// (seedLock), so the comments the array holds need not be kept: a plain Set
+// of the values writes them as uv reads them.
 func SeedManifest(dir string, pins *RuntimePins) (out []byte, n int, err error) {
 	src, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	if err != nil {
@@ -88,51 +99,26 @@ func SeedManifest(dir string, pins *RuntimePins) (out []byte, n int, err error) 
 	if err != nil {
 		return nil, 0, err
 	}
-	if _, ok := ed.Get([]string{"tool", "uv", "workspace"}); ok {
-		return nil, 0, ErrSeedWorkspace
-	}
 	lines, _ := tomledit.GetLines(ed, constraintsKey)
-	project := projectConstraints(lines)
-	added := pins.constraints(ownRequirements(ed, project))
+	added := pins.constraints(ownRequirements(ed, projectConstraints(lines)))
 	if len(added) == 0 {
 		return nil, 0, nil
 	}
-	values, _ := ed.Get(constraintsKey)
-	current, _ := values.([]any)
+	var current []any
+	for _, v := range lines {
+		if s, isString := v.(string); isString && manifest.AstroPin(s) {
+			current = append(current, s)
+		}
+	}
+	current = slices.Concat(projectConstraints(lines), current)
 	for _, c := range added {
 		current = append(current, c)
 	}
-	// The copy is thrown away, so the comments the array holds need not be
-	// kept: a plain Set of the values writes them as uv reads them.
 	if err := ed.Set(constraintsKey, current); err != nil {
-		return nil, 0, err
-	}
-	if err := absoluteSourcePaths(ed, dir); err != nil {
 		return nil, 0, err
 	}
 	out, err = ed.Bytes()
 	return out, len(added), err
-}
-
-// absoluteSourcePaths makes every relative path a [tool.uv.sources] entry
-// names absolute against dir. A source given as a list of alternatives is
-// left as it is; a lock of it may then fail in the copy, which leaves the
-// project's lock unseeded rather than wrong.
-func absoluteSourcePaths(ed tomledit.Editor, dir string) error {
-	sources, _ := ed.Get(sourcesKey)
-	table, _ := sources.(map[string]any)
-	for pkg, v := range table {
-		entry, _ := v.(map[string]any)
-		path, isString := entry["path"].(string)
-		if !isString || filepath.IsAbs(path) {
-			continue
-		}
-		key := append(slices.Clone(sourcesKey), pkg, "path")
-		if err := ed.Set(key, filepath.ToSlash(filepath.Join(dir, filepath.FromSlash(path)))); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // SetRuntimeGroup writes group as the astro-runtime dependency group of the
@@ -383,28 +369,21 @@ func ownRequirements(ed tomledit.Editor, constraints []any) projectRequirements 
 	return r
 }
 
-// Excludes reports whether the project in dir chooses a version of pin's
-// package (name==version) that pin's does not meet: the packages a seed
-// leaves to the project, so a lock that differs from the image there differs
-// by the project's own choice. false when the manifest cannot be read.
-func Excludes(dir string, pins []string) map[string]bool {
-	out := map[string]bool{}
+// SeededPins are the pins a seed of the project in dir holds its lock to,
+// name==version: the same filter the seed states them with (seeds), so a
+// lock that differs from the image elsewhere differs by the project's own
+// choice, which drift does not count. None when the manifest cannot be read.
+func SeededPins(dir string, pins *RuntimePins) []string {
 	src, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	if err != nil {
-		return out
+		return nil
 	}
 	ed, err := tomledit.NewSurgical(src)
 	if err != nil {
-		return out
+		return nil
 	}
 	lines, _ := tomledit.GetLines(ed, constraintsKey)
-	own := ownRequirements(ed, projectConstraints(lines))
-	for _, pin := range pins {
-		if own.excludes(pin) {
-			out[manifest.DistName(pin)] = true
-		}
-	}
-	return out
+	return pins.seeds(ownRequirements(ed, projectConstraints(lines)))
 }
 
 // ErrNoRuntimeBuild reports a project whose image is no Astro Runtime build

@@ -2,6 +2,8 @@ package scaffold
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
@@ -11,7 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 )
 
-// RuntimeGroup is what SetAstroBuild writes into the project's astro-runtime
+// RuntimeGroup is what SetAstroBuildSeed writes into the project's astro-runtime
 // dependency group (manifest.RuntimeGroupName): the top-level packages the
 // image of one Astro Runtime build installs, which the CLI's
 // runtimecatalog.RuntimeRoots reads. With the group in [tool.uv]
@@ -41,10 +43,11 @@ var uvDefaultGroups = []any{"dev"}
 // The group is never taken out. One with nothing left in it stays, empty, under
 // comments that say so (manifest.RuntimeGroupEmptyComments): a project that
 // took it out of default-groups keeps that choice when the group fills again.
-// A group is created with packages in it, and then joins default-groups so uv
-// installs it, or with a record alone; one the project had stays as
-// default-groups has it. refused reports a group not written because its
-// table cannot hold the comments that head it (an inline [dependency-groups]).
+// A group joins default-groups when it is created, empty or not, so one that
+// fills later is installed; one the project had stays as default-groups has
+// it, which is how a project opts out. refused reports a group not written
+// because its table cannot hold the comments that head it (an inline
+// [dependency-groups]).
 func setRuntimeGroup(ed tomledit.Editor, g *RuntimeGroup, seed *Seed) (refused bool, err error) {
 	current, exists := tomledit.GetLines(ed, runtimeGroupKey)
 	listed := listedPackages(ed)
@@ -84,7 +87,7 @@ func setRuntimeGroup(ed tomledit.Editor, g *RuntimeGroup, seed *Seed) (refused b
 		}
 		return false, err
 	}
-	if !exists && len(entries) > 0 {
+	if !exists {
 		// Only now the group is there: a refused one leaves no dev group behind.
 		if err := ensureDevGroup(ed); err != nil {
 			return false, err
@@ -92,6 +95,61 @@ func setRuntimeGroup(ed tomledit.Editor, g *RuntimeGroup, seed *Seed) (refused b
 		return false, addDefaultGroup(ed)
 	}
 	return false, nil
+}
+
+// RuntimeGroupAdds reports whether writing g as the astro-runtime group of the
+// manifest in dir would list a package it does not list now: one the lock may
+// not hold yet, which only a seed holds to the image's version. A package
+// that only leaves the group (the project now lists it) adds nothing. false
+// when the manifest cannot be read.
+func RuntimeGroupAdds(dir string, g *RuntimeGroup) bool {
+	if g == nil {
+		return false
+	}
+	src, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	if err != nil {
+		return false
+	}
+	ed, err := tomledit.NewSurgical(src)
+	if err != nil {
+		return false
+	}
+	current, _ := tomledit.GetLines(ed, runtimeGroupKey)
+	listed := map[string]bool{}
+	for _, v := range current {
+		if s, isString := v.(string); isString {
+			listed[manifest.DistName(s)] = true
+		}
+	}
+	for _, entry := range groupEntries(g.Names, listedPackages(ed)) {
+		if !listed[manifest.DistName(entry)] {
+			return true
+		}
+	}
+	return false
+}
+
+// RuntimeGroupInstalled reports whether uv installs the astro-runtime group of
+// the manifest in dir by default: [tool.uv] default-groups names it, or is
+// "all". A project that took it out lists the packages without installing
+// them. false when the manifest cannot be read.
+func RuntimeGroupInstalled(dir string) bool {
+	src, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	if err != nil {
+		return false
+	}
+	ed, err := tomledit.NewSurgical(src)
+	if err != nil {
+		return false
+	}
+	current, _ := ed.Get(defaultGroupsKey)
+	switch v := current.(type) {
+	case string:
+		return v == "all"
+	case []any:
+		return slices.Contains(v, any(manifest.RuntimeGroupName))
+	}
+	return false
 }
 
 // groupEntries are names as the group lists them: normalized, a marker kept,
