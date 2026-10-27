@@ -86,6 +86,10 @@ func (c *cli) reportSeed(r cliout.Renderer, res astroBuildWrite) {
 	}
 }
 
+// narrowedNotePackages is how many of the packages uv named narrowedNote
+// lists.
+const narrowedNotePackages = 3
+
 // narrowedNote is what the seeded notice adds when the seed held the image's
 // versions on its Python alone: which packages kept uv from holding them on
 // every Python requires-python allows, when uv named them.
@@ -97,8 +101,8 @@ func narrowedNote(python string, narrowed error) string {
 	var resolution *uv.ResolutionError
 	if errors.As(narrowed, &resolution) && len(resolution.Packages) > 0 {
 		pkgs := resolution.Packages
-		if len(pkgs) > 3 {
-			pkgs = pkgs[:3]
+		if len(pkgs) > narrowedNotePackages {
+			pkgs = pkgs[:narrowedNotePackages]
 		}
 		why = "uv could not hold " + strings.Join(pkgs, ", ") + " on every Python requires-python allows"
 	}
