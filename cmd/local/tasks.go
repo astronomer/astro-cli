@@ -219,16 +219,22 @@ func (q *query) runTasksInstance(ctx context.Context, dagID, runID, taskID strin
 	if err != nil {
 		return err
 	}
-	var instance airflowapi.TaskInstance
-	if mapIndex >= 0 {
-		instance, err = client.GetMappedTaskInstance(ctx, dagID, runID, taskID, mapIndex)
-	} else {
-		instance, err = client.GetTaskInstance(ctx, dagID, runID, taskID)
-	}
+	instance, err := fetchTaskInstance(ctx, client, dagID, runID, taskID, mapIndex)
 	if err != nil {
 		return err
 	}
 	return emitDetail(r, newTaskInstanceRow(instance), taskInstanceFields)
+}
+
+// fetchTaskInstance reads one task instance: an expansion of a mapped task
+// when mapIndex names one, else the task's single instance. Index 0 is a real
+// expansion, so "no index" is a value outside the range rather than the zero
+// one.
+func fetchTaskInstance(ctx context.Context, client *airflowapi.Client, dagID, runID, taskID string, mapIndex int) (airflowapi.TaskInstance, error) {
+	if mapIndex >= 0 {
+		return client.GetMappedTaskInstance(ctx, dagID, runID, taskID, mapIndex)
+	}
+	return client.GetTaskInstance(ctx, dagID, runID, taskID)
 }
 
 func taskInstanceFields(row taskInstanceRow) []field {

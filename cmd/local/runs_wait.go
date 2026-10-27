@@ -15,7 +15,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
-// The exit statuses of `runs trigger-wait`, one per way the wait can end.
+// The exit statuses of the waits — `runs trigger-wait`, `runs wait` and
+// `tasks wait` — one per way a wait can end.
 // Success is zero like any command. A run that failed and a wait that ran out
 // are both something a script has to act on, and they call for different
 // actions — look at the failure, or wait longer — so they get a status each
@@ -102,7 +103,7 @@ func (f *waitFlags) register(cmd *cobra.Command) {
 	// -t is --tags across this tree (TestShorthandsMeanOneThingEachAcrossTheCoreTree),
 	// so --timeout has no shorthand here.
 	cmd.Flags().StringVar(&f.timeout, "timeout", defaultWaitTimeout, "How long to wait before giving up, in seconds or as a duration")
-	cmd.Flags().StringVarP(&f.poll, "poll-interval", "p", defaultPollInterval, "How often to check on the run, in seconds or as a duration")
+	cmd.Flags().StringVarP(&f.poll, "poll-interval", "p", defaultPollInterval, "How often to check, in seconds or as a duration")
 }
 
 func (f *waitFlags) options() (waitOptions, error) {
@@ -166,6 +167,10 @@ func (q *query) runRunsTriggerWait(ctx context.Context, dagID string, trigger ai
 	if err != nil {
 		return err
 	}
+	// The Dag is the one asked for, whatever the trigger's answer carried:
+	// the checks and the failed-task listing address it by this id, as
+	// `runs wait` does with its arguments.
+	run.DAGID = dagID
 	started := time.Now()
 	fmt.Fprintf(q.d.Stderr, "triggered %s run %s; waiting up to %s for it to finish\n", dagID, run.DAGRunID, formatDuration(wait.timeout.Seconds()))
 

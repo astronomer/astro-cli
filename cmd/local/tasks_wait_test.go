@@ -57,10 +57,45 @@ func TestTasksWaitUntilAMappedTaskIsAwaitingInput(t *testing.T) {
 		v["until"] != "awaiting_input" || v["reached"] != true || v["timed_out"] != false || v["run_state"] != "running" {
 		t.Errorf("json = %v", v)
 	}
-	for _, want := range []string{"review[2] in orders_etl run manual__1: scheduled", "review[2] in orders_etl run manual__1: awaiting_input"} {
+	for _, want := range []string{
+		"review[2] in orders_etl run manual__1: scheduled",
+		"waiting up to 5s for review[2] in orders_etl run manual__1 to be awaiting_input",
+		"review[2] in orders_etl run manual__1: awaiting_input",
+	} {
 		if !strings.Contains(errOut, want) {
 			t.Errorf("stderr is missing %q:\n%s", want, errOut)
 		}
+	}
+	if strings.Count(errOut, "waiting up to") != 1 {
+		t.Errorf("stderr = %q, want the wait announced once", errOut)
+	}
+}
+
+// A mapped task has no single instance once it expands, so a wait on it
+// without an expansion would last until the run ended; it is refused instead.
+func TestTasksWaitNeedsTheExpansionOfAMappedTask(t *testing.T) {
+	stub := taskWaitStub(t, "running")
+	_, _, err := runQuery(t, stub, append([]string{"tasks", "wait", "orders_etl", "manual__1", "review"}, fast...)...)
+	if err == nil || !strings.Contains(err.Error(), "review is a mapped task") || !strings.Contains(err.Error(), "--map-index") {
+		t.Errorf("err = %v, want the expansion asked for", err)
+	}
+	if stub.sawRequest(http.MethodGet, runPath+"/taskInstances/review") {
+		t.Error("the instance was checked on anyway")
+	}
+}
+
+// A state a task passes through can fall between two polls, and an ended
+// task is then reported as not seen there rather than as unable to get there.
+func TestTasksWaitSaysWhenAPassingStateWasMissed(t *testing.T) {
+	stub := taskWaitStub(t, "running")
+	stub.routeSequence(loadInstancePath, instanceBody("load", -1, "scheduled"), instanceBody("load", -1, "success"))
+
+	out, _, err := runQuery(t, stub, append([]string{"tasks", "wait", "orders_etl", "manual__1", "load", "--until", "running"}, fast...)...)
+	if code := exitCode(t, err); code != exitRunFailed {
+		t.Fatalf("exit = %d, want %d", code, exitRunFailed)
+	}
+	if !strings.Contains(out, "load in orders_etl run manual__1 ended success and was not seen running") {
+		t.Errorf("text = %q", out)
 	}
 }
 
@@ -97,8 +132,8 @@ func TestTasksWaitWaitsThroughAMissingInstanceAndStopsWhenTheRunEnds(t *testing.
 // A state is matched as Airflow spells it, however the flag spelled it.
 func TestTasksWaitTimesOut(t *testing.T) {
 	stub := taskWaitStub(t, "running")
-	stub.route(http.MethodGet, runPath+"/taskInstances/review", instanceBody("review", -1, "deferred"))
-	out, _, err := runQuery(t, stub, "tasks", "wait", "orders_etl", "manual__1", "review", "--until", "SUCCESS", "-o", "json",
+	stub.route(http.MethodGet, loadInstancePath, instanceBody("load", -1, "deferred"))
+	out, _, err := runQuery(t, stub, "tasks", "wait", "orders_etl", "manual__1", "load", "--until", "SUCCESS", "-o", "json",
 		"--poll-interval", "5ms", "--timeout", "30ms")
 	if code := exitCode(t, err); code != exitWaitTimeout {
 		t.Fatalf("exit = %d, want %d", code, exitWaitTimeout)

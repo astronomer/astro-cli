@@ -113,14 +113,22 @@ func (q *query) runTasksWait(ctx context.Context, dagID, runID string, target ta
 	if err != nil {
 		return err
 	}
-	// A task instance that is not there yet is waited for, so a task the DAG
-	// does not define would otherwise be waited for until the run ended.
-	// Airflow's answer says which of the DAG and the task it has not got.
-	if _, err := client.GetTask(ctx, dagID, target.taskID); err != nil {
+	// A task instance that is not there yet is waited for, so a task the Dag
+	// does not define, or a mapped task named without its expansion, would
+	// otherwise be waited for until the run ended: once a mapped task expands
+	// it has no single instance for Airflow to return. Airflow's answer to a
+	// task it has not got says which of the Dag and the task is missing. The
+	// other way round is not refused: a task inside a mapped task group has
+	// expansions without being mapped itself.
+	task, err := client.GetTask(ctx, dagID, target.taskID)
+	if err != nil {
 		return err
 	}
+	if task.IsMapped && target.mapIndex < 0 {
+		return fmt.Errorf("%s is a mapped task, so name the expansion to wait on with --map-index", target.taskID)
+	}
 	started := time.Now()
-	result, err := q.awaitTask(ctx, client, dagID, runID, target, started.Add(wait.timeout), wait.poll)
+	result, err := q.awaitTask(ctx, client, dagID, runID, target, wait)
 	if err != nil {
 		return err
 	}
@@ -139,10 +147,13 @@ func (q *query) runTasksWait(ctx context.Context, dagID, runID string, target ta
 
 // awaitTask checks on a task instance, and its run, until the instance reaches
 // the target state, settles in another, the run finishes without it, or the
-// deadline passes. Each change is noted on stderr as it is seen.
-func (q *query) awaitTask(ctx context.Context, client *airflowapi.Client, dagID, runID string, target taskTarget, deadline time.Time, poll time.Duration) (waitedTask, error) {
+// timeout passes. Each change is noted on stderr as it is seen, and the wait
+// is announced once the first check has shown there is one.
+func (q *query) awaitTask(ctx context.Context, client *airflowapi.Client, dagID, runID string, target taskTarget, wait waitOptions) (waitedTask, error) {
 	result := waitedTask{DAGID: dagID, RunID: runID, TaskID: target.taskID, MapIndex: target.mapIndex, Until: target.state}
 	check := q.t.suggest("runs tasks " + dagID + " " + runID)
+	deadline := time.Now().Add(wait.timeout)
+	announced := false
 	last := "\x00"
 	for {
 		// The run before the task: a run read as finished means the task read
@@ -174,7 +185,12 @@ func (q *query) awaitTask(ctx context.Context, client *airflowapi.Client, dagID,
 			result.TimedOut = true
 			return result, nil
 		}
-		timer := time.NewTimer(min(poll, remaining))
+		if !announced {
+			fmt.Fprintf(q.d.Stderr, "waiting up to %s for %s in %s run %s to be %s\n",
+				formatDuration(wait.timeout.Seconds()), target.name(), dagID, runID, target.state)
+			announced = true
+		}
+		timer := time.NewTimer(min(wait.poll, remaining))
 		select {
 		case <-ctx.Done():
 			timer.Stop()
@@ -189,13 +205,7 @@ func (q *query) awaitTask(ctx context.Context, client *airflowapi.Client, dagID,
 // an expansion not yet mapped, or a task not yet scheduled on Airflow 2 — has
 // no state, and the wait carries on.
 func taskState(ctx context.Context, client *airflowapi.Client, dagID, runID string, target taskTarget) (string, error) {
-	var instance airflowapi.TaskInstance
-	var err error
-	if target.mapIndex >= 0 {
-		instance, err = client.GetMappedTaskInstance(ctx, dagID, runID, target.taskID, target.mapIndex)
-	} else {
-		instance, err = client.GetTaskInstance(ctx, dagID, runID, target.taskID)
-	}
+	instance, err := fetchTaskInstance(ctx, client, dagID, runID, target.taskID, target.mapIndex)
 	if errors.Is(err, airflowapi.ErrNotFound) {
 		return "", nil
 	}
@@ -218,8 +228,13 @@ func (q *query) renderWaitedTask(w io.Writer, result waitedTask) error {
 	case result.TimedOut:
 		_, err = fmt.Fprintf(w, "%s in %s run %s is still %s after %s, not %s; stopped waiting, and the run carries on\n",
 			name, result.DAGID, result.RunID, orDash(result.State), formatDuration(result.ElapsedSeconds), result.Until)
-	case taskSettled(result.State):
+	case taskSettled(result.State) && taskSettled(result.Until):
 		_, err = fmt.Fprintf(w, "%s in %s run %s ended %s, so it will not reach %s\n",
+			name, result.DAGID, result.RunID, result.State, result.Until)
+	case taskSettled(result.State):
+		// A state a task passes through can fall between two polls, so an
+		// ended task may well have been there; it just was not seen.
+		_, err = fmt.Fprintf(w, "%s in %s run %s ended %s and was not seen %s; a state a task passes through can fall between two polls\n",
 			name, result.DAGID, result.RunID, result.State, result.Until)
 	default:
 		_, err = fmt.Fprintf(w, "%s run %s finished %s with %s %s, so it will not reach %s\n",

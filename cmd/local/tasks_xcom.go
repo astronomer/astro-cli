@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
@@ -48,6 +49,11 @@ func newTasksXComCmd(q *query) *cobra.Command {
 			"A value pushed under its own key", "tasks xcom <DAG_ID> <RUN_ID> <TASK_ID> --key rows_loaded",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// An empty key would address the collection, and Airflow's answer
+			// to that is a redirect rather than anything that names the key.
+			if opts.key == "" {
+				return errors.New("--key names the XCom key to read; the default is " + defaultXComKey)
+			}
 			return q.runTasksXCom(cmd.Context(), args[0], args[1], args[2], opts.key, opts.mapIndex)
 		},
 	}

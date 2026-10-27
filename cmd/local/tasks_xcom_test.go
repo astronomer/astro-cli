@@ -69,3 +69,16 @@ func TestTasksXComNamesAMissingKey(t *testing.T) {
 		t.Errorf("err = %v, want Airflow's not found", err)
 	}
 }
+
+// An empty key, an unset shell variable most often, would address the whole
+// collection and come back as a redirect that names nothing.
+func TestTasksXComRefusesAnEmptyKey(t *testing.T) {
+	stub := newAirflowStub(t)
+	_, _, err := runQuery(t, stub, "tasks", "xcom", "orders_etl", "manual__1", "review", "--key", "")
+	if err == nil || !strings.Contains(err.Error(), "--key names the XCom key") {
+		t.Errorf("err = %v, want the key asked for", err)
+	}
+	if n := len(stub.requests()); n != 0 {
+		t.Errorf("airflow saw %d requests, want none for a refused flag", n)
+	}
+}
