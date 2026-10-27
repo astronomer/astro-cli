@@ -250,3 +250,42 @@ func TestClearTaskInstancesReportsAnInstanceThatCannotDoIt(t *testing.T) {
 		t.Errorf("err = %v, want it to read as not served", err)
 	}
 }
+
+func TestGetXComEntryDeserializesOnAirflow3(t *testing.T) {
+	stub := newAF3Stub(t)
+	stub.route(http.MethodGet, "/api/v2/dags/etl/dagRuns/r1/taskInstances/review/xcomEntries/return_value",
+		`{"key":"return_value","task_id":"review","dag_id":"etl","run_id":"r1","map_index":2,"value":{"chosen_options":["Pass"]}}`)
+	client := stub.client()
+
+	entry, err := client.GetXComEntry(t.Context(), "etl", "r1", "review", "return_value", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(entry.Value) != `{"chosen_options":["Pass"]}` || entry.MapIndex != 2 {
+		t.Errorf("entry = %+v, want expansion 2's value as sent", entry)
+	}
+	query := stub.lastRequest().Query
+	if query.Get("map_index") != "2" || query.Get("deserialize") != "true" || query.Get("stringify") != "false" {
+		t.Errorf("query = %v, want map_index=2, deserialize=true and stringify=false", query)
+	}
+}
+
+// Airflow 2 refuses deserialize unless [api] enable_xcom_deserialize_support
+// is on, so it is not asked for there, and an unmapped read sends no index.
+func TestGetXComEntryOnAirflow2AsksForTheStoredValue(t *testing.T) {
+	stub := newAF2Stub(t)
+	stub.route(http.MethodGet, "/api/v1/dags/etl/dagRuns/r1/taskInstances/load/xcomEntries/rows",
+		`{"key":"rows","task_id":"load","dag_id":"etl","value":"42"}`)
+	client := stub.client()
+
+	entry, err := client.GetXComEntry(t.Context(), "etl", "r1", "load", "rows", -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(entry.Value) != `"42"` {
+		t.Errorf("value = %s, want the stored string", entry.Value)
+	}
+	if query := stub.lastRequest().Query; len(query) != 0 {
+		t.Errorf("query = %v, want none", query)
+	}
+}
