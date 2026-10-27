@@ -48,10 +48,6 @@ type Manifest struct {
 	Project Project
 	Astro   Astro
 	UV      UV
-	// RuntimeGroup is the [dependency-groups] group astro writes the runtime
-	// image's top-level packages into (RuntimeGroupName): its names, in order,
-	// nil when there is none.
-	RuntimeGroup []string
 	// Warnings are findings that do not stop a load, sorted like the problems
 	// of a ValidationError: today, a [tool.astro.targets.<name>] key nothing
 	// reads. A caller shows them where it would show the manifest's errors.
@@ -102,10 +98,12 @@ type UV struct {
 	// entry stands for, for the entries that name a git repository or a URL.
 	DirectURLs map[string]string
 	// RuntimeBuild and RuntimePython name the Astro Runtime build and the
-	// Python astro seeded the project's uv.lock from (SeedRecord, the first
-	// comment of the RuntimeGroupName group): "3.3-9" and "3.12". Empty when
-	// it has not.
+	// Python the project's runtime constraints come from (RuntimeRecord):
+	// "3.3-11" and "3.14". Empty when there is no record.
 	RuntimeBuild, RuntimePython string
+	// RuntimeConstraints are the constraint-dependencies lines the record
+	// heads: the runtime's own, beside the +astro pins (SQLAlchemy's).
+	RuntimeConstraints []string
 	// ExcludeNewer is [tool.uv] exclude-newer as written: a date, a time or
 	// a duration such as "1 week". Empty when the project sets none.
 	ExcludeNewer string
@@ -701,7 +699,7 @@ func parse(data []byte, repair bool) (*Manifest, error) {
 
 	p := &parser{}
 	m := &Manifest{Astro: p.astro(*f.Tool.Astro), UV: uvTable(f.Tool.UV)}
-	m.RuntimeGroup, m.UV.RuntimeBuild, m.UV.RuntimePython = runtimeGroupOf(data, f.DependencyGroups)
+	m.UV.RuntimeBuild, m.UV.RuntimePython, m.UV.RuntimeConstraints = runtimeRecordOf(data, m.UV.ConstraintDependencies)
 	if f.Project != nil {
 		m.Project = Project{
 			Name:           f.Project.Name,
@@ -1459,9 +1457,6 @@ func (p *parser) validate(m *Manifest) {
 type wireFile struct {
 	Project *wireProject `toml:"project"`
 	Tool    wireTool     `toml:"tool"`
-	// DependencyGroups is plain data for the reason UV is: astro reads one
-	// group of it (RuntimeGroup) and owns none of the rest.
-	DependencyGroups map[string]any `toml:"dependency-groups"`
 }
 
 // Astro is a pointer so that a present-but-empty [tool.astro] is told apart

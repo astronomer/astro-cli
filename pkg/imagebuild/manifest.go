@@ -56,11 +56,11 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 	}
 }
 
-// lockedRuntime is the build m's uv.lock was seeded from, the one its
+// lockedRuntime is the build m's pyproject.toml records, the one its
 // uv.lock was made for, while it still carries the Airflow the pin asks for: its
 // tag agrees with the pin, and so does the Astronomer build of Airflow pinned
 // beside it, which names the exact release (an Airflow 2 build's tag shows
-// only the generation). A pin moved since the lock was seeded leaves it to
+// only the generation). A pin moved since the build was recorded leaves it to
 // the next refresh, and the base to the pin. A [tool.astro] runtime or a
 // declared Dockerfile still decides over it; the resolution, not this,
 // applies that.
@@ -85,10 +85,10 @@ func lockedRuntime(m *manifest.Manifest) string {
 // deploybuild.OfferedBase instead, which takes it only when the Deployment
 // offers it.
 //
-// The image runs the Python the lock was seeded for (LockedPython), so it is
+// The image runs the recorded Python (LockedPython), so it is
 // the image the lock was made for. A requires-python that excludes that
-// Python, or admits none the lock's build ships (edited since the lock was
-// seeded), falls back to the rule without the lock's build, the newest build
+// Python, or admits none the lock's build ships (edited since the build was
+// recorded), falls back to the rule without the lock's build, the newest build
 // of the series, rather than failing the build; so does a lock's build whose
 // Airflow, by the catalog, is a release the pin no longer covers.
 // LockedRuntimeNotices says which.
@@ -112,18 +112,18 @@ func lockedBase(base BaseImageFunc, catalog func() *runtimeversions.Catalog) Bas
 
 // lockedSkipped says why an image of m does not start FROM the build its
 // lock was made for, though there is one: requires-python excludes the
-// Python the lock was seeded for, or the catalog says the build carries an
+// recorded Python, or the catalog says the build carries an
 // Airflow release the pin no longer covers. "" when nothing rules it out, a
 // nil catalog included.
 func lockedSkipped(m ManifestBuild, catalog *runtimeversions.Catalog) string {
 	if p := m.LockedPython; p != "" && !runtimeversions.RequiresPythonAdmits(m.RequiresPython, p) {
-		return fmt.Sprintf("requires-python %s excludes Python %s, the one this project's uv.lock was seeded for on Astro Runtime %s", m.RequiresPython, p, m.LockedRuntime)
+		return fmt.Sprintf("requires-python %s excludes Python %s, the one this project's pyproject.toml records for Astro Runtime %s", m.RequiresPython, p, m.LockedRuntime)
 	}
 	if catalog == nil {
 		return ""
 	}
 	if r, ok := catalog.Runtime(m.LockedRuntime); ok && r.AirflowVersion != "" && !manifest.PinCovers(m.AirflowVersion, r.AirflowVersion) {
-		return fmt.Sprintf("Astro Runtime %s, the build this project's uv.lock was seeded from, carries Airflow %s, which the requirement %s no longer covers", m.LockedRuntime, r.AirflowVersion, m.AirflowVersion)
+		return fmt.Sprintf("Astro Runtime %s, the build this project's pyproject.toml records, carries Airflow %s, which the requirement %s no longer covers", m.LockedRuntime, r.AirflowVersion, m.AirflowVersion)
 	}
 	return ""
 }
@@ -171,7 +171,7 @@ func LockedRuntimeNotices(m ManifestBuild, catalog *runtimeversions.Catalog) []s
 		return nil
 	}
 	if why := lockedSkipped(m, catalog); why != "" {
-		return []string{why + ", so the image builds on the newest build of Airflow " + m.AirflowVersion + " instead. Run astro init to seed the lock again"}
+		return []string{why + ", so the image builds on the newest build of Airflow " + m.AirflowVersion + " instead. Run astro init to record the build again"}
 	}
 	if catalog == nil {
 		return nil
@@ -181,7 +181,7 @@ func LockedRuntimeNotices(m ManifestBuild, catalog *runtimeversions.Catalog) []s
 	if notShipped := (*runtimeversions.PythonNotShippedError)(nil); errors.As(err, &notShipped) {
 		if m.LockedPython != "" {
 			return []string{fmt.Sprintf(
-				"Astro Runtime %s ships no Python %s (it ships %s), the one this project's uv.lock was seeded for, so the image builds on the newest build of Airflow %s instead. Run astro init to seed the lock again",
+				"Astro Runtime %s ships no Python %s (it ships %s), the one this project's pyproject.toml records, so the image builds on the newest build of Airflow %s instead. Run astro init to record the build again",
 				m.LockedRuntime, m.LockedPython, strings.Join(notShipped.Pythons, ", "), m.AirflowVersion)}
 		}
 		return []string{fmt.Sprintf(

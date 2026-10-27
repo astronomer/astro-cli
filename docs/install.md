@@ -163,12 +163,7 @@ uses an older cached copy or the series built into the CLI, and still
 succeeds. To choose the version yourself, pass `--airflow-version 3.3`. To read
 the catalog from a mirror, or to stop the request, set
 `ASTRO_RUNTIME_VERSIONS_URL` to the mirror's address, or to one that does not
-answer. The Airflow 2 image lookup in Docker mode reads the same address. The
-package lists it seeds `uv.lock` from are read the same way, from
-`https://cdn.astronomer.io/runtime-freeze` or `ASTRO_RUNTIME_FREEZE_URL`,
-and the lists of the image's top-level packages its `astro-runtime` group comes
-from, from `https://cdn.astronomer.io/runtime-roots` or `ASTRO_RUNTIME_ROOTS_URL`
-(without one, uv works the list out from the package list).
+answer. The Airflow 2 image lookup in Docker mode reads the same address.
 
 Either way it creates the standard directories it doesn't find (`dags/`,
 `include/`, `plugins/`, `tests/`), writes a `.gitignore` and an `AGENTS.md` if

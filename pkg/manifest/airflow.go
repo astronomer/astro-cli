@@ -146,18 +146,16 @@ func AstroPin(spec string) bool {
 
 // PinCovers reports whether an Airflow release satisfies a pin that may name
 // fewer segments than the release does: "3.3" covers "3.3.2", "3.3.2" covers
-// "3.3.2", and neither covers "3.4.0" or "3.30.0". It is whether
-// apache-airflow==<pin>.* admits the release, as PEP 440 matches a prefix
-// (RequirementAdmits), so a local version is compared without its local
-// label: Astronomer's build "3.3.2+astro.2" is release 3.3.2. A pin or a
-// release PEP 440 does not spell covers nothing.
+// "3.3.2", and neither covers "3.4.0" or "3.30.0". A local version is compared
+// without its local label: Astronomer's build "3.3.2+astro.2" is release
+// 3.3.2. An empty pin or release covers nothing.
 func PinCovers(pin, release string) bool {
 	pin = strings.TrimSpace(pin)
-	if pin == "" {
+	release, _, _ = strings.Cut(strings.TrimSpace(release), "+")
+	if pin == "" || release == "" {
 		return false
 	}
-	admits, known := RequirementAdmits(airflowDist+"=="+pin+".*", strings.TrimSpace(release))
-	return known && admits
+	return release == pin || strings.HasPrefix(release, pin+".")
 }
 
 // AstroBuildCovered reports whether every Astronomer build of Airflow pinned

@@ -13,20 +13,20 @@ import (
 	"time"
 )
 
-// A packaged image starts FROM the runtime build the project's uv.lock was
-// seeded from, not from the series tag.
+// A packaged image starts FROM the runtime build pyproject.toml records, not
+// from the series tag.
 //
-// The record astro writes first in the [dependency-groups] astro-runtime group
-// names the build the lock was seeded from, and every image is meant to be
-// that build: otherwise the series tag moves on to a newer build and the
-// image installs the lock's versions over a runtime they were not resolved
-// for. So the build has to start FROM <build>-base, and the case reads that
-// off the build's own log, where the base is named.
+// The record astro writes in [tool.uv] constraint-dependencies names the build
+// the project builds on, and every image is meant to be that build: otherwise
+// the series tag moves on to a newer build and the image installs the lock's
+// versions over a runtime they were not resolved for. So the build has to
+// start FROM <build>-base, and the case reads that off the build's own log,
+// where the base is named.
 //
 // The build named is the series' newest published one, which is the image the
 // series tag serves today: the layers are the ones every other tier 3 case
 // pulls, and only the tag differs, which is the thing under test.
-func TestAPackagedImageBuildsOnTheBuildTheLockWasSeededFrom(t *testing.T) {
+func TestAPackagedImageBuildsOnTheRecordedBuild(t *testing.T) {
 	tier(t, 3)
 	p := dockerProject(t, "lockedbuild")
 	needsDocker(t, p)
@@ -36,13 +36,21 @@ func TestAPackagedImageBuildsOnTheBuildTheLockWasSeededFrom(t *testing.T) {
 
 	path := filepath.Join(p.Dir, "pyproject.toml")
 	raw := read(t, path)
-	// The suite runs uv under a cutoff, so init seeded nothing and wrote no
-	// group: the record is written here, as a seed of that build would.
-	if strings.Contains(raw, "[dependency-groups]") {
-		t.Fatalf("init wrote a [dependency-groups] under the suite's cutoff:\n%s", raw)
+	// The suite runs uv under a cutoff, so init wrote no runtime record: it
+	// is written here, as init would write it for that build.
+	if strings.Contains(raw, "constrains these.") {
+		t.Fatalf("init wrote a runtime record under the suite's cutoff:\n%s", raw)
 	}
-	write(t, path, raw+"\n[dependency-groups]\nastro-runtime = [\n"+
-		"    # astro seeded uv.lock from Astro Runtime "+build+" (Python 3.12). Run astro init to seed it again.\n]\n")
+	record := "    # Astro Runtime " + build + " (Python 3.12) constrains these. astro writes them.\n"
+	switch {
+	case strings.Contains(raw, "constraint-dependencies = [\n"):
+		raw = strings.Replace(raw, "constraint-dependencies = [\n", "constraint-dependencies = [\n"+record, 1)
+	case strings.Contains(raw, "[tool.uv]\n"):
+		raw = strings.Replace(raw, "[tool.uv]\n", "[tool.uv]\nconstraint-dependencies = [\n"+record+"]\n", 1)
+	default:
+		raw += "\n[tool.uv]\nconstraint-dependencies = [\n" + record + "]\n"
+	}
+	write(t, path, raw)
 
 	t.Cleanup(func() { removeImagesNamed(t, "astro-package/lockedbuild") })
 	got := p.runSlow("package", "astro", "--output", "json").requireSuccess()

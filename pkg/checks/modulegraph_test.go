@@ -35,25 +35,11 @@ func TestTheModuleGraphStaysANearLeaf(t *testing.T) {
 		// The shared table of what MWAA and Composer offer, a pure leaf.
 		"github.com/astronomer/astro-cli/pkg/platformversions": true,
 		// Which requirements state the Airflow version, the rule a generated
-		// build and a package share (manifest.WithoutAirflow). Its
-		// dependencies are the TOML parser below, which every consumer of this
-		// module (the CLI, Astro Desktop) links already, and the PEP 440
-		// reader below.
+		// build and a package share (manifest.WithoutAirflow). A leaf whose one
+		// dependency is the TOML parser below, which every consumer of this
+		// module (the CLI, Astro Desktop) links already.
 		"github.com/astronomer/astro-cli/pkg/manifest": true,
 		"github.com/pelletier/go-toml/v2":              true,
-		// manifest.RequirementAdmits reads PEP 440 specifiers with Trivy's
-		// library. It links that, its version-part package and x/xerrors. The
-		// rest is in the graph only because go-version's go.mod requires them
-		// for its own command and tests, none of which a consumer links.
-		"github.com/aquasecurity/go-pep440-version": true,
-		"github.com/aquasecurity/go-version":        true,
-		"golang.org/x/xerrors":                      true,
-		"github.com/urfave/cli/v2":                  true,
-		"github.com/cpuguy83/go-md2man/v2":          true,
-		"github.com/russross/blackfriday/v2":        true,
-		"github.com/xrash/smetrics":                 true,
-		"github.com/davecgh/go-spew":                true,
-		"github.com/pmezard/go-difflib":             true,
 		// Test-only, with the transitive set go list reports for it. Written
 		// from `go list -m all` rather than from memory.
 		"github.com/stretchr/testify": true,

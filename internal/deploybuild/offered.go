@@ -96,7 +96,7 @@ func OfferedBase(offer RuntimeOffer, resolve imagebuild.BaseImageFunc, warn func
 // offered builds of the pin, newest first. locked is the lock's build when it
 // leads the list. The lock's build has to be one of the pin's offered builds:
 // those carry an Airflow release the pin covers, by the platform's own word
-// of each build's Airflow, so a lock seeded for a release the pin has since
+// of each build's Airflow, so a build recorded for a release the pin has since
 // moved off is not built on, and a build the platform lists only on another
 // channel (a preview) is not either. A bare "3" pin has none, as every other
 // path refuses to resolve one.

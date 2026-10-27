@@ -22,8 +22,6 @@ require (
 )
 
 require (
-	github.com/aquasecurity/go-pep440-version v0.0.1 // indirect
-	github.com/aquasecurity/go-version v0.0.1 // indirect
 	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.23 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.30 // indirect
@@ -37,7 +35,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.42.1 // indirect
 	github.com/aws/smithy-go v1.27.3 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.4-0.20260718201843-686c980c4758 // indirect
-	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 )
 
 replace github.com/astronomer/astro-cli/pkg/airflowapi => ../airflowapi

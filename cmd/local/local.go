@@ -316,15 +316,15 @@ func schedulesOn(p localrt.Plan, mode localrt.Mode) bool {
 }
 
 // runtimeKey is the manifest key a runtime-build finding is about, and
-// lockBuildKey the one a finding about the build the lock was seeded from is:
-// the astro-runtime group, whose first comment records it.
+// lockBuildKey the one a finding about the recorded build is: [tool.uv]
+// constraint-dependencies, whose runtime record names it.
 const (
 	runtimeKey   = "tool.astro.runtime"
-	lockBuildKey = "dependency-groups." + manifest.RuntimeGroupName
+	lockBuildKey = "tool.uv.constraint-dependencies"
 )
 
 // checkRuntimeBuild holds a Docker-mode start's runtime build, [tool.astro]
-// runtime or else the build its uv.lock was seeded from (Plan.LockedRuntime), to
+// runtime or else the build pyproject.toml records (Plan.LockedRuntime), to
 // the pin with the runtime catalog (Deps.RuntimeCheck), before anything
 // starts: a build of another Airflow series refuses the start, and a yanked
 // build, one whose exact Airflow the pin excludes, or one the check could not
@@ -335,9 +335,9 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localr
 	if p.Mode != localrt.ModeDocker || p.Dockerfile != "" || c.d.RuntimeCheck == nil {
 		return nil
 	}
-	// The build the image starts FROM: [tool.astro] runtime, else the build the
-	// lock was seeded from, which the record in the astro-runtime group
-	// names, when the image does start from it (imagebuild.LockedRuntimeUsed).
+	// The build the image starts FROM: [tool.astro] runtime, else the build
+	// the runtime record in [tool.uv] names, when the image does start from it
+	// (imagebuild.LockedRuntimeUsed).
 	build, key := p.Runtime, runtimeKey
 	if build == "" {
 		var catalog *runtimeversions.Catalog
@@ -360,7 +360,7 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localr
 		}
 		text := w.Message
 		if p.Runtime == "" {
-			text = fmt.Sprintf("the build uv.lock was seeded from, Astro Runtime %s, which the image builds on: %s", build, w.Message)
+			text = fmt.Sprintf("the build pyproject.toml records, Astro Runtime %s, which the image builds on: %s", build, w.Message)
 		}
 		emitWarning(r, event{
 			Event:  "warning",
@@ -370,7 +370,7 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localr
 		})
 	}
 	if err != nil && p.Runtime == "" {
-		return fmt.Errorf("the build uv.lock was seeded from, Astro Runtime %s, which the image builds on: %w; run astro init to seed it from another build", build, err)
+		return fmt.Errorf("the build pyproject.toml records, Astro Runtime %s, which the image builds on: %w; run astro init to record another build", build, err)
 	}
 	return err
 }

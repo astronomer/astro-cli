@@ -35,6 +35,10 @@ var helperContentAtVersion = map[int]string{
 	// first in the [dependency-groups] astro-runtime group, and names astro
 	// init as what seeds the lock again.
 	7: "f75055dd939d1db94bac3940afb66b3a8e0a65ae13c38138f34098b7fab96b68",
+	// Reads the build the project builds on out of the runtime record astro
+	// writes in [tool.uv] constraint-dependencies, and counts every dependency
+	// group as the project's own naming.
+	8: "bc6b44ed6a0cfae918e704a407a48715c63a6e269bc57379ba1c682db4c4e440",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {

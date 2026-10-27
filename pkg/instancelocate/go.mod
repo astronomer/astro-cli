@@ -23,14 +23,11 @@ require github.com/astronomer/astro-cli/pkg/manifest v0.0.0-00010101000000-00000
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	github.com/aquasecurity/go-pep440-version v0.0.1 // indirect
-	github.com/aquasecurity/go-version v0.0.1 // indirect
 	github.com/astronomer/astro-cli/pkg/airflowapi v0.0.0-00010101000000-000000000000 // indirect
 	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.4-0.20260718201843-686c980c4758 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 )
 
 replace github.com/astronomer/astro-cli/pkg/googleauth => ../googleauth

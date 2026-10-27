@@ -1,5 +1,5 @@
 # Written by the Astro CLI. Do not edit: `astro init` replaces this file.
-# astro-install-helper: 7
+# astro-install-helper: 8
 #
 # Turns the project's pyproject.toml, and its uv.lock when there is one, into
 # the files the Astro Runtime image's install steps read: requirements.txt,
@@ -69,10 +69,6 @@ TASK_SDK = "apache-airflow-task-sdk"
 AIRFLOW_DISTS = (AIRFLOW, AIRFLOW_CORE, TASK_SDK)
 
 GIT_PACKAGE = "git"
-
-# The [dependency-groups] group astro writes with the runtime image's own
-# packages, normalized as PEP 735 group names compare.
-RUNTIME_GROUP = "astro-runtime"
 
 
 def warn(msg):
@@ -284,16 +280,12 @@ class Manifest:
         self.stated = strings(project.get("dependencies"))
         # Every distribution the project names itself, in its dependencies,
         # its optional dependencies or a dependency group: the ones the lock
-        # may move off the base image's versions. The astro-runtime group is
-        # not the project's naming: astro writes it, listing what the image
-        # ships so a local environment has it too, and those stay as the
-        # image has them.
+        # may move off the base image's versions.
         named = list(self.stated)
         for extra in (project.get("optional-dependencies") or {}).values():
             named += strings(extra)
-        for group, entries in (pyproject.get("dependency-groups") or {}).items():
-            if norm(group) != RUNTIME_GROUP:
-                named += strings(entries)
+        for entries in (pyproject.get("dependency-groups") or {}).values():
+            named += strings(entries)
         self.named = {dist_name(d) for d in named}
         self.constraint_dependencies = strings(uv.get("constraint-dependencies"))
         self.override_dependencies = strings(uv.get("override-dependencies"))
@@ -839,21 +831,20 @@ def locked_airflow(lock):
     return next(iter(versions)) if len(versions) == 1 else None
 
 
-# The comment astro writes first in the [dependency-groups] astro-runtime
-# group, naming the build uv.lock was seeded from.
-SEED_RECORD = re.compile(r"^\s*#\s*astro seeded uv\.lock from Astro Runtime (\S+) \(Python \d+\.\d+\)")
+# The comment astro writes in [tool.uv] constraint-dependencies above the
+# runtime's own constraints, naming the build the project builds on.
+RUNTIME_RECORD = re.compile(r"^\s*#\s*Astro Runtime (\S+) \(Python \d+\.\d+\) constrains these\.")
 TABLE_HEADER = re.compile(r"^\s*\[\s*([^\[\]]+?)\s*\]\s*(#.*)?$")
-RUNTIME_GROUP_KEY = re.compile(r"^\s*astro-runtime\s*=\s*\[")
+CONSTRAINTS_KEY = re.compile(r"^\s*constraint-dependencies\s*=\s*\[")
 QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
 
 
-def seeded_runtime(pyproject_text):
-    """The Astro Runtime build the project's uv.lock was seeded from, as the
-    record astro writes first in its astro-runtime dependency group names it,
-    or None. Comments are not in what tomllib reads, so this finds the
-    [dependency-groups] table's astro-runtime array in the text, and reads the
-    comment from that array alone: the same words anywhere else in the file
-    are not it."""
+def recorded_runtime(pyproject_text):
+    """The Astro Runtime build the project builds on, as the record astro
+    writes in [tool.uv] constraint-dependencies names it, or None. Comments
+    are not in what tomllib reads, so this finds the [tool.uv] table's
+    constraint-dependencies array in the text, and reads the comment from that
+    array alone: the same words anywhere else in the file are not it."""
     table, inside, depth = None, False, 0
     for line in pyproject_text.splitlines():
         if not inside:
@@ -861,7 +852,7 @@ def seeded_runtime(pyproject_text):
             if header:
                 table = header.group(1).replace(" ", "")
                 continue
-            if table == "dependency-groups" and RUNTIME_GROUP_KEY.match(line):
+            if table == "tool.uv" and CONSTRAINTS_KEY.match(line):
                 inside, depth = True, 0
             else:
                 continue
@@ -869,7 +860,7 @@ def seeded_runtime(pyproject_text):
         # not the array's.
         code = QUOTED.sub("", line).split("#", 1)[0]
         depth += code.count("[") - code.count("]")
-        m = SEED_RECORD.match(line)
+        m = RUNTIME_RECORD.match(line)
         if m:
             return m.group(1)
         if depth <= 0:
@@ -898,8 +889,8 @@ def airflow_mismatch(lock, installed, runtime):
         made_for += " (Astro Runtime %s)" % runtime
     return (
         "uv.lock was made for %s, and this image has Airflow %s, so the lock's versions install over another runtime than "
-        "the one they were resolved for: build FROM the runtime the lock was made for, or run `astro init`, which seeds "
-        "the lock again from the newest build" % (made_for, installed.strip())
+        "the one they were resolved for: build FROM the runtime the lock was made for, or run `astro init` and `uv lock` "
+        "to move the project to this runtime" % (made_for, installed.strip())
     )
 
 
@@ -944,7 +935,7 @@ def main(argv=None):
                 # Every build checks it, `docker build .` included: the lock is
                 # for one runtime's Airflow, and this image may be another's. A
                 # lock set aside as out of date installs nothing it says.
-                mismatch = airflow_mismatch(lock_data, base_airflow(), seeded_runtime(pyproject.decode("utf-8", "replace")))
+                mismatch = airflow_mismatch(lock_data, base_airflow(), recorded_runtime(pyproject.decode("utf-8", "replace")))
                 if mismatch:
                     warn(mismatch)
         except Exception as e:  # a lock this cannot read installs as no lock

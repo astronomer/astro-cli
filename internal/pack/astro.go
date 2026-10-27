@@ -135,7 +135,7 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 	found, err := req.CheckRuntime(ctx, build, airflow.Pin)
 	if err != nil {
 		if locked {
-			return nil, fmt.Errorf("the build uv.lock was seeded from, Astro Runtime %s, which the image builds on: %w; run astro init to seed it from another build", build, err)
+			return nil, fmt.Errorf("the build pyproject.toml records, Astro Runtime %s, which the image builds on: %w; run astro init to record another build", build, err)
 		}
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 			continue
 		}
 		if locked {
-			warnings = append(warnings, fmt.Sprintf("the build uv.lock was seeded from, Astro Runtime %s, which the image builds on: %s", build, f.Message))
+			warnings = append(warnings, fmt.Sprintf("the build pyproject.toml records, Astro Runtime %s, which the image builds on: %s", build, f.Message))
 			continue
 		}
 		warnings = append(warnings, f.Message)

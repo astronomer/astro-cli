@@ -163,6 +163,9 @@ type Finding struct {
 	Key     string `json:"key,omitempty"`
 	// Message carries an import error's text.
 	Message string `json:"message,omitempty"`
+	// Hint is a fix for an import error, when one is known: the package the
+	// project's runtime image ships under the missing module's name.
+	Hint string `json:"hint,omitempty"`
 	// ParseSeconds and ThresholdSeconds describe a slow-parse finding.
 	ParseSeconds     float64 `json:"parse_time_seconds,omitempty"`
 	ThresholdSeconds float64 `json:"threshold_seconds,omitempty"`

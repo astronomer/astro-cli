@@ -132,55 +132,27 @@ func editManifestJudged(dir string, wrap func(run func() error) error, edit Mani
 	return err
 }
 
-// manifestTarget is the file the pyproject.toml in dir is written as, and its
-// mode. The write replaces the file by renaming onto it, and renaming onto a
-// symlink replaces the link with a regular file, so it is what the link
-// points at, which keeps the link. A rename replaces a file whatever its own
-// permissions say, so a manifest this user may not write is refused here,
-// rather than rewritten anyway.
-func manifestTarget(path string) (target string, mode fs.FileMode, err error) {
-	target, err = filepath.EvalSymlinks(path)
+func editManifest(dir string, edit ManifestEdit, ok judge) error {
+	path := filepath.Join(dir, manifest.Marker)
+	// The write replaces the file by renaming onto it, and renaming onto a
+	// symlink replaces the link with a regular file. Writing to what it points
+	// at keeps the link.
+	target, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return "", 0, fmt.Errorf("%w: %w", manifest.ErrNotFound, err)
+			return fmt.Errorf("%w: %w", manifest.ErrNotFound, err)
 		}
-		return "", 0, fmt.Errorf("reading %s: %w", path, err)
+		return fmt.Errorf("reading %s: %w", path, err)
 	}
 	info, err := os.Stat(target)
 	if err != nil {
-		return "", 0, fmt.Errorf("reading %s: %w", path, err)
+		return fmt.Errorf("reading %s: %w", path, err)
 	}
-	mode = info.Mode().Perm()
+	mode := info.Mode().Perm()
+	// A rename replaces a file whatever its own permissions say, so without
+	// this a manifest this user may not write would be rewritten anyway.
 	if !writable(target, mode) {
-		return "", 0, fmt.Errorf("%s is read-only for this user, so it was not changed", path)
-	}
-	return target, mode, nil
-}
-
-// RestoreManifest writes data back as the pyproject.toml in dir, byte for
-// byte: what a caller read before an edit it undoes (the seed of uv.lock puts
-// the manifest back so). It writes as EditManifest does, through a symlink to
-// what it points at, at the file's mode, and refuses a read-only manifest;
-// data is not judged, since it is the file as it was.
-func RestoreManifest(dir string, wrap func(run func() error) error, data []byte) error {
-	run := func() error {
-		target, mode, err := manifestTarget(filepath.Join(dir, manifest.Marker))
-		if err != nil {
-			return err
-		}
-		return fsatomic.WriteFile(target, data, mode)
-	}
-	if wrap == nil {
-		return run()
-	}
-	return wrap(run)
-}
-
-func editManifest(dir string, edit ManifestEdit, ok judge) error {
-	path := filepath.Join(dir, manifest.Marker)
-	target, mode, err := manifestTarget(path)
-	if err != nil {
-		return err
+		return fmt.Errorf("%s is read-only for this user, so it was not changed", path)
 	}
 	src, err := fsatomic.ReadFile(target)
 	if err != nil {

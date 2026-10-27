@@ -200,15 +200,14 @@ func TestStartChecksTheRuntimeBuildInDockerModeOnly(t *testing.T) {
 	}
 }
 
-// lockedPins is a project whose uv.lock was seeded from 3.1-12, with no
+// lockedPins is a project whose pyproject.toml records 3.1-12, with no
 // [tool.astro] runtime: the build a Docker-mode start and a package build on.
 const lockedPins = "\n[tool.uv]\nconstraint-dependencies = [\n" +
-	"    'apache-airflow==3.1.8+astro.1',\n]\n" +
-	"\n[dependency-groups]\nastro-runtime = [\n" +
-	"    # astro seeded uv.lock from Astro Runtime 3.1-12 (Python 3.12). Run astro init to seed it again.\n" +
-	"    'pandas',\n]\n"
+	"    'apache-airflow==3.1.8+astro.1',\n" +
+	"    # Astro Runtime 3.1-12 (Python 3.12) constrains these. astro writes them.\n" +
+	"    'SQLAlchemy==2.0.48',\n]\n"
 
-// With no [tool.astro] runtime, the build uv.lock was seeded from is the one the
+// With no [tool.astro] runtime, the build pyproject.toml records is the one the
 // image starts FROM, so a Docker-mode start and a package hold it to the
 // catalog as they would a named runtime: a yanked one is warned about, naming
 // the pins, and a refusal says to move them with astro init.
@@ -230,11 +229,11 @@ func TestTheRuntimePinsBuildIsCheckedLikeANamedRuntime(t *testing.T) {
 		t.Errorf("calls = %v, want one for the pins' 3.1-12 against 3.1", rec.calls)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "the build uv.lock was seeded from, Astro Runtime 3.1-12, which the image builds on: runtime 3.1-12 carries Airflow 3.1.0") {
+	if !strings.Contains(out, "the build pyproject.toml records, Astro Runtime 3.1-12, which the image builds on: runtime 3.1-12 carries Airflow 3.1.0") {
 		t.Errorf("the warning did not name the pins' build: %q", out)
 	}
-	if !strings.Contains(out, "dependency-groups.astro-runtime") || strings.Contains(out, "tool.uv.constraint-dependencies") {
-		t.Errorf("the warning is not filed under the astro-runtime group that records the build: %q", out)
+	if !strings.Contains(out, "tool.uv.constraint-dependencies") {
+		t.Errorf("the warning is not filed under [tool.uv] constraint-dependencies, whose record names the build: %q", out)
 	}
 	if strings.Contains(out, "is yanked") {
 		t.Errorf("the check repeated the yank the notices say: %q", out)
