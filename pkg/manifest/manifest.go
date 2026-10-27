@@ -114,6 +114,8 @@ type UV struct {
 // project, where uv cannot read [tool.uv.sources]: a page lists one package's
 // files, so passing it as find-links scopes the index to that package the way
 // the source does.
+//
+//nolint:gocritic // a value receiver, as Astro Desktop calls it: UV outgrew the hugeParam limit after this shipped
 func (u UV) IndexPages() []string {
 	pkgs := make([]string, 0, len(u.Sources))
 	for pkg := range u.Sources {

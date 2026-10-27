@@ -81,9 +81,9 @@ func stalePin(m *manifest.Manifest) bool {
 
 // astroBuildWrite is what writeAstroBuild did, for its caller to report.
 type astroBuildWrite struct {
-	pin       string
-	build     runtimeversions.AstroBuild
-	changed   bool
+	pin     string
+	build   runtimeversions.AstroBuild
+	changed bool
 	// runtime is the build whose constraints the write newly recorded, or "".
 	runtime   string
 	lookupErr error

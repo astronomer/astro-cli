@@ -53,8 +53,8 @@ func (c *cli) withRuntimeHints(ctx context.Context, project string, m *manifest.
 		return res
 	}
 	missing := false
-	for _, f := range res.Findings {
-		if f.Kind == checks.KindImportError && missingModule(f.Message) != "" {
+	for i := range res.Findings {
+		if f := &res.Findings[i]; f.Kind == checks.KindImportError && missingModule(f.Message) != "" {
 			missing = true
 			break
 		}

@@ -410,12 +410,13 @@ func renderCheck(r cliout.Renderer, res checks.Result, strict, provisioned bool,
 	// One line per distinct hint: a missing package fails every Dag that
 	// imports it the same way.
 	seen := map[string]bool{}
-	for _, f := range res.Findings {
-		if f.Hint == "" || seen[f.Hint] {
+	for i := range res.Findings {
+		hint := res.Findings[i].Hint
+		if hint == "" || seen[hint] {
 			continue
 		}
-		seen[f.Hint] = true
-		if _, err := fmt.Fprintf(r.Out, "hint: %s\n\n", f.Hint); err != nil {
+		seen[hint] = true
+		if _, err := fmt.Fprintf(r.Out, "hint: %s\n\n", hint); err != nil {
 			return err
 		}
 	}
