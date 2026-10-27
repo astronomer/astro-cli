@@ -47,6 +47,9 @@ type fakeUV struct {
 	seedLocks, projectLocks int
 	// err fails every lock; projectErr fails only the project's.
 	err, projectErr error
+	// requiredOnly locks as uv does, a constraint adding no package: only
+	// what [project] dependencies or a dependency group names is written.
+	requiredOnly bool
 }
 
 func (f *fakeUV) lock(_ context.Context, dir string) error {
@@ -76,6 +79,9 @@ func (f *fakeUV) lock(_ context.Context, dir string) error {
 		f.seeded = append(f.seeded, c)
 		head, _, _ := strings.Cut(c, ";")
 		name, version, _ := strings.Cut(head, "==")
+		if f.requiredOnly && !requires(m, manifest.DistName(name)) {
+			continue
+		}
 		fmt.Fprintf(&lock, "\n[[package]]\nname = %q\nversion = %q\n", manifest.DistName(name), strings.TrimSpace(version))
 	}
 	return os.WriteFile(filepath.Join(dir, "uv.lock"), []byte(lock.String()), 0o600)

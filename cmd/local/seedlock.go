@@ -53,17 +53,29 @@ func lockProject(ctx context.Context, dir string) error {
 }
 
 // seedLock seeds the uv.lock of the project in dir with pins, and reports how
-// many packages the lock holds at the image's versions once it is. None, with
-// no error, when there is nothing to seed with. On an error, a canceled ctx
-// included, pyproject.toml and uv.lock are put back as they were.
-func (c *cli) seedLock(ctx context.Context, dir string, pins *scaffold.RuntimePins) (int, error) {
-	seeding, added, err := scaffold.SeedManifest(dir, pins)
-	if err != nil || added == 0 {
-		return 0, err
-	}
+// many packages the lock holds at the image's versions once it is. prepare,
+// when not nil, writes what the seed is part of (the runtime group and its
+// record) into pyproject.toml first, so the lock is seeded with the group's
+// packages in it. None, with no error, when there is nothing to seed with.
+// On an error, a canceled ctx included, and when there is nothing to seed,
+// pyproject.toml and uv.lock are put back as they were before prepare.
+func (c *cli) seedLock(ctx context.Context, dir string, pins *scaffold.RuntimePins, prepare func() error) (int, error) {
 	saved, err := saveProject(dir)
 	if err != nil {
 		return 0, err
+	}
+	if prepare != nil {
+		if err := prepare(); err != nil {
+			return 0, errors.Join(err, saved.restore())
+		}
+	}
+	seeding, added, err := scaffold.SeedManifest(dir, pins)
+	if err != nil || added == 0 {
+		return 0, errors.Join(err, saved.restore())
+	}
+	prepared, err := os.ReadFile(saved.manifestPath)
+	if err != nil {
+		return 0, errors.Join(err, saved.restore())
 	}
 	steps := []func() error{
 		func() error { return fsatomic.WriteFile(saved.manifestPath, seeding, saved.mode) },
@@ -73,7 +85,7 @@ func (c *cli) seedLock(ctx context.Context, dir string, pins *scaffold.RuntimePi
 			}
 			return nil
 		},
-		func() error { return fsatomic.WriteFile(saved.manifestPath, saved.manifest, saved.mode) },
+		func() error { return fsatomic.WriteFile(saved.manifestPath, prepared, saved.mode) },
 		ctx.Err,
 		func() error {
 			if err := c.d.Lock(ctx, dir); err != nil {
