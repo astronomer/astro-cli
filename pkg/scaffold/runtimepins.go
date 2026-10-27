@@ -36,6 +36,14 @@ type RuntimePins struct {
 	// means there is nothing to seed, and the record of an earlier seed is
 	// taken out.
 	Pins []string
+	// OnlyImagePython limits each constraint the seed states to the image's
+	// Python. Without it the image's versions hold on every Python
+	// requires-python allows, so the lock resolves once; with it, the lock
+	// forks: the image's versions on its Python and a resolution of its own
+	// for each other one. The seed tries without first and limits them only
+	// when that leaves uv nothing to lock (a version that needs a newer
+	// Python than requires-python allows).
+	OnlyImagePython bool
 }
 
 // seeds are the pins a seed holds the lock to, name==version, sorted by
@@ -60,13 +68,16 @@ func (p *RuntimePins) seeds(own projectRequirements) []string {
 	return out
 }
 
-// constraints are the seeds as the seed states them, each limited to the
-// image's Python: a lockfile resolves for every Python requires-python
-// allows, and the image's versions are of one (numpy 2.3 needs Python 3.11,
-// so held on every Python it leaves a project that allows 3.10 nothing to
-// lock there).
+// constraints are the seeds as the seed states them: as they are, so the
+// lock resolves once for every Python requires-python allows, or with
+// OnlyImagePython each limited to the image's Python, for a project where
+// held on every Python they leave uv nothing to lock (numpy 2.3 needs Python
+// 3.11, so held everywhere it fails a project that allows 3.10).
 func (p *RuntimePins) constraints(own projectRequirements) []string {
 	seeds := p.seeds(own)
+	if !p.OnlyImagePython {
+		return seeds
+	}
 	for i, pin := range seeds {
 		seeds[i] = pin + "; python_version == '" + p.Python + "'"
 	}

@@ -64,7 +64,35 @@ func lockProject(ctx context.Context, dir string) error {
 // written between the comments that mark them as astro's, so a process
 // killed before it puts the manifest back leaves nothing the next write of
 // the manifest does not take out.
-func (c *cli) seedLock(ctx context.Context, dir string, pins *scaffold.RuntimePins) (int, error) {
+//
+// The image's versions are first held on every Python requires-python
+// allows, so the lock resolves once rather than forking per Python, which
+// would hold every package the image ships twice. When that leaves uv
+// nothing to lock (a version that needs a newer Python than requires-python
+// allows), the project is put back and the seed holds them on the image's
+// Python alone (scaffold.RuntimePins.OnlyImagePython); narrowed then says
+// why, and is nil when the first one held.
+func (c *cli) seedLock(ctx context.Context, dir string, pins *scaffold.RuntimePins) (held int, narrowed, err error) {
+	everywhere := *pins
+	everywhere.OnlyImagePython = false
+	held, err = c.seedOnce(ctx, dir, &everywhere)
+	var resolution *uv.ResolutionError
+	if err == nil || !errors.As(err, &resolution) || ctx.Err() != nil {
+		return held, nil, err
+	}
+	imageOnly := *pins
+	imageOnly.OnlyImagePython = true
+	held, err = c.seedOnce(ctx, dir, &imageOnly)
+	if err != nil {
+		return 0, nil, err
+	}
+	return held, resolution, nil
+}
+
+// seedOnce is one try of seedLock: pins written in, the lock resolved, pins
+// taken out and the lock resolved again, with the project put back as it was
+// on any error.
+func (c *cli) seedOnce(ctx context.Context, dir string, pins *scaffold.RuntimePins) (int, error) {
 	saved, err := saveProject(dir)
 	if err != nil {
 		return 0, err

@@ -74,10 +74,11 @@ func seedFor(t *testing.T, dir string, pins *RuntimePins) (constraints []string,
 	return m.UV.ConstraintDependencies, n
 }
 
-// The seed's manifest states the image's versions, each limited to its Python,
-// beside the project's own constraints and Airflow's build pins, and leaves
-// out what a seed never holds: Airflow itself, Astronomer's own builds, and a
-// package the project gives a version the image's does not meet.
+// The seed's manifest states the image's versions, on every Python or,
+// narrowed, on the image's alone, beside the project's own constraints and
+// Airflow's build pins, and leaves out what a seed never holds: Airflow
+// itself, Astronomer's own builds, and a package the project gives a version
+// the image's does not meet.
 func TestAddSeedConstraintsStatesTheImagesVersions(t *testing.T) {
 	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'Pandas>=3']", 1) +
 		"\n[tool.uv]\nconstraint-dependencies = ['protobuf>=7', 'apache-airflow==3.3.2+astro.1']\n"
@@ -86,12 +87,24 @@ func TestAddSeedConstraintsStatesTheImagesVersions(t *testing.T) {
 	assert.Equal(t, []string{
 		"protobuf>=7",
 		"apache-airflow==3.3.2+astro.1",
+		"a2wsgi==1.10.10",
+		"SQLAlchemy==2.0.50",
+		"zipp==4.1.0",
+	}, got)
+	assert.Equal(t, 3, n)
+	assert.Equal(t, src, readManifest(t, dir), "the project's manifest is put back as it was")
+
+	narrowed := *freeze339
+	narrowed.OnlyImagePython = true
+	got, n = seedFor(t, dir, &narrowed)
+	assert.Equal(t, []string{
+		"protobuf>=7",
+		"apache-airflow==3.3.2+astro.1",
 		"a2wsgi==1.10.10; python_version == '3.12'",
 		"SQLAlchemy==2.0.50; python_version == '3.12'",
 		"zipp==4.1.0; python_version == '3.12'",
 	}, got)
 	assert.Equal(t, 3, n)
-	assert.Equal(t, src, readManifest(t, dir), "the project's manifest is put back as it was")
 }
 
 func TestThePinOfAPackageTheProjectNamesFollowsItsRequirement(t *testing.T) {
@@ -104,7 +117,7 @@ func TestThePinOfAPackageTheProjectNamesFollowsItsRequirement(t *testing.T) {
 		"protobuf==6.33.6", "ruff==0.14.0", "SQLAlchemy==2.0.50", "tomli==2.3.0",
 	}})
 	joined := strings.Join(got, "\n")
-	for _, kept := range []string{"pandas==", "zipp==", "a2wsgi==", "ruff==", "SQLAlchemy==2.0.50;", "tomli=="} {
+	for _, kept := range []string{"pandas==", "zipp==", "a2wsgi==", "ruff==", "SQLAlchemy==2.0.50", "tomli=="} {
 		assert.Contains(t, joined, kept, "the project's requirement admits the image's version")
 	}
 	for _, dropped := range []string{"numpy==", "matplotlib==", "pytest==", "protobuf=="} {

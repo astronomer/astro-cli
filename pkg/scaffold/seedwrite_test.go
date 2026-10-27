@@ -75,7 +75,7 @@ func TestAddSeedConstraintsMarksThemAsAstros(t *testing.T) {
 	got, _ := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	text := string(got)
 	own, heading, end := strings.Index(text, "urllib3<3"), strings.Index(text, "ships these versions"), strings.Index(text, legacyPinsEnd)
-	if own < 0 || heading < own || end < heading || !strings.Contains(text[heading:end], "pandas==2.2.3; python_version == '3.12'") {
+	if own < 0 || heading < own || end < heading || !strings.Contains(text[heading:end], "pandas==2.2.3") {
 		t.Errorf("the constraints are not after the project's own, between astro's comments:\n%s", text)
 	}
 	ed, err := tomledit.NewSurgical(got)

@@ -77,13 +77,32 @@ func (c *cli) reportSeed(r cliout.Renderer, res astroBuildWrite) {
 	}
 	switch {
 	case res.seeded > 0:
-		fmt.Fprintf(c.d.Stderr, "uv.lock: seeded with the versions Astro Runtime %s (Python %s) ships (%d packages)\n",
-			res.seed.Build, res.seed.Python, res.seeded)
+		fmt.Fprintf(c.d.Stderr, "uv.lock: seeded with the versions Astro Runtime %s (Python %s) ships (%d packages)%s\n",
+			res.seed.Build, res.seed.Python, res.seeded, narrowedNote(res.seed.Python, res.seedNarrowed))
 	case res.drift > 0:
 		fmt.Fprintf(c.d.Stderr, "uv.lock: %d packages differ from Astro Runtime %s; run astro init to re-seed\n", res.drift, res.driftBuild)
 	case res.recordChanged && res.after.RuntimeBuild == "":
 		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer records an Astro Runtime uv.lock was seeded from\n", manifest.Marker)
 	}
+}
+
+// narrowedNote is what the seeded notice adds when the seed held the image's
+// versions on its Python alone: which packages kept uv from holding them on
+// every Python requires-python allows, when uv named them.
+func narrowedNote(python string, narrowed error) string {
+	if narrowed == nil {
+		return ""
+	}
+	why := "uv could not hold them on every Python requires-python allows"
+	var resolution *uv.ResolutionError
+	if errors.As(narrowed, &resolution) && len(resolution.Packages) > 0 {
+		pkgs := resolution.Packages
+		if len(pkgs) > 3 {
+			pkgs = pkgs[:3]
+		}
+		why = "uv could not hold " + strings.Join(pkgs, ", ") + " on every Python requires-python allows"
+	}
+	return "; held for Python " + python + " only: " + why
 }
 
 // stalePin reports a manifest whose pin to an Astronomer build of Airflow is of
@@ -122,6 +141,10 @@ type astroBuildWrite struct {
 	seed       scaffold.Seed
 	drift      int
 	driftBuild string
+	// seedNarrowed is why the seed held the image's versions on its Python
+	// alone rather than on every Python requires-python allows; nil when it
+	// held them everywhere.
+	seedNarrowed error
 	// seedWarn says what happened to the seed, when it is worth a warning,
 	// and recordRefused that its record could not be written at all.
 	seedWarn      error
@@ -260,7 +283,8 @@ func (c *cli) applySeed(ctx context.Context, dir string, m *manifest.Manifest, p
 	if c.d.Lock == nil {
 		return false, nil
 	}
-	n, err := c.seedLock(ctx, dir, pins)
+	n, narrowed, err := c.seedLock(ctx, dir, pins)
+	res.seedNarrowed = narrowed
 	switch {
 	case errors.Is(err, uv.ErrNotFound):
 		res.seedWarn = fmt.Errorf("uv.lock is not seeded with what Astro Runtime %s ships: uv is not installed", pins.Build)

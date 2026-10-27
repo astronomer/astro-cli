@@ -45,6 +45,35 @@ type fakeUV struct {
 	seedLocks, projectLocks int
 	// err fails every lock; projectErr fails only the project's.
 	err, projectErr error
+	// everywhereFails has a seed whose versions are held on every Python
+	// fail to resolve, as one that needs a newer Python than requires-python
+	// allows does, so the seed narrows them to the image's Python.
+	everywhereFails bool
+	// tries are the seed locks' constraints, one entry per try.
+	tries [][]string
+}
+
+// seedConstraints are the constraints a seed wrote into the manifest text,
+// the lines between its heading and its end comment.
+func seedConstraints(text string) []string {
+	var out []string
+	in := false
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.Contains(line, "ships these versions; astro seeds uv.lock"):
+			in = true
+		case strings.HasPrefix(line, "# End of what astro writes"):
+			in = false
+		case in && line != "" && !strings.HasPrefix(line, "#"):
+			v := strings.TrimSuffix(line, ",")
+			if len(v) >= 2 && (v[0] == '"' || v[0] == '\'') && v[len(v)-1] == v[0] {
+				v = v[1 : len(v)-1]
+			}
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func (f *fakeUV) lock(_ context.Context, dir string) error {
@@ -55,23 +84,20 @@ func (f *fakeUV) lock(_ context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
-	m, err := manifest.Parse(data)
-	if err != nil {
-		return err
-	}
-	if !slices.ContainsFunc(m.UV.ConstraintDependencies, func(c string) bool { return strings.Contains(c, "python_version") }) {
+	constraints := seedConstraints(string(data))
+	if len(constraints) == 0 {
 		f.projectLocks++
 		return f.projectErr
 	}
+	f.tries = append(f.tries, constraints)
+	if f.everywhereFails && !strings.Contains(constraints[0], "python_version") {
+		return &uv.ResolutionError{Op: "lock", Packages: []string{"numpy"}, Summary: "numpy==2.3.1 requires Python >=3.11"}
+	}
 	f.seedLocks++
-	f.seeded = nil
+	f.seeded = constraints
 	var lock strings.Builder
 	lock.WriteString("version = 1\n")
-	for _, c := range m.UV.ConstraintDependencies {
-		if !strings.Contains(c, "python_version") {
-			continue
-		}
-		f.seeded = append(f.seeded, c)
+	for _, c := range constraints {
 		head, _, _ := strings.Cut(c, ";")
 		name, version, _ := strings.Cut(head, "==")
 		fmt.Fprintf(&lock, "\n[[package]]\nname = %q\nversion = %q\n", manifest.DistName(name), strings.TrimSpace(version))
@@ -209,12 +235,40 @@ func seeded(t *testing.T) pinsResult {
 	return pinsRun{src: buildManifest, build: build332, freeze: freeze339}.start(t)
 }
 
+// A seed holds the image's versions on every Python requires-python allows,
+// so the lock resolves once; only when that leaves uv nothing to lock does it
+// hold them on the image's Python alone, and say why.
+func TestASeedNarrowsToTheImagesPythonOnlyWhenItMustEverywhere(t *testing.T) {
+	r := seeded(t)
+	if len(r.uv.tries) != 1 || slices.ContainsFunc(r.uv.seeded, func(c string) bool { return strings.Contains(c, "python_version") }) {
+		t.Errorf("tries %q; want one try holding the versions on every Python, with no marker", r.uv.tries)
+	}
+	if strings.Contains(r.out, "only:") {
+		t.Errorf("a seed held everywhere said it narrowed:\n%s", r.out)
+	}
+
+	narrow := pinsRun{src: buildManifest, build: build332, freeze: freeze339, uv: &fakeUV{everywhereFails: true}}.start(t)
+	if len(narrow.uv.tries) != 2 || strings.Contains(narrow.uv.tries[0][0], "python_version") ||
+		!strings.Contains(narrow.uv.tries[1][0], "; python_version == '3.12'") {
+		t.Fatalf("tries %q; want one on every Python, then one on 3.12 alone", narrow.uv.tries)
+	}
+	if narrow.uv.seedLocks != 1 || !strings.Contains(narrow.lock, `version = "2.2.3"`) || !strings.Contains(narrow.manifest, seedRecord339) {
+		t.Errorf("the narrowed seed did not hold (seed locks %d):\n%s\n%s", narrow.uv.seedLocks, narrow.manifest, narrow.lock)
+	}
+	if !strings.Contains(narrow.out, "held for Python 3.12 only: uv could not hold numpy on every Python requires-python allows") {
+		t.Errorf("the start did not say the seed narrowed, or why:\n%s", narrow.out)
+	}
+	if strings.Contains(narrow.manifest, "python_version") || strings.Contains(narrow.manifest, "ships these versions") {
+		t.Errorf("the narrowed seed left constraints in the manifest:\n%s", narrow.manifest)
+	}
+}
+
 func TestStartSeedsTheLock(t *testing.T) {
 	r := seeded(t)
 	if strings.Join(r.freezeAsked, " ") != "3.3-9 3.12" {
 		t.Errorf("package list asked for %q, want the series' newest build and its default Python", r.freezeAsked)
 	}
-	want := []string{"pandas==2.2.3; python_version == '3.12'", "SQLAlchemy==2.0.50; python_version == '3.12'"}
+	want := []string{"pandas==2.2.3", "SQLAlchemy==2.0.50"}
 	if strings.Join(r.uv.seeded, "|") != strings.Join(want, "|") {
 		t.Errorf("seeded with %q, want %q", r.uv.seeded, want)
 	}
@@ -510,7 +564,7 @@ func TestAPatchPinsSeedIsOfThePythonTheProjectRuns(t *testing.T) {
 	list := []string{"apache-airflow==3.3.1+astro.1", "pandas==2.2.3"}
 
 	r := pinsRun{src: src, build: build331, catalog: patchCatalog, freeze: list}.start(t)
-	if strings.Join(r.freezeAsked, " ") != "3.3-8 3.13" || !strings.Contains(strings.Join(r.uv.seeded, " "), "python_version == '3.13'") {
+	if strings.Join(r.freezeAsked, " ") != "3.3-8 3.13" || len(r.uv.seeded) == 0 || !strings.Contains(r.manifest, "Astro Runtime 3.3-8 (Python 3.13)") {
 		t.Errorf("asked %q, seeded %q; want 3.3-8 on 3.13, the Python the project runs", r.freezeAsked, r.uv.seeded)
 	}
 
