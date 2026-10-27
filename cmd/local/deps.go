@@ -103,6 +103,12 @@ type Deps struct {
 	// when that leaves none to offer.
 	PickDeployment func(workspaceID string, linked map[string]string) (PickedDeployment, error)
 	PickWorkspace  func() (string, error)
+	// CurrentDomain and CurrentOrganization are the current Astro login's
+	// domain and organization, which `astro link workspace` writes beside a
+	// workspace when no flag names them. The root wires them under Astro only,
+	// from config/, which this tree cannot import; nil reads as none.
+	CurrentDomain       func() string
+	CurrentOrganization func() string
 
 	// APC is set by the root when the current context is Astro Private
 	// Cloud's, and nil under Astro. `astro link add` then links an APC

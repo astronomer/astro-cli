@@ -56,6 +56,14 @@ func withLinkPickers(d *local.Deps, client astrov1.APIClient, out io.Writer) {
 		ws, _ := workspace.GetCurrentWorkspace() //nolint:errcheck // no current workspace reads as none, as deploy reads it
 		return ws
 	}
+	d.CurrentDomain = currentDomain
+	d.CurrentOrganization = func() string {
+		ctx, err := config.GetCurrentContext()
+		if err != nil {
+			return ""
+		}
+		return ctx.Organization
+	}
 	d.PickDeployment = func(workspaceID string, linked map[string]string) (local.PickedDeployment, error) {
 		// deploy's own filter hook leaves out what the project already links.
 		unlinked := func(dep astrov1.Deployment) bool {

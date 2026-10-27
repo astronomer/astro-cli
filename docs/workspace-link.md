@@ -2,7 +2,7 @@
 
 A project can link an Astro workspace in its manifest. The workspace's Environment Manager objects (environment variables, Airflow Variables and connections) then reach the project's local Airflow, below every local source, and a name declared `source = "workspace"` is required from it. `astro local start` and Astro Desktop both read the link, and a project starts with the same values whichever one starts it. This page is the contract both implement. How workspace values fit among the local sources is in [secrets.md](secrets.md#precedence).
 
-**Status: experimental.** Astro Desktop sets the link; the CLI reads it and has no command to set it (see [Setting the link](#setting-the-link)).
+**Status: experimental.** `astro link workspace` and Astro Desktop set the link, through the same writer, and both apps read it (see [Setting the link](#setting-the-link)).
 
 ## The manifest
 
@@ -252,13 +252,26 @@ the current one.
 
 ## Setting the link
 
-**The workspace link is set from Astro Desktop, and is experimental.** The CLI
-reads `workspace`, `domain` and `organization` exactly as this document
-describes, so a project linked in Astro Desktop behaves the same in both tools,
-but the CLI has no command to set or clear them. Link, switch or unlink the
-workspace in Astro Desktop rather than editing these keys by hand.
+**The workspace link is set with `astro link workspace` or from Astro Desktop,
+and is experimental.** Both write `workspace`, `domain` and `organization`
+through the same writer, so a project linked in either behaves the same in
+both tools. Link, switch or unlink the workspace with one of them rather than
+editing these keys by hand.
 
-Astro Desktop writes the three keys together through `scaffold.SetWorkspaceLink`.
+```sh
+astro link workspace                  # in a terminal, pick one of your workspaces
+astro link workspace clx123abc        # link a workspace by id
+astro link workspace --unset          # unlink it
+```
+
+The CLI takes the domain from `--domain`, else the current Astro login's (the
+login the picker lists workspaces from), else the one the project already
+reads its workspace on (see [The manifest](#the-manifest)). It takes the
+organization from `--organization`, else the current login's when the domain
+is that login's. `--output json` reports the keys as written, and `pinned`
+names the Deployment links a switch or an unlink wrote the old workspace onto.
+
+Both write the three keys together through `scaffold.SetWorkspaceLink`.
 An empty organization there means "not given": it keeps the one recorded for
 the workspace already linked, and clears it when the workspace changes.
 Unlinking removes all three. A switch or an unlink first writes the old

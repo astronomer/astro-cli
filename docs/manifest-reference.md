@@ -236,7 +236,7 @@ The project's Astro workspace. It does three jobs:
 - Its Environment Manager objects (environment variables, Airflow variables, connections) reach the project's local Airflow, declared or not, below every local source and above a declaration's default, and a `{ source = 'workspace' }` value in `[tool.astro.env]` resolves from it. See [`[tool.astro.env]`](#toolastroenv).
 - It is the workspace `astro env` and `astro deployment` act on when run inside the project without `--workspace`, in place of the one `astro workspace switch` picked. See [Commands that manage Astro](workspace-link.md#commands-that-manage-astro).
 
-**Experimental: the workspace link is set from Astro Desktop.** Link, switch or unlink the workspace there; it writes `workspace`, `domain` and `organization` together, and a switch or unlink first writes the old id onto each Astro link that was inheriting it, so no link moves to a workspace its Deployment is not in. The CLI reads all three, so a project linked in Astro Desktop behaves the same in both tools and for anyone who clones it, but the CLI has no command to set them, and they are not meant to be edited by hand. See [Setting the link](workspace-link.md#setting-the-link).
+**Experimental: the workspace link is set with `astro link workspace` or from Astro Desktop.** Link, switch or unlink the workspace with either; both write `workspace`, `domain` and `organization` together, and a switch or unlink first writes the old id onto each Astro link that was inheriting it, so no link moves to a workspace its Deployment is not in. Both tools read all three, so a linked project behaves the same in either and for anyone who clones it. They are not meant to be edited by hand. See [Setting the link](workspace-link.md#setting-the-link).
 
 ```toml
 [tool.astro]
@@ -400,7 +400,7 @@ The two levels fold together at parse time, so by the time the CLI acts on a lin
 
 ### Linking from the command line
 
-`astro link add <name>` writes a link, `astro link remove <name>` removes one, and `astro link default <name>` moves the `default` mark (`--unset` clears it). Astro Desktop's link editor writes through the same code, so both refuse a link the next read would not load, and both leave the rest of the file, comments included, as it was.
+`astro link add <name>` writes a link, `astro link remove <name>` removes one, and `astro link default <name>` moves the `default` mark (`--unset` clears it). `astro link workspace [<id>]` links the project's workspace (`--unset` unlinks it); see [Setting the link](workspace-link.md#setting-the-link). Astro Desktop's link editor writes through the same code, so both refuse a link the next read would not load, and both leave the rest of the file, comments included, as it was.
 
 In a terminal, a missing argument is asked for instead: `astro link add` with no `--deployment` lists the Astro Deployments in the project's workspace (else your current one) with the picker `astro deploy` uses, and names the link after the one chosen, lowercased with each run of other characters turned into a dash; `remove` and `default` list the project's links. A run that cannot be asked, with no terminal or with `--output json`, never prompts and names the missing argument instead.
 

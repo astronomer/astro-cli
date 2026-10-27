@@ -88,6 +88,7 @@ var publishedPayloads = []schemaCase{
 	{"use-listing", useListing{}},
 	{"use-link-row", useLinkRow{}},
 	{"link-result", linkResult{}},
+	{"workspace-link-result", workspaceLinkResult{}},
 	{"error", cliout.ErrorObject{}},
 	{"event", event{}},
 	{"open-url", urlResult{}},

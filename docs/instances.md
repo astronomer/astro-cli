@@ -90,4 +90,4 @@ For an Astro link, a 502, 503 or 504 from the Airflow is explained by asking the
 
 ## Editing links
 
-`astro link add`, `astro link remove` and `astro link default [--unset]` edit the project's links in `pyproject.toml`. They are described in [Linking from the command line](manifest-reference.md#linking-from-the-command-line).
+`astro link add`, `astro link remove` and `astro link default [--unset]` edit the project's links in `pyproject.toml`, and `astro link workspace [--unset]` its workspace link. They are described in [Linking from the command line](manifest-reference.md#linking-from-the-command-line).

@@ -82,14 +82,16 @@ func NewLinkCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "link",
 		Short: "Link Deployments to this project",
-		Long: "Link the Deployments this project works with. Links are " +
-			"saved in the project, so everyone who clones it gets them. astro use lists them.",
+		Long: "Link the Deployments this project works with, and the Astro workspace its local Airflow " +
+			"reads connections and variables from. Links are saved in the project, so everyone who " +
+			"clones it gets them. astro use lists the Deployment links.",
 		Example: "  astro link add                              # pick a Deployment to link\n" +
 			"  astro link add prod --deployment clx123abc\n" +
-			"  astro link default prod",
+			"  astro link default prod\n" +
+			"  astro link workspace                        # pick a workspace to link",
 		Args: cobra.NoArgs,
 	}
-	cmd.AddCommand(newLinkAddCmd(c), newLinkRemoveCmd(c), newLinkDefaultCmd(c))
+	cmd.AddCommand(newLinkAddCmd(c), newLinkRemoveCmd(c), newLinkDefaultCmd(c), newLinkWorkspaceCmd(c))
 	cliout.AddOutputFlag(cmd, &c.output)
 	markSkipPreRun(cmd)
 	return cmd
