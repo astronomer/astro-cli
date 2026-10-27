@@ -64,8 +64,9 @@ func TestExplainHibernating(t *testing.T) {
 			assert.Equal(t, tc.keepsText, strings.Contains(got.Error(), refusal.Error()), "Astro's own text in %q", got)
 			assert.ErrorIs(t, got, refusal)
 			assert.True(t, httputil.HasStatus(got, tc.status))
-			// The deployment_hibernating kind, under --output json.
-			assert.ErrorIs(t, got, instancelocate.ErrDeploymentHibernating)
+			// The deployment_hibernating kind goes with a refusal that itself
+			// names hibernation, which is the one whose text is the hint alone.
+			assert.Equal(t, !tc.keepsText, errors.Is(got, instancelocate.ErrDeploymentHibernating), "the deployment_hibernating kind on %q", got)
 		})
 	}
 }
@@ -178,10 +179,9 @@ func TestDeployManifestImage_HibernatingSaysHowToWakeIt(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
-func TestDeployManifestImage_HibernatingRefusesBeforeBuilding(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	client := new(astrov1_mocks.ClientWithResponsesInterface)
-
+// mockHibernatingDeployment reads back a hibernating Deployment on runtime
+// 3.1-2 with DAG deploys on.
+func mockHibernatingDeployment(client *astrov1_mocks.ClientWithResponsesInterface, cicdEnforced bool) {
 	standard := astrov1.DeploymentTypeSTANDARD
 	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.GetDeploymentResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
@@ -192,9 +192,17 @@ func TestDeployManifestImage_HibernatingRefusesBeforeBuilding(t *testing.T) {
 			AstroRuntimeVersion: "3.1-2",
 			Type:                &standard,
 			IsDagDeployEnabled:  true,
+			IsCicdEnforced:      cicdEnforced,
 			Status:              astrov1.DeploymentStatusHIBERNATING,
 		},
 	}, nil)
+}
+
+func TestDeployManifestImage_HibernatingRefusesBeforeBuilding(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+
+	mockHibernatingDeployment(client, false)
 	cmd := withImageSeams(t, "3.1-2")
 	built := false
 
@@ -214,4 +222,29 @@ func TestDeployManifestImage_HibernatingRefusesBeforeBuilding(t *testing.T) {
 	// Neither the runtime offer nor a deploy is asked for.
 	client.AssertExpectations(t)
 	client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// The refusals waking would not clear come first, so a hibernating Deployment
+// that enforces CI/CD is told about CI/CD, as a Dags-only deploy tells it.
+func TestDeployManifestImage_HibernatingComesAfterCiCdEnforcement(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+
+	mockHibernatingDeployment(client, true)
+	was := canCiCdDeploy
+	canCiCdDeploy = func(string) bool { return false }
+	t.Cleanup(func() { canCiCdDeploy = was })
+	withImageSeams(t, "3.1-2")
+
+	_, err := DeployManifestImage(ManifestImageDeployInput{
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     manifestProjectDir(t),
+			AirflowVersion: "3.1",
+		},
+		DeploymentID: "test-deployment-id",
+	}, client)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ci/cd enforcement")
+	assert.NotErrorIs(t, err, instancelocate.ErrDeploymentHibernating)
+	client.AssertExpectations(t)
 }
