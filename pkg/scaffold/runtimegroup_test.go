@@ -54,7 +54,7 @@ func defaultGroups(t *testing.T, out string) any {
 
 func writeGroup(t *testing.T, dir string, group *RuntimeGroup, seed *Seed) (string, *manifest.Manifest) {
 	t.Helper()
-	refused, err := SetAstroBuild(dir, nil, build332, group, seed)
+	refused, err := SetAstroBuildSeed(dir, nil, build332, group, seed)
 	require.NoError(t, err)
 	require.False(t, refused)
 	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
@@ -160,7 +160,8 @@ func TestTheRuntimeGroupIsPrunedAndEmptied(t *testing.T) {
 
 // A group with nothing in it is not created: a project that never had one
 // (a runtime with no package list) gets no group and no default-groups. A
-// record alone creates it, empty, and still out of default-groups.
+// record alone creates it, empty, and it joins default-groups then, so it is
+// installed once it fills.
 func TestAnEmptyRuntimeGroupIsNotCreated(t *testing.T) {
 	dir := projectWith(t, astroHead)
 	out, m := writeGroup(t, dir, &RuntimeGroup{}, nil)
@@ -171,7 +172,7 @@ func TestAnEmptyRuntimeGroupIsNotCreated(t *testing.T) {
 	out, m = writeGroup(t, dir, &RuntimeGroup{}, seed339)
 	assert.Equal(t, "3.3-9", m.UV.RuntimeBuild)
 	assert.Contains(t, out, "astro-runtime = [")
-	assert.NotContains(t, out, "default-groups")
+	assert.Contains(t, out, "'astro-runtime'")
 }
 
 // The group is astro's list of what the image has, not packages the project
@@ -206,7 +207,7 @@ func TestTheRuntimeGroupIsRefusedInAnInlineTable(t *testing.T) {
 	src := astroHead + "\n[tool]\nfoo = 1\n"
 	src = strings.Replace(src, "[project]\n", "dependency-groups = { lint = ['ruff'] }\n\n[project]\n", 1)
 	dir := projectWith(t, src)
-	refused, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, group339, seed339)
+	refused, err := SetAstroBuildSeed(dir, nil, runtimeversions.AstroBuild{}, group339, seed339)
 	require.NoError(t, err)
 	assert.True(t, refused)
 	// Nothing the group would have needed is left behind: no default-groups,

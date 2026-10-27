@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -34,15 +35,16 @@ var freeze339 = []string{
 // seedRecord339 is the record a seed from freeze339 leaves in the manifest.
 const seedRecord339 = "# astro seeded uv.lock from Astro Runtime 3.3-9 (Python 3.12)."
 
-// fakeUV stands in for `uv lock`. In a seed's scratch copy it writes a lock
-// holding every constraint the copy states at its version, as a resolution
-// held to them would; in the project it keeps the lock there, as uv's
-// preferences keep a seeded lock's versions, and says so by leaving it alone.
+// fakeUV stands in for `uv lock`. With the seed's constraints in the
+// project's pyproject.toml it writes a lock holding every one at its version,
+// as a resolution held to them would; without them it keeps the lock there,
+// as uv's preferences keep a seeded lock's versions, and says so by leaving
+// it alone.
 type fakeUV struct {
-	// seeded are the constraints the last scratch copy stated.
+	// seeded are the constraints the last seed lock stated.
 	seeded []string
-	// scratchLocks and projectLocks count the two kinds of lock.
-	scratchLocks, projectLocks int
+	// seedLocks and projectLocks count the two kinds of lock.
+	seedLocks, projectLocks int
 	// err fails every lock; projectErr fails only the project's.
 	err, projectErr error
 }
@@ -51,11 +53,6 @@ func (f *fakeUV) lock(_ context.Context, dir string) error {
 	if f.err != nil {
 		return f.err
 	}
-	if !strings.HasPrefix(filepath.Base(dir), "astro-seed-") {
-		f.projectLocks++
-		return f.projectErr
-	}
-	f.scratchLocks++
 	data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	if err != nil {
 		return err
@@ -64,6 +61,11 @@ func (f *fakeUV) lock(_ context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
+	if !slices.ContainsFunc(m.UV.ConstraintDependencies, func(c string) bool { return strings.Contains(c, "python_version") }) {
+		f.projectLocks++
+		return f.projectErr
+	}
+	f.seedLocks++
 	f.seeded = nil
 	var lock strings.Builder
 	lock.WriteString("version = 1\n")
@@ -209,8 +211,8 @@ func TestStartSeedsTheLock(t *testing.T) {
 	if strings.Join(r.uv.seeded, "|") != strings.Join(want, "|") {
 		t.Errorf("seeded with %q, want %q", r.uv.seeded, want)
 	}
-	if r.uv.scratchLocks != 1 || r.uv.projectLocks != 1 {
-		t.Errorf("locked %d scratch copies and the project %d times, want 1 and 1", r.uv.scratchLocks, r.uv.projectLocks)
+	if r.uv.seedLocks != 1 || r.uv.projectLocks != 1 {
+		t.Errorf("locked %d seed locks and the project %d times, want 1 and 1", r.uv.seedLocks, r.uv.projectLocks)
 	}
 	if !strings.Contains(r.lock, `name = "pandas"`) || !strings.Contains(r.lock, `version = "2.2.3"`) {
 		t.Errorf("the project's lock does not hold the seeded versions:\n%s", r.lock)
@@ -233,8 +235,8 @@ func TestStartSeedsTheLock(t *testing.T) {
 
 	// With the lock there, a start seeds nothing, and the lock is the image's.
 	again := pinsRun{src: r.manifest, files: map[string]string{"uv.lock": r.lock}, build: build332, freeze: freeze339}.start(t)
-	if again.manifest != r.manifest || again.uv.scratchLocks != 0 || strings.Contains(again.out, "uv.lock:") || strings.Contains(again.out, "now installs") {
-		t.Errorf("a second start changed something (scratch locks %d):\n%s", again.uv.scratchLocks, again.out)
+	if again.manifest != r.manifest || again.uv.seedLocks != 0 || strings.Contains(again.out, "uv.lock:") || strings.Contains(again.out, "now installs") {
+		t.Errorf("a second start changed something (seed locks %d):\n%s", again.uv.seedLocks, again.out)
 	}
 
 	// A package the project gives a bound the image's version does not meet
@@ -256,7 +258,7 @@ func TestStartSaysHowFarTheLockIsFromTheImage(t *testing.T) {
 	if !strings.Contains(got.out, "uv.lock: 2 packages differ from Astro Runtime 3.3-9; run astro init to re-seed") {
 		t.Errorf("no drift notice:\n%s", got.out)
 	}
-	if got.uv.scratchLocks != 0 || got.lock != drifted {
+	if got.uv.seedLocks != 0 || got.lock != drifted {
 		t.Error("a start seeded a lock that was there")
 	}
 
@@ -272,8 +274,8 @@ func TestInitSeedsALockThatIsThere(t *testing.T) {
 	r := seeded(t)
 	drifted := strings.Replace(r.lock, `"2.2.3"`, `"3.0.1"`, 1)
 	got := pinsRun{src: r.manifest, files: map[string]string{"uv.lock": drifted}, build: build332, freeze: freeze339, init: true}.start(t)
-	if got.uv.scratchLocks != 1 || !strings.Contains(got.lock, `"2.2.3"`) {
-		t.Errorf("init did not seed the lock again (scratch locks %d):\n%s", got.uv.scratchLocks, got.lock)
+	if got.uv.seedLocks != 1 || !strings.Contains(got.lock, `"2.2.3"`) {
+		t.Errorf("init did not seed the lock again (seed locks %d):\n%s", got.uv.seedLocks, got.lock)
 	}
 }
 
@@ -296,6 +298,18 @@ func TestAFailedSeedLeavesTheLockAsItWas(t *testing.T) {
 	if r.lock != before || strings.Contains(r.manifest, "astro seeded") {
 		t.Errorf("a seed the project does not lock with left the lock changed (%q) or a record", r.lock)
 	}
+	if strings.Contains(r.manifest, "python_version") {
+		t.Errorf("a failed seed left the image's versions in pyproject.toml:\n%s", r.manifest)
+	}
+	// A seed that fails at its first lock, the one with the image's versions,
+	// leaves both files as they were too.
+	r = pinsRun{
+		src: buildManifest, files: map[string]string{"uv.lock": before}, build: build332, freeze: freeze339, init: true,
+		uv: &fakeUV{err: errors.New("no solution found")},
+	}.start(t)
+	if r.lock != before || strings.Contains(r.manifest, "python_version") || strings.Contains(r.manifest, "astro seeded") {
+		t.Errorf("a seed that did not resolve left something behind (%q):\n%s", r.lock, r.manifest)
+	}
 }
 
 func TestStartKeepsTheSeedWhenTheListCannotBeRead(t *testing.T) {
@@ -304,8 +318,32 @@ func TestStartKeepsTheSeedWhenTheListCannotBeRead(t *testing.T) {
 	if got.manifest != r.manifest {
 		t.Errorf("an unreadable list changed the record:\n%s", got.manifest)
 	}
-	if !strings.Contains(got.out, "uv.lock stays as it is: could not read what Astro Runtime 3.3-9 ships") {
-		t.Errorf("the start did not say it could not read the list:\n%s", got.out)
+	if strings.Count(got.out, "warning:") != 1 || !strings.Contains(got.out, "uv.lock stays seeded from Astro Runtime 3.3-9: could not read what Astro Runtime 3.3-9 ships") {
+		t.Errorf("the start did not say, once, that it could not read the list:\n%s", got.out)
+	}
+	// A newer build whose list cannot be read keeps the seed too, while the
+	// requirement still covers its Airflow.
+	newer := pinsRun{
+		src: r.manifest, files: map[string]string{"uv.lock": r.lock}, build: build332,
+		catalog:   strings.Replace(pinsCatalog, `"3.3-9":`, `"3.3-10": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "releaseDate": "2026-01-01", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}}, "3.3-9":`, 1),
+		freezeErr: errors.New("context deadline exceeded"),
+	}.start(t)
+	if newer.manifest != r.manifest || newer.lock != r.lock {
+		t.Errorf("a newer build's unreadable list changed the record or the lock:\n%s", newer.manifest)
+	}
+}
+
+// A start that cannot reach Astronomer's index keeps the seed as it is, even
+// for a project whose Airflow comes from PyPI, which has no Astronomer build
+// to keep.
+func TestStartOfflineKeepsTheSeedOfAPyPIAirflow(t *testing.T) {
+	pypi := pinsRun{src: buildManifest, build: runtimeversions.AstroBuild{}, lookupErr: runtimeversions.ErrNoAstroBuild, freeze: freeze339, init: true}.start(t)
+	if !strings.Contains(pypi.manifest, seedRecord339) {
+		t.Fatalf("no seed to start from:\n%s\n%s", pypi.manifest, pypi.out)
+	}
+	got := pinsRun{src: pypi.manifest, files: map[string]string{"uv.lock": pypi.lock}, lookupErr: errors.New("dial tcp: no route to host"), freeze: freeze339}.start(t)
+	if got.manifest != pypi.manifest || got.lock != pypi.lock {
+		t.Errorf("an offline start changed a PyPI Airflow's seed:\n%s", got.manifest)
 	}
 }
 
@@ -320,14 +358,16 @@ func TestStartTakesOutTheRecordOfABuildWithNoList(t *testing.T) {
 	}
 }
 
-// A project with its own exclude-newer reads no package list, as under
-// UV_EXCLUDE_NEWER: versions newer than its cutoff would leave uv nothing to
-// lock, so nothing is seeded and an earlier seed's record comes out.
+// A project with its own exclude-newer, in [tool.uv] or its uv.toml, reads no
+// package list: versions newer than its cutoff would leave uv nothing to
+// lock, so nothing is seeded and an earlier seed's record comes out. A
+// UV_EXCLUDE_NEWER in the environment says nothing of the project: nothing is
+// read or seeded either, and the record stays.
 func TestStartSeedsNothingUnderACutoff(t *testing.T) {
 	r := seeded(t)
 	src := strings.Replace(r.manifest, "[tool.uv]\n", "[tool.uv]\nexclude-newer = \"1 week\"\n", 1)
 	got := pinsRun{src: src, build: build332, freeze: freeze339}.start(t)
-	if len(got.freezeAsked) != 0 || strings.Contains(got.manifest, "astro seeded") || got.uv.scratchLocks != 0 {
+	if len(got.freezeAsked) != 0 || strings.Contains(got.manifest, "astro seeded") || got.uv.seedLocks != 0 {
 		t.Errorf("the list was read (%q), or a seed made or kept, under the project's cutoff:\n%s", got.freezeAsked, got.manifest)
 	}
 	// Nothing is resolved for a seed there will not be. (The start's plan
@@ -338,11 +378,15 @@ func TestStartSeedsNothingUnderACutoff(t *testing.T) {
 		t.Errorf("catalog read %d times under a cutoff, %d without: the cutoff should spare the seed's read", cutoffReads, plain.catalogReads)
 	}
 
-	// UV_EXCLUDE_NEWER is a cutoff too, a duration as well as a date.
-	t.Setenv("UV_EXCLUDE_NEWER", "1 week")
-	got = pinsRun{src: r.manifest, build: build332, freeze: freeze339}.start(t)
+	got = pinsRun{src: r.manifest, files: map[string]string{"uv.toml": "exclude-newer = \"2026-01-01\"\n"}, build: build332, freeze: freeze339}.start(t)
 	if len(got.freezeAsked) != 0 || strings.Contains(got.manifest, "astro seeded") {
-		t.Errorf("the list was read (%q), or the record kept, under UV_EXCLUDE_NEWER:\n%s", got.freezeAsked, got.manifest)
+		t.Errorf("the list was read (%q), or the record kept, under uv.toml's cutoff:\n%s", got.freezeAsked, got.manifest)
+	}
+
+	t.Setenv("UV_EXCLUDE_NEWER", "1 week")
+	got = pinsRun{src: r.manifest, files: map[string]string{"uv.lock": r.lock}, build: build332, freeze: freeze339}.start(t)
+	if len(got.freezeAsked) != 0 || got.manifest != r.manifest || got.uv.seedLocks != 0 {
+		t.Errorf("the list was read (%q), or the record changed, under UV_EXCLUDE_NEWER:\n%s", got.freezeAsked, got.manifest)
 	}
 }
 
@@ -383,8 +427,8 @@ func TestStartWithoutTheCatalogKeepsOnlyARecordThePinStillCovers(t *testing.T) {
 func TestStartOfflineStillSeedsALockThatIsNotThere(t *testing.T) {
 	r := seeded(t)
 	got := pinsRun{src: r.manifest, lookupErr: errors.New("dial tcp: no route to host"), freeze: freeze339}.start(t)
-	if got.uv.scratchLocks != 1 || !strings.Contains(got.manifest, seedRecord339) || !strings.Contains(got.manifest, "apache-airflow==3.3.2+astro.2") {
-		t.Errorf("offline, no seed or the build changed (scratch locks %d):\n%s", got.uv.scratchLocks, got.manifest)
+	if got.uv.seedLocks != 1 || !strings.Contains(got.manifest, seedRecord339) || !strings.Contains(got.manifest, "apache-airflow==3.3.2+astro.2") {
+		t.Errorf("offline, no seed or the build changed (seed locks %d):\n%s", got.uv.seedLocks, got.manifest)
 	}
 }
 
@@ -409,7 +453,7 @@ func TestStartOfflineStillAppliesACutoff(t *testing.T) {
 func TestStartSeedsNothingOfAnotherRelease(t *testing.T) {
 	other := []string{"apache-airflow==3.3.1+astro.1", "pandas==2.2.3"}
 	r := pinsRun{src: buildManifest, build: build332, freeze: other}.start(t)
-	if strings.Contains(r.manifest, "astro seeded") || r.uv.scratchLocks != 0 {
+	if strings.Contains(r.manifest, "astro seeded") || r.uv.seedLocks != 0 {
 		t.Errorf("seeded with another Airflow release's versions:\n%s", r.manifest)
 	}
 	if !strings.Contains(r.out, "no published Astro Runtime image carries Airflow 3.3.2") || strings.Contains(r.out, "make the two agree") {
@@ -423,7 +467,7 @@ func TestStartAsksToReconcileANamedRuntimeOfAnotherRelease(t *testing.T) {
 	other := []string{"apache-airflow==3.3.1+astro.1", "pandas==2.2.3"}
 	src := strings.Replace(buildManifest, "[tool.astro]\n", "[tool.astro]\nruntime = '3.3-9'\n", 1)
 	r := pinsRun{src: src, build: build332, freeze: other}.start(t)
-	if strings.Contains(r.manifest, "astro seeded") || r.uv.scratchLocks != 0 {
+	if strings.Contains(r.manifest, "astro seeded") || r.uv.seedLocks != 0 {
 		t.Errorf("seeded with another Airflow release's versions:\n%s", r.manifest)
 	}
 	if !strings.Contains(r.out, "carries Airflow 3.3.1, and the Airflow requirement holds it to 3.3.2; make the two agree") {
@@ -465,13 +509,13 @@ func TestStartKeepsTheSeedWhenANewBuildsListCannotBeRead(t *testing.T) {
 func TestInitSeedsFromTheNewestBuildAndSaysSo(t *testing.T) {
 	r := olderSeed(t)
 	start := pinsRun{src: r.manifest, files: map[string]string{"uv.lock": r.lock}, build: build332, freeze: freeze339}.start(t)
-	if strings.Contains(start.out, "seeded from Astro Runtime 3.3-9 now") || start.uv.scratchLocks != 0 {
+	if strings.Contains(start.out, "seeded from Astro Runtime 3.3-9 now") || start.uv.seedLocks != 0 {
 		t.Errorf("a start moved the seed:\n%s", start.out)
 	}
 
 	got := pinsRun{src: r.manifest, files: map[string]string{"uv.lock": r.lock}, build: build332, freeze: freeze339, args: []string{"init"}}.start(t)
-	if !strings.Contains(got.manifest, "Astro Runtime 3.3-9 (Python 3.12)") || got.uv.scratchLocks != 1 {
-		t.Errorf("init did not seed from 3.3-9 (scratch locks %d):\n%s", got.uv.scratchLocks, got.manifest)
+	if !strings.Contains(got.manifest, "Astro Runtime 3.3-9 (Python 3.12)") || got.uv.seedLocks != 1 {
+		t.Errorf("init did not seed from 3.3-9 (scratch locks %d):\n%s", got.uv.seedLocks, got.manifest)
 	}
 	if !strings.Contains(got.out, "uv.lock: seeded from Astro Runtime 3.3-9 now, not 3.3-8") {
 		t.Errorf("init did not say the build moved:\n%s", got.out)
@@ -496,8 +540,8 @@ func TestInitRelocksALockItDidNotSeed(t *testing.T) {
 	r := seeded(t)
 	src := strings.Replace(r.manifest, "[tool.uv]\n", "[tool.uv]\nexclude-newer = \"1 week\"\n", 1)
 	got := pinsRun{src: src, files: map[string]string{"uv.lock": r.lock}, build: build332, freeze: freeze339, args: []string{"init"}}.start(t)
-	if got.uv.scratchLocks != 0 || got.uv.projectLocks != 1 {
-		t.Errorf("scratch locks %d, project locks %d; want no seed and one relock", got.uv.scratchLocks, got.uv.projectLocks)
+	if got.uv.seedLocks != 0 || got.uv.projectLocks != 1 {
+		t.Errorf("scratch locks %d, project locks %d; want no seed and one relock", got.uv.seedLocks, got.uv.projectLocks)
 	}
 }
 
@@ -583,7 +627,7 @@ func TestAPatchPinsSeedIsOfThePythonTheProjectRuns(t *testing.T) {
 		}
 		return list, nil
 	}}.start(t)
-	if strings.Contains(r.manifest, "astro seeded") || r.uv.scratchLocks != 0 {
+	if strings.Contains(r.manifest, "astro seeded") || r.uv.seedLocks != 0 {
 		t.Errorf("seeded with a Python the project does not run:\n%s", r.manifest)
 	}
 	if strings.Join(r.freezeAsked, " ") != "3.3-8 3.13" {

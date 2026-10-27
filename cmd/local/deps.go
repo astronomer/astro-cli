@@ -167,12 +167,13 @@ type Deps struct {
 	// or runs uv; nil leaves the group as it is.
 	RuntimeRoots func(ctx context.Context, build, python string, freeze []string) (runtimecatalog.Roots, error)
 
-	// Lock runs `uv lock` in dir: twice for a seed, once in a scratch copy
-	// with the image's versions and once in the project (seedLock), and once
-	// after an init that did not seed (relockAfterInit). It returns an error
-	// wrapping uv.ErrNotFound when there is no uv to run. Production runs the
-	// uv the CLI finds (lockProject). A seam so a test needs no uv; nil seeds
-	// and relocks nothing.
+	// Lock runs `uv lock` in dir: twice for a seed, once with the image's
+	// versions added to the project's pyproject.toml and once without
+	// (seedLock), and once after an init that did not try to seed
+	// (relockAfterInit). It returns an error wrapping uv.ErrNotFound when
+	// there is no uv to run. Production runs the uv the CLI finds
+	// (lockProject). A seam so a test needs no uv; nil seeds and relocks
+	// nothing.
 	Lock func(ctx context.Context, dir string) error
 
 	// RuntimeCatalog reads the runtime catalog for an edit that moves the

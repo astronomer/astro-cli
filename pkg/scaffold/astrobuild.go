@@ -40,7 +40,7 @@ import (
 // build.
 //
 // The rest of what the image ships is held in the lock, not here: astro
-// seeds uv.lock with the image's versions (RuntimePins, SeedManifest), lists
+// seeds uv.lock with the image's versions in place (RuntimePins, SeedManifest), lists
 // the image's top-level packages in the astro-runtime dependency group
 // (RuntimeGroup), and records there which build and Python it seeded from
 // (Seed). Without that a lockfile takes the newest of each, so standalone ran
@@ -72,19 +72,25 @@ var (
 // [tool.uv] settings above, and the two distributions sources need listed. A
 // zero b takes out what an earlier one wrote, for an Airflow Astronomer has no
 // build of, which then comes from PyPI. It leaves every other [tool.uv] key,
-// and every comment, as it was.
-//
-// group is the astro-runtime dependency group to write in place of the one
-// there (setRuntimeGroup), nil when it is not known; seed is the record of
-// the build and Python the project's uv.lock was seeded from, written as the
-// group's first comment: nil keeps it, a zero Seed takes it out. What an
-// older astro wrote into constraint-dependencies (its runtime pins, a seed
-// record) is taken out either way.
+// and every comment, as it was, the astro-runtime group and the record of a
+// seed included (SetAstroBuildSeed).
+func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild) error {
+	_, err := SetAstroBuildSeed(dir, wrap, b, nil, nil)
+	return err
+}
+
+// SetAstroBuildSeed is SetAstroBuild with group, the astro-runtime dependency
+// group to write in place of the one there (setRuntimeGroup), nil when it is
+// not known; and seed, the record of the build and Python the project's
+// uv.lock was seeded from, written as the group's first comment: nil keeps
+// it, a zero Seed takes it out. What an older astro wrote into
+// constraint-dependencies (its runtime pins, a seed record) is taken out
+// either way.
 //
 // refused reports a group that was not written because its table cannot
 // hold the comments that head it: a [dependency-groups] written as an inline
 // table. The rest was written; the caller says why the group was not.
-func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, group *RuntimeGroup, seed *Seed) (refused bool, err error) {
+func SetAstroBuildSeed(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, group *RuntimeGroup, seed *Seed) (refused bool, err error) {
 	err = EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
 		if err := setAstroBuild(before, ed, b); err != nil {
 			return err

@@ -1,6 +1,7 @@
 package local
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	pep440 "github.com/aquasecurity/go-pep440-version"
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -90,8 +92,18 @@ func (c *cli) reportSeed(r cliout.Renderer, res astroBuildWrite) {
 	}
 	if res.groupChanged {
 		if n := len(res.groupAfter); n > 0 {
-			fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s now installs the %d packages Astro Runtime %s installs\n",
-				manifest.Marker, manifest.RuntimeGroupName, n, res.groupBuild)
+			// A group the project took out of default-groups lists them; uv
+			// installs them only from one it left in.
+			verb := "lists"
+			if res.groupInstalled {
+				verb = "installs"
+			}
+			of := "the runtime image"
+			if build := cmp.Or(res.groupBuild, res.after.RuntimeBuild); build != "" {
+				of = "Astro Runtime " + build
+			}
+			fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s now %s the %d packages %s installs\n",
+				manifest.Marker, manifest.RuntimeGroupName, verb, n, of)
 		} else {
 			fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s now lists none of a runtime image's packages: none apply to this project\n", manifest.Marker, manifest.RuntimeGroupName)
 		}
@@ -166,9 +178,13 @@ type astroBuildWrite struct {
 	// written at all.
 	seedWarn error
 	refused  bool
-	// cutoff says nothing is seeded for a cutoff, which keeps the runtime
-	// group (runtimeGroup).
+	// cutoff says nothing is seeded for the project's own cutoff, which
+	// keeps the runtime group (runtimeGroup).
 	cutoff bool
+	// offline is a write whose Airflow lookup could not be made, which
+	// leaves the Airflow build as the manifest has it: nothing it cannot
+	// tell for want of the index changes the seed.
+	offline bool
 	// groupWritten says the runtime group decided on was written, and
 	// groupBuild is the build it is of. groupErr says why the group was not
 	// brought up to date, when it is worth a warning, and groupLeftOut the
@@ -177,6 +193,9 @@ type astroBuildWrite struct {
 	groupBuild   string
 	groupErr     error
 	groupLeftOut []runtimecatalog.LeftOut
+	// groupInstalled says uv installs the group as the write left it: it is
+	// in [tool.uv] default-groups (scaffold.RuntimeGroupInstalled).
+	groupInstalled bool
 	// updated is a write that changed the file, which could not be read back
 	// to say what changed.
 	updated bool
@@ -207,7 +226,12 @@ type runtimeImage struct {
 //
 // When the lookup could not be made and the pin has not moved, the Airflow
 // build stays as the manifest has it, and what needs no index still applies:
-// the seed, and its record (scaffold.SetSeedRecord).
+// the seed, and its record (scaffold.SetSeedRecord), which also takes out
+// what an older astro wrote.
+//
+// The record changes only after a seed of its build succeeds, or on a
+// definitive answer that there is nothing to seed (runtimePins); a failure
+// to read or reach anything leaves it, and the lock, as they are.
 //
 // A declared Dockerfile's FROM names the image, so the lookup holds Airflow
 // to the release that build carries, and both are of one image.
@@ -224,10 +248,10 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroB
 	res := astroBuildWrite{pin: airflow.Pin}
 	// The image is resolved for the seed, and for a declared Dockerfile's
 	// build, which the Airflow lookup is asked about. Under a cutoff there is
-	// nothing to seed (runtimePins).
-	cutoff := underCutoff(m)
+	// nothing to seed (runtimePins), so nothing is read for one.
+	cut := underCutoff(dir, m)
 	image := runtimeImage{err: errNoImage}
-	if (c.d.RuntimePins != nil && !cutoff) || m.Astro.Dockerfile != "" {
+	if (c.d.RuntimePins != nil && cut == noCutoff) || m.Astro.Dockerfile != "" {
 		image = c.runtimeImage(ctx, dir, m)
 	}
 	runtime := airflow.Runtime
@@ -236,10 +260,11 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroB
 	}
 	res.build, res.lookupErr = c.d.AstroBuild(ctx, airflow.Pin, runtime)
 	offline := res.lookupErr != nil && !errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild) && !stalePin(m)
+	res.offline = offline
 	if offline {
 		res.build = recordedAstroBuild(m)
 	}
-	pins := c.runtimePins(ctx, dir, m, image, cutoff, &res)
+	pins := c.runtimePins(ctx, dir, m, image, cut, &res)
 	group := c.runtimeGroup(ctx, pins, &res)
 	if !offline {
 		switch {
@@ -257,21 +282,26 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroB
 	if pins != nil && len(pins.Pins) == 0 {
 		record = &scaffold.Seed{}
 	}
+	willSeed, now := c.seedPlan(dir, m, pins, group, seed)
 	changed, writeErr := watchManifest(dir, func(wrap func(run func() error) error) error {
 		var err error
 		if offline {
-			res.refused, err = scaffold.SetRuntimeGroup(dir, wrap, group, record)
+			// Still a write: it takes out what an older astro wrote into
+			// constraint-dependencies, which a seed must not read.
+			res.refused, err = scaffold.SetRuntimeGroup(dir, wrap, now, record)
 			return err
 		}
-		res.refused, err = scaffold.SetAstroBuild(dir, wrap, res.build, group, record)
+		res.refused, err = scaffold.SetAstroBuildSeed(dir, wrap, res.build, now, record)
 		return err
 	})
 	res.writeErr = writeErr
-	res.groupWritten = group != nil && writeErr == nil && !res.refused
+	res.groupWritten = now != nil && writeErr == nil && !res.refused
 	if writeErr == nil && pins != nil && len(pins.Pins) > 0 {
-		// A group with other packages in it than before has packages the lock
-		// does not hold yet, which only a seed holds to the image's versions.
-		recorded, recordErr := c.applySeed(ctx, dir, m, pins, seed || groupMoved(m, path), &res)
+		var later *scaffold.RuntimeGroup
+		if now == nil {
+			later = group
+		}
+		recorded, recordErr := c.applySeed(ctx, dir, m, pins, willSeed, later, &res)
 		changed = changed || recorded
 		if recordErr != nil {
 			res.writeErr = recordErr
@@ -281,24 +311,35 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroB
 	return res
 }
 
-// groupMoved reports a runtime group the manifest at path lists other
-// packages in than before did.
-func groupMoved(before *manifest.Manifest, path string) bool {
-	after, err := manifest.Load(path)
-	return err == nil && !slices.Equal(before.RuntimeGroup, after.RuntimeGroup)
+// seedPlan decides whether the write seeds the lock with pins (init asks;
+// otherwise a project with no lock, or a group that gains packages the lock
+// may not hold), and which runtime group it writes now, before any seed. A
+// seed decides on its group: the group of a build the lock is to be seeded
+// from, or one with packages the lock does not hold yet, is written with the
+// seed's record once the seed has worked (applySeed), so now is nil then. A
+// group that only lost packages the project now lists itself needs no seed.
+func (c *cli) seedPlan(dir string, m *manifest.Manifest, pins *scaffold.RuntimePins, group *scaffold.RuntimeGroup, seed bool) (willSeed bool, now *scaffold.RuntimeGroup) {
+	seedable := pins != nil && len(pins.Pins) > 0 && c.d.Lock != nil
+	adds := group != nil && seedable && scaffold.RuntimeGroupAdds(dir, group)
+	willSeed = seedable && (seed || !hasLock(dir) || adds)
+	if willSeed || (seedable && group != nil && pins.Build != m.UV.RuntimeBuild) {
+		return willSeed, nil
+	}
+	return willSeed, group
 }
 
-// applySeed seeds the lock of the project in dir with pins, and records the
-// seed, when seed asks or there is no lock; otherwise it counts how far the
-// lock is from pins. It reports whether it changed the manifest.
-func (c *cli) applySeed(ctx context.Context, dir string, m *manifest.Manifest, pins *scaffold.RuntimePins, seed bool, res *astroBuildWrite) (bool, error) {
-	if !seed && hasLock(dir) {
-		if res.drift = lockDrift(dir, pins); res.drift > 0 {
-			res.driftBuild = pins.Build
+// applySeed seeds the lock of the project in dir with pins when seed asks,
+// and on success records the seed and writes group, the runtime group that
+// waited for it; otherwise it counts how far the lock is from pins. A seed
+// that fails leaves the lock, its record and the group as they were. It
+// reports whether it changed the manifest.
+func (c *cli) applySeed(ctx context.Context, dir string, m *manifest.Manifest, pins *scaffold.RuntimePins, seed bool, group *scaffold.RuntimeGroup, res *astroBuildWrite) (bool, error) {
+	if !seed {
+		if hasLock(dir) {
+			if res.drift = lockDrift(dir, pins); res.drift > 0 {
+				res.driftBuild = pins.Build
+			}
 		}
-		return false, nil
-	}
-	if c.d.Lock == nil {
 		return false, nil
 	}
 	n, err := c.seedLock(ctx, dir, pins)
@@ -313,16 +354,17 @@ func (c *cli) applySeed(ctx context.Context, dir string, m *manifest.Manifest, p
 		return false, nil
 	}
 	res.seeded, res.seed = n, scaffold.Seed{Build: pins.Build, Python: pins.Python}
-	if m.UV.RuntimeBuild == pins.Build && m.UV.RuntimePython == pins.Python {
+	if group == nil && m.UV.RuntimeBuild == pins.Build && m.UV.RuntimePython == pins.Python {
 		return false, nil
 	}
 	var refused bool
 	changed, err := watchManifest(dir, func(wrap func(run func() error) error) error {
 		var err error
-		refused, err = scaffold.SetRuntimeGroup(dir, wrap, nil, &res.seed)
+		refused, err = scaffold.SetRuntimeGroup(dir, wrap, group, &res.seed)
 		return err
 	})
 	res.refused = res.refused || refused
+	res.groupWritten = res.groupWritten || (group != nil && err == nil && !refused)
 	return changed, err
 }
 
@@ -357,11 +399,48 @@ func (c *cli) runtimeGroup(ctx context.Context, pins *scaffold.RuntimePins, res 
 // for: under a cutoff, or with no seed to make and no Dockerfile.
 var errNoImage = errors.New("the runtime image was not resolved")
 
-// underCutoff reports a project uv resolves as of a cutoff: its own [tool.uv]
-// exclude-newer, or UV_EXCLUDE_NEWER, a date or a duration alike. A runtime's
-// package list is of the present, so such a project's lock is not seeded.
-func underCutoff(m *manifest.Manifest) bool {
-	return m.UV.ExcludeNewer != "" || strings.TrimSpace(os.Getenv("UV_EXCLUDE_NEWER")) != ""
+// cutoff is which cutoff holds the project's uv, if any: a runtime's package
+// list is of the present, and versions newer than a cutoff would leave uv
+// nothing to lock, so a project under one is not seeded.
+type cutoff int
+
+const (
+	noCutoff cutoff = iota
+	// projectCutoff is the project's own: [tool.uv] exclude-newer, or
+	// exclude-newer in its uv.toml. Its lock is not seeded, and the record
+	// of an earlier seed comes out.
+	projectCutoff
+	// envCutoff is UV_EXCLUDE_NEWER, the environment's, which says nothing
+	// of the project: its lock and the record stay as they are.
+	envCutoff
+)
+
+// underCutoff is the cutoff the project in dir resolves as of, a date or a
+// duration alike: the one rule for whether a seed may be made.
+func underCutoff(dir string, m *manifest.Manifest) cutoff {
+	switch {
+	case m.UV.ExcludeNewer != "" || uvTOMLExcludeNewer(dir) != "":
+		return projectCutoff
+	case strings.TrimSpace(os.Getenv("UV_EXCLUDE_NEWER")) != "":
+		return envCutoff
+	}
+	return noCutoff
+}
+
+// uvTOMLExcludeNewer is exclude-newer in the uv.toml beside the project's
+// pyproject.toml, which uv reads before [tool.uv]; "" when there is none.
+func uvTOMLExcludeNewer(dir string) string {
+	data, err := os.ReadFile(filepath.Join(dir, "uv.toml"))
+	if err != nil {
+		return ""
+	}
+	var settings struct {
+		ExcludeNewer any `toml:"exclude-newer"`
+	}
+	if toml.Unmarshal(data, &settings) != nil || settings.ExcludeNewer == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(settings.ExcludeNewer))
 }
 
 // recordedAstroBuild is the Astronomer build of Airflow the manifest holds
@@ -403,6 +482,7 @@ func (res *astroBuildWrite) compare(before *manifest.Manifest, path string, chan
 		return
 	}
 	res.after, res.groupAfter, res.beforeBuild = after.UV, after.RuntimeGroup, before.UV.RuntimeBuild
+	res.groupInstalled = scaffold.RuntimeGroupInstalled(filepath.Dir(path))
 	res.recordChanged = before.UV.RuntimeBuild != after.UV.RuntimeBuild || before.UV.RuntimePython != after.UV.RuntimePython
 	res.groupChanged = !slices.Equal(before.RuntimeGroup, after.RuntimeGroup)
 	if recordOnly {
@@ -434,33 +514,45 @@ func (c *cli) runtimeImage(ctx context.Context, dir string, m *manifest.Manifest
 
 // runtimePins are what the lock of the project m describes is seeded with:
 // the package list of image's build. None, which seeds nothing and takes the
-// record of an earlier seed out, whenever they would no longer fit:
+// record of an earlier seed out, only on a definitive answer that they would
+// no longer fit:
 //
-//   - under a cutoff (underCutoff): a list is of the present, and versions
-//     newer than the cutoff would leave uv nothing to lock. Nothing is
-//     resolved or read for them then;
-//   - the Airflow pin's own build was taken out (moved while the index could
-//     not be read);
+//   - the project's own cutoff (projectCutoff): a list is of the present, and
+//     versions newer than the cutoff would leave uv nothing to lock. Nothing
+//     is resolved or read for them then;
+//   - the Airflow pin's own build was taken out (the pin moved off it while
+//     the index could not be read);
 //   - the project builds on no runtime, or its runtime publishes no list for
 //     the Python the project runs;
 //   - the list's Airflow is another release than the Airflow pin's, or, with
 //     no Astronomer build of the pin (Airflow then comes from PyPI), one the
-//     pin does not cover;
-//   - the list of a build other than the recorded one could not be read.
+//     pin does not cover.
 //
-// nil, which leaves the lock and its record as they are, only for what
-// passes: the list of the recorded build and Python could not be read, or the
-// build cannot be told for want of a catalog. res.seedWarn says what happened
-// when it is worth a warning.
-func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest, image runtimeImage, cutoff bool, res *astroBuildWrite) *scaffold.RuntimePins {
+// nil, which leaves the lock and its record as they are, for everything that
+// passes: the index could not be reached, UV_EXCLUDE_NEWER is set in the
+// environment, a list could not be read while the requirement still covers
+// the Airflow the lock was seeded beside (keepRecordedSeed), or the build
+// cannot be told for want of a catalog. res.seedWarn says what happened when
+// it is worth a warning; one, at most.
+func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest, image runtimeImage, cut cutoff, res *astroBuildWrite) *scaffold.RuntimePins {
 	none := &scaffold.RuntimePins{}
 	noBuild := errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild)
 	switch {
 	case c.d.RuntimePins == nil:
 		return nil
-	case cutoff:
+	case cut == projectCutoff:
 		res.cutoff = true
 		return none
+	case cut == envCutoff:
+		if m.UV.RuntimeBuild != "" {
+			res.seedWarn = fmt.Errorf("uv.lock stays seeded from Astro Runtime %s: UV_EXCLUDE_NEWER holds uv to a cutoff, which a runtime's package list does not follow", m.UV.RuntimeBuild)
+		}
+		return nil
+	case res.build.Airflow == "" && !noBuild && res.offline:
+		// The lookup could not be made, and the manifest holds no Astronomer
+		// build to keep (Airflow from PyPI): what the lock was seeded with is
+		// not the index's to say. The lookup's error is warned of already.
+		return nil
 	case res.build.Airflow == "" && !noBuild, errors.Is(image.err, scaffold.ErrNoRuntimeBuild):
 		return none
 	case image.err != nil, image.python == "":
@@ -487,16 +579,10 @@ func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest,
 				image.build, image.python)
 		}
 		return none
-	case errors.Is(err, runtimecatalog.ErrPinnedResolution):
-		res.cutoff = true
-		return none
-	case err != nil && m.UV.RuntimeBuild == image.build && m.UV.RuntimePython == image.python:
-		res.seedWarn = fmt.Errorf("uv.lock stays as it is: could not read what Astro Runtime %s ships: %w", image.build, err)
-		return nil
 	case err != nil:
-		// The build moved on and its list cannot be read yet: the seed there
-		// still describes the build the images use, so it stays while the
-		// requirement covers its Airflow.
+		// The list could not be read: a network error, a timeout, a CDN or
+		// mirror that does not answer. The seed there stays while it is still
+		// of the Airflow the requirement covers.
 		return keepRecordedSeed(m, res,
 			fmt.Sprintf("could not read what Astro Runtime %s ships: %v", image.build, err),
 			fmt.Errorf("uv.lock is not seeded until what Astro Runtime %s ships can be read: %w", image.build, err))
@@ -553,18 +639,27 @@ func (c *cli) pinsOfRelease(ctx context.Context, dir string, m *manifest.Manifes
 // keepRecordedSeed leaves the lock and its record as they are when the
 // Airflow requirement still covers the Airflow the lock was seeded beside, and
 // holds res.build to that Airflow build too, so the lock does not pair one
-// release with another's dependencies. It says why with kept. Otherwise, or
-// with no seed recorded, the record comes out, with dropped as the warning.
+// release with another's dependencies. It says why with kept. With no seed
+// recorded there is nothing to keep, and nothing changes either; a pin that
+// moved off the recorded Airflow takes the record out, with dropped as the
+// warning. A seed beside Airflow from PyPI (no Astronomer build recorded)
+// stays.
 func keepRecordedSeed(m *manifest.Manifest, res *astroBuildWrite, kept string, dropped error) *scaffold.RuntimePins {
+	if m.UV.RuntimeBuild == "" {
+		res.seedWarn = dropped
+		return nil
+	}
 	recorded := recordedAstroBuild(m)
-	if m.UV.RuntimeBuild == "" || recorded.Airflow == "" || !manifest.PinCovers(m.Airflow().Pin, recorded.Airflow) {
+	if recorded.Airflow != "" && !manifest.PinCovers(m.Airflow().Pin, recorded.Airflow) {
 		res.seedWarn = dropped
 		return &scaffold.RuntimePins{}
 	}
-	if res.build.Index != "" {
-		recorded.Index = res.build.Index
+	if recorded.Airflow != "" {
+		if res.build.Index != "" {
+			recorded.Index = res.build.Index
+		}
+		res.build = recorded
 	}
-	res.build = recorded
 	res.seedWarn = fmt.Errorf("uv.lock stays seeded from Astro Runtime %s: %s", m.UV.RuntimeBuild, kept)
 	return nil
 }

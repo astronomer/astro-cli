@@ -18,26 +18,25 @@ import (
 	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
-// A project's uv.lock is seeded with the versions its runtime image ships:
-// resolved once with them as constraints, in a scratch copy of the project,
-// then copied back and locked once more in the project itself, where uv keeps
-// every version the lock already holds (its preferences) and only brings the
-// lock's record of the project's settings up to date. pyproject.toml carries
-// none of those versions, only the record of which build and Python they were
-// (scaffold.Seed).
+// A project's uv.lock is seeded with the versions its runtime image ships,
+// in the project itself: its pyproject.toml takes the image's versions as
+// constraints for one `uv lock`, then goes back to what it was, and a second
+// `uv lock` brings the lock's record of the project's settings up to date
+// while uv keeps every version the lock already holds (its preferences).
+// pyproject.toml carries none of those versions, only the record of which
+// build and Python they were (scaffold.Seed).
 //
-// From then on uv keeps them on its own: `uv add`, `uv lock` and `uv sync`
-// change a seeded version only where a requirement needs another. `uv lock
-// --upgrade`, or deleting uv.lock, lets them go, on purpose; `astro init`
-// seeds the lock again.
+// Locking in place is what makes every project lock as it does on its own: a
+// dynamic version, a build backend, relative find-links or index paths, and
+// a uv.toml (exclude-newer included) all apply as they always do.
+//
+// From then on uv keeps the versions on its own: `uv add`, `uv lock` and `uv
+// sync` change a seeded version only where a requirement needs another. `uv
+// lock --upgrade`, or deleting uv.lock, lets them go, on purpose; `astro
+// init` seeds the lock again.
 
 // lockFile is uv's lockfile, beside pyproject.toml.
 const lockFile = "uv.lock"
-
-// seedLockCopied are the files beside pyproject.toml the scratch copy takes:
-// the lock, whose versions the seed starts from and keeps where it can, and
-// what else uv reads there to lock (its own settings, the Python pin).
-var seedLockCopied = []string{lockFile, "uv.toml", ".python-version"}
 
 // lockProject is the production Deps.Lock: `uv lock` in dir, through the uv
 // the CLI finds, sharing the CLI's uv cache.
@@ -54,69 +53,90 @@ func lockProject(ctx context.Context, dir string) error {
 }
 
 // seedLock seeds the uv.lock of the project in dir with pins, and reports how
-// many of the image's versions it held the lock to. None, with no error, when
-// there is nothing to seed with. On an error the project's lock is as it was.
+// many packages the lock holds at the image's versions once it is. None, with
+// no error, when there is nothing to seed with. On an error, a canceled ctx
+// included, pyproject.toml and uv.lock are put back as they were.
 func (c *cli) seedLock(ctx context.Context, dir string, pins *scaffold.RuntimePins) (int, error) {
-	src, n, err := scaffold.SeedManifest(dir, pins)
-	if err != nil || n == 0 {
+	seeding, added, err := scaffold.SeedManifest(dir, pins)
+	if err != nil || added == 0 {
 		return 0, err
 	}
-	scratch, err := os.MkdirTemp("", "astro-seed-")
+	saved, err := saveProject(dir)
 	if err != nil {
 		return 0, err
 	}
-	defer os.RemoveAll(scratch) //nolint:errcheck // a scratch copy left in the temp dir costs nothing
-	if err := os.WriteFile(filepath.Join(scratch, manifest.Marker), src, scratchFilePerm); err != nil {
-		return 0, err
+	steps := []func() error{
+		func() error { return fsatomic.WriteFile(saved.manifestPath, seeding, saved.mode) },
+		func() error {
+			if err := c.d.Lock(ctx, dir); err != nil {
+				return fmt.Errorf("resolving the image's versions: %w", err)
+			}
+			return nil
+		},
+		func() error { return fsatomic.WriteFile(saved.manifestPath, saved.manifest, saved.mode) },
+		ctx.Err,
+		func() error {
+			if err := c.d.Lock(ctx, dir); err != nil {
+				return fmt.Errorf("locking the project with them: %w", err)
+			}
+			return nil
+		},
 	}
-	for _, name := range seedLockCopied {
-		data, err := os.ReadFile(filepath.Join(dir, name))
-		if errors.Is(err, os.ErrNotExist) {
-			continue
+	for _, step := range steps {
+		if err := step(); err != nil {
+			// What the seed left is not kept: the project is as it was before.
+			return 0, errors.Join(err, saved.restore())
 		}
-		if err != nil {
-			return 0, err
-		}
-		if err := os.WriteFile(filepath.Join(scratch, name), data, scratchFilePerm); err != nil { //nolint:gosec // name is one of seedLockCopied
-			return 0, err
-		}
 	}
-	if err := c.d.Lock(ctx, scratch); err != nil {
-		return 0, fmt.Errorf("resolving the image's versions: %w", err)
-	}
-	seeded, err := os.ReadFile(filepath.Join(scratch, lockFile))
-	if err != nil {
-		return 0, err
-	}
-	path := filepath.Join(dir, lockFile)
-	original, readErr := os.ReadFile(path)
-	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
-		return 0, readErr
-	}
-	if err := fsatomic.WriteFile(path, seeded, lockFilePerm); err != nil {
-		return 0, err
-	}
-	if err := c.d.Lock(ctx, dir); err != nil {
-		// The project does not lock with the seeded versions; leave it as it
-		// was, which is what it locks to without them.
-		var restoreErr error
-		if readErr == nil {
-			restoreErr = fsatomic.WriteFile(path, original, lockFilePerm)
-		} else {
-			restoreErr = os.Remove(path)
-		}
-		return 0, errors.Join(fmt.Errorf("locking the project with them: %w", err), restoreErr)
-	}
-	return n, nil
+	return heldPins(dir, scaffold.SeededPins(dir, pins)), nil
 }
 
-const (
-	// scratchFilePerm is the mode of the scratch copy's files, read by this
-	// user's uv alone.
-	scratchFilePerm = 0o600
-	// lockFilePerm is uv.lock's mode, as uv writes it.
-	lockFilePerm = 0o644
-)
+// savedProject is a project's pyproject.toml and uv.lock as they were before
+// a seed, to put back when it fails.
+type savedProject struct {
+	manifestPath, lockPath string
+	manifest, lock         []byte
+	mode                   os.FileMode
+	// hadLock says there was a uv.lock to put back; without one, a lock the
+	// seed wrote is removed.
+	hadLock bool
+}
+
+// saveProject reads what restore puts back.
+func saveProject(dir string) (*savedProject, error) {
+	s := &savedProject{manifestPath: filepath.Join(dir, manifest.Marker), lockPath: filepath.Join(dir, lockFile)}
+	info, err := os.Stat(s.manifestPath)
+	if err != nil {
+		return nil, err
+	}
+	s.mode = info.Mode().Perm()
+	if s.manifest, err = os.ReadFile(s.manifestPath); err != nil {
+		return nil, err
+	}
+	s.lock, err = os.ReadFile(s.lockPath)
+	switch {
+	case err == nil:
+		s.hadLock = true
+	case !errors.Is(err, os.ErrNotExist):
+		return nil, err
+	}
+	return s, nil
+}
+
+// restore puts the project's pyproject.toml and uv.lock back as they were.
+func (s *savedProject) restore() error {
+	err := fsatomic.WriteFile(s.manifestPath, s.manifest, s.mode)
+	if s.hadLock {
+		return errors.Join(err, fsatomic.WriteFile(s.lockPath, s.lock, lockFilePerm))
+	}
+	if rmErr := os.Remove(s.lockPath); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
+		err = errors.Join(err, rmErr)
+	}
+	return err
+}
+
+// lockFilePerm is uv.lock's mode, as uv writes it.
+const lockFilePerm = 0o644
 
 // hasLock reports a uv.lock in dir.
 func hasLock(dir string) bool {
@@ -124,16 +144,13 @@ func hasLock(dir string) bool {
 	return err == nil
 }
 
-// lockDrift counts the packages the uv.lock in dir holds at a version other
-// than pins', where the project does not choose another itself
-// (scaffold.Excludes): what has drifted from the image since the lock was
-// seeded, or what a lock that was never seeded holds apart from it. A
-// package the lock does not hold is no drift: a seed adds none. 0 when there
-// is no lock to read.
-func lockDrift(dir string, pins *scaffold.RuntimePins) int {
+// lockedVersions are the versions the uv.lock in dir holds of each
+// distribution, by name (manifest.DistName). nil when there is no lock to
+// read.
+func lockedVersions(dir string) map[string][]string {
 	data, err := os.ReadFile(filepath.Join(dir, lockFile))
 	if err != nil {
-		return 0
+		return nil
 	}
 	var lock struct {
 		Package []struct {
@@ -142,22 +159,42 @@ func lockDrift(dir string, pins *scaffold.RuntimePins) int {
 		} `toml:"package"`
 	}
 	if err := toml.Unmarshal(data, &lock); err != nil {
-		return 0
+		return nil
 	}
 	locked := map[string][]string{}
 	for _, p := range lock.Package {
 		name := manifest.DistName(p.Name)
 		locked[name] = append(locked[name], p.Version)
 	}
-	own := scaffold.Excludes(dir, pins.Pins)
-	drift := 0
-	for _, pin := range pins.Pins {
-		name, version, ok := strings.Cut(pin, "==")
-		name = manifest.DistName(name)
-		if !ok || own[name] || strings.Contains(version, "+astro.") {
-			continue
+	return locked
+}
+
+// heldPins counts the seeded pins the uv.lock in dir holds at their version:
+// what a seed is reported as.
+func heldPins(dir string, seeded []string) int {
+	locked := lockedVersions(dir)
+	held := 0
+	for _, pin := range seeded {
+		name, version, _ := strings.Cut(pin, "==")
+		if slices.Contains(locked[manifest.DistName(name)], strings.TrimSpace(version)) {
+			held++
 		}
-		versions, held := locked[name]
+	}
+	return held
+}
+
+// lockDrift counts the packages the uv.lock in dir holds at a version other
+// than pins', among the ones a seed holds it to (scaffold.SeededPins, which
+// leaves out what the project chooses itself): what has drifted from the
+// image since the lock was seeded, or what a lock that was never seeded
+// holds apart from it. A package the lock does not hold is no drift: a seed
+// adds none. 0 when there is no lock to read.
+func lockDrift(dir string, pins *scaffold.RuntimePins) int {
+	locked := lockedVersions(dir)
+	drift := 0
+	for _, pin := range scaffold.SeededPins(dir, pins) {
+		name, version, _ := strings.Cut(pin, "==")
+		versions, held := locked[manifest.DistName(name)]
 		if held && !slices.Contains(versions, strings.TrimSpace(version)) {
 			drift++
 		}

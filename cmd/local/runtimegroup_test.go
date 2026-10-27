@@ -74,8 +74,8 @@ func TestStartRefreshesTheRuntimeGroupWithoutTheIndex(t *testing.T) {
 	if !strings.Contains(r.manifest, "'statsd'") || strings.Contains(r.manifest, "'pandas-market-calendars'") {
 		t.Errorf("the group was not refreshed without the index:\n%s", r.manifest)
 	}
-	if r.uv.scratchLocks != 1 {
-		t.Errorf("a group with new packages in it did not seed the lock again (scratch locks %d)", r.uv.scratchLocks)
+	if r.uv.seedLocks != 1 {
+		t.Errorf("a group with new packages in it did not seed the lock again (scratch locks %d)", r.uv.seedLocks)
 	}
 	if !strings.Contains(r.manifest, "'apache-airflow==3.3.2+astro.2'") {
 		t.Errorf("the Airflow build did not stay:\n%s", r.manifest)
@@ -181,7 +181,7 @@ func TestTheRuntimeGroupFollowsKeptAndMovedSeeds(t *testing.T) {
 		strings.Contains(moved.manifest, "'pandas-market-calendars'") {
 		t.Errorf("init did not move the group with the seed:\n%s", moved.manifest)
 	}
-	if moved.uv.scratchLocks != 1 {
-		t.Errorf("init seeded %d times, want once", moved.uv.scratchLocks)
+	if moved.uv.seedLocks != 1 {
+		t.Errorf("init seeded %d times, want once", moved.uv.seedLocks)
 	}
 }
