@@ -160,7 +160,8 @@ func TestTheRuntimeGroupIsPrunedAndEmptied(t *testing.T) {
 
 // A group with nothing in it is not created: a project that never had one
 // (a runtime with no package list) gets no group and no default-groups. A
-// record alone creates it, empty, and still out of default-groups.
+// record alone creates it, empty, and it joins default-groups then, so it is
+// installed once it fills.
 func TestAnEmptyRuntimeGroupIsNotCreated(t *testing.T) {
 	dir := projectWith(t, astroHead)
 	out, m := writeGroup(t, dir, &RuntimeGroup{}, nil)
@@ -171,7 +172,7 @@ func TestAnEmptyRuntimeGroupIsNotCreated(t *testing.T) {
 	out, m = writeGroup(t, dir, &RuntimeGroup{}, seed339)
 	assert.Equal(t, "3.3-9", m.UV.RuntimeBuild)
 	assert.Contains(t, out, "astro-runtime = [")
-	assert.NotContains(t, out, "default-groups")
+	assert.Contains(t, out, "'astro-runtime'")
 }
 
 // The group is astro's list of what the image has, not packages the project

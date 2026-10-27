@@ -235,7 +235,8 @@ func (r *rootsRun) args(platform string) []string {
 
 // roots is the published list named name, else the one uv works out, kept.
 func (r *rootsRun) roots(ctx context.Context, name string) ([]string, error) {
-	if roots, ok := publishedRoots(ctx, cacheDir(rootsCacheDir), name); ok {
+	base := rootsBase()
+	if roots, ok := publishedRoots(ctx, base, cacheDirFor(rootsCacheDir, base, rootsBaseURL), name); ok {
 		return roots, nil
 	}
 	computed := cacheDir(rootsComputedDir)
@@ -246,12 +247,21 @@ func (r *rootsRun) roots(ctx context.Context, name string) ([]string, error) {
 	if len(candidates) == 0 {
 		return nil, errors.New("its freeze lists no package to resolve")
 	}
-	out, err := r.compile(ctx, slices.Concat(candidates, airflow),
-		append(r.args(rootsPlatforms[0].uv), "--annotation-style", "line"))
+	// Astronomer's platform packages are resolved too, though never roots, so
+	// what they alone pull in reads as theirs and not as a top-level package
+	// of the image. One its indexes cannot serve is resolved without.
+	platform := platformPackages(r.freeze)
+	args := append(r.args(rootsPlatforms[0].uv), "--annotation-style", "line")
+	out, err := r.compile(ctx, slices.Concat(candidates, airflow, platform), args)
+	var resolution *uv.ResolutionError
+	if errors.As(err, &resolution) && len(platform) > 0 {
+		platform = nil
+		out, err = r.compile(ctx, slices.Concat(candidates, airflow), args)
+	}
 	if err != nil {
 		return nil, err
 	}
-	roots := rootsFromCompile(out, candidates, airflow)
+	roots := rootsFromCompile(out, candidates, slices.Concat(airflow, platform))
 	if len(roots) == 0 {
 		return nil, errors.New("uv's resolution left no top-level package")
 	}
@@ -279,10 +289,24 @@ func rootsCandidates(freeze []string) (candidates, airflow []string) {
 	return slices.Compact(candidates), airflow
 }
 
-// rootsFromCompile reads the candidates no other one, and no Airflow
-// distribution, pulls in from a `uv pip compile --annotation-style line`: a
-// line is "name==version  # via a, b, -c constraints.txt".
-func rootsFromCompile(out string, candidates, airflow []string) []string {
+// platformPackages are the freeze's Astronomer platform packages, the
+// astronomer-* ones rootCandidate leaves out, by name.
+func platformPackages(freeze []string) []string {
+	var out []string
+	for _, pin := range freeze {
+		if name := manifest.DistName(pin); strings.HasPrefix(name, "astronomer-") && !rootCandidate(name) {
+			out = append(out, name)
+		}
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// rootsFromCompile reads the candidates no other one, and none of parents
+// (Airflow's distributions and Astronomer's platform packages), pulls in from
+// a `uv pip compile --annotation-style line`: a line is "name==version  #
+// via a, b, -c constraints.txt".
+func rootsFromCompile(out string, candidates, parents []string) []string {
 	pulledIn := map[string]bool{}
 	for _, line := range strings.Split(out, "\n") {
 		req, via, ok := strings.Cut(line, "# via ")
@@ -293,7 +317,7 @@ func rootsFromCompile(out string, candidates, airflow []string) []string {
 		for _, parent := range strings.Split(via, ",") {
 			parent = strings.TrimSpace(parent)
 			if p := manifest.DistName(parent); !strings.HasPrefix(parent, "-") && p != name &&
-				(slices.Contains(candidates, p) || slices.Contains(airflow, p)) {
+				(slices.Contains(candidates, p) || slices.Contains(parents, p)) {
 				pulledIn[name] = true
 			}
 		}
@@ -308,9 +332,9 @@ func rootsFromCompile(out string, candidates, airflow []string) []string {
 }
 
 // publishedRoots is the published list for name, from the cache under dir or
-// the CDN, and whether there was one. A 404, remembered as the freeze's are,
-// or any failure to read it, is no list.
-func publishedRoots(ctx context.Context, dir, name string) ([]string, bool) {
+// from base, and whether there was one. A 404, remembered as the freeze's
+// are, or any failure to read it, is no list.
+func publishedRoots(ctx context.Context, base, dir, name string) ([]string, bool) {
 	data, err := cachedFreeze(dir, name)
 	if err != nil {
 		return nil, false
@@ -318,7 +342,7 @@ func publishedRoots(ctx context.Context, dir, name string) ([]string, bool) {
 	if data == nil {
 		fetchCtx, cancel := context.WithTimeout(ctx, freezeTimeout)
 		defer cancel()
-		if data, err = fetchAndKeep(fetchCtx, rootsBase(), dir, name); err != nil {
+		if data, err = fetchAndKeep(fetchCtx, base, dir, name); err != nil {
 			return nil, false
 		}
 	}
@@ -360,14 +384,31 @@ func rootCandidate(dist string) bool {
 // installs it on from wheels alone, by a marker when that is not all of them;
 // left out, with uv's reason, when it is none.
 func (r *rootsRun) withPlatforms(ctx context.Context, roots []string) (Roots, error) {
+	// The first failure to ask (the network, uv itself) ends the rest: one is
+	// enough to fail the list, and an offline machine should not wait out
+	// every other question.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	sem := make(chan struct{}, rootsConcurrency)
+	var wg sync.WaitGroup
 	// What Airflow pulls in on each platform may build from source: the
 	// project installs it anyway.
 	exempt := make([][]string, len(rootsPlatforms))
+	exemptErr := make([]error, len(rootsPlatforms))
 	for i, p := range rootsPlatforms {
-		var err error
-		if exempt[i], err = r.airflowPulls(ctx, p.uv); err != nil {
-			return Roots{}, err
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			if exempt[i], exemptErr[i] = r.airflowPulls(ctx, p.uv); exemptErr[i] != nil {
+				cancel()
+			}
+		}()
+	}
+	wg.Wait()
+	if err := errors.Join(exemptErr...); err != nil {
+		return Roots{}, err
 	}
 	type answer struct {
 		ok  bool
@@ -375,8 +416,10 @@ func (r *rootsRun) withPlatforms(ctx context.Context, roots []string) (Roots, er
 		err error
 	}
 	answers := make([][]answer, len(roots))
-	sem := make(chan struct{}, rootsConcurrency)
-	var wg sync.WaitGroup
+	// first is the failure that ended the run, not one of the cancellations
+	// it caused.
+	var first error
+	var firstOnce sync.Once
 	for i, root := range roots {
 		answers[i] = make([]answer, len(rootsPlatforms))
 		for j, p := range rootsPlatforms {
@@ -386,11 +429,20 @@ func (r *rootsRun) withPlatforms(ctx context.Context, roots []string) (Roots, er
 				sem <- struct{}{}
 				defer func() { <-sem }()
 				ok, why, err := r.installsFromWheels(ctx, root, p.uv, exempt[j])
+				if err != nil {
+					firstOnce.Do(func() {
+						first = fmt.Errorf("asking uv whether %s installs from wheels on %s: %w", root, rootsPlatforms[j].name, err)
+					})
+					cancel()
+				}
 				answers[i][j] = answer{ok, why, err}
 			}()
 		}
 	}
 	wg.Wait()
+	if first != nil {
+		return Roots{}, first
+	}
 	var out Roots
 	for i, root := range roots {
 		var markers, missing []string
@@ -487,8 +539,11 @@ func (r *rootsRun) installsFromWheels(ctx context.Context, root, platform string
 		return answer == "ok", strings.TrimPrefix(answer, "no: "), nil
 	}
 	builds := slices.Clone(exempt)
-	ttl := time.Duration(0)
+	// Running out of retries says nothing for good: kept for answerTTL unless
+	// a break below decides otherwise.
+	ttl := answerTTL
 	for range rootsRetries {
+		ttl = 0
 		args := r.args(platform)
 		for _, pin := range r.freeze {
 			if name := manifest.DistName(pin); !slices.Contains(builds, name) {
@@ -526,6 +581,7 @@ func (r *rootsRun) installsFromWheels(ctx context.Context, root, platform string
 			break
 		}
 		builds = append(builds, named)
+		ttl = answerTTL
 	}
 	keep(path, "no: "+why, ttl)
 	return false, why, nil
@@ -562,7 +618,14 @@ func (r *rootsRun) sourceOnly(ctx context.Context, dist string) (source, later b
 	if answer, err := readAnswer(path); err == nil {
 		return answer == "yes", answer == "later", nil
 	}
-	pythons := slices.Compact(append([]string{r.python}, sourcePythons...))
+	// The project's Python first, so an answer for it is never shadowed by an
+	// older one's; each asked once.
+	pythons := []string{r.python}
+	for _, p := range sourcePythons {
+		if !slices.Contains(pythons, p) {
+			pythons = append(pythons, p)
+		}
+	}
 	for _, python := range pythons {
 		for _, platform := range sourcePlatforms {
 			args := append(r.args(platform), "--only-binary", dist)

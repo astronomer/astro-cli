@@ -281,18 +281,7 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroB
 	if pins != nil && len(pins.Pins) == 0 {
 		record = &scaffold.Seed{}
 	}
-	// A seed decides on its group: the group of a build the lock is to be
-	// seeded from, or one with packages the lock does not hold yet, is written
-	// with the seed's record, once the seed has worked, and not before
-	// (applySeed). A group that only lost packages the project now lists
-	// itself needs no seed.
-	seedable := pins != nil && len(pins.Pins) > 0 && c.d.Lock != nil
-	adds := group != nil && seedable && scaffold.RuntimeGroupAdds(dir, group)
-	willSeed := seedable && (seed || !hasLock(dir) || adds)
-	now := group
-	if willSeed || (seedable && group != nil && pins.Build != m.UV.RuntimeBuild) {
-		now = nil
-	}
+	willSeed, now := c.seedPlan(dir, m, pins, group, seed)
 	changed, writeErr := watchManifest(dir, func(wrap func(run func() error) error) error {
 		var err error
 		if offline {
@@ -319,6 +308,23 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroB
 	}
 	res.compare(m, path, changed, offline)
 	return res
+}
+
+// seedPlan decides whether the write seeds the lock with pins (init asks;
+// otherwise a project with no lock, or a group that gains packages the lock
+// may not hold), and which runtime group it writes now, before any seed. A
+// seed decides on its group: the group of a build the lock is to be seeded
+// from, or one with packages the lock does not hold yet, is written with the
+// seed's record once the seed has worked (applySeed), so now is nil then. A
+// group that only lost packages the project now lists itself needs no seed.
+func (c *cli) seedPlan(dir string, m *manifest.Manifest, pins *scaffold.RuntimePins, group *scaffold.RuntimeGroup, seed bool) (willSeed bool, now *scaffold.RuntimeGroup) {
+	seedable := pins != nil && len(pins.Pins) > 0 && c.d.Lock != nil
+	adds := group != nil && seedable && scaffold.RuntimeGroupAdds(dir, group)
+	willSeed = seedable && (seed || !hasLock(dir) || adds)
+	if willSeed || (seedable && group != nil && pins.Build != m.UV.RuntimeBuild) {
+		return willSeed, nil
+	}
+	return willSeed, group
 }
 
 // applySeed seeds the lock of the project in dir with pins when seed asks,
