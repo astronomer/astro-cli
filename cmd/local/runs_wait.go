@@ -7,7 +7,6 @@ import (
 	"io"
 	"math"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -360,45 +359,30 @@ func (q *query) renderFailedTasks(w io.Writer, dagID, runID string, failed []tas
 
 func newRunsWaitCmd(q *query) *cobra.Command {
 	var timing waitFlags
-	var until string
 	cmd := &cobra.Command{
 		Use:   "wait <DAG_ID> <RUN_ID>",
-		Short: "Wait for a run, or one of its tasks, to reach a state",
+		Short: "Wait for a run already going to finish",
 		Long: "Check on a run every --poll-interval until it succeeds, fails, or --timeout passes, and report it " +
 			"as " + q.t.suggest("runs trigger-wait") + " does. It waits on a run that is already going, such as a " +
-			"scheduled one.\n\n" +
-			"--until waits for one task instance instead, written TASK_ID=STATE or TASK_ID:MAP_INDEX=STATE for " +
-			"one expansion of a mapped task: for example review:0=awaiting_input, to act once a human-in-the-loop " +
-			"task is waiting for an answer. The wait ends early when the task instance settles in a different " +
-			"state it will not leave by itself, or the run finishes first. A task instance that does not exist " +
-			"yet, such as an expansion not yet mapped, is waited for.\n\n" +
+			"scheduled one. To wait on one task of a run instead, see " + q.t.suggest("tasks wait") + ".\n\n" +
 			"--timeout and --poll-interval take a number of seconds (300) or a duration (5m, 1h30m).\n\n" +
-			"Exit status: 0 when the run succeeded or the task reached the state, " + strconv.Itoa(exitRunFailed) +
-			" when the run failed or the task cannot reach the state (or the command itself failed), " +
-			strconv.Itoa(exitWaitTimeout) + " when the wait timed out. Stopping the wait never stops the run.",
+			"Exit status: 0 when the run succeeded, " + strconv.Itoa(exitRunFailed) + " when it failed (or the " +
+			"command itself did), " + strconv.Itoa(exitWaitTimeout) + " when the wait timed out. Stopping the " +
+			"wait never stops the run.",
 		Args: cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"Wait for a run to finish", "runs wait <DAG_ID> <RUN_ID>",
-			"Wait until a task is waiting for a human answer", "runs wait <DAG_ID> <RUN_ID> --until <TASK_ID>=awaiting_input",
-			"Wait for one expansion of a mapped task to succeed", "runs wait <DAG_ID> <RUN_ID> --until <TASK_ID>:3=success --timeout 10m",
+			"Give up waiting after ten minutes", "runs wait <DAG_ID> <RUN_ID> --timeout 10m",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			wait, err := timing.options()
 			if err != nil {
 				return err
 			}
-			if until == "" {
-				return q.runRunsWait(cmd.Context(), args[0], args[1], wait)
-			}
-			target, err := parseUntil(until)
-			if err != nil {
-				return err
-			}
-			return q.runRunsWaitUntil(cmd.Context(), args[0], args[1], target, wait)
+			return q.runRunsWait(cmd.Context(), args[0], args[1], wait)
 		},
 	}
 	timing.register(cmd)
-	cmd.Flags().StringVar(&until, "until", "", "Wait for a task instance instead: TASK_ID=STATE, or TASK_ID:MAP_INDEX=STATE")
 	return cmd
 }
 
@@ -421,177 +405,4 @@ func (q *query) runRunsWait(ctx context.Context, dagID, runID string, wait waitO
 		return err
 	}
 	return q.reportWaitedRun(ctx, r, client, run, false, timedOut, started)
-}
-
-// untilTarget is the task instance --until waits on, and the state it waits
-// for.
-type untilTarget struct {
-	taskID   string
-	mapIndex int
-	state    string
-}
-
-func (t untilTarget) name() string {
-	if t.mapIndex >= 0 {
-		return t.taskID + "[" + strconv.Itoa(t.mapIndex) + "]"
-	}
-	return t.taskID
-}
-
-// parseUntil reads TASK_ID=STATE or TASK_ID:MAP_INDEX=STATE. A task id cannot
-// hold a colon or an equals sign, so the last colon before the equals sign is
-// the map index's.
-func parseUntil(value string) (untilTarget, error) {
-	invalid := fmt.Errorf("--until must be TASK_ID=STATE or TASK_ID:MAP_INDEX=STATE, such as review:0=awaiting_input, not %q", value)
-	task, state, ok := strings.Cut(value, "=")
-	if !ok || task == "" || state == "" {
-		return untilTarget{}, invalid
-	}
-	target := untilTarget{taskID: task, mapIndex: -1, state: strings.ToLower(state)}
-	if id, index, mapped := strings.Cut(task, ":"); mapped {
-		n, err := strconv.Atoi(index)
-		if id == "" || err != nil || n < 0 {
-			return untilTarget{}, invalid
-		}
-		target.taskID, target.mapIndex = id, n
-	}
-	return target, nil
-}
-
-// taskSettled reports whether a task instance's state is one it will not leave
-// by itself. Every other state — none yet, scheduled, queued, running, deferred,
-// up_for_retry, awaiting_input and the rest — can still move.
-func taskSettled(state string) bool {
-	switch state {
-	case stateSuccess, stateFailed, stateUpstreamFailed, "skipped", "removed":
-		return true
-	}
-	return false
-}
-
-// waitedTask is what `runs wait --until` reports: the task instance as it last
-// stood, the state it was waited for, and how the wait ended. Reached and
-// TimedOut carry no omitempty: each answers a question asked every time.
-type waitedTask struct {
-	DAGID    string `json:"dag_id"`
-	RunID    string `json:"dag_run_id"`
-	TaskID   string `json:"task_id"`
-	MapIndex int    `json:"map_index"`
-	// State is "" when the task instance never appeared.
-	State          string  `json:"state"`
-	Until          string  `json:"until"`
-	Reached        bool    `json:"reached"`
-	TimedOut       bool    `json:"timed_out"`
-	RunState       string  `json:"run_state"`
-	ElapsedSeconds float64 `json:"elapsed_seconds"`
-}
-
-func (q *query) runRunsWaitUntil(ctx context.Context, dagID, runID string, target untilTarget, wait waitOptions) error {
-	r, client, err := q.open(ctx)
-	if err != nil {
-		return err
-	}
-	started := time.Now()
-	result, err := q.awaitTask(ctx, client, dagID, runID, target, started.Add(wait.timeout), wait.poll)
-	if err != nil {
-		return err
-	}
-	result.ElapsedSeconds = hundredths(time.Since(started).Seconds())
-	if err := r.Emit(result, func(w io.Writer) error { return q.renderWaitedTask(w, result) }); err != nil {
-		return err
-	}
-	switch {
-	case result.Reached:
-		return nil
-	case result.TimedOut:
-		return &cliout.ExitError{Code: exitWaitTimeout}
-	}
-	return &cliout.ExitError{Code: exitRunFailed}
-}
-
-// awaitTask checks on a task instance, and its run, until the instance reaches
-// the target state, settles in another, the run finishes without it, or the
-// deadline passes. Each change is noted on stderr as it is seen.
-func (q *query) awaitTask(ctx context.Context, client *airflowapi.Client, dagID, runID string, target untilTarget, deadline time.Time, poll time.Duration) (waitedTask, error) {
-	result := waitedTask{DAGID: dagID, RunID: runID, TaskID: target.taskID, MapIndex: target.mapIndex, Until: target.state}
-	check := q.t.suggest("runs tasks " + dagID + " " + runID)
-	last := "\x00"
-	for {
-		state, err := taskState(ctx, client, dagID, runID, target)
-		if err != nil {
-			return result, fmt.Errorf("could not check on %s in %s run %s: %w. Check on it with %s", target.name(), dagID, runID, err, check)
-		}
-		run, err := client.GetDAGRun(ctx, dagID, runID)
-		if err != nil {
-			return result, fmt.Errorf("could not check on %s run %s: %w. Check on it with %s", dagID, runID, err, check)
-		}
-		result.State, result.RunState = state, run.State
-		if state != last {
-			fmt.Fprintf(q.d.Stderr, "%s in %s run %s: %s\n", target.name(), dagID, runID, orDash(state))
-			last = state
-		}
-		switch {
-		case state == target.state:
-			result.Reached = true
-			return result, nil
-		case taskSettled(state), runFinished(run.State):
-			return result, nil
-		}
-		remaining := time.Until(deadline)
-		if remaining <= 0 {
-			result.TimedOut = true
-			return result, nil
-		}
-		timer := time.NewTimer(min(poll, remaining))
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return result, fmt.Errorf("stopped waiting for %s in %s run %s, which is %s: %w. Check on it with %s",
-				target.name(), dagID, runID, orDash(state), ctx.Err(), check)
-		case <-timer.C:
-		}
-	}
-}
-
-// taskState reads one task instance's state. One that does not exist yet —
-// an expansion not yet mapped, or a task not yet scheduled on Airflow 2 — has
-// no state, and the wait carries on.
-func taskState(ctx context.Context, client *airflowapi.Client, dagID, runID string, target untilTarget) (string, error) {
-	var instance airflowapi.TaskInstance
-	var err error
-	if target.mapIndex >= 0 {
-		instance, err = client.GetMappedTaskInstance(ctx, dagID, runID, target.taskID, target.mapIndex)
-	} else {
-		instance, err = client.GetTaskInstance(ctx, dagID, runID, target.taskID)
-	}
-	if errors.Is(err, airflowapi.ErrNotFound) {
-		return "", nil
-	}
-	return instance.State, err
-}
-
-func orDash(state string) string {
-	if state == "" {
-		return "-"
-	}
-	return state
-}
-
-func (q *query) renderWaitedTask(w io.Writer, result waitedTask) error {
-	name := untilTarget{taskID: result.TaskID, mapIndex: result.MapIndex}.name()
-	var err error
-	switch {
-	case result.Reached:
-		_, err = fmt.Fprintf(w, "%s in %s run %s: %s%s\n", name, result.DAGID, result.RunID, result.State, afterElapsed(result.ElapsedSeconds))
-	case result.TimedOut:
-		_, err = fmt.Fprintf(w, "%s in %s run %s is still %s after %s, not %s; stopped waiting, and the run carries on\n",
-			name, result.DAGID, result.RunID, orDash(result.State), formatDuration(result.ElapsedSeconds), result.Until)
-	case taskSettled(result.State):
-		_, err = fmt.Fprintf(w, "%s in %s run %s ended %s, so it will not reach %s\n",
-			name, result.DAGID, result.RunID, result.State, result.Until)
-	default:
-		_, err = fmt.Fprintf(w, "%s run %s finished %s with %s %s, so it will not reach %s\n",
-			result.DAGID, result.RunID, result.RunState, name, orDash(result.State), result.Until)
-	}
-	return err
 }

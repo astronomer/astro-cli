@@ -20,11 +20,13 @@ func newTasksCmd(d Deps, t target) *cobra.Command {
 		Use:   "tasks",
 		Short: "Read a Dag's tasks, their runs, and their logs",
 		Long: "Work with tasks on " + t.which() + ": what a Dag defines, what one run " +
-			"of a task did, the value it pushed to XCom, its log, and clearing tasks so they run again.",
+			"of a task did, waiting for it to reach a state, the value it pushed to XCom, its log, and " +
+			"clearing tasks so they run again.",
 	},
 		newTasksListCmd,
 		newTasksGetCmd,
 		newTasksInstanceCmd,
+		newTasksWaitCmd,
 		newTasksXComCmd,
 		newTasksLogsCmd,
 		newTasksClearCmd,
