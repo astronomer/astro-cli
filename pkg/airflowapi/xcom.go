@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -34,34 +33,28 @@ type XComEntry struct {
 // negative mapIndex reads an unmapped task's value; a mapped task keeps one
 // value per expansion, so it needs the index.
 //
-// On Airflow 3 the value is asked for deserialized. Airflow 3.0 does that only
-// with [api] enable_xcom_deserialize_support on, and refuses otherwise; 3.1
-// dropped the setting and deserializes for anyone. Which one answered is
+// The value is asked for deserialized first. Airflow 3.1 and later do that
+// for anyone; Airflow 3.0, and Airflow 2.10 and later, only with
+// [api] enable_xcom_deserialize_support on, and refuse otherwise; an Airflow
+// 2 older than the parameters refuses them as unknown. Which one answered is
 // learned from the answer, never from the version: a refusal is asked again
-// for the stored value. Airflow 2 has the same setting, off by default, and is
-// not asked: the stored value there is the string it keeps.
+// for the stored value, at the cost of one more read where it was refused.
 func (c *Client) GetXComEntry(ctx context.Context, dagID, runID, taskID, key string, mapIndex int) (XComEntry, error) {
-	generation, err := c.Generation(ctx)
-	if err != nil {
-		return XComEntry{}, err
-	}
 	path := pathf("/dags/%s/dagRuns/%s/taskInstances/%s/xcomEntries/%s", dagID, runID, taskID, key)
 	var entry XComEntry
-	if generation == Airflow3 {
-		err = c.get(ctx, path, xcomQuery(mapIndex, true), &entry)
-		if !deserializeRefused(err) {
-			return entry, err
-		}
+	err := c.get(ctx, path, xcomQuery(mapIndex, true), &entry)
+	if !deserializeRefused(err) {
+		return entry, err
 	}
 	err = c.get(ctx, path, xcomQuery(mapIndex, false), &entry)
 	return entry, err
 }
 
 // xcomQuery addresses one expansion when there is one and, when asked, has
-// Airflow 3 deserialize the value. Without that, Airflow 3 answers with its
+// Airflow deserialize the value. Without that, Airflow 3 answers with its
 // serialization envelopes (__classname__, __data__) rather than the value the
 // task returned; stringify=false keeps the answer JSON rather than Python's
-// rendering of it.
+// rendering of it, on Airflow 2 as on 3.
 func xcomQuery(mapIndex int, deserialize bool) url.Values {
 	query := url.Values{}
 	if mapIndex >= 0 {
@@ -74,11 +67,11 @@ func xcomQuery(mapIndex int, deserialize bool) url.Values {
 	return query
 }
 
-// deserializeRefused reports Airflow 3.0's answer to deserialize=true with its
-// [api] enable_xcom_deserialize_support off: a 400 that says so. Any other
-// refusal is the caller's to see.
+// deserializeRefused reports an Airflow that would not take the deserialized
+// read: a 400, whether it says the setting is off or that it does not know the
+// parameters. The plain read differs only in those parameters, so a 400 that
+// is about something else comes back from it too, and is reported then.
 func deserializeRefused(err error) bool {
 	var status *StatusError
-	return errors.As(err, &status) && status.StatusCode == http.StatusBadRequest &&
-		strings.Contains(strings.ToLower(status.Detail()), "deserialization is disabled")
+	return errors.As(err, &status) && status.StatusCode == http.StatusBadRequest
 }

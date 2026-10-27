@@ -39,9 +39,9 @@ func newTasksXComCmd(q *query) *cobra.Command {
 			"under --key. Text output is the value alone, a string as it is and anything else as indented " +
 			"JSON, so it can be piped; --output json wraps it with the ids it came from.\n\n" +
 			"On Airflow 3.1 and later the value is deserialized, and anything JSON cannot hold, such as a " +
-			"datetime, arrives as a string. Airflow 3.0 deserializes only with [api] " +
-			"enable_xcom_deserialize_support on, and Airflow 2 is not asked to: each returns the value as it " +
-			"stores it.",
+			"datetime, arrives as a string. Airflow 3.0, and Airflow 2.10 and later, deserialize only with " +
+			"[api] enable_xcom_deserialize_support on; without it, and on an older Airflow 2, the value " +
+			"arrives as Airflow stores it.",
 		Args: cobra.ExactArgs(taskInstanceArgs),
 		Example: afExample(q.t,
 			"Print what a task returned", "tasks xcom <DAG_ID> <RUN_ID> <TASK_ID>",

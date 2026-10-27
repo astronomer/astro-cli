@@ -271,12 +271,18 @@ func TestGetXComEntryDeserializesOnAirflow3(t *testing.T) {
 	}
 }
 
-// Airflow 2 refuses deserialize unless [api] enable_xcom_deserialize_support
-// is on, so it is not asked for there, and an unmapped read sends no index.
-func TestGetXComEntryOnAirflow2AsksForTheStoredValue(t *testing.T) {
+// Airflow 2 is asked to deserialize too. With its [api]
+// enable_xcom_deserialize_support off, the default, it refuses, and the
+// stored string is read instead; an unmapped read sends no index.
+func TestGetXComEntryOnAirflow2FallsBackToTheStoredValue(t *testing.T) {
+	const path = "/api/v1/dags/etl/dagRuns/r1/taskInstances/load/xcomEntries/rows"
 	stub := newAF2Stub(t)
-	stub.route(http.MethodGet, "/api/v1/dags/etl/dagRuns/r1/taskInstances/load/xcomEntries/rows",
-		`{"key":"rows","task_id":"load","dag_id":"etl","value":"42"}`)
+	stub.routeFunc(http.MethodGet, path, func(r *http.Request) (int, string) {
+		if r.URL.Query().Get("deserialize") == "true" {
+			return http.StatusBadRequest, `{"detail":"XCom deserialization is disabled in configuration.","status":400,"title":"Bad Request"}`
+		}
+		return http.StatusOK, `{"key":"rows","task_id":"load","dag_id":"etl","value":"42"}`
+	})
 	client := stub.client()
 
 	entry, err := client.GetXComEntry(t.Context(), "etl", "r1", "load", "rows", -1)
@@ -286,8 +292,57 @@ func TestGetXComEntryOnAirflow2AsksForTheStoredValue(t *testing.T) {
 	if string(entry.Value) != `"42"` {
 		t.Errorf("value = %s, want the stored string", entry.Value)
 	}
+	if n := stub.countRequests(http.MethodGet, path); n != 2 {
+		t.Errorf("reads = %d, want the refused one and the plain one", n)
+	}
 	if query := stub.lastRequest().Query; len(query) != 0 {
 		t.Errorf("query = %v, want none", query)
+	}
+}
+
+// An Airflow 2 with the setting on answers the first read, with the value as
+// JSON rather than Python's rendering of it.
+func TestGetXComEntryOnAirflow2WithTheSettingOnDeserializes(t *testing.T) {
+	const path = "/api/v1/dags/etl/dagRuns/r1/taskInstances/load/xcomEntries/return_value"
+	stub := newAF2Stub(t)
+	stub.route(http.MethodGet, path, `{"key":"return_value","task_id":"load","dag_id":"etl","value":{"rows":42}}`)
+	client := stub.client()
+
+	entry, err := client.GetXComEntry(t.Context(), "etl", "r1", "load", "return_value", -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(entry.Value) != `{"rows":42}` {
+		t.Errorf("value = %s, want the value as JSON", entry.Value)
+	}
+	if n := stub.countRequests(http.MethodGet, path); n != 1 {
+		t.Errorf("reads = %d, want one", n)
+	}
+	if query := stub.lastRequest().Query; query.Get("deserialize") != "true" || query.Get("stringify") != "false" {
+		t.Errorf("query = %v, want deserialize=true and stringify=false", query)
+	}
+}
+
+// An Airflow 2 older than the parameters validates its query strictly and
+// refuses them as unknown. That is a refusal like any other: the stored value
+// is read.
+func TestGetXComEntryOnAnOlderAirflow2FallsBackToTheStoredValue(t *testing.T) {
+	const path = "/api/v1/dags/etl/dagRuns/r1/taskInstances/load/xcomEntries/rows"
+	stub := newAF2Stub(t)
+	stub.routeFunc(http.MethodGet, path, func(r *http.Request) (int, string) {
+		if r.URL.Query().Has("stringify") || r.URL.Query().Has("deserialize") {
+			return http.StatusBadRequest, `{"detail":"Extra query parameter(s) deserialize, stringify not in spec","status":400,"title":"Bad Request"}`
+		}
+		return http.StatusOK, `{"key":"rows","task_id":"load","dag_id":"etl","value":"42"}`
+	})
+	client := stub.client()
+
+	entry, err := client.GetXComEntry(t.Context(), "etl", "r1", "load", "rows", -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(entry.Value) != `"42"` {
+		t.Errorf("value = %s, want the stored string", entry.Value)
 	}
 }
 
@@ -320,8 +375,9 @@ func TestGetXComEntryReadsTheStoredValueWhenAirflow3RefusesToDeserialize(t *test
 	}
 }
 
-// Any other refusal is the caller's to see, not a sign to ask again.
-func TestGetXComEntryReportsAnyOtherRefusal(t *testing.T) {
+// A refusal that is about something else comes back from the plain read too,
+// and is the caller's to see then.
+func TestGetXComEntryReportsARefusalThePlainReadGetsToo(t *testing.T) {
 	const path = "/api/v2/dags/etl/dagRuns/r1/taskInstances/load/xcomEntries/return_value"
 	stub := newAF3Stub(t)
 	stub.routeStatus(http.MethodGet, path, http.StatusBadRequest, `{"detail":"map_index must be an integer"}`)
@@ -331,7 +387,7 @@ func TestGetXComEntryReportsAnyOtherRefusal(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "map_index must be an integer") {
 		t.Errorf("err = %v, want Airflow's own refusal", err)
 	}
-	if n := stub.countRequests(http.MethodGet, path); n != 1 {
-		t.Errorf("reads = %d, want one", n)
+	if n := stub.countRequests(http.MethodGet, path); n != 2 {
+		t.Errorf("reads = %d, want the deserialized one and the plain one", n)
 	}
 }
