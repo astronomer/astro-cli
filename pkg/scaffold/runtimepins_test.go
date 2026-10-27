@@ -47,19 +47,19 @@ func setBuild(dir string, b runtimeversions.AstroBuild) error {
 // seed's lock, and how many constraints it added; the manifest is put back
 // as it was after (RestoreManifest), as the seed does. "" when nothing was
 // added.
-func seedText(t *testing.T, dir string, pins *RuntimePins) (string, int) {
+func seedText(t *testing.T, dir string, pins *RuntimePins) (text string, n int) {
 	t.Helper()
 	before, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
-	n, err := AddSeedConstraints(dir, nil, pins)
+	n, err = AddSeedConstraints(dir, nil, pins)
 	require.NoError(t, err)
 	if n == 0 {
 		assert.Equal(t, string(before), readManifest(t, dir), "nothing to seed writes nothing")
 		return "", 0
 	}
-	out := readManifest(t, dir)
+	text = readManifest(t, dir)
 	require.NoError(t, RestoreManifest(dir, nil, before))
-	return out, n
+	return text, n
 }
 
 // seedFor is seedText read back as the constraints it states.
