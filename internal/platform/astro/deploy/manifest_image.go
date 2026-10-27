@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/deploybuild"
+	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
@@ -278,7 +279,7 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 	// that comes after the build: refuse here, on the status Astro refuses
 	// on, before the build's minutes are spent.
 	if dep.Status == astrov1.DeploymentStatusHIBERNATING {
-		return astrov1.Deployment{}, nil, &hibernatingError{deploymentID: dep.Id, name: dep.Name, refusal: errHibernatingStatus}
+		return astrov1.Deployment{}, nil, &hibernatingError{deploymentID: dep.Id, name: dep.Name, refusal: instancelocate.ErrDeploymentHibernating}
 	}
 	if dep.IsCicdEnforced && !canCiCdDeploy(c.Token) {
 		return astrov1.Deployment{}, nil, fmt.Errorf(errCiCdEnforcementUpdate, dep.Name)

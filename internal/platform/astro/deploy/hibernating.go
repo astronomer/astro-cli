@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
-// errHibernatingStatus is the refusal when the Deployment's status says it is
-// hibernating before Astro is asked for the deploy.
-var errHibernatingStatus = errors.New("deployment status is HIBERNATING")
-
+// hibernatingError is a deploy refused because the Deployment is hibernating:
+// by the status read before the build, whose refusal is
+// instancelocate.ErrDeploymentHibernating, or by Astro when the deploy was
+// created, whose refusal is its *httputil.StatusError.
 type hibernatingError struct {
 	deploymentID string
 	name         string
@@ -28,7 +29,7 @@ func (e *hibernatingError) Error() string {
 	if e.name != "" {
 		named = fmt.Sprintf("%s (%q)", e.deploymentID, e.name)
 	}
-	hint := fmt.Sprintf("Astro Deployment %s is hibernating, so it cannot take a deploy — wake it with astro deployment wake-up %s, which takes about a minute, then deploy again",
+	hint := fmt.Sprintf("Astro Deployment %s is hibernating, so it cannot take a deploy — wake it with astro deployment wake-up %s --wait, which takes about a minute, then deploy again",
 		named, e.deploymentID)
 	if namesHibernation(e.refusal) {
 		return hint
@@ -37,6 +38,14 @@ func (e *hibernatingError) Error() string {
 }
 
 func (e *hibernatingError) Unwrap() error { return e.refusal }
+
+// Is makes every hibernating refusal instancelocate.ErrDeploymentHibernating,
+// the sentinel behind the deployment_hibernating problem kind, so --output
+// json names the kind whichever read said so. The kind follows the headline:
+// the hint leads the text even when Astro's refusal may be for another reason.
+func (e *hibernatingError) Is(target error) bool {
+	return target == instancelocate.ErrDeploymentHibernating
+}
 
 func namesHibernation(err error) bool {
 	return strings.Contains(strings.ToUpper(err.Error()), "HIBERNATING")

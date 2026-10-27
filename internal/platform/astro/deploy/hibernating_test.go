@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -21,7 +22,7 @@ import (
 
 const blockedByHibernation = `{"message":"Deploy is blocked because Deployment is in HIBERNATING state","statusCode":400}`
 
-const wakeUpHint = "Astro Deployment test-deployment-id (\"test-deployment\") is hibernating, so it cannot take a deploy — wake it with astro deployment wake-up test-deployment-id"
+const wakeUpHint = "Astro Deployment test-deployment-id (\"test-deployment\") is hibernating, so it cannot take a deploy — wake it with astro deployment wake-up test-deployment-id --wait"
 
 func refuse(status int, body string) error {
 	return httputil.NormalizeAPIError(&http.Response{StatusCode: status}, []byte(body))
@@ -56,12 +57,15 @@ func TestExplainHibernating(t *testing.T) {
 			got := explainHibernating(refusal, tc.dep)
 			if !tc.explains {
 				assert.Same(t, refusal, got)
+				assert.NotErrorIs(t, got, instancelocate.ErrDeploymentHibernating)
 				return
 			}
 			assert.Contains(t, got.Error(), wakeUpHint)
 			assert.Equal(t, tc.keepsText, strings.Contains(got.Error(), refusal.Error()), "Astro's own text in %q", got)
 			assert.ErrorIs(t, got, refusal)
 			assert.True(t, httputil.HasStatus(got, tc.status))
+			// The deployment_hibernating kind, under --output json.
+			assert.ErrorIs(t, got, instancelocate.ErrDeploymentHibernating)
 		})
 	}
 }
@@ -129,7 +133,7 @@ func TestDeleteBundle_HibernatingSaysHowToWakeIt(t *testing.T) {
 			name: "a Deployment named by id",
 			dep:  nil,
 			body: blockedByHibernation,
-			hint: "Astro Deployment test-deployment-id is hibernating, so it cannot take a deploy — wake it with astro deployment wake-up test-deployment-id",
+			hint: "Astro Deployment test-deployment-id is hibernating, so it cannot take a deploy — wake it with astro deployment wake-up test-deployment-id --wait",
 		},
 	}
 	for _, tc := range cases {
@@ -204,6 +208,7 @@ func TestDeployManifestImage_HibernatingRefusesBeforeBuilding(t *testing.T) {
 	}, client)
 	require.Error(t, err)
 	assert.Equal(t, wakeUpHint+", which takes about a minute, then deploy again", err.Error())
+	assert.ErrorIs(t, err, instancelocate.ErrDeploymentHibernating, "the deployment_hibernating kind")
 	assert.False(t, built, "the build never starts")
 	assert.False(t, hasImageCall(cmd.calls, "build"), "nothing is built, got %v", cmd.calls)
 	// Neither the runtime offer nor a deploy is asked for.
