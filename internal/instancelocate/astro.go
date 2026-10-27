@@ -135,8 +135,8 @@ func (e *UnavailableError) Unwrap() error { return e.State }
 func (e *UnavailableError) Error() string {
 	switch e.State {
 	case ErrDeploymentHibernating:
-		return fmt.Sprintf("Astro Deployment %s (%q) is hibernating, so its Airflow is not answering — wake it with astro deployment wake-up %s, which takes about a minute",
-			e.DeploymentID, e.Name, e.DeploymentID)
+		return fmt.Sprintf("Astro Deployment %s (%q) is hibernating, so its Airflow is not answering — %s",
+			e.DeploymentID, e.Name, WakeUpStep(e.DeploymentID))
 	case ErrDeploymentDeploying:
 		return fmt.Sprintf("Astro Deployment %s (%q) is still deploying, so its Airflow is not answering yet — try again in a minute or two",
 			e.DeploymentID, e.Name)
@@ -146,6 +146,14 @@ func (e *UnavailableError) Error() string {
 	}
 	return fmt.Sprintf("Astro reports Deployment %s (%q) as unhealthy, so its Airflow is not answering — see astro deployment inspect %s",
 		e.DeploymentID, e.Name, e.DeploymentID)
+}
+
+// WakeUpStep is the step that ends a Deployment's hibernation, for every
+// hint that explains what hibernation stops (this package's, and a deploy's).
+// --wait is in it so the retry the hint goes on to suggest finds the
+// Deployment awake.
+func WakeUpStep(deploymentID string) string {
+	return fmt.Sprintf("wake it with astro deployment wake-up %s --wait, which takes about a minute", deploymentID)
 }
 
 // bearer puts the identity astrosession resolved on one request, replacing the

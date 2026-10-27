@@ -190,7 +190,7 @@ The command-specific 2s predate the usage 2. A script that runs one of those com
 | `unsupported_base` | the image base is not one this mode can run |
 | `database_newer_than_airflow` | the metadata database was migrated by a newer Airflow (Docker mode) |
 | `not_running` | nothing is running for this project |
-| `deployment_hibernating`, `deployment_deploying`, `deployment_unhealthy`, `airflow_unavailable` | an Astro Deployment's Airflow did not answer (see [instances.md](instances.md#when-a-deployments-airflow-does-not-answer)); `deployment_deploying` and `airflow_unavailable` mean try again |
+| `deployment_hibernating`, `deployment_deploying`, `deployment_unhealthy`, `airflow_unavailable` | an Astro Deployment's Airflow did not answer (see [instances.md](instances.md#when-a-deployments-airflow-does-not-answer)); `deployment_hibernating` is also `astro deploy` refused because the Deployment is hibernating (see [deploy.md](deploy.md#1-image-deploys) and [Dags-only deploys](deploy.md#2-dags-only-deploys)); `deployment_deploying` and `airflow_unavailable` mean try again |
 | `unauthenticated` | no usable Astro login: none was made, the API refused the token (401), or one was needed and a run under `--output json` may not start a browser login |
 | `forbidden` | the login lacks the permission this needs (403) |
 | `not_found` | the Astro API has no such object (404) |
