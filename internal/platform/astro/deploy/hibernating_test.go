@@ -173,3 +173,40 @@ func TestDeployManifestImage_HibernatingSaysHowToWakeIt(t *testing.T) {
 	assert.False(t, hasImageCall(cmd.calls, " push "), "nothing is pushed, got %v", cmd.calls)
 	client.AssertExpectations(t)
 }
+
+func TestDeployManifestImage_HibernatingRefusesBeforeBuilding(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+
+	standard := astrov1.DeploymentTypeSTANDARD
+	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.GetDeploymentResponse{
+		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		JSON200: &astrov1.Deployment{
+			Id:                  "test-deployment-id",
+			Name:                "test-deployment",
+			OrganizationId:      "test-org-id",
+			AstroRuntimeVersion: "3.1-2",
+			Type:                &standard,
+			IsDagDeployEnabled:  true,
+			Status:              astrov1.DeploymentStatusHIBERNATING,
+		},
+	}, nil)
+	cmd := withImageSeams(t, "3.1-2")
+	built := false
+
+	_, err := DeployManifestImage(ManifestImageDeployInput{
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     manifestProjectDir(t),
+			AirflowVersion: "3.1",
+		},
+		DeploymentID: "test-deployment-id",
+		OnBuild:      func() { built = true },
+	}, client)
+	require.Error(t, err)
+	assert.Equal(t, wakeUpHint+", which takes about a minute, then deploy again", err.Error())
+	assert.False(t, built, "the build never starts")
+	assert.False(t, hasImageCall(cmd.calls, "build"), "nothing is built, got %v", cmd.calls)
+	// Neither the runtime offer nor a deploy is asked for.
+	client.AssertExpectations(t)
+	client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}

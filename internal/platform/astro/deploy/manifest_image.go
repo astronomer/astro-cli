@@ -274,6 +274,12 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 	if err != nil {
 		return astrov1.Deployment{}, nil, err
 	}
+	// Astro refuses a hibernating Deployment's deploy when it is created, and
+	// that comes after the build: refuse here, on the status Astro refuses
+	// on, before the build's minutes are spent.
+	if dep.Status == astrov1.DeploymentStatusHIBERNATING {
+		return astrov1.Deployment{}, nil, &hibernatingError{deploymentID: dep.Id, name: dep.Name, refusal: errHibernatingStatus}
+	}
 	if dep.IsCicdEnforced && !canCiCdDeploy(c.Token) {
 		return astrov1.Deployment{}, nil, fmt.Errorf(errCiCdEnforcementUpdate, dep.Name)
 	}

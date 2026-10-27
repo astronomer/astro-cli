@@ -9,6 +9,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
+// errHibernatingStatus is the refusal when the Deployment's status says it is
+// hibernating before Astro is asked for the deploy.
+var errHibernatingStatus = errors.New("deployment status is HIBERNATING")
+
 type hibernatingError struct {
 	deploymentID string
 	name         string
