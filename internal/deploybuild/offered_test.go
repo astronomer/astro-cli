@@ -3,7 +3,6 @@ package deploybuild
 import (
 	"context"
 	"errors"
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,15 +17,6 @@ import (
 type offer map[string][]string
 
 func (o offer) BuildsFor(pin string) []string { return o[pin] }
-
-func (o offer) Offers(build string) bool {
-	for _, builds := range o {
-		if slices.Contains(builds, build) {
-			return true
-		}
-	}
-	return false
-}
 
 // The manifest's runtime wins, then the offer's newest for the pin, and with
 // neither the platform's own fallback runs with no build named.
@@ -143,4 +133,19 @@ func TestOfferedBaseStaysWithinTheOfferWhenAPythonIsNotShipped(t *testing.T) {
 	var notShipped *runtimeversions.PythonNotShippedError
 	require.True(t, errors.As(err, &notShipped), "%v", err)
 	assert.ErrorContains(t, err, "none of the builds the Deployment offers for Airflow 3.3")
+}
+
+// A lock seeded for a build of a release the pin has since moved off is not
+// built on, though the Deployment lists that build for its own release: only
+// the pin's offered builds are candidates, by the platform's word of each
+// build's Airflow.
+func TestOfferedBaseSkipsALockOfAReleaseThePinNoLongerCovers(t *testing.T) {
+	var warned []string
+	resolve := func(_ context.Context, m imagebuild.ManifestBuild) (string, error) { return "base:" + m.Runtime, nil }
+	base := OfferedBase(offer{"3.3": {"3.3-9"}, "3.2": {"3.2-5"}}, resolve, func(s string) { warned = append(warned, s) })
+	ref, err := base(context.Background(), imagebuild.ManifestBuild{AirflowVersion: "3.3", LockedRuntime: "3.2-5"})
+	require.NoError(t, err)
+	assert.Equal(t, "base:3.3-9", ref)
+	require.Len(t, warned, 1)
+	assert.Contains(t, warned[0], "3.2-5")
 }

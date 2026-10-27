@@ -26,8 +26,6 @@ type RuntimeOffer interface {
 	// covers, newest first, of those the platform offers as a base nobody
 	// chose. None for a pin the platform refuses to resolve (a bare "3").
 	BuildsFor(airflowPin string) []string
-	// Offers reports whether the platform offers build as such a base.
-	Offers(build string) bool
 }
 
 // OfferedBase is the rule a platform's deploy follows for a generated build's
@@ -94,15 +92,20 @@ func OfferedBase(offer RuntimeOffer, resolve imagebuild.BaseImageFunc, warn func
 }
 
 // offeredCandidates are the builds OfferedBase tries for m, in order: the
-// lock's build first when the platform offers it, then the offered builds of
-// the pin, newest first. locked is the lock's build when it leads the list.
-// A bare "3" pin has none, as every other path refuses to resolve one.
+// lock's build first when the platform offers it for the pin, then the
+// offered builds of the pin, newest first. locked is the lock's build when it
+// leads the list. The lock's build has to be one of the pin's offered builds:
+// those carry an Airflow release the pin covers, by the platform's own word
+// of each build's Airflow, so a lock seeded for a release the pin has since
+// moved off is not built on, and a build the platform lists only on another
+// channel (a preview) is not either. A bare "3" pin has none, as every other
+// path refuses to resolve one.
 func offeredCandidates(offer RuntimeOffer, m imagebuild.ManifestBuild) (candidates []string, locked string) {
 	if strings.TrimSpace(m.AirflowVersion) == "3" {
 		return nil, ""
 	}
 	candidates = offer.BuildsFor(m.AirflowVersion)
-	if l := m.LockedRuntime; l != "" && offer.Offers(l) {
+	if l := m.LockedRuntime; l != "" && slices.Contains(candidates, l) {
 		candidates = append([]string{l}, slices.DeleteFunc(slices.Clone(candidates), func(b string) bool { return b == l })...)
 		locked = l
 	}

@@ -556,11 +556,6 @@ func (l listedReleases) BuildsFor(pin string) []string {
 	return out
 }
 
-// Offers reports whether the platform lists build.
-func (l listedReleases) Offers(build string) bool {
-	return slices.ContainsFunc(l, func(r houston.RuntimeRelease) bool { return r.Version == build })
-}
-
 // houstonBase resolves a generated build's runtime base by local Docker
 // mode's rule (imagebuild.LocalRuntimeImageWith), so Airflow 2 from 2.7 and
 // Airflow 3 both build. With no [tool.astro] runtime it builds on the newest

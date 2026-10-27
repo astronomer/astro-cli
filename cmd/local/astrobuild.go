@@ -182,10 +182,9 @@ type astroBuildWrite struct {
 	// cutoff says nothing is seeded for the project's own cutoff, which
 	// keeps the runtime group (runtimeGroup).
 	cutoff bool
-	// seedTried says a seed of the lock was tried, worked or not: init does
-	// not lock the project again after one (relockAfterInit), which would
-	// only repeat a failing resolve.
-	seedTried bool
+	// uvMissing says a seed was not made for want of uv: init has nothing to
+	// relock with either (relockAfterInit).
+	uvMissing bool
 	// offline is a write whose Airflow lookup could not be made, which
 	// leaves the Airflow build as the manifest has it: nothing it cannot
 	// tell for want of the index changes the seed.
@@ -392,7 +391,6 @@ func (c *cli) applySeed(ctx context.Context, dir string, pins *scaffold.RuntimeP
 		}
 		return false
 	}
-	res.seedTried = true
 	path := filepath.Join(dir, manifest.Marker)
 	before, _ := os.ReadFile(path) //nolint:errcheck // unread, any change counts as one
 	record := scaffold.Seed{Build: pins.Build, Python: pins.Python}
@@ -410,6 +408,7 @@ func (c *cli) applySeed(ctx context.Context, dir string, pins *scaffold.RuntimeP
 	case errors.Is(err, uv.ErrNotFound):
 		// Installing uv changes nothing a start can see, so this one is not
 		// remembered.
+		res.uvMissing = true
 		res.seedWarn = fmt.Errorf("uv.lock is not seeded with what Astro Runtime %s ships: uv is not installed", pins.Build)
 		return false
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):

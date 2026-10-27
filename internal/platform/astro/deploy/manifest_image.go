@@ -494,19 +494,6 @@ func offeredAsBase(r *astrov1.RuntimeRelease) bool {
 	return r.Channel == "" || r.Channel == "stable" || r.Channel == "deprecated"
 }
 
-// Offers reports whether the deployment offers build as a base nobody chose:
-// on the stable or deprecated channel, as BuildsFor picks. A preview build is
-// the user's to opt into by [tool.astro] runtime, and a lock made for one does
-// not opt in.
-func (o offeredReleases) Offers(build string) bool {
-	for i := range o {
-		if o[i].Version == build && offeredAsBase(&o[i]) {
-			return true
-		}
-	}
-	return false
-}
-
 // astroBase resolves a generated build's runtime base for an Astro deploy:
 // the newest runtime the deployment offers for the pin (deploybuild.
 // OfferedBase), so the image carries a runtime the deployment takes, and with

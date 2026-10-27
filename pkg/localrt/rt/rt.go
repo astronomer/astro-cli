@@ -65,6 +65,10 @@ type Plan struct {
 	// rather than the newest build of the series, so the image is the build
 	// the lock matches. Standalone ignores it.
 	LockedRuntime string
+	// LockedPython is the Python the uv.lock was seeded for on LockedRuntime
+	// (manifest UV.RuntimePython), or "" for none: the Python Docker mode's
+	// image of LockedRuntime runs, when requires-python admits it.
+	LockedPython string
 	// PythonVersion is the interpreter standalone asks uv for ("3.13"), or ""
 	// to let uv pick within requires-python. A caller sets it with
 	// imagebuild.StandalonePython: the Python a generated image of the same

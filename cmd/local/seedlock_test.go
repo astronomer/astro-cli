@@ -45,8 +45,9 @@ type fakeUV struct {
 	seeded []string
 	// seedLocks and projectLocks count the two kinds of lock.
 	seedLocks, projectLocks int
-	// err fails every lock; projectErr fails only the project's.
-	err, projectErr error
+	// err fails every lock; projectErr fails only the project's; seedErr
+	// only the one with the image's versions.
+	err, projectErr, seedErr error
 	// requiredOnly locks as uv does, a constraint adding no package: only
 	// what [project] dependencies or a dependency group names is written.
 	requiredOnly bool
@@ -72,6 +73,9 @@ func (f *fakeUV) lock(_ context.Context, dir string) error {
 		return f.projectErr
 	}
 	f.seedLocks++
+	if f.seedErr != nil {
+		return f.seedErr
+	}
 	f.seeded = nil
 	var lock strings.Builder
 	lock.WriteString("version = 1\n")
@@ -612,14 +616,15 @@ func TestInitRelocksALockItDidNotSeed(t *testing.T) {
 		t.Errorf("seed locks %d, project locks %d; want no seed and one relock", got.uv.seedLocks, got.uv.projectLocks)
 	}
 
-	// A seed that was tried and failed has said why: init does not lock again
-	// only to fail the same way.
+	// A seed that failed put the lock back as it was, resolved before what
+	// init wrote: init still relocks it plainly, which can lock where the
+	// seed, with the image's versions, could not.
 	failed := pinsRun{
 		src: r.manifest, files: map[string]string{"uv.lock": r.lock}, build: build332, freeze: freeze339, args: []string{"init"},
-		uv: &fakeUV{projectErr: errors.New("no solution found")},
+		uv: &fakeUV{seedErr: errors.New("no solution found")},
 	}.start(t)
 	if failed.uv.seedLocks != 1 || failed.uv.projectLocks != 1 {
-		t.Errorf("seed locks %d, project locks %d after a failed seed; want the seed's two and no relock", failed.uv.seedLocks, failed.uv.projectLocks)
+		t.Errorf("seed locks %d, project locks %d after a failed seed; want the failed seed and one plain relock", failed.uv.seedLocks, failed.uv.projectLocks)
 	}
 }
 

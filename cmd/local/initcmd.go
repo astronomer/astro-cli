@@ -150,7 +150,11 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 // that is not as it is. With no uv to run, it says to run it when the
 // manifest changed. A project with no uv.lock has nothing to follow.
 func (c *cli) relockAfterInit(ctx context.Context, r cliout.Renderer, dir string, build astroBuildWrite) {
-	if build.seeded > 0 || build.seedTried || !hasLock(dir) {
+	// A seed that worked relocked already. One that failed put the lock back
+	// as it was, resolved before what init wrote, so it is relocked plainly:
+	// without the image's versions it can lock where the seed could not.
+	// Without uv, which the seed said, there is nothing to relock with.
+	if build.seeded > 0 || build.uvMissing || !hasLock(dir) {
 		return
 	}
 	changed := build.recordChanged || build.airflowChanged || build.groupChanged
