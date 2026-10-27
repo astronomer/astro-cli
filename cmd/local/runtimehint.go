@@ -90,7 +90,10 @@ func (c *cli) withRuntimeHints(ctx context.Context, project string, m *manifest.
 		if f.Kind != checks.KindImportError {
 			continue
 		}
-		dist := manifest.DistName(missingModule(f.Message))
+		// The top-level name alone, matched exactly: a dotted provider path
+		// (airflow.providers.x) names Airflow's namespace, not a package.
+		top, _, _ := strings.Cut(missingModule(f.Message), ".")
+		dist := manifest.DistName(top)
 		pin, ok := ships[dist]
 		if dist == "" || !ok || listed[dist] {
 			continue

@@ -72,7 +72,7 @@ func TestCommentsInAnArrayAreWrittenAndReadBack(t *testing.T) {
 				t.Errorf("GetLines = %#v, want %#v", lines, wantLines)
 			}
 			values, _ := back.Get(pinsKey)
-			if !reflect.DeepEqual(values, valuesOf(wantLines)) {
+			if !reflect.DeepEqual(values, Values(wantLines)) {
 				t.Errorf("Get = %#v, want the values alone", values)
 			}
 		})

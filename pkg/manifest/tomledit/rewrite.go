@@ -76,7 +76,7 @@ func (r *rewrite) Set(key []string, value any) error {
 		return &KeyError{Key: key, Reason: "a comment is written as an element of an array, not on its own"}
 	}
 	if hasComment(value) {
-		value = valuesOf(value.([]any))
+		value = Values(value.([]any))
 	}
 	// Probe the value alone so a bad one fails here, like the surgical
 	// editor, not later in Bytes.

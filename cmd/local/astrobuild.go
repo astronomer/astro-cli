@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+
+	toml "github.com/pelletier/go-toml/v2"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -51,11 +54,18 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 	if res.runtime != "" {
 		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] now holds what Astro Runtime %s constrains\n", manifest.Marker, res.runtime)
 	}
+	if res.runtimeGone != "" {
+		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer holds what Astro Runtime %s constrains\n", manifest.Marker, res.runtimeGone)
+	}
+	// The Airflow line is said whenever the Airflow pins moved, beside a
+	// runtime line or not; a write that touched only the runtime's lines says
+	// only that.
+	onlyRuntime := (res.runtime != "" || res.runtimeGone != "") && !res.airflowChanged
 	switch {
-	case res.changed && res.runtime != "":
-	case res.changed && res.build.Airflow != "":
+	case !res.changed || onlyRuntime:
+	case res.build.Airflow != "":
 		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] now installs Astronomer's Airflow %s\n", manifest.Marker, res.build.Airflow)
-	case res.changed:
+	default:
 		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer points Airflow at Astronomer's index\n", manifest.Marker)
 	}
 }
@@ -65,18 +75,7 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 // could not be read. Such a build pin makes the project unsatisfiable, so it
 // is taken out without a lookup, and Airflow comes from PyPI until one works.
 func stalePin(m *manifest.Manifest) bool {
-	pin := m.Airflow().Pin
-	for _, c := range m.UV.ConstraintDependencies {
-		if !manifest.AstroPin(c) || manifest.DistName(c) != runtimeversions.DistAirflow {
-			continue
-		}
-		_, version, _ := strings.Cut(c, "==")
-		release, _, _ := strings.Cut(strings.TrimSpace(version), "+")
-		if release != pin && !strings.HasPrefix(release, pin+".") {
-			return true
-		}
-	}
-	return false
+	return !manifest.AstroBuildCovered(m.Airflow().Pin, m.UV.ConstraintDependencies)
 }
 
 // astroBuildWrite is what writeAstroBuild did, for its caller to report.
@@ -84,10 +83,13 @@ type astroBuildWrite struct {
 	pin     string
 	build   runtimeversions.AstroBuild
 	changed bool
-	// runtime is the build whose constraints the write newly recorded, or "".
-	runtime   string
-	lookupErr error
-	writeErr  error
+	// airflowChanged reports that the write moved the +astro Airflow pins.
+	airflowChanged bool
+	// runtime is the build whose constraints the write newly recorded, and
+	// runtimeGone the one whose record it took out; "" when neither happened.
+	runtime, runtimeGone string
+	lookupErr            error
+	writeErr             error
 }
 
 // writeAstroBuild looks up the build for the manifest in dir and writes it,
@@ -111,9 +113,25 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 	res.changed, res.writeErr = watchManifest(dir, func(wrap func(run func() error) error) error {
 		return scaffold.SetAstroBuildWith(dir, wrap, res.build, rc)
 	})
-	if res.changed && rc != nil {
-		if after, err := manifest.Load(filepath.Join(dir, manifest.Marker)); err == nil && after.UV.RuntimeBuild != m.UV.RuntimeBuild {
-			res.runtime = after.UV.RuntimeBuild
+	if !res.changed || res.writeErr != nil {
+		return res
+	}
+	// What moved, from what was written: no second read of the file.
+	var before, after []string
+	for _, c := range m.UV.ConstraintDependencies {
+		if manifest.AstroPin(c) {
+			before = append(before, c)
+		}
+	}
+	if res.build.Airflow != "" {
+		after = res.build.Pins()
+	}
+	res.airflowChanged = !slices.Equal(before, after)
+	if rc != nil && rc.Build != m.UV.RuntimeBuild {
+		if rc.Build != "" {
+			res.runtime = rc.Build
+		} else {
+			res.runtimeGone = m.UV.RuntimeBuild
 		}
 	}
 	return res
@@ -124,13 +142,16 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 // (scaffold.RuntimeBuildFor): written beside the Airflow pins, so the lockfile
 // resolves Airflow's database driver, and the rest the runtime constrains, as
 // the image does. nil leaves what is written as it is: no way to read it, a
-// cutoff (the runtime's versions may postdate it, and uv would find no
-// solution), a build or a file that cannot be read now. A zero one takes it
-// out: a project on no runtime build, or one that publishes no such file (an
-// Airflow 2 runtime before 11.0.0).
+// build or a file that cannot be read now. A zero one takes it out: a cutoff
+// (the runtime's versions may postdate it, and uv would find no solution), a
+// project on no runtime build, or one that publishes no such file (an Airflow
+// 2 runtime before 11.0.0).
 func (c *cli) runtimeConstraints(ctx context.Context, dir string, m *manifest.Manifest) *scaffold.RuntimeConstraints {
-	if c.d.RuntimeConstraints == nil || underCutoff(m) {
+	if c.d.RuntimeConstraints == nil {
 		return nil
+	}
+	if underCutoff(dir, m) {
+		return &scaffold.RuntimeConstraints{}
 	}
 	var catalog *runtimeversions.Catalog
 	if c.d.RuntimeCatalog != nil {
@@ -154,7 +175,24 @@ func (c *cli) runtimeConstraints(ctx context.Context, dir string, m *manifest.Ma
 }
 
 // underCutoff reports a uv resolve held to a date: the project's own
-// exclude-newer, or UV_EXCLUDE_NEWER in the environment.
-func underCutoff(m *manifest.Manifest) bool {
-	return m.UV.ExcludeNewer != "" || strings.TrimSpace(os.Getenv("UV_EXCLUDE_NEWER")) != ""
+// exclude-newer, in [tool.uv] or its uv.toml, or UV_EXCLUDE_NEWER in the
+// environment.
+func underCutoff(dir string, m *manifest.Manifest) bool {
+	return m.UV.ExcludeNewer != "" || strings.TrimSpace(os.Getenv("UV_EXCLUDE_NEWER")) != "" ||
+		uvTOMLExcludeNewer(filepath.Join(dir, "uv.toml"))
+}
+
+// uvTOMLExcludeNewer reports a uv.toml at path that sets exclude-newer. A
+// file that is missing or does not parse sets none.
+func uvTOMLExcludeNewer(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var cfg map[string]any
+	if toml.Unmarshal(data, &cfg) != nil {
+		return false
+	}
+	v, ok := cfg["exclude-newer"]
+	return ok && v != nil && strings.TrimSpace(fmt.Sprint(v)) != ""
 }

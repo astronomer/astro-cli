@@ -19,6 +19,7 @@ package runtimeversions
 import (
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -206,7 +207,7 @@ func (c *Catalog) RequiresPython(series string) (string, bool) {
 func (c *Catalog) NewestRuntimeFor(airflowPin string) (string, bool) {
 	var best string
 	for tag, r := range c.runtimes {
-		if r.Yanked || !pinCovers(airflowPin, r.AirflowVersion) {
+		if r.Yanked || !PinCovers(airflowPin, r.AirflowVersion) {
 			continue
 		}
 		if best == "" || compareVersions(tag, best) > 0 {
@@ -224,7 +225,7 @@ func (c *Catalog) NewestRuntimeFor(airflowPin string) (string, bool) {
 func (c *Catalog) NewestPublishedRuntimeFor(airflowPin string) (string, bool) {
 	var best string
 	for tag, r := range c.runtimes {
-		if r.Yanked || r.scheduled() || !pinCovers(airflowPin, r.AirflowVersion) {
+		if r.Yanked || r.scheduled() || !PinCovers(airflowPin, r.AirflowVersion) {
 			continue
 		}
 		if best == "" || compareVersions(tag, best) > 0 {
@@ -278,35 +279,32 @@ func (r *Runtime) scheduled() bool {
 	return err == nil && day.After(now().UTC())
 }
 
-// pinCovers reports whether an Airflow release satisfies a pin that may name
-// fewer segments than the release does. It agrees with manifest.PinCovers,
-// PEP 440's apache-airflow==<pin>.*, on every release a catalog lists: a
-// local label is not compared, and a pre-, post- or dev release of the pinned
-// release is covered ("3.3.0" covers "3.3.0rc1" and "3.3.0.post1"). This
-// module carries no requirements, so the rule is spelled out here rather
-// than taken from the PEP 440 library pkg/manifest uses.
-func pinCovers(pin, release string) bool {
+// PinCovers reports whether an Airflow release satisfies a pin that may name
+// fewer segments than the release does: "3.3" covers "3.3.2", "3.3.2" covers
+// "3.3.2" and "3.3.2.post1", and neither covers "3.4.0" or "3.30.0". A local
+// label is not compared. A pre- or dev release ("3.3.0rc1", "3.3.0.dev1") is
+// covered only by a pin that names a pre-release itself, as a resolver takes
+// one only when asked. An empty pin or release covers nothing.
+//
+// It is the same rule as manifest.PinCovers, spelled out here because this
+// module imports nothing; a root-module test holds the two to the same
+// answers.
+func PinCovers(pin, release string) bool {
 	pin = strings.TrimSpace(pin)
 	release, _, _ = strings.Cut(strings.TrimSpace(release), "+")
-	if pin == "" || !strings.HasPrefix(release, pin) {
+	if pin == "" || release == "" {
 		return false
 	}
-	rest := release[len(pin):]
-	return rest == "" || rest[0] == '.' || preReleaseStart(rest)
+	if preRelease.MatchString(release) && !preRelease.MatchString(pin) {
+		return false
+	}
+	return release == pin || strings.HasPrefix(release, pin+".")
 }
 
-// preReleaseStart reports a version's remainder after its release segments
-// that starts a pre-release, as PEP 440 spells one: a, b, c, rc, alpha, beta,
-// pre or preview, optionally after a '-' or '_' separator, then a number.
-func preReleaseStart(rest string) bool {
-	rest = strings.TrimLeft(strings.ToLower(rest), "-_")
-	for _, tag := range []string{"preview", "alpha", "beta", "pre", "rc", "a", "b", "c"} {
-		if after, ok := strings.CutPrefix(rest, tag); ok {
-			return after == "" || after[0] >= '0' && after[0] <= '9' || after[0] == '.' || after[0] == '-' || after[0] == '_'
-		}
-	}
-	return false
-}
+// preRelease matches a version that is a pre- or dev release, as PEP 440
+// spells one: a, b, c, rc, alpha, beta, pre, preview or dev after a release
+// number, with an optional separator.
+var preRelease = regexp.MustCompile(`(?i)\d[-_.]?(a|b|c|rc|alpha|beta|pre|preview|dev)\d*`)
 
 // seriesOf is an Airflow version's major.minor: "3.3" from "3.3.2" or "3.3".
 // Empty when the version names no minor.

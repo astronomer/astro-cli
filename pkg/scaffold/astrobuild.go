@@ -185,10 +185,11 @@ func checkNotTheUsers(ed tomledit.Editor, dists []string) error {
 // when rc is not nil, the runtime's record and lines with rc's, keeping the
 // project's own where they were. A constraint is the build's when it names
 // one of the rebuilt distributions at an +astro version; the runtime's are the
-// record comment and the exact name==version lines right after it.
+// record comment and the exact pins right after it of a distribution the
+// runtime constrains (manifest.SplitRuntimeBlock).
 func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, rc *RuntimeConstraints) error {
 	list, _ := tomledit.GetLines(ed, constraintsKey)
-	own, block := splitRuntimeBlock(list)
+	own, block := manifest.SplitRuntimeBlock(list, rc.owns)
 	var kept []any
 	for _, v := range own {
 		if s, _ := v.(string); manifest.AstroPin(s) {
@@ -208,7 +209,7 @@ func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []stri
 	if reflect.DeepEqual(kept, list) {
 		return nil
 	}
-	if len(valuesOf(kept)) == 0 {
+	if len(tomledit.Values(kept)) == 0 {
 		ed.Delete(constraintsKey)
 		return nil
 	}
@@ -216,9 +217,28 @@ func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []stri
 	if errors.Is(err, tomledit.ErrCommentsUnsupported) {
 		// An inline [tool.uv] holds no comment, so no record: without one
 		// the lines could not be told from the project's own later.
-		return tomledit.SetLines(ed, constraintsKey, valuesOf(withoutRuntimeBlock(kept)))
+		rest, _ := manifest.SplitRuntimeBlock(kept, rc.owns)
+		return tomledit.SetLines(ed, constraintsKey, tomledit.Values(rest))
 	}
 	return err
+}
+
+// owns reports a distribution the runtime's block may hold: one a runtime's
+// constraints file names besides Airflow's (manifest.RuntimeConstrained), or
+// one rc's own lines name. A nil rc owns the former alone.
+func (rc *RuntimeConstraints) owns(dist string) bool {
+	if manifest.RuntimeConstrained(dist) {
+		return true
+	}
+	if rc == nil {
+		return false
+	}
+	for _, line := range rc.Lines {
+		if manifest.DistName(line) == manifest.DistName(dist) && !slices.Contains(astroDists, manifest.DistName(dist)) {
+			return true
+		}
+	}
+	return false
 }
 
 // runtimeBlock is the record comment and rc's lines other than the Airflow
@@ -232,46 +252,6 @@ func runtimeBlock(rc RuntimeConstraints) []any {
 		block = append(block, line)
 	}
 	return block
-}
-
-// splitRuntimeBlock splits an array's lines into the rest and the runtime's
-// block: its record comment and the exact name==version lines that follow it,
-// up to the next comment or any other line.
-func splitRuntimeBlock(lines []any) (rest, block []any) {
-	for i := 0; i < len(lines); i++ {
-		c, isComment := lines[i].(tomledit.Comment)
-		if _, _, ok := manifest.IsRuntimeRecord(string(c)); !isComment || !ok {
-			rest = append(rest, lines[i])
-			continue
-		}
-		block = append(block, lines[i])
-		for i+1 < len(lines) {
-			s, isString := lines[i+1].(string)
-			if !isString || !manifest.ExactPin(s) {
-				break
-			}
-			block = append(block, s)
-			i++
-		}
-	}
-	return rest, block
-}
-
-// withoutRuntimeBlock is lines without the runtime's block.
-func withoutRuntimeBlock(lines []any) []any {
-	rest, _ := splitRuntimeBlock(lines)
-	return rest
-}
-
-// valuesOf is lines without their comments.
-func valuesOf(lines []any) []any {
-	var out []any
-	for _, l := range lines {
-		if _, isComment := l.(tomledit.Comment); !isComment {
-			out = append(out, l)
-		}
-	}
-	return out
 }
 
 // setAstroSources points each rebuilt distribution at the index, and takes

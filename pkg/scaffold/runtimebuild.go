@@ -55,7 +55,9 @@ func RuntimeBuildFor(dir string, m *manifest.Manifest, c *runtimeversions.Catalo
 		}
 	}
 	if c != nil {
-		python, _, err := runtimeversions.ProjectPython(airflow.Pin, airflow.Runtime, m.Project.RequiresPython, func() *runtimeversions.Catalog { return c })
+		// The Python of the build resolved here, not of the series' newest:
+		// for a patch pin they can ship different Pythons.
+		python, _, err := runtimeversions.ProjectPython(airflow.Pin, build, m.Project.RequiresPython, func() *runtimeversions.Catalog { return c })
 		if err == nil && python != "" {
 			return build, python, nil
 		}
