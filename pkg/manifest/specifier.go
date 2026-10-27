@@ -77,3 +77,17 @@ func requirementSpecifier(req string) (string, bool) {
 	}
 	return s, true
 }
+
+// SameVersion reports whether two versions are one release as PEP 440 orders
+// them, not as they are spelled: pip freeze and uv.lock can write one version
+// two ways (1.0.0-post0 and 1.0.0.post0, 2.0 and 2.0.0). Versions PEP 440
+// does not spell compare as written.
+func SameVersion(a, b string) bool {
+	a, b = strings.TrimSpace(a), strings.TrimSpace(b)
+	va, errA := pep440.Parse(a)
+	vb, errB := pep440.Parse(b)
+	if errA != nil || errB != nil {
+		return a == b
+	}
+	return va.Equal(vb)
+}

@@ -133,7 +133,7 @@ func TestRuntimePinsRefusesAFileTooLargeToReadWhole(t *testing.T) {
 }
 
 func TestParseFreezeReportsALineTooLongToRead(t *testing.T) {
-	_, err := parseFreeze([]byte("pandas==2.2.3\n" + strings.Repeat("x", freezeMaxBytes+1) + "\n"))
+	_, err := freezePins([]byte("pandas==2.2.3\n" + strings.Repeat("x", freezeMaxBytes+1) + "\n"))
 	assert.Error(t, err)
 }
 

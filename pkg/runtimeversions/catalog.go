@@ -279,10 +279,33 @@ func (r *Runtime) scheduled() bool {
 }
 
 // pinCovers reports whether an Airflow release satisfies a pin that may name
-// fewer segments than the release does.
+// fewer segments than the release does. It agrees with manifest.PinCovers,
+// PEP 440's apache-airflow==<pin>.*, on every release a catalog lists: a
+// local label is not compared, and a pre-, post- or dev release of the pinned
+// release is covered ("3.3.0" covers "3.3.0rc1" and "3.3.0.post1"). This
+// module carries no requirements, so the rule is spelled out here rather
+// than taken from the PEP 440 library pkg/manifest uses.
 func pinCovers(pin, release string) bool {
 	pin = strings.TrimSpace(pin)
-	return pin != "" && (release == pin || strings.HasPrefix(release, pin+"."))
+	release, _, _ = strings.Cut(strings.TrimSpace(release), "+")
+	if pin == "" || !strings.HasPrefix(release, pin) {
+		return false
+	}
+	rest := release[len(pin):]
+	return rest == "" || rest[0] == '.' || preReleaseStart(rest)
+}
+
+// preReleaseStart reports a version's remainder after its release segments
+// that starts a pre-release, as PEP 440 spells one: a, b, c, rc, alpha, beta,
+// pre or preview, optionally after a '-' or '_' separator, then a number.
+func preReleaseStart(rest string) bool {
+	rest = strings.TrimLeft(strings.ToLower(rest), "-_")
+	for _, tag := range []string{"preview", "alpha", "beta", "pre", "rc", "a", "b", "c"} {
+		if after, ok := strings.CutPrefix(rest, tag); ok {
+			return after == "" || after[0] >= '0' && after[0] <= '9' || after[0] == '.' || after[0] == '-' || after[0] == '_'
+		}
+	}
+	return false
 }
 
 // seriesOf is an Airflow version's major.minor: "3.3" from "3.3.2" or "3.3".

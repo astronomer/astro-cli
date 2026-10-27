@@ -198,10 +198,10 @@ func TestRuntimeRootsWorksOutTheList(t *testing.T) {
 	assert.Equal(t, "apache-airflow-providers-google\napache-airflow-providers-mysql\nlinuxonly\nstatsd\n", string(data))
 }
 
-// A failure to ask uv (the network, uv itself) fails the whole list, which
-// keeps the group as it is, and is remembered for an hour; it is not kept as
-// an answer.
-func TestRuntimeRootsRemembersAFailure(t *testing.T) {
+// A failure to ask uv (the network) fails the whole list, which keeps the
+// group as it is. It is neither kept as an answer nor remembered: the next
+// start asks again.
+func TestRuntimeRootsDoesNotRememberANetworkFailure(t *testing.T) {
 	rootsServer(t, map[string]string{published339: "statsd\n"})
 	f := &fakeUV{answer: func([]string, string, string, bool, []string) (string, error) {
 		return "", errors.New("dial tcp: no route to host")
@@ -211,8 +211,43 @@ func TestRuntimeRootsRemembersAFailure(t *testing.T) {
 	require.ErrorContains(t, err, "no route to host")
 	before := f.calls.Load()
 	_, err = RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
+	require.ErrorContains(t, err, "no route to host")
+	assert.Greater(t, f.calls.Load(), before, "the next run asked uv again")
+}
+
+// A run uv completes with no answer for the whole list is remembered for an
+// hour, under the mirror it read from: pointing ASTRO_RUNTIME_ROOTS_URL at
+// another tries at once.
+func TestRuntimeRootsRemembersACompletedFailureByMirror(t *testing.T) {
+	rootsServer(t, map[string]string{published339: "statsd\n", "/mirror/roots/runtime-3.3-9-python-3.14.txt": "statsd\n"})
+	f := &fakeUV{answer: func([]string, string, string, bool, []string) (string, error) {
+		return "", &uv.ResolutionError{Stderr: "× No solution found when resolving dependencies"}
+	}}
+	f.install(t)
+	_, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
+	require.Error(t, err)
+	before := f.calls.Load()
+	_, err = RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
 	require.ErrorContains(t, err, "is not tried again until then")
 	assert.Equal(t, before, f.calls.Load())
+
+	t.Setenv(RootsURLEnv, strings.TrimSuffix(rootsBaseURL, "/runtime-roots")+"/mirror/roots/")
+	_, err = RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "is not tried again until then")
+	assert.Greater(t, f.calls.Load(), before, "another mirror was tried at once")
+}
+
+// uv missing is fixed by installing it, so it is not remembered either.
+func TestRuntimeRootsDoesNotRememberAMissingUV(t *testing.T) {
+	rootsServer(t, map[string]string{published339: "statsd\n"})
+	old := newCompiler
+	t.Cleanup(func() { newCompiler = old })
+	newCompiler = func(context.Context) (compileFunc, error) { return nil, uv.ErrNotFound }
+	_, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
+	require.ErrorIs(t, err, uv.ErrNotFound)
+	_, err = os.Stat(filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", rootsFailedDir, "runtime-3.3-9-python-3.14.txt"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
 // ASTRO_RUNTIME_ROOTS_URL points the published lists at a mirror, read by the

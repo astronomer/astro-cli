@@ -82,43 +82,45 @@ type Seed struct {
 	Build, Python string
 }
 
-// SeedManifest is the manifest in dir as the seed of its lock resolves it, in
-// place: pyproject.toml with pins's constraints added to [tool.uv]
-// constraint-dependencies, after the project's own and the Airflow build
-// pins, and without what an older astro wrote there (legacyPins). n is how
-// many constraints it added; none means there is nothing to seed. The caller
-// writes it over the project's file for one lock and puts the original back
-// (seedLock), so the comments the array holds need not be kept: a plain Set
-// of the values writes them as uv reads them.
-func SeedManifest(dir string, pins *RuntimePins) (out []byte, n int, err error) {
-	src, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
-	if err != nil {
-		return nil, 0, err
-	}
-	ed, err := tomledit.NewSurgical(src)
-	if err != nil {
-		return nil, 0, err
-	}
-	lines, _ := tomledit.GetLines(ed, constraintsKey)
-	added := pins.constraints(ownRequirements(ed, projectConstraints(lines)))
-	if len(added) == 0 {
-		return nil, 0, nil
-	}
-	var current []any
-	for _, v := range lines {
-		if s, isString := v.(string); isString && manifest.AstroPin(s) {
-			current = append(current, s)
+// AddSeedConstraints writes pins's constraints into the manifest in dir for
+// the one lock that seeds the project's uv.lock: appended to [tool.uv]
+// constraint-dependencies, after what is there, between the heading and end
+// comments an older astro wrote its runtime pins between (legacyPins). So
+// marked, constraints a killed process leaves behind are never read as the
+// project's own, and the next write of the manifest takes them out. The
+// caller puts the manifest back as it was once the lock is resolved
+// (RestoreManifest). The write is EditManifest's, so a symlinked manifest
+// stays a link and a read-only one is refused.
+//
+// n is how many constraints it added; none, with nothing written, means there
+// is nothing to seed. A [tool.uv] written as an inline table cannot carry the
+// comments, and is refused (tomledit.ErrCommentsUnsupported).
+func AddSeedConstraints(dir string, wrap func(run func() error) error, pins *RuntimePins) (n int, err error) {
+	err = EditManifest(dir, wrap, func(_ *manifest.Manifest, ed tomledit.Editor) error {
+		lines, _ := tomledit.GetLines(ed, constraintsKey)
+		added := pins.constraints(ownRequirements(ed, projectConstraints(lines)))
+		if n = len(added); n == 0 {
+			return nil
 		}
+		out := slices.Clone(legacyPins(lines))
+		out = append(out, tomledit.Comment(seedingHeading(pins)))
+		for _, c := range added {
+			out = append(out, c)
+		}
+		out = append(out, tomledit.Comment(legacyPinsEnd))
+		return setConstraints(ed, out)
+	})
+	if err != nil {
+		return 0, err
 	}
-	current = slices.Concat(projectConstraints(lines), current)
-	for _, c := range added {
-		current = append(current, c)
-	}
-	if err := ed.Set(constraintsKey, current); err != nil {
-		return nil, 0, err
-	}
-	out, err = ed.Bytes()
-	return out, len(added), err
+	return n, nil
+}
+
+// seedingHeading is the comment AddSeedConstraints opens its constraints
+// with. It starts as an older astro's runtime pins heading does
+// (legacyPinsHeadRe), so legacyPins reads what it heads as astro's.
+func seedingHeading(pins *RuntimePins) string {
+	return "Astro Runtime " + pins.Build + " (Python " + pins.Python + ") ships these versions; astro seeds uv.lock with them and takes them out again."
 }
 
 // SetRuntimeGroup writes group as the astro-runtime dependency group of the
