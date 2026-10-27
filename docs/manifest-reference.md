@@ -15,6 +15,7 @@ Which commands report what is worth knowing, because they differ:
 | `astro local env <noun> declare` / `undeclare` | yes | yes |
 | `astro package` | yes | yes |
 | `astro local check` | yes | yes, except values from the linked workspace |
+| `astro project inspect` | yes | no: shown as written |
 
 `astro local check` reports the environment the way `astro local start` gates on it. A declaration that does not parse stops the check. A required value with no source on this machine is an `env_missing` error, which fails the check as it blocks a start, and names the `astro local env <noun> set` command that provides it. A value that is present but is not what its declaration says (its `type`, `enum` or `conn_type`) is an `env_invalid` warning, which a start prints and runs past, and which `--strict` fails on. The check runs offline and never asks the Environment Manager, so a `source = 'workspace'` value that no local source holds is not reported, and neither is anything else the linked workspace supplies: `astro local start` reads them, and says so if it cannot. When the manifest links a workspace, the check's note says its values were not checked. It imports the DAGs under the values a start would give them (the project's `.env`, the vault, declared defaults), so a value held in the vault can bring up the same keychain prompt a start does. The environment is reported for the plain check and `--target astro`; `--target mwaa` and `--target composer` check a platform that sets its own values, from the `ENV_SETUP.md` that `astro package` writes.
 
@@ -236,7 +237,7 @@ The project's Astro workspace. It does three jobs:
 - Its Environment Manager objects (environment variables, Airflow variables, connections) reach the project's local Airflow, declared or not, below every local source and above a declaration's default, and a `{ source = 'workspace' }` value in `[tool.astro.env]` resolves from it. See [`[tool.astro.env]`](#toolastroenv).
 - It is the workspace `astro env` and `astro deployment` act on when run inside the project without `--workspace`, in place of the one `astro workspace switch` picked. See [Commands that manage Astro](workspace-link.md#commands-that-manage-astro).
 
-**Experimental: the workspace link is set from Astro Desktop.** Link, switch or unlink the workspace there; it writes `workspace`, `domain` and `organization` together, and a switch or unlink first writes the old id onto each Astro link that was inheriting it, so no link moves to a workspace its Deployment is not in. The CLI reads all three, so a project linked in Astro Desktop behaves the same in both tools and for anyone who clones it, but the CLI has no command to set them, and they are not meant to be edited by hand. See [Setting the link](workspace-link.md#setting-the-link).
+**Experimental: the workspace link is set from Astro Desktop.** Link, switch or unlink the workspace there; it writes `workspace`, `domain` and `organization` together, and a switch or unlink first writes the old id onto each Astro link that was inheriting it, so no link moves to a workspace its Deployment is not in. The CLI reads all three, so a project linked in Astro Desktop behaves the same in both tools and for anyone who clones it, but the CLI has no command to set them, and they are not meant to be edited by hand. See [Setting the link](workspace-link.md#setting-the-link). `astro project inspect` shows all three as the CLI resolves them (see [Reading the manifest from a script](#reading-the-manifest-from-a-script)).
 
 ```toml
 [tool.astro]
@@ -672,6 +673,29 @@ constraint-dependencies = ['pandas<3']
 ```
 
 A project on Airflow 3.1 that fails to import with an error naming `ScalarAttributeImpl` has resolved SQLAlchemy 2.1, which the SQLAlchemy-Utils that Airflow 3.1 depends on does not support yet ([sqlalchemy-utils#800](https://github.com/kvesteri/sqlalchemy-utils/issues/800)): add `constraint-dependencies = ['sqlalchemy<2.1']` here, or move the project to Airflow 3.2 or later.
+
+## Reading the manifest from a script
+
+`astro project inspect` prints the manifest as the CLI reads it, so a script, a CI job or an agent reads a project setting from the CLI instead of parsing `pyproject.toml` itself. It runs offline, from anywhere inside the project, and refuses a manifest that does not load the way `astro local start` does, every problem at once. Outside a project it fails with kind `no_project`.
+
+```sh
+astro project inspect                                   # every setting, as YAML
+astro project inspect -o json                           # the same object, as JSON
+astro project inspect --key organization                # one value, bare
+astro project inspect --key deployments.prod.deployment
+```
+
+The object is the file's values with the CLI's own resolution on top:
+
+- `name`, `requires_python` and `dependencies` are `[project]`'s, and `airflow` is the version the dependencies pin, the one statement of the project's Airflow version.
+- `deployments` holds every link by name, with its `kind` derived and its `workspace`, `target` and `auth_method` already resolved from the link's own table and the `[tool.astro]` defaults, as [How links resolve](#how-links-resolve) describes.
+- Three keys are resolved past the file. `domain` is `[tool.astro] domain`, else `ASTRO_DOMAIN`, else `astronomer.io` when the project names a workspace; absent when it names neither a host nor a workspace, which means the current login's. `organization` is `[tool.astro] organization`, else the organization of the identity a call on that host would use, in the order every Astro call picks it: an API token's, from `ASTRO_API_TOKEN`'s claims, else the context saved for that host. That read touches no keyring, so a host you have logged out of still answers with the organization it was last read under; whether its login is live is the next command's question. Absent when neither is known. `target` is `[tool.astro] target`, else `astro`.
+- `env` and `targets` are shown as written: `[tool.astro.env]`'s typing belongs to the commands that resolve values, and a target's keys are its platform's own. A quoted key with a dot in it is reached by `--key` all the same: at each table the shortest run of dotted parts that names a key is the key.
+- `requires_python`, `runtime`, `dockerfile`, `workspace`, `domain` and `organization` are omitted when unset. Every list and table is present, empty rather than null, so `packages`, `build_secrets`, `deployments`, `env`, `pools` and `targets` are there on every project.
+
+`--key` names one value by its dotted path, spelled as `-o json` spells it. A string, number or boolean prints bare, so `$(astro project inspect --key organization)` holds the value and nothing else; under `-o json` a string is quoted, which `jq -r` reads. A table or list prints as YAML, or as JSON under `-o json`. A key the project does not have is a usage error, exit 2, naming the keys the table does have, so a script stops there rather than going on with an empty value; an `organization` the project does not set and no login supplies is refused the same way.
+
+In a Deployment, the organization, workspace and Deployment ids need no reading: Astro sets `ASTRO_ORGANIZATION_ID`, `ASTRO_WORKSPACE_ID` and `ASTRO_DEPLOYMENT_ID` in every Deployment's containers. `astro project inspect` is for the machine that holds the project: a CI job, a local shell, an agent.
 
 ## A complete example
 

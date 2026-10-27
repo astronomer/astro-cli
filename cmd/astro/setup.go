@@ -571,18 +571,7 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 		return false, err
 	}
 
-	var wsID, orgID string
-	for _, permission := range claims.Permissions {
-		splitPermission := strings.Split(permission, ":")
-		permissionType := splitPermission[0]
-		id := splitPermission[1]
-		switch permissionType {
-		case "workspaceId":
-			wsID = id
-		case "organizationId":
-			orgID = id
-		}
-	}
+	wsID, orgID := claims.PermissionID("workspaceId"), claims.PermissionID("organizationId")
 
 	_, orgProduct, err := environmentOrganization(astroV1Client)
 	if err != nil {

@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -16,22 +14,10 @@ import (
 )
 
 // instanceProject writes a project whose manifest carries the given deployment
-// links, and points the cache root at a scratch dir so the pin and any runtime
-// records stay out of the user's machine.
+// links, under the preamble, isolated as projectFile isolates one.
 func instanceProject(t *testing.T, links string) string {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), "orders")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	body := instancestest.Preamble + links
-	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
-	t.Setenv("ASTRO_HOME", t.TempDir())
-	t.Setenv(instances.EnvVar, "")
-	return dir
+	return projectFile(t, instancestest.Preamble+links)
 }
 
 // instanceDeps points the commands at dir, with running holding whatever local

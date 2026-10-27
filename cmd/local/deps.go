@@ -181,6 +181,17 @@ type Deps struct {
 	// it, because the read touches config/, which this tree never imports.
 	// nil reads as nothing set.
 	Legacy1xSetting func(projectDir, key string) (value, file, replacement string)
+
+	// LoginOrganization is the organization of the identity a call on
+	// domain would use, in Session's order ("" for a project that names no
+	// host: the current context's), for `astro project inspect`'s
+	// organization when the manifest names none
+	// (manifest.Astro.WorkspaceOrganization's fallback). Production reads it
+	// offline through astrosession.OrganizationFor: an API token's claims,
+	// else the context saved for the host, with no keyring and no API. A
+	// seam because the read touches config/, which this tree never imports;
+	// nil, or "", reads as unknown.
+	LoginOrganization func(domain string) string
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an
@@ -213,23 +224,24 @@ type Runtime interface {
 func NewDeps() Deps {
 	runner := checks.NewVenvRunner()
 	d := Deps{
-		Stdin:            os.Stdin,
-		Stdout:           os.Stdout,
-		Stderr:           os.Stderr,
-		Checks:           runner,
-		CheckVenv:        runner,
-		Provisioner:      newUVProvisioner,
-		WorkingDir:       os.Getwd,
-		OpenURL:          browser.OpenURL,
-		WorkspaceClients: emenv.Clients,
-		Session:          astrosession.BearerFor,
-		Locator:          instancelocate.New,
-		Interactive:      stdinIsTerminal,
-		OutputTerminal:   stdoutIsTerminal,
-		AirflowDefault:   catalogDefault,
-		RuntimeCheck:     runtimecatalog.CheckRuntime,
-		AstroBuild:       runtimecatalog.AstroBuild,
-		RuntimeCatalog:   runtimecatalog.Catalog,
+		Stdin:             os.Stdin,
+		Stdout:            os.Stdout,
+		Stderr:            os.Stderr,
+		Checks:            runner,
+		CheckVenv:         runner,
+		Provisioner:       newUVProvisioner,
+		WorkingDir:        os.Getwd,
+		OpenURL:           browser.OpenURL,
+		WorkspaceClients:  emenv.Clients,
+		Session:           astrosession.BearerFor,
+		LoginOrganization: astrosession.OrganizationFor,
+		Locator:           instancelocate.New,
+		Interactive:       stdinIsTerminal,
+		OutputTerminal:    stdoutIsTerminal,
+		AirflowDefault:    catalogDefault,
+		RuntimeCheck:      runtimecatalog.CheckRuntime,
+		AstroBuild:        runtimecatalog.AstroBuild,
+		RuntimeCatalog:    runtimecatalog.Catalog,
 		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(airflowPin)(ctx)
 		},

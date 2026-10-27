@@ -1,0 +1,49 @@
+{
+  "path": "x",
+  "name": "x",
+  "requires_python": "x",
+  "dependencies": [
+    "x"
+  ],
+  "airflow": "x",
+  "runtime": "x",
+  "dockerfile": "x",
+  "packages": [
+    "x"
+  ],
+  "build_secrets": [
+    "x"
+  ],
+  "workspace": "x",
+  "domain": "x",
+  "organization": "x",
+  "target": "x",
+  "deployments": {
+    "x": {
+      "kind": "x",
+      "target": "x",
+      "workspace": "x",
+      "deployment": "x",
+      "environment": "x",
+      "url": "x",
+      "domain": "x",
+      "auth_method": "x",
+      "default": true
+    }
+  },
+  "env": {
+    "x": null
+  },
+  "pools": {
+    "x": {
+      "slots": -1,
+      "description": "x",
+      "include_deferred": true
+    }
+  },
+  "targets": {
+    "x": {
+      "x": null
+    }
+  }
+}
