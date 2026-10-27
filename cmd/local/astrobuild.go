@@ -89,7 +89,7 @@ type astroBuildWrite struct {
 	// runtimeGone the one whose record it took out; "" when neither happened.
 	runtime, runtimeGone string
 	lookupErr            error
-	writeErr  error
+	writeErr             error
 }
 
 // writeAstroBuild looks up the build for the manifest in dir and writes it,
