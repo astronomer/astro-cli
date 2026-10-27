@@ -156,7 +156,9 @@ func RuntimeRoots(ctx context.Context, build, python string, freeze []string) (R
 		return Roots{}, fmt.Errorf("%w: build %q, Python %q", ErrFreezeNotPublished, build, python)
 	}
 	name := freezeName(build, python)
-	failed := cacheDir(rootsFailedDir)
+	// The note is of one mirror: a list that could not be had from one says
+	// nothing of another, so pointing RootsURLEnv elsewhere tries at once.
+	failed := cacheDirFor(rootsFailedDir, rootsBase(), rootsBaseURL)
 	if failed != "" {
 		path := filepath.Join(failed, name)
 		if info, err := os.Stat(path); err == nil && time.Since(info.ModTime()) < rootsFailedTTL {
@@ -172,10 +174,22 @@ func RuntimeRoots(ctx context.Context, build, python string, freeze []string) (R
 		if failed != "" {
 			_ = os.Remove(filepath.Join(failed, name)) //nolint:errcheck // a stale note expires on its own
 		}
-	case ctx.Err() == nil && failed != "" && os.MkdirAll(failed, freezeDirPerm) == nil:
+	case ctx.Err() == nil && rootsFailureLasts(err) && failed != "" && os.MkdirAll(failed, freezeDirPerm) == nil:
 		_ = fsatomic.WriteFile(filepath.Join(failed, name), []byte(err.Error()+"\n"), freezeFilePerm) //nolint:errcheck // a note that cannot be written only means trying again sooner
 	}
 	return out, err
+}
+
+// rootsFailureLasts reports a failure of RuntimeRoots worth remembering for
+// rootsFailedTTL: one the computation reached the end of, so trying again
+// soon gets the same answer: uv saying a resolution has no answer, or the
+// whole of rootsBudget spent (a network too slow to finish in it, which each
+// start would otherwise wait out). uv missing, which installing it fixes, and
+// a network error, on which the run ends at once (withPlatforms cancels the
+// rest), are tried again on the next start.
+func rootsFailureLasts(err error) bool {
+	var resolution *uv.ResolutionError
+	return errors.As(err, &resolution) || errors.Is(err, context.DeadlineExceeded)
 }
 
 func runtimeRoots(ctx context.Context, build, python string, freeze []string) (Roots, error) {
@@ -240,7 +254,7 @@ func (r *rootsRun) roots(ctx context.Context, name string) ([]string, error) {
 		return roots, nil
 	}
 	computed := cacheDir(rootsComputedDir)
-	if data, _ := cachedFreeze(computed, name); data != nil { //nolint:errcheck // a computed list has no 404 to remember
+	if data, _ := cachedFreeze(computed, name, listNames); data != nil { //nolint:errcheck // a computed list has no 404 to remember
 		return rootsOf(data), nil
 	}
 	candidates, airflow := rootsCandidates(r.freeze)
@@ -335,14 +349,14 @@ func rootsFromCompile(out string, candidates, parents []string) []string {
 // from base, and whether there was one. A 404, remembered as the freeze's
 // are, or any failure to read it, is no list.
 func publishedRoots(ctx context.Context, base, dir, name string) ([]string, bool) {
-	data, err := cachedFreeze(dir, name)
+	data, err := cachedFreeze(dir, name, listNames)
 	if err != nil {
 		return nil, false
 	}
 	if data == nil {
 		fetchCtx, cancel := context.WithTimeout(ctx, freezeTimeout)
 		defer cancel()
-		if data, err = fetchAndKeep(fetchCtx, base, dir, name); err != nil {
+		if data, err = fetchAndKeep(fetchCtx, base, dir, name, listNames); err != nil {
 			return nil, false
 		}
 	}
@@ -353,7 +367,7 @@ func publishedRoots(ctx context.Context, base, dir, name string) ([]string, bool
 // rootsOf reads a list of top-level packages, `pip freeze` lines or bare
 // names, into the names RuntimeRoots starts from.
 func rootsOf(data []byte) []string {
-	dists, err := parseFreeze(data)
+	dists, err := listNames(data)
 	if err != nil {
 		return nil
 	}
