@@ -34,13 +34,6 @@ const (
 	DistTaskSDK = "apache-airflow-task-sdk"
 )
 
-// AirflowDists are DistAirflow, DistCore and DistTaskSDK, as a list: the
-// distributions a project lists itself, which the seed and the
-// astro-runtime group leave out. A copy, so no caller changes another's.
-func AirflowDists() []string {
-	return []string{DistAirflow, DistCore, DistTaskSDK}
-}
-
 // ErrNoAstroBuild reports an Airflow pin Astronomer's index has no build of,
 // a release newer than any runtime most often. Airflow then comes from PyPI.
 var ErrNoAstroBuild = errors.New("Astronomer's index has no build of this Airflow")

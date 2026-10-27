@@ -39,6 +39,8 @@ var helperContentAtVersion = map[int]string{
 	// writes in [tool.uv] constraint-dependencies, and counts every dependency
 	// group as the project's own naming.
 	8: "bc6b44ed6a0cfae918e704a407a48715c63a6e269bc57379ba1c682db4c4e440",
+	// A stale lock's warning says to run uv lock, which is what relocks.
+	9: "eb4ca08c703fc89c58dd398bac0e540edaf0dde018963818e342c3a4d95f1be3",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {

@@ -352,7 +352,7 @@ func TestInstallHelperSaysWhenTheLockIsForAnotherAirflow(t *testing.T) {
 	out := runHelper(t, helperProject(t, stale, lock), helperRun{env: []string{"ASTRO_INSTALL_PROJECT_BASE_AIRFLOW=3.3.3+astro.1"}})
 	assert.NotContains(t, out.stderr, "was made for")
 	assert.Contains(t, out.stderr, "out of date with pyproject.toml")
-	assert.Contains(t, out.stderr, "run `astro init`, which relocks")
+	assert.Contains(t, out.stderr, "run `uv lock`; installing")
 }
 
 // The build the project builds on is read from the record astro writes in

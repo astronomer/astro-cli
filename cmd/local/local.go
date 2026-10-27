@@ -252,8 +252,9 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	if err := checkImageDockerfile(r, built.Plan); err != nil {
 		return err
 	}
-	c.noticeLockedRuntime(ctx, r, built.Plan)
-	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
+	catalog := c.startCatalog(ctx, built.Plan)
+	noticeLockedRuntime(r, built.Plan, catalog)
+	if err := c.checkRuntimeBuild(ctx, r, built.Plan, catalog); err != nil {
 		return err
 	}
 	af, err := c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
@@ -331,8 +332,8 @@ const (
 // read the catalog for is a warning. Standalone installs the requirement and
 // builds no image, so the build decides nothing there and is not checked; a
 // declared Dockerfile never has one beside it.
-func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localrt.Plan) error {
-	if p.Mode != localrt.ModeDocker || p.Dockerfile != "" || c.d.RuntimeCheck == nil {
+func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localrt.Plan, catalog *runtimeversions.Catalog) error {
+	if p.Mode != localrt.ModeDocker || p.Dockerfile != "" || c.d.RuntimeCheck == nil || (p.Runtime == "" && p.LockedRuntime == "") {
 		return nil
 	}
 	// The build the image starts FROM: [tool.astro] runtime, else the build
@@ -340,10 +341,6 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localr
 	// (imagebuild.LockedRuntimeUsed).
 	build, key := p.Runtime, runtimeKey
 	if build == "" {
-		var catalog *runtimeversions.Catalog
-		if c.d.RuntimeCatalog != nil {
-			catalog = c.d.RuntimeCatalog(ctx)
-		}
 		if !imagebuild.LockedRuntimeUsed(p.ManifestBuild(p.ProjectPath), catalog) {
 			return nil
 		}
@@ -413,13 +410,23 @@ func checkImageDockerfile(r cliout.Renderer, p localrt.Plan) error {
 // image builds on the newest one instead. A Docker-only project never runs the
 // standalone refresh that moves the pins, so this is where it hears of a new
 // build. Standalone builds no image.
-func (c *cli) noticeLockedRuntime(ctx context.Context, r cliout.Renderer, p localrt.Plan) {
-	if p.Mode != localrt.ModeDocker || c.d.RuntimeCatalog == nil {
+func noticeLockedRuntime(r cliout.Renderer, p localrt.Plan, catalog *runtimeversions.Catalog) {
+	if p.Mode != localrt.ModeDocker || catalog == nil {
 		return
 	}
-	for _, n := range imagebuild.LockedRuntimeNotices(p.ManifestBuild(p.ProjectPath), c.d.RuntimeCatalog(ctx)) {
+	for _, n := range imagebuild.LockedRuntimeNotices(p.ManifestBuild(p.ProjectPath), catalog) {
 		emitWarning(r, event{Event: "warning", Text: n})
 	}
+}
+
+// startCatalog is the runtime catalog a Docker-mode start's two checks of the
+// recorded build read (noticeLockedRuntime, checkRuntimeBuild), loaded once:
+// nil when neither has a build to check, or there is no catalog to read.
+func (c *cli) startCatalog(ctx context.Context, p localrt.Plan) *runtimeversions.Catalog {
+	if p.Mode != localrt.ModeDocker || p.Dockerfile != "" || p.Runtime != "" || p.LockedRuntime == "" || c.d.RuntimeCatalog == nil {
+		return nil
+	}
+	return c.d.RuntimeCatalog(ctx)
 }
 
 // warnManifest reports the manifest's findings that do not stop a start: a
@@ -718,9 +725,10 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	if err := checkImageDockerfile(r, built.Plan); err != nil {
 		return err
 	}
-	c.noticeLockedRuntime(ctx, r, built.Plan)
+	catalog := c.startCatalog(ctx, built.Plan)
+	noticeLockedRuntime(r, built.Plan, catalog)
 	// Before the stop, like the build: a refusal leaves Airflow running.
-	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
+	if err := c.checkRuntimeBuild(ctx, r, built.Plan, catalog); err != nil {
 		return err
 	}
 	if err := af.Stop(ctx, localrt.StopOptions{Force: force}); err != nil {

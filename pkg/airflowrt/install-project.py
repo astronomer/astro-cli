@@ -1,5 +1,5 @@
 # Written by the Astro CLI. Do not edit: `astro init` replaces this file.
-# astro-install-helper: 8
+# astro-install-helper: 9
 #
 # Turns the project's pyproject.toml, and its uv.lock when there is one, into
 # the files the Astro Runtime image's install steps read: requirements.txt,
@@ -927,7 +927,7 @@ def main(argv=None):
                 lock_data = tomllib.load(f)
             lock = Lock(lock_data, manifest, runtime_constrained(args.runtime_constraints), base)
             if lock.stale:
-                warn("uv.lock is out of date with pyproject.toml (%s); run `astro init`, which relocks; installing pyproject.toml's dependencies unpinned" % lock.stale)
+                warn("uv.lock is out of date with pyproject.toml (%s); run `uv lock`; installing pyproject.toml's dependencies unpinned" % lock.stale)
                 lock = None
             else:
                 if lock.elsewhere:

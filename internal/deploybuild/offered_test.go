@@ -90,6 +90,34 @@ func TestOfferedBasePrefersTheLocksBuild(t *testing.T) {
 	}
 }
 
+// The lock's build runs the recorded Python, as a local or packaged image of
+// it does; a requires-python that excludes that Python moves on to the next
+// offered build, with a warning.
+func TestOfferedBaseRunsTheLocksBuildOnTheRecordedPython(t *testing.T) {
+	var asked []imagebuild.ManifestBuild
+	resolve := func(_ context.Context, m imagebuild.ManifestBuild) (string, error) {
+		asked = append(asked, m)
+		return m.Runtime, nil
+	}
+	o := offer{"3.3": {"3.3-10", "3.3-9"}}
+
+	ref, err := OfferedBase(o, resolve, nil)(context.Background(),
+		imagebuild.ManifestBuild{AirflowVersion: "3.3", LockedRuntime: "3.3-9", LockedPython: "3.12", RequiresPython: ">=3.12"})
+	require.NoError(t, err)
+	assert.Equal(t, "3.3-9", ref)
+	assert.Equal(t, "==3.12.*", asked[0].RequiresPython)
+
+	asked = nil
+	var warnings []string
+	ref, err = OfferedBase(o, resolve, func(s string) { warnings = append(warnings, s) })(context.Background(),
+		imagebuild.ManifestBuild{AirflowVersion: "3.3", LockedRuntime: "3.3-9", LockedPython: "3.12", RequiresPython: ">=3.13"})
+	require.NoError(t, err)
+	assert.Equal(t, "3.3-10", ref, "requires-python excludes the recorded 3.12")
+	assert.Equal(t, ">=3.13", asked[0].RequiresPython)
+	require.NotEmpty(t, warnings)
+	assert.Contains(t, warnings[0], "excludes Python 3.12")
+}
+
 // An offered build that ships no Python requires-python admits gives way to
 // the next offered build that does, newest first, and the warning names the
 // build skipped and why: the lock's build when it was that one, else the
