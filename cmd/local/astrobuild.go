@@ -97,18 +97,11 @@ func stalePin(m *manifest.Manifest) bool {
 			continue
 		}
 		_, version, _ := strings.Cut(c, "==")
-		if !pinCovers(pin, astroRelease(version)) {
+		if !manifest.PinCovers(pin, astroRelease(version)) {
 			return true
 		}
 	}
 	return false
-}
-
-// pinCovers reports whether an Airflow pin ("3.3", "3.3.2") covers a release:
-// whether apache-airflow==<pin>.* admits it, as PEP 440 matches a prefix.
-func pinCovers(pin, release string) bool {
-	admits, known := manifest.RequirementAdmits(runtimeversions.DistAirflow+"=="+pin+".*", release)
-	return known && admits
 }
 
 // astroBuildWrite is what writeAstroBuild did, for its caller to report.
@@ -140,6 +133,10 @@ type astroBuildWrite struct {
 	// updated is a write that changed the file, which could not be read back
 	// to say what changed.
 	updated bool
+	// wouldSeed is a write that seeds the lock if it can: init's, or a
+	// start's with no uv.lock. Only then is a list that cannot be read worth
+	// a warning; a start with a lock only counts drift.
+	wouldSeed bool
 }
 
 // runtimeImage is the build and Python scaffold.RuntimeBuildFor names for a
@@ -186,7 +183,7 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroB
 		return astroBuildWrite{}
 	}
 	airflow := m.Airflow()
-	res := astroBuildWrite{pin: airflow.Pin}
+	res := astroBuildWrite{pin: airflow.Pin, wouldSeed: seed || !hasLock(dir)}
 	// The image is resolved for the seed, and for a declared Dockerfile's
 	// build, which the Airflow lookup is asked about. Under a cutoff there is
 	// nothing to seed (runtimePins), so nothing is read for one.
@@ -249,6 +246,11 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroB
 // seed, when seed asks or there is no lock; otherwise it counts how far the
 // lock is from pins. It reports whether it changed the manifest.
 func (c *cli) applySeed(ctx context.Context, dir string, m *manifest.Manifest, pins *scaffold.RuntimePins, seed bool, res *astroBuildWrite) (bool, error) {
+	if root := workspaceRoot(dir); root != "" {
+		res.seedWarn = fmt.Errorf("uv.lock is not seeded with what Astro Runtime %s ships: this project is a member of the uv workspace at %s, whose uv.lock is at its root, and astro seeds only a project's own lock",
+			pins.Build, root)
+		return false, nil
+	}
 	if !seed && hasLock(dir) {
 		if res.drift = lockDrift(dir, pins); res.drift > 0 {
 			res.driftBuild = pins.Build
@@ -298,27 +300,56 @@ const (
 	// exclude-newer in its uv.toml. Its lock is not seeded, and the record
 	// of an earlier seed comes out.
 	projectCutoff
-	// envCutoff is UV_EXCLUDE_NEWER, the environment's, which says nothing
-	// of the project: its lock and the record stay as they are.
+	// envCutoff is UV_EXCLUDE_NEWER, or exclude-newer in the user's or the
+	// system's uv.toml: the environment's, which says nothing of the
+	// project: its lock and the record stay as they are.
 	envCutoff
 )
 
 // underCutoff is the cutoff the project in dir resolves as of, a date or a
 // duration alike: the one rule for whether a seed may be made.
+//
+// The user's and the system's uv.toml say nothing of the project either, and
+// count as the environment's: uv reads them on this machine only.
 func underCutoff(dir string, m *manifest.Manifest) cutoff {
 	switch {
-	case m.UV.ExcludeNewer != "" || uvTOMLExcludeNewer(dir) != "":
+	case m.UV.ExcludeNewer != "" || uvTOMLExcludeNewer(filepath.Join(dir, "uv.toml")) != "":
 		return projectCutoff
 	case strings.TrimSpace(os.Getenv("UV_EXCLUDE_NEWER")) != "":
 		return envCutoff
 	}
+	for _, path := range userUVConfigs() {
+		if uvTOMLExcludeNewer(path) != "" {
+			return envCutoff
+		}
+	}
 	return noCutoff
 }
 
-// uvTOMLExcludeNewer is exclude-newer in the uv.toml beside the project's
-// pyproject.toml, which uv reads before [tool.uv]; "" when there is none.
-func uvTOMLExcludeNewer(dir string) string {
-	data, err := os.ReadFile(filepath.Join(dir, "uv.toml"))
+// userUVConfigs are the uv.toml files uv reads beyond the project's, in the
+// order it does: UV_CONFIG_FILE alone when it is set; else the user's
+// ($XDG_CONFIG_HOME/uv/uv.toml, or ~/.config/uv/uv.toml) and the system's
+// (/etc/uv/uv.toml). None under UV_NO_CONFIG, which makes uv read none.
+func userUVConfigs() []string {
+	if v := strings.TrimSpace(os.Getenv("UV_NO_CONFIG")); v != "" && v != "0" && !strings.EqualFold(v, "false") {
+		return nil
+	}
+	if f := strings.TrimSpace(os.Getenv("UV_CONFIG_FILE")); f != "" {
+		return []string{f}
+	}
+	var paths []string
+	if xdg := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); xdg != "" {
+		paths = append(paths, filepath.Join(xdg, "uv", "uv.toml"))
+	} else if home, err := os.UserHomeDir(); err == nil {
+		paths = append(paths, filepath.Join(home, ".config", "uv", "uv.toml"))
+	}
+	return append(paths, filepath.Join(string(filepath.Separator), "etc", "uv", "uv.toml"))
+}
+
+// uvTOMLExcludeNewer is exclude-newer in the uv.toml at path; "" when there is
+// none.
+func uvTOMLExcludeNewer(path string) string {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""
 	}
@@ -430,7 +461,7 @@ func (c *cli) runtimePins(ctx context.Context, m *manifest.Manifest, image runti
 		return none
 	case cut == envCutoff:
 		if m.UV.RuntimeBuild != "" {
-			res.seedWarn = fmt.Errorf("uv.lock stays seeded from Astro Runtime %s: UV_EXCLUDE_NEWER holds uv to a cutoff, which a runtime's package list does not follow", m.UV.RuntimeBuild)
+			res.seedWarn = fmt.Errorf("uv.lock stays seeded from Astro Runtime %s: this environment holds uv to a cutoff (UV_EXCLUDE_NEWER, or exclude-newer in your own uv.toml), which a runtime's package list does not follow", m.UV.RuntimeBuild)
 		}
 		return nil
 	case res.build.Airflow == "" && !noBuild && res.offline:
@@ -445,7 +476,7 @@ func (c *cli) runtimePins(ctx context.Context, m *manifest.Manifest, image runti
 		// while the Airflow it was made beside is one the pin still covers; a
 		// pin that moved off it leaves it another Airflow's.
 		recorded := releaseIn(m.UV.ConstraintDependencies, runtimeversions.DistAirflow)
-		if m.UV.RuntimeBuild != "" && recorded != "" && !pinCovers(m.Airflow().Pin, recorded) {
+		if m.UV.RuntimeBuild != "" && recorded != "" && !manifest.PinCovers(m.Airflow().Pin, recorded) {
 			res.seedWarn = fmt.Errorf("uv.lock is no longer recorded as seeded from Astro Runtime %s: its Airflow %s is one the Airflow requirement no longer covers, and which build carries the new one cannot be told without the runtime catalog",
 				m.UV.RuntimeBuild, recorded)
 			return none
@@ -479,7 +510,7 @@ func (c *cli) runtimePins(ctx context.Context, m *manifest.Manifest, image runti
 	// pin covers, so the build's list applies while it carries one of those.
 	carried := releaseIn(freeze, runtimeversions.DistAirflow)
 	if noBuild {
-		if carried == "" || !pinCovers(m.Airflow().Pin, carried) {
+		if carried == "" || !manifest.PinCovers(m.Airflow().Pin, carried) {
 			return none
 		}
 	} else if pinned := astroRelease(res.build.Airflow); carried != "" && carried != pinned {
@@ -497,13 +528,18 @@ func (c *cli) runtimePins(ctx context.Context, m *manifest.Manifest, image runti
 // recorded there is nothing to keep, and nothing changes either; a pin that
 // moved off the recorded Airflow takes the record out, with dropped as the
 // warning.
+//
+// The warnings are for a write that would seed (res.wouldSeed): a start with a
+// lock only counts drift, and has nothing to say about a list it did not need.
 func keepRecordedSeed(m *manifest.Manifest, res *astroBuildWrite, kept string, dropped error) *scaffold.RuntimePins {
 	if m.UV.RuntimeBuild == "" {
-		res.seedWarn = dropped
+		if res.wouldSeed {
+			res.seedWarn = dropped
+		}
 		return nil
 	}
 	recorded := recordedAstroBuild(m)
-	if recorded.Airflow != "" && !pinCovers(m.Airflow().Pin, astroRelease(recorded.Airflow)) {
+	if recorded.Airflow != "" && !manifest.PinCovers(m.Airflow().Pin, astroRelease(recorded.Airflow)) {
 		res.seedWarn = dropped
 		return &scaffold.RuntimePins{}
 	}
@@ -513,7 +549,9 @@ func keepRecordedSeed(m *manifest.Manifest, res *astroBuildWrite, kept string, d
 		}
 		res.build = recorded
 	}
-	res.seedWarn = fmt.Errorf("uv.lock stays seeded from Astro Runtime %s: %s", m.UV.RuntimeBuild, kept)
+	if res.wouldSeed {
+		res.seedWarn = fmt.Errorf("uv.lock stays seeded from Astro Runtime %s: %s", m.UV.RuntimeBuild, kept)
+	}
 	return nil
 }
 

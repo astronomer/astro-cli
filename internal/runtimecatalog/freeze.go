@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fsatomic"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/version"
 )
 
@@ -53,17 +54,6 @@ func freezeBase() string {
 		return strings.TrimSuffix(u, "/")
 	}
 	return freezeBaseURL
-}
-
-// withoutUser is rawURL without its user and password, for an address an
-// error prints: a mirror's address can carry its credentials.
-func withoutUser(rawURL string) string {
-	u, err := neturl.Parse(rawURL)
-	if err != nil || u.User == nil {
-		return rawURL
-	}
-	u.User = nil
-	return u.String()
 }
 
 const (
@@ -121,7 +111,10 @@ func RuntimePins(ctx context.Context, build, python string) ([]string, error) {
 			return nil, err
 		}
 	}
-	return freezePins(data), nil
+	// Only a copy with a pin in it is kept or fetched (cachedFreeze,
+	// fetchFreeze), so a list with none never reaches here as a definitive
+	// "nothing to seed".
+	return freezePins(data)
 }
 
 // freezeName is the file a build's freeze for one Python is served and kept
@@ -162,7 +155,7 @@ func cachedFreeze(dir, name string) ([]byte, error) {
 		return nil, nil
 	}
 	path := filepath.Join(dir, name)
-	// A copy that does not parse is read again from the CDN.
+	// A copy that does not parse, or holds no pin, is read again from the CDN.
 	if data, err := fsatomic.ReadFile(path); err == nil {
 		if dists, err := parseFreeze(data); err == nil && len(dists) > 0 {
 			return data, nil
@@ -195,7 +188,7 @@ func fetchAndKeep(ctx context.Context, base, dir, name string) ([]byte, error) {
 // one is ever cached. An error names the address without its user and
 // password.
 func fetchFreeze(ctx context.Context, url string) ([]byte, error) {
-	shown := withoutUser(url)
+	shown := runtimeversions.WithoutUser(url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: the address does not parse", shown)
@@ -232,40 +225,20 @@ func fetchFreeze(ctx context.Context, url string) ([]byte, error) {
 		return nil, fmt.Errorf("reading %s: %w", shown, err)
 	}
 	if len(dists) == 0 {
-		// A 200 with no requirement in it is a captive portal or an error page,
+		// A 200 with no pin in it is a captive portal or an error page,
 		// not a freeze, and caching it would answer every later read wrongly.
 		return nil, fmt.Errorf("reading %s: no packages in the response", shown)
 	}
 	return data, nil
 }
 
-// parseFreeze reads `pip freeze` output into normalized distribution names:
-// "name==version" and "name @ url" lines, comments and blanks skipped. A line
-// too long to read is an error, not the end of the file.
-func parseFreeze(data []byte) ([]string, error) {
-	var dists []string
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	sc.Buffer(make([]byte, 0, 64<<10), freezeMaxBytes)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "-") {
-			continue
-		}
-		if name := manifest.DistName(line); name != "" {
-			dists = append(dists, name)
-		}
-	}
-	if err := sc.Err(); err != nil {
-		return nil, err
-	}
-	return dists, nil
-}
-
-// freezePins reads `pip freeze` output, a copy parseFreeze accepted, into its
-// name==version lines, as they are written. A "name @ url" line, an editable
-// install or anything else names no version to hold a package to, and is left
-// out.
-func freezePins(data []byte) []string {
+// freezePins reads `pip freeze` output into its name==version lines, as they
+// are written: the one reading of a freeze, which decides both whether a copy
+// is one (a copy with no such line is not) and what a seed holds. A "name @
+// url" line, an editable install, a comment or anything else names no version
+// to hold a package to, and is left out. A line too long to read is an error,
+// not the end of the file.
+func freezePins(data []byte) ([]string, error) {
 	var pins []string
 	sc := bufio.NewScanner(bytes.NewReader(data))
 	sc.Buffer(make([]byte, 0, 64<<10), freezeMaxBytes)
@@ -279,5 +252,22 @@ func freezePins(data []byte) []string {
 		}
 		pins = append(pins, name+"=="+release)
 	}
-	return pins
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	return pins, nil
+}
+
+// parseFreeze is the normalized distribution names freezePins reads, in its
+// order.
+func parseFreeze(data []byte) ([]string, error) {
+	pins, err := freezePins(data)
+	if err != nil {
+		return nil, err
+	}
+	dists := make([]string, 0, len(pins))
+	for _, pin := range pins {
+		dists = append(dists, manifest.DistName(pin))
+	}
+	return dists, nil
 }

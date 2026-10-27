@@ -43,25 +43,42 @@ func setBuild(dir string, b runtimeversions.AstroBuild) error {
 	return err
 }
 
-// seedFor is SeedManifest's scratch manifest for dir, read back as the
-// constraints it states.
+// seedText is the manifest in dir as AddSeedConstraints writes it for the
+// seed's lock, and how many constraints it added; the manifest is put back
+// as it was after (RestoreManifest), as the seed does. "" when nothing was
+// added.
+func seedText(t *testing.T, dir string, pins *RuntimePins) (string, int) {
+	t.Helper()
+	before, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	require.NoError(t, err)
+	n, err := AddSeedConstraints(dir, nil, pins)
+	require.NoError(t, err)
+	if n == 0 {
+		assert.Equal(t, string(before), readManifest(t, dir), "nothing to seed writes nothing")
+		return "", 0
+	}
+	out := readManifest(t, dir)
+	require.NoError(t, RestoreManifest(dir, nil, before))
+	return out, n
+}
+
+// seedFor is seedText read back as the constraints it states.
 func seedFor(t *testing.T, dir string, pins *RuntimePins) (constraints []string, n int) {
 	t.Helper()
-	out, n, err := SeedManifest(dir, pins)
-	require.NoError(t, err)
-	if out == nil {
+	out, n := seedText(t, dir, pins)
+	if n == 0 {
 		return nil, n
 	}
-	m, err := manifest.Parse(out)
+	m, err := manifest.Parse([]byte(out))
 	require.NoError(t, err)
 	return m.UV.ConstraintDependencies, n
 }
 
-// The scratch copy states the image's versions, each limited to its Python,
+// The seed's manifest states the image's versions, each limited to its Python,
 // beside the project's own constraints and Airflow's build pins, and leaves
 // out what a seed never holds: Airflow itself, Astronomer's own builds, and a
 // package the project gives a version the image's does not meet.
-func TestSeedManifestStatesTheImagesVersions(t *testing.T) {
+func TestAddSeedConstraintsStatesTheImagesVersions(t *testing.T) {
 	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'Pandas>=3']", 1) +
 		"\n[tool.uv]\nconstraint-dependencies = ['protobuf>=7', 'apache-airflow==3.3.2+astro.1']\n"
 	dir := projectWith(t, src)
@@ -74,7 +91,7 @@ func TestSeedManifestStatesTheImagesVersions(t *testing.T) {
 		"zipp==4.1.0; python_version == '3.12'",
 	}, got)
 	assert.Equal(t, 3, n)
-	assert.Equal(t, src, readManifest(t, dir), "the project's own manifest is not touched")
+	assert.Equal(t, src, readManifest(t, dir), "the project's manifest is put back as it was")
 }
 
 func TestThePinOfAPackageTheProjectNamesFollowsItsRequirement(t *testing.T) {
@@ -96,28 +113,25 @@ func TestThePinOfAPackageTheProjectNamesFollowsItsRequirement(t *testing.T) {
 }
 
 // Nothing left to seed with: no scratch manifest at all.
-func TestSeedManifestWithNothingToSeed(t *testing.T) {
+func TestAddSeedConstraintsWithNothingToSeed(t *testing.T) {
 	dir := projectWith(t, astroHead)
-	out, n, err := SeedManifest(dir, &RuntimePins{Build: "10.5.0", Python: "3.11"})
-	require.NoError(t, err)
-	assert.Nil(t, out)
+	out, n := seedText(t, dir, &RuntimePins{Build: "10.5.0", Python: "3.11"})
+	assert.Empty(t, out)
 	assert.Zero(t, n)
 }
 
 // The seed locks the project in place, so its sources stay as they are
 // written, relative paths and all, and a workspace's root is seeded too. The
 // runtime pins an older astro wrote never reach the seed.
-func TestSeedManifestLeavesTheProjectAsItIsWritten(t *testing.T) {
+func TestAddSeedConstraintsLeavesTheProjectAsItIsWritten(t *testing.T) {
 	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'mylib']", 1) +
 		"\n[tool.uv.sources]\nmylib = { path = 'libs/mylib' }\n"
 	dir := projectWith(t, src)
-	out, _, err := SeedManifest(dir, freeze339)
-	require.NoError(t, err)
-	assert.Contains(t, string(out), "'libs/mylib'")
+	out, _ := seedText(t, dir, freeze339)
+	assert.Contains(t, out, "'libs/mylib'")
 
 	ws := projectWith(t, astroHead+"\n[tool.uv.workspace]\nmembers = ['packages/*']\n")
-	_, n, err := SeedManifest(ws, freeze339)
-	require.NoError(t, err)
+	_, n := seedText(t, ws, freeze339)
 	assert.Positive(t, n)
 
 	legacy := projectWith(t, astroHead+"\n[tool.uv]\nconstraint-dependencies = [\n"+
@@ -126,12 +140,11 @@ func TestSeedManifestLeavesTheProjectAsItIsWritten(t *testing.T) {
 		"    \"zipp==3.0.0; python_version == '3.12'\",\n"+
 		"    # End of what astro writes. Constraints below this line are yours.\n"+
 		"    'numpy<3',\n]\n")
-	out, _, err = SeedManifest(legacy, freeze339)
-	require.NoError(t, err)
-	assert.NotContains(t, string(out), "zipp==3.0.0")
-	assert.Contains(t, string(out), "zipp==4.1.0")
-	assert.Contains(t, string(out), "numpy<3")
-	assert.Contains(t, string(out), "apache-airflow==3.3.2+astro.1")
+	out, _ = seedText(t, legacy, freeze339)
+	assert.NotContains(t, out, "zipp==3.0.0")
+	assert.Contains(t, out, "zipp==4.1.0")
+	assert.Contains(t, out, "numpy<3")
+	assert.Contains(t, out, "apache-airflow==3.3.2+astro.1")
 }
 
 // The record follows Airflow's build pins and the project's own constraints;

@@ -144,6 +144,22 @@ func AstroPin(spec string) bool {
 	return false
 }
 
+// PinCovers reports whether an Airflow release satisfies a pin that may name
+// fewer segments than the release does: "3.3" covers "3.3.2", "3.3.2" covers
+// "3.3.2", and neither covers "3.4.0" or "3.30.0". It is whether
+// apache-airflow==<pin>.* admits the release, as PEP 440 matches a prefix
+// (RequirementAdmits), so a local version is compared without its local
+// label: Astronomer's build "3.3.2+astro.2" is release 3.3.2. A pin or a
+// release PEP 440 does not spell covers nothing.
+func PinCovers(pin, release string) bool {
+	pin = strings.TrimSpace(pin)
+	if pin == "" {
+		return false
+	}
+	admits, known := RequirementAdmits(airflowDist+"=="+pin+".*", strings.TrimSpace(release))
+	return known && admits
+}
+
 // WithoutAstroPins returns constraints without the AstroPin entries, for an
 // environment that runs Apache's own Airflow: MWAA's, or Composer's.
 func WithoutAstroPins(constraints []string) []string {

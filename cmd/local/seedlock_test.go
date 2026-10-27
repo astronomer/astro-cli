@@ -100,6 +100,12 @@ type pinsRun struct {
 	// init runs the write as `astro init` does, seeding whatever the lock
 	// holds, in place of a start.
 	init bool
+	// workspace, when set, is the pyproject.toml of a directory the project
+	// sits in, as proj/.
+	workspace string
+	// symlink writes the manifest as real.toml with pyproject.toml a link to
+	// it.
+	symlink bool
 }
 
 // pinsResult is what a pinsRun left: the manifest and the lock, what it
@@ -109,6 +115,11 @@ type pinsResult struct {
 	lookupAsked, freezeAsked []string
 	catalogReads             int
 	uv                       *fakeUV
+	// seedWarn is the warning an init's write reports (init runs the write
+	// itself, without a start's report).
+	seedWarn error
+	// manifestIsLink reports pyproject.toml still a symlink after the run.
+	manifestIsLink bool
 }
 
 func (p pinsRun) start(t *testing.T) pinsResult {
@@ -117,8 +128,24 @@ func (p pinsRun) start(t *testing.T) pinsResult {
 	stderr := &bytes.Buffer{}
 	d.Stderr = stderr
 	dir := t.TempDir()
+	if p.workspace != "" {
+		if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(p.workspace), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		dir = filepath.Join(dir, "proj")
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
 	path := filepath.Join(dir, "pyproject.toml")
-	if err := os.WriteFile(path, []byte(p.src), 0o600); err != nil {
+	written := path
+	if p.symlink {
+		written = filepath.Join(dir, "real.toml")
+		if err := os.Symlink("real.toml", path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(written, []byte(p.src), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for name, body := range p.files {
@@ -159,7 +186,7 @@ func (p pinsRun) start(t *testing.T) pinsResult {
 		return p.freeze, p.freezeErr
 	}
 	if p.init {
-		(&cli{d: d}).writeAstroBuild(context.Background(), dir, true)
+		res.seedWarn = (&cli{d: d}).writeAstroBuild(context.Background(), dir, true).seedWarn
 	} else {
 		_ = execute(t, d, "local", "start")
 	}
@@ -169,6 +196,9 @@ func (p pinsRun) start(t *testing.T) pinsResult {
 	}
 	lock, _ := os.ReadFile(filepath.Join(dir, "uv.lock"))
 	res.manifest, res.lock, res.out = string(data), string(lock), stdout.String()+stderr.String()
+	if info, err := os.Lstat(path); err == nil {
+		res.manifestIsLink = info.Mode()&os.ModeSymlink != 0
+	}
 	return res
 }
 
@@ -295,8 +325,17 @@ func TestStartKeepsTheSeedWhenTheListCannotBeRead(t *testing.T) {
 	if got.manifest != r.manifest {
 		t.Errorf("an unreadable list changed the record:\n%s", got.manifest)
 	}
-	if strings.Count(got.out, "warning:") != 1 || !strings.Contains(got.out, "uv.lock stays seeded from Astro Runtime 3.3-9: could not read what Astro Runtime 3.3-9 ships") {
-		t.Errorf("the start did not say, once, that it could not read the list:\n%s", got.out)
+	// A start with a lock would not seed, and has nothing to say of a list it
+	// did not need; init, which would, says once that it could not read it.
+	if strings.Contains(got.out, "warning:") {
+		t.Errorf("a start with a lock warned of a list it did not need:\n%s", got.out)
+	}
+	viaInit := pinsRun{src: r.manifest, files: map[string]string{"uv.lock": r.lock}, build: build332, init: true, freezeErr: errors.New("dial tcp: no route to host")}.start(t)
+	if viaInit.manifest != r.manifest || viaInit.lock != r.lock {
+		t.Errorf("init with an unreadable list changed the record or the lock:\n%s", viaInit.manifest)
+	}
+	if viaInit.seedWarn == nil || !strings.Contains(viaInit.seedWarn.Error(), "uv.lock stays seeded from Astro Runtime 3.3-9: could not read what Astro Runtime 3.3-9 ships") {
+		t.Errorf("init did not say that it could not read the list: %v", viaInit.seedWarn)
 	}
 	// A newer build whose list cannot be read keeps the seed too, while the
 	// requirement still covers its Airflow.

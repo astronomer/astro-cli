@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -56,24 +57,30 @@ func lockProject(ctx context.Context, dir string) error {
 // many packages the lock holds at the image's versions once it is. None, with
 // no error, when there is nothing to seed with. On an error, a canceled ctx
 // included, pyproject.toml and uv.lock are put back as they were.
+//
+// Every write of pyproject.toml is the manifest's own
+// (scaffold.AddSeedConstraints, scaffold.RestoreManifest): a symlinked
+// manifest stays a link, a read-only one is refused. The constraints are
+// written between the comments that mark them as astro's, so a process
+// killed before it puts the manifest back leaves nothing the next write of
+// the manifest does not take out.
 func (c *cli) seedLock(ctx context.Context, dir string, pins *scaffold.RuntimePins) (int, error) {
-	seeding, added, err := scaffold.SeedManifest(dir, pins)
-	if err != nil || added == 0 {
-		return 0, err
-	}
 	saved, err := saveProject(dir)
 	if err != nil {
 		return 0, err
 	}
+	added, err := scaffold.AddSeedConstraints(dir, nil, pins)
+	if err != nil || added == 0 {
+		return 0, err
+	}
 	steps := []func() error{
-		func() error { return fsatomic.WriteFile(saved.manifestPath, seeding, saved.mode) },
 		func() error {
 			if err := c.d.Lock(ctx, dir); err != nil {
 				return fmt.Errorf("resolving the image's versions: %w", err)
 			}
 			return nil
 		},
-		func() error { return fsatomic.WriteFile(saved.manifestPath, saved.manifest, saved.mode) },
+		func() error { return scaffold.RestoreManifest(dir, nil, saved.manifest) },
 		ctx.Err,
 		func() error {
 			if err := c.d.Lock(ctx, dir); err != nil {
@@ -85,7 +92,7 @@ func (c *cli) seedLock(ctx context.Context, dir string, pins *scaffold.RuntimePi
 	for _, step := range steps {
 		if err := step(); err != nil {
 			// What the seed left is not kept: the project is as it was before.
-			return 0, errors.Join(err, saved.restore())
+			return 0, errors.Join(err, saved.restore(dir))
 		}
 	}
 	return heldPins(dir, scaffold.SeededPins(dir, pins)), nil
@@ -94,9 +101,8 @@ func (c *cli) seedLock(ctx context.Context, dir string, pins *scaffold.RuntimePi
 // savedProject is a project's pyproject.toml and uv.lock as they were before
 // a seed, to put back when it fails.
 type savedProject struct {
-	manifestPath, lockPath string
-	manifest, lock         []byte
-	mode                   os.FileMode
+	lockPath       string
+	manifest, lock []byte
 	// hadLock says there was a uv.lock to put back; without one, a lock the
 	// seed wrote is removed.
 	hadLock bool
@@ -104,13 +110,9 @@ type savedProject struct {
 
 // saveProject reads what restore puts back.
 func saveProject(dir string) (*savedProject, error) {
-	s := &savedProject{manifestPath: filepath.Join(dir, manifest.Marker), lockPath: filepath.Join(dir, lockFile)}
-	info, err := os.Stat(s.manifestPath)
-	if err != nil {
-		return nil, err
-	}
-	s.mode = info.Mode().Perm()
-	if s.manifest, err = os.ReadFile(s.manifestPath); err != nil {
+	s := &savedProject{lockPath: filepath.Join(dir, lockFile)}
+	var err error
+	if s.manifest, err = os.ReadFile(filepath.Join(dir, manifest.Marker)); err != nil {
 		return nil, err
 	}
 	s.lock, err = os.ReadFile(s.lockPath)
@@ -123,9 +125,10 @@ func saveProject(dir string) (*savedProject, error) {
 	return s, nil
 }
 
-// restore puts the project's pyproject.toml and uv.lock back as they were.
-func (s *savedProject) restore() error {
-	err := fsatomic.WriteFile(s.manifestPath, s.manifest, s.mode)
+// restore puts the project's pyproject.toml and uv.lock in dir back as they
+// were, the manifest through its own write (scaffold.RestoreManifest).
+func (s *savedProject) restore(dir string) error {
+	err := scaffold.RestoreManifest(dir, nil, s.manifest)
 	if s.hadLock {
 		return errors.Join(err, fsatomic.WriteFile(s.lockPath, s.lock, lockFilePerm))
 	}
@@ -133,6 +136,59 @@ func (s *savedProject) restore() error {
 		err = errors.Join(err, rmErr)
 	}
 	return err
+}
+
+// workspaceRoot is the root of the uv workspace the project in dir is a member
+// of, or "" when it is in none. uv locks a workspace once, at its root, so a
+// member has no uv.lock of its own beside pyproject.toml: there is nothing
+// there to seed, and a lock its `uv lock` writes would be the root's. A
+// member is a project whose directory an ancestor's [tool.uv.workspace]
+// members glob names and its exclude does not.
+func workspaceRoot(dir string) string {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return ""
+	}
+	for parent := filepath.Dir(abs); parent != filepath.Dir(parent); parent = filepath.Dir(parent) {
+		data, err := os.ReadFile(filepath.Join(parent, manifest.Marker))
+		if err != nil {
+			continue
+		}
+		var doc struct {
+			Tool struct {
+				UV struct {
+					Workspace *struct {
+						Members []string `toml:"members"`
+						Exclude []string `toml:"exclude"`
+					} `toml:"workspace"`
+				} `toml:"uv"`
+			} `toml:"tool"`
+		}
+		if toml.Unmarshal(data, &doc) != nil || doc.Tool.UV.Workspace == nil {
+			continue
+		}
+		rel, err := filepath.Rel(parent, abs)
+		if err != nil {
+			continue
+		}
+		rel = filepath.ToSlash(rel)
+		if globsMatch(doc.Tool.UV.Workspace.Members, rel) && !globsMatch(doc.Tool.UV.Workspace.Exclude, rel) {
+			return parent
+		}
+	}
+	return ""
+}
+
+// globsMatch reports whether one of globs, as a workspace's members and
+// exclude write them ("packages/*"), names rel, a slash-separated path.
+func globsMatch(globs []string, rel string) bool {
+	for _, g := range globs {
+		g = strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(g), "./"), "/")
+		if ok, err := path.Match(g, rel); err == nil && ok {
+			return true
+		}
+	}
+	return false
 }
 
 // lockFilePerm is uv.lock's mode, as uv writes it.
@@ -176,7 +232,7 @@ func heldPins(dir string, seeded []string) int {
 	held := 0
 	for _, pin := range seeded {
 		name, version, _ := strings.Cut(pin, "==")
-		if slices.Contains(locked[manifest.DistName(name)], strings.TrimSpace(version)) {
+		if holds(locked[manifest.DistName(name)], version) {
 			held++
 		}
 	}
@@ -195,9 +251,16 @@ func lockDrift(dir string, pins *scaffold.RuntimePins) int {
 	for _, pin := range scaffold.SeededPins(dir, pins) {
 		name, version, _ := strings.Cut(pin, "==")
 		versions, held := locked[manifest.DistName(name)]
-		if held && !slices.Contains(versions, strings.TrimSpace(version)) {
+		if held && !holds(versions, version) {
 			drift++
 		}
 	}
 	return drift
+}
+
+// holds reports whether one of the versions a lock holds of a package is
+// version, as PEP 440 orders them (manifest.SameVersion): pip freeze and
+// uv.lock can spell one version two ways.
+func holds(locked []string, version string) bool {
+	return slices.ContainsFunc(locked, func(v string) bool { return manifest.SameVersion(v, version) })
 }
