@@ -116,7 +116,7 @@ func TestAPinThatMovesOffTheSeedsReleaseReseedsOnAStart(t *testing.T) {
 	f := &fakeUV{}
 	got := pinsRun{
 		src: moved, files: map[string]string{"uv.lock": r.lock}, catalog: catalog, uv: f,
-		build: runtimeversions.AstroBuild{Index: build332.Index, Airflow: "3.3.1+astro.1", TaskSDK: "1.3.1+astro.1"},
+		build:  runtimeversions.AstroBuild{Index: build332.Index, Airflow: "3.3.1+astro.1", TaskSDK: "1.3.1+astro.1"},
 		freeze: []string{"apache-airflow==3.3.1+astro.1", "apache-airflow-task-sdk==1.3.1+astro.1", "pandas==2.2.0", "SQLAlchemy==2.0.40"},
 		roots:  []string{"pandas"},
 	}.start(t)

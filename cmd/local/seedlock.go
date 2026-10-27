@@ -129,8 +129,10 @@ var errSeedHeldNothing = errors.New("uv resolved none of its versions")
 // whose failure was the network's is tried again the next day. `astro init`
 // always tries.
 const (
-	seedSkipsDir = "seed-skips"
-	seedSkipTTL  = 24 * time.Hour
+	seedSkipsDir     = "seed-skips"
+	seedSkipTTL      = 24 * time.Hour
+	seedSkipDirPerm  = 0o755
+	seedSkipFilePerm = 0o644
 )
 
 // seedSkipKey names a seed by everything that decides how it goes: the
@@ -167,11 +169,11 @@ func seedSkipPath(key string) string {
 // held nothing, or could not write its group, with the same inputs, within
 // seedSkipTTL.
 func seedSkipped(dir string, pins *scaffold.RuntimePins) bool {
-	path := seedSkipPath(seedSkipKey(dir, pins))
-	if path == "" {
+	note := seedSkipPath(seedSkipKey(dir, pins))
+	if note == "" {
 		return false
 	}
-	info, err := os.Stat(path)
+	info, err := os.Stat(note)
 	return err == nil && time.Since(info.ModTime()) < seedSkipTTL
 }
 
@@ -179,11 +181,11 @@ func seedSkipped(dir string, pins *scaffold.RuntimePins) bool {
 // project is now, for seedSkipped. A cache that cannot be written forgets it,
 // which costs a seed and nothing else.
 func rememberSeedSkip(dir string, pins *scaffold.RuntimePins) {
-	path := seedSkipPath(seedSkipKey(dir, pins))
-	if path == "" || os.MkdirAll(filepath.Dir(path), 0o755) != nil {
+	note := seedSkipPath(seedSkipKey(dir, pins))
+	if note == "" || os.MkdirAll(filepath.Dir(note), seedSkipDirPerm) != nil {
 		return
 	}
-	_ = fsatomic.WriteFile(path, nil, 0o644) //nolint:errcheck // best effort, see above
+	_ = fsatomic.WriteFile(note, nil, seedSkipFilePerm) //nolint:errcheck // best effort, see above
 }
 
 // savedProject is a project's pyproject.toml and uv.lock as they were before

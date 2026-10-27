@@ -300,7 +300,7 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroB
 		if now == nil {
 			later = group
 		}
-		changed = c.applySeed(ctx, dir, pins, willSeed && (seed || !seedSkipped(dir, pins)), later, &res) || changed
+		changed = c.applySeed(ctx, dir, pins, seedRun{seed: willSeed, init: seed}, later, &res) || changed
 	}
 	res.compare(m, path, changed, offline)
 	return res
@@ -349,6 +349,13 @@ func (c *cli) seedPlan(dir string, m *manifest.Manifest, pins *scaffold.RuntimeP
 	return false, group
 }
 
+// seedRun is what seedPlan decided for applySeed: seed, whether the write
+// seeds the lock; init, whether it is `astro init`'s, which tries a seed a
+// start would skip.
+type seedRun struct {
+	seed, init bool
+}
+
 // recordCovered reports whether the Airflow pin still covers the release of
 // the Astronomer build the manifest holds Airflow to beside the seed record,
 // or there is none to tell by.
@@ -364,8 +371,10 @@ func recordCovered(m *manifest.Manifest) bool {
 // lock is from pins. A seed that fails leaves the lock, the record and the
 // group as they were before it, and says why in res.seedWarn. It reports
 // whether it changed the manifest.
-func (c *cli) applySeed(ctx context.Context, dir string, pins *scaffold.RuntimePins, seed bool, group *scaffold.RuntimeGroup, res *astroBuildWrite) bool {
-	if !seed {
+func (c *cli) applySeed(ctx context.Context, dir string, pins *scaffold.RuntimePins, run seedRun, group *scaffold.RuntimeGroup, res *astroBuildWrite) bool {
+	// A start does not repeat a seed that came to nothing with these inputs
+	// (seedSkipped); init always tries.
+	if !run.seed || (!run.init && seedSkipped(dir, pins)) {
 		if hasLock(dir) {
 			if res.drift = lockDrift(dir, pins); res.drift > 0 {
 				res.driftBuild = pins.Build
