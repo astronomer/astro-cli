@@ -5,7 +5,34 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
+
+// requires reports whether m's [project] dependencies or its astro-runtime
+// group name dist: what a lock holds, since a constraint adds no package.
+func requires(m *manifest.Manifest, dist string) bool {
+	for _, d := range slices.Concat(m.Project.Dependencies, m.RuntimeGroup) {
+		if manifest.DistName(d) == dist {
+			return true
+		}
+	}
+	return false
+}
+
+// The group is in pyproject.toml while the lock is seeded, so the lock holds
+// its packages at the image's versions: a lock seeded without them would
+// leave them to the newest on the next sync.
+func TestTheSeedHoldsTheGroupsPackages(t *testing.T) {
+	freeze := append(slices.Clone(freeze339), "statsd==4.0.1")
+	r := pinsRun{src: buildManifest, build: build332, freeze: freeze, roots: roots339, uv: &fakeUV{requiredOnly: true}}.start(t)
+	if !strings.Contains(r.manifest, "'statsd'") {
+		t.Fatalf("the group was not written:\n%s", r.manifest)
+	}
+	if !strings.Contains(r.lock, "name = \"statsd\"\nversion = \"4.0.1\"") {
+		t.Errorf("the seeded lock does not hold the group's statsd at the image's version:\n%s", r.lock)
+	}
+}
 
 // A seed that fails leaves the group, its record and the lock exactly as they
 // were: the group of a new build is written only once its seed has worked.

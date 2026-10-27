@@ -1,6 +1,7 @@
 package local
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"errors"
@@ -180,6 +181,8 @@ type astroBuildWrite struct {
 	// cutoff says nothing is seeded for the project's own cutoff, which
 	// keeps the runtime group (runtimeGroup).
 	cutoff bool
+	// seedTried says a seed of the lock was tried, worked or not.
+	seedTried bool
 	// offline is a write whose Airflow lookup could not be made, which
 	// leaves the Airflow build as the manifest has it: nothing it cannot
 	// tell for want of the index changes the seed.
@@ -300,11 +303,7 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroB
 		if now == nil {
 			later = group
 		}
-		recorded, recordErr := c.applySeed(ctx, dir, m, pins, willSeed, later, &res)
-		changed = changed || recorded
-		if recordErr != nil {
-			res.writeErr = recordErr
-		}
+		changed = c.applySeed(ctx, dir, pins, willSeed, later, &res) || changed
 	}
 	res.compare(m, path, changed, offline)
 	return res
@@ -315,7 +314,8 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, seed bool) astroB
 // may not hold), and which runtime group it writes now, before any seed. A
 // seed decides on its group: the group of a build the lock is to be seeded
 // from, or one with packages the lock does not hold yet, is written with the
-// seed's record once the seed has worked (applySeed), so now is nil then. A
+// seed's record as part of the seed (applySeed), in pyproject.toml while the
+// lock is seeded and kept only when the seed works, so now is nil then. A
 // group that only lost packages the project now lists itself needs no seed.
 func (c *cli) seedPlan(dir string, m *manifest.Manifest, pins *scaffold.RuntimePins, group *scaffold.RuntimeGroup, seed bool) (willSeed bool, now *scaffold.RuntimeGroup) {
 	seedable := pins != nil && len(pins.Pins) > 0 && c.d.Lock != nil
@@ -328,43 +328,46 @@ func (c *cli) seedPlan(dir string, m *manifest.Manifest, pins *scaffold.RuntimeP
 }
 
 // applySeed seeds the lock of the project in dir with pins when seed asks,
-// and on success records the seed and writes group, the runtime group that
-// waited for it; otherwise it counts how far the lock is from pins. A seed
-// that fails leaves the lock, its record and the group as they were. It
-// reports whether it changed the manifest.
-func (c *cli) applySeed(ctx context.Context, dir string, m *manifest.Manifest, pins *scaffold.RuntimePins, seed bool, group *scaffold.RuntimeGroup, res *astroBuildWrite) (bool, error) {
+// with group, the runtime group that waited for it, and the seed's record
+// written into pyproject.toml as part of the seed, so the lock holds the
+// group's packages at the image's versions; otherwise it counts how far the
+// lock is from pins. A seed that fails leaves the lock, the record and the
+// group as they were before it, and says why in res.seedWarn. It reports
+// whether it changed the manifest.
+func (c *cli) applySeed(ctx context.Context, dir string, pins *scaffold.RuntimePins, seed bool, group *scaffold.RuntimeGroup, res *astroBuildWrite) bool {
 	if !seed {
 		if hasLock(dir) {
 			if res.drift = lockDrift(dir, pins); res.drift > 0 {
 				res.driftBuild = pins.Build
 			}
 		}
-		return false, nil
+		return false
 	}
-	n, err := c.seedLock(ctx, dir, pins)
+	res.seedTried = true
+	path := filepath.Join(dir, manifest.Marker)
+	before, _ := os.ReadFile(path) //nolint:errcheck // unread, any change counts as one
+	record := scaffold.Seed{Build: pins.Build, Python: pins.Python}
+	var refused bool
+	n, err := c.seedLock(ctx, dir, pins, func() error {
+		var err error
+		refused, err = scaffold.SetRuntimeGroup(dir, nil, group, &record)
+		return err
+	})
 	switch {
 	case errors.Is(err, uv.ErrNotFound):
 		res.seedWarn = fmt.Errorf("uv.lock is not seeded with what Astro Runtime %s ships: uv is not installed", pins.Build)
-		return false, nil
+		return false
 	case err != nil:
 		res.seedWarn = fmt.Errorf("uv.lock is not seeded with what Astro Runtime %s ships: %w", pins.Build, err)
-		return false, nil
+		return false
 	case n == 0:
-		return false, nil
+		return false
 	}
-	res.seeded, res.seed = n, scaffold.Seed{Build: pins.Build, Python: pins.Python}
-	if group == nil && m.UV.RuntimeBuild == pins.Build && m.UV.RuntimePython == pins.Python {
-		return false, nil
-	}
-	var refused bool
-	changed, err := watchManifest(dir, func(wrap func(run func() error) error) error {
-		var err error
-		refused, err = scaffold.SetRuntimeGroup(dir, wrap, group, &res.seed)
-		return err
-	})
+	res.seeded, res.seed = n, record
 	res.refused = res.refused || refused
-	res.groupWritten = res.groupWritten || (group != nil && err == nil && !refused)
-	return changed, err
+	res.groupWritten = res.groupWritten || (group != nil && !refused)
+	after, readErr := os.ReadFile(path)
+	return readErr != nil || !bytes.Equal(before, after)
 }
 
 // runtimeGroup is the astro-runtime dependency group to write beside pins,
