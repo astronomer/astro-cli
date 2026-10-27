@@ -90,7 +90,7 @@ func LookupAstroBuild(ctx context.Context, o Options, pin, runtime string, exclu
 	}
 	var covered []astroBuild
 	for _, b := range parseBuilds(page, DistAirflow, excludeNewer) {
-		if pinCovers(pin, b.release) {
+		if PinCovers(pin, b.release) {
 			covered = append(covered, b)
 		}
 	}

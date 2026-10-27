@@ -105,8 +105,8 @@ func SetLines(e Editor, key []string, list []any) error {
 // break. Nothing is written.
 var ErrCommentsUnsupported = errors.New("this array is inside an inline value, which holds no comment")
 
-// valuesOf is list without its comments.
-func valuesOf(list []any) []any {
+// Values is list without its comments.
+func Values(list []any) []any {
 	out := make([]any, 0, len(list))
 	for _, v := range list {
 		if _, isComment := v.(Comment); !isComment {

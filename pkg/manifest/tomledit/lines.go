@@ -97,7 +97,7 @@ func (s *surgical) setLines(key []string, value any) (bool, error) {
 func (s *surgical) SetLines(key []string, list []any) error {
 	done, err := s.writeLines(key, list, true)
 	if !done && err == nil {
-		err = s.doc.Set(key, valuesOf(list))
+		err = s.doc.Set(key, Values(list))
 	}
 	if err != nil {
 		return &KeyError{Key: key, Err: err}
@@ -112,7 +112,7 @@ func (s *surgical) writeLines(key []string, value any, exact bool) (bool, error)
 	if !ok || len(list) == 0 || slices.ContainsFunc(list, composite) {
 		return false, nil
 	}
-	values := valuesOf(list)
+	values := Values(list)
 	commented := len(values) < len(list)
 	if commented || exact {
 		if cur, has := s.GetLines(key); has && reflect.DeepEqual(cur, list) {

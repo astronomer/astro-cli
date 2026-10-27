@@ -3,6 +3,7 @@ package scaffold
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,4 +47,25 @@ func TestSetAstroBuildWithWritesTheRuntimesLinesUnderTheRecord(t *testing.T) {
 	assert.NotContains(t, gone, "SQLAlchemy")
 	assert.Contains(t, gone, "'urllib3<3'")
 	assert.Contains(t, gone, "apache-airflow==3.3.2+astro.1")
+}
+
+// The runtime's block owns only what the runtime constrains: a project's own
+// exact pin written right under it stays the project's through a refresh, and
+// is not counted among the runtime's lines.
+func TestTheRuntimesBlockKeepsAnExactPinWrittenUnderIt(t *testing.T) {
+	got := withConstraints(t, astroHead, &rc339)
+	mine := strings.Replace(got, "    'SQLAlchemy==2.0.50',\n", "    'SQLAlchemy==2.0.50',\n    'urllib3==2.2.3',\n", 1)
+	require.NotEqual(t, got, mine)
+
+	m, err := manifest.Parse([]byte(mine))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"SQLAlchemy==2.0.50"}, m.UV.RuntimeConstraints)
+
+	moved := withConstraints(t, mine, &RuntimeConstraints{Build: "3.3-10", Python: "3.14", Lines: []string{"SQLAlchemy==2.0.51"}})
+	assert.Contains(t, moved, "'urllib3==2.2.3'")
+	assert.Contains(t, moved, "'SQLAlchemy==2.0.51'")
+	assert.NotContains(t, moved, "2.0.50")
+	gone := withConstraints(t, mine, &RuntimeConstraints{})
+	assert.Contains(t, gone, "'urllib3==2.2.3'")
+	assert.NotContains(t, gone, "SQLAlchemy")
 }

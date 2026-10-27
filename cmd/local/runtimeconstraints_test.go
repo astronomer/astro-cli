@@ -113,3 +113,31 @@ func TestStartUnderACutoffWritesNoRuntimeLines(t *testing.T) {
 		t.Errorf("a cutoff read or wrote the runtime's constraints (asked %q):\n%s", asked, got)
 	}
 }
+
+// A cutoff set after the runtime's lines were written takes them out, since
+// the runtime's versions may postdate it; the project's own uv.toml counts.
+func TestACutoffTakesOutTheRuntimesLines(t *testing.T) {
+	first, _, _ := startWithConstraints(t, buildManifest, runtimeFile, nil)
+	cut := strings.Replace(first, "[tool.uv]\n", "[tool.uv]\nexclude-newer = '2026-01-01'\n", 1)
+	got, out, asked := startWithConstraints(t, cut, runtimeFile, nil)
+	if len(asked) != 0 || strings.Contains(got, constraints339) || strings.Contains(got, "constrains these") {
+		t.Errorf("a cutoff kept the runtime's lines (asked %q):\n%s", asked, got)
+	}
+	if !strings.Contains(out, "no longer holds what Astro Runtime 3.3-9 constrains") {
+		t.Errorf("the start did not say it took the runtime's lines out:\n%s", out)
+	}
+}
+
+// When a write moves both the Airflow build and the runtime's record, both
+// are said: the Airflow change is never hidden behind the runtime's.
+func TestStartSaysBothAnAirflowAndARuntimeChange(t *testing.T) {
+	_, out, _ := startWithConstraints(t, buildManifest, runtimeFile, nil)
+	for _, want := range []string{
+		"now installs Astronomer's Airflow 3.3.2+astro.1",
+		"now holds what Astro Runtime 3.3-9 constrains",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the start did not say %q:\n%s", want, out)
+		}
+	}
+}

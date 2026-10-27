@@ -49,8 +49,8 @@ func IsRuntimeRecord(comment string) (build, python string, ok bool) {
 var constraintsKey = []string{"tool", "uv", "constraint-dependencies"}
 
 // runtimeRecordOf reads the record out of a manifest's bytes, given the
-// constraint-dependencies they decoded to, with the lines it heads: the exact
-// name==version lines right after it. "" and none when there is no record.
+// constraint-dependencies they decoded to, with the runtime's lines it heads
+// (SplitRuntimeBlock). "" and none when there is no record.
 func runtimeRecordOf(data []byte, constraints []string) (build, python string, lines []string) {
 	// Every manifest load comes through here, so the comments are looked for
 	// only when the record can be among them.
@@ -61,31 +61,58 @@ func runtimeRecordOf(data []byte, constraints []string) (build, python string, l
 	for i, c := range constraints {
 		values[i] = c
 	}
-	all := tomledit.ArrayLines(data, constraintsKey, values)
-	for i, l := range all {
-		c, isComment := l.(tomledit.Comment)
-		if !isComment {
-			continue
+	_, block := SplitRuntimeBlock(tomledit.ArrayLines(data, constraintsKey, values), RuntimeConstrained)
+	for _, l := range block {
+		switch v := l.(type) {
+		case tomledit.Comment:
+			build, python, _ = IsRuntimeRecord(string(v))
+		case string:
+			lines = append(lines, v)
 		}
-		var ok bool
-		if build, python, ok = IsRuntimeRecord(string(c)); !ok {
-			continue
-		}
-		for _, next := range all[i+1:] {
-			s, isString := next.(string)
-			if !isString || !ExactPin(s) {
-				break
-			}
-			lines = append(lines, s)
-		}
-		return build, python, lines
 	}
-	return "", "", nil
+	return build, python, lines
 }
 
-// ExactPin reports a plain name==version line with no marker, the only kind
+// runtimeConstrainedDists are the distributions a runtime's constraints file
+// holds besides the Airflow ones, whose +astro pins init writes on their own:
+// SQLAlchemy, on Airflow 3.
+var runtimeConstrainedDists = []string{"sqlalchemy"}
+
+// RuntimeConstrained reports a distribution a runtime's constraints file
+// holds besides the Airflow ones: what the runtime's block in [tool.uv]
+// constraint-dependencies may own.
+func RuntimeConstrained(dist string) bool {
+	return slices.Contains(runtimeConstrainedDists, DistName(dist))
+}
+
+// SplitRuntimeBlock splits an array's lines into the rest and the runtime's
+// block: its record comment and the exact name==version lines right after it
+// whose distribution owned accepts, up to the first line that is not one. A
+// project's own line written under the block, an exact pin of another
+// distribution included, is never the runtime's.
+func SplitRuntimeBlock(lines []any, owned func(dist string) bool) (rest, block []any) {
+	for i := 0; i < len(lines); i++ {
+		c, isComment := lines[i].(tomledit.Comment)
+		if _, _, ok := IsRuntimeRecord(string(c)); !isComment || !ok {
+			rest = append(rest, lines[i])
+			continue
+		}
+		block = append(block, lines[i])
+		for i+1 < len(lines) {
+			s, isString := lines[i+1].(string)
+			if !isString || !exactPin(s) || !owned(DistName(s)) {
+				break
+			}
+			block = append(block, s)
+			i++
+		}
+	}
+	return rest, block
+}
+
+// exactPin reports a plain name==version line with no marker, the only kind
 // a runtime's constraints file holds.
-func ExactPin(s string) bool {
+func exactPin(s string) bool {
 	name, version, ok := strings.Cut(s, "==")
 	return ok && name != "" && version != "" && !strings.ContainsAny(s, ";@ ")
 }

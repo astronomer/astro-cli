@@ -46,6 +46,10 @@ func TestRuntimeHintNamesThePackageTheImageShips(t *testing.T) {
 		{Kind: checks.KindImportError, Message: "ModuleNotFoundError: No module named 'yaml'"},
 		{Kind: checks.KindImportError, Message: "ModuleNotFoundError: No module named 'psycopg2'"},
 		{Kind: checks.KindImportError, Message: "SyntaxError: invalid syntax"},
+		// A dotted provider path names Airflow's namespace, not a package.
+		{Kind: checks.KindImportError, Message: "ModuleNotFoundError: No module named 'airflow.providers.celery'"},
+		// The top-level name is what is matched.
+		{Kind: checks.KindImportError, Message: "ModuleNotFoundError: No module named 'pandas.io'"},
 	}}
 	got := c.withRuntimeHints(context.Background(), t.TempDir(), m, res).Findings
 
@@ -55,10 +59,13 @@ func TestRuntimeHintNamesThePackageTheImageShips(t *testing.T) {
 	}
 	// Only an exact name: yaml is PyYAML's module and psycopg2 is
 	// psycopg2-binary's, which no table maps here.
-	for _, f := range got[1:] {
+	for _, f := range got[1:5] {
 		if f.Hint != "" {
 			t.Errorf("unexpected hint %q for %q", f.Hint, f.Message)
 		}
+	}
+	if got[5].Hint != want {
+		t.Errorf("pandas.io hint = %q, want pandas'", got[5].Hint)
 	}
 }
 
