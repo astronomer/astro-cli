@@ -556,14 +556,6 @@ func (l listedReleases) BuildsFor(pin string) []string {
 	return out
 }
 
-// NewestFor is the newest of BuildsFor, or "" when none is listed.
-func (l listedReleases) NewestFor(pin string) string {
-	if builds := l.BuildsFor(pin); len(builds) > 0 {
-		return builds[0]
-	}
-	return ""
-}
-
 // Offers reports whether the platform lists build.
 func (l listedReleases) Offers(build string) bool {
 	return slices.ContainsFunc(l, func(r houston.RuntimeRelease) bool { return r.Version == build })

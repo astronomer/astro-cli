@@ -98,6 +98,25 @@ func lockedBase(base BaseImageFunc) BaseImageFunc {
 	}
 }
 
+// LockedRuntimeUsed reports whether a local or packaged image of m starts
+// FROM the build its lock was made for (LockedRuntime): there is one, the
+// manifest names no build of its own, and requires-python admits one of its
+// Pythons, or the catalog that would say otherwise is nil. Otherwise the
+// image builds on another (lockedBase), and a check of the lock's build would
+// be of a build the image does not use.
+func LockedRuntimeUsed(m ManifestBuild, catalog *runtimeversions.Catalog) bool {
+	if m.Runtime != "" || m.Dockerfile != "" || m.LockedRuntime == "" {
+		return false
+	}
+	if catalog == nil {
+		return true
+	}
+	_, _, err := runtimeversions.ProjectPython(m.AirflowVersion, m.LockedRuntime, m.RequiresPython,
+		func() *runtimeversions.Catalog { return catalog })
+	notShipped := (*runtimeversions.PythonNotShippedError)(nil)
+	return !errors.As(err, &notShipped)
+}
+
 // LockedRuntimeNotices are what a local or packaged build of m has to say
 // about the build its lock was made for (LockedRuntime), read against
 // catalog: that requires-python admits none of that build's Pythons, so the

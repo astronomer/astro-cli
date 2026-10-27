@@ -489,14 +489,6 @@ func (o offeredReleases) BuildsFor(pin string) []string {
 	return out
 }
 
-// NewestFor is the newest of BuildsFor, or "" when none is offered.
-func (o offeredReleases) NewestFor(pin string) string {
-	if builds := o.BuildsFor(pin); len(builds) > 0 {
-		return builds[0]
-	}
-	return ""
-}
-
 // offeredAsBase reports a release on the stable or deprecated channel.
 func offeredAsBase(r *astrov1.RuntimeRelease) bool {
 	return r.Channel == "" || r.Channel == "stable" || r.Channel == "deprecated"

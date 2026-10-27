@@ -118,7 +118,16 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 	// runtime pins were taken from, held to the same check.
 	build, locked := airflow.Runtime, false
 	if build == "" && req.Manifest.Astro.Dockerfile == "" {
-		build, locked = imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest).LockedRuntime, true
+		mb := imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest)
+		var catalog *runtimeversions.Catalog
+		if req.RuntimeCatalog != nil {
+			catalog = req.RuntimeCatalog(ctx)
+		}
+		// Only the build the image does start from; the notices say when it
+		// does not.
+		if imagebuild.LockedRuntimeUsed(mb, catalog) {
+			build, locked = mb.LockedRuntime, true
+		}
 	}
 	if req.CheckRuntime == nil || build == "" {
 		return nil, nil
@@ -132,6 +141,10 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 	}
 	var warnings []string
 	for _, f := range found {
+		if locked && f.Kind == runtimeversions.FindingYanked {
+			// lockedRuntimeNotices says so already, with the build to move to.
+			continue
+		}
 		if locked {
 			warnings = append(warnings, fmt.Sprintf("the build uv.lock was seeded from, Astro Runtime %s, which the image builds on: %s", build, f.Message))
 			continue

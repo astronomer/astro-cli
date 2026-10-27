@@ -216,7 +216,12 @@ func TestTheRuntimePinsBuildIsCheckedLikeANamedRuntime(t *testing.T) {
 	d, stdout := testDeps(t)
 	started := false
 	d.Runtime = startRecorder{started: &started}
-	rec := &runtimeCheckRecorder{warnings: []runtimeversions.Finding{{Kind: runtimeversions.FindingYanked, Message: "runtime 3.1-12 is yanked"}}}
+	rec := &runtimeCheckRecorder{warnings: []runtimeversions.Finding{
+		{Kind: runtimeversions.FindingAirflowExcluded, Message: "runtime 3.1-12 carries Airflow 3.1.0"},
+		// The notices say a yank of the lock's build, once, with the build to
+		// move to; the check does not say it again.
+		{Kind: runtimeversions.FindingYanked, Message: "runtime 3.1-12 is yanked"},
+	}}
 	d.RuntimeCheck = rec.check
 	wiringProject(t, &d, lockedPins, "")
 
@@ -224,8 +229,15 @@ func TestTheRuntimePinsBuildIsCheckedLikeANamedRuntime(t *testing.T) {
 	if len(rec.calls) != 1 || rec.calls[0] != [2]string{"3.1-12", "3.1"} {
 		t.Errorf("calls = %v, want one for the pins' 3.1-12 against 3.1", rec.calls)
 	}
-	if !strings.Contains(stdout.String(), "the build uv.lock was seeded from, Astro Runtime 3.1-12, which the image builds on: runtime 3.1-12 is yanked") {
-		t.Errorf("the warning did not name the pins' build: %q", stdout.String())
+	out := stdout.String()
+	if !strings.Contains(out, "the build uv.lock was seeded from, Astro Runtime 3.1-12, which the image builds on: runtime 3.1-12 carries Airflow 3.1.0") {
+		t.Errorf("the warning did not name the pins' build: %q", out)
+	}
+	if !strings.Contains(out, "dependency-groups.astro-runtime") || strings.Contains(out, "tool.uv.constraint-dependencies") {
+		t.Errorf("the warning is not filed under the astro-runtime group that records the build: %q", out)
+	}
+	if strings.Contains(out, "is yanked") {
+		t.Errorf("the check repeated the yank the notices say: %q", out)
 	}
 
 	d, _ = testDeps(t)

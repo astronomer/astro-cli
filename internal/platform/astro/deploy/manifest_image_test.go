@@ -281,7 +281,7 @@ func TestDeployManifestImage_Airflow2(t *testing.T) {
 // The deployment's offer is matched by the Airflow each release carries: a
 // patch pin to that release, a series or generation pin to any under it, and
 // an Astronomer build of Airflow by its release.
-func TestOfferedReleasesNewestFor(t *testing.T) {
+func TestOfferedReleasesBuildsFor(t *testing.T) {
 	o := offeredReleases{
 		{Version: "12.6.0", AirflowVersion: "2.10.4"},
 		{Version: "12.10.0", AirflowVersion: "2.10.5"},
@@ -302,7 +302,7 @@ func TestOfferedReleasesNewestFor(t *testing.T) {
 		"3":      "", // a bare Airflow 3 pin is refused, not resolved to a series
 		"":       "",
 	} {
-		assert.Equal(t, want, o.NewestFor(pin), pin)
+		assert.Equal(t, want, newestOf(o.BuildsFor(pin)), pin)
 	}
 }
 
@@ -391,7 +391,7 @@ func TestOfferedRuntimesAsksForTheOrganization(t *testing.T) {
 	offer, err := offeredRuntimes(context.Background(), "org-id", client)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"12.6.0"}, offer.versions())
-	assert.Equal(t, "12.6.0", offer.NewestFor("2.10"))
+	assert.Equal(t, "12.6.0", newestOf(offer.BuildsFor("2.10")))
 	client.AssertExpectations(t)
 }
 

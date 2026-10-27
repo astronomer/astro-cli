@@ -541,7 +541,17 @@ func TestInitRelocksALockItDidNotSeed(t *testing.T) {
 	src := strings.Replace(r.manifest, "[tool.uv]\n", "[tool.uv]\nexclude-newer = \"1 week\"\n", 1)
 	got := pinsRun{src: src, files: map[string]string{"uv.lock": r.lock}, build: build332, freeze: freeze339, args: []string{"init"}}.start(t)
 	if got.uv.seedLocks != 0 || got.uv.projectLocks != 1 {
-		t.Errorf("scratch locks %d, project locks %d; want no seed and one relock", got.uv.seedLocks, got.uv.projectLocks)
+		t.Errorf("seed locks %d, project locks %d; want no seed and one relock", got.uv.seedLocks, got.uv.projectLocks)
+	}
+
+	// A seed that was tried and failed has said why: init does not lock again
+	// only to fail the same way.
+	failed := pinsRun{
+		src: r.manifest, files: map[string]string{"uv.lock": r.lock}, build: build332, freeze: freeze339, args: []string{"init"},
+		uv: &fakeUV{projectErr: errors.New("no solution found")},
+	}.start(t)
+	if failed.uv.seedLocks != 1 || failed.uv.projectLocks != 1 {
+		t.Errorf("seed locks %d, project locks %d after a failed seed; want the seed's two and no relock", failed.uv.seedLocks, failed.uv.projectLocks)
 	}
 }
 

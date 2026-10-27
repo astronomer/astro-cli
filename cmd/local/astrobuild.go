@@ -181,6 +181,10 @@ type astroBuildWrite struct {
 	// cutoff says nothing is seeded for the project's own cutoff, which
 	// keeps the runtime group (runtimeGroup).
 	cutoff bool
+	// seedTried says a seed of the lock was tried, worked or not: init does
+	// not lock the project again after one (relockAfterInit), which would
+	// only repeat a failing resolve.
+	seedTried bool
 	// offline is a write whose Airflow lookup could not be made, which
 	// leaves the Airflow build as the manifest has it: nothing it cannot
 	// tell for want of the index changes the seed.
@@ -226,7 +230,7 @@ type runtimeImage struct {
 //
 // When the lookup could not be made and the pin has not moved, the Airflow
 // build stays as the manifest has it, and what needs no index still applies:
-// the seed, and its record (scaffold.SetSeedRecord), which also takes out
+// the seed, and its group and record (scaffold.SetRuntimeGroup), which also takes out
 // what an older astro wrote.
 //
 // The record changes only after a seed of its build succeeds, or on a
@@ -342,6 +346,7 @@ func (c *cli) applySeed(ctx context.Context, dir string, m *manifest.Manifest, p
 		}
 		return false, nil
 	}
+	res.seedTried = true
 	n, err := c.seedLock(ctx, dir, pins)
 	switch {
 	case errors.Is(err, uv.ErrNotFound):

@@ -566,7 +566,7 @@ func TestDeployManifestImageRefusesImageOnlyBeforeTheEngine(t *testing.T) {
 
 // Of several builds of a series, the newest is the base, whatever order the
 // list gives them in.
-func TestNewestForPicksTheNewestBuild(t *testing.T) {
+func TestBuildsForPutsTheNewestFirst(t *testing.T) {
 	l := listedReleases{
 		{Version: "3.1-3", AirflowVersion: "3.1.0"},
 		{Version: "3.1-5", AirflowVersion: "3.1.1"},
@@ -575,10 +575,10 @@ func TestNewestForPicksTheNewestBuild(t *testing.T) {
 		{Version: "12.1.0", AirflowVersion: "2.10.3"},
 		{Version: "12.1.1", AirflowVersion: "2.10.3"},
 	}
-	assert.Equal(t, "3.1-5", l.NewestFor("3.1"))
-	assert.Equal(t, "3.1-3", l.NewestFor("3.1.0"))
-	assert.Equal(t, "12.1.1", l.NewestFor("2.10"))
-	assert.Equal(t, "", l.NewestFor("3.2"))
+	assert.Equal(t, "3.1-5", newestOf(l.BuildsFor("3.1")))
+	assert.Equal(t, "3.1-3", newestOf(l.BuildsFor("3.1.0")))
+	assert.Equal(t, "12.1.1", newestOf(l.BuildsFor("2.10")))
+	assert.Equal(t, "", newestOf(l.BuildsFor("3.2")))
 }
 
 // airflow2Only is what a platform lists for a Deployment without Airflow 3.

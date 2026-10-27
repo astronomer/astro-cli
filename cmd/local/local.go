@@ -315,8 +315,13 @@ func schedulesOn(p localrt.Plan, mode localrt.Mode) bool {
 	return ok && slices.Contains([]string{"t", "true", "1"}, strings.ToLower(strings.TrimSpace(v)))
 }
 
-// runtimeKey is the manifest key a runtime-build finding is about.
-const runtimeKey = "tool.astro.runtime"
+// runtimeKey is the manifest key a runtime-build finding is about, and
+// lockBuildKey the one a finding about the build the lock was seeded from is:
+// the astro-runtime group, whose first comment records it.
+const (
+	runtimeKey   = "tool.astro.runtime"
+	lockBuildKey = "dependency-groups." + manifest.RuntimeGroupName
+)
 
 // checkRuntimeBuild holds a Docker-mode start's runtime build, [tool.astro]
 // runtime or else the build its uv.lock was seeded from (Plan.LockedRuntime), to
@@ -327,18 +332,32 @@ const runtimeKey = "tool.astro.runtime"
 // builds no image, so the build decides nothing there and is not checked; a
 // declared Dockerfile never has one beside it.
 func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localrt.Plan) error {
+	if p.Mode != localrt.ModeDocker || p.Dockerfile != "" || c.d.RuntimeCheck == nil {
+		return nil
+	}
 	// The build the image starts FROM: [tool.astro] runtime, else the build the
-	// lock was seeded from, which a yanked build is held
-	// to the same way.
+	// lock was seeded from, which the record in the astro-runtime group
+	// names, when the image does start from it (imagebuild.LockedRuntimeUsed).
 	build, key := p.Runtime, runtimeKey
 	if build == "" {
-		build, key = p.LockedRuntime, "tool.uv.constraint-dependencies"
+		var catalog *runtimeversions.Catalog
+		if c.d.RuntimeCatalog != nil {
+			catalog = c.d.RuntimeCatalog(ctx)
+		}
+		if !imagebuild.LockedRuntimeUsed(p.ManifestBuild(p.ProjectPath), catalog) {
+			return nil
+		}
+		build, key = p.LockedRuntime, lockBuildKey
 	}
-	if p.Mode != localrt.ModeDocker || build == "" || p.Dockerfile != "" || c.d.RuntimeCheck == nil {
+	if build == "" {
 		return nil
 	}
 	warnings, err := c.d.RuntimeCheck(ctx, build, p.AirflowVersion)
 	for _, w := range warnings {
+		if p.Runtime == "" && w.Kind == runtimeversions.FindingYanked {
+			// noticeLockedRuntime said so already, with the build to move to.
+			continue
+		}
 		text := w.Message
 		if p.Runtime == "" {
 			text = fmt.Sprintf("the build uv.lock was seeded from, Astro Runtime %s, which the image builds on: %s", build, w.Message)

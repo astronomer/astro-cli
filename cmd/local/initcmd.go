@@ -142,13 +142,15 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 // relockAfterInit runs `uv lock` in a project that has a uv.lock and was not
 // seeded (a cutoff, a runtime with no package list, no list to read), so the
 // lock follows pyproject.toml as init left it: the Airflow build or the
-// runtime group may have moved. A seed locked the project already. It runs
+// runtime group may have moved. A seed locked the project already, and one
+// that was tried and failed has said why: another lock would only repeat its
+// failing resolve. It runs
 // whether or not init changed the manifest, which is what makes "run astro
 // init" the one advice for a lock that is out of date; uv lock leaves a lock
 // that is not as it is. With no uv to run, it says to run it when the
 // manifest changed. A project with no uv.lock has nothing to follow.
 func (c *cli) relockAfterInit(ctx context.Context, r cliout.Renderer, dir string, build astroBuildWrite) {
-	if build.seeded > 0 || !hasLock(dir) {
+	if build.seeded > 0 || build.seedTried || !hasLock(dir) {
 		return
 	}
 	changed := build.recordChanged || build.airflowChanged || build.groupChanged
