@@ -150,27 +150,24 @@ type Deps struct {
 	// the network; nil writes nothing.
 	AstroBuild func(ctx context.Context, airflowPin, runtime string) (runtimeversions.AstroBuild, error)
 
-	// RuntimePins reads the name==version lines of one Astro Runtime build's
-	// image running python, which init and a start seed the project's
-	// uv.lock with (scaffold.RuntimePins). Production reads the build's
-	// freeze file from Astronomer's CDN, cached, through
-	// runtimecatalog.RuntimePins. A seam so a test never reaches the network;
-	// nil leaves the lock and its record as they are.
-	RuntimePins func(ctx context.Context, build, python string) ([]string, error)
-
-	// Lock runs `uv lock` in dir: twice for a seed, once with the image's
-	// versions added to the project's pyproject.toml and once without
-	// (seedLock).
-	// Production runs the uv the CLI finds (lockProject). A seam so a test
-	// needs no uv; nil seeds nothing.
-	Lock func(ctx context.Context, dir string) error
-
 	// RuntimeCatalog reads the runtime catalog for an edit that moves the
 	// Airflow pin, which uses it to move requires-python and [tool.astro]
 	// runtime with the pin. nil, or a nil result, means no catalog: the edit
 	// then follows the built-in rules. Production reads it through
 	// runtimecatalog.Catalog. A seam so a test never reaches the network.
 	RuntimeCatalog func(ctx context.Context) *runtimeversions.Catalog
+
+	// RuntimeConstraints reads the constraints a runtime build's image
+	// installs under for one Python (runtimecatalog.RuntimeConstraints),
+	// which init and a start hold [tool.uv] to beside the Airflow pins. A
+	// seam so a test never reaches the network; nil writes none.
+	RuntimeConstraints func(ctx context.Context, build, python string) ([]string, error)
+
+	// RuntimeFreeze reads every package a runtime build's image has
+	// installed for one Python (runtimecatalog.RuntimeFreeze), which
+	// astro local check names when a Dag imports one the project does not
+	// list. A seam so a test never reaches the network; nil gives no hint.
+	RuntimeFreeze func(ctx context.Context, build, python string) ([]string, error)
 
 	// ImageCatalog reads the runtime catalog for `astro package astro`'s
 	// generated image: its Python, and an Airflow 2 base with no
@@ -244,9 +241,9 @@ func NewDeps() Deps {
 		AirflowDefault:   catalogDefault,
 		RuntimeCheck:     runtimecatalog.CheckRuntime,
 		AstroBuild:       runtimecatalog.AstroBuild,
-		RuntimePins:      runtimecatalog.RuntimePins,
-		Lock:             lockProject,
 		RuntimeCatalog:   runtimecatalog.Catalog,
+		RuntimeConstraints: runtimecatalog.RuntimeConstraints,
+		RuntimeFreeze:      runtimecatalog.RuntimeFreeze,
 		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(airflowPin)(ctx)
 		},

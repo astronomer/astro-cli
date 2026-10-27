@@ -98,9 +98,12 @@ type UV struct {
 	// entry stands for, for the entries that name a git repository or a URL.
 	DirectURLs map[string]string
 	// RuntimeBuild and RuntimePython name the Astro Runtime build and the
-	// Python astro seeded the project's uv.lock from (SeedRecord): "3.3-9"
-	// and "3.12". Empty when it has not.
+	// Python the project's runtime constraints come from (RuntimeRecord):
+	// "3.3-11" and "3.14". Empty when there is no record.
 	RuntimeBuild, RuntimePython string
+	// RuntimeConstraints are the constraint-dependencies lines the record
+	// heads: the runtime's own, beside the +astro pins (SQLAlchemy's).
+	RuntimeConstraints []string
 	// ExcludeNewer is [tool.uv] exclude-newer as written: a date, a time or
 	// a duration such as "1 week". Empty when the project sets none.
 	ExcludeNewer string
@@ -111,8 +114,6 @@ type UV struct {
 // project, where uv cannot read [tool.uv.sources]: a page lists one package's
 // files, so passing it as find-links scopes the index to that package the way
 // the source does.
-//
-//nolint:gocritic // a value receiver, as Astro Desktop calls it: UV outgrew the hugeParam limit after this shipped
 func (u UV) IndexPages() []string {
 	pkgs := make([]string, 0, len(u.Sources))
 	for pkg := range u.Sources {
@@ -670,7 +671,7 @@ func parse(data []byte, repair bool) (*Manifest, error) {
 
 	p := &parser{}
 	m := &Manifest{Astro: p.astro(*f.Tool.Astro), UV: uvTable(f.Tool.UV)}
-	m.UV.RuntimeBuild, m.UV.RuntimePython = seedRecordOf(data, m.UV.ConstraintDependencies)
+	m.UV.RuntimeBuild, m.UV.RuntimePython, m.UV.RuntimeConstraints = runtimeRecordOf(data, m.UV.ConstraintDependencies)
 	if f.Project != nil {
 		m.Project = Project{
 			Name:           f.Project.Name,

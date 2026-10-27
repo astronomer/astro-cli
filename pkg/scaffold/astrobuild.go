@@ -39,12 +39,9 @@ import (
 // numba<0.63) drag a shared dependency back to a release whose sdist does not
 // build.
 //
-// The rest of what the image ships is held in the lock, not here: astro
-// seeds uv.lock with the image's versions in place (RuntimePins, SeedManifest), and
-// constraint-dependencies records only which build and Python it seeded from
-// (Seed). Without that a lockfile takes the newest of each, so standalone ran
-// SQLAlchemy 2.1 beside an Airflow whose image holds it to 2.0, and newer
-// releases of most of what Airflow imports.
+// The runtime image's constraints also pin SQLAlchemy, but nothing published
+// says to which release short of pulling the image, so that line is left out
+// rather than guessed.
 
 // astroIndexName names the [[tool.uv.index]] entry this file writes.
 const astroIndexName = "astronomer"
@@ -71,29 +68,32 @@ var (
 // [tool.uv] settings above, and the two distributions sources need listed. A
 // zero b takes out what an earlier one wrote, for an Airflow Astronomer has no
 // build of, which then comes from PyPI. It leaves every other [tool.uv] key,
-// and every comment, as it was, the record of a seed included
-// (SetAstroBuildSeed).
+// and every comment, as it was.
 func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild) error {
-	_, err := SetAstroBuildSeed(dir, wrap, b, nil)
-	return err
+	return SetAstroBuildWith(dir, wrap, b, nil)
 }
 
-// SetAstroBuildSeed is SetAstroBuild with seed, the record of the build and
-// Python the project's uv.lock was seeded from, written in place of the one
-// there: nil keeps it, a zero Seed takes it out. Runtime pins an older astro
-// wrote into constraint-dependencies are taken out either way.
-//
-// refused reports a record that was not written because the array cannot
-// hold a comment: a [tool.uv] written as an inline table. The rest was
-// written; the caller says why the record was not.
-func SetAstroBuildSeed(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, seed *Seed) (refused bool, err error) {
-	err = EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		return setAstroBuild(before, ed, b, seed, &refused)
+// RuntimeConstraints is what an Astro Runtime image's own install holds
+// packages to (the runtime's constraints file), for one build and Python.
+// Lines are its name==version lines as published.
+type RuntimeConstraints struct {
+	Build, Python string
+	Lines         []string
+}
+
+// SetAstroBuildWith is SetAstroBuild that also writes rc: rc's lines other
+// than the Airflow distributions' (which b's pins hold), under one comment
+// recording rc's build and Python (manifest.RuntimeRecord), in place of the
+// lines and the record an earlier rc wrote. A nil rc leaves those as they
+// are; a zero one takes them out. Where the array cannot hold a comment (an
+// inline [tool.uv]), no record and no lines are written.
+func SetAstroBuildWith(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, rc *RuntimeConstraints) error {
+	return EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
+		return setAstroBuild(before, ed, b, rc)
 	})
-	return refused, err
 }
 
-func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, seed *Seed, refused *bool) error {
+func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, rc *RuntimeConstraints) error {
 	dists := b.Dists()
 	if b.Airflow == "" {
 		dists = nil
@@ -101,11 +101,9 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 	if err := checkNotTheUsers(ed, dists); err != nil {
 		return err
 	}
-	recordRefused, err := setAstroPins(ed, b, dists, seed)
-	if err != nil {
+	if err := setAstroPins(ed, b, dists, rc); err != nil {
 		return err
 	}
-	*refused = recordRefused
 	if err := setAstroSources(ed, dists); err != nil {
 		return err
 	}
@@ -183,39 +181,97 @@ func checkNotTheUsers(ed tomledit.Editor, dists []string) error {
 	return nil
 }
 
-// setAstroPins replaces the constraints an earlier build wrote with b's, and
-// the seed record with seed's (nil keeps it), keeping the project's own
-// constraints and their comments ahead of them. A constraint is the build's
-// when it names one of the rebuilt distributions at an +astro version.
-//
-// refused reports a record left out because the array cannot carry a comment
-// (tomledit.ErrCommentsUnsupported); the rest is written.
-func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, seed *Seed) (refused bool, err error) {
-	lines, _ := tomledit.GetLines(ed, constraintsKey)
-	var astroPins []any
-	if len(dists) > 0 {
-		astroPins = asAny(b.Pins())
-	}
-	return writeConstraints(ed, lines, withoutAstroManaged(lines), astroPins, seed)
-}
-
-// setConstraints writes lines as constraint-dependencies, comments included,
-// so comments that lines leave out go even when the values stay the same, or
-// takes the key out when it would hold neither a constraint nor the seed
-// record: comments alone are nothing to keep, and the record is kept even
-// with no constraint beside it.
-func setConstraints(ed tomledit.Editor, lines []any) error {
-	if !slices.ContainsFunc(lines, func(v any) bool {
-		if c, isComment := v.(tomledit.Comment); isComment {
-			_, _, record := manifest.IsSeedRecord(string(c))
-			return record
+// setAstroPins replaces the constraints an earlier build wrote with b's, and,
+// when rc is not nil, the runtime's record and lines with rc's, keeping the
+// project's own where they were. A constraint is the build's when it names
+// one of the rebuilt distributions at an +astro version; the runtime's are the
+// record comment and the exact name==version lines right after it.
+func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, rc *RuntimeConstraints) error {
+	list, _ := tomledit.GetLines(ed, constraintsKey)
+	own, block := splitRuntimeBlock(list)
+	var kept []any
+	for _, v := range own {
+		if s, _ := v.(string); manifest.AstroPin(s) {
+			continue
 		}
-		return true
-	}) {
+		kept = append(kept, v)
+	}
+	if len(dists) > 0 {
+		kept = append(kept, asAny(b.Pins())...)
+	}
+	switch {
+	case rc == nil:
+		kept = append(kept, block...)
+	case rc.Build != "":
+		kept = append(kept, runtimeBlock(*rc)...)
+	}
+	if reflect.DeepEqual(kept, list) {
+		return nil
+	}
+	if len(valuesOf(kept)) == 0 {
 		ed.Delete(constraintsKey)
 		return nil
 	}
-	return tomledit.SetLines(ed, constraintsKey, lines)
+	err := tomledit.SetLines(ed, constraintsKey, kept)
+	if errors.Is(err, tomledit.ErrCommentsUnsupported) {
+		// An inline [tool.uv] holds no comment, so no record: without one
+		// the lines could not be told from the project's own later.
+		return tomledit.SetLines(ed, constraintsKey, valuesOf(withoutRuntimeBlock(kept)))
+	}
+	return err
+}
+
+// runtimeBlock is the record comment and rc's lines other than the Airflow
+// distributions', which the build's +astro pins hold.
+func runtimeBlock(rc RuntimeConstraints) []any {
+	block := []any{tomledit.Comment(manifest.RuntimeRecord(rc.Build, rc.Python))}
+	for _, line := range rc.Lines {
+		if slices.Contains(astroDists, manifest.DistName(line)) {
+			continue
+		}
+		block = append(block, line)
+	}
+	return block
+}
+
+// splitRuntimeBlock splits an array's lines into the rest and the runtime's
+// block: its record comment and the exact name==version lines that follow it,
+// up to the next comment or any other line.
+func splitRuntimeBlock(lines []any) (rest, block []any) {
+	for i := 0; i < len(lines); i++ {
+		c, isComment := lines[i].(tomledit.Comment)
+		if _, _, ok := manifest.IsRuntimeRecord(string(c)); !isComment || !ok {
+			rest = append(rest, lines[i])
+			continue
+		}
+		block = append(block, lines[i])
+		for i+1 < len(lines) {
+			s, isString := lines[i+1].(string)
+			if !isString || !manifest.ExactPin(s) {
+				break
+			}
+			block = append(block, s)
+			i++
+		}
+	}
+	return rest, block
+}
+
+// withoutRuntimeBlock is lines without the runtime's block.
+func withoutRuntimeBlock(lines []any) []any {
+	rest, _ := splitRuntimeBlock(lines)
+	return rest
+}
+
+// valuesOf is lines without their comments.
+func valuesOf(lines []any) []any {
+	var out []any
+	for _, l := range lines {
+		if _, isComment := l.(tomledit.Comment); !isComment {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 // setAstroSources points each rebuilt distribution at the index, and takes

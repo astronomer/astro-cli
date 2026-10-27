@@ -2,174 +2,76 @@ package runtimecatalog
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	_ "github.com/astronomer/astro-cli/pkg/testing" // refuses any host but this machine
 )
 
-const sampleFreeze = "# pip freeze\n" +
-	"apache-airflow==3.3.2+astro.2\n" +
-	"PyYAML==6.0.3\n" +
-	"psycopg2_binary==2.9.11\n" +
-	"\n" +
-	"openlineage-python @ https://example.invalid/openlineage.whl\n"
-
-// freezeServer serves files by path and counts requests, with the cache root
-// and the CDN address pointed at test-owned places, and no UV_EXCLUDE_NEWER.
-func freezeServer(t *testing.T, files map[string]string) (*httptest.Server, *atomic.Int32) {
+// serveFiles points both published files at a local server answering body
+// for any name (404 when body is ""), with an empty cache, and counts its
+// requests.
+func serveFiles(t *testing.T, body string) *atomic.Int32 {
 	t.Helper()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
-	t.Setenv("UV_EXCLUDE_NEWER", "")
+	t.Setenv(ConstraintsURLEnv, "")
 	t.Setenv(FreezeURLEnv, "")
 	var hits atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits.Add(1)
-		body, ok := files[r.URL.Path]
-		if !ok {
-			http.NotFound(w, r)
+		if body == "" {
+			http.NotFound(w, nil)
 			return
 		}
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(srv.Close)
-	old := freezeBaseURL
-	freezeBaseURL = srv.URL + "/runtime-freeze"
-	t.Cleanup(func() { freezeBaseURL = old })
-	return srv, &hits
+	oldC, oldF := constraintsFile, freezeFile
+	constraintsFile.baseURL, freezeFile.baseURL = srv.URL, srv.URL
+	t.Cleanup(func() { constraintsFile, freezeFile = oldC, oldF })
+	return &hits
 }
 
-// cachedCopy is where a build's freeze for one Python is kept.
-func cachedCopy(name string) string {
-	return filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", freezeCacheDir, name)
-}
-
-// RuntimePins keeps the versions, and says why it has none: the runtime pins
-// come out for a build with no file, and stay when the file cannot be read.
-func TestRuntimePinsKeepsTheVersions(t *testing.T) {
-	srv, _ := freezeServer(t, map[string]string{"/runtime-freeze/runtime-3.3-9-python-3.12.txt": sampleFreeze})
-	got, err := RuntimePins(context.Background(), "3.3-9", "3.12")
-	require.NoError(t, err)
-	assert.Equal(t, []string{"apache-airflow==3.3.2+astro.2", "PyYAML==6.0.3", "psycopg2_binary==2.9.11"}, got,
-		"a direct reference names no version to hold a package to")
-
-	_, err = RuntimePins(context.Background(), "10.5.0", "3.11")
-	assert.ErrorIs(t, err, ErrFreezeNotPublished)
-
-	srv.Close()
-	_, err = RuntimePins(context.Background(), "3.3-10", "3.12")
-	require.Error(t, err)
-	assert.NotErrorIs(t, err, ErrFreezeNotPublished, "not reaching the CDN says nothing about whether the build has a file")
-}
-
-// A build's freeze never changes, so the second read is the cached copy, even
-// with the CDN gone.
-func TestRuntimePinsKeepsWhatItRead(t *testing.T) {
-	srv, hits := freezeServer(t, map[string]string{"/runtime-freeze/runtime-3.3-9-python-3.12.txt": sampleFreeze})
-	_, err := RuntimePins(context.Background(), "3.3-9", "3.12")
-	require.NoError(t, err)
-	srv.Close()
-	got, err := RuntimePins(context.Background(), "3.3-9", "3.12")
-	require.NoError(t, err)
-	assert.Len(t, got, 3)
-	assert.Equal(t, int32(1), hits.Load())
-	assert.FileExists(t, cachedCopy("runtime-3.3-9-python-3.12.txt"))
-}
-
-// What a mirror answers is kept apart from what the CDN does: a mirror's 404
-// does not answer for the CDN once the mirror is unset, and the CDN's copy
-// does not answer for a mirror.
-func TestAMirrorsAnswersAreKeptApartFromTheCDNs(t *testing.T) {
-	srv, hits := freezeServer(t, map[string]string{"/runtime-freeze/runtime-3.3-9-python-3.12.txt": sampleFreeze})
-	t.Setenv(FreezeURLEnv, srv.URL+"/partial-mirror")
-	_, err := RuntimePins(context.Background(), "3.3-9", "3.12")
-	require.ErrorIs(t, err, ErrFreezeNotPublished)
-
-	t.Setenv(FreezeURLEnv, "")
-	got, err := RuntimePins(context.Background(), "3.3-9", "3.12")
-	require.NoError(t, err, "the mirror's 404 is not the CDN's")
-	assert.Len(t, got, 3)
-
-	t.Setenv(FreezeURLEnv, srv.URL+"/partial-mirror")
-	_, err = RuntimePins(context.Background(), "3.3-9", "3.12")
-	assert.ErrorIs(t, err, ErrFreezeNotPublished, "the CDN's copy is not the mirror's")
-	assert.Equal(t, int32(2), hits.Load(), "the mirror's 404 is remembered for the mirror")
-}
-
-// A 404 is remembered for a day, so a project on a runtime with no freeze does
-// not ask on every start; after that it asks again.
-func TestA404IsRememberedForADay(t *testing.T) {
-	_, hits := freezeServer(t, nil)
+func TestRuntimeConstraintsReadsAndKeepsTheFile(t *testing.T) {
+	hits := serveFiles(t, "apache-airflow==3.3.2+astro.2\napache-airflow-task-sdk==1.3.2+astro.1\nSQLAlchemy==2.0.50\n")
 	for range 2 {
-		_, err := RuntimePins(context.Background(), "10.5.0", "3.11")
-		assert.ErrorIs(t, err, ErrFreezeNotPublished)
+		got, err := RuntimeConstraints(context.Background(), "3.3-9", "3.14")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Join(got, ",") != "apache-airflow==3.3.2+astro.2,apache-airflow-task-sdk==1.3.2+astro.1,SQLAlchemy==2.0.50" {
+			t.Errorf("RuntimeConstraints = %q", got)
+		}
 	}
-	assert.Equal(t, int32(1), hits.Load(), "the second read is answered from the cache")
-
-	marker := cachedCopy("runtime-10.5.0-python-3.11.txt" + freezeMissingSuffix)
-	old := time.Now().Add(-freezeMissingTTL - time.Minute)
-	require.NoError(t, os.Chtimes(marker, old, old))
-	_, err := RuntimePins(context.Background(), "10.5.0", "3.11")
-	assert.ErrorIs(t, err, ErrFreezeNotPublished)
-	assert.Equal(t, int32(2), hits.Load(), "a day on, it asks again")
+	if hits.Load() != 1 {
+		t.Errorf("%d requests, want 1: a build's file is kept", hits.Load())
+	}
 }
 
-// A file past the size cap is refused, not read short, and not kept.
-func TestRuntimePinsRefusesAFileTooLargeToReadWhole(t *testing.T) {
-	big := strings.Repeat("pandas==2.2.3\n", freezeMaxBytes/14+1)
-	freezeServer(t, map[string]string{"/runtime-freeze/runtime-3.3-9-python-3.12.txt": big})
-	_, err := RuntimePins(context.Background(), "3.3-9", "3.12")
-	assert.Error(t, err)
-	assert.NoFileExists(t, cachedCopy("runtime-3.3-9-python-3.12.txt"))
+func TestRuntimeFreezeRemembersANotPublishedFile(t *testing.T) {
+	hits := serveFiles(t, "")
+	for range 2 {
+		if _, err := RuntimeFreeze(context.Background(), "10.9.0", "3.11"); !errors.Is(err, ErrNotPublished) {
+			t.Fatalf("err = %v, want ErrNotPublished", err)
+		}
+	}
+	if hits.Load() != 1 {
+		t.Errorf("%d requests, want 1: a 404 is remembered", hits.Load())
+	}
 }
 
-func TestParseFreezeReportsALineTooLongToRead(t *testing.T) {
-	_, err := parseFreeze([]byte("pandas==2.2.3\n" + strings.Repeat("x", freezeMaxBytes+1) + "\n"))
-	assert.Error(t, err)
+func TestRuntimeConstraintsRefusesAPageWithNoPins(t *testing.T) {
+	serveFiles(t, "<html>captive portal</html>")
+	if _, err := RuntimeConstraints(context.Background(), "3.3-9", "3.14"); err == nil || errors.Is(err, ErrNotPublished) {
+		t.Errorf("err = %v, want a read error", err)
+	}
 }
 
-// A 200 that lists no package is an error page, and is neither used nor kept.
-func TestRuntimePinsRefusesAPageWithNoPackages(t *testing.T) {
-	freezeServer(t, map[string]string{"/runtime-freeze/runtime-3.3-9-python-3.12.txt": "<html>\n<body>Sign in</body>\n</html>\n"})
-	_, err := RuntimePins(context.Background(), "3.3-9", "3.12")
-	assert.Error(t, err)
-	assert.NoFileExists(t, cachedCopy("runtime-3.3-9-python-3.12.txt"))
-}
-
-// ASTRO_RUNTIME_FREEZE_URL points the reads at a mirror, and an error names
-// the mirror without the credentials its address carries.
-func TestRuntimePinsReadsAMirror(t *testing.T) {
-	srv, hits := freezeServer(t, map[string]string{"/mirror/runtime-3.3-9-python-3.12.txt": sampleFreeze})
-	t.Setenv(FreezeURLEnv, srv.URL+"/mirror/")
-	got, err := RuntimePins(context.Background(), "3.3-9", "3.12")
-	require.NoError(t, err)
-	assert.Len(t, got, 3)
-	assert.Equal(t, int32(1), hits.Load())
-
-	srv.Close()
-	t.Setenv(FreezeURLEnv, strings.Replace(srv.URL, "http://", "http://user:s3cret@", 1)+"/mirror")
-	_, err = RuntimePins(context.Background(), "3.3-10", "3.12")
-	require.Error(t, err)
-	assert.NotContains(t, err.Error(), "s3cret")
-	assert.NotContains(t, err.Error(), "user")
-}
-
-// A build or Python becomes part of a URL and a file name, so one that could
-// leave either is refused before a request.
-func TestRuntimePinsRefusesANameThatIsNotAVersion(t *testing.T) {
-	_, hits := freezeServer(t, nil)
-	_, err := RuntimePins(context.Background(), "../../etc", "3.12")
-	assert.Error(t, err)
-	_, err = RuntimePins(context.Background(), "3.3-9", "3.12/../x")
-	assert.Error(t, err)
-	assert.Equal(t, int32(0), hits.Load())
+func TestRuntimeConstraintsRefusesANameThatIsNotAVersion(t *testing.T) {
+	serveFiles(t, "x==1\n")
+	if _, err := RuntimeConstraints(context.Background(), "../x", "3.14"); !errors.Is(err, ErrNotPublished) {
+		t.Errorf("err = %v, want ErrNotPublished", err)
+	}
 }

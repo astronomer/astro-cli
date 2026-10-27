@@ -106,6 +106,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 		return err
 	}
 	res = withEnvFindings(res, envFindings(envRep))
+	res = c.withRuntimeHints(ctx, project, m, res)
 
 	// Best effort: the check is about the DAGs, and a listing that cannot be
 	// read only costs the note.
@@ -200,7 +201,7 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, env []str
 		Deps:        deps,
 		// Without the pins to Astronomer's build of Airflow: a platform runs
 		// Apache's own, at its own version.
-		Constraints: manifest.WithoutAstroPins(m.UV.ConstraintDependencies),
+		Constraints: m.UV.WithoutRuntimeConstraints(manifest.WithoutAstroPins(m.UV.ConstraintDependencies)),
 		Env:         env,
 	}, prov, c.d.CheckVenv, strict, progress)
 }
@@ -403,6 +404,18 @@ func renderCheck(r cliout.Renderer, res checks.Result, strict, provisioned bool,
 	// gap, a duplicate dag id butted straight up against the verdict.
 	if len(res.Findings) > 0 {
 		if _, err := fmt.Fprintln(r.Out); err != nil {
+			return err
+		}
+	}
+	// One line per distinct hint: a missing package fails every Dag that
+	// imports it the same way.
+	seen := map[string]bool{}
+	for _, f := range res.Findings {
+		if f.Hint == "" || seen[f.Hint] {
+			continue
+		}
+		seen[f.Hint] = true
+		if _, err := fmt.Fprintf(r.Out, "hint: %s\n\n", f.Hint); err != nil {
 			return err
 		}
 	}
