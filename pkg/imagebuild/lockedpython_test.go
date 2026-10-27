@@ -9,7 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
-// The image of the lock's build runs the Python the lock was seeded for, not
+// The image of the lock's build runs the recorded Python, not
 // the build's default, so it is the image the lock was made for. A
 // requires-python that excludes that Python, or a build the catalog says
 // carries a release the pin no longer covers, builds on the newest build of
@@ -32,7 +32,7 @@ func TestTheLocksBuildRunsTheLocksPython(t *testing.T) {
 	assert.False(t, LockedRuntimeUsed(m, c))
 	notices := LockedRuntimeNotices(m, c)
 	require.Len(t, notices, 1)
-	assert.Contains(t, notices[0], "excludes Python 3.13, the one this project's uv.lock was seeded for on Astro Runtime 3.3-10")
+	assert.Contains(t, notices[0], "excludes Python 3.13, the one this project's pyproject.toml records for Astro Runtime 3.3-10")
 
 	moved := ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "3.3.1", LockedRuntime: "3.3-8"}
 	req, err = ForManifest(moved, catalog)

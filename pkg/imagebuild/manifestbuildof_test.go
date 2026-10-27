@@ -67,7 +67,7 @@ func TestManifestBuildOf(t *testing.T) {
 	assert.Equal(t, ManifestBuild{ProjectDir: "/project"}, ManifestBuildOf("/project", nil))
 }
 
-// The build uv.lock was seeded from is carried while its tag agrees with the
+// The recorded build is carried while its tag agrees with the
 // Airflow pin, and dropped once the pin has moved to another series or
 // generation: the seed waits for its next refresh, and the base follows the
 // pin.

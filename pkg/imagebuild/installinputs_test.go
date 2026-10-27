@@ -303,7 +303,7 @@ func lockProject(deps []string, packages string) (pyproject, lock string) {
 
 // Every build checks the lock's Airflow against the image's, `docker build .`
 // included: a lock made for another runtime's Airflow is said in the build
-// output, naming the runtime the lock was seeded from when pyproject.toml
+// output, naming the runtime pyproject.toml records when it
 // records it, and the build goes on with the lock's versions. A lock for this image's
 // Airflow, a lock holding no Airflow, and an image whose Airflow cannot be
 // read say nothing.
