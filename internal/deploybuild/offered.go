@@ -62,19 +62,9 @@ func OfferedBase(offer RuntimeOffer, resolve imagebuild.BaseImageFunc, warn func
 		var first error
 		var skipped string
 		for _, build := range candidates {
-			named := m
-			named.Runtime = build
-			if build == locked && m.LockedPython != "" {
-				// The lock's build runs the recorded Python, as a local and a
-				// packaged image of it do (imagebuild's lockedBase), so all three
-				// run one Python. A requires-python that excludes it moves on to
-				// the next offered build, with a warning.
-				if !runtimeversions.RequiresPythonAdmits(m.RequiresPython, m.LockedPython) {
-					warn(fmt.Sprintf("requires-python %s excludes Python %s, the one this project's pyproject.toml records for Astro Runtime %s, so the image builds on the newest other build the Deployment offers",
-						m.RequiresPython, m.LockedPython, locked))
-					continue
-				}
-				named.RequiresPython = "==" + m.LockedPython + ".*"
+			named, ok := candidateBuild(m, build, locked, warn)
+			if !ok {
+				continue
 			}
 			image, err := resolve(ctx, named)
 			var notShipped *runtimeversions.PythonNotShippedError
@@ -101,6 +91,26 @@ func OfferedBase(offer RuntimeOffer, resolve imagebuild.BaseImageFunc, warn func
 		}
 		return "", fmt.Errorf("none of the builds the Deployment offers for Airflow %s ships a Python requires-python admits: %w", m.AirflowVersion, first)
 	}
+}
+
+// candidateBuild is m with build named, for OfferedBase to resolve. The lock's
+// build runs the recorded Python, as a local and a packaged image of it do
+// (imagebuild's lockedBase), so all three run one Python. A requires-python
+// that excludes that Python skips the lock's build (ok false), with a
+// warning, and the next offered build is tried.
+func candidateBuild(m imagebuild.ManifestBuild, build, locked string, warn func(string)) (named imagebuild.ManifestBuild, ok bool) {
+	named = m
+	named.Runtime = build
+	if build != locked || m.LockedPython == "" {
+		return named, true
+	}
+	if !runtimeversions.RequiresPythonAdmits(m.RequiresPython, m.LockedPython) {
+		warn(fmt.Sprintf("requires-python %s excludes Python %s, the one this project's pyproject.toml records for Astro Runtime %s, so the image builds on the newest other build the Deployment offers",
+			m.RequiresPython, m.LockedPython, locked))
+		return named, false
+	}
+	named.RequiresPython = "==" + m.LockedPython + ".*"
+	return named, true
 }
 
 // offeredCandidates are the builds OfferedBase tries for m, in order: the
