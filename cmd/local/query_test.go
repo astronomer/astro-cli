@@ -84,12 +84,12 @@ func (s *airflowStub) routeStatus(method, path string, status int, body string) 
 	s.routes[method+" "+path] = stubRoute{status: status, body: body}
 }
 
-// routeSequence answers successive calls to one path with each body in turn,
+// routeSequence answers successive GETs of one path with each body in turn,
 // holding on the last.
-func (s *airflowStub) routeSequence(method, path string, bodies ...string) {
+func (s *airflowStub) routeSequence(path string, bodies ...string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.routes[method+" "+path] = stubRoute{status: http.StatusOK, sequence: bodies}
+	s.routes[http.MethodGet+" "+path] = stubRoute{status: http.StatusOK, sequence: bodies}
 }
 
 // routeFunc answers a path with a body built from the request's query, for a
