@@ -203,6 +203,9 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// func and runs it ahead of its own (markUsageErrors). An unknown command
 	// is recorded by Execute, after the run it failed.
 	rootCmd.SetFlagErrorFunc(flagError)
+	// A 1.x spelling of a renamed flag is noted once the flags parse, on
+	// every tree, the core one included, which skips the pre-run.
+	utils.BeforeArgs(rootCmd, noteRenamedFlags)
 	markV1Tree(rootCmd, o.platform)
 	installHelp(rootCmd, o.platform, houstonVersion)
 

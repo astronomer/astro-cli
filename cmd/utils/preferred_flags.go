@@ -50,6 +50,16 @@ func IsAlias(f *pflag.Flag) bool {
 	return aliasOf(f) != ""
 }
 
+// VisitGivenAliases calls fn for each alias given on fs, with the alias's
+// name and the name of the flag it stands for.
+func VisitGivenAliases(fs *pflag.FlagSet, fn func(alias, preferred string)) {
+	fs.Visit(func(f *pflag.Flag) {
+		if p := aliasOf(f); p != "" {
+			fn(f.Name, p)
+		}
+	})
+}
+
 func aliasOf(f *pflag.Flag) string {
 	if p := f.Annotations[aliasAnnotation]; len(p) == 1 {
 		return p[0]

@@ -50,7 +50,7 @@ The isolation contract is the part worth getting right, and `e2e/doc.go` states 
 ## Flags and 1.x compatibility
 
 - A new flag uses the v2 spellings (`--deployment`, `--workspace`, `-o json`) and gets no 1.x alias.
-- An old spelling exists only on a command 1.x had, as a hidden alias. The command opts in through the helpers (`addDeploymentFlag`/`addWorkspaceFlag` with `oneXDeploymentID`, `oneXDeploymentName`, `oneXWorkspaceID` in `cmd/astro`; `addDeploymentFlag`/`addWorkspaceFlag` in `cmd/apc`; `utils.AddAlias` elsewhere, and every tree installs `utils.ApplyPreferredFlagsIn`, which hands the aliases on), and nothing reads the alias directly. The command reads the v2 flag.
+- An old spelling exists only on a command 1.x had, as a hidden alias. The command opts in through the helpers (`addDeploymentFlag`/`addWorkspaceFlag` with `oneXDeploymentID`, `oneXDeploymentName`, `oneXWorkspaceID` in `cmd/astro`; `addDeploymentFlag`/`addWorkspaceFlag` in `cmd/apc`; `utils.AddAlias` elsewhere, and every tree installs `utils.ApplyPreferredFlagsIn`, which hands the aliases on), and nothing reads the alias directly. The command reads the v2 flag. A run that passes an alias prints a rename hint on stderr and sends a `CLI Renamed Flag` event (`cmd/renamed_flags.go`), which is how we tell when an alias can go.
 - Retiring a 1.x flag means a tombstone in `cmd/removed_flags.go`, never a silent deletion. `TestEveryV1FlagStillWorksOrSaysWhatReplacedIt` holds this.
 - Aligning one platform with another never drops a capability either one has.
 - Every hidden flag is a 1.x flag (`cmd/v1_flags.tsv`, on that command) or is on the allowlist in `TestEveryHiddenFlagIsA1xFlagOrSaysWhy` (`cmd/hidden_flags_test.go`) with a reason.
