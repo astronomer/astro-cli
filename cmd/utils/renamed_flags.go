@@ -72,17 +72,26 @@ func renameHint(preferred *pflag.Flag, aliases []*pflag.Flag) string {
 	} else {
 		fmt.Fprintf(&b, "Flags %s are replaced by %s, which takes one value.", strings.Join(names, " and "), spelling(preferred))
 	}
-	// 1.x's --deployment-id and --deployment-name keep the kind they were
-	// given as; --deployment works it out, so the same value can name another
-	// Deployment. A command that had --deployment-name takes names there too.
+	// A command that had --deployment-name takes names in --deployment too.
+	// 1.x's --deployment-id takes its value as an id whatever it looks like,
+	// where --deployment tries a link name first (on APC), so the same value
+	// can name another Deployment. --deployment-name already tries a link
+	// name first, so switching from it alone changes nothing that matters.
 	if preferred.Name == "deployment" {
-		takes := "Deployment ids and link names"
+		takes, check := "Deployment ids and link names", false
 		for _, a := range aliases {
-			if a.Name == "deployment-name" {
+			switch a.Name {
+			case "deployment-name":
 				takes = "Deployment names, ids and link names"
+			case "deployment-id":
+				check = true
 			}
 		}
-		fmt.Fprintf(&b, " --deployment takes %s, so check that the value names the same Deployment before switching.", takes)
+		fmt.Fprintf(&b, " --deployment takes %s", takes)
+		if check {
+			b.WriteString(", so check that the value names the same Deployment before switching")
+		}
+		b.WriteString(".")
 	}
 	fmt.Fprintf(&b, " The old spelling will be removed in a future release. Set %s=1 to hide this message.", RenameHintsDisabledEnv)
 	return b.String()

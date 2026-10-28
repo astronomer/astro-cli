@@ -49,7 +49,7 @@ func TestRenamedFlagsSayWhatTheyAreCalledNow(t *testing.T) {
 			astroTree,
 			[]string{"deployment", "inspect", "-n", "dep"},
 			&renamedFlagEvent{"astro deployment inspect", []string{"--deployment-name"}, []string{"--deployment"}},
-			[]string{"Flag --deployment-name (-n) has been renamed to --deployment. --deployment takes Deployment names, ids and link names, so check that the value names the same Deployment before switching."},
+			[]string{"Flag --deployment-name (-n) has been renamed to --deployment. --deployment takes Deployment names, ids and link names. The old spelling"},
 		},
 		{
 			apcTree,
@@ -72,7 +72,8 @@ func TestRenamedFlagsSayWhatTheyAreCalledNow(t *testing.T) {
 				[]string{"--deployment", "--deployment", "--workspace"},
 			},
 			[]string{
-				"Flags --deployment-id (-d) and --deployment-name are replaced by --deployment, which takes one value.",
+				"Flags --deployment-id (-d) and --deployment-name are replaced by --deployment, which takes one value. " +
+					"--deployment takes Deployment names, ids and link names, so check that the value names the same Deployment before switching.",
 				"Flag --workspace-id has been renamed to --workspace.",
 			},
 		},
