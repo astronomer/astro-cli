@@ -11,20 +11,37 @@ import (
 
 // A warning about the gitignored files an image carries names where they
 // are, most files first, so the place to add to an ignore file is what the
-// reader sees, not a list of thousands of paths.
-func TestPlacesOfNamesTopLevelPlaces(t *testing.T) {
-	var paths []string
+// reader sees, not a list of thousands of paths. Every place it names is safe
+// to add as it stands: it holds nothing else the image would carry.
+func TestPlacesOfNamesPlacesSafeToIgnore(t *testing.T) {
+	// The aperture case: a .claude/ that holds only ignored worktrees, beside
+	// the project's own DAGs.
+	var ignored []string
 	for i := range 5509 {
-		paths = append(paths, fmt.Sprintf(".claude/worktrees/agent-%d/README.md", i))
+		ignored = append(ignored, fmt.Sprintf(".claude/worktrees/agent-%d/README.md", i))
 	}
-	paths = append(paths, ".astro/config.local.lock")
-	assert.Equal(t, ".claude/ and .astro/", placesOf(paths))
+	carried := append([]string{"dags/a.py", "pyproject.toml"}, ignored...)
+	assert.Equal(t, ".claude/", placesOf(ignored, carried))
 
-	assert.Equal(t, "notes.txt", placesOf([]string{"notes.txt"}), "a file at the root is its own place")
-	assert.Equal(t, "a/, b/ and c.txt", placesOf([]string{"b/1", "a/1", "a/2", "c.txt", "b/2", "a/3"}),
-		"most files first, then by name")
-	assert.Equal(t, "a/, b/, c/ and 1 more place", placesOf([]string{"a/1", "a/2", "a/3", "b/1", "b/2", "c/1", "d/1"}))
-	assert.Equal(t, "a/, b/, c/ and 2 more places", placesOf([]string{"a/1", "b/1", "c/1", "d/1", "e/1"}))
+	// dags/ ships a DAG, so the place is the ignored directory inside it.
+	ignored = []string{"dags/__pycache__/a.cpython-312.pyc", "dags/__pycache__/b.cpython-312.pyc"}
+	carried = append([]string{"dags/a.py", "dags/b.py"}, ignored...)
+	assert.Equal(t, "dags/__pycache__/", placesOf(ignored, carried))
+
+	// A .claude/ that also holds a committed settings file is named one level
+	// down, where only ignored files are.
+	ignored = []string{".claude/worktrees/x/README.md", ".claude/worktrees/y/README.md"}
+	carried = append([]string{".claude/settings.json"}, ignored...)
+	assert.Equal(t, ".claude/worktrees/", placesOf(ignored, carried))
+
+	// A file at the root, or one beside a file that ships, is named itself.
+	assert.Equal(t, "notes.txt", placesOf([]string{"notes.txt"}, []string{"notes.txt", "dags/a.py"}))
+	assert.Equal(t, "dags/scratch.py", placesOf([]string{"dags/scratch.py"}, []string{"dags/scratch.py", "dags/a.py"}))
+
+	// Most files first, then by name; at most three, then how many more.
+	assert.Equal(t, "a/, b/ and c.txt", placesOf([]string{"b/1", "a/1", "a/2", "c.txt", "b/2", "a/3"}, nil))
+	assert.Equal(t, "a/, b/, c/ and 1 more place", placesOf([]string{"a/1", "a/2", "a/3", "b/1", "b/2", "c/1", "d/1"}, nil))
+	assert.Equal(t, "a/, b/, c/ and 2 more places", placesOf([]string{"a/1", "b/1", "c/1", "d/1", "e/1"}, nil))
 }
 
 // Every message that lists files agrees with how many it lists: one file is
@@ -33,11 +50,11 @@ func TestMessagesAgreeWithTheirCount(t *testing.T) {
 	one := Report{IgnoreFile: ".dockerignore", Gitignored: []string{"build/out.txt"}, Unchecked: []string{"prod.pem"}}
 	several := Report{IgnoreFile: ".dockerignore", Gitignored: []string{"build/a", "build/b"}, Unchecked: []string{"a.pem", "b.pem"}}
 	assert.Equal(t, []string{
-		"the image will carry 1 file that .gitignore ignores and .dockerignore does not, under build/. If it does not belong in the image, add it to .dockerignore",
+		"the image will carry 1 file that .gitignore ignores and .dockerignore does not, in build/. If it does not belong in the image, add it to .dockerignore",
 		"the image will carry this file that looks like credentials, which git could not say is committed: prod.pem. If it does not belong in the image, add it to .dockerignore",
 	}, one.Warnings())
 	assert.Equal(t, []string{
-		"the image will carry 2 files that .gitignore ignores and .dockerignore does not, under build/. If they do not belong in the image, add them to .dockerignore",
+		"the image will carry 2 files that .gitignore ignores and .dockerignore does not, in build/. If they do not belong in the image, add them to .dockerignore",
 		"the image will carry these files that look like credentials, which git could not say are committed: a.pem, b.pem. If they do not belong in the image, add them to .dockerignore",
 	}, several.Warnings())
 

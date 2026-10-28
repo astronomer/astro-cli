@@ -87,17 +87,39 @@ func cappedList(paths []string) string {
 // placesShown caps how many places a summary names.
 const placesShown = 3
 
-// placesOf names where paths are rather than the paths: the top-level
-// directory each is under (".claude/"), or the file itself at the project
-// root, most files first, at most three and a count of the rest. A warning
-// about thousands of files is read for what to add to an ignore file, and that
-// is a directory, not a list the warning would be lost in.
-func placesOf(paths []string) string {
+// placesOf names where the ignored files are rather than the files, so that
+// every place it names is safe to add to an ignore file as it stands: each
+// file is named by the highest directory above it that holds nothing else the
+// image would carry (carried, the whole list), so dags/__pycache__/ and never
+// dags/ beside a DAG that ships; a file with no such directory, one at the
+// project root or beside a shipped file, is named itself. Most files first,
+// at most three, and a count of the rest. A warning about thousands of files
+// is read for what to add to an ignore file, and that is a line or two, not a
+// list the warning would be lost in.
+func placesOf(ignored, carried []string) string {
+	isIgnored := make(map[string]bool, len(ignored))
+	for _, p := range ignored {
+		isIgnored[p] = true
+	}
+	// shipping are the directories holding a file the image carries for real:
+	// naming one of them would leave that file out too.
+	shipping := map[string]bool{}
+	for _, f := range carried {
+		if isIgnored[f] {
+			continue
+		}
+		for i := strings.IndexByte(f, '/'); i >= 0; i = nextSlash(f, i) {
+			shipping[f[:i+1]] = true
+		}
+	}
 	counts := map[string]int{}
-	for _, p := range paths {
+	for _, p := range ignored {
 		place := p
-		if top, _, nested := strings.Cut(p, "/"); nested {
-			place = top + "/"
+		for i := strings.IndexByte(p, '/'); i >= 0; i = nextSlash(p, i) {
+			if !shipping[p[:i+1]] {
+				place = p[:i+1]
+				break
+			}
 		}
 		counts[place]++
 	}
@@ -119,6 +141,15 @@ func placesOf(paths []string) string {
 		more = "1 more place"
 	}
 	return strings.Join(places[:placesShown], ", ") + " and " + more
+}
+
+// nextSlash is the index of the next "/" in p after the one at i, or -1.
+func nextSlash(p string, i int) int {
+	j := strings.IndexByte(p[i+1:], '/')
+	if j < 0 {
+		return -1
+	}
+	return i + 1 + j
 }
 
 // joinAnd joins items as a sentence does: "a", "a and b", "a, b and c".

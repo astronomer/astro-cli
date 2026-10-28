@@ -480,8 +480,8 @@ A value that resolves to something its `type` did not promise is reported as a w
 start, and does **not** stop the start:
 
 ```
-warning: env var PORT: expected a port between 1 and 65535, got "99999"
-warning: connection warehouse: declared conn_type "snowflake" but resolved to "postgres"
+Warning: env var PORT: expected a port between 1 and 65535, got "99999"
+Warning: connection warehouse: declared conn_type "snowflake" but resolved to "postgres"
 ```
 
 Warning rather than refusing is deliberate. The value may well work, and `type` is documentation you
@@ -583,7 +583,7 @@ A pool name is at most 256 characters and cannot contain a slash, since the Airf
 - **Only what the manifest sets.** A pool already as declared is not written. When you leave out `description` or `include_deferred`, the pool keeps the value it has in Airflow.
 - **Pools the manifest does not list stay.** Nothing is deleted, so a pool you make in the Airflow UI survives a restart. To remove a pool, delete it from the table and from Airflow.
 - **`default_pool`** is the pool Airflow makes itself and every task uses when it names none. You can set its `slots` and `include_deferred`. You cannot set its `description`, since Airflow 3 does not let a caller change it.
-- **A failure does not stop the start.** A pool that Airflow refuses prints one warning, `warning: pool etl was not created or updated: ...`, and Airflow keeps running.
+- **A failure does not stop the start.** A pool that Airflow refuses prints one warning on stderr, `Warning: pool etl was not created or updated: ...`, and Airflow keeps running.
 
 `astro init` carries the pools in a 1.x project's `airflow_settings.yaml` into this table. See [converting a 1.x project](install.md).
 

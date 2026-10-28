@@ -239,6 +239,9 @@ func formatNames(extras []Format) []string {
 type Renderer struct {
 	Format Format
 	Out    io.Writer
+	// Err is the command's stderr, where a text-mode warning goes (Warn) so it
+	// is not read as the command's output. nil writes text warnings to Out.
+	Err io.Writer
 	// Style lays out a json result (Emit). The zero value, StyleAuto, decides
 	// from Out, the way gh does: indented and colored on a terminal, compact
 	// on one line anywhere else. A test is never on a terminal, so it sets

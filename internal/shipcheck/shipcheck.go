@@ -49,6 +49,9 @@ type Report struct {
 	VCSSecrets []string
 	// IgnoreFile is the ignore file the build reads, for the messages.
 	IgnoreFile string
+	// carried is every file the image would carry, for the gitignored
+	// warning to name only places that hold nothing else that ships.
+	carried []string
 }
 
 // Check looks at the files an image built from the project at dir would
@@ -57,7 +60,7 @@ type Report struct {
 // carries, are looked at always; the rest are asked of git, and outside a git
 // work tree there is nothing to ask.
 func Check(dir string, survey *imagebuild.ProjectSurvey) Report {
-	r := Report{IgnoreFile: cmp.Or(survey.IgnoreFile, ".dockerignore")}
+	r := Report{IgnoreFile: cmp.Or(survey.IgnoreFile, ".dockerignore"), carried: survey.Files}
 	root, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		root = dir
@@ -83,8 +86,8 @@ func Check(dir string, survey *imagebuild.ProjectSurvey) Report {
 func (r *Report) Warnings() []string {
 	var out []string
 	if n := len(r.Gitignored); n > 0 {
-		out = append(out, fmt.Sprintf("the image will carry %s that .gitignore ignores and %s does not, under %s. If %s not belong in the image, add %s to %s",
-			countFiles(n), r.IgnoreFile, placesOf(r.Gitignored), agree(n, "it does", "they do"), agree(n, "it", "them"), r.IgnoreFile))
+		out = append(out, fmt.Sprintf("the image will carry %s that .gitignore ignores and %s does not, in %s. If %s not belong in the image, add %s to %s",
+			countFiles(n), r.IgnoreFile, placesOf(r.Gitignored, r.carried), agree(n, "it does", "they do"), agree(n, "it", "them"), r.IgnoreFile))
 	}
 	for _, u := range r.Unanswered {
 		out = append(out, fmt.Sprintf("could not ask git which files it tracks in %s, so files there that look like credentials were not checked", u))

@@ -123,6 +123,15 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		pin := m.Airflow().Pin
 		catalog = func(ctx context.Context) *runtimeversions.Catalog { return c.d.ImageCatalog(ctx, pin) }
 	}
+	// A warning the target finds as it goes is shown as it is found, as every
+	// cmd/local warning is (emitWarning), so a build it then refuses still
+	// shows it. shown keeps the ones already out, for the result's warnings
+	// below.
+	shown := map[string]bool{}
+	warn := func(w string) {
+		shown[w] = true
+		emitWarning(r, event{Event: "warning", Text: w})
+	}
 	res, err := target.Build(ctx, pack.Request{
 		ProjectDir:     dir,
 		Manifest:       m,
@@ -133,7 +142,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		OutDir:         opts.outDir,
 		CheckRuntime:   c.d.RuntimeCheck,
 		RuntimeCatalog: catalog,
-		Warn:           c.packageWarn(r),
+		Warn:           warn,
 	}, c.callbacks(r))
 	if err != nil {
 		return err
@@ -149,33 +158,21 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	if note != "" {
 		res.Warnings = append(res.Warnings, note)
 	}
+	// The result carries every warning in json. In text, the ones not shown as
+	// the build ran (the note above, a bucket target's own) are shown now, the
+	// same way, rather than listed under the result.
+	if r.Format == cliout.FormatText {
+		for _, w := range res.Warnings {
+			if !shown[w] {
+				emitWarning(r, event{Event: "warning", Text: w})
+			}
+		}
+	}
 	// An event rather than a result: an image build streamed its progress
 	// before it, and this ends that stream, so it is one line too.
 	return r.EmitEvent(res, func(w io.Writer) error {
-		if err := renderPackage(w, res, m.Astro.Deployments); err != nil {
-			return err
-		}
-		// A tree result prints its Warnings itself. An image target's own
-		// warnings were streamed as the build ran, so only the note is left.
-		if res.Kind == pack.KindImage && note != "" {
-			return renderWarnings(w, []string{note})
-		}
-		return nil
+		return renderPackage(w, res, m.Astro.Deployments)
 	})
-}
-
-// packageWarn shows a warning found before the image build (pack.Request.Warn)
-// the way the CLI's other warnings are shown: a yellow "Warning:" on stderr in
-// text, and a warning event in json, rather than as one of the build's
-// timestamped progress lines, where it was lost among them.
-func (c *cli) packageWarn(r cliout.Renderer) func(string) {
-	return func(w string) {
-		if r.Format == cliout.FormatJSON {
-			emitWarning(r, event{Event: "warning", Text: w})
-			return
-		}
-		cliout.Warn(c.d.Stderr, w)
-	}
 }
 
 // packageRegistry builds the target registry with the production astro target:
@@ -265,9 +262,6 @@ func renderTreeResult(w io.Writer, res pack.Result) error {
 			return err
 		}
 	}
-	if err := renderWarnings(w, res.Warnings); err != nil {
-		return err
-	}
 	return renderNextSteps(w, res.NextSteps)
 }
 
@@ -287,19 +281,3 @@ func renderNextSteps(w io.Writer, steps []string) error {
 	return nil
 }
 
-// renderWarnings prints any non-fatal findings under a heading. The build still
-// produced a valid artifact, so these inform rather than stop.
-func renderWarnings(w io.Writer, warnings []string) error {
-	if len(warnings) == 0 {
-		return nil
-	}
-	if _, err := fmt.Fprintf(w, "\nwarnings:\n"); err != nil {
-		return err
-	}
-	for _, warning := range warnings {
-		if _, err := fmt.Fprintf(w, "  - %s\n", warning); err != nil {
-			return err
-		}
-	}
-	return nil
-}

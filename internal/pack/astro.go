@@ -165,10 +165,22 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	if name == "" {
 		return Result{}, errors.New("the project has no name; set [project] name in pyproject.toml")
 	}
+	// Every warning this target gives goes through one path: shown as it is
+	// found (Request.Warn, or a progress line), and kept for the result, so
+	// -o json's result carries every one, as a deploy's does.
+	var warnings []string
+	show := req.warn(cb)
+	req.Warn = func(w string) {
+		warnings = append(warnings, w)
+		show(w)
+	}
 	airflow := req.Manifest.Airflow()
-	warnings, err := checkManifest(ctx, req, airflow)
+	found, err := checkManifest(ctx, req, airflow)
 	if err != nil {
 		return Result{}, err
+	}
+	for _, w := range found {
+		req.Warn(w)
 	}
 	// Which image the manifest builds is imagebuild's rule, the one deploy
 	// follows too, so the artifact is the image a deploy of the same project
@@ -258,16 +270,8 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// the inspect having actually succeeded — a daemon that failed to answer says
 	// nothing about the image's base.
 	if declared != "" && inspected && runtimeV == "" {
-		// The same shape this target's other lines use (see emit below), rather
-		// than a second mechanism for one message.
-		if cb.OnLine != nil {
-			cb.OnLine(localrt.LogLine{
-				Component: "package",
-				Time:      time.Now(),
-				Text: fmt.Sprintf("warning: the image built from %s carries no %s label, so it is not based on Astro Runtime. It cannot be deployed with astro deploy; build it FROM an Astro Runtime image if that is the goal",
-					req.Manifest.Astro.Dockerfile, airflowrt.RuntimeVersionLabel),
-			})
-		}
+		req.Warn(fmt.Sprintf("the image built from %s carries no %s label, so it is not based on Astro Runtime. It cannot be deployed with astro deploy; build it FROM an Astro Runtime image if that is the goal",
+			req.Manifest.Astro.Dockerfile, airflowrt.RuntimeVersionLabel))
 	}
 
 	finalTag := req.Tag
