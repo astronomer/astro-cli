@@ -74,9 +74,15 @@ func renameHint(preferred *pflag.Flag, aliases []*pflag.Flag) string {
 	}
 	// 1.x's --deployment-id and --deployment-name keep the kind they were
 	// given as; --deployment works it out, so the same value can name another
-	// Deployment.
+	// Deployment. A command that had --deployment-name takes names there too.
 	if preferred.Name == "deployment" {
-		b.WriteString(" --deployment also takes a link name from the project, and reads a value shaped like a Deployment id as an id, so check that the value names the same Deployment before switching.")
+		takes := "Deployment ids and link names"
+		for _, a := range aliases {
+			if a.Name == "deployment-name" {
+				takes = "Deployment names, ids and link names"
+			}
+		}
+		fmt.Fprintf(&b, " --deployment takes %s, so check that the value names the same Deployment before switching.", takes)
 	}
 	fmt.Fprintf(&b, " The old spelling will be removed in a future release. Set %s=1 to hide this message.", RenameHintsDisabledEnv)
 	return b.String()
