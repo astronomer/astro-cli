@@ -232,6 +232,22 @@ func TestUsageErrors(t *testing.T) {
 	}
 }
 
+// markedUsage is an error a package that cannot import cliout marks as a
+// usage error itself, or declines to.
+type markedUsage bool
+
+func (m markedUsage) Error() string      { return "marked" }
+func (m markedUsage) IsUsageError() bool { return bool(m) }
+
+// An error that marks itself is a usage error wrapped or not, and one that
+// declines is not.
+func TestAnErrorCanMarkItselfAUsageError(t *testing.T) {
+	assert.True(t, IsUsage(markedUsage(true)))
+	assert.True(t, IsUsage(fmt.Errorf("deleting: %w", markedUsage(true))))
+	assert.False(t, IsUsage(markedUsage(false)))
+	assert.Equal(t, ExitUsage, ExitCode(context.Background(), markedUsage(true)))
+}
+
 // A flag error func the root already has is not replaced by Execute's: it is
 // handed the error first, and what it returns is still reported as a usage
 // error, in either mode.

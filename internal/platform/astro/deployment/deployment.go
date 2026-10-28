@@ -2075,20 +2075,11 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 	}
 	// find deployment by name
 	if deploymentID == "" && deploymentName != "" {
-		var stageDeployments []astrov1.Deployment
-		for i := range deployments {
-			if deployments[i].Name == deploymentName {
-				stageDeployments = append(stageDeployments, deployments[i])
-			}
+		id, err := oneNamed(deployments, deploymentName, ws, selectionFilter)
+		if err != nil {
+			return astrov1.Deployment{}, err
 		}
-		if len(stageDeployments) > 1 {
-			fmt.Printf("More than one Deployment with the name %s was found\n", deploymentName)
-		}
-		if len(stageDeployments) < 1 {
-			fmt.Printf("No Deployment with the name %s was found\n", deploymentName)
-			return astrov1.Deployment{}, errInvalidDeployment
-		}
-		currentDeployment, err := GetDeploymentByID("", stageDeployments[0].Id, astroV1Client)
+		currentDeployment, err := GetDeploymentByID("", id, astroV1Client)
 		if err != nil {
 			return astrov1.Deployment{}, err
 		}

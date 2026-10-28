@@ -374,7 +374,7 @@ func deploymentNamed(name, ws string, login *deployLogin) (*astrov1.Deployment, 
 	case 1:
 		return &found[0], nil
 	}
-	return nil, cliout.Usage(fmt.Errorf("%d Deployments are named %s in workspace %s (%s): pass the id of the one you mean with --deployment", len(found), name, ws, strings.Join(deployment.DeploymentIDs(found), ", ")))
+	return nil, &deployment.NameError{Name: name, Workspace: ws, Matches: found, Flag: "--deployment"}
 }
 
 // errBundleNoTarget is a bundle deploy or delete that names no Deployment and

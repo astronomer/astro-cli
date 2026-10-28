@@ -418,7 +418,7 @@ func TestDeployBundleDeploymentByName(t *testing.T) {
 		var got errorJSON
 		decodeOne(t, r.stdout, &got)
 		assert.Equal(t, string(cliout.KindUsage), got.Kind)
-		assert.Contains(t, got.Error, "2 Deployments are named analytics in workspace clxdbtworkspace0000000000 ("+dbtTestDeploymentID+", clxdbtother00000000000000)")
+		assert.Contains(t, got.Error, `2 Deployments are named "analytics" in workspace clxdbtworkspace0000000000: pass --deployment with one's id (`+dbtTestDeploymentID+", clxdbtother00000000000000)")
 	})
 }
 
