@@ -133,6 +133,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		OutDir:         opts.outDir,
 		CheckRuntime:   c.d.RuntimeCheck,
 		RuntimeCatalog: catalog,
+		Warn:           c.packageWarn(r),
 	}, c.callbacks(r))
 	if err != nil {
 		return err
@@ -161,6 +162,20 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		}
 		return nil
 	})
+}
+
+// packageWarn shows a warning found before the image build (pack.Request.Warn)
+// the way the CLI's other warnings are shown: a yellow "Warning:" on stderr in
+// text, and a warning event in json, rather than as one of the build's
+// timestamped progress lines, where it was lost among them.
+func (c *cli) packageWarn(r cliout.Renderer) func(string) {
+	return func(w string) {
+		if r.Format == cliout.FormatJSON {
+			emitWarning(r, event{Event: "warning", Text: w})
+			return
+		}
+		cliout.Warn(c.d.Stderr, w)
+	}
 }
 
 // packageRegistry builds the target registry with the production astro target:

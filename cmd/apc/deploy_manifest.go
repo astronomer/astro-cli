@@ -88,7 +88,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 	var warnings []string
 	warnf := func(msg string) {
 		warnings = append(warnings, msg)
-		fmt.Fprintln(progress, "Warning: "+msg)
+		cliout.Warn(progress, msg)
 	}
 	interactive := deployOutput == cliout.FormatText && stdinIsTerminal()
 	engine := utils.OnceEngine(func() (string, []string, error) { return containercfg.Engine(config.WorkingPath) })

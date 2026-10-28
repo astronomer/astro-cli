@@ -9,9 +9,44 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
+
+// A warning found before the image build reaches the user as the CLI's other
+// warnings do: a "Warning:" line on stderr in text, and a warning event in
+// json, never as one of the build's timestamped progress lines on stdout.
+func TestPackageWarnShowsWarningsAsWarnings(t *testing.T) {
+	const msg = "the image will carry 5,510 files that .gitignore ignores and .dockerignore does not, under .claude/. If they do not belong in the image, add them to .dockerignore"
+	d, _ := testDeps(t)
+	var stderr bytes.Buffer
+	d.Stderr = &stderr
+	c := &cli{d: d}
+
+	var out bytes.Buffer
+	c.packageWarn(cliout.Renderer{Format: cliout.FormatText, Out: &out})(msg)
+	if got, want := stderr.String(), "Warning: "+msg+"\n"; got != want {
+		t.Errorf("text: stderr = %q, want %q", got, want)
+	}
+	if out.Len() != 0 {
+		t.Errorf("text: a warning is not output, but stdout got %q", out.String())
+	}
+
+	stderr.Reset()
+	out.Reset()
+	c.packageWarn(cliout.Renderer{Format: cliout.FormatJSON, Out: &out})(msg)
+	var e map[string]any
+	if err := json.Unmarshal(out.Bytes(), &e); err != nil {
+		t.Fatalf("json: want one event, got %q: %v", out.String(), err)
+	}
+	if e["event"] != "warning" || e["text"] != msg {
+		t.Errorf("json: event = %v", e)
+	}
+	if stderr.Len() != 0 {
+		t.Errorf("json: the event carries it, but stderr got %q", stderr.String())
+	}
+}
 
 // writeManifest drops a minimal valid manifest in dir and points the deps'
 // WorkingDir at it, so `astro package` discovers a project.

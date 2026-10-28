@@ -151,7 +151,7 @@ func TestDeployImageNameOutsideAProject(t *testing.T) {
 				assert.NotContains(t, out, "inside the image")
 			}
 			assert.Contains(t, out, `"warnings":["`+warning+`"]`)
-			assert.Contains(t, out, "warning: "+warning)
+			assert.Contains(t, out, "Warning: "+warning)
 		})
 	}
 

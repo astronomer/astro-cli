@@ -79,6 +79,21 @@ type Request struct {
 	// nil, or a nil catalog, builds on the runtime's default Python, and
 	// refuses an Airflow 2 project with no [tool.astro] runtime.
 	RuntimeCatalog func(ctx context.Context) *runtimeversions.Catalog
+	// Warn receives the warnings found before the image target builds: the
+	// files the image would carry (shipcheck.Survey) and the build secrets a
+	// declared Dockerfile mounts that nothing supplies. They are warnings,
+	// not progress, so the command shows them as its other warnings are, and
+	// they reach it even when the build is then refused. nil streams them as
+	// progress lines, "warning: …".
+	Warn func(string)
+}
+
+// warn is Request.Warn, or a progress line through cb when it is nil.
+func (r Request) warn(cb localrt.Callbacks) func(string) {
+	if r.Warn != nil {
+		return r.Warn
+	}
+	return func(w string) { emit(cb, "warning: "+w) }
 }
 
 // Result is the packaged artifact — the value both text and json render. The

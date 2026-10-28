@@ -132,8 +132,9 @@ func checkSecrets(req Request, cb localrt.Callbacks) (imagebuild.MissingSecrets,
 	if dockerfile != "" {
 		missing.Hint = util.BuildSecretHint
 	}
+	warn := req.warn(cb)
 	for _, w := range missing.Warnings() {
-		emit(cb, "warning: "+w)
+		warn(w)
 	}
 	return missing, err
 }
@@ -148,8 +149,7 @@ func (t *AstroTarget) reachEngineAndCheck(ctx context.Context, req Request, cb l
 	if err != nil {
 		return imagebuild.Engine{}, err
 	}
-	warn := func(w string) { emit(cb, "warning: "+w) }
-	_, err = shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, imagebuild.IsPodman(ctx, engine.Cmd, engine.Bin, engine.Env), warn)
+	_, err = shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, imagebuild.IsPodman(ctx, engine.Cmd, engine.Bin, engine.Env), req.warn(cb))
 	return engine, err
 }
 

@@ -83,8 +83,8 @@ func Check(dir string, survey *imagebuild.ProjectSurvey) Report {
 func (r *Report) Warnings() []string {
 	var out []string
 	if len(r.Gitignored) > 0 {
-		out = append(out, fmt.Sprintf("the image will carry %d file(s) that .gitignore ignores and %s does not: %s. If they do not belong in the image, add them to %s",
-			len(r.Gitignored), r.IgnoreFile, cappedList(r.Gitignored), r.IgnoreFile))
+		out = append(out, fmt.Sprintf("the image will carry %s that .gitignore ignores and %s does not, under %s. If they do not belong in the image, add them to %s",
+			countFiles(len(r.Gitignored)), r.IgnoreFile, placesOf(r.Gitignored), r.IgnoreFile))
 	}
 	for _, u := range r.Unanswered {
 		out = append(out, fmt.Sprintf("could not ask git which files it tracks in %s, so files there that look like credentials were not checked", u))

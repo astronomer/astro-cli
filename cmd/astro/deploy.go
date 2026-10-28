@@ -278,12 +278,13 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	interactive := format == cliout.FormatText && stdinIsTerminal()
 
 	errOut := cmd.ErrOrStderr()
-	// Every warning the deploy gives goes to stderr as it is given, and into
-	// the result's warnings, so -o json carries the same ones.
+	// Every warning the deploy gives goes to stderr as it is given, led by a
+	// yellow "Warning:" as the CLI's other warnings are, and into the result's
+	// warnings, so -o json carries the same ones.
 	var warnings []string
 	warn := func(msg string) {
 		warnings = append(warnings, msg)
-		fmt.Fprintf(errOut, "warning: %s\n", msg)
+		cliout.Warn(errOut, msg)
 	}
 	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, manifestDeployment)
 	res, err := manifestdeploy.Run(manifestdeploy.Request{

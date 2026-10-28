@@ -83,3 +83,65 @@ func cappedList(paths []string) string {
 	}
 	return fmt.Sprintf("%s and %d more", strings.Join(paths[:listShown], ", "), len(paths)-listShown)
 }
+
+// placesShown caps how many places a summary names.
+const placesShown = 3
+
+// placesOf names where paths are rather than the paths: the top-level
+// directory each is under (".claude/"), or the file itself at the project
+// root, most files first, at most three and a count of the rest. A warning
+// about thousands of files is read for what to add to an ignore file, and that
+// is a directory, not a list the warning would be lost in.
+func placesOf(paths []string) string {
+	counts := map[string]int{}
+	for _, p := range paths {
+		place := p
+		if top, _, nested := strings.Cut(p, "/"); nested {
+			place = top + "/"
+		}
+		counts[place]++
+	}
+	places := make([]string, 0, len(counts))
+	for place := range counts {
+		places = append(places, place)
+	}
+	slices.SortFunc(places, func(a, b string) int {
+		if counts[a] != counts[b] {
+			return counts[b] - counts[a]
+		}
+		return strings.Compare(a, b)
+	})
+	if len(places) <= placesShown {
+		return joinAnd(places)
+	}
+	more := fmt.Sprintf("%d more places", len(places)-placesShown)
+	if len(places)-placesShown == 1 {
+		more = "1 more place"
+	}
+	return strings.Join(places[:placesShown], ", ") + " and " + more
+}
+
+// joinAnd joins items as a sentence does: "a", "a and b", "a, b and c".
+func joinAnd(items []string) string {
+	if len(items) < 2 {
+		return strings.Join(items, "")
+	}
+	return strings.Join(items[:len(items)-1], ", ") + " and " + items[len(items)-1]
+}
+
+// countFiles is n with its noun and thousands separators: "1 file",
+// "5,510 files".
+func countFiles(n int) string {
+	if n == 1 {
+		return "1 file"
+	}
+	digits := fmt.Sprint(n)
+	var b strings.Builder
+	for i, d := range digits {
+		if i > 0 && (len(digits)-i)%3 == 0 {
+			b.WriteByte(',')
+		}
+		b.WriteRune(d)
+	}
+	return b.String() + " files"
+}

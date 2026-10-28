@@ -388,14 +388,14 @@ func TestDeployManifestJSONCarriesTheTransportsWarnings(t *testing.T) {
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img, warn: w})
 	out, errOut, err := execDeployIO("", "prod", "--image-name", "img:1", "--output", "json")
 	require.NoError(t, err)
-	assert.Contains(t, errOut, "warning: "+w+"\n", "stderr still has it")
+	assert.Contains(t, errOut, "Warning: "+w+"\n", "stderr still has it")
 	m := decodeOneJSON(t, out)
 	assert.Equal(t, []any{w}, m["warnings"])
 
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img, warn: w})
 	out, errOut, err = execDeployIO("", "prod", "--image-name", "img:1")
 	require.NoError(t, err)
-	assert.Contains(t, errOut, "warning: "+w+"\n")
+	assert.Contains(t, errOut, "Warning: "+w+"\n")
 	assert.NotContains(t, out, w, "text keeps warnings off stdout")
 }
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,18 +44,22 @@ func TestAstroBuildRefusesGitignoredCredentials(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "target", "manifest.json"), []byte("{}"), 0o600))
 
 			builder := &fakeBuilder{}
-			var lines []string
+			var lines, warned []string
 			cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l.Text) }}
+			req.Warn = func(w string) { warned = append(warned, w) }
 			_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, cb)
 			require.ErrorContains(t, err, "certs/prod.pem look like credentials")
 			assert.Empty(t, builder.gotReq.Tag, "nothing was built")
+			assert.Contains(t, strings.Join(warned, "\n"), "2 files that .gitignore ignores and .dockerignore does not, under certs/ and target/",
+				"a refused build still hands over its warnings")
 
 			require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".dockerignore"), []byte("certs/\n**/.git\n"), 0o600))
-			lines = nil
+			lines, warned = nil, nil
 			_, err = newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, cb)
 			require.NoError(t, err)
-			require.Len(t, lines, 1)
-			assert.Contains(t, lines[0], "warning: the image will carry 1 file(s) that .gitignore ignores and .dockerignore does not: target/manifest.json")
+			assert.Empty(t, lines, "warnings are not progress lines")
+			require.Len(t, warned, 1)
+			assert.Equal(t, "the image will carry 1 file that .gitignore ignores and .dockerignore does not, under target/. If they do not belong in the image, add them to .dockerignore", warned[0])
 		})
 	}
 }

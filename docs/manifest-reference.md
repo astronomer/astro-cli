@@ -169,6 +169,7 @@ logs/
 .astro/worktrees/
 .astro/*.local.yaml
 .astro/*.local.yml
+.astro/*.local.lock
 .astro/otto/*.local.json
 .astro/otto/mcp.json
 plugins/fix_local_executor_pickle.py

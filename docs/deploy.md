@@ -129,7 +129,7 @@ An image a deploy or `astro package astro` builds is pushed to a registry, so be
 
 | what the image would carry | outcome |
 | --- | --- |
-| a file git ignores | warned about: ten named, the rest counted, with the ignore file as the fix. Generated output such as a dbt `target/` ships on purpose often enough that this is a warning |
+| a file git ignores | warned about with a count and the top-level places they are under, not the files ("5,510 files … under `.claude/` and `.astro/`", at most three places, then how many more), with the ignore file as the fix. Generated output such as a dbt `target/` ships on purpose often enough that this is a warning |
 | a file that looks like a credential and that git ignores, or that was never added | **refused**, naming it |
 | a file that looks like a credential and that git tracks (committed or staged) | goes ahead: the project's choice |
 | anything, where git cannot answer (not installed, an unsafe owner, another failure) | warned about, with git's reason and the files that look like credentials; the build goes ahead, so a CI deploy does not break on committed files |
