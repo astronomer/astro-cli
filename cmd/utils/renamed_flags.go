@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/astronomer/astro-cli/internal/telemetry"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	sharedtel "github.com/astronomer/astro-cli/pkg/telemetry"
 )
 
@@ -49,8 +50,11 @@ func noteRenamedFlags(cmd *cobra.Command) {
 		return
 	}
 	if !sharedtel.EnvIsTrue(RenameHintsDisabledEnv) {
+		// Led by "Warning:", as the CLI's other warnings are, in yellow when
+		// stderr is a terminal, so it is not read as the command's output.
+		label := ansi.ForStderr().Yellow("Warning:")
 		for _, p := range order {
-			fmt.Fprintln(cmd.ErrOrStderr(), renameHint(fs.Lookup(p), hinted[p]))
+			fmt.Fprintln(cmd.ErrOrStderr(), label, renameHint(fs.Lookup(p), hinted[p]))
 		}
 	}
 	RecordRenamedFlags(cmd, renamed, current)

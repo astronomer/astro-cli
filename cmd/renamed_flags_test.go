@@ -101,6 +101,9 @@ func TestRenamedFlagsSayWhatTheyAreCalledNow(t *testing.T) {
 			for _, h := range tc.hints {
 				assert.Contains(t, stderr, h)
 			}
+			// Each hint is its own line, led by a plain "Warning:" here, where
+			// stderr is no terminal and so gets no color.
+			assert.Equal(t, len(tc.hints), strings.Count(stderr, "Warning: Flag"), stderr)
 			assert.Equal(t, len(tc.hints), strings.Count(stderr, "will be removed in a future release"), stderr)
 		})
 	}
