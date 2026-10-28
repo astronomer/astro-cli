@@ -85,3 +85,6 @@ func (p Palette) Green(text string) string { return p.a.Sprintf(p.a.Green(text))
 
 // Cyan returns text colored cyan for the palette's stream.
 func (p Palette) Cyan(text string) string { return p.a.Sprintf(p.a.Cyan(text)) }
+
+// Yellow returns text colored yellow for the palette's stream.
+func (p Palette) Yellow(text string) string { return p.a.Sprintf(p.a.Yellow(text)) }
