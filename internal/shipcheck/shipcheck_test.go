@@ -78,7 +78,7 @@ func TestCheckFindsGitignoredFilesAndSecretsAmongThem(t *testing.T) {
 	assert.Contains(t, w[0], "add them to .dockerignore")
 	err := r.Err()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "keys/service-account.json look like credentials and are not tracked by git")
+	assert.Contains(t, err.Error(), "keys/service-account.json looks like credentials and is not tracked by git, and the image would carry it to a registry. Add it to .dockerignore, or remove it from the project")
 	assert.Contains(t, err.Error(), "to a registry")
 
 	// A .dockerignore line is the way out, and the warning goes with it.
@@ -336,7 +336,7 @@ func TestSurvey(t *testing.T) {
 
 	writeFiles(t, dir, map[string]string{".gitignore": "target/\nid_rsa\n", "id_rsa": "k"})
 	_, err = Survey(dir, "", false, func(string) {})
-	assert.ErrorContains(t, err, "id_rsa look like credentials")
+	assert.ErrorContains(t, err, "id_rsa looks like credentials")
 
 	// A declared Dockerfile's local files, .git among them, are warned about
 	// from the same survey.

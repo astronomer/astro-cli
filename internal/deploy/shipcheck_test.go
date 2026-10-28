@@ -40,7 +40,7 @@ func TestRun_RefusesGitignoredCredentials(t *testing.T) {
 
 	d := &fakeDeployer{}
 	_, err = Run(Request{ProjectDir: dir, LinkName: "prod", Manifest: linkedManifest()}, d)
-	require.ErrorContains(t, err, "prod.pem look like credentials")
+	require.ErrorContains(t, err, "prod.pem looks like credentials and is not tracked by git, and the image would carry it to a registry")
 	assert.Zero(t, d.imgDeploys)
 
 	_, err = Run(Request{ProjectDir: dir, LinkName: "prod", DagsOnly: true, Manifest: linkedManifest()}, d)

@@ -82,18 +82,28 @@ func Check(dir string, survey *imagebuild.ProjectSurvey) Report {
 // Warnings are what a build goes ahead despite.
 func (r *Report) Warnings() []string {
 	var out []string
-	if len(r.Gitignored) > 0 {
-		out = append(out, fmt.Sprintf("the image will carry %s that .gitignore ignores and %s does not, under %s. If they do not belong in the image, add them to %s",
-			countFiles(len(r.Gitignored)), r.IgnoreFile, placesOf(r.Gitignored), r.IgnoreFile))
+	if n := len(r.Gitignored); n > 0 {
+		out = append(out, fmt.Sprintf("the image will carry %s that .gitignore ignores and %s does not, under %s. If %s not belong in the image, add %s to %s",
+			countFiles(n), r.IgnoreFile, placesOf(r.Gitignored), agree(n, "it does", "they do"), agree(n, "it", "them"), r.IgnoreFile))
 	}
 	for _, u := range r.Unanswered {
 		out = append(out, fmt.Sprintf("could not ask git which files it tracks in %s, so files there that look like credentials were not checked", u))
 	}
-	if len(r.Unchecked) > 0 {
-		out = append(out, fmt.Sprintf("the image will carry these files that look like credentials, which git could not say are committed: %s. If they do not belong in the image, add them to %s",
-			cappedList(r.Unchecked), r.IgnoreFile))
+	if n := len(r.Unchecked); n > 0 {
+		out = append(out, fmt.Sprintf("the image will carry %s, which git could not say %s committed: %s. If %s not belong in the image, add %s to %s",
+			agree(n, "this file that looks like credentials", "these files that look like credentials"), agree(n, "is", "are"),
+			cappedList(r.Unchecked), agree(n, "it does", "they do"), agree(n, "it", "them"), r.IgnoreFile))
 	}
 	return out
+}
+
+// agree is one when n is 1 and many otherwise, for the words of a message
+// that name or refer back to the files it lists.
+func agree(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }
 
 // Err refuses a build that would put credentials in an image bound for a
@@ -102,19 +112,22 @@ func (r *Report) Warnings() []string {
 // whose config holds one. nil when there are none.
 func (r *Report) Err() error {
 	var why []string
-	if len(r.Secrets) > 0 {
-		why = append(why, fmt.Sprintf("%s look like credentials and are not tracked by git", cappedList(r.Secrets)))
+	if n := len(r.Secrets); n > 0 {
+		why = append(why, fmt.Sprintf("%s %s and %s not tracked by git",
+			cappedList(r.Secrets), agree(n, "looks like credentials", "look like credentials"), agree(n, "is", "are")))
 	}
-	if len(r.Outside) > 0 {
-		why = append(why, fmt.Sprintf("%s look like credentials and are reached through a link out of the project", cappedList(r.Outside)))
+	if n := len(r.Outside); n > 0 {
+		why = append(why, fmt.Sprintf("%s %s and %s reached through a link out of the project",
+			cappedList(r.Outside), agree(n, "looks like credentials", "look like credentials"), agree(n, "is", "are")))
 	}
 	if len(why) > 0 {
-		return fmt.Errorf("refusing to build: %s, and the image would carry them to a registry. Add them to %s, or remove them from the project, and try again",
-			strings.Join(why, "; "), r.IgnoreFile)
+		it := agree(len(r.Secrets)+len(r.Outside), "it", "them")
+		return fmt.Errorf("refusing to build: %s, and the image would carry %s to a registry. Add %s to %s, or remove %s from the project, and try again",
+			strings.Join(why, "; "), it, it, r.IgnoreFile, it)
 	}
-	if len(r.VCSSecrets) > 0 {
-		return fmt.Errorf("refusing to build: the git config under %s holds a credential (an extraheader, or a URL with a password or a known token in it), and the image would carry it to a registry. Add **/.git to %s and try again",
-			cappedList(r.VCSSecrets), r.IgnoreFile)
+	if n := len(r.VCSSecrets); n > 0 {
+		return fmt.Errorf("refusing to build: the git %s under %s %s (an extraheader, or a URL with a password or a known token in it), and the image would carry %s to a registry. Add **/.git to %s and try again",
+			agree(n, "config", "configs"), cappedList(r.VCSSecrets), agree(n, "holds a credential", "hold credentials"), agree(n, "it", "them"), r.IgnoreFile)
 	}
 	return nil
 }
@@ -126,11 +139,13 @@ func (r *Report) Err() error {
 // what it copies, so the build goes ahead, but the plugin would read any it
 // copies as current.
 func CosmosBoostWarning(survey *imagebuild.ProjectSurvey) string {
-	if len(survey.CosmosBoost) == 0 {
+	n := len(survey.CosmosBoost)
+	if n == 0 {
 		return ""
 	}
-	return fmt.Sprintf("the build context carries Cosmos Boost files an earlier Astro CLI wrote into the project: %s. The Cosmos Boost plugin would read them as current if the Dockerfile copies them into the image. This CLI no longer writes them; delete them",
-		cappedList(survey.CosmosBoost))
+	it := agree(n, "it", "them")
+	return fmt.Sprintf("the build context carries %s an earlier Astro CLI wrote into the project: %s. The Cosmos Boost plugin would read %s as current if the Dockerfile copies %s into the image. This CLI no longer writes %s; delete %s",
+		agree(n, "a Cosmos Boost file", "Cosmos Boost files"), cappedList(survey.CosmosBoost), it, it, it, it)
 }
 
 // Survey is the check a command runs before it builds an image to push. It
