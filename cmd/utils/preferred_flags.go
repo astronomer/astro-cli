@@ -50,16 +50,6 @@ func IsAlias(f *pflag.Flag) bool {
 	return aliasOf(f) != ""
 }
 
-// VisitGivenAliases calls fn for each alias given on fs, with the alias's
-// name and the name of the flag it stands for.
-func VisitGivenAliases(fs *pflag.FlagSet, fn func(alias, preferred string)) {
-	fs.Visit(func(f *pflag.Flag) {
-		if p := aliasOf(f); p != "" {
-			fn(f.Name, p)
-		}
-	})
-}
-
 func aliasOf(f *pflag.Flag) string {
 	if p := f.Annotations[aliasAnnotation]; len(p) == 1 {
 		return p[0]
@@ -154,7 +144,8 @@ func ApplyPreferredFlagsIn(tree *cobra.Command, resolve Resolver) {
 }
 
 // ApplyPreferredFlags hands the 1.x spellings given to cmd to the flags they
-// stand for (ApplyAliases), then runs resolve, nil for none.
+// stand for (ApplyAliases), then runs resolve, nil for none. Once both accept
+// the run, the 1.x spellings it gave are noted (noteRenamedFlags).
 func ApplyPreferredFlags(cmd *cobra.Command, args []string, resolve Resolver) error {
 	fs := cmd.Flags()
 	typed := map[string]bool{}
@@ -162,10 +153,13 @@ func ApplyPreferredFlags(cmd *cobra.Command, args []string, resolve Resolver) er
 	if err := ApplyAliases(fs); err != nil {
 		return err
 	}
-	if resolve == nil {
-		return nil
+	if resolve != nil {
+		if err := resolve(cmd, args, func(name string) bool { return typed[name] }); err != nil {
+			return err
+		}
 	}
-	return resolve(cmd, args, func(name string) bool { return typed[name] })
+	noteRenamedFlags(cmd)
+	return nil
 }
 
 // RefuseDisagreeingDeployment refuses a command line that names its

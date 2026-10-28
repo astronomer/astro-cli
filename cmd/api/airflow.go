@@ -170,7 +170,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 	cmd.AddCommand(NewAirflowListCmd(out, opts))
 	cmd.AddCommand(NewAirflowDescribeCmd(out, opts))
 	cmd.AddCommand(NewAirflowSpecCmd(out, opts))
-	utils.BeforeArgs(cmd, func(c *cobra.Command, _ []string) error { return utils.ApplyAliases(c.Flags()) })
+	utils.ApplyPreferredFlagsIn(cmd, nil)
 
 	return cmd
 }
