@@ -178,6 +178,12 @@ type Deps struct {
 	// Airflow 2 pin, whose base has no fallback, and as long for any other.
 	ImageCatalog func(ctx context.Context, airflowPin string) *runtimeversions.Catalog
 
+	// Lock runs `uv lock` in a project, which init does after it changes
+	// [tool.uv] so uv.lock follows. Production discovers uv as a standalone
+	// start does (uvLock); an error wrapping uv.ErrNotFound means no uv. A
+	// seam so a test runs no uv; nil locks nothing.
+	Lock func(ctx context.Context, dir string) error
+
 	// LaunchOtto starts an interactive Otto session with prompt as its first
 	// message and waits for it to end, as `astro otto "<prompt>"` does. The
 	// root wires it, because Otto reads config/, which this tree never
@@ -244,6 +250,7 @@ func NewDeps() Deps {
 		RuntimeCatalog:     runtimecatalog.Catalog,
 		RuntimeConstraints: runtimecatalog.RuntimeConstraints,
 		RuntimeFreeze:      runtimecatalog.RuntimeFreeze,
+		Lock:               uvLock,
 		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(airflowPin)(ctx)
 		},

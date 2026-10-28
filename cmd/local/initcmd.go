@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"slices"
 
@@ -112,18 +111,14 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// After the manifest is written rather than inside scaffold.Plan, which
 	// stays offline. A lookup that fails is not reported here, since init has
 	// no to-do in it: `astro local start` makes the same lookup and says what
-	// it found.
+	// it found. uv.lock follows what it wrote; nothing written, nothing locked.
 	if build := c.writeAstroBuild(ctx, res.Dir); build.changed {
 		// What it wrote is an update like the rest, so an existing project is
 		// not reported as up to date.
 		if !slices.Contains(res.Updated, manifest.Marker) {
 			res.Updated = append(res.Updated, manifest.Marker)
 		}
-		// A uv.lock already there was resolved without it. On stderr as text
-		// in either format: init's stdout is its one result.
-		if _, err := os.Stat(filepath.Join(res.Dir, "uv.lock")); err == nil {
-			fmt.Fprintf(c.d.Stderr, "uv.lock: run uv lock so it follows %s\n", manifest.Marker)
-		}
+		c.lockAfterInit(ctx, res.Dir)
 	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))

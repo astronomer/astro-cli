@@ -107,7 +107,8 @@ func TestStartLeavesTheRuntimesLinesWhenTheyCannotBeRead(t *testing.T) {
 }
 
 // init in an existing project that writes the runtime's lines reports
-// pyproject.toml as updated, not up to date, and says the lock is behind.
+// pyproject.toml as updated, not up to date, and relocks once so uv.lock
+// follows.
 func TestInitInAnExistingProjectReportsTheRuntimeLines(t *testing.T) {
 	t.Setenv("UV_EXCLUDE_NEWER", "")
 	d, stdout := testDeps(t)
@@ -123,6 +124,11 @@ func TestInitInAnExistingProjectReportsTheRuntimeLines(t *testing.T) {
 	d.AstroBuild = func(context.Context, string, string) (runtimeversions.AstroBuild, error) { return build332, nil }
 	d.RuntimeCatalog = func(context.Context) *runtimeversions.Catalog { return constraintsCatalog(t) }
 	d.RuntimeConstraints = func(context.Context, string, string) ([]string, error) { return runtimeFile, nil }
+	locks := 0
+	d.Lock = func(_ context.Context, dir string) error {
+		locks++
+		return os.WriteFile(filepath.Join(dir, "uv.lock"), []byte(lockOf("sqlalchemy", "2.0.50")), 0o600)
+	}
 
 	if err := execute(t, d, "init"); err != nil {
 		t.Fatalf("init: %v", err)
@@ -130,8 +136,11 @@ func TestInitInAnExistingProjectReportsTheRuntimeLines(t *testing.T) {
 	if strings.Contains(stdout.String(), "is up to date") {
 		t.Errorf("init called a project it changed up to date:\n%s", stdout)
 	}
-	if !strings.Contains(stderr.String(), "uv.lock: run uv lock so it follows pyproject.toml") {
-		t.Errorf("init did not say the lock is behind:\n%s", stderr)
+	if locks != 1 || !strings.Contains(stderr.String(), "uv.lock: updated") {
+		t.Errorf("init did not relock the project once (%d locks):\n%s", locks, stderr)
+	}
+	if strings.Contains(stderr.String(), "run uv lock") {
+		t.Errorf("init asked for a lock it ran:\n%s", stderr)
 	}
 }
 
