@@ -2081,8 +2081,16 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 				stageDeployments = append(stageDeployments, deployments[i])
 			}
 		}
+		// A name is not unique. Acting on the first of several would update
+		// or delete a Deployment the run never singled out, so it is refused,
+		// naming the ids to choose from, as clone and deploy bundle refuse it.
 		if len(stageDeployments) > 1 {
-			fmt.Printf("More than one Deployment with the name %s was found\n", deploymentName)
+			where := "the current workspace"
+			if ws != "" {
+				where = "workspace " + ws
+			}
+			return astrov1.Deployment{}, fmt.Errorf("%d Deployments are named %q in %s: pass --deployment with one's id (%s)",
+				len(stageDeployments), deploymentName, where, strings.Join(DeploymentIDs(stageDeployments), ", "))
 		}
 		if len(stageDeployments) < 1 {
 			fmt.Printf("No Deployment with the name %s was found\n", deploymentName)

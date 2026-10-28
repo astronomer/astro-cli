@@ -206,7 +206,9 @@ a command reads its workspace and Deployment in this order:
    (the rule in [Deployment links](#deployment-links)). A Deployment id that a
    link holds is read the same way. A link's name wins over a Deployment of
    the same name, and on a command that takes a Deployment name, a value that
-   names no link and is not a Deployment id is a Deployment name. On a
+   names no link and is not a Deployment id is a Deployment name. A name that
+   several Deployments in the workspace share is refused, and the error lists
+   their ids, so the run names one by id. On a
    command that takes only an id (the `team`, `user`, `token` and `bundle`
    groups, `astro env`), or as an argument, a value that is neither a link nor
    a Deployment id is refused, and the error lists the project's Astro links.

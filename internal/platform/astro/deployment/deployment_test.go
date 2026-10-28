@@ -502,45 +502,21 @@ func (s *Suite) TestGetDeployment() {
 		mockV1Client.AssertExpectations(s.T())
 	})
 
+	// A name is not unique: several of it are refused, naming their ids,
+	// rather than acting on the first, and nothing is fetched.
 	s.Run("two deployments with the same name", func() {
-		mockCoreDeploymentResponse = []astrov1.Deployment{
-			{
-				Id:            "test-id-1",
-				Name:          "test",
-				Status:        "HEALTHY",
-				Type:          &standardType,
-				Region:        &testRegion,
-				CloudProvider: &testProvider,
-				WorkspaceName: &workspace1.Name,
-			},
-			{
-				Id:            "test-id-2",
-				Name:          "test",
-				Status:        "HEALTHY",
-				Type:          &hybridType,
-				ClusterName:   &testCluster,
-				WorkspaceName: &workspace1.Name,
-			},
+		sameName := astrov1.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200: &astrov1.DeploymentsPaginated{Deployments: []astrov1.Deployment{
+				{Id: "test-id-1", Name: "test", Status: "HEALTHY", Type: &standardType, WorkspaceName: &workspace1.Name},
+				{Id: "test-id-2", Name: "test", Status: "HEALTHY", Type: &hybridType, WorkspaceName: &workspace1.Name},
+				{Id: "test-id-3", Name: "other", Status: "HEALTHY", Type: &standardType, WorkspaceName: &workspace1.Name},
+			}},
 		}
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&sameName, nil).Once()
 
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
-
-		// Mock os.Stdin
-		input := []byte("1")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(input)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
-		deployment, err := GetDeployment(ws, "", deploymentName, false, nil, mockV1Client)
-		s.NoError(err)
-		s.Equal(deploymentName, deployment.Name)
+		_, err := GetDeployment(ws, "", deploymentName, false, nil, mockV1Client)
+		s.EqualError(err, `2 Deployments are named "test" in workspace `+ws+`: pass --deployment with one's id (test-id-1, test-id-2)`)
 
 		mockV1Client.AssertExpectations(s.T())
 	})
