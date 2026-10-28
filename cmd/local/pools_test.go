@@ -35,10 +35,12 @@ etl = {slots = 4, description = 'ETL loads'}
 ml = {slots = 1, include_deferred = true}
 `
 
-func startWithPools(t *testing.T, stub *airflowStub) (stdout, stderr string, err error) {
+// startWithPools starts a project whose manifest declares pools, and returns
+// what the start wrote to stderr, where its warnings go.
+func startWithPools(t *testing.T, stub *airflowStub) (stderr string, err error) {
 	t.Helper()
 	dir := instanceProject(t, poolsManifest)
-	d, out, errOut := queryDeps(t)
+	d, _, errOut := queryDeps(t)
 	d.WorkingDir = func() (string, error) { return dir, nil }
 	d.Runtime = poolsRuntime{af: startedAirflow{status: localrt.Status{
 		ProjectPath:  dir,
@@ -47,14 +49,14 @@ func startWithPools(t *testing.T, stub *airflowStub) (stdout, stderr string, err
 		AirflowMajor: "3",
 	}}}
 	err = execute(t, d, "local", "start")
-	return out.String(), errOut.String(), err
+	return errOut.String(), err
 }
 
 func TestStartCreatesTheManifestPools(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodPost, "/api/v2/pools", `{}`)
 
-	_, warned, err := startWithPools(t, stub)
+	warned, err := startWithPools(t, stub)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +90,7 @@ func TestStartWarnsForAPoolItCouldNotApply(t *testing.T) {
 	stub.routeStatus(http.MethodGet, "/api/v2/pools/etl", http.StatusForbidden, `{"detail":"Forbidden"}`)
 	stub.route(http.MethodPost, "/api/v2/pools", `{}`)
 
-	_, warned, err := startWithPools(t, stub)
+	warned, err := startWithPools(t, stub)
 	if err != nil {
 		t.Fatalf("a pool that failed failed the start: %v", err)
 	}

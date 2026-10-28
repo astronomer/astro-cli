@@ -280,4 +280,3 @@ func renderNextSteps(w io.Writer, steps []string) error {
 	}
 	return nil
 }
-
