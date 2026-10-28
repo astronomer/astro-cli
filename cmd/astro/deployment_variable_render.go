@@ -25,8 +25,8 @@ var deploymentVariableOutput cliout.Format
 // run, and returns what puts it back.
 //
 // The platform code these commands call is inherited shell code that still
-// prints notes to bare stdout: GetDeployment's "Only one Deployment was found"
-// and "No Deployment with the name", and Update's Deployment table
+// prints notes to bare stdout: GetDeployment's "Only one Deployment was found",
+// and Update's Deployment table
 // when the variable list it is handed is empty. In text mode that is the
 // output people have always seen, so it stays. Under json, stdout carries one
 // object and nothing else, and a note is not the result, so it goes to stderr,

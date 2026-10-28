@@ -2075,28 +2075,11 @@ func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bo
 	}
 	// find deployment by name
 	if deploymentID == "" && deploymentName != "" {
-		var stageDeployments []astrov1.Deployment
-		for i := range deployments {
-			if deployments[i].Name == deploymentName {
-				stageDeployments = append(stageDeployments, deployments[i])
-			}
+		id, err := oneNamed(deployments, deploymentName, ws, selectionFilter)
+		if err != nil {
+			return astrov1.Deployment{}, err
 		}
-		// A name is not unique. Acting on the first of several would update
-		// or delete a Deployment the run never singled out, so it is refused,
-		// naming the ids to choose from, as clone and deploy bundle refuse it.
-		if len(stageDeployments) > 1 {
-			where := "the current workspace"
-			if ws != "" {
-				where = "workspace " + ws
-			}
-			return astrov1.Deployment{}, fmt.Errorf("%d Deployments are named %q in %s: pass --deployment with one's id (%s)",
-				len(stageDeployments), deploymentName, where, strings.Join(DeploymentIDs(stageDeployments), ", "))
-		}
-		if len(stageDeployments) < 1 {
-			fmt.Printf("No Deployment with the name %s was found\n", deploymentName)
-			return astrov1.Deployment{}, errInvalidDeployment
-		}
-		currentDeployment, err := GetDeploymentByID("", stageDeployments[0].Id, astroV1Client)
+		currentDeployment, err := GetDeploymentByID("", id, astroV1Client)
 		if err != nil {
 			return astrov1.Deployment{}, err
 		}
