@@ -278,13 +278,17 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	interactive := format == cliout.FormatText && stdinIsTerminal()
 
 	errOut := cmd.ErrOrStderr()
-	// Every warning the deploy gives goes to stderr as it is given, led by a
-	// yellow "Warning:" as the CLI's other warnings are, and into the result's
-	// warnings, so -o json carries the same ones.
+	// Every warning the deploy gives goes to stderr, led by a yellow "Warning:"
+	// as the CLI's other warnings are, and into the result's warnings, so -o
+	// json carries the same ones. In text, the warnings and notes are held and
+	// printed after the build's output, just above the result, where a long
+	// build cannot scroll them away; a deploy that fails prints them before its
+	// error. Under json they print as they are given.
 	var warnings []string
+	held := cliout.NewDeferred(errOut, format == cliout.FormatText)
 	warn := func(msg string) {
 		warnings = append(warnings, msg)
-		cliout.Warn(errOut, msg)
+		held.Warn(msg)
 	}
 	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, manifestDeployment)
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
@@ -317,7 +321,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		},
 		Warn: warn,
 		// A plain line on stderr, as the deploy's other notes are.
-		Note: func(msg string) { cliout.Note(errOut, msg) },
+		Note: held.Note,
 		// Resolved once, when a deploy that builds first needs it, and
 		// shared by the checks and the transport.
 		Engine: onceEngine(astrodeploy.ResolveContainerEngine),
@@ -366,15 +370,17 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		},
 	}, newManifestDeployer(&login, cmd.InOrStdin(), errOut))
 	if err != nil {
+		held.Flush()
 		return manifestDeployErr(cmd, err)
 	}
 
 	if res.Git.Uncommitted {
-		cliout.Note(errOut, "the project has uncommitted changes, so this deploy records no git commit")
+		held.Note("the project has uncommitted changes, so this deploy records no git commit")
 	}
 	if !inProject {
 		warn(imageAloneWarning(&res, imageName))
 	}
+	held.Flush()
 	return renderManifestDeploy(out, format, &res, warnings)
 }
 

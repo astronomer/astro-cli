@@ -43,7 +43,7 @@ Everything that reaches the project is injected, declared or not:
 
 A name more than one source holds goes to the highest in the chain. To keep a global out of a project, narrow its links; a declaration does not filter.
 
-**Declarations are requirements.** A declared name no source supplies refuses `astro local start` (`--allow-missing` starts without it). Types, enums and `conn_type` are validated and reported as warnings. `astro local env list` shows each undeclared value the project gets, and `astro local check` and `astro package` name the local ones, since they will not follow the project to a Deployment or a teammate's clone.
+**Declarations are requirements.** A declared name no source supplies refuses `astro local start` (`--allow-missing` starts without it). Types, enums and `conn_type` are validated and reported as warnings. `astro local env list` shows each undeclared value the project gets, and `astro local check` and `astro package` warn about the local ones, since they will not follow the project to a Deployment or a teammate's clone: a line per value with its source and the two commands `astro local env list` offers for it, one that declares it if the project needs it and one that deletes it if not.
 
 **Vault and workspace values stay off disk.** In Docker mode they are passed to the containers through the environment of the compose process, never written into the compose file the CLI generates and never put on a command line. Plain `.env` values are written into that file, as docker-compose would read them anyway. As with any container, `docker inspect` can show a running container's environment.
 

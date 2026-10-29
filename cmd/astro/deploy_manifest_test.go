@@ -89,9 +89,11 @@ type fakeCmdDeployer struct {
 	refuseBeforeBuild bool
 	// warn is a warning the transport gives through ImageDeploy.Warn, as
 	// the real one does for a check the deploy goes ahead despite.
-	warn     string
-	dagInput *manifestdeploy.DagDeploy
-	imgInput *manifestdeploy.ImageDeploy
+	warn string
+	// warnBeforeBuild is a warning given before the build starts.
+	warnBeforeBuild string
+	dagInput        *manifestdeploy.DagDeploy
+	imgInput        *manifestdeploy.ImageDeploy
 }
 
 func (f *fakeCmdDeployer) ConfirmTarget([]manifestdeploy.Choice, string) (string, error) {
@@ -116,6 +118,9 @@ func (f *fakeCmdDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 	if f.refuseBeforeBuild {
 		return manifestdeploy.ImageResult{}, f.imgErr
 	}
+	if f.warnBeforeBuild != "" && in.Warn != nil {
+		in.Warn(f.warnBeforeBuild)
+	}
 	if in.ImageName == "" && in.OnBuild != nil {
 		in.OnBuild()
 	}
@@ -123,6 +128,62 @@ func (f *fakeCmdDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		in.Warn(f.warn)
 	}
 	return f.img, f.imgErr
+}
+
+// execDeployOneStream runs astro deploy with stdout and stderr in one buffer,
+// so the order the two interleave in is what a terminal shows.
+func execDeployOneStream(args ...string) (string, error) {
+	defer func() { workspaceID = "" }() // see execDeployCmd
+	testUtil.SetupOSArgsForGinkgo()
+	root := deployUnderRoot()
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetIn(strings.NewReader(""))
+	err := cliout.Execute(context.Background(), root, append([]string{"deploy"}, args...), &buf, nil)
+	return buf.String(), err
+}
+
+// In text, what a deploy finds as it goes prints after the build's output,
+// just above the result; a deploy that fails prints it before its error.
+func TestDeployManifestPrintsWarningsAfterTheBuild(t *testing.T) {
+	const before, after = "found before the build", "found after it"
+	setupManifestDeploy(t, &fakeCmdDeployer{
+		img:             manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "tag-1", DagTarballVersion: "3-1"},
+		warnBeforeBuild: before, warn: after,
+	})
+	out, err := execDeployOneStream("prod")
+	require.NoError(t, err)
+	assertInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after, "Deployed image (tag tag-1)")
+
+	boom := errors.New("boom")
+	setupManifestDeploy(t, &fakeCmdDeployer{imgErr: boom, warnBeforeBuild: before, warn: after})
+	out, err = execDeployOneStream("prod")
+	require.ErrorIs(t, err, boom)
+	assertInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after, "boom")
+
+	// Under json a warning prints as it is given, before the build here.
+	setupManifestDeploy(t, &fakeCmdDeployer{
+		img:             manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "tag-1", DagTarballVersion: "3-1"},
+		warnBeforeBuild: before,
+	})
+	_, errOut, err := execDeployIO("", "prod", "--output", "json")
+	require.NoError(t, err)
+	assert.Contains(t, errOut, "Warning: "+before+"\n")
+}
+
+// assertInOrder fails unless each of wants appears in got, each after the one
+// before it.
+func assertInOrder(t *testing.T, got string, wants ...string) {
+	t.Helper()
+	at := 0
+	for _, w := range wants {
+		i := strings.Index(got[at:], w)
+		if i < 0 {
+			t.Fatalf("want %q after offset %d in:\n%s", w, at, got)
+		}
+		at += i + len(w)
+	}
 }
 
 // setupManifestDeploy points config.WorkingPath at a fresh project (one default

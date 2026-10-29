@@ -123,14 +123,25 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		pin := m.Airflow().Pin
 		catalog = func(ctx context.Context) *runtimeversions.Catalog { return c.d.ImageCatalog(ctx, pin) }
 	}
-	// A warning the target finds as it goes is shown as it is found, as every
-	// cmd/local warning is (emitWarning), so a build it then refuses still
-	// shows it. shown keeps the ones already out, for the result's warnings
-	// below.
+	// A warning or note the target finds as it goes is held, in text, and
+	// printed after the build's progress, just above the result, where a long
+	// build's output cannot scroll it away; a build that fails prints them
+	// before its error. Under json each warning is an event, emitted as it is
+	// found, and a note streams as a progress line. shown keeps the warnings
+	// already out, for the result's warnings below.
+	held := packageHeld(r)
 	shown := map[string]bool{}
 	warn := func(w string) {
 		shown[w] = true
+		if held != nil {
+			held.Warn(w)
+			return
+		}
 		emitWarning(r, event{Event: "warning", Text: w})
+	}
+	var note func(string)
+	if held != nil {
+		note = held.Note
 	}
 	res, err := target.Build(ctx, pack.Request{
 		ProjectDir:     dir,
@@ -143,31 +154,34 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		CheckRuntime:   c.d.RuntimeCheck,
 		RuntimeCatalog: catalog,
 		Warn:           warn,
-		Note:           packageNote(r),
+		Note:           note,
 	}, c.callbacks(r))
 	if err != nil {
+		if held != nil {
+			held.Flush()
+		}
 		return err
 	}
 	// What the project gets from this machine without declaring it runs locally
 	// and is carried by no artifact, so every target says so beside its own
-	// warnings. Best effort: a listing that cannot be read costs only the note.
-	var undeclared []string
-	if names, uerr := plan.UndeclaredLocal(dir, m); uerr == nil {
-		undeclared = names
+	// warnings. Best effort: a listing that cannot be read costs only the
+	// warning. A linked workspace's values are not named: no artifact carries
+	// them either, and a Deployment gets its own workspace's.
+	if undeclared, uerr := plan.UndeclaredLocal(dir, m); uerr == nil {
+		if w := plan.UndeclaredWarning(undeclared); w != "" {
+			res.Warnings = append(res.Warnings, w)
+		}
 	}
-	note := plan.UndeclaredNote(undeclared, m.Astro.Workspace)
-	if note != "" {
-		res.Warnings = append(res.Warnings, note)
-	}
-	// The result carries every warning in json. In text, the ones not shown as
-	// the build ran (the note above, a bucket target's own) are shown now, the
-	// same way, rather than listed under the result.
-	if r.Format == cliout.FormatText {
+	// The result carries every warning in json. In text, the ones not held as
+	// the build ran (the one above, a bucket target's own) join them, and all
+	// print now, above the result rather than listed in it.
+	if held != nil {
 		for _, w := range res.Warnings {
 			if !shown[w] {
-				emitWarning(r, event{Event: "warning", Text: w})
+				held.Warn(w)
 			}
 		}
+		held.Flush()
 	}
 	// An event rather than a result: an image build streamed its progress
 	// before it, and this ends that stream, so it is one line too.
@@ -178,8 +192,12 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 
 // packageRegistry builds the target registry with the production astro target:
 // the shared image builder and a container command runner, both backed by
-// os/exec, driving the engine container.binary picks for the project.
+// os/exec, driving the engine container.binary picks for the project. A test's
+// Deps.PackageAstro stands in for it.
 func (c *cli) packageRegistry() *pack.Registry {
+	if c.d.PackageAstro != nil {
+		return pack.NewRegistry(c.d.PackageAstro)
+	}
 	cmd := imagebuild.NewExecCommander()
 	astro := pack.NewAstroTarget(imagebuild.New(cmd, time.Now), cmd, containercfg.Engine)
 	return pack.NewRegistry(astro)
@@ -282,10 +300,10 @@ func renderNextSteps(w io.Writer, steps []string) error {
 	return nil
 }
 
-// packageNote shows a note the target finds as it goes: in text, a cyan Note:
-// line on stderr, beside the warnings; under json, nil, so it streams as a
-// progress line, as it always has.
-func packageNote(r cliout.Renderer) func(string) {
+// packageHeld holds the warnings and notes a text-mode package finds, for
+// stderr beside the build's progress (or stdout when there is no stderr). It
+// is nil under json, where they stream as they are found.
+func packageHeld(r cliout.Renderer) *cliout.Deferred {
 	if r.Format != cliout.FormatText {
 		return nil
 	}
@@ -293,5 +311,5 @@ func packageNote(r cliout.Renderer) func(string) {
 	if w == nil {
 		w = r.Out
 	}
-	return func(n string) { cliout.Note(w, n) }
+	return cliout.NewDeferred(w, true)
 }

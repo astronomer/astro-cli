@@ -275,6 +275,8 @@ The flags only a 1.x project's deploy read are gone: `--save` (`-s`), `--pytest`
 
 **Git metadata.** With the `deploy.git_metadata` setting on (the default), the deploy records the HEAD commit on Astro, and the commit message becomes the description when `--description` is not given. `commit_url` is set only for a GitHub remote. A project with uncommitted changes to tracked files records no commit and prints `note: the project has uncommitted changes, so this deploy records no git commit` on stderr. `--image-name` records none.
 
+**Warnings come last.** In text, `astro deploy` and `astro package` hold the warnings and notes they find as they go and print them on stderr after the build's output, just above the result, where a long build cannot scroll them away. A build or deploy that fails prints them before its error. Under `--output json` they print as they are found, and the result carries them in `warnings`.
+
 **`astro deploy --output json`** prints one object when the deploy finishes. It streams no progress events, so the object is a result like any other (see [Output](architecture.md#output)): indented and colored on a terminal, one line when piped. Its shape is pinned by `cmd/astro/testdata/schema/deploy.json`.
 
 ```json

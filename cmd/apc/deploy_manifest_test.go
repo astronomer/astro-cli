@@ -1,6 +1,8 @@
 package apc
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -260,6 +262,38 @@ func TestDeployManifestWarnings(t *testing.T) {
 	decodeOne(t, run.stdout, &got)
 	assert.Equal(t, []string{"this deploy upgrades Deployment dep-prod from Airflow 2 to Airflow 3"}, got.Warnings)
 	assert.Contains(t, run.stderr, "Warning: this deploy upgrades Deployment dep-prod from Airflow 2 to Airflow 3")
+}
+
+// In text, a warning the deploy gives prints on stderr after the build's
+// output, just above the result; a deploy that fails prints it before its
+// error.
+func TestDeployManifestPrintsWarningsAfterTheBuild(t *testing.T) {
+	const w = "found before the build"
+	for _, fail := range []bool{false, true} {
+		linkedProject(t)
+		prev := DeployManifestImage
+		t.Cleanup(func() { DeployManifestImage = prev })
+		DeployManifestImage = func(_ houston.ClientInterface, in *deploy.ManifestImage) (deploy.ManifestImageResult, error) {
+			in.Warn(w)
+			// Something the build writes on stderr after the warning is
+			// given, which a held warning follows.
+			fmt.Fprintln(os.Stderr, "build step 1/9")
+			if fail {
+				return deploy.ManifestImageResult{}, errors.New("boom")
+			}
+			return builtAndPushed, nil
+		}
+		run := runAPC(t, newAPCClient(), "", "deploy", "prod")
+		if fail {
+			require.Error(t, run.err)
+		} else {
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		}
+		build := strings.Index(run.stderr, "build step 1/9")
+		warning := strings.Index(run.stderr, "Warning: "+w)
+		require.GreaterOrEqual(t, build, 0, "stderr:\n%s", run.stderr)
+		assert.Greater(t, warning, build, "the warning must follow the build's output:\n%s", run.stderr)
+	}
 }
 
 // --force and --prompt answered 1.x's questions, which a project's deploy

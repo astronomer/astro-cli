@@ -85,12 +85,17 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 	// question goes to stderr either way.
 	progress := cliout.NotesTo(cmd, deployOutput, out)
 	errOut := cmd.ErrOrStderr()
-	// Every warning goes to stderr as it is given, led by a yellow "Warning:",
-	// as Astro's deploy does, and into the result's warnings for -o json.
+	// Every warning goes to stderr, led by a yellow "Warning:", as Astro's
+	// deploy does, and into the result's warnings for -o json. In text the
+	// warnings and notes are held, as Astro's deploy holds them, and printed
+	// on stderr after the build's output, just above the result; a deploy that
+	// fails prints them before its error. Under json they print as given, on
+	// stderr, where the progress goes too.
 	var warnings []string
+	held := cliout.NewDeferred(errOut, deployOutput == cliout.FormatText)
 	warnf := func(msg string) {
 		warnings = append(warnings, msg)
-		cliout.Warn(errOut, msg)
+		held.Warn(msg)
 	}
 	interactive := deployOutput == cliout.FormatText && stdinIsTerminal()
 	engine := utils.OnceEngine(func() (string, []string, error) { return containercfg.Engine(config.WorkingPath) })
@@ -120,9 +125,8 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		CheckRuntime: func(runtime, airflowPin string) ([]runtimeversions.Finding, error) {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
-		Warn: warnf,
-		// A plain line with the deploy's progress.
-		Note:   func(msg string) { cliout.Note(progress, msg) },
+		Warn:   warnf,
+		Note:   held.Note,
 		Engine: engine,
 		Link: func(l scaffold.Link) error {
 			if err := scaffold.SaveLink(config.WorkingPath, nil, l); err != nil {
@@ -146,6 +150,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 			fmt.Fprintln(progress, "Building your project image, this can take a few minutes...")
 		},
 	}, &apcManifestDeployer{client: houstonClient, in: cmd.InOrStdin(), errOut: errOut, progress: progress, warn: warnf})
+	held.Flush()
 	if err != nil {
 		if errors.Is(err, manifestdeploy.ErrAborted) {
 			// Asked, and declined: the exit code says so.

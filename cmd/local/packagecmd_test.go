@@ -2,6 +2,7 @@ package local
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/pack"
+	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -165,12 +167,123 @@ func TestPackageWarnsAboutUndeclaredLocalValues(t *testing.T) {
 	if err := execute(t, d, "package", "mwaa", "--out-dir", outDir); err != nil {
 		t.Fatalf("package mwaa: %v", err)
 	}
-	line, ok := lineContaining(stderrOf(d), "AIRFLOW_VAR_REGION")
-	if !ok || !strings.HasPrefix(line, "Warning: ") || !strings.Contains(line, "will not follow it to a Deployment") {
-		t.Errorf("want a Warning on stderr naming AIRFLOW_VAR_REGION:\n%s", stderrOf(d))
+	want := "Warning: 1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it:\n" +
+		"  region  project  if needed: astro local env airflow-variable declare region  " +
+		"if not: astro local env airflow-variable delete region --project\n"
+	if !strings.Contains(stderrOf(d), want) {
+		t.Errorf("want the warning on stderr:\n%s\ngot:\n%s", want, stderrOf(d))
 	}
-	if strings.Contains(out.String(), "AIRFLOW_VAR_REGION") {
+	if strings.Contains(out.String(), "region") {
 		t.Errorf("a warning is not the command's output, but stdout has it:\n%s", out.String())
+	}
+}
+
+// A package linked to a workspace says nothing about it: an image carries
+// none of the workspace's values, and a Deployment gets its own workspace's.
+func TestPackageSaysNothingAboutALinkedWorkspace(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("ASTRO_HOME", "")
+	d, out := testDeps(t)
+	dir := t.TempDir()
+	writeManifest(t, &d, dir)
+	m := "[project]\nname = 'demo'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nworkspace = 'cmws'\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(m), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := execute(t, d, "package", "mwaa", "--out-dir", filepath.Join(t.TempDir(), "mwaa")); err != nil {
+		t.Fatalf("package mwaa: %v", err)
+	}
+	if all := out.String() + stderrOf(d); strings.Contains(all, "cmws") {
+		t.Errorf("package named the workspace:\n%s", all)
+	}
+}
+
+// fakePackageTarget stands in for the astro target: it finds a warning and a
+// note, streams a line of build output, finds another warning, then returns
+// res or err.
+type fakePackageTarget struct {
+	res pack.Result
+	err error
+}
+
+func (fakePackageTarget) Name() string { return pack.TargetAstro }
+
+func (f fakePackageTarget) Build(_ context.Context, req pack.Request, cb localrt.Callbacks) (pack.Result, error) {
+	req.Warn("found before the build")
+	if req.Note != nil {
+		req.Note("a note before the build")
+	}
+	cb.OnLine(localrt.LogLine{Component: "build", Text: "step 1/9"})
+	req.Warn("found after the build")
+	return f.res, f.err
+}
+
+// packageWithFake runs `astro package` over fakePackageTarget, with stdout and
+// stderr in one buffer so the order the two interleave in is what a terminal
+// shows.
+func packageWithFake(t *testing.T, target fakePackageTarget, args ...string) (string, error) {
+	t.Helper()
+	d, out := testDeps(t)
+	d.Stderr = out
+	writeManifest(t, &d, t.TempDir())
+	d.PackageAstro = target
+	err := execute(t, d, append([]string{"package", "astro"}, args...)...)
+	return out.String(), err
+}
+
+// In text, what a package finds as it goes prints after the build's output,
+// just above the result, in the order it was found.
+func TestPackagePrintsWarningsAfterTheBuild(t *testing.T) {
+	got, err := packageWithFake(t, fakePackageTarget{res: pack.Result{
+		Target: pack.TargetAstro, Kind: pack.KindImage, Image: "astro-package/demo:x",
+		Warnings: []string{"found before the build", "found after the build"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertInOrder(t, got, "[build] step 1/9", "Warning: found before the build", "Note: a note before the build",
+		"Warning: found after the build", "target: astro")
+	if n := strings.Count(got, "found before the build"); n != 1 {
+		t.Errorf("warning printed %d times, want once:\n%s", n, got)
+	}
+}
+
+// A build that fails still prints what it found, after its output and before
+// the error the command returns.
+func TestPackagePrintsWarningsWhenTheBuildFails(t *testing.T) {
+	boom := errors.New("boom")
+	got, err := packageWithFake(t, fakePackageTarget{err: boom})
+	if !errors.Is(err, boom) {
+		t.Fatalf("err = %v, want boom", err)
+	}
+	assertInOrder(t, got, "[build] step 1/9", "Warning: found before the build", "Note: a note before the build",
+		"Warning: found after the build")
+}
+
+// Under json a warning is an event emitted as it is found, between the
+// build's lines, as before.
+func TestPackageStreamsWarningsInJSON(t *testing.T) {
+	got, err := packageWithFake(t, fakePackageTarget{res: pack.Result{Target: pack.TargetAstro, Kind: pack.KindImage, Image: "i"}},
+		"--output", "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertInOrder(t, got, `"text":"found before the build"`, `step 1/9`, `"text":"found after the build"`)
+}
+
+// assertInOrder fails unless each of wants appears in got, each after the one
+// before it.
+func assertInOrder(t *testing.T, got string, wants ...string) {
+	t.Helper()
+	at := 0
+	for _, w := range wants {
+		i := strings.Index(got[at:], w)
+		if i < 0 {
+			t.Fatalf("want %q after offset %d in:\n%s", w, at, got)
+		}
+		at += i + len(w)
 	}
 }
 
