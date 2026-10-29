@@ -20,8 +20,8 @@ func Warn(w io.Writer, msg string) {
 }
 
 // Note prints msg to w led by "Note:", for something worth knowing that is
-// neither a warning nor the command's output. The label is dim under the rule
-// labelFor states, so warnings and errors stand out beside it.
+// neither a warning nor the command's output. The label is cyan, as Next: is,
+// under the rule labelFor states.
 func Note(w io.Writer, msg string) {
 	fmt.Fprintln(w, NoteLabel(w), msg)
 }
@@ -38,10 +38,10 @@ func ErrorLabel(w io.Writer) string {
 	return labelFor(w, "Error:", Palette.Red)
 }
 
-// NoteLabel is the "Note:" that leads a note written to w, dim under the
+// NoteLabel is the "Note:" that leads a note written to w, cyan under the
 // rule labelFor states.
 func NoteLabel(w io.Writer) string {
-	return labelFor(w, "Note:", Palette.Faint)
+	return labelFor(w, "Note:", Palette.Cyan)
 }
 
 // DangerLabel is the "WARNING:" that leads a confirmation of something that

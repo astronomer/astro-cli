@@ -15,7 +15,7 @@ import (
 // The CLI leads a warning, an error and a note with a label pkg/ansi defines and
 // cmd/cliout passes on:
 // Warn and WarningLabel (yellow), ErrorLabel (red), Note and NoteLabel
-// (dim), DangerLabel (red, for a confirmation of something that cannot be
+// (cyan), DangerLabel (red, for a confirmation of something that cannot be
 // undone). Each colors its label only on a terminal's stderr. A message that
 // spells "Warning: " into its own text prints it plain, in whatever case the
 // author chose, and is the drift the sweep that added these labels removed.

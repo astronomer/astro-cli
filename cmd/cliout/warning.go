@@ -14,13 +14,13 @@ import (
 // Warn prints msg to w led by a yellow "Warning:" (ansi.Warn).
 func Warn(w io.Writer, msg string) { ansi.Warn(w, msg) }
 
-// Note prints msg to w led by a dim "Note:" (ansi.Note).
+// Note prints msg to w led by a cyan "Note:" (ansi.Note).
 func Note(w io.Writer, msg string) { ansi.Note(w, msg) }
 
 // ErrorLabel is the red "Error:" that leads the error a command fails with.
 func ErrorLabel(w io.Writer) string { return ansi.ErrorLabel(w) }
 
-// NoteLabel is the dim "Note:" that leads a note written to w.
+// NoteLabel is the cyan "Note:" that leads a note written to w.
 func NoteLabel(w io.Writer) string { return ansi.NoteLabel(w) }
 
 // NextLabel is the cyan "Next:" that leads the command a run suggests next.

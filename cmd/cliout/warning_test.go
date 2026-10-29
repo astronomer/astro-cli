@@ -78,7 +78,7 @@ func TestNextLabelColorsOnStdoutAndStderr(t *testing.T) {
 	}
 }
 
-// Note: is dim and the danger label red on stderr with color on; off stderr,
+// Note: is cyan and the danger label red on stderr with color on; off stderr,
 // or under NO_COLOR, both are plain.
 func TestNoteAndDangerLabels(t *testing.T) {
 	forced := ansi.ForceColors
@@ -86,8 +86,8 @@ func TestNoteAndDangerLabels(t *testing.T) {
 	t.Cleanup(func() { ansi.ForceColors = forced })
 	t.Setenv("NO_COLOR", "")
 
-	if got := NoteLabel(os.Stderr); !strings.Contains(got, "\x1b[2m") || !strings.Contains(got, "Note:") {
-		t.Errorf("NoteLabel on stderr = %q, want a dim Note:", got)
+	if got := NoteLabel(os.Stderr); !strings.Contains(got, "\x1b[36m") || !strings.Contains(got, "Note:") {
+		t.Errorf("NoteLabel on stderr = %q, want a cyan Note:", got)
 	}
 	if got := DangerLabel(os.Stderr); !strings.Contains(got, "\x1b[31m") || !strings.Contains(got, "WARNING:") {
 		t.Errorf("DangerLabel on stderr = %q, want a red WARNING:", got)
