@@ -18,14 +18,15 @@ func newRunsCmd(d Deps, t target) *cobra.Command {
 		Use:   "runs",
 		Short: "List, trigger, and clear Dag runs on an Airflow",
 		Long: "Work with the runs on " + t.which() + ": list them, read one, see what its " +
-			"tasks did, start one and optionally wait for it to finish, diagnose a failed one, and delete or " +
-			"clear one.",
+			"tasks did, start one and optionally wait for it to finish, wait on one already going, diagnose a " +
+			"failed one, and delete or clear one.",
 	},
 		newRunsListCmd,
 		newRunsGetCmd,
 		newRunsTasksCmd,
 		newRunsTriggerCmd,
 		newRunsTriggerWaitCmd,
+		newRunsWaitCmd,
 		newRunsDiagnoseCmd,
 		newRunsDeleteCmd,
 		newRunsClearCmd,

@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	sa "github.com/astronomer/astro-cli/internal/platform/apc/service_account"
 )
@@ -14,16 +15,16 @@ import (
 var (
 	workspaceSAUserID   string
 	workspaceSACategory string
-	workspaceSALabel    string
+	workspaceSAName     string
 	workspaceSARole     string
 
 	workspaceSaCreateExample = `
   # Create a service account in a Workspace
-  astro workspace service-account create --workspace-id <WORKSPACE_ID> --label my_label \
+  astro workspace service-account create --workspace <WORKSPACE_ID> --name ci-deployer \
     --role WORKSPACE_EDITOR
 `
 	workspaceSaListExample = `
-  astro workspace service-account list --workspace-id <WORKSPACE_ID>
+  astro workspace service-account list --workspace <WORKSPACE_ID>
 `
 )
 
@@ -54,12 +55,14 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command {
 			return workspaceSaCreate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the workspace, you can leave it empty if you want to use your current context's workspace ID")
+	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
 	cmd.Flags().StringVarP(&workspaceSAUserID, "user-id", "u", "", "ID of the user you want to link this service account to")
 	cmd.Flags().StringVarP(&workspaceSACategory, "category", "c", "default", "Category of the new service account")
-	cmd.Flags().StringVarP(&workspaceSALabel, "label", "l", "", "Label of the new service account")
+	// --name, as an Astro API token's; 1.x's --label, -l, is its alias.
+	cmd.Flags().StringVarP(&workspaceSAName, "name", "n", "", "Name of the new service account")
+	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 	cmd.Flags().StringVarP(&workspaceSARole, "role", "r", houston.WorkspaceViewerRole, "Role (permissions) attached to the created service account")
-	_ = cmd.MarkFlagRequired("label") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("name") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -75,7 +78,7 @@ func newWorkspaceSaListCmd(out io.Writer) *cobra.Command {
 			return workspaceSaList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the workspace, you can leave it empty if you want to use your current context's workspace ID")
+	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -85,20 +88,28 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete <SERVICE_ACCOUNT_ID>",
 		Aliases: []string{"de"},
 		Short:   "Delete a service account in the APC platform",
-		Long:    "Delete a service account in the APC platform",
+		Long:    "Delete a service account in the APC platform. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Args:    cobra.ExactArgs(1),
-		Example: `  astro workspace service-account delete <SERVICE_ACCOUNT_ID>`,
+		Example: `  # Delete a service account from the current Workspace, after you confirm
+  astro workspace service-account delete <SERVICE_ACCOUNT_ID>
+
+  # Delete it without the confirmation, from a script
+  astro workspace service-account delete <SERVICE_ACCOUNT_ID> --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaDelete(cmd, out, args)
 		},
 	}
-	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the workspace, you can leave it empty if you want to use your current context's workspace ID")
+	addYesFlag(cmd, "Don't ask for confirmation before deleting the service account")
+	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
 
 func workspaceSaCreate(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
+	if workspaceSAName == "" {
+		return errServiceAccountNameEmpty
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
@@ -109,7 +120,7 @@ func workspaceSaCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	created, err := sa.CreateUsingWorkspaceUUID(ws, workspaceSALabel, workspaceSACategory, workspaceSARole, houstonClient)
+	created, err := sa.CreateUsingWorkspaceUUID(ws, workspaceSAName, workspaceSACategory, workspaceSARole, houstonClient)
 	if err != nil {
 		return err
 	}
@@ -141,6 +152,10 @@ func workspaceSaDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	ok, err := confirmRemoval(out, serviceAccountDeleteQuestion(args[0]), serviceAccountDeleteCanceled)
+	if err != nil || !ok {
+		return err
+	}
 	deleted, err := sa.DeleteUsingWorkspaceUUID(args[0], ws, houstonClient)
 	if err != nil {
 		return err

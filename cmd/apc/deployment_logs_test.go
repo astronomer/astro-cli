@@ -40,10 +40,10 @@ func (s *Suite) TestDeploymentLogsRootCommandTriggererEnabled() {
 		},
 	}
 
-	output, err := execDeploymentCmd("logs")
+	output, err := execDeploymentCmd("logs", "--help")
 	s.NoError(err)
 	s.Contains(output, "astro deployment logs")
-	s.Contains(output, "triggerer")
+	s.Contains(output, "--triggerer")
 }
 
 func (s *Suite) TestDeploymentLogsRootCommandTriggererDisabled() {
@@ -55,7 +55,7 @@ func (s *Suite) TestDeploymentLogsRootCommandTriggererDisabled() {
 		},
 	}
 
-	output, err := execDeploymentCmd("logs")
+	output, err := execDeploymentCmd("logs", "--help")
 	s.NoError(err)
 	s.Contains(output, "astro deployment logs")
 	s.NotContains(output, "triggerer")
@@ -64,11 +64,12 @@ func (s *Suite) TestDeploymentLogsRootCommandTriggererDisabled() {
 func (s *Suite) TestDeploymentLogsWebServerRemoteLogs() {
 	for _, test := range []struct {
 		component string
+		args      []string
 	}{
-		{component: "webserver"},
-		{component: "scheduler"},
-		{component: "workers"},
-		{component: "triggerer"},
+		{component: "webserver", args: []string{"logs", "webserver", mockDeployment.ID}},
+		{component: "scheduler", args: []string{"logs", "scheduler", mockDeployment.ID}},
+		{component: "workers", args: []string{"logs", "workers", mockDeployment.ID}},
+		{component: "triggerer", args: []string{"logs", mockDeployment.ID, "--triggerer"}},
 	} {
 		mockLogs := getTestLogs(test.component)
 		appConfig = &houston.AppConfig{
@@ -85,7 +86,7 @@ func (s *Suite) TestDeploymentLogsWebServerRemoteLogs() {
 			api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 
 			houstonClient = api
-			output, err := execDeploymentCmd("logs", test.component, mockDeployment.ID)
+			output, err := execDeploymentCmd(test.args...)
 			s.NoError(err)
 			s.Contains(output, mockLogs[0].Log)
 			s.Contains(output, mockLogs[1].Log)
@@ -97,7 +98,7 @@ func (s *Suite) TestDeploymentLogsWebServerRemoteLogs() {
 			api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 
 			houstonClient = api
-			_, err := execDeploymentCmd("logs", test.component, mockDeployment.ID)
+			_, err := execDeploymentCmd(test.args...)
 			s.ErrorIs(errMock, err)
 		})
 	}

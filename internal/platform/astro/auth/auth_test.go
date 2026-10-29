@@ -397,7 +397,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 				assert.Equal(t, "https://auth.astronomer.io/device/success", res.Header.Get("Location"))
 			}
 		}()
-		code, err := authorizeCallbackHandler()
+		code, err := authorizeCallback(io.Discard)
 		assert.Equal(t, "test", code)
 		assert.NoError(t, err)
 		wg.Wait()
@@ -411,7 +411,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 		t.Cleanup(func() { callbackServer = previous })
 		callbackServer = held.Addr().String()
 
-		code, err := authorizeCallbackHandler()
+		code, err := authorizeCallback(io.Discard)
 		assert.Error(t, err)
 		assert.Empty(t, code)
 		assert.Contains(t, err.Error(), "cannot open the login callback on "+held.Addr().String())
@@ -436,7 +436,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 				assert.Equal(t, "https://auth.astronomer.io/device/denied", res.Header.Get("Location"))
 			}
 		}()
-		_, err := authorizeCallbackHandler()
+		_, err := authorizeCallback(io.Discard)
 		assert.Contains(t, err.Error(), "fatal_error")
 		wg.Wait()
 	})
@@ -444,12 +444,12 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 	t.Run("timeout", func(t *testing.T) {
 		callbackServer = "localhost:12347"
 		callbackTimeout = 5 * time.Millisecond
-		_, err := authorizeCallbackHandler()
+		_, err := authorizeCallback(io.Discard)
 		assert.Contains(t, err.Error(), "the operation has timed out")
 	})
 }
 
-// awaitCallbackServer waits for authorizeCallbackHandler, which runs in the
+// awaitCallbackServer waits for authorizeCallback, which runs in the
 // test's own goroutine, to open its listener. A fixed sleep would be both
 // slower and still a race.
 func awaitCallbackServer(t *testing.T, addr string) {

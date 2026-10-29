@@ -135,13 +135,13 @@ Already have an account? Log in from the same page, or run `astro login --signin
 ## Install
 
 ```sh
-curl -sSL install.astronomer.io | sudo bash -s -- v2
+curl -sSL install.astronomer.io | bash -s -- v2
 ```
 
-Until v2 has a stable release, it is published as GitHub pre-releases, and the installer without a version installs Astro CLI 1.x. With `v2` it installs the newest v2 release, the newest stable one once there is one, into `/usr/local/bin`, replacing a 1.x `astro` there. To install somewhere else, without `sudo`, run the installer script directly with `-b`:
+Until v2 has a stable release, it is published as GitHub pre-releases, and the installer without a version installs Astro CLI 1.x. With `v2` it installs the newest v2 release, the newest stable one once there is one. It installs into `~/.local/bin` (`$XDG_BIN_HOME` if set) without `sudo`, and prints the line to add to your shell profile if that directory is not on your PATH. Run it as `sudo bash -s -- v2` instead to install system-wide into `/usr/local/bin`, replacing a 1.x `astro` there. `ASTRO_INSTALL_DIR` picks any other directory:
 
 ```sh
-curl -sSL https://raw.githubusercontent.com/astronomer/astro-cli/main/godownloader.sh | bash -s -- -b ~/astro-v2 v2
+curl -sSL install.astronomer.io | ASTRO_INSTALL_DIR="$HOME/astro-v2" bash -s -- v2
 ```
 
 For standalone mode you also need [uv](https://docs.astral.sh/uv/) 0.9.25 or later on your PATH. *Coming soon: Homebrew and winget.* Step by step, including converting a 1.x project: [docs/install.md](docs/install.md).

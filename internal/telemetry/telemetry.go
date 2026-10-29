@@ -154,7 +154,8 @@ func showFirstRunNotice() {
 	fmt.Fprintln(os.Stderr,
 		"The Astro CLI collects usage data to help us prioritize and invest in CLI features.\n"+
 			"Commands, OS, and CLI version are tracked — never arguments or their values.\n"+
-			"A command or flag the CLI does not have is tracked too, so we can see what to add.\n"+
+			"A command or flag the CLI does not have, and an old flag name it still accepts,\n"+
+			"are tracked too, so we can see what to add and what to remove.\n"+
 			"While you are logged in, events are linked to your Astro organization.\n"+
 			"Logged-out usage stays anonymous.\n"+
 			"Opt out anytime: astro telemetry disable or ASTRO_TELEMETRY_DISABLED=1")
@@ -195,15 +196,17 @@ func buildCommandProperties(cmd *cobra.Command) map[string]interface{} {
 
 // TrackCommand sends telemetry data for a command execution.
 // It spawns a subprocess to send the data asynchronously.
+//
+// It also sends the renamed-flag event RecordRenamedFlags queued for cmd,
+// hidden or not: 1.x's hidden commands take 1.x spellings too.
 func TrackCommand(cmd *cobra.Command) {
-	if commandPath := GetCommandPath(cmd); commandPath == "" || cmd.Hidden {
+	if GetCommandPath(cmd) == "" {
 		return
 	}
-	if !canTrack(cmd) {
-		return
+	if !cmd.Hidden && canTrack(cmd) {
+		track(EventCommandExecution, buildCommandProperties(cmd))
 	}
-
-	track(EventCommandExecution, buildCommandProperties(cmd))
+	sendRenamedFlags(cmd)
 }
 
 // TrackRemovedCommand sends the command event for the stub of a command Astro
@@ -291,8 +294,7 @@ func isTestRun() bool {
 
 // isDebugMode returns true if synchronous debug mode is enabled
 func isDebugMode() bool {
-	val := os.Getenv("ASTRO_TELEMETRY_DEBUG")
-	return val == "1" || strings.EqualFold(val, "true")
+	return sharedtel.EnvIsTrue("ASTRO_TELEMETRY_DEBUG")
 }
 
 // sendDebug sends telemetry synchronously and prints debug output.

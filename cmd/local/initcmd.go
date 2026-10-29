@@ -218,7 +218,7 @@ func renderInit(w io.Writer, res *scaffold.Result, next string) error {
 	if err := renderLeftToDo(w, res.Notes); err != nil {
 		return err
 	}
-	_, err := fmt.Fprintf(w, "\nNext: %s\n", next)
+	_, err := fmt.Fprintf(w, "\n%s %s\n", cliout.NextLabel(w), next)
 	return err
 }
 

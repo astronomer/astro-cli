@@ -3,7 +3,6 @@ package deployment
 import (
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -29,11 +28,11 @@ func CloneSource(ref, ws string, astroV1Client astrov1.APIClient) (astrov1.Deplo
 	}
 	switch len(named) {
 	case 0:
-		return astrov1.Deployment{}, fmt.Errorf("no Deployment named %q in Workspace %s. Pass its id to --clone to copy one from another Workspace", ref, ws)
+		return astrov1.Deployment{}, fmt.Errorf("%w. Pass its id to --clone to copy one from another workspace", &NameError{Name: ref, Workspace: ws, Flag: "--clone"})
 	case 1:
 		return GetDeploymentByID("", named[0].Id, astroV1Client)
 	}
-	return astrov1.Deployment{}, fmt.Errorf("%d Deployments are named %q in Workspace %s: pass one of their ids to --clone instead: %s", len(named), ref, ws, strings.Join(DeploymentIDs(named), ", "))
+	return astrov1.Deployment{}, &NameError{Name: ref, Workspace: ws, Matches: named, Flag: "--clone"}
 }
 
 // DeploymentsNamed is every Deployment in workspace ws called name, listed
@@ -44,22 +43,7 @@ func DeploymentsNamed(name, ws, orgID string, astroV1Client astrov1.APIClient) (
 	if err != nil {
 		return nil, err
 	}
-	var named []astrov1.Deployment
-	for i := range deployments {
-		if deployments[i].Name == name {
-			named = append(named, deployments[i])
-		}
-	}
-	return named, nil
-}
-
-// DeploymentIDs is the id of each of ds, in order.
-func DeploymentIDs(ds []astrov1.Deployment) []string {
-	ids := make([]string, len(ds))
-	for i := range ds {
-		ids[i] = ds[i].Id
-	}
-	return ids
+	return namedIn(deployments, name), nil
 }
 
 // Clone creates a copy of src named name, in workspaceID or else src's own

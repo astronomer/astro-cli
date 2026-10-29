@@ -133,7 +133,7 @@ func TestWarnStandaloneOmissionsPackages(t *testing.T) {
 			text := &bytes.Buffer{}
 			warnStandaloneOmissions(cliout.Renderer{Format: cliout.FormatText, Out: text}, tc.plan)
 			if tc.wantWarn {
-				if !strings.Contains(text.String(), "warning: this project declares OS packages") {
+				if !strings.Contains(text.String(), "Warning: this project declares OS packages") {
 					t.Errorf("text output missing the warning: %q", text.String())
 				}
 			} else if text.Len() != 0 {
@@ -364,7 +364,7 @@ func TestWarnStandaloneOmissionsExactText(t *testing.T) {
 
 	text := &bytes.Buffer{}
 	warnStandaloneOmissions(cliout.Renderer{Format: cliout.FormatText, Out: text}, plan)
-	if want := "warning: " + dockerfileText + "\nwarning: " + packagesText + "\nwarning: " + overrideText + "\n"; text.String() != want {
+	if want := "Warning: " + dockerfileText + "\nWarning: " + packagesText + "\nWarning: " + overrideText + "\n"; text.String() != want {
 		t.Errorf("text output:\n got %q\nwant %q", text.String(), want)
 	}
 
@@ -407,7 +407,7 @@ func envWarningCases() []envWarningCase {
 				Key:     "PORT",
 				Reason:  `expected a port between 1 and 65535, got "99999"`,
 			}},
-			wantText: []string{`warning: env var PORT: expected a port between 1 and 65535, got "99999"`},
+			wantText: []string{`Warning: env var PORT: expected a port between 1 and 65535, got "99999"`},
 		},
 		{
 			// The wire value is snake_case; a person reads this.
@@ -418,7 +418,7 @@ func envWarningCases() []envWarningCase {
 				Key:     "mode",
 				Reason:  `expected one of "a", "b", got "c"`,
 			}},
-			wantText: []string{`warning: Airflow variable mode:`},
+			wantText: []string{`Warning: Airflow variable mode:`},
 		},
 		{
 			name: "a connection of the wrong kind",
@@ -428,7 +428,7 @@ func envWarningCases() []envWarningCase {
 				Key:     "warehouse",
 				Reason:  `declared conn_type "snowflake" but resolved to "postgres"`,
 			}},
-			wantText: []string{`warning: connection warehouse: declared conn_type "snowflake" but resolved to "postgres"`},
+			wantText: []string{`Warning: connection warehouse: declared conn_type "snowflake" but resolved to "postgres"`},
 		},
 		{
 			// One line each: a project with several is a list, not a summary.
@@ -437,7 +437,7 @@ func envWarningCases() []envWarningCase {
 				{Kind: envschema.ViolationWrongType, Section: envschema.SectionEnvVar, Key: "A", Reason: "one"},
 				{Kind: envschema.ViolationWrongType, Section: envschema.SectionEnvVar, Key: "B", Reason: "two"},
 			},
-			wantText: []string{"warning: env var A: one", "warning: env var B: two"},
+			wantText: []string{"Warning: env var A: one", "Warning: env var B: two"},
 		},
 	}
 }
@@ -459,7 +459,7 @@ func TestWarnEnvValuesText(t *testing.T) {
 					t.Errorf("output missing %q, got %q", want, out.String())
 				}
 			}
-			if got := strings.Count(out.String(), "warning:"); got != len(tc.warnings) {
+			if got := strings.Count(out.String(), "Warning:"); got != len(tc.warnings) {
 				t.Errorf("got %d warning lines, want %d: %q", got, len(tc.warnings), out.String())
 			}
 		})

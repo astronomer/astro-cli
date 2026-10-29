@@ -156,6 +156,7 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 		BundleType:    b.bundleType,
 		Description:   o.description,
 		AstroV1Client: login.client,
+		ErrOut:        cmd.ErrOrStderr(),
 	}
 	if !login.current {
 		in.Login = &login.context
@@ -313,7 +314,7 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 
 	if name != "" {
 		if m != nil && hasLink(m, name) {
-			named, _, err := manifestdeploy.ResolveNamed(m, name, "", workspace, "")
+			named, _, err := manifestdeploy.ResolveNamed(manifestdeploy.Request{Manifest: m, LinkName: name, WorkspaceID: workspace})
 			if err != nil {
 				return "", nil, login, cliout.Usage(err)
 			}
@@ -374,7 +375,7 @@ func deploymentNamed(name, ws string, login *deployLogin) (*astrov1.Deployment, 
 	case 1:
 		return &found[0], nil
 	}
-	return nil, cliout.Usage(fmt.Errorf("%d Deployments are named %s in workspace %s (%s): pass the id of the one you mean with --deployment", len(found), name, ws, strings.Join(deployment.DeploymentIDs(found), ", ")))
+	return nil, &deployment.NameError{Name: name, Workspace: ws, Matches: found, Flag: "--deployment"}
 }
 
 // errBundleNoTarget is a bundle deploy or delete that names no Deployment and

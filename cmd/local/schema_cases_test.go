@@ -83,6 +83,8 @@ var publishedPayloads = []schemaCase{
 	{"task-row", taskRow{}},
 	{"task-instance-row", taskInstanceRow{}},
 	{"task-log", taskLog{}},
+	{"task-waited", waitedTask{}},
+	{"task-xcom", xcomRow{}},
 	{"tasks-cleared", clearedTasks{}},
 	{"use-result", useResult{}},
 	{"use-listing", useListing{}},

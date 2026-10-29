@@ -97,32 +97,27 @@ func TestAirflowCmdFlags(t *testing.T) {
 	assert.NotNil(t, cmd.Flags().Lookup("generate"))
 }
 
-// --workspace-id is 1.x's spelling of --workspace: it reaches --workspace, the
-// one the command reads, and the two naming different workspaces is refused.
-func TestAirflowWorkspaceIDIsAnAliasOfWorkspace(t *testing.T) {
-	apply := func(args ...string) (string, error) {
+// 1.x's --workspace-id (-W) never did anything, and still does nothing: it
+// is accepted, hidden, so a 1.x script keeps working. There is no
+// --workspace.
+func TestAirflowWorkspaceIDIsAHiddenNoOp(t *testing.T) {
+	apply := func(args ...string) error {
 		cmd := NewAirflowCmd(new(bytes.Buffer))
-		require.NoError(t, cmd.ParseFlags(args))
-		err := cmd.Args(cmd, cmd.Flags().Args())
-		return cmd.Flags().Lookup("workspace").Value.String(), err
+		if err := cmd.ParseFlags(args); err != nil {
+			return err
+		}
+		return cmd.Args(cmd, cmd.Flags().Args())
 	}
-	for _, args := range [][]string{{"--workspace", "ws"}, {"--workspace-id", "ws"}, {"-W", "ws", "--workspace-id", "ws"}} {
-		got, err := apply(args...)
-		require.NoError(t, err, args)
-		assert.Equal(t, "ws", got, args)
+	for _, args := range [][]string{{"--workspace-id", "ws"}, {"-W", "ws"}, {"--workspace-id", ""}} {
+		require.NoError(t, apply(args...), args)
 	}
-	_, err := apply("--workspace", "a", "--workspace-id", "b")
-	require.EqualError(t, err, `--workspace "a" and --workspace-id "b" disagree: pass only --workspace`)
-	_, err = apply("--workspace", "")
-	require.EqualError(t, err, "--workspace cannot be empty")
-	// 1.x took an empty --workspace-id as the default, and still does.
-	got, err := apply("--workspace-id", "")
-	require.NoError(t, err)
-	assert.Empty(t, got)
-	assert.True(t, NewAirflowCmd(new(bytes.Buffer)).PersistentFlags().Lookup("workspace-id").Hidden)
+	f := NewAirflowCmd(new(bytes.Buffer)).PersistentFlags().Lookup("workspace-id")
+	assert.True(t, f.Hidden)
+	assert.Equal(t, "W", f.Shorthand)
+	assert.Equal(t, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working", f.Usage)
+	require.EqualError(t, apply("--workspace", "ws"), "unknown flag: --workspace")
 	for _, args := range [][]string{{"--deployment", ""}, {"-d", ""}} {
-		_, err = apply(args...)
-		require.EqualError(t, err, "--deployment cannot be empty", args)
+		require.EqualError(t, apply(args...), "--deployment cannot be empty", args)
 	}
 }
 
@@ -622,11 +617,11 @@ func TestResolveAirflowTarget_DeploymentID(t *testing.T) {
 	t.Cleanup(func() { deployment.GetDeploymentByID = orig })
 	deployment.GetDeploymentByID = func(orgID, deploymentID string, _ astrov1.APIClient) (astrov1.Deployment, error) {
 		assert.Equal(t, "test-org", orgID)
-		assert.Equal(t, "clxyz123", deploymentID)
+		assert.Equal(t, testDeploymentID, deploymentID)
 		return astrov1.Deployment{Id: deploymentID, WebServerAirflowApiUrl: "deployment.airflow.astronomer.io/api/v2"}, nil
 	}
 
-	opts := &AirflowOptions{Deployment: "clxyz123", RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)}}
+	opts := &AirflowOptions{Deployment: testDeploymentID, RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)}}
 	target, err := resolveAirflowTarget(context.Background(), opts)
 	require.NoError(t, err)
 	// A URL with no scheme gets https, and the /api/v2 the control plane

@@ -61,7 +61,8 @@ const (
 	// KindNotRunning: no local Airflow is running for this project.
 	KindNotRunning cliout.ProblemKind = "not_running"
 	// KindDeploymentHibernating: the Astro Deployment is hibernating, so its
-	// Airflow cannot answer until something wakes it.
+	// Airflow cannot answer, and it cannot take a deploy, until something
+	// wakes it.
 	KindDeploymentHibernating cliout.ProblemKind = "deployment_hibernating"
 	// KindDeploymentDeploying: the Astro Deployment is being created or
 	// updated, and its Airflow has not come up yet. Transient.

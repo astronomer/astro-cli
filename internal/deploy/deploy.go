@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/internal/deploybuild"
+	"github.com/astronomer/astro-cli/internal/shipcheck"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -105,6 +106,10 @@ type Request struct {
 	// Warn reports a finding the deploy goes ahead despite, as a sentence.
 	// nil drops it.
 	Warn func(string)
+	// Note reports something the deploy did that is worth knowing but not a
+	// warning: the linked worktrees of the project's own repository a
+	// generated image leaves out (shipcheck.LeftOutNote). nil drops it.
+	Note func(string)
 	// Engine resolves the container engine that will build the image: its
 	// CLI and the env that reaches its daemon. cmd hands the same memoized
 	// resolver to the transport, so the engine is resolved once. It is
@@ -353,6 +358,11 @@ func Run(req Request, d Deployer) (Result, error) {
 	missingSecrets, survey, err := checkImageSource(req)
 	if err != nil {
 		return Result{}, err
+	}
+	if req.Note != nil && survey != nil {
+		if note := shipcheck.LeftOutNote(survey); note != "" {
+			req.Note(note)
+		}
 	}
 
 	target, err := resolveTarget(req, d)
@@ -744,15 +754,17 @@ func listWorkspace(req Request) string {
 }
 
 // ResolveNamed settles a target named on the command line, as Run does: the
-// argument (linkName) and --deployment, which must agree, each a link of m
-// (nil for no manifest) or a Deployment id. named is false when neither names
-// one. It is for a command that ships something other than the project, such
-// as astro deploy bundle, to name its Deployment the way a deploy does.
-func ResolveNamed(m *manifest.Manifest, linkName, deployment, workspaceID, contextWorkspace string) (target Target, named bool, err error) {
-	req := Request{Manifest: m, LinkName: linkName, Deployment: deployment, WorkspaceID: workspaceID, ContextWorkspace: contextWorkspace}
+// argument (req.LinkName) and --deployment (req.Deployment), which must
+// agree, each a link of req.Manifest (nil for no manifest) of req.Platform,
+// on req.Domain for Astro Private Cloud, or a Deployment id. Only those
+// fields, the workspaces and OtherDomain are read. named is false when
+// neither names one. It is for a command that ships something other than the
+// project, such as astro deploy bundle, or that acts on a Deployment, such as
+// APC's astro deployment logs, to name its Deployment the way a deploy does.
+func ResolveNamed(req Request) (target Target, named bool, err error) {
 	var links map[string]manifest.Link
-	if m != nil {
-		links = m.Astro.Deployments
+	if req.Manifest != nil {
+		links = req.Manifest.Astro.Deployments
 	}
 	return resolveNamed(req, links)
 }

@@ -73,11 +73,12 @@ func TestCheckFindsGitignoredFilesAndSecretsAmongThem(t *testing.T) {
 	assert.Empty(t, r.Unanswered)
 	w := r.Warnings()
 	require.Len(t, w, 1)
-	assert.Contains(t, w[0], "2 file(s) that .gitignore ignores")
+	assert.Contains(t, w[0], "2 files that .gitignore ignores and .dockerignore does not, in keys/ and target/.")
+	assert.NotContains(t, w[0], "manifest.json", "the warning names places, not files")
 	assert.Contains(t, w[0], "add them to .dockerignore")
 	err := r.Err()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "keys/service-account.json look like credentials and are not tracked by git")
+	assert.Contains(t, err.Error(), "keys/service-account.json looks like credentials and is not tracked by git, and the image would carry it to a registry. Add it to .dockerignore, or remove it from the project")
 	assert.Contains(t, err.Error(), "to a registry")
 
 	// A .dockerignore line is the way out, and the warning goes with it.
@@ -169,8 +170,15 @@ func TestCheckAsksEachRepositoryAboutItsOwnFiles(t *testing.T) {
 
 	r := check(t, dir, "")
 	assert.Empty(t, r.Unanswered, "every repository answered")
-	assert.ElementsMatch(t, []string{"vendor/lib/local.key", "scratch/notes.txt"}, r.Gitignored)
+	assert.ElementsMatch(t, []string{"vendor/lib/local.key", "scratch/notes.txt"}, r.Gitignored,
+		"a generated build carries the gitlinked repository and the clone: only the project's own worktrees are left out")
 	assert.Equal(t, []string{"vendor/lib/local.key"}, r.Secrets)
+
+	writeFiles(t, dir, map[string]string{"Dockerfile": "FROM python:3.12\n"})
+	r = check(t, dir, "Dockerfile")
+	assert.Empty(t, r.Unanswered)
+	assert.ElementsMatch(t, []string{"vendor/lib/local.key", "scratch/notes.txt"}, r.Gitignored,
+		"a declared build's context carries the clone, whose files the project ignores as a whole")
 }
 
 // A link that stays inside the project is asked about at its real path, which
@@ -331,11 +339,11 @@ func TestSurvey(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, survey.DagsCarried)
 	require.Len(t, warned, 1)
-	assert.Contains(t, warned[0], "target/out.json")
+	assert.Contains(t, warned[0], "1 file that .gitignore ignores and .dockerignore does not, in target/.")
 
 	writeFiles(t, dir, map[string]string{".gitignore": "target/\nid_rsa\n", "id_rsa": "k"})
 	_, err = Survey(dir, "", false, func(string) {})
-	assert.ErrorContains(t, err, "id_rsa look like credentials")
+	assert.ErrorContains(t, err, "id_rsa looks like credentials")
 
 	// A declared Dockerfile's local files, .git among them, are warned about
 	// from the same survey.
@@ -403,4 +411,66 @@ func TestCappedList(t *testing.T) {
 	assert.Contains(t, got, "k09.pem and 2 more")
 	assert.NotContains(t, got, "k10.pem")
 	assert.Equal(t, "a, b", cappedList([]string{"a", "b"}))
+}
+
+// aperture is a project shaped like one a coding agent works in: a worktree of
+// the project under .claude/worktrees/, which .gitignore leaves out, holding
+// its own tracked copy of deploy/sandbox.env, a file that looks like a
+// credential by its name.
+func aperture(t *testing.T) string {
+	t.Helper()
+	needsGit(t)
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q", "-b", "main")
+	writeFiles(t, dir, map[string]string{
+		".gitignore":         ".claude/worktrees/\n",
+		"dags/a.py":          "",
+		"deploy/sandbox.env": "MODE=sandbox\n",
+	})
+	gitRun(t, dir, "add", ".")
+	gitRun(t, dir, "commit", "-q", "-m", "project")
+	gitRun(t, dir, "worktree", "add", "-q", "-b", "agent", filepath.Join(dir, ".claude", "worktrees", "deploy-workflows"))
+	return dir
+}
+
+// A generated build leaves a nested worktree out, so neither its ignored files
+// nor its copy of a file that looks like a credential are warned about or
+// refused; the project's own tracked copy is the project's choice.
+func TestCheckGeneratedBuildIgnoresANestedWorktree(t *testing.T) {
+	dir := aperture(t)
+	r := check(t, dir, "")
+	assert.Empty(t, r.Gitignored)
+	assert.Empty(t, r.Secrets)
+	assert.Empty(t, r.Warnings())
+	require.NoError(t, r.Err())
+}
+
+// A declared Dockerfile's context carries the worktree, so the build is
+// refused, and the refusal says the file sits in another git checkout and
+// names the directory to leave out, rather than calling it untracked.
+func TestCheckDeclaredBuildNamesTheNestedCheckout(t *testing.T) {
+	dir := aperture(t)
+	writeFiles(t, dir, map[string]string{"Dockerfile": "FROM python:3.12\n"})
+	r := check(t, dir, "Dockerfile")
+	err := r.Err()
+	require.Error(t, err)
+	assert.Equal(t, "refusing to build: .claude/worktrees/deploy-workflows/deploy/sandbox.env looks like credentials and sits in .claude/worktrees/deploy-workflows/, another git checkout inside the project, which the image would carry to a registry. Add .claude/worktrees/deploy-workflows/ to .dockerignore, and try again", err.Error())
+	assert.NotContains(t, err.Error(), "not tracked by git")
+	w := r.Warnings()
+	require.Len(t, w, 1)
+	assert.Contains(t, w[0], "in .claude/.", "the warning names the place holding only the checkout")
+
+	// Two checkouts, and a credential of the project's own beside them.
+	gitRun(t, dir, "worktree", "add", "-q", "-b", "other", filepath.Join(dir, ".claude", "worktrees", "other"))
+	writeFiles(t, dir, map[string]string{"keys/token.json": "t", ".gitignore": ".claude/worktrees/\nkeys/\n"})
+	r = check(t, dir, "Dockerfile")
+	err = r.Err()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "keys/token.json looks like credentials and is not tracked by git")
+	assert.Contains(t, err.Error(), "look like credentials and sit in .claude/worktrees/deploy-workflows/ and .claude/worktrees/other/, other git checkouts inside the project")
+	assert.Contains(t, err.Error(), "Add .claude/worktrees/deploy-workflows/ and .claude/worktrees/other/ to .dockerignore")
+
+	writeFiles(t, dir, map[string]string{".dockerignore": ".claude/\nkeys/\n"})
+	r = check(t, dir, "Dockerfile")
+	require.NoError(t, r.Err())
 }

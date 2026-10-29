@@ -103,6 +103,7 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 		Platform:     remotePlatform,
 		BuildSecrets: util.ResolveBuildSecrets(remoteBuildSecrets, os.Getenv(util.BuildSecretInputEnv)),
 		DeploymentID: remoteDeploymentID,
+		ErrOut:       cmd.ErrOrStderr(),
 	}
 
 	res, err := deployClientImage(deployInput, astroV1Client)

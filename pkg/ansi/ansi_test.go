@@ -43,7 +43,7 @@ func (s *Suite) TestShouldUseColors() {
 // A question goes to stderr, so its colors follow stderr: colored at a
 // terminal with stdout redirected, and plain on a redirected stderr.
 func (s *Suite) TestForStderrFollowsStderrNotStdout() {
-	for _, v := range []string{cliColorForce, "CLICOLOR"} {
+	for _, v := range []string{cliColorForce, "CLICOLOR", "NO_COLOR"} {
 		s.T().Setenv(v, "")
 		s.Require().NoError(os.Unsetenv(v))
 	}
@@ -64,4 +64,24 @@ func (s *Suite) TestForStderrFollowsStderrNotStdout() {
 	for _, plain := range []string{ForStderr().Bold("x"), ForStderr().Green("x"), ForStderr().Red("x"), ForStderr().Cyan("x")} {
 		s.Equal("x", plain, "stderr is redirected")
 	}
+}
+
+// NO_COLOR, set and not empty, turns color off on a terminal and over
+// ForceColors; only an explicit CLICOLOR_FORCE wins over it.
+func (s *Suite) TestNoColorTurnsColorOff() {
+	for _, v := range []string{cliColorForce, "CLICOLOR", "NO_COLOR"} {
+		s.T().Setenv(v, "")
+		s.Require().NoError(os.Unsetenv(v))
+	}
+	previousCheck, previousForce := isMessagesTerminal, ForceColors
+	s.T().Cleanup(func() { isMessagesTerminal, ForceColors = previousCheck, previousForce })
+	isMessagesTerminal = func() bool { return true }
+	ForceColors = true
+	s.Contains(ForStderr().Red("x"), "\x1b[", "a terminal with NO_COLOR unset is colored")
+
+	s.T().Setenv("NO_COLOR", "1")
+	s.Equal("x", ForStderr().Red("x"), "NO_COLOR turns color off")
+
+	s.T().Setenv(cliColorForce, "1")
+	s.Contains(ForStderr().Red("x"), "\x1b[", "CLICOLOR_FORCE wins over NO_COLOR")
 }

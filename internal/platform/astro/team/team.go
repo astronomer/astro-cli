@@ -526,12 +526,19 @@ func GetOrgTeams(client astrov1.APIClient) ([]astrov1.Team, error) {
 }
 
 // Delete deletes the team with id, or the one picked when id is "", and
-// returns which team it deleted. It returns nil, and deletes nothing, when
-// the team is IdP-managed and the person declines to go on.
+// returns which team it deleted, asking first unless force. It returns nil,
+// and deletes nothing, when the person declines.
 func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemoval, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
+	}
+	// A run that cannot ask is refused before anything is listed or read:
+	// the question it would end on is one only --yes answers.
+	if !force {
+		if err := input.MayAsk("", input.About("confirmation to delete the team"), input.AnsweredBy("--yes")); err != nil {
+			return nil, err
+		}
 	}
 
 	var team astrov1.Team
@@ -556,8 +563,14 @@ func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemov
 			return nil, ErrTeamNotFound
 		}
 	}
-	if team.IsIdpManaged {
-		y, err := confirmOperation(force)
+	// Every team is asked about, as a Workspace is: a deleted team cannot
+	// be brought back, and an IdP-managed one says so too.
+	if !force {
+		question := fmt.Sprintf("\nAre you sure you want to delete the %s team? This cannot be undone.", ansi.Bold(team.Name))
+		if team.IsIdpManaged {
+			question = "\nThis is an IDP-managed team." + question
+		}
+		y, err := input.Confirm(question, input.AnsweredBy("--yes"))
 		if err != nil {
 			return nil, err
 		}
@@ -972,8 +985,6 @@ func roleInWorkspace(team astrov1.Team, workspaceID string) string { //nolint:go
 }
 
 // ListDeploymentTeamsData returns deployment team list data for structured output
-//
-//nolint:dupl // the duplication is acceptable here
 func ListDeploymentTeamsData(client astrov1.APIClient, deploymentID string) (*TeamList, error) {
 	teams, err := GetDeploymentTeams(client, deploymentID, teamPaginationLimit)
 	if err != nil {
@@ -998,16 +1009,22 @@ func ListDeploymentTeamsData(client astrov1.APIClient, deploymentID string) (*Te
 	return &TeamList{Teams: teamInfos}, nil
 }
 
-var deploymentTeamTableConfig = output.BuildTableConfig(
-	[]output.Column[TeamInfo]{
-		{Header: "ID", Value: func(t TeamInfo) string { return t.ID }},
-		{Header: "ROLE", Value: func(t TeamInfo) string { return t.DeploymentRole }},
-		{Header: "NAME", Value: func(t TeamInfo) string { return t.Name }},
-		{Header: "DESCRIPTION", Value: func(t TeamInfo) string { return t.Description }},
-		{Header: "CREATE DATE", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
-	},
-	func(d any) []TeamInfo { return d.(*TeamList).Teams },
-)
+// roleTeamTableConfig is the table of teams with a role on one Deployment or
+// Workspace, which role reads.
+func roleTeamTableConfig(role func(TeamInfo) string) *output.TableConfig {
+	return output.BuildTableConfig(
+		[]output.Column[TeamInfo]{
+			{Header: "ID", Value: func(t TeamInfo) string { return t.ID }},
+			{Header: "ROLE", Value: role},
+			{Header: "NAME", Value: func(t TeamInfo) string { return t.Name }},
+			{Header: "DESCRIPTION", Value: func(t TeamInfo) string { return t.Description }},
+			{Header: "CREATE DATE", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
+		},
+		func(d any) []TeamInfo { return d.(*TeamList).Teams },
+	)
+}
+
+var deploymentTeamTableConfig = roleTeamTableConfig(func(t TeamInfo) string { return t.DeploymentRole })
 
 // ListDeploymentTeamsWithFormat lists deployment teams with the specified output format
 func ListDeploymentTeamsWithFormat(client astrov1.APIClient, deploymentID string, r output.Emitter) error {
@@ -1018,9 +1035,16 @@ func ListDeploymentTeamsWithFormat(client astrov1.APIClient, deploymentID string
 }
 
 // ListWorkspaceTeamsData returns workspace team list data for structured output
-//
-//nolint:dupl // the duplication is acceptable here
 func ListWorkspaceTeamsData(client astrov1.APIClient, workspaceID string) (*TeamList, error) {
+	// The roles shown are the ones on the Workspace listed, which is the
+	// current one when workspaceID is "".
+	if workspaceID == "" {
+		ctx, err := context.GetCurrentContext()
+		if err != nil {
+			return nil, err
+		}
+		workspaceID = ctx.Workspace
+	}
 	teams, err := GetWorkspaceTeams(client, workspaceID, teamPaginationLimit)
 	if err != nil {
 		return nil, err
@@ -1044,16 +1068,7 @@ func ListWorkspaceTeamsData(client astrov1.APIClient, workspaceID string) (*Team
 	return &TeamList{Teams: teamInfos}, nil
 }
 
-var workspaceTeamTableConfig = output.BuildTableConfig(
-	[]output.Column[TeamInfo]{
-		{Header: "ID", Value: func(t TeamInfo) string { return t.ID }},
-		{Header: "ROLE", Value: func(t TeamInfo) string { return t.WorkspaceRole }},
-		{Header: "NAME", Value: func(t TeamInfo) string { return t.Name }},
-		{Header: "DESCRIPTION", Value: func(t TeamInfo) string { return t.Description }},
-		{Header: "CREATE DATE", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
-	},
-	func(d any) []TeamInfo { return d.(*TeamList).Teams },
-)
+var workspaceTeamTableConfig = roleTeamTableConfig(func(t TeamInfo) string { return t.WorkspaceRole })
 
 // ListWorkspaceTeamsWithFormat lists workspace teams with the specified output format
 func ListWorkspaceTeamsWithFormat(client astrov1.APIClient, workspaceID string, r output.Emitter) error {

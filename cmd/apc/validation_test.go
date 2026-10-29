@@ -156,7 +156,33 @@ func (s *Suite) TestValidateExecutorArg() {
 			name:        "invalid executor",
 			args:        args{executor: "invalid test"},
 			result:      "",
-			expectedErr: "please specify correct executor, one of: local, celery, kubernetes, k8s",
+			expectedErr: errInvalidExecutorType.Error(),
+		},
+		{
+			name:   "Astro's spelling of the local executor",
+			args:   args{executor: "LocalExecutor"},
+			result: houston.LocalExecutorType,
+		},
+		{
+			name:   "Astro's spelling of the celery executor",
+			args:   args{executor: "CeleryExecutor"},
+			result: houston.CeleryExecutorType,
+		},
+		{
+			name:   "Astro's spelling of the kubernetes executor, in any case",
+			args:   args{executor: "kubernetesEXECUTOR"},
+			result: houston.KubernetesExecutorType,
+		},
+		{
+			name:   "APC's spelling, in any case",
+			args:   args{executor: "Celery"},
+			result: houston.CeleryExecutorType,
+		},
+		{
+			name:        "AstroExecutor has no APC equivalent",
+			args:        args{executor: "AstroExecutor"},
+			result:      "",
+			expectedErr: errAstroExecutorOnAPC.Error(),
 		},
 	}
 
@@ -166,6 +192,8 @@ func (s *Suite) TestValidateExecutorArg() {
 			s.Equal(tt.result, executorType)
 			if tt.expectedErr != "" {
 				s.EqualError(err, tt.expectedErr)
+			} else {
+				s.NoError(err)
 			}
 		})
 	}
