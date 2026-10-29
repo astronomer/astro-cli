@@ -20,6 +20,9 @@ var helperContentAtVersion = map[int]string{
 	// Compares a lock's recorded constraints by name and specifier, and reads
 	// python_version == 'X.Y' as python_full_version == 'X.Y.*'.
 	3: "72b26579905db375023b6b1e60149e277de2aecb385fdf5822bb23019a785f64",
+	// Reads markers, requirements and specifiers with packaging (or pip's
+	// vendored copy) in place of its own evaluator; shorter prose.
+	4: "373f3dbcaba5899d23c8335cbff5714c37dfd190e027b404ce83c2426e3f5952",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {

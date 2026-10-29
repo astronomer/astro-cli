@@ -1,5 +1,5 @@
 # Written by the Astro CLI. Do not edit: `astro init` replaces this file.
-# astro-install-helper: 3
+# astro-install-helper: 4
 #
 # Runs inside the image build, on the runtime image's own Python. Reads the
 # project's pyproject.toml, and its uv.lock when there is one, and writes what
