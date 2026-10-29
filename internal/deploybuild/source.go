@@ -3,6 +3,7 @@ package deploybuild
 import (
 	"context"
 
+	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/internal/shipcheck"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -58,7 +59,7 @@ func CheckSource(s *Source) (imagebuild.MissingSecrets, *imagebuild.ProjectSurve
 	if s.DagsOnly || s.ImageName != "" || s.Manifest == nil {
 		return missing, nil, nil
 	}
-	if err := scaffold.CheckDockerfileAirflow(s.ProjectDir, s.Manifest); err != nil {
+	if err := scaffold.CheckDockerfileAirflowWith(s.ProjectDir, s.Manifest, runtimecatalog.ForDockerfileCheck); err != nil {
 		return missing, nil, err
 	}
 	warn := s.Warn

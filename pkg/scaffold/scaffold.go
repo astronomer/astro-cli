@@ -54,6 +54,13 @@ type Options struct {
 	// nil means runtimeversions.FallbackAirflowSeries, with no lookup, reported
 	// as runtimeversions.SourceBuiltIn.
 	Default DefaultAirflow
+	// RuntimeAirflow answers the Airflow an Astro Runtime build carries
+	// ("12.6.0" → "2.10.4"), or "" when it does not know. A 1.x Dockerfile on
+	// one Airflow 2 build then pins that Airflow's series (2.10) rather than
+	// the generation (2), whose newest Airflow 2 is not what the image runs.
+	// Asked at most once, and only for such a Dockerfile; nil keeps the pin
+	// "2" and its note, which is what Plan does offline.
+	RuntimeAirflow func(build string) string
 	// GOOS overrides runtime.GOOS, so tests can check the Windows layout
 	// (no CLAUDE.md symlink) from any host.
 	GOOS string
@@ -368,6 +375,7 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	if err != nil {
 		return nil, err
 	}
+	refineAirflow2Pin(from1x, opts.RuntimeAirflow)
 	from1x.apcDomain = manifest.NormalizeAPCDomain(opts.APCDomain)
 	from1x.apcWorkspace = opts.APCWorkspace
 

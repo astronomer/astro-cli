@@ -9,6 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
 // A project that declares its own Dockerfile states its Airflow twice: the
@@ -49,12 +50,31 @@ func dockerfilePath(dir string, m *manifest.Manifest) string {
 // build argument, one pinned by digest, one that is not an Astro Runtime image,
 // or a tag the runtime grammar does not read (an untagged FROM among them).
 func CheckDockerfileAirflow(dir string, m *manifest.Manifest) error {
+	return CheckDockerfileAirflowWith(dir, m, nil)
+}
+
+// CheckDockerfileAirflowWith is CheckDockerfileAirflow that also reads, from
+// the catalog catalog returns, the Airflow release an Airflow 2 base carries.
+// catalog is called only for such a base, so every other project reads none. An Airflow 2 tag
+// ("12.6.0") names only the generation, so without the catalog a 2.11
+// requirement passes against a 2.10 image; with it, the release the build
+// carries has to be one the requirement covers. A nil catalog, a floating or
+// flavored tag, or a build the catalog does not list is judged by the tag
+// alone, as before.
+func CheckDockerfileAirflowWith(dir string, m *manifest.Manifest, catalog func() *runtimeversions.Catalog) error {
 	path := dockerfilePath(dir, m)
 	if path == "" {
 		return nil
 	}
 	base := airflowrt.ReadDeclaredBase(path)
 	p, ok := m.DockerfileRuntimeProblem(base.Ref(), base.RuntimeVersion())
+	if !ok && catalog != nil {
+		if t, parsed := manifest.ParseRuntimeTag(base.RuntimeVersion()); parsed && t.Major == "2" && t.Build {
+			if r, listed := catalogRuntime(catalog(), base.RuntimeVersion()); listed {
+				p, ok = m.DockerfileReleaseProblem(base.Ref(), r.AirflowVersion)
+			}
+		}
+	}
 	if !ok {
 		return nil
 	}
@@ -181,4 +201,12 @@ func fromForMessage(b airflowrt.DeclaredBase) string {
 		return b.Image + ", pinned by digest"
 	}
 	return b.Ref()
+}
+
+// catalogRuntime is catalog.Runtime for a catalog that may be nil.
+func catalogRuntime(catalog *runtimeversions.Catalog, build string) (runtimeversions.Runtime, bool) {
+	if catalog == nil {
+		return runtimeversions.Runtime{}, false
+	}
+	return catalog.Runtime(build)
 }

@@ -75,6 +75,19 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 			return c.d.AirflowDefault(ctx)
 		}
 	}
+	// A 1.x Dockerfile on one Airflow 2 build pins the Airflow that build
+	// carries, which only the catalog knows. Asked only for such a
+	// Dockerfile; without a catalog the pin stays the generation, with its note.
+	if c.d.RuntimeCatalog != nil {
+		opts.RuntimeAirflow = func(build string) string {
+			if cat := c.d.RuntimeCatalog(ctx); cat != nil {
+				if r, ok := cat.Runtime(build); ok {
+					return r.AirflowVersion
+				}
+			}
+			return ""
+		}
+	}
 	// There is one project format, and init converts a 1.x project to it the
 	// same way on Astro and on Astro Private Cloud, which deploys
 	// pyproject.toml projects too. The one thing the context decides is the
