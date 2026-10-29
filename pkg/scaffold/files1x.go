@@ -60,6 +60,13 @@ type project1x struct {
 	// pin is "2" and the next image build would move it to the newest
 	// Airflow 2. An Airflow 3 tag needs none: the pin names its series.
 	runtime string
+	// airflow2Build is the one Airflow 2 runtime build the Dockerfile's final
+	// stage is FROM ("12.6.0"), on any registry, whatever else the file does,
+	// or "". Its tag names no Airflow minor, so airflow reads "2" until plan
+	// asks Options.RuntimeAirflow which Airflow the build carries
+	// (refineAirflow2Pin). A flavor ("12.6.0-python-3.11") or floating
+	// ("12") tag leaves it empty.
+	airflow2Build string
 	// basePython is the Python the Dockerfile's Astro Runtime base runs, when
 	// its tag names one ("3.13" from runtime:3.3-2-python-3.13), or "".
 	basePython string
@@ -307,6 +314,11 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 		// says the minor was not read. Nor does a mirror: a generated build
 		// pulls the build from Astronomer's own repository, so the file is
 		// the only record of where this project's base comes from.
+		if bare := strings.TrimPrefix(tag, "v"); version == "2" {
+			if t, ok := manifest.ParseRuntimeTag(bare); ok && t.Major == "2" && t.Build {
+				from1x.airflow2Build = bare
+			}
+		}
 		if bare := strings.TrimPrefix(tag, "v"); version == "2" && from1x.dockerfilePinOnly && image == airflow2RuntimeImage {
 			if t, ok := manifest.ParseRuntimeTag(bare); ok && t.Major == "2" && t.Build && runtimeMajor(bare) >= minAirflow2Runtime {
 				from1x.runtime = bare
@@ -769,11 +781,42 @@ func airflowFromDockerfile(image, tag string, err error) (version string, stated
 		p := runtimeTagRe.FindStringSubmatch(bare)
 		return p[1] + "." + p[2], true, nil
 	case oldRuntimeTagRe.MatchString(bare):
-		return "2", true, []string{prefix + "runtime " + tag + " is an Airflow 2 image whose tag does not name the Airflow minor, " +
-			"so the pin is \"2\", meaning the newest Airflow 2. Set it explicitly if this project needs a particular one"}
+		return "2", true, []string{airflow2MinorNote(tag)}
 	default:
 		return "", true, []string{prefix + "the tag " + tag + " is not an Astro Runtime version, so the Airflow version was not read from it"}
 	}
+}
+
+// airflow2MinorNote is what a run says about an Airflow 2 tag whose Airflow it
+// could not read: the pin is the generation. refineAirflow2Pin takes it back
+// out when the catalog names the build's Airflow after all.
+func airflow2MinorNote(tag string) string {
+	return "Dockerfile: runtime " + tag + " is an Airflow 2 image whose tag does not name the Airflow minor, " +
+		"so the pin is \"2\", meaning the newest Airflow 2. Set it explicitly if this project needs a particular one"
+}
+
+// refineAirflow2Pin reads the Airflow an Airflow 2 Dockerfile's build carries
+// from runtimeAirflow (the catalog, through Options.RuntimeAirflow) and pins
+// its series: runtime 12.6.0 carries 2.10.4, so the pin is "2.10" and the
+// manifest writes apache-airflow==2.10.*. Without it the pin stayed "2", the
+// newest Airflow 2, and the lockfile and standalone ran a newer Airflow than
+// the image the Dockerfile builds. The pin-only Dockerfile's recorded runtime
+// (#2380) still applies: it is written when the chosen pin is from1x.airflow,
+// which this changes in step. Nothing is asked when there is no exact build,
+// no resolver, or the Dockerfile already named a series.
+func refineAirflow2Pin(from1x *project1x, runtimeAirflow func(build string) string) {
+	if from1x.airflow != "2" || from1x.airflow2Build == "" || runtimeAirflow == nil {
+		return
+	}
+	major, rest, _ := strings.Cut(strings.TrimSpace(runtimeAirflow(from1x.airflow2Build)), ".")
+	minor, _, _ := strings.Cut(rest, ".")
+	if major != "2" || minor == "" {
+		return
+	}
+	from1x.airflow = major + "." + minor
+	from1x.notes = slices.DeleteFunc(from1x.notes, func(n string) bool {
+		return strings.HasPrefix(n, "Dockerfile: runtime ") && strings.Contains(n, "does not name the Airflow minor")
+	})
 }
 
 // buildInstructionRe finds a Dockerfile instruction that is not FROM.
