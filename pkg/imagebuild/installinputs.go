@@ -71,8 +71,9 @@ const generatedInputsDir = ".astro/install"
 // pages in [tool.uv] of the pyproject.toml it is given (requestPyproject).
 const installFindLinksName = "install-find-links.txt"
 
-// UVImage is the image the install stage copies uv from (airflowrt.UVImage).
-const UVImage = airflowrt.UVImage
+// UVImage is the image the install stage copies uv from (airflowrt.UVImage,
+// pinned by tag and digest in pkg/airflowrt/uv-image.txt).
+var UVImage = airflowrt.UVImage
 
 // uvImage is the uv image a generated build copies uv from: UVImage, or the
 // mirror the ASTRO_UV_IMAGE environment variable names, as the build argument

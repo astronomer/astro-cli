@@ -121,13 +121,21 @@ const ProjectInputs = pyprojectName + " " + uvLockName + "* " + InstallHelperPat
 // InstallStage is the name InstallDockerfile gives the helper's stage.
 const InstallStage = "astro-install"
 
+// uvImagePin is uv-image.txt: the uv image as tag@digest, one line. It is the
+// one place the uv release is named, and scripts/bump-uv-image.sh rewrites it
+// when a newer release has aged past the supply-chain cooldown.
+//
+//go:embed uv-image.txt
+var uvImagePin string
+
 // UVImage is the image the install stage copies uv from, at the uv release the
-// helper is tested with. It is the default of the UVImageArg build argument
-// InstallDockerfile declares, so a build that cannot pull from ghcr.io names a
-// mirror of the same image instead: `--build-arg ASTRO_UV_IMAGE=<mirror>`, or
-// an edit of the ARG line, for a project's own Dockerfile; pkg/imagebuild reads
-// the environment variable of the same name for a build it generates.
-const UVImage = "ghcr.io/astral-sh/uv:0.11.8"
+// helper is tested with, pinned by digest. It is the default of the UVImageArg
+// build argument InstallDockerfile declares, so a build that cannot pull from
+// ghcr.io names a mirror of the same image instead: `--build-arg
+// ASTRO_UV_IMAGE=<mirror>`, or an edit of the ARG line, for a project's own
+// Dockerfile; pkg/imagebuild reads the environment variable of the same name
+// for a build it generates.
+var UVImage = strings.TrimSpace(uvImagePin)
 
 // UVImageArg is the build argument naming the image the install stage copies
 // uv from (UVImage by default), declared ahead of every FROM.
