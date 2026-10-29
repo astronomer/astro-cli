@@ -32,7 +32,7 @@ var labelAllowed = map[string]string{
 // labelLiteral matches a string that starts with a label the CLI prints
 // through cmd/cliout, after any leading whitespace or newlines, so
 // "\nWarning: …" is caught too.
-var labelLiteral = regexp.MustCompile(`(?i)^\s*(warning|error|note): `)
+var labelLiteral = regexp.MustCompile(`(?i)^\s*(warning|error|note|next): `)
 
 // No non-test string literal starts with a Warning, Error or Note label,
 // except what labelAllowed names. The labels themselves are built from the
@@ -66,8 +66,8 @@ func TestLabelsComeFromCliout(t *testing.T) {
 	}
 	sort.Strings(problems)
 	if len(problems) > 0 {
-		t.Errorf("%d string literals start with a Warning, Error or Note label:\n\t%s\n\n"+
-			"Print the label through cmd/cliout (or pkg/ansi, from internal/) instead: Warn, Note, or WarningLabel, "+
+		t.Errorf("%d string literals start with a Warning, Error, Note or Next label:\n\t%s\n\n"+
+			"Print the label through cmd/cliout (or pkg/ansi, from internal/) instead: Warn, Note, or WarningLabel, NextLabel, "+
 			"ErrorLabel, NoteLabel, DangerLabel beside the message, so it is colored on a terminal and "+
 			"spelled the same everywhere. If the text is not the CLI's own label, for example another "+
 			"tool's output being parsed, add it to labelAllowed in internal/archlint/labels_test.go "+

@@ -23,6 +23,10 @@ func ErrorLabel(w io.Writer) string { return ansi.ErrorLabel(w) }
 // NoteLabel is the dim "Note:" that leads a note written to w.
 func NoteLabel(w io.Writer) string { return ansi.NoteLabel(w) }
 
+// NextLabel is the cyan "Next:" that leads the command a run suggests next.
+// It colors on a terminal stdout as well as stderr (ansi.NextLabel).
+func NextLabel(w io.Writer) string { return ansi.NextLabel(w) }
+
 // DangerLabel is the red "WARNING:" that leads a confirmation of something
 // that cannot be undone.
 func DangerLabel(w io.Writer) string { return ansi.DangerLabel(w) }

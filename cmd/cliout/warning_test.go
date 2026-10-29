@@ -54,6 +54,30 @@ func TestLabelsAreColoredOnStderrUnlessNoColor(t *testing.T) {
 	}
 }
 
+// Next: is cyan on a terminal stdout as well as stderr, since it leads a
+// command's own output; anything else, and NO_COLOR, gets it plain.
+func TestNextLabelColorsOnStdoutAndStderr(t *testing.T) {
+	forced := ansi.ForceColors
+	ansi.ForceColors = true
+	t.Cleanup(func() { ansi.ForceColors = forced })
+	t.Setenv("NO_COLOR", "")
+
+	for name, w := range map[string]*os.File{"stdout": os.Stdout, "stderr": os.Stderr} {
+		if got := NextLabel(w); !strings.Contains(got, "\x1b[36m") || !strings.Contains(got, "Next:") {
+			t.Errorf("NextLabel on %s = %q, want a cyan Next:", name, got)
+		}
+	}
+	var b bytes.Buffer
+	if got := NextLabel(&b); got != "Next:" {
+		t.Errorf("NextLabel on a buffer = %q, want plain", got)
+	}
+
+	t.Setenv("NO_COLOR", "1")
+	if got := NextLabel(os.Stdout); got != "Next:" {
+		t.Errorf("NextLabel on stdout under NO_COLOR = %q, want plain", got)
+	}
+}
+
 // Note: is dim and the danger label red on stderr with color on; off stderr,
 // or under NO_COLOR, both are plain.
 func TestNoteAndDangerLabels(t *testing.T) {

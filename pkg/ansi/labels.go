@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/logrusorgru/aurora"
 )
 
 // The labels that lead the CLI's warnings, errors and notes. They live here,
@@ -47,6 +49,37 @@ func NoteLabel(w io.Writer) string {
 // it marks a danger rather than a warning the command goes ahead despite.
 func DangerLabel(w io.Writer) string {
 	return labelFor(w, "WARNING:", Palette.Red)
+}
+
+// NextLabel is the "Next:" that leads the command a run suggests next, cyan.
+// Unlike the labels above it leads a command's own output, which is often on
+// stdout, so it colors on whichever of stdout or stderr w is, by that
+// stream's own terminal (streamLabelFor).
+func NextLabel(w io.Writer) string {
+	return streamLabelFor(w, "Next:", Palette.Cyan)
+}
+
+// streamLabelFor colors a label written to the process's stdout or stderr
+// when that stream colors (a terminal, or color forced, this package's rule)
+// and NO_COLOR is unset or empty. Anywhere else (a pipe of either stream's
+// own, a file, a test's buffer) it is plain text.
+func streamLabelFor(w io.Writer, text string, color func(Palette, string) string) string {
+	f, ok := w.(*os.File)
+	if !ok || os.Getenv("NO_COLOR") != "" {
+		return text
+	}
+	switch f {
+	case os.Stderr:
+		return color(ForStderr(), text)
+	case os.Stdout:
+		return color(forStdout(), text)
+	}
+	return text
+}
+
+// forStdout colors text written to stdout, by whether stdout is a terminal.
+func forStdout() Palette {
+	return Palette{aurora.NewAurora(shouldColor(IsOutputTerminal))}
 }
 
 // labelFor colors a label only where color belongs: w is the process's
