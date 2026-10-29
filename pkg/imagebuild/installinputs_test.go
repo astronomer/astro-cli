@@ -2,6 +2,7 @@ package imagebuild
 
 import (
 	"bytes"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -116,13 +117,28 @@ func helperProject(t *testing.T, pyproject, lock string) string {
 	return dir
 }
 
-// fixtureProject is helperProject over testdata/install/name's pyproject.toml
-// and uv.lock, which `uv lock` wrote. Rewrite a lock with `uv lock` in its
-// directory after changing its pyproject.toml.
+// fixtureProject is helperProject over testdata/install/name: its
+// pyproject.toml, the uv.lock `uv lock` wrote for it, and any file a path
+// source names. Rewrite a lock with `uv lock` in its directory after changing
+// its pyproject.toml.
 func fixtureProject(t *testing.T, name string) string {
 	t.Helper()
 	pyproject, lock := fixtureFiles(t, name)
-	return helperProject(t, pyproject, lock)
+	dir := helperProject(t, pyproject, lock)
+	root := filepath.Join("testdata", "install", name)
+	require.NoError(t, filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Dir(path) == root {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, path)
+		writeTree(t, dir, map[string]string{filepath.ToSlash(rel): string(data)})
+		return nil
+	}))
+	return dir
 }
 
 // fixtureFiles are testdata/install/name's pyproject.toml and uv.lock.
@@ -177,6 +193,14 @@ func TestInstallHelperInstallsByNameFromADefaultIndex(t *testing.T) {
 	out := runHelper(t, fixtureProject(t, "mirror"), helperRun{})
 	assert.Empty(t, out.stderr)
 	assert.Equal(t, "six==1.16.0\n", out.requirements)
+}
+
+// A package from a path is installed by name at the lock's version, as the
+// path is not in the image.
+func TestInstallHelperInstallsAPathSourceByName(t *testing.T) {
+	out := runHelper(t, fixtureProject(t, "path"), helperRun{})
+	assert.Empty(t, out.stderr)
+	assert.Equal(t, "localpkg==1.2.0\ntabulate==0.10.0\n", out.requirements)
 }
 
 // A git or URL source is a direct reference at the commit or file the lock
