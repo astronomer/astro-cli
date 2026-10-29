@@ -17,13 +17,18 @@ import (
 // What a build installs comes from the project's pyproject.toml and uv.lock,
 // read inside the build by one helper, install-project.py, at InstallHelperPath
 // in the build's context, so `docker build .` needs nothing from the CLI. The
-// helper writes the runtime's install inputs: requirements.txt (the
-// dependencies, without Airflow, a [tool.uv.sources] git or URL source as a
-// direct reference, an index source as a --find-links line), packages.txt
-// ([tool.astro] packages, plus git when a dependency is fetched with it), and,
-// from uv.lock, a constraints file holding each package at the version the lock
-// resolved, which requirements.txt names with -c. So the image installs the
-// versions `uv sync` installs in standalone mode.
+// helper hands the resolving to uv, which its stage copies in from UVImage:
+// `uv lock --check` decides whether uv.lock still matches pyproject.toml, `uv
+// lock` resolves one in the build when it does not (with a warning), and `uv
+// export --format pylock.toml` lists what it installs. The helper keeps what
+// the runtime image ships as it ships it, and writes the runtime's install
+// inputs: requirements.txt (the project's own dependencies at the lock's
+// versions, without Airflow; a package from git, a URL or the index a
+// [tool.uv.sources] entry routes it to as a direct reference to what the lock
+// recorded), packages.txt ([tool.astro] packages, plus git when a dependency
+// is fetched with it), and a constraints file pinning every other locked
+// package the image does not already have, which requirements.txt names with
+// -c. uv itself stays in that stage: the image has none.
 //
 // It runs in a stage of its own (InstallDockerfile), and the install steps copy
 // only what it wrote. The stage reads the whole project and reruns on any edit,
@@ -116,6 +121,25 @@ const ProjectInputs = pyprojectName + " " + uvLockName + "* " + InstallHelperPat
 // InstallStage is the name InstallDockerfile gives the helper's stage.
 const InstallStage = "astro-install"
 
+// UVImage is the image the install stage copies uv from, at the uv release the
+// helper is tested with. It is the default of the UVImageArg build argument
+// InstallDockerfile declares, so a build that cannot pull from ghcr.io names a
+// mirror of the same image instead: `--build-arg ASTRO_UV_IMAGE=<mirror>`, or
+// an edit of the ARG line, for a project's own Dockerfile; pkg/imagebuild reads
+// the environment variable of the same name for a build it generates.
+const UVImage = "ghcr.io/astral-sh/uv:0.11.8"
+
+// UVImageArg is the build argument naming the image the install stage copies
+// uv from (UVImage by default), declared ahead of every FROM.
+const UVImageArg = "ASTRO_UV_IMAGE"
+
+// UVStage is the name InstallDockerfile gives the stage uv is copied from.
+const UVStage = "astro-uv"
+
+// uvPath is where the install stage puts uv, as install-project.py's UV
+// expects it.
+const uvPath = "/opt/astro-uv/uv"
+
 // InstallDockerfile is the Dockerfile that installs a project over from, an
 // Astro Runtime -base image (BaseOf): the install helper's stage, then the
 // steps the runtime's ONBUILD tag runs as triggers (astro-runtime's
@@ -128,6 +152,10 @@ const InstallStage = "astro-install"
 //
 // from is everything a FROM line takes after the keyword and before any AS, so
 // a stage flag (--platform=linux/amd64) comes with the reference.
+//
+// Its first line declares UVImageArg, which a FROM can read only when the
+// declaration comes before the file's first FROM: a caller that writes the
+// rest after stages of its own puts that line ahead of them.
 //
 // The install steps are written out rather than inherited for two reasons. The
 // trigger list has changed across runtimes (the netrc mount is in 3.3-9 but not
@@ -158,7 +186,10 @@ type InstallOptions struct {
 	// Empty is a project's own: pyproject.toml, uv.lock when there is one,
 	// and the helper at InstallHelperPath (ProjectInputs).
 	Inputs string
-	// NoNetrc leaves the Python install's netrc mount out: a generated build
+	// UVImage is the default of the UVImageArg build argument the install
+	// stage copies uv from. Empty is UVImage.
+	UVImage string
+	// NoNetrc leaves the netrc mounts out: a generated build
 	// mounts the secret only when the build passes it. RUN --mount needs
 	// BuildKit (Docker) or Buildah 1.21 (Podman 3.2), so a generated build
 	// with no secret to mount keeps to a plain RUN, and the legacy builder and
@@ -174,6 +205,10 @@ func InstallDockerfileWith(from string, opts InstallOptions) string {
 	if opts.NoNetrc {
 		netrc = ""
 	}
+	uvImage := opts.UVImage
+	if uvImage == "" {
+		uvImage = UVImage
+	}
 	inputs := opts.Inputs
 	if inputs == "" {
 		inputs = ProjectInputs
@@ -182,14 +217,19 @@ func InstallDockerfileWith(from string, opts InstallOptions) string {
 	if opts.Alias != "" {
 		final = "FROM " + from + " AS " + opts.Alias + "\n"
 	}
-	return "FROM " + from + " AS " + InstallStage + "\n" +
+	return "ARG " + UVImageArg + "=" + uvImage + "\n" +
+		"FROM ${" + UVImageArg + "} AS " + UVStage + "\n" +
+		"FROM " + from + " AS " + InstallStage + "\n" +
 		// Root, because the context keeps its files' modes, and a project's may
 		// be readable by its owner alone.
 		"USER root\n" +
 		// Just the inputs, so an edit elsewhere in the project does not rerun
 		// the stage.
 		"COPY " + inputs + " " + inputsDir + "/\n" +
-		"RUN python " + inputsDir + "/" + path.Base(InstallHelperPath) + " --project " + inputsDir + " --out " + listsDir + "\n" +
+		"COPY --from=" + UVStage + " /uv " + uvPath + "\n" +
+		// The netrc too, for a lock that is resolved in the build against an
+		// index that wants it.
+		"RUN " + netrc + "python " + inputsDir + "/" + path.Base(InstallHelperPath) + " --project " + inputsDir + " --out " + listsDir + "\n" +
 		final +
 		"COPY --from=" + InstallStage + " " + listsDir + "/" + PackagesName + " .\n" +
 		"USER root\n" +

@@ -109,8 +109,8 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 		return nil, prefix + "because runtime " + final.Tag + " is older than runtime 9 (Airflow 2.7), the oldest astro builds images for", true
 	}
 	for i := range stages {
-		if strings.EqualFold(stages[i].Alias, airflowrt.InstallStage) {
-			return nil, prefix + "because it already has a stage named " + stages[i].Alias + ", the name of the stage that does the install", true
+		if strings.EqualFold(stages[i].Alias, airflowrt.InstallStage) || strings.EqualFold(stages[i].Alias, airflowrt.UVStage) {
+			return nil, prefix + "because it already has a stage named " + stages[i].Alias + ", the name of a stage that does the install", true
 		}
 	}
 	lines := strings.Split(string(data), "\n")
@@ -126,13 +126,28 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 	base := airflowrt.BaseOf(final.Ref)
 	from := strings.Join(append(append([]string{}, final.Flags...), base), " ")
 	install := airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias})
+	// The recipe's first line declares the build argument its uv stage reads,
+	// which a FROM sees only when it comes before the file's first FROM: ahead
+	// of the file's earlier stages, after its parser directives and its own
+	// global ARGs.
+	uvArg, install, _ := strings.Cut(install, "\n")
+	first := stages[0].Line
 
 	var b strings.Builder
-	if final.Line > 0 {
-		b.WriteString(strings.Join(lines[:final.Line], "\n"))
-		b.WriteString("\n")
+	if first < final.Line {
+		if first > 0 {
+			b.WriteString(strings.Join(lines[:first], "\n") + "\n")
+		}
+		b.WriteString(uvArg + "\n")
+		b.WriteString(strings.Join(lines[first:final.Line], "\n") + "\n")
+		b.WriteString(installBlockComment)
+	} else {
+		if final.Line > 0 {
+			b.WriteString(strings.Join(lines[:final.Line], "\n") + "\n")
+		}
+		b.WriteString(installBlockComment)
+		b.WriteString(uvArg + "\n")
 	}
-	b.WriteString(installBlockComment)
 	b.WriteString(install)
 	if own := lines[final.Line+1:]; strings.TrimSpace(strings.Join(own, "\n")) != "" {
 		b.WriteString("\n" + ownStepsComment)

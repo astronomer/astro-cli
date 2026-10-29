@@ -1,6 +1,7 @@
 package airflowrt
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -54,7 +55,11 @@ func TestBaseOf(t *testing.T) {
 func TestInstallDockerfileRunsTheHelperAtItsPath(t *testing.T) {
 	df := InstallDockerfile("img:1-base")
 	assert.Contains(t, df, " "+InstallHelperPath+" ", "the stage copies the helper in")
-	assert.Contains(t, df, "RUN python /tmp/astro-project/install-project.py ")
+	assert.Contains(t, df, " python /tmp/astro-project/install-project.py ")
 	assert.Contains(t, df, "FROM img:1-base AS "+InstallStage+"\n")
+	assert.True(t, strings.HasPrefix(df, "ARG "+UVImageArg+"="+UVImage+"\nFROM ${"+UVImageArg+"} AS "+UVStage+"\n"),
+		"the uv stage comes first, its build argument ahead of every FROM")
+	assert.Contains(t, df, "COPY --from="+UVStage+" /uv /opt/astro-uv/uv\n")
+	assert.Contains(t, InstallDockerfileWith("img:1-base", InstallOptions{UVImage: "mirror.example/uv:1"}), "ARG "+UVImageArg+"=mirror.example/uv:1\n")
 	assert.NotEmpty(t, InstallHelper())
 }

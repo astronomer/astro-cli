@@ -121,7 +121,10 @@ func TestDockerfileRewriteOfKeepsEarlierStagesAndTheAlias(t *testing.T) {
 
 	from := "--platform=linux/amd64 astrocrpublic.azurecr.io/runtime:3.1-12-base"
 	install := airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: "app"})
-	want := "ARG PY=3.12\nFROM python:3.12-slim AS builder\nRUN pip wheel --wheel-dir /wheels mylib\n\n" +
+	// The build argument the uv stage reads goes ahead of the first FROM, where
+	// a FROM can read it, and after the file's own.
+	uvArg, install, _ := strings.Cut(install, "\n")
+	want := "ARG PY=3.12\n" + uvArg + "\nFROM python:3.12-slim AS builder\nRUN pip wheel --wheel-dir /wheels mylib\n\n" +
 		installBlockComment + install + "\n" + ownStepsComment +
 		"COPY --from=builder /wheels /wheels\nENV TZ=UTC\n"
 	assert.Equal(t, want, string(rw.body))
@@ -129,12 +132,13 @@ func TestDockerfileRewriteOfKeepsEarlierStagesAndTheAlias(t *testing.T) {
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1-12-base", rw.base)
 	assert.False(t, rw.mirror)
 
-	// The install's helper stage is unnamed by the project and keeps the
-	// install's own name; only the project's final stage carries "app".
+	// The install's uv and helper stages are unnamed by the project and keep
+	// the install's own names; only the project's final stage carries "app".
 	stages := airflowrt.DockerfileStages(rw.body)
-	require.Len(t, stages, 3)
-	assert.Equal(t, airflowrt.InstallStage, stages[1].Alias)
-	assert.Equal(t, "app", stages[2].Alias)
+	require.Len(t, stages, 4)
+	assert.Equal(t, airflowrt.UVStage, stages[1].Alias)
+	assert.Equal(t, airflowrt.InstallStage, stages[2].Alias)
+	assert.Equal(t, "app", stages[3].Alias)
 	for _, st := range stages {
 		assert.False(t, st.OnBuildRuntime(), "no stage is left on an ONBUILD tag: %s", st.Ref)
 	}

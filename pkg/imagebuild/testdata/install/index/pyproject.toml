@@ -1,0 +1,13 @@
+[project]
+name = "index"
+version = "0"
+requires-python = ">=3.10"
+dependencies = ["six", "tabulate"]
+
+[tool.uv.sources]
+six = { index = "other" }
+
+[[tool.uv.index]]
+name = "other"
+url = "https://test.pypi.org/simple/"
+explicit = true
