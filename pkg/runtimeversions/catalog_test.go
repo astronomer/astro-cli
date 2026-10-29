@@ -265,6 +265,25 @@ func TestAirflowFor(t *testing.T) {
 	}
 }
 
+// A build listed ahead of its release date has no image yet, so the Airflow a
+// deployment runs is the newest published build's, the build the runtime pins
+// are of too (NewestPublishedRuntimeFor). Counting the scheduled one held
+// Airflow to 3.3.3 beside pins of a build carrying 3.3.2.
+func TestAirflowForSkipsAScheduledBuild(t *testing.T) {
+	standOn(t, "2026-10-04")
+	c := parse(t, `{"runtimeVersionsV3": {
+    "3.3-9": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "releaseDate": "2026-10-01"}},
+    "3.3-10": {"metadata": {"airflowVersion": "3.3.3", "channel": "stable", "releaseDate": "2026-10-20"}}
+  }}`)
+	got, ok := c.AirflowFor("3.3", "")
+	if !ok || got != "3.3.2" {
+		t.Errorf("AirflowFor(3.3) = %q, %v; want 3.3.2, the published build's", got, ok)
+	}
+	if build, _ := c.NewestPublishedRuntimeFor("3.3"); build != "3.3-9" {
+		t.Errorf("NewestPublishedRuntimeFor(3.3) = %q; want 3.3-9, the build the pins are of", build)
+	}
+}
+
 func TestRuntimeTagOrderIsNumeric(t *testing.T) {
 	c := parse(t, `{"runtimeVersionsV3": {
 		"3.3-8":  {"metadata": {"airflowVersion": "3.3.2", "channel": "stable"}},

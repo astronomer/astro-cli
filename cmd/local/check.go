@@ -106,6 +106,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 		return err
 	}
 	res = withEnvFindings(res, envFindings(envRep))
+	res = c.withRuntimeHints(ctx, project, m, res)
 
 	// Best effort: the check is about the DAGs, and a listing that cannot be
 	// read only costs the note.
@@ -156,6 +157,7 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 		// from the ENV_SETUP.md checklist `astro package` writes.
 		if t == checks.TargetAstro && rep.OpError == "" {
 			res := withEnvFindings(checks.Result{Findings: rep.Findings, DagCount: rep.DagCount, Errors: rep.Errors, Warnings: rep.Warnings}, envFindings(envRep))
+			res = c.withRuntimeHints(ctx, project, m, res)
 			rep.Findings, rep.Errors, rep.Warnings = res.Findings, res.Errors, res.Warnings
 		}
 		reports = append(reports, rep)
@@ -200,7 +202,7 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, env []str
 		Deps:        deps,
 		// Without the pins to Astronomer's build of Airflow: a platform runs
 		// Apache's own, at its own version.
-		Constraints: manifest.WithoutAstroPins(m.UV.ConstraintDependencies),
+		Constraints: m.UV.WithoutRuntimeConstraints(manifest.WithoutAstroPins(m.UV.ConstraintDependencies)),
 		Env:         env,
 	}, prov, c.d.CheckVenv, strict, progress)
 }
@@ -406,6 +408,9 @@ func renderCheck(r cliout.Renderer, res checks.Result, strict, provisioned bool,
 			return err
 		}
 	}
+	if err := renderHints(r.Out, res.Findings); err != nil {
+		return err
+	}
 	if note := plan.UndeclaredNote(undeclared, workspace); note != "" {
 		if _, err := fmt.Fprintf(r.Out, "info: %s\n\n", note); err != nil {
 			return err
@@ -413,6 +418,23 @@ func renderCheck(r cliout.Renderer, res checks.Result, strict, provisioned bool,
 	}
 	_, err := fmt.Fprintln(r.Out, checkSummaryLine(summary))
 	return err
+}
+
+// renderHints writes one line per distinct hint, each followed by a blank
+// line: a missing package fails every Dag that imports it the same way.
+func renderHints(w io.Writer, findings []checks.Finding) error {
+	seen := map[string]bool{}
+	for i := range findings {
+		hint := findings[i].Hint
+		if hint == "" || seen[hint] {
+			continue
+		}
+		seen[hint] = true
+		if _, err := fmt.Fprintf(w, "hint: %s\n\n", hint); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func renderFindingsTable(w io.Writer, findings []checks.Finding, budget *int) error {
@@ -921,6 +943,9 @@ func renderTargetReport(w io.Writer, rep *checks.TargetReport, strict bool, budg
 		// the findings block is what stops the spacing depending on which kind
 		// of finding printed last.
 		if _, err := fmt.Fprintln(w); err != nil {
+			return err
+		}
+		if err := renderHints(w, rep.Findings); err != nil {
 			return err
 		}
 	}
