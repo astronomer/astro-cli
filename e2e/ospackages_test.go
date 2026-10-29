@@ -27,7 +27,7 @@ const (
 // T7.4's first claim, and the last part of the manifest's build contract with
 // no test behind it. The plumbing reads as though it works — the manifest's
 // `packages` reach the build request, imagebuild writes them to packages.txt,
-// and the runtime image's ONBUILD trigger apt-installs that file — but no case
+// and the generated Dockerfile apt-installs that file — but no case
 // had ever asked the running container whether any of it happened. A dropped
 // field anywhere along that path produces an image that starts perfectly and
 // is missing what the project said it needed, which is only discovered by the
@@ -92,7 +92,7 @@ func TestTheBaseImageDoesNotAlreadyHaveTheDeclaredPackage(t *testing.T) {
 	p := dockerProject(t, "ospkgbase")
 	needsDocker(t, p)
 
-	base := runtimeImageFor(t, p)
+	base := runtimeBaseImageFor(t, p)
 	out, err := exec.CommandContext(t.Context(), "docker", "run", "--rm", "--entrypoint", "sh", base,
 		"-c", "dpkg -s "+declaredPackage+" >/dev/null 2>&1 && echo BASE-YES || echo BASE-NO").CombinedOutput()
 	if err != nil {

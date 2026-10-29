@@ -21,6 +21,7 @@ func TestPlanCarriesEveryManifestBuildField(t *testing.T) {
 		RequiresPython: "==3.13.*",
 		Dockerfile:     "docker/Dockerfile",
 		Dependencies:   []string{"apache-airflow==3.1.*", "pandas"},
+		FindLinks:      []string{"https://pypi.acme.example/simple/private-lib/"},
 		Packages:       []string{"libpq-dev"},
 	}
 	v := reflect.ValueOf(want)

@@ -119,7 +119,7 @@ func TestForManifestGeneratedRequestInstallsDependenciesAndPackages(t *testing.T
 	assert.Equal(t, "libpq-dev\n", string(pkgs))
 	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
 	require.NoError(t, err)
-	assert.Equal(t, "FROM "+RuntimeImageRepo+":3.1\n", string(df))
+	assert.Equal(t, GeneratedDockerfile(RuntimeImageRepo+":3.1", false), string(df))
 }
 
 // A secret other than netrc reaches the build exactly when a Dockerfile is
@@ -149,7 +149,7 @@ func TestFromDeclaredDockerfileMatchesWhereSecretsReachTheBuild(t *testing.T) {
 	}
 }
 
-// With nothing to install, BuildLocal still builds the one-line `FROM <base>`
+// With nothing to install, BuildLocal still builds the generated Dockerfile
 // at the requested platform, so the tag it returns names a single-platform
 // image in the local store rather than the base's multi-platform index.
 func TestBuildLocalBuildsEvenWithNothingToInstall(t *testing.T) {
@@ -170,7 +170,7 @@ func TestBuildLocalBuildsEvenWithNothingToInstall(t *testing.T) {
 	assert.Contains(t, cmd.calls[0], "--platform linux/amd64")
 	assert.False(t, hasCall(cmd.calls, "docker pull"), "%v", cmd.calls)
 
-	// The ONBUILD triggers COPY both files, so both exist, and install nothing.
+	// The install steps COPY both files, so both exist, and install nothing.
 	reqs, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, requirementsName))
 	require.NoError(t, err)
 	assert.Equal(t, "\n", string(reqs))
@@ -179,7 +179,7 @@ func TestBuildLocalBuildsEvenWithNothingToInstall(t *testing.T) {
 	assert.Empty(t, pkgs)
 	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
 	require.NoError(t, err)
-	assert.Equal(t, "FROM "+RuntimeImageRepo+":3.1\n", string(df))
+	assert.Equal(t, GeneratedDockerfile(RuntimeImageRepo+":3.1", false), string(df))
 }
 
 // Build keeps its fast path: local docker mode runs the base as-is at the host
@@ -193,7 +193,7 @@ func TestBuildKeepsTheFastPathBuildLocalSkips(t *testing.T) {
 	cmd := &fakeCmd{}
 	built, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
-	assert.Equal(t, req.BaseImage, built)
+	assert.Equal(t, req.BaseImage+"-base", built)
 	assert.Empty(t, cmd.calls)
 }
 

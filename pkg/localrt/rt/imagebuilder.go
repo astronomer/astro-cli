@@ -28,11 +28,19 @@ type ImageBuilder interface {
 	// Airflow 2; docker mode runs it, and that is the one difference.
 	//
 	// The returned request carries BaseImage, or Dockerfile and Context, plus
-	// Dependencies and Packages. The engine fills in the rest.
+	// Dependencies, FindLinks and Packages. The engine fills in the rest. An
+	// adapter copying fields across must copy every one: a field it leaves
+	// out reaches the build as its zero value, with nothing to say so.
 	Request(ctx context.Context, m ManifestBuild) (BuildRequest, error)
-	// Build layers the project's dependencies and OS packages over BaseImage and
-	// returns the image to run. With nothing to install it returns BaseImage
-	// unchanged rather than building an empty layer.
+	// Build returns the image to run. A generated build (no Dockerfile)
+	// starts FROM BaseImage's -base tag, BaseImage + "-base", the same image
+	// without the runtime's ONBUILD triggers, and installs the project's OS
+	// packages and dependencies in steps of its own. With nothing to install
+	// it builds nothing and returns that -base tag itself: never BaseImage,
+	// and never req.Tag. So a consumer tells the fast path from a build by
+	// comparing the result with req.Tag, which every build returns; comparing
+	// it with BaseImage matches neither. A declared Dockerfile always builds
+	// and returns req.Tag.
 	Build(ctx context.Context, req BuildRequest, cb Callbacks) (string, error)
 }
 
@@ -69,6 +77,10 @@ type ManifestBuild struct {
 	// Dependencies are [project] dependencies (PEP 508), as
 	// manifest.Requirements gives them.
 	Dependencies []string
+	// FindLinks are the per-package pages of the indexes [tool.uv.sources]
+	// routes a dependency to (manifest.UV.IndexPages), which a generated
+	// image's install searches besides PyPI.
+	FindLinks []string
 	// Packages are [tool.astro] packages, OS (apt) package names.
 	Packages []string
 }
@@ -84,6 +96,7 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 		RequiresPython: p.RequiresPython,
 		Dockerfile:     p.Dockerfile,
 		Dependencies:   p.Dependencies,
+		FindLinks:      p.FindLinks,
 		Packages:       p.Packages,
 	}
 }
@@ -97,6 +110,7 @@ func (p *Plan) SetManifestBuild(mb ManifestBuild) {
 	p.RequiresPython = mb.RequiresPython
 	p.Dockerfile = mb.Dockerfile
 	p.Dependencies = mb.Dependencies
+	p.FindLinks = mb.FindLinks
 	p.Packages = mb.Packages
 }
 
@@ -107,8 +121,11 @@ func (p *Plan) SetManifestBuild(mb ManifestBuild) {
 type BuildRequest struct {
 	// WorkDir is where the build context and Dockerfile are written.
 	WorkDir string
-	// BaseImage is the resolved runtime image the build starts FROM. Empty when
-	// Dockerfile is set — that file declares its own FROM.
+	// BaseImage is the resolved runtime image the build is of: the runtime's
+	// own tag (runtime:3.1-5), which names the runtime and is what a caller
+	// parses a version out of. The build starts FROM its -base tag, and the
+	// fast path returns that tag (ImageBuilder.Build), not this one. Empty
+	// when Dockerfile is set — that file declares its own FROM.
 	BaseImage string
 	// Dockerfile and Context ask the builder to run the project's own Dockerfile
 	// rather than generate one, for a project whose manifest declared it. Both
@@ -117,12 +134,15 @@ type BuildRequest struct {
 	Dockerfile string
 	Context    string
 	// Secrets are docker build --secret specs. A generated build passes on
-	// only the netrc one, which the runtime image mounts while it installs.
+	// only the netrc one, which its Python install mounts.
 	Secrets []string
 	// Tag is the image reference the build produces.
 	Tag string
 	// Dependencies are the manifest's Python dependencies (PEP 508).
 	Dependencies []string
+	// FindLinks are pages the Python install searches besides PyPI
+	// (ManifestBuild.FindLinks).
+	FindLinks []string
 	// Packages are the manifest's OS (apt) package names.
 	Packages []string
 	// Bin is the container CLI to shell out to; Env reaches its daemon.
