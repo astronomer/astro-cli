@@ -41,6 +41,10 @@ var helperContentAtVersion = map[int]string{
 	8: "bc6b44ed6a0cfae918e704a407a48715c63a6e269bc57379ba1c682db4c4e440",
 	// A stale lock's warning says to run uv lock, which is what relocks.
 	9: "eb4ca08c703fc89c58dd398bac0e540edaf0dde018963818e342c3a4d95f1be3",
+	// Reads markers, requirements and specifiers with packaging (or pip's
+	// vendored copy) in place of its own evaluator; shorter prose. (#2394's
+	// own version 4, 373f3dbc…, is the same helper without the Airflow check.)
+	10: "e63c29660b49a9107092d9e97205533280b40c2a77701bbb13d79a7a90185706",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {
