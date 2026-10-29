@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/instances
 
-go 1.26.1
+go 1.26.10
 
 // Three declared exceptions to the sibling rule (docs/architecture.md), each
 // on grounds an existing exception already uses.

@@ -223,6 +223,17 @@ func TestDeployManifestJSONImageAndDag(t *testing.T) {
 	assert.Equal(t, "https://cloud.astronomer.io/deployments/clx-dep", m["url"])
 }
 
+// -o is --output, as on every other command with one, APC's deploy among them.
+func TestDeployManifestOutputShorthand(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{WorkspaceID: "clw-ws", RuntimeVersion: "3.1-2"}})
+
+	out, err := execDeployCapture("--deployment", "prod", "-o", "json")
+	require.NoError(t, err)
+	m := decodeOneJSON(t, out)
+	assert.Equal(t, "clx-dep", m["deployment"])
+	assert.Equal(t, "image-and-dag", m["type"])
+}
+
 func TestDeployManifestJSONImageOnly(t *testing.T) {
 	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{
 		WorkspaceID:    "clw-ws",
@@ -377,14 +388,14 @@ func TestDeployManifestJSONCarriesTheTransportsWarnings(t *testing.T) {
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img, warn: w})
 	out, errOut, err := execDeployIO("", "prod", "--image-name", "img:1", "--output", "json")
 	require.NoError(t, err)
-	assert.Contains(t, errOut, "warning: "+w+"\n", "stderr still has it")
+	assert.Contains(t, errOut, "Warning: "+w+"\n", "stderr still has it")
 	m := decodeOneJSON(t, out)
 	assert.Equal(t, []any{w}, m["warnings"])
 
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img, warn: w})
 	out, errOut, err = execDeployIO("", "prod", "--image-name", "img:1")
 	require.NoError(t, err)
-	assert.Contains(t, errOut, "warning: "+w+"\n")
+	assert.Contains(t, errOut, "Warning: "+w+"\n")
 	assert.NotContains(t, out, w, "text keeps warnings off stdout")
 }
 
@@ -533,7 +544,7 @@ func TestDeployManifestNotesUncommittedChanges(t *testing.T) {
 
 			out, errOut, err := execDeployIO("", "prod", "--dags", "--output", format)
 			require.NoError(t, err)
-			assert.Contains(t, errOut, "note: the project has uncommitted changes, so this deploy records no git commit\n")
+			assert.Contains(t, errOut, "Note: the project has uncommitted changes, so this deploy records no git commit\n")
 			assert.NotContains(t, out, "uncommitted")
 		})
 	}
@@ -556,7 +567,7 @@ func TestDeployManifestPromptIgnoresTheShellsSelection(t *testing.T) {
 	assert.Contains(t, out, "to prod (deployment clx-dep).")
 	// The variable once moved the cursor, so its being ignored is said once,
 	// before the prompt, and never as a row's mark.
-	assert.Contains(t, errOut, "note: ASTRO_DEPLOYMENT=dev chooses what the query commands read; astro deploy asks, with the project's default, prod, preselected")
+	assert.Contains(t, errOut, "Note: ASTRO_DEPLOYMENT=dev chooses what the query commands read; astro deploy asks, with the project's default, prod, preselected")
 	assert.NotContains(t, pickerRow(t, errOut, "dev"), "ASTRO_DEPLOYMENT")
 }
 
@@ -569,7 +580,7 @@ func TestDeployManifestSaysNothingWhenTheEnvNamesTheDefault(t *testing.T) {
 
 	_, errOut, err := execDeployIO("\n")
 	require.NoError(t, err)
-	assert.NotContains(t, errOut, "note: ASTRO_DEPLOYMENT")
+	assert.NotContains(t, errOut, "Note: ASTRO_DEPLOYMENT")
 }
 
 // savePinForTest writes an `astro use` selection for the project under test.

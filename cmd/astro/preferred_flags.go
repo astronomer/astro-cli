@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -126,15 +125,34 @@ func addDeploymentFlag(fs *pflag.FlagSet, usage string, to deploymentTargets, on
 // addWorkspaceFlag registers --workspace on fs, read into to, and the 1.x
 // spelling oneX names (oneXWorkspaceID) as a hidden alias.
 func addWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string, oneX ...oneXSpelling) {
-	fs.StringVarP(to, "workspace", shorthand, "", usage)
-	utils.RefuseEmpty(fs.Lookup("workspace"))
-	markWorkspaceChoice(fs.Lookup("workspace"))
+	alias, aliasShorthand := false, ""
 	for _, o := range oneX {
-		if o != oneXWorkspaceID {
+		if o.name != oneXWorkspaceID.name {
 			panic(fmt.Sprintf("addWorkspaceFlag: --%s is no 1.x spelling of --workspace", o.name))
 		}
-		utils.AddAlias(fs, o.name, o.shorthand, "workspace")
+		alias, aliasShorthand = true, o.shorthand
 	}
+	markWorkspaceChoice(utils.AddWorkspaceFlag(fs, to, shorthand, usage, alias, aliasShorthand))
+}
+
+// addOneXWorkspaceIDNoOp registers 1.x's --workspace-id on fs for a command
+// that 1.x gave it to, through its group, and that never read it: hidden and
+// read by nothing, so a 1.x script passing it keeps working. It is no
+// spelling of --workspace, which the command does not take, and chooses no
+// workspace, so a project's workspace and host apply as they would without
+// it.
+func addOneXWorkspaceIDNoOp(fs *pflag.FlagSet) {
+	utils.AddOneXNoOp(fs, oneXWorkspaceID.name, oneXWorkspaceID.shorthand)
+}
+
+// deploymentWorkspaceUsage is --workspace on a deployment command that looks
+// its Deployment up in a workspace.
+const deploymentWorkspaceUsage = "Workspace the Deployment is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)"
+
+// addDeploymentWorkspaceFlag registers --workspace, and 1.x's --workspace-id
+// as its alias, on a deployment command that reads it.
+func addDeploymentWorkspaceFlag(fs *pflag.FlagSet) {
+	addWorkspaceFlag(fs, &workspaceID, "", deploymentWorkspaceUsage, oneXWorkspaceID)
 }
 
 // deploymentFlagOf is the --deployment on fs that addDeploymentFlag
@@ -151,33 +169,25 @@ func deploymentFlagOf(fs *pflag.FlagSet) *deploymentFlag {
 
 // applyPreferredFlagsIn has every runnable command in tree reconcile its
 // spellings before its argument check and its pre-runs, which read what they
-// resolve to. Each top-level constructor calls it on its own tree.
+// resolve to (utils.ApplyPreferredFlagsIn, with resolveDeploymentFlag). Each
+// top-level constructor calls it on its own tree.
 func applyPreferredFlagsIn(tree *cobra.Command) {
-	utils.BeforeArgs(tree, applyPreferredFlags)
+	utils.ApplyPreferredFlagsIn(tree, resolveDeploymentFlag)
 }
 
-// applyPreferredFlags is the hook every runnable Astro command runs once its
-// flags are parsed: the 1.x spellings go to the flags they stand for, and
-// --deployment is split into the command's Deployment id or name.
-func applyPreferredFlags(cmd *cobra.Command, args []string) error {
-	fs := cmd.Flags()
-	d := deploymentFlagOf(fs)
-	typed := d != nil && d.self.Changed
-	if err := utils.ApplyAliases(fs); err != nil {
-		return err
-	}
+// resolveDeploymentFlag is the Astro tree's work once the 1.x spellings are
+// handed on: --deployment is split into the command's Deployment id or name.
+func resolveDeploymentFlag(cmd *cobra.Command, args []string, typed func(string) bool) error {
+	d := deploymentFlagOf(cmd.Flags())
 	if d == nil {
 		return nil
 	}
-	d.resolve(typed)
+	d.resolve(typed("deployment"))
 	// A command whose id is its argument would take the argument over a
 	// --deployment id without a word, and `delete <a> --deployment <b>` would
 	// delete a. Two different Deployments named at once is a usage mistake,
 	// the same as an old and a new spelling that disagree.
-	if d.arg != "" && len(args) > 0 && args[0] != d.arg {
-		return cliout.Usage(fmt.Errorf("the Deployment argument %q and --deployment %q disagree: pass only one", args[0], d.arg))
-	}
-	return nil
+	return utils.RefuseDisagreeingDeployment(args, d.arg)
 }
 
 // resolve splits what this run gave into the command's id and name. A value

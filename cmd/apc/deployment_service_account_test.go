@@ -51,7 +51,7 @@ func (s *Suite) TestDeploymentSaDeleteWoDeploymentIdCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	_, err := execDeploymentCmd("service-account", "delete", "key-test-id")
 	s.Error(err)
-	s.EqualError(err, `required flag(s) "deployment-id" not set`)
+	s.EqualError(err, `required flag(s) "deployment" not set`)
 }
 
 func (s *Suite) TestDeploymentSaDeleteRootCommand() {
@@ -62,7 +62,7 @@ func (s *Suite) TestDeploymentSaDeleteRootCommand() {
 	api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: "1234", ServiceAccountID: mockDeploymentSA.ID}).Return(mockDeploymentSA, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
-	output, err := execDeploymentCmd("service-account", "delete", mockDeploymentSA.ID, "--deployment-id=1234")
+	output, err := execDeploymentCmd("service-account", "delete", mockDeploymentSA.ID, "--deployment-id=1234", "--yes")
 	s.NoError(err)
 	s.Contains(output, "Service Account my_label (q1w2e3r4t5y6u7i8o9p0) successfully deleted")
 }

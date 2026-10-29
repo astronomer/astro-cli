@@ -68,7 +68,7 @@ func TestThePackagedImageCarriesTheProjectAndNoSecrets(t *testing.T) {
 	}
 
 	refused := p.runSlow("package", "astro").requireFailure()
-	if !strings.Contains(refused.Stderr, "certs/prod.pem look like credentials") {
+	if !strings.Contains(refused.Stderr, "certs/prod.pem looks like credentials") {
 		t.Fatalf("a gitignored key was not refused by name\n%s", refused.output())
 	}
 	if tags, _ := dockerLines(t.Context(), "images", "--format", "{{.Repository}}:{{.Tag}}", "astro-package/shipsafe"); len(tags) > 0 {

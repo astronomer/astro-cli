@@ -37,17 +37,7 @@ func (l *locator) astroDeployment(ctx context.Context, i instances.Instance) (*a
 	if deploymentID == "" {
 		return nil, fmt.Errorf("deployment %q names no Deployment: set deployment = '<id>' on the link", i.Name)
 	}
-	if l.session == nil {
-		return nil, astrosession.ErrLoggedOut
-	}
-	token, err := l.session(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if token == "" {
-		return nil, astrosession.ErrLoggedOut
-	}
-	org, err := l.organization()
+	token, org, err := l.identity(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +51,28 @@ func (l *locator) astroDeployment(ctx context.Context, i instances.Instance) (*a
 		return nil, deploymentOutage(l.domain, i, deploymentID, resp)
 	}
 	return resp.JSON200, nil
+}
+
+// identity is the bearer and the organization a control-plane call goes out
+// under. It is resolved before the call rather than after it because a
+// machine with none gets a better sentence from us than from an API that was
+// never reached.
+func (l *locator) identity(ctx context.Context) (token, org string, err error) {
+	if l.session == nil {
+		return "", "", astrosession.ErrLoggedOut
+	}
+	token, err = l.session(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	if token == "" {
+		return "", "", astrosession.ErrLoggedOut
+	}
+	org, err = l.organization()
+	if err != nil {
+		return "", "", err
+	}
+	return token, org, nil
 }
 
 // WhyUnavailable asks Astro why an astro link's Airflow is not answering. It
@@ -123,8 +135,8 @@ func (e *UnavailableError) Unwrap() error { return e.State }
 func (e *UnavailableError) Error() string {
 	switch e.State {
 	case ErrDeploymentHibernating:
-		return fmt.Sprintf("Astro Deployment %s (%q) is hibernating, so its Airflow is not answering — wake it with astro deployment wake-up %s, which takes about a minute",
-			e.DeploymentID, e.Name, e.DeploymentID)
+		return fmt.Sprintf("Astro Deployment %s (%q) is hibernating, so its Airflow is not answering — %s",
+			e.DeploymentID, e.Name, WakeUpStep(e.DeploymentID))
 	case ErrDeploymentDeploying:
 		return fmt.Sprintf("Astro Deployment %s (%q) is still deploying, so its Airflow is not answering yet — try again in a minute or two",
 			e.DeploymentID, e.Name)
@@ -134,6 +146,14 @@ func (e *UnavailableError) Error() string {
 	}
 	return fmt.Sprintf("Astro reports Deployment %s (%q) as unhealthy, so its Airflow is not answering — see astro deployment inspect %s",
 		e.DeploymentID, e.Name, e.DeploymentID)
+}
+
+// WakeUpStep is the step that ends a Deployment's hibernation, for every
+// hint that explains what hibernation stops (this package's, and a deploy's).
+// --wait is in it so the retry the hint goes on to suggest finds the
+// Deployment awake.
+func WakeUpStep(deploymentID string) string {
+	return fmt.Sprintf("wake it with astro deployment wake-up %s --wait, which takes about a minute", deploymentID)
 }
 
 // bearer puts the identity astrosession resolved on one request, replacing the

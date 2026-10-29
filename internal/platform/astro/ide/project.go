@@ -30,7 +30,7 @@ var (
 	// DefaultDirPerm is the default permission for directories
 	DefaultDirPerm           os.FileMode = 0o755
 	openURL                              = browser.OpenURL
-	gitignoreParseWarningMsg             = "Warning: failed to parse .gitignore: %v. Continuing without gitignore filtering."
+	gitignoreParseWarningMsg             = "failed to parse .gitignore: %v. Continuing without gitignore filtering."
 )
 
 // The functions here that note something along the way take notes, the
@@ -493,7 +493,7 @@ func gitignoreMatcher(root string, notes io.Writer) gitignore.Matcher {
 	fs := osfs.New(root)
 	patterns, err := gitignore.ReadPatterns(fs, []string{})
 	if err != nil {
-		fmt.Fprintln(notes, fmt.Sprintf(gitignoreParseWarningMsg, err))
+		ansi.Warn(notes, fmt.Sprintf(gitignoreParseWarningMsg, err))
 		return gitignore.NewMatcher(nil)
 	}
 	return gitignore.NewMatcher(patterns)

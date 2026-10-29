@@ -193,7 +193,12 @@ project that names no host keeps working for someone logged in to another host. 
 a command reads its workspace and Deployment in this order:
 
 1. **`--workspace` wins.** Given, it is the workspace. A link name in the
-   same command still picks the link's Deployment and host.
+   same command still picks the link's Deployment and host. The
+   `deployment team`, `user` and `token` commands, which act on a Deployment
+   by its id alone, take no `--workspace`; `deployment token workspace-token
+   add` and `remove`, which find a Workspace token, do. The 1.x
+   `--workspace-id` those commands had is accepted and does nothing, as in
+   1.x: the project's workspace and host still apply.
 2. **A link name is a Deployment.** `--deployment` and the Deployment-id
    argument of `inspect`, `logs`, `update`, `delete`, `hibernate` and
    `wake-up` take an Astro link's name. The command acts on the link's
@@ -201,7 +206,9 @@ a command reads its workspace and Deployment in this order:
    (the rule in [Deployment links](#deployment-links)). A Deployment id that a
    link holds is read the same way. A link's name wins over a Deployment of
    the same name, and on a command that takes a Deployment name, a value that
-   names no link and is not a Deployment id is a Deployment name. On a
+   names no link and is not a Deployment id is a Deployment name. A name that
+   several Deployments in the workspace share is refused, and the error lists
+   their ids, so the run names one by id. On a
    command that takes only an id (the `team`, `user`, `token` and `bundle`
    groups, `astro env`), or as an argument, a value that is neither a link nor
    a Deployment id is refused, and the error lists the project's Astro links.

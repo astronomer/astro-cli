@@ -82,7 +82,10 @@ func TestPortedCommandsWorkUnderBothRegistrations(t *testing.T) {
 		{[]string{"dags", "explore", "orders_etl"}, `"fileloc":"/dags/orders.py"`},
 		{[]string{"dags", "list", "--include-inactive"}, `"dag_id":"orders_etl"`},
 		{[]string{"runs", "trigger-wait", "orders_etl", "--poll-interval", "5ms"}, `"state":"success"`},
+		{[]string{"runs", "wait", "orders_etl", "manual__1", "--poll-interval", "5ms"}, `"state":"success"`},
 		{[]string{"runs", "diagnose", "orders_etl", "manual__1"}, `"total_tasks":4`},
+		{[]string{"tasks", "wait", "orders_etl", "manual__1", "load", "--poll-interval", "5ms"}, `"reached":true`},
+		{[]string{"tasks", "xcom", "orders_etl", "manual__1", "load"}, `"key":"return_value"`},
 		{[]string{"assets", "triggers", "orders_etl", "manual__1"}, `"uri":"s3://orders/gold"`},
 		{[]string{"assets", "list", "--uri-pattern", "s3%"}, `"uri":"s3://orders/gold"`},
 		{[]string{"version"}, `"version":"3.0.3"`},
@@ -102,6 +105,11 @@ func TestPortedCommandsWorkUnderBothRegistrations(t *testing.T) {
 		stub.route(http.MethodPost, "/api/v2/dags/orders_etl/dagRuns", runBody("queued"))
 		stub.route(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns/manual__1", runBody("success"))
 		stub.route(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns/manual__1/taskInstances", failedInstances)
+		stub.route(http.MethodGet, "/api/v2/dags/orders_etl/tasks/load", `{"task_id":"load"}`)
+		stub.route(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns/manual__1/taskInstances/load",
+			`{"task_id":"load","dag_id":"orders_etl","dag_run_id":"manual__1","state":"success","map_index":-1}`)
+		stub.route(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns/manual__1/taskInstances/load/xcomEntries/return_value",
+			`{"key":"return_value","task_id":"load","dag_id":"orders_etl","run_id":"manual__1","map_index":-1,"value":{"rows":42}}`)
 		stub.route(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns/manual__1/upstreamAssetEvents",
 			`{"asset_events":[{"id":1,"uri":"s3://orders/gold"}],"total_entries":1}`)
 		stub.route(http.MethodGet, "/api/v2/assets", `{"assets":[{"id":1,"uri":"s3://orders/gold"}],"total_entries":1}`)

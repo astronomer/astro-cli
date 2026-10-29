@@ -163,7 +163,7 @@ func TestRunOfflineNamesSkippedWorkspaceValuesOnOneLine(t *testing.T) {
 			if err := execute(t, d, cmd...); err != nil {
 				t.Fatalf("offline %s: %v", cmd[1], err)
 			}
-			want := "warning: running without env var API_TOKEN, env var DATA_WAREHOUSE_URI: declared source = \"workspace\"; pass --with-workspace to fetch them\n"
+			want := "Warning: running without env var API_TOKEN, env var DATA_WAREHOUSE_URI: declared source = \"workspace\"; pass --with-workspace to fetch them\n"
 			if got := stderr.String(); got != want {
 				t.Errorf("stderr = %q, want %q", got, want)
 			}
@@ -203,7 +203,7 @@ func TestRunWithWorkspaceStillRunsWithoutALocalValue(t *testing.T) {
 	if err := execute(t, d, "local", "run", "--with-workspace", "pytest"); err != nil {
 		t.Fatalf("run --with-workspace: %v", err)
 	}
-	if !strings.Contains(stderr.String(), "warning: running without env var ASTRO_TEST_LOCAL_ONLY") {
+	if !strings.Contains(stderr.String(), "Warning: running without env var ASTRO_TEST_LOCAL_ONLY") {
 		t.Errorf("stderr = %q, want a warning for the local value", stderr.String())
 	}
 	if calls.stopped.SecretEnv["DATA_WAREHOUSE_URI"] != "postgres://cloud" {

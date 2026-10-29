@@ -211,6 +211,9 @@ jobs:
       - name: Run sub-module unit tests
         run: bash scripts/test-submodules.sh
 
+      - name: Test the installer's version resolution
+        run: make test-installer
+
       # The e2e suite rides in this job rather than one of its own so that it
       # shares the Go build cache above; a job of its own would hold a cache of
       # its own and build the tree from cold.

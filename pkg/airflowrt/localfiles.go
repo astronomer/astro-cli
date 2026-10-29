@@ -19,7 +19,9 @@ const PickleFixRule = "plugins/fix_local_executor_pickle.py"
 //   - .astro/*.local.yaml and .astro/*.local.yml cover the standalone af CLI's
 //     instance file, config.local.yaml: a local URL derived from this machine's
 //     directory name and proxy port, the local admin credentials, and the
-//     current instance.
+//     current instance. .astro/*.local.lock covers the lock file taken beside
+//     it while it is written, config.local.lock: empty, and meaningless on any
+//     other machine, so it belongs in no repository and no image either.
 //   - .astro/otto/*.local.json covers Otto's per-machine permissions scope,
 //     permissions.local.json. Its sibling permissions.json is meant to be
 //     committed, and so is extensions.json, which is why .astro/otto/ is not
@@ -39,6 +41,7 @@ var localFileRules = []string{
 	".astro/worktrees/",
 	".astro/*.local.yaml",
 	".astro/*.local.yml",
+	".astro/*.local.lock",
 	".astro/otto/*.local.json",
 	".astro/otto/mcp.json",
 	PickleFixRule,

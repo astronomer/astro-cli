@@ -83,12 +83,12 @@ func NewDeployCmd() *cobra.Command {
 	// read by nothing, because astronomer/deploy-action passes it on every
 	// deploy (TestDeployManifestDeployActionInvocations); hidden, as there is
 	// nothing for anyone to choose.
-	cmd.Flags().BoolP("force", "f", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
+	cmd.Flags().BoolP("force", "f", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("force") //nolint:errcheck // the flag is defined just above
 	// --prompt asked 1.x to offer the Deployment list even with one named. A
 	// deploy here asks whenever none is named, so it is accepted, hidden and
 	// read by nothing, as a pyproject.toml project's deploy always took it.
-	cmd.Flags().BoolP("prompt", "p", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
+	cmd.Flags().BoolP("prompt", "p", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
 	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a prebuilt local image to deploy instead of building one. Outside a pyproject.toml project it deploys the image alone")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only Dags to your Astro Deployment")
@@ -102,7 +102,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&manifestDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
 	utils.RefuseEmpty(cmd.Flags().Lookup("deployment"))
 	addWorkspaceFlag(cmd.Flags(), &manifestWorkspace, "", "Workspace for the deploy, overriding the context", oneXWorkspaceID)
-	cmd.Flags().StringVar(&deployOutput, "output", string(cliout.FormatText), "Output format: text or json")
+	cmd.Flags().StringVarP(&deployOutput, "output", "o", string(cliout.FormatText), "Output format: text or json")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
 
@@ -278,12 +278,13 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	interactive := format == cliout.FormatText && stdinIsTerminal()
 
 	errOut := cmd.ErrOrStderr()
-	// Every warning the deploy gives goes to stderr as it is given, and into
-	// the result's warnings, so -o json carries the same ones.
+	// Every warning the deploy gives goes to stderr as it is given, led by a
+	// yellow "Warning:" as the CLI's other warnings are, and into the result's
+	// warnings, so -o json carries the same ones.
 	var warnings []string
 	warn := func(msg string) {
 		warnings = append(warnings, msg)
-		fmt.Fprintf(errOut, "warning: %s\n", msg)
+		cliout.Warn(errOut, msg)
 	}
 	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, manifestDeployment)
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
@@ -315,6 +316,8 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
 		Warn: warn,
+		// A plain line on stderr, as the deploy's other notes are.
+		Note: func(msg string) { cliout.Note(errOut, msg) },
 		// Resolved once, when a deploy that builds first needs it, and
 		// shared by the checks and the transport.
 		Engine: onceEngine(astrodeploy.ResolveContainerEngine),
@@ -367,7 +370,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	}
 
 	if res.Git.Uncommitted {
-		fmt.Fprintln(errOut, "note: the project has uncommitted changes, so this deploy records no git commit")
+		cliout.Note(errOut, "the project has uncommitted changes, so this deploy records no git commit")
 	}
 	if !inProject {
 		warn(imageAloneWarning(&res, imageName))
@@ -409,9 +412,9 @@ func noteIgnoredDeploymentEnv(w io.Writer, m *manifest.Manifest, interactive boo
 	case ok && def == env:
 		return
 	case ok:
-		fmt.Fprintf(w, "note: %s=%s chooses what the query commands read; astro deploy asks, with the project's default, %s, preselected\n", instances.EnvVar, env, def)
+		cliout.Note(w, fmt.Sprintf("%s=%s chooses what the query commands read; astro deploy asks, with the project's default, %s, preselected", instances.EnvVar, env, def))
 	default:
-		fmt.Fprintf(w, "note: %s=%s chooses what the query commands read; astro deploy asks, and preselects nothing without a default link\n", instances.EnvVar, env)
+		cliout.Note(w, fmt.Sprintf("%s=%s chooses what the query commands read; astro deploy asks, and preselects nothing without a default link", instances.EnvVar, env))
 	}
 }
 

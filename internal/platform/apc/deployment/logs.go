@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"io"
+	"sort"
 	"time"
 
 	"github.com/astronomer/astro-cli/config"
@@ -32,6 +33,47 @@ func Log(deploymentID, component, search string, since time.Duration, client hou
 	}
 
 	return houston.Call(client.ListDeploymentLogs)(request)
+}
+
+// Logs returns the log records of each of components from the last since,
+// matching search when it is set, each with Component set to the one asked
+// for. Houston answers for one component at a time, so this asks it once for
+// each. One component's records keep Houston's order. Several are merged
+// oldest first when Houston gave every record a time it can read, and
+// otherwise left one component after another, as Houston gave them, rather
+// than ordered by a guess.
+func Logs(deploymentID string, components []string, search string, since time.Duration, client houston.ClientInterface) ([]houston.DeploymentLog, error) {
+	var all []houston.DeploymentLog
+	for _, c := range components {
+		logs, err := Log(deploymentID, c, search, since, client)
+		if err != nil {
+			return nil, err
+		}
+		for _, l := range logs {
+			l.Component = c
+			all = append(all, l)
+		}
+	}
+	if len(components) < 2 {
+		return all, nil
+	}
+	type timed struct {
+		at  time.Time
+		log houston.DeploymentLog
+	}
+	merged := make([]timed, len(all))
+	for i, l := range all {
+		at, err := time.Parse(time.RFC3339Nano, l.CreatedAt)
+		if err != nil {
+			return all, nil
+		}
+		merged[i] = timed{at: at, log: l}
+	}
+	sort.SliceStable(merged, func(i, j int) bool { return merged[i].at.Before(merged[j].at) })
+	for i := range merged {
+		all[i] = merged[i].log
+	}
+	return all, nil
 }
 
 // SubscribeDeploymentLog follows a Deployment component's log records from

@@ -37,6 +37,7 @@ func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentBundleDeleteCmd(out),
 	)
 	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose bundles you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID(""))
+	addDeploymentWorkspaceFlag(cmd.PersistentFlags())
 	return cmd
 }
 
@@ -61,7 +62,7 @@ func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
 				return errors.Wrap(err, "failed to find a valid workspace")
 			}
 			cmd.SilenceUsage = true
-			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
+			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), astroV1Client, astroV1Alpha1Client)
 		},
 	}
 	cmd.Flags().StringVar(&bundleName, "name", "", "Name of the Dag bundle to create. Mutually exclusive with --mount-path")
@@ -122,7 +123,7 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 			if len(args) > 0 {
 				bundleID = args[0]
 			}
-			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
+			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), astroV1Client, astroV1Alpha1Client)
 		},
 	}
 	cmd.Flags().StringVar(&bundleName, "name", "", "Identify the Dag bundle to update by name, instead of by ID")

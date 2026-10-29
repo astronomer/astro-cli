@@ -926,7 +926,7 @@ func renderTargetReport(w io.Writer, rep *checks.TargetReport, strict bool, budg
 		}
 	}
 	for _, note := range rep.Notes {
-		if _, err := fmt.Fprintf(w, "note: %s\n", note); err != nil {
+		if _, err := fmt.Fprintln(w, cliout.NoteLabel(w), note); err != nil {
 			return err
 		}
 	}

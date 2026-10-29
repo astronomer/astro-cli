@@ -84,7 +84,7 @@ func deploymentClone(cmd *cobra.Command, out io.Writer, format cliout.Format) er
 		return err
 	}
 	for _, n := range notes {
-		fmt.Fprintln(cmd.ErrOrStderr(), "Note: "+string(n))
+		cliout.Note(cmd.ErrOrStderr(), string(n))
 	}
 	// The Deployment exists even when the --wait for it failed, so it is
 	// published either way.
