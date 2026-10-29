@@ -131,7 +131,7 @@ func (c *cli) runUpgradeAirflow(ctx context.Context, version string, withOtto bo
 		// The version passed the checks above, so the cause is the project:
 		// a manifest that does not parse, or one the writer refuses. Otto
 		// gets the whole job and the reason, as the desktop does.
-		fmt.Fprintf(c.d.Stderr, "Error: %v\nStarting Otto to make the upgrade instead.\n", err)
+		fmt.Fprintf(c.d.Stderr, "%s %v\nStarting Otto to make the upgrade instead.\n", cliout.ErrorLabel(c.d.Stderr), err)
 		return c.d.LaunchOtto(scaffold.AirflowUpgradeFallbackPrompt(currentPin(dir), version, err.Error(), cliUpgradePrompt))
 	}
 	res := airflowUpgrade{
