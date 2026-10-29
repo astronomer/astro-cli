@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/apirequest"
@@ -93,6 +94,9 @@ Use "astro api registry ls" to discover all available endpoints and operation ID
 			return runRegistry(opts)
 		},
 	}
+	// The registry is public: no Astro login, so none is checked, and a lookup
+	// that fails for the login's organization cannot stop it.
+	cmd.Annotations = map[string]string{astroCmd.NoLoginAnnotation: "true"}
 
 	// Registry-specific persistent flags
 	cmd.PersistentFlags().StringVar(&opts.RegistryURL, "registry-url", "", "Override the registry base URL (env: ASTRO_REGISTRY_URL)")

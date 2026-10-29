@@ -106,8 +106,9 @@ func TestDeploymentCloneUsage(t *testing.T) {
 }
 
 // A name has to name one Deployment in the Workspace. None, or several, fails
-// the run, exit 1, having created nothing; several are listed by id rather
-// than one being taken.
+// the run as a usage error, exit 2, having created nothing, as every
+// Deployment name lookup does (deployment.NameError); several are listed by
+// id rather than one being taken.
 func TestDeploymentCloneSourceByName(t *testing.T) {
 	other := cloneSrc()
 	other.Id = "clh1rai0g000008l50d5hahbd"
@@ -117,10 +118,11 @@ func TestDeploymentCloneSourceByName(t *testing.T) {
 	t.Run("several share the name", func(t *testing.T) {
 		m := cloneMock(t, nil, cloneMade(), cloneSrc(), other, unrelated)
 		r := execDeploymentRun(t, m, "", "create", "--clone", "etl-prod", "--name", "etl-preview", "--workspace-id", "workspace-id", "-o", "json")
-		assert.Equal(t, cliout.ExitFailure, r.code)
+		assert.Equal(t, cliout.ExitUsage, r.code)
 		var got errorJSON
 		decodeOne(t, r.stdout, &got)
-		assert.Contains(t, got.Error, `2 Deployments are named "etl-prod"`)
+		assert.Equal(t, string(cliout.KindUsage), got.Kind)
+		assert.Contains(t, got.Error, `2 Deployments are named "etl-prod" in workspace workspace-id: pass --clone with one's id`)
 		assert.Contains(t, got.Error, cloneSourceID)
 		assert.Contains(t, got.Error, other.Id)
 		m.AssertNotCalled(t, "CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)
@@ -129,9 +131,10 @@ func TestDeploymentCloneSourceByName(t *testing.T) {
 	t.Run("none has it", func(t *testing.T) {
 		m := cloneMock(t, nil, cloneMade(), unrelated)
 		r := execDeploymentRun(t, m, "", "create", "--clone", "etl-prod", "--name", "etl-preview", "--workspace-id", "workspace-id")
-		assert.Equal(t, cliout.ExitFailure, r.code)
+		assert.Equal(t, cliout.ExitUsage, r.code)
 		require.Error(t, r.err)
-		assert.Contains(t, r.err.Error(), `no Deployment named "etl-prod" in Workspace workspace-id`)
+		assert.Contains(t, r.err.Error(), `no Deployment named "etl-prod" in workspace workspace-id`)
+		assert.Contains(t, r.err.Error(), "Pass its id to --clone to copy one from another workspace")
 		assert.Empty(t, r.stdout)
 		m.AssertNotCalled(t, "CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)
 	})

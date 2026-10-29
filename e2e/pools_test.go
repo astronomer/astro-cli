@@ -39,7 +39,7 @@ func TestStartAndRestartApplyTheManifestPools(t *testing.T) {
 	start := p.runSlow("local", "start")
 	t.Cleanup(func() { p.runSlow("local", "stop") })
 	start.requireSuccess()
-	if strings.Contains(start.Stdout, "warning: pool") {
+	if strings.Contains(start.Stderr, "Warning: pool") {
 		t.Errorf("the start warned about a pool\n%s", start.output())
 	}
 	p.requirePool("etl", 4, "ETL loads")
@@ -48,7 +48,7 @@ func TestStartAndRestartApplyTheManifestPools(t *testing.T) {
 
 	writePools("5", "17")
 	restart := p.runSlow("local", "restart").requireSuccess()
-	if strings.Contains(restart.Stdout, "warning: pool") {
+	if strings.Contains(restart.Stderr, "Warning: pool") {
 		t.Errorf("the restart warned about a pool\n%s", restart.output())
 	}
 	p.requirePool("etl", 5, "ETL loads")

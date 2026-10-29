@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/connwarehouse
 
-go 1.26.1
+go 1.26.10
 
 // Declared exceptions to the sibling rule (docs/architecture.md): the
 // connection value type it maps, and the atomic write both files go through.

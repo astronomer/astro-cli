@@ -24,6 +24,12 @@ func (f deploymentsFunc) GetDeploymentWithResponse(ctx context.Context, org, dep
 	return f(ctx, org, deploymentID)
 }
 
+// ListDeploymentsWithResponse is never what a test of the lookup by id
+// expects: one that lists builds a fakeDeployments instead.
+func (f deploymentsFunc) ListDeploymentsWithResponse(context.Context, string, *astrov1.ListDeploymentsParams, ...astrov1.RequestEditorFn) (*astrov1.ListDeploymentsResponse, error) {
+	return nil, errors.New("a lookup by id listed the workspace's Deployments")
+}
+
 // astroLocator builds a locator with a session and an org already in hand, so
 // each test says only what it is about.
 func astroLocator(deployments deploymentsFunc) *locator {

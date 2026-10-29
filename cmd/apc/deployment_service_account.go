@@ -1,32 +1,46 @@
 package apc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	sa "github.com/astronomer/astro-cli/internal/platform/apc/service_account"
 )
 
 var (
-	deploymentSACreateLabel    string
+	deploymentSACreateName     string
 	deploymentSACreateCategory string
 	deploymentSACreateRole     string
 
 	deploymentSaCreateExample = `  # Create a service account that can view a Deployment
-  astro deployment service-account create --deployment-id=<DEPLOYMENT_ID> --label=my_label
+  astro deployment service-account create --deployment=<DEPLOYMENT_ID> --name=ci-deployer
 
   # Create one that can edit it
-  astro deployment service-account create --deployment-id=<DEPLOYMENT_ID> --label=my_label \
+  astro deployment service-account create --deployment=<DEPLOYMENT_ID> --name=ci-deployer \
     --role=DEPLOYMENT_EDITOR`
 	deploymentSaListExample = `  # List a Deployment's service accounts
-  astro deployment service-account list --deployment-id=<DEPLOYMENT_ID>`
-	deploymentSaDeleteExample = `  # Delete a service account from a Deployment
-  astro deployment service-account delete <SERVICE_ACCOUNT_ID> --deployment-id=<DEPLOYMENT_ID>`
+  astro deployment service-account list --deployment=<DEPLOYMENT_ID>`
+	deploymentSaDeleteExample = `  # Delete a service account from a Deployment, after you confirm
+  astro deployment service-account delete <SERVICE_ACCOUNT_ID> --deployment=<DEPLOYMENT_ID>
+
+  # Delete it without the confirmation, from a script
+  astro deployment service-account delete <SERVICE_ACCOUNT_ID> --deployment=<DEPLOYMENT_ID> --yes`
 )
+
+// errServiceAccountNameEmpty refuses a service account named "": --name or
+// 1.x's --label given as an unset variable would otherwise create one with no
+// name and a live API key, as workspace create refuses a workspace with none.
+var errServiceAccountNameEmpty = cliout.Usage(errors.New("a service account needs a name: --name cannot be empty"))
+
+// deploymentSAFlagUsage is --deployment's help on the commands that manage
+// a Deployment's service accounts.
+const deploymentSAFlagUsage = "Deployment whose service accounts to manage: a link name from the project's manifest, or a Deployment id"
 
 func newDeploymentSaRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -54,12 +68,14 @@ func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command {
 			return deploymentSaCreate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage service accounts")
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
 	cmd.Flags().StringVarP(&deploymentSACreateCategory, "category", "c", "default", "Category of the service account")
-	cmd.Flags().StringVarP(&deploymentSACreateLabel, "label", "l", "", "Label of the service account")
+	// --name, as an Astro API token's; 1.x's --label, -l, is its alias.
+	cmd.Flags().StringVarP(&deploymentSACreateName, "name", "n", "", "Name of the service account")
+	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 	cmd.Flags().StringVarP(&deploymentSACreateRole, "role", "r", houston.DeploymentViewerRole, "Role of the service account to create, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
-	_ = cmd.MarkFlagRequired("label")         //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("name")       //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -75,8 +91,8 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 			return deploymentSaList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage service accounts")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -86,27 +102,39 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete <SERVICE_ACCOUNT_ID>",
 		Aliases: []string{"de"},
 		Short:   "Delete a service account in the APC platform",
-		Long:    "Delete a service account in the APC platform",
+		Long:    "Delete a service account in the APC platform. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Example: deploymentSaDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaDelete(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage service accounts")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addYesFlag(cmd, "Don't ask for confirmation before deleting the service account")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
 
+// serviceAccountDeleteQuestion is what a service-account delete asks before
+// it deletes id, and serviceAccountDeleteCanceled what it says when told no.
+func serviceAccountDeleteQuestion(id string) string {
+	return fmt.Sprintf("\nAre you sure you want to delete service account %s? This cannot be undone.", id)
+}
+
+const serviceAccountDeleteCanceled = "Canceling service account deletion"
+
 func deploymentSaCreate(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
+	if deploymentSACreateName == "" {
+		return errServiceAccountNameEmpty
+	}
 	if err := validateDeploymentRole(deploymentSACreateRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	created, err := sa.CreateUsingDeploymentUUID(deploymentID, deploymentSACreateLabel, deploymentSACreateCategory, deploymentSACreateRole, houstonClient)
+	created, err := sa.CreateUsingDeploymentUUID(deploymentID, deploymentSACreateName, deploymentSACreateCategory, deploymentSACreateRole, houstonClient)
 	if err != nil {
 		return err
 	}
@@ -128,6 +156,10 @@ func deploymentSaDelete(cmd *cobra.Command, args []string, out io.Writer) error 
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	ok, err := confirmRemoval(out, serviceAccountDeleteQuestion(args[0]), serviceAccountDeleteCanceled)
+	if err != nil || !ok {
+		return err
+	}
 	deleted, err := sa.DeleteUsingDeploymentUUID(args[0], deploymentID, houstonClient)
 	if err != nil {
 		return err

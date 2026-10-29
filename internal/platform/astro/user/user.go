@@ -626,6 +626,15 @@ func ListDeploymentUsersWithFormat(client astrov1.APIClient, deploymentID string
 
 // ListWorkspaceUsersData returns workspace user list data for structured output
 func ListWorkspaceUsersData(client astrov1.APIClient, workspaceID string) (*UserList, error) {
+	// The roles shown are the ones on the Workspace listed, which is the
+	// current one when workspaceID is "".
+	if workspaceID == "" {
+		ctx, err := context.GetCurrentContext()
+		if err != nil {
+			return nil, err
+		}
+		workspaceID = ctx.Workspace
+	}
 	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
 	if err != nil {
 		return nil, err

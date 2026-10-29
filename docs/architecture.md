@@ -138,7 +138,7 @@ Under `--output json`, a command that fails writes one object on stdout and noth
 Some failures publish something else instead, and a consumer has to expect them (neither adds a second object):
 
 - a command that already wrote a richer structured payload (`cliout.JSONShown`): a start blocked on missing env values publishes that list;
-- a command that carries its own exit code (`cliout.ExitError`): `astro local check` publishes its NDJSON summary, `astro af runs trigger-wait` its result, and `astro local run` exits with the child's code.
+- a command that carries its own exit code (`cliout.ExitError`): `astro local check` publishes its NDJSON summary, `astro af runs trigger-wait`, `astro af runs wait` and `astro af tasks wait` their result, and `astro local run` exits with the child's code.
 
 ### Commands in messages
 
@@ -169,9 +169,9 @@ A command that already refuses to ask when it has no terminal marks that refusal
 | 1 | the command failed, including `input_required`: a question it could not ask. Not 2, because a question can come after work has started, so the "nothing ran" that 2 promises would not hold. The same refusal without a terminal has always exited 1. A script that needs to tell it from other failures reads `kind` |
 | 2 | usage error: an unknown flag or subcommand, a flag value the command does not accept (`--output yaml` included), the wrong number of arguments, a missing required flag, a group run with no subcommand under `--output json`, whether it has a RunE of its own (`cliout.GroupHelp`) or not (`cliout.Execute` answers it); in text mode it prints its help and exits 0, as before. Nothing ran |
 | 130 | interrupted (Ctrl-C or SIGTERM); the command unwound what it had started |
-| the command's own | `astro local check`: 1 when a check failed, 2 when it could not reach a verdict (no environment, no project). `astro af runs trigger-wait` (and `astro local af runs trigger-wait`): 1 when the run failed, 2 when the wait timed out. `astro local run`: the child's status |
+| the command's own | `astro local check`: 1 when a check failed, 2 when it could not reach a verdict (no environment, no project). `astro af runs trigger-wait`, `astro af runs wait` and `astro af tasks wait` (and their `astro local af` forms): 1 when the run failed, or for `tasks wait` when the task cannot reach the state, 2 when the wait timed out. `astro local run`: the child's status |
 
-The command-specific 2s predate the usage 2. A script that runs one of those commands tells them apart by what it published: a usage error under `--output json` is an error object with kind `usage`, while `check` and `trigger-wait` publish their own result.
+The command-specific 2s predate the usage 2. A script that runs one of those commands tells them apart by what it published: a usage error under `--output json` is an error object with kind `usage`, while `check`, `trigger-wait`, `runs wait` and `tasks wait` publish their own result.
 
 ### Kinds
 
@@ -190,7 +190,7 @@ The command-specific 2s predate the usage 2. A script that runs one of those com
 | `unsupported_base` | the image base is not one this mode can run |
 | `database_newer_than_airflow` | the metadata database was migrated by a newer Airflow (Docker mode) |
 | `not_running` | nothing is running for this project |
-| `deployment_hibernating`, `deployment_deploying`, `deployment_unhealthy`, `airflow_unavailable` | an Astro Deployment's Airflow did not answer (see [instances.md](instances.md#when-a-deployments-airflow-does-not-answer)); `deployment_deploying` and `airflow_unavailable` mean try again |
+| `deployment_hibernating`, `deployment_deploying`, `deployment_unhealthy`, `airflow_unavailable` | an Astro Deployment's Airflow did not answer (see [instances.md](instances.md#when-a-deployments-airflow-does-not-answer)); `deployment_hibernating` is also `astro deploy` refused because the Deployment is hibernating (see [deploy.md](deploy.md#1-image-deploys) and [Dags-only deploys](deploy.md#2-dags-only-deploys)); `deployment_deploying` and `airflow_unavailable` mean try again |
 | `unauthenticated` | no usable Astro login: none was made, the API refused the token (401), or one was needed and a run under `--output json` may not start a browser login |
 | `forbidden` | the login lacks the permission this needs (403) |
 | `not_found` | the Astro API has no such object (404) |
@@ -218,7 +218,7 @@ The root's flag error func (`flagError` in [`cmd/unknown.go`](../cmd/unknown.go)
 
 A run that asks for help (`-h`, `--help` or `--help=true`) gets the help, not the refusal. A shell asking for completions (`__complete`) gets them: cobra parses flags itself there, without the flag error func, so when a flag typed is one the command being completed does not have, `acceptRemovedFlags` gives that command each removed flag 1.x had on it as a hidden flag, and each shorthand 1.x gave a flag it still has under its long name alone, for that run only. The command completed is the one cobra's own `Find` resolves, so a removed flag typed before a subcommand's name (`astro api airflow --json ls`) completes as cobra would complete it without the tombstones: a run of that line fails too, since the parent never had the flag.
 
-An entry marked `v2Only` is the one exception to that inventory check: it names a v2 command 1.x did not have, and answers there for a 1.x spelling a script may carry over (`astro env list --workspace-id` says to use `--workspace`). To remove a flag, delete it and add an entry for its name if none applies yet. `TestEveryV1FlagStillWorksOrSaysWhatReplacedIt` runs every inventory flag against its v2 tree, and every flag of a command in `v1Predecessors` against the command that replaced it. It fails on any flag v2 neither has nor reports, checks that each refusal is the message its entry gives there, and fails on an entry that no flag in the inventory reaches. `TestRemovedFlagsSayWhatReplacedThem` needs a case for every entry. The entries go in v3, once the unknown-flag events show nobody still passes them.
+An entry marked `v2Only` is the one exception to that inventory check: it names commands where 1.x did not have the flag, and answers there for a 1.x spelling a script may carry over to a v2 command 1.x did not have (`astro env list --workspace-id` says to use `--workspace`), or for a spelling an earlier v2 build gave a command and took away (`astro deployment team --workspace`). To remove a flag, delete it and add an entry for its name if none applies yet. `TestEveryV1FlagStillWorksOrSaysWhatReplacedIt` runs every inventory flag against its v2 tree, and every flag of a command in `v1Predecessors` against the command that replaced it. It fails on any flag v2 neither has nor reports, checks that each refusal is the message its entry gives there, and fails on an entry that no flag in the inventory reaches. `TestRemovedFlagsSayWhatReplacedThem` needs a case for every entry. The entries go in v3, once the unknown-flag events show nobody still passes them.
 
 ## Help
 

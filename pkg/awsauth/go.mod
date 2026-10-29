@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/awsauth
 
-go 1.26.1
+go 1.26.10
 
 // Declared exceptions to the sibling rule (docs/architecture.md): a door
 // implements pkg/instances' Provider, so it names that package's Instance,

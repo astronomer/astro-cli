@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/runtimeversions
 
-go 1.26.1
+go 1.26.10
 
 // No requires, test-only or otherwise, and none expected: this reads one public
 // JSON document over net/http and caches it with os. Everything that links it

@@ -31,7 +31,7 @@ regoin = 'us-east-1'
 		{nameRestart, attachableRuntime{}},
 	} {
 		t.Run(tc.cmd, func(t *testing.T) {
-			d, stdout := testDeps(t)
+			d, _ := testDeps(t)
 			d.Runtime = tc.rt
 			dir := t.TempDir()
 			if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(m), 0o600); err != nil {
@@ -43,9 +43,9 @@ regoin = 'us-east-1'
 			// The error is the fake runtime refusing to start.
 			_ = execute(t, d, "local", tc.cmd)
 
-			want := "warning: pyproject.toml: tool.astro.targets.mwaa.regoin: unknown key"
-			if !strings.Contains(stdout.String(), want) {
-				t.Errorf("%s did not report the unknown target key; stdout was %q", tc.cmd, stdout.String())
+			want := "Warning: pyproject.toml: tool.astro.targets.mwaa.regoin: unknown key"
+			if !strings.Contains(stderrOf(d), want) {
+				t.Errorf("%s did not report the unknown target key; stderr was %q", tc.cmd, stderrOf(d))
 			}
 		})
 	}

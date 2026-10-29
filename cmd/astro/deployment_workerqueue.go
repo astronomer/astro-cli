@@ -33,6 +33,7 @@ func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentWorkerQueueDeleteCmd(out),
 	)
 	cliout.AddOutputFlag(cmd, &deploymentWorkerQueueOutput)
+	addDeploymentWorkspaceFlag(cmd.PersistentFlags())
 	return cmd
 }
 

@@ -122,10 +122,16 @@ var ciEnvVars = []envMapping{
 	{"CI", "ci-unknown"},
 }
 
+// EnvIsTrue reports whether the environment variable name is set to "1" or
+// "true" (any case), the values every on/off ASTRO_* switch accepts.
+func EnvIsTrue(name string) bool {
+	v := os.Getenv(name)
+	return v == "1" || strings.EqualFold(v, "true")
+}
+
 // IsDisabledByEnv checks if telemetry is disabled via the ASTRO_TELEMETRY_DISABLED env var.
 func IsDisabledByEnv() bool {
-	envVal := os.Getenv(envTelemetryDisabled)
-	return envVal == "1" || strings.EqualFold(envVal, "true")
+	return EnvIsTrue(envTelemetryDisabled)
 }
 
 // NewAnonymousID generates a new anonymous UUID. Callers are responsible for persistence.
@@ -189,8 +195,7 @@ func isTestRun() bool {
 
 // isDebugMode returns true if synchronous debug mode is enabled
 func isDebugMode() bool {
-	val := os.Getenv(envTelemetryDebug)
-	return val == "1" || strings.EqualFold(val, "true")
+	return EnvIsTrue(envTelemetryDebug)
 }
 
 // sendDebug sends telemetry synchronously and prints debug output

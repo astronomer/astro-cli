@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/checks
 
-go 1.26.1
+go 1.26.10
 
 // Declared exception to the sibling rule (docs/architecture.md): the
 // target-aware pre-flight check picks which Airflow version to check against

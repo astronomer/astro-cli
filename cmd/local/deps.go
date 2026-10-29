@@ -438,9 +438,7 @@ func healthTimeout() time.Duration {
 	}
 	d, err := time.ParseDuration(raw)
 	if err != nil || d <= 0 {
-		fmt.Fprintf(os.Stderr,
-			"warning: ignoring %s=%q, which is not a positive duration — use a unit, like 10m or 90s\n",
-			healthTimeoutEnv, raw)
+		cliout.Warn(os.Stderr, fmt.Sprintf("ignoring %s=%q, which is not a positive duration — use a unit, like 10m or 90s", healthTimeoutEnv, raw))
 		return 0
 	}
 	return d

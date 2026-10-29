@@ -91,6 +91,9 @@ func (s *Suite) TestWorkspaceDelete() {
 	// Houston answers with the record it removed, or fails; never null on
 	// success.
 	houstonMock.On("DeleteWorkspace", wsID).Return(&houston.Workspace{ID: wsID, Label: "test", Description: new("N/A")}, nil).Once()
+	// As --yes does: the question is the command's, and tested there.
+	skipPrompt = true
+	defer func() { skipPrompt = false }()
 	err := workspaceDelete(&cobra.Command{}, buf, []string{wsID})
 	s.NoError(err)
 	s.Contains(buf.String(), "Successfully deleted workspace")

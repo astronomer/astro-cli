@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/cosmosboost/precompute"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -56,7 +57,16 @@ func slimManifestEnabled() bool {
 // plugin simply falls back to hashing at parse time. The one thing it refuses
 // is to replace another producer's file: the plugin reads that path, and this
 // CLI will not judge a file it did not write stale.
-func BundleOverlay(root string, enabled bool) (fileutil.TarOverlay, error) {
+//
+// progress gets the step's progress line and warnings its warning; nil
+// writes them to stdout and stderr (ansi.Output, ansi.Messages).
+func BundleOverlay(root string, enabled bool, progress, warnings io.Writer) (fileutil.TarOverlay, error) {
+	if progress == nil {
+		progress = ansi.Output
+	}
+	if warnings == nil {
+		warnings = ansi.Messages
+	}
 	extra := map[string][]byte{}
 	overlay := fileutil.TarOverlay{Extra: extra, Skip: func(rel, file string, info os.FileInfo) (bool, error) {
 		if _, replaced := extra[rel]; replaced {
@@ -84,10 +94,10 @@ func BundleOverlay(root string, enabled bool) (fileutil.TarOverlay, error) {
 		extra[filepath.ToSlash(rel)] = a.Data
 	}
 	if stepErr != nil {
-		fmt.Printf("Warning: the Cosmos Boost pre-deploy step failed, continuing deploy: %s\n", stepErr)
+		ansi.Warn(warnings, fmt.Sprintf("the Cosmos Boost pre-deploy step failed, continuing deploy: %s", stepErr))
 		return overlay, nil
 	}
-	fmt.Println("Cosmos Boost pre-deploy step complete")
+	fmt.Fprintln(progress, "Cosmos Boost pre-deploy step complete")
 	return overlay, nil
 }
 

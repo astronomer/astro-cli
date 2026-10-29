@@ -1,0 +1,9 @@
+{
+  "dag_id": "x",
+  "dag_run_id": "x",
+  "task_id": "x",
+  "map_index": -1,
+  "key": "x",
+  "timestamp": "x",
+  "value": null
+}

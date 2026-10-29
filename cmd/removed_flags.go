@@ -33,6 +33,10 @@ const (
 	errEnvListWorkspaceIDRemoved  = "use --workspace"
 	errEnvListDeploymentIDRemoved = "use --deployment, which takes a Deployment id or a link name from pyproject.toml"
 
+	// astro deployment team, user and token took a --workspace in v2 before
+	// it moved to the commands that read it; none of these ever read it.
+	errDeploymentByIDWorkspaceRemoved = "astro deployment team, user and token act on the Deployment you name, which carries its workspace, so drop it"
+
 	errDeploymentFileRemoved = "to manage Deployments as code, use the Astro Terraform provider: " + terraformProviderURL + ". " +
 		"To copy a Deployment, use astro deployment create --clone <deployment> --name <new name>"
 	errInspectTemplateRemoved = "to copy a Deployment, use astro deployment create --clone <deployment> --name <new name>. " +
@@ -132,9 +136,10 @@ type removedFlag struct {
 	// flag's name, for one reason several entries share. It follows the flag
 	// as the run typed it (removedMessage), so it never names that itself.
 	reason reasonFunc
-	// v2Only is set on an entry for commands 1.x did not have (under names
-	// them): a 1.x spelling a script may carry over to a v2 command that
-	// never took it. v1_flags.tsv has no row for it there, so it is
+	// v2Only is set on an entry for a flag 1.x did not have on the commands
+	// under names: a 1.x spelling a script may carry over to a v2 command
+	// that never took it, or a spelling an earlier v2 build gave a command
+	// and took away. v1_flags.tsv has no row for it there, so it is
 	// consulted without one, for the long name alone.
 	v2Only bool
 }
@@ -198,6 +203,11 @@ var removedFlags = []removedFlag{
 	{name: "deployment-id", under: []string{"api airflow"}, needs: has("deployment"), reason: says(errDeploymentIDAPIFlag)},
 	{name: "workspace-id", under: []string{"env list"}, v2Only: true, reason: says(errEnvListWorkspaceIDRemoved)},
 	{name: "deployment-id", under: []string{"env list"}, v2Only: true, reason: says(errEnvListDeploymentIDRemoved)},
+	// --workspace is no 1.x flag there (1.x's --workspace-id still is, as a
+	// no-op), so these answer for the long name alone. An earlier v2 build
+	// gave it to Astro's: needs keeps them to Astro's tree. APC's commands of
+	// these names never took one, so cobra's own error answers there.
+	{name: "workspace", under: []string{"deployment team", "deployment user", "deployment token"}, needs: onAstro(has("deployment")), v2Only: true, reason: says(errDeploymentByIDWorkspaceRemoved)},
 	// 1.x's list commands shared --json, --template and -o
 	// table|json|template (pkg/output's AddFlags), and api ls and describe
 	// had --json.
@@ -208,8 +218,8 @@ var removedFlags = []removedFlag{
 	{name: "format", needs: cliout.HasOutput, reason: formatRemoved},
 	// --force skipped the confirmation that --yes skips now.
 	{name: "force", needs: has("yes"), reason: forceRemoved},
-	// astro deploy's 1.x-project flags. Astro's deploy has --deployment for
-	// --save to point at; APC's names its Deployment by the argument alone.
+	// astro deploy's 1.x-project flags. Astro's deploy and APC's both have
+	// --deployment for --save to point at.
 	{name: "save", under: []string{"deploy"}, needs: has("deployment"), reason: says(errDeploySaveRemoved)},
 	{name: "pytest", under: []string{"deploy"}, reason: says(errDeployPytestRemoved)},
 	{name: "test", under: []string{"deploy"}, reason: says(errDeployTestRemoved)},
@@ -476,6 +486,14 @@ func pathBelowRoot(cmd *cobra.Command) string {
 
 func has(flag string) func(*cobra.Command) bool {
 	return func(cmd *cobra.Command) bool { return cmd.Flag(flag) != nil }
+}
+
+// onAstro is needs on a command of Astro's tree alone (markV1Tree): one
+// APC's tree has under the same name answers as it would without the entry.
+func onAstro(needs func(*cobra.Command) bool) func(*cobra.Command) bool {
+	return func(cmd *cobra.Command) bool {
+		return cmd.Root().Annotations[v1TreeAnnotation] != v1TreeAPC && needs(cmd)
+	}
 }
 
 // forceRemoved names --yes with its shorthand when cmd gives it one, and
