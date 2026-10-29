@@ -9,6 +9,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/uv"
@@ -49,7 +50,11 @@ func (c *cli) lockAfterInit(ctx context.Context, dir string) {
 		}
 		return
 	case err != nil:
-		fmt.Fprintf(c.d.Stderr, "warning: uv.lock: uv lock failed: %s; run uv lock so it follows %s\n", firstLine(err.Error()), manifest.Marker)
+		// The "Warning:" label as the CLI's other stderr warnings spell it, in
+		// yellow on a terminal. Not emitWarning: in json mode that would put a
+		// warning event on stdout ahead of init's one result.
+		fmt.Fprintln(c.d.Stderr, ansi.ForStderr().Yellow("Warning:"),
+			fmt.Sprintf("uv.lock: uv lock failed: %s; run uv lock so it follows %s", firstLine(err.Error()), manifest.Marker))
 		return
 	}
 	after, _ := readLock(dir)

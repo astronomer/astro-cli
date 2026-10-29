@@ -104,7 +104,7 @@ func TestInitWarnsWhenTheLockFails(t *testing.T) {
 	out, _ := initWithLock(t, dir, func(context.Context, string) error {
 		return errors.New("uv lock: no solution: sqlalchemy==2.0.50 conflicts\nmore detail")
 	})
-	if !strings.Contains(out, "warning: uv.lock: uv lock failed: uv lock: no solution: sqlalchemy==2.0.50 conflicts; run uv lock so it follows pyproject.toml") {
+	if !strings.Contains(out, "Warning: uv.lock: uv lock failed: uv lock: no solution: sqlalchemy==2.0.50 conflicts; run uv lock so it follows pyproject.toml") {
 		t.Errorf("a failed lock did not warn on one line:\n%s", out)
 	}
 }
