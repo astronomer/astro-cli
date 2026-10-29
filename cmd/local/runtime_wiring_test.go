@@ -266,7 +266,7 @@ func TestStartJudgesAnONBUILDDockerfileByWhetherInitCanMoveIt(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			d, stdout := testDeps(t)
+			d, _ := testDeps(t)
 			started := false
 			d.Runtime = startRecorder{started: &started}
 			wiringProject(t, &d, "dockerfile = 'Dockerfile'\n", tc.from)
@@ -284,8 +284,8 @@ func TestStartJudgesAnONBUILDDockerfileByWhetherInitCanMoveIt(t *testing.T) {
 			if !started {
 				t.Errorf("the start did not reach the runtime: %v", err)
 			}
-			if tc.warning != "" && !strings.Contains(stdout.String(), tc.warning) {
-				t.Errorf("no warning naming the blocker: %q", stdout.String())
+			if tc.warning != "" && !strings.Contains(stderrOf(d), tc.warning) {
+				t.Errorf("no warning naming the blocker: %q", stderrOf(d))
 			}
 		})
 	}
