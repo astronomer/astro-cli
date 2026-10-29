@@ -1,0 +1,31 @@
+version = 1
+revision = 3
+requires-python = ">=3.10"
+
+[[package]]
+name = "pyfiglet"
+version = "1.0.2"
+source = { git = "https://github.com/pwaller/pyfiglet?tag=v1.0.2#be130d640d520d4a9db2b4f8a86f9d838534f8d0" }
+
+[[package]]
+name = "six"
+version = "1.17.0"
+source = { url = "https://user:s3cret@files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl" }
+wheels = [
+    { url = "https://user:s3cret@files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274" },
+]
+
+[[package]]
+name = "sources"
+version = "0"
+source = { virtual = "." }
+dependencies = [
+    { name = "pyfiglet" },
+    { name = "six" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pyfiglet", git = "https://github.com/pwaller/pyfiglet?tag=v1.0.2" },
+    { name = "six", url = "https://user:s3cret@files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl" },
+]

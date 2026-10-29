@@ -1,0 +1,10 @@
+[project]
+name = "mirror"
+version = "0"
+requires-python = ">=3.10"
+dependencies = ["six"]
+
+[[tool.uv.index]]
+name = "mirror"
+url = "https://test.pypi.org/simple/"
+default = true

@@ -1,0 +1,9 @@
+[project]
+name = "sources"
+version = "0"
+requires-python = ">=3.10"
+dependencies = ["pyfiglet", "six"]
+
+[tool.uv.sources]
+pyfiglet = { git = "https://github.com/pwaller/pyfiglet", tag = "v1.0.2" }
+six = { url = "https://user:s3cret@files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl" }

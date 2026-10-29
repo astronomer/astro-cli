@@ -1,0 +1,14 @@
+[project]
+name = "airflow"
+version = "0"
+requires-python = ">=3.10"
+dependencies = ["apache-airflow==3.3.*", "six"]
+
+[tool.uv]
+constraint-dependencies = [
+    'six<2',
+    # Astro Runtime 3.3-9 (Python 3.12) constrains these. astro writes them.
+]
+
+[tool.uv.sources]
+apache-airflow = { path = "stub/apache_airflow-3.3.2+astro.2-py3-none-any.whl" }

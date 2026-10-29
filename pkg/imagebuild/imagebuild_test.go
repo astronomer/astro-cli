@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -99,9 +100,12 @@ func TestBuildWritesTheInstallDockerfile(t *testing.T) {
 	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
 	require.NoError(t, err)
 	base := req.BaseImage + "-base"
-	assert.Equal(t, "FROM "+base+" AS astro-install\n"+
+	assert.Equal(t, "ARG ASTRO_UV_IMAGE="+UVImage+"\n"+
+		"FROM ${ASTRO_UV_IMAGE} AS astro-uv\n"+
+		"FROM "+base+" AS astro-install\n"+
 		"USER root\n"+
 		"COPY .astro/install/ /tmp/astro-project/\n"+
+		"COPY --from=astro-uv /uv /opt/astro-uv/uv\n"+
 		"RUN python /tmp/astro-project/install-project.py --project /tmp/astro-project --out /tmp/astro-install\n"+
 		"FROM "+base+"\n"+
 		"COPY --from=astro-install /tmp/astro-install/packages.txt .\n"+
@@ -121,7 +125,7 @@ func TestBuildWritesTheInstallDockerfile(t *testing.T) {
 // and uv.lock, copied into the context as they are.
 func TestBuildCopiesTheProjectsManifestAndLock(t *testing.T) {
 	project := t.TempDir()
-	pyproject, lock := lockProject([]string{"pandas"}, "[[package]]\nname = \"pandas\"\nversion = \"2.2.3\"\nsource = { registry = \"https://pypi.org/simple\" }\n")
+	pyproject, lock := fixtureFiles(t, "pins")
 	writeTree(t, project, map[string]string{"pyproject.toml": pyproject, "uv.lock": lock})
 	req := testRequest(t)
 	req.ManifestDir = project
@@ -136,8 +140,8 @@ func TestBuildCopiesTheProjectsManifestAndLock(t *testing.T) {
 		assert.Equal(t, want, string(got), name)
 	}
 	reqs, _, constraints := installLists(t, ctxDir)
-	assert.Equal(t, "-c "+lockConstraintsName+"\npandas\n", reqs)
-	assert.Contains(t, constraints, "\npandas==2.2.3\n")
+	assert.Equal(t, "-c "+lockConstraintsName+"\nidna==3.20\nrequests==2.32.3\ntabulate==0.10.0\n", reqs)
+	assert.Contains(t, constraints, "\ncharset-normalizer==3.5.2\n")
 }
 
 // A project with no uv.lock installs its dependencies unpinned, as before.
@@ -157,9 +161,9 @@ func TestBuildWithoutALockInstallsUnpinned(t *testing.T) {
 	assert.Empty(t, constraints)
 }
 
-// Find-links pages lead the generated requirements.txt, one --find-links
-// line each, before the dependencies they serve, from a request naming no
-// project too: its pyproject.toml routes each page's package to its index.
+// A request naming no project states its find-links pages in the [tool.uv]
+// settings of the pyproject.toml it is given, where uv reads them when it
+// resolves that project in the build.
 func TestBuildWritesFindLinks(t *testing.T) {
 	req := testRequest(t)
 	req.Dependencies = []string{"private-lib", "pandas"}
@@ -168,10 +172,17 @@ func TestBuildWritesFindLinks(t *testing.T) {
 
 	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
-	reqs, _, _ := installLists(t, filepath.Join(req.WorkDir, buildContextDir))
-	assert.Equal(t, "--find-links https://pypi.acme.example/simple/private-lib/\n"+
-		"--find-links https://files.acme.example/wheels/index.html\n"+
-		"--find-links ./vendor\nprivate-lib\npandas\n", reqs)
+	data, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, filepath.FromSlash(generatedInputsDir), pyprojectName))
+	require.NoError(t, err)
+	var doc struct {
+		Tool struct {
+			UV struct {
+				FindLinks []string `toml:"find-links"`
+			} `toml:"uv"`
+		} `toml:"tool"`
+	}
+	require.NoError(t, toml.Unmarshal(data, &doc))
+	assert.Equal(t, req.FindLinks, doc.Tool.UV.FindLinks)
 }
 
 // Local Docker mode builds in the same WorkDir every start, so the context is
@@ -179,7 +190,7 @@ func TestBuildWritesFindLinks(t *testing.T) {
 // from.
 func TestBuildForgetsALockTheProjectDeleted(t *testing.T) {
 	project := t.TempDir()
-	pyproject, lock := lockProject([]string{"pandas"}, "[[package]]\nname = \"pandas\"\nversion = \"2.2.3\"\nsource = { registry = \"https://pypi.org/simple\" }\n")
+	pyproject, lock := fixtureFiles(t, "pins")
 	writeTree(t, project, map[string]string{"pyproject.toml": pyproject, "uv.lock": lock})
 	req := testRequest(t)
 	req.ManifestDir = project
@@ -189,14 +200,14 @@ func TestBuildForgetsALockTheProjectDeleted(t *testing.T) {
 	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	_, _, constraints := installLists(t, ctxDir)
-	require.Contains(t, constraints, "pandas==2.2.3")
+	require.Contains(t, constraints, "charset-normalizer==3.5.2")
 
 	require.NoError(t, os.Remove(filepath.Join(project, "uv.lock")))
 	_, err = testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	assert.NoFileExists(t, filepath.Join(ctxDir, uvLockName))
 	reqs, _, constraints := installLists(t, ctxDir)
-	assert.Equal(t, "pandas\n", reqs)
+	assert.Equal(t, "requests==2.32.3\ntabulate\n", reqs, "resolved again, offline here, so unpinned")
 	assert.Empty(t, constraints)
 }
 
@@ -228,7 +239,7 @@ func TestBaseOf(t *testing.T) {
 	assert.Equal(t, RuntimeImageRepo+":3.1-5-base", baseOf(RuntimeImageRepo+":3.1-5"))
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0-python-3.11-base", baseOf("quay.io/astronomer/astro-runtime:12.6.0-python-3.11"))
 	assert.Equal(t, RuntimeImageRepo+":3.1-base", baseOf(RuntimeImageRepo+":3.1-base"))
-	assert.True(t, strings.HasPrefix(GeneratedDockerfile(RuntimeImageRepo+":3.1", false), "FROM "+RuntimeImageRepo+":3.1-base AS astro-install\n"))
+	assert.Contains(t, GeneratedDockerfile(RuntimeImageRepo+":3.1", false), "\nFROM "+RuntimeImageRepo+":3.1-base AS astro-install\n")
 	// A project's own Dockerfile always mounts the secret; a generated build
 	// only when it has one. They differ in nothing else but what the install
 	// stage copies: the project's files, or the inputs directory a generated
@@ -254,7 +265,7 @@ func TestBuildWritesOSPackages(t *testing.T) {
 
 	reqs, pkgs, _ := installLists(t, filepath.Join(req.WorkDir, buildContextDir))
 	assert.Equal(t, "libpq-dev\nbuild-essential\n", pkgs)
-	assert.Equal(t, "\n", reqs, "written with nothing in it, so the install's COPY finds it")
+	assert.Empty(t, reqs, "written with nothing in it, so the install's COPY finds it")
 }
 
 // A git direct reference in a request naming no project still brings git in.
