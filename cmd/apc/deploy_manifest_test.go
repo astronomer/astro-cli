@@ -221,7 +221,7 @@ func TestDeployManifestLinkOnAnotherDomain(t *testing.T) {
 // is read off the config, not the login.
 func TestOtherDomainNamesTheWayThere(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	assert.ErrorContains(t, otherDomain("elsewhere", "astro.other.example"), "run astro login astro.other.example")
+	assert.ErrorContains(t, otherDomainThen("deploy again")("elsewhere", "astro.other.example"), "run astro login astro.other.example")
 
 	// A second context in an in-memory config, with no login stored for it.
 	fs := afero.NewMemMapFs()
@@ -229,7 +229,7 @@ func TestOtherDomainNamesTheWayThere(t *testing.T) {
 	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, []byte(cfg), 0o600))
 	config.InitConfig(fs)
 	t.Cleanup(func() { testUtil.InitTestConfig(testUtil.SoftwarePlatform) })
-	assert.ErrorContains(t, otherDomain("elsewhere", "astro.other.example"), "run astro context switch astro.other.example")
+	assert.ErrorContains(t, otherDomainThen("deploy again")("elsewhere", "astro.other.example"), "run astro context switch astro.other.example")
 }
 
 // --dags uploads the project's DAGs to the link named, with no build.

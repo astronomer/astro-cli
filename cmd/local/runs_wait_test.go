@@ -30,7 +30,7 @@ func waitStub(t *testing.T, af2 bool, states ...string) (stub *airflowStub, pref
 	for _, state := range states {
 		bodies = append(bodies, runBody(state))
 	}
-	stub.routeSequence(http.MethodGet, prefix+"/dags/orders_etl/dagRuns/manual__1", bodies...)
+	stub.routeSequence(prefix+"/dags/orders_etl/dagRuns/manual__1", bodies...)
 	return stub, prefix
 }
 
@@ -287,7 +287,7 @@ func TestRunFinishedStopsOnlyOnTheTerminalStates(t *testing.T) {
 // not read as a clean one.
 func TestFailedTasksReadEveryPage(t *testing.T) {
 	stub, _ := waitStub(t, false, "failed")
-	stub.routeSequence(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns/manual__1/taskInstances",
+	stub.routeSequence("/api/v2/dags/orders_etl/dagRuns/manual__1/taskInstances",
 		`{"task_instances":[{"task_id":"a","state":"success","map_index":-1},{"task_id":"b","state":"success","map_index":-1}],"total_entries":3}`,
 		`{"task_instances":[{"task_id":"c","state":"failed","try_number":1,"map_index":-1}],"total_entries":3}`)
 	out, _, err := runQuery(t, stub, append([]string{"runs", "trigger-wait", "orders_etl", "-o", "json"}, fast...)...)

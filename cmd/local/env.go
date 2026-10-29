@@ -719,11 +719,9 @@ func (c *cli) runEnvSet(route *scopeFlags, kind localenv.Kind, name, value strin
 	}
 	switch {
 	case created && !everywhere:
-		fmt.Fprintf(c.d.Stderr, "note: %s reaches no project yet. Link it with %s, or re-run with --auto-link.\n",
-			name, localenv.LinkHint(kind, name))
+		cliout.Note(c.d.Stderr, fmt.Sprintf("%s reaches no project yet. Link it with %s, or re-run with --auto-link.", name, localenv.LinkHint(kind, name)))
 	case !created && everywhere:
-		fmt.Fprintf(c.d.Stderr, "note: %s already existed, so its links were kept; to auto-link it to every project run: %s --auto-link\n",
-			name, localenv.LinkHint(kind, name))
+		cliout.Note(c.d.Stderr, fmt.Sprintf("%s already existed, so its links were kept; to auto-link it to every project run: %s --auto-link", name, localenv.LinkHint(kind, name)))
 	}
 	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "set"}
 	return r.Emit(res, func(w io.Writer) error {
@@ -798,7 +796,7 @@ func (c *cli) removeOtherCopy(scope *scopeFlags, kind localenv.Kind, name string
 			localenv.Noun(kind), name, other.Where(), err)
 	}
 	if removed {
-		fmt.Fprintf(c.d.Stderr, "note: removed the other copy of %s from %s\n", name, other.Where())
+		cliout.Note(c.d.Stderr, fmt.Sprintf("removed the other copy of %s from %s", name, other.Where()))
 	}
 	return nil
 }
@@ -824,10 +822,8 @@ func (c *cli) warnProjectShadows(scope *scopeFlags, kind localenv.Kind, name str
 		if ok, err := st.Has(kind, name); err != nil || !ok {
 			continue
 		}
-		fmt.Fprintf(c.d.Stderr,
-			"warning: %s is also set in %s, which outranks the global value for this project, so start uses that copy. "+
-				"Remove it with: astro local env %s delete %s --project\n",
-			name, st.Where(), localenv.Noun(kind), name)
+		cliout.Warn(c.d.Stderr, fmt.Sprintf("%s is also set in %s, which outranks the global value for this project, so start uses that copy. "+
+			"Remove it with: astro local env %s delete %s --project", name, st.Where(), localenv.Noun(kind), name))
 		warned = true
 	}
 	return warned
@@ -853,9 +849,8 @@ func (c *cli) noteUndeclaredGlobal(kind localenv.Kind, name string) {
 	if _, ok := declaredSpec(schema, kind, name); ok {
 		return
 	}
-	fmt.Fprintf(c.d.Stderr, "note: this project does not declare %s. It gets the global value wherever the value reaches, "+
-		"but declare it to make it a requirement: %s\n",
-		name, localenv.DeclareHint(kind, name))
+	cliout.Note(c.d.Stderr, fmt.Sprintf("this project does not declare %s. It gets the global value wherever the value reaches, "+
+		"but declare it to make it a requirement: %s", name, localenv.DeclareHint(kind, name)))
 }
 
 func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) error {
@@ -891,8 +886,7 @@ func (c *cli) getScoped(r cliout.Renderer, scope *scopeFlags, kind localenv.Kind
 		case winner == nil:
 			winner = st
 		default:
-			fmt.Fprintf(c.d.Stderr, "note: %s is also set in %s; showing the %s copy, which is the one Airflow gets\n",
-				name, st.Where(), winner.ScopeName())
+			cliout.Note(c.d.Stderr, fmt.Sprintf("%s is also set in %s; showing the %s copy, which is the one Airflow gets", name, st.Where(), winner.ScopeName()))
 		}
 	}
 	if winner == nil {
@@ -1193,8 +1187,7 @@ func (c *cli) scopeStores(scope *scopeFlags) ([]valueStore, error) {
 func (c *cli) deleteKeepingRow(store valueStore, kind localenv.Kind, name string) (bool, error) {
 	ok, err := store.Delete(kind, name)
 	if errors.Is(err, vaultenv.ErrLinkRowKept) {
-		fmt.Fprintf(c.d.Stderr, "warning: deleted %s %s, but %v. A new global of this name would reach only the projects that row names; once the index is usable, clear it with: %s --auto-link\n",
-			localenv.Noun(kind), name, err, localenv.LinkHint(kind, name))
+		cliout.Warn(c.d.Stderr, fmt.Sprintf("deleted %s %s, but %v. A new global of this name would reach only the projects that row names; once the index is usable, clear it with: %s --auto-link", localenv.Noun(kind), name, err, localenv.LinkHint(kind, name)))
 		return ok, nil
 	}
 	return ok, err
@@ -1544,9 +1537,7 @@ func (c *cli) connFieldPassword(cmd *cobra.Command, in *setInput, f *connFields,
 	// two ways of arriving at no password both matter: a terminal with nothing
 	// piped, and — the one that bites in CI — a pipe that turned out empty.
 	if password == "" && f.login != "" {
-		fmt.Fprintf(c.d.Stderr,
-			"warning: connection %s has a login but no password; pipe one, or pass --password, if it needs one\n",
-			name)
+		cliout.Warn(c.d.Stderr, fmt.Sprintf("connection %s has a login but no password; pipe one, or pass --password, if it needs one", name))
 	}
 	return password, nil
 }
@@ -1562,5 +1553,5 @@ func (c *cli) warnUnignoredEnv(path string, scope localenv.Scope, projectDir str
 	if err != nil || ignored {
 		return
 	}
-	fmt.Fprintf(c.d.Stderr, "warning: %s is not covered by .gitignore; add a .env line to it so the file is never committed\n", path)
+	cliout.Warn(c.d.Stderr, fmt.Sprintf("%s is not covered by .gitignore; add a .env line to it so the file is never committed", path))
 }

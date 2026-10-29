@@ -172,7 +172,7 @@ func TestStartChecksTheRuntimeBuildInDockerModeOnly(t *testing.T) {
 		{name: "restart docker", args: []string{"local", "restart"}, mode: localrt.ModeDocker, check: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			d, stdout := testDeps(t)
+			d, _ := testDeps(t)
 			started := false
 			d.Runtime = startRecorder{started: &started, mode: tc.mode}
 			rec := &runtimeCheckRecorder{warnings: []runtimeversions.Finding{{Kind: runtimeversions.FindingYanked, Message: "runtime 3.1-12 is yanked"}}}
@@ -189,8 +189,8 @@ func TestStartChecksTheRuntimeBuildInDockerModeOnly(t *testing.T) {
 			if len(rec.calls) != 1 || rec.calls[0] != [2]string{"3.1-12", "3.1"} {
 				t.Errorf("calls = %v, want one for 3.1-12 against 3.1", rec.calls)
 			}
-			if !strings.Contains(stdout.String(), "warning: pyproject.toml: tool.astro.runtime: runtime 3.1-12 is yanked") {
-				t.Errorf("the warning was not shown: %q", stdout.String())
+			if !strings.Contains(stderrOf(d), "Warning: pyproject.toml: tool.astro.runtime: runtime 3.1-12 is yanked") {
+				t.Errorf("the warning was not shown: %q", stderrOf(d))
 			}
 			if !started {
 				t.Error("a warning stopped the start")
@@ -247,7 +247,7 @@ func TestPackageChecksTheRuntimeBuild(t *testing.T) {
 // about the per-machine files that build would copy into the image, and go on.
 // Standalone builds no image, so it says nothing.
 func TestStartWarnsAboutLocalFilesInTheImageInDockerModeOnly(t *testing.T) {
-	const warning = "warning: the image built from Dockerfile would copy in these local or per-machine files: " +
+	const warning = "Warning: the image built from Dockerfile would copy in these local or per-machine files: " +
 		".astro/standalone. To keep them out, add it to .dockerignore"
 	for _, tc := range []struct {
 		name string
@@ -261,7 +261,7 @@ func TestStartWarnsAboutLocalFilesInTheImageInDockerModeOnly(t *testing.T) {
 		{name: "restart docker", args: []string{"local", "restart"}, mode: localrt.ModeDocker, warn: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			d, stdout := testDeps(t)
+			d, _ := testDeps(t)
 			started := false
 			d.Runtime = startRecorder{started: &started, mode: tc.mode}
 			wiringProject(t, &d, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.1-12")
@@ -271,8 +271,8 @@ func TestStartWarnsAboutLocalFilesInTheImageInDockerModeOnly(t *testing.T) {
 			}
 
 			_ = execute(t, d, tc.args...)
-			if got := strings.Contains(stdout.String(), warning); got != tc.warn {
-				t.Errorf("warned = %v, want %v: %q", got, tc.warn, stdout.String())
+			if got := strings.Contains(stderrOf(d), warning); got != tc.warn {
+				t.Errorf("warned = %v, want %v: %q", got, tc.warn, stderrOf(d))
 			}
 			if !started {
 				t.Error("the start did not reach the runtime")

@@ -59,6 +59,11 @@ var cobraUsagePrefixes = []string{
 	"at least one of the flags in the group ",
 }
 
+// usageMarker is an error a package that cannot import cliout (one under
+// internal/platform) marks as a usage error itself, such as a Deployment name
+// several Deployments share.
+type usageMarker interface{ IsUsageError() bool }
+
 // IsUsage reports whether err is a usage error.
 func IsUsage(err error) bool {
 	if err == nil {
@@ -66,6 +71,10 @@ func IsUsage(err error) bool {
 	}
 	var u *usageError
 	if errors.As(err, &u) {
+		return true
+	}
+	var m usageMarker
+	if errors.As(err, &m) && m.IsUsageError() {
 		return true
 	}
 	msg := err.Error()

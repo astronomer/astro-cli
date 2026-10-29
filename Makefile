@@ -194,6 +194,10 @@ test-e2e:
 test-e2e-tier0:
 	@ASTRO_E2E_MAX_TIER=0 bash scripts/test-e2e.sh
 
+# Version resolution in godownloader.sh, against a stubbed GitHub API
+test-installer:
+	bash scripts/test-godownloader.sh
+
 temp-astro:
 	cd $(shell mktemp -d) && ${PWD}/astro init
 

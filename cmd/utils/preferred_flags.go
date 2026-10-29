@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -93,7 +94,11 @@ func ApplyAliases(fs *pflag.FlagSet) error {
 				err = cliout.Usage(fmt.Errorf("--%s %q and --%s %q disagree: pass only --%s", p, v, f.Name, f.Value.String(), p))
 			}
 		case !pf.Changed:
-			err = fs.Set(p, f.Value.String())
+			// A value the flag refuses is refused as given: a usage error,
+			// led by the spelling typed, before pflag's naming of the flag.
+			if setErr := fs.Set(p, f.Value.String()); setErr != nil {
+				err = cliout.Usage(fmt.Errorf("--%s: %w", f.Name, setErr))
+			}
 		}
 	})
 	return err
@@ -119,4 +124,86 @@ func BeforeArgs(tree *cobra.Command, hook func(*cobra.Command, []string) error) 
 	for _, sub := range tree.Commands() {
 		BeforeArgs(sub, hook)
 	}
+}
+
+// Resolver is a tree's own work on what a command's flags hold once the 1.x
+// spellings are handed on, such as reading a link name given as
+// --deployment. typed reports whether this run typed the flag of that name
+// itself, as distinct from a value an alias handed it.
+type Resolver func(cmd *cobra.Command, args []string, typed func(name string) bool) error
+
+// ApplyPreferredFlagsIn has every runnable command in tree reconcile its
+// spellings once its flags are parsed (ApplyPreferredFlags), before its
+// argument check and its pre-runs, which read what they resolve to. Each
+// tree's top-level constructors call it on their own tree, with the tree's
+// own resolution.
+func ApplyPreferredFlagsIn(tree *cobra.Command, resolve Resolver) {
+	BeforeArgs(tree, func(cmd *cobra.Command, args []string) error {
+		return ApplyPreferredFlags(cmd, args, resolve)
+	})
+}
+
+// ApplyPreferredFlags hands the 1.x spellings given to cmd to the flags they
+// stand for (ApplyAliases), then runs resolve, nil for none. Once both accept
+// the run, the 1.x spellings it gave are noted (noteRenamedFlags).
+func ApplyPreferredFlags(cmd *cobra.Command, args []string, resolve Resolver) error {
+	fs := cmd.Flags()
+	typed := map[string]bool{}
+	fs.Visit(func(f *pflag.Flag) { typed[f.Name] = true })
+	if err := ApplyAliases(fs); err != nil {
+		return err
+	}
+	if resolve != nil {
+		if err := resolve(cmd, args, func(name string) bool { return typed[name] }); err != nil {
+			return err
+		}
+	}
+	noteRenamedFlags(cmd)
+	return nil
+}
+
+// RefuseDisagreeingDeployment refuses a command line that names its
+// Deployment twice, as the argument (args[0]) and as --deployment (flag, as
+// typed), naming two different ones: it would act on one of them without a
+// word. same are other values the argument agrees with, such as the
+// Deployment id flag resolved to.
+func RefuseDisagreeingDeployment(args []string, flag string, same ...string) error {
+	return RefuseDisagreeingArg(args, "Deployment", "deployment", flag, same...)
+}
+
+// RefuseDisagreeingArg refuses a command line that gives one value twice, as
+// the argument (args[0], what it names) and as --name (value, as typed),
+// differently: it would act on one of them without a word. same are other
+// values the argument agrees with.
+func RefuseDisagreeingArg(args []string, what, name, value string, same ...string) error {
+	if len(args) == 0 || value == "" || args[0] == value || slices.Contains(same, args[0]) {
+		return nil
+	}
+	return cliout.Usage(fmt.Errorf("the %s argument %q and --%s %q disagree: pass only one", what, args[0], name, value))
+}
+
+// AddWorkspaceFlag registers --workspace on fs, read into to, with the
+// shorthand given ("" for none), refusing "" (RefuseEmpty). With oneX, 1.x's
+// --workspace-id is its hidden alias, with the shorthand 1.x gave it there
+// (oneXShorthand, "" for none). It returns --workspace.
+func AddWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string, oneX bool, oneXShorthand string) *pflag.Flag {
+	fs.StringVarP(to, "workspace", shorthand, "", usage)
+	f := fs.Lookup("workspace")
+	RefuseEmpty(f)
+	if oneX {
+		AddAlias(fs, "workspace-id", oneXShorthand, "workspace")
+	}
+	return f
+}
+
+// OneXNoOpUsage is the help of a 1.x flag a command accepts and ignores.
+const OneXNoOpUsage = "Has no effect; accepted so scripts written for Astro CLI 1.x keep working"
+
+// AddOneXNoOp registers 1.x's --name on fs, a flag that took a value, with
+// the shorthand 1.x gave it ("" for none), for a command that 1.x gave it to
+// and that never read it: hidden and read by nothing, so a 1.x script
+// passing it keeps working.
+func AddOneXNoOp(fs *pflag.FlagSet, name, shorthand string) {
+	fs.StringP(name, shorthand, "", OneXNoOpUsage)
+	fs.MarkHidden(name) //nolint:errcheck // the flag is defined just above
 }

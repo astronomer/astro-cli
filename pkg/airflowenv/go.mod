@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/airflowenv
 
-go 1.26.1
+go 1.26.10
 
 // Declared exception to the sibling rule (docs/architecture.md):
 // the codec exists to encode the connmodel value type.

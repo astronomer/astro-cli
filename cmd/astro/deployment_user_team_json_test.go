@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -280,5 +281,34 @@ func TestDeploymentUserTeamOutputUsage(t *testing.T) {
 		for _, sub := range c.Commands() {
 			assert.Nil(t, sub.LocalNonPersistentFlags().Lookup("output"), "%s %s registers its own -o", group, sub.Name())
 		}
+	}
+}
+
+// The text tables of deployment team list and workspace team list each show
+// the role on what they list: the Deployment's, and the Workspace's. They are
+// built by one function, given the role to read.
+func TestTeamListTablesShowTheirOwnRole(t *testing.T) {
+	_, _, eng, idp := deploymentUserTeamFixtures()
+	teams := userTeamMock(nil, []astrov1.Team{eng, idp}, nil)
+	row := func(id, role, name, description string) map[string]string {
+		return map[string]string{"ID": id, "ROLE": role, "NAME": name, "DESCRIPTION": description, "CREATE DATE": "2026-01-02T03:04:05Z"}
+	}
+	for _, tc := range []struct {
+		name string
+		root func(io.Writer) *cobra.Command
+		args []string
+		role string
+	}{
+		{"deployment team list", newDeploymentRootCmd, []string{"deployment", "team", "list", "--deployment", tokDeploymentID}, "DEPLOYMENT_ADMIN"},
+		{"workspace team list", newWorkspaceCmd, []string{"workspace", "team", "list"}, "WORKSPACE_OPERATOR"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := execAstroCmd(t, teams(t), "", tc.root, tc.args...)
+			require.NoError(t, r.err)
+			assert.Equal(t, []map[string]string{
+				row("team-eng", tc.role, "Engineering", "Builds things"),
+				row("team-idp", "", "Okta Ops", ""),
+			}, tableRows(t, r.stdout, "ID"))
+		})
 	}
 }

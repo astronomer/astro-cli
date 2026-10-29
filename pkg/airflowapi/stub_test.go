@@ -30,6 +30,9 @@ type stubRoute struct {
 	status   int
 	body     string
 	location string
+	// respond, when set, answers from the request instead: a path whose
+	// answer depends on its query.
+	respond func(*http.Request) (int, string)
 }
 
 // airflowStub is an httptest server standing in for an Airflow. Routes are
@@ -79,6 +82,14 @@ func (s *airflowStub) routeStatus(method, path string, status int, body string) 
 	s.routes[method+" "+path] = stubRoute{status: status, body: body}
 }
 
+// routeFunc answers a path from each request, for an answer that depends on
+// the query.
+func (s *airflowStub) routeFunc(method, path string, respond func(*http.Request) (int, string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.routes[method+" "+path] = stubRoute{respond: respond}
+}
+
 // redirect answers a path with a 302 elsewhere, the way an Airflow 2 under
 // session auth bounces an unauthenticated API call to its login page.
 func (s *airflowStub) redirect(method, path, location string) {
@@ -112,6 +123,12 @@ func (s *airflowStub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = io.WriteString(w, `{"detail":"Not Found"}`)
+		return
+	}
+	if route.respond != nil {
+		status, body := route.respond(r)
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, body)
 		return
 	}
 	w.WriteHeader(route.status)

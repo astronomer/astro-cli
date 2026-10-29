@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/astrosession"
@@ -36,6 +37,10 @@ var (
 	parseAPIToken         = util.ParseAPIToken
 	errNotAPIToken        = errors.New("the API token given does not appear to be an Astro API Token")
 	errExpiredAPIToken    = errors.New("the API token given has expired")
+	// ErrAPITokenOrganization is returned when the organization of an accepted
+	// API token, or of API keys, can't be looked up, which leaves the context
+	// without one.
+	ErrAPITokenOrganization = errors.New("cannot look up the organization of the Astro credentials in the environment")
 )
 
 const (
@@ -110,6 +115,15 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	if isAuthTokenCmd(cmd) {
 		// Quietly: the command's output is the token alone.
 		_, err := ensureEnvCredentials(true, astroV1Client)
+		// An API token is saved before its organization is looked up, and
+		// printing it needs no organization, so a lookup that failed for want
+		// of the API (a rate limit, an outage) does not stop this command as it
+		// stops the others. One the API refused did not fail for want of it:
+		// the token no longer works, and printing it would hide that.
+		if errors.Is(err, ErrAPITokenOrganization) && !httputil.HasStatus(err, http.StatusUnauthorized) && !httputil.HasStatus(err, http.StatusForbidden) {
+			logger.Debug(err)
+			return nil
+		}
 		return err
 	}
 
@@ -453,7 +467,8 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 	}
 	if !isDeploymentFile {
 		fmt.Fprintln(os.Stderr, "Using an Astro API key")
-		fmt.Fprintln(os.Stderr, "\nWarning: Starting June 1st, 2024, Deployment API Keys will stop working. To ensure uninterrupted access to our services, we strongly recommend transitioning to Deployment API tokens. See https://www.astronomer.io/docs/astro/deployment-api-tokens")
+		fmt.Fprintln(os.Stderr)
+		cliout.Warn(os.Stderr, "Starting June 1st, 2024, Deployment API Keys will stop working. To ensure uninterrupted access to our services, we strongly recommend transitioning to Deployment API tokens. See https://www.astronomer.io/docs/astro/deployment-api-tokens")
 	}
 
 	domain, current := environmentDomain()
@@ -503,19 +518,18 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 	if err != nil {
 		return false, err
 	}
-	orgs, err := organization.ListOrganizations(astroV1Client)
+	orgID, orgProduct, err := environmentOrganization(astroV1Client)
 	if err != nil {
 		return false, err
 	}
 
-	org := orgs[0]
-	orgID := org.Id
-	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint:staticcheck // renders the typed Product enum as a plain string
-
 	// get workspace ID
 	deployments, err := deployment.ListDeployments("", orgID, astroV1Client)
 	if err != nil {
-		return false, errors.Wrap(err, organization.AstronomerConnectionErrMsg)
+		return false, fmt.Errorf("%w: %w", ErrAPITokenOrganization, errors.Wrap(err, organization.AstronomerConnectionErrMsg))
+	}
+	if len(deployments) == 0 {
+		return false, fmt.Errorf("%w: the API keys' organization has no Deployment to take a workspace from", ErrAPITokenOrganization)
 	}
 	workspaceID = deployments[0].WorkspaceId
 
@@ -572,13 +586,10 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 		}
 	}
 
-	orgs, err := organization.ListOrganizations(astroV1Client)
+	_, orgProduct, err := environmentOrganization(astroV1Client)
 	if err != nil {
 		return false, err
 	}
-
-	org := orgs[0]
-	orgProduct := fmt.Sprintf("%s", *org.Product) //nolint:staticcheck // renders the typed Product enum as a plain string
 
 	if wsID == "" {
 		wsID = c.Workspace
@@ -622,6 +633,26 @@ func useEnvironmentLogin(domain string, current bool, token string, expiresAt ti
 // useEnvironmentSelection records the organization and workspace the
 // environment's credential is for, for this process only, as the credential
 // itself is.
+// environmentOrganization looks up the organization the credentials in the
+// environment belong to, and its product. The product cannot be skipped: it is
+// what tells a hosted organization from a hybrid one (organization.IsOrgHosted),
+// and an environment login keeps it only for the process, so every run asks.
+// Every failure is ErrAPITokenOrganization, which stops the command rather
+// than letting it run without an organization.
+func environmentOrganization(astroV1Client astrov1.APIClient) (orgID, orgProduct string, err error) {
+	orgs, err := organization.ListOrganizations(astroV1Client)
+	if err != nil {
+		return "", "", fmt.Errorf("%w: %w", ErrAPITokenOrganization, err)
+	}
+	if len(orgs) == 0 {
+		return "", "", fmt.Errorf("%w: the credentials can see no organization", ErrAPITokenOrganization)
+	}
+	if orgs[0].Product == nil {
+		return "", "", fmt.Errorf("%w: organization %s names no product", ErrAPITokenOrganization, orgs[0].Id)
+	}
+	return orgs[0].Id, string(*orgs[0].Product), nil
+}
+
 func useEnvironmentSelection(c *config.Context, orgID, orgProduct, wsID string) {
 	if err := c.SetEnvironmentContextKey("workspace", wsID); err != nil {
 		fmt.Fprintln(os.Stderr, "no workspace set")

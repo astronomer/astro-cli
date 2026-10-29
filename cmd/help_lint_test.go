@@ -108,6 +108,13 @@ var helpRules = []helpRule{
 		check: checkExampleRuns,
 	},
 	{
+		name: "example-visible",
+		why: "An example uses only the commands and flags help shows. A hidden one is a 1.x spelling kept so old " +
+			"scripts run, or a flag nobody is meant to reach for, and an example teaches whatever it uses: the " +
+			"spelling an example shows is the one people copy into new scripts.",
+		check: checkExampleVisible,
+	},
+	{
 		name: "long-unwrapped",
 		why: "A paragraph of a Long is one line, separated from the next by a blank line: help wraps prose to the " +
 			"terminal itself, so a paragraph broken by hand at a fixed width renders as a short line in mid-sentence " +
@@ -380,31 +387,9 @@ func shellWords(line string) []string {
 // resolveExample finds the command args name under root and parses args'
 // flags with it, reporting what cobra would refuse.
 func resolveExample(root *cobra.Command, args []string) string {
-	target, rest, err := root.Find(args)
-	if err != nil {
-		return err.Error()
-	}
-	if target == root {
-		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-			return fmt.Sprintf("no command %q", args[0])
-		}
-		return ""
-	}
-	if target.HasAvailableSubCommands() && !target.Runnable() {
-		return fmt.Sprintf("%q is a group, not a command", target.CommandPath())
-	}
-	// Parse a copy of the flags, so linting one example leaves no values set
-	// on the tree for the next. Help is not run, so -h needs no special case.
-	flags := pflag.NewFlagSet(target.Name(), pflag.ContinueOnError)
-	flags.SetOutput(io.Discard)
-	target.Flags().VisitAll(func(f *pflag.Flag) { flags.AddFlag(copyFlag(f)) })
-	target.InheritedFlags().VisitAll(func(f *pflag.Flag) {
-		if flags.Lookup(f.Name) == nil {
-			flags.AddFlag(copyFlag(f))
-		}
-	})
-	if err := flags.Parse(rest); err != nil {
-		return err.Error()
+	target, flags, problem := parseExample(root, args)
+	if problem != "" || target == nil {
+		return problem
 	}
 	// Find stops at the deepest command it can match, so a mistyped
 	// subcommand under a runnable group comes back as that group's argument.
@@ -417,6 +402,79 @@ func resolveExample(root *cobra.Command, args []string) string {
 		return err.Error()
 	}
 	return ""
+}
+
+// parseExample finds the command args name under root and parses args' flags
+// into a copy of its flags, which keep the commands' Hidden marks. It returns
+// a nil command for a line that names none (the root's flags alone), and
+// what cobra would refuse in finding it or parsing its flags.
+func parseExample(root *cobra.Command, args []string) (*cobra.Command, *pflag.FlagSet, string) {
+	target, rest, err := root.Find(args)
+	if err != nil {
+		return nil, nil, err.Error()
+	}
+	if target == root {
+		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+			return nil, nil, fmt.Sprintf("no command %q", args[0])
+		}
+		return nil, nil, ""
+	}
+	if target.HasAvailableSubCommands() && !target.Runnable() {
+		return nil, nil, fmt.Sprintf("%q is a group, not a command", target.CommandPath())
+	}
+	// Parse a copy of the flags, so linting one example leaves no values set
+	// on the tree for the next. Help is not run, so -h needs no special case.
+	flags := pflag.NewFlagSet(target.Name(), pflag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	target.Flags().VisitAll(func(f *pflag.Flag) { flags.AddFlag(copyFlag(f)) })
+	target.InheritedFlags().VisitAll(func(f *pflag.Flag) {
+		if flags.Lookup(f.Name) == nil {
+			flags.AddFlag(copyFlag(f))
+		}
+	})
+	if err := flags.Parse(rest); err != nil {
+		return nil, nil, err.Error()
+	}
+	return target, flags, ""
+}
+
+// checkExampleVisible names each command and flag an astro command line in
+// cmd's examples uses that help does not show. A line example-runs refuses is
+// that rule's to report.
+func checkExampleVisible(cmd *cobra.Command) string {
+	if strings.TrimSpace(cmd.Example) == "" {
+		return ""
+	}
+	var bad []string
+	joined := strings.ReplaceAll(cmd.Example, "\\\n", " ")
+	for _, line := range strings.Split(joined, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		for _, args := range astroCommands(line) {
+			target, flags, problem := parseExample(cmd.Root(), args)
+			if problem != "" || target == nil {
+				continue
+			}
+			var hidden []string
+			for c := target; c != nil && c != cmd.Root(); c = c.Parent() {
+				if c.Hidden {
+					hidden = append(hidden, fmt.Sprintf("the hidden command %q", c.CommandPath()))
+					break
+				}
+			}
+			flags.Visit(func(f *pflag.Flag) {
+				if f.Hidden {
+					hidden = append(hidden, "the hidden flag --"+f.Name)
+				}
+			})
+			if len(hidden) > 0 {
+				bad = append(bad, fmt.Sprintf("%q uses %s", line, strings.Join(hidden, ", ")))
+			}
+		}
+	}
+	return strings.Join(bad, "; ")
 }
 
 // copyFlag is f with a value of its own of the same type, so parsing sets

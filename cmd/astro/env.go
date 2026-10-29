@@ -12,7 +12,7 @@ import (
 
 // includeSecretsWarning is printed to stderr (so it doesn't pollute piped
 // dotenv/JSON output) whenever a list/export call sets --include-secrets.
-const includeSecretsWarning = "Warning: --include-secrets returns secret values in the response. Treat the output as sensitive: do not commit, paste into shared channels, or leave on disk longer than necessary." //nolint:gosec // user-facing warning text, not a credential
+const includeSecretsWarning = "--include-secrets returns secret values in the response. Treat the output as sensitive: do not commit, paste into shared channels, or leave on disk longer than necessary."
 
 // addAutoLinkFlag wires --auto-link onto a create/update subcommand.
 // At workspace scope, this toggles the platform's "auto-link to all

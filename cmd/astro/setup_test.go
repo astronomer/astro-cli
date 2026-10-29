@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -533,6 +534,40 @@ func TestCheckAPIToken(t *testing.T) {
 		// run checkAPIToken
 		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
+	})
+
+	t.Run("an organization that can't be looked up is an error", func(t *testing.T) {
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+		rateLimited := astrov1.ListOrganizationsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusTooManyRequests}}
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&rateLimited, nil).Once()
+		t.Setenv("ASTRO_API_TOKEN", "token")
+		require.NoError(t, context.Switch("astronomer-dev.io"))
+
+		_, err := checkAPIToken(mockV1Client)
+		assert.ErrorIs(t, err, ErrAPITokenOrganization)
+		assert.ErrorContains(t, err, "status 429")
+	})
+
+	t.Run("an organization list it can't use is an error, not a panic", func(t *testing.T) {
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+		t.Setenv("ASTRO_API_TOKEN", "token")
+		require.NoError(t, context.Switch("astronomer-dev.io"))
+		for name, orgs := range map[string][]astrov1.Organization{
+			"none":       {},
+			"no product": {{Name: "test-org", Id: "test-org-id"}},
+		} {
+			resp := astrov1.ListOrganizationsResponse{
+				HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+				JSON200:      &astrov1.OrganizationsPaginated{Organizations: orgs, TotalCount: len(orgs), Limit: 100},
+			}
+			mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&resp, nil).Once()
+			_, err := checkAPIToken(mockV1Client)
+			assert.ErrorIs(t, err, ErrAPITokenOrganization, name)
+		}
 	})
 
 	t.Run("failed to parse api token", func(t *testing.T) {

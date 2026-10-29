@@ -9,4 +9,4 @@
 // require and a `replace ../` then, and not before.
 module github.com/astronomer/astro-cli/e2e
 
-go 1.26.1
+go 1.26.10
