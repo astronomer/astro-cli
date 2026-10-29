@@ -67,7 +67,7 @@ func runDeploymentTokenRotate(format cliout.Format, out io.Writer) error {
 	}
 	if !forceRotate {
 		ok, err := confirmTokenChange(
-			"WARNING: API Token rotation will invalidate the current token and cannot be undone.",
+			"API Token rotation will invalidate the current token and cannot be undone.",
 			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
 		if err != nil {
 			return err
@@ -93,7 +93,7 @@ func runDeploymentTokenDelete(format cliout.Format, out io.Writer) error {
 	if !forceDelete {
 		warning, question, canceled := "", fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Deployment?", ansi.Bold(token.Name)), "Canceling API Token removal"
 		if isDep {
-			warning = "WARNING: API token deletion cannot be undone."
+			warning = "API token deletion cannot be undone."
 			question = fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name))
 			canceled = "Canceling API Token deletion"
 		}

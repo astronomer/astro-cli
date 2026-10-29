@@ -244,7 +244,7 @@ func TestBundleForeignSidecar(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, foreignFile, entries[rel], "disabled: a foreign file ships")
 
-		out := captureStdout(t, func() { _, err = bundle(t, dir, true) })
+		out := captureStream(t, &os.Stdout, func() { _, err = bundle(t, dir, true) })
 		require.Error(t, err, rel)
 		require.ErrorContains(t, err, "unrecognized producer")
 		require.ErrorContains(t, err, foreign)
@@ -318,21 +318,22 @@ func TestBundleLinksAndDirectoriesAtSidecarPaths(t *testing.T) {
 	}
 }
 
-// captureStdout returns what fn prints to stdout.
-func captureStdout(t *testing.T, fn func()) string {
+// captureStream returns what fn prints to the stream *stream points at
+// (&os.Stdout or &os.Stderr).
+func captureStream(t *testing.T, stream **os.File, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
-	orig := os.Stdout
-	os.Stdout = w
+	orig := *stream
+	*stream = w
 	done := make(chan string)
 	go func() {
 		data, _ := io.ReadAll(r)
 		done <- string(data)
 	}()
-	defer func() { os.Stdout = orig }()
+	defer func() { *stream = orig }()
 	fn()
-	os.Stdout = orig
+	*stream = orig
 	require.NoError(t, w.Close())
 	return <-done
 }
@@ -375,9 +376,14 @@ func TestBundleStepFailureIsAWarning(t *testing.T) {
 
 	var overlay fileutil.TarOverlay
 	var err error
-	out := captureStdout(t, func() { overlay, err = BundleOverlay(dir, true) })
+	var stdout string
+	stderr := captureStream(t, &os.Stderr, func() {
+		stdout = captureStream(t, &os.Stdout, func() { overlay, err = BundleOverlay(dir, true) })
+	})
 	require.NoError(t, err)
-	require.Contains(t, out, "pre-deploy step failed for 1 unit(s)")
+	require.Contains(t, stderr, "Warning: the Cosmos Boost pre-deploy step failed")
+	require.Contains(t, stderr, "pre-deploy step failed for 1 unit(s)")
+	require.NotContains(t, stdout, "pre-deploy step failed", "the warning goes to stderr, not the command's output")
 	require.Equal(t, []string{"fine/" + sidecarRel}, keys(overlay.Extra))
 }
 

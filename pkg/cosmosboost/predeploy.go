@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/cosmosboost/precompute"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -84,7 +85,7 @@ func BundleOverlay(root string, enabled bool) (fileutil.TarOverlay, error) {
 		extra[filepath.ToSlash(rel)] = a.Data
 	}
 	if stepErr != nil {
-		fmt.Printf("Warning: the Cosmos Boost pre-deploy step failed, continuing deploy: %s\n", stepErr)
+		ansi.Warn(os.Stderr, fmt.Sprintf("the Cosmos Boost pre-deploy step failed, continuing deploy: %s", stepErr))
 		return overlay, nil
 	}
 	fmt.Println("Cosmos Boost pre-deploy step complete")

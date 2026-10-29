@@ -144,7 +144,7 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 	if envIncludeSecrets {
-		fmt.Fprintln(os.Stderr, includeSecretsWarning)
+		cliout.Warn(os.Stderr, includeSecretsWarning)
 	}
 	return env.WriteAirflowVarList(objs, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
 }

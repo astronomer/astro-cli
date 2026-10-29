@@ -1,31 +1,31 @@
 package cliout
 
 import (
-	"fmt"
 	"io"
-	"os"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
-// Warn prints msg to w led by "Warning:", as the CLI's warnings are, so it is
-// not read as the command's output. The label is yellow under the rule
-// labelFor states.
-func Warn(w io.Writer, msg string) {
-	fmt.Fprintln(w, WarningLabel(w), msg)
-}
+// The CLI's warning, error and note labels. They are defined in pkg/ansi,
+// which internal/ can import too, so the whole CLI spells and colors them one
+// way; these are the names cmd/ calls them by. Each label is colored only on a
+// terminal's stderr and is plain under NO_COLOR or anywhere else.
 
-// WarningLabel is the "Warning:" that leads a warning written to w, yellow
-// under the rule labelFor states.
-func WarningLabel(w io.Writer) string {
-	return labelFor(w, "Warning:", ansi.Palette.Yellow)
-}
+// Warn prints msg to w led by a yellow "Warning:" (ansi.Warn).
+func Warn(w io.Writer, msg string) { ansi.Warn(w, msg) }
 
-// ErrorLabel is the "Error:" that leads the error a command fails with,
-// written to w: red under the rule labelFor states, as Warning: is yellow.
-func ErrorLabel(w io.Writer) string {
-	return labelFor(w, errorPrefix, ansi.Palette.Red)
-}
+// Note prints msg to w led by a dim "Note:" (ansi.Note).
+func Note(w io.Writer, msg string) { ansi.Note(w, msg) }
+
+// ErrorLabel is the red "Error:" that leads the error a command fails with.
+func ErrorLabel(w io.Writer) string { return ansi.ErrorLabel(w) }
+
+// NoteLabel is the dim "Note:" that leads a note written to w.
+func NoteLabel(w io.Writer) string { return ansi.NoteLabel(w) }
+
+// DangerLabel is the red "WARNING:" that leads a confirmation of something
+// that cannot be undone.
+func DangerLabel(w io.Writer) string { return ansi.DangerLabel(w) }
 
 // errorPrefix is cobra's own error prefix, which a command that sets none
 // reports (cobra.Command.ErrPrefix).
@@ -38,17 +38,4 @@ func errorPrefixFor(prefix string, w io.Writer) string {
 		return prefix
 	}
 	return ErrorLabel(w)
-}
-
-// labelFor colors a label only where color belongs: w is the process's
-// stderr, stderr is a terminal (or color is forced, ansi's rule), and NO_COLOR
-// is unset or empty (no-color.org). Anywhere else (stdout, a pipe, a file, a
-// test's buffer) it is plain text, since stderr's palette says nothing about
-// another stream.
-func labelFor(w io.Writer, text string, color func(ansi.Palette, string) string) string {
-	f, ok := w.(*os.File)
-	if !ok || f != os.Stderr || os.Getenv("NO_COLOR") != "" {
-		return text
-	}
-	return color(ansi.ForStderr(), text)
 }

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	astrocontext "github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/astrosession"
@@ -321,7 +322,7 @@ func (o *AirflowOptions) urlTarget(ctx context.Context, hostRoot, name string) (
 		// guess here would. A connection failure says nothing about auth, and the
 		// request is about to report it properly, so it is not worth a warning.
 		if !isConnectionError(err) {
-			fmt.Fprintf(o.GetErrOut(), "Warning: could not fetch auth token (%v), continuing without authentication\n", err)
+			cliout.Warn(o.GetErrOut(), fmt.Sprintf("could not fetch auth token (%v), continuing without authentication", err))
 		}
 		return o.httpTarget(name, hostRoot, "")
 	}

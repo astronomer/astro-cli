@@ -10,6 +10,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 )
@@ -283,7 +284,7 @@ func emitBundleResult(r output.Emitter, result *BundleResult, verb string) error
 			return err
 		}
 		for _, warning := range result.Warnings {
-			if _, err := fmt.Fprintln(w, "Warning: "+warning); err != nil {
+			if _, err := fmt.Fprintln(w, ansi.WarningLabel(w), warning); err != nil {
 				return err
 			}
 		}

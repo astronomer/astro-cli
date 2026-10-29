@@ -98,7 +98,7 @@ func (c *cli) runUse(name string) error {
 // written, since the pin then changes nothing until the variable is unset.
 func (c *cli) warnEnvOverridesPin(pin string) {
 	if env := os.Getenv(instances.EnvVar); env != "" && env != pin {
-		fmt.Fprintf(c.d.Stderr, "note: %s=%s still takes precedence; unset it for %s to apply\n", instances.EnvVar, env, pin)
+		cliout.Note(c.d.Stderr, fmt.Sprintf("%s=%s still takes precedence; unset it for %s to apply", instances.EnvVar, env, pin))
 	}
 }
 

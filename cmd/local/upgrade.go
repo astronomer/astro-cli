@@ -217,7 +217,7 @@ func currentPin(dir string) string {
 func (c *cli) airflowRunning(dir string) bool {
 	st, err := c.d.Runtime.ReadStatus(dir)
 	if err != nil {
-		fmt.Fprintf(c.d.Stderr, "Warning: could not tell whether Airflow is running (%s); restart it to apply\n", err)
+		cliout.Warn(c.d.Stderr, fmt.Sprintf("could not tell whether Airflow is running (%s); restart it to apply", err))
 		return true
 	}
 	return st.State == localrt.StateRunning || st.State == localrt.StateStarting

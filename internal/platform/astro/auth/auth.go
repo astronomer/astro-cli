@@ -220,14 +220,14 @@ func authorizeCallbackHandler() (string, error) {
 		case <-time.After(callbackTimeout):
 			err := s.Shutdown(http_context.Background())
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: %s", err)
+				ansi.Warn(os.Stderr, fmt.Sprintf("could not shut down the login callback server: %s", err))
 			}
 			return "", errors.New("the operation has timed out")
 		}
 	}
 	err = s.Shutdown(http_context.Background())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
+		ansi.Warn(os.Stderr, fmt.Sprintf("could not shut down the login callback server: %s", err))
 	}
 
 	// return code

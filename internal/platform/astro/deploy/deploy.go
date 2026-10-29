@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/azure"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
@@ -378,7 +379,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		if util.IsAstronomerRegistry(dockerfileClientContent) || err != nil {
 			// login to the registry
 			if err != nil {
-				fmt.Println("WARNING: Failed to read Dockerfile.client, so will assume the base image is using images.astronomer.cloud and try to login to the registry")
+				ansi.Warn(os.Stderr, "could not read Dockerfile.client, so astro assumes its base image is on images.astronomer.cloud and logs in to that registry")
 			}
 			baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
 			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)

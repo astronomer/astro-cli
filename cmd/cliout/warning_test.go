@@ -17,7 +17,7 @@ func TestWarnLeadsWithWarning(t *testing.T) {
 	if got, want := b.String(), "Warning: the image will carry 1 file that .gitignore ignores\n"; got != want {
 		t.Errorf("Warn wrote %q, want %q", got, want)
 	}
-	if got := WarningLabel(&b); got != "Warning:" {
+	if got := ansi.WarningLabel(&b); got != "Warning:" {
 		t.Errorf("a writer that is not stderr gets a plain label, got %q", got)
 	}
 }
@@ -41,7 +41,7 @@ func TestLabelsAreColoredOnStderrUnlessNoColor(t *testing.T) {
 	if got := ErrorLabel(os.Stderr); !strings.Contains(got, "\x1b[31m") || !strings.Contains(got, "Error:") {
 		t.Errorf("ErrorLabel on stderr = %q, want a red Error:", got)
 	}
-	if got := WarningLabel(os.Stderr); !strings.Contains(got, "\x1b[33m") || !strings.Contains(got, "Warning:") {
+	if got := ansi.WarningLabel(os.Stderr); !strings.Contains(got, "\x1b[33m") || !strings.Contains(got, "Warning:") {
 		t.Errorf("WarningLabel on stderr = %q, want a yellow Warning:", got)
 	}
 
@@ -49,8 +49,38 @@ func TestLabelsAreColoredOnStderrUnlessNoColor(t *testing.T) {
 	if got := ErrorLabel(os.Stderr); got != "Error:" {
 		t.Errorf("ErrorLabel under NO_COLOR = %q, want plain", got)
 	}
-	if got := WarningLabel(os.Stderr); got != "Warning:" {
+	if got := ansi.WarningLabel(os.Stderr); got != "Warning:" {
 		t.Errorf("WarningLabel under NO_COLOR = %q, want plain", got)
+	}
+}
+
+// Note: is dim and the danger label red on stderr with color on; off stderr,
+// or under NO_COLOR, both are plain.
+func TestNoteAndDangerLabels(t *testing.T) {
+	forced := ansi.ForceColors
+	ansi.ForceColors = true
+	t.Cleanup(func() { ansi.ForceColors = forced })
+	t.Setenv("NO_COLOR", "")
+
+	if got := NoteLabel(os.Stderr); !strings.Contains(got, "\x1b[2m") || !strings.Contains(got, "Note:") {
+		t.Errorf("NoteLabel on stderr = %q, want a dim Note:", got)
+	}
+	if got := DangerLabel(os.Stderr); !strings.Contains(got, "\x1b[31m") || !strings.Contains(got, "WARNING:") {
+		t.Errorf("DangerLabel on stderr = %q, want a red WARNING:", got)
+	}
+
+	var b strings.Builder
+	Note(&b, "the project has uncommitted changes")
+	if got := b.String(); got != "Note: the project has uncommitted changes\n" {
+		t.Errorf("Note off stderr wrote %q, want a plain Note: line", got)
+	}
+
+	t.Setenv("NO_COLOR", "1")
+	if got := NoteLabel(os.Stderr); got != "Note:" {
+		t.Errorf("NoteLabel under NO_COLOR = %q, want plain", got)
+	}
+	if got := DangerLabel(os.Stderr); got != "WARNING:" {
+		t.Errorf("DangerLabel under NO_COLOR = %q, want plain", got)
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
@@ -265,8 +266,7 @@ func (c *cli) runEnvUnlink(scope *scopeFlags, kind localenv.Kind, name string, d
 		return linkEditErr(w, kind, name, err)
 	}
 	if len(after.Projects) == 0 {
-		fmt.Fprintf(c.d.Stderr, "warning: %s %s now reaches no project. Link it to one with: %s, or auto-link it to every project with: %s --auto-link\n",
-			localenv.Noun(kind), name, localenv.LinkHint(kind, name), localenv.LinkHint(kind, name))
+		cliout.Warn(c.d.Stderr, fmt.Sprintf("%s %s now reaches no project. Link it to one with: %s, or auto-link it to every project with: %s --auto-link", localenv.Noun(kind), name, localenv.LinkHint(kind, name), localenv.LinkHint(kind, name)))
 	}
 	reach := newReachJSON(after)
 	res := envLinkResult{Kind: kind, Name: name, Status: envLinkStatusUnlinked, Reach: *reach}

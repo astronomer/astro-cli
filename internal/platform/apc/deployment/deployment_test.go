@@ -933,7 +933,7 @@ func (s *Suite) Test_meetsAirflowUpgradeReqs() {
 	airflowVersion = "2.0.0"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
 	s.Error(err)
-	s.EqualError(err, "Error: You tried to set --desired-airflow-version to 2.0.0, but this Airflow Deployment "+
+	s.EqualError(err, "You tried to set --desired-airflow-version to 2.0.0, but this Airflow Deployment "+
 		"is already running 2.0.0. Please indicate a higher version of Airflow and try again.")
 
 	airflowVersion = "1.10.14"

@@ -368,7 +368,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	}
 
 	if res.Git.Uncommitted {
-		fmt.Fprintln(errOut, "note: the project has uncommitted changes, so this deploy records no git commit")
+		cliout.Note(errOut, "the project has uncommitted changes, so this deploy records no git commit")
 	}
 	if !inProject {
 		warn(imageAloneWarning(&res, imageName))
@@ -410,9 +410,9 @@ func noteIgnoredDeploymentEnv(w io.Writer, m *manifest.Manifest, interactive boo
 	case ok && def == env:
 		return
 	case ok:
-		fmt.Fprintf(w, "note: %s=%s chooses what the query commands read; astro deploy asks, with the project's default, %s, preselected\n", instances.EnvVar, env, def)
+		cliout.Note(w, fmt.Sprintf("%s=%s chooses what the query commands read; astro deploy asks, with the project's default, %s, preselected", instances.EnvVar, env, def))
 	default:
-		fmt.Fprintf(w, "note: %s=%s chooses what the query commands read; astro deploy asks, and preselects nothing without a default link\n", instances.EnvVar, env)
+		cliout.Note(w, fmt.Sprintf("%s=%s chooses what the query commands read; astro deploy asks, and preselects nothing without a default link", instances.EnvVar, env))
 	}
 }
 
