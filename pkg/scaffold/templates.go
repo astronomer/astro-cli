@@ -40,6 +40,7 @@ __pycache__/
 .astro/worktrees/
 .astro/*.local.yaml
 .astro/*.local.yml
+.astro/*.local.lock
 .astro/otto/*.local.json
 .astro/otto/mcp.json
 # Airflow 2 on macOS: the standalone engine regenerates this plugin.

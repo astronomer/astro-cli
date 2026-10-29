@@ -9,9 +9,56 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
+
+// Every cmd/local warning (emitWarning) reaches the user one way: a "Warning:"
+// line on stderr in text, and a warning event in json, never on stdout as if
+// it were the command's output.
+func TestEmitWarningIsAWarningOnStderr(t *testing.T) {
+	const msg = "the image will carry 5,510 files that .gitignore ignores and .dockerignore does not, in .claude/. If they do not belong in the image, add them to .dockerignore"
+	var out, stderr bytes.Buffer
+	emitWarning(cliout.Renderer{Format: cliout.FormatText, Out: &out, Err: &stderr}, event{Event: "warning", Text: msg})
+	if got, want := stderr.String(), "Warning: "+msg+"\n"; got != want {
+		t.Errorf("text: stderr = %q, want %q", got, want)
+	}
+	if out.Len() != 0 {
+		t.Errorf("text: a warning is not output, but stdout got %q", out.String())
+	}
+
+	stderr.Reset()
+	out.Reset()
+	emitWarning(cliout.Renderer{Format: cliout.FormatJSON, Out: &out, Err: &stderr}, event{Event: "warning", Text: msg})
+	var e map[string]any
+	if err := json.Unmarshal(out.Bytes(), &e); err != nil {
+		t.Fatalf("json: want one event, got %q: %v", out.String(), err)
+	}
+	if e["event"] != "warning" || e["text"] != msg {
+		t.Errorf("json: event = %v", e)
+	}
+	if stderr.Len() != 0 {
+		t.Errorf("json: the event carries it, but stderr got %q", stderr.String())
+	}
+}
+
+// A Renderer whose Format nobody mapped (an unbound flag's "", an extra like
+// yaml) is a programming error, and a warning through it panics rather than
+// render as text.
+func TestEmitWarningPanicsOnAnUnmappedFormat(t *testing.T) {
+	for _, format := range []cliout.Format{"", "yaml"} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("format %q: emitWarning did not panic", format)
+				}
+			}()
+			var out bytes.Buffer
+			emitWarning(cliout.Renderer{Format: format, Out: &out}, event{Event: "warning", Text: "x"})
+		}()
+	}
+}
 
 // writeManifest drops a minimal valid manifest in dir and points the deps'
 // WorkingDir at it, so `astro package` discovers a project.
@@ -118,9 +165,12 @@ func TestPackageWarnsAboutUndeclaredLocalValues(t *testing.T) {
 	if err := execute(t, d, "package", "mwaa", "--out-dir", outDir); err != nil {
 		t.Fatalf("package mwaa: %v", err)
 	}
-	line, ok := lineContaining(out.String(), "AIRFLOW_VAR_REGION")
-	if !ok || !strings.Contains(line, "will not follow it to a Deployment") {
-		t.Errorf("want a warning naming AIRFLOW_VAR_REGION:\n%s", out.String())
+	line, ok := lineContaining(stderrOf(d), "AIRFLOW_VAR_REGION")
+	if !ok || !strings.HasPrefix(line, "Warning: ") || !strings.Contains(line, "will not follow it to a Deployment") {
+		t.Errorf("want a Warning on stderr naming AIRFLOW_VAR_REGION:\n%s", stderrOf(d))
+	}
+	if strings.Contains(out.String(), "AIRFLOW_VAR_REGION") {
+		t.Errorf("a warning is not the command's output, but stdout has it:\n%s", out.String())
 	}
 }
 

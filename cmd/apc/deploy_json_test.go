@@ -203,8 +203,8 @@ func TestDeployJSON(t *testing.T) {
 		assert.False(t, in.InRegistry)
 	})
 
-	// A warning the image deploy gives is on stderr with the progress under
-	// json, and in the result; in text, on stdout, once.
+	// A warning the image deploy gives is on stderr, once, in both modes, as
+	// Astro's deploy gives its warnings, and in the result under json.
 	t.Run("--image-name warnings", func(t *testing.T) {
 		inProject(t, true)
 		inImage := pushed
@@ -220,9 +220,9 @@ func TestDeployJSON(t *testing.T) {
 
 		run = runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-		assert.Equal(t, "Deploying prebuilt image img:1...\nDeploying: rel-ac\nWarning: "+inImageWarning+"\n"+
+		assert.Equal(t, "Deploying prebuilt image img:1...\nDeploying: rel-ac\n"+
 			"Deployed image registry/rel-ac/airflow:deploy-2 to Deployment dep-ac, with the Dags inside the image.\nDeployment: https://airflow\n", run.stdout)
-		assert.NotContains(t, run.stderr, "Warning")
+		assert.Equal(t, 1, strings.Count(run.stderr, "Warning: "+inImageWarning+"\n"), run.stderr)
 	})
 
 	t.Run("--image --image-name", func(t *testing.T) {
@@ -454,8 +454,8 @@ func TestDeployRemoteHoldsItsRuntimeToThePlatformsRules(t *testing.T) {
 
 // A runtime --runtime-version names that the platform lists nothing as new
 // as, or no Airflow 3 build of, is warned of and deployed: the platform may
-// take it. The warning is on stderr and in the result under json, and with
-// the progress on stdout in text.
+// take it. The warning is on stderr in both modes, and in the result under
+// json.
 func TestDeployRemoteWarnsOfARuntimeThePlatformDoesNotList(t *testing.T) {
 	for _, tc := range []struct{ runtime, says string }{
 		{"12.2.0", "Astro Runtime 12.2.0 is newer than the newest the platform lists for this Deployment, 12.1.1"},
@@ -476,7 +476,8 @@ func TestDeployRemoteWarnsOfARuntimeThePlatformDoesNotList(t *testing.T) {
 
 			run = runAPC(t, api, "", "deploy", "dep-ac", "--image-name", "img:1", "--remote", "--runtime-version", tc.runtime)
 			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-			assert.Contains(t, run.stdout, "Warning: "+tc.says)
+			assert.Contains(t, run.stderr, "Warning: "+tc.says)
+			assert.NotContains(t, run.stdout, "Warning")
 		})
 	}
 }

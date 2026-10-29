@@ -115,11 +115,13 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	if cmd.CalledAs() == "" {
 		// Find failed (an unknown command at the root): cobra prints a pointer
 		// to help instead of the usage block.
-		cmd.PrintErrln(cmd.ErrPrefix(), err.Error())
+		cmd.PrintErrln(errorPrefixFor(cmd.ErrPrefix(), cmd.ErrOrStderr()), err.Error())
 		cmd.PrintErrf("Run '%v --help' for usage.\n", cmd.CommandPath())
 		return err
 	}
-	root.PrintErrln(cmd.ErrPrefix(), err.Error())
+	// "Error:" in red, as Warning: is yellow (ErrorLabel); a command that
+	// set its own ErrPrefix keeps it.
+	root.PrintErrln(errorPrefixFor(cmd.ErrPrefix(), root.ErrOrStderr()), err.Error())
 	// The root's own SilenceUsage is forced on for the run, so for the root
 	// only quietUsage, its setting from before, decides.
 	if !quietUsage && (cmd == root || !cmd.SilenceUsage) {
