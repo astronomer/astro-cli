@@ -85,10 +85,12 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 	// question goes to stderr either way.
 	progress := cliout.NotesTo(cmd, deployOutput, out)
 	errOut := cmd.ErrOrStderr()
+	// Every warning goes to stderr as it is given, led by a yellow "Warning:",
+	// as Astro's deploy does, and into the result's warnings for -o json.
 	var warnings []string
 	warnf := func(msg string) {
 		warnings = append(warnings, msg)
-		cliout.Warn(progress, msg)
+		cliout.Warn(errOut, msg)
 	}
 	interactive := deployOutput == cliout.FormatText && stdinIsTerminal()
 	engine := utils.OnceEngine(func() (string, []string, error) { return containercfg.Engine(config.WorkingPath) })
@@ -118,7 +120,9 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		CheckRuntime: func(runtime, airflowPin string) ([]runtimeversions.Finding, error) {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
-		Warn:   warnf,
+		Warn: warnf,
+		// A plain line with the deploy's progress.
+		Note:   func(msg string) { fmt.Fprintln(progress, msg) },
 		Engine: engine,
 		Link: func(l scaffold.Link) error {
 			if err := scaffold.SaveLink(config.WorkingPath, nil, l); err != nil {

@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"slices"
@@ -198,106 +197,104 @@ type walker struct {
 	// project (slash-separated), its source path and its mode: a regular
 	// file's, or a symlink's when links are not followed.
 	visit func(rel, src string, mode fs.FileMode) error
-	// nested, when set, takes each nested checkout (nestedCheckout) the walk
-	// carries, which a declared Dockerfile's context does. A generated build
-	// leaves them out instead.
+	// nested, when set, takes each linked worktree of the project's own
+	// repository (linkedWorktree) the walk carries, which a declared
+	// Dockerfile's context does.
 	nested func(rel string)
-	// root is the project root the walk started at, resolved.
-	root string
-	// tracked holds the checkouts the project's git tracks (submodules,
-	// trackedCheckouts), read once a walk first meets a nested .git.
-	tracked *trackedCheckouts
+	// leftOut, when set, takes each linked worktree a generated build's walk
+	// leaves out, for the command to say so.
+	leftOut func(rel string)
+	// worktrees is the directory holding the linked worktrees' git dirs of
+	// the repository the project is in (<common git dir>/worktrees),
+	// resolved: "" outside a repository, and for a walk that applies no
+	// rules (countDagsOnDisk).
+	worktrees string
 }
 
-// nestedCheckout reports whether the directory at src, rel from the project
-// root, is a git checkout of its own inside the project that the project's
-// git does not track: a worktree (a .git file pointing elsewhere), or a clone
-// (a .git directory). Agents and tools put worktrees inside a project
-// (.claude/worktrees/, a clone checked out under it), and an image would carry
-// a second copy of the repository, with whatever is ignored there. A submodule,
-// or a repository the project's index records as a gitlink, is part of the
-// project and is carried like any other directory.
-func (w walker) nestedCheckout(root, src, rel string) bool {
-	if w.tracked == nil {
-		return false // a walk that applies no rules (countDagsOnDisk)
-	}
-	if _, err := os.Lstat(filepath.Join(src, ".git")); err != nil {
+// linkedWorktree reports whether the directory at src is a linked worktree
+// of the repository the project itself is in: its .git is a file whose
+// `gitdir:` points under that repository's <common git dir>/worktrees/. An
+// agent or a tool checks one out inside the project (.claude/worktrees/, and
+// the like), and an image would carry a second copy of the project, with
+// whatever is ignored there. Anything else with a .git (a clone, a submodule,
+// a worktree of another repository) is the project's own code as far as the
+// image is concerned, and is carried. Only files are read; git is not run.
+func (w walker) linkedWorktree(src string) bool {
+	if w.worktrees == "" {
 		return false
 	}
-	return !w.tracked.has(root, rel)
-}
-
-// trackedCheckouts are the directories, slash-separated from the project root,
-// that the project's git tracks as checkouts of their own: the paths its
-// .gitmodules lists, and the gitlinks (mode 160000) its index records, which
-// cover a repository added without a .gitmodules entry. A submodule's own
-// submodules are read when the walk enters it.
-type trackedCheckouts struct {
-	read  map[string]bool // the repositories, by prefix, already read
-	paths map[string]bool
-}
-
-func newTrackedCheckouts() *trackedCheckouts {
-	return &trackedCheckouts{read: map[string]bool{}, paths: map[string]bool{}}
-}
-
-// has reports whether rel is a tracked checkout, reading the project's own
-// list first if nothing has been read yet.
-func (t *trackedCheckouts) has(root, rel string) bool {
-	t.readRepo(root, "")
-	return t.paths[rel]
-}
-
-// enter reads the tracked checkouts of the submodule at src (rel from the
-// root), for the walk below it.
-func (t *trackedCheckouts) enter(src, rel string) {
-	if t != nil && t.paths[rel] {
-		t.readRepo(src, rel)
+	gitdir, ok := readGitdirFile(filepath.Join(src, ".git"))
+	if !ok {
+		return false
 	}
+	return strings.HasPrefix(gitdir, w.worktrees+string(filepath.Separator))
 }
 
-// readRepo adds the checkouts the repository at dir (prefix from the project
-// root, "" for the project's own) tracks, once. Git is asked for the gitlinks
-// in its index; when it cannot answer (no git, no repository) .gitmodules
-// alone answers.
-func (t *trackedCheckouts) readRepo(dir, prefix string) {
-	if t.read[prefix] {
-		return
+// readGitdirFile reads a .git file (a worktree's or a submodule's), which
+// says `gitdir: <path>`, and returns that path made absolute against the
+// file's directory and resolved. A .git directory, or anything that is not
+// such a file, is not one.
+func readGitdirFile(dotGit string) (string, bool) {
+	info, err := os.Lstat(dotGit)
+	if err != nil || !info.Mode().IsRegular() {
+		return "", false
 	}
-	t.read[prefix] = true
-	readGitmodules(dir, prefix, t.paths)
-	out, err := exec.Command("git", "-C", dir, "ls-files", "--stage", "-z").Output()
+	data, err := os.ReadFile(dotGit)
 	if err != nil {
-		return
+		return "", false
 	}
-	for _, entry := range strings.Split(string(out), "\x00") {
-		meta, p, ok := strings.Cut(entry, "\t")
-		if ok && strings.HasPrefix(meta, "160000 ") {
-			t.paths[path.Join(prefix, p)] = true
+	line, _, _ := strings.Cut(string(data), "\n")
+	gitdir, ok := strings.CutPrefix(strings.TrimSpace(line), "gitdir:")
+	if !ok {
+		return "", false
+	}
+	gitdir = strings.TrimSpace(gitdir)
+	if !filepath.IsAbs(gitdir) {
+		gitdir = filepath.Join(filepath.Dir(dotGit), gitdir)
+	}
+	return resolvedPath(gitdir), true
+}
+
+// projectWorktrees is <common git dir>/worktrees of the repository the
+// project at root is in, resolved, or "" outside one. The repository is the
+// nearest .git at or above root: a directory is the git dir; a file (the
+// project is itself a worktree or a submodule) names it. A linked worktree's
+// git dir names the common one in its commondir file.
+func projectWorktrees(root string) string {
+	for dir := root; ; {
+		dotGit := filepath.Join(dir, ".git")
+		var gitdir string
+		if info, err := os.Lstat(dotGit); err == nil && info.IsDir() {
+			gitdir = resolvedPath(dotGit)
+		} else if g, ok := readGitdirFile(dotGit); ok {
+			gitdir = g
 		}
+		if gitdir != "" {
+			common := gitdir
+			if data, err := os.ReadFile(filepath.Join(gitdir, "commondir")); err == nil {
+				c := strings.TrimSpace(string(data))
+				if !filepath.IsAbs(c) {
+					c = filepath.Join(gitdir, c)
+				}
+				common = resolvedPath(c)
+			}
+			return filepath.Join(common, "worktrees")
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
 	}
 }
 
-// readGitmodules adds the submodule paths the .gitmodules in dir lists, as
-// paths from the project root (prefix is dir's own path, "" for the root).
-// Git writes `path = <dir>` under each [submodule] section; a missing or
-// unreadable file lists none.
-func readGitmodules(dir, prefix string, into map[string]bool) {
-	data, err := os.ReadFile(filepath.Join(dir, ".gitmodules"))
-	if err != nil {
-		return
+// resolvedPath is p with its symlinks resolved, or cleaned when it cannot be
+// (it does not exist, yet), so two spellings of one directory compare equal.
+func resolvedPath(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
 	}
-	for _, line := range strings.Split(string(data), "\n") {
-		key, value, ok := strings.Cut(strings.TrimSpace(line), "=")
-		if !ok || strings.TrimSpace(key) != "path" {
-			continue
-		}
-		p := path.Clean(strings.Trim(strings.TrimSpace(value), `"`))
-		if p == "." || strings.HasPrefix(p, "../") {
-			continue
-		}
-		into[path.Join(prefix, p)] = true
-	}
+	return filepath.Clean(p)
 }
 
 // walkProject calls visit for every regular file the project's generated
@@ -306,16 +303,17 @@ func readGitmodules(dir, prefix string, into map[string]bool) {
 // a link would dangle in the image when it points outside the project, and
 // creating one needs a privilege most Windows users lack. A link that resolves
 // to a directory already being walked is not followed again, and a dangling
-// one is left out. The root itself may be a symlink. A git checkout nested in
-// the project that is not one of its submodules is left out whole
-// (walker.nestedCheckout).
+// one is left out. The root itself may be a symlink. A linked worktree of the
+// project's own repository inside it is left out whole
+// (walker.linkedWorktree).
 func walkProject(root string, visit func(rel, src string, mode fs.FileMode) error) error {
-	return walkProjectLinks(root, visit, nil)
+	return walkProjectLinks(root, visit, nil, nil)
 }
 
 // walkProjectLinks is walkProject, handing link each symlink it goes through
-// (walker.link).
-func walkProjectLinks(root string, visit func(rel, src string, mode fs.FileMode) error, link func(rel string)) error {
+// (walker.link) and leftOut each linked worktree it leaves out
+// (walker.leftOut).
+func walkProjectLinks(root string, visit func(rel, src string, mode fs.FileMode) error, link, leftOut func(rel string)) error {
 	resolved, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		return err
@@ -324,7 +322,7 @@ func walkProjectLinks(root string, visit func(rel, src string, mode fs.FileMode)
 	if err != nil {
 		return err
 	}
-	w := walker{filter: filter, follow: true, link: link, visit: visit, root: resolved, tracked: newTrackedCheckouts()}
+	w := walker{filter: filter, follow: true, link: link, leftOut: leftOut, visit: visit, worktrees: projectWorktrees(resolved)}
 	return w.walkDir(resolved, "", map[string]bool{resolved: true})
 }
 
@@ -396,20 +394,23 @@ func (w walker) stat(src string) (fs.FileInfo, error) {
 }
 
 // leavesOutCheckout reports whether the walk leaves the directory at src (rel
-// from the root) out because it is a nested checkout (nestedCheckout), which a
-// generated build does. A declared build's walk carries it and hands it to
-// nested, unless a rule already leaves it out (skip). A submodule's own
-// tracked checkouts are read on the way in.
+// from the root) out because it is a linked worktree of the project's own
+// repository (linkedWorktree), which a generated build does, handing it to
+// leftOut unless a rule already leaves it out (skip). A declared build's walk
+// carries it and hands it to nested, under the same condition.
 func (w walker) leavesOutCheckout(src, rel string, skip bool) bool {
-	if w.nestedCheckout(w.root, src, rel) {
-		if w.filter.generated {
-			return true
-		}
-		if w.nested != nil && !skip {
-			w.nested(rel)
-		}
+	if !w.linkedWorktree(src) {
+		return false
 	}
-	w.tracked.enter(src, rel)
+	if w.filter.generated {
+		if w.leftOut != nil && !skip {
+			w.leftOut(rel)
+		}
+		return true
+	}
+	if w.nested != nil && !skip {
+		w.nested(rel)
+	}
 	return false
 }
 
@@ -486,11 +487,15 @@ type ProjectSurvey struct {
 	// Dockerfile's context carries, which its ignore file leaves in: each
 	// one's path, not what is in it. A generated build carries none.
 	VCS []string
-	// Nested are the git checkouts inside the project that are not its
-	// submodules (a worktree under .claude/worktrees/, a clone) and that a
+	// Nested are the linked worktrees of the project's own repository inside
+	// it (one an agent checked out under .claude/worktrees/, say) that a
 	// declared Dockerfile's context carries, slash-separated: each
 	// directory's path. A generated build leaves them out and lists none.
 	Nested []string
+	// LeftOut are the linked worktrees of the project's own repository inside
+	// it that a generated build leaves out, slash-separated: each directory's
+	// path. A declared build lists none here.
+	LeftOut []string
 	// CosmosBoost are the Cosmos Boost files an earlier Astro CLI wrote into
 	// the project that a declared Dockerfile's context carries, which the
 	// plugin would read as current in the image. A generated build leaves
@@ -532,7 +537,9 @@ func SurveyProject(dir, dockerfile string, podman bool) (ProjectSurvey, error) {
 		return nil
 	}
 	if dockerfile == "" {
-		err = walkProjectLinks(resolved, collect, func(rel string) { s.Links = append(s.Links, rel) })
+		err = walkProjectLinks(resolved, collect,
+			func(rel string) { s.Links = append(s.Links, rel) },
+			func(rel string) { s.LeftOut = append(s.LeftOut, rel) })
 	} else {
 		s.IgnoreFile = declaredIgnoreFile(resolved, dockerfile, podman)
 		var filter projectFilter
@@ -545,8 +552,7 @@ func SurveyProject(dir, dockerfile string, podman bool) (ProjectSurvey, error) {
 			cosmosBoost: func(rel string) { s.CosmosBoost = append(s.CosmosBoost, rel) },
 			nested:      func(rel string) { s.Nested = append(s.Nested, rel) },
 			visit:       collect,
-			root:        resolved,
-			tracked:     newTrackedCheckouts(),
+			worktrees:   projectWorktrees(resolved),
 		}
 		err = w.walkDir(resolved, "", map[string]bool{resolved: true})
 	}

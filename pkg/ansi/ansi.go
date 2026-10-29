@@ -57,6 +57,11 @@ func shouldColor(isTerminal func() bool) bool {
 		if os.Getenv("CLICOLOR") == "0" {
 			return false
 		}
+		// NO_COLOR, set and not empty, turns color off for every stream
+		// (no-color.org); only an explicit CLICOLOR_FORCE, above, wins over it.
+		if os.Getenv("NO_COLOR") != "" {
+			return false
+		}
 	}
 
 	return ForceColors || isTerminal()

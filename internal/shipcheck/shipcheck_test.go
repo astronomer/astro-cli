@@ -170,8 +170,8 @@ func TestCheckAsksEachRepositoryAboutItsOwnFiles(t *testing.T) {
 
 	r := check(t, dir, "")
 	assert.Empty(t, r.Unanswered, "every repository answered")
-	assert.Equal(t, []string{"vendor/lib/local.key"}, r.Gitignored,
-		"a generated build carries the gitlinked repository and leaves the untracked clone out")
+	assert.ElementsMatch(t, []string{"vendor/lib/local.key", "scratch/notes.txt"}, r.Gitignored,
+		"a generated build carries the gitlinked repository and the clone: only the project's own worktrees are left out")
 	assert.Equal(t, []string{"vendor/lib/local.key"}, r.Secrets)
 
 	writeFiles(t, dir, map[string]string{"Dockerfile": "FROM python:3.12\n"})

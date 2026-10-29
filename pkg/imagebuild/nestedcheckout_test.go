@@ -19,11 +19,10 @@ func gitIn(t *testing.T, dir string, args ...string) {
 	require.NoError(t, err, "git %v: %s", args, out)
 }
 
-// nestedProject is a project repository holding, below its root, a worktree
-// of itself (.claude/worktrees/x, a .git file), an untracked clone (scratch/,
-// a .git directory), a submodule (vendor/sub, listed in .gitmodules) and a
-// repository its index records as a gitlink with no .gitmodules entry
-// (vendor/embedded).
+// nestedProject is a project repository holding, below its root, a linked
+// worktree of itself (.claude/worktrees/x, a .git file), an untracked clone
+// (scratch/, a .git directory), a submodule (vendor/sub) and a repository its
+// index records as a gitlink with no .gitmodules entry (vendor/embedded).
 func nestedProject(t *testing.T) string {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -62,15 +61,19 @@ func nestedProject(t *testing.T) string {
 	return project
 }
 
-// A generated build leaves out a git checkout nested in the project that the
-// project's git does not track, a worktree or a clone, and carries a
-// submodule and a gitlinked repository like any other directory. The survey,
-// the copy and the digest agree.
-func TestGeneratedBuildLeavesOutNestedCheckouts(t *testing.T) {
+// A generated build leaves out only a linked worktree of the project's own
+// repository, and names it; a stray clone, a submodule and a gitlinked
+// repository are carried like any other directory. The survey, the copy and
+// the digest agree.
+func TestGeneratedBuildLeavesOutOnlyTheProjectsWorktrees(t *testing.T) {
 	project := nestedProject(t)
 	s, err := SurveyProject(project, "", false)
 	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{"dags/a.py", "deploy/sandbox.env", ".gitignore", ".gitmodules", "vendor/sub/lib.py", "vendor/embedded/util.py"}, s.Files)
+	assert.ElementsMatch(t, []string{
+		"dags/a.py", "deploy/sandbox.env", ".gitignore", ".gitmodules",
+		"scratch/notes.txt", "vendor/sub/lib.py", "vendor/embedded/util.py",
+	}, s.Files)
+	assert.Equal(t, []string{".claude/worktrees/x"}, s.LeftOut, "the worktree it leaves out is named")
 	assert.Empty(t, s.Nested, "a generated build lists none: it carries none")
 
 	dst := t.TempDir()
@@ -82,36 +85,63 @@ func TestGeneratedBuildLeavesOutNestedCheckouts(t *testing.T) {
 	writeTree(t, project, map[string]string{".claude/worktrees/x/dags/new.py": ""})
 	after, err := ProjectFilesDigest(project)
 	require.NoError(t, err)
-	assert.Equal(t, before, after, "an edit inside a nested worktree does not move the image")
+	assert.Equal(t, before, after, "an edit inside the project's worktree does not move the image")
 }
 
 // A declared Dockerfile's context is the whole project, so it carries the
-// nested checkouts; the survey names them, for the ship check to say where a
-// file it flags sits.
-func TestDeclaredSurveyNamesNestedCheckouts(t *testing.T) {
+// project's worktrees; the survey names them, and only them, for the ship
+// check to say where a file it flags sits.
+func TestDeclaredSurveyNamesTheProjectsWorktrees(t *testing.T) {
 	project := nestedProject(t)
 	writeTree(t, project, map[string]string{"Dockerfile": "FROM python:3.12\n"})
 	s, err := SurveyProject(project, "Dockerfile", false)
 	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{".claude/worktrees/x", "scratch"}, s.Nested)
+	assert.Equal(t, []string{".claude/worktrees/x"}, s.Nested)
+	assert.Empty(t, s.LeftOut)
 	assert.Contains(t, s.Files, ".claude/worktrees/x/deploy/sandbox.env")
 	assert.Contains(t, s.Files, "scratch/notes.txt")
 
 	writeTree(t, project, map[string]string{".dockerignore": ".claude/\n"})
 	s, err = SurveyProject(project, "Dockerfile", false)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"scratch"}, s.Nested, "a checkout its ignore file leaves out is not named")
+	assert.Empty(t, s.Nested, "a worktree its ignore file leaves out is not named")
 }
 
-// Without git, .gitmodules alone says which nested checkouts are submodules.
-func TestTrackedCheckoutsFromGitmodules(t *testing.T) {
-	dir := t.TempDir()
-	writeTree(t, dir, map[string]string{".gitmodules": "[submodule \"a\"]\n\tpath = vendor/a\n\turl = ../a\n[submodule \"b\"]\n\tpath = \"libs/b\"\n"})
-	paths := map[string]bool{}
-	readGitmodules(dir, "", paths)
-	assert.Equal(t, map[string]bool{"vendor/a": true, "libs/b": true}, paths)
+// The rule reads files only. A .git file whose gitdir, relative or absolute,
+// points under the project's .git/worktrees/ is a worktree of the project and
+// is left out; one pointing anywhere else (another repository's worktree, a
+// submodule's .git/modules/) is carried.
+func TestLinkedWorktreeIsReadFromFiles(t *testing.T) {
+	project := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(project, ".git", "worktrees", "a"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(project, ".git", "modules", "lib"), 0o755))
+	elsewhere := t.TempDir()
+	writeTree(t, project, map[string]string{
+		"dags/d.py":         "",
+		"wt/a/.git":         "gitdir: ../../.git/worktrees/a\n",
+		"wt/a/dags/copy.py": "",
+		"wt/other/.git":     "gitdir: " + filepath.Join(elsewhere, ".git", "worktrees", "o") + "\n",
+		"wt/other/keep.py":  "",
+		"vendor/lib/.git":   "gitdir: ../../.git/modules/lib\n",
+		"vendor/lib/lib.py": "",
+	})
+	s, err := SurveyProject(project, "", false)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"dags/d.py", "wt/other/keep.py", "vendor/lib/lib.py"}, s.Files)
+	assert.Equal(t, []string{"wt/a"}, s.LeftOut)
+}
 
-	nested := map[string]bool{}
-	readGitmodules(dir, "vendor/a", nested)
-	assert.Equal(t, map[string]bool{"vendor/a/vendor/a": true, "vendor/a/libs/b": true}, nested, "a submodule's own are read under its path")
+// A project that is not in a repository has no worktrees to leave out: a
+// clone checked out under dags/ is the project's code, and is carried.
+func TestNonGitProjectCarriesAClone(t *testing.T) {
+	project := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(project, "dags", "shared", ".git"), 0o755))
+	writeTree(t, project, map[string]string{
+		"dags/shared/common.py": "",
+		"dags/d.py":             "",
+	})
+	s, err := SurveyProject(project, "", false)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"dags/d.py", "dags/shared/common.py"}, s.Files)
+	assert.Empty(t, s.LeftOut)
 }

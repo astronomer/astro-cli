@@ -500,7 +500,9 @@ func sectionLabel(s envschema.Section) string {
 // on stderr (cliout.Warn), yellow on a terminal, so it is not read as the
 // command's output. A renderer with no Err writes it to Out instead.
 func emitWarning(r cliout.Renderer, e event) {
-	if r.Format == cliout.FormatJSON {
+	if r.Format != cliout.FormatText {
+		// JSON emits the event; any other format panics in EmitEvent, as an
+		// unmapped Format must (cliout.Renderer.emit).
 		//nolint:errcheck // a warning write failure surfaces on the command's own output
 		r.EmitEvent(e, func(io.Writer) error { return nil })
 		return

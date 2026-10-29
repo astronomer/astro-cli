@@ -41,13 +41,13 @@ func errorPrefixFor(prefix string, w io.Writer) string {
 }
 
 // labelFor colors a label only where color belongs: w is the process's
-// stderr, stderr is a terminal (or color is forced, ansi's rule), and NO_COLOR
-// is unset or empty (no-color.org). Anywhere else (stdout, a pipe, a file, a
+// stderr and stderr's palette colors (ansi.ForStderr: a terminal, the
+// CLICOLOR variables, NO_COLOR). Anywhere else (stdout, a pipe, a file, a
 // test's buffer) it is plain text, since stderr's palette says nothing about
 // another stream.
 func labelFor(w io.Writer, text string, color func(ansi.Palette, string) string) string {
 	f, ok := w.(*os.File)
-	if !ok || f != os.Stderr || os.Getenv("NO_COLOR") != "" {
+	if !ok || f != os.Stderr {
 		return text
 	}
 	return color(ansi.ForStderr(), text)

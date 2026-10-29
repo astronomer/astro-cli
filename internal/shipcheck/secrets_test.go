@@ -80,11 +80,21 @@ func TestMessagesAgreeWithTheirCount(t *testing.T) {
 		},
 		"one git config": {
 			Report{IgnoreFile: ".dockerignore", VCSSecrets: []string{".git"}},
-			"refusing to build: the git config under .git holds a credential (an extraheader, or a URL with a password or a known token in it), and the image would carry it to a registry. Add **/.git to .dockerignore and try again",
+			"refusing to build: the git config under .git holds a credential (an extraheader, or a URL with a password or a known token in it), and the image would carry it to a registry. Add **/.git to .dockerignore, and try again",
 		},
 		"several git configs": {
 			Report{IgnoreFile: ".dockerignore", VCSSecrets: []string{".git", "sub/.git"}},
-			"refusing to build: the git configs under .git, sub/.git hold credentials (an extraheader, or a URL with a password or a known token in it), and the image would carry them to a registry. Add **/.git to .dockerignore and try again",
+			"refusing to build: the git configs under .git, sub/.git hold credentials (an extraheader, or a URL with a password or a known token in it), and the image would carry them to a registry. Add **/.git to .dockerignore, and try again",
+		},
+		// Every reason is in the one refusal, not the first one found alone.
+		"every reason together": {
+			Report{
+				IgnoreFile: ".dockerignore", Secrets: []string{"a.env", "wt/b.env"}, VCSSecrets: []string{".git"},
+				nested: []string{"wt"},
+			},
+			"refusing to build: a.env looks like credentials and is not tracked by git, and the image would carry it to a registry. Add it to .dockerignore, or remove it from the project. " +
+				"wt/b.env looks like credentials and sits in wt/, another git checkout inside the project, which the image would carry to a registry. Add wt/ to .dockerignore. " +
+				"The git config under .git holds a credential (an extraheader, or a URL with a password or a known token in it), and the image would carry it to a registry. Add **/.git to .dockerignore, and try again",
 		},
 	}
 	for name, tc := range refusals {
@@ -109,4 +119,26 @@ func TestCountFiles(t *testing.T) {
 	} {
 		assert.Equal(t, want, countFiles(n))
 	}
+}
+
+// The note for the project's worktrees a generated build left out summarizes
+// them as the gitignored warning does: a count and the places, with words
+// agreeing with the count. None left out is no note.
+func TestLeftOutNote(t *testing.T) {
+	assert.Empty(t, LeftOutNote(&imagebuild.ProjectSurvey{}))
+	assert.Equal(t, "left out 1 git worktree of this repository, in wt/",
+		LeftOutNote(&imagebuild.ProjectSurvey{LeftOut: []string{"wt"}}))
+	assert.Equal(t, "left out 33 git worktrees of this repository, in .claude/",
+		LeftOutNote(&imagebuild.ProjectSurvey{LeftOut: worktreesUnder(".claude/worktrees", 33), Files: []string{"dags/a.py"}}))
+	assert.Equal(t, "left out 2 git worktrees of this repository, in .claude/worktrees/",
+		LeftOutNote(&imagebuild.ProjectSurvey{LeftOut: worktreesUnder(".claude/worktrees", 2), Files: []string{".claude/settings.json"}}),
+		"a place that also holds a file the image carries is never named")
+}
+
+func worktreesUnder(dir string, n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = fmt.Sprintf("%s/agent-%d", dir, i)
+	}
+	return out
 }

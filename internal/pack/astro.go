@@ -149,7 +149,12 @@ func (t *AstroTarget) reachEngineAndCheck(ctx context.Context, req Request, cb l
 	if err != nil {
 		return imagebuild.Engine{}, err
 	}
-	_, err = shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, imagebuild.IsPodman(ctx, engine.Cmd, engine.Bin, engine.Env), req.warn(cb))
+	survey, err := shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, imagebuild.IsPodman(ctx, engine.Cmd, engine.Bin, engine.Env), req.warn(cb))
+	if err == nil {
+		if note := shipcheck.LeftOutNote(survey); note != "" {
+			emit(cb, note)
+		}
+	}
 	return engine, err
 }
 
