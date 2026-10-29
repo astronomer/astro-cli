@@ -117,12 +117,10 @@ func getObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentOb
 	return getObjectByKey(idOrKey, scope, objectType, false, includeSecrets, astroV1Client)
 }
 
-// getResolvedObjectByKey fetches a single env-object by key, including objects
-// inherited via a link or auto-link from a parent (workspace) scope
-// (resolveLinked=true). Unlike getObject, the returned object's Id is not
-// guaranteed to be addressable in subsequent CRUD calls when the object was
-// resolved from a link -- callers that need to act on the result should
-// follow SourceScope/SourceScopeEntityId back to the originating object.
+// getResolvedObjectByKey is getObjectByKey with resolveLinked=true, so it also
+// finds objects inherited via a link from a parent scope. The result's Id may
+// not be addressable in CRUD calls in that case; use SourceScope /
+// SourceScopeEntityId instead.
 func getResolvedObjectByKey(key string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, includeSecrets bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	return getObjectByKey(key, scope, objectType, true, includeSecrets, astroV1Client)
 }

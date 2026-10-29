@@ -315,12 +315,8 @@ func (s *Suite) TestUpdateVarPreservesAutoLink() {
 	})
 }
 
-// Regression: updating a key at deployment scope must find and update a
-// workspace-scoped variable that's linked/overridden at that deployment
-// (what the UI labels "This Deployment" scope) instead of treating it as
-// not-found and falling through to a deployment-scoped CreateVar, which the
-// platform always rejects ("Environment variables can only be created with
-// WORKSPACE scope").
+// Regression: update --deployment-id must update a workspace var linked at
+// that deployment instead of falling through to a deployment-scoped create.
 func (s *Suite) TestUpdateVarAtDeploymentScopeUpdatesLinkedWorkspaceVar() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	ctx, _ := config.GetCurrentContext()
@@ -335,7 +331,7 @@ func (s *Suite) TestUpdateVarAtDeploymentScopeUpdatesLinkedWorkspaceVar() {
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	// 1. UpdateVar's initial literal-scope lookup at DEPLOYMENT scope: not found.
+	// Literal deployment-scope lookup: not found.
 	noResolve := false
 	literalParams := &astrov1.ListEnvironmentObjectsParams{
 		DeploymentId:  &depID,
@@ -350,9 +346,8 @@ func (s *Suite) TestUpdateVarAtDeploymentScopeUpdatesLinkedWorkspaceVar() {
 		JSON200:      &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: nil},
 	}, nil).Once()
 
-	// 2. Resolved (resolveLinked=true) lookup at DEPLOYMENT scope finds the
-	// workspace-sourced link, twice: once to discover it, once to return the
-	// post-update state.
+	// Resolved lookup finds the workspace-sourced link; called twice (before
+	// and after the update).
 	resolve := true
 	resolvedParams := &astrov1.ListEnvironmentObjectsParams{
 		DeploymentId:  &depID,
@@ -379,7 +374,7 @@ func (s *Suite) TestUpdateVarAtDeploymentScopeUpdatesLinkedWorkspaceVar() {
 		JSON200:      &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{updatedObj}},
 	}, nil).Once()
 
-	// 3. LinkVar resolves the originating WORKSPACE object by key.
+	// LinkVar resolves the originating workspace object by key.
 	workspaceParams := &astrov1.ListEnvironmentObjectsParams{
 		WorkspaceId:   &workspaceID,
 		ObjectType:    &objType,
@@ -395,7 +390,7 @@ func (s *Suite) TestUpdateVarAtDeploymentScopeUpdatesLinkedWorkspaceVar() {
 		}},
 	}, nil).Once()
 
-	// 4. LinkVar PATCHes the workspace object with the new per-deployment override.
+	// LinkVar PATCHes the workspace object with the new per-deployment override.
 	mc.On("UpdateEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
 		mock.MatchedBy(func(b astrov1.UpdateEnvironmentObjectJSONRequestBody) bool {
 			if b.Links == nil || len(*b.Links) != 1 {
