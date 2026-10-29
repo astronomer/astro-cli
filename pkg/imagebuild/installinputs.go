@@ -20,16 +20,20 @@ import (
 // read inside the build by one helper, install-project.py, which every build
 // path runs: a generated build carries it in its context, and a project with a
 // Dockerfile of its own carries it at InstallHelperPath, so `docker build .`
-// needs nothing from the CLI. The helper writes the runtime's install inputs:
-// requirements.txt (the dependencies, without Airflow, a [tool.uv.sources] git
-// or URL source as a direct reference), packages.txt ([tool.astro] packages,
-// plus git when a dependency is fetched with it), and, from uv.lock, a
-// constraints file holding each package at the version the lock resolved,
-// which requirements.txt names with -c. So the image installs the versions
-// `uv sync` installs in standalone mode. A dependency an index of its own
-// serves is installed from the exact file the lock recorded, by URL and hash,
-// so PyPI is never asked for it; without a lock it is a --find-links page,
-// which leaves PyPI a candidate too.
+// needs nothing from the CLI. The helper hands the resolving to uv, copied into
+// its stage from UVImage: `uv lock --check` decides whether uv.lock still
+// matches pyproject.toml, `uv lock` resolves one in the build when it does not
+// (with a warning), and `uv export --format pylock.toml` lists what it
+// installs, each package with the index, git commit or URL it comes from. The
+// helper keeps what the runtime image ships as it ships it, and writes the
+// runtime's install inputs: requirements.txt (the project's own dependencies at
+// the lock's versions, without Airflow; a package from git, a URL or the index
+// a [tool.uv.sources] entry routes it to as a direct reference to what the
+// lock recorded),
+// packages.txt ([tool.astro] packages, plus git when a dependency is fetched
+// with it), and a constraints file pinning every other locked package the image
+// does not already have, which requirements.txt names with -c. uv itself stays
+// in that stage: the image has none.
 //
 // It runs in a stage of its own (InstallDockerfile) over a copy of just its
 // inputs, so an edit elsewhere in the project does not rerun it, and the
@@ -56,21 +60,29 @@ func InstallHelper() []byte {
 
 // generatedInputsDir is where a generated build stages the install helper's
 // inputs in its context: the helper, the project's pyproject.toml and, when it
-// has them, its uv.lock and (for a request naming no project) the find-links
-// file. The directory always exists, so the install stage copies it whole and
-// needs no wildcard for the optional files, which Buildah has refused when
-// they match nothing.
+// has one, its uv.lock. The directory always exists, so the install stage
+// copies it whole and needs no wildcard for the optional lock, which Buildah
+// has refused when it matches nothing.
 const generatedInputsDir = ".astro/install"
 
-// installFindLinksName is the file a build request naming no project leaves
-// the find-links pages it was given in, one per line, beside pyproject.toml in
-// generatedInputsDir, for the helper to pass on as they are
-// (install-project.py's FIND_LINKS). It is only that: the helper derives a
-// project's pages from its pyproject.toml every time, as
-// manifest.UV.IndexPagesFor does, so no build of a project writes it, a
-// project's own copy is never read, and a plain `docker build .` of a
-// project's own Dockerfile reads the same pages a CLI build does.
+// installFindLinksName is the find-links file an older build left in a
+// project's .astro directory, which writeInstallInputs removes from the build
+// context. Nothing reads it: a request naming no project states its find-links
+// pages in [tool.uv] of the pyproject.toml it is given (requestPyproject).
 const installFindLinksName = "install-find-links.txt"
+
+// UVImage is the image the install stage copies uv from (airflowrt.UVImage).
+const UVImage = airflowrt.UVImage
+
+// uvImage is the uv image a generated build copies uv from: UVImage, or the
+// mirror the ASTRO_UV_IMAGE environment variable names, as the build argument
+// of the same name does for a project's own Dockerfile.
+func uvImage() string {
+	if image := strings.TrimSpace(os.Getenv(airflowrt.UVImageArg)); image != "" {
+		return image
+	}
+	return UVImage
+}
 
 // generatedInputs is what a generated build's install stage copies: the whole
 // of generatedInputsDir.
@@ -85,11 +97,11 @@ func InstallDockerfile(from string) string {
 }
 
 // installDockerfile is InstallDockerfile, its install stage copying inputs (a
-// COPY's sources), with the Python install's netrc mount left out when
+// COPY's sources) and uv from uvFrom, with the netrc mounts left out when
 // mountNetrc is false: a generated build mounts the secret only when the build
 // passes it (airflowrt.InstallOptions).
-func installDockerfile(from string, mountNetrc bool, inputs string) string {
-	return airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Inputs: inputs, NoNetrc: !mountNetrc})
+func installDockerfile(from string, mountNetrc bool, inputs, uvFrom string) string {
+	return airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Inputs: inputs, NoNetrc: !mountNetrc, UVImage: uvFrom})
 }
 
 // GeneratedDockerfile is the Dockerfile a generated build over the runtime
@@ -99,7 +111,7 @@ func installDockerfile(from string, mountNetrc bool, inputs string) string {
 // addresses the image by what builds it (`astro package astro`'s content tag
 // hashes it, so a change to the recipe is a change to the tag).
 func GeneratedDockerfile(baseImage string, mountNetrc bool) string {
-	return installDockerfile(baseOf(baseImage), mountNetrc, generatedInputs)
+	return installDockerfile(baseOf(baseImage), mountNetrc, generatedInputs, uvImage())
 }
 
 // The manifest files the helper reads.
@@ -139,8 +151,8 @@ func projectManifest(req Request) ([]byte, error) {
 // their name in generatedInputsDir: the helper, and the project's
 // pyproject.toml and uv.lock as they are (manifestProject), so the copies are
 // always the project's own. A request naming no project, or whose
-// project has no pyproject.toml, gets a pyproject.toml stating its Dependencies
-// and Packages, and its FindLinks pages as they were given.
+// project has no pyproject.toml, gets a pyproject.toml stating its
+// Dependencies, Packages and FindLinks pages.
 func installInputs(req Request) (map[string][]byte, error) {
 	inputs := map[string][]byte{filepath.Base(InstallHelperPath): installHelper}
 	data, err := projectManifest(req)
@@ -161,9 +173,6 @@ func installInputs(req Request) (map[string][]byte, error) {
 	}
 	if inputs[pyprojectName], err = requestPyproject(req); err != nil {
 		return nil, err
-	}
-	if len(req.FindLinks) > 0 {
-		inputs[installFindLinksName] = []byte(strings.Join(req.FindLinks, "\n") + "\n")
 	}
 	return inputs, nil
 }
@@ -190,8 +199,8 @@ func (r *Request) installsNothing() bool {
 
 // writeInstallInputs writes installInputs into generatedInputsDir in the
 // generated build's context, replacing whatever a project carried there, and
-// removes a find-links file the project carried where only an older build
-// wrote one: the helper reads neither, and neither belongs in the image.
+// removes the find-links file an older build left (installFindLinksName):
+// nothing reads it, and it does not belong in the image.
 func writeInstallInputs(contextDir string, req Request) error {
 	inputs, err := installInputs(req)
 	if err != nil {
@@ -236,8 +245,9 @@ func InstallInputsDigest(req Request) (string, error) {
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
-// requestPyproject is a pyproject.toml stating a request's Dependencies and
-// Packages, for the helper to read when the request names no project.
+// requestPyproject is a pyproject.toml stating a request's Dependencies,
+// Packages and FindLinks pages, for the helper to read (and uv to lock in the
+// build) when the request names no project.
 func requestPyproject(req Request) ([]byte, error) {
 	type project struct {
 		Name         string   `toml:"name"`
@@ -247,13 +257,18 @@ func requestPyproject(req Request) ([]byte, error) {
 	type astro struct {
 		Packages []string `toml:"packages"`
 	}
+	type uv struct {
+		FindLinks []string `toml:"find-links,omitempty"`
+	}
 	doc := struct {
 		Project project `toml:"project"`
 		Tool    struct {
 			Astro astro `toml:"astro"`
+			UV    uv    `toml:"uv,omitempty"`
 		} `toml:"tool"`
 	}{Project: project{Name: "astro-generated", Version: "0", Dependencies: nonNil(req.Dependencies)}}
 	doc.Tool.Astro.Packages = nonNil(req.Packages)
+	doc.Tool.UV.FindLinks = req.FindLinks
 	data, err := toml.Marshal(doc)
 	if err != nil {
 		return nil, fmt.Errorf("writing the build's %s: %w", pyprojectName, err)

@@ -1,0 +1,36 @@
+version = 1
+revision = 3
+requires-python = ">=3.10"
+
+[[package]]
+name = "index"
+version = "0"
+source = { virtual = "." }
+dependencies = [
+    { name = "six" },
+    { name = "tabulate" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "six", index = "https://test.pypi.org/simple/" },
+    { name = "tabulate" },
+]
+
+[[package]]
+name = "six"
+version = "1.16.0"
+source = { registry = "https://test.pypi.org/simple/" }
+sdist = { url = "https://test-files.pythonhosted.org/packages/93/6f/7dedca313e7cf5611ae4fb762f478a014a0efdac7d663218f33428f0c5f8/six-1.16.0.tar.gz", hash = "sha256:e2360b9ec97c52c32404f846b6951cb58faaab3a0c0bb551b743b708dcc96868", size = 34130, upload-time = "2024-12-03T16:00:15.544Z" }
+wheels = [
+    { url = "https://test-files.pythonhosted.org/packages/1e/5c/ecacc0c9c346004e43acc024f076d74c0005d11b9a70ecaa81b21c8b080b/six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8a8a628020883f98172cef8ab824189aeaa1dde28720cc90e367bb1103ab7a58", size = 11085, upload-time = "2024-12-03T16:00:14.68Z" },
+]
+
+[[package]]
+name = "tabulate"
+version = "0.10.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/46/58/8c37dea7bbf769b20d58e7ace7e5edfe65b849442b00ffcdd56be88697c6/tabulate-0.10.0.tar.gz", hash = "sha256:e2cfde8f79420f6deeffdeda9aaec3b6bc5abce947655d17ac662b126e48a60d", size = 91754, upload-time = "2026-03-04T18:55:34.402Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl", hash = "sha256:f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3", size = 39814, upload-time = "2026-03-04T18:55:31.284Z" },
+]

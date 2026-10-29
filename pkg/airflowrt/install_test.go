@@ -3,6 +3,7 @@ package airflowrt
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,6 +24,9 @@ var helperContentAtVersion = map[int]string{
 	// Reads markers, requirements and specifiers with packaging (or pip's
 	// vendored copy) in place of its own evaluator; shorter prose.
 	4: "373f3dbcaba5899d23c8335cbff5714c37dfd190e027b404ce83c2426e3f5952",
+	// Hands the resolving to uv (uv lock --check, uv lock, uv export --format
+	// pylock.toml), copied into its stage; keeps only the image's policy.
+	5: "21f166c41d1c858c6d75fe0e083b8219b4ff1b0863d21f042ae72d42dd4629a5",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {
@@ -88,7 +92,11 @@ func TestBaseOf(t *testing.T) {
 func TestInstallDockerfileRunsTheHelperAtItsPath(t *testing.T) {
 	df := InstallDockerfile("img:1-base")
 	assert.Contains(t, df, " "+InstallHelperPath+" ", "the stage copies the helper in")
-	assert.Contains(t, df, "RUN python /tmp/astro-project/install-project.py ")
+	assert.Contains(t, df, " python /tmp/astro-project/install-project.py ")
 	assert.Contains(t, df, "FROM img:1-base AS "+InstallStage+"\n")
+	assert.True(t, strings.HasPrefix(df, "ARG "+UVImageArg+"="+UVImage+"\nFROM ${"+UVImageArg+"} AS "+UVStage+"\n"),
+		"the uv stage comes first, its build argument ahead of every FROM")
+	assert.Contains(t, df, "COPY --from="+UVStage+" /uv /opt/astro-uv/uv\n")
+	assert.Contains(t, InstallDockerfileWith("img:1-base", InstallOptions{UVImage: "mirror.example/uv:1"}), "ARG "+UVImageArg+"=mirror.example/uv:1\n")
 	assert.NotEmpty(t, InstallHelper())
 }

@@ -170,7 +170,7 @@ func TestBuildLocalBuildsEvenWithNothingToInstall(t *testing.T) {
 	// The install steps COPY what the helper writes, so it writes every file,
 	// and they install nothing.
 	reqs, pkgs, constraints := installLists(t, filepath.Join(req.WorkDir, buildContextDir))
-	assert.Equal(t, "\n", reqs)
+	assert.Empty(t, reqs)
 	assert.Empty(t, pkgs)
 	assert.Empty(t, constraints)
 	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
