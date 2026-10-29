@@ -6,34 +6,32 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
-// The CLI's warning, error and note labels. They are defined in pkg/ansi,
+// The CLI's warning, error, note and next-step labels. They are pkg/ansi's,
 // which internal/ can import too, so the whole CLI spells and colors them one
-// way; these are the names cmd/ calls them by. Each label is colored only on a
-// terminal's stderr and is plain under NO_COLOR or anywhere else.
-
-// Warn prints msg to w led by a yellow "Warning:" (ansi.Warn).
-func Warn(w io.Writer, msg string) { ansi.Warn(w, msg) }
-
-// Note prints msg to w led by a cyan "Note:" (ansi.Note).
-func Note(w io.Writer, msg string) { ansi.Note(w, msg) }
-
-// ErrorLabel is the red "Error:" that leads the error a command fails with.
-func ErrorLabel(w io.Writer) string { return ansi.ErrorLabel(w) }
-
-// NoteLabel is the cyan "Note:" that leads a note written to w.
-func NoteLabel(w io.Writer) string { return ansi.NoteLabel(w) }
-
-// NextLabel is the cyan "Next:" that leads the command a run suggests next.
-// It colors on a terminal stdout as well as stderr (ansi.NextLabel).
-func NextLabel(w io.Writer) string { return ansi.NextLabel(w) }
-
-// DangerLabel is the red "WARNING:" that leads a confirmation of something
-// that cannot be undone.
-func DangerLabel(w io.Writer) string { return ansi.DangerLabel(w) }
+// way; these are the same functions under the names cmd/ calls them by, so
+// the two cannot drift. Each colors only on a terminal stdout or stderr, and
+// is plain under NO_COLOR or anywhere else (ansi's labelFor rule).
+var (
+	// Warn prints msg to w led by a yellow "Warning:".
+	Warn = ansi.Warn
+	// Note prints msg to w led by a cyan "Note:".
+	Note = ansi.Note
+	// WarningLabel is the yellow "Warning:" that leads a warning.
+	WarningLabel = ansi.WarningLabel
+	// ErrorLabel is the red "Error:" that leads the error a command fails with.
+	ErrorLabel = ansi.ErrorLabel
+	// NoteLabel is the cyan "Note:" that leads a note.
+	NoteLabel = ansi.NoteLabel
+	// NextLabel is the cyan "Next:" that leads the command a run suggests next.
+	NextLabel = ansi.NextLabel
+	// DangerLabel is the red "WARNING:" that leads a confirmation of something
+	// that cannot be undone.
+	DangerLabel = ansi.DangerLabel
+)
 
 // errorPrefix is cobra's own error prefix, which a command that sets none
-// reports (cobra.Command.ErrPrefix).
-const errorPrefix = "Error:"
+// reports (cobra.Command.ErrPrefix): ansi's, so it is spelled once.
+const errorPrefix = ansi.ErrorPrefix
 
 // errorPrefixFor is the prefix cmd's error is printed after: its own
 // ErrPrefix as set, or, for cobra's default, the red Error: label.

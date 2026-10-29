@@ -17,7 +17,7 @@ func TestWarnLeadsWithWarning(t *testing.T) {
 	if got, want := b.String(), "Warning: the image will carry 1 file that .gitignore ignores\n"; got != want {
 		t.Errorf("Warn wrote %q, want %q", got, want)
 	}
-	if got := ansi.WarningLabel(&b); got != "Warning:" {
+	if got := WarningLabel(&b); got != "Warning:" {
 		t.Errorf("a writer that is not stderr gets a plain label, got %q", got)
 	}
 }
@@ -41,7 +41,7 @@ func TestLabelsAreColoredOnStderrUnlessNoColor(t *testing.T) {
 	if got := ErrorLabel(os.Stderr); !strings.Contains(got, "\x1b[31m") || !strings.Contains(got, "Error:") {
 		t.Errorf("ErrorLabel on stderr = %q, want a red Error:", got)
 	}
-	if got := ansi.WarningLabel(os.Stderr); !strings.Contains(got, "\x1b[33m") || !strings.Contains(got, "Warning:") {
+	if got := WarningLabel(os.Stderr); !strings.Contains(got, "\x1b[33m") || !strings.Contains(got, "Warning:") {
 		t.Errorf("WarningLabel on stderr = %q, want a yellow Warning:", got)
 	}
 
@@ -49,7 +49,7 @@ func TestLabelsAreColoredOnStderrUnlessNoColor(t *testing.T) {
 	if got := ErrorLabel(os.Stderr); got != "Error:" {
 		t.Errorf("ErrorLabel under NO_COLOR = %q, want plain", got)
 	}
-	if got := ansi.WarningLabel(os.Stderr); got != "Warning:" {
+	if got := WarningLabel(os.Stderr); got != "Warning:" {
 		t.Errorf("WarningLabel under NO_COLOR = %q, want plain", got)
 	}
 }
@@ -75,6 +75,22 @@ func TestNextLabelColorsOnStdoutAndStderr(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	if got := NextLabel(os.Stdout); got != "Next:" {
 		t.Errorf("NextLabel on stdout under NO_COLOR = %q, want plain", got)
+	}
+}
+
+// Every label follows one rule: it colors on a terminal stdout too, as a Note:
+// in a command's own text output (local reset, check) does.
+func TestLabelsColorOnStdout(t *testing.T) {
+	forced := ansi.ForceColors
+	ansi.ForceColors = true
+	t.Cleanup(func() { ansi.ForceColors = forced })
+	t.Setenv("NO_COLOR", "")
+
+	if got := NoteLabel(os.Stdout); !strings.Contains(got, "\x1b[36m") || !strings.Contains(got, "Note:") {
+		t.Errorf("NoteLabel on stdout = %q, want a cyan Note:", got)
+	}
+	if got := WarningLabel(os.Stdout); !strings.Contains(got, "\x1b[33m") {
+		t.Errorf("WarningLabel on stdout = %q, want a yellow Warning:", got)
 	}
 }
 

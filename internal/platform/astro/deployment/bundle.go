@@ -4,7 +4,6 @@ import (
 	httpContext "context"
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -156,7 +155,7 @@ func bundleTableConfig() *output.TableConfig {
 // name; a non-DAG bundle is created with a mount path (and optional bundle type
 // plus the DAG bundles it is served alongside). It publishes the bundle it
 // created, in the shape bundle list gives each one.
-func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, r output.Emitter, errOut io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 	if (name == "") == (mountPath == "") {
 		return errCreateBundleTarget
 	}
@@ -212,13 +211,13 @@ func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBund
 		result.BundleInfo = BundleInfo{Name: nonEmpty(name), NonDagMountPath: nonEmpty(mountPath)}
 		result.Warnings = []string{fmt.Sprintf("the bundle was created, but it could not be read back: %v", err)}
 	}
-	return emitBundleResult(r, &result, "Created")
+	return emitBundleResult(r, errOut, &result, "Created")
 }
 
 // UpdateBundle changes a bundle's description and, for non-DAG bundles, the set of
 // DAG bundles it is served alongside. The bundle is identified by id, DAG bundle
 // name, or non-DAG mount path. It publishes the bundle as the update left it.
-func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, r output.Emitter, errOut io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 	if err := validateBundleSelector(bundleID, bundleName, bundleMountPath); err != nil {
 		return err
 	}
@@ -265,13 +264,13 @@ func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription strin
 		result.BundleInfo = BundleInfo{ID: bundleID, Name: nonEmpty(bundleName), NonDagMountPath: nonEmpty(bundleMountPath)}
 		result.Warnings = []string{fmt.Sprintf("the bundle was updated, but it could not be read back: %v", err)}
 	}
-	return emitBundleResult(r, &result, "Updated")
+	return emitBundleResult(r, errOut, &result, "Updated")
 }
 
 // emitBundleResult publishes what a create or update did. In text, the line
 // it always printed, naming the bundle by its id, or by its name or mount
 // path when the id could not be read back, and then each warning.
-func emitBundleResult(r output.Emitter, result *BundleResult, verb string) error {
+func emitBundleResult(r output.Emitter, errOut io.Writer, result *BundleResult, verb string) error {
 	return r.Emit(result, func(w io.Writer) error {
 		bundle := result.ID
 		switch {
@@ -284,19 +283,15 @@ func emitBundleResult(r output.Emitter, result *BundleResult, verb string) error
 		if _, err := fmt.Fprintf(w, "%s bundle %s on deployment %s\n", verb, bundle, result.DeploymentID); err != nil {
 			return err
 		}
-		// Warnings go to stderr, not the result's text: colored there on a
-		// terminal, and out of piped output. json carries them as "warnings".
-		errOut := bundleWarningsTo()
+		// Warnings go to the command's error writer, not the result's text:
+		// colored there on a terminal, and out of piped output. json carries
+		// them as "warnings".
 		for _, warning := range result.Warnings {
 			ansi.Warn(errOut, warning)
 		}
 		return nil
 	})
 }
-
-// bundleWarningsTo is where a bundle create's or update's text warnings go:
-// stderr. A test swaps it to read them.
-var bundleWarningsTo = func() io.Writer { return os.Stderr }
 
 // nonEmpty is s's address, or nil for "", for a field left out when empty.
 func nonEmpty(s string) *string {

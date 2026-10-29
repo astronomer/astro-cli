@@ -96,7 +96,7 @@ var (
 var authenticator = Authenticator{
 	userInfoRequester: requestUserInfo,
 	tokenRequester:    requestToken,
-	callbackHandler:   authorizeCallbackHandler,
+	callbackHandler:   authorizeCallbackHandlerTo(ansi.Messages),
 }
 
 // Config is an alias for astroauth.AuthConfig.
@@ -179,7 +179,14 @@ func authorizeError(errorCode, errorDescription []string) error {
 	return fmt.Errorf("Could not authorize your device. %s: %s", errorCode, errorDescription)
 }
 
-func authorizeCallbackHandler() (string, error) {
+// authorizeCallbackHandlerTo is the login callback that waits for the
+// browser's authorization code, with its warnings (a callback server that
+// would not shut down) going to errOut.
+func authorizeCallbackHandlerTo(errOut io.Writer) AuthorizeCallbackHandler {
+	return func() (string, error) { return authorizeCallback(errOut) }
+}
+
+func authorizeCallback(errOut io.Writer) (string, error) {
 	m := http.NewServeMux()
 	s := http.Server{Handler: m, ReadHeaderTimeout: 0}
 	m.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
@@ -220,14 +227,14 @@ func authorizeCallbackHandler() (string, error) {
 		case <-time.After(callbackTimeout):
 			err := s.Shutdown(http_context.Background())
 			if err != nil {
-				ansi.Warn(os.Stderr, fmt.Sprintf("could not shut down the login callback server: %s", err))
+				ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
 			}
 			return "", errors.New("the operation has timed out")
 		}
 	}
 	err = s.Shutdown(http_context.Background())
 	if err != nil {
-		ansi.Warn(os.Stderr, fmt.Sprintf("could not shut down the login callback server: %s", err))
+		ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
 	}
 
 	// return code

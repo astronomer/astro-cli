@@ -2,6 +2,7 @@ package cosmosboost
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"errors"
@@ -73,7 +74,13 @@ func setVersion(t *testing.T, v string) {
 // tarball's entries by name, or the error the deploy would stop on.
 func bundle(t *testing.T, dir string, enabled bool) (map[string]string, error) {
 	t.Helper()
-	overlay, err := BundleOverlay(dir, enabled)
+	return bundleTo(t, dir, enabled, io.Discard, io.Discard)
+}
+
+// bundleTo is bundle with the step's progress and warning writers named.
+func bundleTo(t *testing.T, dir string, enabled bool, progress, warnings io.Writer) (map[string]string, error) {
+	t.Helper()
+	overlay, err := BundleOverlay(dir, enabled, progress, warnings)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +251,9 @@ func TestBundleForeignSidecar(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, foreignFile, entries[rel], "disabled: a foreign file ships")
 
-		out := captureStream(t, &os.Stdout, func() { _, err = bundle(t, dir, true) })
+		var progress bytes.Buffer
+		_, err = bundleTo(t, dir, true, &progress, io.Discard)
+		out := progress.String()
 		require.Error(t, err, rel)
 		require.ErrorContains(t, err, "unrecognized producer")
 		require.ErrorContains(t, err, foreign)
@@ -318,26 +327,6 @@ func TestBundleLinksAndDirectoriesAtSidecarPaths(t *testing.T) {
 	}
 }
 
-// captureStream returns what fn prints to the stream *stream points at
-// (&os.Stdout or &os.Stderr).
-func captureStream(t *testing.T, stream **os.File, fn func()) string {
-	t.Helper()
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	orig := *stream
-	*stream = w
-	done := make(chan string)
-	go func() {
-		data, _ := io.ReadAll(r)
-		done <- string(data)
-	}()
-	defer func() { *stream = orig }()
-	fn()
-	*stream = orig
-	require.NoError(t, w.Close())
-	return <-done
-}
-
 func TestBundleNoDbtContentAddsNothing(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{"app.py": "print('hi')"})
@@ -374,16 +363,12 @@ func TestBundleStepFailureIsAWarning(t *testing.T) {
 	require.NoError(t, os.Chmod(model, 0o000))
 	t.Cleanup(func() { _ = os.Chmod(model, 0o644) })
 
-	var overlay fileutil.TarOverlay
-	var err error
-	var stdout string
-	stderr := captureStream(t, &os.Stderr, func() {
-		stdout = captureStream(t, &os.Stdout, func() { overlay, err = BundleOverlay(dir, true) })
-	})
+	var progress, warnings bytes.Buffer
+	overlay, err := BundleOverlay(dir, true, &progress, &warnings)
 	require.NoError(t, err)
-	require.Contains(t, stderr, "Warning: the Cosmos Boost pre-deploy step failed")
-	require.Contains(t, stderr, "pre-deploy step failed for 1 unit(s)")
-	require.NotContains(t, stdout, "pre-deploy step failed", "the warning goes to stderr, not the command's output")
+	require.Contains(t, warnings.String(), "Warning: the Cosmos Boost pre-deploy step failed")
+	require.Contains(t, warnings.String(), "pre-deploy step failed for 1 unit(s)")
+	require.NotContains(t, progress.String(), "pre-deploy step failed", "the warning goes to the warnings writer, not the progress one")
 	require.Equal(t, []string{"fine/" + sidecarRel}, keys(overlay.Extra))
 }
 

@@ -16,28 +16,30 @@ import (
 // cmd/cliout passes on:
 // Warn and WarningLabel (yellow), ErrorLabel (red), Note and NoteLabel
 // (cyan), DangerLabel (red, for a confirmation of something that cannot be
-// undone). Each colors its label only on a terminal's stderr. A message that
+// undone). Each colors its label on a terminal stdout or stderr. A message that
 // spells "Warning: " into its own text prints it plain, in whatever case the
 // author chose, and is the drift the sweep that added these labels removed.
 //
 // labelAllowed is what may start with such a label anyway, because it is not
 // the CLI's own label. A key is a file, or a file and one literal as written
-// in it. Each says why.
+// in it (unquoted). Each says why.
 var labelAllowed = map[string]string{
+	"pkg/ansi/labels.go":                "defines the labels themselves, the one place their words are spelled",
 	"pkg/container/command.go: Error: ": "parses the container engine's own output, which leads its errors with Error:",
+	"pkg/uv/errors.go: error:":          "parses uv's own output, whose failure line starts error:",
 	"internal/pack/pack.go: warning: ": "the fallback for a pack.Request with no Warn hook: the warning rides the build's " +
 		"progress stream as a log line's text, which a progress reader shows as is, not as a terminal label",
 }
 
-// labelLiteral matches a string that starts with a label the CLI prints
-// through cmd/cliout, after any leading whitespace or newlines, so
-// "\nWarning: …" is caught too.
-var labelLiteral = regexp.MustCompile(`(?i)^\s*(warning|error|note|next): `)
+// labelLiteral matches a string that holds a label the CLI prints through
+// pkg/ansi: at its start or after any newline ("\nWarning: …", "done.\nNote:
+// …"), after any spaces, in any case; or a string that is a label on its own
+// ("Warning:"), handed to a print call as its own argument.
+var labelLiteral = regexp.MustCompile(`(?i)(^|\n)[ \t]*(warning|error|note|next): |^\s*(warning|error|note|next):\s*$`)
 
-// No non-test string literal starts with a Warning, Error or Note label,
-// except what labelAllowed names. The labels themselves are built from the
-// bare words ("Warning:"), which this does not match. An allowlist key is a
-// file, or a file and the literal's unquoted value.
+// No non-test string literal holds a Warning, Error, Note or Next label,
+// except what labelAllowed names. An allowlist key is a file, or a file and
+// the literal's unquoted value.
 func TestLabelsComeFromCliout(t *testing.T) {
 	root := repoRoot(t)
 	var problems []string

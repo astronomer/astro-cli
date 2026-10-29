@@ -156,6 +156,7 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 		BundleType:    b.bundleType,
 		Description:   o.description,
 		AstroV1Client: login.client,
+		ErrOut:        cmd.ErrOrStderr(),
 	}
 	if !login.current {
 		in.Login = &login.context
