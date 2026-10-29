@@ -83,7 +83,7 @@ def direct(pkg, routed):
         v = pkg["vcs"]
         sub = "#subdirectory=" + v["subdirectory"] if v.get("subdirectory") else ""
         return "%s @ %s+%s@%s%s" % (pkg["name"], v["type"], no_credentials(v["url"]), v["commit-id"], sub)
-    if "archive" in pkg:
+    if "url" in pkg.get("archive", {}):
         return "%s @ %s" % (pkg["name"], no_credentials(pkg["archive"]["url"]))
     if name_of(pkg["name"]) not in routed:
         return None
@@ -147,10 +147,11 @@ def main():
             if name in installed and name not in own:
                 continue  # the runtime's, at its tested version
             ref = direct(pkg, routed)
+            pin = pkg["name"] + ("==" + pkg["version"] if pkg.get("version") else "")
             if name in own or ref:
-                requirements.append(ref or "%s==%s" % (pkg["name"], pkg["version"]))
-            else:
-                constraints.append("%s==%s" % (pkg["name"], pkg["version"]))
+                requirements.append(ref or pin)
+            elif pkg.get("version"):
+                constraints.append(pin)
             git = git or "vcs" in pkg
     if git and not any(p.split("=", 1)[0].strip() == "git" for p in packages):
         packages.append("git")
