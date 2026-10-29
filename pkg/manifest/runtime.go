@@ -254,6 +254,30 @@ func (m *Manifest) DockerfileRuntimeProblem(from, tag string) (Problem, bool) {
 	}, true
 }
 
+// DockerfileReleaseProblem is DockerfileRuntimeProblem for the Airflow release
+// a declared Dockerfile's base carries, when the caller knows it (an Airflow 2
+// tag names only the generation, so only the catalog does: runtime 12.6.0
+// carries 2.10.4). It reports the requirement not covering that release, a pin
+// of 2.11 against a 2.10 image, with the same code and key, so a caller shows it
+// as it does the tag's own disagreement. false when the pin covers it, or when
+// there is no pin or no release to compare.
+func (m *Manifest) DockerfileReleaseProblem(from, release string) (Problem, bool) {
+	pin := m.Airflow().Pin
+	release = strings.TrimSpace(release)
+	if pin == "" || release == "" || release == pin || strings.HasPrefix(release, pin+".") {
+		return Problem{}, false
+	}
+	series := Airflow{Pin: release}.Series()
+	req := m.requirementLine()
+	return Problem{
+		Code: CodeDockerfileAirflowMismatch,
+		Key:  astroRoot + ".dockerfile",
+		Reason: fmt.Sprintf("%s builds FROM %s, which carries Airflow %s, and the requirement %s in [project] dependencies is Airflow %s: "+
+			"Docker mode would run one and standalone the other. To fix it, change the requirement to %s, or change the FROM line to a runtime that carries Airflow %s",
+			m.Astro.Dockerfile, from, release, req, describePin(pin), requirementFor(DistName(req), series), describePin(pin)),
+	}, true
+}
+
 // describePin is a pin as a message names it: its series, or its generation
 // when it names no minor.
 func describePin(pin string) string {

@@ -88,6 +88,14 @@ func ForBuild(airflowPin string) func(context.Context) *runtimeversions.Catalog 
 	return Catalog
 }
 
+// ForDockerfileCheck is Catalog for scaffold.CheckDockerfileAirflowWith, which
+// calls it only for a declared Dockerfile on one Airflow 2 build, whose Airflow
+// the tag does not name. The check's callers run before any request context
+// exists, so it reads under its own timeout, as Catalog does.
+func ForDockerfileCheck() *runtimeversions.Catalog {
+	return Catalog(context.Background())
+}
+
 // Catalog reads the catalog for an edit that moves the Airflow pin, and for a
 // standalone plan choosing its Python: a fresh cache, a fetch, a stale cache,
 // in that order. nil when none of those works, which the edit takes as "no
