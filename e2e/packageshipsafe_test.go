@@ -83,8 +83,10 @@ func TestThePackagedImageCarriesTheProjectAndNoSecrets(t *testing.T) {
 	}
 	built := p.runSlow("package", "astro", "--output", "json").requireSuccess()
 	built.requireLastJSON(&res)
-	if !strings.Contains(built.Stdout+built.Stderr, "target/manifest.json") {
-		t.Errorf("the gitignored target/manifest.json that ships was not warned about\n%s", built.output())
+	// The warning counts the files and names where they are, not each path:
+	// one gitignored file, in target/. In json it is a warning event.
+	if got := built.Stdout + built.Stderr; !strings.Contains(got, "1 file that .gitignore ignores") || !strings.Contains(got, "target/") {
+		t.Errorf("the gitignored target/manifest.json that ships was not warned about, by count and place\n%s", built.output())
 	}
 	if res.Image == "" {
 		t.Fatalf("`astro package astro` named no image\n%s", built.output())

@@ -665,7 +665,12 @@ uv's own table, and yours. uv applies it to the project's environment: `astro lo
 ```toml
 [tool.uv]
 environments = ["sys_platform == 'linux'", "sys_platform == 'darwin' and platform_machine == 'arm64'"]
-constraint-dependencies = ['apache-airflow==3.3.2+astro.1', 'apache-airflow-task-sdk==1.3.2+astro.1']
+constraint-dependencies = [
+    'apache-airflow==3.3.2+astro.1',
+    'apache-airflow-task-sdk==1.3.2+astro.1',
+    # Astro Runtime 3.3-11 (Python 3.14) constrains these. astro writes them.
+    'SQLAlchemy==2.0.50',
+]
 
 [tool.uv.sources]
 apache-airflow = {index = 'astronomer'}
@@ -683,14 +688,27 @@ apache-airflow-core = false
 apache-airflow-task-sdk = false
 ```
 
-- **The pins** are the ones the runtime image pins. The release is the one the runtime catalog says a deployment runs: the one the [`runtime`](#runtime) build carries when it is set, and otherwise the one the newest runtime of the requirement's series carries. The catalog does not name the build, so the newest `+astro` build of that release on the index is taken. The image also pins SQLAlchemy, but nothing published says to which release without pulling the image, so that line is not written.
+- **The pins** are the ones the runtime image pins. The release is the one the runtime catalog says a deployment runs: the one the [`runtime`](#runtime) build carries when it is set, and otherwise the one the newest runtime of the requirement's series carries. The catalog does not name the build, so the newest `+astro` build of that release on the index is taken.
+- **The runtime's own constraints** follow them, under one comment that records the build and Python they come from. They are the runtime's constraints file, which its image installs under (`/etc/pip-constraints.txt` in the image), read from `https://cdn.astronomer.io/runtime-constraints/` for the build the project builds on: the declared Dockerfile's `FROM`, else [`runtime`](#runtime), else the newest build of the Airflow pin, on the Python the project runs. Besides Airflow and the Task SDK, which the pins above hold, that is SQLAlchemy on Airflow 3. The comment is also the committed record of which runtime build the project builds on. Set `ASTRO_RUNTIME_CONSTRAINTS_URL` to read the files from a mirror. A runtime that publishes no such file (Airflow 2 before 11.0.0) gets none; one that cannot be read keeps what is written; under an `exclude-newer` cutoff (in `[tool.uv]`, the project's `uv.toml`, or a `UV_EXCLUDE_NEWER`) they are taken out, since the runtime's versions may postdate it. A line you write above the comment or below them stays yours, an exact pin of another package right under them included: only packages the runtime constrains are its.
 - **The index is explicit**, so uv takes only the three packages the sources name from it. Every other package still comes from PyPI, or from the indexes you add.
 - **`environments`** limits the lockfile to the platforms Airflow runs on locally. Without it, uv also locks for Intel macOS, where one package's marker (shap's `numba<0.63`) pulls numba and llvmlite back to releases that do not build. A project that names its own `environments` keeps them. On an Intel Mac, `astro local start` stops before uv and says so: run Docker mode with `--docker`, or add `"sys_platform == 'darwin' and platform_machine == 'x86_64'"` to the list. Windows is left out too: standalone does not run there, so a Docker-mode project on Windows that runs `uv sync`, `uv run` or `uv add` on the host needs `"sys_platform == 'win32'"` added.
 - **`exclude-newer-package`** turns any `exclude-newer` cutoff off for the three packages, `false` for each. Astronomer's index shows upload times only in the text of its pages, which uv does not read, so under a cutoff, the project's own or a `UV_EXCLUDE_NEWER`, uv would treat every build as too new. This is why the CLI needs uv 0.9.25 or later.
 
+When `astro init` writes or changes these settings, it runs `uv lock` so `uv.lock` follows them: it creates the lock for a new project and updates an existing one, and says which, with how many packages moved. Without uv it says to run `uv lock`; a lock that fails warns with uv's reason, and init still succeeds.
+
 A standalone `astro local start` keeps these settings current. When the pin or `runtime` moves, or Astronomer ships a newer build of the release, it rewrites them and says so. It leaves your other keys and your comments alone, and it never takes over an index named `astronomer` at another address, or a source you wrote for one of the three packages: it warns and writes nothing instead. When Astronomer's index has no build the requirement covers, it takes out the pins, the sources, the index and the `environments` it wrote, and Airflow comes from PyPI; the bare `apache-airflow-core` and `apache-airflow-task-sdk` stay, except on Airflow 2, which has neither. When the index cannot be read, it leaves the settings as they are, unless the pin has moved off the build's release, in which case it takes out everything it wrote, as for an index with no build.
 
 To add a dependency, run `uv add <package>`. It keeps the pins, and a running standalone Airflow picks the package up.
+
+### What standalone installs, and what the image has
+
+Standalone mode installs what the project declares. Docker mode and a deployment run the runtime image, which also has what it preinstalls: pandas, psycopg2, kubernetes and a few providers among them. A Dag that imports one of those without declaring it works in Docker mode and on a deployment, and fails in standalone with `ModuleNotFoundError`. Declare what your Dags import. `astro local check` says so when the missing module is, by name, a package the image ships, at the image's version, which a deployment then installs as it already runs:
+
+```
+hint: Astro Runtime 3.3-11 ships pandas 2.3.3, but this project doesn't list it: uv add 'pandas==2.3.3'
+```
+
+It matches the missing module's top-level name exactly against the image's package names, reads the image's package list from `https://cdn.astronomer.io/runtime-freeze/` (`ASTRO_RUNTIME_FREEZE_URL` for a mirror) only when a Dag is missing a module, and gives no hint for a module whose package has another name (`yaml` is PyYAML's, `airflow.providers.celery` is a provider's) or when the list cannot be read. `--target astro` gives the same hints. To run exactly what a deployment runs, start in Docker mode.
 
 ### Private packages without a Dockerfile
 
@@ -714,7 +732,7 @@ Set `NETRC_CONTENT` to a netrc entry, such as `machine github.com login x-access
 
 A source that names an index, `private-lib = { index = "acme" }` with a `[[tool.uv.index]]` named `acme`, reaches a generated image in one of two ways. With a `uv.lock`, the image installs the exact file the lock recorded for `private-lib`, by its URL on the index and its hash, so PyPI is never asked for it. Without one, it is a `--find-links` line for that package's page on the index (`<url>/private-lib/`), the way `astro local check` passes it, and the install reads the page besides PyPI rather than instead of it: a package with the same name on PyPI is a candidate too, which is how a dependency-confusion attack gets in. Commit a `uv.lock` for a project with a private index. Either way, only a source for a package the image installs counts: the Airflow sources `astro init` writes add nothing, since the runtime image already is Airflow. An index behind a login takes the same `netrc` secret.
 
-`astro local check` builds its check environments outside the project, where uv cannot see the table, so it passes `constraint-dependencies` and the source index pages to them itself, and a check resolves the way the project does. A check against MWAA or Composer leaves out the `+astro` pins: those platforms run Apache's own Airflow.
+`astro local check` builds its check environments outside the project, where uv cannot see the table, so it passes `constraint-dependencies` and the source index pages to them itself, and a check resolves the way the project does. A check against MWAA or Composer leaves out the `+astro` pins and the runtime's own lines: those platforms run Apache's own Airflow, with its own constraints.
 
 ```toml
 [tool.uv]

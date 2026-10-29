@@ -150,7 +150,7 @@ func fetch(ctx context.Context, o Options, url, accept string) ([]byte, error) {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s returned HTTP %d", withoutUser(url), res.StatusCode)
+		return nil, fmt.Errorf("%s returned HTTP %d", WithoutUser(url), res.StatusCode)
 	}
 	return io.ReadAll(io.LimitReader(res.Body, maxBytes))
 }

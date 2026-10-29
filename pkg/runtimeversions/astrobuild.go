@@ -90,7 +90,7 @@ func LookupAstroBuild(ctx context.Context, o Options, pin, runtime string, exclu
 	}
 	var covered []astroBuild
 	for _, b := range parseBuilds(page, DistAirflow, excludeNewer) {
-		if pinCovers(pin, b.release) {
+		if PinCovers(pin, b.release) {
 			covered = append(covered, b)
 		}
 	}
@@ -237,12 +237,12 @@ func IndexURL() string {
 // written into a project's pyproject.toml or printed. uv reads a mirror's
 // credentials from its own settings, not from the committed file.
 func PublicIndexURL() string {
-	return withoutUser(IndexURL())
+	return WithoutUser(IndexURL())
 }
 
-// withoutUser is rawURL without its user and password, for an address that is
+// WithoutUser is rawURL without its user and password, for an address that is
 // written or printed.
-func withoutUser(rawURL string) string {
+func WithoutUser(rawURL string) string {
 	u, err := neturl.Parse(rawURL)
 	if err != nil || u.User == nil {
 		return rawURL
@@ -267,7 +267,7 @@ func (o Options) indexPage(ctx context.Context, dist string) ([]byte, error) {
 	}
 	data, err := fetch(ctx, o, url, "text/html")
 	if err == nil && len(parseBuilds(data, dist, time.Time{})) == 0 {
-		err = fmt.Errorf("%s lists no Astronomer builds", withoutUser(url))
+		err = fmt.Errorf("%s lists no Astronomer builds", WithoutUser(url))
 	}
 	if err == nil {
 		if path != "" {
