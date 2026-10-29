@@ -359,19 +359,11 @@ func (w walker) walkDir(dir, rel string, onPath map[string]bool) error {
 		if skip && !descend {
 			continue
 		}
+		if info.IsDir() && w.leavesOutCheckout(src, childRel, skip) {
+			continue
+		}
 		if w.follow && w.link != nil && e.Type()&fs.ModeSymlink != 0 && (info.IsDir() || !skip) {
 			w.link(childRel)
-		}
-		if info.IsDir() && w.nestedCheckout(w.root, src, childRel) {
-			if w.filter.generated {
-				continue
-			}
-			if w.nested != nil && !skip {
-				w.nested(childRel)
-			}
-		}
-		if info.IsDir() {
-			w.tracked.enter(src, childRel)
 		}
 		switch {
 		case info.IsDir():
@@ -391,6 +383,24 @@ func (w walker) walkDir(dir, rel string, onPath map[string]bool) error {
 		// A socket, a pipe or a device has no place in an image.
 	}
 	return nil
+}
+
+// leavesOutCheckout reports whether the walk leaves the directory at src (rel
+// from the root) out because it is a nested checkout (nestedCheckout), which a
+// generated build does. A declared build's walk carries it and hands it to
+// nested, unless a rule already leaves it out (skip). A submodule's own
+// tracked checkouts are read on the way in.
+func (w walker) leavesOutCheckout(src, rel string, skip bool) bool {
+	if w.nestedCheckout(w.root, src, rel) {
+		if w.filter.generated {
+			return true
+		}
+		if w.nested != nil && !skip {
+			w.nested(rel)
+		}
+	}
+	w.tracked.enter(src, rel)
+	return false
 }
 
 // carry visits a file the walk carries, unless it is a Cosmos Boost file an
