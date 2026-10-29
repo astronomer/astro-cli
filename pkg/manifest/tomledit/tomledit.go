@@ -13,6 +13,7 @@
 package tomledit
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -48,6 +49,85 @@ type Editor interface {
 	Delete(key []string) bool
 	// Bytes returns the edited document.
 	Bytes() ([]byte, error)
+}
+
+// Comment is a comment line inside an array, as GetLines reads it and Set
+// writes it: the text after the '#' and the one space that follows it. It
+// is never a value, and Get leaves it out.
+type Comment string
+
+// LineGetter is an Editor that reads an array with its comments. Both editors
+// here are one; an Editor from elsewhere need not be, which is why it is not
+// part of Editor.
+type LineGetter interface {
+	// GetLines is Get for the array at key, with the comments between its
+	// elements in place as Comment values, so a Set of what it returns keeps
+	// them. It reports false when the value at key is not an array. An
+	// editor that keeps no comments returns the elements alone.
+	GetLines(key []string) ([]any, bool)
+}
+
+// GetLines reads the array at key in e with its comments when e is a
+// LineGetter, and its elements alone, as Get decodes them, when it is not.
+// It reports false when the value at key is not an array.
+func GetLines(e Editor, key []string) ([]any, bool) {
+	if lines, ok := e.(LineGetter); ok {
+		return lines.GetLines(key)
+	}
+	v, ok := e.Get(key)
+	if !ok {
+		return nil, false
+	}
+	list, isArray := v.([]any)
+	return list, isArray
+}
+
+// LineSetter is an Editor that writes an array line for line, comments
+// included. The surgical editor is one; an Editor from elsewhere need not be.
+type LineSetter interface {
+	// SetLines writes list at key as Set does, but compares it with the
+	// array there comments and all, so one whose values are unchanged and
+	// whose comments are not is rewritten.
+	SetLines(key []string, list []any) error
+}
+
+// SetLines writes list at key in e, line for line when e is a LineSetter,
+// and by Set, whose values alone it compares, when it is not.
+func SetLines(e Editor, key []string, list []any) error {
+	if lines, ok := e.(LineSetter); ok {
+		return lines.SetLines(key, list)
+	}
+	return e.Set(key, list)
+}
+
+// ErrCommentsUnsupported refuses a Set of an array holding a Comment where the
+// array cannot carry one: inside an inline table, where TOML allows no line
+// break. Nothing is written.
+var ErrCommentsUnsupported = errors.New("this array is inside an inline value, which holds no comment")
+
+// Values is list without its comments.
+func Values(list []any) []any {
+	out := make([]any, 0, len(list))
+	for _, v := range list {
+		if _, isComment := v.(Comment); !isComment {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// hasComment reports whether value is an array holding a Comment.
+func hasComment(value any) bool {
+	list, ok := value.([]any)
+	if !ok {
+		return false
+	}
+	for _, v := range list {
+		if _, isComment := v.(Comment); isComment {
+			return true
+		}
+	}
+	return false
 }
 
 // ParseError reports input that does not decode as TOML.

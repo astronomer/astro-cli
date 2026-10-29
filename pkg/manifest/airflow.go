@@ -144,6 +144,53 @@ func AstroPin(spec string) bool {
 	return false
 }
 
+// PinCovers reports whether an Airflow release satisfies a pin that may name
+// fewer segments than the release does: "3.3" covers "3.3.2", "3.3.2" covers
+// "3.3.2" and "3.3.2.post1", and neither covers "3.4.0" or "3.30.0". A local
+// label is not compared: Astronomer's build "3.3.2+astro.2" is release 3.3.2.
+// A pre- or dev release ("3.3.0rc1", "3.3.0.dev1") is covered only by a pin
+// that names a pre-release itself, as a resolver takes one only when asked.
+// An empty pin or release covers nothing.
+//
+// runtimeversions has the same rule for the catalog's matching (it is a
+// module of its own and imports nothing); a root-module test holds the two
+// to the same answers.
+func PinCovers(pin, release string) bool {
+	pin = strings.TrimSpace(pin)
+	release, _, _ = strings.Cut(strings.TrimSpace(release), "+")
+	if pin == "" || release == "" {
+		return false
+	}
+	if preRelease.MatchString(release) && !preRelease.MatchString(pin) {
+		return false
+	}
+	return release == pin || strings.HasPrefix(release, pin+".")
+}
+
+// preRelease matches a version that is a pre- or dev release, as PEP 440
+// spells one: a, b, c, rc, alpha, beta, pre, preview or dev after a release
+// number, with an optional separator.
+var preRelease = regexp.MustCompile(`(?i)\d[-_.]?(a|b|c|rc|alpha|beta|pre|preview|dev)\d*`)
+
+// AstroBuildCovered reports whether every Astronomer build of Airflow pinned
+// in constraints ([tool.uv] constraint-dependencies, the AstroPin
+// "apache-airflow==X.Y.Z+astro.N" line) carries a release the Airflow pin
+// still covers. With none pinned there is nothing to disagree, and it is true.
+// False is a pin that moved since the build was written: the build, and what
+// was written beside it, belong to an Airflow the project no longer asks for.
+func AstroBuildCovered(pin string, constraints []string) bool {
+	for _, c := range constraints {
+		if !AstroPin(c) || DistName(c) != airflowDist {
+			continue
+		}
+		_, version, _ := strings.Cut(c, "==")
+		if !PinCovers(pin, version) {
+			return false
+		}
+	}
+	return true
+}
+
 // WithoutAstroPins returns constraints without the AstroPin entries, for an
 // environment that runs Apache's own Airflow: MWAA's, or Composer's.
 func WithoutAstroPins(constraints []string) []string {

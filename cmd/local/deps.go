@@ -157,6 +157,18 @@ type Deps struct {
 	// runtimecatalog.Catalog. A seam so a test never reaches the network.
 	RuntimeCatalog func(ctx context.Context) *runtimeversions.Catalog
 
+	// RuntimeConstraints reads the constraints a runtime build's image
+	// installs under for one Python (runtimecatalog.RuntimeConstraints),
+	// which init and a start hold [tool.uv] to beside the Airflow pins. A
+	// seam so a test never reaches the network; nil writes none.
+	RuntimeConstraints func(ctx context.Context, build, python string) ([]string, error)
+
+	// RuntimeFreeze reads every package a runtime build's image has
+	// installed for one Python (runtimecatalog.RuntimeFreeze), which
+	// astro local check names when a Dag imports one the project does not
+	// list. A seam so a test never reaches the network; nil gives no hint.
+	RuntimeFreeze func(ctx context.Context, build, python string) ([]string, error)
+
 	// ImageCatalog reads the runtime catalog for `astro package astro`'s
 	// generated image: its Python, and an Airflow 2 base with no
 	// [tool.astro] runtime. nil, or a nil result, means no catalog: the image
@@ -165,6 +177,12 @@ type Deps struct {
 	// runtimecatalog.ForBuild, which waits longer than RuntimeCatalog for an
 	// Airflow 2 pin, whose base has no fallback, and as long for any other.
 	ImageCatalog func(ctx context.Context, airflowPin string) *runtimeversions.Catalog
+
+	// Lock runs `uv lock` in a project, which init does after it changes
+	// [tool.uv] so uv.lock follows. Production discovers uv as a standalone
+	// start does (uvLock); an error wrapping uv.ErrNotFound means no uv. A
+	// seam so a test runs no uv; nil locks nothing.
+	Lock func(ctx context.Context, dir string) error
 
 	// LaunchOtto starts an interactive Otto session with prompt as its first
 	// message and waits for it to end, as `astro otto "<prompt>"` does. The
@@ -213,23 +231,26 @@ type Runtime interface {
 func NewDeps() Deps {
 	runner := checks.NewVenvRunner()
 	d := Deps{
-		Stdin:            os.Stdin,
-		Stdout:           os.Stdout,
-		Stderr:           os.Stderr,
-		Checks:           runner,
-		CheckVenv:        runner,
-		Provisioner:      newUVProvisioner,
-		WorkingDir:       os.Getwd,
-		OpenURL:          browser.OpenURL,
-		WorkspaceClients: emenv.Clients,
-		Session:          astrosession.BearerFor,
-		Locator:          instancelocate.New,
-		Interactive:      stdinIsTerminal,
-		OutputTerminal:   stdoutIsTerminal,
-		AirflowDefault:   catalogDefault,
-		RuntimeCheck:     runtimecatalog.CheckRuntime,
-		AstroBuild:       runtimecatalog.AstroBuild,
-		RuntimeCatalog:   runtimecatalog.Catalog,
+		Stdin:              os.Stdin,
+		Stdout:             os.Stdout,
+		Stderr:             os.Stderr,
+		Checks:             runner,
+		CheckVenv:          runner,
+		Provisioner:        newUVProvisioner,
+		WorkingDir:         os.Getwd,
+		OpenURL:            browser.OpenURL,
+		WorkspaceClients:   emenv.Clients,
+		Session:            astrosession.BearerFor,
+		Locator:            instancelocate.New,
+		Interactive:        stdinIsTerminal,
+		OutputTerminal:     stdoutIsTerminal,
+		AirflowDefault:     catalogDefault,
+		RuntimeCheck:       runtimecatalog.CheckRuntime,
+		AstroBuild:         runtimecatalog.AstroBuild,
+		RuntimeCatalog:     runtimecatalog.Catalog,
+		RuntimeConstraints: runtimecatalog.RuntimeConstraints,
+		RuntimeFreeze:      runtimecatalog.RuntimeFreeze,
+		Lock:               uvLock,
 		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(airflowPin)(ctx)
 		},

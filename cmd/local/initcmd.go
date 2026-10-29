@@ -117,8 +117,10 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// After the manifest is written rather than inside scaffold.Plan, which
 	// stays offline. A lookup that fails is not reported here, since init has
 	// no to-do in it: `astro local start` makes the same lookup and says what
-	// it found.
-	c.writeAstroBuild(ctx, res.Dir)
+	// it found. uv.lock follows what it wrote; nothing written, nothing locked.
+	if build := c.writeAstroBuild(ctx, res.Dir); build.changed {
+		c.lockAfterInit(ctx, res.Dir)
+	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
 	})

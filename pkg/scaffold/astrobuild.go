@@ -70,12 +70,30 @@ var (
 // build of, which then comes from PyPI. It leaves every other [tool.uv] key,
 // and every comment, as it was.
 func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild) error {
+	return SetAstroBuildWith(dir, wrap, b, nil)
+}
+
+// RuntimeConstraints is what an Astro Runtime image's own install holds
+// packages to (the runtime's constraints file), for one build and Python.
+// Lines are its name==version lines as published.
+type RuntimeConstraints struct {
+	Build, Python string
+	Lines         []string
+}
+
+// SetAstroBuildWith is SetAstroBuild that also writes rc: rc's lines other
+// than the Airflow distributions' (which b's pins hold), under one comment
+// recording rc's build and Python (manifest.RuntimeRecord), in place of the
+// lines and the record an earlier rc wrote. A nil rc leaves those as they
+// are; a zero one takes them out. Where the array cannot hold a comment (an
+// inline [tool.uv]), no record and no lines are written.
+func SetAstroBuildWith(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, rc *RuntimeConstraints) error {
 	return EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		return setAstroBuild(before, ed, b)
+		return setAstroBuild(before, ed, b, rc)
 	})
 }
 
-func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild) error {
+func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, rc *RuntimeConstraints) error {
 	dists := b.Dists()
 	if b.Airflow == "" {
 		dists = nil
@@ -83,7 +101,7 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 	if err := checkNotTheUsers(ed, dists); err != nil {
 		return err
 	}
-	if err := setAstroPins(ed, b, dists); err != nil {
+	if err := setAstroPins(ed, b, dists, rc); err != nil {
 		return err
 	}
 	if err := setAstroSources(ed, dists); err != nil {
@@ -163,14 +181,17 @@ func checkNotTheUsers(ed tomledit.Editor, dists []string) error {
 	return nil
 }
 
-// setAstroPins replaces the constraints an earlier build wrote with b's,
-// keeping the project's own. A constraint is the build's when it names one of
-// the rebuilt distributions at an +astro version.
-func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string) error {
-	current, _ := ed.Get(constraintsKey)
-	list, _ := current.([]any)
+// setAstroPins replaces the constraints an earlier build wrote with b's, and,
+// when rc is not nil, the runtime's record and lines with rc's, keeping the
+// project's own where they were. A constraint is the build's when it names
+// one of the rebuilt distributions at an +astro version; the runtime's are the
+// record comment and the exact pins right after it of a distribution the
+// runtime constrains (manifest.SplitRuntimeBlock).
+func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, rc *RuntimeConstraints) error {
+	list, _ := tomledit.GetLines(ed, constraintsKey)
+	own, block := manifest.SplitRuntimeBlock(list, rc.owns)
 	var kept []any
-	for _, v := range list {
+	for _, v := range own {
 		if s, _ := v.(string); manifest.AstroPin(s) {
 			continue
 		}
@@ -179,14 +200,58 @@ func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []stri
 	if len(dists) > 0 {
 		kept = append(kept, asAny(b.Pins())...)
 	}
+	switch {
+	case rc == nil:
+		kept = append(kept, block...)
+	case rc.Build != "":
+		kept = append(kept, runtimeBlock(*rc)...)
+	}
 	if reflect.DeepEqual(kept, list) {
 		return nil
 	}
-	if len(kept) == 0 {
+	if len(tomledit.Values(kept)) == 0 {
 		ed.Delete(constraintsKey)
 		return nil
 	}
-	return ed.Set(constraintsKey, kept)
+	err := tomledit.SetLines(ed, constraintsKey, kept)
+	if errors.Is(err, tomledit.ErrCommentsUnsupported) {
+		// An inline [tool.uv] holds no comment, so no record: without one
+		// the lines could not be told from the project's own later.
+		rest, _ := manifest.SplitRuntimeBlock(kept, rc.owns)
+		return tomledit.SetLines(ed, constraintsKey, tomledit.Values(rest))
+	}
+	return err
+}
+
+// owns reports a distribution the runtime's block may hold: one a runtime's
+// constraints file names besides Airflow's (manifest.RuntimeConstrained), or
+// one rc's own lines name. A nil rc owns the former alone.
+func (rc *RuntimeConstraints) owns(dist string) bool {
+	if manifest.RuntimeConstrained(dist) {
+		return true
+	}
+	if rc == nil {
+		return false
+	}
+	for _, line := range rc.Lines {
+		if manifest.DistName(line) == manifest.DistName(dist) && !slices.Contains(astroDists, manifest.DistName(dist)) {
+			return true
+		}
+	}
+	return false
+}
+
+// runtimeBlock is the record comment and rc's lines other than the Airflow
+// distributions', which the build's +astro pins hold.
+func runtimeBlock(rc RuntimeConstraints) []any {
+	block := []any{tomledit.Comment(manifest.RuntimeRecord(rc.Build, rc.Python))}
+	for _, line := range rc.Lines {
+		if slices.Contains(astroDists, manifest.DistName(line)) {
+			continue
+		}
+		block = append(block, line)
+	}
+	return block
 }
 
 // setAstroSources points each rebuilt distribution at the index, and takes

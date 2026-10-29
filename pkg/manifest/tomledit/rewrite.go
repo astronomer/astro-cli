@@ -57,9 +57,26 @@ func (r *rewrite) Get(key []string) (any, bool) {
 	return v, true
 }
 
+// GetLines is Get: this editor keeps no comments to put between the
+// elements.
+func (r *rewrite) GetLines(key []string) ([]any, bool) {
+	v, ok := r.Get(key)
+	if !ok {
+		return nil, false
+	}
+	list, isArray := v.([]any)
+	return list, isArray
+}
+
 func (r *rewrite) Set(key []string, value any) error {
 	if len(key) == 0 {
 		return &KeyError{Key: key, Reason: "empty key"}
+	}
+	if _, isComment := value.(Comment); isComment {
+		return &KeyError{Key: key, Reason: "a comment is written as an element of an array, not on its own"}
+	}
+	if hasComment(value) {
+		value = Values(value.([]any))
 	}
 	// Probe the value alone so a bad one fails here, like the surgical
 	// editor, not later in Bytes.
