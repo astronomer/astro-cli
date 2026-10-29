@@ -68,13 +68,21 @@ const generatedInputsDir = ".astro/install"
 // pages in [tool.uv] of the pyproject.toml it is given (requestPyproject).
 const installFindLinksName = "install-find-links.txt"
 
+// uvImagePin is uv-image.txt: the uv image as tag@digest, one line. It is the
+// one place the uv release is named, and scripts/bump-uv-image.sh rewrites it
+// when a newer release has aged past the supply-chain cooldown.
+//
+//go:embed uv-image.txt
+var uvImagePin string
+
 // UVImage is the image the install stage copies uv from, at the uv release the
-// helper is tested with. Its tag is the install stage's ASTRO_UV_IMAGE build
-// argument's default, so a build that cannot pull from ghcr.io names a mirror
-// of the same image instead: `--build-arg ASTRO_UV_IMAGE=...` for a project's
-// own Dockerfile (or an edit of its ARG line), and the ASTRO_UV_IMAGE
-// environment variable for a build the CLI generates (uvImage).
-const UVImage = "ghcr.io/astral-sh/uv:0.11.8"
+// helper is tested with, pinned by digest. It is the install stage's
+// ASTRO_UV_IMAGE build argument's default, so a build that cannot pull from
+// ghcr.io names a mirror of the same image instead: `--build-arg
+// ASTRO_UV_IMAGE=...` for a project's own Dockerfile (or an edit of its ARG
+// line), and the ASTRO_UV_IMAGE environment variable for a build the CLI
+// generates (uvImage).
+var UVImage = strings.TrimSpace(uvImagePin)
 
 // uvImageEnv names the environment variable that points a generated build's
 // install stage at a mirror of UVImage.
