@@ -4,6 +4,7 @@ package env
 import (
 	httpcontext "context"
 	"errors"
+	"fmt"
 
 	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/config"
@@ -84,6 +85,17 @@ func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV
 	// them. See echoPreservedFields.
 	current, err := getObject(idOrKey, scope, objectTypeVar, false, astroV1Client)
 	if err != nil {
+		// No literal DEPLOYMENT-scoped object exists for this key. Deployment-level
+		// values are implemented as links/overrides on a WORKSPACE-scoped object
+		// (the platform has no DEPLOYMENT-scoped create), so a key that's visible
+		// at this deployment via a link would otherwise look not-found here and
+		// send the caller's upsert into a doomed deployment-scoped CreateVar. Check
+		// for a linked/auto-linked workspace object before giving up.
+		if errors.Is(err, ErrNotFound) && scope.DeploymentID != "" {
+			if updated, linkErr := updateLinkedVarOverride(idOrKey, scope.DeploymentID, value, astroV1Client); linkErr == nil {
+				return updated, nil
+			}
+		}
 		return nil, err
 	}
 	id, err := objectID(current, idOrKey)
@@ -117,4 +129,28 @@ func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV
 // DeleteVar deletes an env var by ID or key.
 func DeleteVar(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) error {
 	return deleteObject(idOrKey, scope, objectTypeVar, astroV1Client)
+}
+
+// updateLinkedVarOverride updates the deployment override value of a
+// workspace-scoped variable that's linked or auto-linked to depID, for a key
+// that has no literal DEPLOYMENT-scoped object. It resolves the originating
+// workspace object (via resolveLinked=true) and writes the override through
+// the link mechanism rather than the generic object-update path. Returns
+// ErrNotFound if the key doesn't resolve to a workspace-sourced object at
+// this deployment, so the caller's existing "not found" handling still
+// applies to keys that genuinely don't exist anywhere.
+func updateLinkedVarOverride(key, depID, value string, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
+	resolved, err := getResolvedObjectByKey(key, Scope{DeploymentID: depID}, objectTypeVar, false, astroV1Client)
+	if err != nil {
+		return nil, err
+	}
+	if resolved.SourceScope == nil || resolved.SourceScopeEntityId == nil ||
+		*resolved.SourceScope != astrov1.EnvironmentObjectSourceScopeWORKSPACE {
+		return nil, fmt.Errorf("%w: %s", ErrNotFound, key)
+	}
+	workspaceScope := Scope{WorkspaceID: *resolved.SourceScopeEntityId}
+	if err := LinkVar(key, workspaceScope, depID, &value, astroV1Client); err != nil {
+		return nil, err
+	}
+	return getResolvedObjectByKey(key, Scope{DeploymentID: depID}, objectTypeVar, false, astroV1Client)
 }

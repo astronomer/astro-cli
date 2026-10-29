@@ -114,13 +114,32 @@ func getObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentOb
 		}
 		return resp.JSON200, nil
 	}
+	return getObjectByKey(idOrKey, scope, objectType, false, includeSecrets, astroV1Client)
+}
 
+// getResolvedObjectByKey fetches a single env-object by key, including objects
+// inherited via a link or auto-link from a parent (workspace) scope
+// (resolveLinked=true). Unlike getObject, the returned object's Id is not
+// guaranteed to be addressable in subsequent CRUD calls when the object was
+// resolved from a link -- callers that need to act on the result should
+// follow SourceScope/SourceScopeEntityId back to the originating object.
+func getResolvedObjectByKey(key string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, includeSecrets bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
+	return getObjectByKey(key, scope, objectType, true, includeSecrets, astroV1Client)
+}
+
+// getObjectByKey filters the list endpoint server-side via ObjectKey (the
+// platform has no GET-by-key endpoint).
+func getObjectByKey(key string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
+	c, err := config.GetCurrentContext()
+	if err != nil {
 		return nil, err
 	}
 	// ObjectKey filtering returns at most one row per (scope, objectType);
 	// limit=2 catches server-side anomalies without forcing pagination.
-	params := buildListParams(scope, objectType, &idOrKey, false, includeSecrets, 2)
+	params := buildListParams(scope, objectType, &key, resolveLinked, includeSecrets, 2)
 
 	resp, err := astroV1Client.ListEnvironmentObjectsWithResponse(httpcontext.Background(), c.Organization, params)
 	if err != nil {
@@ -130,11 +149,11 @@ func getObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentOb
 		return nil, err
 	}
 	for i := range resp.JSON200.EnvironmentObjects {
-		if resp.JSON200.EnvironmentObjects[i].ObjectKey == idOrKey {
+		if resp.JSON200.EnvironmentObjects[i].ObjectKey == key {
 			return &resp.JSON200.EnvironmentObjects[i], nil
 		}
 	}
-	return nil, fmt.Errorf("%w: %s", ErrNotFound, idOrKey)
+	return nil, fmt.Errorf("%w: %s", ErrNotFound, key)
 }
 
 // deleteObject deletes an env-object by ID or key.
