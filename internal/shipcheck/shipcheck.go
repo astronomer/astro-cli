@@ -52,6 +52,11 @@ type Report struct {
 	// carried is every file the image would carry, for the gitignored
 	// warning to name only places that hold nothing else that ships.
 	carried []string
+	// nested are the git checkouts inside the project a declared
+	// Dockerfile's context carries (imagebuild.ProjectSurvey.Nested), for
+	// the refusal to name the checkout a file sits in: git there may track
+	// it, but this project's git does not.
+	nested []string
 }
 
 // Check looks at the files an image built from the project at dir would
@@ -60,7 +65,7 @@ type Report struct {
 // carries, are looked at always; the rest are asked of git, and outside a git
 // work tree there is nothing to ask.
 func Check(dir string, survey *imagebuild.ProjectSurvey) Report {
-	r := Report{IgnoreFile: cmp.Or(survey.IgnoreFile, ".dockerignore"), carried: survey.Files}
+	r := Report{IgnoreFile: cmp.Or(survey.IgnoreFile, ".dockerignore"), carried: survey.Files, nested: survey.Nested}
 	root, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		root = dir
@@ -114,25 +119,76 @@ func agree(n int, one, many string) string {
 // track, ones reached through a link out of the project, and git metadata
 // whose config holds one. nil when there are none.
 func (r *Report) Err() error {
+	inCheckout, own := r.byCheckout(r.Secrets)
 	var why []string
-	if n := len(r.Secrets); n > 0 {
+	if n := len(own); n > 0 {
 		why = append(why, fmt.Sprintf("%s %s and %s not tracked by git",
-			cappedList(r.Secrets), agree(n, "looks like credentials", "look like credentials"), agree(n, "is", "are")))
+			cappedList(own), agree(n, "looks like credentials", "look like credentials"), agree(n, "is", "are")))
 	}
 	if n := len(r.Outside); n > 0 {
 		why = append(why, fmt.Sprintf("%s %s and %s reached through a link out of the project",
 			cappedList(r.Outside), agree(n, "looks like credentials", "look like credentials"), agree(n, "is", "are")))
 	}
 	if len(why) > 0 {
-		it := agree(len(r.Secrets)+len(r.Outside), "it", "them")
-		return fmt.Errorf("refusing to build: %s, and the image would carry %s to a registry. Add %s to %s, or remove %s from the project, and try again",
+		it := agree(len(own)+len(r.Outside), "it", "them")
+		msg := fmt.Sprintf("refusing to build: %s, and the image would carry %s to a registry. Add %s to %s, or remove %s from the project",
 			strings.Join(why, "; "), it, it, r.IgnoreFile, it)
+		if len(inCheckout) > 0 {
+			msg += ". " + r.checkoutAdvice(inCheckout)
+		}
+		return fmt.Errorf("%s, and try again", msg)
+	}
+	if len(inCheckout) > 0 {
+		return fmt.Errorf("refusing to build: %s, and try again", r.checkoutAdvice(inCheckout))
 	}
 	if n := len(r.VCSSecrets); n > 0 {
 		return fmt.Errorf("refusing to build: the git %s under %s %s (an extraheader, or a URL with a password or a known token in it), and the image would carry %s to a registry. Add **/.git to %s and try again",
 			agree(n, "config", "configs"), cappedList(r.VCSSecrets), agree(n, "holds a credential", "hold credentials"), agree(n, "it", "them"), r.IgnoreFile)
 	}
 	return nil
+}
+
+// byCheckout splits files into those inside one of the nested checkouts a
+// declared build carries (r.nested), mapped to that checkout, and the rest.
+func (r *Report) byCheckout(files []string) (inCheckout map[string][]string, rest []string) {
+	inCheckout = map[string][]string{}
+	for _, f := range files {
+		if c := checkoutOf(f, r.nested); c != "" {
+			inCheckout[c] = append(inCheckout[c], f)
+			continue
+		}
+		rest = append(rest, f)
+	}
+	return inCheckout, rest
+}
+
+// checkoutOf is the innermost of checkouts holding f, "" for none.
+func checkoutOf(f string, checkouts []string) string {
+	best := ""
+	for _, c := range checkouts {
+		if strings.HasPrefix(f, c+"/") && len(c) > len(best) {
+			best = c
+		}
+	}
+	return best
+}
+
+// checkoutAdvice says that the files flagged inside nested checkouts sit in
+// another git checkout rather than in this project's repository: git there
+// may track them, which is why "not tracked by git" alone reads wrong, and
+// the fix is to leave the checkout out, not to commit or remove a file.
+func (r *Report) checkoutAdvice(inCheckout map[string][]string) string {
+	var files, dirs []string
+	for c, fs := range inCheckout {
+		files = append(files, fs...)
+		dirs = append(dirs, c+"/")
+	}
+	slices.Sort(files)
+	slices.Sort(dirs)
+	n, d := len(files), len(dirs)
+	return fmt.Sprintf("%s %s and %s in %s, %s inside the project, which the image would carry to a registry. Add %s to %s",
+		cappedList(files), agree(n, "looks like credentials", "look like credentials"), agree(n, "sits", "sit"),
+		joinAnd(dirs), agree(d, "another git checkout", "other git checkouts"), joinAnd(dirs), r.IgnoreFile)
 }
 
 // CosmosBoostWarning is the warning for the Cosmos Boost files an earlier
