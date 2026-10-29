@@ -2,11 +2,13 @@ package apc
 
 import (
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/apc/workspace"
@@ -14,8 +16,8 @@ import (
 )
 
 var (
-	errUpdateWorkspaceInvalidArgs  = errors.New("must specify at least one attribute to update (--label or --description)")
-	errCreateWorkspaceMissingLabel = errors.New("must specify a label for your workspace")
+	errUpdateWorkspaceInvalidArgs  = errors.New("must specify at least one attribute to update (--name or --description)")
+	errCreateWorkspaceMissingLabel = errors.New("must specify a name for your workspace")
 )
 
 var (
@@ -26,9 +28,11 @@ var (
 	workspacePaginated         bool
 	workspacePageSize          int
 	workspaceOutput            cliout.Format
-	workspaceDeleteExample     = `
+	workspaceDeleteExample     = `  # Delete a Workspace, after you confirm
   astro workspace delete <WORKSPACE_ID>
-`
+
+  # Delete it without the confirmation, from a script
+  astro workspace delete <WORKSPACE_ID> --yes`
 )
 
 const defaultPageSize = 100
@@ -50,6 +54,7 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 		newWorkspaceSaRootCmd(out),
 		newWorkspaceTeamRootCmd(out),
 	)
+	applyPreferredFlagsIn(cmd)
 	return cmd
 }
 
@@ -74,15 +79,16 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cr"},
 		Short:   "Create an APC Workspace",
 		Long:    "Create an APC Workspace",
-		Example: `  # Create a Workspace with a label and a description
-  astro workspace create --label my-workspace --description "Production pipelines"`,
+		Example: `  # Create a Workspace with a name and a description
+  astro workspace create --name my-workspace --description "Production pipelines"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceCreate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&workspaceCreateLabel, "label", "l", "", "Label for your new workspace")
+	cmd.Flags().StringVarP(&workspaceCreateLabel, "name", "n", "", "Name for your new workspace")
+	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 	cmd.Flags().StringVarP(&workspaceCreateDescription, "description", "d", "", "Description for your new workspace")
-	_ = cmd.MarkFlagRequired("label") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("name") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 
 	return cmd
@@ -93,13 +99,14 @@ func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete <WORKSPACE_ID>",
 		Aliases: []string{"de"},
 		Short:   "Delete an APC Workspace",
-		Long:    "Delete an APC Workspace",
+		Long:    "Delete an APC Workspace. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Example: workspaceDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceDelete(cmd, out, args)
 		},
 	}
+	addYesFlag(cmd, "Don't ask for confirmation before deleting the Workspace")
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 	return cmd
 }
@@ -135,15 +142,16 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"up"},
 		Short:   "Update an APC Workspace",
 		Long:    "Update a Workspace name, as well as users and roles assigned to a Workspace",
-		Example: `  # Change a Workspace's label and description
-  astro workspace update <WORKSPACE_ID> --label my-new-label --description "My new description"`,
+		Example: `  # Change a Workspace's name and description
+  astro workspace update <WORKSPACE_ID> --name my-new-name --description "My new description"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUpdate(cmd, out, args)
 		},
 	}
 
-	cmd.Flags().StringVarP(&workspaceUpdateLabel, "label", "l", "", "The new label you want to give to your workspace")
+	cmd.Flags().StringVarP(&workspaceUpdateLabel, "name", "n", "", "The new name you want to give to your workspace")
+	utils.AddAlias(cmd.Flags(), "label", "l", "name")
 	cmd.Flags().StringVarP(&workspaceUpdateDescription, "description", "d", "", "The new description you want to give to your workspace")
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 
@@ -191,6 +199,10 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	ok, err := confirmRemoval(out, fmt.Sprintf("\nAre you sure you want to delete Workspace %s? This cannot be undone.", args[0]), "Canceling Workspace deletion")
+	if err != nil || !ok {
+		return err
+	}
 	w, err := workspace.Delete(args[0], houstonClient)
 	if err != nil {
 		return err

@@ -162,7 +162,7 @@ func confirmTokenChange(warning, question string) (bool, error) {
 		return false, err
 	}
 	if warning != "" {
-		fmt.Fprintln(os.Stderr, warning)
+		fmt.Fprintln(os.Stderr, cliout.DangerLabel(os.Stderr), warning)
 	}
 	return input.Confirm(question, input.AnsweredBy("--yes"))
 }

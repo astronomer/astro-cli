@@ -65,22 +65,34 @@ Check uv with `uv --version`. To install it, see the
 Run:
 
 ```sh
-curl -sSL install.astronomer.io | sudo bash -s -- v2
+curl -sSL install.astronomer.io | bash -s -- v2
 ```
 
 The `v2` matters. Until v2 has a stable release, it is published as GitHub
 pre-releases, and the installer without a version installs Astro CLI 1.x. With
 `v2` it installs the newest v2 release, the newest stable one once there is
-one. It installs into `/usr/local/bin`, replacing a 1.x `astro` there.
+one.
 
-To install somewhere else, without `sudo`, run the installer script directly
-and name the directory with `-b`:
+It installs into `~/.local/bin`, or `$XDG_BIN_HOME` if you set it, and needs no
+`sudo`. If that directory is not on your PATH, the installer prints the line to
+add to your shell profile; it does not edit the profile itself. If another
+`astro` comes earlier on your PATH, such as a 1.x in `/usr/local/bin`, it warns
+and shows both paths.
+
+To install system-wide into `/usr/local/bin` instead, replacing a 1.x `astro`
+there, run it with `sudo`:
 
 ```sh
-curl -sSL https://raw.githubusercontent.com/astronomer/astro-cli/main/godownloader.sh | bash -s -- -b ~/astro-v2 v2
+curl -sSL install.astronomer.io | sudo bash -s -- v2
 ```
 
-Then run it as `~/astro-v2/astro`, or put that directory on your PATH.
+To pick the directory, set `ASTRO_INSTALL_DIR`. With `sudo`, set it after
+`sudo`, because `sudo` drops your environment:
+
+```sh
+curl -sSL install.astronomer.io | ASTRO_INSTALL_DIR="$HOME/astro-v2" bash -s -- v2
+curl -sSL install.astronomer.io | sudo ASTRO_INSTALL_DIR=/opt/astro bash -s -- v2
+```
 
 To build from source instead, for example to contribute, you need Go (the
 version in `go.mod`):

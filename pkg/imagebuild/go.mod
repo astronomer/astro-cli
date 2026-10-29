@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/imagebuild
 
-go 1.26.1
+go 1.26.10
 
 // Only the contract leaf, whose own dependency list is empty. This module used to
 // require pkg/localrt itself, which meant inheriting the local runtime's engines

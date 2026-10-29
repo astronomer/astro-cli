@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/deploybuild"
+	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
@@ -264,11 +265,11 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 }
 
 // checkDeployment fetches the deployment and confirms the deploy is allowed:
-// cicd enforcement, and DAG deploys enabled for an image-only (--image)
-// deploy, which leaves the running DAGs in place and so needs them to live
-// outside the image. It also returns the runtimes the deployment offers,
-// which a generated build starts from and the image's runtime is checked
-// against.
+// cicd enforcement, DAG deploys enabled for an image-only (--image) deploy,
+// which leaves the running DAGs in place and so needs them to live outside
+// the image, and then that the Deployment is not hibernating. It also
+// returns the runtimes the deployment offers, which a generated build starts
+// from and the image's runtime is checked against.
 func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDeployInput, astroV1Client astrov1.APIClient) (astrov1.Deployment, offeredReleases, error) {
 	dep, err := deployment.GetDeploymentByID(c.Organization, in.DeploymentID, astroV1Client)
 	if err != nil {
@@ -282,6 +283,13 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 		// the image, so there are no running DAGs for --image to leave alone.
 		// Under remote execution they live with the remote agents instead.
 		return astrov1.Deployment{}, nil, fmt.Errorf(imageOnlyNeedsDagDeployMsg, in.DeploymentID)
+	}
+	// Astro refuses a hibernating Deployment's deploy when it is created, and
+	// that comes after the build: refuse here, on the status Astro refuses
+	// on, before the build's minutes are spent. After the two above, which
+	// waking would not clear, so the wake-up step never hides them.
+	if dep.Status == astrov1.DeploymentStatusHIBERNATING {
+		return astrov1.Deployment{}, nil, &hibernatingError{deploymentID: dep.Id, name: dep.Name, refusal: instancelocate.ErrDeploymentHibernating}
 	}
 	offer, err := offeredRuntimes(ctx, dep.OrganizationId, astroV1Client)
 	if err != nil {

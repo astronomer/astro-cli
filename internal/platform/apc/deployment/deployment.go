@@ -63,7 +63,7 @@ type ErrInvalidAirflowVersion struct {
 }
 
 func (e ErrInvalidAirflowVersion) Error() string {
-	return fmt.Sprintf("Error: You tried to set --desired-airflow-version to %s, but this Airflow Deployment "+
+	return fmt.Sprintf("You tried to set --desired-airflow-version to %s, but this Airflow Deployment "+
 		"is already running %s. Please indicate a higher version of Airflow and try again.", e.desiredVersion, e.currentVersion)
 }
 
@@ -75,7 +75,7 @@ type ErrInvalidRuntimeVersion struct {
 }
 
 func (e ErrInvalidRuntimeVersion) Error() string {
-	return fmt.Sprintf("Error: You tried to set --desired-runtime-version to %s, but this Runtime Deployment "+
+	return fmt.Sprintf("You tried to set --desired-runtime-version to %s, but this Runtime Deployment "+
 		"is already running %s. Please indicate a higher version of Runtime and try again.", e.desiredVersion, e.currentVersion)
 }
 

@@ -1,0 +1,12 @@
+{
+  "dag_id": "x",
+  "dag_run_id": "x",
+  "task_id": "x",
+  "map_index": -1,
+  "state": "x",
+  "until": "x",
+  "reached": true,
+  "timed_out": true,
+  "run_state": "x",
+  "elapsed_seconds": 1.5
+}

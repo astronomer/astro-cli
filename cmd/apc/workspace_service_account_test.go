@@ -49,6 +49,9 @@ func (s *Suite) TestWorkspaceSaCreate() {
 	currentClient := houstonClient
 	houstonClient = houstonMock
 	defer func() { houstonClient = currentClient }()
+	// As --name does: a service account needs one.
+	workspaceSAName = "ci"
+	defer func() { workspaceSAName = "" }()
 	workspaceSARole = houston.WorkspaceAdminRole
 	houstonMock.On("CreateWorkspaceServiceAccount", mock.Anything).Return(&houston.WorkspaceServiceAccount{}, nil).Once()
 
@@ -74,6 +77,9 @@ func (s *Suite) TestWorkspaceSaDelete() {
 	workspaceSARole = houston.WorkspaceAdminRole
 	houstonMock.On("DeleteWorkspaceServiceAccount", mock.Anything).Return(&houston.ServiceAccount{}, nil).Once()
 
+	// As --yes does: the question is the command's, and tested there.
+	skipPrompt = true
+	defer func() { skipPrompt = false }()
 	err := workspaceSaDelete(&cobra.Command{}, buf, []string{saID})
 	s.NoError(err)
 

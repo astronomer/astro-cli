@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/instancelocate
 
-go 1.26.1
+go 1.26.10
 
 // Declared exceptions to the sibling rule (docs/architecture.md): the
 // lookup takes and returns pkg/instances' Instance, which is the link it

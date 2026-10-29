@@ -21,8 +21,8 @@ The `af` families are `dags`, `runs`, `tasks`, `assets`, `connections`, `variabl
 The first of these that names something wins:
 
 1. **`--url <address>`**: an Airflow addressed directly, with no link. It cannot be combined with `-d` and works outside a project.
-2. **`-d/--deployment <name>`**: a link name, or an Astro Deployment id when no link has that name.
-3. **`ASTRO_DEPLOYMENT`**: the same, from the environment.
+2. **`-d/--deployment <name>`**: a link name, else an Astro Deployment id or name (see [A Deployment no link declares](#a-deployment-no-link-declares)).
+3. **`ASTRO_DEPLOYMENT`**: a link name, from the environment (not an id or a Deployment name).
 4. **Your selection**, set with `astro use` (below).
 5. **The default link**: the link marked `default = true`, or a project's only link. Adding a second link to a project whose only link is unmarked (`astro link add`, a deploy that links what it picked, Astro Desktop) marks that first link `default = true`, so the project keeps pointing where it did, and says so. A link written `default = false` (by hand, or by `astro link default --unset`) is never marked. Nothing else picks a default: a project that already has several unmarked links stays without one until you run `astro link default NAME`.
 
@@ -34,6 +34,15 @@ With nothing resolved:
 Both errors add `For this machine: astro local af <family>`. Every run prints the target it resolved on stderr, as `→ name (kind where)`.
 
 `astro api airflow` takes only steps 1 and 2. With neither it fails and lists `-d <link>`, `--url` and `astro local api`. Its `ls` and `spec` subcommands need no target.
+
+## A Deployment no link declares
+
+`astro af -d` and `astro api airflow -d` read a value no link declares the same way, which is the way `--deployment` reads on `astro deployment`:
+
+- a Deployment id (`c` and 24 lowercase letters or digits) is that Deployment, fetched by id across the organization, with no other call. When a link carries that id, the link answers for it, with its name and auth;
+- anything else is a Deployment's name, looked up in the project's `[tool.astro] workspace`, else the current workspace of the login the command uses (for `astro af`, the login for the project's `domain`; for `astro api airflow`, the current context). The project's workspace is listed in the project's `[tool.astro] organization` when it names one, else in the login's. No Deployment of that name, or several (listed by id), is an error. A Deployment a link carries is that link, with its name and auth. `astro api airflow` reads through the current context, so in a project whose `domain` is another Astro host it refuses a name up front, naming that host, with `astro context switch <host>` or the Deployment id as the way on.
+
+Inside a project, a name that matches neither a link nor a Deployment is most likely a mistyped link, so the error leads with the project's links. Neither command takes a workspace flag. On `astro api airflow`, 1.x's `--workspace-id` (`-W`) is still accepted, hidden, and does nothing, as in 1.x. `-O/--organization-id` picks the organization an id is fetched in. For a name it has to be the organization of the workspace being searched (the project's `[tool.astro] organization` when the project names its workspace and an organization, else the context's); any other organization is refused, with a request to pass the Deployment id.
 
 ## `astro use`
 

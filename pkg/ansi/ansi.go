@@ -57,6 +57,11 @@ func shouldColor(isTerminal func() bool) bool {
 		if os.Getenv("CLICOLOR") == "0" {
 			return false
 		}
+		// NO_COLOR, set and not empty, turns color off for every stream
+		// (no-color.org); only an explicit CLICOLOR_FORCE, above, wins over it.
+		if os.Getenv("NO_COLOR") != "" {
+			return false
+		}
 	}
 
 	return ForceColors || isTerminal()
@@ -85,3 +90,6 @@ func (p Palette) Green(text string) string { return p.a.Sprintf(p.a.Green(text))
 
 // Cyan returns text colored cyan for the palette's stream.
 func (p Palette) Cyan(text string) string { return p.a.Sprintf(p.a.Cyan(text)) }
+
+// Yellow returns text colored yellow for the palette's stream.
+func (p Palette) Yellow(text string) string { return p.a.Sprintf(p.a.Yellow(text)) }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/envschema"
@@ -453,7 +454,7 @@ func (c *cli) noteNoWorkspace(dir, name string) {
 	if err != nil || m.Astro.Workspace != "" {
 		return
 	}
-	fmt.Fprintf(c.d.Stderr, "note: [tool.astro] sets no workspace, so %s resolves only from local values until one is linked in Astro Desktop\n", name)
+	cliout.Note(c.d.Stderr, fmt.Sprintf("[tool.astro] sets no workspace, so %s resolves only from local values until one is linked in Astro Desktop", name))
 }
 
 // notePlaintextCopy says, on stderr, that a name just declared secret still
@@ -465,6 +466,5 @@ func (c *cli) notePlaintextCopy(dir string, kind localenv.Kind, name string) {
 	if _, ok, err := store.Get(kind, name); err != nil || !ok {
 		return
 	}
-	fmt.Fprintf(c.d.Stderr, "note: %s is still in %s, a plain file. Run astro local env %s set %s to move it into the vault\n",
-		name, store.Path, localenv.Noun(kind), name)
+	cliout.Note(c.d.Stderr, fmt.Sprintf("%s is still in %s, a plain file. Run astro local env %s set %s to move it into the vault", name, store.Path, localenv.Noun(kind), name))
 }

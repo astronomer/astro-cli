@@ -67,7 +67,7 @@ func runDeploymentTokenRotate(format cliout.Format, out io.Writer) error {
 	}
 	if !forceRotate {
 		ok, err := confirmTokenChange(
-			"WARNING: API Token rotation will invalidate the current token and cannot be undone.",
+			"API Token rotation will invalidate the current token and cannot be undone.",
 			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
 		if err != nil {
 			return err
@@ -93,7 +93,7 @@ func runDeploymentTokenDelete(format cliout.Format, out io.Writer) error {
 	if !forceDelete {
 		warning, question, canceled := "", fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Deployment?", ansi.Bold(token.Name)), "Canceling API Token removal"
 		if isDep {
-			warning = "WARNING: API token deletion cannot be undone."
+			warning = "API token deletion cannot be undone."
 			question = fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name))
 			canceled = "Canceling API Token deletion"
 		}
@@ -170,11 +170,16 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 		err   error
 	)
 	if kind == tokenKindWorkspace {
-		pick := deploymentTokenPicker("--workspace-token-name")
+		// An update finds the token among the Deployment's, so only an add
+		// reads a workspace.
+		pick, ws := deploymentTokenPicker("--workspace-token-name"), ""
 		if operation == tokenRoleAdd {
 			pick = workspaceTokenPicker("--workspace-token-name", "Please select the Workspace API token you would like to add to the Deployment:")
+			if ws, err = workspaceTokenWorkspace(); err != nil {
+				return err
+			}
 		}
-		token, err = deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, tokenRole, workspaceID, deploymentID, operation, pick, astroV1Client)
+		token, err = deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, tokenRole, ws, deploymentID, operation, pick, astroV1Client)
 	} else {
 		pick := deploymentTokenPicker("--org-token-name")
 		if operation == tokenRoleAdd {
@@ -188,6 +193,19 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 	return renderTokenLine(format, out, token, fmt.Sprintf("Astro %s API token %s was successfully added/updated to the Deployment", kind, token.Name))
 }
 
+// workspaceTokenWorkspace is the workspace a workspace-token add or remove
+// finds its Workspace token in: --workspace, else the project's, else the
+// current one (coalesceWorkspace). A token given by id is read wherever it
+// is, so then none is needed, and a login with no workspace, such as an
+// Organization token's, can still name one.
+func workspaceTokenWorkspace() (string, error) {
+	ws, err := coalesceWorkspace()
+	if err != nil && workspaceTokenID == "" {
+		return "", fmt.Errorf("failed to find a valid workspace to find the Workspace token in; pass --workspace, or the token's ID: %w", err)
+	}
+	return ws, nil
+}
+
 // runDeploymentTokenRemove removes the Deployment role of a Workspace or
 // Organization token.
 func runDeploymentTokenRemove(format cliout.Format, out io.Writer, kind string) error {
@@ -197,7 +215,11 @@ func runDeploymentTokenRemove(format cliout.Format, out io.Writer, kind string) 
 	)
 	if kind == tokenKindWorkspace {
 		pick := workspaceTokenPicker("--workspace-token-name", "Please select the Workspace API token you would like to remove from the Deployment:")
-		removal, err = deployment.RemoveWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, workspaceID, deploymentID, pick, astroV1Client)
+		ws, wsErr := workspaceTokenWorkspace()
+		if wsErr != nil {
+			return wsErr
+		}
+		removal, err = deployment.RemoveWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, ws, deploymentID, pick, astroV1Client)
 	} else {
 		pick := deploymentTokenPicker("--org-token-name")
 		removal, err = deployment.RemoveOrgTokenDeploymentRole(orgTokenID, orgTokenName, deploymentID, pick, astroV1Client)

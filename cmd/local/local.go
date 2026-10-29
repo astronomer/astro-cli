@@ -64,7 +64,7 @@ type cli struct {
 }
 
 func (c *cli) renderer() cliout.Renderer {
-	return cliout.Renderer{Format: c.output, Out: c.d.Stdout, Style: c.d.JSONStyle}
+	return cliout.Renderer{Format: c.output, Out: c.d.Stdout, Err: c.d.Stderr, Style: c.d.JSONStyle}
 }
 
 // projectPath discovers the project that contains the working directory,
@@ -496,13 +496,22 @@ func sectionLabel(s envschema.Section) string {
 
 // emitWarning is the one definition of what a warning looks like on the wire,
 // in both modes. Every warning source goes through it, so the shape cannot
-// drift between them.
+// drift between them: a warning event in json, and in text a "Warning:" line
+// on stderr (cliout.Warn), yellow on a terminal, so it is not read as the
+// command's output. A renderer with no Err writes it to Out instead.
 func emitWarning(r cliout.Renderer, e event) {
-	//nolint:errcheck // a warning write failure surfaces on the command's own output
-	r.EmitEvent(e, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "warning: %s\n", e.Text)
-		return werr
-	})
+	if r.Format != cliout.FormatText {
+		// JSON emits the event; any other format panics in EmitEvent, as an
+		// unmapped Format must (cliout.Renderer.emit).
+		//nolint:errcheck // a warning write failure surfaces on the command's own output
+		r.EmitEvent(e, func(io.Writer) error { return nil })
+		return
+	}
+	w := r.Err
+	if w == nil {
+		w = r.Out
+	}
+	cliout.Warn(w, e.Text)
 }
 
 // reportBuildError renders a plan-build failure. A *plan.MissingEnvError in
@@ -1223,8 +1232,8 @@ func renderReset(w io.Writer, report localrt.ResetReport) error {
 		// Said rather than swallowed: a docker-mode project keeps its metadata
 		// database in a volume, so "wiped" would be a lie if the engine that
 		// holds it never answered.
-		_, err := fmt.Fprintln(w,
-			"note: no container engine answered, so any docker-mode volume for this project is still there — start the engine and run this again to remove it")
+		_, err := fmt.Fprintln(w, cliout.NoteLabel(w),
+			"no container engine answered, so any docker-mode volume for this project is still there — start the engine and run this again to remove it")
 		return err
 	}
 	return nil

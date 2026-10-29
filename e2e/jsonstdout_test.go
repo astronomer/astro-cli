@@ -213,6 +213,10 @@ var ownResultOnFailure = map[string]string{
 	"astro local check":                "publishes its findings and verdict; exit 1 or 2",
 	"astro af runs trigger-wait":       "publishes the run it waited for; exit 1 or 2",
 	"astro local af runs trigger-wait": "publishes the run it waited for; exit 1 or 2",
+	"astro af runs wait":               "publishes the run it waited for; exit 1 or 2",
+	"astro local af runs wait":         "publishes the run it waited for; exit 1 or 2",
+	"astro af tasks wait":              "publishes the task instance it waited for; exit 1 or 2",
+	"astro local af tasks wait":        "publishes the task instance it waited for; exit 1 or 2",
 	"astro local run":                  "exits with the child's status",
 }
 

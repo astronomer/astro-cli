@@ -90,7 +90,7 @@ type deploymentFlags struct {
 // deployment), and --url is the escape hatch for an Airflow no project
 // declares.
 func addDeploymentFlags(cmd *cobra.Command, f *deploymentFlags) {
-	cmd.PersistentFlags().StringVarP(&f.deployment, "deployment", "d", "", "Deployment to act on: a link name from the manifest, or a Deployment id")
+	cmd.PersistentFlags().StringVarP(&f.deployment, "deployment", "d", "", "Deployment to act on: a link name from the manifest, else an Astro Deployment id or name")
 	cmd.PersistentFlags().StringVar(&f.url, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
 }
 
@@ -105,18 +105,69 @@ func (c *cli) deploymentClient(ctx context.Context, f deploymentFlags) (*airflow
 	if err != nil {
 		return nil, err
 	}
-	client, err := c.clientFor(ctx, sel.Instance, domain)
+	instance := sel.Instance
+	if instance.Source == instances.SourceDeploymentID {
+		instance, err = c.findDeployment(ctx, instance, domain)
+	}
+	var client *airflowapi.Client
+	if err == nil {
+		client, err = c.clientFor(ctx, instance, domain)
+	}
 	if err != nil && sel.Instance.Source == instances.SourceDeploymentID {
-		// A name that matched no link is more often a typo than an id, so the
-		// names it could have been travel with the failure, as they do for
-		// `astro api airflow -d`.
+		// A name that matched no link is more often a typo than a Deployment,
+		// so the names it could have been travel with the failure, as they do
+		// for `astro api airflow -d` — first, when no Deployment had the name
+		// either, since the likeliest fix is one of them.
 		if _, set, serr := c.deploymentSet(); serr == nil {
 			if names := set.Names(); len(names) > 0 {
+				var nameErr *instancelocate.DeploymentNameError
+				if errors.As(err, &nameErr) && nameErr.NotFound() {
+					return nil, fmt.Errorf("no link or Deployment named %q. Deployments this project links: %s\n%w", f.deployment, strings.Join(names, ", "), err)
+				}
 				return nil, fmt.Errorf("%w\nDeployments this project links: %s", err, strings.Join(names, ", "))
 			}
 		}
 	}
 	return client, err
+}
+
+// findDeployment reads a -d no link declares the way --deployment reads on
+// the astro deployment commands: a Deployment id is that Deployment, found
+// across the organization by the lookup that reads its address, and anything
+// else is the name of one, looked up in the project's [tool.astro]
+// workspace, else the workspace of the login the project uses. What a name
+// finds is read as an id again (instances.Set.DeploymentByID), so a link
+// pointing at that Deployment answers for it, as it does for an id.
+func (c *cli) findDeployment(ctx context.Context, i instances.Instance, domain string) (instances.Instance, error) {
+	dir, err := c.projectPath()
+	if err != nil {
+		return instances.Instance{}, err
+	}
+	m, err := manifest.Load(filepath.Join(dir, project.Marker))
+	if err != nil {
+		return instances.Instance{}, err
+	}
+	ref := i.Link.Deployment
+	var finder instancelocate.DeploymentFinder
+	if c.d.Locator != nil {
+		finder, _ = c.d.Locator(domain).(instancelocate.DeploymentFinder)
+	}
+	if finder == nil {
+		// Nothing here can reach a control plane, so there is nothing to look
+		// a name up in either: the instance stays the id it was read as, and
+		// the lookup that reads its address reports why it cannot.
+		return i, nil
+	}
+	id, err := finder.DeploymentID(ctx, ref, m.Astro.Workspace, m.Astro.Organization)
+	if err != nil {
+		return instances.Instance{}, err
+	}
+	found := instances.Build(m).DeploymentByID(id)
+	if found.Source == instances.SourceDeploymentID && id != ref {
+		// Found by name: the name is what the reader typed and recognizes.
+		found.Name = ref
+	}
+	return found, nil
 }
 
 // projectDomain is the Astro host whose login this project's astro links use,

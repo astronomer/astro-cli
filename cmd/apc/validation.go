@@ -16,7 +16,8 @@ var (
 	ErrInvalidDAGDeploymentType = errors.New("please specify the correct Dag deployment type, one of the following: image, volume, git_sync(if enabled in platform config), dag_deploy(if enabled in platform config)")
 	errNFSLocationNotFound      = errors.New("please specify the nfs location via --nfs-location flag")
 	errGitRepoNotFound          = errors.New("please specify a valid git repository URL via --git-repository-url")
-	errInvalidExecutorType      = errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")
+	errInvalidExecutorType      = errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s, or Astro's spellings LocalExecutor, CeleryExecutor, KubernetesExecutor")
+	errAstroExecutorOnAPC       = errors.New("AstroExecutor is an Astro executor, and Astro Private Cloud has no equivalent: specify one of local, celery, kubernetes (or LocalExecutor, CeleryExecutor, KubernetesExecutor)")
 	errNoWorkspaceFound         = errors.New("no valid workspace source found")
 	errInvalidDeploymentMode    = errors.New("please specify a valid deployment mode, one of: helm, operator")
 )
@@ -28,15 +29,17 @@ var validGitScheme = map[string]struct{}{
 	"https": {},
 }
 
+// coalesceWorkspace is the workspace a command acts in: --workspace, else
+// the context's. The flag is read first, so a context with no workspace, or
+// none at all, does not fail a command that names one.
 func coalesceWorkspace() (string, error) {
-	wsFlag := workspaceID
+	if workspaceID != "" {
+		return workspaceID, nil
+	}
+
 	wsCfg, err := workspace.GetCurrentWorkspace()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current workspace: %w", err)
-	}
-
-	if wsFlag != "" {
-		return wsFlag, nil
 	}
 
 	if wsCfg != "" {
@@ -94,15 +97,19 @@ func validateDeploymentModeArg(mode string) error {
 	}
 }
 
+// validateExecutorArg is the executor --executor names, in APC's spelling
+// (celery) or Astro's (CeleryExecutor), either in any case.
 func validateExecutorArg(executor string) (string, error) {
 	var executorType string
-	switch executor {
-	case localExecutorArg:
+	switch strings.ToLower(executor) {
+	case localExecutorArg, "localexecutor":
 		executorType = houston.LocalExecutorType
-	case celeryExecutorArg:
+	case celeryExecutorArg, "celeryexecutor":
 		executorType = houston.CeleryExecutorType
-	case kubernetesExecutorArg, k8sExecutorArg:
+	case kubernetesExecutorArg, k8sExecutorArg, "kubernetesexecutor":
 		executorType = houston.KubernetesExecutorType
+	case "astroexecutor":
+		return executorType, errAstroExecutorOnAPC
 	default:
 		return executorType, errInvalidExecutorType
 	}

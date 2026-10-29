@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/envschema
 
-go 1.26.1
+go 1.26.10
 
 // Declared exception to the sibling rule (docs/architecture.md): the parser
 // validates declared names against airflowenv's three predicates, and

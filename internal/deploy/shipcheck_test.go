@@ -40,7 +40,7 @@ func TestRun_RefusesGitignoredCredentials(t *testing.T) {
 
 	d := &fakeDeployer{}
 	_, err = Run(Request{ProjectDir: dir, LinkName: "prod", Manifest: linkedManifest()}, d)
-	require.ErrorContains(t, err, "prod.pem look like credentials")
+	require.ErrorContains(t, err, "prod.pem looks like credentials and is not tracked by git, and the image would carry it to a registry")
 	assert.Zero(t, d.imgDeploys)
 
 	_, err = Run(Request{ProjectDir: dir, LinkName: "prod", DagsOnly: true, Manifest: linkedManifest()}, d)
@@ -53,7 +53,7 @@ func TestRun_RefusesGitignoredCredentials(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, d.imgDeploys)
 	require.Len(t, warned, 1)
-	assert.Contains(t, warned[0], "build/out.txt")
+	assert.Contains(t, warned[0], "1 file that .gitignore ignores and .dockerignore does not, in build/.")
 }
 
 // The transport's warnings reach Request.Warn, and an image deploy whose DAGs

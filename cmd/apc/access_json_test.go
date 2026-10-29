@@ -96,7 +96,7 @@ func TestServiceAccountJSON(t *testing.T) {
 		api := newAccessClient()
 		api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: "dep-1", ServiceAccountID: "sa-1"}).Return(&houston.ServiceAccount{ID: "sa-1", Label: "ci"}, nil)
 
-		run := runAccess(t, api, "", "deployment", "service-account", "delete", "sa-1", "--deployment-id", "dep-1", "-o", "json")
+		run := runAccess(t, api, "", "deployment", "service-account", "delete", "sa-1", "--deployment-id", "dep-1", "--yes", "-o", "json")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		var got deploymentServiceAccountRemovalJSON
 		decodeAccess(t, run.stdout, &got)
@@ -104,7 +104,7 @@ func TestServiceAccountJSON(t *testing.T) {
 
 		api = newAccessClient()
 		api.On("DeleteWorkspaceServiceAccount", houston.DeleteServiceAccountRequest{WorkspaceID: accessWorkspaceID, ServiceAccountID: "sa-1"}).Return(&houston.ServiceAccount{ID: "sa-1", Label: "ci"}, nil)
-		run = runAccess(t, api, "", "workspace", "service-account", "delete", "sa-1", "--workspace-id", accessWorkspaceID, "-o", "json")
+		run = runAccess(t, api, "", "workspace", "service-account", "delete", "sa-1", "--workspace-id", accessWorkspaceID, "--yes", "-o", "json")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		var ws workspaceServiceAccountRemovalJSON
 		decodeAccess(t, run.stdout, &ws)
