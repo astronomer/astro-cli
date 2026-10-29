@@ -28,8 +28,9 @@ import (
 // installs, each package with the index, git commit or URL it comes from. The
 // helper keeps what the runtime image ships as it ships it, and writes the
 // runtime's install inputs: requirements.txt (the project's own dependencies at
-// the lock's versions, without Airflow; a package from a git, URL or non-PyPI
-// index source as a direct reference to the file the lock recorded),
+// the lock's versions, without Airflow; a package from git, a URL or the index
+// a [tool.uv.sources] entry routes it to as a direct reference to what the
+// lock recorded),
 // packages.txt ([tool.astro] packages, plus git when a dependency is fetched
 // with it), and a constraints file pinning every other locked package the image
 // does not already have, which requirements.txt names with -c. uv itself stays
