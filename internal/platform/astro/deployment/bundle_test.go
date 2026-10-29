@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/stretchr/testify/mock"
@@ -395,7 +397,9 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 	// succeeds, with what it knows.
 	for _, asJSON := range []bool{false, true} {
 		s.Run(fmt.Sprintf("create warns when it cannot find the bundle (json %t)", asJSON), func() {
-			out := &bytes.Buffer{}
+			out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+			bundleWarningsTo = func() io.Writer { return errOut }
+			s.T().Cleanup(func() { bundleWarningsTo = func() io.Writer { return os.Stderr } })
 			s.mockGetDeployment()
 			mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 			mockV1Alpha1Client.On("CreateBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(created, nil).Once()
@@ -404,8 +408,8 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 			err := CreateBundle(name, "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{JSON: asJSON, Out: out}, mockV1Client, mockV1Alpha1Client)
 			s.NoError(err)
 			if !asJSON {
-				s.Equal("Created bundle my-dags on deployment test-id-1\n"+
-					"Warning: the bundle was created, but it could not be read back: no Dag bundle named \"my-dags\" on deployment test-id-1\n", out.String())
+				s.Equal("Created bundle my-dags on deployment test-id-1\n", out.String(), "the warning stays out of the result's text")
+				s.Equal("Warning: the bundle was created, but it could not be read back: no Dag bundle named \"my-dags\" on deployment test-id-1\n", errOut.String())
 				return
 			}
 			var got map[string]any
@@ -418,7 +422,9 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 		})
 
 		s.Run(fmt.Sprintf("update warns when it cannot read the bundle (json %t)", asJSON), func() {
-			out := &bytes.Buffer{}
+			out, errOut := &bytes.Buffer{}, &bytes.Buffer{}
+			bundleWarningsTo = func() io.Writer { return errOut }
+			s.T().Cleanup(func() { bundleWarningsTo = func() io.Writer { return os.Stderr } })
 			s.mockGetDeployment()
 			mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 			mockV1Alpha1Client.On("UpdateBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1", mock.Anything).Return(updated, nil).Once()
@@ -429,8 +435,8 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 			err := UpdateBundle("bundle-1", "", "", "d", nil, ws, testBundleDeploymentID, testUtil.Renderer{JSON: asJSON, Out: out}, mockV1Client, mockV1Alpha1Client)
 			s.NoError(err)
 			if !asJSON {
-				s.Equal("Updated bundle bundle-1 on deployment test-id-1\n"+
-					"Warning: the bundle was updated, but it could not be read back: the API returned no bundle\n", out.String())
+				s.Equal("Updated bundle bundle-1 on deployment test-id-1\n", out.String(), "the warning stays out of the result's text")
+				s.Equal("Warning: the bundle was updated, but it could not be read back: the API returned no bundle\n", errOut.String())
 				return
 			}
 			var got map[string]any

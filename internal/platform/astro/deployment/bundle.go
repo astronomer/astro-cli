@@ -4,6 +4,7 @@ import (
 	httpContext "context"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -283,14 +284,19 @@ func emitBundleResult(r output.Emitter, result *BundleResult, verb string) error
 		if _, err := fmt.Fprintf(w, "%s bundle %s on deployment %s\n", verb, bundle, result.DeploymentID); err != nil {
 			return err
 		}
+		// Warnings go to stderr, not the result's text: colored there on a
+		// terminal, and out of piped output. json carries them as "warnings".
+		errOut := bundleWarningsTo()
 		for _, warning := range result.Warnings {
-			if _, err := fmt.Fprintln(w, ansi.WarningLabel(w), warning); err != nil {
-				return err
-			}
+			ansi.Warn(errOut, warning)
 		}
 		return nil
 	})
 }
+
+// bundleWarningsTo is where a bundle create's or update's text warnings go:
+// stderr. A test swaps it to read them.
+var bundleWarningsTo = func() io.Writer { return os.Stderr }
 
 // nonEmpty is s's address, or nil for "", for a field left out when empty.
 func nonEmpty(s string) *string {

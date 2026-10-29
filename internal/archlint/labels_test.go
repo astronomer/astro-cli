@@ -24,23 +24,26 @@ import (
 // the CLI's own label. A key is a file, or a file and one literal as written
 // in it. Each says why.
 var labelAllowed = map[string]string{
-	`pkg/container/command.go: "Error: "`: "parses the container engine's own output, which leads its errors with Error:",
-	`internal/pack/pack.go: "warning: "`: "the fallback for a pack.Request with no Warn hook: the warning rides the build's " +
+	"pkg/container/command.go: Error: ": "parses the container engine's own output, which leads its errors with Error:",
+	"internal/pack/pack.go: warning: ": "the fallback for a pack.Request with no Warn hook: the warning rides the build's " +
 		"progress stream as a log line's text, which a progress reader shows as is, not as a terminal label",
 }
 
 // labelLiteral matches a string that starts with a label the CLI prints
-// through cmd/cliout.
-var labelLiteral = regexp.MustCompile(`(?i)^(warning|error|note): `)
+// through cmd/cliout, after any leading whitespace or newlines, so
+// "\nWarning: …" is caught too.
+var labelLiteral = regexp.MustCompile(`(?i)^\s*(warning|error|note): `)
 
-// No non-test string literal outside cmd/cliout starts with a Warning, Error
-// or Note label, except what labelAllowed names.
+// No non-test string literal starts with a Warning, Error or Note label,
+// except what labelAllowed names. The labels themselves are built from the
+// bare words ("Warning:"), which this does not match. An allowlist key is a
+// file, or a file and the literal's unquoted value.
 func TestLabelsComeFromCliout(t *testing.T) {
 	root := repoRoot(t)
 	var problems []string
 	used := map[string]bool{}
 	for _, file := range trackedGoFiles(t, root) {
-		if !heldToPlainText(file) || strings.HasPrefix(file, "cmd/cliout/") {
+		if !heldToPlainText(file) {
 			continue
 		}
 		f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, filepath.FromSlash(file)), nil, parser.SkipObjectResolution)
@@ -52,7 +55,7 @@ func TestLabelsComeFromCliout(t *testing.T) {
 			if err != nil || !labelLiteral.MatchString(s) {
 				return
 			}
-			for _, key := range []string{file, file + ": " + lit.Value} {
+			for _, key := range []string{file, file + ": " + s} {
 				if _, ok := labelAllowed[key]; ok {
 					used[key] = true
 					return
