@@ -1,5 +1,5 @@
 # Written by the Astro CLI. Do not edit: `astro init` replaces this file.
-# astro-install-helper: 10
+# astro-install-helper: 11
 #
 # Runs inside the image build, on the runtime image's own Python. Reads the
 # project's pyproject.toml, and its uv.lock when there is one, and writes what
@@ -583,7 +583,7 @@ def airflow_mismatch(lock, installed, runtime):
     made_for = "Airflow %s" % locked + (" (Astro Runtime %s)" % runtime if runtime else "")
     return (
         "uv.lock was made for %s, and this image has Airflow %s, so the lock's versions install over another runtime than "
-        "the one they were resolved for: build FROM the runtime the lock was made for, or run `astro init` and `uv lock` "
+        "the one they were resolved for: build FROM the runtime the lock was made for, or run `astro init` "
         "to move the project to this runtime" % (made_for, installed.strip())
     )
 

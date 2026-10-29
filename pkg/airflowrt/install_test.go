@@ -45,6 +45,8 @@ var helperContentAtVersion = map[int]string{
 	// vendored copy) in place of its own evaluator; shorter prose. (#2394's
 	// own version 4, 373f3dbc…, is the same helper without the Airflow check.)
 	10: "e63c29660b49a9107092d9e97205533280b40c2a77701bbb13d79a7a90185706",
+	// The Airflow-mismatch warning says only to run astro init, which relocks.
+	11: "a698faee032795b637cbc83bad745149818a80acf5bc141405364cb4e7e13081",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {
