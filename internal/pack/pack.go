@@ -79,13 +79,28 @@ type Request struct {
 	// nil, or a nil catalog, builds on the runtime's default Python, and
 	// refuses an Airflow 2 project with no [tool.astro] runtime.
 	RuntimeCatalog func(ctx context.Context) *runtimeversions.Catalog
-	// Warn receives the warnings found before the image target builds: the
-	// files the image would carry (shipcheck.Survey) and the build secrets a
-	// declared Dockerfile mounts that nothing supplies. They are warnings,
-	// not progress, so the command shows them as its other warnings are, and
-	// they reach it even when the build is then refused. nil streams them as
-	// progress lines, "warning: …".
+	// Warn receives every warning the target gives, as it gives it, before
+	// the build and after it: the catalog's findings for a [tool.astro]
+	// runtime, the env warning, the files the image would carry
+	// (shipcheck.Survey), the build secrets a declared Dockerfile mounts that
+	// nothing supplies, and a built image's missing runtime label. They are
+	// warnings, not progress, so the command shows them as its other
+	// warnings are, and they reach it even when the build is then refused.
+	// Each is also kept on Result.Warnings. nil streams them as progress
+	// lines, "warning: …".
 	Warn func(string)
+	// Note receives what the image target notes before it builds and that is
+	// not wrong: the project's own linked worktrees it leaves out
+	// (shipcheck.LeftOutNote). nil streams it as a progress line.
+	Note func(string)
+}
+
+// note is Request.Note, or a progress line through cb when it is nil.
+func (r Request) note(cb localrt.Callbacks) func(string) {
+	if r.Note != nil {
+		return r.Note
+	}
+	return func(n string) { emit(cb, n) }
 }
 
 // warn is Request.Warn, or a progress line through cb when it is nil.

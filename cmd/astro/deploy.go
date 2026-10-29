@@ -316,6 +316,8 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
 		Warn: warn,
+		// A plain line on stderr, as the deploy's other notes are.
+		Note: func(msg string) { cliout.Note(errOut, msg) },
 		// Resolved once, when a deploy that builds first needs it, and
 		// shared by the checks and the transport.
 		Engine: onceEngine(astrodeploy.ResolveContainerEngine),

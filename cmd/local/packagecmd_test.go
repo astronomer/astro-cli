@@ -43,6 +43,23 @@ func TestEmitWarningIsAWarningOnStderr(t *testing.T) {
 	}
 }
 
+// A Renderer whose Format nobody mapped (an unbound flag's "", an extra like
+// yaml) is a programming error, and a warning through it panics rather than
+// render as text.
+func TestEmitWarningPanicsOnAnUnmappedFormat(t *testing.T) {
+	for _, format := range []cliout.Format{"", "yaml"} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("format %q: emitWarning did not panic", format)
+				}
+			}()
+			var out bytes.Buffer
+			emitWarning(cliout.Renderer{Format: format, Out: &out}, event{Event: "warning", Text: "x"})
+		}()
+	}
+}
+
 // writeManifest drops a minimal valid manifest in dir and points the deps'
 // WorkingDir at it, so `astro package` discovers a project.
 func writeManifest(t *testing.T, d *Deps, dir string) {

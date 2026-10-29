@@ -116,11 +116,13 @@ func agree(n int, one, many string) string {
 
 // Err refuses a build that would put credentials in an image bound for a
 // registry: carried files that look like credentials and that git does not
-// track, ones reached through a link out of the project, and git metadata
-// whose config holds one. nil when there are none.
+// track, ones reached through a link out of the project, ones inside another
+// git checkout, and git metadata whose config holds one. Every reason found
+// is in the one refusal, so fixing it fixes the build. nil when there are
+// none.
 func (r *Report) Err() error {
 	inCheckout, own := r.byCheckout(r.Secrets)
-	var why []string
+	var sentences, why []string
 	if n := len(own); n > 0 {
 		why = append(why, fmt.Sprintf("%s %s and %s not tracked by git",
 			cappedList(own), agree(n, "looks like credentials", "look like credentials"), agree(n, "is", "are")))
@@ -131,21 +133,26 @@ func (r *Report) Err() error {
 	}
 	if len(why) > 0 {
 		it := agree(len(own)+len(r.Outside), "it", "them")
-		msg := fmt.Sprintf("refusing to build: %s, and the image would carry %s to a registry. Add %s to %s, or remove %s from the project",
-			strings.Join(why, "; "), it, it, r.IgnoreFile, it)
-		if len(inCheckout) > 0 {
-			msg += ". " + r.checkoutAdvice(inCheckout)
-		}
-		return fmt.Errorf("%s, and try again", msg)
+		sentences = append(sentences, fmt.Sprintf("%s, and the image would carry %s to a registry. Add %s to %s, or remove %s from the project",
+			strings.Join(why, "; "), it, it, r.IgnoreFile, it))
 	}
 	if len(inCheckout) > 0 {
-		return fmt.Errorf("refusing to build: %s, and try again", r.checkoutAdvice(inCheckout))
+		sentences = append(sentences, r.checkoutAdvice(inCheckout))
 	}
 	if n := len(r.VCSSecrets); n > 0 {
-		return fmt.Errorf("refusing to build: the git %s under %s %s (an extraheader, or a URL with a password or a known token in it), and the image would carry %s to a registry. Add **/.git to %s and try again",
-			agree(n, "config", "configs"), cappedList(r.VCSSecrets), agree(n, "holds a credential", "hold credentials"), agree(n, "it", "them"), r.IgnoreFile)
+		// It follows "refusing to build: " in lower case, and starts a
+		// sentence of its own after another reason.
+		the := "the"
+		if len(sentences) > 0 {
+			the = "The"
+		}
+		sentences = append(sentences, fmt.Sprintf("%s git %s under %s %s (an extraheader, or a URL with a password or a known token in it), and the image would carry %s to a registry. Add **/.git to %s",
+			the, agree(n, "config", "configs"), cappedList(r.VCSSecrets), agree(n, "holds a credential", "hold credentials"), agree(n, "it", "them"), r.IgnoreFile))
 	}
-	return nil
+	if len(sentences) == 0 {
+		return nil
+	}
+	return fmt.Errorf("refusing to build: %s, and try again", strings.Join(sentences, ". "))
 }
 
 // byCheckout splits files into those inside one of the nested checkouts a
@@ -189,6 +196,25 @@ func (r *Report) checkoutAdvice(inCheckout map[string][]string) string {
 	return fmt.Sprintf("%s %s and %s in %s, %s inside the project, which the image would carry to a registry. Add %s to %s",
 		cappedList(files), agree(n, "looks like credentials", "look like credentials"), agree(n, "sits", "sit"),
 		joinAnd(dirs), agree(d, "another git checkout", "other git checkouts"), joinAnd(dirs), r.IgnoreFile)
+}
+
+// LeftOutNote says which linked worktrees of the project's own repository a
+// generated build left out (imagebuild.ProjectSurvey.LeftOut), summarized as
+// the gitignored warning is: a count and at most three places. It is a note,
+// not a warning: nothing is wrong, and the image is the project without a
+// second copy of itself. "" when none were.
+func LeftOutNote(survey *imagebuild.ProjectSurvey) string {
+	n := len(survey.LeftOut)
+	if n == 0 {
+		return ""
+	}
+	// Each is a directory: with its slash, one at the root is named as one.
+	dirs := make([]string, n)
+	for i, d := range survey.LeftOut {
+		dirs[i] = d + "/"
+	}
+	return fmt.Sprintf("left out %s of this repository, in %s",
+		agree(n, "1 git worktree", fmt.Sprintf("%d git worktrees", n)), placesOf(dirs, survey.Files))
 }
 
 // CosmosBoostWarning is the warning for the Cosmos Boost files an earlier

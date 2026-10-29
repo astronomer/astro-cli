@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/internal/deploybuild"
+	"github.com/astronomer/astro-cli/internal/shipcheck"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -104,6 +105,10 @@ type Request struct {
 	// Warn reports a finding the deploy goes ahead despite, as a sentence.
 	// nil drops it.
 	Warn func(string)
+	// Note reports something the deploy did that is worth knowing but not a
+	// warning: the linked worktrees of the project's own repository a
+	// generated image leaves out (shipcheck.LeftOutNote). nil drops it.
+	Note func(string)
 	// Engine resolves the container engine that will build the image: its
 	// CLI and the env that reaches its daemon. cmd hands the same memoized
 	// resolver to the transport, so the engine is resolved once. It is
@@ -352,6 +357,11 @@ func Run(req Request, d Deployer) (Result, error) {
 	missingSecrets, survey, err := checkImageSource(req)
 	if err != nil {
 		return Result{}, err
+	}
+	if req.Note != nil && survey != nil {
+		if note := shipcheck.LeftOutNote(survey); note != "" {
+			req.Note(note)
+		}
 	}
 
 	target, err := resolveTarget(req, d)

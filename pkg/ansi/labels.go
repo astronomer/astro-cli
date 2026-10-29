@@ -3,7 +3,6 @@ package ansi
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/logrusorgru/aurora"
 )
@@ -14,9 +13,9 @@ import (
 // these same functions under the names cmd/ uses.
 //
 // Every label follows one rule (labelFor): it is colored when it is written
-// to the process's stdout (Output) or stderr (Messages) and that stream colors,
-// by that stream's own palette, and NO_COLOR is unset or empty. Anywhere else
-// (a buffer, a file, another writer) it is plain text.
+// to the process's stdout (Output) or stderr (Messages) and that stream's
+// palette colors (shouldColor: a terminal, the CLICOLOR variables, NO_COLOR).
+// Anywhere else (a buffer, a file, another writer) it is plain text.
 
 // ErrorPrefix is the label that leads a command's error: cobra's own error
 // prefix, which a command that sets none reports.
@@ -61,11 +60,12 @@ func NextLabel(w io.Writer) string {
 	return labelFor(w, "Next:", Palette.Cyan)
 }
 
-// labelFor colors text by the palette of the stream w is, and leaves it plain
-// on any other writer or under NO_COLOR (no-color.org).
+// labelFor colors text by the palette of the stream w is, which leaves it
+// plain where that stream does not color (NO_COLOR among them), and leaves it
+// plain on any other writer.
 func labelFor(w io.Writer, text string, color func(Palette, string) string) string {
 	p, ok := paletteFor(w)
-	if !ok || os.Getenv("NO_COLOR") != "" {
+	if !ok {
 		return text
 	}
 	return color(p, text)
