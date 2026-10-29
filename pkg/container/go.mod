@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/container
 
-go 1.26.1
+go 1.26.10
 
 require github.com/stretchr/testify v1.11.1
 

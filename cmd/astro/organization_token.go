@@ -113,7 +113,7 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 	if !forceRotate {
 		ok, err := confirmTokenChange(
-			"WARNING: API Token rotation will invalidate the current token and cannot be undone.",
+			"API Token rotation will invalidate the current token and cannot be undone.",
 			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
 		if err != nil {
 			return err
@@ -143,7 +143,7 @@ func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 		return err
 	}
 	if !forceDelete {
-		ok, err := confirmTokenChange("WARNING: API token deletion cannot be undone.",
+		ok, err := confirmTokenChange("API token deletion cannot be undone.",
 			fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name)))
 		if err != nil {
 			return err

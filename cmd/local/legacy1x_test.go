@@ -39,8 +39,8 @@ func (s runningOn) ReadStatus(dir string) (localrt.Status, error) {
 
 const (
 	portReason3 = "set to 8099, but it is an Astro CLI 1.x setting v2 does not read. To start on 8099, run astro local start --port 8099."
-	portWarning = "warning: " + legacyConfigFile + ": api-server.port: " + portReason3 + "\n"
-	secretsNote = "warning: " + legacyConfigFile + ": dev.build_secrets: set, but it is an Astro CLI 1.x setting v2 does not apply. " +
+	portWarning = "Warning: " + legacyConfigFile + ": api-server.port: " + portReason3 + "\n"
+	secretsNote = "Warning: " + legacyConfigFile + ": dev.build_secrets: set, but it is an Astro CLI 1.x setting v2 does not apply. " +
 		fakeReplacement + "\n"
 )
 
@@ -68,7 +68,7 @@ func TestStartWarnsOf1xPort(t *testing.T) {
 		{
 			name:       "airflow 2",
 			legacyCase: legacyCase{args: []string{"local", "start"}, airflow: "2.10", settings: both},
-			want: "warning: " + legacyConfigFile + ": webserver.port: set to 8100, but it is an Astro CLI 1.x setting v2 does not read. " +
+			want: "Warning: " + legacyConfigFile + ": webserver.port: set to 8100, but it is an Astro CLI 1.x setting v2 does not read. " +
 				"To start on 8100, run astro local start --port 8100.\n",
 		},
 		{name: "the other generation's key", legacyCase: legacyCase{args: []string{"local", "start"}, settings: map[string]string{legacyWebserverPort: "8100"}}},
@@ -77,7 +77,7 @@ func TestStartWarnsOf1xPort(t *testing.T) {
 		{
 			name:       "not a port",
 			legacyCase: legacyCase{args: []string{"local", "start"}, settings: map[string]string{legacyAPIServerPort: "99999"}},
-			want: "warning: " + legacyConfigFile + `: api-server.port: set to "99999", which is not a valid port, and it is an Astro CLI 1.x setting v2 does not read. ` +
+			want: "Warning: " + legacyConfigFile + `: api-server.port: set to "99999", which is not a valid port, and it is an Astro CLI 1.x setting v2 does not read. ` +
 				fakeReplacement + "\n",
 		},
 		{name: "overridden by --port", legacyCase: legacyCase{args: []string{"local", "start", "--port", "8099"}, settings: both}},
@@ -228,19 +228,21 @@ func runWithLegacySettings(t *testing.T, tc legacyCase) (stdout, stderr string) 
 // 1.x warning when want is empty.
 func assertLegacyWarning(t *testing.T, stdout, stderr, want string) {
 	t.Helper()
-	if strings.Contains(stderr, "Astro CLI 1.x") {
-		t.Errorf("a 1.x warning reached stderr rather than the start's own warnings: %q", stderr)
+	// A 1.x setting is one of the start's own warnings (emitWarning), which in
+	// text are "Warning:" lines on stderr, never the command's output.
+	if strings.Contains(stdout, "Astro CLI 1.x") {
+		t.Errorf("a 1.x warning reached stdout, as if it were the start's output: %q", stdout)
 	}
 	if want == "" {
-		if strings.Contains(stdout, "Astro CLI 1.x") {
-			t.Errorf("output carries a 1.x warning it should not: %q", stdout)
+		if strings.Contains(stderr, "Astro CLI 1.x") {
+			t.Errorf("stderr carries a 1.x warning it should not: %q", stderr)
 		}
 		return
 	}
-	if !strings.Contains(stdout, want) {
-		t.Errorf("output = %q, want it to carry %q", stdout, want)
+	if !strings.Contains(stderr, want) {
+		t.Errorf("stderr = %q, want it to carry %q", stderr, want)
 	}
-	if n := strings.Count(stdout, "Astro CLI 1.x"); n != 1 {
-		t.Errorf("output carries %d 1.x warnings, want 1: %q", n, stdout)
+	if n := strings.Count(stderr, "Astro CLI 1.x"); n != 1 {
+		t.Errorf("stderr carries %d 1.x warnings, want 1: %q", n, stderr)
 	}
 }

@@ -188,7 +188,7 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
 		return err
 	}
 	if envIncludeSecrets {
-		fmt.Fprintln(os.Stderr, includeSecretsWarning)
+		cliout.Warn(os.Stderr, includeSecretsWarning)
 	}
 	if f == formatDotenv {
 		return env.WriteVarDotenv(objs, envIncludeSecrets, out)

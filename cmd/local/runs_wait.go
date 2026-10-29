@@ -15,7 +15,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
-// The exit statuses of `runs trigger-wait`, one per way the wait can end.
+// The exit statuses of the waits — `runs trigger-wait`, `runs wait` and
+// `tasks wait` — one per way a wait can end.
 // Success is zero like any command. A run that failed and a wait that ran out
 // are both something a script has to act on, and they call for different
 // actions — look at the failure, or wait longer — so they get a status each
@@ -51,7 +52,7 @@ func runFinished(state string) bool {
 
 func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 	var opts triggerFlags
-	var timeout, poll string
+	var timing waitFlags
 	cmd := &cobra.Command{
 		Use:   "trigger-wait <DAG_ID>",
 		Short: "Start a run of a Dag and wait for it to finish",
@@ -75,21 +76,15 @@ func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			var wait waitOptions
-			if wait.timeout, err = parseWait("--timeout", timeout); err != nil {
-				return err
-			}
-			if wait.poll, err = parseWait("--poll-interval", poll); err != nil {
+			wait, err := timing.options()
+			if err != nil {
 				return err
 			}
 			return q.runRunsTriggerWait(cmd.Context(), args[0], trigger, !opts.noAutoUnpause, wait)
 		},
 	}
 	opts.register(cmd)
-	// -t is --tags across this tree (TestShorthandsMeanOneThingEachAcrossTheCoreTree),
-	// so --timeout has no shorthand here.
-	cmd.Flags().StringVar(&timeout, "timeout", defaultWaitTimeout, "How long to wait before giving up, in seconds or as a duration")
-	cmd.Flags().StringVarP(&poll, "poll-interval", "p", defaultPollInterval, "How often to check on the run, in seconds or as a duration")
+	timing.register(cmd)
 	return cmd
 }
 
@@ -97,6 +92,30 @@ func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 type waitOptions struct {
 	timeout time.Duration
 	poll    time.Duration
+}
+
+// waitFlags is --timeout and --poll-interval, which every wait takes.
+type waitFlags struct {
+	timeout, poll string
+}
+
+func (f *waitFlags) register(cmd *cobra.Command) {
+	// -t is --tags across this tree (TestShorthandsMeanOneThingEachAcrossTheCoreTree),
+	// so --timeout has no shorthand here.
+	cmd.Flags().StringVar(&f.timeout, "timeout", defaultWaitTimeout, "How long to wait before giving up, in seconds or as a duration")
+	cmd.Flags().StringVarP(&f.poll, "poll-interval", "p", defaultPollInterval, "How often to check, in seconds or as a duration")
+}
+
+func (f *waitFlags) options() (waitOptions, error) {
+	var wait waitOptions
+	var err error
+	if wait.timeout, err = parseWait("--timeout", f.timeout); err != nil {
+		return waitOptions{}, err
+	}
+	if wait.poll, err = parseWait("--poll-interval", f.poll); err != nil {
+		return waitOptions{}, err
+	}
+	return wait, nil
 }
 
 // parseWait reads a wait flag. A bare number is seconds, which is how these
@@ -148,6 +167,10 @@ func (q *query) runRunsTriggerWait(ctx context.Context, dagID string, trigger ai
 	if err != nil {
 		return err
 	}
+	// The Dag is the one asked for, whatever the trigger's answer carried:
+	// the checks and the failed-task listing address it by this id, as
+	// `runs wait` does with its arguments.
+	run.DAGID = dagID
 	started := time.Now()
 	fmt.Fprintf(q.d.Stderr, "triggered %s run %s; waiting up to %s for it to finish\n", dagID, run.DAGRunID, formatDuration(wait.timeout.Seconds()))
 
@@ -155,6 +178,12 @@ func (q *query) runRunsTriggerWait(ctx context.Context, dagID string, trigger ai
 	if err != nil {
 		return err
 	}
+	return q.reportWaitedRun(ctx, r, client, run, unpaused, timedOut, started)
+}
+
+// reportWaitedRun emits a finished wait on a run and ends with the exit status
+// that says how it ended.
+func (q *query) reportWaitedRun(ctx context.Context, r cliout.Renderer, client *airflowapi.Client, run airflowapi.DAGRun, unpaused, timedOut bool, started time.Time) error {
 	result := waitedRun{
 		runRow:         newRunRow(run),
 		Unpaused:       unpaused,
@@ -162,7 +191,7 @@ func (q *query) runRunsTriggerWait(ctx context.Context, dagID string, trigger ai
 		ElapsedSeconds: hundredths(time.Since(started).Seconds()),
 	}
 	if !timedOut && run.State != stateSuccess {
-		result.FailedTasks = q.failedTasks(ctx, client, dagID, run.DAGRunID)
+		result.FailedTasks = q.failedTasks(ctx, client, run.DAGID, run.DAGRunID)
 	}
 	if err := r.Emit(result, func(w io.Writer) error { return q.renderWaitedRun(w, result) }); err != nil {
 		return err
@@ -174,6 +203,16 @@ func (q *query) runRunsTriggerWait(ctx context.Context, dagID string, trigger ai
 		return &cliout.ExitError{Code: exitRunFailed}
 	}
 	return nil
+}
+
+// afterElapsed is " after <how long>" for a wait that took any measurable
+// time, and nothing for a run that had already finished when the wait began,
+// which a "0s" would misreport as a wait.
+func afterElapsed(seconds float64) string {
+	if elapsed := formatDuration(seconds); elapsed != "" {
+		return " after " + elapsed
+	}
+	return ""
 }
 
 // hundredths rounds seconds to two places, which is as fine as a wait measured
@@ -230,8 +269,8 @@ func (q *query) renderWaitedRun(w io.Writer, result waitedRun) error {
 			q.t.suggest("runs get "+result.DAGID+" "+result.RunID))
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "%s run %s: %s after %s\n",
-		result.DAGID, result.RunID, result.State, formatDuration(result.ElapsedSeconds)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s run %s: %s%s\n",
+		result.DAGID, result.RunID, result.State, afterElapsed(result.ElapsedSeconds)); err != nil {
 		return err
 	}
 	if result.State == stateSuccess {
@@ -321,4 +360,54 @@ func (q *query) renderFailedTasks(w io.Writer, dagID, runID string, failed []tas
 		return err
 	}
 	return nil
+}
+
+func newRunsWaitCmd(q *query) *cobra.Command {
+	var timing waitFlags
+	cmd := &cobra.Command{
+		Use:   "wait <DAG_ID> <RUN_ID>",
+		Short: "Wait for a run already going to finish",
+		Long: "Check on a run every --poll-interval until it succeeds, fails, or --timeout passes, and report it " +
+			"as " + q.t.suggest("runs trigger-wait") + " does. It waits on a run that is already going, such as a " +
+			"scheduled one. To wait on one task of a run instead, see " + q.t.suggest("tasks wait") + ".\n\n" +
+			"--timeout and --poll-interval take a number of seconds (300) or a duration (5m, 1h30m).\n\n" +
+			"Exit status: 0 when the run succeeded, " + strconv.Itoa(exitRunFailed) + " when it failed (or the " +
+			"command itself did), " + strconv.Itoa(exitWaitTimeout) + " when the wait timed out. Stopping the " +
+			"wait never stops the run.",
+		Args: cobra.ExactArgs(2),
+		Example: afExample(q.t,
+			"Wait for a run to finish", "runs wait <DAG_ID> <RUN_ID>",
+			"Give up waiting after ten minutes", "runs wait <DAG_ID> <RUN_ID> --timeout 10m",
+		),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			wait, err := timing.options()
+			if err != nil {
+				return err
+			}
+			return q.runRunsWait(cmd.Context(), args[0], args[1], wait)
+		},
+	}
+	timing.register(cmd)
+	return cmd
+}
+
+func (q *query) runRunsWait(ctx context.Context, dagID, runID string, wait waitOptions) error {
+	r, client, err := q.open(ctx)
+	if err != nil {
+		return err
+	}
+	run, err := client.GetDAGRun(ctx, dagID, runID)
+	if err != nil {
+		return err
+	}
+	run.DAGID, run.DAGRunID = dagID, runID
+	started := time.Now()
+	if !runFinished(run.State) {
+		fmt.Fprintf(q.d.Stderr, "%s run %s is %s; waiting up to %s for it to finish\n", dagID, runID, run.State, formatDuration(wait.timeout.Seconds()))
+	}
+	run, timedOut, err := q.awaitRun(ctx, client, run, started.Add(wait.timeout), wait.poll)
+	if err != nil {
+		return err
+	}
+	return q.reportWaitedRun(ctx, r, client, run, false, timedOut, started)
 }

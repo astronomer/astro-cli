@@ -540,6 +540,7 @@ func (s *Suite) TestDelete() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseOK, nil).Once()
+		defer testUtil.MockUserInput(s.T(), "y")()
 		got, err := Delete(team1.Id, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
@@ -573,6 +574,26 @@ func (s *Suite) TestDelete() {
 		s.Equal(Deleted, got.Action)
 	})
 
+	s.Run("a team that is not IdP-managed is asked about too", func() {
+		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
+		defer testUtil.MockUserInput(s.T(), "n")()
+		got, err := Delete(team1.Id, false, mockClient)
+		s.NoError(err)
+		s.Nil(got, "declined, so nothing to report")
+	})
+
+	s.Run("a question that may not be asked is refused, naming --yes", func() {
+		restore := input.SetGuard(func() string { return "with --output json it cannot" })
+		defer restore()
+		// Refused before the team is read: the mock expects nothing.
+		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
+		got, err := Delete(team1.Id, false, mockClient)
+		s.True(input.IsRequired(err), "got %v", err)
+		s.ErrorContains(err, "--yes")
+		s.Nil(got)
+	})
+
 	s.Run("error path user reject delete", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
@@ -588,7 +609,8 @@ func (s *Suite) TestDelete() {
 		defer restore()
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseOK, nil).Once()
-		got, err := Delete("", false, mockClient)
+		// --yes, so the picker is what refuses, not the confirmation.
+		got, err := Delete("", true, mockClient)
 		s.True(input.IsRequired(err), "got %v", err)
 		s.Nil(got)
 	})
@@ -611,7 +633,7 @@ func (s *Suite) TestDelete() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := Delete(team1.Id, false, mockClient)
+		_, err := Delete(team1.Id, true, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -619,7 +641,7 @@ func (s *Suite) TestDelete() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseError, nil).Once()
-		_, err := Delete(team1.Id, false, mockClient)
+		_, err := Delete(team1.Id, true, mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 
@@ -648,7 +670,8 @@ func (s *Suite) TestDelete() {
 
 		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseOK, nil).Once()
 
-		got, err := Delete("", false, mockClient)
+		// The picker is under test, not the question after it.
+		got, err := Delete("", true, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(team1.Id, got.ID)

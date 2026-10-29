@@ -340,6 +340,33 @@ func (s *Suite) TestDeploymentCreateCommandGitSyncDisabledAndVersionIs1_0_0AndCl
 	}
 }
 
+func (s *Suite) TestDeploymentCreateCommandAppConfigLookupFails() {
+	appConfig = &houston.AppConfig{}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig", mock.Anything).Return(nil, errMockHouston)
+	api.On("GetPlatformVersion", nil).Return("1.0.0", nil)
+
+	houstonClient = api
+	_, err := execDeploymentCmd("create", "--label=new-deployment-name", "--executor=celery", "--cluster-id=cluster-test-id")
+	s.EqualError(err, "failed to get app config: "+errMockHouston.Error())
+	api.AssertNotCalled(s.T(), "CreateDeployment", mock.Anything)
+}
+
+func (s *Suite) TestDeploymentCreateCommandNoAppConfig() {
+	previousAppConfig, previousClient := appConfig, houstonClient
+	defer func() { appConfig, houstonClient = previousAppConfig, previousClient }()
+	appConfig = nil
+
+	api := new(mocks.ClientInterface)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
+
+	houstonClient = api
+	_, err := execDeploymentCmd("create", "--label=new-deployment-name", "--executor=celery")
+	s.ErrorIs(err, errNoAppConfig)
+	api.AssertNotCalled(s.T(), "CreateDeployment", mock.Anything)
+}
+
 func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 	s.Run("user should not be prompted if deployment type is not dag_deploy", func() {
 		appConfig = &houston.AppConfig{
@@ -984,7 +1011,7 @@ func (s *Suite) TestDeploymentAdopt() {
 		}).Return(mockAdoptedDeployment, nil)
 
 		houstonClient = api
-		output, err := execDeploymentCmd("adopt", "--cluster-id=cluster-test-id", "--name=prod-airflow-4", "--namespace=airflow-prod4")
+		output, err := execDeploymentCmd("adopt", "--cluster-id=cluster-test-id", "--cr-name=prod-airflow-4", "--namespace=airflow-prod4")
 		s.NoError(err)
 		s.Contains(output, expectedOut)
 		s.Contains(output, mockAdoptedDeployment.ReleaseName)
@@ -1011,7 +1038,7 @@ func (s *Suite) TestDeploymentAdopt() {
 			"adopt",
 			"--workspace-id=some-other-workspace-id",
 			"--cluster-id=cluster-test-id",
-			"--name=prod-airflow-4",
+			"--cr-name=prod-airflow-4",
 			"--namespace=airflow-prod4",
 			"--label=My Adopted Deployment",
 			"--description=adopted from standalone operator",
@@ -1032,9 +1059,9 @@ func (s *Suite) TestDeploymentAdopt() {
 			cmdArgs       []string
 			expectedError string
 		}{
-			{cmdArgs: []string{"adopt", "--name=prod-airflow-4", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "cluster-id" not set`},
-			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "name" not set`},
-			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--name=prod-airflow-4"}, expectedError: `required flag(s) "namespace" not set`},
+			{cmdArgs: []string{"adopt", "--cr-name=prod-airflow-4", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "cluster-id" not set`},
+			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--namespace=airflow-prod4"}, expectedError: `required flag(s) "cr-name" not set`},
+			{cmdArgs: []string{"adopt", "--cluster-id=cluster-test-id", "--cr-name=prod-airflow-4"}, expectedError: `required flag(s) "namespace" not set`},
 		}
 		for _, tt := range myTests {
 			houstonClient = api
@@ -1049,7 +1076,7 @@ func (s *Suite) TestDeploymentAdopt() {
 		api.On("AdoptDeployment", mock.Anything).Return(nil, errMockHouston)
 
 		houstonClient = api
-		_, err := execDeploymentCmd("adopt", "--cluster-id=cluster-test-id", "--name=prod-airflow-4", "--namespace=airflow-prod4")
+		_, err := execDeploymentCmd("adopt", "--cluster-id=cluster-test-id", "--cr-name=prod-airflow-4", "--namespace=airflow-prod4")
 		s.EqualError(err, errMockHouston.Error())
 	})
 }
@@ -1095,7 +1122,7 @@ func (s *Suite) TestDeploymentUnadopt() {
 
 		houstonClient = api
 		_, err := execDeploymentCmd("unadopt")
-		s.EqualError(err, `required flag(s) "deployment-id" not set`)
+		s.EqualError(err, `required flag(s) "deployment" not set`)
 	})
 
 	s.Run("api error", func() {

@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/localrt
 
-go 1.26.1
+go 1.26.10
 
 // The engines under internal/ need these. All six are declared in
 // docs/architecture.md's exception list (localrt -> airflowrt predates this

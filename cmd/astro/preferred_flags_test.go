@@ -20,6 +20,13 @@ import (
 
 const unlinkedDep = "clunlinkeddeployment00001"
 
+// applyPreferredFlags is the hook every runnable Astro command runs once its
+// flags are parsed (applyPreferredFlagsIn), for a test that parses them
+// itself.
+func applyPreferredFlags(cmd *cobra.Command, args []string) error {
+	return utils.ApplyPreferredFlags(cmd, args, resolveDeploymentFlag)
+}
+
 // parsePreferred finds the command args names under root, parses its flags
 // and runs the hook every Astro command runs once they are parsed. It puts
 // back what the hook and the flags set.

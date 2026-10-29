@@ -190,7 +190,7 @@ func TestWorkspaceTextIsUnchanged(t *testing.T) {
 		}, []string{"workspace", "update", wsOther.ID, "--label", "renamed"}, " NAME        ID                            \n renamed     ckbv8pwbq00wk0760us7ktcgd     \n\n Successfully updated workspace\n"},
 		{"delete", func(a *mocks.ClientInterface) {
 			a.On("DeleteWorkspace", wsOther.ID).Return(&wsOther, nil)
-		}, []string{"workspace", "delete", wsOther.ID}, "\n Successfully deleted workspace\n"},
+		}, []string{"workspace", "delete", wsOther.ID, "--yes"}, "\n Successfully deleted workspace\n"},
 		{"switch shows the context it left", func(a *mocks.ClientInterface) {
 			a.On("ValidateWorkspaceID", wsOther.ID).Return(&wsOther, nil)
 		}, []string{"workspace", "switch", wsOther.ID}, contextTable},
@@ -303,7 +303,7 @@ func TestWorkspaceDeleteJSON(t *testing.T) {
 		// Houston answers with the record it removed: id, label and description.
 		api.On("DeleteWorkspace", wsOther.ID).Return(&houston.Workspace{ID: wsOther.ID, Label: wsOther.Label, Description: wsOther.Description}, nil)
 
-		got := runWorkspaceTree(t, api, "", true, "workspace", "delete", wsOther.ID, "-o", "json")
+		got := runWorkspaceTree(t, api, "", true, "workspace", "delete", wsOther.ID, "--yes", "-o", "json")
 		require.Equal(t, 0, got.code, "stdout:\n%s", got.stdout)
 		var r workspaceRemovalJSON
 		decodeWorkspaceOutput(t, got.stdout, &r)
@@ -317,7 +317,7 @@ func TestWorkspaceDeleteJSON(t *testing.T) {
 		// Houston refuses rather than deleting.
 		api.On("DeleteWorkspace", wsOther.ID).Return(nil, errors.New("You must first deprovision all deployments before you can delete your workspace."))
 
-		got := runWorkspaceTree(t, api, "", true, "workspace", "delete", wsOther.ID, "-o", "json")
+		got := runWorkspaceTree(t, api, "", true, "workspace", "delete", wsOther.ID, "--yes", "-o", "json")
 		assert.Equal(t, 1, got.code)
 		var e wsErrorObject
 		decodeWorkspaceOutput(t, got.stdout, &e)
@@ -408,7 +408,7 @@ func TestWorkspaceJSONReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 		}, []string{"workspace", "update", wsOther.ID, "-l", "second", "-o", "json"}},
 		{"delete", func(a *mocks.ClientInterface) {
 			a.On("DeleteWorkspace", wsOther.ID).Return(&wsOther, nil)
-		}, []string{"workspace", "delete", wsOther.ID, "-o", "json"}},
+		}, []string{"workspace", "delete", wsOther.ID, "--yes", "-o", "json"}},
 		{"switch", func(a *mocks.ClientInterface) {
 			a.On("ValidateWorkspaceID", wsOther.ID).Return(&wsOther, nil)
 		}, []string{"workspace", "switch", wsOther.ID, "-o", "json"}},

@@ -502,45 +502,43 @@ func (s *Suite) TestGetDeployment() {
 		mockV1Client.AssertExpectations(s.T())
 	})
 
+	// A name is not unique: several of it are refused, naming their ids,
+	// rather than acting on the first, and nothing is fetched.
 	s.Run("two deployments with the same name", func() {
-		mockCoreDeploymentResponse = []astrov1.Deployment{
-			{
-				Id:            "test-id-1",
-				Name:          "test",
-				Status:        "HEALTHY",
-				Type:          &standardType,
-				Region:        &testRegion,
-				CloudProvider: &testProvider,
-				WorkspaceName: &workspace1.Name,
-			},
-			{
-				Id:            "test-id-2",
-				Name:          "test",
-				Status:        "HEALTHY",
-				Type:          &hybridType,
-				ClusterName:   &testCluster,
-				WorkspaceName: &workspace1.Name,
-			},
+		sameName := astrov1.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200: &astrov1.DeploymentsPaginated{Deployments: []astrov1.Deployment{
+				{Id: "test-id-1", Name: "test", Status: "HEALTHY", Type: &standardType, WorkspaceName: &workspace1.Name},
+				{Id: "test-id-2", Name: "test", Status: "HEALTHY", Type: &hybridType, WorkspaceName: &workspace1.Name},
+				{Id: "test-id-3", Name: "other", Status: "HEALTHY", Type: &standardType, WorkspaceName: &workspace1.Name},
+			}},
 		}
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&sameName, nil).Once()
 
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		_, err := GetDeployment(ws, "", deploymentName, false, nil, mockV1Client)
+		s.EqualError(err, `2 Deployments are named "test" in workspace `+ws+`: pass --deployment with one's id (test-id-1, test-id-2)`)
+		var nameErr *NameError
+		s.ErrorAs(err, &nameErr)
 
-		// Mock os.Stdin
-		input := []byte("1")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(input)
+		mockV1Client.AssertExpectations(s.T())
+	})
+
+	// hibernate and wake-up act on development Deployments alone, so only
+	// those of the name count: one is that Deployment, not an ambiguity.
+	s.Run("two of the same name, one the command can act on", func() {
+		notDev := false
+		sameName := astrov1.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200: &astrov1.DeploymentsPaginated{Deployments: []astrov1.Deployment{
+				{Id: "test-id-1", Name: "test", Status: "HEALTHY", IsDevelopmentMode: &notDev},
+				{Id: "test-id-dev", Name: "test", Status: "HEALTHY", IsDevelopmentMode: &isDevelopmentMode},
+			}},
+		}
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&sameName, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-id-dev").Return(&deploymentResponse, nil).Once()
+
+		_, err := GetDeployment(ws, "", deploymentName, false, isDevelopmentDeployment, mockV1Client)
 		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
-		deployment, err := GetDeployment(ws, "", deploymentName, false, nil, mockV1Client)
-		s.NoError(err)
-		s.Equal(deploymentName, deployment.Name)
 
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -2168,7 +2166,8 @@ func (s *Suite) TestUpdate() {
 		s.ErrorContains(err, "the Deployment specified was not found in this workspace.")
 		// invalid name
 		_, err = Update("", "", ws, "update", "invalid-name", "enable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
-		s.ErrorContains(err, "the Deployment specified was not found in this workspace.")
+		s.ErrorContains(err, `no Deployment named "invalid-name" in workspace `+ws)
+		s.ErrorIs(err, errInvalidDeployment)
 
 		// mock os.Stdin
 		// Mock user input for deployment name

@@ -74,7 +74,7 @@ func failedAfterResult(cmd *cobra.Command, format cliout.Format, err error) erro
 	if err == nil || format != cliout.FormatJSON {
 		return err
 	}
-	fmt.Fprintln(cmd.ErrOrStderr(), "Error: "+err.Error())
+	fmt.Fprintln(cmd.ErrOrStderr(), cliout.ErrorLabel(cmd.ErrOrStderr()), err.Error())
 	return cliout.JSONShown(err)
 }
 

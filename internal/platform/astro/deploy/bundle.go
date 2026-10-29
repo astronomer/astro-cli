@@ -33,6 +33,9 @@ type DeployBundleInput struct {
 	// Login is the Astro login the deploy runs under, whose host the
 	// Deployment lives on; nil is the current context.
 	Login *config.Context
+	// ErrOut is the command's error writer, which the bundle's warnings go
+	// to; nil is stderr.
+	ErrOut io.Writer
 }
 
 // BundleGit is the commit a bundle deploy recorded, when the bundle sits in a
@@ -107,7 +110,7 @@ func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
 	}
 
 	// upload the bundle
-	tarballVersion, err := UploadBundle(input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.AstroRuntimeVersion)
+	tarballVersion, err := UploadBundle(input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.AstroRuntimeVersion, input.ErrOut)
 	if err != nil {
 		return BundleDeploy{}, err
 	}
@@ -277,7 +280,7 @@ func ValidateBundleSymlinks(bundlePath string) error {
 // UploadBundle tars and gzips the directory bundlePath and uploads it to
 // uploadURL. The tarball is written to a temporary directory of its own, never
 // under bundlePath, so it cannot end up inside itself.
-func UploadBundle(bundlePath, uploadURL string, prependBaseDir bool, currentRuntimeVersion string) (string, error) {
+func UploadBundle(bundlePath, uploadURL string, prependBaseDir bool, currentRuntimeVersion string, errOut io.Writer) (string, error) {
 	// If Airflow 3.x, check for symlinks pointing outside the bundle directory
 	if airflowversions.AirflowMajorVersionForRuntimeVersion(currentRuntimeVersion) == "3" {
 		err := ValidateBundleSymlinks(bundlePath)
@@ -302,7 +305,7 @@ func UploadBundle(bundlePath, uploadURL string, prependBaseDir bool, currentRunt
 	// tree. Ones an earlier CLI wrote into the tree are always left out (a
 	// stale one must not ship), and with deploy.cosmos_boost on, fresh
 	// ones are generated into the bundle, best-effort (a missing one is safe).
-	overlay, err := cosmosboost.BundleOverlay(bundlePath, config.CFG.CosmosBoostPreDeploy.GetBool())
+	overlay, err := cosmosboost.BundleOverlay(bundlePath, config.CFG.CosmosBoostPreDeploy.GetBool(), nil, errOut)
 	if err != nil {
 		return "", err
 	}

@@ -268,7 +268,7 @@ func TestDeploymentCreateUpdateAdoptJSON(t *testing.T) {
 		api := newAPCClient()
 		api.On("AdoptDeployment", mock.Anything).Return(&houston.Deployment{ID: "adopted", Label: "cr", ReleaseName: "cr", Namespace: "ns", ClusterID: "cl-1"}, nil)
 
-		run := runAPC(t, api, "", "deployment", "adopt", "--cluster-id", "cl-1", "--name", "cr", "--namespace", "ns", "-o", "json")
+		run := runAPC(t, api, "", "deployment", "adopt", "--cluster-id", "cl-1", "--cr-name", "cr", "--namespace", "ns", "-o", "json")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		var got deploymentJSON
 		decodeOne(t, run.stdout, &got)

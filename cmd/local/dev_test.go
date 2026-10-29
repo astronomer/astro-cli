@@ -55,6 +55,12 @@ func testDeps(t *testing.T) (d Deps, stdout *bytes.Buffer) {
 	return d, stdout
 }
 
+// stderrOf is what a run wrote to the stderr testDeps gave it: where its
+// warnings go in text (emitWarning).
+func stderrOf(d Deps) string {
+	return d.Stderr.(*bytes.Buffer).String()
+}
+
 func execute(t *testing.T, d Deps, args ...string) error {
 	t.Helper()
 	root := newRootCmd(d)
@@ -465,7 +471,7 @@ func TestDevStubTextMatchesJSONData(t *testing.T) {
 // anything, so its presence on stdout shows the report happens on the way to
 // starting rather than after a successful start.
 func TestStartReportsEnvValueWarnings(t *testing.T) {
-	d, stdout := testDeps(t)
+	d, _ := testDeps(t)
 	dir := t.TempDir()
 	m := `[project]
 name = 'demo'
@@ -486,11 +492,11 @@ ASTRO_TEST_PORT = { type = 'port', default = '99999' }
 	// The error is the fake runtime refusing to start, not a rejected project.
 	_ = execute(t, d, "local", "start")
 
-	if !strings.Contains(stdout.String(), "warning: env var ASTRO_TEST_PORT:") {
-		t.Errorf("start did not report the value warning; stdout was %q", stdout.String())
+	if !strings.Contains(stderrOf(d), "Warning: env var ASTRO_TEST_PORT:") {
+		t.Errorf("start did not report the value warning; stderr was %q", stderrOf(d))
 	}
-	if !strings.Contains(stdout.String(), "99999") {
-		t.Errorf("the warning does not name the offending value; stdout was %q", stdout.String())
+	if !strings.Contains(stderrOf(d), "99999") {
+		t.Errorf("the warning does not name the offending value; stderr was %q", stderrOf(d))
 	}
 }
 
@@ -517,7 +523,7 @@ ASTRO_TEST_PORT = { type = 'port', default = '8080' }
 
 	_ = execute(t, d, "local", "start")
 
-	if strings.Contains(stdout.String(), "warning: env var") {
+	if strings.Contains(stderrOf(d), "Warning: env var") {
 		t.Errorf("expected no value warning, got %q", stdout.String())
 	}
 }
@@ -550,7 +556,7 @@ func (attachableRuntime) ReadStatus(string) (localrt.Status, error) {
 // `astro local restart` reports value warnings too. warnEnvValues has two call
 // sites, and a test of one says nothing about the other.
 func TestRestartReportsEnvValueWarnings(t *testing.T) {
-	d, stdout := testDeps(t)
+	d, _ := testDeps(t)
 	d.Runtime = attachableRuntime{}
 	dir := t.TempDir()
 	m := `[project]
@@ -571,8 +577,8 @@ ASTRO_TEST_PORT = { type = 'port', default = '99999' }
 
 	_ = execute(t, d, "local", "restart")
 
-	if !strings.Contains(stdout.String(), "warning: env var ASTRO_TEST_PORT:") {
-		t.Errorf("restart did not report the value warning; stdout was %q", stdout.String())
+	if !strings.Contains(stderrOf(d), "Warning: env var ASTRO_TEST_PORT:") {
+		t.Errorf("restart did not report the value warning; stderr was %q", stderrOf(d))
 	}
 }
 

@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/secrets
 
-go 1.26.1
+go 1.26.10
 
 require github.com/zalando/go-keyring v0.2.8
 

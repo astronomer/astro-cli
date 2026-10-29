@@ -26,6 +26,22 @@ var hiddenFlagAllowed = map[string]string{
 		"flag of that name, so it names the link target",
 	"env connection link --deployment-id":       "it shadows the noun's scope flag of that name, so it names the link target",
 	"env airflow-variable link --deployment-id": "it shadows the noun's scope flag of that name, so it names the link target",
+	// 1.x's APC deployment group gave --workspace-id to every command below
+	// it; these two are below version and feature gates that the tree
+	// v1_flags.tsv was made from did not pass, so it lists neither command.
+	"deployment unadopt --workspace-id": "1.x had it there (APC 2.1.0 and newer), through the deployment group; " +
+		"nothing read it, so it is kept doing nothing",
+	"deployment runtime --workspace-id": "1.x had it there (where the platform enables Astro Runtime), through the deployment group; " +
+		"nothing read it, so it is kept doing nothing",
+	// The 1.x spellings of --workspace and --deployment on commands behind
+	// the same gates (1.x's cmd/apc, deployment.go and utils.go at 7aa23cdc).
+	"deployment adopt --workspace-id": "1.x had it there (APC 2.1.0 and newer), through the deployment group, and adopt read it; " +
+		"it is --workspace's alias",
+	"deployment adopt --label": "1.x's adopt had it, with -l (APC 2.1.0 and newer), for the adopted Deployment's label; " +
+		"it is --name's alias, as on create and update",
+	"deployment unadopt --deployment-id": "1.x's unadopt had it, with -d (APC 2.1.0 and newer); it is --deployment's alias, and keeps -d",
+	"deployment runtime --deployment-id": "1.x's runtime upgrade and migrate had it, with -d (where the platform enables Astro Runtime); " +
+		"it is --deployment's alias, and keeps -d",
 }
 
 // A hidden flag is a 1.x spelling a command keeps working for scripts written

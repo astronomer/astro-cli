@@ -3,6 +3,7 @@ package deploy
 import (
 	httpContext "context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/azure"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
@@ -62,6 +64,9 @@ type InputClientDeploy struct {
 	Platform     string
 	BuildSecrets []string
 	DeploymentID string
+	// ErrOut is the command's error writer, which the deploy's warnings go
+	// to; nil is stderr.
+	ErrOut io.Writer
 }
 
 // includeMonitoringDag reports whether a DAG upload carries the monitoring DAG,
@@ -97,7 +102,7 @@ func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitorin
 	// By default, prepend dags/ directory prefix. Use --no-dags-base-dir to place files at bundle root
 	// (needed for some Airflow 3.x deployments where sys.path includes the bundle root, not dags/).
 	prependBaseDir := !noDagsBaseDir
-	versionID, err := UploadBundle(dagsPath, dagsUploadURL, prependBaseDir, currentRuntimeVersion)
+	versionID, err := UploadBundle(dagsPath, dagsUploadURL, prependBaseDir, currentRuntimeVersion, nil)
 	if err != nil {
 		return "", err
 	}
@@ -378,7 +383,11 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		if util.IsAstronomerRegistry(dockerfileClientContent) || err != nil {
 			// login to the registry
 			if err != nil {
-				fmt.Println("WARNING: Failed to read Dockerfile.client, so will assume the base image is using images.astronomer.cloud and try to login to the registry")
+				errOut := deployInput.ErrOut
+				if errOut == nil {
+					errOut = ansi.Messages
+				}
+				ansi.Warn(errOut, "could not read Dockerfile.client, so astro assumes its base image is on images.astronomer.cloud and logs in to that registry")
 			}
 			baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
 			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)

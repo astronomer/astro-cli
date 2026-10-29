@@ -21,7 +21,7 @@ func TestGlobalSetWarnsAboutAProjectPlaintextCopy(t *testing.T) {
 		t.Fatal(err)
 	}
 	msg := stderr.String()
-	if !strings.Contains(msg, "warning: API_TOKEN is also set in project") {
+	if !strings.Contains(msg, "Warning: API_TOKEN is also set in project") {
 		t.Errorf("a global set shadowed by the project .env should warn; stderr: %q", msg)
 	}
 	if !strings.Contains(msg, "astro local env variable delete API_TOKEN --project\n") {

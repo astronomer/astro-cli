@@ -217,7 +217,8 @@ func TestAstroBuildHandsTheManifestBuildToTheBuilder(t *testing.T) {
 }
 
 // A [tool.astro] runtime is checked against the catalog before the build,
-// its warnings ride on the result, and the image starts FROM that build.
+// its warnings are shown as they are found (Request.Warn) and ride on the
+// result, and the image starts FROM that build.
 func TestAstroBuildChecksAndBuildsFromTheRuntimeBuild(t *testing.T) {
 	req := testRequest(t)
 	req.Manifest.Astro.Runtime = "3.1-12"
@@ -226,10 +227,13 @@ func TestAstroBuildChecksAndBuildsFromTheRuntimeBuild(t *testing.T) {
 		calls = append(calls, [2]string{runtime, pin})
 		return []runtimeversions.Finding{{Kind: runtimeversions.FindingYanked, Message: "runtime 3.1-12 is yanked"}}, nil
 	}
+	var warned []string
+	req.Warn = func(w string) { warned = append(warned, w) }
 	builder := &fakeBuilder{}
 	res, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-12"}).Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
 	assert.Equal(t, [][2]string{{"3.1-12", "3.1"}}, calls)
+	assert.Equal(t, []string{"runtime 3.1-12 is yanked"}, warned, "shown as it is found, not only on the result")
 	assert.Equal(t, []string{"runtime 3.1-12 is yanked"}, res.Warnings)
 	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1-12", builder.gotReq.BaseImage)
 

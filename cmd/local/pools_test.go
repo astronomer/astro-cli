@@ -35,10 +35,12 @@ etl = {slots = 4, description = 'ETL loads'}
 ml = {slots = 1, include_deferred = true}
 `
 
-func startWithPools(t *testing.T, stub *airflowStub) (stdout string, err error) {
+// startWithPools starts a project whose manifest declares pools, and returns
+// what the start wrote to stderr, where its warnings go.
+func startWithPools(t *testing.T, stub *airflowStub) (stderr string, err error) {
 	t.Helper()
 	dir := instanceProject(t, poolsManifest)
-	d, out, _ := queryDeps(t)
+	d, _, errOut := queryDeps(t)
 	d.WorkingDir = func() (string, error) { return dir, nil }
 	d.Runtime = poolsRuntime{af: startedAirflow{status: localrt.Status{
 		ProjectPath:  dir,
@@ -47,19 +49,19 @@ func startWithPools(t *testing.T, stub *airflowStub) (stdout string, err error) 
 		AirflowMajor: "3",
 	}}}
 	err = execute(t, d, "local", "start")
-	return out.String(), err
+	return errOut.String(), err
 }
 
 func TestStartCreatesTheManifestPools(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodPost, "/api/v2/pools", `{}`)
 
-	out, err := startWithPools(t, stub)
+	warned, err := startWithPools(t, stub)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "warning") {
-		t.Errorf("a start that created every pool warned:\n%s", out)
+	if strings.Contains(strings.ToLower(warned), "warning") {
+		t.Errorf("a start that created every pool warned:\n%s", warned)
 	}
 	var bodies []map[string]any
 	for _, req := range stub.requests() {
@@ -88,15 +90,15 @@ func TestStartWarnsForAPoolItCouldNotApply(t *testing.T) {
 	stub.routeStatus(http.MethodGet, "/api/v2/pools/etl", http.StatusForbidden, `{"detail":"Forbidden"}`)
 	stub.route(http.MethodPost, "/api/v2/pools", `{}`)
 
-	out, err := startWithPools(t, stub)
+	warned, err := startWithPools(t, stub)
 	if err != nil {
 		t.Fatalf("a pool that failed failed the start: %v", err)
 	}
-	if n := strings.Count(out, "warning:"); n != 1 {
-		t.Errorf("want one warning, got %d:\n%s", n, out)
+	if n := strings.Count(warned, "Warning:"); n != 1 {
+		t.Errorf("want one warning, got %d:\n%s", n, warned)
 	}
-	if !strings.Contains(out, "warning: pool etl was not created or updated") {
-		t.Errorf("the warning does not name the pool:\n%s", out)
+	if !strings.Contains(warned, "Warning: pool etl was not created or updated") {
+		t.Errorf("the warning does not name the pool:\n%s", warned)
 	}
 	if !stub.sawRequest(http.MethodPost, "/api/v2/pools") {
 		t.Error("the pool after the failed one was not created")
