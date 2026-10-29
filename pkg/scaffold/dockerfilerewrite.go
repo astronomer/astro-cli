@@ -125,31 +125,40 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 
 	base := airflowrt.BaseOf(final.Ref)
 	from := strings.Join(append(append([]string{}, final.Flags...), base), " ")
-	install := airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias})
-	// The recipe's first line declares the build argument its uv stage reads,
-	// which a FROM sees only when it comes before the file's first FROM: ahead
-	// of the file's earlier stages, after its parser directives and its own
-	// global ARGs.
-	uvArg, install, _ := strings.Cut(install, "\n")
-	first := stages[0].Line
+	body := rewrittenBody(lines, stages[0].Line, final.Line, airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias}))
+	return &dockerfileRewrite{
+		body:   body,
+		from:   final.Ref,
+		base:   base,
+		mirror: !airflowrt.IsPublishedRuntimeRepo(final.Image),
+	}, "", true
+}
 
+// rewrittenBody is a Dockerfile's lines with install, the recipe, in place of
+// its final FROM (at line final) and the file's own lines after it. The
+// recipe's first line declares the build argument its uv stage reads, which a
+// FROM sees only when it comes before the file's first FROM (at line first):
+// ahead of the file's earlier stages, after its parser directives and its own
+// global ARGs.
+func rewrittenBody(lines []string, first, final int, install string) []byte {
+	uvArg, install, _ := strings.Cut(install, "\n")
 	var b strings.Builder
-	if first < final.Line {
+	if first < final {
 		if first > 0 {
 			b.WriteString(strings.Join(lines[:first], "\n") + "\n")
 		}
 		b.WriteString(uvArg + "\n")
-		b.WriteString(strings.Join(lines[first:final.Line], "\n") + "\n")
+		b.WriteString(strings.Join(lines[first:final], "\n") + "\n")
 		b.WriteString(installBlockComment)
 	} else {
-		if final.Line > 0 {
-			b.WriteString(strings.Join(lines[:final.Line], "\n") + "\n")
+		if final > 0 {
+			b.WriteString(strings.Join(lines[:final], "\n") + "\n")
 		}
 		b.WriteString(installBlockComment)
 		b.WriteString(uvArg + "\n")
 	}
 	b.WriteString(install)
-	if own := lines[final.Line+1:]; strings.TrimSpace(strings.Join(own, "\n")) != "" {
+	if own := lines[final+1:]; strings.TrimSpace(strings.Join(own, "\n")) != "" {
 		b.WriteString("\n" + ownStepsComment)
 		// The file's own lines keep their leading blank lines out of the way of
 		// the comment, and their trailing newline as the file had it.
@@ -162,12 +171,7 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 	if !strings.HasSuffix(body, "\n") {
 		body += "\n"
 	}
-	return &dockerfileRewrite{
-		body:   []byte(body),
-		from:   final.Ref,
-		base:   base,
-		mirror: !airflowrt.IsPublishedRuntimeRepo(final.Image),
-	}, "", true
+	return []byte(body)
 }
 
 // instructionsName reports a Dockerfile instruction that names the file name as
