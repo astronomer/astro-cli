@@ -265,13 +265,13 @@ func TestInstallHelperReadsTheRecordedBuildFromTheConstraintsOnly(t *testing.T) 
 	assert.NotContains(t, out.stderr, "8.8-8")
 }
 
-// editFile replaces old, which must be in the file at path, with new.
-func editFile(t *testing.T, path, old, new string) {
+// editFile replaces from, which must be in the file at path, with to.
+func editFile(t *testing.T, path, from, to string) {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
-	require.Contains(t, string(data), old)
-	require.NoError(t, os.WriteFile(path, []byte(strings.Replace(string(data), old, new, 1)), 0o600))
+	require.Contains(t, string(data), from)
+	require.NoError(t, os.WriteFile(path, []byte(strings.Replace(string(data), from, to, 1)), 0o600))
 }
 
 // A git or URL source is a direct reference at the commit or file the lock
