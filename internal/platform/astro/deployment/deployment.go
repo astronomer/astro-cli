@@ -995,8 +995,9 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			if err := input.MayAsk("Are you sure you want to continue?", input.AnsweredBy("--yes")); err != nil {
 				return UpdateResult{}, err
 			}
-			fmt.Fprintf(progressTo(notes), "\nWarning: You are trying to update the dag deploy setting with ci-cd enforcement enabled. Once the setting is updated, you will not be able to deploy your dags using the CLI. Until you deploy your dags, dags will not be visible in the UI nor will new tasks start."+
-				"\nAfter the setting is updated, either disable cicd enforcement and then deploy your dags OR deploy your dags via CICD or using API Tokens.")
+			pw := progressTo(notes)
+			fmt.Fprintf(pw, "\n%s You are trying to update the dag deploy setting with ci-cd enforcement enabled. Once the setting is updated, you will not be able to deploy your dags using the CLI. Until you deploy your dags, dags will not be visible in the UI nor will new tasks start."+
+				"\nAfter the setting is updated, either disable cicd enforcement and then deploy your dags OR deploy your dags via CICD or using API Tokens.", ansi.WarningLabel(pw))
 			y, err := input.Confirm("\n\nAre you sure you want to continue?", input.AnsweredBy("--yes"))
 			if err != nil {
 				return UpdateResult{}, err
@@ -1025,8 +1026,9 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			return UpdateResult{Deployment: currentDeployment}, nil
 		}
 		if config.CFG.ShowWarnings.GetBool() {
-			fmt.Fprintf(progressTo(notes), "\nWarning: This command will disable Dag-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled"+
-				"\nRun astro deploy after this command to restart your Dags. It may take a few minutes for the Airflow UI to update.")
+			pw := progressTo(notes)
+			fmt.Fprintf(pw, "\n%s This command will disable Dag-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled"+
+				"\nRun astro deploy after this command to restart your Dags. It may take a few minutes for the Airflow UI to update.", ansi.WarningLabel(pw))
 			confirmWithUser = true
 		}
 		dagDeployEnabled = false

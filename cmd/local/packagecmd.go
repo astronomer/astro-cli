@@ -143,6 +143,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		CheckRuntime:   c.d.RuntimeCheck,
 		RuntimeCatalog: catalog,
 		Warn:           warn,
+		Note:           packageNote(r),
 	}, c.callbacks(r))
 	if err != nil {
 		return err
@@ -279,4 +280,18 @@ func renderNextSteps(w io.Writer, steps []string) error {
 		}
 	}
 	return nil
+}
+
+// packageNote shows a note the target finds as it goes: in text, a cyan Note:
+// line on stderr, beside the warnings; under json, nil, so it streams as a
+// progress line, as it always has.
+func packageNote(r cliout.Renderer) func(string) {
+	if r.Format != cliout.FormatText {
+		return nil
+	}
+	w := r.Err
+	if w == nil {
+		w = r.Out
+	}
+	return func(n string) { cliout.Note(w, n) }
 }

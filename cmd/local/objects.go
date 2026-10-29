@@ -35,7 +35,7 @@ func (q *query) envSourcedNote(kind localenv.Kind) string {
 // noteEnvSourced closes a text listing with envSourcedNote on stderr.
 func (q *query) noteEnvSourced(r cliout.Renderer, kind localenv.Kind) {
 	if r.Format == cliout.FormatText {
-		fmt.Fprintln(q.d.Stderr, "note: "+q.envSourcedNote(kind))
+		cliout.Note(q.d.Stderr, q.envSourcedNote(kind))
 	}
 }
 

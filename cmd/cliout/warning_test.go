@@ -54,6 +54,76 @@ func TestLabelsAreColoredOnStderrUnlessNoColor(t *testing.T) {
 	}
 }
 
+// Next: is cyan on a terminal stdout as well as stderr, since it leads a
+// command's own output; anything else, and NO_COLOR, gets it plain.
+func TestNextLabelColorsOnStdoutAndStderr(t *testing.T) {
+	forced := ansi.ForceColors
+	ansi.ForceColors = true
+	t.Cleanup(func() { ansi.ForceColors = forced })
+	t.Setenv("NO_COLOR", "")
+
+	for name, w := range map[string]*os.File{"stdout": os.Stdout, "stderr": os.Stderr} {
+		if got := NextLabel(w); !strings.Contains(got, "\x1b[36m") || !strings.Contains(got, "Next:") {
+			t.Errorf("NextLabel on %s = %q, want a cyan Next:", name, got)
+		}
+	}
+	var b bytes.Buffer
+	if got := NextLabel(&b); got != "Next:" {
+		t.Errorf("NextLabel on a buffer = %q, want plain", got)
+	}
+
+	t.Setenv("NO_COLOR", "1")
+	if got := NextLabel(os.Stdout); got != "Next:" {
+		t.Errorf("NextLabel on stdout under NO_COLOR = %q, want plain", got)
+	}
+}
+
+// Every label follows one rule: it colors on a terminal stdout too, as a Note:
+// in a command's own text output (local reset, check) does.
+func TestLabelsColorOnStdout(t *testing.T) {
+	forced := ansi.ForceColors
+	ansi.ForceColors = true
+	t.Cleanup(func() { ansi.ForceColors = forced })
+	t.Setenv("NO_COLOR", "")
+
+	if got := NoteLabel(os.Stdout); !strings.Contains(got, "\x1b[36m") || !strings.Contains(got, "Note:") {
+		t.Errorf("NoteLabel on stdout = %q, want a cyan Note:", got)
+	}
+	if got := WarningLabel(os.Stdout); !strings.Contains(got, "\x1b[33m") {
+		t.Errorf("WarningLabel on stdout = %q, want a yellow Warning:", got)
+	}
+}
+
+// Note: is cyan and the danger label red on stderr with color on; off stderr,
+// or under NO_COLOR, both are plain.
+func TestNoteAndDangerLabels(t *testing.T) {
+	forced := ansi.ForceColors
+	ansi.ForceColors = true
+	t.Cleanup(func() { ansi.ForceColors = forced })
+	t.Setenv("NO_COLOR", "")
+
+	if got := NoteLabel(os.Stderr); !strings.Contains(got, "\x1b[36m") || !strings.Contains(got, "Note:") {
+		t.Errorf("NoteLabel on stderr = %q, want a cyan Note:", got)
+	}
+	if got := DangerLabel(os.Stderr); !strings.Contains(got, "\x1b[31m") || !strings.Contains(got, "WARNING:") {
+		t.Errorf("DangerLabel on stderr = %q, want a red WARNING:", got)
+	}
+
+	var b strings.Builder
+	Note(&b, "the project has uncommitted changes")
+	if got := b.String(); got != "Note: the project has uncommitted changes\n" {
+		t.Errorf("Note off stderr wrote %q, want a plain Note: line", got)
+	}
+
+	t.Setenv("NO_COLOR", "1")
+	if got := NoteLabel(os.Stderr); got != "Note:" {
+		t.Errorf("NoteLabel under NO_COLOR = %q, want plain", got)
+	}
+	if got := DangerLabel(os.Stderr); got != "WARNING:" {
+		t.Errorf("DangerLabel under NO_COLOR = %q, want plain", got)
+	}
+}
+
 // A command that set its own ErrPrefix keeps it; cobra's default becomes the
 // Error: label.
 func TestErrorPrefixKeepsACustomPrefix(t *testing.T) {

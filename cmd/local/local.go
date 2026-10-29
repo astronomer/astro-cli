@@ -1232,8 +1232,8 @@ func renderReset(w io.Writer, report localrt.ResetReport) error {
 		// Said rather than swallowed: a docker-mode project keeps its metadata
 		// database in a volume, so "wiped" would be a lie if the engine that
 		// holds it never answered.
-		_, err := fmt.Fprintln(w,
-			"note: no container engine answered, so any docker-mode volume for this project is still there — start the engine and run this again to remove it")
+		_, err := fmt.Fprintln(w, cliout.NoteLabel(w),
+			"no container engine answered, so any docker-mode volume for this project is still there — start the engine and run this again to remove it")
 		return err
 	}
 	return nil

@@ -122,7 +122,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		},
 		Warn: warnf,
 		// A plain line with the deploy's progress.
-		Note:   func(msg string) { fmt.Fprintln(progress, msg) },
+		Note:   func(msg string) { cliout.Note(progress, msg) },
 		Engine: engine,
 		Link: func(l scaffold.Link) error {
 			if err := scaffold.SaveLink(config.WorkingPath, nil, l); err != nil {

@@ -362,7 +362,8 @@ func executePaginatedRequest(opts *RequestOptions, method, requestURL, token str
 			break
 		}
 		if pageSize <= 0 {
-			fmt.Fprintf(opts.GetErrOut(), "\nWarning: server reported %d total records but returned an empty page; stopping pagination\n", total)
+			fmt.Fprintln(opts.GetErrOut())
+			cliout.Warn(opts.GetErrOut(), fmt.Sprintf("server reported %d total records but returned an empty page; stopping pagination", total))
 			break
 		}
 		currentOffset += pageSize
@@ -372,7 +373,8 @@ func executePaginatedRequest(opts *RequestOptions, method, requestURL, token str
 
 		// Safety limit to prevent infinite loops
 		if pageNum >= maxPaginationPages {
-			fmt.Fprintf(opts.GetErrOut(), "\nWarning: reached maximum page limit (100)\n")
+			fmt.Fprintln(opts.GetErrOut())
+			cliout.Warn(opts.GetErrOut(), "reached maximum page limit (100)")
 			break
 		}
 	}

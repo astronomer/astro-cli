@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"time"
 
@@ -23,8 +24,8 @@ const (
 	kubernetesExecutorArg = "kubernetes"
 	k8sExecutorArg        = "k8s"
 
-	cliDeploymentHardDeletePrompt              = "\nWarning: This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with delete?"
-	cliDeploymentUnadoptPrompt                 = "\nWarning: This permanently removes the Deployment record from APC. The Airflow custom resource, its namespace, and its metadata database are left untouched, but this action cannot be undone from the CLI. Proceed with unadopt?"
+	cliDeploymentHardDeletePrompt              = "This action permanently deletes all data associated with this Deployment, including the database. You will not be able to recover it. Proceed with delete?"
+	cliDeploymentUnadoptPrompt                 = "This permanently removes the Deployment record from APC. The Airflow custom resource, its namespace, and its metadata database are left untouched, but this action cannot be undone from the CLI. Proceed with unadopt?"
 	deploymentTypeCmdMessage                   = "Dag Deployment mechanism: image, volume, git_sync, dag_deploy"
 	continueSubMsg                             = " for more details. Do you want to continue?"
 	CreateDeploymentWithTypeDagDeployPromptMsg = "\nthis is an experimental feature. Please use with caution. See the APC documentation at " + houston.DagDeployDocsLink + continueSubMsg
@@ -849,7 +850,7 @@ func deploymentDelete(cmd *cobra.Command, out io.Writer) error {
 	// the Deployment, including the database, is permanently removed. Confirm
 	// before proceeding, unless --yes already did.
 	if !skipPrompt {
-		prompt := cliDeploymentHardDeletePrompt
+		prompt := dangerPrompt(cliDeploymentHardDeletePrompt)
 		if deploymentLink != "" {
 			// The run named a link: say which Deployment that is before
 			// asking to delete it.
@@ -902,13 +903,20 @@ func deploymentAdopt(cmd *cobra.Command, out io.Writer) error {
 	return emitAdopted(r, d)
 }
 
+// dangerPrompt leads a confirmation of something that cannot be undone with
+// the red WARNING: label, on its own line. The question is asked on stderr,
+// so the label is colored by stderr's terminal.
+func dangerPrompt(text string) string {
+	return "\n" + cliout.DangerLabel(os.Stderr) + " " + text
+}
+
 func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
 	if !skipPrompt {
-		i, err := input.Confirm(cliDeploymentUnadoptPrompt, input.AnsweredBy("--yes"))
+		i, err := input.Confirm(dangerPrompt(cliDeploymentUnadoptPrompt), input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}
