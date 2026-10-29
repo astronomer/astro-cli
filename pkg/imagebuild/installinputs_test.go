@@ -29,7 +29,9 @@ func hostPython(t *testing.T) string {
 		if err != nil {
 			continue
 		}
-		if exec.Command(bin, "-c", "import sys; assert sys.version_info >= (3, 8)\ntry:\n import tomllib\nexcept ImportError:\n import tomli").Run() == nil {
+		// The helper also needs packaging, its own or pip's vendored copy, as
+		// every runtime image has.
+		if exec.Command(bin, "-c", "import sys; assert sys.version_info >= (3, 8)\ntry:\n import tomllib\nexcept ImportError:\n import tomli\ntry:\n import packaging.markers\nexcept ImportError:\n import pip._vendor.packaging.markers").Run() == nil {
 			return bin
 		}
 	}
@@ -102,10 +104,6 @@ func runHelper(t *testing.T, dir string, r helperRun) helperOutput {
 	}
 	return helperOutput{read(requirementsName), read(packagesName), read(lockConstraintsName), strings.ReplaceAll(stderr.String(), "\r\n", "\n")}
 }
-
-// withoutPackaging runs the helper as on a Python whose packaging it cannot
-// use, so it falls back to its own marker evaluator and specifier comparison.
-var withoutPackaging = []string{"ASTRO_INSTALL_PROJECT_NO_PACKAGING=1"}
 
 // helperProject is a build context holding the install helper and the given
 // pyproject.toml and, when lock is not "", uv.lock.
@@ -350,7 +348,7 @@ resolution-markers = [
 	runtime := filepath.Join(t.TempDir(), "pip-constraints.txt")
 	require.NoError(t, os.WriteFile(runtime, []byte("apache-airflow==2.10.4+astro.1\nSQLAlchemy==1.4.54\n"), 0o600))
 
-	for name, env := range map[string][]string{"packaging": nil, "own evaluator": withoutPackaging} {
+	for name, env := range map[string][]string{"packaging": nil} {
 		t.Run(name, func(t *testing.T) {
 			out := runHelper(t, dir, helperRun{runtimeConstraints: runtime, env: env})
 			assert.Equal(t, "-c "+lockConstraintsName+"\npandas>=2,<3\nsix\n", out.requirements)
@@ -391,7 +389,7 @@ func TestInstallHelperIgnoresALockThatIsOutOfDate(t *testing.T) {
 		"an extra added":            {"'pandas>=2,<3'", "'pandas[excel]>=2,<3'"},
 		"a lock it cannot read":     {"", ""},
 	} {
-		for mode, env := range map[string][]string{"packaging": nil, "own evaluator": withoutPackaging} {
+		for mode, env := range map[string][]string{"packaging": nil} {
 			t.Run(name+"/"+mode, func(t *testing.T) {
 				p, l := strings.Replace(pyproject, tc.from, tc.to, 1), lock
 				switch name {
@@ -445,55 +443,6 @@ wheels = [
 			"private-lib @ https://pypi.acme.example/files/private_lib-1.2.0-py3-none-any.whl#sha256=cccc\npandas\n", out.requirements)
 		assert.NotContains(t, out.constraints, "private-lib", "its file pins it")
 	})
-	t.Run("with a lock, without packaging to pick a wheel", func(t *testing.T) {
-		out := runHelper(t, helperProject(t, pyproject, lock), helperRun{env: withoutPackaging})
-		assert.Contains(t, out.requirements, "private-lib @ https://pypi.acme.example/files/private_lib-1.2.0.tar.gz#sha256=aaaa\n")
-	})
-}
-
-// The fallback evaluator reads the resolution markers uv writes, and refuses
-// what it cannot read rather than guessing.
-func TestInstallHelperMarkerEvaluator(t *testing.T) {
-	py := hostPython(t)
-	if py == "" {
-		t.Skip("no Python 3.8+ with tomllib or tomli on PATH to run the install helper on")
-	}
-	dir := helperProject(t, "[project]\n", "")
-	const script = `
-import importlib.util, sys
-spec = importlib.util.spec_from_file_location("h", sys.argv[1])
-h = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(h)
-env = {"python_full_version": "3.11.9", "python_version": "3.11", "sys_platform": "linux", "platform_machine": "x86_64"}
-for line in sys.stdin.read().splitlines():
-    try:
-        print(h.evaluate_marker(line, env))
-    except ValueError:
-        print("refused")
-`
-	cases := []struct{ marker, want string }{
-		{"python_full_version < '3.11' and sys_platform == 'linux'", "False"},
-		{"python_full_version >= '3.11' and sys_platform == 'linux'", "True"},
-		{"(python_full_version == '3.13.*' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version == '3.11.*' and sys_platform == 'linux')", "True"},
-		{"python_version != '3.11' or platform_machine == 'x86_64'", "True"},
-		{"'linux' in sys_platform and python_version < '3.12'", "True"},
-		{"sys_platform not in 'win32 cygwin'", "True"},
-		{"extra == 'test'", "refused"},
-		{"python_full_version >=", "refused"},
-	}
-	var input strings.Builder
-	for _, c := range cases {
-		input.WriteString(c.marker + "\n")
-	}
-	cmd := exec.Command(py, "-c", script, filepath.Join(dir, filepath.FromSlash(InstallHelperPath)))
-	cmd.Stdin = strings.NewReader(input.String())
-	got, err := cmd.Output()
-	require.NoError(t, err)
-	lines := strings.Split(strings.ReplaceAll(strings.TrimSpace(string(got)), "\r\n", "\n"), "\n")
-	require.Len(t, lines, len(cases))
-	for i, c := range cases {
-		assert.Equal(t, c.want, lines[i], c.marker)
-	}
 }
 
 // A plain `docker build .` of a project's own Dockerfile has no find-links file
@@ -789,7 +738,7 @@ func TestInstallHelperReadsUvsSpellingOfARuntimePinsMarker(t *testing.T) {
 		"another version":                      {`'a2wsgi==1.10.11; python_version == "3.14"', 'aiofiles==24.1.0; python_version == "3.14"', "SQLAlchemy==2.0.50 ; python_version != '3.13'"`, true},
 		"a compound marker, not compared":      {`'a2wsgi==1.10.10; python_version == "3.14" and sys_platform == "linux"', 'aiofiles==24.1.0; python_version == "3.14"', "SQLAlchemy==2.0.50 ; python_version != '3.13'"`, false},
 	} {
-		for mode, env := range map[string][]string{"packaging": nil, "own evaluator": withoutPackaging} {
+		for mode, env := range map[string][]string{"packaging": nil} {
 			t.Run(name+"/"+mode, func(t *testing.T) {
 				out := runHelper(t, helperProject(t, pyproject+"\n[tool.uv]\nconstraint-dependencies = ["+tc.pins+"]\n", lock), helperRun{env: env})
 				if tc.stale {
