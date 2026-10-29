@@ -26,7 +26,7 @@ var helperContentAtVersion = map[int]string{
 	4: "373f3dbcaba5899d23c8335cbff5714c37dfd190e027b404ce83c2426e3f5952",
 	// Hands the resolving to uv (uv lock --check, uv lock, uv export --format
 	// pylock.toml), copied into its stage; keeps only the image's policy.
-	5: "21f166c41d1c858c6d75fe0e083b8219b4ff1b0863d21f042ae72d42dd4629a5",
+	5: "7fac3db16fefba17fc0f30a7974dd77b84e9feb92c740c461b551a4d20183f44",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {
