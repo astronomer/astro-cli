@@ -431,9 +431,9 @@ func TestAstroBuildWritesADeclaredDockerfilesContext(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, KindContext, res.Kind)
 	dir := req.ContextDir
-	flags := " --platform linux/amd64 --tag astro-package/my-project:latest --file " + filepath.Join(dir, "Dockerfile") +
-		" --build-context astro-install=" + filepath.Join(dir, "astro-install") +
-		" --secret id=netrc,env=NETRC_CONTENT --secret id=other,src=/x " + filepath.Join(dir, "context")
+	flags := " --platform linux/amd64 --tag astro-package/my-project:latest --file " + scaffold.ShellQuote(filepath.Join(dir, "Dockerfile")) +
+		" --build-context " + scaffold.ShellQuote("astro-install="+filepath.Join(dir, "astro-install")) +
+		" --secret id=netrc,env=NETRC_CONTENT --secret id=other,src=/x " + scaffold.ShellQuote(filepath.Join(dir, "context"))
 	assert.Equal(t, []string{"docker build" + flags, "podman build" + flags}, res.NextSteps)
 	assert.Equal(t, imagebuild.NamedContextRequirement, res.BuildNeeds, "the commands pass a named context")
 	assert.Empty(t, docker.callStrings(), "no engine")
