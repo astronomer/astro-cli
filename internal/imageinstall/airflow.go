@@ -23,17 +23,30 @@ type AirflowMismatchError struct {
 	Recorded string
 	// Base is the image the build starts FROM.
 	Base string
+	// Dockerfile is the project's own Dockerfile, relative to the project,
+	// whose FROM names Base, or "" for a generated build.
+	Dockerfile string
 }
 
+// Error names both Airflows and both ways out: build on a runtime with the
+// lock's Airflow (for a declared Dockerfile, its FROM line), or move the
+// project to the image's Airflow with astro init. Either can be the one
+// meant: after `astro local upgrade airflow` it is the Dockerfile that is
+// behind, after an edited FROM it is the lock.
 func (e *AirflowMismatchError) Error() string {
-	madeFor := ""
+	madeFor, withLocked := "", "Airflow "+release(e.Locked)
 	if e.Recorded != "" {
 		madeFor = " (Astro Runtime " + e.Recorded + ")"
+		withLocked += ", such as " + e.Recorded
+	}
+	build := "build on a runtime with " + withLocked
+	if e.Dockerfile != "" {
+		build = "change the FROM line of " + e.Dockerfile + " to a runtime with " + withLocked
 	}
 	return fmt.Sprintf("uv.lock was made for Airflow %s%s, and the image builds on %s, which has Airflow %s, "+
 		"so the lock's versions would install over an Airflow they were not resolved for. "+
-		"Run astro init to move the project to the image's runtime, which relocks uv.lock, or build on the runtime the lock was made for",
-		e.Locked, madeFor, baseName(e.Base), e.Image)
+		"To keep the lock's Airflow, %s; to move to the image's, run astro init, which relocks uv.lock",
+		e.Locked, madeFor, baseName(e.Base), e.Image, build)
 }
 
 // airflowMismatch is the refusal of a build whose lock, pylock (what `uv
@@ -45,8 +58,9 @@ func (e *AirflowMismatchError) Error() string {
 //
 // recorded is the build pyproject.toml records for the lock (manifest's
 // RuntimeBuild), named in the message when there is one; base is the image's
-// runtime, for the message.
-func airflowMismatch(pylockData []byte, freeze []string, catalog *runtimeversions.Catalog, build, recorded, base string) error {
+// runtime, and dockerfile the project's own Dockerfile that names it, or "",
+// for the message.
+func airflowMismatch(pylockData []byte, freeze []string, catalog *runtimeversions.Catalog, build, recorded, base, dockerfile string) error {
 	locked := lockedAirflow(pylockData)
 	if locked == "" {
 		return nil
@@ -60,7 +74,7 @@ func airflowMismatch(pylockData []byte, freeze []string, catalog *runtimeversion
 	if image == "" || release(image) == release(locked) {
 		return nil
 	}
-	return &AirflowMismatchError{Locked: locked, Image: image, Recorded: recorded, Base: base}
+	return &AirflowMismatchError{Locked: locked, Image: image, Recorded: recorded, Base: base, Dockerfile: dockerfile}
 }
 
 // lockedAirflow is the one apache-airflow version a lock's export pins, or ""

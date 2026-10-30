@@ -362,7 +362,7 @@ func TestFillRefusesALockForAnotherAirflow(t *testing.T) {
 			name: "another airflow", installed: []string{"six==1.17.0", "apache-airflow==3.3.3+astro.1"},
 			want: []string{
 				"uv.lock was made for Airflow 3.3.2+astro.2 (Astro Runtime 3.3-9), and the image builds on runtime 3.1-5-python-3.12, which has Airflow 3.3.3+astro.1",
-				"Run astro init to move the project to the image's runtime",
+				"To keep the lock's Airflow, build on a runtime with Airflow 3.3.2, such as 3.3-9; to move to the image's, run astro init",
 			},
 		},
 	} {
@@ -404,4 +404,13 @@ func TestFillReadsTheImagesAirflowFromTheCatalog(t *testing.T) {
 	var mismatch *AirflowMismatchError
 	require.ErrorAs(t, err, &mismatch)
 	assert.Contains(t, err.Error(), "uv.lock was made for Airflow 3.3.2+astro.2, and the image builds on runtime 3.1-5, which has Airflow 3.1.5")
+}
+
+// A declared Dockerfile's mismatch names its FROM line as the way to keep the
+// lock's Airflow (after `astro local upgrade airflow`, the Dockerfile is what
+// is behind), and astro init as the way to take the image's.
+func TestAirflowMismatchNamesTheDockerfilesFROM(t *testing.T) {
+	err := &AirflowMismatchError{Locked: "3.3.2+astro.2", Image: "3.1.7+astro.1", Recorded: "3.3-11", Base: "quay.io/astronomer/runtime:3.1-12-base", Dockerfile: "Dockerfile"}
+	assert.Contains(t, err.Error(), "uv.lock was made for Airflow 3.3.2+astro.2 (Astro Runtime 3.3-11), and the image builds on runtime 3.1-12, which has Airflow 3.1.7+astro.1")
+	assert.Contains(t, err.Error(), "To keep the lock's Airflow, change the FROM line of Dockerfile to a runtime with Airflow 3.3.2, such as 3.3-11; to move to the image's, run astro init, which relocks uv.lock")
 }

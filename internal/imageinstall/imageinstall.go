@@ -161,7 +161,13 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 	if r.Catalog != nil {
 		catalog = r.Catalog(ctx)
 	}
-	if err := airflowMismatch(exported, in.baseInstalled, catalog, build, recorded, base); err != nil {
+	dockerfile := ""
+	if req.FromDeclaredDockerfile() {
+		if rel, err := filepath.Rel(project, req.Dockerfile); err == nil {
+			dockerfile = filepath.ToSlash(rel)
+		}
+	}
+	if err := airflowMismatch(exported, in.baseInstalled, catalog, build, recorded, base, dockerfile); err != nil {
 		return err
 	}
 	if in.baseInstalled == nil {
