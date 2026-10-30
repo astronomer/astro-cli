@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -168,13 +169,34 @@ func TestPackageWarnsAboutUndeclaredLocalValues(t *testing.T) {
 		t.Fatalf("package mwaa: %v", err)
 	}
 	want := "Warning: 1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it:\n" +
-		"  region  project  if needed: astro local env airflow-variable declare region  " +
+		"  airflow-variable region  project  if needed: astro local env airflow-variable declare region  " +
 		"if not: astro local env airflow-variable delete region --project\n"
 	if !strings.Contains(stderrOf(d), want) {
 		t.Errorf("want the warning on stderr:\n%s\ngot:\n%s", want, stderrOf(d))
 	}
 	if strings.Contains(out.String(), "region") {
 		t.Errorf("a warning is not the command's output, but stdout has it:\n%s", out.String())
+	}
+
+	// Under json the result carries the same warning as one sentence: a
+	// string a program reads, not a table.
+	d, out = testDeps(t)
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	if err := execute(t, d, "package", "mwaa", "--out-dir", outDir, "--output", "json"); err != nil {
+		t.Fatalf("package mwaa: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	var res struct {
+		Warnings []string `json:"warnings"`
+	}
+	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &res); err != nil {
+		t.Fatalf("result did not decode: %v: %s", err, out.String())
+	}
+	sentence := "1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it: " +
+		"airflow-variable region from project (if needed: astro local env airflow-variable declare region; " +
+		"if not: astro local env airflow-variable delete region --project)."
+	if !slices.Contains(res.Warnings, sentence) {
+		t.Errorf("json warnings = %q, want the sentence %q", res.Warnings, sentence)
 	}
 }
 
@@ -233,9 +255,10 @@ func packageWithFake(t *testing.T, target fakePackageTarget, args ...string) (st
 	return out.String(), err
 }
 
-// In text, what a package finds as it goes prints after the build's output,
-// just above the result, in the order it was found.
-func TestPackagePrintsWarningsAfterTheBuild(t *testing.T) {
+// In text, what a package finds is shown when found, and what the build's
+// output then followed is repeated just above the result; one found after
+// the last of the output prints once.
+func TestPackageShowsWarningsAndRepeatsThemAfterTheBuild(t *testing.T) {
 	got, err := packageWithFake(t, fakePackageTarget{res: pack.Result{
 		Target: pack.TargetAstro, Kind: pack.KindImage, Image: "astro-package/demo:x",
 		Warnings: []string{"found before the build", "found after the build"},
@@ -243,26 +266,29 @@ func TestPackagePrintsWarningsAfterTheBuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertInOrder(t, got, "[build] step 1/9", "Warning: found before the build", "Note: a note before the build",
-		"Warning: found after the build", "target: astro")
-	if n := strings.Count(got, "found before the build"); n != 1 {
-		t.Errorf("warning printed %d times, want once:\n%s", n, got)
+	requireInOrder(t, got, "Warning: found before the build", "Note: a note before the build", "[build] step 1/9",
+		"Warning: found after the build", "Warning: found before the build", "Note: a note before the build", "target: astro")
+	if n := strings.Count(got, "found after the build"); n != 1 {
+		t.Errorf("a warning after the build's output printed %d times, want once:\n%s", n, got)
 	}
 }
 
-// A build that fails still prints what it found, after its output and before
-// the error the command returns.
-func TestPackagePrintsWarningsWhenTheBuildFails(t *testing.T) {
+// A build that fails repeats what it found before the error the command
+// returns.
+func TestPackageRepeatsWarningsWhenTheBuildFails(t *testing.T) {
 	boom := errors.New("boom")
 	got, err := packageWithFake(t, fakePackageTarget{err: boom})
 	if !errors.Is(err, boom) {
 		t.Fatalf("err = %v, want boom", err)
 	}
-	assertInOrder(t, got, "[build] step 1/9", "Warning: found before the build", "Note: a note before the build",
-		"Warning: found after the build")
+	requireInOrder(t, got, "Warning: found before the build", "[build] step 1/9", "Warning: found after the build",
+		"Warning: found before the build", "Note: a note before the build")
+	if n := strings.Count(got, "found before the build"); n != 2 {
+		t.Errorf("printed %d times, want when found and once more at the end:\n%s", n, got)
+	}
 }
 
-// Under json a warning is an event emitted as it is found, between the
+// Under json a warning is an event emitted once, as it is found, between the
 // build's lines, as before.
 func TestPackageStreamsWarningsInJSON(t *testing.T) {
 	got, err := packageWithFake(t, fakePackageTarget{res: pack.Result{Target: pack.TargetAstro, Kind: pack.KindImage, Image: "i"}},
@@ -270,20 +296,9 @@ func TestPackageStreamsWarningsInJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertInOrder(t, got, `"text":"found before the build"`, `step 1/9`, `"text":"found after the build"`)
-}
-
-// assertInOrder fails unless each of wants appears in got, each after the one
-// before it.
-func assertInOrder(t *testing.T, got string, wants ...string) {
-	t.Helper()
-	at := 0
-	for _, w := range wants {
-		i := strings.Index(got[at:], w)
-		if i < 0 {
-			t.Fatalf("want %q after offset %d in:\n%s", w, at, got)
-		}
-		at += i + len(w)
+	requireInOrder(t, got, `"text":"found before the build"`, `a note before the build`, `step 1/9`, `"text":"found after the build"`)
+	if n := strings.Count(got, `"text":"found before the build"`); n != 1 {
+		t.Errorf("json emitted the warning %d times, want once:\n%s", n, got)
 	}
 }
 

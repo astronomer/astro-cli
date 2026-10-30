@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -123,30 +124,19 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		pin := m.Airflow().Pin
 		catalog = func(ctx context.Context) *runtimeversions.Catalog { return c.d.ImageCatalog(ctx, pin) }
 	}
-	// A warning or note the target finds as it goes is held, in text, and
-	// printed after the build's progress, just above the result, where a long
-	// build's output cannot scroll it away; a build that fails prints them
-	// before its error. Under json each warning is an event, emitted as it is
-	// found, and a note streams as a progress line. shown keeps the warnings
-	// already out, for the result's warnings below.
-	held := packageHeld(r)
-	if held != nil {
-		// Package asks nothing today; a question it comes to ask is not
-		// answered with a held warning still unread.
-		defer held.FlushBeforeQuestions()()
-	}
+	// A warning or note the target finds as it goes is shown as it is found,
+	// so a build that is interrupted still shows it, and in text repeated
+	// after the build's output, just above the result, where a long build
+	// cannot scroll it away; a build that fails repeats them before its error
+	// (packageRecap). shown keeps the warnings already out, for the result's
+	// warnings below.
+	cb := c.callbacks(r)
+	recap := packageRecap(r, cb)
+	cb = trackProgress(cb, recap)
 	shown := map[string]bool{}
 	warn := func(w string) {
 		shown[w] = true
-		if held != nil {
-			held.Warn(w)
-			return
-		}
-		emitWarning(r, event{Event: "warning", Text: w})
-	}
-	var note func(string)
-	if held != nil {
-		note = held.Note
+		recap.Warn(w)
 	}
 	res, err := target.Build(ctx, pack.Request{
 		ProjectDir:     dir,
@@ -159,12 +149,10 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		CheckRuntime:   c.d.RuntimeCheck,
 		RuntimeCatalog: catalog,
 		Warn:           warn,
-		Note:           note,
-	}, c.callbacks(r))
+		Note:           recap.Note,
+	}, cb)
 	if err != nil {
-		if held != nil {
-			held.Flush()
-		}
+		recap.End()
 		return err
 	}
 	// What the project gets from this machine without declaring it runs locally
@@ -172,22 +160,25 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	// warnings. Best effort: a listing that cannot be read costs only the
 	// warning. A linked workspace's values are not named: no artifact carries
 	// them either, and a Deployment gets its own workspace's.
-	if undeclared, uerr := plan.UndeclaredLocal(dir, m); uerr == nil {
-		if w := plan.UndeclaredWarning(undeclared); w != "" {
-			res.Warnings = append(res.Warnings, w)
-		}
-	}
-	// The result carries every warning in json. In text, the ones not held as
-	// the build ran (the one above, a bucket target's own) join them, and all
-	// print now, above the result rather than listed in it.
-	if held != nil {
+	undeclared, _ := plan.UndeclaredLocal(dir, m) //nolint:errcheck // best effort, see above
+	// The result carries every warning in json, the undeclared values as one
+	// sentence. In text, the ones not shown as the build ran (a bucket
+	// target's own, then the undeclared values as a table) print once, after
+	// the repeated ones, above the result rather than listed in it.
+	if r.Format == cliout.FormatText {
 		for _, w := range res.Warnings {
 			if !shown[w] {
-				held.Warn(w)
+				recap.Later(w)
 			}
 		}
-		held.Flush()
+		if w := plan.UndeclaredWarning(undeclared); w != "" {
+			recap.Later(w)
+		}
 	}
+	if s := plan.UndeclaredSentence(undeclared); s != "" {
+		res.Warnings = append(res.Warnings, s)
+	}
+	recap.End()
 	// An event rather than a result: an image build streamed its progress
 	// before it, and this ends that stream, so it is one line too.
 	return r.EmitEvent(res, func(w io.Writer) error {
@@ -305,16 +296,41 @@ func renderNextSteps(w io.Writer, steps []string) error {
 	return nil
 }
 
-// packageHeld holds the warnings and notes a text-mode package finds, for
-// stderr beside the build's progress (or stdout when there is no stderr). It
-// is nil under json, where they stream as they are found.
-func packageHeld(r cliout.Renderer) *cliout.Deferred {
-	if r.Format != cliout.FormatText {
-		return nil
+// packageRecap shows the warnings and notes a package finds as it goes. In
+// text they are Warning: and Note: lines on stderr beside the build's
+// progress (or stdout when there is no stderr), repeated after it. Under json
+// a warning is a warning event and a note a progress line, as they always
+// were, each emitted once.
+func packageRecap(r cliout.Renderer, cb localrt.Callbacks) *cliout.Recap {
+	if r.Format == cliout.FormatText {
+		w := r.Err
+		if w == nil {
+			w = r.Out
+		}
+		return cliout.NewRecap(w, true)
 	}
-	w := r.Err
-	if w == nil {
-		w = r.Out
+	return cliout.NewRecapFunc(func(note bool, msg string) {
+		if !note {
+			emitWarning(r, event{Event: "warning", Text: msg})
+		} else if cb.OnLine != nil {
+			cb.OnLine(localrt.LogLine{Component: "package", Time: time.Now(), Text: msg})
+		}
+	}, false)
+}
+
+// trackProgress is cb, telling recap each time it prints a line of progress.
+func trackProgress(cb localrt.Callbacks, recap *cliout.Recap) localrt.Callbacks {
+	if onLine := cb.OnLine; onLine != nil {
+		cb.OnLine = func(l localrt.LogLine) {
+			onLine(l)
+			recap.Progress()
+		}
 	}
-	return cliout.NewDeferred(w, true)
+	if onState := cb.OnState; onState != nil {
+		cb.OnState = func(s localrt.State, err error) {
+			onState(s, err)
+			recap.Progress()
+		}
+	}
+	return cb
 }

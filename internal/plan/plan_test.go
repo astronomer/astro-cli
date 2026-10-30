@@ -535,31 +535,43 @@ func TestUndeclaredLocal(t *testing.T) {
 		t.Errorf("UndeclaredLocal = %v, want %v", keys, want)
 	}
 	want := "2 values reach this project only from this machine, so a Deployment or a teammate's clone won't get them:\n" +
-		"  region       vault (global)  if needed: astro local env airflow-variable declare region --secret  " +
+		"  airflow-variable region  vault (global)  if needed: astro local env airflow-variable declare region --secret  " +
 		"if not: astro local env airflow-variable delete region --global\n" +
-		"  FROM_DOTENV  project         if needed: astro local env variable declare FROM_DOTENV              " +
+		"  variable FROM_DOTENV     project         if needed: astro local env variable declare FROM_DOTENV              " +
 		"if not: astro local env variable delete FROM_DOTENV --project"
 	if w := UndeclaredWarning(got); w != want {
 		t.Errorf("UndeclaredWarning =\n%s\nwant\n%s", w, want)
 	}
+	sentence := "2 values reach this project only from this machine, so a Deployment or a teammate's clone won't get them: " +
+		"airflow-variable region from vault (global) (if needed: astro local env airflow-variable declare region --secret; " +
+		"if not: astro local env airflow-variable delete region --global), " +
+		"variable FROM_DOTENV from project (if needed: astro local env variable declare FROM_DOTENV; " +
+		"if not: astro local env variable delete FROM_DOTENV --project)."
+	if s := UndeclaredSentence(got); s != sentence {
+		t.Errorf("UndeclaredSentence =\n%s\nwant\n%s", s, sentence)
+	}
 }
 
 func TestUndeclaredWarning(t *testing.T) {
-	if UndeclaredWarning(nil) != "" {
+	if UndeclaredWarning(nil) != "" || UndeclaredSentence(nil) != "" {
 		t.Error("no values must give no warning")
 	}
-	one := UndeclaredWarning([]localenv.UndeclaredValue{{Name: "X", Source: "project", RemoveHint: "rm X"}})
+	one := []localenv.UndeclaredValue{{Kind: localenv.KindEnv, Name: "X", Source: "project", RemoveHint: "rm X"}}
 	want := "1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it:\n" +
-		"  X  project  if not: rm X"
-	if one != want {
-		t.Errorf("UndeclaredWarning =\n%s\nwant\n%s", one, want)
+		"  variable X  project  if not: rm X"
+	if got := UndeclaredWarning(one); got != want {
+		t.Errorf("UndeclaredWarning =\n%s\nwant\n%s", got, want)
 	}
-	// A value with no declare command keeps the remove command in its column.
+	if got := UndeclaredSentence(one); strings.Contains(got, "\n") || !strings.HasSuffix(got, "won't get it: variable X from project (if not: rm X).") {
+		t.Errorf("UndeclaredSentence = %q", got)
+	}
+	// Sorted by what is shown, the kind first; a value with no declare
+	// command keeps the remove command in its column.
 	two := UndeclaredWarning([]localenv.UndeclaredValue{
-		{Name: "A", Source: "project", DeclareHint: "declare A", RemoveHint: "rm A"},
-		{Name: "B", Source: "project", RemoveHint: "rm B"},
+		{Kind: localenv.KindEnv, Name: "B", Source: "project", RemoveHint: "rm B"},
+		{Kind: localenv.KindConn, Name: "a", Source: "project", DeclareHint: "declare a", RemoveHint: "rm a"},
 	})
-	if !strings.HasSuffix(two, "\n  A  project  if needed: declare A  if not: rm A\n  B  project                        if not: rm B") {
+	if !strings.HasSuffix(two, "\n  connection a  project  if needed: declare a  if not: rm a\n  variable B    project                        if not: rm B") {
 		t.Errorf("UndeclaredWarning =\n%s", two)
 	}
 }

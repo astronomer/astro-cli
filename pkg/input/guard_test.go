@@ -177,30 +177,6 @@ func (s *Suite) TestReaderSharesOnlyFiles() {
 	s.Same(Reader(r), Reader(r))
 }
 
-// The BeforeAsk hook runs just before a question a run may ask, the
-// primitives' and a picker's alike (both pass through MayAsk), and never for
-// one the guard refuses; restore puts back the hook it replaced.
-func (s *Suite) TestBeforeAskRunsOnlyForAQuestionAsked() {
-	defer SetGuard(nil)()
-	calls := 0
-	restore := BeforeAsk(func() { calls++ })
-
-	s.stdinWith("y\n")
-	_, err := Confirm("Proceed?")
-	s.Require().NoError(err)
-	s.Require().NoError(MayAsk("> "))
-	s.Equal(2, calls)
-
-	restoreGuard := SetGuard(refuseJSON)
-	s.Error(MayAsk("> "))
-	s.Equal(2, calls, "a refused question asks nothing, so nothing runs before it")
-	restoreGuard()
-
-	restore()
-	s.Require().NoError(MayAsk("> "))
-	s.Equal(2, calls, "restore removes the hook")
-}
-
 // A replaced os.Stdin is read from the start, with nothing the reader on the
 // old one read ahead carried over.
 func (s *Suite) TestReaderFollowsAReplacedStdin() {

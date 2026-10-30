@@ -278,19 +278,20 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	interactive := format == cliout.FormatText && stdinIsTerminal()
 
 	errOut := cmd.ErrOrStderr()
-	// Every warning the deploy gives goes to stderr, led by a yellow "Warning:"
-	// as the CLI's other warnings are, and into the result's warnings, so -o
-	// json carries the same ones. In text, the warnings and notes are held and
-	// printed after the build's output, just above the result, where a long
-	// build cannot scroll them away; a deploy that fails prints them before its
-	// error, and a question the deploy asks (the deployment picker) prints
-	// them before it is asked. Under json they print as they are given.
+	// Every warning the deploy gives goes to stderr as it is given, led by a
+	// yellow "Warning:" as the CLI's other warnings are, and into the result's
+	// warnings, so -o json carries the same ones. In text, the warnings and
+	// notes given before the deploy's output begins (the announce line, then
+	// the build, the push, the upload) are repeated just above the result,
+	// where a long build cannot scroll them away, or before the error a failed
+	// deploy returns; one given once the output has begun prints once. The
+	// transport writes to errOut itself, untouched, so a push to a terminal
+	// still draws its progress as one.
 	var warnings []string
-	held := cliout.NewDeferred(errOut, format == cliout.FormatText)
-	defer held.FlushBeforeQuestions()()
+	recap := cliout.NewRecap(errOut, format == cliout.FormatText)
 	warn := func(msg string) {
 		warnings = append(warnings, msg)
-		held.Warn(msg)
+		recap.Warn(msg)
 	}
 	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, manifestDeployment)
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
@@ -323,7 +324,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		},
 		Warn: warn,
 		// A plain line on stderr, as the deploy's other notes are.
-		Note: held.Note,
+		Note: recap.Note,
 		// Resolved once, when a deploy that builds first needs it, and
 		// shared by the checks and the transport.
 		Engine: onceEngine(astrodeploy.ResolveContainerEngine),
@@ -364,25 +365,30 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 			if !dags && imageName != "" {
 				fmt.Fprintf(out, "Deploying prebuilt image %s...\n", imageName)
 			}
+			recap.Progress()
 		},
 		OnBuild: func() {
 			if format == cliout.FormatText {
 				fmt.Fprintln(out, "Building your project image, this can take a few minutes...")
 			}
+			recap.Progress()
 		},
 	}, newManifestDeployer(&login, cmd.InOrStdin(), errOut))
 	if err != nil {
-		held.Flush()
+		recap.End()
 		return manifestDeployErr(cmd, err)
 	}
 
+	// What the deploy says once it is over prints once, after the repeated ones.
 	if res.Git.Uncommitted {
-		held.Note("the project has uncommitted changes, so this deploy records no git commit")
+		recap.LaterNote("the project has uncommitted changes, so this deploy records no git commit")
 	}
 	if !inProject {
-		warn(imageAloneWarning(&res, imageName))
+		w := imageAloneWarning(&res, imageName)
+		warnings = append(warnings, w)
+		recap.Later(w)
 	}
-	held.Flush()
+	recap.End()
 	return renderManifestDeploy(out, format, &res, warnings)
 }
 

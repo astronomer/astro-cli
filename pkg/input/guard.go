@@ -59,35 +59,13 @@ func About(what string) Option {
 	return func(e *RequiredError) { e.About = what }
 }
 
-// beforeAsk runs when a question is about to be asked: what a command holds
-// back to print later (cliout.Deferred's warnings) is printed now instead, so
-// nothing the user should read before answering comes after the question.
-// Process-level for the reason the guard is.
-var beforeAsk atomic.Pointer[func()]
-
-// BeforeAsk installs fn, which runs each time MayAsk lets a question be asked,
-// before it is. It returns a function that puts back the hook it replaced. A
-// nil fn removes the hook.
-func BeforeAsk(fn func()) (restore func()) {
-	var next *func()
-	if fn != nil {
-		next = &fn
-	}
-	prev := beforeAsk.Swap(next)
-	return func() { beforeAsk.Store(prev) }
-}
-
 // MayAsk returns nil when this run may ask prompt, and otherwise the
 // *RequiredError a prompt refuses with. A caller that reads its answer from a
 // reader of its own (a table picker, a y/N on stderr) calls it first, so it
-// refuses the same way the primitives here do, and the BeforeAsk hook runs
-// for it as for them.
+// refuses the same way the primitives here do.
 func MayAsk(prompt string, opts ...Option) error {
 	reason := refusal()
 	if reason == "" {
-		if fn := beforeAsk.Load(); fn != nil {
-			(*fn)()
-		}
 		return nil
 	}
 	e := &RequiredError{Prompt: prompt, Reason: reason}

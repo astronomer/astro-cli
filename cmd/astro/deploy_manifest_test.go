@@ -147,24 +147,27 @@ func execDeployOneStream(answers string, args ...string) (string, error) {
 	return buf.String(), err
 }
 
-// A warning held before the deploy asks which Deployment to ship to prints
-// before the question, since it may bear on the answer; one found after the
-// question is still held for the end.
-func TestDeployManifestPrintsHeldWarningsBeforeAQuestion(t *testing.T) {
+// A warning found before the deploy asks which Deployment to ship to is
+// shown when found, so before the question, and repeated after the build;
+// one found after the build prints once.
+func TestDeployManifestShowsAWarningBeforeAQuestionAndRepeatsIt(t *testing.T) {
 	interactiveDeploy(t)
 	fake := newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
 	fake.listErr = errors.New("list refused")
-	fake.warn = "found after the question"
+	fake.warn = "found after the build"
 	out, err := execDeployOneStream("\n")
 	require.NoError(t, err)
-	assertInOrder(t, out, "Warning: could not list the Deployments", "Deploy to which deployment?",
-		"Building your project image", "Warning: found after the question", "to prod (deployment clx-dep).")
-	assert.Equal(t, 1, strings.Count(out, "could not list the Deployments"), out)
+	requireInOrder(t, out, "Warning: could not list the Deployments", "Deploy to which deployment?",
+		"Building your project image", "Warning: found after the build", "Warning: could not list the Deployments",
+		"to prod (deployment clx-dep).")
+	assert.Equal(t, 2, strings.Count(out, "could not list the Deployments"), out)
+	assert.Equal(t, 1, strings.Count(out, "found after the build"), out)
 }
 
-// In text, what a deploy finds as it goes prints after the build's output,
-// just above the result; a deploy that fails prints it before its error.
-func TestDeployManifestPrintsWarningsAfterTheBuild(t *testing.T) {
+// In text, a warning is shown when found and repeated after the build's
+// output, just above the result; a deploy that fails repeats it before its
+// error. One found after the build prints once.
+func TestDeployManifestShowsWarningsAndRepeatsThemAfterTheBuild(t *testing.T) {
 	const before, after = "found before the build", "found after it"
 	setupManifestDeploy(t, &fakeCmdDeployer{
 		img:             manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "tag-1", DagTarballVersion: "3-1"},
@@ -172,36 +175,24 @@ func TestDeployManifestPrintsWarningsAfterTheBuild(t *testing.T) {
 	})
 	out, err := execDeployOneStream("", "prod")
 	require.NoError(t, err)
-	assertInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after, "Deployed image (tag tag-1)")
+	requireInOrder(t, out, "Warning: "+before, "Building your project image", "Warning: "+after,
+		"Warning: "+before, "Deployed image (tag tag-1)")
+	assert.Equal(t, 1, strings.Count(out, after), out)
 
 	boom := errors.New("boom")
 	setupManifestDeploy(t, &fakeCmdDeployer{imgErr: boom, warnBeforeBuild: before, warn: after})
 	out, err = execDeployOneStream("", "prod")
 	require.ErrorIs(t, err, boom)
-	assertInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after, "boom")
+	requireInOrder(t, out, "Warning: "+before, "Building your project image", "Warning: "+after, "Warning: "+before)
 
-	// Under json a warning prints as it is given, before the build here.
+	// Under json a warning prints once, as it is given.
 	setupManifestDeploy(t, &fakeCmdDeployer{
 		img:             manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "tag-1", DagTarballVersion: "3-1"},
 		warnBeforeBuild: before,
 	})
 	_, errOut, err := execDeployIO("", "prod", "--output", "json")
 	require.NoError(t, err)
-	assert.Contains(t, errOut, "Warning: "+before+"\n")
-}
-
-// assertInOrder fails unless each of wants appears in got, each after the one
-// before it.
-func assertInOrder(t *testing.T, got string, wants ...string) {
-	t.Helper()
-	at := 0
-	for _, w := range wants {
-		i := strings.Index(got[at:], w)
-		if i < 0 {
-			t.Fatalf("want %q after offset %d in:\n%s", w, at, got)
-		}
-		at += i + len(w)
-	}
+	assert.Equal(t, 1, strings.Count(errOut, "Warning: "+before+"\n"), errOut)
 }
 
 // setupManifestDeploy points config.WorkingPath at a fresh project (one default

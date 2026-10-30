@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
@@ -254,51 +255,84 @@ func UndeclaredLocal(dir string, m *manifest.Manifest) ([]localenv.UndeclaredVal
 	return src.Undeclared(schema, vaultenv.Load(dir).Tiers()), nil
 }
 
-// UndeclaredWarning is the warning check and package print for
+// UndeclaredWarning is the warning check and package print in text for
 // UndeclaredLocal's values, or empty when there are none: a sentence, then a
-// line per value with its source and the commands `astro local env list`
-// offers for it, in aligned columns. The caller's printer adds the Warning:
-// label.
+// row per value with its kind and name, its source, and the commands
+// `astro local env list` offers for it, aligned. The caller's printer adds
+// the Warning: label. UndeclaredSentence is the same warning as one line.
 func UndeclaredWarning(values []localenv.UndeclaredValue) string {
 	if len(values) == 0 {
 		return ""
 	}
-	head := fmt.Sprintf("%d values reach this project only from this machine, "+
-		"so a Deployment or a teammate's clone won't get them:", len(values))
-	if len(values) == 1 {
-		head = "1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it:"
-	}
-	nameW, sourceW, declareW := 0, 0, 0
-	for _, v := range values {
-		nameW = max(nameW, len(v.Name))
-		sourceW = max(sourceW, len(v.Source))
-		if v.DeclareHint != "" {
-			declareW = max(declareW, len(ifNeeded+v.DeclareHint))
-		}
-	}
-	lines := []string{head}
-	for _, v := range values {
-		cols := []string{padRight(v.Name, nameW), padRight(v.Source, sourceW)}
-		declare := ""
-		if v.DeclareHint != "" {
-			declare = ifNeeded + v.DeclareHint
-		}
-		if declareW > 0 {
-			cols = append(cols, padRight(declare, declareW))
+	var b strings.Builder
+	b.WriteString(undeclaredHead(len(values)) + ":\n")
+	anyDeclare := slices.ContainsFunc(values, func(v localenv.UndeclaredValue) bool { return v.DeclareHint != "" })
+	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	for _, v := range sortedUndeclared(values) {
+		cells := []string{"  " + undeclaredLabel(v), v.Source}
+		if anyDeclare {
+			declare := ""
+			if v.DeclareHint != "" {
+				declare = "if needed: " + v.DeclareHint
+			}
+			cells = append(cells, declare)
 		}
 		if v.RemoveHint != "" {
-			cols = append(cols, ifNot+v.RemoveHint)
+			cells = append(cells, "if not: "+v.RemoveHint)
 		}
-		lines = append(lines, strings.TrimRight("  "+strings.Join(cols, "  "), " "))
+		fmt.Fprintln(tw, strings.Join(cells, "\t"))
+	}
+	tw.Flush() //nolint:errcheck // a strings.Builder does not fail
+	lines := strings.Split(strings.TrimSuffix(b.String(), "\n"), "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " ")
 	}
 	return strings.Join(lines, "\n")
 }
 
-// The labels UndeclaredWarning puts before each value's two commands.
-const (
-	ifNeeded = "if needed: "
-	ifNot    = "if not: "
-)
+// UndeclaredSentence is UndeclaredWarning as one sentence, for json, whose
+// warnings are strings a program reads rather than a table to line up.
+func UndeclaredSentence(values []localenv.UndeclaredValue) string {
+	if len(values) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(values))
+	for _, v := range sortedUndeclared(values) {
+		part := undeclaredLabel(v) + " from " + v.Source
+		switch {
+		case v.DeclareHint != "" && v.RemoveHint != "":
+			part += " (if needed: " + v.DeclareHint + "; if not: " + v.RemoveHint + ")"
+		case v.DeclareHint != "":
+			part += " (if needed: " + v.DeclareHint + ")"
+		case v.RemoveHint != "":
+			part += " (if not: " + v.RemoveHint + ")"
+		}
+		parts = append(parts, part)
+	}
+	return undeclaredHead(len(values)) + ": " + strings.Join(parts, ", ") + "."
+}
+
+func undeclaredHead(n int) string {
+	if n == 1 {
+		return "1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it"
+	}
+	return fmt.Sprintf("%d values reach this project only from this machine, so a Deployment or a teammate's clone won't get them", n)
+}
+
+// undeclaredLabel is how a value is named: its kind as the commands spell it,
+// and its name ("variable PYTHONPATH", "connection my_db").
+func undeclaredLabel(v localenv.UndeclaredValue) string {
+	return localenv.Noun(v.Kind) + " " + v.Name
+}
+
+// sortedUndeclared is values sorted by the label they are shown under.
+func sortedUndeclared(values []localenv.UndeclaredValue) []localenv.UndeclaredValue {
+	out := slices.Clone(values)
+	slices.SortFunc(out, func(a, b localenv.UndeclaredValue) int {
+		return strings.Compare(undeclaredLabel(a), undeclaredLabel(b))
+	})
+	return out
+}
 
 // WorkspaceNote is the note check prints for a project linked to a workspace,
 // or empty when it is not linked. A start passes Airflow what the workspace
@@ -310,10 +344,6 @@ func WorkspaceNote(workspace string) string {
 		return ""
 	}
 	return "workspace " + workspace + " also supplies values when Airflow starts; astro local env list shows them."
-}
-
-func padRight(s string, width int) string {
-	return s + strings.Repeat(" ", width-len(s))
 }
 
 // choosePort applies the v2 requested-port precedence:

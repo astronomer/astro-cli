@@ -420,10 +420,14 @@ func renderCheck(r cliout.Renderer, res checks.Result, strict, provisioned bool,
 	// linked workspace this offline check cannot read: each just above the
 	// verdict, followed by a blank line.
 	if w := plan.UndeclaredWarning(undeclared); w != "" {
-		cliout.Warn(r.Out, w+"\n")
+		if _, err := fmt.Fprintf(r.Out, "%s %s\n\n", cliout.WarningLabel(r.Out), w); err != nil {
+			return err
+		}
 	}
 	if n := plan.WorkspaceNote(workspace); n != "" {
-		cliout.Note(r.Out, n+"\n")
+		if _, err := fmt.Fprintf(r.Out, "%s %s\n\n", cliout.NoteLabel(r.Out), n); err != nil {
+			return err
+		}
 	}
 	_, err := fmt.Fprintln(r.Out, checkSummaryLine(summary))
 	return err

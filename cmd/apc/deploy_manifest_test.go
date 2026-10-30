@@ -264,35 +264,46 @@ func TestDeployManifestWarnings(t *testing.T) {
 	assert.Contains(t, run.stderr, "Warning: this deploy upgrades Deployment dep-prod from Airflow 2 to Airflow 3")
 }
 
-// In text, a warning the deploy gives prints on stderr after the build's
-// output, just above the result; a deploy that fails prints it before its
-// error.
-func TestDeployManifestPrintsWarningsAfterTheBuild(t *testing.T) {
-	const w = "found before the build"
+// In text, a warning given before the deploy's output begins is shown on
+// stderr when given and repeated after the build's output, just above the
+// result, or before the error a failed deploy returns; one the build gives
+// prints once.
+func TestDeployManifestShowsWarningsAndRepeatsThemAfterTheBuild(t *testing.T) {
+	const early = "--runtime-version has no effect without --remote"
+	const during = "found during the build"
 	for _, fail := range []bool{false, true} {
 		linkedProject(t)
 		prev := DeployManifestImage
 		t.Cleanup(func() { DeployManifestImage = prev })
 		DeployManifestImage = func(_ houston.ClientInterface, in *deploy.ManifestImage) (deploy.ManifestImageResult, error) {
-			in.Warn(w)
-			// Something the build writes on stderr after the warning is
-			// given, which a held warning follows.
+			// The build's output, on the same stderr the warnings use.
 			fmt.Fprintln(os.Stderr, "build step 1/9")
+			in.Warn(during)
 			if fail {
 				return deploy.ManifestImageResult{}, errors.New("boom")
 			}
 			return builtAndPushed, nil
 		}
-		run := runAPC(t, newAPCClient(), "", "deploy", "prod")
+		run := runAPC(t, newAPCClient(), "", "deploy", "prod", "--runtime-version", "3.1-5")
 		if fail {
 			require.Error(t, run.err)
 		} else {
 			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		}
-		build := strings.Index(run.stderr, "build step 1/9")
-		warning := strings.Index(run.stderr, "Warning: "+w)
-		require.GreaterOrEqual(t, build, 0, "stderr:\n%s", run.stderr)
-		assert.Greater(t, warning, build, "the warning must follow the build's output:\n%s", run.stderr)
+		requireInOrder(t, run.stderr, "Warning: "+early, "build step 1/9", "Warning: "+during, "Warning: "+early)
+		assert.Equal(t, 1, strings.Count(run.stderr, during), run.stderr)
+	}
+}
+
+// requireInOrder fails unless each of parts appears in out, each after the
+// one before it.
+func requireInOrder(t *testing.T, out string, parts ...string) {
+	t.Helper()
+	rest := out
+	for _, p := range parts {
+		i := strings.Index(rest, p)
+		require.GreaterOrEqual(t, i, 0, "%q missing, or out of order, in:\n%s", p, out)
+		rest = rest[i+len(p):]
 	}
 }
 
