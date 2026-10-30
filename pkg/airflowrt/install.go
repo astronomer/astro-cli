@@ -14,9 +14,10 @@ import (
 //
 // What a build installs is decided before the build, by the CLI, which
 // resolves the project's pyproject.toml and uv.lock with the host's uv and
-// writes three lists: requirements.txt, uv-lock-constraints.txt (which
-// requirements.txt names with -c) and packages.txt. The build resolves
-// nothing; it installs the lists. A generated build finds them in its own
+// writes the lists: requirements.txt, uv-lock-constraints.txt (which
+// requirements.txt names with -c) and packages.txt, and, for the packages a
+// [tool.uv.sources] entry routes to an index, routed-requirements.txt and
+// routed-links.html. The build resolves nothing; it installs the lists. A generated build finds them in its own
 // context. A project's own Dockerfile finds them in a second, named build
 // context, InstallContext, which the CLI passes beside the project
 // (`--build-context astro-install=<dir>`), so nothing is written into the
@@ -24,16 +25,20 @@ import (
 
 // The install lists (pkg/imagebuild's InstallLists.Files). The first two are
 // the names the runtime's install scripts read from their working directory;
-// the third is the file of uv.lock's versions requirements.txt names with -c.
+// the third is the file of uv.lock's versions requirements.txt names with -c;
+// the last two are the routed install's requirements and the page of the
+// files it finds them on.
 const (
 	RequirementsName    = "requirements.txt"
 	PackagesName        = "packages.txt"
 	LockConstraintsName = "uv-lock-constraints.txt"
+	RoutedName          = "routed-requirements.txt"
+	RoutedLinksName     = "routed-links.html"
 )
 
 // InstallContext is the named build context a project's own Dockerfile copies
 // the install lists from (COPY --from=astro-install). A build passes it as
-// `--build-context astro-install=<dir>`, a directory holding the three lists;
+// `--build-context astro-install=<dir>`, a directory holding the lists;
 // a build that passes none fails at that COPY.
 const InstallContext = "astro-install"
 
@@ -112,6 +117,17 @@ const (
 // install is one `docker build` runs as written, with nothing happening at FROM
 // that the file does not show.
 //
+// One step is the CLI's own: the packages a [tool.uv.sources] entry routes to
+// an index install first, in the same RUN as the rest, with pip, from the
+// lock's files alone (--no-index, --find-links on routed-links.html), without
+// their dependencies. pip picks the file the image's Python and platform take
+// and checks the lock's hash, and the runtime's install then finds them
+// installed, so it never asks the image's index for those names. pip, with
+// the runtime's constraints in /etc/pip.conf, is in every runtime image, and
+// both pip 23 (runtime 10) and 26 (3.3) follow a local page's links to remote
+// files and verify their #sha256 fragments. With nothing routed both files
+// are empty and the step does nothing.
+//
 // Each install runs the runtime's own script, so the runtime's constraints file
 // and its choice of installer (uv, or pip with ASTRO_RUNTIME_USE_PIP) still
 // apply. Runtimes before 11.0.0 ship no scripts: their triggers run the apt
@@ -163,8 +179,9 @@ func InstallDockerfileWith(from string, opts InstallOptions) string {
 		"USER root\n" +
 		"RUN if [ -x " + installSystemPackages + " ]; then " + installSystemPackages + "; " +
 		"elif [ -s " + PackagesName + " ]; then apt-get update && cat " + PackagesName + " | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n" +
-		copyFrom + RequirementsName + " " + LockConstraintsName + " ./\n" +
+		copyFrom + RequirementsName + " " + LockConstraintsName + " " + RoutedName + " " + RoutedLinksName + " ./\n" +
 		run +
+		"if [ -s " + RoutedName + " ]; then pip install --no-cache-dir --root-user-action=ignore --no-index --no-deps --find-links " + RoutedLinksName + " -r " + RoutedName + "; fi && " +
 		"if [ -x " + installPythonDependencies + " ]; then " + installPythonDependencies + "; " +
 		"else pip install --no-cache-dir --root-user-action=ignore -r " + RequirementsName + "; fi\n" +
 		"USER astro\n" +

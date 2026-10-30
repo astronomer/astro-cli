@@ -57,8 +57,10 @@ func TestBaseOf(t *testing.T) {
 func TestInstallDockerfileReadsTheListsFromTheNamedContext(t *testing.T) {
 	df := InstallDockerfile("img:1-base")
 	assert.True(t, strings.HasPrefix(df, "FROM img:1-base\nCOPY --from="+InstallContext+" packages.txt .\n"), df)
-	assert.Contains(t, df, "COPY --from="+InstallContext+" requirements.txt uv-lock-constraints.txt ./\n")
-	assert.Contains(t, df, "RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false if [ -x /usr/local/bin/install-python-dependencies ]")
+	assert.Contains(t, df, "COPY --from="+InstallContext+" requirements.txt uv-lock-constraints.txt routed-requirements.txt routed-links.html ./\n")
+	assert.Contains(t, df, "RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false "+
+		"if [ -s routed-requirements.txt ]; then pip install --no-cache-dir --root-user-action=ignore --no-index --no-deps --find-links routed-links.html -r routed-requirements.txt; fi && "+
+		"if [ -x /usr/local/bin/install-python-dependencies ]")
 	assert.NotContains(t, df, "ARG ", "no build argument, no helper stage")
 	assert.Equal(t, 1, strings.Count(df, "FROM "))
 	assert.Contains(t, InstallDockerfileWith("img:1-base", InstallOptions{ListsFrom: InstallContext, Alias: "app"}), "FROM img:1-base AS app\n")

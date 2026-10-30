@@ -139,7 +139,6 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 
 	in := policyInput{pyproject: pyproject, pylock: exported, packages: req.Packages}
 	build, python := r.runtimeOf(ctx, base)
-	in.python = python
 	if build != "" && python != "" {
 		if r.Constraints != nil {
 			if pins, err := r.Constraints(ctx, build, python); err == nil {

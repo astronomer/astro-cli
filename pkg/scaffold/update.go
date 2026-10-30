@@ -1,6 +1,7 @@
 package scaffold
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -25,6 +26,8 @@ import (
 //   - a declared Dockerfile an Astro CLI preview moved onto -base, which runs
 //     the install helper those previews wrote, given the install steps this
 //     astro writes, and the helper removed (updateStaleHelper);
+//   - a declared Dockerfile whose install steps an older astro wrote, given
+//     this astro's (updateInstallBlock);
 //   - the ignore file a moved Dockerfile's context needs (updateDockerignore).
 //
 // Each is a step that adds Changes to the changeset, so a later one is a new
@@ -42,7 +45,7 @@ type updateStep func(u *update) error
 
 // updateSteps are run in order. The Dockerfile goes first, since what the
 // others do depends on what it builds FROM once the run is done.
-var updateSteps = []updateStep{updateDockerfile, updateStaleHelper, updateDockerignore}
+var updateSteps = []updateStep{updateDockerfile, updateStaleHelper, updateInstallBlock, updateDockerignore}
 
 // update is the state the steps share.
 type update struct {
@@ -319,6 +322,69 @@ func previewInstallReplaced(data []byte) (body []byte, ok bool) {
 	}
 	return []byte(out), true
 }
+
+// updateInstallBlock brings the install steps of a Dockerfile that reads the
+// lists from the astro-install context up to the ones this astro writes, when
+// an older astro wrote them: the lists it reads have grown (the routed
+// install's two files), and a file that copies fewer than this astro writes
+// installs fewer than the CLI resolved. Only the block is replaced
+// (installBlockRefreshed); a file whose block this cannot find is left alone.
+func updateInstallBlock(u *update) error {
+	if u.body == nil || runsStaleHelper(u.body) || !airflowrt.ReadsInstallContext(u.body) {
+		return nil
+	}
+	body, ok := installBlockRefreshed(u.body)
+	if !ok || bytes.Equal(body, u.body) {
+		return nil
+	}
+	u.cs.Changes = append(u.cs.Changes, Change{
+		Kind: UpdateFile, Path: u.dockerfile, Content: body,
+		Labels: []string{u.dockerfile + " (install steps updated to the ones this astro writes)"},
+	})
+	u.body = body
+	return nil
+}
+
+// installBlockRefreshed is a Dockerfile an astro rewrite wrote, data, with its
+// install block written again. The block runs from its comment
+// (previewBlockPrefix) through the last line every version of the steps ends
+// with (installBlockLastLine), so whatever follows, the file's own steps
+// whether or not their comment is still there, stays as it is. The final
+// stage keeps its reference, flags and name. ok is false when the block is
+// not there to find, or the final stage is not on a runtime -base tag.
+func installBlockRefreshed(data []byte) (body []byte, ok bool) {
+	stages := airflowrt.DockerfileStages(data)
+	if len(stages) == 0 {
+		return nil, false
+	}
+	final := stages[len(stages)-1]
+	if !strings.HasSuffix(final.Tag, "-base") || !airflowrt.IsAstroRuntimeRef(final.Image, final.Tag) {
+		return nil, false
+	}
+	lines := strings.Split(string(data), "\n")
+	start := slices.IndexFunc(lines, func(l string) bool { return strings.HasPrefix(l, previewBlockPrefix) })
+	if start < 0 || start > final.Line {
+		return nil, false
+	}
+	last := slices.IndexFunc(lines[final.Line:], func(l string) bool { return strings.TrimSpace(l) == installBlockLastLine })
+	if last < 0 {
+		return nil, false
+	}
+	end := final.Line + last + 1
+	from := strings.Join(append(append([]string{}, final.Flags...), final.Ref), " ")
+	var b strings.Builder
+	if start > 0 {
+		b.WriteString(strings.Join(lines[:start], "\n") + "\n")
+	}
+	b.WriteString(installBlockComment)
+	b.WriteString(airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias, ListsFrom: airflowrt.InstallContext}))
+	b.WriteString(strings.Join(lines[end:], "\n"))
+	return []byte(b.String()), true
+}
+
+// installBlockLastLine is the line every version of the install steps ends
+// with (airflowrt.InstallDockerfileWith).
+const installBlockLastLine = "COPY --chown=astro:0 . ."
 
 // previewBlockPrefix is how every rewrite has begun its install block's
 // comment, an Astro CLI preview's and this astro's (installBlockComment).

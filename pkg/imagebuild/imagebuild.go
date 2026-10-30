@@ -148,10 +148,13 @@ const (
 	// requirementsName and packagesName are the names the runtime's install
 	// scripts read from their working directory, and lockConstraintsName the
 	// file of uv.lock's versions requirements.txt names with -c
-	// (InstallLists.Files).
+	// (InstallLists.Files). routedName and routedLinksName are the routed
+	// install's requirements and the page of the files it finds them in.
 	requirementsName    = airflowrt.RequirementsName
 	packagesName        = airflowrt.PackagesName
 	lockConstraintsName = airflowrt.LockConstraintsName
+	routedName          = airflowrt.RoutedName
+	routedLinksName     = airflowrt.RoutedLinksName
 	// contextDirPerm is owner-only, matching internal/localstate.
 	contextDirPerm = 0o700
 )
