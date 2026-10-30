@@ -79,9 +79,10 @@ func Fill(ctx context.Context, req *imagebuild.Request, warn func(string)) error
 //
 // A uv.lock that is missing or out of date with pyproject.toml, by `uv lock
 // --check`, is written again with `uv lock`, in the project, with a warning
-// to commit it: what is installed is then what the project would run. An
-// error is returned only for a lock uv wrote and then could not list, or a
-// pyproject.toml that cannot be read.
+// to commit it: what is installed is then what the project would run. When
+// uv cannot check or relock, a committed uv.lock is installed as it stands
+// (settleLock). An error is returned only for a lock that could not be
+// listed, or a pyproject.toml that cannot be read.
 func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(string)) error {
 	if warn == nil {
 		warn = func(string) {}
@@ -109,15 +110,16 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 		warn(fmt.Sprintf("the image installs pyproject.toml's dependencies without uv.lock's versions: uv is needed to read the lock, and %s. Install uv (https://docs.astral.sh/uv/) to build what the lock says", uvProblem(err)))
 		return nil
 	}
-	if client.LockCheck(ctx, project) != nil {
-		warn("uv.lock is missing or out of date with pyproject.toml, so the build is running uv lock in the project; commit the uv.lock it writes")
-		if err := client.Lock(ctx, project, uv.Stdio{}); err != nil {
-			warn("uv could not lock the project, so the image installs pyproject.toml's dependencies without a lock's versions: " + err.Error())
-			return nil
-		}
+	settled, asCommitted := settleLock(ctx, client, project, warn)
+	if !settled {
+		return nil
 	}
 	exported, err := client.ExportPylock(ctx, project)
-	if err != nil {
+	switch {
+	case err != nil && asCommitted:
+		warn("uv could not read the committed uv.lock either, so the image installs pyproject.toml's dependencies without a lock's versions: " + err.Error())
+		return nil
+	case err != nil:
 		return fmt.Errorf("listing what uv.lock installs: %w", err)
 	}
 
@@ -147,6 +149,39 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 	}
 	req.Install = &lists
 	return nil
+}
+
+// settleLock makes sure project has a uv.lock to install from: settled is
+// false when it has none and uv could not write one, and asCommitted reports
+// a lock uv did not vouch for, installed as it stands. Only uv's answer that the lock is
+// missing or out of date (uv.ErrLockMissing, uv.ErrLockStale) runs uv lock in
+// the project, with a warning to commit what it writes. A check uv could not
+// make, offline or against an index it cannot reach, says nothing about the
+// lock, so the committed one is installed as it stands; so is a stale one uv
+// could not lock again, rather than nothing the project pinned.
+func settleLock(ctx context.Context, client UV, project string, warn func(string)) (settled, asCommitted bool) {
+	err := client.LockCheck(ctx, project)
+	_, statErr := os.Stat(filepath.Join(project, "uv.lock"))
+	hasLock := statErr == nil
+	switch {
+	case err == nil:
+		return true, false
+	case errors.Is(err, uv.ErrLockMissing), errors.Is(err, uv.ErrLockStale), !hasLock:
+	default:
+		warn("uv could not check uv.lock against pyproject.toml, so the image installs uv.lock as committed: " + err.Error())
+		return true, true
+	}
+	warn("uv.lock is missing or out of date with pyproject.toml, so the build is running uv lock in the project; commit the uv.lock it writes")
+	lockErr := client.Lock(ctx, project, uv.Stdio{})
+	switch {
+	case lockErr == nil:
+		return true, false
+	case hasLock:
+		warn("uv could not lock the project again, so the image installs uv.lock as committed, without what pyproject.toml changed since: " + lockErr.Error())
+		return true, true
+	}
+	warn("uv could not lock the project, so the image installs pyproject.toml's dependencies without a lock's versions: " + lockErr.Error())
+	return false, false
 }
 
 // uvProblem says why uv could not be used, for a sentence.
