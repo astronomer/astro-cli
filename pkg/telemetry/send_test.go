@@ -80,3 +80,17 @@ func TestSenderPayloadOmitsEmptyToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(body), "token")
 }
+
+// The sender fills in os_version when the CLI left it out, and keeps one a
+// caller such as Desktop set itself.
+func TestAddOSVersion(t *testing.T) {
+	props := map[string]interface{}{}
+	addOSVersion(props)
+	assert.Equal(t, GetOSVersion(), props[osVersionProperty])
+
+	props = map[string]interface{}{osVersionProperty: "Desktop's own"}
+	addOSVersion(props)
+	assert.Equal(t, "Desktop's own", props[osVersionProperty])
+
+	addOSVersion(nil)
+}

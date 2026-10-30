@@ -198,25 +198,6 @@ func (r *Report) checkoutAdvice(inCheckout map[string][]string) string {
 		joinAnd(dirs), agree(d, "another git checkout", "other git checkouts"), joinAnd(dirs), r.IgnoreFile)
 }
 
-// LeftOutNote says which linked worktrees of the project's own repository a
-// generated build left out (imagebuild.ProjectSurvey.LeftOut), summarized as
-// the gitignored warning is: a count and at most three places. It is a note,
-// not a warning: nothing is wrong, and the image is the project without a
-// second copy of itself. "" when none were.
-func LeftOutNote(survey *imagebuild.ProjectSurvey) string {
-	n := len(survey.LeftOut)
-	if n == 0 {
-		return ""
-	}
-	// Each is a directory: with its slash, one at the root is named as one.
-	dirs := make([]string, n)
-	for i, d := range survey.LeftOut {
-		dirs[i] = d + "/"
-	}
-	return fmt.Sprintf("left out %s of this repository, in %s",
-		agree(n, "1 git worktree", fmt.Sprintf("%d git worktrees", n)), placesOf(dirs, survey.Files))
-}
-
 // CosmosBoostWarning is the warning for the Cosmos Boost files an earlier
 // Astro CLI wrote into the project that a declared Dockerfile's context
 // carries (imagebuild.ProjectSurvey.CosmosBoost), or "" when there are none.

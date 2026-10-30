@@ -2,6 +2,7 @@ package local
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/pack"
+	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -149,8 +151,9 @@ func TestPackageMWAABuildsTree(t *testing.T) {
 }
 
 // A value the project gets from this machine without declaring it is carried by
-// no artifact, so package warns about it beside the target's own warnings.
-func TestPackageWarnsAboutUndeclaredLocalValues(t *testing.T) {
+// no artifact, but that is the project's setup, not the artifact's: astro local
+// check warns about it, and package says nothing.
+func TestPackageSaysNothingAboutUndeclaredLocalValues(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
@@ -165,12 +168,150 @@ func TestPackageWarnsAboutUndeclaredLocalValues(t *testing.T) {
 	if err := execute(t, d, "package", "mwaa", "--out-dir", outDir); err != nil {
 		t.Fatalf("package mwaa: %v", err)
 	}
-	line, ok := lineContaining(stderrOf(d), "AIRFLOW_VAR_REGION")
-	if !ok || !strings.HasPrefix(line, "Warning: ") || !strings.Contains(line, "will not follow it to a Deployment") {
-		t.Errorf("want a Warning on stderr naming AIRFLOW_VAR_REGION:\n%s", stderrOf(d))
+	if got := stderrOf(d) + out.String(); strings.Contains(got, "region") {
+		t.Errorf("package named the undeclared value:\n%s", got)
 	}
-	if strings.Contains(out.String(), "AIRFLOW_VAR_REGION") {
-		t.Errorf("a warning is not the command's output, but stdout has it:\n%s", out.String())
+
+	d, out = testDeps(t)
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	if err := execute(t, d, "package", "mwaa", "--out-dir", outDir, "--output", "json"); err != nil {
+		t.Fatalf("package mwaa: %v", err)
+	}
+	if strings.Contains(out.String(), "region") {
+		t.Errorf("package -o json named the undeclared value:\n%s", out.String())
+	}
+}
+
+// An image's result lists the values the manifest declares under the deploy
+// command, for the Deployment to set, the required ones first, aligned.
+func TestPackageListsTheDeploymentEnvUnderTheDeployCommand(t *testing.T) {
+	var b strings.Builder
+	err := renderImageResult(&b, pack.Result{
+		Image: "astro-package/p:3.1-2-abc",
+		DeploymentEnv: []pack.DeploymentValue{
+			{Kind: "connection", Name: "llm_gateway", Status: "required"},
+			{Kind: "connection", Name: "github_default", Status: "optional"},
+			{Kind: "airflow variable", Name: "region", Status: "has a default"},
+		},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "\nDeploy it with:\n  astro deploy --image-name astro-package/p:3.1-2-abc\n" +
+		"and set these on the Deployment, as environment variables or linked Environment Manager objects:\n" +
+		"  connection llm_gateway     required\n" +
+		"  connection github_default  optional\n" +
+		"  airflow variable region    has a default\n"
+	if !strings.HasSuffix(b.String(), want) {
+		t.Errorf("got:\n%s\nwant suffix:\n%s", b.String(), want)
+	}
+
+	b.Reset()
+	if err := renderImageResult(&b, pack.Result{Image: "i"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(b.String(), "set these") {
+		t.Errorf("no declared values, yet:\n%s", b.String())
+	}
+}
+
+// A package linked to a workspace says nothing about it: an image carries
+// none of the workspace's values, and a Deployment gets its own workspace's.
+func TestPackageSaysNothingAboutALinkedWorkspace(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("ASTRO_HOME", "")
+	d, out := testDeps(t)
+	dir := t.TempDir()
+	writeManifest(t, &d, dir)
+	m := "[project]\nname = 'demo'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nworkspace = 'cmws'\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(m), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := execute(t, d, "package", "mwaa", "--out-dir", filepath.Join(t.TempDir(), "mwaa")); err != nil {
+		t.Fatalf("package mwaa: %v", err)
+	}
+	if all := out.String() + stderrOf(d); strings.Contains(all, "cmws") {
+		t.Errorf("package named the workspace:\n%s", all)
+	}
+}
+
+// fakePackageTarget stands in for the astro target: it finds a warning,
+// streams a line of build output, finds another warning, then returns
+// res or err.
+type fakePackageTarget struct {
+	res pack.Result
+	err error
+}
+
+func (fakePackageTarget) Name() string { return pack.TargetAstro }
+
+func (f fakePackageTarget) Build(_ context.Context, req pack.Request, cb localrt.Callbacks) (pack.Result, error) {
+	req.Warn("found before the build")
+	cb.OnLine(localrt.LogLine{Component: "build", Text: "step 1/9"})
+	req.Warn("found after the build")
+	return f.res, f.err
+}
+
+// packageWithFake runs `astro package` over fakePackageTarget, with stdout and
+// stderr in one buffer so the order the two interleave in is what a terminal
+// shows.
+func packageWithFake(t *testing.T, target fakePackageTarget, args ...string) (string, error) {
+	t.Helper()
+	d, out := testDeps(t)
+	d.Stderr = out
+	writeManifest(t, &d, t.TempDir())
+	d.PackageAstro = target
+	err := execute(t, d, append([]string{"package", "astro"}, args...)...)
+	return out.String(), err
+}
+
+// In text, each warning a package finds prints once, after the
+// build's output, just above the result.
+func TestPackageShowsWarningsOnceAfterTheBuild(t *testing.T) {
+	got, err := packageWithFake(t, fakePackageTarget{res: pack.Result{
+		Target: pack.TargetAstro, Kind: pack.KindImage, Image: "astro-package/demo:x",
+		Warnings: []string{"found before the build", "found after the build"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireInOrder(t, got, "[build] step 1/9", "Warning: found before the build",
+		"Warning: found after the build", "target: astro")
+	for _, msg := range []string{"found before the build", "found after the build"} {
+		if n := strings.Count(got, msg); n != 1 {
+			t.Errorf("%q printed %d times, want once:\n%s", msg, n, got)
+		}
+	}
+}
+
+// A build that fails prints what it found once, before the error the command
+// returns.
+func TestPackageShowsWarningsOnceWhenTheBuildFails(t *testing.T) {
+	boom := errors.New("boom")
+	got, err := packageWithFake(t, fakePackageTarget{err: boom})
+	if !errors.Is(err, boom) {
+		t.Fatalf("err = %v, want boom", err)
+	}
+	requireInOrder(t, got, "[build] step 1/9", "Warning: found before the build",
+		"Warning: found after the build")
+	if n := strings.Count(got, "found before the build"); n != 1 {
+		t.Errorf("printed %d times, want once:\n%s", n, got)
+	}
+}
+
+// Under json a warning is an event emitted once, as it is found, between the
+// build's lines, as before.
+func TestPackageStreamsWarningsInJSON(t *testing.T) {
+	got, err := packageWithFake(t, fakePackageTarget{res: pack.Result{Target: pack.TargetAstro, Kind: pack.KindImage, Image: "i"}},
+		"--output", "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireInOrder(t, got, `"text":"found before the build"`, `step 1/9`, `"text":"found after the build"`)
+	if n := strings.Count(got, `"text":"found before the build"`); n != 1 {
+		t.Errorf("json emitted the warning %d times, want once:\n%s", n, got)
 	}
 }
 
