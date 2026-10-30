@@ -22,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // fakeBuilder is an ImageBuilder that records the request and never touches a
@@ -395,8 +396,8 @@ func TestAstroBuildWritesTheContext(t *testing.T) {
 	assert.Equal(t, KindContext, res.Kind)
 	assert.Equal(t, req.ContextDir, res.ContextDir)
 	assert.Equal(t, []string{
-		"docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + req.ContextDir,
-		"podman build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + req.ContextDir,
+		"docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + scaffold.ShellQuote(req.ContextDir),
+		"podman build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + scaffold.ShellQuote(req.ContextDir),
 	}, res.NextSteps)
 	assert.Empty(t, docker.callStrings(), "no engine")
 	assert.Empty(t, builder.gotReq.Tag, "no build")
