@@ -7,39 +7,50 @@ import (
 	"testing"
 )
 
-// A warning is shown when found and repeated at the end once progress output
-// has followed it; one found after the last progress output, and one held
-// for the end, print once.
-func TestRecapShowsWhenFoundAndRepeatsWhatProgressBuried(t *testing.T) {
+// Held, each warning and note prints once, at the Flush after the run's
+// output, in the order found.
+func TestRecapHoldsEachForTheFlush(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRecap(&buf, true)
 	r.Warn("early")
 	r.Note("a note")
 	fmt.Fprintln(&buf, "step 1/9")
-	r.Progress()
 	r.Warn("late")
-	r.Later("after the work")
-	r.End()
-	want := "Warning: early\nNote: a note\nstep 1/9\nWarning: late\n" +
-		"Warning: early\nNote: a note\nWarning: after the work\n"
+	r.Flush()
+	want := "step 1/9\nWarning: early\nNote: a note\nWarning: late\n"
 	if buf.String() != want {
 		t.Errorf("printed\n%s\nwant\n%s", buf.String(), want)
 	}
-	r.End()
+	r.Flush()
 	if buf.String() != want {
-		t.Errorf("a second End reprinted:\n%s", buf.String())
+		t.Errorf("a second Flush reprinted:\n%s", buf.String())
 	}
 }
 
-// Without repeat (json), each prints once: when found, or at the end.
-func TestRecapWithoutRepeatPrintsEachOnce(t *testing.T) {
+// A Flush before a question prints what was found so far; the next prints
+// only what came after.
+func TestRecapFlushBeforeAQuestionIsNotRepeated(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRecap(&buf, true)
+	r.Warn("before the question")
+	r.Flush()
+	fmt.Fprintln(&buf, "Deploy to which deployment?")
+	r.Warn("after")
+	r.Flush()
+	want := "Warning: before the question\nDeploy to which deployment?\nWarning: after\n"
+	if buf.String() != want {
+		t.Errorf("printed\n%s\nwant\n%s", buf.String(), want)
+	}
+}
+
+// Not holding (json), each prints once, as found.
+func TestRecapWithoutHoldPrintsAsFound(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRecap(&buf, false)
 	r.Warn("early")
-	r.Progress()
-	r.Later("after the work")
-	r.End()
-	if want := "Warning: early\nWarning: after the work\n"; buf.String() != want {
+	fmt.Fprintln(&buf, "step 1/9")
+	r.Flush()
+	if want := "Warning: early\nstep 1/9\n"; buf.String() != want {
 		t.Errorf("printed %q, want %q", buf.String(), want)
 	}
 }
@@ -53,11 +64,11 @@ func TestRecapIsSafeForConcurrentUse(t *testing.T) {
 	for range 8 {
 		wg.Add(2)
 		go func() { defer wg.Done(); r.Warn("w") }()
-		go func() { defer wg.Done(); r.Progress() }()
+		go func() { defer wg.Done(); r.Flush() }()
 	}
 	wg.Wait()
-	r.End()
-	if n < 8 || n > 16 {
-		t.Errorf("shown %d times, want each warning once or twice", n)
+	r.Flush()
+	if n != 8 {
+		t.Errorf("shown %d times, want each warning once", n)
 	}
 }

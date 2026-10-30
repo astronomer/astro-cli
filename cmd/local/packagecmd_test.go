@@ -222,8 +222,8 @@ func TestPackageSaysNothingAboutALinkedWorkspace(t *testing.T) {
 	}
 }
 
-// fakePackageTarget stands in for the astro target: it finds a warning and a
-// note, streams a line of build output, finds another warning, then returns
+// fakePackageTarget stands in for the astro target: it finds a warning,
+// streams a line of build output, finds another warning, then returns
 // res or err.
 type fakePackageTarget struct {
 	res pack.Result
@@ -234,9 +234,6 @@ func (fakePackageTarget) Name() string { return pack.TargetAstro }
 
 func (f fakePackageTarget) Build(_ context.Context, req pack.Request, cb localrt.Callbacks) (pack.Result, error) {
 	req.Warn("found before the build")
-	if req.Note != nil {
-		req.Note("a note before the build")
-	}
 	cb.OnLine(localrt.LogLine{Component: "build", Text: "step 1/9"})
 	req.Warn("found after the build")
 	return f.res, f.err
@@ -255,10 +252,9 @@ func packageWithFake(t *testing.T, target fakePackageTarget, args ...string) (st
 	return out.String(), err
 }
 
-// In text, what a package finds is shown when found, and what the build's
-// output then followed is repeated just above the result; one found after
-// the last of the output prints once.
-func TestPackageShowsWarningsAndRepeatsThemAfterTheBuild(t *testing.T) {
+// In text, each warning a package finds prints once, after the
+// build's output, just above the result.
+func TestPackageShowsWarningsOnceAfterTheBuild(t *testing.T) {
 	got, err := packageWithFake(t, fakePackageTarget{res: pack.Result{
 		Target: pack.TargetAstro, Kind: pack.KindImage, Image: "astro-package/demo:x",
 		Warnings: []string{"found before the build", "found after the build"},
@@ -266,25 +262,27 @@ func TestPackageShowsWarningsAndRepeatsThemAfterTheBuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	requireInOrder(t, got, "Warning: found before the build", "Note: a note before the build", "[build] step 1/9",
-		"Warning: found after the build", "Warning: found before the build", "Note: a note before the build", "target: astro")
-	if n := strings.Count(got, "found after the build"); n != 1 {
-		t.Errorf("a warning after the build's output printed %d times, want once:\n%s", n, got)
+	requireInOrder(t, got, "[build] step 1/9", "Warning: found before the build",
+		"Warning: found after the build", "target: astro")
+	for _, msg := range []string{"found before the build", "found after the build"} {
+		if n := strings.Count(got, msg); n != 1 {
+			t.Errorf("%q printed %d times, want once:\n%s", msg, n, got)
+		}
 	}
 }
 
-// A build that fails repeats what it found before the error the command
+// A build that fails prints what it found once, before the error the command
 // returns.
-func TestPackageRepeatsWarningsWhenTheBuildFails(t *testing.T) {
+func TestPackageShowsWarningsOnceWhenTheBuildFails(t *testing.T) {
 	boom := errors.New("boom")
 	got, err := packageWithFake(t, fakePackageTarget{err: boom})
 	if !errors.Is(err, boom) {
 		t.Fatalf("err = %v, want boom", err)
 	}
-	requireInOrder(t, got, "Warning: found before the build", "[build] step 1/9", "Warning: found after the build",
-		"Warning: found before the build", "Note: a note before the build")
-	if n := strings.Count(got, "found before the build"); n != 2 {
-		t.Errorf("printed %d times, want when found and once more at the end:\n%s", n, got)
+	requireInOrder(t, got, "[build] step 1/9", "Warning: found before the build",
+		"Warning: found after the build")
+	if n := strings.Count(got, "found before the build"); n != 1 {
+		t.Errorf("printed %d times, want once:\n%s", n, got)
 	}
 }
 
@@ -296,7 +294,7 @@ func TestPackageStreamsWarningsInJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	requireInOrder(t, got, `"text":"found before the build"`, `a note before the build`, `step 1/9`, `"text":"found after the build"`)
+	requireInOrder(t, got, `"text":"found before the build"`, `step 1/9`, `"text":"found after the build"`)
 	if n := strings.Count(got, `"text":"found before the build"`); n != 1 {
 		t.Errorf("json emitted the warning %d times, want once:\n%s", n, got)
 	}

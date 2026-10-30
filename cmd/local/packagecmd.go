@@ -16,7 +16,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
-	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -124,15 +123,13 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		pin := m.Airflow().Pin
 		catalog = func(ctx context.Context) *runtimeversions.Catalog { return c.d.ImageCatalog(ctx, pin) }
 	}
-	// A warning or note the target finds as it goes is shown as it is found,
-	// so a build that is interrupted still shows it, and in text repeated
+	// In text, a warning or note the target finds as it goes prints once,
 	// after the build's output, just above the result, where a long build
-	// cannot scroll it away; a build that fails repeats them before its error
-	// (packageRecap). shown keeps the warnings already out, for the result's
+	// cannot scroll it away, or before the error a failed build returns
+	// (packageRecap). shown keeps the warnings already given, for the result's
 	// warnings below.
 	cb := c.callbacks(r)
-	recap := packageRecap(r, cb)
-	cb = trackProgress(cb, recap)
+	recap := packageRecap(r)
 	shown := map[string]bool{}
 	warn := func(w string) {
 		shown[w] = true
@@ -149,10 +146,9 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		CheckRuntime:   c.d.RuntimeCheck,
 		RuntimeCatalog: catalog,
 		Warn:           warn,
-		Note:           recap.Note,
 	}, cb)
 	if err != nil {
-		recap.End()
+		recap.Flush()
 		return err
 	}
 	// What the project gets from this machine without declaring it runs locally
@@ -162,23 +158,23 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	// them either, and a Deployment gets its own workspace's.
 	undeclared, _ := plan.UndeclaredLocal(dir, m) //nolint:errcheck // best effort, see above
 	// The result carries every warning in json, the undeclared values as one
-	// sentence. In text, the ones not shown as the build ran (a bucket
-	// target's own, then the undeclared values as a table) print once, after
-	// the repeated ones, above the result rather than listed in it.
+	// sentence. In text, the ones not given as the build ran (a bucket
+	// target's own, then the undeclared values as a table) print with the
+	// rest, above the result rather than listed in it.
 	if r.Format == cliout.FormatText {
 		for _, w := range res.Warnings {
 			if !shown[w] {
-				recap.Later(w)
+				recap.Warn(w)
 			}
 		}
 		if w := plan.UndeclaredWarning(undeclared); w != "" {
-			recap.Later(w)
+			recap.Warn(w)
 		}
 	}
 	if s := plan.UndeclaredSentence(undeclared); s != "" {
 		res.Warnings = append(res.Warnings, s)
 	}
-	recap.End()
+	recap.Flush()
 	// An event rather than a result: an image build streamed its progress
 	// before it, and this ends that stream, so it is one line too.
 	return r.EmitEvent(res, func(w io.Writer) error {
@@ -296,12 +292,11 @@ func renderNextSteps(w io.Writer, steps []string) error {
 	return nil
 }
 
-// packageRecap shows the warnings and notes a package finds as it goes. In
-// text they are Warning: and Note: lines on stderr beside the build's
-// progress (or stdout when there is no stderr), repeated after it. Under json
-// a warning is a warning event and a note a progress line, as they always
-// were, each emitted once.
-func packageRecap(r cliout.Renderer, cb localrt.Callbacks) *cliout.Recap {
+// packageRecap shows the warnings a package finds. In text they are
+// Warning: lines on stderr (or stdout when there is no stderr), held until
+// after the build's progress. Under json each is a warning event, emitted as
+// found, as it always was.
+func packageRecap(r cliout.Renderer) *cliout.Recap {
 	if r.Format == cliout.FormatText {
 		w := r.Err
 		if w == nil {
@@ -309,28 +304,7 @@ func packageRecap(r cliout.Renderer, cb localrt.Callbacks) *cliout.Recap {
 		}
 		return cliout.NewRecap(w, true)
 	}
-	return cliout.NewRecapFunc(func(note bool, msg string) {
-		if !note {
-			emitWarning(r, event{Event: "warning", Text: msg})
-		} else if cb.OnLine != nil {
-			cb.OnLine(localrt.LogLine{Component: "package", Time: time.Now(), Text: msg})
-		}
+	return cliout.NewRecapFunc(func(_ bool, msg string) {
+		emitWarning(r, event{Event: "warning", Text: msg})
 	}, false)
-}
-
-// trackProgress is cb, telling recap each time it prints a line of progress.
-func trackProgress(cb localrt.Callbacks, recap *cliout.Recap) localrt.Callbacks {
-	if onLine := cb.OnLine; onLine != nil {
-		cb.OnLine = func(l localrt.LogLine) {
-			onLine(l)
-			recap.Progress()
-		}
-	}
-	if onState := cb.OnState; onState != nil {
-		cb.OnState = func(s localrt.State, err error) {
-			onState(s, err)
-			recap.Progress()
-		}
-	}
-	return cb
 }

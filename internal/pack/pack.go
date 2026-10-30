@@ -89,18 +89,6 @@ type Request struct {
 	// Each is also kept on Result.Warnings. nil streams them as progress
 	// lines, "warning: …".
 	Warn func(string)
-	// Note receives what the image target notes before it builds and that is
-	// not wrong: the project's own linked worktrees it leaves out
-	// (shipcheck.LeftOutNote). nil streams it as a progress line.
-	Note func(string)
-}
-
-// note is Request.Note, or a progress line through cb when it is nil.
-func (r Request) note(cb localrt.Callbacks) func(string) {
-	if r.Note != nil {
-		return r.Note
-	}
-	return func(n string) { emit(cb, n) }
 }
 
 // warn is Request.Warn, or a progress line through cb when it is nil.

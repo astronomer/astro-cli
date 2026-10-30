@@ -147,10 +147,10 @@ func execDeployOneStream(answers string, args ...string) (string, error) {
 	return buf.String(), err
 }
 
-// A warning found before the deploy asks which Deployment to ship to is
-// shown when found, so before the question, and repeated after the build;
-// one found after the build prints once.
-func TestDeployManifestShowsAWarningBeforeAQuestionAndRepeatsIt(t *testing.T) {
+// A warning found before the deploy asks which Deployment to ship to prints
+// before the question, and not again; one found later prints once, after the
+// build.
+func TestDeployManifestShowsAWarningBeforeAQuestionOnce(t *testing.T) {
 	interactiveDeploy(t)
 	fake := newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
 	fake.listErr = errors.New("list refused")
@@ -158,16 +158,14 @@ func TestDeployManifestShowsAWarningBeforeAQuestionAndRepeatsIt(t *testing.T) {
 	out, err := execDeployOneStream("\n")
 	require.NoError(t, err)
 	requireInOrder(t, out, "Warning: could not list the Deployments", "Deploy to which deployment?",
-		"Building your project image", "Warning: found after the build", "Warning: could not list the Deployments",
-		"to prod (deployment clx-dep).")
-	assert.Equal(t, 2, strings.Count(out, "could not list the Deployments"), out)
+		"Building your project image", "Warning: found after the build", "to prod (deployment clx-dep).")
+	assert.Equal(t, 1, strings.Count(out, "could not list the Deployments"), out)
 	assert.Equal(t, 1, strings.Count(out, "found after the build"), out)
 }
 
-// In text, a warning is shown when found and repeated after the build's
-// output, just above the result; a deploy that fails repeats it before its
-// error. One found after the build prints once.
-func TestDeployManifestShowsWarningsAndRepeatsThemAfterTheBuild(t *testing.T) {
+// In text, each warning prints once, after the build's output, just above
+// the result; a deploy that fails prints them before its error.
+func TestDeployManifestShowsWarningsOnceAfterTheBuild(t *testing.T) {
 	const before, after = "found before the build", "found after it"
 	setupManifestDeploy(t, &fakeCmdDeployer{
 		img:             manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "tag-1", DagTarballVersion: "3-1"},
@@ -175,15 +173,17 @@ func TestDeployManifestShowsWarningsAndRepeatsThemAfterTheBuild(t *testing.T) {
 	})
 	out, err := execDeployOneStream("", "prod")
 	require.NoError(t, err)
-	requireInOrder(t, out, "Warning: "+before, "Building your project image", "Warning: "+after,
-		"Warning: "+before, "Deployed image (tag tag-1)")
+	requireInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after,
+		"Deployed image (tag tag-1)")
+	assert.Equal(t, 1, strings.Count(out, before), out)
 	assert.Equal(t, 1, strings.Count(out, after), out)
 
 	boom := errors.New("boom")
 	setupManifestDeploy(t, &fakeCmdDeployer{imgErr: boom, warnBeforeBuild: before, warn: after})
 	out, err = execDeployOneStream("", "prod")
 	require.ErrorIs(t, err, boom)
-	requireInOrder(t, out, "Warning: "+before, "Building your project image", "Warning: "+after, "Warning: "+before)
+	requireInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after)
+	assert.Equal(t, 1, strings.Count(out, before), out)
 
 	// Under json a warning prints once, as it is given.
 	setupManifestDeploy(t, &fakeCmdDeployer{

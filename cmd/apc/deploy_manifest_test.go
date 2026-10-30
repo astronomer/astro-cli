@@ -264,11 +264,9 @@ func TestDeployManifestWarnings(t *testing.T) {
 	assert.Contains(t, run.stderr, "Warning: this deploy upgrades Deployment dep-prod from Airflow 2 to Airflow 3")
 }
 
-// In text, a warning given before the deploy's output begins is shown on
-// stderr when given and repeated after the build's output, just above the
-// result, or before the error a failed deploy returns; one the build gives
-// prints once.
-func TestDeployManifestShowsWarningsAndRepeatsThemAfterTheBuild(t *testing.T) {
+// In text, each warning prints once on stderr, after the build's output,
+// just above the result, or before the error a failed deploy returns.
+func TestDeployManifestShowsWarningsOnceAfterTheBuild(t *testing.T) {
 	const early = "--runtime-version has no effect without --remote"
 	const during = "found during the build"
 	for _, fail := range []bool{false, true} {
@@ -290,7 +288,8 @@ func TestDeployManifestShowsWarningsAndRepeatsThemAfterTheBuild(t *testing.T) {
 		} else {
 			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		}
-		requireInOrder(t, run.stderr, "Warning: "+early, "build step 1/9", "Warning: "+during, "Warning: "+early)
+		requireInOrder(t, run.stderr, "build step 1/9", "Warning: "+early, "Warning: "+during)
+		assert.Equal(t, 1, strings.Count(run.stderr, early), run.stderr)
 		assert.Equal(t, 1, strings.Count(run.stderr, during), run.stderr)
 	}
 }
