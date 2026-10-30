@@ -1,0 +1,13 @@
+experiment,version_ms,help_ms,local_status_ms,total_mean_ms,total_median_ms,binary,note
+baseline,30.09,10.58,10.62,51.29,51.07,59.7MB,v2 head
+baseline-2,30.24,10.64,10.56,51.44,51.29,59.7MB,noise check
+exp1-release-cache,11.81,10.82,10.72,33.35,33.50,59.7MB,cache release check 24h (kept)
+exp2-os-version-in-child,11.20,10.82,10.85,32.86,32.69,59.7MB,os_version in sender child (kept)
+exp3-gc-off-during-tree,10.75,10.09,10.07,30.92,30.86,59.7MB,GC off during tree build (superseded by exp4)
+exp4-gc-window,9.23,8.97,8.84,27.03,26.76,59.7MB,no GC for first 100ms (kept)
+exp5-help-flag-no-merge,8.51,8.25,8.34,25.09,24.72,59.7MB,help flag without persistent merge (kept)
+exp6-lazy-help-flag,8.28,7.98,8.12,24.38,24.21,59.7MB,help flag only on the running command (kept)
+final,8.85,8.46,8.25,25.57,25.07,59.7MB,final tree (100 runs)
+rejected: strip binary (-s -w),,10.6 vs 10.4,,,,41.7MB,no gain
+rejected: GOMAXPROCS 1/2/4,,10.3/9.2/9.1 vs 9.1,,,,,no gain
+not kept: drop distribution/reference,,7.6 vs 8.2,,,,,saves 0.6ms; needs a copy of Docker's reference grammar
