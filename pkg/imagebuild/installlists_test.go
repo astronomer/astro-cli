@@ -3,6 +3,7 @@ package imagebuild
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -204,12 +205,17 @@ func TestWriteContextInsideTheProject(t *testing.T) {
 		"pyproject.toml": "[project]\nname = 'p'\n",
 		".astro/a.txt":   "carried\n",
 	})
-	require.NoError(t, os.Symlink("build", filepath.Join(project, "zz-link")))
+	// The directory exists, empty, before the link to it is made, so Windows
+	// makes a directory link, which a walk can follow.
+	dir := filepath.Join(project, "build")
+	require.NoError(t, os.Mkdir(dir, 0o755))
+	if err := os.Symlink("build", filepath.Join(project, "zz-link")); err != nil && runtime.GOOS != "windows" {
+		t.Fatal(err)
+	}
 	req := testRequest(t)
 	req.ProjectFiles = project
 	req.Install = &InstallLists{Requirements: []string{"pandas==2.2.3"}}
 
-	dir := filepath.Join(project, "build")
 	require.NoError(t, WriteContext(dir, req))
 	assert.ElementsMatch(t, []string{
 		"dags/a.py", "pyproject.toml", ".astro/a.txt",
