@@ -1,6 +1,7 @@
 package imageinstall
 
 import (
+	"errors"
 	"fmt"
 	neturl "net/url"
 	"strings"
@@ -36,8 +37,9 @@ import (
 //     the image's install never asks its own index for that name. It is in
 //     requirements.txt too, at the same version, which the main install
 //     finds already installed, so its dependencies install with the rest.
-//     Everything else installs by name through the image's own index, a
-//     package from a local path included, which the image does not have.
+//     Everything else installs by name through the image's own index. A
+//     package from a path on this machine, a path source or a workspace
+//     member, is refused (ErrLocalSource): the image cannot reach it.
 //   - A user or password in any of those URLs is left out, with one warning:
 //     the lists land in an image layer and the build log, and the build
 //     authenticates through the netrc secret.
@@ -59,13 +61,14 @@ type pylock struct {
 
 // lockedPackage is one [[packages]] entry of a pylock.toml.
 type lockedPackage struct {
-	Name    string       `toml:"name"`
-	Version string       `toml:"version"`
-	Marker  string       `toml:"marker"`
-	VCS     *lockedVCS   `toml:"vcs"`
-	Archive *lockedFile  `toml:"archive"`
-	Sdist   *lockedFile  `toml:"sdist"`
-	Wheels  []lockedFile `toml:"wheels"`
+	Name      string       `toml:"name"`
+	Version   string       `toml:"version"`
+	Marker    string       `toml:"marker"`
+	VCS       *lockedVCS   `toml:"vcs"`
+	Archive   *lockedFile  `toml:"archive"`
+	Directory *lockedDir   `toml:"directory"`
+	Sdist     *lockedFile  `toml:"sdist"`
+	Wheels    []lockedFile `toml:"wheels"`
 }
 
 // lockedVCS is a package's vcs table: the repository and the commit the lock
@@ -77,11 +80,36 @@ type lockedVCS struct {
 	Subdirectory string `toml:"subdirectory"`
 }
 
-// lockedFile is a wheel, an sdist or an archive: where it is and its hashes.
+// lockedFile is a wheel, an sdist or an archive: where it is, a URL or a
+// path on this machine, and its hashes.
 type lockedFile struct {
 	URL    string            `toml:"url"`
+	Path   string            `toml:"path"`
 	Hashes map[string]string `toml:"hashes"`
 }
+
+// lockedDir is a package's directory table: a source tree on this machine, a
+// path source or a workspace member.
+type lockedDir struct {
+	Path string `toml:"path"`
+}
+
+// localPath is where on this machine the lock takes pkg from, a path source
+// or a workspace member, or "" when it comes from an index, git or a URL.
+func localPath(pkg *lockedPackage) string {
+	switch {
+	case pkg.Directory != nil:
+		return pkg.Directory.Path
+	case pkg.Archive != nil && pkg.Archive.URL == "":
+		return pkg.Archive.Path
+	}
+	return ""
+}
+
+// ErrLocalSource reports a package the lock takes from a path on this
+// machine, which an image cannot install: its install reads indexes, git and
+// URLs, before the project's files are in it.
+var ErrLocalSource = errors.New("the image cannot install a package from a path on this machine")
 
 // projectNames are what the policy reads of pyproject.toml: the names the
 // project lists itself, with whether it gives a version, and the packages a
@@ -211,6 +239,7 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 	var lists imagebuild.InstallLists
 	urls := &urlCleaner{}
 	git := false
+	var local []string
 	for i := range lock.Packages {
 		pkg := &lock.Packages[i]
 		name := manifest.DistName(pkg.Name)
@@ -222,6 +251,10 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 			continue
 		case installed[name] && !own:
 			continue // the runtime's, at its tested version
+		}
+		if p := localPath(pkg); p != "" {
+			local = append(local, fmt.Sprintf("%s (%s)", pkg.Name, p))
+			continue
 		}
 		refs := directRefs(pkg, urls)
 		switch {
@@ -244,6 +277,11 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 			lists.Constraints = append(lists.Constraints, withMarker(pin(pkg), pkg.Marker))
 		}
 		git = git || pkg.VCS != nil
+	}
+	if len(local) > 0 {
+		return imagebuild.InstallLists{}, nil, fmt.Errorf("%w: uv.lock takes %s from a path, which the image build has no way to reach. "+
+			"An image installs packages from an index, a git repository or a URL: publish it to an index and route it there with [tool.uv.sources], or point its source at git or a URL",
+			ErrLocalSource, strings.Join(local, ", "))
 	}
 	lists.Packages = in.packages
 	if git {

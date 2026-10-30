@@ -146,12 +146,15 @@ func TestFillInstallsByNameFromADefaultIndex(t *testing.T) {
 	assert.Equal(t, []string{"six==1.16.0"}, req.Install.Requirements)
 }
 
-// A package from a path is installed by name at the lock's version, as the
-// path is not in the image.
-func TestFillInstallsAPathSourceByName(t *testing.T) {
-	req, warnings := fill(t, testResolver(t, nil, []string{}), fixture(t, "path"))
-	assert.Empty(t, warnings)
-	assert.Equal(t, []string{"localpkg==1.2.0", "tabulate==0.10.0"}, req.Install.Requirements)
+// A package from a path on this machine is refused before the build, by
+// name and path: the image cannot reach it, and installing the name from the
+// image's index could install someone else's package of that name.
+func TestFillRefusesAPathSource(t *testing.T) {
+	req := imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.1-5-python-3.12", ManifestDir: fixture(t, "path")}
+	err := testResolver(t, nil, []string{}).Fill(t.Context(), &req, nil)
+	require.ErrorIs(t, err, ErrLocalSource)
+	assert.Contains(t, err.Error(), "localpkg (stub/localpkg-1.2.0-py3-none-any.whl)")
+	assert.Nil(t, req.Install)
 }
 
 // A git or URL source is a direct reference at the commit or file the lock

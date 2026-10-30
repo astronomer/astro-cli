@@ -147,3 +147,14 @@ func TestURLCleaner(t *testing.T) {
 		assert.Equal(t, tc.stripped, c.stripped, raw)
 	}
 }
+
+// A workspace member, which the lock lists as a directory, is refused like a
+// path source.
+func TestApplyRefusesAWorkspaceMember(t *testing.T) {
+	_, _, err := apply(&policyInput{
+		pyproject: []byte("[project]\nname = 'p'\ndependencies = ['member']\n[tool.uv.sources]\nmember = { workspace = true }\n"),
+		pylock:    []byte("[[packages]]\nname = \"member\"\nversion = \"0.1.0\"\ndirectory = { path = \"packages/member\", editable = true }\n"),
+	})
+	require.ErrorIs(t, err, ErrLocalSource)
+	assert.Contains(t, err.Error(), "member (packages/member)")
+}
