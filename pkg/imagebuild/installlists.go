@@ -120,9 +120,14 @@ func lines(entries []string) []byte {
 // --find-links line for each page in findLinks, and the OS packages, plus git
 // when a dependency is a git direct reference (WithGit). It is what
 // a request that carries no Install installs, and what the CLI falls back to
-// when it cannot lock the project.
+// when it cannot lock the project. The dependencies and the packages are
+// sorted, as an install does not depend on their order, so neither do the
+// files nor a tag made of them (Digest). The inputs are not modified.
 func UnpinnedLists(deps, findLinks, packages []string) InstallLists {
-	deps = runtimeDeps(deps)
+	deps = slices.Sorted(slices.Values(runtimeDeps(deps)))
+	if packages != nil {
+		packages = slices.Sorted(slices.Values(packages))
+	}
 	reqs := make([]string, 0, len(findLinks)+len(deps))
 	for _, l := range findLinks {
 		reqs = append(reqs, "--find-links "+l)

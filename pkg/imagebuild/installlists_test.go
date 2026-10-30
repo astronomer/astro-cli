@@ -233,3 +233,17 @@ func TestWriteContextRefuses(t *testing.T) {
 	declared := Request{Dockerfile: filepath.Join(dir, "Dockerfile"), Context: dir}
 	assert.Error(t, WriteContext(filepath.Join(t.TempDir(), "x"), declared))
 }
+
+// Without a lock the lists, and so their digest and the content tag made of
+// it, do not depend on the order dependencies and packages are written in,
+// and the caller's slices are left as they were.
+func TestUnpinnedListsIgnoreOrder(t *testing.T) {
+	deps := []string{"pandas>=2", "apache-airflow==3.1.*", "boto3"}
+	packages := []string{"libpq-dev", "build-essential"}
+	a := UnpinnedLists(deps, []string{"https://acme.example/simple/p/"}, packages)
+	b := UnpinnedLists([]string{"boto3", "pandas>=2"}, []string{"https://acme.example/simple/p/"}, []string{"build-essential", "libpq-dev"})
+	assert.Equal(t, a.Digest(), b.Digest())
+	assert.Equal(t, []string{"--find-links https://acme.example/simple/p/", "boto3", "pandas>=2"}, a.Requirements)
+	assert.Equal(t, []string{"pandas>=2", "apache-airflow==3.1.*", "boto3"}, deps, "input untouched")
+	assert.Equal(t, []string{"libpq-dev", "build-essential"}, packages, "input untouched")
+}
