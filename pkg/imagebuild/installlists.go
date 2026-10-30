@@ -19,7 +19,7 @@ import (
 // and handed to it ready-made as InstallLists: the CLI resolves the project
 // with the host's uv and applies the image's policy to the lock
 // (internal/imageinstall). The build itself resolves nothing. Its Dockerfile is
-// the runtime's ONBUILD steps written out, reading the three lists from the
+// the runtime's ONBUILD steps written out, reading the lists from the
 // context, so the context is self-contained: `docker build` runs it as written,
 // on any machine, with nothing from the CLI (WriteContext).
 
