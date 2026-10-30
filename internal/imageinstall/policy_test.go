@@ -49,12 +49,15 @@ marker = "python_version >= '3.10'"
 	}
 }
 
-// A routed package's file is the one the image's platform installs: one line
-// when every platform takes the same file, else one for each, limited to it.
-func TestApplyPicksARoutedPackagesFileForEachPlatform(t *testing.T) {
-	const pyproject = "[project]\nname = 'p'\ndependencies = ['fast', 'pure']\n" +
-		"[tool.uv.sources]\nfast = [{ index = 'acme', marker = \"sys_platform == 'linux'\" }]\npure = { index = 'acme' }\n"
-	lists, _, err := apply(&policyInput{
+// A routed package installs on its own, from every file the lock recorded
+// for it: the line pins its version with the lock's marker, and the page lists
+// each wheel and the sdist with its hash, without the URL's credentials, for
+// pip in the image to pick from. It installs this way whether the project
+// names it or it is only a dependency, unless the image already has it.
+func TestApplyInstallsARoutedPackageFromTheLocksFiles(t *testing.T) {
+	const pyproject = "[project]\nname = 'p'\ndependencies = ['fast', 'needs-dep']\n" +
+		"[tool.uv.sources]\nfast = [{ index = 'acme', marker = \"sys_platform == 'linux'\" }]\ndep = { index = 'acme' }\nshipped = { index = 'acme' }\n"
+	lists, warnings, err := apply(&policyInput{
 		pyproject: []byte(pyproject),
 		pylock: []byte(`
 [[packages]]
@@ -63,77 +66,45 @@ version = "1.0"
 marker = "sys_platform == 'linux'"
 sdist = { url = "https://acme.example/fast-1.0.tar.gz", hashes = { sha256 = "s0" } }
 wheels = [
-  { url = "https://acme.example/fast-1.0-cp312-cp312-win_amd64.whl", hashes = { sha256 = "w0" } },
-  { url = "https://acme.example/fast-1.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hashes = { sha256 = "x0" } },
   { url = "https://acme.example/fast-1.0-cp312-cp312-manylinux_2_28_x86_64.whl", hashes = { sha256 = "x1" } },
-  { url = "https://acme.example/fast-1.0-cp312-cp312-manylinux_2_34_aarch64.whl", hashes = { sha256 = "a0" } },
-  { url = "https://acme.example/fast-1.0-cp313-cp313-manylinux_2_17_aarch64.whl", hashes = { sha256 = "a1" } },
+  { url = "https://user:pw@acme.example/fast-1.0-cp312-cp312-manylinux_2_34_aarch64.whl", hashes = { sha256 = "a0" } },
 ]
 [[packages]]
-name = "pure"
+name = "needs-dep"
+version = "3.0"
+[[packages]]
+name = "dep"
 version = "2.0"
-wheels = [
-  { url = "https://acme.example/pure-2.0-py2.py3-none-any.whl", hashes = { sha256 = "p0" } },
-  { url = "https://acme.example/pure-2.0-cp312-abi3-manylinux_2_17_x86_64.whl", hashes = { sha256 = "p1" } },
-]
+wheels = [{ url = "https://acme.example/dep-2.0-py3-none-any.whl", hashes = { sha256 = "p0" } }]
+[[packages]]
+name = "shipped"
+version = "4.0"
+wheels = [{ url = "https://acme.example/shipped-4.0-py3-none-any.whl", hashes = { sha256 = "h0" } }]
 `),
-		python: "3.12",
+		baseInstalled: []string{"shipped==3.9"},
 	})
 	require.NoError(t, err)
+	assert.Equal(t, []string{"fast==1.0 ; sys_platform == 'linux'", "dep==2.0"}, lists.Routed)
 	assert.Equal(t, []string{
-		"fast @ https://acme.example/fast-1.0-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=x1 ; (sys_platform == 'linux') and platform_machine == 'x86_64'",
-		// Neither aarch64 wheel installs: one needs glibc 2.34, the other
-		// Python 3.13.
-		"fast @ https://acme.example/fast-1.0.tar.gz#sha256=s0 ; (sys_platform == 'linux') and platform_machine == 'aarch64'",
-		"pure @ https://acme.example/pure-2.0-cp312-abi3-manylinux_2_17_x86_64.whl#sha256=p1 ; platform_machine == 'x86_64'",
-		"pure @ https://acme.example/pure-2.0-py2.py3-none-any.whl#sha256=p0 ; platform_machine == 'aarch64'",
-	}, lists.Requirements)
+		"https://acme.example/fast-1.0-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=x1",
+		"https://acme.example/fast-1.0-cp312-cp312-manylinux_2_34_aarch64.whl#sha256=a0",
+		"https://acme.example/fast-1.0.tar.gz#sha256=s0",
+		"https://acme.example/dep-2.0-py3-none-any.whl#sha256=p0",
+	}, lists.RoutedLinks)
+	assert.Equal(t, []string{"needs-dep==3.0"}, lists.Requirements, "a routed package is not in requirements.txt")
+	assert.Empty(t, lists.Constraints)
+	assert.Len(t, warnings, 1, "the stripped credentials are warned of")
 }
 
-// A routed package with no file the image can install installs by name.
+// A routed package the lock recorded no file of installs by name.
 func TestApplyInstallsARoutedPackageByNameWithoutAFile(t *testing.T) {
 	lists, _, err := apply(&policyInput{
-		pyproject: []byte("[project]\nname = 'p'\ndependencies = ['win']\n[tool.uv.sources]\nwin = { index = 'acme' }\n"),
-		pylock: []byte(`
-[[packages]]
-name = "win"
-version = "1.0"
-wheels = [{ url = "https://acme.example/win-1.0-cp312-cp312-win_amd64.whl" }]
-`),
-		python: "3.12",
+		pyproject: []byte("[project]\nname = 'p'\ndependencies = ['bare']\n[tool.uv.sources]\nbare = { index = 'acme' }\n"),
+		pylock:    []byte("[[packages]]\nname = \"bare\"\nversion = \"1.0\"\n"),
 	})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"win==1.0"}, lists.Requirements)
-}
-
-// The tags an image's CPython takes, best first, as packaging ranks them.
-func TestImageTags(t *testing.T) {
-	tags := imageTags("3.12", "x86_64")
-	order := []string{
-		"cp312-cp312-manylinux_2_28_x86_64",
-		"cp312-cp312-manylinux2014_x86_64",
-		"cp312-cp312-linux_x86_64",
-		"cp312-abi3-manylinux_2_28_x86_64",
-		"cp312-none-manylinux_2_28_x86_64",
-		"cp311-abi3-manylinux_2_28_x86_64",
-		"py312-none-manylinux_2_28_x86_64",
-		"py3-none-linux_x86_64",
-		"cp312-none-any",
-		"py312-none-any",
-		"py3-none-any",
-		"py30-none-any",
-	}
-	for i := 1; i < len(order); i++ {
-		a, okA := tags[order[i-1]]
-		b, okB := tags[order[i]]
-		require.True(t, okA && okB, "%s, %s", order[i-1], order[i])
-		assert.Less(t, a, b, "%s before %s", order[i-1], order[i])
-	}
-	for _, no := range []string{"cp313-cp313-manylinux_2_17_x86_64", "cp312-cp312-manylinux_2_34_x86_64", "cp312-cp312-manylinux_2_17_aarch64", "cp312-cp312-win_amd64"} {
-		assert.NotContains(t, tags, no)
-	}
-	assert.Contains(t, imageTags("", "aarch64"), "py3-none-any")
-	assert.NotContains(t, imageTags("", "aarch64"), "cp312-none-any")
+	assert.Equal(t, []string{"bare==1.0"}, lists.Requirements)
+	assert.Empty(t, lists.Routed)
 }
 
 // statesVersion tells a requirement that limits its version from one that

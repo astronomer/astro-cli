@@ -226,8 +226,8 @@ FROM quay.io/astronomer/astro-runtime:12.6.0-base
 COPY --from=astro-install packages.txt .
 USER root
 RUN if [ -x /usr/local/bin/install-system-packages ]; then /usr/local/bin/install-system-packages; elif [ -s packages.txt ]; then apt-get update && cat packages.txt | tr '\r\n' '\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi
-COPY --from=astro-install requirements.txt uv-lock-constraints.txt ./
-RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false if [ -x /usr/local/bin/install-python-dependencies ]; then /usr/local/bin/install-python-dependencies; else pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; fi
+COPY --from=astro-install requirements.txt uv-lock-constraints.txt routed-requirements.txt routed-links.html ./
+RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false if [ -s routed-requirements.txt ]; then pip install --no-cache-dir --root-user-action=ignore --no-index --no-deps --find-links routed-links.html -r routed-requirements.txt; fi && if [ -x /usr/local/bin/install-python-dependencies ]; then /usr/local/bin/install-python-dependencies; else pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; fi
 USER astro
 COPY --chown=astro:0 . .
 
@@ -734,7 +734,7 @@ private-lib = { git = "https://github.com/acme/private-lib.git", rev = "4bfeaf8"
 
 Set `NETRC_CONTENT` to a netrc entry, such as `machine github.com login x-access-token password <token>`. List `git` in [`packages`](#packages) if the runtime image does not have it. The mount is the generated build's own step, so it works on every runtime, including those whose own `ONBUILD` install never mounted it. It is written only when the build has the secret, and then needs BuildKit under Docker, or Podman 3.2 or later.
 
-A source that names an index, `private-lib = { index = "acme" }` with a `[[tool.uv.index]]` named `acme`, reaches a generated image as the exact file the lock recorded for `private-lib`, by its URL on the index and its hash, so PyPI is never asked for it. Without a `uv.lock`, the build runs `uv lock` first, through the same index, and asks you to commit the lock it writes, so what the image installs is what you tested. Only a source for a package the image installs counts: the Airflow sources `astro init` writes add nothing, since the runtime image already is Airflow. An index behind a login takes the same `netrc` secret for the install; uv's resolve, on the host, reads the host's own credentials for it (`~/.netrc`, a keyring, or `UV_INDEX_<NAME>_USERNAME` and `_PASSWORD`).
+A source that names an index, `private-lib = { index = "acme" }` with a `[[tool.uv.index]]` named `acme`, reaches a generated image from the files the lock recorded for `private-lib`, by their URLs on the index and their hashes: the build installs it first, with pip and no index, so pip picks the file the image takes and PyPI is never asked for it. Without a `uv.lock`, the build runs `uv lock` first, through the same index, and asks you to commit the lock it writes, so what the image installs is what you tested. Only a source for a package the image installs counts: the Airflow sources `astro init` writes add nothing, since the runtime image already is Airflow. An index behind a login takes the same `netrc` secret for the install; uv's resolve, on the host, reads the host's own credentials for it (`~/.netrc`, a keyring, or `UV_INDEX_<NAME>_USERNAME` and `_PASSWORD`).
 
 `astro local check` builds its check environments outside the project, where uv cannot see the table, so it passes `constraint-dependencies` and the source index pages to them itself, and a check resolves the way the project does. A check against MWAA or Composer leaves out the `+astro` pins and the runtime's own lines: those platforms run Apache's own Airflow, with its own constraints.
 

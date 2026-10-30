@@ -29,9 +29,11 @@ import (
 //     and the install keeps whatever the image has that satisfies the
 //     requirements, as pip and uv do.
 //   - A package from git or a URL is a direct reference to the commit or file
-//     the lock recorded, and so is one a [tool.uv.sources] entry routes to an
-//     index: the file the lock recorded for the image's platform, by URL and
-//     hash, so the image's install never asks its own index for that name.
+//     the lock recorded. One a [tool.uv.sources] entry routes to an index
+//     installs before everything else, from the files the lock recorded for
+//     it alone (InstallLists.Routed): pip, in the image, picks the one its
+//     Python and platform take, and checks it against the lock's hash, so
+//     the image's install never asks its own index for that name.
 //     Everything else installs by name through the image's own index, a
 //     package from a local path included, which the image does not have.
 //   - A user or password in any of those URLs is left out, with one warning:
@@ -173,9 +175,6 @@ type policyInput struct {
 	// baseInstalled those of the image's freeze. A nil baseInstalled is not
 	// known (not the same as an image with nothing in it).
 	runtimePins, baseInstalled []string
-	// python is the image's Python, "3.12", for the wheel a routed package
-	// installs from; "" when not known.
-	python string
 	// packages are the project's OS packages ([tool.astro] packages).
 	packages []string
 }
@@ -222,8 +221,11 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 		case installed[name] && !own:
 			continue // the runtime's, at its tested version
 		}
-		refs := directRefs(pkg, project.routed[name], in.python, urls)
+		refs := directRefs(pkg, urls)
 		switch {
+		case len(refs) == 0 && project.routed[name] && hasFiles(pkg):
+			lists.Routed = append(lists.Routed, withMarker(pin(pkg), pkg.Marker))
+			lists.RoutedLinks = append(lists.RoutedLinks, fileLinks(pkg, urls)...)
 		case own || len(refs) > 0:
 			if len(refs) == 0 {
 				refs = []string{withMarker(pin(pkg), pkg.Marker)}
@@ -274,12 +276,9 @@ func pinName(line string) string {
 }
 
 // directRefs are the requirement lines that install pkg from where the lock
-// says it comes from, or none when it installs by name: a git commit, a URL,
-// or, when routed, the file the lock recorded on the index a
-// [tool.uv.sources] entry routes it to. A routed package whose best file
-// differs between the platforms an image is built for gets a line for each,
-// limited to that platform.
-func directRefs(pkg *lockedPackage, routed bool, python string, urls *urlCleaner) []string {
+// says it comes from, or none when it installs by name: a git commit or a
+// URL.
+func directRefs(pkg *lockedPackage, urls *urlCleaner) []string {
 	switch {
 	case pkg.VCS != nil:
 		v := pkg.VCS
@@ -290,63 +289,35 @@ func directRefs(pkg *lockedPackage, routed bool, python string, urls *urlCleaner
 		return []string{withMarker(ref, pkg.Marker)}
 	case pkg.Archive != nil && pkg.Archive.URL != "":
 		return []string{withMarker(pkg.Name+" @ "+urls.clean(pkg.Archive.URL), pkg.Marker)}
-	case !routed:
-		return nil
 	}
-	type choice struct {
-		machine string
-		file    *lockedFile
-	}
-	var choices []choice
-	for _, machine := range imageMachines {
-		f := bestFile(pkg, imageTags(python, machine))
-		if f == nil {
-			// Nothing installs here from the lock's files; by name, then, as
-			// the helper did, for every platform alike.
-			return nil
-		}
-		choices = append(choices, choice{machine, f})
-	}
-	if choices[0].file == choices[1].file {
-		return []string{withMarker(fileRef(pkg.Name, choices[0].file, urls), pkg.Marker)}
-	}
-	refs := make([]string, 0, len(choices))
-	for _, c := range choices {
-		marker := "platform_machine == '" + c.machine + "'"
-		if m := strings.TrimSpace(pkg.Marker); m != "" {
-			marker = "(" + m + ") and " + marker
-		}
-		refs = append(refs, withMarker(fileRef(pkg.Name, c.file, urls), marker))
-	}
-	return refs
+	return nil
 }
 
-// fileRef is `name @ url#sha256=…` for a file the lock recorded.
-func fileRef(name string, f *lockedFile, urls *urlCleaner) string {
-	ref := name + " @ " + urls.clean(f.URL)
-	if sha := f.Hashes["sha256"]; sha != "" {
-		ref += "#sha256=" + sha
-	}
-	return ref
+// hasFiles reports a package the lock recorded a wheel or an sdist of. A
+// routed package with none installs by name, as any other.
+func hasFiles(pkg *lockedPackage) bool {
+	return len(pkg.Wheels) > 0 || pkg.Sdist != nil
 }
 
-// bestFile is the file of pkg an install for tags picks: the wheel whose best
-// tag ranks first, else the sdist, else nil.
-func bestFile(pkg *lockedPackage, tags map[string]int) *lockedFile {
-	var best *lockedFile
-	bestRank := len(tags)
+// fileLinks are the links to every wheel and the sdist the lock recorded of
+// pkg, each `url#sha256=…`, for the page a routed install finds them on.
+func fileLinks(pkg *lockedPackage, urls *urlCleaner) []string {
+	files := make([]*lockedFile, 0, len(pkg.Wheels)+1)
 	for i := range pkg.Wheels {
-		w := &pkg.Wheels[i]
-		for _, tag := range wheelTags(w.URL) {
-			if rank, ok := tags[tag]; ok && rank < bestRank {
-				best, bestRank = w, rank
-			}
+		files = append(files, &pkg.Wheels[i])
+	}
+	if pkg.Sdist != nil {
+		files = append(files, pkg.Sdist)
+	}
+	links := make([]string, 0, len(files))
+	for _, f := range files {
+		link := urls.clean(f.URL)
+		if sha := f.Hashes["sha256"]; sha != "" {
+			link += "#sha256=" + sha
 		}
+		links = append(links, link)
 	}
-	if best != nil {
-		return best
-	}
-	return pkg.Sdist
+	return links
 }
 
 // urlCleaner leaves a URL's user and password out, and remembers that it did.
