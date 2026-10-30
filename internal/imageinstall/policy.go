@@ -334,10 +334,16 @@ type urlCleaner struct {
 	stripped bool
 }
 
-// clean is raw without the user and password in its authority.
+// clean is raw without the user and password in its authority. An ssh URL's
+// user without a password (ssh://git@github.com/…) is kept: it is the account
+// ssh logs in as, not a secret, and the clone fails without it. A user on any
+// other URL can be a token, so it goes.
 func (c *urlCleaner) clean(raw string) string {
 	u, err := neturl.Parse(raw)
 	if err != nil || u.User == nil {
+		return raw
+	}
+	if _, hasPassword := u.User.Password(); !hasPassword && strings.HasSuffix(u.Scheme, "ssh") {
 		return raw
 	}
 	c.stripped = true

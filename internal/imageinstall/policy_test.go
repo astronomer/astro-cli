@@ -127,3 +127,23 @@ func TestStatesVersion(t *testing.T) {
 		assert.Equal(t, want, statesVersion(req), req)
 	}
 }
+
+// A URL's credentials are left out, and said to be, except an ssh URL's user
+// with no password, which is the account ssh logs in as.
+func TestURLCleaner(t *testing.T) {
+	for raw, tc := range map[string]struct {
+		want     string
+		stripped bool
+	}{
+		"ssh://git@github.com/org/repo.git":          {"ssh://git@github.com/org/repo.git", false},
+		"git+ssh://git@github.com/org/repo.git":      {"git+ssh://git@github.com/org/repo.git", false},
+		"ssh://git:pw@github.com/org/repo.git":       {"ssh://github.com/org/repo.git", true},
+		"https://token@github.com/org/repo.git":      {"https://github.com/org/repo.git", true},
+		"https://user:pw@acme.example/p-1.0.whl":     {"https://acme.example/p-1.0.whl", true},
+		"https://files.pythonhosted.org/p/p-1.0.whl": {"https://files.pythonhosted.org/p/p-1.0.whl", false},
+	} {
+		c := &urlCleaner{}
+		assert.Equal(t, tc.want, c.clean(raw), raw)
+		assert.Equal(t, tc.stripped, c.stripped, raw)
+	}
+}
