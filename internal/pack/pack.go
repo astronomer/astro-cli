@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -29,9 +30,10 @@ import (
 type Kind string
 
 const (
-	KindImage  Kind = "image"
-	KindTree   Kind = "tree"
-	KindBundle Kind = "bundle"
+	KindImage   Kind = "image"
+	KindTree    Kind = "tree"
+	KindBundle  Kind = "bundle"
+	KindContext Kind = "context"
 )
 
 // Target names the registered targets, in listing order.
@@ -88,6 +90,16 @@ type Request struct {
 	// Each is also kept on Result.Warnings. nil streams them as progress
 	// lines, "warning: …".
 	Warn func(string)
+	// ContextDir, for the image target, writes the image's build context to
+	// this directory (new or empty) instead of building it, for a container
+	// engine the CLI does not drive to build with `docker build` or `podman
+	// build`. Refused for a project that declares its own Dockerfile, whose
+	// project already is its context.
+	ContextDir string
+	// ResolveInstall resolves what a generated image installs from the
+	// project's lock, into req.Install (imageinstall.Fill), with its warnings
+	// through warn. nil installs the manifest's dependencies as written.
+	ResolveInstall func(ctx context.Context, req *imagebuild.Request, warn func(string)) error
 	// Note receives what the image target notes before it builds and that is
 	// not wrong: the project's own linked worktrees it leaves out
 	// (shipcheck.LeftOutNote). nil streams it as a progress line.
@@ -134,8 +146,12 @@ type Result struct {
 	// Airflow pin the platform does not list, OS packages it cannot install.
 	Warnings []string `json:"warnings,omitempty"`
 	// NextSteps are the exact commands to ship the artifact — the upload
-	// hand-off a tree target cannot do itself (it never touches the network).
+	// hand-off a tree target cannot do itself (it never touches the network) —
+	// or, for a build context, to build it.
 	NextSteps []string `json:"next_steps,omitempty"`
+	// ContextDir is the build context the image target wrote with
+	// --context-dir, which NextSteps build.
+	ContextDir string `json:"context_dir,omitempty"`
 }
 
 // Target packages a project for one Airflow platform. Build validates the

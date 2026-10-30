@@ -1,9 +1,9 @@
 // Package imagebuild builds a deployable Airflow image from a manifest's
-// fields. It assembles a small build context (the project's pyproject.toml and
-// uv.lock, and the install helper that reads them) and builds it over the
-// runtime's -base image, the build without ONBUILD triggers, with the install
-// steps those triggers would run written out in the Dockerfile it generates
-// (InstallDockerfile).
+// fields. It assembles a small build context (requirements.txt,
+// uv-lock-constraints.txt, packages.txt: the InstallLists its caller resolved)
+// and builds it over the runtime's -base image, the build without ONBUILD
+// triggers, with the install steps those triggers would run written out in the
+// Dockerfile it generates (generatedDockerfile).
 //
 // A project may instead declare its own Dockerfile in the manifest, which the
 // project design calls tier 3: the escape hatch for multi-stage builds and
@@ -138,17 +138,16 @@ var ErrDockerfileBuild = errors.New("building the project's Dockerfile failed; s
 
 const (
 	// dockerfileName is the Dockerfile a generated build runs
-	// (InstallDockerfile).
+	// (generatedDockerfile).
 	dockerfileName = "Dockerfile.astro-local"
 	// buildContextDir is the sub-directory of a Request's WorkDir that holds
-	// the build context: the inputs the install helper reads, and the
-	// project's files when the image ships.
+	// the build context: the install lists, and the project's files when the
+	// image ships.
 	buildContextDir = "deps-build"
 	// requirementsName and packagesName are the names the runtime's install
 	// scripts read from their working directory, and lockConstraintsName the
-	// file of uv.lock's versions requirements.txt names with -c. The install
-	// helper writes all three (install-project.py's REQUIREMENTS, PACKAGES and
-	// LOCK_CONSTRAINTS).
+	// file of uv.lock's versions requirements.txt names with -c
+	// (InstallLists.Files).
 	requirementsName    = "requirements.txt"
 	packagesName        = "packages.txt"
 	lockConstraintsName = "uv-lock-constraints.txt"
@@ -223,10 +222,9 @@ type Request struct {
 	// owns its own installs; it takes its FROM from the file rather than
 	// BaseImage; and it builds the PROJECT as its context, because a
 	// multi-stage build COPYs from the repo. The generated mode's context is
-	// synthetic: pyproject.toml, uv.lock and the install helper
-	// (writeInstallInputs), plus, for an image that ships, a filtered copy of
-	// the project (ProjectFiles), which the generated Dockerfile's `COPY . .`
-	// lays down after both installs.
+	// synthetic: the install lists (InstallLists.Files), plus, for an image
+	// that ships, a filtered copy of the project (ProjectFiles), which the
+	// generated Dockerfile's `COPY . .` lays down after both installs.
 	//
 	// Dependencies and Packages are ignored here rather than rejected. A caller
 	// reading a manifest has them populated whichever tier the project
@@ -235,30 +233,30 @@ type Request struct {
 	Context    string
 	// Tag is the image reference the build produces.
 	Tag string
-	// ManifestDir is the project directory whose pyproject.toml, and uv.lock
-	// when it has one, a generated build installs from: the install helper
-	// reads them inside the build (InstallDockerfile), so the image holds every
-	// package at the version uv.lock resolved. ForManifest sets it for a
-	// generated build; empty, ProjectFiles stands in for it.
-	//
-	// When that project has a pyproject.toml, the file is authoritative:
-	// Dependencies, FindLinks and Packages are ignored, both by the install and
-	// by Build's decision that there is nothing to install. Only a request
-	// naming no project, or one with no pyproject.toml, installs those three,
-	// from a pyproject.toml the build writes of them, unpinned. Ignored in
-	// Dockerfile mode.
+	// ManifestDir is the project directory a generated build is of, whose
+	// pyproject.toml and uv.lock the caller resolves into Install
+	// (internal/imageinstall). ForManifest sets it for a generated build. The
+	// build itself never reads it.
 	ManifestDir string
+	// Install is what a generated build installs, resolved by the caller from
+	// ManifestDir's lock: the image holds every package at the version uv.lock
+	// resolved. When it is set, Dependencies, FindLinks and Packages are
+	// ignored, both by the install and by Build's decision that there is
+	// nothing to install. nil installs those three as written
+	// (UnpinnedLists). Ignored in Dockerfile mode.
+	Install *InstallLists
 	// Dependencies are the manifest's Python dependencies (PEP 508);
 	// apache-airflow is dropped, since the runtime base already provides it.
-	// Ignored when ManifestDir (or ProjectFiles) has a pyproject.toml.
+	// Ignored when Install is set.
 	Dependencies []string
 	// FindLinks are pages the Python install searches besides PyPI, written
-	// into the generated requirements.txt as --find-links lines. Ignored in
-	// Dockerfile mode, and when ManifestDir (or ProjectFiles) has a
-	// pyproject.toml, whose [tool.uv.sources] the install reads instead.
+	// into the generated requirements.txt as --find-links lines: the
+	// per-package pages of the indexes a [tool.uv.sources] entry routes a
+	// dependency to (manifest.UV.IndexPages). Ignored in Dockerfile mode, and
+	// when Install is set.
 	FindLinks []string
 	// Packages are the manifest's OS (apt) package names. Ignored when
-	// ManifestDir (or ProjectFiles) has a pyproject.toml.
+	// Install is set.
 	Packages []string
 	// ProjectFiles is the project directory whose files a generated build
 	// carries into the image (/usr/local/airflow), for an image that is
@@ -342,7 +340,7 @@ func (execCommander) RunIn(ctx context.Context, dir string, extraEnv []string, s
 // Two modes. With req.Dockerfile set the project's own file is the build, and it
 // is run as-is against the project as context (see the field's doc for why they
 // share so little). Otherwise the request's dependencies and OS packages are
-// installed into a layer over its base's -base image (InstallDockerfile),
+// installed into a layer over its base's -base image (generatedDockerfile),
 // with the project's files over them when the request carries ProjectFiles.
 // With nothing to install, no project files and no labels it builds nothing
 // and returns the -base image unchanged (the fast path).
@@ -394,35 +392,27 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 	// -base image, so a project pulls one tag whether it builds or not.
 	// An image carrying the project's files, or labels of its own, is never
 	// the bare base.
-	if fastPath && req.ProjectFiles == "" && len(req.Labels) == 0 && req.installsNothing() {
+	if fastPath && req.ProjectFiles == "" && len(req.Labels) == 0 && req.Lists().Empty() {
 		return from, nil
 	}
 
 	contextDir := filepath.Join(req.WorkDir, buildContextDir)
 	// Started empty, so a file deleted from the project since an earlier build
-	// in the same WorkDir is not carried into this one, and an install input
-	// an earlier build wrote (a uv.lock since deleted) is not read by this one.
-	// The directory is the build's own; local Docker mode reuses it every start.
+	// in the same WorkDir is not carried into this one. The directory is the
+	// build's own; local Docker mode reuses it every start.
 	if err := os.RemoveAll(contextDir); err != nil {
 		return "", fmt.Errorf("clearing %s: %w", contextDir, err)
 	}
 	if err := os.MkdirAll(contextDir, contextDirPerm); err != nil {
 		return "", fmt.Errorf("creating %s: %w", contextDir, err)
 	}
-	if req.ProjectFiles != "" {
-		if err := copyProjectFiles(req.ProjectFiles, contextDir); err != nil {
-			return "", err
-		}
-	}
-	// After the project's files, so the CLI's helper replaces a copy the
-	// project carries.
-	if err := writeInstallInputs(contextDir, req); err != nil {
+	if err := writeContext(contextDir, req); err != nil {
 		return "", err
 	}
 	// The Dockerfile sits outside the context so the trailing `COPY . .` does
 	// not bake it in.
 	dfPath := filepath.Join(req.WorkDir, dockerfileName)
-	if err := os.WriteFile(dfPath, []byte(installDockerfile(from, len(req.buildSecrets()) > 0, generatedInputs, uvImage())), filePermRW); err != nil {
+	if err := os.WriteFile(dfPath, []byte(generatedDockerfile(from, len(req.buildSecrets()) > 0)), filePermRW); err != nil {
 		return "", fmt.Errorf("writing %s: %w", dfPath, err)
 	}
 
@@ -514,7 +504,7 @@ func absPaths(req Request) (Request, error) {
 
 // buildSecrets are the Secrets the build can read. A declared Dockerfile
 // mounts whichever it names. A generated build's Dockerfile mounts
-// manifest.RuntimeSecretID alone (installDockerfile), and only when this
+// manifest.RuntimeSecretID alone (generatedDockerfile), and only when this
 // returns it, so any other secret is dropped rather than handed to docker,
 // which would read its source for nothing.
 func (r *Request) buildSecrets() []string {
@@ -532,7 +522,7 @@ func (r *Request) buildSecrets() []string {
 
 // baseOf is the image a generated build starts FROM for the runtime base ref:
 // its -base tag, the same image as the runtime's tag without the ONBUILD
-// triggers, whose steps InstallDockerfile writes out instead. It is the one
+// triggers, whose steps generatedDockerfile writes out instead. It is the one
 // place the suffix is added, after whichever rule resolved the base (the
 // catalog, a platform's offer, a [tool.astro] runtime), so every caller of
 // Build gets it. A ref already on a -base tag is returned as it is.

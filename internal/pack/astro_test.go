@@ -321,47 +321,103 @@ func TestAstroBuildTagIsContentAddressed(t *testing.T) {
 	assert.Equal(t, plain, withLib(map[string]string{"apache-airflow": "https://pip.astronomer.io/v2/"}), "a source the image never installs does not")
 }
 
-// A generated build's Dockerfile and what its install reads are part of its
-// address: the same project over another recipe, or with another pyproject.toml
-// or uv.lock, is another image. uv.lock's versions are the ones installed, so
-// editing the lock moves the tag. A declared Dockerfile is addressed by its own
+// A generated build's Dockerfile and the lists its install reads are part of
+// its address: the same project over another recipe, or installing other
+// versions, is another image. A declared Dockerfile is addressed by its own
 // bytes and reads neither, so neither moves its tag.
-func TestContentHashCoversTheGeneratedRecipeAndItsInputs(t *testing.T) {
+func TestContentHashCoversTheGeneratedRecipeAndItsLists(t *testing.T) {
 	const base = "astrocrpublic.azurecr.io/runtime:3.1-2"
-	project := t.TempDir()
-	breq := imagebuild.Request{ManifestDir: project}
-	hash := func(recipe string, df declaredDockerfile) string {
+	hash := func(recipe string, install *imagebuild.InstallLists, df declaredDockerfile) string {
 		t.Helper()
-		h, err := contentHash(base, "linux/amd64", recipe, breq, df)
+		h, err := contentHash(base, "linux/amd64", recipe, imagebuild.Request{Install: install}, df)
 		require.NoError(t, err)
 		return h
 	}
-	write := func(name, body string) {
-		t.Helper()
-		require.NoError(t, os.WriteFile(filepath.Join(project, name), []byte(body), 0o600))
+	lists := func(reqs string, constraints ...string) *imagebuild.InstallLists {
+		return &imagebuild.InstallLists{Requirements: []string{reqs}, Constraints: constraints}
 	}
-	write("pyproject.toml", "[project]\n")
 
-	assert.NotEqual(t, hash("recipe one", declaredDockerfile{}), hash("recipe two", declaredDockerfile{}),
+	assert.NotEqual(t, hash("recipe one", nil, declaredDockerfile{}), hash("recipe two", nil, declaredDockerfile{}),
 		"a changed generated recipe moves the tag")
-
-	first := hash("recipe", declaredDockerfile{})
-	write("pyproject.toml", "[project]\ndependencies = ['pandas']\n")
-	edited := hash("recipe", declaredDockerfile{})
-	write("uv.lock", "version = 1\n")
-	locked := hash("recipe", declaredDockerfile{})
-	write("uv.lock", "version = 1\n# relocked\n")
-	relocked := hash("recipe", declaredDockerfile{})
-	assert.NotEqual(t, first, edited, "pyproject.toml is hashed")
-	assert.NotEqual(t, edited, locked, "uv.lock is hashed")
-	assert.NotEqual(t, locked, relocked, "editing uv.lock moves the tag")
+	first := hash("recipe", lists("pandas==2.2.3"), declaredDockerfile{})
+	assert.Equal(t, first, hash("recipe", lists("pandas==2.2.3"), declaredDockerfile{}))
+	assert.NotEqual(t, first, hash("recipe", lists("pandas==2.2.2"), declaredDockerfile{}), "a requirement's version is hashed")
+	assert.NotEqual(t, first, hash("recipe", lists("pandas==2.2.3", "numpy==2.1.0"), declaredDockerfile{}), "the lock's constraints are hashed")
 
 	df := filepath.Join(t.TempDir(), "Dockerfile")
 	require.NoError(t, os.WriteFile(df, []byte("FROM scratch\n"), 0o600))
 	declared := declaredDockerfile{rel: "Dockerfile", abs: df}
-	before := hash("", declared)
-	write("uv.lock", "version = 1\n# relocked again\n")
-	assert.Equal(t, before, hash("", declared), "a declared Dockerfile's tag does not follow the generated build's inputs")
+	assert.Equal(t, hash("", lists("a==1"), declared), hash("", lists("a==2"), declared),
+		"a declared Dockerfile's tag does not follow the generated build's lists")
+}
+
+// The resolve runs before the content address, over the request ForManifest
+// made, and what it resolves is what the build installs and the tag covers.
+func TestAstroBuildResolvesTheInstallFirst(t *testing.T) {
+	tags := map[string]string{}
+	for _, version := range []string{"2.2.3", "2.2.2"} {
+		builder := &fakeBuilder{}
+		req := testRequest(t)
+		req.ResolveInstall = func(_ context.Context, breq *imagebuild.Request, warn func(string)) error {
+			assert.Equal(t, req.ProjectDir, breq.ManifestDir)
+			warn("resolved")
+			breq.Install = &imagebuild.InstallLists{Requirements: []string{"pandas==" + version}}
+			return nil
+		}
+		res, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+		require.NoError(t, err)
+		assert.Contains(t, res.Warnings, "resolved")
+		require.NotNil(t, builder.gotReq.Install)
+		assert.Equal(t, []string{"pandas==" + version}, builder.gotReq.Install.Requirements)
+		tags[version] = res.Image
+	}
+	assert.NotEqual(t, tags["2.2.3"], tags["2.2.2"])
+
+	req := testRequest(t)
+	req.ResolveInstall = func(context.Context, *imagebuild.Request, func(string)) error { return errors.New("export failed") }
+	_, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	assert.ErrorContains(t, err, "export failed")
+}
+
+// --context-dir writes the build context and the commands that build it, and
+// builds nothing: no engine is asked for anything.
+func TestAstroBuildWritesTheContext(t *testing.T) {
+	builder, docker := &fakeBuilder{}, &fakeDocker{}
+	req := testRequest(t)
+	req.ContextDir = filepath.Join(t.TempDir(), "build")
+	req.BuildSecrets = []string{"id=netrc,env=NETRC_CONTENT", "id=other,src=/x"}
+	req.ResolveInstall = func(_ context.Context, breq *imagebuild.Request, _ func(string)) error {
+		breq.Install = &imagebuild.InstallLists{Requirements: []string{"pandas==2.2.3"}, Packages: []string{"libpq-dev"}}
+		return nil
+	}
+	res, err := newAstro(builder, docker).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, KindContext, res.Kind)
+	assert.Equal(t, req.ContextDir, res.ContextDir)
+	assert.Equal(t, []string{
+		"docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + req.ContextDir,
+		"podman build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + req.ContextDir,
+	}, res.NextSteps)
+	assert.Empty(t, docker.callStrings(), "no engine")
+	assert.Empty(t, builder.gotReq.Tag, "no build")
+	reqs, err := os.ReadFile(filepath.Join(req.ContextDir, "requirements.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, "pandas==2.2.3\n", string(reqs))
+	assert.FileExists(t, filepath.Join(req.ContextDir, "Dockerfile"))
+
+	_, err = newAstro(builder, docker).Build(context.Background(), req, localrt.Callbacks{})
+	assert.ErrorContains(t, err, "--context-dir writes only into a new or empty directory")
+}
+
+// A project that declares its own Dockerfile is its own build context.
+func TestAstroBuildRefusesAContextForADeclaredDockerfile(t *testing.T) {
+	req := testRequest(t)
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\n"), 0o600))
+	req.Manifest.Astro.Dockerfile = "Dockerfile"
+	req.ContextDir = filepath.Join(t.TempDir(), "build")
+	_, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
+	assert.ErrorContains(t, err, "the project is its build context")
+	assert.NoDirExists(t, req.ContextDir)
 }
 
 func TestAstroBuildTagOverrideSkipsLatest(t *testing.T) {

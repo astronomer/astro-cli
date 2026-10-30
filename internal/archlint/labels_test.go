@@ -29,6 +29,8 @@ var labelAllowed = map[string]string{
 	"pkg/uv/errors.go: error:":          "parses uv's own output, whose failure line starts error:",
 	"internal/pack/pack.go: warning: ": "the fallback for a pack.Request with no Warn hook: the warning rides the build's " +
 		"progress stream as a log line's text, which a progress reader shows as is, not as a terminal label",
+	"cmd/local/deps.go: warning: ": "a local Docker build's install warnings ride its progress stream as a log line's text, " +
+		"as pack.go's do, which a progress reader shows as is, not as a terminal label",
 }
 
 // labelLiteral matches a string that holds a label the CLI prints through

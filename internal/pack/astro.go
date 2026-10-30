@@ -195,6 +195,20 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 	declared := breq.Dockerfile
+	// What a generated image installs is resolved here, from the project's
+	// lock, before the content address that covers it.
+	if req.ResolveInstall != nil {
+		if err := req.ResolveInstall(ctx, &breq, req.Warn); err != nil {
+			return Result{}, err
+		}
+	}
+	// A context is built later, by whoever runs the commands it prints, so
+	// the secrets it names need not be readable now.
+	if req.ContextDir != "" {
+		res, err := writeContext(req, breq, name)
+		res.Warnings = warnings
+		return res, err
+	}
 	missingSecrets, err := checkSecrets(req, cb)
 	if err != nil {
 		return Result{}, err
@@ -457,8 +471,8 @@ func generatedRecipe(breq imagebuild.Request) string {
 // a declared Dockerfile.
 //
 // A generated build contributes its recipe, the Dockerfile imagebuild writes,
-// and everything its install reads (imagebuild.InstallInputsDigest: the install
-// helper, pyproject.toml, and uv.lock, whose versions are the ones installed).
+// and the lists its install reads (InstallLists.Digest: requirements.txt, the
+// lock's constraints and packages.txt, as the CLI resolved them from uv.lock).
 // The dependencies, packages and index pages are all in those, so no list of
 // them is hashed besides.
 //
@@ -514,11 +528,7 @@ func contentHash(base, platform, recipe string, breq imagebuild.Request, df decl
 	writeField("platform", platform)
 	if recipe != "" {
 		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(recipe))))
-		inputs, err := imagebuild.InstallInputsDigest(breq)
-		if err != nil {
-			return "", err
-		}
-		writeField("install-inputs", inputs)
+		writeField("install-lists", breq.Lists().Digest())
 	} else {
 		writeField("dockerfile", filepath.ToSlash(df.rel))
 		body, err := os.ReadFile(df.abs)
