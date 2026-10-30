@@ -1,6 +1,7 @@
 package imageinstall
 
 import (
+	"errors"
 	"fmt"
 	neturl "net/url"
 	"strings"
@@ -33,9 +34,12 @@ import (
 //     installs before everything else, from the files the lock recorded for
 //     it alone (InstallLists.Routed): pip, in the image, picks the one its
 //     Python and platform take, and checks it against the lock's hash, so
-//     the image's install never asks its own index for that name.
-//     Everything else installs by name through the image's own index, a
-//     package from a local path included, which the image does not have.
+//     the image's install never asks its own index for that name. It is in
+//     requirements.txt too, at the same version, which the main install
+//     finds already installed, so its dependencies install with the rest.
+//     Everything else installs by name through the image's own index. A
+//     package from a path on this machine, a path source or a workspace
+//     member, is refused (ErrLocalSource): the image cannot reach it.
 //   - A user or password in any of those URLs is left out, with one warning:
 //     the lists land in an image layer and the build log, and the build
 //     authenticates through the netrc secret.
@@ -57,13 +61,14 @@ type pylock struct {
 
 // lockedPackage is one [[packages]] entry of a pylock.toml.
 type lockedPackage struct {
-	Name    string       `toml:"name"`
-	Version string       `toml:"version"`
-	Marker  string       `toml:"marker"`
-	VCS     *lockedVCS   `toml:"vcs"`
-	Archive *lockedFile  `toml:"archive"`
-	Sdist   *lockedFile  `toml:"sdist"`
-	Wheels  []lockedFile `toml:"wheels"`
+	Name      string       `toml:"name"`
+	Version   string       `toml:"version"`
+	Marker    string       `toml:"marker"`
+	VCS       *lockedVCS   `toml:"vcs"`
+	Archive   *lockedFile  `toml:"archive"`
+	Directory *lockedDir   `toml:"directory"`
+	Sdist     *lockedFile  `toml:"sdist"`
+	Wheels    []lockedFile `toml:"wheels"`
 }
 
 // lockedVCS is a package's vcs table: the repository and the commit the lock
@@ -75,11 +80,36 @@ type lockedVCS struct {
 	Subdirectory string `toml:"subdirectory"`
 }
 
-// lockedFile is a wheel, an sdist or an archive: where it is and its hashes.
+// lockedFile is a wheel, an sdist or an archive: where it is, a URL or a
+// path on this machine, and its hashes.
 type lockedFile struct {
 	URL    string            `toml:"url"`
+	Path   string            `toml:"path"`
 	Hashes map[string]string `toml:"hashes"`
 }
+
+// lockedDir is a package's directory table: a source tree on this machine, a
+// path source or a workspace member.
+type lockedDir struct {
+	Path string `toml:"path"`
+}
+
+// localPath is where on this machine the lock takes pkg from, a path source
+// or a workspace member, or "" when it comes from an index, git or a URL.
+func localPath(pkg *lockedPackage) string {
+	switch {
+	case pkg.Directory != nil:
+		return pkg.Directory.Path
+	case pkg.Archive != nil && pkg.Archive.URL == "":
+		return pkg.Archive.Path
+	}
+	return ""
+}
+
+// ErrLocalSource reports a package the lock takes from a path on this
+// machine, which an image cannot install: its install reads indexes, git and
+// URLs, before the project's files are in it.
+var ErrLocalSource = errors.New("the image cannot install a package from a path on this machine")
 
 // projectNames are what the policy reads of pyproject.toml: the names the
 // project lists itself, with whether it gives a version, and the packages a
@@ -190,22 +220,16 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 	if err := toml.Unmarshal(in.pylock, &lock); err != nil {
 		return imagebuild.InstallLists{}, nil, fmt.Errorf("reading uv's export of uv.lock: %w", err)
 	}
-	skip := map[string]bool{airflowDist: true, airflowCoreDist: true}
-	for _, line := range in.runtimePins {
-		if name := pinName(line); name != "" {
-			skip[name] = true
-		}
-	}
+	skip := pinNames(in.runtimePins)
+	skip[airflowDist], skip[airflowCoreDist] = true, true
 	var installed map[string]bool
 	if in.baseInstalled != nil {
-		installed = map[string]bool{}
-		for _, line := range in.baseInstalled {
-			if name := pinName(line); name != "" {
-				installed[name] = true
-			}
-		}
+		installed = pinNames(in.baseInstalled)
 	}
 
+	if err := refuseLocal(&lock); err != nil {
+		return imagebuild.InstallLists{}, nil, err
+	}
 	var lists imagebuild.InstallLists
 	urls := &urlCleaner{}
 	git := false
@@ -224,8 +248,15 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 		refs := directRefs(pkg, urls)
 		switch {
 		case len(refs) == 0 && project.routed[name] && hasFiles(pkg):
-			lists.Routed = append(lists.Routed, withMarker(pin(pkg), pkg.Marker))
+			// Installed first, alone and without its dependencies, from the
+			// lock's files; then named in requirements.txt too, at the same
+			// version, so the main install finds it there and installs the
+			// dependencies it needs that the image lacks, at the lock's
+			// versions.
+			line := withMarker(pin(pkg), pkg.Marker)
+			lists.Routed = append(lists.Routed, line)
 			lists.RoutedLinks = append(lists.RoutedLinks, fileLinks(pkg, urls)...)
+			lists.Requirements = append(lists.Requirements, line)
 		case own || len(refs) > 0:
 			if len(refs) == 0 {
 				refs = []string{withMarker(pin(pkg), pkg.Marker)}
@@ -247,6 +278,23 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 	return lists, warnings, nil
 }
 
+// refuseLocal is ErrLocalSource for the packages lock takes from a path on
+// this machine (localPath), each named with its path, or nil for none.
+func refuseLocal(lock *pylock) error {
+	var local []string
+	for i := range lock.Packages {
+		if p := localPath(&lock.Packages[i]); p != "" {
+			local = append(local, fmt.Sprintf("%s (%s)", lock.Packages[i].Name, p))
+		}
+	}
+	if len(local) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%w: uv.lock takes %s from a path, which the image build has no way to reach. "+
+		"An image installs packages from an index, a git repository or a URL: publish it to an index and route it there with [tool.uv.sources], or point its source at git or a URL",
+		ErrLocalSource, strings.Join(local, ", "))
+}
+
 // pin is name==version, or the bare name for a package with no version.
 func pin(pkg *lockedPackage) string {
 	if pkg.Version == "" {
@@ -262,6 +310,17 @@ func withMarker(line, marker string) string {
 		return line
 	}
 	return line + " ; " + marker
+}
+
+// pinNames are the names lines pin (pinName), as a set.
+func pinNames(lines []string) map[string]bool {
+	names := map[string]bool{}
+	for _, line := range lines {
+		if name := pinName(line); name != "" {
+			names[name] = true
+		}
+	}
+	return names
 }
 
 // pinName is the normalized name a constraints or freeze line pins, or ""
@@ -325,10 +384,16 @@ type urlCleaner struct {
 	stripped bool
 }
 
-// clean is raw without the user and password in its authority.
+// clean is raw without the user and password in its authority. An ssh URL's
+// user without a password (ssh://git@github.com/…) is kept: it is the account
+// ssh logs in as, not a secret, and the clone fails without it. A user on any
+// other URL can be a token, so it goes.
 func (c *urlCleaner) clean(raw string) string {
 	u, err := neturl.Parse(raw)
 	if err != nil || u.User == nil {
+		return raw
+	}
+	if _, hasPassword := u.User.Password(); !hasPassword && strings.HasSuffix(u.Scheme, "ssh") {
 		return raw
 	}
 	c.stripped = true

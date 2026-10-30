@@ -108,7 +108,7 @@ func TestBuildWritesFindLinks(t *testing.T) {
 	require.NoError(t, err)
 	got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, requirementsName))
 	require.NoError(t, err)
-	assert.Equal(t, "--find-links https://pypi.acme.example/simple/private-lib/\nprivate-lib\npandas\n", string(got))
+	assert.Equal(t, "--find-links https://pypi.acme.example/simple/private-lib/\npandas\nprivate-lib\n", string(got), "the dependencies sorted, after the links")
 }
 
 // The -base suffix is added once: a base already on a -base tag is not
@@ -134,7 +134,7 @@ func TestBuildWritesOSPackages(t *testing.T) {
 
 	got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, packagesName))
 	require.NoError(t, err)
-	assert.Equal(t, "libpq-dev\nbuild-essential\n", string(got))
+	assert.Equal(t, "build-essential\nlibpq-dev\n", string(got), "sorted")
 	// requirements.txt is still written (no extra deps here) so its own ONBUILD
 	// copy holds.
 	assert.FileExists(t, filepath.Join(req.WorkDir, buildContextDir, requirementsName))

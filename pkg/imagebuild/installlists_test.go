@@ -195,6 +195,28 @@ func TestWriteContext(t *testing.T) {
 	}, contextFiles(t, filepath.Join(req.WorkDir, buildContextDir)))
 }
 
+// A context written inside the project (`--context-dir ./build`) does not
+// carry a copy of itself, by its own path or through a link to it.
+func TestWriteContextInsideTheProject(t *testing.T) {
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{
+		"dags/a.py":      "x = 1\n",
+		"pyproject.toml": "[project]\nname = 'p'\n",
+		".astro/a.txt":   "carried\n",
+	})
+	require.NoError(t, os.Symlink("build", filepath.Join(project, "zz-link")))
+	req := testRequest(t)
+	req.ProjectFiles = project
+	req.Install = &InstallLists{Requirements: []string{"pandas==2.2.3"}}
+
+	dir := filepath.Join(project, "build")
+	require.NoError(t, WriteContext(dir, req))
+	assert.ElementsMatch(t, []string{
+		"dags/a.py", "pyproject.toml", ".astro/a.txt",
+		"Dockerfile", ".dockerignore", requirementsName, packagesName, lockConstraintsName, routedName, routedLinksName,
+	}, contextFiles(t, dir))
+}
+
 // A context is written only into a directory that is new or empty, and only
 // for a generated build.
 func TestWriteContextRefuses(t *testing.T) {
@@ -210,4 +232,18 @@ func TestWriteContextRefuses(t *testing.T) {
 
 	declared := Request{Dockerfile: filepath.Join(dir, "Dockerfile"), Context: dir}
 	assert.Error(t, WriteContext(filepath.Join(t.TempDir(), "x"), declared))
+}
+
+// Without a lock the lists, and so their digest and the content tag made of
+// it, do not depend on the order dependencies and packages are written in,
+// and the caller's slices are left as they were.
+func TestUnpinnedListsIgnoreOrder(t *testing.T) {
+	deps := []string{"pandas>=2", "apache-airflow==3.1.*", "boto3"}
+	packages := []string{"libpq-dev", "build-essential"}
+	a := UnpinnedLists(deps, []string{"https://acme.example/simple/p/"}, packages)
+	b := UnpinnedLists([]string{"boto3", "pandas>=2"}, []string{"https://acme.example/simple/p/"}, []string{"build-essential", "libpq-dev"})
+	assert.Equal(t, a.Digest(), b.Digest())
+	assert.Equal(t, []string{"--find-links https://acme.example/simple/p/", "boto3", "pandas>=2"}, a.Requirements)
+	assert.Equal(t, []string{"pandas>=2", "apache-airflow==3.1.*", "boto3"}, deps, "input untouched")
+	assert.Equal(t, []string{"libpq-dev", "build-essential"}, packages, "input untouched")
 }

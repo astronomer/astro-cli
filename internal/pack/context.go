@@ -9,6 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // writeContext writes the build context of the generated image breq describes
@@ -77,6 +78,8 @@ func contextDirError(err error) error {
 // WriteDeclaredContext wrote at dir: its Dockerfile over its context/, with
 // the lists as the named context when it wrote them (lists), and every build
 // secret, as a build of the project's own Dockerfile forwards them all.
+// Each argument is quoted for a POSIX shell when it needs it, as in
+// buildCommand.
 // Named contexts need imagebuild.NamedContextRequirement, which the result
 // says (Result.BuildNeeds).
 func declaredBuildCommand(engine, platform, tag string, secrets []string, dir string, lists bool) string {
@@ -91,12 +94,18 @@ func declaredBuildCommand(engine, platform, tag string, secrets []string, dir st
 	for _, s := range secrets {
 		args = append(args, "--secret", s)
 	}
-	return strings.Join(append(args, filepath.Join(dir, imagebuild.DeclaredContextDir)), " ")
+	args = append(args, filepath.Join(dir, imagebuild.DeclaredContextDir))
+	for i, a := range args {
+		args[i] = scaffold.ShellQuote(a)
+	}
+	return strings.Join(args, " ")
 }
 
 // buildCommand is the engine's command that builds the context at dir for
 // platform, tagged tag, with the netrc secret among secrets, the one the
-// generated Dockerfile mounts (as Build forwards only it).
+// generated Dockerfile mounts (as Build forwards only it). Each argument is
+// quoted for a POSIX shell when it needs it (a path with a space), so the
+// line runs as printed.
 func buildCommand(engine, platform, tag string, secrets []string, dir string) string {
 	args := []string{engine, "build"}
 	if platform != "" {
@@ -108,5 +117,9 @@ func buildCommand(engine, platform, tag string, secrets []string, dir string) st
 			args = append(args, "--secret", s)
 		}
 	}
-	return strings.Join(append(args, dir), " ")
+	args = append(args, dir)
+	for i, a := range args {
+		args[i] = scaffold.ShellQuote(a)
+	}
+	return strings.Join(args, " ")
 }
