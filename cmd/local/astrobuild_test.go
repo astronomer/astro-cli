@@ -61,12 +61,12 @@ func TestStartWritesTheAstroBuildIntoTheManifest(t *testing.T) {
 			t.Errorf("manifest lacks %q:\n%s", want, got)
 		}
 	}
-	if !strings.Contains(out, "now installs Astronomer's Airflow 3.3.2+astro.1") {
+	if !strings.Contains(out, "pyproject.toml: updated") {
 		t.Errorf("the start did not say it changed the manifest:\n%s", out)
 	}
 
 	again, out := startWithBuild(t, got, build332, nil)
-	if again != got || strings.Contains(out, "now installs") {
+	if again != got || strings.Contains(out, "pyproject.toml: updated") {
 		t.Errorf("a second start with the same build changed the manifest:\n%s", out)
 	}
 }

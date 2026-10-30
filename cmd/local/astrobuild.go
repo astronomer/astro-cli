@@ -51,22 +51,10 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 	if res.writeErr != nil {
 		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf("could not update %s for Astronomer's build of Airflow: %v", manifest.Marker, res.writeErr)})
 	}
-	if res.runtime != "" {
-		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] now holds what Astro Runtime %s constrains\n", manifest.Marker, res.runtime)
-	}
-	if res.runtimeGone != "" {
-		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer holds what Astro Runtime %s constrains\n", manifest.Marker, res.runtimeGone)
-	}
-	// The Airflow line is said whenever the Airflow pins moved, beside a
-	// runtime line or not; a write that touched only the runtime's lines says
-	// only that.
-	onlyRuntime := (res.runtime != "" || res.runtimeGone != "") && !res.airflowChanged
-	switch {
-	case !res.changed || onlyRuntime:
-	case res.build.Airflow != "":
-		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] now installs Astronomer's Airflow %s\n", manifest.Marker, res.build.Airflow)
-	default:
-		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer points Airflow at Astronomer's index\n", manifest.Marker)
+	// One line, as the upgrade commands and uv.lock say it: git diff has the
+	// details.
+	if res.changed {
+		fmt.Fprintf(c.d.Stderr, "%s: updated\n", manifest.Marker)
 	}
 }
 
