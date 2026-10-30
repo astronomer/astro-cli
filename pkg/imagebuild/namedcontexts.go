@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
@@ -44,16 +45,21 @@ func (b *Builder) checkNamedContexts(ctx context.Context, req Request) error {
 
 // foundBuilder says which builder the CLI picked and how to get one that takes
 // a named context, for checkNamedContexts' error.
+// Podman is told by what its --version prints, as IsPodman tells it, so the
+// podman-docker shim counts, or by its binary's name when that says nothing.
 func (b *Builder) foundBuilder(ctx context.Context, req Request, help string) string {
-	found := filepath.Base(req.Bin)
+	name := strings.TrimSuffix(strings.ToLower(filepath.Base(req.Bin)), ".exe")
+	found, podman := filepath.Base(req.Bin), name == podmanName
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	var version bytes.Buffer
 	if err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: &version}, req.Bin, "--version"); err == nil {
 		if v := strings.TrimSpace(version.String()); v != "" {
-			found = v
+			found, podman = v, strings.Contains(strings.ToLower(v), podmanName)
 		}
 	}
 	switch {
-	case filepath.Base(req.Bin) == "podman":
+	case podman:
 		return found + ", whose build does not take " + buildContextFlag + ". Upgrade Podman to 4.2 or later"
 	case buildKitOff(req.Env):
 		return found + " with DOCKER_BUILDKIT=0, which selects Docker's legacy builder. Unset it to build with BuildKit"

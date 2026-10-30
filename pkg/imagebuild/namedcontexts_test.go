@@ -107,6 +107,14 @@ func TestABuilderWithoutNamedContextsIsRefusedBeforeTheBuild(t *testing.T) {
 	}
 }
 
+// Podman behind the docker shim is told by its --version, and told to upgrade
+// Podman rather than to install buildx.
+func TestPodmanBehindTheDockerShimIsToldToUpgradePodman(t *testing.T) {
+	_, err := namedContextBuild(t, "docker", ncOldPodmanHelp, ncPodmanVersion)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "found podman version 4.1.1, whose build does not take --build-context. Upgrade Podman to 4.2 or later")
+}
+
 // A help that does not run, or that is not a build's, decides nothing: the
 // build goes ahead and reports its own failure, if any.
 func TestAnUnreadableBuildHelpLetsTheBuildRun(t *testing.T) {
