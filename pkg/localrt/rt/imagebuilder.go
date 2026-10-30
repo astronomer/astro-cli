@@ -80,6 +80,12 @@ type ManifestBuild struct {
 	// runs it, when requires-python admits it, so the image runs the Python
 	// the lock was made for.
 	LockedPython string
+	// LockedAirflow is the Astronomer build of Airflow pyproject.toml records
+	// beside LockedRuntime ("3.1.3+astro.2"), the Airflow its uv.lock was made
+	// for, or "" for none: a build that falls back from LockedRuntime to one
+	// carrying another Airflow release is refused, as the lock's versions were
+	// not resolved for it.
+	LockedAirflow string
 	// RequiresPython is [project] requires-python. A generated image runs the
 	// newest Python of its runtime build that it admits, preferring the
 	// build's default (imagebuild.RuntimeImageForPython).
@@ -108,6 +114,7 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 		Runtime:        p.Runtime,
 		LockedRuntime:  p.LockedRuntime,
 		LockedPython:   p.LockedPython,
+		LockedAirflow:  p.LockedAirflow,
 		RequiresPython: p.RequiresPython,
 		Dockerfile:     p.Dockerfile,
 		Dependencies:   p.Dependencies,
@@ -124,6 +131,7 @@ func (p *Plan) SetManifestBuild(mb ManifestBuild) {
 	p.Runtime = mb.Runtime
 	p.LockedRuntime = mb.LockedRuntime
 	p.LockedPython = mb.LockedPython
+	p.LockedAirflow = mb.LockedAirflow
 	p.RequiresPython = mb.RequiresPython
 	p.Dockerfile = mb.Dockerfile
 	p.Dependencies = mb.Dependencies

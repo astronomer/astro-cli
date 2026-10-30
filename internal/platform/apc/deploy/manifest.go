@@ -560,6 +560,16 @@ func (l listedReleases) BuildsFor(pin string) []string {
 	return out
 }
 
+// AirflowOf is the Airflow Houston lists for a runtime build, or "".
+func (l listedReleases) AirflowOf(build string) string {
+	for i := range l {
+		if l[i].Version == build {
+			return l[i].AirflowVersion
+		}
+	}
+	return ""
+}
+
 // houstonBase resolves a generated build's runtime base by local Docker
 // mode's rule (imagebuild.LocalRuntimeImageWith), so Airflow 2 from 2.7 and
 // Airflow 3 both build. With no [tool.astro] runtime it builds on the newest

@@ -26,20 +26,30 @@ type RuntimeOffer interface {
 	// covers, newest first, of those the platform offers as a base nobody
 	// chose. None for a pin the platform refuses to resolve (a bare "3").
 	BuildsFor(airflowPin string) []string
+	// AirflowOf is the Airflow an offered build carries, by the platform's
+	// own word, or "" when it does not say.
+	AirflowOf(build string) string
 }
 
 // OfferedBase is the rule a platform's deploy follows for a generated build's
 // runtime base. A [tool.astro] runtime the manifest names wins. Otherwise the
 // build the project's uv.lock was made for (m.LockedRuntime) when the platform
 // offers it, so the image is the build the lock matches; else the newest build
-// offer has for the pin, so the image carries a runtime the platform takes,
-// and warn says the lock was made for another build.
+// offer has for the pin, so the image carries a runtime the platform takes.
 //
 // A build requires-python admits none of the Pythons of
 // (runtimeversions.PythonNotShippedError from resolve) gives way to the next
-// offered build, newest first, that ships one, and warn names the build
-// skipped and why: the image stays a runtime the platform takes. With every
-// offered build refused so, the deploy is refused with the first error.
+// offered build, newest first, that ships one: the image stays a runtime the
+// platform takes. With every offered build refused so, the deploy is refused
+// with the first error.
+//
+// When the image does not start FROM the lock's build (not offered, or its
+// Python ruled out), warn says why and that the lock's versions install over
+// the build it does start FROM, but only when that build carries the lock's
+// Airflow release (m.LockedAirflow, by offer.AirflowOf). One that carries
+// another is refused before the build, in one message
+// (imagebuild.LockedBuildError), as the lock's versions were not resolved for
+// it.
 //
 // With none offered for the pin (or offer nil), resolve runs with no build
 // named and is the platform's own fallback: a series tag for Airflow 3, the
@@ -59,11 +69,18 @@ func OfferedBase(offer RuntimeOffer, resolve imagebuild.BaseImageFunc, warn func
 		if len(candidates) == 0 {
 			return resolve(ctx, m)
 		}
+		// lockedWhy says why the image does not start FROM the lock's build,
+		// as a clause, once that is known.
+		lockedWhy := ""
+		if m.LockedRuntime != "" && locked == "" {
+			lockedWhy = "the Deployment does not offer it"
+		}
 		var first error
 		var skipped string
 		for _, build := range candidates {
-			named, ok := candidateBuild(m, build, locked, warn)
-			if !ok {
+			named, why := candidateBuild(m, build, locked)
+			if why != "" {
+				lockedWhy = why
 				continue
 			}
 			image, err := resolve(ctx, named)
@@ -72,20 +89,22 @@ func OfferedBase(offer RuntimeOffer, resolve imagebuild.BaseImageFunc, warn func
 				if first == nil {
 					first, skipped = err, build
 				}
+				if build == locked {
+					lockedWhy = err.Error()
+				}
 				continue
 			}
 			if err != nil {
 				return "", err
 			}
-			switch {
-			case first != nil && skipped == locked:
-				warn(fmt.Sprintf("uv.lock was made for Astro Runtime %s, which the Deployment offers, but %v, so the image builds on %s, the newest offered build that ships one, and installs the lock's versions over it. "+
-					"Run astro init to move the lock to %s", locked, first, build, build))
-			case first != nil:
+			if m.LockedRuntime != "" && build != m.LockedRuntime {
+				if err := offeredFallback(offer, m, build, lockedWhy, locked != "", warn); err != nil {
+					return "", err
+				}
+				return image, nil
+			}
+			if first != nil {
 				warn(fmt.Sprintf("the image builds on Astro Runtime %s, not %s, the newest the Deployment offers: %v", build, skipped, first))
-			case m.LockedRuntime != "" && build != m.LockedRuntime:
-				warn(fmt.Sprintf("uv.lock was made for Astro Runtime %s, which the Deployment does not offer, so the image builds on %s, the newest build it offers, and installs the lock's versions over that runtime. "+
-					"Deploy once the Deployment offers %s, or run astro init to move the lock to the newest build", m.LockedRuntime, build, m.LockedRuntime))
 			}
 			return image, nil
 		}
@@ -93,24 +112,43 @@ func OfferedBase(offer RuntimeOffer, resolve imagebuild.BaseImageFunc, warn func
 	}
 }
 
+// offeredFallback says, through warn, that a deploy of m builds on build, an
+// offered build other than the lock's, for why, and installs the lock's
+// versions over it; or refuses it (imagebuild.LockedBuildError) when build
+// carries another Airflow release than the lock. offered reports the lock's
+// build among the Deployment's offer.
+func offeredFallback(offer RuntimeOffer, m imagebuild.ManifestBuild, build, why string, offered bool, warn func(string)) error {
+	fix := "Run astro init to move the project to " + build + ", which relocks uv.lock"
+	if !offered {
+		fix = "Deploy once the Deployment offers " + m.LockedRuntime + ", or run astro init to move the project to " + build + ", which relocks uv.lock"
+	}
+	if af := offer.AirflowOf(build); !imagebuild.SameAirflowRelease(m.LockedAirflow, af) {
+		return &imagebuild.LockedBuildError{
+			Locked: m.LockedRuntime, LockedAirflow: m.LockedAirflow, Why: why,
+			Fallback: build, FallbackAirflow: af, Fix: fix,
+		}
+	}
+	warn(fmt.Sprintf("uv.lock was made for Astro Runtime %s, and %s, so the image builds on %s, which the Deployment offers, and installs the lock's versions over that runtime. %s",
+		m.LockedRuntime, why, build, fix))
+	return nil
+}
+
 // candidateBuild is m with build named, for OfferedBase to resolve. The lock's
 // build runs the recorded Python, as a local and a packaged image of it do
 // (imagebuild's lockedBase), so all three run one Python. A requires-python
-// that excludes that Python skips the lock's build (ok false), with a
-// warning, and the next offered build is tried.
-func candidateBuild(m imagebuild.ManifestBuild, build, locked string, warn func(string)) (named imagebuild.ManifestBuild, ok bool) {
+// that excludes that Python skips the lock's build, saying why, and the next
+// offered build is tried.
+func candidateBuild(m imagebuild.ManifestBuild, build, locked string) (named imagebuild.ManifestBuild, skip string) {
 	named = m
 	named.Runtime = build
 	if build != locked || m.LockedPython == "" {
-		return named, true
+		return named, ""
 	}
 	if !runtimeversions.RequiresPythonAdmits(m.RequiresPython, m.LockedPython) {
-		warn(fmt.Sprintf("requires-python %s excludes Python %s, the one this project's pyproject.toml records for Astro Runtime %s, so the image builds on the newest other build the Deployment offers",
-			m.RequiresPython, m.LockedPython, locked))
-		return named, false
+		return named, fmt.Sprintf("requires-python %s excludes Python %s, the one this project's pyproject.toml records for it", m.RequiresPython, m.LockedPython)
 	}
 	named.RequiresPython = "==" + m.LockedPython + ".*"
-	return named, true
+	return named, ""
 }
 
 // offeredCandidates are the builds OfferedBase tries for m, in order: the

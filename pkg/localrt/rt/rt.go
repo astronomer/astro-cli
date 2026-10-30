@@ -69,6 +69,10 @@ type Plan struct {
 	// (manifest UV.RuntimePython), or "" for none: the Python Docker mode's
 	// image of LockedRuntime runs, when requires-python admits it.
 	LockedPython string
+	// LockedAirflow is the Astronomer build of Airflow pyproject.toml records
+	// beside LockedRuntime ("3.1.3+astro.2"), so the Airflow its uv.lock was
+	// made for, or "" for none. Standalone ignores it.
+	LockedAirflow string
 	// PythonVersion is the interpreter standalone asks uv for ("3.13"), or ""
 	// to let uv pick within requires-python. A caller sets it with
 	// imagebuild.StandalonePython: the Python a generated image of the same

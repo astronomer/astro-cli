@@ -507,6 +507,16 @@ func (o offeredReleases) BuildsFor(pin string) []string {
 	return out
 }
 
+// AirflowOf is the Airflow Astro lists for an offered build, or "".
+func (o offeredReleases) AirflowOf(build string) string {
+	for i := range o {
+		if o[i].Version == build {
+			return o[i].AirflowVersion
+		}
+	}
+	return ""
+}
+
 // offeredAsBase reports a release on the stable or deprecated channel.
 func offeredAsBase(r *astrov1.RuntimeRelease) bool {
 	return r.Channel == "" || r.Channel == "stable" || r.Channel == "deprecated"

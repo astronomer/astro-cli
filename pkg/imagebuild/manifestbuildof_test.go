@@ -28,9 +28,10 @@ func fullManifest() *manifest.Manifest {
 			Packages:   []string{"libpq-dev"},
 		},
 		UV: manifest.UV{
-			Sources:       map[string]string{"private-lib": "https://pypi.acme.example/simple/"},
-			RuntimeBuild:  "3.1-1",
-			RuntimePython: "3.13",
+			Sources:                map[string]string{"private-lib": "https://pypi.acme.example/simple/"},
+			RuntimeBuild:           "3.1-1",
+			RuntimePython:          "3.13",
+			ConstraintDependencies: []string{"apache-airflow==3.1.3+astro.1"},
 		},
 	}
 }
@@ -58,6 +59,7 @@ func TestManifestBuildOf(t *testing.T) {
 		Runtime:        "3.1-2",
 		LockedRuntime:  "3.1-1",
 		LockedPython:   "3.13",
+		LockedAirflow:  "3.1.3+astro.1",
 		RequiresPython: "==3.13.*",
 		Dockerfile:     "docker/Dockerfile",
 		Dependencies:   []string{"apache-airflow==3.1.*", "pandas", "private-lib"},
