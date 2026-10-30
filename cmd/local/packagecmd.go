@@ -6,6 +6,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -14,7 +15,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/pack"
-	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -151,28 +151,15 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		recap.Flush()
 		return err
 	}
-	// What the project gets from this machine without declaring it runs locally
-	// and is carried by no artifact, so every target says so beside its own
-	// warnings. Best effort: a listing that cannot be read costs only the
-	// warning. A linked workspace's values are not named: no artifact carries
-	// them either, and a Deployment gets its own workspace's.
-	undeclared, _ := plan.UndeclaredLocal(dir, m) //nolint:errcheck // best effort, see above
-	// The result carries every warning in json, the undeclared values as one
-	// sentence. In text, the ones not given as the build ran (a bucket
-	// target's own, then the undeclared values as a table) print with the
-	// rest, above the result rather than listed in it.
+	// In text, a bucket target's own warnings, which it returns rather than
+	// gives as it goes, print with the rest, above the result rather than
+	// listed in it. json's result carries every one.
 	if r.Format == cliout.FormatText {
 		for _, w := range res.Warnings {
 			if !shown[w] {
 				recap.Warn(w)
 			}
 		}
-		if w := plan.UndeclaredWarning(undeclared); w != "" {
-			recap.Warn(w)
-		}
-	}
-	if s := plan.UndeclaredSentence(undeclared); s != "" {
-		res.Warnings = append(res.Warnings, s)
 	}
 	recap.Flush()
 	// An event rather than a result: an image build streamed its progress
@@ -231,8 +218,29 @@ func renderImageResult(w io.Writer, res pack.Result, links map[string]manifest.L
 			return err
 		}
 	}
-	_, err := fmt.Fprintf(w, "\nDeploy it with:\n%s\n", deployImageHint(res.Image, links))
-	return err
+	if _, err := fmt.Fprintf(w, "\nDeploy it with:\n%s\n", deployImageHint(res.Image, links)); err != nil {
+		return err
+	}
+	return renderDeploymentEnv(w, res.DeploymentEnv)
+}
+
+// renderDeploymentEnv lists, under the deploy command, the values the
+// Deployment must supply because the image carries none of them, one aligned
+// row each. Nothing when the project declares none.
+func renderDeploymentEnv(w io.Writer, values []pack.DeploymentValue) error {
+	if len(values) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintln(w, "and set these on the Deployment, as environment variables or linked Environment Manager objects:"); err != nil {
+		return err
+	}
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	for _, v := range values {
+		if _, err := fmt.Fprintf(tw, "  %s %s\t%s\n", v.Kind, v.Name, v.Status); err != nil {
+			return err
+		}
+	}
+	return tw.Flush()
 }
 
 // deployImageHint is the deploy command for an image. Deploy refuses to pick a

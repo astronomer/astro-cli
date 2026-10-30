@@ -255,11 +255,11 @@ func UndeclaredLocal(dir string, m *manifest.Manifest) ([]localenv.UndeclaredVal
 	return src.Undeclared(schema, vaultenv.Load(dir).Tiers()), nil
 }
 
-// UndeclaredWarning is the warning check and package print in text for
+// UndeclaredWarning is the warning `astro local check` prints in text for
 // UndeclaredLocal's values, or empty when there are none: a sentence, then a
 // row per value with its kind and name, its source, and the commands
 // `astro local env list` offers for it, aligned. The caller's printer adds
-// the Warning: label. UndeclaredSentence is the same warning as one line.
+// the Warning: label.
 func UndeclaredWarning(values []localenv.UndeclaredValue) string {
 	if len(values) == 0 {
 		return ""
@@ -288,28 +288,6 @@ func UndeclaredWarning(values []localenv.UndeclaredValue) string {
 		lines[i] = strings.TrimRight(lines[i], " ")
 	}
 	return strings.Join(lines, "\n")
-}
-
-// UndeclaredSentence is UndeclaredWarning as one sentence, for json, whose
-// warnings are strings a program reads rather than a table to line up.
-func UndeclaredSentence(values []localenv.UndeclaredValue) string {
-	if len(values) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(values))
-	for _, v := range sortedUndeclared(values) {
-		part := undeclaredLabel(v) + " from " + v.Source
-		switch {
-		case v.DeclareHint != "" && v.RemoveHint != "":
-			part += " (if needed: " + v.DeclareHint + "; if not: " + v.RemoveHint + ")"
-		case v.DeclareHint != "":
-			part += " (if needed: " + v.DeclareHint + ")"
-		case v.RemoveHint != "":
-			part += " (if not: " + v.RemoveHint + ")"
-		}
-		parts = append(parts, part)
-	}
-	return undeclaredHead(len(values)) + ": " + strings.Join(parts, ", ") + "."
 }
 
 func undeclaredHead(n int) string {

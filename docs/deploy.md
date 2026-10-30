@@ -275,7 +275,7 @@ The flags only a 1.x project's deploy read are gone: `--save` (`-s`), `--pytest`
 
 **Git metadata.** With the `deploy.git_metadata` setting on (the default), the deploy records the HEAD commit on Astro, and the commit message becomes the description when `--description` is not given. `commit_url` is set only for a GitHub remote. A project with uncommitted changes to tracked files records no commit and prints `note: the project has uncommitted changes, so this deploy records no git commit` on stderr. `--image-name` records none.
 
-**Warnings come at the end.** In text, `astro deploy` and `astro package` print each warning once, on stderr, after the build's output, just above the result, where a long build cannot scroll it away. A build or deploy that fails prints them before its error. When a deploy asks which Deployment to ship to, the warnings found so far print before the question instead, and not again. Under `--output json` each prints once, as it is found, and the result carries them in `warnings`, the undeclared values as one sentence.
+**Warnings come at the end.** In text, `astro deploy` and `astro package` print each warning once, on stderr, after the build's output, just above the result, where a long build cannot scroll it away. A build or deploy that fails prints them before its error. When a deploy asks which Deployment to ship to, the warnings found so far print before the question instead, and not again. Under `--output json` each prints once, as it is found, and the result carries them in `warnings`.
 
 **`astro deploy --output json`** prints one object when the deploy finishes. It streams no progress events, so the object is a result like any other (see [Output](architecture.md#output)): indented and colored on a terminal, one line when piped. Its shape is pinned by `cmd/astro/testdata/schema/deploy.json`.
 
@@ -311,4 +311,4 @@ The flags only a 1.x project's deploy read are gone: `--save` (`-s`), `--pytest`
 }
 ```
 
-`target` and `kind` are always present. An image carries `image`, `runtime_version` and, with `--save`, `saved_path`. A tree carries `tree_path`, `deps_file` and `next_steps`. A bundle carries `bundle_path`. `size`, when present, is the saved file's size in bytes, and `warnings` lists the target's warnings, including undeclared local env values that will not follow the project.
+`target` and `kind` are always present. An image carries `image`, `runtime_version` and, with `--save`, `saved_path`. A tree carries `tree_path`, `deps_file` and `next_steps`. A bundle carries `bundle_path`. `size`, when present, is the saved file's size in bytes. An image also carries `deployment_env` when the manifest declares environment values: one `{"kind", "name", "status"}` per value the Deployment must set, since the image carries none, with `status` one of `required`, `optional`, `has a default` or `from workspace`, the required ones first. `warnings` lists the target's warnings.

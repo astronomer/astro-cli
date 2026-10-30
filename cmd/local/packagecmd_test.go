@@ -7,7 +7,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -152,8 +151,9 @@ func TestPackageMWAABuildsTree(t *testing.T) {
 }
 
 // A value the project gets from this machine without declaring it is carried by
-// no artifact, so package warns about it beside the target's own warnings.
-func TestPackageWarnsAboutUndeclaredLocalValues(t *testing.T) {
+// no artifact, but that is the project's setup, not the artifact's: astro local
+// check warns about it, and package says nothing.
+func TestPackageSaysNothingAboutUndeclaredLocalValues(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
@@ -168,35 +168,50 @@ func TestPackageWarnsAboutUndeclaredLocalValues(t *testing.T) {
 	if err := execute(t, d, "package", "mwaa", "--out-dir", outDir); err != nil {
 		t.Fatalf("package mwaa: %v", err)
 	}
-	want := "Warning: 1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it:\n" +
-		"  airflow-variable region  project  if needed: astro local env airflow-variable declare region  " +
-		"if not: astro local env airflow-variable delete region --project\n"
-	if !strings.Contains(stderrOf(d), want) {
-		t.Errorf("want the warning on stderr:\n%s\ngot:\n%s", want, stderrOf(d))
-	}
-	if strings.Contains(out.String(), "region") {
-		t.Errorf("a warning is not the command's output, but stdout has it:\n%s", out.String())
+	if got := stderrOf(d) + out.String(); strings.Contains(got, "region") {
+		t.Errorf("package named the undeclared value:\n%s", got)
 	}
 
-	// Under json the result carries the same warning as one sentence: a
-	// string a program reads, not a table.
 	d, out = testDeps(t)
 	d.WorkingDir = func() (string, error) { return dir, nil }
 	if err := execute(t, d, "package", "mwaa", "--out-dir", outDir, "--output", "json"); err != nil {
 		t.Fatalf("package mwaa: %v", err)
 	}
-	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	var res struct {
-		Warnings []string `json:"warnings"`
+	if strings.Contains(out.String(), "region") {
+		t.Errorf("package -o json named the undeclared value:\n%s", out.String())
 	}
-	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &res); err != nil {
-		t.Fatalf("result did not decode: %v: %s", err, out.String())
+}
+
+// An image's result lists the values the manifest declares under the deploy
+// command, for the Deployment to set, the required ones first, aligned.
+func TestPackageListsTheDeploymentEnvUnderTheDeployCommand(t *testing.T) {
+	var b strings.Builder
+	err := renderImageResult(&b, pack.Result{
+		Image: "astro-package/p:3.1-2-abc",
+		DeploymentEnv: []pack.DeploymentValue{
+			{Kind: "connection", Name: "llm_gateway", Status: "required"},
+			{Kind: "connection", Name: "github_default", Status: "optional"},
+			{Kind: "airflow variable", Name: "region", Status: "has a default"},
+		},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	sentence := "1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it: " +
-		"airflow-variable region from project (if needed: astro local env airflow-variable declare region; " +
-		"if not: astro local env airflow-variable delete region --project)."
-	if !slices.Contains(res.Warnings, sentence) {
-		t.Errorf("json warnings = %q, want the sentence %q", res.Warnings, sentence)
+	want := "\nDeploy it with:\n  astro deploy --image-name astro-package/p:3.1-2-abc\n" +
+		"and set these on the Deployment, as environment variables or linked Environment Manager objects:\n" +
+		"  connection llm_gateway     required\n" +
+		"  connection github_default  optional\n" +
+		"  airflow variable region    has a default\n"
+	if !strings.HasSuffix(b.String(), want) {
+		t.Errorf("got:\n%s\nwant suffix:\n%s", b.String(), want)
+	}
+
+	b.Reset()
+	if err := renderImageResult(&b, pack.Result{Image: "i"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(b.String(), "set these") {
+		t.Errorf("no declared values, yet:\n%s", b.String())
 	}
 }
 

@@ -11,6 +11,13 @@
   "warnings": [
     "x"
   ],
+  "deployment_env": [
+    {
+      "kind": "x",
+      "name": "x",
+      "status": "x"
+    }
+  ],
   "next_steps": [
     "x"
   ]
