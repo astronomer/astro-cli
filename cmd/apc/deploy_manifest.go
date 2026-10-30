@@ -86,12 +86,17 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 	// question goes to stderr either way.
 	progress := cliout.NotesTo(cmd, deployOutput, out)
 	errOut := cmd.ErrOrStderr()
-	// Every warning goes to stderr as it is given, led by a yellow "Warning:",
-	// as Astro's deploy does, and into the result's warnings for -o json.
+	// Every warning goes to stderr, led by a yellow "Warning:", as Astro's
+	// deploy does, and into the result's warnings for -o json; notes go to
+	// stderr too. In text they print once, after the deploy's progress (the
+	// build and the push), just above the result, or before the error a failed
+	// deploy returns; the ones found before a question print before it
+	// instead. Under json each prints as given.
 	var warnings []string
+	recap := cliout.NewRecap(errOut, deployOutput == cliout.FormatText)
 	warnf := func(msg string) {
 		warnings = append(warnings, msg)
-		cliout.Warn(errOut, msg)
+		recap.Warn(msg)
 	}
 	interactive := deployOutput == cliout.FormatText && stdinIsTerminal()
 	engine := utils.OnceEngine(func() (string, []string, error) { return containercfg.Engine(config.WorkingPath) })
@@ -121,9 +126,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		CheckRuntime: func(runtime, airflowPin string) ([]runtimeversions.Finding, error) {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
-		Warn: warnf,
-		// A plain line with the deploy's progress.
-		Note:   func(msg string) { cliout.Note(progress, msg) },
+		Warn:   warnf,
 		Engine: engine,
 		Link: func(l scaffold.Link) error {
 			if err := scaffold.SaveLink(config.WorkingPath, nil, l); err != nil {
@@ -146,7 +149,8 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		OnBuild: func() {
 			fmt.Fprintln(progress, "Building your project image, this can take a few minutes...")
 		},
-	}, &apcManifestDeployer{client: houstonClient, in: cmd.InOrStdin(), errOut: errOut, progress: progress, warn: warnf})
+	}, manifestdeploy.BeforeAsking(&apcManifestDeployer{client: houstonClient, in: cmd.InOrStdin(), errOut: errOut, progress: progress, warn: warnf}, recap.Flush))
+	recap.Flush()
 	if err != nil {
 		if errors.Is(err, manifestdeploy.ErrAborted) {
 			// Asked, and declined: the exit code says so.

@@ -100,10 +100,6 @@ type Request struct {
 	// project's lock, into req.Install (imageinstall.Fill), with its warnings
 	// through warn. nil installs the manifest's dependencies as written.
 	ResolveInstall func(ctx context.Context, req *imagebuild.Request, warn func(string)) error
-	// Note receives what the image target notes before it builds and that is
-	// not wrong: the project's own linked worktrees it leaves out
-	// (shipcheck.LeftOutNote). nil streams it as a progress line.
-	Note func(string)
 }
 
 // resolveInstall resolves what breq installs with ResolveInstall, when there
@@ -113,14 +109,6 @@ func (r Request) resolveInstall(ctx context.Context, breq *imagebuild.Request) e
 		return nil
 	}
 	return r.ResolveInstall(ctx, breq, r.Warn)
-}
-
-// note is Request.Note, or a progress line through cb when it is nil.
-func (r Request) note(cb localrt.Callbacks) func(string) {
-	if r.Note != nil {
-		return r.Note
-	}
-	return func(n string) { emit(cb, n) }
 }
 
 // warn is Request.Warn, or a progress line through cb when it is nil.
@@ -154,6 +142,9 @@ type Result struct {
 	// Warnings are non-fatal findings the artifact is still valid despite: an
 	// Airflow pin the platform does not list, OS packages it cannot install.
 	Warnings []string `json:"warnings,omitempty"`
+	// DeploymentEnv is what an image target's Deployment must supply: each
+	// value [tool.astro.env] declares, which the image does not carry.
+	DeploymentEnv []DeploymentValue `json:"deployment_env,omitempty"`
 	// NextSteps are the exact commands to ship the artifact — the upload
 	// hand-off a tree target cannot do itself (it never touches the network) —
 	// or, for a build context, to build it.

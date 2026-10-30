@@ -174,7 +174,6 @@ func buildCommandProperties(cmd *cobra.Command) map[string]interface{} {
 		"command":      GetCommandPath(cmd),
 		"cli_version":  version.Current(),
 		"os":           runtime.GOOS,
-		"os_version":   sharedtel.GetOSVersion(),
 		"go_version":   runtime.Version(),
 		"context":      context,
 		"architecture": runtime.GOARCH,
@@ -300,6 +299,8 @@ func isDebugMode() bool {
 // sendDebug sends telemetry synchronously and prints debug output.
 // It prints the event body and whether a token was attached, never the token.
 func sendDebug(payload sharedtel.TelemetryPayload, apiURL, token string) {
+	// os_version is otherwise the sender subprocess's to fill in (sharedtel.SendEvent).
+	payload.Properties["os_version"] = sharedtel.GetOSVersion()
 	body, _ := json.MarshalIndent(payload, "", "  ") //nolint:errcheck // marshaling a plain struct that does not error in practice
 	authState := "anonymous"
 	if token != "" {

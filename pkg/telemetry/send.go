@@ -77,6 +77,19 @@ func SendEvent() error {
 		return err
 	}
 
+	addOSVersion(sp.Properties)
 	_, err = SendWithToken(sp.TelemetryPayload, sp.APIURL, sp.Token)
 	return err
+}
+
+// addOSVersion fills in os_version when the caller left it out. The CLI leaves
+// it to this process: finding it runs a command (uname, or cmd /c ver), and
+// the parent is the process the user is waiting on.
+func addOSVersion(properties map[string]interface{}) {
+	if properties == nil {
+		return
+	}
+	if _, ok := properties[osVersionProperty]; !ok {
+		properties[osVersionProperty] = GetOSVersion()
+	}
 }

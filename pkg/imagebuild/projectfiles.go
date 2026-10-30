@@ -203,9 +203,6 @@ type walker struct {
 	// repository (linkedWorktree) the walk carries, which a declared
 	// Dockerfile's context does.
 	nested func(rel string)
-	// leftOut, when set, takes each linked worktree a generated build's walk
-	// leaves out, for the command to say so.
-	leftOut func(rel string)
 	// worktrees is the directory holding the linked worktrees' git dirs of
 	// the repository the project is in (<common git dir>/worktrees),
 	// resolved: "" outside a repository, and for a walk that applies no
@@ -309,13 +306,12 @@ func resolvedPath(p string) string {
 // project's own repository inside it is left out whole
 // (walker.linkedWorktree).
 func walkProject(root string, visit func(rel, src string, mode fs.FileMode) error) error {
-	return walkProjectLinks(root, visit, nil, nil)
+	return walkProjectLinks(root, visit, nil)
 }
 
 // walkProjectLinks is walkProject, handing link each symlink it goes through
-// (walker.link) and leftOut each linked worktree it leaves out
-// (walker.leftOut).
-func walkProjectLinks(root string, visit func(rel, src string, mode fs.FileMode) error, link, leftOut func(rel string)) error {
+// (walker.link).
+func walkProjectLinks(root string, visit func(rel, src string, mode fs.FileMode) error, link func(rel string)) error {
 	resolved, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		return err
@@ -324,7 +320,7 @@ func walkProjectLinks(root string, visit func(rel, src string, mode fs.FileMode)
 	if err != nil {
 		return err
 	}
-	w := walker{filter: filter, follow: true, link: link, leftOut: leftOut, visit: visit, worktrees: projectWorktrees(resolved)}
+	w := walker{filter: filter, follow: true, link: link, visit: visit, worktrees: projectWorktrees(resolved)}
 	return w.walkDir(resolved, "", map[string]bool{resolved: true})
 }
 
@@ -397,17 +393,14 @@ func (w walker) stat(src string) (fs.FileInfo, error) {
 
 // leavesOutCheckout reports whether the walk leaves the directory at src (rel
 // from the root) out because it is a linked worktree of the project's own
-// repository (linkedWorktree), which a generated build does, handing it to
-// leftOut unless a rule already leaves it out (skip). A declared build's walk
-// carries it and hands it to nested, under the same condition.
+// repository (linkedWorktree), which a generated build does, silently. A
+// declared build's walk carries it and hands it to nested unless a rule
+// already leaves it out (skip).
 func (w walker) leavesOutCheckout(src, rel string, skip bool) bool {
 	if !w.linkedWorktree(src) {
 		return false
 	}
 	if w.filter.generated {
-		if w.leftOut != nil && !skip {
-			w.leftOut(rel)
-		}
 		return true
 	}
 	if w.nested != nil && !skip {
@@ -494,10 +487,6 @@ type ProjectSurvey struct {
 	// declared Dockerfile's context carries, slash-separated: each
 	// directory's path. A generated build leaves them out and lists none.
 	Nested []string
-	// LeftOut are the linked worktrees of the project's own repository inside
-	// it that a generated build leaves out, slash-separated: each directory's
-	// path. A declared build lists none here.
-	LeftOut []string
 	// CosmosBoost are the Cosmos Boost files an earlier Astro CLI wrote into
 	// the project that a declared Dockerfile's context carries, which the
 	// plugin would read as current in the image. A generated build leaves
@@ -540,8 +529,7 @@ func SurveyProject(dir, dockerfile string, podman bool) (ProjectSurvey, error) {
 	}
 	if dockerfile == "" {
 		err = walkProjectLinks(resolved, collect,
-			func(rel string) { s.Links = append(s.Links, rel) },
-			func(rel string) { s.LeftOut = append(s.LeftOut, rel) })
+			func(rel string) { s.Links = append(s.Links, rel) })
 	} else {
 		s.IgnoreFile = declaredIgnoreFile(resolved, dockerfile, podman)
 		var filter projectFilter

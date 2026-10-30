@@ -319,39 +319,58 @@ func envChecklist(project string, env map[string]any, intro, note string) (strin
 	return b.String(), nil
 }
 
-// imageEnvWarning says what the astro image does not carry: none of the values
-// [tool.astro.env] declares, defaults included, since the image is built from
-// the dependencies and OS packages alone. The Deployment supplies them, as its
-// own environment variables or the Environment Manager objects linked to it.
-// "" when the manifest declares none. A declaration the parser refuses is an
-// error, as it is for `astro local start`.
-func imageEnvWarning(env map[string]any) (string, error) {
+// DeploymentValue is one value [tool.astro.env] declares that the Deployment
+// must supply, since the astro image carries none of them: it is built from
+// the dependencies and OS packages alone. Kind is "env var", "airflow
+// variable" or "connection"; Status is where the value comes from
+// (valueStatus): "required", "optional", "has a default" or "from workspace".
+type DeploymentValue struct {
+	Kind   string `json:"kind"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+// statusRequired is valueStatus for a value with no default, no workspace
+// source and no optional mark, which deploymentEnv lists first.
+const statusRequired = "required"
+
+// deploymentEnv lists the values [tool.astro.env] declares, defaults included,
+// for the Deployment to set as its environment variables or linked
+// Environment Manager objects: the required ones first, then by kind and
+// name. Nil when the manifest declares none. A declaration the parser refuses
+// is an error, as it is for `astro local start`.
+func deploymentEnv(env map[string]any) ([]DeploymentValue, error) {
 	if len(env) == 0 {
-		return "", nil
+		return nil, nil
 	}
 	schema, err := envschema.ParseSchema(env)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	var names []string
+	var values []DeploymentValue
 	for _, s := range []struct {
-		label string
+		kind  string
 		specs map[string]envschema.ValueSpec
 	}{
 		{"env var", schema.EnvVars},
 		{"airflow variable", schema.AirflowVariables},
 		{"connection", schema.Connections},
 	} {
-		for _, name := range sortedKeys(s.specs) {
-			names = append(names, s.label+" "+name+valueMeta(s.specs[name]))
+		for name, spec := range s.specs {
+			values = append(values, DeploymentValue{Kind: s.kind, Name: name, Status: valueStatus(spec)})
 		}
 	}
-	if len(names) == 0 {
-		return "", nil
-	}
-	return fmt.Sprintf("the image carries none of the %d value(s) [tool.astro.env] declares, defaults included: "+
-		"set them on the Deployment, as its environment variables or linked Environment Manager objects: %s",
-		len(names), strings.Join(names, ", ")), nil
+	sort.Slice(values, func(i, j int) bool {
+		a, b := values[i], values[j]
+		if ar, br := a.Status == statusRequired, b.Status == statusRequired; ar != br {
+			return ar
+		}
+		if a.Kind != b.Kind {
+			return a.Kind < b.Kind
+		}
+		return a.Name < b.Name
+	})
+	return values, nil
 }
 
 // valueMeta annotates a checklist entry with where its value comes from: a
@@ -366,15 +385,21 @@ func imageEnvWarning(env map[string]any) (string, error) {
 // Only a value with neither falls to optional, so a Dag's nice-to-have
 // setting does not read as something the environment cannot run without.
 func valueMeta(spec envschema.ValueSpec) string {
+	return " (" + valueStatus(spec) + ")"
+}
+
+// valueStatus is valueMeta's annotation alone, for a list that shows it in a
+// column of its own.
+func valueStatus(spec envschema.ValueSpec) string {
 	switch {
 	case spec.Source == envschema.SourceWorkspace:
-		return " (from workspace)"
+		return "from workspace"
 	case spec.HasDefault:
-		return " (has a default)"
+		return "has a default"
 	case spec.Optional:
-		return " (optional)"
+		return "optional"
 	default:
-		return " (required)"
+		return statusRequired
 	}
 }
 
