@@ -169,7 +169,7 @@ func (c *cli) runtimeConstraints(ctx context.Context, dir string, m *manifest.Ma
 	case err != nil:
 		return nil, err
 	case python == "":
-		return nil, fmt.Errorf("the runtime catalog could not be read for the Python runtime %s runs", build)
+		return nil, fmt.Errorf("which Python runtime %s runs cannot be told: the runtime catalog could not be read, or does not list the build yet", build)
 	}
 	lines, err := c.d.RuntimeConstraints(ctx, build, python)
 	switch {

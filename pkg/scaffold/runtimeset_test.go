@@ -98,6 +98,18 @@ func TestSetRuntimeBuildPicksAPython(t *testing.T) {
 	assert.Equal(t, "3.13", change.Python)
 }
 
+// A Python given across a series move is the one requires-python reports,
+// once: the pin change's own bound was overwritten, so it is not reported.
+func TestSetRuntimeBuildReportsThePythonGivenAcrossASeriesMove(t *testing.T) {
+	dir, path := writeEditFixture(t, seriesProject("apache-airflow==3.3.*", ""), 0o644)
+	change, err := SetRuntimeBuildWith(dir, nil, "3.4-1", "3.13", AirflowPinOptions{Catalog: buildCatalog(t)})
+	require.NoError(t, err)
+	require.NotNil(t, change.Airflow)
+	assert.Empty(t, change.Airflow.RequiresPython)
+	assert.Equal(t, "==3.13.*", change.RequiresPython)
+	assert.Contains(t, readFile(t, path), "requires-python = '==3.13.*'")
+}
+
 func TestSetRuntimeBuildKeepsAChosenRangeThatAdmitsTheDefault(t *testing.T) {
 	dir, _ := writeEditFixture(t, seriesProject("apache-airflow==3.3.*", ""), 0o644)
 	change, err := SetRuntimeBuildWith(dir, nil, "3.3-10", "", AirflowPinOptions{Catalog: buildCatalog(t)})

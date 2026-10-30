@@ -122,6 +122,30 @@ func TestUpgradeRuntimeWithNoBuildPicksTheNewestOfTheSeries(t *testing.T) {
 	assert.Contains(t, err.Error(), "Pass a build instead")
 }
 
+// A build newer than the newest published one (the catalog dates it ahead,
+// or a cached copy predates it) is not traded for an older one.
+func TestUpgradeRuntimeWithNoBuildNeverMovesBack(t *testing.T) {
+	rd := newRefreshDeps(t, buildManifest+"runtime = '3.3-12'\n")
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime"))
+	assert.Contains(t, readText(t, rd.path), "runtime = '3.3-12'")
+	assert.Contains(t, rd.stdout.String(), "The runtime is already 3.3-12.")
+}
+
+// An upgrade that keeps the build still refreshes, and says so rather than
+// that nothing changed.
+func TestUpgradeRuntimeOnTheSameBuildSaysWhatTheRefreshChanged(t *testing.T) {
+	rd := newRefreshDeps(t, buildManifest+"runtime = '3.3-10'\n")
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10"))
+	out := rd.stdout.String()
+	assert.Contains(t, out, "The runtime is already 3.3-10. Refreshed what follows from it:")
+	assert.Contains(t, out, "  uv.lock: locked")
+	assert.NotContains(t, out, "Nothing changed")
+
+	rd.stdout.Reset()
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10"))
+	assert.Contains(t, rd.stdout.String(), "The runtime is already 3.3-10. Nothing changed.")
+}
+
 func TestUpgradeRuntimePicksAPython(t *testing.T) {
 	rd := newRefreshDeps(t, buildManifest)
 	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10", "--python", "3.14"))
@@ -155,8 +179,7 @@ func TestUpgradeRuntimeOfflineSaysWhatItCouldNotRefresh(t *testing.T) {
 	var res runtimeUpgrade
 	require.NoError(t, json.Unmarshal(rd.stdout.Bytes(), &res))
 	assert.True(t, res.Changed)
-	require.Len(t, res.Findings, 1)
-	assert.Equal(t, string(runtimeversions.FindingSkipped), res.Findings[0].Kind)
+	assert.Empty(t, res.Findings, "an Airflow 3 build's tag already said its series, as the image-build check says")
 	require.NotNil(t, res.Refresh.Lock)
 	assert.Equal(t, lockFailed, res.Refresh.Lock.Status)
 	assert.Len(t, res.Refresh.Warnings, 2)

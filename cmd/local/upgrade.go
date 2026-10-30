@@ -108,11 +108,12 @@ func (c *cli) refreshAfterUpgrade(ctx context.Context, dir string) pinRefresh {
 			"Airflow %s comes from PyPI for now: Astronomer's index could not be read for the new build: %v", w.pin, w.lookupErr))
 	case w.lookupErr != nil:
 		out.Warnings = append(out.Warnings, fmt.Sprintf(
-			"[tool.uv] was not refreshed: Astronomer's index could not be read: %v. astro local start refreshes it when it can", w.lookupErr))
+			"[tool.uv] was not refreshed, so its Airflow build and runtime constraints may still be the previous runtime's, "+
+				"and uv.lock was locked against them: Astronomer's index could not be read: %v. Run this command again once it can be", w.lookupErr))
 	}
 	if w.constraintsErr != nil {
 		out.Warnings = append(out.Warnings, fmt.Sprintf(
-			"the runtime's constraints in [tool.uv] were not refreshed: %v. astro local start refreshes them when it can", w.constraintsErr))
+			"the runtime's constraints in [tool.uv] were not refreshed: %v. Run this command again once they can be", w.constraintsErr))
 	}
 	if w.writeErr != nil {
 		out.Warnings = append(out.Warnings, fmt.Sprintf("could not update %s for Astronomer's build of Airflow: %v", manifest.Marker, w.writeErr))
@@ -124,6 +125,23 @@ func (c *cli) refreshAfterUpgrade(ctx context.Context, dir string) pinRefresh {
 		}
 	}
 	return out
+}
+
+// changed reports that the refresh rewrote [tool.uv] or uv.lock, which an
+// upgrade that left the pin alone can still do: a new build shipped, or an
+// older CLI moved the pin without refreshing.
+func (p pinRefresh) changed() bool {
+	return p.Constraints != "" || p.ConstraintsRemoved != "" || p.AstroAirflow != "" || p.AstroAirflowRemoved ||
+		(p.Lock != nil && (p.Lock.Status == lockLocked || p.Lock.Status == lockUpdated))
+}
+
+// nothingChanged ends the line an upgrade that kept the pin says: nothing
+// changed, unless the refresh changed something, whose lines follow.
+func nothingChanged(p pinRefresh) string {
+	if p.changed() {
+		return " Refreshed what follows from it:"
+	}
+	return " Nothing changed."
 }
 
 // lines is what a refresh says in text: what moved, never what stayed.
@@ -219,7 +237,7 @@ func (c *cli) runUpgradeRuntime(ctx context.Context, build, python string) error
 	}
 	target := ""
 	if build == "" {
-		if build, err = pickRuntimeTarget(opts.Catalog, currentPin(dir)); err != nil {
+		if build, err = pickRuntimeTarget(opts.Catalog, currentPin(dir), currentRuntime(dir)); err != nil {
 			return err
 		}
 		target = build
@@ -237,8 +255,8 @@ func (c *cli) runUpgradeRuntime(ctx context.Context, build, python string) error
 		Target:             target,
 		Findings:           runtimeFindings(opts.Catalog, change.Runtime, currentPin(dir)),
 		Refresh:            c.refreshAfterUpgrade(ctx, dir),
-		RestartNeeded:      change.Changed && c.airflowRunning(dir),
 	}
+	res.RestartNeeded = (change.Changed || res.Refresh.changed()) && c.airflowRunning(dir)
 	if r.Format != cliout.FormatJSON {
 		for _, f := range res.Findings {
 			cliout.Warn(c.d.Stderr, f.Message)
@@ -249,9 +267,11 @@ func (c *cli) runUpgradeRuntime(ctx context.Context, build, python string) error
 }
 
 // pickRuntimeTarget is the build an upgrade with none given moves to: the
-// newest published build of the series pin names, or of its generation when
-// it names none. Published, so the build has an image to pull.
-func pickRuntimeTarget(catalog *runtimeversions.Catalog, pin string) (string, error) {
+// newest published build of the series pin names (of its generation, for a
+// pin naming only that). Published, so the build has an image to pull. A
+// current build of the series newer than that (one the catalog dates ahead,
+// or a cached copy predates) stays: an upgrade never moves a project back.
+func pickRuntimeTarget(catalog *runtimeversions.Catalog, pin, current string) (string, error) {
 	if catalog == nil {
 		return "", errors.New("could not read the runtime catalog to pick the newest build. " +
 			"Pass a build instead, like astro local upgrade runtime 3.3-10")
@@ -261,39 +281,54 @@ func pickRuntimeTarget(catalog *runtimeversions.Catalog, pin string) (string, er
 			"Pass a build instead, like astro local upgrade runtime 3.3-10", manifest.Marker)
 	}
 	series := manifest.Airflow{Pin: pin}.Series()
-	if series == "" {
-		series = pin
-	}
 	build, ok := catalog.NewestPublishedRuntimeFor(series)
 	if !ok {
 		return "", fmt.Errorf("the runtime catalog lists no build of Airflow %s", series)
 	}
+	if t, ok := manifest.ParseRuntimeTag(current); ok && t.Build && t.Agrees(series) &&
+		runtimeversions.CompareRuntimes(current, build) > 0 {
+		return current, nil
+	}
 	return build, nil
 }
 
-// runtimeFindings is what the catalog says about build, as the manifest
-// checks an image build makes say it (runtimeversions.Catalog.CheckRuntime).
-// Without a catalog, an Airflow 3 build was judged by its tag alone, which is
-// said too.
-func runtimeFindings(catalog *runtimeversions.Catalog, build, pin string) []runtimeFinding {
-	if catalog == nil {
-		return []runtimeFinding{{
-			Kind:    string(runtimeversions.FindingSkipped),
-			Message: fmt.Sprintf("the runtime catalog could not be read, so runtime %s was not checked: whether it exists, is yanked, or which Airflow it carries", build),
-		}}
+// currentRuntime is the [tool.astro] runtime the manifest in dir names, read
+// as for a repair. Empty when it names none or cannot be read.
+func currentRuntime(dir string) string {
+	data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	if err != nil {
+		return ""
 	}
+	m, err := manifest.ParseForRepair(data)
+	if err != nil {
+		return ""
+	}
+	return m.Astro.Runtime
+}
+
+// runtimeFindings is what the catalog says about build, as an image build's
+// runtime check says it (runtimeversions.Catalog.CheckRuntime, nil catalog
+// included: offline an Airflow 3 build's tag already said its series).
+func runtimeFindings(catalog *runtimeversions.Catalog, build, pin string) []runtimeFinding {
 	var out []runtimeFinding
 	for _, f := range catalog.CheckRuntime(build, pin) {
-		out = append(out, runtimeFinding{Kind: string(f.Kind), Message: f.Message})
+		out = append(out, runtimeFinding{
+			Kind: string(f.Kind), Message: f.Message, AirflowVersion: f.AirflowVersion,
+			YankedReason: f.YankedReason, Suggested: f.Suggested,
+		})
 	}
 	return out
 }
 
-// runtimeFinding is a runtimeversions.Finding as the CLI's json says it: its
-// stable kind, and the message for a person.
+// runtimeFinding is a runtimeversions.Finding as the CLI's json says it, in
+// snake_case. Runtime and AirflowPin are the result's own runtime and pin, and
+// Blocking never reaches here: the pin moves with the build, so the two agree.
 type runtimeFinding struct {
-	Kind    string `json:"kind"`
-	Message string `json:"message"`
+	Kind           string `json:"kind"`
+	Message        string `json:"message"`
+	AirflowVersion string `json:"airflow_version,omitempty"`
+	YankedReason   string `json:"yanked_reason,omitempty"`
+	Suggested      string `json:"suggested,omitempty"`
 }
 
 func renderRuntimeUpgrade(w io.Writer, res runtimeUpgrade) error {
@@ -302,7 +337,7 @@ func renderRuntimeUpgrade(w io.Writer, res runtimeUpgrade) error {
 		lines = append(lines, fmt.Sprintf("Upgrading to %s (the newest build of the project's Airflow series in the runtime catalog)", res.Target))
 	}
 	if !res.Changed {
-		lines = append(lines, fmt.Sprintf("The runtime is already %s. Nothing changed.", res.Runtime))
+		lines = append(lines, fmt.Sprintf("The runtime is already %s.%s", res.Runtime, nothingChanged(res.Refresh)))
 	} else {
 		from := res.Previous
 		if from == "" {
@@ -419,8 +454,8 @@ func (c *cli) runUpgradeAirflow(ctx context.Context, version string, withOtto bo
 		Target:           target,
 		Available:        available,
 		Refresh:          c.refreshAfterUpgrade(ctx, dir),
-		RestartNeeded:    change.Changed && c.airflowRunning(dir),
 	}
+	res.RestartNeeded = (change.Changed || res.Refresh.changed()) && c.airflowRunning(dir)
 	c.warnRefresh(r, res.Refresh)
 	if err := r.Emit(res, func(w io.Writer) error { return renderAirflowUpgrade(w, res) }); err != nil {
 		return err
@@ -515,7 +550,7 @@ func renderAirflowUpgrade(w io.Writer, res airflowUpgrade) error {
 		// Only an Airflow 2 pin is offered another generation.
 		lines = append(lines, fmt.Sprintf("Airflow is already on the newest Airflow 2 (%s). %s", res.Version, availableHint(res.Available)))
 	case !res.Changed:
-		lines = append(lines, fmt.Sprintf("Airflow is already pinned to %s. Nothing changed.", res.Version))
+		lines = append(lines, fmt.Sprintf("Airflow is already pinned to %s.%s", res.Version, nothingChanged(res.Refresh)))
 	default:
 		from := res.Previous
 		if from == "" {

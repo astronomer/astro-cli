@@ -161,6 +161,11 @@ func (e *runtimeBuildEdit) apply(before *manifest.Manifest, ed tomledit.Editor) 
 		return RuntimeBuildChange{}, err
 	}
 	out.Python = python
+	if out.Airflow != nil {
+		// The result's own RequiresPython says what was written, which a
+		// python given overrides; the pin change's would contradict it.
+		out.Airflow.RequiresPython = ""
+	}
 	if next != rp {
 		if err := ed.Set([]string{"project", "requires-python"}, next); err != nil {
 			return RuntimeBuildChange{}, err

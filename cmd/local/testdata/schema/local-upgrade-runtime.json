@@ -24,7 +24,10 @@
   "findings": [
     {
       "kind": "x",
-      "message": "x"
+      "message": "x",
+      "airflow_version": "x",
+      "yanked_reason": "x",
+      "suggested": "x"
     }
   ],
   "refresh": {
