@@ -126,7 +126,9 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 	in.python = python
 	if build != "" && python != "" {
 		if r.Constraints != nil {
-			in.runtimePins, _ = r.Constraints(ctx, build, python)
+			if pins, err := r.Constraints(ctx, build, python); err == nil {
+				in.runtimePins = pins
+			}
 		}
 		if r.Freeze != nil {
 			if freeze, err := r.Freeze(ctx, build, python); err == nil {
@@ -137,7 +139,7 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 	if in.baseInstalled == nil {
 		warn(fmt.Sprintf("the package list of %s could not be read, so the image pins the project's own dependencies to uv.lock's versions and leaves the rest to the install", baseName(req.BaseImage)))
 	}
-	lists, warnings, err := apply(in)
+	lists, warnings, err := apply(&in)
 	if err != nil {
 		return err
 	}

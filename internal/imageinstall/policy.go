@@ -182,7 +182,7 @@ type policyInput struct {
 
 // apply applies the image's policy to in, returning the lists and the
 // warnings to show.
-func apply(in policyInput) (imagebuild.InstallLists, []string, error) {
+func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 	project, err := readProject(in.pyproject)
 	if err != nil {
 		return imagebuild.InstallLists{}, nil, err
@@ -210,7 +210,8 @@ func apply(in policyInput) (imagebuild.InstallLists, []string, error) {
 	var lists imagebuild.InstallLists
 	urls := &urlCleaner{}
 	git := false
-	for _, pkg := range lock.Packages {
+	for i := range lock.Packages {
+		pkg := &lock.Packages[i]
 		name := manifest.DistName(pkg.Name)
 		versioned, own := project.own[name]
 		switch {
@@ -245,7 +246,7 @@ func apply(in policyInput) (imagebuild.InstallLists, []string, error) {
 }
 
 // pin is name==version, or the bare name for a package with no version.
-func pin(pkg lockedPackage) string {
+func pin(pkg *lockedPackage) string {
 	if pkg.Version == "" {
 		return pkg.Name
 	}
@@ -278,7 +279,7 @@ func pinName(line string) string {
 // [tool.uv.sources] entry routes it to. A routed package whose best file
 // differs between the platforms an image is built for gets a line for each,
 // limited to that platform.
-func directRefs(pkg lockedPackage, routed bool, python string, urls *urlCleaner) []string {
+func directRefs(pkg *lockedPackage, routed bool, python string, urls *urlCleaner) []string {
 	switch {
 	case pkg.VCS != nil:
 		v := pkg.VCS
@@ -331,7 +332,7 @@ func fileRef(name string, f *lockedFile, urls *urlCleaner) string {
 
 // bestFile is the file of pkg an install for tags picks: the wheel whose best
 // tag ranks first, else the sdist, else nil.
-func bestFile(pkg lockedPackage, tags map[string]int) *lockedFile {
+func bestFile(pkg *lockedPackage, tags map[string]int) *lockedFile {
 	var best *lockedFile
 	bestRank := len(tags)
 	for i := range pkg.Wheels {

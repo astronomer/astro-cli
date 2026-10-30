@@ -24,6 +24,14 @@ var imageMachines = []string{"x86_64", "aarch64"}
 // package that publishes only for a newer glibc installs from its sdist.
 const manylinuxGlibc = 28
 
+// manylinux2014Glibc is the glibc minor manylinux2014, the oldest tag an
+// aarch64 wheel is built for, names.
+const manylinux2014Glibc = 17
+
+// wheelNameParts is how many dash-separated parts a wheel's file name has at
+// the least: name, version, Python tag, ABI tag, platform tag.
+const wheelNameParts = 5
+
 // imageTags ranks the wheel tags an image's CPython (python, "3.12") on
 // machine installs, best first, as rank by tag. With python unknown, only the
 // tags any Python 3 takes.
@@ -35,9 +43,9 @@ func imageTags(python, machine string) map[string]int {
 		}
 	}
 	var platforms []string
-	for g := manylinuxGlibc; g >= 17; g-- {
+	for g := manylinuxGlibc; g >= manylinux2014Glibc; g-- {
 		platforms = append(platforms, fmt.Sprintf("manylinux_2_%d_%s", g, machine))
-		if g == 17 {
+		if g == manylinux2014Glibc {
 			platforms = append(platforms, "manylinux2014_"+machine)
 		}
 	}
@@ -99,7 +107,7 @@ func wheelTags(url string) []string {
 		return nil
 	}
 	parts := strings.Split(stem, "-")
-	if len(parts) < 5 {
+	if len(parts) < wheelNameParts {
 		return nil
 	}
 	n := len(parts)

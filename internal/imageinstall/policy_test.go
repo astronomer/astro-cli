@@ -18,7 +18,7 @@ func TestApplyLeavesOutAirflow(t *testing.T) {
 		"a Task SDK with a version": {`["apache-airflow-task-sdk>=1.1", "pandas"]`, []string{"apache-airflow-task-sdk==1.1.5", "pandas==2.2.3 ; python_version >= '3.10'"}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			lists, warnings, err := apply(policyInput{
+			lists, warnings, err := apply(&policyInput{
 				pyproject: []byte("[project]\nname = 'p'\ndependencies = " + tc.deps + "\n"),
 				pylock: []byte(`
 [[packages]]
@@ -54,7 +54,7 @@ marker = "python_version >= '3.10'"
 func TestApplyPicksARoutedPackagesFileForEachPlatform(t *testing.T) {
 	const pyproject = "[project]\nname = 'p'\ndependencies = ['fast', 'pure']\n" +
 		"[tool.uv.sources]\nfast = [{ index = 'acme', marker = \"sys_platform == 'linux'\" }]\npure = { index = 'acme' }\n"
-	lists, _, err := apply(policyInput{
+	lists, _, err := apply(&policyInput{
 		pyproject: []byte(pyproject),
 		pylock: []byte(`
 [[packages]]
@@ -92,7 +92,7 @@ wheels = [
 
 // A routed package with no file the image can install installs by name.
 func TestApplyInstallsARoutedPackageByNameWithoutAFile(t *testing.T) {
-	lists, _, err := apply(policyInput{
+	lists, _, err := apply(&policyInput{
 		pyproject: []byte("[project]\nname = 'p'\ndependencies = ['win']\n[tool.uv.sources]\nwin = { index = 'acme' }\n"),
 		pylock: []byte(`
 [[packages]]

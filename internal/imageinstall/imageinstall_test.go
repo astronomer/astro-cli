@@ -84,10 +84,9 @@ func project(t *testing.T, pyproject, lock string) string {
 
 // fill runs r over a generated build of dir on runtime 3.1-5, with packages,
 // and returns the request and the warnings.
-func fill(t *testing.T, r Resolver, dir string, packages ...string) (imagebuild.Request, []string) {
+func fill(t *testing.T, r Resolver, dir string, packages ...string) (req imagebuild.Request, warnings []string) {
 	t.Helper()
-	req := imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.1-5-python-3.12", ManifestDir: dir, Packages: packages}
-	var warnings []string
+	req = imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.1-5-python-3.12", ManifestDir: dir, Packages: packages}
 	require.NoError(t, r.Fill(t.Context(), &req, func(w string) { warnings = append(warnings, w) }))
 	return req, warnings
 }

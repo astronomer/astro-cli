@@ -106,6 +106,15 @@ type Request struct {
 	Note func(string)
 }
 
+// resolveInstall resolves what breq installs with ResolveInstall, when there
+// is one, its warnings through Warn.
+func (r Request) resolveInstall(ctx context.Context, breq *imagebuild.Request) error {
+	if r.ResolveInstall == nil {
+		return nil
+	}
+	return r.ResolveInstall(ctx, breq, r.Warn)
+}
+
 // note is Request.Note, or a progress line through cb when it is nil.
 func (r Request) note(cb localrt.Callbacks) func(string) {
 	if r.Note != nil {

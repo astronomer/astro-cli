@@ -1,6 +1,7 @@
 package pack
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -197,10 +198,8 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	declared := breq.Dockerfile
 	// What a generated image installs is resolved here, from the project's
 	// lock, before the content address that covers it.
-	if req.ResolveInstall != nil {
-		if err := req.ResolveInstall(ctx, &breq, req.Warn); err != nil {
-			return Result{}, err
-		}
+	if err := req.resolveInstall(ctx, &breq); err != nil {
+		return Result{}, err
 	}
 	// A context is built later, by whoever runs the commands it prints, so
 	// the secrets it names need not be readable now.
@@ -268,13 +267,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// load-bearing: that base is an Astro runtime by construction, so a missing
 	// label means something odd about the image rather than a choice the user made.
 	runtimeV, airflowLabel, inspected := readVersionLabels(ctx, engine, built)
-	runtimeVersion := runtimeV
-	if runtimeVersion == "" {
-		runtimeVersion = airflowLabel
-	}
-	if runtimeVersion == "" {
-		runtimeVersion = airflow.Pin
-	}
+	runtimeVersion := cmp.Or(runtimeV, airflowLabel, airflow.Pin)
 	// A declared Dockerfile that did not produce an Astro Runtime image is
 	// REPORTED, not refused.
 	//
