@@ -346,7 +346,7 @@ func (w walker) walkDir(dir, rel string, onPath map[string]bool) error {
 		if err != nil {
 			return err
 		}
-		if info == nil || (w.exclude != nil && info.IsDir() && os.SameFile(info, w.exclude)) {
+		if info == nil {
 			continue
 		}
 		skip, descend := w.filter.skip(childRel, info.IsDir())
@@ -388,15 +388,19 @@ func (w walker) walkDir(dir, rel string, onPath map[string]bool) error {
 // stat is the entry at src as the walk sees it: what a symlink points at when
 // links are followed, the link itself otherwise. A nil info and no error is an
 // entry gone: a dangling link has nothing to carry, and a file removed since
-// the directory was read (a tool's temp file) is not there to.
+// the directory was read (a tool's temp file) is not there to. So is the
+// directory the walk leaves out (walker.exclude), by whatever path it is met.
 func (w walker) stat(src string) (fs.FileInfo, error) {
 	stat := os.Stat // follows a symlink
 	if !w.follow {
 		stat = os.Lstat
 	}
 	info, err := stat(src)
-	if errors.Is(err, fs.ErrNotExist) {
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
 		return nil, nil
+	case err == nil && w.exclude != nil && info.IsDir() && os.SameFile(info, w.exclude):
+		return nil, nil // the directory the walk leaves out (walker.exclude)
 	}
 	return info, err
 }

@@ -220,26 +220,19 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 	if err := toml.Unmarshal(in.pylock, &lock); err != nil {
 		return imagebuild.InstallLists{}, nil, fmt.Errorf("reading uv's export of uv.lock: %w", err)
 	}
-	skip := map[string]bool{airflowDist: true, airflowCoreDist: true}
-	for _, line := range in.runtimePins {
-		if name := pinName(line); name != "" {
-			skip[name] = true
-		}
-	}
+	skip := pinNames(in.runtimePins)
+	skip[airflowDist], skip[airflowCoreDist] = true, true
 	var installed map[string]bool
 	if in.baseInstalled != nil {
-		installed = map[string]bool{}
-		for _, line := range in.baseInstalled {
-			if name := pinName(line); name != "" {
-				installed[name] = true
-			}
-		}
+		installed = pinNames(in.baseInstalled)
 	}
 
+	if err := refuseLocal(&lock); err != nil {
+		return imagebuild.InstallLists{}, nil, err
+	}
 	var lists imagebuild.InstallLists
 	urls := &urlCleaner{}
 	git := false
-	var local []string
 	for i := range lock.Packages {
 		pkg := &lock.Packages[i]
 		name := manifest.DistName(pkg.Name)
@@ -251,10 +244,6 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 			continue
 		case installed[name] && !own:
 			continue // the runtime's, at its tested version
-		}
-		if p := localPath(pkg); p != "" {
-			local = append(local, fmt.Sprintf("%s (%s)", pkg.Name, p))
-			continue
 		}
 		refs := directRefs(pkg, urls)
 		switch {
@@ -278,11 +267,6 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 		}
 		git = git || pkg.VCS != nil
 	}
-	if len(local) > 0 {
-		return imagebuild.InstallLists{}, nil, fmt.Errorf("%w: uv.lock takes %s from a path, which the image build has no way to reach. "+
-			"An image installs packages from an index, a git repository or a URL: publish it to an index and route it there with [tool.uv.sources], or point its source at git or a URL",
-			ErrLocalSource, strings.Join(local, ", "))
-	}
 	lists.Packages = in.packages
 	if git {
 		lists.Packages = imagebuild.WithGit(lists.Packages)
@@ -292,6 +276,23 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 		warnings = append(warnings, "the image build leaves out a URL's user and password: give the build a netrc secret instead")
 	}
 	return lists, warnings, nil
+}
+
+// refuseLocal is ErrLocalSource for the packages lock takes from a path on
+// this machine (localPath), each named with its path, or nil for none.
+func refuseLocal(lock *pylock) error {
+	var local []string
+	for i := range lock.Packages {
+		if p := localPath(&lock.Packages[i]); p != "" {
+			local = append(local, fmt.Sprintf("%s (%s)", lock.Packages[i].Name, p))
+		}
+	}
+	if len(local) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%w: uv.lock takes %s from a path, which the image build has no way to reach. "+
+		"An image installs packages from an index, a git repository or a URL: publish it to an index and route it there with [tool.uv.sources], or point its source at git or a URL",
+		ErrLocalSource, strings.Join(local, ", "))
 }
 
 // pin is name==version, or the bare name for a package with no version.
@@ -309,6 +310,17 @@ func withMarker(line, marker string) string {
 		return line
 	}
 	return line + " ; " + marker
+}
+
+// pinNames are the names lines pin (pinName), as a set.
+func pinNames(lines []string) map[string]bool {
+	names := map[string]bool{}
+	for _, line := range lines {
+		if name := pinName(line); name != "" {
+			names[name] = true
+		}
+	}
+	return names
 }
 
 // pinName is the normalized name a constraints or freeze line pins, or ""
