@@ -130,6 +130,11 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	// found, and a note streams as a progress line. shown keeps the warnings
 	// already out, for the result's warnings below.
 	held := packageHeld(r)
+	if held != nil {
+		// Package asks nothing today; a question it comes to ask is not
+		// answered with a held warning still unread.
+		defer held.FlushBeforeQuestions()()
+	}
 	shown := map[string]bool{}
 	warn := func(w string) {
 		shown[w] = true

@@ -92,8 +92,11 @@ type fakeCmdDeployer struct {
 	warn string
 	// warnBeforeBuild is a warning given before the build starts.
 	warnBeforeBuild string
-	dagInput        *manifestdeploy.DagDeploy
-	imgInput        *manifestdeploy.ImageDeploy
+	// listErr fails the workspace's Deployment list, which the deploy warns
+	// about before it asks for the target.
+	listErr  error
+	dagInput *manifestdeploy.DagDeploy
+	imgInput *manifestdeploy.ImageDeploy
 }
 
 func (f *fakeCmdDeployer) ConfirmTarget([]manifestdeploy.Choice, string) (string, error) {
@@ -101,7 +104,7 @@ func (f *fakeCmdDeployer) ConfirmTarget([]manifestdeploy.Choice, string) (string
 }
 
 func (f *fakeCmdDeployer) ListDeployments(string) ([]manifestdeploy.Deployment, error) {
-	return nil, nil
+	return nil, f.listErr
 }
 
 func (f *fakeCmdDeployer) ResolveUnlinked(string) (manifestdeploy.Deployment, error) {
@@ -132,16 +135,31 @@ func (f *fakeCmdDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 
 // execDeployOneStream runs astro deploy with stdout and stderr in one buffer,
 // so the order the two interleave in is what a terminal shows.
-func execDeployOneStream(args ...string) (string, error) {
+func execDeployOneStream(answers string, args ...string) (string, error) {
 	defer func() { workspaceID = "" }() // see execDeployCmd
 	testUtil.SetupOSArgsForGinkgo()
 	root := deployUnderRoot()
 	var buf bytes.Buffer
 	root.SetOut(&buf)
 	root.SetErr(&buf)
-	root.SetIn(strings.NewReader(""))
+	root.SetIn(strings.NewReader(answers))
 	err := cliout.Execute(context.Background(), root, append([]string{"deploy"}, args...), &buf, nil)
 	return buf.String(), err
+}
+
+// A warning held before the deploy asks which Deployment to ship to prints
+// before the question, since it may bear on the answer; one found after the
+// question is still held for the end.
+func TestDeployManifestPrintsHeldWarningsBeforeAQuestion(t *testing.T) {
+	interactiveDeploy(t)
+	fake := newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+	fake.listErr = errors.New("list refused")
+	fake.warn = "found after the question"
+	out, err := execDeployOneStream("\n")
+	require.NoError(t, err)
+	assertInOrder(t, out, "Warning: could not list the Deployments", "Deploy to which deployment?",
+		"Building your project image", "Warning: found after the question", "to prod (deployment clx-dep).")
+	assert.Equal(t, 1, strings.Count(out, "could not list the Deployments"), out)
 }
 
 // In text, what a deploy finds as it goes prints after the build's output,
@@ -152,13 +170,13 @@ func TestDeployManifestPrintsWarningsAfterTheBuild(t *testing.T) {
 		img:             manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "tag-1", DagTarballVersion: "3-1"},
 		warnBeforeBuild: before, warn: after,
 	})
-	out, err := execDeployOneStream("prod")
+	out, err := execDeployOneStream("", "prod")
 	require.NoError(t, err)
 	assertInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after, "Deployed image (tag tag-1)")
 
 	boom := errors.New("boom")
 	setupManifestDeploy(t, &fakeCmdDeployer{imgErr: boom, warnBeforeBuild: before, warn: after})
-	out, err = execDeployOneStream("prod")
+	out, err = execDeployOneStream("", "prod")
 	require.ErrorIs(t, err, boom)
 	assertInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after, "boom")
 
@@ -701,7 +719,7 @@ func (p *promptDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselec
 
 // newPromptDeploy wires the real prompt onto the command's own streams, so a
 // test drives the question a user would actually see.
-func newPromptDeploy(t *testing.T, img *manifestdeploy.ImageResult) {
+func newPromptDeploy(t *testing.T, img *manifestdeploy.ImageResult) *promptDeployer {
 	t.Helper()
 	fake := &promptDeployer{fakeCmdDeployer: fakeCmdDeployer{img: *img}}
 	setupManifestDeploy(t, fake)
@@ -711,6 +729,7 @@ func newPromptDeploy(t *testing.T, img *manifestdeploy.ImageResult) {
 		return fake
 	}
 	t.Cleanup(func() { newManifestDeployer = orig })
+	return fake
 }
 
 func TestDeployManifestPromptPreselectsDefaultAndAsksAnyway(t *testing.T) {

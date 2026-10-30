@@ -89,10 +89,12 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 	// deploy does, and into the result's warnings for -o json. In text the
 	// warnings and notes are held, as Astro's deploy holds them, and printed
 	// on stderr after the build's output, just above the result; a deploy that
-	// fails prints them before its error. Under json they print as given, on
+	// fails prints them before its error, and a question it asks (the
+	// deployment picker) before it is asked. Under json they print as given, on
 	// stderr, where the progress goes too.
 	var warnings []string
 	held := cliout.NewDeferred(errOut, deployOutput == cliout.FormatText)
+	defer held.FlushBeforeQuestions()()
 	warnf := func(msg string) {
 		warnings = append(warnings, msg)
 		held.Warn(msg)

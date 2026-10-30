@@ -3,6 +3,8 @@ package cliout
 import (
 	"bytes"
 	"testing"
+
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 func TestDeferredPrintsNothingUntilFlushedThenInOrder(t *testing.T) {
@@ -22,6 +24,37 @@ func TestDeferredPrintsNothingUntilFlushedThenInOrder(t *testing.T) {
 	d.Flush()
 	if buf.String() != want {
 		t.Errorf("a second Flush reprinted: %q", buf.String())
+	}
+}
+
+// A question the run asks prints what is held first; what comes after the
+// question is held until Flush, and the hook goes once restored.
+func TestDeferredFlushesBeforeAQuestion(t *testing.T) {
+	defer input.SetGuard(nil)()
+	var buf bytes.Buffer
+	d := NewDeferred(&buf, true)
+	restore := d.FlushBeforeQuestions()
+	d.Warn("before")
+	if err := input.MayAsk("> "); err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != "Warning: before\n" {
+		t.Fatalf("before the question: %q", buf.String())
+	}
+	d.Warn("after")
+	if buf.String() != "Warning: before\n" {
+		t.Fatalf("a warning after the question printed early: %q", buf.String())
+	}
+	restore()
+	if err := input.MayAsk("> "); err != nil {
+		t.Fatal(err)
+	}
+	if buf.String() != "Warning: before\n" {
+		t.Fatalf("a restored hook still flushed: %q", buf.String())
+	}
+	d.Flush()
+	if want := "Warning: before\nWarning: after\n"; buf.String() != want {
+		t.Errorf("printed %q, want %q", buf.String(), want)
 	}
 }
 

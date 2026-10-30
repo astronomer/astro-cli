@@ -283,9 +283,11 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	// json carries the same ones. In text, the warnings and notes are held and
 	// printed after the build's output, just above the result, where a long
 	// build cannot scroll them away; a deploy that fails prints them before its
-	// error. Under json they print as they are given.
+	// error, and a question the deploy asks (the deployment picker) prints
+	// them before it is asked. Under json they print as they are given.
 	var warnings []string
 	held := cliout.NewDeferred(errOut, format == cliout.FormatText)
+	defer held.FlushBeforeQuestions()()
 	warn := func(msg string) {
 		warnings = append(warnings, msg)
 		held.Warn(msg)

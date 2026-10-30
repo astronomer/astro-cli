@@ -1,6 +1,10 @@
 package cliout
 
-import "io"
+import (
+	"io"
+
+	"github.com/astronomer/astro-cli/pkg/input"
+)
 
 // Deferred holds the warnings and notes a text-mode run finds as it goes, so
 // they print together after the run's progress output — an image build's,
@@ -43,6 +47,15 @@ func (d *Deferred) add(it deferredItem) {
 		return
 	}
 	d.print(it)
+}
+
+// FlushBeforeQuestions has every question the run asks (input.MayAsk, which
+// the prompts and pickers all pass through) flush what is held first, so a
+// warning found before a question is read before it is answered; what is
+// found after the question is held for the end as before. It returns the
+// function that removes the hook, for the command to defer.
+func (d *Deferred) FlushBeforeQuestions() (restore func()) {
+	return input.BeforeAsk(d.Flush)
 }
 
 // Flush prints what is held, in the order it came, and empties it.
