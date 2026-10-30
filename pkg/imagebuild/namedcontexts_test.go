@@ -81,14 +81,23 @@ func TestABuilderWithoutNamedContextsIsRefusedBeforeTheBuild(t *testing.T) {
 		env                      []string
 		want                     string
 	}{
-		{"no buildx", "docker", ncLegacyHelp, ncDockerVersion, nil,
-			"found Docker version 29.8.2, build 1a2b3c4 without the buildx plugin, so it builds with Docker's legacy builder. Install buildx (https://docs.docker.com/go/buildx/)"},
-		{"BuildKit off", "docker", ncLegacyOffHelp, ncDockerVersion, []string{"DOCKER_BUILDKIT=0"},
-			"found Docker version 29.8.2, build 1a2b3c4 with DOCKER_BUILDKIT=0, which selects Docker's legacy builder. Unset it to build with BuildKit"},
-		{"old podman", "podman", ncOldPodmanHelp, ncPodmanVersion, nil,
-			"found podman version 4.1.1, whose build does not take --build-context. Upgrade Podman to 4.2 or later"},
-		{"no version", "/usr/local/bin/podman", ncOldPodmanHelp, "", nil,
-			"found podman, whose build does not take --build-context. Upgrade Podman to 4.2 or later"},
+		{
+			"no buildx", "docker", ncLegacyHelp, ncDockerVersion, nil,
+			"found Docker version 29.8.2, build 1a2b3c4 without the buildx plugin, so it builds with Docker's legacy builder. Install buildx (https://docs.docker.com/go/buildx/)",
+		},
+		{
+			"BuildKit off", "docker", ncLegacyOffHelp, ncDockerVersion,
+			[]string{"DOCKER_BUILDKIT=0"},
+			"found Docker version 29.8.2, build 1a2b3c4 with DOCKER_BUILDKIT=0, which selects Docker's legacy builder. Unset it to build with BuildKit",
+		},
+		{
+			"old podman", "podman", ncOldPodmanHelp, ncPodmanVersion, nil,
+			"found podman version 4.1.1, whose build does not take --build-context. Upgrade Podman to 4.2 or later",
+		},
+		{
+			"no version", "/usr/local/bin/podman", ncOldPodmanHelp, "", nil,
+			"found podman, whose build does not take --build-context. Upgrade Podman to 4.2 or later",
+		},
 	} {
 		calls, err := namedContextBuild(t, tc.bin, tc.help, tc.version, tc.env...)
 		require.Error(t, err, tc.name)
