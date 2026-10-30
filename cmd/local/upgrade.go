@@ -147,18 +147,11 @@ func nothingChanged(p pinRefresh) string {
 // lines is what a refresh says in text: what moved, never what stayed.
 // Warnings are said apart, on stderr.
 func (p pinRefresh) lines() []string {
+	// One line per file, as uv.lock's: git diff has the details, and the json
+	// result names what moved.
 	var lines []string
-	if p.Constraints != "" {
-		lines = append(lines, "  [tool.uv]: now holds what Astro Runtime "+p.Constraints+" constrains")
-	}
-	if p.ConstraintsRemoved != "" {
-		lines = append(lines, "  [tool.uv]: no longer holds what Astro Runtime "+p.ConstraintsRemoved+" constrains")
-	}
-	switch {
-	case p.AstroAirflow != "":
-		lines = append(lines, "  [tool.uv]: now installs Astronomer's Airflow "+p.AstroAirflow)
-	case p.AstroAirflowRemoved:
-		lines = append(lines, "  [tool.uv]: no longer points Airflow at Astronomer's index")
+	if p.Constraints != "" || p.ConstraintsRemoved != "" || p.AstroAirflow != "" || p.AstroAirflowRemoved {
+		lines = append(lines, "  "+manifest.Marker+": updated")
 	}
 	if p.Lock != nil && p.Lock.Status != lockFailed && p.Lock.Status != lockNoUV {
 		if t := p.Lock.text(); t != "" {

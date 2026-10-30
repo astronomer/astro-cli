@@ -85,7 +85,7 @@ func TestUpgradeRuntimeWritesTheBuildRefreshesConstraintsAndLocks(t *testing.T) 
 		"Runtime: no build -> 3.3-10 in " + rd.path,
 		"  Airflow: 3.3.2",
 		"  Python: 3.13",
-		"  [tool.uv]: now holds what Astro Runtime 3.3-10 constrains",
+		"  pyproject.toml: updated",
 		"  uv.lock: locked",
 	} {
 		assert.Contains(t, out, want)
@@ -209,7 +209,7 @@ func TestUpgradeAirflowRefreshesConstraintsAndLocks(t *testing.T) {
 	assert.Contains(t, got, "# Astro Runtime 3.4-1 (Python 3.14) constrains these.")
 	assert.Equal(t, 1, rd.locks)
 	out := rd.stdout.String()
-	assert.Contains(t, out, "  [tool.uv]: now holds what Astro Runtime 3.4-1 constrains")
+	assert.Contains(t, out, "  pyproject.toml: updated")
 	assert.Contains(t, out, "  uv.lock: locked")
 }
 
