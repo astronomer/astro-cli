@@ -78,6 +78,8 @@ func contextDirError(err error) error {
 // WriteDeclaredContext wrote at dir: its Dockerfile over its context/, with
 // the lists as the named context when it wrote them (lists), and every build
 // secret, as a build of the project's own Dockerfile forwards them all.
+// Each argument is quoted for a POSIX shell when it needs it, as in
+// buildCommand.
 // Named contexts need imagebuild.NamedContextRequirement, which the result
 // says (Result.BuildNeeds).
 func declaredBuildCommand(engine, platform, tag string, secrets []string, dir string, lists bool) string {
@@ -92,7 +94,11 @@ func declaredBuildCommand(engine, platform, tag string, secrets []string, dir st
 	for _, s := range secrets {
 		args = append(args, "--secret", s)
 	}
-	return strings.Join(append(args, filepath.Join(dir, imagebuild.DeclaredContextDir)), " ")
+	args = append(args, filepath.Join(dir, imagebuild.DeclaredContextDir))
+	for i, a := range args {
+		args[i] = scaffold.ShellQuote(a)
+	}
+	return strings.Join(args, " ")
 }
 
 // buildCommand is the engine's command that builds the context at dir for
