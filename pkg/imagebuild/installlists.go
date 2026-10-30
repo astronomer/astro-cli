@@ -4,8 +4,10 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"html"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -21,9 +23,9 @@ import (
 // context, so the context is self-contained: `docker build` runs it as written,
 // on any machine, with nothing from the CLI (WriteContext).
 
-// InstallLists are the three files a generated build's install steps read, one
+// InstallLists are the files a generated build's install steps read, one
 // line per entry, as the runtime's install scripts read them from the image's
-// working directory.
+// working directory, and the routed install before them.
 type InstallLists struct {
 	// Requirements is requirements.txt: what the image installs over its
 	// base, without Airflow. Constraints, when there are any, are named in it
@@ -35,17 +37,27 @@ type InstallLists struct {
 	Constraints []string
 	// Packages is packages.txt: the OS (apt) packages, installed first.
 	Packages []string
+	// Routed is routed-requirements.txt: the packages a [tool.uv.sources]
+	// entry routes to an index, name==version, which install before
+	// requirements.txt and without their dependencies, from RoutedLinks
+	// alone, never from an index.
+	Routed []string
+	// RoutedLinks are the files the lock recorded for Routed, each
+	// `url#sha256=…`, which routed-links.html lists for pip's --find-links:
+	// pip picks the one the image's Python and platform take, and checks its
+	// hash.
+	RoutedLinks []string
 }
 
-// Empty reports lists that install nothing over the base: no requirement and
-// no OS package. Constraints alone install nothing.
+// Empty reports lists that install nothing over the base: no requirement, no
+// routed package and no OS package. Constraints alone install nothing.
 func (l InstallLists) Empty() bool {
-	return len(l.Requirements) == 0 && len(l.Packages) == 0
+	return len(l.Requirements) == 0 && len(l.Routed) == 0 && len(l.Packages) == 0
 }
 
-// Files are the lists as the build context holds them, by file name. All three
-// are always there, empty or not, so the Dockerfile's COPY lines never miss
-// one.
+// Files are the lists as the build context holds them, by file name. All of
+// them are always there, empty or not, so the Dockerfile's COPY lines never
+// miss one.
 func (l InstallLists) Files() map[string][]byte {
 	reqs := l.Requirements
 	if len(l.Constraints) > 0 {
@@ -55,7 +67,26 @@ func (l InstallLists) Files() map[string][]byte {
 		requirementsName:    lines(reqs),
 		lockConstraintsName: lines(l.Constraints),
 		packagesName:        lines(l.Packages),
+		routedName:          lines(l.Routed),
+		routedLinksName:     linksPage(l.RoutedLinks),
 	}
+}
+
+// linksPage is the HTML page pip's --find-links reads links from: one
+// anchor for each, named by the file the URL ends in. Empty for none.
+func linksPage(links []string) []byte {
+	if len(links) == 0 {
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString("<!DOCTYPE html>\n<html><body>\n")
+	for _, l := range links {
+		file, _, _ := strings.Cut(path.Base(l), "#")
+		file, _, _ = strings.Cut(file, "?")
+		fmt.Fprintf(&b, "<a href=\"%s\">%s</a>\n", html.EscapeString(l), html.EscapeString(file))
+	}
+	b.WriteString("</body></html>\n")
+	return []byte(b.String())
 }
 
 // Digest is a digest of Files, for a caller that addresses the image by what
@@ -159,6 +190,16 @@ const installFindLinksName = "install-find-links.txt"
 // the context (InstallLists.Files), and uv-lock-constraints.txt is copied with
 // requirements.txt, which names it with -c.
 //
+// One step is the CLI's own: the packages a [tool.uv.sources] entry routes to
+// an index (InstallLists.Routed) install first, in the same RUN, with pip,
+// from the lock's files alone (--no-index, --find-links on routed-links.html),
+// without their dependencies. pip picks the file the image's Python and
+// platform take and checks the lock's hash, and the runtime's install then
+// finds them installed, so it never asks the image's index for those names.
+// pip, with the runtime's constraints in /etc/pip.conf, is in every runtime
+// image, and both pip 23 (runtime 10) and 26 (3.3) follow a local page's links
+// to remote files and verify their #sha256 fragments.
+//
 // Written out rather than inherited for two reasons. The trigger list has
 // changed across runtimes (the netrc mount is in 3.3-9 but not 3.1-12 or
 // 12.6.0), so a build inherited whichever list its base happened to carry;
@@ -191,8 +232,9 @@ func generatedDockerfile(from string, mountNetrc bool) string {
 		"USER root\n" +
 		"RUN if [ -x " + installSystemPackages + " ]; then " + installSystemPackages + "; " +
 		"elif [ -s " + packagesName + " ]; then apt-get update && cat " + packagesName + " | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n" +
-		"COPY " + requirementsName + " " + lockConstraintsName + " ./\n" +
+		"COPY " + requirementsName + " " + lockConstraintsName + " " + routedName + " " + routedLinksName + " ./\n" +
 		run +
+		"if [ -s " + routedName + " ]; then pip install --no-cache-dir --root-user-action=ignore --no-index --no-deps --find-links " + routedLinksName + " -r " + routedName + "; fi && " +
 		"if [ -x " + installPythonDependencies + " ]; then " + installPythonDependencies + "; " +
 		"else pip install --no-cache-dir --root-user-action=ignore -r " + requirementsName + "; fi\n" +
 		"USER astro\n" +

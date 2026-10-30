@@ -120,17 +120,20 @@ func TestFillWithoutTheImagesPackages(t *testing.T) {
 	assert.Contains(t, warnings[0], "the package list of runtime 3.1-5-python-3.12 could not be read")
 }
 
-// A package the lock takes from an index other than PyPI is installed from the
-// file the lock recorded, by URL and hash, so the install never asks the
-// image's index for it. PyPI's are installed by name.
-func TestFillInstallsAnIndexSourceFromItsFile(t *testing.T) {
+// A package the lock takes from an index other than PyPI installs on its own,
+// from the files the lock recorded, by URL and hash, so the install never asks
+// the image's index for it. PyPI's are installed by name.
+func TestFillInstallsAnIndexSourceFromItsFiles(t *testing.T) {
 	req, warnings := fill(t, testResolver(t, nil, []string{}), fixture(t, "index"))
 	assert.Empty(t, warnings)
-	assert.Equal(t, []string{
-		"six @ https://test-files.pythonhosted.org/packages/1e/5c/ecacc0c9c346004e43acc024f076d74c0005d11b9a70ecaa81b21c8b080b/six-1.16.0-py2.py3-none-any.whl" +
-			"#sha256=8a8a628020883f98172cef8ab824189aeaa1dde28720cc90e367bb1103ab7a58",
-		"tabulate==0.10.0",
-	}, req.Install.Requirements)
+	assert.Equal(t, []string{"tabulate==0.10.0"}, req.Install.Requirements)
+	assert.Equal(t, []string{"six==1.16.0"}, req.Install.Routed)
+	assert.Contains(t, req.Install.RoutedLinks,
+		"https://test-files.pythonhosted.org/packages/1e/5c/ecacc0c9c346004e43acc024f076d74c0005d11b9a70ecaa81b21c8b080b/six-1.16.0-py2.py3-none-any.whl"+
+			"#sha256=8a8a628020883f98172cef8ab824189aeaa1dde28720cc90e367bb1103ab7a58")
+	for _, l := range req.Install.RoutedLinks {
+		assert.Contains(t, l, "https://test-files.pythonhosted.org/", "only the routed index's files")
+	}
 }
 
 // A package from an index no [tool.uv.sources] entry routes it to (a default

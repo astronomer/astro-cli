@@ -147,10 +147,13 @@ const (
 	// requirementsName and packagesName are the names the runtime's install
 	// scripts read from their working directory, and lockConstraintsName the
 	// file of uv.lock's versions requirements.txt names with -c
-	// (InstallLists.Files).
+	// (InstallLists.Files). routedName and routedLinksName are the routed
+	// install's requirements and the page of the files it finds them in.
 	requirementsName    = "requirements.txt"
 	packagesName        = "packages.txt"
 	lockConstraintsName = "uv-lock-constraints.txt"
+	routedName          = "routed-requirements.txt"
+	routedLinksName     = "routed-links.html"
 	// baseTagSuffix turns a runtime tag into its -base tag (3.1-5 to
 	// 3.1-5-base, 12.6.0-python-3.11 to 12.6.0-python-3.11-base), the same
 	// image without the ONBUILD triggers. The runtime publishes one beside
