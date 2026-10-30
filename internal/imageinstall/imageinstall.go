@@ -153,21 +153,7 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 			}
 		}
 	}
-	recorded := ""
-	if m, err := manifest.Parse(pyproject); err == nil {
-		recorded = m.UV.RuntimeBuild
-	}
-	var catalog *runtimeversions.Catalog
-	if r.Catalog != nil {
-		catalog = r.Catalog(ctx)
-	}
-	dockerfile := ""
-	if req.FromDeclaredDockerfile() {
-		if rel, err := filepath.Rel(project, req.Dockerfile); err == nil {
-			dockerfile = filepath.ToSlash(rel)
-		}
-	}
-	if err := airflowMismatch(exported, in.baseInstalled, catalog, build, recorded, base, dockerfile); err != nil {
+	if err := airflowMismatch(exported, in.baseInstalled, r.catalog(ctx), build, recordedBuild(pyproject), base, declaredRel(req, project)); err != nil {
 		return err
 	}
 	if in.baseInstalled == nil {
@@ -215,6 +201,37 @@ func settleLock(ctx context.Context, client UV, project string, warn func(string
 	}
 	warn("uv could not lock the project, so the image installs pyproject.toml's dependencies without a lock's versions: " + lockErr.Error())
 	return false, false
+}
+
+// catalog is the runtime catalog, or nil without one.
+func (r Resolver) catalog(ctx context.Context) *runtimeversions.Catalog {
+	if r.Catalog == nil {
+		return nil
+	}
+	return r.Catalog(ctx)
+}
+
+// recordedBuild is the build pyproject.toml records for the lock (its
+// [tool.uv] runtime record), or "".
+func recordedBuild(pyproject []byte) string {
+	m, err := manifest.Parse(pyproject)
+	if err != nil {
+		return ""
+	}
+	return m.UV.RuntimeBuild
+}
+
+// declaredRel is req's own Dockerfile relative to project, slash-separated,
+// or "" for a generated build.
+func declaredRel(req *imagebuild.Request, project string) string {
+	if !req.FromDeclaredDockerfile() {
+		return ""
+	}
+	rel, err := filepath.Rel(project, req.Dockerfile)
+	if err != nil {
+		return ""
+	}
+	return filepath.ToSlash(rel)
 }
 
 // uvProblem says why uv could not be used, for a sentence.

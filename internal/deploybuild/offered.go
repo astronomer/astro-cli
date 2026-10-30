@@ -69,47 +69,53 @@ func OfferedBase(offer RuntimeOffer, resolve imagebuild.BaseImageFunc, warn func
 		if len(candidates) == 0 {
 			return resolve(ctx, m)
 		}
-		// lockedWhy says why the image does not start FROM the lock's build,
-		// as a clause, once that is known.
-		lockedWhy := ""
-		if m.LockedRuntime != "" && locked == "" {
-			lockedWhy = "the Deployment does not offer it"
+		return offeredBuild(ctx, offer, resolve, m, candidates, locked, warn)
+	}
+}
+
+// offeredBuild is OfferedBase's pick among candidates, the offered builds in
+// the order offeredCandidates gives them, locked the lock's build when it
+// leads them: the first that resolves, past those whose Python is ruled out.
+func offeredBuild(ctx context.Context, offer RuntimeOffer, resolve imagebuild.BaseImageFunc, m imagebuild.ManifestBuild,
+	candidates []string, locked string, warn func(string),
+) (string, error) {
+	// lockedWhy says why the image does not start FROM the lock's build, as
+	// a clause, once that is known.
+	lockedWhy := ""
+	if m.LockedRuntime != "" && locked == "" {
+		lockedWhy = "the Deployment does not offer it"
+	}
+	var first error
+	var skipped string
+	for _, build := range candidates {
+		named, why := candidateBuild(m, build, locked)
+		if why != "" {
+			lockedWhy = why
+			continue
 		}
-		var first error
-		var skipped string
-		for _, build := range candidates {
-			named, why := candidateBuild(m, build, locked)
-			if why != "" {
-				lockedWhy = why
-				continue
+		image, err := resolve(ctx, named)
+		if notShipped := (*runtimeversions.PythonNotShippedError)(nil); errors.As(err, &notShipped) {
+			if first == nil {
+				first, skipped = err, build
 			}
-			image, err := resolve(ctx, named)
-			var notShipped *runtimeversions.PythonNotShippedError
-			if errors.As(err, &notShipped) {
-				if first == nil {
-					first, skipped = err, build
-				}
-				if build == locked {
-					lockedWhy = err.Error()
-				}
-				continue
+			if build == locked {
+				lockedWhy = err.Error()
 			}
-			if err != nil {
+			continue
+		}
+		switch {
+		case err != nil:
+			return "", err
+		case m.LockedRuntime != "" && build != m.LockedRuntime:
+			if err := offeredFallback(offer, m, build, lockedWhy, locked != "", warn); err != nil {
 				return "", err
 			}
-			if m.LockedRuntime != "" && build != m.LockedRuntime {
-				if err := offeredFallback(offer, m, build, lockedWhy, locked != "", warn); err != nil {
-					return "", err
-				}
-				return image, nil
-			}
-			if first != nil {
-				warn(fmt.Sprintf("the image builds on Astro Runtime %s, not %s, the newest the Deployment offers: %v", build, skipped, first))
-			}
-			return image, nil
+		case first != nil:
+			warn(fmt.Sprintf("the image builds on Astro Runtime %s, not %s, the newest the Deployment offers: %v", build, skipped, first))
 		}
-		return "", fmt.Errorf("none of the builds the Deployment offers for Airflow %s ships a Python requires-python admits: %w", m.AirflowVersion, first)
+		return image, nil
 	}
+	return "", fmt.Errorf("none of the builds the Deployment offers for Airflow %s ships a Python requires-python admits: %w", m.AirflowVersion, first)
 }
 
 // offeredFallback says, through warn, that a deploy of m builds on build, an
