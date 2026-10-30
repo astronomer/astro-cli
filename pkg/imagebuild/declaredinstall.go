@@ -114,7 +114,7 @@ func WriteDeclaredContext(dir string, req Request) (lists bool, err error) {
 	if err := copyDeclaredContext(req.Context, req.Dockerfile, contextDir); err != nil {
 		return false, err
 	}
-	if err := os.WriteFile(filepath.Join(dir, DeclaredDockerfileName), data, filePermRW); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, DeclaredDockerfileName), data, filePermRW); err != nil { //nolint:gosec // G703: dir is the caller's new or empty --context-dir, and the name a constant
 		return false, fmt.Errorf("writing %s: %w", DeclaredDockerfileName, err)
 	}
 	if !airflowrt.ReadsInstallContext(data) {
