@@ -70,6 +70,7 @@ astro local open      Open the Airflow UI in your browser
 astro local reset     Stop and wipe what start created (database, logs, environment)
 astro local check     Validate this project's DAGs without starting Airflow (--strict, --target mwaa|composer)
 astro local upgrade airflow [version]  Move the project to a new Airflow, the newest of its generation if none is given (--with-otto hands the rest to Otto)
+astro local upgrade runtime [build]    Pick an Astro Runtime build, older ones included; the newest of the series if none is given (--python X.Y)
 ```
 
 `astro start`, `astro stop`, and `astro logs` work as shorthand for the `local` versions. The cloud commands — `astro login`, `astro deployment`, `astro workspace` — work as they did in v1. `astro deploy` ships a project with a `pyproject.toml`: a project made by Astro CLI 1.x is converted with `astro init` first, or keeps deploying with Astro CLI 1.x.

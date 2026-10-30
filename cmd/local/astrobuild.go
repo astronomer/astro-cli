@@ -89,7 +89,10 @@ type astroBuildWrite struct {
 	// runtimeGone the one whose record it took out; "" when neither happened.
 	runtime, runtimeGone string
 	lookupErr            error
-	writeErr             error
+	// constraintsErr is why the runtime's constraints were left as written:
+	// the catalog or the constraints file could not be read.
+	constraintsErr error
+	writeErr       error
 }
 
 // writeAstroBuild looks up the build for the manifest in dir and writes it,
@@ -109,7 +112,8 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 	if res.lookupErr != nil && !errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild) && !stalePin(m) {
 		return res
 	}
-	rc := c.runtimeConstraints(ctx, dir, m)
+	rc, rcErr := c.runtimeConstraints(ctx, dir, m)
+	res.constraintsErr = rcErr
 	res.changed, res.writeErr = watchManifest(dir, func(wrap func(run func() error) error) error {
 		return scaffold.SetAstroBuildWith(dir, wrap, res.build, rc)
 	})
@@ -145,13 +149,14 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 // build or a file that cannot be read now. A zero one takes it out: a cutoff
 // (the runtime's versions may postdate it, and uv would find no solution), a
 // project on no runtime build, or one that publishes no such file (an Airflow
-// 2 runtime before 11.0.0).
-func (c *cli) runtimeConstraints(ctx context.Context, dir string, m *manifest.Manifest) *scaffold.RuntimeConstraints {
+// 2 runtime before 11.0.0). The error says why a nil one could not be read;
+// it is nil when this build has no way to read it.
+func (c *cli) runtimeConstraints(ctx context.Context, dir string, m *manifest.Manifest) (*scaffold.RuntimeConstraints, error) {
 	if c.d.RuntimeConstraints == nil {
-		return nil
+		return nil, nil
 	}
 	if underCutoff(dir, m) {
-		return &scaffold.RuntimeConstraints{}
+		return &scaffold.RuntimeConstraints{}, nil
 	}
 	var catalog *runtimeversions.Catalog
 	if c.d.RuntimeCatalog != nil {
@@ -160,18 +165,20 @@ func (c *cli) runtimeConstraints(ctx context.Context, dir string, m *manifest.Ma
 	build, python, err := scaffold.RuntimeBuildFor(dir, m, catalog)
 	switch {
 	case errors.Is(err, scaffold.ErrNoRuntimeBuild):
-		return &scaffold.RuntimeConstraints{}
-	case err != nil || python == "":
-		return nil
+		return &scaffold.RuntimeConstraints{}, nil
+	case err != nil:
+		return nil, err
+	case python == "":
+		return nil, fmt.Errorf("the runtime catalog could not be read for the Python runtime %s runs", build)
 	}
 	lines, err := c.d.RuntimeConstraints(ctx, build, python)
 	switch {
 	case errors.Is(err, runtimecatalog.ErrNotPublished):
-		return &scaffold.RuntimeConstraints{}
+		return &scaffold.RuntimeConstraints{}, nil
 	case err != nil:
-		return nil
+		return nil, err
 	}
-	return &scaffold.RuntimeConstraints{Build: build, Python: python, Lines: lines}
+	return &scaffold.RuntimeConstraints{Build: build, Python: python, Lines: lines}, nil
 }
 
 // underCutoff reports a uv resolve held to a date: the project's own
