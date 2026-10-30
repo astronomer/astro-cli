@@ -134,16 +134,24 @@ func (m MissingSecrets) hint(ids []string) string {
 
 // Explain adds the missing secrets to a failed build of the project's
 // Dockerfile, where the warning printed before the build has scrolled out of
-// sight. Any other error comes back as it is.
+// sight. Any other error comes back as it is. Like Warnings it leaves out a
+// mount that says required=false (SecretMount.Optional): the build runs that
+// step without it, so its absence is not why the build failed, and naming it
+// would send the user after a secret while the real cause sits in the output.
 func (m MissingSecrets) Explain(err error) error {
-	if len(m.Mounts) == 0 || !errors.Is(err, ErrDockerfileBuild) {
+	if !errors.Is(err, ErrDockerfileBuild) {
 		return err
 	}
-	ids := make([]string, len(m.Mounts))
-	quoted := make([]string, len(m.Mounts))
-	for i, mount := range m.Mounts {
-		ids[i] = mount.ID
-		quoted[i] = strconv.Quote(mount.ID)
+	var ids, quoted []string
+	for _, mount := range m.Mounts {
+		if mount.Optional {
+			continue
+		}
+		ids = append(ids, mount.ID)
+		quoted = append(quoted, strconv.Quote(mount.ID))
+	}
+	if len(ids) == 0 {
+		return err
 	}
 	if len(ids) == 1 {
 		return fmt.Errorf("%w. %s mounts build secret %s, which was not given%s", err, m.Dockerfile, quoted[0], m.hint(ids))
