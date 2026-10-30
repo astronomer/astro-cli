@@ -164,6 +164,52 @@ func TestUpdateReplacesAPreviewInstall(t *testing.T) {
 	assert.Empty(t, res.Deleted)
 }
 
+// olderInstall is the install block an earlier astro wrote: the lists it read
+// before the routed install's two files.
+func olderInstall(from string) string {
+	return strings.NewReplacer(
+		" "+airflowrt.RoutedName+" "+airflowrt.RoutedLinksName+" ./", " ./",
+		"if [ -s "+airflowrt.RoutedName+" ]; then pip install --no-cache-dir --root-user-action=ignore --no-index --no-deps --find-links "+airflowrt.RoutedLinksName+" -r "+airflowrt.RoutedName+"; fi && ", "",
+	).Replace(airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{ListsFrom: airflowrt.InstallContext}))
+}
+
+// A Dockerfile whose install steps an older astro wrote gets this astro's,
+// and only those: the stages before them and the file's own steps after them
+// stay, their comment or not. A second run changes nothing.
+func TestUpdateRefreshesAnOlderInstallBlock(t *testing.T) {
+	const from = "quay.io/astronomer/astro-runtime:12.6.0-base"
+	older := olderInstall(from)
+	require.NotEqual(t, airflowrt.InstallDockerfile(from), older)
+	for name, own := range map[string]string{
+		"with its comment":    "\n" + ownStepsComment + "ENV TZ=UTC\n",
+		"without its comment": "RUN echo ours\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := v2Project(t, map[string]string{"Dockerfile": "FROM python:3.12-slim AS tools\n" + installBlockComment + older + own})
+
+			res := runUpdate(t, dir)
+
+			got, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+			require.NoError(t, err)
+			assert.Equal(t, "FROM python:3.12-slim AS tools\n"+installBlockComment+airflowrt.InstallDockerfile(from)+own, string(got))
+			assert.Contains(t, strings.Join(res.Updated, "\n"), "Dockerfile (install steps updated to the ones this astro writes)")
+			assert.Empty(t, res.Notes)
+
+			res = runUpdate(t, dir)
+			assert.Empty(t, res.Updated)
+		})
+	}
+
+	// A block whose last line is gone is not one this can tell the end of.
+	edited := installBlockComment + strings.Replace(older, "COPY --chown=astro:0 . .\n", "COPY . .\n", 1)
+	dir := v2Project(t, map[string]string{"Dockerfile": edited})
+	res := runUpdate(t, dir)
+	assert.NotContains(t, strings.Join(res.Updated, "\n"), "install steps updated")
+	got, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+	require.NoError(t, err)
+	assert.Equal(t, edited, string(got))
+}
+
 // A preview's Dockerfile whose block cannot be found (someone rewrote the
 // comment) is left as it is, and so is the helper it still runs, with a note.
 // A helper no Dockerfile runs goes, and a file of the project's own at that

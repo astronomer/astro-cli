@@ -39,7 +39,8 @@ func newInitCmd(c *cli) *cobra.Command {
 			"except requirements.txt and packages.txt when a Dockerfile left on its ONBUILD tag still installs them, and other files already there are kept. " +
 			"What init could not carry over, such as a requirements.txt line that is not a plain requirement, is listed at the end, to move across by hand.\n\n" +
 			"Run in a project that is already an Astro project, it brings what astro writes there up to date and changes nothing else: " +
-			"a declared Dockerfile still on an ONBUILD tag is moved onto its -base image as a conversion would, and one an earlier preview moved, which runs .astro/install-project.py, gets this astro's install steps and loses the helper.",
+			"a declared Dockerfile still on an ONBUILD tag is moved onto its -base image as a conversion would, and one an earlier preview moved, which runs .astro/install-project.py, gets this astro's install steps and loses the helper, " +
+			"and install steps an older astro wrote are replaced with this astro's.",
 		Example: "  # Make the current directory an Astro project\n" +
 			"  astro init\n\n" +
 			"  # Create a new project in its own directory, pinned to Airflow 3.1\n" +
