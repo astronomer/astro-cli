@@ -753,3 +753,19 @@ func TestAstroBuildWarnsAboutLocalFilesInTheContext(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, lines)
 }
+
+// The printed commands run as printed: an argument with a space, the context
+// directory or a secret's file, is quoted for the shell.
+func TestAstroBuildQuotesTheContextCommands(t *testing.T) {
+	req := testRequest(t)
+	req.ContextDir = filepath.Join(t.TempDir(), "my build")
+	req.BuildSecrets = []string{"id=netrc,src=/Users/a b/.netrc"}
+	req.ResolveInstall = func(_ context.Context, breq *imagebuild.Request, _ func(string)) error {
+		breq.Install = &imagebuild.InstallLists{}
+		return nil
+	}
+	res, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, "docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret 'id=netrc,src=/Users/a b/.netrc' '"+req.ContextDir+"'",
+		res.NextSteps[0])
+}

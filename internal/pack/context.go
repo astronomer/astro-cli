@@ -8,6 +8,7 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // writeContext writes the build context of the generated image breq describes
@@ -48,7 +49,9 @@ func writeContext(req Request, breq imagebuild.Request, name string) (Result, er
 
 // buildCommand is the engine's command that builds the context at dir for
 // platform, tagged tag, with the netrc secret among secrets, the one the
-// generated Dockerfile mounts (as Build forwards only it).
+// generated Dockerfile mounts (as Build forwards only it). Each argument is
+// quoted for a POSIX shell when it needs it (a path with a space), so the
+// line runs as printed.
 func buildCommand(engine, platform, tag string, secrets []string, dir string) string {
 	args := []string{engine, "build"}
 	if platform != "" {
@@ -60,5 +63,9 @@ func buildCommand(engine, platform, tag string, secrets []string, dir string) st
 			args = append(args, "--secret", s)
 		}
 	}
-	return strings.Join(append(args, dir), " ")
+	args = append(args, dir)
+	for i, a := range args {
+		args[i] = scaffold.ShellQuote(a)
+	}
+	return strings.Join(args, " ")
 }
