@@ -89,18 +89,6 @@ type Request struct {
 	// Each is also kept on Result.Warnings. nil streams them as progress
 	// lines, "warning: …".
 	Warn func(string)
-	// Note receives what the image target notes before it builds and that is
-	// not wrong: the project's own linked worktrees it leaves out
-	// (shipcheck.LeftOutNote). nil streams it as a progress line.
-	Note func(string)
-}
-
-// note is Request.Note, or a progress line through cb when it is nil.
-func (r Request) note(cb localrt.Callbacks) func(string) {
-	if r.Note != nil {
-		return r.Note
-	}
-	return func(n string) { emit(cb, n) }
 }
 
 // warn is Request.Warn, or a progress line through cb when it is nil.
@@ -134,6 +122,9 @@ type Result struct {
 	// Warnings are non-fatal findings the artifact is still valid despite: an
 	// Airflow pin the platform does not list, OS packages it cannot install.
 	Warnings []string `json:"warnings,omitempty"`
+	// DeploymentEnv is what an image target's Deployment must supply: each
+	// value [tool.astro.env] declares, which the image does not carry.
+	DeploymentEnv []DeploymentValue `json:"deployment_env,omitempty"`
 	// NextSteps are the exact commands to ship the artifact — the upload
 	// hand-off a tree target cannot do itself (it never touches the network).
 	NextSteps []string `json:"next_steps,omitempty"`

@@ -24,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
+	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/checks"
@@ -177,6 +178,11 @@ type Deps struct {
 	// runtimecatalog.ForBuild, which waits longer than RuntimeCatalog for an
 	// Airflow 2 pin, whose base has no fallback, and as long for any other.
 	ImageCatalog func(ctx context.Context, airflowPin string) *runtimeversions.Catalog
+
+	// PackageAstro is the target `astro package astro` builds with. nil is
+	// production's, which drives a container engine; a test injects a fake so
+	// it can watch what the command prints around a build without one.
+	PackageAstro pack.Target
 
 	// Lock runs `uv lock` in a project, which init does after it changes
 	// [tool.uv] so uv.lock follows. Production discovers uv as a standalone

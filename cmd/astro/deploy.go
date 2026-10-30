@@ -278,13 +278,18 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	interactive := format == cliout.FormatText && stdinIsTerminal()
 
 	errOut := cmd.ErrOrStderr()
-	// Every warning the deploy gives goes to stderr as it is given, led by a
-	// yellow "Warning:" as the CLI's other warnings are, and into the result's
-	// warnings, so -o json carries the same ones.
+	// Every warning the deploy gives goes to stderr, led by a yellow
+	// "Warning:" as the CLI's other warnings are, and into the result's
+	// warnings, so -o json carries the same ones. In text, the warnings and
+	// notes print once, after the deploy's output (the build, the push, the
+	// upload), just above the result, where a long build cannot scroll them
+	// away, or before the error a failed deploy returns. The ones found before
+	// a question print before it instead. Under json each prints as given.
 	var warnings []string
+	recap := cliout.NewRecap(errOut, format == cliout.FormatText)
 	warn := func(msg string) {
 		warnings = append(warnings, msg)
-		cliout.Warn(errOut, msg)
+		recap.Warn(msg)
 	}
 	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, manifestDeployment)
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
@@ -316,8 +321,6 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
 		Warn: warn,
-		// A plain line on stderr, as the deploy's other notes are.
-		Note: func(msg string) { cliout.Note(errOut, msg) },
 		// Resolved once, when a deploy that builds first needs it, and
 		// shared by the checks and the transport.
 		Engine: onceEngine(astrodeploy.ResolveContainerEngine),
@@ -364,17 +367,21 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 				fmt.Fprintln(out, "Building your project image, this can take a few minutes...")
 			}
 		},
-	}, newManifestDeployer(&login, cmd.InOrStdin(), errOut))
+	}, manifestdeploy.BeforeAsking(newManifestDeployer(&login, cmd.InOrStdin(), errOut), recap.Flush))
 	if err != nil {
+		recap.Flush()
 		return manifestDeployErr(cmd, err)
 	}
 
 	if res.Git.Uncommitted {
-		cliout.Note(errOut, "the project has uncommitted changes, so this deploy records no git commit")
+		recap.Note("the project has uncommitted changes, so this deploy records no git commit")
 	}
 	if !inProject {
-		warn(imageAloneWarning(&res, imageName))
+		w := imageAloneWarning(&res, imageName)
+		warnings = append(warnings, w)
+		recap.Warn(w)
 	}
+	recap.Flush()
 	return renderManifestDeploy(out, format, &res, warnings)
 }
 

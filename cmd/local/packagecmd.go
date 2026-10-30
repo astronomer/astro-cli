@@ -6,6 +6,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -14,7 +15,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/pack"
-	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -123,14 +123,17 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		pin := m.Airflow().Pin
 		catalog = func(ctx context.Context) *runtimeversions.Catalog { return c.d.ImageCatalog(ctx, pin) }
 	}
-	// A warning the target finds as it goes is shown as it is found, as every
-	// cmd/local warning is (emitWarning), so a build it then refuses still
-	// shows it. shown keeps the ones already out, for the result's warnings
-	// below.
+	// In text, a warning or note the target finds as it goes prints once,
+	// after the build's output, just above the result, where a long build
+	// cannot scroll it away, or before the error a failed build returns
+	// (packageRecap). shown keeps the warnings already given, for the result's
+	// warnings below.
+	cb := c.callbacks(r)
+	recap := packageRecap(r)
 	shown := map[string]bool{}
 	warn := func(w string) {
 		shown[w] = true
-		emitWarning(r, event{Event: "warning", Text: w})
+		recap.Warn(w)
 	}
 	res, err := target.Build(ctx, pack.Request{
 		ProjectDir:     dir,
@@ -143,32 +146,22 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		CheckRuntime:   c.d.RuntimeCheck,
 		RuntimeCatalog: catalog,
 		Warn:           warn,
-		Note:           packageNote(r),
-	}, c.callbacks(r))
+	}, cb)
 	if err != nil {
+		recap.Flush()
 		return err
 	}
-	// What the project gets from this machine without declaring it runs locally
-	// and is carried by no artifact, so every target says so beside its own
-	// warnings. Best effort: a listing that cannot be read costs only the note.
-	var undeclared []string
-	if names, uerr := plan.UndeclaredLocal(dir, m); uerr == nil {
-		undeclared = names
-	}
-	note := plan.UndeclaredNote(undeclared, m.Astro.Workspace)
-	if note != "" {
-		res.Warnings = append(res.Warnings, note)
-	}
-	// The result carries every warning in json. In text, the ones not shown as
-	// the build ran (the note above, a bucket target's own) are shown now, the
-	// same way, rather than listed under the result.
+	// In text, a bucket target's own warnings, which it returns rather than
+	// gives as it goes, print with the rest, above the result rather than
+	// listed in it. json's result carries every one.
 	if r.Format == cliout.FormatText {
 		for _, w := range res.Warnings {
 			if !shown[w] {
-				emitWarning(r, event{Event: "warning", Text: w})
+				recap.Warn(w)
 			}
 		}
 	}
+	recap.Flush()
 	// An event rather than a result: an image build streamed its progress
 	// before it, and this ends that stream, so it is one line too.
 	return r.EmitEvent(res, func(w io.Writer) error {
@@ -178,8 +171,12 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 
 // packageRegistry builds the target registry with the production astro target:
 // the shared image builder and a container command runner, both backed by
-// os/exec, driving the engine container.binary picks for the project.
+// os/exec, driving the engine container.binary picks for the project. A test's
+// Deps.PackageAstro stands in for it.
 func (c *cli) packageRegistry() *pack.Registry {
+	if c.d.PackageAstro != nil {
+		return pack.NewRegistry(c.d.PackageAstro)
+	}
 	cmd := imagebuild.NewExecCommander()
 	astro := pack.NewAstroTarget(imagebuild.New(cmd, time.Now), cmd, containercfg.Engine)
 	return pack.NewRegistry(astro)
@@ -221,8 +218,29 @@ func renderImageResult(w io.Writer, res pack.Result, links map[string]manifest.L
 			return err
 		}
 	}
-	_, err := fmt.Fprintf(w, "\nDeploy it with:\n%s\n", deployImageHint(res.Image, links))
-	return err
+	if _, err := fmt.Fprintf(w, "\nDeploy it with:\n%s\n", deployImageHint(res.Image, links)); err != nil {
+		return err
+	}
+	return renderDeploymentEnv(w, res.DeploymentEnv)
+}
+
+// renderDeploymentEnv lists, under the deploy command, the values the
+// Deployment must supply because the image carries none of them, one aligned
+// row each. Nothing when the project declares none.
+func renderDeploymentEnv(w io.Writer, values []pack.DeploymentValue) error {
+	if len(values) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintln(w, "and set these on the Deployment, as environment variables or linked Environment Manager objects:"); err != nil {
+		return err
+	}
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	for _, v := range values {
+		if _, err := fmt.Fprintf(tw, "  %s %s\t%s\n", v.Kind, v.Name, v.Status); err != nil {
+			return err
+		}
+	}
+	return tw.Flush()
 }
 
 // deployImageHint is the deploy command for an image. Deploy refuses to pick a
@@ -282,16 +300,19 @@ func renderNextSteps(w io.Writer, steps []string) error {
 	return nil
 }
 
-// packageNote shows a note the target finds as it goes: in text, a cyan Note:
-// line on stderr, beside the warnings; under json, nil, so it streams as a
-// progress line, as it always has.
-func packageNote(r cliout.Renderer) func(string) {
-	if r.Format != cliout.FormatText {
-		return nil
+// packageRecap shows the warnings a package finds. In text they are
+// Warning: lines on stderr (or stdout when there is no stderr), held until
+// after the build's progress. Under json each is a warning event, emitted as
+// found, as it always was.
+func packageRecap(r cliout.Renderer) *cliout.Recap {
+	if r.Format == cliout.FormatText {
+		w := r.Err
+		if w == nil {
+			w = r.Out
+		}
+		return cliout.NewRecap(w, true)
 	}
-	w := r.Err
-	if w == nil {
-		w = r.Out
-	}
-	return func(n string) { cliout.Note(w, n) }
+	return cliout.NewRecapFunc(func(_ bool, msg string) {
+		emitWarning(r, event{Event: "warning", Text: msg})
+	}, false)
 }
