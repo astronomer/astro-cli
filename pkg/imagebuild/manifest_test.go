@@ -247,7 +247,7 @@ func TestForManifestBuildCarriesTheProject(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"include/agents/__init__.py", "dags/blueprints.py", "pyproject.toml", ".astro/config.yaml",
 		"include/logs/fixture.json", "include/airflow.cfg", "include/sample_env", "include/environment/defaults.yaml",
-		requirementsName, packagesName, lockConstraintsName,
+		requirementsName, packagesName, lockConstraintsName, routedName, routedLinksName,
 	}, contextFiles(t, ctxDir))
 	reqs, err := os.ReadFile(filepath.Join(ctxDir, requirementsName))
 	require.NoError(t, err)

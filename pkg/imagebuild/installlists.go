@@ -4,8 +4,10 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"html"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -17,13 +19,13 @@ import (
 // and handed to it ready-made as InstallLists: the CLI resolves the project
 // with the host's uv and applies the image's policy to the lock
 // (internal/imageinstall). The build itself resolves nothing. Its Dockerfile is
-// the runtime's ONBUILD steps written out, reading the three lists from the
+// the runtime's ONBUILD steps written out, reading the lists from the
 // context, so the context is self-contained: `docker build` runs it as written,
 // on any machine, with nothing from the CLI (WriteContext).
 
-// InstallLists are the three files a generated build's install steps read, one
+// InstallLists are the files a generated build's install steps read, one
 // line per entry, as the runtime's install scripts read them from the image's
-// working directory.
+// working directory, and the routed install before them.
 type InstallLists struct {
 	// Requirements is requirements.txt: what the image installs over its
 	// base, without Airflow. Constraints, when there are any, are named in it
@@ -35,17 +37,27 @@ type InstallLists struct {
 	Constraints []string
 	// Packages is packages.txt: the OS (apt) packages, installed first.
 	Packages []string
+	// Routed is routed-requirements.txt: the packages a [tool.uv.sources]
+	// entry routes to an index, name==version, which install before
+	// requirements.txt and without their dependencies, from RoutedLinks
+	// alone, never from an index.
+	Routed []string
+	// RoutedLinks are the files the lock recorded for Routed, each
+	// `url#sha256=…`, which routed-links.html lists for pip's --find-links:
+	// pip picks the one the image's Python and platform take, and checks its
+	// hash.
+	RoutedLinks []string
 }
 
-// Empty reports lists that install nothing over the base: no requirement and
-// no OS package. Constraints alone install nothing.
+// Empty reports lists that install nothing over the base: no requirement, no
+// routed package and no OS package. Constraints alone install nothing.
 func (l InstallLists) Empty() bool {
-	return len(l.Requirements) == 0 && len(l.Packages) == 0
+	return len(l.Requirements) == 0 && len(l.Routed) == 0 && len(l.Packages) == 0
 }
 
-// Files are the lists as the build context holds them, by file name. All three
-// are always there, empty or not, so the Dockerfile's COPY lines never miss
-// one.
+// Files are the lists as the build context holds them, by file name. All of
+// them are always there, empty or not, so the Dockerfile's COPY lines never
+// miss one.
 func (l InstallLists) Files() map[string][]byte {
 	reqs := l.Requirements
 	if len(l.Constraints) > 0 {
@@ -55,7 +67,26 @@ func (l InstallLists) Files() map[string][]byte {
 		requirementsName:    lines(reqs),
 		lockConstraintsName: lines(l.Constraints),
 		packagesName:        lines(l.Packages),
+		routedName:          lines(l.Routed),
+		routedLinksName:     linksPage(l.RoutedLinks),
 	}
+}
+
+// linksPage is the HTML page pip's --find-links reads links from: one
+// anchor for each, named by the file the URL ends in. Empty for none.
+func linksPage(links []string) []byte {
+	if len(links) == 0 {
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString("<!DOCTYPE html>\n<html><body>\n")
+	for _, l := range links {
+		file, _, _ := strings.Cut(path.Base(l), "#")
+		file, _, _ = strings.Cut(file, "?")
+		fmt.Fprintf(&b, "<a href=\"%s\">%s</a>\n", html.EscapeString(l), html.EscapeString(file))
+	}
+	b.WriteString("</body></html>\n")
+	return []byte(b.String())
 }
 
 // Digest is a digest of Files, for a caller that addresses the image by what

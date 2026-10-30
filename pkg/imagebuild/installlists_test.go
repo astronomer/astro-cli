@@ -11,27 +11,36 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
-// The three lists, as the context holds them: requirements.txt names the
-// lock's constraints with -c only when there are some, and every file is
-// there, empty or not, for the Dockerfile's COPY lines.
+// The lists, as the context holds them: requirements.txt names the lock's
+// constraints with -c only when there are some, the routed links are an HTML
+// page, and every file is there, empty or not, for the Dockerfile's COPY
+// lines.
 func TestInstallListsFiles(t *testing.T) {
 	files := InstallLists{
 		Requirements: []string{"pandas==2.2.3", "six @ https://example.com/six.whl#sha256=ab"},
 		Constraints:  []string{"numpy==2.1.0 ; python_version >= '3.10'"},
 		Packages:     []string{"libpq-dev"},
+		Routed:       []string{"acme-lib==1.0 ; sys_platform == 'linux'"},
+		RoutedLinks:  []string{"https://acme.example/acme_lib-1.0-py3-none-any.whl#sha256=ab", "https://acme.example/acme-lib-1.0.tar.gz?a=1&b=2#sha256=cd"},
 	}.Files()
 	assert.Equal(t, map[string][]byte{
 		requirementsName:    []byte("-c uv-lock-constraints.txt\npandas==2.2.3\nsix @ https://example.com/six.whl#sha256=ab\n"),
 		lockConstraintsName: []byte("numpy==2.1.0 ; python_version >= '3.10'\n"),
 		packagesName:        []byte("libpq-dev\n"),
+		routedName:          []byte("acme-lib==1.0 ; sys_platform == 'linux'\n"),
+		routedLinksName: []byte("<!DOCTYPE html>\n<html><body>\n" +
+			"<a href=\"https://acme.example/acme_lib-1.0-py3-none-any.whl#sha256=ab\">acme_lib-1.0-py3-none-any.whl</a>\n" +
+			"<a href=\"https://acme.example/acme-lib-1.0.tar.gz?a=1&amp;b=2#sha256=cd\">acme-lib-1.0.tar.gz</a>\n" +
+			"</body></html>\n"),
 	}, files)
 
 	empty := InstallLists{}.Files()
-	assert.Len(t, empty, 3)
+	assert.Len(t, empty, 5)
 	for name, data := range empty {
 		assert.Empty(t, data, name)
 	}
 	assert.True(t, InstallLists{Constraints: []string{"numpy==2.1.0"}}.Empty(), "constraints alone install nothing")
+	assert.False(t, InstallLists{Routed: []string{"acme-lib==1.0"}}.Empty(), "a routed package installs")
 }
 
 // The digest follows the files, so a change to any list moves it.
@@ -41,6 +50,7 @@ func TestInstallListsDigest(t *testing.T) {
 	assert.NotEqual(t, a.Digest(), InstallLists{Requirements: []string{"pandas==2.2.2"}}.Digest())
 	assert.NotEqual(t, a.Digest(), InstallLists{Requirements: []string{"pandas==2.2.3"}, Constraints: []string{"numpy==2.1.0"}}.Digest())
 	assert.NotEqual(t, a.Digest(), InstallLists{Requirements: []string{"pandas==2.2.3"}, Packages: []string{"git"}}.Digest())
+	assert.NotEqual(t, a.Digest(), InstallLists{Requirements: []string{"pandas==2.2.3"}, RoutedLinks: []string{"https://acme.example/x.whl#sha256=ab"}}.Digest())
 }
 
 // Without a lock to pin from, the dependencies install as written, without
@@ -163,7 +173,7 @@ func TestWriteContext(t *testing.T) {
 	require.NoError(t, WriteContext(dir, req))
 	assert.ElementsMatch(t, []string{
 		"dags/a.py", "pyproject.toml", "include/notes.md",
-		"Dockerfile", ".dockerignore", requirementsName, packagesName, lockConstraintsName,
+		"Dockerfile", ".dockerignore", requirementsName, packagesName, lockConstraintsName, routedName, routedLinksName,
 	}, contextFiles(t, dir))
 	read := func(name string) string {
 		data, err := os.ReadFile(filepath.Join(dir, name))
@@ -181,7 +191,7 @@ func TestWriteContext(t *testing.T) {
 	_, err := testBuilder(&fakeCmd{}).Build(t.Context(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{
-		"dags/a.py", "pyproject.toml", "include/notes.md", requirementsName, packagesName, lockConstraintsName,
+		"dags/a.py", "pyproject.toml", "include/notes.md", requirementsName, packagesName, lockConstraintsName, routedName, routedLinksName,
 	}, contextFiles(t, filepath.Join(req.WorkDir, buildContextDir)))
 }
 
