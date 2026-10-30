@@ -208,6 +208,10 @@ type walker struct {
 	// resolved: "" outside a repository, and for a walk that applies no
 	// rules (countDagsOnDisk).
 	worktrees string
+	// exclude, when set, is a directory the walk leaves out wherever it
+	// meets it, by whatever path: the build context being written, when it
+	// is inside the project (copyProjectFiles).
+	exclude fs.FileInfo
 }
 
 // linkedWorktree reports whether the directory at src is a linked worktree
@@ -312,6 +316,12 @@ func walkProject(root string, visit func(rel, src string, mode fs.FileMode) erro
 // walkProjectLinks is walkProject, handing link each symlink it goes through
 // (walker.link).
 func walkProjectLinks(root string, visit func(rel, src string, mode fs.FileMode) error, link func(rel string)) error {
+	return walkProjectExcept(root, nil, visit, link)
+}
+
+// walkProjectExcept is walkProjectLinks, leaving out the directory exclude
+// (walker.exclude) when it is not nil.
+func walkProjectExcept(root string, exclude fs.FileInfo, visit func(rel, src string, mode fs.FileMode) error, link func(rel string)) error {
 	resolved, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		return err
@@ -320,7 +330,7 @@ func walkProjectLinks(root string, visit func(rel, src string, mode fs.FileMode)
 	if err != nil {
 		return err
 	}
-	w := walker{filter: filter, follow: true, link: link, visit: visit, worktrees: projectWorktrees(resolved)}
+	w := walker{filter: filter, follow: true, link: link, visit: visit, worktrees: projectWorktrees(resolved), exclude: exclude}
 	return w.walkDir(resolved, "", map[string]bool{resolved: true})
 }
 
@@ -378,15 +388,19 @@ func (w walker) walkDir(dir, rel string, onPath map[string]bool) error {
 // stat is the entry at src as the walk sees it: what a symlink points at when
 // links are followed, the link itself otherwise. A nil info and no error is an
 // entry gone: a dangling link has nothing to carry, and a file removed since
-// the directory was read (a tool's temp file) is not there to.
+// the directory was read (a tool's temp file) is not there to. So is the
+// directory the walk leaves out (walker.exclude), by whatever path it is met.
 func (w walker) stat(src string) (fs.FileInfo, error) {
 	stat := os.Stat // follows a symlink
 	if !w.follow {
 		stat = os.Lstat
 	}
 	info, err := stat(src)
-	if errors.Is(err, fs.ErrNotExist) {
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
 		return nil, nil
+	case err == nil && w.exclude != nil && info.IsDir() && os.SameFile(info, w.exclude):
+		return nil, nil // the directory the walk leaves out (walker.exclude)
 	}
 	return info, err
 }
@@ -589,15 +603,21 @@ func countDagsOnDisk(root string) (int, error) {
 }
 
 // copyProjectFiles copies the files the project's image carries from src into
-// the build context dst.
+// the build context dst, which exists. dst is left out of the copy when it is
+// inside src (`astro package --context-dir ./build`), by any path, so the
+// context never carries a copy of itself.
 func copyProjectFiles(src, dst string) error {
-	err := walkProject(src, func(rel, from string, mode fs.FileMode) error {
+	dstInfo, err := os.Stat(dst)
+	if err != nil {
+		return fmt.Errorf("copying the project into the image: %w", err)
+	}
+	err = walkProjectExcept(src, dstInfo, func(rel, from string, mode fs.FileMode) error {
 		target := filepath.Join(dst, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(target), ownerAll); err != nil {
 			return err
 		}
 		return copyFile(from, target, mode.Perm())
-	})
+	}, nil)
 	if err != nil {
 		return fmt.Errorf("copying the project into the image: %w", err)
 	}
