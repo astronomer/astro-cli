@@ -1,49 +1,12 @@
 package airflowrt
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// helperContentAtVersion pins the helper's content to its version stamp. A
-// change to install-project.py that keeps the stamp fails here: bump the
-// "# astro-install-helper:" line and add the new hash, so astro init knows a
-// project's copy is older and refreshes it.
-var helperContentAtVersion = map[int]string{
-	1: "b21a2237f2142b9bb010dd1dbe211ab9a9ce3f5c2f567e64a668315bd0ca326d",
-	// Writes its outputs with LF line endings on every host.
-	2: "e2c1f44df4ed6b3cc93e73e45473fc4b9549322b876962fe29fa62f9e36846a7",
-	// Compares a lock's recorded constraints by name and specifier, and reads
-	// python_version == 'X.Y' as python_full_version == 'X.Y.*'.
-	3: "72b26579905db375023b6b1e60149e277de2aecb385fdf5822bb23019a785f64",
-	// Reads markers, requirements and specifiers with packaging (or pip's
-	// vendored copy) in place of its own evaluator; shorter prose.
-	4: "373f3dbcaba5899d23c8335cbff5714c37dfd190e027b404ce83c2426e3f5952",
-	// Hands the resolving to uv (uv lock --check, uv lock, uv export --format
-	// pylock.toml), copied into its stage; keeps only the image's policy.
-	5: "7fac3db16fefba17fc0f30a7974dd77b84e9feb92c740c461b551a4d20183f44",
-}
-
-func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {
-	v := InstallHelperVersion()
-	require.Positive(t, v, "the helper carries a version stamp")
-	sum := sha256.Sum256(InstallHelper())
-	assert.Equal(t, helperContentAtVersion[v], hex.EncodeToString(sum[:]),
-		"install-project.py changed without its version stamp moving: bump it and pin the new hash")
-}
-
-func TestHelperVersion(t *testing.T) {
-	v, ok := HelperVersion([]byte("# Written by the Astro CLI.\n# astro-install-helper: 7\r\n#\n"))
-	assert.True(t, ok)
-	assert.Equal(t, 7, v)
-	_, ok = HelperVersion([]byte("# Written by the Astro CLI.\nprint('hi')\n"))
-	assert.False(t, ok, "an unstamped copy has no version")
-}
 
 func TestDockerfileStages(t *testing.T) {
 	stages := DockerfileStages([]byte("ARG V=1\n" +
@@ -88,15 +51,28 @@ func TestBaseOf(t *testing.T) {
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.3-base", BaseOf("astrocrpublic.azurecr.io/runtime:3.3-base"))
 }
 
-// The install reads the helper from the path it is written to.
-func TestInstallDockerfileRunsTheHelperAtItsPath(t *testing.T) {
+// A project's own Dockerfile reads the lists from the named context, and
+// mounts the netrc secret whether or not the build passes one; a generated
+// build reads them from its own context, and mounts it only when asked.
+func TestInstallDockerfileReadsTheListsFromTheNamedContext(t *testing.T) {
 	df := InstallDockerfile("img:1-base")
-	assert.Contains(t, df, " "+InstallHelperPath+" ", "the stage copies the helper in")
-	assert.Contains(t, df, " python /tmp/astro-project/install-project.py ")
-	assert.Contains(t, df, "FROM img:1-base AS "+InstallStage+"\n")
-	assert.True(t, strings.HasPrefix(df, "ARG "+UVImageArg+"="+UVImage+"\nFROM ${"+UVImageArg+"} AS "+UVStage+"\n"),
-		"the uv stage comes first, its build argument ahead of every FROM")
-	assert.Contains(t, df, "COPY --from="+UVStage+" /uv /opt/astro-uv/uv\n")
-	assert.Contains(t, InstallDockerfileWith("img:1-base", InstallOptions{UVImage: "mirror.example/uv:1"}), "ARG "+UVImageArg+"=mirror.example/uv:1\n")
-	assert.NotEmpty(t, InstallHelper())
+	assert.True(t, strings.HasPrefix(df, "FROM img:1-base\nCOPY --from="+InstallContext+" packages.txt .\n"), df)
+	assert.Contains(t, df, "COPY --from="+InstallContext+" requirements.txt uv-lock-constraints.txt ./\n")
+	assert.Contains(t, df, "RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false if [ -x /usr/local/bin/install-python-dependencies ]")
+	assert.NotContains(t, df, "ARG ", "no build argument, no helper stage")
+	assert.Equal(t, 1, strings.Count(df, "FROM "))
+	assert.Contains(t, InstallDockerfileWith("img:1-base", InstallOptions{ListsFrom: InstallContext, Alias: "app"}), "FROM img:1-base AS app\n")
+
+	gen := InstallDockerfileWith("img:1-base", InstallOptions{})
+	assert.Contains(t, gen, "\nCOPY packages.txt .\n")
+	assert.NotContains(t, gen, "--mount")
+	assert.Contains(t, InstallDockerfileWith("img:1-base", InstallOptions{MountNetrc: true}), "RUN --mount=type=secret,id=netrc")
+}
+
+func TestReadsInstallContext(t *testing.T) {
+	assert.True(t, ReadsInstallContext([]byte(InstallDockerfile("img:1-base"))))
+	assert.True(t, ReadsInstallContext([]byte("FROM x\nCOPY --from=\"astro-install\" requirements.txt .\n")))
+	assert.False(t, ReadsInstallContext([]byte(InstallDockerfileWith("img:1-base", InstallOptions{}))), "a generated build reads its own context")
+	assert.False(t, ReadsInstallContext([]byte("FROM x\n# COPY --from=astro-install packages.txt .\n")))
+	assert.False(t, ReadsInstallContext([]byte("FROM x\nCOPY --from=astro-installer a .\n")))
 }

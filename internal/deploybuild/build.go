@@ -42,6 +42,11 @@ type Image struct {
 	Progress io.Writer
 	// ReadLabel reads the runtime label off the built image.
 	ReadLabel LabelReader
+	// ResolveInstall resolves what a generated image installs from the
+	// project's lock, into the request's Install, before it is built (the
+	// caller's imageinstall.Fill, with the deploy's warnings). nil installs
+	// the manifest's dependencies as written.
+	ResolveInstall func(ctx context.Context, req *imagebuild.Request) error
 }
 
 // BuildImage builds the image at Platform and returns its local tag and the
@@ -55,6 +60,11 @@ func BuildImage(ctx context.Context, in *Image) (image, runtimeVersion string, e
 	defer os.RemoveAll(workDir) //nolint:errcheck // best-effort cleanup of a temp dir
 
 	req := in.Request
+	if in.ResolveInstall != nil {
+		if err := in.ResolveInstall(ctx, &req); err != nil {
+			return "", "", err
+		}
+	}
 	req.WorkDir = workDir
 	req.Tag = ImageTag(in.ProjectDir)
 	req.Platform = Platform

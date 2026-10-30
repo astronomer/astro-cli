@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
+	"github.com/astronomer/astro-cli/internal/imageinstall"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -322,6 +323,7 @@ func (d *apcManifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manif
 		Description:    in.Description,
 		Progress:       d.progress,
 		Catalog:        runtimecatalog.Options(0),
+		ResolveInstall: imageinstall.Fill,
 	})
 	if err != nil {
 		return manifestdeploy.ImageResult{}, err

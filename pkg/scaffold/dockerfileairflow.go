@@ -144,9 +144,12 @@ func onBuildRefusal(declared string, final *airflowrt.DockerfileStage) error {
 	from := strings.Join(append(append([]string{}, final.Flags...), base), " ")
 	return fmt.Errorf("%w: %s builds FROM %s, whose ONBUILD steps install requirements.txt and packages.txt "+
 		"rather than what pyproject.toml lists, so the image and standalone mode would install different packages. "+
-		"Run astro init, which moves the file onto %s, or replace the FROM line with these lines and commit %s, which astro init writes:\n\n%s",
-		ErrOnBuildBase, declared, final.Ref, base, airflowrt.InstallHelperPath,
-		airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias}))
+		"Run astro init, which moves the file onto %s, or replace the FROM line with these lines, which astro init writes:\n\n%s\n"+
+		"They install the lists the Astro CLI resolves from pyproject.toml and uv.lock, which it passes to the build as the named context %s: "+
+		"build with astro package or astro deploy, or run astro package --context-dir <dir> for the docker build command",
+		ErrOnBuildBase, declared, final.Ref, base,
+		airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias, ListsFrom: airflowrt.InstallContext}),
+		airflowrt.InstallContext)
 }
 
 // refuseKeptDockerfileOfAnotherAirflow refuses a conversion that would keep the

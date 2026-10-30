@@ -33,6 +33,8 @@ var backtickAllowed = map[string]string{
 	"cmd/local/upgrade.go: cliUpgradePrompt": "the CLI's own words in the Otto upgrade prompt, which is markdown for a " +
 		"model and is never printed",
 	"pkg/scaffold/files1x.go: \"$*?`\\\\\"": "the shell metacharacters that make an argument unsafe to repeat unquoted",
+	"pkg/scaffold/dockerfilerewrite.go: staleHelperHeader": "the first line of the install helper earlier previews wrote into a project, " +
+		"matched byte for byte to tell the CLI's file from one of the project's own; never printed",
 }
 
 // Every string literal in the repo's non-test Go code is plain text, with no

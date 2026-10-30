@@ -213,23 +213,20 @@ A conversion sets this for you when it finds a Dockerfile it cannot carry — on
 
 Astro Runtime publishes every image twice, under two tags of the same repository: `12.6.0` and `12.6.0-base`, `3.1-12-python-3.12` and `3.1-12-python-3.12-base`. The plain tag carries ONBUILD steps that, as soon as anything builds `FROM` it, install `packages.txt` and `requirements.txt` from the build context. The `-base` tag is the same image without them. A Dockerfile built on the plain tag therefore needs those two files beside `pyproject.toml`, and nothing keeps the three lists in step: `uv add` reaches standalone mode and not the image.
 
-So a Dockerfile of your own builds on the `-base` tag and installs from `pyproject.toml`, with the steps a generated image runs written out ahead of your own:
+So a Dockerfile of your own builds on the `-base` tag and installs what `pyproject.toml` and `uv.lock` say, with the steps a generated image runs written out ahead of your own:
 
 ```dockerfile
-# Installs this project's packages from pyproject.toml and uv.lock
-# (.astro/install-project.py reads them; astro init keeps both up to date).
-ARG ASTRO_UV_IMAGE=ghcr.io/astral-sh/uv:0.11.8
-FROM ${ASTRO_UV_IMAGE} AS astro-uv
-FROM quay.io/astronomer/astro-runtime:12.6.0-base AS astro-install
-USER root
-COPY pyproject.toml uv.lock* .astro/install-project.py /tmp/astro-project/
-COPY --from=astro-uv /uv /opt/astro-uv/uv
-RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false python /tmp/astro-project/install-project.py --project /tmp/astro-project --out /tmp/astro-install
+# Installs this project's packages from pyproject.toml and uv.lock. The
+# Astro CLI resolves them into lists it passes to the build as the named
+# context astro-install, so build with astro package or astro deploy; a
+# plain docker build . fails at the first COPY --from=astro-install. To
+# build it with docker yourself, run astro package --context-dir <dir>,
+# which writes the lists and prints the docker build command.
 FROM quay.io/astronomer/astro-runtime:12.6.0-base
-COPY --from=astro-install /tmp/astro-install/packages.txt .
+COPY --from=astro-install packages.txt .
 USER root
 RUN if [ -x /usr/local/bin/install-system-packages ]; then /usr/local/bin/install-system-packages; elif [ -s packages.txt ]; then apt-get update && cat packages.txt | tr '\r\n' '\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi
-COPY --from=astro-install /tmp/astro-install/requirements.txt /tmp/astro-install/uv-lock-constraints.txt ./
+COPY --from=astro-install requirements.txt uv-lock-constraints.txt ./
 RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false if [ -x /usr/local/bin/install-python-dependencies ]; then /usr/local/bin/install-python-dependencies; else pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; fi
 USER astro
 COPY --chown=astro:0 . .
@@ -238,26 +235,30 @@ COPY --chown=astro:0 . .
 ENV TZ=UTC
 ```
 
-The first stage copies uv in from its own image and runs `.astro/install-project.py`, which has uv check `uv.lock` against `pyproject.toml` (and resolve it again, with a warning, when it is missing or out of date) and writes what the runtime's own install steps read: your dependencies at the versions `uv.lock` resolved, without Airflow, a git, URL or index source as a direct reference to what the lock recorded, `[tool.astro] packages`, and every other locked package the runtime image does not already ship, so the image installs what `uv sync` installs in standalone mode, around the runtime's own packages. uv stays in that stage; the image carries none. A build that cannot pull from `ghcr.io` names a mirror of the uv image with `--build-arg ASTRO_UV_IMAGE=<mirror>`, or by editing the `ARG` line. The second stage is the runtime's ONBUILD steps, in the same order and as the same users, so the runtime's constraints still apply, and the `netrc` secret reaches the install on every runtime. Your own steps follow, and run as they did. `[tool.astro] packages` and your dependencies describe the image again: `uv add` and `astro local deps` change what the next build installs.
+The install steps are the runtime's ONBUILD steps, in the same order and as the same users, so the runtime's constraints still apply, and the `netrc` secret reaches the install on every runtime (`required=false`, so a build without it is not warned about it). They read three lists from a second build context named `astro-install`, which the CLI writes before the build and passes beside the project (`--build-context astro-install=<dir>`), so nothing is written into the project: `requirements.txt`, `uv-lock-constraints.txt` and `packages.txt`. They are what a generated image installs, resolved the same way on your machine with uv ([deploy.md](deploy.md#1-image-deploys)): your dependencies at the versions `uv.lock` resolved, without Airflow, `[tool.astro] packages`, and every other locked package the runtime image does not already ship, so the image installs what `uv sync` installs in standalone mode, around the runtime's own packages. The runtime whose package list they are resolved against is the one the file's final `FROM` names: its exact build, or the newest build of a series tag such as `runtime:3.3-base`. Your own steps follow, and run as they did. `[tool.astro] packages` and your dependencies describe the image again: `uv add` and `astro local deps` change what the next build installs.
 
-`astro init` writes this for you. Converting a 1.x project whose Dockerfile does more than name a base, it moves the file onto its tag's `-base` image, mirrors included (`registry.example.com/astronomer/astro-runtime:12.1.0` becomes `…:12.1.0-base`, so mirror that tag too), keeps every line after the original `FROM` in order, declares the `ASTRO_UV_IMAGE` build argument ahead of the file's first `FROM`, writes `.astro/install-project.py`, and removes `requirements.txt` and `packages.txt`, which are in `pyproject.toml` and which nothing reads any more. It adds an exception to `.dockerignore` for any of `pyproject.toml`, `uv.lock` and `.astro/install-project.py` the file would leave out. It leaves the file on its ONBUILD tag, keeps both lists, and says why in its notes, when the move would have to guess:
+`astro init` writes this for you. Converting a 1.x project whose Dockerfile does more than name a base, it moves the file onto its tag's `-base` image, mirrors included (`registry.example.com/astronomer/astro-runtime:12.1.0` becomes `…:12.1.0-base`, so mirror that tag too), keeps every line after the original `FROM` in order, and removes `requirements.txt` and `packages.txt`, which are in `pyproject.toml` and which nothing reads any more. It also removes the `.astro/install-project.py` an earlier preview of the Astro CLI wrote there, which the build no longer runs. It leaves the file on its ONBUILD tag, keeps both lists, and says why in its notes, when the move would have to guess:
 
 - a line of `requirements.txt` or `packages.txt` that `pyproject.toml` cannot carry (`--extra-index-url`, `-r`, `-c`, `-e`, a local path, a URL with no name): the file is its only record, and the ONBUILD tag still installs it;
 - an earlier stage built on an ONBUILD tag, whose steps would still read the two files;
 - a `FROM` pinned by digest, built from a build argument, or continued onto a second line;
-- a Dockerfile that reads `requirements.txt` or `packages.txt` itself, or that has a stage named `astro-install` or `astro-uv`;
+- a Dockerfile that reads `requirements.txt` or `packages.txt` itself, or that has a stage named `astro-install`;
 - a runtime older than 9 (Airflow 2.7), or a tag whose runtime version it cannot read.
 
-Commit `.astro/install-project.py` with the Dockerfile: it is what `docker build .` runs, so a clone builds without the CLI. The file needs BuildKit, for the `netrc` secret's `RUN --mount`: the default builder in Docker Engine 23 and later and in Docker Desktop, and `DOCKER_BUILDKIT=1` before that. The install stage's `COPY` names `uv.lock*`, so a project without a `uv.lock` builds too: Docker (BuildKit and the legacy builder) and Podman 5.8 (Buildah 1.43) copy nothing for it. An older Buildah is untested there. With it, `docker build .` builds the image `astro package astro` builds, except for three things the CLI adds: `--platform linux/amd64`, the labels a Deployment reads, and the build secrets you pass with `--build-secret`, `BUILD_SECRET_INPUT` or [`build-secrets`](#build-secrets). The `netrc` mount says `required=false`, so a build without that secret is not warned about it.
+Build it with `astro package astro`, `astro deploy` or `astro local start --docker`, which resolve the lists and pass the context. A plain `docker build .` has no `astro-install` context, and fails at the first `COPY --from=astro-install` with an error about pulling an image of that name. To build it with docker or podman yourself, in CI say, write the inputs with `astro package --context-dir <dir>`: the Dockerfile at `<dir>/Dockerfile`, the project as the build reads it (its `.dockerignore` already applied) in `<dir>/context/`, and the lists in `<dir>/astro-install/`. It prints the command that builds them:
 
-A Dockerfile still on an ONBUILD tag is judged by whether `astro init` can move it. Run in a project that is already an Astro project, `astro init` brings what astro writes there up to date: it moves a declared Dockerfile on an ONBUILD tag onto `-base` under the gates above, plus one more, that every line of a `requirements.txt` or `packages.txt` beside it is already in `pyproject.toml` (the lists have had time to drift), and it writes or refreshes `.astro/install-project.py`. So:
+```sh
+docker build --tag astro-package/<name>:latest --file <dir>/Dockerfile --build-context astro-install=<dir>/astro-install <dir>/context
+```
+
+Named build contexts need BuildKit under Docker: the default builder in Docker Engine 23 and later and in Docker Desktop, or Buildx 0.8 and later before that; Docker's legacy builder has no `--build-context`. Podman takes them from 4.2 (Buildah 1.26.4, backported from 1.27). The image is the one `astro package astro` builds, except for three things the CLI adds: `--platform linux/amd64`, the labels a Deployment reads, and the build secrets you pass with `--build-secret`, `BUILD_SECRET_INPUT` or [`build-secrets`](#build-secrets), which the printed command carries as `--secret`.
+
+A Dockerfile still on an ONBUILD tag is judged by whether `astro init` can move it. Run in a project that is already an Astro project, `astro init` brings what astro writes there up to date: it moves a declared Dockerfile on an ONBUILD tag onto `-base` under the gates above, plus one more, that every line of a `requirements.txt` or `packages.txt` beside it is already in `pyproject.toml` (the lists have had time to drift). A Dockerfile an earlier preview of the Astro CLI moved onto `-base`, which runs `.astro/install-project.py` in a stage of its own, gets this astro's install steps in place of that block, its own steps kept, and the helper is removed; until then each build warns about it. So:
 
 - when `astro init` would move the file, every build of it refuses it (`onbuild_base`): `astro local start --docker` and `restart`, `astro package astro` and `astro deploy`. The message shows the lines that replace the `FROM`, the stage's name and flags kept, and says to run `astro init`, which does it. `astro local check` and `astro package mwaa` or `composer` build no image from the file, and are not held to it.
-- when a gate stops the move, the build goes ahead on the ONBUILD tag as it always has, the tag's steps installing `requirements.txt` and `packages.txt`, and warns each time with what `astro init` would say: the line that is not in `pyproject.toml`, the earlier stage, the `.gitignore` rule.
+- when a gate stops the move, the build goes ahead on the ONBUILD tag as it always has, the tag's steps installing `requirements.txt` and `packages.txt`, and warns each time with what `astro init` would say: the line that is not in `pyproject.toml`, or the earlier stage.
 
 Standalone mode builds no image, and is held to neither.
-
-`.astro/install-project.py` carries a version stamp in its header (`# astro-install-helper: <n>`, raised whenever the file changes). `astro init` refreshes the project's copy only when it is older than the one this astro writes, or carries no stamp, and never replaces a newer astro's; a build warns about a copy that is missing or older, and says nothing about one at this version or newer, edits included.
 
 ### `build-secrets`
 
@@ -715,7 +716,7 @@ It matches the missing module's top-level name exactly against the image's packa
 
 ### Private packages without a Dockerfile
 
-`uv add git+https://github.com/acme/private-lib.git` adds `private-lib` to `dependencies` and its repository to `[tool.uv.sources]`. Standalone mode installs it through uv. A generated image resolves the project with uv too, in the build, and installs the commit `uv.lock` recorded for it, as a direct reference, `private-lib @ git+https://github.com/acme/private-lib.git@<commit>`. A check environment cannot read `[tool.uv.sources]`, so `astro local check` writes a dependency whose source is a git repository or a URL as a direct reference with the source's `rev`, `tag` or `branch` and its `subdirectory`. A version on the dependency is dropped there, since a direct reference cannot carry one, and a source limited by `marker`, `extra` or `group`, a `path` and a `workspace` member are left as the bare name. When uv cannot lock the project in the build (an index or repository it cannot reach), the image installs the dependencies as written, without their sources, and the build says so.
+`uv add git+https://github.com/acme/private-lib.git` adds `private-lib` to `dependencies` and its repository to `[tool.uv.sources]`. Standalone mode installs it through uv. A generated image is resolved with uv too, on the host before the build, and installs the commit `uv.lock` recorded for it, as a direct reference, `private-lib @ git+https://github.com/acme/private-lib.git@<commit>`. A check environment cannot read `[tool.uv.sources]`, so `astro local check` writes a dependency whose source is a git repository or a URL as a direct reference with the source's `rev`, `tag` or `branch` and its `subdirectory`. A version on the dependency is dropped there, since a direct reference cannot carry one, and a source limited by `marker`, `extra` or `group`, a `path` and a `workspace` member are left as the bare name. When there is no uv on the host, or uv cannot lock the project (an index or repository it cannot reach), the image installs the dependencies as written and the build says so.
 
 To install from a private repository, give the build a `netrc` secret. The generated build mounts it as `/root/.netrc` while it installs your requirements, and git reads its credentials from there:
 
@@ -733,7 +734,7 @@ private-lib = { git = "https://github.com/acme/private-lib.git", rev = "4bfeaf8"
 
 Set `NETRC_CONTENT` to a netrc entry, such as `machine github.com login x-access-token password <token>`. List `git` in [`packages`](#packages) if the runtime image does not have it. The mount is the generated build's own step, so it works on every runtime, including those whose own `ONBUILD` install never mounted it. It is written only when the build has the secret, and then needs BuildKit under Docker, or Podman 3.2 or later.
 
-A source that names an index, `private-lib = { index = "acme" }` with a `[[tool.uv.index]]` named `acme`, reaches a generated image as the exact file the lock recorded for `private-lib`, by its URL on the index and its hash, so PyPI is never asked for it. Without a `uv.lock`, uv resolves one in the build, through the same index. Commit a `uv.lock` all the same, so what the image installs is what you tested. Only a source for a package the image installs counts: the Airflow sources `astro init` writes add nothing, since the runtime image already is Airflow. An index behind a login takes the same `netrc` secret, which the build mounts for uv's resolve as well as the install.
+A source that names an index, `private-lib = { index = "acme" }` with a `[[tool.uv.index]]` named `acme`, reaches a generated image as the exact file the lock recorded for `private-lib`, by its URL on the index and its hash, so PyPI is never asked for it. Without a `uv.lock`, the build runs `uv lock` first, through the same index, and asks you to commit the lock it writes, so what the image installs is what you tested. Only a source for a package the image installs counts: the Airflow sources `astro init` writes add nothing, since the runtime image already is Airflow. An index behind a login takes the same `netrc` secret for the install; uv's resolve, on the host, reads the host's own credentials for it (`~/.netrc`, a keyring, or `UV_INDEX_<NAME>_USERNAME` and `_PASSWORD`).
 
 `astro local check` builds its check environments outside the project, where uv cannot see the table, so it passes `constraint-dependencies` and the source index pages to them itself, and a check resolves the way the project does. A check against MWAA or Composer leaves out the `+astro` pins and the runtime's own lines: those platforms run Apache's own Airflow, with its own constraints.
 

@@ -35,7 +35,8 @@ func TestAnONBUILDDockerfileIsRefusedAndInitMovesIt(t *testing.T) {
 	r := p.run("package", "astro").requireFailure()
 	for _, want := range []string{
 		"Dockerfile builds FROM " + base + ", whose ONBUILD steps",
-		"FROM " + base + "-base AS astro-install",
+		"FROM " + base + "-base\nCOPY --from=astro-install packages.txt .",
+		"astro package --context-dir",
 		"Run astro init",
 	} {
 		if !strings.Contains(r.output(), want) {
@@ -53,8 +54,8 @@ func TestAnONBUILDDockerfileIsRefusedAndInitMovesIt(t *testing.T) {
 		t.Fatalf("init --output json: %v\n%s", err, out.output())
 	}
 	if !res.Existing || !reports(res.Updated, "Dockerfile (now builds FROM "+base+"-base") ||
-		!reports(res.Created, ".astro/install-project.py") {
-		t.Errorf("init in the project did not move the Dockerfile and write the helper: %+v", res)
+		reports(res.Created, ".astro/install-project.py") {
+		t.Errorf("init in the project did not move the Dockerfile, or wrote the helper earlier previews did: %+v", res)
 	}
 	if got := read(t, filepath.Join(p.Dir, "Dockerfile")); !strings.HasSuffix(got, "\nRUN echo hi\n") {
 		t.Errorf("the Dockerfile's own step is not kept last:\n%s", got)

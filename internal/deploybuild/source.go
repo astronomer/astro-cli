@@ -72,7 +72,7 @@ func CheckSource(s *Source) (imagebuild.MissingSecrets, *imagebuild.ProjectSurve
 	case w != "":
 		warn(w)
 	}
-	if w := scaffold.InstallHelperWarning(s.ProjectDir, s.Manifest.Astro.Dockerfile); w != "" {
+	if w := scaffold.StaleHelperWarning(s.ProjectDir, s.Manifest.Astro.Dockerfile); w != "" {
 		warn(w)
 	}
 	var err error
