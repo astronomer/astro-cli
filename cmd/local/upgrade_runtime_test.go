@@ -83,7 +83,7 @@ func TestUpgradeRuntimeWritesTheBuildRefreshesConstraintsAndLocks(t *testing.T) 
 	out := rd.stdout.String()
 	for _, want := range []string{
 		"Runtime: no build -> 3.3-10 in " + rd.path,
-		"  carries Airflow 3.3.2",
+		"  Airflow: 3.3.2",
 		"  Python: 3.13",
 		"  [tool.uv]: now holds what Astro Runtime 3.3-10 constrains",
 		"  uv.lock: locked",
@@ -106,7 +106,7 @@ func TestUpgradeRuntimeGoesBackAndAcrossSeries(t *testing.T) {
 	assert.Contains(t, got, "'apache-airflow==3.4.*'")
 	assert.Contains(t, got, "runtime = '3.4-1'")
 	out := rd.stdout.String()
-	assert.Contains(t, out, "  Airflow: 3.3 -> 3.4")
+	assert.Contains(t, out, "  Airflow: 3.3 -> 3.4.0")
 	assert.Contains(t, out, "Not changed: providers and Dag code.")
 }
 

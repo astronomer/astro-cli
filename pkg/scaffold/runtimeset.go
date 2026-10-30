@@ -58,9 +58,11 @@ type RuntimeBuildChange struct {
 //   - The Airflow requirement moves when the build carries an Airflow it does
 //     not cover, with SetAirflowVersionWith's edit: to the build's exact
 //     Airflow when the requirement pinned an exact one, else to its series.
-//     Which Airflow a build carries comes from opts.Catalog; without it, or
-//     for a build it does not list, an Airflow 3 build's tag still names its
-//     series, and an Airflow 2 build is refused, since its tag names none.
+//     Which Airflow a build carries comes from opts.Catalog. A build it does
+//     not list is taken within the requirement's series (it may be newer than
+//     the copy read), and refused outside it. Without a catalog an Airflow 3
+//     build's tag names its series, and an Airflow 2 build is refused, since
+//     its tag names none.
 //   - python, when given, is the Python the image and the standalone venv
 //     run: requires-python becomes "==python.*". It has to be one the build
 //     ships, when the catalog lists the build. Without it the build's default
@@ -221,6 +223,13 @@ func runtimeAirflowPin(current, build string, tag manifest.RuntimeTag, carried s
 		}
 		if current != "" && tag.Agrees(current) {
 			return current, nil
+		}
+		// Moving the requirement on an unlisted build's word is a guess the
+		// catalog could have answered: refused when it was read, and made
+		// from the tag only offline.
+		if haveCatalog {
+			return "", fmt.Errorf("the runtime catalog lists no build %s, so the Airflow requirement is not moved to Airflow %s for it. "+
+				"Check the build, or move the requirement first with astro local upgrade airflow", build, tag.Series)
 		}
 		return tag.Series, nil
 	}

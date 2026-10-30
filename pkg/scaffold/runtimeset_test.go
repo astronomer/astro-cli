@@ -129,6 +129,7 @@ func TestSetRuntimeBuildRefuses(t *testing.T) {
 		{"a Python that is not one", seriesProject("apache-airflow==3.3.*", ""), "3.3-7", "3", true, "not a Python version"},
 		{"a Python for Airflow 2", seriesProject("apache-airflow==2.11.*", ""), "13.11.0", "3.12", true, "Airflow 2 runtime"},
 		{"an unlisted Airflow 2 build", seriesProject("apache-airflow==2.11.*", ""), "13.99.0", "", true, "lists no build 13.99.0"},
+		{"an unlisted build of another series", seriesProject("apache-airflow==3.3.*", ""), "3.9-1", "", true, "not moved to Airflow 3.9"},
 		{"an Airflow 2 build offline", seriesProject("apache-airflow==2.11.*", ""), "13.11.0", "", false, "could not be read"},
 		{"a declared Dockerfile", seriesProject("apache-airflow==3.3.*", "dockerfile = 'Dockerfile'\n"), "3.3-7", "", true, "FROM line"},
 		{"a range no build Python meets", "[project]\nname = 'x'\nrequires-python = '>=3.14'\ndependencies = ['apache-airflow==3.3.*']\n\n[tool.astro]\n", "3.3-7", "", true, "Pass --python"},

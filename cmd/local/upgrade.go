@@ -344,15 +344,23 @@ func renderRuntimeUpgrade(w io.Writer, res runtimeUpgrade) error {
 			from = "no build"
 		}
 		lines = append(lines, fmt.Sprintf("Runtime: %s -> %s in %s", from, res.Runtime, res.Manifest))
-		if res.AirflowVersion != "" {
-			lines = append(lines, "  carries Airflow "+res.AirflowVersion)
-		}
+		// The Airflow the build runs, or the requirement's move to it: the
+		// exact version when the catalog lists the build, else the new pin.
+		airflow := res.AirflowVersion
 		if a := res.Airflow; a != nil {
 			prev := a.Previous
 			if prev == "" {
 				prev = "no version"
 			}
-			lines = append(lines, fmt.Sprintf("  Airflow: %s -> %s", prev, a.Version))
+			if airflow == "" {
+				airflow = a.Version
+			}
+			airflow = prev + " -> " + airflow
+		}
+		if airflow != "" {
+			lines = append(lines, "  Airflow: "+airflow)
+		}
+		if a := res.Airflow; a != nil {
 			for _, req := range a.Requirements {
 				lines = append(lines, "  requirement: "+req)
 			}
