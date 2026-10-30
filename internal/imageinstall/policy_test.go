@@ -158,3 +158,16 @@ func TestApplyRefusesAWorkspaceMember(t *testing.T) {
 	require.ErrorIs(t, err, ErrLocalSource)
 	assert.Contains(t, err.Error(), "member (packages/member)")
 }
+
+// A package the image does not install is not refused for coming from a path:
+// here Airflow, which the image is, from a local wheel.
+func TestApplyLetsALeftOutPackageComeFromAPath(t *testing.T) {
+	lists, _, err := apply(&policyInput{
+		pyproject: []byte("[project]\nname = 'p'\ndependencies = ['apache-airflow==3.3.*', 'six']\n"),
+		pylock: []byte("[[packages]]\nname = \"apache-airflow\"\nversion = \"3.3.2\"\narchive = { path = \"stub/apache_airflow-3.3.2-py3-none-any.whl\" }\n" +
+			"[[packages]]\nname = \"six\"\nversion = \"1.17.0\"\n"),
+		baseInstalled: []string{},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"six==1.17.0"}, lists.Requirements)
+}

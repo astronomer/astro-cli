@@ -227,7 +227,15 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 		installed = pinNames(in.baseInstalled)
 	}
 
-	if err := refuseLocal(&lock); err != nil {
+	// leftOut reports a package the image does not install: Airflow, what
+	// the runtime pins, a Task SDK the project gives no version, and what
+	// the image has that the project does not name, at the runtime's tested
+	// version.
+	leftOut := func(name string) bool {
+		versioned, own := project.own[name]
+		return skip[name] || (name == taskSDKDist && !versioned) || (installed[name] && !own)
+	}
+	if err := refuseLocal(&lock, leftOut); err != nil {
 		return imagebuild.InstallLists{}, nil, err
 	}
 	var lists imagebuild.InstallLists
@@ -236,15 +244,10 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 	for i := range lock.Packages {
 		pkg := &lock.Packages[i]
 		name := manifest.DistName(pkg.Name)
-		versioned, own := project.own[name]
-		switch {
-		case skip[name]:
+		if leftOut(name) {
 			continue
-		case name == taskSDKDist && !versioned:
-			continue
-		case installed[name] && !own:
-			continue // the runtime's, at its tested version
 		}
+		_, own := project.own[name]
 		refs := directRefs(pkg, urls)
 		switch {
 		case len(refs) == 0 && project.routed[name] && hasFiles(pkg):
@@ -278,11 +281,15 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 	return lists, warnings, nil
 }
 
-// refuseLocal is ErrLocalSource for the packages lock takes from a path on
-// this machine (localPath), each named with its path, or nil for none.
-func refuseLocal(lock *pylock) error {
+// refuseLocal is ErrLocalSource for the packages the image installs (not
+// leftOut) that lock takes from a path on this machine (localPath), each
+// named with its path, or nil for none.
+func refuseLocal(lock *pylock, leftOut func(name string) bool) error {
 	var local []string
 	for i := range lock.Packages {
+		if leftOut(manifest.DistName(lock.Packages[i].Name)) {
+			continue
+		}
 		if p := localPath(&lock.Packages[i]); p != "" {
 			local = append(local, fmt.Sprintf("%s (%s)", lock.Packages[i].Name, p))
 		}
