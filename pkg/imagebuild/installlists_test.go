@@ -195,6 +195,28 @@ func TestWriteContext(t *testing.T) {
 	}, contextFiles(t, filepath.Join(req.WorkDir, buildContextDir)))
 }
 
+// A context written inside the project (`--context-dir ./build`) does not
+// carry a copy of itself, by its own path or through a link to it.
+func TestWriteContextInsideTheProject(t *testing.T) {
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{
+		"dags/a.py":      "x = 1\n",
+		"pyproject.toml": "[project]\nname = 'p'\n",
+		".astro/a.txt":   "carried\n",
+	})
+	require.NoError(t, os.Symlink("build", filepath.Join(project, "zz-link")))
+	req := testRequest(t)
+	req.ProjectFiles = project
+	req.Install = &InstallLists{Requirements: []string{"pandas==2.2.3"}}
+
+	dir := filepath.Join(project, "build")
+	require.NoError(t, WriteContext(dir, req))
+	assert.ElementsMatch(t, []string{
+		"dags/a.py", "pyproject.toml", ".astro/a.txt",
+		"Dockerfile", ".dockerignore", requirementsName, packagesName, lockConstraintsName, routedName, routedLinksName,
+	}, contextFiles(t, dir))
+}
+
 // A context is written only into a directory that is new or empty, and only
 // for a generated build.
 func TestWriteContextRefuses(t *testing.T) {
