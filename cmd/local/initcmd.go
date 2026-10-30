@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -128,14 +129,24 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// it found. uv.lock follows what it wrote; nothing written, nothing locked.
 	if build := c.writeAstroBuild(ctx, res.Dir); build.changed {
 		// What it wrote is an update like the rest, so an existing project is
-		// not reported as up to date.
-		if !slices.Contains(res.Updated, manifest.Marker) {
+		// not reported as up to date; a manifest this run created or already
+		// lists as updated, under a label of its own, is not listed again.
+		if !listsFile(res.Created, manifest.Marker) && !listsFile(res.Updated, manifest.Marker) {
 			res.Updated = append(res.Updated, manifest.Marker)
 		}
 		c.lockAfterInit(ctx, res.Dir)
 	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
+	})
+}
+
+// listsFile reports whether entries, a Result's Created or Updated, list the
+// file name: by itself, or under a label that starts with it
+// ("pyproject.toml (added [tool.astro])").
+func listsFile(entries []string, name string) bool {
+	return slices.ContainsFunc(entries, func(e string) bool {
+		return e == name || strings.HasPrefix(e, name+" ")
 	})
 }
 
