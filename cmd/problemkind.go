@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -98,5 +99,34 @@ func Execute(ctx context.Context) error {
 // (acceptRemovedFlags).
 func execute(ctx context.Context, root *cobra.Command, args []string, stdout io.Writer) error {
 	acceptRemovedFlags(root, args)
+	for c := helpTarget(root, args); c != nil; c = c.Parent() {
+		addHelpFlag(c)
+	}
 	return cliout.Execute(ctx, root, args, stdout, problemKinds)
+}
+
+// helpTarget is the command args run, or complete for: the one cobra gives a
+// -h/--help flag. Its ancestors need the flag too: cobra's Find strips flags
+// level by level, and a level without -h reads the next word as its value.
+func helpTarget(root *cobra.Command, args []string) *cobra.Command {
+	if len(args) > 0 && (args[0] == cobra.ShellCompRequestCmd || args[0] == cobra.ShellCompNoDescRequestCmd) {
+		args = args[1:]
+	}
+	if c, _, err := root.Find(withoutHelpFlags(args)); err == nil {
+		return c
+	}
+	return root
+}
+
+func withoutHelpFlags(args []string) []string {
+	kept := make([]string, 0, len(args))
+	for i, a := range args {
+		if a == "--" {
+			return append(kept, args[i:]...)
+		}
+		if name, _, _ := strings.Cut(a, "="); name != "-h" && name != "--help" {
+			kept = append(kept, a)
+		}
+	}
+	return kept
 }

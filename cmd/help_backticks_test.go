@@ -40,3 +40,10 @@ func TestHelpHasNoBackticks(t *testing.T) {
 		})
 	}
 }
+
+func walkTree(c *cobra.Command, fn func(*cobra.Command)) {
+	fn(c)
+	for _, sub := range c.Commands() {
+		walkTree(sub, fn)
+	}
+}
