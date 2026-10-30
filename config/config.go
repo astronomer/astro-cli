@@ -333,22 +333,24 @@ func IsProjectDir(path string) (bool, error) {
 
 // IsWithinProjectDir returns true if the path is at or within an Astro project directory
 func IsWithinProjectDir(path string) (bool, error) {
-	pathAbs, err := filepath.Abs(filepath.Clean(path))
+	dir, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
 		return false, err
 	}
-	pathComponents := strings.Split(pathAbs, string(os.PathSeparator))
-	for i := range pathComponents {
-		componentAbs := strings.Join(pathComponents[:i+1], string(os.PathSeparator))
-		isProjectDir, err := IsProjectDir(componentAbs)
+	for {
+		isProjectDir, err := IsProjectDir(dir)
 		if err != nil {
 			return false, err
 		}
 		if isProjectDir {
 			return true, nil
 		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false, nil
+		}
+		dir = parent
 	}
-	return false, nil
 }
 
 // saveConfig serializes viper writes under an exclusive OS-level file lock.

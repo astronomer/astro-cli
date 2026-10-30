@@ -70,6 +70,21 @@ func (s *Suite) TestIsWithinProjectDir() {
 	}
 }
 
+func (s *Suite) TestIsWithinProjectDirFromInsideProject() {
+	projectDir, cleanupProjectDir, err := CreateTempProject()
+	s.NoError(err)
+	defer cleanupProjectDir()
+
+	anotherDir, err := os.MkdirTemp("", "")
+	s.NoError(err)
+
+	s.T().Chdir(projectDir)
+
+	got, err := IsWithinProjectDir(anotherDir)
+	s.NoError(err)
+	s.False(got)
+}
+
 func (s *Suite) TestInitHomeDefaultCase() {
 	fs := afero.NewMemMapFs()
 	initHome(fs)
