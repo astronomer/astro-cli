@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/checks"
@@ -381,11 +382,15 @@ type checkSummary struct {
 // renderCheck writes findings then a summary. In json mode each finding is one
 // NDJSON line and the summary is the last; in text mode findings form a table
 // and the summary is one sentence. Both render the same data.
-func renderCheck(r cliout.Renderer, res checks.Result, strict, provisioned bool, undeclared []string, workspace string) error {
+func renderCheck(r cliout.Renderer, res checks.Result, strict, provisioned bool, undeclared []localenv.UndeclaredValue, workspace string) error {
+	var undeclaredKeys []string
+	for _, v := range undeclared {
+		undeclaredKeys = append(undeclaredKeys, v.EnvKey)
+	}
 	summary := checkSummary{
 		Event:         "summary",
 		Provisioned:   provisioned,
-		UndeclaredEnv: undeclared,
+		UndeclaredEnv: undeclaredKeys,
 		Dags:          res.DagCount,
 		Errors:        res.Errors,
 		Warnings:      res.Warnings,
@@ -416,8 +421,16 @@ func renderCheck(r cliout.Renderer, res checks.Result, strict, provisioned bool,
 	if err := renderHints(r.Out, res.Findings); err != nil {
 		return err
 	}
-	if note := plan.UndeclaredNote(undeclared, workspace); note != "" {
-		if _, err := fmt.Fprintf(r.Out, "info: %s\n\n", note); err != nil {
+	// What a start passes from this machine without declaring it, then the
+	// linked workspace this offline check cannot read: each just above the
+	// verdict, followed by a blank line.
+	if w := plan.UndeclaredWarning(undeclared); w != "" {
+		if _, err := fmt.Fprintf(r.Out, "%s %s\n\n", cliout.WarningLabel(r.Out), w); err != nil {
+			return err
+		}
+	}
+	if n := plan.WorkspaceNote(workspace); n != "" {
+		if _, err := fmt.Fprintf(r.Out, "%s %s\n\n", cliout.NoteLabel(r.Out), n); err != nil {
 			return err
 		}
 	}

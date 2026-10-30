@@ -527,34 +527,50 @@ func TestUndeclaredLocal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"AIRFLOW_VAR_REGION", "FROM_DOTENV"}; !slices.Equal(got, want) {
-		t.Errorf("UndeclaredLocal = %v, want %v", got, want)
+	keys := make([]string, len(got))
+	for i, v := range got {
+		keys[i] = v.EnvKey
 	}
-	note := UndeclaredNote(got, "")
-	if !strings.HasSuffix(note, ").") {
-		t.Errorf("note = %q, want it to end in a period", note)
+	if want := []string{"AIRFLOW_VAR_REGION", "FROM_DOTENV"}; !slices.Equal(keys, want) {
+		t.Errorf("UndeclaredLocal = %v, want %v", keys, want)
 	}
-	for _, want := range []string{"AIRFLOW_VAR_REGION, FROM_DOTENV", "will not follow it to a Deployment", "astro local env <kind> declare NAME"} {
-		if !strings.Contains(note, want) {
-			t.Errorf("note = %q, want it to contain %q", note, want)
-		}
+	want := "2 values reach this project only from this machine, so a Deployment or a teammate's clone won't get them:\n" +
+		"  airflow-variable region  vault (global)  if needed: astro local env airflow-variable declare region --secret  " +
+		"if not: astro local env airflow-variable delete region --global\n" +
+		"  variable FROM_DOTENV     project         if needed: astro local env variable declare FROM_DOTENV              " +
+		"if not: astro local env variable delete FROM_DOTENV --project"
+	if w := UndeclaredWarning(got); w != want {
+		t.Errorf("UndeclaredWarning =\n%s\nwant\n%s", w, want)
 	}
-	if UndeclaredNote(nil, "") != "" {
-		t.Error("no names must give no note")
+}
+
+func TestUndeclaredWarning(t *testing.T) {
+	if UndeclaredWarning(nil) != "" {
+		t.Error("no values must give no warning")
 	}
-	if strings.Contains(note, "workspace") {
-		t.Errorf("note = %q names a workspace the manifest does not link", note)
+	one := []localenv.UndeclaredValue{{Kind: localenv.KindEnv, Name: "X", Source: "project", RemoveHint: "rm X"}}
+	want := "1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it:\n" +
+		"  variable X  project  if not: rm X"
+	if got := UndeclaredWarning(one); got != want {
+		t.Errorf("UndeclaredWarning =\n%s\nwant\n%s", got, want)
 	}
-	for _, names := range [][]string{nil, got} {
-		ws := UndeclaredNote(names, "cmws")
-		if !strings.HasSuffix(ws, ".") || strings.Contains(ws, "..") || strings.Contains(ws, ". .") {
-			t.Errorf("note = %q, want sentences that each end in one period", ws)
-		}
-		for _, want := range []string{"workspace cmws holds, declared or not", "not checked here", "astro local env list"} {
-			if !strings.Contains(ws, want) {
-				t.Errorf("note = %q, want it to contain %q", ws, want)
-			}
-		}
+	// Sorted by what is shown, the kind first; a value with no declare
+	// command keeps the remove command in its column.
+	two := UndeclaredWarning([]localenv.UndeclaredValue{
+		{Kind: localenv.KindEnv, Name: "B", Source: "project", RemoveHint: "rm B"},
+		{Kind: localenv.KindConn, Name: "a", Source: "project", DeclareHint: "declare a", RemoveHint: "rm a"},
+	})
+	if !strings.HasSuffix(two, "\n  connection a  project  if needed: declare a  if not: rm a\n  variable B    project                        if not: rm B") {
+		t.Errorf("UndeclaredWarning =\n%s", two)
+	}
+}
+
+func TestWorkspaceNote(t *testing.T) {
+	if WorkspaceNote("") != "" {
+		t.Error("no workspace must give no note")
+	}
+	if got, want := WorkspaceNote("cmws"), "workspace cmws also supplies values when Airflow starts; astro local env list shows them."; got != want {
+		t.Errorf("WorkspaceNote = %q, want %q", got, want)
 	}
 }
 

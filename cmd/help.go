@@ -96,19 +96,33 @@ const rootBanner = `
 // machine points at, and Houston's version on APC. They are shown only on a
 // page whose command talks to that control plane (contextMatters).
 func installHelp(rootCmd *cobra.Command, platform, platformVersion string) {
-	walkTree(rootCmd, func(c *cobra.Command) {
-		c.InitDefaultHelpFlag()
-		if f := c.Flags().Lookup(helpName); f != nil {
-			f.Usage = helpFlagUsage
-		}
-	})
 	rootCmd.SetUsageFunc(func(c *cobra.Command) error {
+		addHelpFlag(c)
 		_, err := io.WriteString(c.OutOrStderr(), usageText(c, helpWidth()))
 		return err
 	})
 	rootCmd.SetHelpFunc(func(c *cobra.Command, _ []string) {
+		addHelpFlag(c)
 		io.WriteString(c.OutOrStdout(), helpPage(c, platform, platformVersion, helpWidth())) //nolint:errcheck // cobra's help func has nowhere to return an error, and cobra's own drops it too
 	})
+}
+
+// addHelpFlag is cobra's InitDefaultHelpFlag with this CLI's usage, or sets
+// that usage on the flag cobra added. It runs for the command a line runs
+// (execute) and the one a help page draws, not across the tree: that walk was
+// a quarter of the time it takes to build the tree, on every command.
+func addHelpFlag(c *cobra.Command) {
+	if f := c.Flags().Lookup(helpName); f != nil {
+		f.Usage = helpFlagUsage
+		return
+	}
+	for p := c; p != nil; p = p.Parent() {
+		if p.PersistentFlags().Lookup(helpName) != nil {
+			return
+		}
+	}
+	c.Flags().BoolP(helpName, "h", false, helpFlagUsage)
+	_ = c.Flags().SetAnnotation(helpName, cobra.FlagSetByCobraAnnotation, []string{"true"}) //nolint:errcheck // the flag was added on the line above
 }
 
 // helpPage is everything `--help` prints for c.
@@ -127,13 +141,6 @@ func helpPage(c *cobra.Command, platform, platformVersion string, width int) str
 		b.WriteString("\n" + contextLine(platform, platformVersion) + "\n")
 	}
 	return b.String()
-}
-
-func walkTree(c *cobra.Command, fn func(*cobra.Command)) {
-	fn(c)
-	for _, sub := range c.Commands() {
-		walkTree(sub, fn)
-	}
 }
 
 func firstNonEmpty(values ...string) string {

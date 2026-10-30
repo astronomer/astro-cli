@@ -382,3 +382,31 @@ func TestLongUnwrappedFindsHandWrappedProse(t *testing.T) {
 		}
 	}
 }
+
+// A help flag written ahead of the command still shows that command's page.
+// Cobra's Find strips flags one level at a time, by that level's own flags, so
+// a parent without -h reads the next word as the flag's value and stops there.
+func TestHelpFlagBeforeTheCommandShowsItsPage(t *testing.T) {
+	for _, tree := range []treeConfig{astroTree, apcTree} {
+		for _, args := range [][]string{
+			{"-h", "deployment", "list"},
+			{"--help", "deployment", "list"},
+			{"--help=true", "deployment", "list"},
+			{"-h", "config", "get"},
+			{"--verbosity", "debug", "-h", "deployment", "list"},
+			{"deployment", "-h", "list"},
+		} {
+			t.Run(tree.name+" "+strings.Join(args, " "), func(t *testing.T) {
+				root, preRuns := disarmedTree(t, tree)
+				var out strings.Builder
+				root.SetOut(&out)
+				_, _, err := executeRootKeepingOut(root, args...)
+				require.NoError(t, err)
+				target, _, err := root.Find(withoutHelpFlags(args))
+				require.NoError(t, err)
+				assert.Contains(t, out.String(), "Usage:\n  "+target.UseLine(), "no help for %s", target.CommandPath())
+				assert.Zero(t, *preRuns)
+			})
+		}
+	}
+}

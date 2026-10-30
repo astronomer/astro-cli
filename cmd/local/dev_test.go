@@ -61,6 +61,20 @@ func stderrOf(d Deps) string {
 	return d.Stderr.(*bytes.Buffer).String()
 }
 
+// requireInOrder fails unless each of parts appears in out, each after the
+// one before it.
+func requireInOrder(t *testing.T, out string, parts ...string) {
+	t.Helper()
+	rest := out
+	for _, p := range parts {
+		i := strings.Index(rest, p)
+		if i < 0 {
+			t.Fatalf("%q missing, or out of order, in:\n%s", p, out)
+		}
+		rest = rest[i+len(p):]
+	}
+}
+
 func execute(t *testing.T, d Deps, args ...string) error {
 	t.Helper()
 	root := newRootCmd(d)

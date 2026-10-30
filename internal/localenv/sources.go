@@ -120,27 +120,54 @@ func (s Sources) Injection() map[string]string {
 	return inj
 }
 
-// Undeclared is the env-var names a start of this project passes to Airflow
-// from local sources the schema does not declare: the project .env and the
-// vault tiers' entries that reach this checkout. They work locally and nowhere
-// else, since a Deployment and a teammate's clone get only what the project
-// declares, so check and package name them. Airflow settings (AIRFLOW__*) are
-// left out: they configure Airflow rather than name a value the project's code
-// expects, the same reason list does not call them orphans. Names only,
-// sorted; nothing here is a value.
-func (s Sources) Undeclared(schema *envschema.Schema, tiers []VaultTier) []string {
+// UndeclaredValue is one value a start of the project passes to Airflow from
+// this machine without the schema declaring it. Source, DeclareHint and
+// RemoveHint are the ones `astro local env list` shows for the same value, so
+// a warning built from them names the exact commands the listing does. No
+// field is a value.
+type UndeclaredValue struct {
+	// EnvKey is the env var Airflow gets.
+	EnvKey string
+	Kind   Kind
+	Name   string
+	// Source is the list's SOURCE label: "project" for the project's .env, a
+	// vault tier's label ("vault", "vault (global)").
+	Source      string
+	DeclareHint string
+	RemoveHint  string
+}
+
+// Undeclared is what a start of this project passes to Airflow from local
+// sources the schema does not declare: the project .env and the vault tiers'
+// entries that reach this checkout. They work locally and nowhere else, since
+// a Deployment and a teammate's clone get only what the project declares, so
+// check and package name them. Airflow settings (AIRFLOW__*) are left out:
+// they configure Airflow rather than name a value the project's code expects,
+// the same reason list does not call them orphans.
+//
+// A key more than one source holds is reported once, from the source a start
+// uses: the .env over the vault, and each vault tier over the ones after it
+// (tiers come in resolution order). Sorted by env key.
+func (s Sources) Undeclared(schema *envschema.Schema, tiers []VaultTier) []UndeclaredValue {
 	declared := map[string]bool{}
 	for _, k := range envschema.DeclaredEnvKeys(schema) {
 		declared[k] = true
 	}
-	seen := map[string]bool{}
-	add := func(key string) {
-		if !declared[key] && !isAirflowSetting(key) {
-			seen[key] = true
+	seen := map[string]UndeclaredValue{}
+	add := func(key string, item ListItem) {
+		if declared[key] || isAirflowSetting(key) {
+			return
+		}
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = UndeclaredValue{
+			EnvKey: key, Kind: item.Kind, Name: item.Name, Source: item.Source,
+			DeclareHint: item.DeclareHint, RemoveHint: item.RemoveHint,
 		}
 	}
 	for key := range s.project {
-		add(key)
+		add(key, orphanItem(key, "", s.hasProject))
 	}
 	for _, tier := range tiers {
 		for _, e := range tier.Entries {
@@ -148,15 +175,15 @@ func (s Sources) Undeclared(schema *envschema.Schema, tiers []VaultTier) []strin
 			// entry never reaches Airflow at all; neither is injected, so
 			// neither is something the project gets.
 			if !e.Unlinked && e.Invalid == "" {
-				add(e.EnvKey)
+				add(e.EnvKey, vaultOrphanItem(e.Kind, e.Name, tier, s.hasProject))
 			}
 		}
 	}
-	out := make([]string, 0, len(seen))
-	for key := range seen {
-		out = append(out, key)
+	out := make([]UndeclaredValue, 0, len(seen))
+	for _, v := range seen {
+		out = append(out, v)
 	}
-	sort.Strings(out)
+	sort.Slice(out, func(i, j int) bool { return out[i].EnvKey < out[j].EnvKey })
 	return out
 }
 

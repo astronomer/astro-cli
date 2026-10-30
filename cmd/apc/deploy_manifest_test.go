@@ -1,6 +1,8 @@
 package apc
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -260,6 +262,48 @@ func TestDeployManifestWarnings(t *testing.T) {
 	decodeOne(t, run.stdout, &got)
 	assert.Equal(t, []string{"this deploy upgrades Deployment dep-prod from Airflow 2 to Airflow 3"}, got.Warnings)
 	assert.Contains(t, run.stderr, "Warning: this deploy upgrades Deployment dep-prod from Airflow 2 to Airflow 3")
+}
+
+// In text, each warning prints once on stderr, after the build's output,
+// just above the result, or before the error a failed deploy returns.
+func TestDeployManifestShowsWarningsOnceAfterTheBuild(t *testing.T) {
+	const early = "--runtime-version has no effect without --remote"
+	const during = "found during the build"
+	for _, fail := range []bool{false, true} {
+		linkedProject(t)
+		prev := DeployManifestImage
+		t.Cleanup(func() { DeployManifestImage = prev })
+		DeployManifestImage = func(_ houston.ClientInterface, in *deploy.ManifestImage) (deploy.ManifestImageResult, error) {
+			// The build's output, on the same stderr the warnings use.
+			fmt.Fprintln(os.Stderr, "build step 1/9")
+			in.Warn(during)
+			if fail {
+				return deploy.ManifestImageResult{}, errors.New("boom")
+			}
+			return builtAndPushed, nil
+		}
+		run := runAPC(t, newAPCClient(), "", "deploy", "prod", "--runtime-version", "3.1-5")
+		if fail {
+			require.Error(t, run.err)
+		} else {
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		}
+		requireInOrder(t, run.stderr, "build step 1/9", "Warning: "+early, "Warning: "+during)
+		assert.Equal(t, 1, strings.Count(run.stderr, early), run.stderr)
+		assert.Equal(t, 1, strings.Count(run.stderr, during), run.stderr)
+	}
+}
+
+// requireInOrder fails unless each of parts appears in out, each after the
+// one before it.
+func requireInOrder(t *testing.T, out string, parts ...string) {
+	t.Helper()
+	rest := out
+	for _, p := range parts {
+		i := strings.Index(rest, p)
+		require.GreaterOrEqual(t, i, 0, "%q missing, or out of order, in:\n%s", p, out)
+		rest = rest[i+len(p):]
+	}
 }
 
 // --force and --prompt answered 1.x's questions, which a project's deploy

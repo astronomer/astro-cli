@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
@@ -238,11 +239,12 @@ func EnvironReport(dir string, m *manifest.Manifest) ([]string, EnvReport, error
 	return env, rep, nil
 }
 
-// UndeclaredLocal is the env-var names a start of the project in dir passes to
-// Airflow from this machine without the manifest declaring them
-// (localenv.Sources.Undeclared). It reads the files and the vault's listing and
+// UndeclaredLocal is what a start of the project in dir passes to Airflow from
+// this machine without the manifest declaring it
+// (localenv.Sources.Undeclared), each value with its source and the commands
+// that declare or remove it. It reads the files and the vault's listing and
 // decrypts nothing, so it opens no keyring.
-func UndeclaredLocal(dir string, m *manifest.Manifest) ([]string, error) {
+func UndeclaredLocal(dir string, m *manifest.Manifest) ([]localenv.UndeclaredValue, error) {
 	schema, err := envschema.ParseSchema(m.Astro.Env)
 	if err != nil {
 		return nil, err
@@ -254,33 +256,73 @@ func UndeclaredLocal(dir string, m *manifest.Manifest) ([]string, error) {
 	return src.Undeclared(schema, vaultenv.Load(dir).Tiers()), nil
 }
 
-// UndeclaredNote is the sentence check and package print for UndeclaredLocal's
-// names and the manifest's linked workspace, or empty when there are neither.
-//
-// The workspace's objects reach a start declared or not too, but check and
-// package stay offline and never read them, so the note names the workspace
-// rather than its objects, and says they were not checked.
-func UndeclaredNote(names []string, workspace string) string {
-	var parts []string
-	if len(names) > 0 {
-		parts = append(parts, fmt.Sprintf("this project gets %s locally without declaring %s, so %s will not follow it to a Deployment "+
-			"or a teammate's clone. Declare what it needs to make it a requirement: astro local env <kind> declare NAME "+
-			"(run astro local env list to see where each comes from).",
-			strings.Join(names, ", "), pronoun(len(names), "it", "them"), pronoun(len(names), "it", "they")))
+// UndeclaredWarning is the warning `astro local check` prints in text for
+// UndeclaredLocal's values, or empty when there are none: a sentence, then a
+// row per value with its kind and name, its source, and the commands
+// `astro local env list` offers for it, aligned. The caller's printer adds
+// the Warning: label.
+func UndeclaredWarning(values []localenv.UndeclaredValue) string {
+	if len(values) == 0 {
+		return ""
 	}
-	if workspace != "" {
-		parts = append(parts, fmt.Sprintf("a start also passes Airflow what workspace %s holds, declared or not, "+
-			"below every local source. Those values are not checked here, since this runs offline: run astro local env list "+
-			"to see them, and declare what the project needs to make it a requirement.", workspace))
+	var b strings.Builder
+	b.WriteString(undeclaredHead(len(values)) + ":\n")
+	anyDeclare := slices.ContainsFunc(values, func(v localenv.UndeclaredValue) bool { return v.DeclareHint != "" })
+	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	for _, v := range sortedUndeclared(values) {
+		cells := []string{"  " + undeclaredLabel(v), v.Source}
+		if anyDeclare {
+			declare := ""
+			if v.DeclareHint != "" {
+				declare = "if needed: " + v.DeclareHint
+			}
+			cells = append(cells, declare)
+		}
+		if v.RemoveHint != "" {
+			cells = append(cells, "if not: "+v.RemoveHint)
+		}
+		fmt.Fprintln(tw, strings.Join(cells, "\t"))
 	}
-	return strings.Join(parts, " ")
+	tw.Flush() //nolint:errcheck // a strings.Builder does not fail
+	lines := strings.Split(strings.TrimSuffix(b.String(), "\n"), "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " ")
+	}
+	return strings.Join(lines, "\n")
 }
 
-func pronoun(n int, one, many string) string {
+func undeclaredHead(n int) string {
 	if n == 1 {
-		return one
+		return "1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it"
 	}
-	return many
+	return fmt.Sprintf("%d values reach this project only from this machine, so a Deployment or a teammate's clone won't get them", n)
+}
+
+// undeclaredLabel is how a value is named: its kind as the commands spell it,
+// and its name ("variable PYTHONPATH", "connection my_db").
+func undeclaredLabel(v localenv.UndeclaredValue) string {
+	return localenv.Noun(v.Kind) + " " + v.Name
+}
+
+// sortedUndeclared is values sorted by the label they are shown under.
+func sortedUndeclared(values []localenv.UndeclaredValue) []localenv.UndeclaredValue {
+	out := slices.Clone(values)
+	slices.SortFunc(out, func(a, b localenv.UndeclaredValue) int {
+		return strings.Compare(undeclaredLabel(a), undeclaredLabel(b))
+	})
+	return out
+}
+
+// WorkspaceNote is the note check prints for a project linked to a workspace,
+// or empty when it is not linked. A start passes Airflow what the workspace
+// holds, declared or not, but check stays offline and never reads it, so the
+// note names the workspace and the command that shows its values. An image
+// carries none of them, so package says nothing about it.
+func WorkspaceNote(workspace string) string {
+	if workspace == "" {
+		return ""
+	}
+	return "workspace " + workspace + " also supplies values when Airflow starts; astro local env list shows them."
 }
 
 // choosePort applies the v2 requested-port precedence:

@@ -82,18 +82,16 @@ func (t *AstroTarget) Name() string { return TargetAstro }
 
 // checkManifest runs the checks on the manifest that come before any build:
 // the runtime build against its pin, then the declared environment, which
-// must parse and which the image does not carry.
-func checkManifest(ctx context.Context, req Request, airflow manifest.Airflow) ([]string, error) {
+// must parse and which the image does not carry, so it comes back as the
+// values the Deployment must supply (deploymentEnv).
+func checkManifest(ctx context.Context, req Request, airflow manifest.Airflow) ([]string, []DeploymentValue, error) {
 	warnings, err := checkRuntimeBuild(ctx, req, airflow)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	envWarning, err := imageEnvWarning(req.Manifest.Astro.Env)
+	env, err := deploymentEnv(req.Manifest.Astro.Env)
 	if err != nil {
-		return nil, err
-	}
-	if envWarning != "" {
-		warnings = append(warnings, envWarning)
+		return nil, nil, err
 	}
 	if w := scaffold.StaleHelperWarning(req.ProjectDir, req.Manifest.Astro.Dockerfile); w != "" {
 		warnings = append(warnings, w)
@@ -103,11 +101,11 @@ func checkManifest(ctx context.Context, req Request, airflow manifest.Airflow) (
 	// before, and says so.
 	switch w, err := scaffold.CheckDockerfileOnBuild(req.ProjectDir, req.Manifest); {
 	case err != nil:
-		return nil, err
+		return nil, nil, err
 	case w != "":
 		warnings = append(warnings, w)
 	}
-	return warnings, nil
+	return warnings, env, nil
 }
 
 // checkRuntimeBuild holds the manifest's runtime build to its pin before
@@ -163,12 +161,7 @@ func (t *AstroTarget) reachEngineAndCheck(ctx context.Context, req Request, cb l
 	if err != nil {
 		return imagebuild.Engine{}, err
 	}
-	survey, err := shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, imagebuild.IsPodman(ctx, engine.Cmd, engine.Bin, engine.Env), req.warn(cb))
-	if err == nil {
-		if note := shipcheck.LeftOutNote(survey); note != "" {
-			req.note(cb)(note)
-		}
-	}
+	_, err = shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, imagebuild.IsPodman(ctx, engine.Cmd, engine.Bin, engine.Env), req.warn(cb))
 	return engine, err
 }
 
@@ -194,7 +187,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		show(w)
 	}
 	airflow := req.Manifest.Airflow()
-	found, err := checkManifest(ctx, req, airflow)
+	found, deployEnv, err := checkManifest(ctx, req, airflow)
 	if err != nil {
 		return Result{}, err
 	}
@@ -332,6 +325,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		Image:          finalTag,
 		RuntimeVersion: runtimeVersion,
 		Warnings:       warnings,
+		DeploymentEnv:  deployEnv,
 	}
 	if req.Save != "" {
 		if err := save(ctx, engine, finalTag, req.Save, cb); err != nil {
