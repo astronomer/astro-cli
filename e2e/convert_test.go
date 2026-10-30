@@ -199,9 +199,9 @@ func cases1x() []case1x {
 			// A Dockerfile that does more than pin becomes the project's
 			// declared build, moved off the ONBUILD tag that read both 1.x
 			// lists onto its -base image, with the install written out ahead
-			// of its own step. The install reads pyproject.toml, so both lists,
-			// carried whole, go: one package list, and nothing left reading
-			// the files. The helper the install runs is written beside it.
+			// of its own step. The install reads the lists the CLI resolves
+			// from pyproject.toml, so both 1.x lists, carried whole, go: one
+			// package list, and nothing left reading the files.
 			name: "a Dockerfile that does more than pin",
 			files: map[string]string{
 				"Dockerfile":       runtime2Build + "RUN apt-get update && apt-get install -y curl\n",
@@ -212,11 +212,10 @@ func cases1x() []case1x {
 			manifestLines: []string{"dependencies = [\n    'apache-airflow==2.*',\n    'pandas==2.1.0',\n]"},
 			manifestHas:   []string{"dockerfile = 'Dockerfile'", "packages = [\n    'libpq-dev',\n]"},
 			retired:       []string{"requirements.txt", "packages.txt"},
-			kept:          []string{"Dockerfile", ".astro/install-project.py"},
+			kept:          []string{"Dockerfile"},
 			keptHas: map[string]string{
-				"Dockerfile": "\nFROM quay.io/astronomer/astro-runtime:9.1.0-base\nCOPY --from=astro-install /tmp/astro-install/packages.txt .\n" +
+				"Dockerfile": "\nFROM quay.io/astronomer/astro-runtime:9.1.0-base\nCOPY --from=astro-install packages.txt .\n" +
 					"USER root\n",
-				".astro/install-project.py": "import tomllib",
 			},
 			reportedUpdated: []string{"Dockerfile (now builds FROM quay.io/astronomer/astro-runtime:9.1.0-base"},
 			notes:           []string{"its RUN instructions were not read here"},

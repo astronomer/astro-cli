@@ -1,9 +1,7 @@
 package airflowrt
 
 import (
-	"bytes"
-	_ "embed"
-	"path"
+	"regexp"
 	"strings"
 )
 
@@ -14,51 +12,47 @@ import (
 // build, and pkg/scaffold writes it into a project whose Dockerfile it rewrites
 // onto a -base tag.
 //
-// What a build installs comes from the project's pyproject.toml and uv.lock,
-// read inside the build by one helper, install-project.py, at InstallHelperPath
-// in the build's context, so `docker build .` needs nothing from the CLI. The
-// helper hands the resolving to uv, which its stage copies in from UVImage:
-// `uv lock --check` decides whether uv.lock still matches pyproject.toml, `uv
-// lock` resolves one in the build when it does not (with a warning), and `uv
-// export --format pylock.toml` lists what it installs. The helper keeps what
-// the runtime image ships as it ships it, and writes the runtime's install
-// inputs: requirements.txt (the project's own dependencies at the lock's
-// versions, without Airflow; a package from git, a URL or the index a
-// [tool.uv.sources] entry routes it to as a direct reference to what the lock
-// recorded), packages.txt ([tool.astro] packages, plus git when a dependency
-// is fetched with it), and a constraints file pinning every other locked
-// package the image does not already have, which requirements.txt names with
-// -c. uv itself stays in that stage: the image has none.
-//
-// It runs in a stage of its own (InstallDockerfile), and the install steps copy
-// only what it wrote. The stage reads the whole project and reruns on any edit,
-// in well under a second; the install layers are keyed on the files it wrote,
-// so an edit to pyproject.toml that leaves the lists as they were (a [tool.ruff]
-// setting, the version) keeps them cached.
+// What a build installs is decided before the build, by the CLI, which
+// resolves the project's pyproject.toml and uv.lock with the host's uv and
+// writes three lists: requirements.txt, uv-lock-constraints.txt (which
+// requirements.txt names with -c) and packages.txt. The build resolves
+// nothing; it installs the lists. A generated build finds them in its own
+// context. A project's own Dockerfile finds them in a second, named build
+// context, InstallContext, which the CLI passes beside the project
+// (`--build-context astro-install=<dir>`), so nothing is written into the
+// project.
 
-//go:embed install-project.py
-var installHelper []byte
-
-// InstallHelperPath is where the install helper sits in a build's context,
-// slash-separated: in a generated build's context, and in a project that
-// builds its own Dockerfile (InstallDockerfile reads it from there).
-const InstallHelperPath = ".astro/install-project.py"
-
-// InstallHelper is the install helper's source, for a caller that writes it
-// into a build's context or a project, or addresses an image by what builds it.
-func InstallHelper() []byte {
-	return bytes.Clone(installHelper)
-}
-
-// The install inputs the helper writes (install-project.py's REQUIREMENTS,
-// PACKAGES and LOCK_CONSTRAINTS). The first two are the names the runtime's
-// install scripts read from their working directory; the third is the file of
-// uv.lock's versions requirements.txt names with -c.
+// The install lists (pkg/imagebuild's InstallLists.Files). The first two are
+// the names the runtime's install scripts read from their working directory;
+// the third is the file of uv.lock's versions requirements.txt names with -c.
 const (
 	RequirementsName    = "requirements.txt"
 	PackagesName        = "packages.txt"
 	LockConstraintsName = "uv-lock-constraints.txt"
 )
+
+// InstallContext is the named build context a project's own Dockerfile copies
+// the install lists from (COPY --from=astro-install). A build passes it as
+// `--build-context astro-install=<dir>`, a directory holding the three lists;
+// a build that passes none fails at that COPY.
+const InstallContext = "astro-install"
+
+// readsInstallContextRe finds an instruction that reads InstallContext:
+// --from=astro-install, as InstallDockerfile writes it, quoted or not.
+var readsInstallContextRe = regexp.MustCompile(`(?i)--from=["']?` + InstallContext + `\b`)
+
+// ReadsInstallContext reports whether a Dockerfile, data, reads the install
+// lists from InstallContext, as InstallDockerfile's steps do: a build of it
+// has to pass that context, and a build of any other Dockerfile has no use
+// for it. Comments are not read.
+func ReadsInstallContext(data []byte) bool {
+	for _, line := range strings.Split(string(data), "\n") {
+		if t := strings.TrimSpace(line); t != "" && !strings.HasPrefix(t, "#") && readsInstallContextRe.MatchString(t) {
+			return true
+		}
+	}
+	return false
+}
 
 // baseTagSuffix turns a runtime tag into its -base tag (3.1-5 to 3.1-5-base,
 // 12.6.0-python-3.11 to 12.6.0-python-3.11-base), the same image without the
@@ -89,19 +83,6 @@ func isBaseTag(ref string) bool {
 // manifest's side; pkg/imagebuild's tests hold the two together.
 const netrcSecretID = "netrc"
 
-// The manifest files the helper reads.
-const (
-	pyprojectName = "pyproject.toml"
-	uvLockName    = "uv.lock"
-)
-
-// Paths the install stage uses inside the build: where its inputs are copied
-// to, and the directory it writes the install's lists to.
-const (
-	inputsDir = "/tmp/astro-project"
-	listsDir  = "/tmp/astro-install"
-)
-
 // The runtime's install scripts, from runtime 11.0.0 on: one installs
 // packages.txt with apt, the other requirements.txt with uv under the
 // runtime's constraints file.
@@ -110,60 +91,18 @@ const (
 	installPythonDependencies = "/usr/local/bin/install-python-dependencies"
 )
 
-// ProjectInputs is what a project's own Dockerfile copies into the install
-// stage, from the project as its context: pyproject.toml, uv.lock when there is
-// one, and the helper at InstallHelperPath. The wildcard is how uv.lock stays
-// optional; Docker's BuildKit and its legacy builder both copy nothing for a
-// wildcard that matches nothing, and so does Podman 5.8 (Buildah 1.43); an
-// older Buildah is untested.
-const ProjectInputs = pyprojectName + " " + uvLockName + "* " + InstallHelperPath
-
-// InstallStage is the name InstallDockerfile gives the helper's stage.
-const InstallStage = "astro-install"
-
-// uvImagePin is uv-image.txt: the uv image as tag@digest, one line. It is the
-// one place the uv release is named, and scripts/bump-uv-image.sh rewrites it
-// when a newer release has aged past the supply-chain cooldown.
-//
-//go:embed uv-image.txt
-var uvImagePin string
-
-// UVImage is the image the install stage copies uv from, at the uv release the
-// helper is tested with, pinned by digest. It is the default of the UVImageArg
-// build argument InstallDockerfile declares, so a build that cannot pull from
-// ghcr.io names a mirror of the same image instead: `--build-arg
-// ASTRO_UV_IMAGE=<mirror>`, or an edit of the ARG line, for a project's own
-// Dockerfile; pkg/imagebuild reads the environment variable of the same name
-// for a build it generates.
-var UVImage = strings.TrimSpace(uvImagePin)
-
-// UVImageArg is the build argument naming the image the install stage copies
-// uv from (UVImage by default), declared ahead of every FROM.
-const UVImageArg = "ASTRO_UV_IMAGE"
-
-// UVStage is the name InstallDockerfile gives the stage uv is copied from.
-const UVStage = "astro-uv"
-
-// uvPath is where the install stage puts uv, as install-project.py's UV
-// expects it.
-const uvPath = "/opt/astro-uv/uv"
-
-// InstallDockerfile is the Dockerfile that installs a project over from, an
-// Astro Runtime -base image (BaseOf): the install helper's stage, then the
-// steps the runtime's ONBUILD tag runs as triggers (astro-runtime's
-// image/Dockerfile.onbuild), in the same order and as the same users: the OS
+// InstallDockerfile is a project's own Dockerfile's install over from, an
+// Astro Runtime -base image (BaseOf): the steps the runtime's ONBUILD tag runs
+// as triggers (astro-runtime's image/Dockerfile.onbuild), in the same order
+// and as the same users, reading the lists from InstallContext: the OS
 // packages, then the Python dependencies under the runtime's constraints, then
 // the context's files owned by astro. A project's own Dockerfile is this
-// followed by its own steps, and it mounts the netrc secret for the Python
-// install whether or not a build passes one (required=false), since a plain
-// `docker build .` decides that, not the file.
+// followed by its own steps. It mounts the netrc secret for the Python install
+// whether or not a build passes one (required=false), since the build decides
+// that, not the file.
 //
 // from is everything a FROM line takes after the keyword and before any AS, so
 // a stage flag (--platform=linux/amd64) comes with the reference.
-//
-// Its first line declares UVImageArg, which a FROM can read only when the
-// declaration comes before the file's first FROM: a caller that writes the
-// rest after stages of its own puts that line ahead of them.
 //
 // The install steps are written out rather than inherited for two reasons. The
 // trigger list has changed across runtimes (the netrc mount is in 3.3-9 but not
@@ -178,73 +117,54 @@ const uvPath = "/opt/astro-uv/uv"
 // apply. Runtimes before 11.0.0 ship no scripts: their triggers run the apt
 // install and `pip install -r` inline, so each step falls back to that command
 // where the script is missing. The inline triggers also refused an
-// apache-airflow pin, which the helper has already removed. The test is POSIX,
-// since a runtime's SHELL is not the same on every line.
+// apache-airflow pin, which the lists never carry. The test is POSIX, since a
+// runtime's SHELL is not the same on every line.
 func InstallDockerfile(from string) string {
-	return InstallDockerfileWith(from, InstallOptions{})
+	return InstallDockerfileWith(from, InstallOptions{ListsFrom: InstallContext})
 }
 
-// InstallOptions are the two ways a caller's install differs from a project's
-// own Dockerfile.
+// InstallOptions are the ways a caller's install differs from the plainest
+// one, a generated build's with no secret.
 type InstallOptions struct {
 	// Alias names the final stage, the project's own (FROM … AS alias), for a
 	// Dockerfile whose later lines refer to it by name.
 	Alias string
-	// Inputs are the install stage's COPY sources, from the build's context.
-	// Empty is a project's own: pyproject.toml, uv.lock when there is one,
-	// and the helper at InstallHelperPath (ProjectInputs).
-	Inputs string
-	// UVImage is the default of the UVImageArg build argument the install
-	// stage copies uv from. Empty is UVImage.
-	UVImage string
-	// NoNetrc leaves the netrc mounts out: a generated build
-	// mounts the secret only when the build passes it. RUN --mount needs
-	// BuildKit (Docker) or Buildah 1.21 (Podman 3.2), so a generated build
-	// with no secret to mount keeps to a plain RUN, and the legacy builder and
-	// an older Podman build it end to end. The runtime's own 3.3-9 trigger
-	// mounts the secret unconditionally; a build that took that trigger needed
-	// BuildKit whether it had a secret or not.
-	NoNetrc bool
+	// ListsFrom is the build context or stage the lists are copied from
+	// (COPY --from=…). Empty copies them from the build's own context, as a
+	// generated build does; a project's own Dockerfile reads them from
+	// InstallContext.
+	ListsFrom string
+	// MountNetrc mounts the netrc secret into the Python install, required=false.
+	// RUN --mount needs BuildKit (Docker) or Buildah 1.21 (Podman 3.2), so a
+	// generated build with no secret to mount keeps to a plain RUN, and the
+	// legacy builder and an older Podman build it end to end. The runtime's
+	// own 3.3-9 trigger mounts the secret unconditionally; a build that took
+	// that trigger needed BuildKit whether it had a secret or not. A project's
+	// own Dockerfile always mounts it.
+	MountNetrc bool
 }
 
-// InstallDockerfileWith is InstallDockerfile with opts.
+// InstallDockerfileWith is the install over from, with opts.
 func InstallDockerfileWith(from string, opts InstallOptions) string {
-	netrc := "--mount=type=secret,id=" + netrcSecretID + ",target=/root/.netrc,required=false "
-	if opts.NoNetrc {
-		netrc = ""
+	run := "RUN "
+	if opts.MountNetrc || opts.ListsFrom != "" {
+		run = "RUN --mount=type=secret,id=" + netrcSecretID + ",target=/root/.netrc,required=false "
 	}
-	uvImage := opts.UVImage
-	if uvImage == "" {
-		uvImage = UVImage
-	}
-	inputs := opts.Inputs
-	if inputs == "" {
-		inputs = ProjectInputs
+	copyFrom := "COPY "
+	if opts.ListsFrom != "" {
+		copyFrom = "COPY --from=" + opts.ListsFrom + " "
 	}
 	final := "FROM " + from + "\n"
 	if opts.Alias != "" {
 		final = "FROM " + from + " AS " + opts.Alias + "\n"
 	}
-	return "ARG " + UVImageArg + "=" + uvImage + "\n" +
-		"FROM ${" + UVImageArg + "} AS " + UVStage + "\n" +
-		"FROM " + from + " AS " + InstallStage + "\n" +
-		// Root, because the context keeps its files' modes, and a project's may
-		// be readable by its owner alone.
-		"USER root\n" +
-		// Just the inputs, so an edit elsewhere in the project does not rerun
-		// the stage.
-		"COPY " + inputs + " " + inputsDir + "/\n" +
-		"COPY --from=" + UVStage + " /uv " + uvPath + "\n" +
-		// The netrc too, for a lock that is resolved in the build against an
-		// index that wants it.
-		"RUN " + netrc + "python " + inputsDir + "/" + path.Base(InstallHelperPath) + " --project " + inputsDir + " --out " + listsDir + "\n" +
-		final +
-		"COPY --from=" + InstallStage + " " + listsDir + "/" + PackagesName + " .\n" +
+	return final +
+		copyFrom + PackagesName + " .\n" +
 		"USER root\n" +
 		"RUN if [ -x " + installSystemPackages + " ]; then " + installSystemPackages + "; " +
 		"elif [ -s " + PackagesName + " ]; then apt-get update && cat " + PackagesName + " | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n" +
-		"COPY --from=" + InstallStage + " " + listsDir + "/" + RequirementsName + " " + listsDir + "/" + LockConstraintsName + " ./\n" +
-		"RUN " + netrc +
+		copyFrom + RequirementsName + " " + LockConstraintsName + " ./\n" +
+		run +
 		"if [ -x " + installPythonDependencies + " ]; then " + installPythonDependencies + "; " +
 		"else pip install --no-cache-dir --root-user-action=ignore -r " + RequirementsName + "; fi\n" +
 		"USER astro\n" +

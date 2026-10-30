@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
+	"github.com/astronomer/astro-cli/internal/imageinstall"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
@@ -733,20 +734,21 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		Catalog: func() *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(in.Build.AirflowVersion)(context.Background())
 		},
-		DeploymentID:  in.DeploymentID,
-		BuildSecrets:  in.BuildSecrets,
-		ImageName:     in.ImageName,
-		OnBuild:       in.OnBuild,
-		IncludeDags:   in.IncludeDags,
-		ImageAlone:    in.ImageAlone,
-		Warn:          in.Warn,
-		Survey:        in.Survey,
-		Engine:        in.Engine,
-		Description:   in.Description,
-		NoDagsBaseDir: in.NoDagsBaseDir,
-		Wait:          in.Wait,
-		WaitTime:      in.WaitTime,
-		Progress:      d.errOut,
+		DeploymentID:   in.DeploymentID,
+		BuildSecrets:   in.BuildSecrets,
+		ImageName:      in.ImageName,
+		OnBuild:        in.OnBuild,
+		IncludeDags:    in.IncludeDags,
+		ImageAlone:     in.ImageAlone,
+		Warn:           in.Warn,
+		Survey:         in.Survey,
+		Engine:         in.Engine,
+		Description:    in.Description,
+		NoDagsBaseDir:  in.NoDagsBaseDir,
+		Wait:           in.Wait,
+		WaitTime:       in.WaitTime,
+		Progress:       d.errOut,
+		ResolveInstall: imageinstall.Fill,
 	}, d.login.client)
 	if err != nil {
 		return manifestdeploy.ImageResult{}, err

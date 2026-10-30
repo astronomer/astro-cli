@@ -51,15 +51,28 @@ func TestBaseOf(t *testing.T) {
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.3-base", BaseOf("astrocrpublic.azurecr.io/runtime:3.3-base"))
 }
 
-// The install reads the helper from the path it is written to.
-func TestInstallDockerfileRunsTheHelperAtItsPath(t *testing.T) {
+// A project's own Dockerfile reads the lists from the named context, and
+// mounts the netrc secret whether or not the build passes one; a generated
+// build reads them from its own context, and mounts it only when asked.
+func TestInstallDockerfileReadsTheListsFromTheNamedContext(t *testing.T) {
 	df := InstallDockerfile("img:1-base")
-	assert.Contains(t, df, " "+InstallHelperPath+" ", "the stage copies the helper in")
-	assert.Contains(t, df, " python /tmp/astro-project/install-project.py ")
-	assert.Contains(t, df, "FROM img:1-base AS "+InstallStage+"\n")
-	assert.True(t, strings.HasPrefix(df, "ARG "+UVImageArg+"="+UVImage+"\nFROM ${"+UVImageArg+"} AS "+UVStage+"\n"),
-		"the uv stage comes first, its build argument ahead of every FROM")
-	assert.Contains(t, df, "COPY --from="+UVStage+" /uv /opt/astro-uv/uv\n")
-	assert.Contains(t, InstallDockerfileWith("img:1-base", InstallOptions{UVImage: "mirror.example/uv:1"}), "ARG "+UVImageArg+"=mirror.example/uv:1\n")
-	assert.NotEmpty(t, InstallHelper())
+	assert.True(t, strings.HasPrefix(df, "FROM img:1-base\nCOPY --from="+InstallContext+" packages.txt .\n"), df)
+	assert.Contains(t, df, "COPY --from="+InstallContext+" requirements.txt uv-lock-constraints.txt ./\n")
+	assert.Contains(t, df, "RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false if [ -x /usr/local/bin/install-python-dependencies ]")
+	assert.NotContains(t, df, "ARG ", "no build argument, no helper stage")
+	assert.Equal(t, 1, strings.Count(df, "FROM "))
+	assert.Contains(t, InstallDockerfileWith("img:1-base", InstallOptions{ListsFrom: InstallContext, Alias: "app"}), "FROM img:1-base AS app\n")
+
+	gen := InstallDockerfileWith("img:1-base", InstallOptions{})
+	assert.Contains(t, gen, "\nCOPY packages.txt .\n")
+	assert.NotContains(t, gen, "--mount")
+	assert.Contains(t, InstallDockerfileWith("img:1-base", InstallOptions{MountNetrc: true}), "RUN --mount=type=secret,id=netrc")
+}
+
+func TestReadsInstallContext(t *testing.T) {
+	assert.True(t, ReadsInstallContext([]byte(InstallDockerfile("img:1-base"))))
+	assert.True(t, ReadsInstallContext([]byte("FROM x\nCOPY --from=\"astro-install\" requirements.txt .\n")))
+	assert.False(t, ReadsInstallContext([]byte(InstallDockerfileWith("img:1-base", InstallOptions{}))), "a generated build reads its own context")
+	assert.False(t, ReadsInstallContext([]byte("FROM x\n# COPY --from=astro-install packages.txt .\n")))
+	assert.False(t, ReadsInstallContext([]byte("FROM x\nCOPY --from=astro-installer a .\n")))
 }

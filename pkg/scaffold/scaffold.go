@@ -411,7 +411,8 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	// has to keep what the rewritten build reads. The rewrite's own changes
 	// add files, so they go ahead of the manifest like every other addition.
 	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x)
-	if err := planDockerfileRewrite(abs, from1x, slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs); err != nil {
+	planDockerfileRewrite(from1x, slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs)
+	if err := planStaleHelperRemoval(abs, cs); err != nil {
 		return nil, err
 	}
 	if err := planKeptDockerfileIgnore(abs, from1x, cs); err != nil {

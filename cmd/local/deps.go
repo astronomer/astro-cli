@@ -23,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/emenv"
+	"github.com/astronomer/astro-cli/internal/imageinstall"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
@@ -513,8 +514,13 @@ func (b imageBuilder) Request(ctx context.Context, m imagebuild.ManifestBuild) (
 // with `image:` blank. The start then died on "services.db-migration.image
 // must be a string": a compose validation error, naming no Dockerfile, for a
 // feature that had never run.
+//
+// What a generated build installs is resolved here, from the project's lock,
+// with the host's uv (imageinstall.Fill), as a deploy and a package resolve
+// it. Its warnings ride the build's progress stream, ahead of the build's own
+// output.
 func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb localrt.Callbacks) (string, error) {
-	return imagebuild.New(imagebuild.NewExecCommander(), time.Now).Build(ctx, imagebuild.Request{
+	breq := imagebuild.Request{
 		WorkDir:      req.WorkDir,
 		BaseImage:    req.BaseImage,
 		Dockerfile:   req.Dockerfile,
@@ -527,7 +533,16 @@ func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb loca
 		Packages:     req.Packages,
 		Bin:          req.Bin,
 		Env:          req.Env,
-	}, cb)
+	}
+	warn := func(w string) {
+		if cb.OnLine != nil {
+			cb.OnLine(localrt.LogLine{Component: "build", Time: time.Now(), Text: "warning: " + w})
+		}
+	}
+	if err := imageinstall.Fill(ctx, &breq, warn); err != nil {
+		return "", err
+	}
+	return imagebuild.New(imagebuild.NewExecCommander(), time.Now).Build(ctx, breq, cb)
 }
 
 // ErrAllDeploymentsLinked reports a Deployment picker with nothing to offer

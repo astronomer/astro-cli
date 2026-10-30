@@ -1,6 +1,7 @@
 package scaffold
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -17,10 +18,14 @@ import (
 //
 // So the conversion moves the file onto the same tag's -base image, which has
 // no triggers, and writes the install out in front of the file's own steps
-// (airflowrt.InstallDockerfile): a stage that reads pyproject.toml and uv.lock
-// with the install helper, then the runtime's own install steps. The two 1.x
-// files are then carried and nothing reads them, so they go like any other
-// carried file, and `docker build .` builds what `astro package astro` does.
+// (airflowrt.InstallDockerfile): the runtime's own install steps, reading the
+// lists the CLI resolves from pyproject.toml and uv.lock, which a build passes
+// as the named context astro-install. The two 1.x files are then carried and
+// nothing reads them, so they go like any other carried file. A plain
+// `docker build .` has no astro-install context and fails at its first COPY;
+// the file's header says how to build it (astro package, astro deploy, or
+// `astro package --context-dir`, which writes the lists and prints the docker
+// command).
 //
 // The rewrite is all or nothing, and it happens only when the file's shape is
 // one this can rewrite without guessing (dockerfileRewriteOf). Anything else
@@ -43,8 +48,12 @@ type dockerfileRewrite struct {
 // rewritten Dockerfile, so a reader can tell the CLI's lines from the
 // project's.
 const (
-	installBlockComment = "# Installs this project's packages from pyproject.toml and uv.lock\n" +
-		"# (.astro/install-project.py reads them; astro init keeps both up to date).\n"
+	installBlockComment = "# Installs this project's packages from pyproject.toml and uv.lock. The\n" +
+		"# Astro CLI resolves them into lists it passes to the build as the named\n" +
+		"# context " + airflowrt.InstallContext + ", so build with astro package or astro deploy; a\n" +
+		"# plain docker build . fails at the first COPY --from=" + airflowrt.InstallContext + ". To\n" +
+		"# build it with docker yourself, run astro package --context-dir <dir>,\n" +
+		"# which writes the lists and prints the docker build command.\n"
 	ownStepsComment = "# This project's own steps.\n"
 )
 
@@ -109,8 +118,8 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 		return nil, prefix + "because runtime " + final.Tag + " is older than runtime 9 (Airflow 2.7), the oldest astro builds images for", true
 	}
 	for i := range stages {
-		if strings.EqualFold(stages[i].Alias, airflowrt.InstallStage) || strings.EqualFold(stages[i].Alias, airflowrt.UVStage) {
-			return nil, prefix + "because it already has a stage named " + stages[i].Alias + ", the name of a stage that does the install", true
+		if strings.EqualFold(stages[i].Alias, airflowrt.InstallContext) {
+			return nil, prefix + "because it already has a stage named " + stages[i].Alias + ", the name of the build context the install reads", true
 		}
 	}
 	lines := strings.Split(string(data), "\n")
@@ -125,7 +134,7 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 
 	base := airflowrt.BaseOf(final.Ref)
 	from := strings.Join(append(append([]string{}, final.Flags...), base), " ")
-	body := rewrittenBody(lines, stages[0].Line, final.Line, airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias}))
+	body := rewrittenBody(lines, final.Line, airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias, ListsFrom: airflowrt.InstallContext}))
 	return &dockerfileRewrite{
 		body:   body,
 		from:   final.Ref,
@@ -135,28 +144,13 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 }
 
 // rewrittenBody is a Dockerfile's lines with install, the recipe, in place of
-// its final FROM (at line final) and the file's own lines after it. The
-// recipe's first line declares the build argument its uv stage reads, which a
-// FROM sees only when it comes before the file's first FROM (at line first):
-// ahead of the file's earlier stages, after its parser directives and its own
-// global ARGs.
-func rewrittenBody(lines []string, first, final int, install string) []byte {
-	uvArg, install, _ := strings.Cut(install, "\n")
+// its final FROM (at line final) and the file's own lines after it.
+func rewrittenBody(lines []string, final int, install string) []byte {
 	var b strings.Builder
-	if first < final {
-		if first > 0 {
-			b.WriteString(strings.Join(lines[:first], "\n") + "\n")
-		}
-		b.WriteString(uvArg + "\n")
-		b.WriteString(strings.Join(lines[first:final], "\n") + "\n")
-		b.WriteString(installBlockComment)
-	} else {
-		if final > 0 {
-			b.WriteString(strings.Join(lines[:final], "\n") + "\n")
-		}
-		b.WriteString(installBlockComment)
-		b.WriteString(uvArg + "\n")
+	if final > 0 {
+		b.WriteString(strings.Join(lines[:final], "\n") + "\n")
 	}
+	b.WriteString(installBlockComment)
 	b.WriteString(install)
 	if own := lines[final+1:]; strings.TrimSpace(strings.Join(own, "\n")) != "" {
 		b.WriteString("\n" + ownStepsComment)
@@ -202,20 +196,47 @@ func nonEmpty(s, otherwise string) string {
 	return s
 }
 
-// installInputs are the files the install stage of a rewritten Dockerfile reads
-// from the build's context, which its ignore file must not leave out.
-var installInputs = []string{manifest.Marker, "uv.lock", airflowrt.InstallHelperPath}
+// staleHelperPath is where Astro CLI preview builds wrote the install helper
+// a rewritten Dockerfile ran inside the build, and staleHelperHeader the line
+// each of them began it with. The CLI resolves the install itself now, so a
+// project carrying one has no use for it.
+const (
+	staleHelperPath   = ".astro/install-project.py"
+	staleHelperHeader = "# Written by the Astro CLI. Do not edit: `astro init` replaces this file."
+)
+
+// planStaleHelperRemoval removes the install helper an Astro CLI preview build
+// wrote into the project, when the file is there and is the CLI's own (its
+// first line says so); a file of the project's own at that path is left
+// alone.
+func planStaleHelperRemoval(dir string, cs *Changeset) error {
+	data, err := readIfPresent(filepath.Join(dir, filepath.FromSlash(staleHelperPath)))
+	if err != nil || data == nil {
+		return err
+	}
+	first, _, _ := strings.Cut(string(data), "\n")
+	if strings.TrimRight(first, "\r") != staleHelperHeader {
+		return nil
+	}
+	cs.Changes = append(cs.Changes, Change{
+		Kind: Delete,
+		Path: staleHelperPath,
+		Labels: []string{staleHelperPath + " (written by an earlier Astro CLI preview, removed: " +
+			"the CLI resolves the install before the build now)"},
+	})
+	return nil
+}
 
 // planDockerfileRewrite adds the rewrite to cs when it can go ahead, and
 // otherwise the notes that say why the 1.x files stay. notes are the run's
 // notes so far, which say whether requirements.txt and packages.txt were
 // carried whole: a line either one could not carry is in a note naming it, and
 // the file stays as its only record, so the Dockerfile that reads it does too.
-func planDockerfileRewrite(dir string, from1x *project1x, notes []string, cs *Changeset) error {
+func planDockerfileRewrite(from1x *project1x, notes []string, cs *Changeset) {
 	rw := from1x.rewrite
 	if rw == nil {
 		from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
-		return nil
+		return
 	}
 	for _, name := range []string{"requirements.txt", "packages.txt"} {
 		if slices.Contains(from1x.present, name) && namedInAny(notes, name) {
@@ -224,32 +245,16 @@ func planDockerfileRewrite(dir string, from1x *project1x, notes []string, cs *Ch
 				", because "+name+" has lines "+manifest.Marker+" does not carry (above), and the base's ONBUILD steps "+
 				"still install them from it. Once they are in "+manifest.Marker+", run astro init again to move it")
 			from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
-			return nil
+			return
 		}
 	}
-	switch blocker, err := planHelperCommittable(dir, cs); {
-	case err != nil:
-		return err
-	case blocker != "":
-		from1x.rewrite = nil
-		from1x.notes = append(from1x.notes, blocker)
-		from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
-		return nil
-	}
-	label := fileDockerfile + " (now builds FROM " + rw.base + " and installs this project's packages from " +
-		manifest.Marker + " and uv.lock, so docker build . and astro deploy build the same image)"
-	helper := Change{
-		Kind:    CreateFile,
-		Path:    airflowrt.InstallHelperPath,
-		Content: airflowrt.InstallHelper(),
-		Labels:  []string{airflowrt.InstallHelperPath + " (reads " + manifest.Marker + " and uv.lock inside the build)"},
-	}
-	cs.Changes = append(cs.Changes, Change{Kind: UpdateFile, Path: fileDockerfile, Content: rw.body, Labels: []string{label}}, helper)
+	label := fileDockerfile + " (now builds FROM " + rw.base + " and installs the packages the Astro CLI resolves from " +
+		manifest.Marker + " and uv.lock; build it with astro package or astro deploy, or astro package --context-dir for docker build)"
+	cs.Changes = append(cs.Changes, Change{Kind: UpdateFile, Path: fileDockerfile, Content: rw.body, Labels: []string{label}})
 	if rw.mirror {
 		cs.Advisories = append(cs.Advisories, fileDockerfile+" now builds FROM "+rw.base+
 			": if your registry mirrors "+rw.from+" tag by tag, mirror "+rw.base+" too")
 	}
-	return nil
 }
 
 // keptListNotes are the notes for a declared Dockerfile kept on its ONBUILD
