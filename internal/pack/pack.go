@@ -93,8 +93,9 @@ type Request struct {
 	// ContextDir, for the image target, writes the image's build context to
 	// this directory (new or empty) instead of building it, for a container
 	// engine the CLI does not drive to build with `docker build` or `podman
-	// build`. Refused for a project that declares its own Dockerfile, whose
-	// project already is its context.
+	// build`. For a project that declares its own Dockerfile it writes that
+	// Dockerfile, the project as its context, and the install lists the
+	// Dockerfile reads from the named context (imagebuild.WriteDeclaredContext).
 	ContextDir string
 	// ResolveInstall resolves what a generated image installs from the
 	// project's lock, into req.Install (imageinstall.Fill), with its warnings
@@ -161,6 +162,10 @@ type Result struct {
 	// ContextDir is the build context the image target wrote with
 	// --context-dir, which NextSteps build.
 	ContextDir string `json:"context_dir,omitempty"`
+	// BuildNeeds is what NextSteps need of the builder, when they pass the
+	// install lists as a named context (imagebuild.NamedContextRequirement),
+	// which Docker's legacy builder and Podman before 4.2 do not take.
+	BuildNeeds string `json:"build_needs,omitempty"`
 }
 
 // Target packages a project for one Airflow platform. Build validates the

@@ -297,6 +297,11 @@ func renderContextResult(w io.Writer, res pack.Result) error {
 			return err
 		}
 	}
+	if res.BuildNeeds != "" {
+		if _, err := fmt.Fprintf(w, "These need %s.\n", res.BuildNeeds); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

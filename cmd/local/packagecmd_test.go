@@ -248,3 +248,25 @@ func TestDeployImageHintNamesATarget(t *testing.T) {
 		})
 	}
 }
+
+// A context whose commands pass a named context says what builder they need,
+// under the commands; one whose commands do not says nothing more.
+func TestContextResultSaysWhatItsBuildNeeds(t *testing.T) {
+	var out bytes.Buffer
+	res := pack.Result{ContextDir: "/b", NextSteps: []string{"docker build x", "podman build x"}, BuildNeeds: "Docker with BuildKit"}
+	if err := renderContextResult(&out, res); err != nil {
+		t.Fatal(err)
+	}
+	want := "context: /b\n\nBuild it with either of:\n  docker build x\n  podman build x\nThese need Docker with BuildKit.\n"
+	if got := out.String(); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	out.Reset()
+	res.BuildNeeds = ""
+	if err := renderContextResult(&out, res); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "These need") {
+		t.Errorf("no named context, yet: %q", out.String())
+	}
+}

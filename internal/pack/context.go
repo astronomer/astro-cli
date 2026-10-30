@@ -37,7 +37,7 @@ func writeContext(req Request, breq imagebuild.Request, name string) (Result, er
 		if err != nil {
 			return Result{}, contextDirError(err)
 		}
-		return Result{
+		res := Result{
 			Target:     TargetAstro,
 			Kind:       KindContext,
 			ContextDir: dir,
@@ -45,7 +45,11 @@ func writeContext(req Request, breq imagebuild.Request, name string) (Result, er
 				declaredBuildCommand("docker", req.Platform, tag, req.BuildSecrets, dir, lists),
 				declaredBuildCommand("podman", req.Platform, tag, req.BuildSecrets, dir, lists),
 			},
-		}, nil
+		}
+		if lists {
+			res.BuildNeeds = imagebuild.NamedContextRequirement
+		}
+		return res, nil
 	}
 	if err := imagebuild.WriteContext(dir, breq); err != nil {
 		return Result{}, contextDirError(err)
@@ -73,8 +77,8 @@ func contextDirError(err error) error {
 // WriteDeclaredContext wrote at dir: its Dockerfile over its context/, with
 // the lists as the named context when it wrote them (lists), and every build
 // secret, as a build of the project's own Dockerfile forwards them all.
-// Named contexts need BuildKit under Docker (Engine 23, or Buildx 0.8, and
-// later), and Podman 4.2 (Buildah 1.26.4) or later.
+// Named contexts need imagebuild.NamedContextRequirement, which the result
+// says (Result.BuildNeeds).
 func declaredBuildCommand(engine, platform, tag string, secrets []string, dir string, lists bool) string {
 	args := []string{engine, "build"}
 	if platform != "" {

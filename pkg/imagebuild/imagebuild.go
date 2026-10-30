@@ -388,6 +388,11 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 		if err != nil {
 			return "", err
 		}
+		if len(contexts) > 0 {
+			if err := b.checkNamedContexts(ctx, req); err != nil {
+				return "", err
+			}
+		}
 		return b.build(ctx, req, req.Dockerfile, req.Context, contexts, cb)
 	}
 
