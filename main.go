@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
+	"time"
 
 	"github.com/spf13/afero"
 
@@ -20,6 +22,7 @@ import (
 //go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config ./internal/platform/astro/clients/astrov1alpha1/api.cfg.yaml ../astro/apps/core/docs/public/v1alpha1/public_v1alpha1.yaml
 
 func main() {
+	pauseGCForStartup()
 	// TODO: Remove this when version logic is implemented
 	fs := afero.NewOsFs()
 	config.InitConfig(fs)
@@ -40,6 +43,26 @@ func main() {
 	// this should run for all commands,
 	// for most of the architectures there's no requirements:
 	ansi.InitConsole()
+}
+
+// startupGCWindow is how long a command runs before the collector does. Most
+// commands are done well inside it, and until then nearly every allocation is
+// the command tree, which stays live, so a collection frees little and costs
+// a millisecond or two of each start.
+const startupGCWindow = 100 * time.Millisecond
+
+// startupMemoryLimit bounds the heap while collection is off, so a command
+// that allocates fast inside the window still collects.
+const startupMemoryLimit = 256 << 20
+
+func pauseGCForStartup() {
+	gcPercent := debug.SetGCPercent(-1)
+	memoryLimit := debug.SetMemoryLimit(-1) // reads it
+	debug.SetMemoryLimit(min(memoryLimit, startupMemoryLimit))
+	time.AfterFunc(startupGCWindow, func() {
+		debug.SetGCPercent(gcPercent)
+		debug.SetMemoryLimit(memoryLimit)
+	})
 }
 
 // signalContext returns a context canceled on the first interrupt, and restores

@@ -3,6 +3,7 @@ package version
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"testing"
@@ -191,7 +192,7 @@ func TestCompareVersionsSkipsTheNetworkForALocalBuild(t *testing.T) {
 				withDerived(t, tc.derived)
 			}
 			tr := &failingTransport{}
-			if err := CompareVersions(context.Background(), &http.Client{Transport: tr}); err != nil {
+			if err := CompareVersions(context.Background(), &http.Client{Transport: tr}, filepath.Join(t.TempDir(), "release-check.json")); err != nil {
 				t.Errorf("a local build must not report an upgrade-check error: %v", err)
 			}
 			if tr.used {
@@ -211,7 +212,7 @@ func TestCompareVersionsChecksAnInstallFromSource(t *testing.T) {
 	tr := &failingTransport{}
 	// The error is the transport refusing; what is being asserted is that the
 	// check got as far as asking.
-	if err := CompareVersions(context.Background(), &http.Client{Transport: tr}); err == nil {
+	if err := CompareVersions(context.Background(), &http.Client{Transport: tr}, filepath.Join(t.TempDir(), "release-check.json")); err == nil {
 		t.Error("expected the failing transport's error to surface")
 	}
 	if !tr.used {

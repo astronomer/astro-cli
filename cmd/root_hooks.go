@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,6 +19,10 @@ import (
 )
 
 var astroSetup = astroCmd.Setup
+
+// releaseCheckFile holds the upgrade check's last answer, in the home config
+// directory.
+const releaseCheckFile = "release-check.json"
 
 // SetupLogging is a pre-run hook shared between APC & cloud
 // setting up log verbosity. Logs go to stderr: stdout is the command's output,
@@ -57,7 +62,7 @@ func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobr
 			httpClient := &http.Client{Timeout: 3 * time.Second}
 
 			// compare current version to latest
-			err := version.CompareVersions(cmd.Context(), httpClient)
+			err := version.CompareVersions(cmd.Context(), httpClient, filepath.Join(config.HomeConfigPath, releaseCheckFile))
 			if err != nil {
 				apcCmd.InitDebugLogs = append(apcCmd.InitDebugLogs, "Error comparing CLI versions: "+err.Error())
 			}

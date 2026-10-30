@@ -98,5 +98,18 @@ func Execute(ctx context.Context) error {
 // (acceptRemovedFlags).
 func execute(ctx context.Context, root *cobra.Command, args []string, stdout io.Writer) error {
 	acceptRemovedFlags(root, args)
+	addHelpFlag(helpTarget(root, args))
 	return cliout.Execute(ctx, root, args, stdout, problemKinds)
+}
+
+// helpTarget is the command args run, or complete for: the one cobra gives a
+// -h/--help flag.
+func helpTarget(root *cobra.Command, args []string) *cobra.Command {
+	if len(args) > 0 && (args[0] == cobra.ShellCompRequestCmd || args[0] == cobra.ShellCompNoDescRequestCmd) {
+		args = args[1:]
+	}
+	if c, _, err := root.Find(args); err == nil {
+		return c
+	}
+	return root
 }
