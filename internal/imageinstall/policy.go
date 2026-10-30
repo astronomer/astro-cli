@@ -33,7 +33,9 @@ import (
 //     installs before everything else, from the files the lock recorded for
 //     it alone (InstallLists.Routed): pip, in the image, picks the one its
 //     Python and platform take, and checks it against the lock's hash, so
-//     the image's install never asks its own index for that name.
+//     the image's install never asks its own index for that name. It is in
+//     requirements.txt too, at the same version, which the main install
+//     finds already installed, so its dependencies install with the rest.
 //     Everything else installs by name through the image's own index, a
 //     package from a local path included, which the image does not have.
 //   - A user or password in any of those URLs is left out, with one warning:
@@ -224,8 +226,15 @@ func apply(in *policyInput) (imagebuild.InstallLists, []string, error) {
 		refs := directRefs(pkg, urls)
 		switch {
 		case len(refs) == 0 && project.routed[name] && hasFiles(pkg):
-			lists.Routed = append(lists.Routed, withMarker(pin(pkg), pkg.Marker))
+			// Installed first, alone and without its dependencies, from the
+			// lock's files; then named in requirements.txt too, at the same
+			// version, so the main install finds it there and installs the
+			// dependencies it needs that the image lacks, at the lock's
+			// versions.
+			line := withMarker(pin(pkg), pkg.Marker)
+			lists.Routed = append(lists.Routed, line)
 			lists.RoutedLinks = append(lists.RoutedLinks, fileLinks(pkg, urls)...)
+			lists.Requirements = append(lists.Requirements, line)
 		case own || len(refs) > 0:
 			if len(refs) == 0 {
 				refs = []string{withMarker(pin(pkg), pkg.Marker)}

@@ -53,7 +53,10 @@ marker = "python_version >= '3.10'"
 // for it: the line pins its version with the lock's marker, and the page lists
 // each wheel and the sdist with its hash, without the URL's credentials, for
 // pip in the image to pick from. It installs this way whether the project
-// names it or it is only a dependency, unless the image already has it.
+// names it or it is only a dependency, unless the image already has it. The
+// routed install takes no dependencies, so requirements.txt names it too, at
+// the same version: the main install finds it installed and brings the
+// dependencies it needs.
 func TestApplyInstallsARoutedPackageFromTheLocksFiles(t *testing.T) {
 	const pyproject = "[project]\nname = 'p'\ndependencies = ['fast', 'needs-dep']\n" +
 		"[tool.uv.sources]\nfast = [{ index = 'acme', marker = \"sys_platform == 'linux'\" }]\ndep = { index = 'acme' }\nshipped = { index = 'acme' }\n"
@@ -91,7 +94,8 @@ wheels = [{ url = "https://acme.example/shipped-4.0-py3-none-any.whl", hashes = 
 		"https://acme.example/fast-1.0.tar.gz#sha256=s0",
 		"https://acme.example/dep-2.0-py3-none-any.whl#sha256=p0",
 	}, lists.RoutedLinks)
-	assert.Equal(t, []string{"needs-dep==3.0"}, lists.Requirements, "a routed package is not in requirements.txt")
+	assert.Equal(t, []string{"fast==1.0 ; sys_platform == 'linux'", "needs-dep==3.0", "dep==2.0"}, lists.Requirements,
+		"a routed package is in requirements.txt too, so the main install brings its dependencies")
 	assert.Empty(t, lists.Constraints)
 	assert.Len(t, warnings, 1, "the stripped credentials are warned of")
 }

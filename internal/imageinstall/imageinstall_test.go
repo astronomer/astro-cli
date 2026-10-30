@@ -127,7 +127,7 @@ func TestFillWithoutTheImagesPackages(t *testing.T) {
 func TestFillInstallsAnIndexSourceFromItsFiles(t *testing.T) {
 	req, warnings := fill(t, testResolver(t, nil, []string{}), fixture(t, "index"))
 	assert.Empty(t, warnings)
-	assert.Equal(t, []string{"tabulate==0.10.0"}, req.Install.Requirements)
+	assert.ElementsMatch(t, []string{"six==1.16.0", "tabulate==0.10.0"}, req.Install.Requirements)
 	assert.Equal(t, []string{"six==1.16.0"}, req.Install.Routed)
 	assert.Contains(t, req.Install.RoutedLinks,
 		"https://test-files.pythonhosted.org/packages/1e/5c/ecacc0c9c346004e43acc024f076d74c0005d11b9a70ecaa81b21c8b080b/six-1.16.0-py2.py3-none-any.whl"+
