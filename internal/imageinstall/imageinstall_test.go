@@ -3,6 +3,7 @@ package imageinstall
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -128,7 +129,7 @@ func TestFillWithoutTheImagesPackages(t *testing.T) {
 func TestFillInstallsAnIndexSourceFromItsFiles(t *testing.T) {
 	req, warnings := fill(t, testResolver(t, nil, []string{}), fixture(t, "index"))
 	assert.Empty(t, warnings)
-	assert.Equal(t, []string{"tabulate==0.10.0"}, req.Install.Requirements)
+	assert.ElementsMatch(t, []string{"six==1.16.0", "tabulate==0.10.0"}, req.Install.Requirements)
 	assert.Equal(t, []string{"six==1.16.0"}, req.Install.Routed)
 	assert.Contains(t, req.Install.RoutedLinks,
 		"https://test-files.pythonhosted.org/packages/1e/5c/ecacc0c9c346004e43acc024f076d74c0005d11b9a70ecaa81b21c8b080b/six-1.16.0-py2.py3-none-any.whl"+
@@ -147,12 +148,15 @@ func TestFillInstallsByNameFromADefaultIndex(t *testing.T) {
 	assert.Equal(t, []string{"six==1.16.0"}, req.Install.Requirements)
 }
 
-// A package from a path is installed by name at the lock's version, as the
-// path is not in the image.
-func TestFillInstallsAPathSourceByName(t *testing.T) {
-	req, warnings := fill(t, testResolver(t, nil, []string{}), fixture(t, "path"))
-	assert.Empty(t, warnings)
-	assert.Equal(t, []string{"localpkg==1.2.0", "tabulate==0.10.0"}, req.Install.Requirements)
+// A package from a path on this machine is refused before the build, by
+// name and path: the image cannot reach it, and installing the name from the
+// image's index could install someone else's package of that name.
+func TestFillRefusesAPathSource(t *testing.T) {
+	req := imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.1-5-python-3.12", ManifestDir: fixture(t, "path")}
+	err := testResolver(t, nil, []string{}).Fill(t.Context(), &req, nil)
+	require.ErrorIs(t, err, ErrLocalSource)
+	assert.Contains(t, err.Error(), "localpkg (stub/localpkg-1.2.0-py3-none-any.whl)")
+	assert.Nil(t, req.Install)
 }
 
 // A git or URL source is a direct reference at the commit or file the lock
@@ -178,29 +182,35 @@ func TestFillInstallsGitAndURLSources(t *testing.T) {
 	assert.Equal(t, []string{"git"}, req.Install.Packages)
 }
 
-// A lock that no longer matches pyproject.toml, or no lock, is written again
-// with uv lock, with a warning. When that cannot be done either (here,
-// offline) the build installs the request's dependencies as written, and says
-// so.
+// No lock is written with uv lock, with a warning. When that cannot be done
+// either (here, offline) the build installs the request's dependencies as
+// written, and says so.
 func TestFillLeavesTheRequestUnpinnedWhenUvCannotLock(t *testing.T) {
-	stale, err := os.ReadFile(filepath.Join("testdata", "install", "pins", "uv.lock"))
+	const pyproject = "[project]\nname = 'p'\nversion = '0'\ndependencies = ['pandas>=2']\n"
+	req, warnings := fill(t, testResolver(t, nil, []string{}), project(t, pyproject, ""))
+	assert.Nil(t, req.Install)
+	require.Len(t, warnings, 2)
+	assert.Contains(t, warnings[0], "uv.lock is missing or out of date with pyproject.toml, so the build is running uv lock in the project")
+	assert.Contains(t, warnings[1], "uv could not lock the project")
+}
+
+// A committed lock uv can neither check nor relock (here, offline) and that
+// does not even export (it was written for another project) leaves the
+// request unpinned, with each reason said; it is not an error.
+func TestFillLeavesTheRequestUnpinnedWhenTheLockCannotBeRead(t *testing.T) {
+	other, err := os.ReadFile(filepath.Join("testdata", "install", "pins", "uv.lock"))
 	require.NoError(t, err)
 	const pyproject = "[project]\nname = 'p'\nversion = '0'\ndependencies = ['pandas>=2']\n"
-	for name, lock := range map[string]string{"no lock": "", "a stale lock": string(stale)} {
-		t.Run(name, func(t *testing.T) {
-			req, warnings := fill(t, testResolver(t, nil, []string{}), project(t, pyproject, lock))
-			assert.Nil(t, req.Install)
-			require.Len(t, warnings, 2)
-			assert.Contains(t, warnings[0], "uv.lock is missing or out of date with pyproject.toml, so the build is running uv lock in the project")
-			assert.Contains(t, warnings[1], "uv could not lock the project")
-		})
-	}
+	req, warnings := fill(t, testResolver(t, nil, []string{}), project(t, pyproject, string(other)))
+	assert.Nil(t, req.Install)
+	require.NotEmpty(t, warnings)
+	assert.Contains(t, warnings[len(warnings)-1], "uv could not read the committed uv.lock either")
 }
 
 // A stale lock is written again in the project, and the image installs what
 // the new one says.
 func TestFillRelocksAStaleLock(t *testing.T) {
-	fake := &fakeUV{check: errors.New("stale"), pylock: "[[packages]]\nname = 'pandas'\nversion = '2.2.3'\n"}
+	fake := &fakeUV{check: fmt.Errorf("%w: uv lock --check failed", uv.ErrLockStale), pylock: "[[packages]]\nname = 'pandas'\nversion = '2.2.3'\n"}
 	r := Resolver{UV: func(context.Context) (UV, error) { return fake, nil }}
 	dir := project(t, "[project]\nname = 'p'\ndependencies = ['pandas']\n", "")
 
@@ -213,10 +223,40 @@ func TestFillRelocksAStaleLock(t *testing.T) {
 	assert.Equal(t, []string{"pandas==2.2.3"}, req.Install.Requirements)
 }
 
-// fakeUV answers the check with check, and exports pylock, recording each
-// call and the project it was for.
+// A check uv could not make is not a stale lock: the committed lock is
+// installed as it stands, and uv lock is not run in the project.
+func TestFillDoesNotRelockWhenTheCheckFails(t *testing.T) {
+	fake := &fakeUV{check: errors.New("uv lock failed (exit 2): Request failed after 3 retries"), pylock: "[[packages]]\nname = 'pandas'\nversion = '2.2.3'\n"}
+	r := Resolver{UV: func(context.Context) (UV, error) { return fake, nil }}
+	dir := project(t, "[project]\nname = 'p'\ndependencies = ['pandas']\n", "version = 1\n")
+
+	req, warnings := fill(t, r, dir)
+	assert.Equal(t, []string{"check " + dir, "export " + dir}, fake.calls)
+	require.NotEmpty(t, warnings)
+	assert.Contains(t, warnings[0], "uv could not check uv.lock against pyproject.toml, so the image installs uv.lock as committed")
+	require.NotNil(t, req.Install)
+	assert.Equal(t, []string{"pandas==2.2.3"}, req.Install.Requirements)
+}
+
+// A stale lock uv cannot write again is installed as committed, with a
+// warning, rather than dropped for an unpinned install.
+func TestFillInstallsAStaleLockUvCannotRelock(t *testing.T) {
+	fake := &fakeUV{check: uv.ErrLockStale, lock: errors.New("no solution"), pylock: "[[packages]]\nname = 'pandas'\nversion = '2.2.3'\n"}
+	r := Resolver{UV: func(context.Context) (UV, error) { return fake, nil }}
+	dir := project(t, "[project]\nname = 'p'\ndependencies = ['pandas']\n", "version = 1\n")
+
+	req, warnings := fill(t, r, dir)
+	assert.Equal(t, []string{"check " + dir, "lock " + dir, "export " + dir}, fake.calls)
+	require.GreaterOrEqual(t, len(warnings), 2)
+	assert.Contains(t, warnings[1], "installs uv.lock as committed, without what pyproject.toml changed since")
+	require.NotNil(t, req.Install)
+}
+
+// fakeUV answers the check with check and the lock with lock, and exports
+// pylock, recording each call and the project it was for.
 type fakeUV struct {
 	check  error
+	lock   error
 	pylock string
 	calls  []string
 }
@@ -228,7 +268,7 @@ func (f *fakeUV) LockCheck(_ context.Context, project string) error {
 
 func (f *fakeUV) Lock(_ context.Context, project string, _ uv.Stdio) error {
 	f.calls = append(f.calls, "lock "+project)
-	return nil
+	return f.lock
 }
 
 func (f *fakeUV) ExportPylock(_ context.Context, project string) ([]byte, error) {

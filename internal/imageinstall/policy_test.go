@@ -53,7 +53,10 @@ marker = "python_version >= '3.10'"
 // for it: the line pins its version with the lock's marker, and the page lists
 // each wheel and the sdist with its hash, without the URL's credentials, for
 // pip in the image to pick from. It installs this way whether the project
-// names it or it is only a dependency, unless the image already has it.
+// names it or it is only a dependency, unless the image already has it. The
+// routed install takes no dependencies, so requirements.txt names it too, at
+// the same version: the main install finds it installed and brings the
+// dependencies it needs.
 func TestApplyInstallsARoutedPackageFromTheLocksFiles(t *testing.T) {
 	const pyproject = "[project]\nname = 'p'\ndependencies = ['fast', 'needs-dep']\n" +
 		"[tool.uv.sources]\nfast = [{ index = 'acme', marker = \"sys_platform == 'linux'\" }]\ndep = { index = 'acme' }\nshipped = { index = 'acme' }\n"
@@ -91,7 +94,8 @@ wheels = [{ url = "https://acme.example/shipped-4.0-py3-none-any.whl", hashes = 
 		"https://acme.example/fast-1.0.tar.gz#sha256=s0",
 		"https://acme.example/dep-2.0-py3-none-any.whl#sha256=p0",
 	}, lists.RoutedLinks)
-	assert.Equal(t, []string{"needs-dep==3.0"}, lists.Requirements, "a routed package is not in requirements.txt")
+	assert.Equal(t, []string{"fast==1.0 ; sys_platform == 'linux'", "needs-dep==3.0", "dep==2.0"}, lists.Requirements,
+		"a routed package is in requirements.txt too, so the main install brings its dependencies")
 	assert.Empty(t, lists.Constraints)
 	assert.Len(t, warnings, 1, "the stripped credentials are warned of")
 }
@@ -122,4 +126,35 @@ func TestStatesVersion(t *testing.T) {
 	} {
 		assert.Equal(t, want, statesVersion(req), req)
 	}
+}
+
+// A URL's credentials are left out, and said to be, except an ssh URL's user
+// with no password, which is the account ssh logs in as.
+func TestURLCleaner(t *testing.T) {
+	for raw, tc := range map[string]struct {
+		want     string
+		stripped bool
+	}{
+		"ssh://git@github.com/org/repo.git":          {"ssh://git@github.com/org/repo.git", false},
+		"git+ssh://git@github.com/org/repo.git":      {"git+ssh://git@github.com/org/repo.git", false},
+		"ssh://git:pw@github.com/org/repo.git":       {"ssh://github.com/org/repo.git", true},
+		"https://token@github.com/org/repo.git":      {"https://github.com/org/repo.git", true},
+		"https://user:pw@acme.example/p-1.0.whl":     {"https://acme.example/p-1.0.whl", true},
+		"https://files.pythonhosted.org/p/p-1.0.whl": {"https://files.pythonhosted.org/p/p-1.0.whl", false},
+	} {
+		c := &urlCleaner{}
+		assert.Equal(t, tc.want, c.clean(raw), raw)
+		assert.Equal(t, tc.stripped, c.stripped, raw)
+	}
+}
+
+// A workspace member, which the lock lists as a directory, is refused like a
+// path source.
+func TestApplyRefusesAWorkspaceMember(t *testing.T) {
+	_, _, err := apply(&policyInput{
+		pyproject: []byte("[project]\nname = 'p'\ndependencies = ['member']\n[tool.uv.sources]\nmember = { workspace = true }\n"),
+		pylock:    []byte("[[packages]]\nname = \"member\"\nversion = \"0.1.0\"\ndirectory = { path = \"packages/member\", editable = true }\n"),
+	})
+	require.ErrorIs(t, err, ErrLocalSource)
+	assert.Contains(t, err.Error(), "member (packages/member)")
 }

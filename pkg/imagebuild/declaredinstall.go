@@ -111,7 +111,7 @@ func WriteDeclaredContext(dir string, req Request) (lists bool, err error) {
 	if err := os.MkdirAll(contextDir, contextDirPerm); err != nil {
 		return false, fmt.Errorf("creating %s: %w", contextDir, err)
 	}
-	if err := copyDeclaredContext(req.Context, req.Dockerfile, contextDir); err != nil {
+	if err := copyDeclaredContext(req.Context, req.Dockerfile, dir, contextDir); err != nil {
 		return false, err
 	}
 	if err := os.WriteFile(filepath.Join(dir, DeclaredDockerfileName), data, filePermRW); err != nil { //nolint:gosec // G703: dir is the caller's new or empty --context-dir, and the name a constant
@@ -125,9 +125,15 @@ func WriteDeclaredContext(dir string, req Request) (lists bool, err error) {
 
 // copyDeclaredContext copies the project at src into dst as a build of its
 // Dockerfile at dockerfile reads it: under docker's ignore file, version
-// control and links included, each link as itself.
-func copyDeclaredContext(src, dockerfile, dst string) error {
+// control and links included, each link as itself. out, the directory being
+// written, which holds dst, is left out when it is inside the project
+// (`--context-dir ./build`), so the context never carries a copy of itself.
+func copyDeclaredContext(src, dockerfile, out, dst string) error {
 	resolved, err := filepath.EvalSymlinks(src)
+	if err != nil {
+		return fmt.Errorf("reading the project's files: %w", err)
+	}
+	outInfo, err := os.Stat(out)
 	if err != nil {
 		return fmt.Errorf("reading the project's files: %w", err)
 	}
@@ -139,7 +145,7 @@ func copyDeclaredContext(src, dockerfile, dst string) error {
 	if err != nil {
 		return err
 	}
-	w := walker{filter: filter, worktrees: projectWorktrees(resolved), visit: func(rel, from string, mode fs.FileMode) error {
+	w := walker{filter: filter, worktrees: projectWorktrees(resolved), exclude: outInfo, visit: func(rel, from string, mode fs.FileMode) error {
 		target := filepath.Join(dst, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(target), ownerAll); err != nil {
 			return err

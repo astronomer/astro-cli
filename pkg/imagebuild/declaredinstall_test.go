@@ -125,6 +125,22 @@ func TestWriteDeclaredContextLayout(t *testing.T) {
 	require.ErrorIs(t, err, ErrContextDirNotEmpty)
 }
 
+// A context written inside the project (`--context-dir ./build`) does not
+// carry a copy of itself.
+func TestWriteDeclaredContextInsideTheProject(t *testing.T) {
+	project := rewrittenProject(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(project, "dags"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(project, "dags", "dag.py"), []byte("x = 1\n"), 0o600))
+	out := filepath.Join(project, "build")
+	req := Request{Dockerfile: filepath.Join(project, "Dockerfile"), Context: project, Install: &InstallLists{Requirements: []string{"pandas==2.2.3"}}}
+
+	_, err := WriteDeclaredContext(out, req)
+	require.NoError(t, err)
+	ctxDir := filepath.Join(out, DeclaredContextDir)
+	assert.FileExists(t, filepath.Join(ctxDir, "dags", "dag.py"))
+	assert.NoDirExists(t, filepath.Join(ctxDir, "build"), "the output directory is not in its own context")
+}
+
 // A Dockerfile that does not read the named context gets no lists.
 func TestWriteDeclaredContextWithoutTheNamedContext(t *testing.T) {
 	dir := declaredProject(t)
