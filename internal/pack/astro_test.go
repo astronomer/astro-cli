@@ -22,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // fakeBuilder is an ImageBuilder that records the request and never touches a
@@ -395,8 +396,8 @@ func TestAstroBuildWritesTheContext(t *testing.T) {
 	assert.Equal(t, KindContext, res.Kind)
 	assert.Equal(t, req.ContextDir, res.ContextDir)
 	assert.Equal(t, []string{
-		"docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + req.ContextDir,
-		"podman build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + req.ContextDir,
+		"docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + scaffold.ShellQuote(req.ContextDir),
+		"podman build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + scaffold.ShellQuote(req.ContextDir),
 	}, res.NextSteps)
 	assert.Empty(t, res.BuildNeeds, "a generated build's context needs no named context")
 	assert.Empty(t, docker.callStrings(), "no engine")
@@ -430,9 +431,9 @@ func TestAstroBuildWritesADeclaredDockerfilesContext(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, KindContext, res.Kind)
 	dir := req.ContextDir
-	flags := " --platform linux/amd64 --tag astro-package/my-project:latest --file " + filepath.Join(dir, "Dockerfile") +
-		" --build-context astro-install=" + filepath.Join(dir, "astro-install") +
-		" --secret id=netrc,env=NETRC_CONTENT --secret id=other,src=/x " + filepath.Join(dir, "context")
+	flags := " --platform linux/amd64 --tag astro-package/my-project:latest --file " + scaffold.ShellQuote(filepath.Join(dir, "Dockerfile")) +
+		" --build-context " + scaffold.ShellQuote("astro-install="+filepath.Join(dir, "astro-install")) +
+		" --secret id=netrc,env=NETRC_CONTENT --secret id=other,src=/x " + scaffold.ShellQuote(filepath.Join(dir, "context"))
 	assert.Equal(t, []string{"docker build" + flags, "podman build" + flags}, res.NextSteps)
 	assert.Equal(t, imagebuild.NamedContextRequirement, res.BuildNeeds, "the commands pass a named context")
 	assert.Empty(t, docker.callStrings(), "no engine")
