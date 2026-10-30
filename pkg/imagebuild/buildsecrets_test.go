@@ -89,7 +89,8 @@ func TestCheckBuildSecretEnv(t *testing.T) {
 
 // The install step's netrc mount says required=false, so a Dockerfile carrying
 // it is not warned about it on every build; a mount of the project's own still
-// is, and a failed build names both.
+// is, and a failed build names only that one: the build ran the install step
+// without netrc, so its absence is not why it failed.
 func TestMissingBuildSecretsLeavesTheInstallStepsMountOutOfTheWarnings(t *testing.T) {
 	dir := t.TempDir()
 	body := airflowrt.InstallDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base") +
@@ -102,7 +103,16 @@ func TestMissingBuildSecretsLeavesTheInstallStepsMountOutOfTheWarnings(t *testin
 	require.Len(t, warnings, 1)
 	assert.Contains(t, warnings[0], `build secret "pip"`)
 	explained := m.Explain(fmt.Errorf("%w: exit status 1", ErrDockerfileBuild)).Error()
-	assert.Contains(t, explained, `"netrc", "pip"`)
+	assert.Contains(t, explained, `build secret "pip", which was not given`)
+	assert.NotContains(t, explained, "netrc")
+}
+
+// A failed build of a Dockerfile whose only missing mount is optional comes
+// back as it is: nothing blames the secret.
+func TestExplainLeavesAFailureAloneWhenOnlyAnOptionalMountIsMissing(t *testing.T) {
+	m := MissingSecrets{Dockerfile: "Dockerfile", Mounts: []airflowrt.SecretMount{{ID: "netrc", Line: 9, Optional: true}}}
+	failed := fmt.Errorf("%w: exit status 1", ErrDockerfileBuild)
+	assert.Equal(t, failed, m.Explain(failed))
 }
 
 // The install step mounts the secret the manifest names for a private index.

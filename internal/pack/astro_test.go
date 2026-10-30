@@ -398,6 +398,7 @@ func TestAstroBuildWritesTheContext(t *testing.T) {
 		"docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + req.ContextDir,
 		"podman build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + req.ContextDir,
 	}, res.NextSteps)
+	assert.Empty(t, res.BuildNeeds, "a generated build's context needs no named context")
 	assert.Empty(t, docker.callStrings(), "no engine")
 	assert.Empty(t, builder.gotReq.Tag, "no build")
 	reqs, err := os.ReadFile(filepath.Join(req.ContextDir, "requirements.txt"))
@@ -433,6 +434,7 @@ func TestAstroBuildWritesADeclaredDockerfilesContext(t *testing.T) {
 		" --build-context astro-install=" + filepath.Join(dir, "astro-install") +
 		" --secret id=netrc,env=NETRC_CONTENT --secret id=other,src=/x " + filepath.Join(dir, "context")
 	assert.Equal(t, []string{"docker build" + flags, "podman build" + flags}, res.NextSteps)
+	assert.Equal(t, imagebuild.NamedContextRequirement, res.BuildNeeds, "the commands pass a named context")
 	assert.Empty(t, docker.callStrings(), "no engine")
 	assert.Empty(t, builder.gotReq.Tag, "no build")
 	reqs, err := os.ReadFile(filepath.Join(dir, "astro-install", "requirements.txt"))

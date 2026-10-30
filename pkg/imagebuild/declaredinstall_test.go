@@ -42,8 +42,9 @@ func TestBuildPassesTheInstallContextToADockerfileThatReadsIt(t *testing.T) {
 	require.NoError(t, err)
 
 	dir := filepath.Join(req.WorkDir, airflowrt.InstallContext)
-	require.Len(t, cmd.calls, 1)
-	assert.Contains(t, cmd.calls[0], " --build-context "+airflowrt.InstallContext+"="+dir+" "+project)
+	require.Len(t, cmd.calls, 2)
+	assert.Equal(t, "docker build --help", cmd.calls[0], "the builder is asked whether it takes a named context first")
+	assert.Contains(t, cmd.calls[1], " --build-context "+airflowrt.InstallContext+"="+dir+" "+project)
 	for name, want := range req.Install.Files() {
 		got, err := os.ReadFile(filepath.Join(dir, name))
 		require.NoError(t, err)

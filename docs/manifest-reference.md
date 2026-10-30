@@ -251,7 +251,7 @@ Build it with `astro package astro`, `astro deploy` or `astro local start --dock
 docker build --tag astro-package/<name>:latest --file <dir>/Dockerfile --build-context astro-install=<dir>/astro-install <dir>/context
 ```
 
-Named build contexts need BuildKit under Docker: the default builder in Docker Engine 23 and later and in Docker Desktop, or Buildx 0.8 and later before that; Docker's legacy builder has no `--build-context`. Podman takes them from 4.2 (Buildah 1.26.4, backported from 1.27). The image is the one `astro package astro` builds, except for three things the CLI adds: `--platform linux/amd64`, the labels a Deployment reads, and the build secrets you pass with `--build-secret`, `BUILD_SECRET_INPUT` or [`build-secrets`](#build-secrets), which the printed command carries as `--secret`.
+Named build contexts need BuildKit under Docker: the default builder in Docker Engine 23 and later and in Docker Desktop, or Buildx 0.8 and later before that; Docker's legacy builder has no `--build-context`. Podman takes them from 4.2 (Buildah 1.26.4, backported from 1.27). `astro package`, `astro deploy` and `astro local start --docker` check for this before they build such a Dockerfile, and refuse a builder that does not take them, naming what they found; `--context-dir` prints the requirement under its commands. The image is the one `astro package astro` builds, except for three things the CLI adds: `--platform linux/amd64`, the labels a Deployment reads, and the build secrets you pass with `--build-secret`, `BUILD_SECRET_INPUT` or [`build-secrets`](#build-secrets), which the printed command carries as `--secret`.
 
 ### `build-secrets`
 
