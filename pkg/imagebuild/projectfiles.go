@@ -58,13 +58,12 @@ var skippedProjectNames = map[string]bool{
 // leave out the same files without a second copy to keep in step.
 var ShippedImageIgnores = slices.Concat(airflowrt.ShippedImageRules(), airflowrt.LocalFileRules())
 
-// generatedNames are the files a generated build's install writes into the
-// image's working directory (the install helper's lists). The project's own
-// copies, in any case, are not carried, so they cannot replace the generated
-// ones, even on a filesystem that folds case. pyproject.toml and uv.lock are not
-// among them: the install reads the project's own (installInputs), so the
-// image carries them as the project has them.
-var generatedNames = []string{requirementsName, packagesName, lockConstraintsName}
+// generatedNames are the files a generated build writes at the context root:
+// the install lists (InstallLists.Files), and the Dockerfile WriteContext
+// writes there. The project's own copies, in any case, are not carried, so
+// they cannot replace the generated ones, even on a filesystem that folds
+// case, and an image built from a written context is the one Build makes.
+var generatedNames = []string{requirementsName, packagesName, lockConstraintsName, contextDockerfileName}
 
 const (
 	dockerIgnoreName = ".dockerignore"

@@ -1,10 +1,10 @@
 package scaffold
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -22,8 +22,10 @@ import (
 //   - a declared Dockerfile still on an Astro Runtime ONBUILD tag, which every
 //     build now refuses, moved onto its -base tag as a conversion would
 //     (updateDockerfile);
-//   - the install helper a Dockerfile on -base runs, written when missing and
-//     refreshed when this astro's differs (updateInstallHelper).
+//   - a declared Dockerfile an Astro CLI preview moved onto -base, which runs
+//     the install helper those previews wrote, given the install steps this
+//     astro writes, and the helper removed (updateStaleHelper);
+//   - the ignore file a moved Dockerfile's context needs (updateDockerignore).
 //
 // Each is a step that adds Changes to the changeset, so a later one is a new
 // function in updateSteps. What it does not do is decide anything about the
@@ -38,9 +40,9 @@ import (
 // updateStep is one part of bringing an existing project up to date.
 type updateStep func(u *update) error
 
-// updateSteps are run in order. The Dockerfile goes first, since whether the
-// helper is needed depends on what it builds FROM once the run is done.
-var updateSteps = []updateStep{updateDockerfile, updateInstallHelper}
+// updateSteps are run in order. The Dockerfile goes first, since what the
+// others do depends on what it builds FROM once the run is done.
+var updateSteps = []updateStep{updateDockerfile, updateStaleHelper, updateDockerignore}
 
 // update is the state the steps share.
 type update struct {
@@ -119,7 +121,11 @@ func boolInt(b bool) int {
 // had all this time to drift from pyproject.toml, so each line of them has to
 // be in it already, or the move would drop what the image installs today.
 func updateDockerfile(u *update) error {
-	if u.body == nil {
+	// Only a file with a stage on an ONBUILD tag, which the build refuses
+	// (CheckDockerfileOnBuild): one whose earlier stage merely might be,
+	// built from a build argument, builds as it is.
+	if u.body == nil || !slices.ContainsFunc(airflowrt.DockerfileStages(u.body),
+		func(st airflowrt.DockerfileStage) bool { return st.OnBuildRuntime() }) {
 		return nil
 	}
 	rw, blocker, _ := dockerfileRewriteOf(u.dockerfile, u.body)
@@ -140,19 +146,10 @@ func updateDockerfile(u *update) error {
 			", because the lists above are not all in "+manifest.Marker+". Once they are, run astro init again"))
 		return nil
 	}
-	// The helper the moved file runs has to be committable, as in a
-	// conversion (planHelperCommittable).
-	switch blocker, err := planHelperCommittable(u.dir, u.dockerfile, u.cs); {
-	case err != nil:
-		return err
-	case blocker != "":
-		u.cs.Notes = append(u.cs.Notes, onBuildKeptNote(blocker))
-		return nil
-	}
 	u.cs.Changes = append(u.cs.Changes, Change{
 		Kind: UpdateFile, Path: u.dockerfile, Content: rw.body,
-		Labels: []string{u.dockerfile + " (now builds FROM " + rw.base + " and installs this project's packages from " +
-			manifest.Marker + " and uv.lock, so docker build . and astro deploy build the same image)"},
+		Labels: []string{u.dockerfile + " (now builds FROM " + rw.base + " and installs the packages the Astro CLI resolves from " +
+			manifest.Marker + " and uv.lock; build it with astro package or astro deploy, or astro package --context-dir for docker build)"},
 	})
 	for _, name := range lists {
 		u.cs.Changes = append(u.cs.Changes, Change{
@@ -239,79 +236,124 @@ func listsCarried(dir string, m *manifest.Manifest) (present, notes []string, er
 	return present, notes, nil
 }
 
-// updateInstallHelper writes the install helper a Dockerfile on -base runs, or
-// refreshes it when the project's is older than this astro's (helperOlder),
-// and keeps what the install reads in the ignore file's context. A Dockerfile
-// that does not run the helper gets neither.
-func updateInstallHelper(u *update) error {
-	if u.body == nil || !bytes.Contains(u.body, []byte(airflowrt.InstallHelperPath)) {
+// updateStaleHelper brings a Dockerfile an Astro CLI preview moved onto -base
+// up to date: those previews ran the install helper they wrote into the
+// project (staleHelperPath) in a stage of the file's own, and the CLI resolves
+// the install before the build now (airflowrt.InstallDockerfile). The file's
+// install block is replaced with this astro's, its own steps kept, and the
+// helper removed (planStaleHelperRemoval) once nothing runs it. A file whose
+// block this cannot find is left as it is, with a note: its build still runs
+// the helper, so the helper stays too.
+func updateStaleHelper(u *update) error {
+	if u.body != nil && runsStaleHelper(u.body) {
+		body, ok := previewInstallReplaced(u.body)
+		if !ok {
+			u.cs.Notes = append(u.cs.Notes, u.dockerfile+" runs "+staleHelperPath+", which an earlier Astro CLI preview wrote, "+
+				"and astro init cannot find the install steps it wrote around it. Replace them with the ones in "+
+				"docs/manifest-reference.md (Your own Dockerfile) and run astro init again, which then removes "+staleHelperPath)
+			return nil
+		}
+		u.cs.Changes = append(u.cs.Changes, Change{
+			Kind: UpdateFile, Path: u.dockerfile, Content: body,
+			Labels: []string{u.dockerfile + " (install steps replaced with the ones this astro writes: the Astro CLI resolves the packages " +
+				"before the build now, and nothing runs " + staleHelperPath + ")"},
+		})
+		u.body = body
+	}
+	return planStaleHelperRemoval(u.dir, u.cs)
+}
+
+// runsStaleHelper reports a Dockerfile, data, with an instruction naming the
+// install helper an Astro CLI preview wrote. Comments are not read.
+func runsStaleHelper(data []byte) bool {
+	name := path.Base(staleHelperPath)
+	for _, line := range strings.Split(string(data), "\n") {
+		if t := strings.TrimSpace(line); t != "" && !strings.HasPrefix(t, "#") && strings.Contains(t, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// previewInstallReplaced is a Dockerfile an Astro CLI preview moved onto -base,
+// data, with the install block that preview wrote replaced by this astro's.
+// The block runs from the comment every preview began it with
+// (previewBlockPrefix) to the comment ahead of the file's own steps
+// (ownStepsComment), or to the end; what is before and after stays. The final
+// stage keeps its reference, flags and name. ok is false when the block is
+// not there to find, or the final stage is not on a runtime -base tag.
+func previewInstallReplaced(data []byte) (body []byte, ok bool) {
+	stages := airflowrt.DockerfileStages(data)
+	if len(stages) == 0 {
+		return nil, false
+	}
+	final := stages[len(stages)-1]
+	if !strings.HasSuffix(final.Tag, "-base") || !airflowrt.IsAstroRuntimeRef(final.Image, final.Tag) {
+		return nil, false
+	}
+	lines := strings.Split(string(data), "\n")
+	start := slices.IndexFunc(lines, func(l string) bool { return strings.HasPrefix(l, previewBlockPrefix) })
+	if start < 0 || start > final.Line {
+		return nil, false
+	}
+	end := slices.IndexFunc(lines[final.Line:], func(l string) bool { return l+"\n" == ownStepsComment })
+	if end < 0 {
+		// No steps of the file's own: the block runs to the end.
+		end = len(lines)
+	} else {
+		end += final.Line
+	}
+	from := strings.Join(append(append([]string{}, final.Flags...), final.Ref), " ")
+	var b strings.Builder
+	if start > 0 {
+		b.WriteString(strings.Join(lines[:start], "\n") + "\n")
+	}
+	b.WriteString(installBlockComment)
+	b.WriteString(airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias, ListsFrom: airflowrt.InstallContext}))
+	if end < len(lines) {
+		b.WriteString("\n" + strings.Join(lines[end:], "\n"))
+	}
+	out := b.String()
+	if !strings.HasSuffix(out, "\n") {
+		out += "\n"
+	}
+	return []byte(out), true
+}
+
+// previewBlockPrefix is how every rewrite has begun its install block's
+// comment, an Astro CLI preview's and this astro's (installBlockComment).
+const previewBlockPrefix = "# Installs this project's packages from pyproject.toml and uv.lock"
+
+// updateDockerignore keeps local secrets and per-machine files out of the
+// context of a declared Dockerfile that installs from the lists the CLI
+// resolves, as a conversion does for the file it moves (planDockerignore).
+func updateDockerignore(u *update) error {
+	if u.body == nil || !airflowrt.ReadsInstallContext(u.body) {
 		return nil
 	}
-	helper := airflowrt.InstallHelper()
-	switch got, err := readIfPresent(filepath.Join(u.dir, filepath.FromSlash(airflowrt.InstallHelperPath))); {
-	case err != nil:
-		return err
-	case got == nil:
-		u.cs.Changes = append(u.cs.Changes, Change{
-			Kind: CreateFile, Path: airflowrt.InstallHelperPath, Content: helper,
-			Labels: []string{airflowrt.InstallHelperPath + " (reads " + manifest.Marker + " and uv.lock inside the build)"},
-		})
-	case helperOlder(got) && !bytes.Equal(got, helper):
-		u.cs.Changes = append(u.cs.Changes, Change{
-			Kind: UpdateFile, Path: airflowrt.InstallHelperPath, Content: helper,
-			Labels: []string{airflowrt.InstallHelperPath + " (refreshed to this astro's version)"},
-		})
-	}
-	ignore, err := planDockerignore(u.dir, u.dockerfile, installInputs)
-	if err != nil {
+	ignore, err := planDockerignore(u.dir, u.dockerfile)
+	if err != nil || ignore == nil {
 		return err
 	}
-	if ignore != nil {
-		u.cs.Changes = append(u.cs.Changes, *ignore)
-	}
+	u.cs.Changes = append(u.cs.Changes, *ignore)
 	return nil
 }
 
-// InstallHelperWarning is the warning for a build of the project's declared
-// Dockerfile, dockerfile (the manifest's value), when that file runs the
-// install helper and the project's copy of it is missing or is not the one
-// this astro writes, or "" when there is nothing to say. dir is the project
-// root.
-//
-// A warning and not a refusal: a copy someone edited on purpose is theirs to
-// keep, and an older astro's helper still installs. But the copy is what the
-// image installs with, whichever astro builds it, so a stale one is worth a
-// line naming the command that refreshes it.
-func InstallHelperWarning(dir, dockerfile string) string {
+// StaleHelperWarning is the warning for a build of the project's declared
+// Dockerfile, dockerfile (the manifest's value), when that file still runs the
+// install helper an Astro CLI preview wrote, or "" when it does not. dir is
+// the project root. The build goes ahead: the helper, while the project has
+// it, still installs. But astro init replaces it with the install this astro
+// resolves, so the warning names that command.
+func StaleHelperWarning(dir, dockerfile string) string {
 	if dockerfile == "" {
 		return ""
 	}
 	body, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(dockerfile)))
-	if err != nil || !bytes.Contains(body, []byte(airflowrt.InstallHelperPath)) {
+	if err != nil || !runsStaleHelper(body) {
 		return ""
 	}
-	got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(airflowrt.InstallHelperPath)))
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-		return dockerfile + " runs " + airflowrt.InstallHelperPath + ", which this project does not have, so the build will fail. Run astro init to write it"
-	case err != nil:
-		return ""
-	case helperOlder(got):
-		return airflowrt.InstallHelperPath + ", which " + dockerfile + " runs to install this project's packages, is older than the one this astro writes. Run astro init to refresh it"
-	}
-	return ""
-}
-
-// helperOlder reports a project's copy of the install helper, data, that is
-// older than this CLI's by its version stamp (airflowrt.HelperVersion), or
-// carries none: a copy from before the stamp, or something else under its
-// name. A copy at this CLI's version or newer is left alone, by init and by
-// the build warning both: a newer astro wrote it, and an older one must not
-// take it back, and one at the same version that differs was edited on
-// purpose.
-func helperOlder(data []byte) bool {
-	v, ok := airflowrt.HelperVersion(data)
-	return !ok || v < airflowrt.InstallHelperVersion()
+	return dockerfile + " runs " + staleHelperPath + ", which an earlier Astro CLI preview wrote. Run astro init to replace it with the install this astro resolves"
 }
 
 // carriesAstroSection reports a manifest with a [tool.astro] table, the one

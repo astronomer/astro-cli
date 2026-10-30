@@ -43,6 +43,27 @@ func (c *Client) Lock(ctx context.Context, project string, stdio Stdio) error {
 	return asResolution("lock", c.fetch(ctx, project, stdio, "lock"))
 }
 
+// LockCheck runs `uv lock --check`: nil when <project>/uv.lock exists and
+// matches pyproject.toml, by uv's own reading of it, and an error otherwise —
+// a missing or stale lock, or a check uv could not make (an index it cannot
+// reach). Nothing is written.
+func (c *Client) LockCheck(ctx context.Context, project string) error {
+	return c.fetch(ctx, project, Stdio{}, "lock", "--check")
+}
+
+// ExportPylock is `uv export --format pylock.toml` of <project>/uv.lock as it
+// stands (--frozen), without dev dependencies and without the project itself:
+// every package the lock installs, as PEP 751 lists it, with its version,
+// environment marker and source. It reads the lock and writes nothing.
+func (c *Client) ExportPylock(ctx context.Context, project string) ([]byte, error) {
+	var out bytes.Buffer
+	err := c.command(ctx, project, Stdio{Out: &out}, "export", "--frozen", "--no-dev", "--no-emit-project", "--format", "pylock.toml")
+	if err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
 // VenvAt creates a standalone venv at dir — not the <project>/.venv Venv
 // makes — for a scratch environment that lives outside any project (a
 // pre-flight check against a platform's Airflow version). python selects the

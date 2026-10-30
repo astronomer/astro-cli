@@ -1,6 +1,7 @@
 package pack
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -94,7 +95,7 @@ func checkManifest(ctx context.Context, req Request, airflow manifest.Airflow) (
 	if envWarning != "" {
 		warnings = append(warnings, envWarning)
 	}
-	if w := scaffold.InstallHelperWarning(req.ProjectDir, req.Manifest.Astro.Dockerfile); w != "" {
+	if w := scaffold.StaleHelperWarning(req.ProjectDir, req.Manifest.Astro.Dockerfile); w != "" {
 		warnings = append(warnings, w)
 	}
 	// One astro init would move off its ONBUILD tag was refused when the
@@ -247,6 +248,18 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	}
 	warnings = append(warnings, lockedRuntimeNotices(ctx, req, mb)...)
 	declared := breq.Dockerfile
+	// What a generated image installs is resolved here, from the project's
+	// lock, before the content address that covers it.
+	if err := req.resolveInstall(ctx, &breq); err != nil {
+		return Result{}, err
+	}
+	// A context is built later, by whoever runs the commands it prints, so
+	// the secrets it names need not be readable now.
+	if req.ContextDir != "" {
+		res, err := writeContext(req, breq, name)
+		res.Warnings = warnings
+		return res, err
+	}
 	missingSecrets, err := checkSecrets(req, cb)
 	if err != nil {
 		return Result{}, err
@@ -306,13 +319,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// load-bearing: that base is an Astro runtime by construction, so a missing
 	// label means something odd about the image rather than a choice the user made.
 	runtimeV, airflowLabel, inspected := readVersionLabels(ctx, engine, built)
-	runtimeVersion := runtimeV
-	if runtimeVersion == "" {
-		runtimeVersion = airflowLabel
-	}
-	if runtimeVersion == "" {
-		runtimeVersion = airflow.Pin
-	}
+	runtimeVersion := cmp.Or(runtimeV, airflowLabel, airflow.Pin)
 	// A declared Dockerfile that did not produce an Astro Runtime image is
 	// REPORTED, not refused.
 	//
@@ -509,8 +516,8 @@ func generatedRecipe(breq imagebuild.Request) string {
 // a declared Dockerfile.
 //
 // A generated build contributes its recipe, the Dockerfile imagebuild writes,
-// and everything its install reads (imagebuild.InstallInputsDigest: the install
-// helper, pyproject.toml, and uv.lock, whose versions are the ones installed).
+// and the lists its install reads (InstallLists.Digest: requirements.txt, the
+// lock's constraints and packages.txt, as the CLI resolved them from uv.lock).
 // The dependencies, packages and index pages are all in those, so no list of
 // them is hashed besides.
 //
@@ -566,11 +573,7 @@ func contentHash(base, platform, recipe string, breq imagebuild.Request, df decl
 	writeField("platform", platform)
 	if recipe != "" {
 		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(recipe))))
-		inputs, err := imagebuild.InstallInputsDigest(breq)
-		if err != nil {
-			return "", err
-		}
-		writeField("install-inputs", inputs)
+		writeField("install-lists", breq.Lists().Digest())
 	} else {
 		writeField("dockerfile", filepath.ToSlash(df.rel))
 		body, err := os.ReadFile(df.abs)
@@ -580,19 +583,12 @@ func contentHash(base, platform, recipe string, breq imagebuild.Request, df decl
 		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
 		// A declared Dockerfile that installs as a generated build does
 		// (airflowrt.InstallDockerfile, which astro init writes into a
-		// converted one) reads the same inputs from its context, the project:
-		// the helper the project carries, pyproject.toml and uv.lock. Each is
-		// hashed when it is there, so an edit to the lock or the helper moves
-		// the tag, as it does for a generated build.
-		for _, name := range []string{"pyproject.toml", "uv.lock", airflowrt.InstallHelperPath} {
-			data, err := os.ReadFile(filepath.Join(breq.Context, filepath.FromSlash(name)))
-			if errors.Is(err, os.ErrNotExist) {
-				continue
-			}
-			if err != nil {
-				return "", fmt.Errorf("reading the project's %s: %w", name, err)
-			}
-			writeField(name, fmt.Sprintf("%x", sha256.Sum256(data)))
+		// converted one) reads the lists the CLI resolved from the project's
+		// lock, through the named context: their digest is part of the
+		// address, so an edit to the lock moves the tag, as it does for a
+		// generated build.
+		if breq.ReadsInstallContext() {
+			writeField("install-lists", breq.Lists().Digest())
 		}
 	}
 	if projectFiles := breq.ProjectFiles; projectFiles != "" {

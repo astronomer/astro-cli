@@ -51,8 +51,12 @@ var (
 // apc links): a pyproject.toml project's image, built from its manifest, or
 // a prebuilt one (ImageName).
 type ManifestImage struct {
-	DeploymentID string
-	WorkspaceID  string
+	// ResolveInstall resolves what a generated image installs from the
+	// project's lock, into req.Install (imageinstall.Fill), with its warnings
+	// through warn. nil installs the manifest's dependencies as written.
+	ResolveInstall func(ctx context.Context, req *imagebuild.Request, warn func(string)) error
+	DeploymentID   string
+	WorkspaceID    string
 	// ImageName is a prebuilt image to deploy instead of building one
 	// (--image-name): a local image, pushed as a built one is, or, with
 	// InRegistry, one already in a registry, which the Deployment is pointed
@@ -597,6 +601,12 @@ func buildManifestImage(ctx context.Context, in *ManifestImage, req *imagebuild.
 		Now:        manifestBuildNow,
 		Progress:   progress,
 		ReadLabel:  readLabel,
+		ResolveInstall: func(ctx context.Context, req *imagebuild.Request) error {
+			if in.ResolveInstall == nil {
+				return nil
+			}
+			return in.ResolveInstall(ctx, req, in.Warn)
+		},
 	})
 }
 

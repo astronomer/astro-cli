@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -78,9 +77,7 @@ func TestUpdateMovesAKeptDockerfileOntoBase(t *testing.T) {
 	got, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
 	require.NoError(t, err)
 	assert.Equal(t, rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", "RUN apt-get update\n"), string(got))
-	helper, err := os.ReadFile(filepath.Join(dir, airflowrt.InstallHelperPath))
-	require.NoError(t, err)
-	assert.Equal(t, airflowrt.InstallHelper(), helper)
+	assert.NoFileExists(t, filepath.Join(dir, staleHelperPath), "the CLI resolves the install; nothing is written for the build to run")
 	assert.NoFileExists(t, filepath.Join(dir, "requirements.txt"))
 	assert.NoFileExists(t, filepath.Join(dir, "packages.txt"))
 	after, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
@@ -116,44 +113,80 @@ func TestUpdateKeepsADockerfileWhoseListsDrifted(t *testing.T) {
 	assert.Contains(t, notes, "Until it builds FROM a -base tag, each build of it warns")
 }
 
-// A Dockerfile already on -base gets the helper it runs: written when the
-// project lacks it, refreshed when it is not this astro's, and left alone when
-// it is. With nothing to do the run changes nothing.
-func TestUpdateWritesAndRefreshesTheHelper(t *testing.T) {
-	onBase := rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", "RUN true\n")
+// previewDockerfile is a Dockerfile as an Astro CLI preview moved it onto
+// -base: an earlier stage of the project's own, the install block that ran
+// the helper in a stage of its own, and the project's own steps.
+const previewDockerfile = "FROM python:3.12-slim AS tools\nRUN true\n" +
+	"# Installs this project's packages from pyproject.toml and uv.lock\n" +
+	"# (.astro/install-project.py reads them; astro init keeps both up to date).\n" +
+	"ARG ASTRO_UV_IMAGE=ghcr.io/astral-sh/uv:0.11.8\n" +
+	"FROM ${ASTRO_UV_IMAGE} AS astro-uv\n" +
+	"FROM quay.io/astronomer/astro-runtime:12.6.0-base AS astro-install\n" +
+	"USER root\n" +
+	"COPY pyproject.toml uv.lock* .astro/install-project.py /tmp/astro-project/\n" +
+	"COPY --from=astro-uv /uv /opt/astro-uv/uv\n" +
+	"RUN python /tmp/astro-project/install-project.py --project /tmp/astro-project --out /tmp/astro-install\n" +
+	"FROM --platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0-base AS app\n" +
+	"COPY --from=astro-install /tmp/astro-install/packages.txt .\n" +
+	"USER astro\n" +
+	"COPY --chown=astro:0 . .\n" +
+	"\n" + ownStepsComment + "COPY --from=tools /usr/bin/true /tmp/true\n"
 
-	dir := v2Project(t, map[string]string{"Dockerfile": onBase})
+// previewHelper is the helper those previews wrote, by its first line.
+const previewHelper = staleHelperHeader + "\n# astro-install-helper: 5\nprint('installing')\n"
+
+// A Dockerfile a preview moved onto -base gets this astro's install block in
+// place of the one that ran the helper, keeping the stages before it, the
+// final stage's flags and name, and its own steps; the helper goes. A second
+// run changes nothing.
+func TestUpdateReplacesAPreviewInstall(t *testing.T) {
+	dir := v2Project(t, map[string]string{"Dockerfile": previewDockerfile, staleHelperPath: previewHelper})
+
 	res := runUpdate(t, dir)
-	assert.Contains(t, res.Created, airflowrt.InstallHelperPath+" (reads pyproject.toml and uv.lock inside the build)")
-	assert.Contains(t, res.Created, fileDockerignore, "the build's context is the project, so it gets the ignore file a conversion writes")
 
-	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: "# an older helper\n"})
-	res = runUpdate(t, dir)
-	assert.Equal(t, []string{airflowrt.InstallHelperPath + " (refreshed to this astro's version)"}, res.Updated)
-	helper, err := os.ReadFile(filepath.Join(dir, airflowrt.InstallHelperPath))
+	got, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
 	require.NoError(t, err)
-	assert.Equal(t, airflowrt.InstallHelper(), helper)
+	assert.Equal(t, "FROM python:3.12-slim AS tools\nRUN true\n"+installBlockComment+
+		airflowrt.InstallDockerfileWith("--platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0-base",
+			airflowrt.InstallOptions{Alias: "app", ListsFrom: airflowrt.InstallContext})+
+		"\n"+ownStepsComment+"COPY --from=tools /usr/bin/true /tmp/true\n", string(got))
+	assert.NoFileExists(t, filepath.Join(dir, staleHelperPath))
+	assert.Contains(t, strings.Join(res.Updated, "\n"), "Dockerfile (install steps replaced with the ones this astro writes")
+	assert.Contains(t, strings.Join(res.Deleted, "\n"), staleHelperPath)
+	assert.Contains(t, res.Created, fileDockerignore, "the build's context is the project, so it gets the ignore file a conversion writes")
+	assert.False(t, res.OnBuildKept)
+	assert.Empty(t, res.Notes)
+	assert.Empty(t, StaleHelperWarning(dir, "Dockerfile"))
 
 	res = runUpdate(t, dir)
 	assert.Empty(t, res.Created)
 	assert.Empty(t, res.Updated)
 	assert.Empty(t, res.Deleted)
-
-	// A newer astro's helper is never taken back to this one's.
-	newer := helperAt(airflowrt.InstallHelperVersion() + 1)
-	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: newer})
-	res = runUpdate(t, dir)
-	assert.Empty(t, res.Updated)
-	got, err := os.ReadFile(filepath.Join(dir, airflowrt.InstallHelperPath))
-	require.NoError(t, err)
-	assert.Equal(t, newer, string(got))
 }
 
-// helperAt is this CLI's install helper stamped with version v instead.
-func helperAt(v int) string {
-	return strings.Replace(string(airflowrt.InstallHelper()),
-		"# astro-install-helper: "+strconv.Itoa(airflowrt.InstallHelperVersion())+"\n",
-		"# astro-install-helper: "+strconv.Itoa(v)+"\n", 1)
+// A preview's Dockerfile whose block cannot be found (someone rewrote the
+// comment) is left as it is, and so is the helper it still runs, with a note.
+// A helper no Dockerfile runs goes, and a file of the project's own at that
+// path stays.
+func TestUpdateLeavesAHelperTheDockerfileStillRuns(t *testing.T) {
+	edited := strings.Replace(previewDockerfile, "# Installs this project's packages", "# Our install", 1)
+	dir := v2Project(t, map[string]string{"Dockerfile": edited, staleHelperPath: previewHelper})
+	res := runUpdate(t, dir)
+	assert.Empty(t, res.Updated)
+	assert.Empty(t, res.Deleted)
+	assert.FileExists(t, filepath.Join(dir, staleHelperPath))
+	require.Len(t, res.Notes, 1)
+	assert.Contains(t, res.Notes[0], "cannot find the install steps it wrote around it")
+
+	onBase := rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", "RUN true\n")
+	dir = v2Project(t, map[string]string{"Dockerfile": onBase, staleHelperPath: previewHelper})
+	res = runUpdate(t, dir)
+	assert.Equal(t, []string{staleHelperPath + " (written by an earlier Astro CLI preview, removed: the CLI resolves the install before the build now)"}, res.Deleted)
+
+	dir = v2Project(t, map[string]string{"Dockerfile": onBase, staleHelperPath: "print('ours')\n"})
+	res = runUpdate(t, dir)
+	assert.Empty(t, res.Deleted)
+	assert.FileExists(t, filepath.Join(dir, staleHelperPath))
 }
 
 // A Dockerfile whose shape the rewrite will not take stays as it is, with the
@@ -169,26 +202,14 @@ func TestUpdateNotesADockerfileItCannotMove(t *testing.T) {
 	assert.True(t, strings.HasSuffix(res.Notes[0], "rather than what pyproject.toml lists"))
 }
 
-func TestInstallHelperWarning(t *testing.T) {
-	onBase := rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", "RUN true\n")
-	dir := v2Project(t, map[string]string{"Dockerfile": onBase})
-	assert.Contains(t, InstallHelperWarning(dir, "Dockerfile"), "which this project does not have, so the build will fail. Run astro init to write it")
+func TestStaleHelperWarning(t *testing.T) {
+	dir := v2Project(t, map[string]string{"Dockerfile": previewDockerfile, staleHelperPath: previewHelper})
+	assert.Equal(t, "Dockerfile runs .astro/install-project.py, which an earlier Astro CLI preview wrote. "+
+		"Run astro init to replace it with the install this astro resolves", StaleHelperWarning(dir, "Dockerfile"))
 
-	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: "# an unstamped copy\n"})
-	assert.Contains(t, InstallHelperWarning(dir, "Dockerfile"), "is older than the one this astro writes. Run astro init to refresh it")
-
-	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: string(airflowrt.InstallHelper())})
-	assert.Empty(t, InstallHelperWarning(dir, "Dockerfile"))
-
-	// A newer astro's, and this version's edited, are left without a word.
-	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: helperAt(airflowrt.InstallHelperVersion() + 1)})
-	assert.Empty(t, InstallHelperWarning(dir, "Dockerfile"), "a newer astro wrote it")
-	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: string(airflowrt.InstallHelper()) + "# edited\n"})
-	assert.Empty(t, InstallHelperWarning(dir, "Dockerfile"), "edited at this version")
-
-	other := v2Project(t, map[string]string{"Dockerfile": "FROM quay.io/astronomer/astro-runtime:12.6.0-base\nRUN pip install x\n"})
-	assert.Empty(t, InstallHelperWarning(other, "Dockerfile"), "a Dockerfile that does not run the helper needs none")
-	assert.Empty(t, InstallHelperWarning(other, ""), "no Dockerfile, no warning")
+	other := v2Project(t, map[string]string{"Dockerfile": rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", "RUN true\n")})
+	assert.Empty(t, StaleHelperWarning(other, "Dockerfile"), "a Dockerfile that does not run the helper")
+	assert.Empty(t, StaleHelperWarning(other, ""), "no Dockerfile, no warning")
 }
 
 // CheckDockerfileOnBuild refuses a Dockerfile on an ONBUILD tag only when
@@ -216,7 +237,8 @@ func TestCheckDockerfileOnBuild(t *testing.T) {
 		_, err := CheckDockerfileOnBuild(dir, load(dir))
 		require.ErrorIs(t, err, ErrOnBuildBase)
 		assert.Contains(t, err.Error(), airflowrt.InstallDockerfileWith("--platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0-base",
-			airflowrt.InstallOptions{Alias: "app"}))
+			airflowrt.InstallOptions{Alias: "app", ListsFrom: airflowrt.InstallContext}))
+		assert.Contains(t, err.Error(), "astro package --context-dir")
 	})
 	t.Run("warned about when a list drifted", func(t *testing.T) {
 		dir := v2Project(t, map[string]string{"Dockerfile": onBuild, "requirements.txt": "pandas==2.1.0\nrequests==2.32.0\n"})

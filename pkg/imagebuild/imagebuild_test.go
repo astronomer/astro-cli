@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -62,7 +61,7 @@ func hasCall(calls []string, substr string) bool {
 	return false
 }
 
-func TestBuildWritesTheInstallInputs(t *testing.T) {
+func TestBuildWritesRequirements(t *testing.T) {
 	cmd := &fakeCmd{}
 	req := testRequest(t)
 	req.Dependencies = []string{"pandas==2.2.0", "requests"}
@@ -74,162 +73,41 @@ func TestBuildWritesTheInstallInputs(t *testing.T) {
 	assert.True(t, hasCall(cmd.calls, "docker build --tag "+req.Tag), "expected a build, got %v", cmd.calls)
 	assert.Equal(t, req.Tag, image)
 
-	// A request naming no project carries its lists in a pyproject.toml of
-	// its own, beside the helper that reads it.
-	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
-	helper, err := os.ReadFile(filepath.Join(ctxDir, filepath.FromSlash(generatedInputsDir), filepath.Base(InstallHelperPath)))
+	got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, requirementsName))
 	require.NoError(t, err)
-	assert.Equal(t, InstallHelper(), helper)
-	assert.FileExists(t, filepath.Join(ctxDir, filepath.FromSlash(generatedInputsDir), pyprojectName))
-	reqs, pkgs, constraints := installLists(t, ctxDir)
-	assert.Equal(t, "pandas==2.2.0\nrequests\n", reqs)
-	assert.Empty(t, pkgs)
-	assert.Empty(t, constraints)
-}
-
-// The Dockerfile starts FROM the base's -base tag, runs the helper in a stage
-// of its own, writes the runtime's ONBUILD steps out over what it wrote, and
-// sits outside the context dir.
-func TestBuildWritesTheInstallDockerfile(t *testing.T) {
-	req := testRequest(t)
-	req.Dependencies = []string{"pandas"}
-	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
-	require.NoError(t, err)
-	// With no secret to mount, the Python install is a plain RUN, and the
-	// helper's stage copies its inputs, so the file needs no BuildKit.
+	assert.Equal(t, "pandas==2.2.0\nrequests\n", string(got))
+	// packages.txt must exist so the Dockerfile's COPY of it does not fail.
+	assert.FileExists(t, filepath.Join(req.WorkDir, buildContextDir, packagesName))
+	// The Dockerfile starts FROM the base's -base tag, writes the runtime's
+	// ONBUILD steps out, and sits outside the context dir. With no secret to
+	// mount, the Python install is a plain RUN, which needs no BuildKit.
 	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
 	require.NoError(t, err)
-	base := req.BaseImage + "-base"
-	assert.Equal(t, "ARG ASTRO_UV_IMAGE="+UVImage+"\n"+
-		"FROM ${ASTRO_UV_IMAGE} AS astro-uv\n"+
-		"FROM "+base+" AS astro-install\n"+
-		"USER root\n"+
-		"COPY .astro/install/ /tmp/astro-project/\n"+
-		"COPY --from=astro-uv /uv /opt/astro-uv/uv\n"+
-		"RUN python /tmp/astro-project/install-project.py --project /tmp/astro-project --out /tmp/astro-install\n"+
-		"FROM "+base+"\n"+
-		"COPY --from=astro-install /tmp/astro-install/packages.txt .\n"+
+	assert.Equal(t, "FROM "+req.BaseImage+"-base\n"+
+		"COPY packages.txt .\n"+
 		"USER root\n"+
 		"RUN if [ -x /usr/local/bin/install-system-packages ]; then /usr/local/bin/install-system-packages; "+
 		"elif [ -s packages.txt ]; then apt-get update && cat packages.txt | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n"+
-		"COPY --from=astro-install /tmp/astro-install/requirements.txt /tmp/astro-install/uv-lock-constraints.txt ./\n"+
+		"COPY requirements.txt uv-lock-constraints.txt ./\n"+
 		"RUN if [ -x /usr/local/bin/install-python-dependencies ]; then /usr/local/bin/install-python-dependencies; "+
 		"else pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; fi\n"+
 		"USER astro\n"+
 		"COPY --chown=astro:0 . .\n", string(df))
 	assert.NotContains(t, string(df), "--mount")
-	assert.NoFileExists(t, filepath.Join(req.WorkDir, buildContextDir, dockerfileName))
 }
 
-// A request naming its project installs from the project's own pyproject.toml
-// and uv.lock, copied into the context as they are.
-func TestBuildCopiesTheProjectsManifestAndLock(t *testing.T) {
-	project := t.TempDir()
-	pyproject, lock := fixtureFiles(t, "pins")
-	writeTree(t, project, map[string]string{"pyproject.toml": pyproject, "uv.lock": lock})
-	req := testRequest(t)
-	req.ManifestDir = project
-	req.Dependencies = []string{"pandas"}
-
-	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
-	require.NoError(t, err)
-	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
-	for name, want := range map[string]string{pyprojectName: pyproject, uvLockName: lock} {
-		got, err := os.ReadFile(filepath.Join(ctxDir, filepath.FromSlash(generatedInputsDir), name))
-		require.NoError(t, err)
-		assert.Equal(t, want, string(got), name)
-	}
-	reqs, _, constraints := installLists(t, ctxDir)
-	assert.Equal(t, "-c "+lockConstraintsName+"\nidna==3.20\nrequests==2.32.3\ntabulate==0.10.0\n", reqs)
-	assert.Contains(t, constraints, "\ncharset-normalizer==3.5.2\n")
-}
-
-// A project with no uv.lock installs its dependencies unpinned, as before.
-func TestBuildWithoutALockInstallsUnpinned(t *testing.T) {
-	project := t.TempDir()
-	writeTree(t, project, map[string]string{"pyproject.toml": "[project]\ndependencies = ['pandas']\n"})
-	req := testRequest(t)
-	req.ManifestDir = project
-	req.Dependencies = []string{"pandas"}
-
-	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
-	require.NoError(t, err)
-	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
-	assert.NoFileExists(t, filepath.Join(ctxDir, uvLockName))
-	reqs, _, constraints := installLists(t, ctxDir)
-	assert.Equal(t, "pandas\n", reqs)
-	assert.Empty(t, constraints)
-}
-
-// A request naming no project states its find-links pages in the [tool.uv]
-// settings of the pyproject.toml it is given, where uv reads them when it
-// resolves that project in the build.
+// Find-links pages lead the generated requirements.txt, one --find-links
+// line each, before the dependencies they serve.
 func TestBuildWritesFindLinks(t *testing.T) {
 	req := testRequest(t)
 	req.Dependencies = []string{"private-lib", "pandas"}
-	// Passed through as they are, whatever their shape.
-	req.FindLinks = []string{"https://pypi.acme.example/simple/private-lib/", "https://files.acme.example/wheels/index.html", "./vendor"}
+	req.FindLinks = []string{"https://pypi.acme.example/simple/private-lib/"}
 
 	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
-	data, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, filepath.FromSlash(generatedInputsDir), pyprojectName))
+	got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, requirementsName))
 	require.NoError(t, err)
-	var doc struct {
-		Tool struct {
-			UV struct {
-				FindLinks []string `toml:"find-links"`
-			} `toml:"uv"`
-		} `toml:"tool"`
-	}
-	require.NoError(t, toml.Unmarshal(data, &doc))
-	assert.Equal(t, req.FindLinks, doc.Tool.UV.FindLinks)
-}
-
-// Local Docker mode builds in the same WorkDir every start, so the context is
-// cleared each time: a uv.lock the project has since deleted is not pinned
-// from.
-func TestBuildForgetsALockTheProjectDeleted(t *testing.T) {
-	project := t.TempDir()
-	pyproject, lock := fixtureFiles(t, "pins")
-	writeTree(t, project, map[string]string{"pyproject.toml": pyproject, "uv.lock": lock})
-	req := testRequest(t)
-	req.ManifestDir = project
-	req.Dependencies = []string{"pandas"}
-	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
-
-	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
-	require.NoError(t, err)
-	_, _, constraints := installLists(t, ctxDir)
-	require.Contains(t, constraints, "charset-normalizer==3.5.2")
-
-	require.NoError(t, os.Remove(filepath.Join(project, "uv.lock")))
-	_, err = testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
-	require.NoError(t, err)
-	assert.NoFileExists(t, filepath.Join(ctxDir, uvLockName))
-	reqs, _, constraints := installLists(t, ctxDir)
-	assert.Equal(t, "requests==2.32.3\ntabulate\n", reqs, "resolved again, offline here, so unpinned")
-	assert.Empty(t, constraints)
-}
-
-// A shipped build from a caller that sets ProjectFiles but predates
-// ManifestDir installs from the project's own pyproject.toml, and ships it as
-// it is, not a stand-in written from the request's lists.
-func TestBuildWithoutManifestDirReadsTheShippedProject(t *testing.T) {
-	project := t.TempDir()
-	const pyproject = "[project]\nname = 'p'\ndependencies = ['pandas']\n\n[tool.ruff]\nline-length = 100\n"
-	writeTree(t, project, map[string]string{"pyproject.toml": pyproject})
-	req := testRequest(t)
-	req.ProjectFiles = project
-	req.Dependencies = []string{"pandas"}
-
-	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
-	require.NoError(t, err)
-	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
-	got, err := os.ReadFile(filepath.Join(ctxDir, pyprojectName))
-	require.NoError(t, err)
-	assert.Equal(t, pyproject, string(got))
-	reqs, _, _ := installLists(t, ctxDir)
-	assert.Equal(t, "pandas\n", reqs)
+	assert.Equal(t, "--find-links https://pypi.acme.example/simple/private-lib/\nprivate-lib\npandas\n", string(got))
 }
 
 // The -base suffix is added once: a base already on a -base tag is not
@@ -239,17 +117,7 @@ func TestBaseOf(t *testing.T) {
 	assert.Equal(t, RuntimeImageRepo+":3.1-5-base", baseOf(RuntimeImageRepo+":3.1-5"))
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0-python-3.11-base", baseOf("quay.io/astronomer/astro-runtime:12.6.0-python-3.11"))
 	assert.Equal(t, RuntimeImageRepo+":3.1-base", baseOf(RuntimeImageRepo+":3.1-base"))
-	assert.Contains(t, GeneratedDockerfile(RuntimeImageRepo+":3.1", false), "\nFROM "+RuntimeImageRepo+":3.1-base AS astro-install\n")
-	// A project's own Dockerfile always mounts the secret; a generated build
-	// only when it has one. They differ in nothing else but what the install
-	// stage copies: the project's files, or the inputs directory a generated
-	// build stages, which needs no wildcard.
-	own, generated := InstallDockerfile(RuntimeImageRepo+":3.1-base"), GeneratedDockerfile(RuntimeImageRepo+":3.1", true)
-	assert.Contains(t, own, "COPY pyproject.toml uv.lock* .astro/install-project.py /tmp/astro-project/\n")
-	assert.Contains(t, generated, "COPY .astro/install/ /tmp/astro-project/\n")
-	assert.NotContains(t, generated, "uv.lock*", "no optional wildcard for Buildah to refuse")
-	assert.Equal(t, own, strings.Replace(generated, "COPY .astro/install/ ", "COPY pyproject.toml uv.lock* .astro/install-project.py ", 1))
-	assert.NotContains(t, GeneratedDockerfile(RuntimeImageRepo+":3.1", false), "--mount")
+	assert.True(t, strings.HasPrefix(GeneratedDockerfile(RuntimeImageRepo+":3.1", false), "FROM "+RuntimeImageRepo+":3.1-base\n"))
 }
 
 func TestBuildWritesOSPackages(t *testing.T) {
@@ -263,21 +131,55 @@ func TestBuildWritesOSPackages(t *testing.T) {
 	assert.True(t, hasCall(cmd.calls, "docker build --tag "+req.Tag), "expected a build, got %v", cmd.calls)
 	assert.Equal(t, req.Tag, image)
 
-	reqs, pkgs, _ := installLists(t, filepath.Join(req.WorkDir, buildContextDir))
-	assert.Equal(t, "libpq-dev\nbuild-essential\n", pkgs)
-	assert.Empty(t, reqs, "written with nothing in it, so the install's COPY finds it")
+	got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, packagesName))
+	require.NoError(t, err)
+	assert.Equal(t, "libpq-dev\nbuild-essential\n", string(got))
+	// requirements.txt is still written (no extra deps here) so its own ONBUILD
+	// copy holds.
+	assert.FileExists(t, filepath.Join(req.WorkDir, buildContextDir, requirementsName))
 }
 
-// A git direct reference in a request naming no project still brings git in.
-func TestBuildAddsGitForAGitReference(t *testing.T) {
+func TestBuildEmptyPackagesWritesEmptyFile(t *testing.T) {
+	cmd := &fakeCmd{}
 	req := testRequest(t)
-	req.Dependencies = []string{"airflow-blueprint @ git+https://github.com/astronomer/blueprint@6f06313"}
-	req.Packages = []string{"libpq-dev"}
-	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
+	req.Dependencies = []string{"pandas"} // a build runs, but no OS packages
+
+	_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
-	_, pkgs, _ := installLists(t, filepath.Join(req.WorkDir, buildContextDir))
-	assert.Equal(t, "libpq-dev\ngit\n", pkgs)
-	assert.Equal(t, []string{"libpq-dev"}, req.Packages, "the caller's list is not modified")
+
+	// packages.txt must exist but stay empty when none are listed, so the
+	// ONBUILD copy does not fail.
+	got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, packagesName))
+	require.NoError(t, err)
+	assert.Empty(t, got)
+}
+
+// The runtime image ships no git, so a git direct reference (what a
+// [tool.uv.sources] git source becomes) brings git in through packages.txt,
+// which the image installs before requirements.txt.
+func TestBuildAddsGitForAGitReference(t *testing.T) {
+	for name, tc := range map[string]struct {
+		deps, packages []string
+		want           string
+	}{
+		"a git source adds git":        {deps: []string{"airflow-blueprint @ git+https://github.com/astronomer/blueprint@6f06313"}, packages: []string{"libpq-dev"}, want: "libpq-dev\ngit\n"},
+		"git already listed":           {deps: []string{"x @ git+https://example.com/x.git"}, packages: []string{"git"}, want: "git\n"},
+		"git already pinned":           {deps: []string{"x @ git+https://example.com/x.git"}, packages: []string{"git=1:2.39.5-0+deb12u2"}, want: "git=1:2.39.5-0+deb12u2\n"},
+		"the scheme in capitals":       {deps: []string{"x @ GIT+https://example.com/x.git"}, want: "git\n"},
+		"a plain url source adds none": {deps: []string{"x @ https://example.com/x-1.0.tar.gz"}, want: ""},
+		"a version pin adds none":      {deps: []string{"pandas>=2"}, want: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := testRequest(t)
+			req.Dependencies, req.Packages = tc.deps, tc.packages
+			_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
+			require.NoError(t, err)
+			got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, packagesName))
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, string(got))
+			assert.Equal(t, tc.packages, req.Packages, "the caller's list is not modified")
+		})
+	}
 }
 
 func TestBuildSkipsWhenNothingToInstall(t *testing.T) {

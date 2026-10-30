@@ -376,7 +376,8 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localr
 // Dockerfile. It refuses one on an ONBUILD tag that astro init would move onto
 // -base, and warns about one it would not (scaffold.CheckDockerfileOnBuild),
 // then about the per-machine files the build would copy into the image
-// (scaffold.LocalFilesWarning) and a stale install helper. Standalone builds no
+// (scaffold.LocalFilesWarning) and an install helper an earlier preview wrote
+// (scaffold.StaleHelperWarning). Standalone builds no
 // image.
 func checkImageDockerfile(r cliout.Renderer, p localrt.Plan) error {
 	if p.Mode != localrt.ModeDocker {
@@ -397,7 +398,7 @@ func checkImageDockerfile(r cliout.Renderer, p localrt.Plan) error {
 	if w := scaffold.LocalFilesWarning(p.ProjectPath, p.Dockerfile); w != "" {
 		emitWarning(r, event{Event: "warning", Text: w})
 	}
-	if w := scaffold.InstallHelperWarning(p.ProjectPath, p.Dockerfile); w != "" {
+	if w := scaffold.StaleHelperWarning(p.ProjectPath, p.Dockerfile); w != "" {
 		emitWarning(r, event{Event: "warning", Text: w})
 	}
 	return nil

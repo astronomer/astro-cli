@@ -156,10 +156,11 @@ type BuildRequest struct {
 	// Tag is the image reference the build produces.
 	Tag string
 	// ManifestDir is the project whose pyproject.toml and uv.lock a generated
-	// build installs from (imagebuild.Request.ManifestDir). When it has a
-	// pyproject.toml, that file is what is installed, and Dependencies,
-	// FindLinks and Packages are ignored. Empty installs those three, unpinned.
-	// An adapter that drops it builds the image without the lock's versions.
+	// build installs from (imagebuild.Request.ManifestDir): the builder
+	// resolves the lock into the lists the image installs before it builds.
+	// When it does, Dependencies, FindLinks and Packages are ignored; when it
+	// cannot, or ManifestDir is empty, it installs those three, unpinned. An
+	// adapter that drops it builds the image without the lock's versions.
 	ManifestDir string
 	// Dependencies are the manifest's Python dependencies (PEP 508).
 	Dependencies []string

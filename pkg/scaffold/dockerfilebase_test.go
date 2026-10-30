@@ -232,12 +232,8 @@ func TestInitDeclaresADockerfileOnARuntimeBase(t *testing.T) {
 			require.NoError(t, err)
 			if tc.rewrittenFrom == "" {
 				assert.Equal(t, body, string(got))
-				assert.NoFileExists(t, filepath.Join(dir, airflowrt.InstallHelperPath))
 			} else {
 				assert.Equal(t, rewrittenDockerfile(tc.rewrittenFrom, "ENV TZ=UTC\n"), string(got))
-				helper, err := os.ReadFile(filepath.Join(dir, airflowrt.InstallHelperPath))
-				require.NoError(t, err)
-				assert.Equal(t, airflowrt.InstallHelper(), helper)
 			}
 			for _, n := range res.Notes {
 				assert.NotContains(t, n, "not an Astro Runtime image")

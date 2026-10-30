@@ -12,3 +12,5 @@ constraint-dependencies = [
 
 [tool.uv.sources]
 apache-airflow = { path = "stub/apache_airflow-3.3.2+astro.2-py3-none-any.whl" }
+
+[tool.astro]

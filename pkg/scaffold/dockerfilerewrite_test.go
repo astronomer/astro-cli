@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
-	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // Each shape the rewrite cannot take without guessing is left as it is, with a
@@ -120,11 +119,8 @@ func TestDockerfileRewriteOfKeepsEarlierStagesAndTheAlias(t *testing.T) {
 	require.NotNil(t, rw)
 
 	from := "--platform=linux/amd64 astrocrpublic.azurecr.io/runtime:3.1-12-base"
-	install := airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: "app"})
-	// The build argument the uv stage reads goes ahead of the first FROM, where
-	// a FROM can read it, and after the file's own.
-	uvArg, install, _ := strings.Cut(install, "\n")
-	want := "ARG PY=3.12\n" + uvArg + "\nFROM python:3.12-slim AS builder\nRUN pip wheel --wheel-dir /wheels mylib\n\n" +
+	install := airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: "app", ListsFrom: airflowrt.InstallContext})
+	want := "ARG PY=3.12\nFROM python:3.12-slim AS builder\nRUN pip wheel --wheel-dir /wheels mylib\n\n" +
 		installBlockComment + install + "\n" + ownStepsComment +
 		"COPY --from=builder /wheels /wheels\nENV TZ=UTC\n"
 	assert.Equal(t, want, string(rw.body))
@@ -132,20 +128,20 @@ func TestDockerfileRewriteOfKeepsEarlierStagesAndTheAlias(t *testing.T) {
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1-12-base", rw.base)
 	assert.False(t, rw.mirror)
 
-	// The install's uv and helper stages are unnamed by the project and keep
-	// the install's own names; only the project's final stage carries "app".
+	// No stage of the install's own: the project's stages, the final one
+	// still named "app", and nothing left on an ONBUILD tag.
 	stages := airflowrt.DockerfileStages(rw.body)
-	require.Len(t, stages, 4)
-	assert.Equal(t, airflowrt.UVStage, stages[1].Alias)
-	assert.Equal(t, airflowrt.InstallStage, stages[2].Alias)
-	assert.Equal(t, "app", stages[3].Alias)
+	require.Len(t, stages, 2)
+	assert.Equal(t, "app", stages[1].Alias)
 	for _, st := range stages {
 		assert.False(t, st.OnBuildRuntime(), "no stage is left on an ONBUILD tag: %s", st.Ref)
 	}
+	assert.Contains(t, string(rw.body), "COPY --from="+airflowrt.InstallContext+" packages.txt .\n")
 }
 
-// A conversion that rewrites says so in each list: the Dockerfile updated, the
-// helper created, both 1.x lists retired.
+// A conversion that rewrites says so in each list: the Dockerfile updated and
+// both 1.x lists retired. Nothing is written for the build to run: the CLI
+// resolves the install before it.
 func TestConversionRewritesTheDockerfileAndRetiresBothLists(t *testing.T) {
 	dir, res, m := initWith(t, map[string]string{
 		fileDockerfile:       "FROM quay.io/astronomer/astro-runtime:12.6.0\nRUN apt-get update\n",
@@ -159,13 +155,11 @@ func TestConversionRewritesTheDockerfileAndRetiresBothLists(t *testing.T) {
 	assert.Equal(t, []string{"unixodbc"}, m.Astro.Packages)
 	assert.NoFileExists(t, filepath.Join(dir, "requirements.txt"))
 	assert.NoFileExists(t, filepath.Join(dir, "packages.txt"))
-	helper, err := os.ReadFile(filepath.Join(dir, airflowrt.InstallHelperPath))
-	require.NoError(t, err)
-	assert.Equal(t, airflowrt.InstallHelper(), helper)
+	assert.NoFileExists(t, filepath.Join(dir, staleHelperPath))
 
 	updated := strings.Join(res.Updated, "\n")
 	assert.Contains(t, updated, "Dockerfile (now builds FROM quay.io/astronomer/astro-runtime:12.6.0-base")
-	assert.Contains(t, strings.Join(res.Created, "\n"), airflowrt.InstallHelperPath)
+	assert.NotContains(t, strings.Join(res.Created, "\n"), ".astro/install")
 	assert.Contains(t, strings.Join(res.Deleted, "\n"), "requirements.txt")
 	assert.Contains(t, strings.Join(res.Deleted, "\n"), "packages.txt")
 	for _, n := range res.Notes {
@@ -188,7 +182,6 @@ func TestConversionKeepsTheONBUILDTagWhenAListWasNotCarried(t *testing.T) {
 	got, err := os.ReadFile(filepath.Join(dir, fileDockerfile))
 	require.NoError(t, err)
 	assert.Equal(t, body, string(got))
-	assert.NoFileExists(t, filepath.Join(dir, airflowrt.InstallHelperPath))
 	assert.FileExists(t, filepath.Join(dir, "requirements.txt"))
 	assert.FileExists(t, filepath.Join(dir, "packages.txt"), "the ONBUILD tag still reads it")
 
@@ -219,22 +212,21 @@ func mirrorAdvisories(res *Result) []string {
 	return out
 }
 
-// An ignore file that leaves out a file the rewritten build reads gains an
-// exception for it, after the lines already there, so the build still sees it.
-func TestConversionKeepsTheInstallInputsInTheContext(t *testing.T) {
-	dir, res, _ := initWith(t, map[string]string{
-		fileDockerfile:   "FROM quay.io/astronomer/astro-runtime:12.6.0\nENV A=b\n",
-		fileDockerignore: "*.toml\n.astro\n.venv/\n**/.git\n",
-	})
-
-	pm, data, err := readDockerignore(dir, fileDockerignore)
-	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(string(data), "*.toml\n.astro\n"), "the file's own lines are kept: %q", data)
-	for _, path := range installInputs {
-		assert.False(t, excludes(pm, path, false), "%s is in the build's context", path)
+// The install helper an earlier preview wrote is removed, with a line saying
+// why; a file of the project's own at that path is not the CLI's to remove.
+func TestConversionRemovesAPreviewsInstallHelper(t *testing.T) {
+	files := map[string]string{
+		fileDockerfile:  "FROM quay.io/astronomer/astro-runtime:12.6.0\nENV A=b\n",
+		staleHelperPath: staleHelperHeader + "\nimport argparse\n",
 	}
-	assert.True(t, excludes(pm, ".astro/standalone", true), "the rest of .astro stays out")
-	assert.Contains(t, strings.Join(res.Updated, "\n"), fileDockerignore+" (added the per-machine rules, and exceptions for the files the build reads)")
+	dir, res, _ := initWith(t, files)
+	assert.NoFileExists(t, filepath.Join(dir, staleHelperPath))
+	assert.Contains(t, strings.Join(res.Deleted, "\n"), staleHelperPath+" (written by an earlier Astro CLI preview, removed")
+
+	files[staleHelperPath] = "# our own\n"
+	dir, res, _ = initWith(t, files)
+	assert.FileExists(t, filepath.Join(dir, staleHelperPath))
+	assert.NotContains(t, strings.Join(res.Deleted, "\n"), staleHelperPath)
 }
 
 // The manifest reference shows the file a conversion writes, byte for byte, so
@@ -245,13 +237,4 @@ func TestManifestReferenceShowsTheRewrittenDockerfile(t *testing.T) {
 	want := rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", "ENV TZ=UTC\n")
 	// A Windows checkout may give the page CRLF; the template is the same either way.
 	assert.Contains(t, strings.ReplaceAll(string(body), "\r\n", "\n"), "```dockerfile\n"+want+"```\n")
-}
-
-// installInputs are the manifest, its lock and the helper, by the names the
-// helper's stage reads them under.
-func TestInstallInputsAreWhatTheInstallStageReads(t *testing.T) {
-	assert.Equal(t, []string{manifest.Marker, "uv.lock", airflowrt.InstallHelperPath}, installInputs)
-	for _, path := range installInputs {
-		assert.Contains(t, string(airflowrt.InstallHelper())+airflowrt.InstallDockerfile("x"), filepath.Base(path))
-	}
 }

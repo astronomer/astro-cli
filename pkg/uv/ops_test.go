@@ -994,3 +994,21 @@ func TestHermeticEnvKeepsTheKnobsAndDropsTheRedirects(t *testing.T) {
 		t.Errorf("child env = %q, want %q", got, want)
 	}
 }
+
+// LockCheck and ExportPylock run the uv commands they name, and ExportPylock
+// returns what uv printed.
+func TestLockCheckAndExportPylock(t *testing.T) {
+	c := newTestClient(t, Options{}, "echo \"$*\"\n[ \"$4\" = \"--check\" ] && exit 1\nexit 0")
+
+	if err := c.LockCheck(t.Context(), t.TempDir()); err == nil {
+		t.Error("LockCheck() = nil, want the check's failure")
+	}
+	out, err := c.ExportPylock(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "--color never export --frozen --no-dev --no-emit-project --format pylock.toml"
+	if got := strings.TrimSpace(string(out)); got != want {
+		t.Errorf("ExportPylock() = %q, want uv run with %q", got, want)
+	}
+}

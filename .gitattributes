@@ -38,6 +38,3 @@ cmd/v1_flags.tsv                text eol=lf
 # Read verbatim into requests that tests compare against LF literals (the
 # git-sync ssh key, for one): the same CRLF problem as the goldens above.
 cmd/apc/testfiles/**            text eol=lf
-# The install helper, embedded and also written into projects: its content is
-# pinned by hash to its version stamp, so its bytes cannot depend on the host.
-pkg/airflowrt/install-project.py text eol=lf

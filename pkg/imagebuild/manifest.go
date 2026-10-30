@@ -316,6 +316,10 @@ func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base Base
 		// directory, where none of the project's COPY paths exist.
 		req.Dockerfile = filepath.Join(m.ProjectDir, filepath.FromSlash(m.Dockerfile))
 		req.Context = m.ProjectDir
+		// For a Dockerfile that reads the install lists from the named
+		// context (ReadsInstallContext), which the caller resolves from the
+		// project's lock as it does a generated build's.
+		req.ManifestDir = m.ProjectDir
 		return req, nil
 	}
 	image, err := base(ctx, m)

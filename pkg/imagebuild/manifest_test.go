@@ -189,9 +189,12 @@ func TestForManifestGeneratedRequestInstallsDependenciesAndPackages(t *testing.T
 	require.NoError(t, err)
 	assert.Equal(t, "astro-deploy/p", built)
 
-	reqs, pkgs, _ := installLists(t, filepath.Join(req.WorkDir, buildContextDir))
-	assert.Equal(t, "pandas>=2\n", reqs)
-	assert.Equal(t, "libpq-dev\n", pkgs)
+	reqs, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, requirementsName))
+	require.NoError(t, err)
+	assert.Equal(t, "pandas>=2\n", string(reqs))
+	pkgs, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, packagesName))
+	require.NoError(t, err)
+	assert.Equal(t, "libpq-dev\n", string(pkgs))
 	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
 	require.NoError(t, err)
 	assert.Equal(t, GeneratedDockerfile(RuntimeImageRepo+":3.1", false), string(df))
@@ -245,12 +248,13 @@ func TestBuildLocalBuildsEvenWithNothingToInstall(t *testing.T) {
 	assert.Contains(t, cmd.calls[0], "--platform linux/amd64")
 	assert.False(t, hasCall(cmd.calls, "docker pull"), "%v", cmd.calls)
 
-	// The install steps COPY what the helper writes, so it writes every file,
-	// and they install nothing.
-	reqs, pkgs, constraints := installLists(t, filepath.Join(req.WorkDir, buildContextDir))
+	// The install steps COPY every list, so each exists, and installs nothing.
+	reqs, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, requirementsName))
+	require.NoError(t, err)
 	assert.Empty(t, reqs)
+	pkgs, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, packagesName))
+	require.NoError(t, err)
 	assert.Empty(t, pkgs)
-	assert.Empty(t, constraints)
 	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
 	require.NoError(t, err)
 	assert.Equal(t, GeneratedDockerfile(RuntimeImageRepo+":3.1", false), string(df))
@@ -278,7 +282,7 @@ func TestForManifestBuildCarriesTheProject(t *testing.T) {
 	writeTree(t, project, map[string]string{
 		"include/agents/__init__.py":           "x = 1\n",
 		"dags/blueprints.py":                   "import include.agents\n",
-		"pyproject.toml":                       "[project]\ndependencies = ['pandas']\n",
+		"pyproject.toml":                       "[project]\n",
 		".astro/config.yaml":                   "committed\n",
 		"Requirements.txt":                     "stale-pin==1\n", // any case: never the generated one
 		".venv/lib/site.py":                    "never\n",
@@ -321,10 +325,11 @@ func TestForManifestBuildCarriesTheProject(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"include/agents/__init__.py", "dags/blueprints.py", "pyproject.toml", ".astro/config.yaml",
 		"include/logs/fixture.json", "include/airflow.cfg", "include/sample_env", "include/environment/defaults.yaml",
-		".astro/install/install-project.py", ".astro/install/pyproject.toml",
+		requirementsName, packagesName, lockConstraintsName,
 	}, contextFiles(t, ctxDir))
-	reqs, _, _ := installLists(t, ctxDir)
-	assert.Equal(t, "pandas\n", reqs, "the generated requirements, not the project's")
+	reqs, err := os.ReadFile(filepath.Join(ctxDir, requirementsName))
+	require.NoError(t, err)
+	assert.Equal(t, "pandas\n", string(reqs), "the generated requirements, not the project's")
 }
 
 // Symlinks are carried as what they point at: a link out of the project would

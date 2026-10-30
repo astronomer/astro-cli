@@ -1,6 +1,7 @@
 package imagebuild
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -124,20 +125,7 @@ func TestManifestBuildOfLeavesOutTheAirflowSourcesInitWrites(t *testing.T) {
 	req.WorkDir, req.Tag, req.Bin = t.TempDir(), "astro-deploy/p", "docker"
 	_, err = testBuilder(&fakeCmd{}).Build(t.Context(), req, rt.Callbacks{})
 	assert.NoError(t, err)
-	reqs, _, _ := installLists(t, filepath.Join(req.WorkDir, buildContextDir))
-	assert.Equal(t, "pandas\n", reqs, "no --find-links line")
-
-	// The same from the project's own pyproject.toml, as `astro init` writes
-	// its Airflow sources: the helper leaves their pages out too.
-	project := t.TempDir()
-	writeTree(t, project, map[string]string{"pyproject.toml": "[project]\nname = 'p'\n" +
-		"dependencies = ['apache-airflow==3.3.*', 'apache-airflow-core', 'apache-airflow-task-sdk', 'pandas']\n" +
-		"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\nexplicit = true\n" +
-		"[tool.uv.sources]\napache-airflow = { index = 'astronomer' }\napache-airflow-core = { index = 'astronomer' }\n" +
-		"apache-airflow-task-sdk = { index = 'astronomer' }\n"})
-	req.ManifestDir = project
-	_, err = testBuilder(&fakeCmd{}).Build(t.Context(), req, rt.Callbacks{})
+	got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, requirementsName))
 	assert.NoError(t, err)
-	reqs, _, _ = installLists(t, filepath.Join(req.WorkDir, buildContextDir))
-	assert.Equal(t, "pandas\n", reqs, "no --find-links line")
+	assert.Equal(t, "pandas\n", string(got), "no --find-links line")
 }
