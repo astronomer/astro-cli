@@ -8,9 +8,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 
 	semver "github.com/Masterminds/semver/v3"
 
@@ -215,13 +217,83 @@ func getLatestRelease(ctx context.Context, client *http.Client, url string, majo
 	}
 
 	if latest == nil {
-		return nil, fmt.Errorf("astro-cli releases endpoint returned 0 valid versions for major version %d", major)
+		return nil, fmt.Errorf("%w %d", errNoReleaseForMajor, major)
 	}
 
 	return latest, nil
 }
 
-func CompareVersions(ctx context.Context, client *http.Client) error {
+// releaseCheckTTL is how long one answer from the release list stands. Asking
+// on every command put a round trip, up to the client's timeout, in front of
+// each one; hearing of a release a day late costs nothing.
+const releaseCheckTTL = 24 * time.Hour
+
+const (
+	releaseCheckDirPerm  = 0o700
+	releaseCheckFilePerm = 0o600
+)
+
+var errNoReleaseForMajor = errors.New("astro-cli releases endpoint returned 0 valid versions for major version")
+
+// releaseCheck is the cached answer. An empty Latest records that the major
+// has no release yet, which is true of every build before its first one.
+type releaseCheck struct {
+	CheckedAt time.Time `json:"checked_at"`
+	Major     uint64    `json:"major"`
+	Latest    string    `json:"latest"`
+}
+
+// latestReleaseCached is getLatestRelease behind a file at cachePath, and
+// returns nil when the major has no release. The file is best effort both
+// ways: one that cannot be read or written means asking.
+func latestReleaseCached(ctx context.Context, client *http.Client, url, cachePath string, major uint64, now time.Time) (*semver.Version, error) {
+	if latest, ok := readReleaseCheck(cachePath, major, now); ok {
+		return latest, nil
+	}
+
+	latest, err := getLatestRelease(ctx, client, url, major)
+	check := releaseCheck{CheckedAt: now, Major: major}
+	switch {
+	case errors.Is(err, errNoReleaseForMajor):
+	case err != nil:
+		return nil, err
+	default:
+		check.Latest = latest.String()
+	}
+	if b, err := json.Marshal(check); err == nil {
+		_ = os.MkdirAll(filepath.Dir(cachePath), releaseCheckDirPerm) //nolint:errcheck // a cache that cannot be written is asked for again next time
+		_ = os.WriteFile(cachePath, b, releaseCheckFilePerm)          //nolint:errcheck // as above
+	}
+	return latest, nil
+}
+
+// readReleaseCheck returns the cached latest release, and false when there is
+// no usable answer for this major from the last day.
+func readReleaseCheck(cachePath string, major uint64, now time.Time) (*semver.Version, bool) {
+	b, err := os.ReadFile(cachePath)
+	if err != nil {
+		return nil, false
+	}
+	var c releaseCheck
+	if json.Unmarshal(b, &c) != nil || c.Major != major {
+		return nil, false
+	}
+	// A check stamped in the future is stale too, or a clock set back would
+	// keep it for good.
+	if age := now.Sub(c.CheckedAt); age < 0 || age >= releaseCheckTTL {
+		return nil, false
+	}
+	if c.Latest == "" {
+		return nil, true
+	}
+	latest, err := semver.NewVersion(c.Latest)
+	return latest, err == nil
+}
+
+// CompareVersions tells the user on stderr when a newer release of the running
+// major exists, asking the release list at most once a day: the answer is kept
+// in cachePath.
+func CompareVersions(ctx context.Context, client *http.Client, cachePath string) error {
 	// Only a release has a version worth comparing. A snapshot, and anything we
 	// could not identify, is a local build: there is nothing for it to upgrade
 	// to, and asking costs a request on every command.
@@ -235,13 +307,13 @@ func CompareVersions(ctx context.Context, client *http.Client) error {
 	}
 
 	// Only suggest upgrades within the running major, so a new major stays opt-in
-	latestSemver, err := getLatestRelease(ctx, client, astroCLIReleaseURL, currentSemver.Major())
+	latestSemver, err := latestReleaseCached(ctx, client, astroCLIReleaseURL, cachePath, currentSemver.Major(), time.Now())
 	if err != nil {
 		return err
 	}
 
 	// Compare the versions and print a message to the user if the current version is outdated
-	if currentSemver.LessThan(latestSemver) {
+	if latestSemver != nil && currentSemver.LessThan(latestSemver) {
 		fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease see https://www.astronomer.io/docs/astro/cli/upgrade-cli for information on how to update the Astro CLI\n\n", latestSemver)
 		fmt.Fprint(os.Stderr, ansi.ForStderr().Cyan("\nTo learn more about what's new in this version, please see https://www.astronomer.io/docs/astro/cli/release-notes\n\n"))
 		fmt.Fprintf(os.Stderr, "If you don't want to see this message again run 'astro config set -g upgrade_message false' or pass '2>/dev/null' to print this text to stderr\n\n")

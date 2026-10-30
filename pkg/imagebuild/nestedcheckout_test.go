@@ -62,7 +62,7 @@ func nestedProject(t *testing.T) string {
 }
 
 // A generated build leaves out only a linked worktree of the project's own
-// repository, and names it; a stray clone, a submodule and a gitlinked
+// repository, silently; a stray clone, a submodule and a gitlinked
 // repository are carried like any other directory. The survey, the copy and
 // the digest agree.
 func TestGeneratedBuildLeavesOutOnlyTheProjectsWorktrees(t *testing.T) {
@@ -73,7 +73,6 @@ func TestGeneratedBuildLeavesOutOnlyTheProjectsWorktrees(t *testing.T) {
 		"dags/a.py", "deploy/sandbox.env", ".gitignore", ".gitmodules",
 		"scratch/notes.txt", "vendor/sub/lib.py", "vendor/embedded/util.py",
 	}, s.Files)
-	assert.Equal(t, []string{".claude/worktrees/x"}, s.LeftOut, "the worktree it leaves out is named")
 	assert.Empty(t, s.Nested, "a generated build lists none: it carries none")
 
 	dst := t.TempDir()
@@ -97,7 +96,6 @@ func TestDeclaredSurveyNamesTheProjectsWorktrees(t *testing.T) {
 	s, err := SurveyProject(project, "Dockerfile", false)
 	require.NoError(t, err)
 	assert.Equal(t, []string{".claude/worktrees/x"}, s.Nested)
-	assert.Empty(t, s.LeftOut)
 	assert.Contains(t, s.Files, ".claude/worktrees/x/deploy/sandbox.env")
 	assert.Contains(t, s.Files, "scratch/notes.txt")
 
@@ -128,7 +126,6 @@ func TestLinkedWorktreeIsReadFromFiles(t *testing.T) {
 	s, err := SurveyProject(project, "", false)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"dags/d.py", "wt/other/keep.py", "vendor/lib/lib.py"}, s.Files)
-	assert.Equal(t, []string{"wt/a"}, s.LeftOut)
 }
 
 // A project that is not in a repository has no worktrees to leave out: a
@@ -143,5 +140,4 @@ func TestNonGitProjectCarriesAClone(t *testing.T) {
 	s, err := SurveyProject(project, "", false)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"dags/d.py", "dags/shared/common.py"}, s.Files)
-	assert.Empty(t, s.LeftOut)
 }

@@ -258,9 +258,16 @@ func TestCheckNotesUndeclaredLocalValues(t *testing.T) {
 	if err := execute(t, d, "local", "check", "--strict"); err != nil {
 		t.Fatalf("an undeclared local value must not fail the check: %v", err)
 	}
-	line, ok := lineContaining(out.String(), "info: ")
-	if !ok || !strings.Contains(line, "AIRFLOW_CONN_LOCAL_DB") || !strings.Contains(line, "will not follow it to a Deployment") {
-		t.Errorf("want an info line naming AIRFLOW_CONN_LOCAL_DB, got:\n%s", out.String())
+	if !strings.Contains(out.String(), "Warning: 1 value reaches this project only from this machine") {
+		t.Errorf("want a warning about the undeclared value, got:\n%s", out.String())
+	}
+	line, ok := lineContaining(out.String(), "  connection local_db  project  ")
+	if !ok || !strings.Contains(line, "if needed: astro local env connection declare local_db") ||
+		!strings.Contains(line, "if not: astro local env connection delete local_db --project") {
+		t.Errorf("want a row for local_db with its commands, got:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "workspace") {
+		t.Errorf("a project linked to no workspace must not get the workspace note:\n%s", out.String())
 	}
 	if !strings.Contains(out.String(), "checks passed") {
 		t.Errorf("summary missing: %q", out.String())

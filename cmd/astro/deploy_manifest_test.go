@@ -89,7 +89,12 @@ type fakeCmdDeployer struct {
 	refuseBeforeBuild bool
 	// warn is a warning the transport gives through ImageDeploy.Warn, as
 	// the real one does for a check the deploy goes ahead despite.
-	warn     string
+	warn string
+	// warnBeforeBuild is a warning given before the build starts.
+	warnBeforeBuild string
+	// listErr fails the workspace's Deployment list, which the deploy warns
+	// about before it asks for the target.
+	listErr  error
 	dagInput *manifestdeploy.DagDeploy
 	imgInput *manifestdeploy.ImageDeploy
 }
@@ -99,7 +104,7 @@ func (f *fakeCmdDeployer) ConfirmTarget([]manifestdeploy.Choice, string) (string
 }
 
 func (f *fakeCmdDeployer) ListDeployments(string) ([]manifestdeploy.Deployment, error) {
-	return nil, nil
+	return nil, f.listErr
 }
 
 func (f *fakeCmdDeployer) ResolveUnlinked(string) (manifestdeploy.Deployment, error) {
@@ -116,6 +121,9 @@ func (f *fakeCmdDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 	if f.refuseBeforeBuild {
 		return manifestdeploy.ImageResult{}, f.imgErr
 	}
+	if f.warnBeforeBuild != "" && in.Warn != nil {
+		in.Warn(f.warnBeforeBuild)
+	}
 	if in.ImageName == "" && in.OnBuild != nil {
 		in.OnBuild()
 	}
@@ -123,6 +131,68 @@ func (f *fakeCmdDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		in.Warn(f.warn)
 	}
 	return f.img, f.imgErr
+}
+
+// execDeployOneStream runs astro deploy with stdout and stderr in one buffer,
+// so the order the two interleave in is what a terminal shows.
+func execDeployOneStream(answers string, args ...string) (string, error) {
+	defer func() { workspaceID = "" }() // see execDeployCmd
+	testUtil.SetupOSArgsForGinkgo()
+	root := deployUnderRoot()
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetIn(strings.NewReader(answers))
+	err := cliout.Execute(context.Background(), root, append([]string{"deploy"}, args...), &buf, nil)
+	return buf.String(), err
+}
+
+// A warning found before the deploy asks which Deployment to ship to prints
+// before the question, and not again; one found later prints once, after the
+// build.
+func TestDeployManifestShowsAWarningBeforeAQuestionOnce(t *testing.T) {
+	interactiveDeploy(t)
+	fake := newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+	fake.listErr = errors.New("list refused")
+	fake.warn = "found after the build"
+	out, err := execDeployOneStream("\n")
+	require.NoError(t, err)
+	requireInOrder(t, out, "Warning: could not list the Deployments", "Deploy to which deployment?",
+		"Building your project image", "Warning: found after the build", "to prod (deployment clx-dep).")
+	assert.Equal(t, 1, strings.Count(out, "could not list the Deployments"), out)
+	assert.Equal(t, 1, strings.Count(out, "found after the build"), out)
+}
+
+// In text, each warning prints once, after the build's output, just above
+// the result; a deploy that fails prints them before its error.
+func TestDeployManifestShowsWarningsOnceAfterTheBuild(t *testing.T) {
+	const before, after = "found before the build", "found after it"
+	setupManifestDeploy(t, &fakeCmdDeployer{
+		img:             manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "tag-1", DagTarballVersion: "3-1"},
+		warnBeforeBuild: before, warn: after,
+	})
+	out, err := execDeployOneStream("", "prod")
+	require.NoError(t, err)
+	requireInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after,
+		"Deployed image (tag tag-1)")
+	assert.Equal(t, 1, strings.Count(out, before), out)
+	assert.Equal(t, 1, strings.Count(out, after), out)
+
+	boom := errors.New("boom")
+	setupManifestDeploy(t, &fakeCmdDeployer{imgErr: boom, warnBeforeBuild: before, warn: after})
+	out, err = execDeployOneStream("", "prod")
+	require.ErrorIs(t, err, boom)
+	requireInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after)
+	assert.Equal(t, 1, strings.Count(out, before), out)
+
+	// Under json a warning prints once, as it is given.
+	setupManifestDeploy(t, &fakeCmdDeployer{
+		img:             manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "tag-1", DagTarballVersion: "3-1"},
+		warnBeforeBuild: before,
+	})
+	_, errOut, err := execDeployIO("", "prod", "--output", "json")
+	require.NoError(t, err)
+	assert.Equal(t, 1, strings.Count(errOut, "Warning: "+before+"\n"), errOut)
 }
 
 // setupManifestDeploy points config.WorkingPath at a fresh project (one default
@@ -640,7 +710,7 @@ func (p *promptDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselec
 
 // newPromptDeploy wires the real prompt onto the command's own streams, so a
 // test drives the question a user would actually see.
-func newPromptDeploy(t *testing.T, img *manifestdeploy.ImageResult) {
+func newPromptDeploy(t *testing.T, img *manifestdeploy.ImageResult) *promptDeployer {
 	t.Helper()
 	fake := &promptDeployer{fakeCmdDeployer: fakeCmdDeployer{img: *img}}
 	setupManifestDeploy(t, fake)
@@ -650,6 +720,7 @@ func newPromptDeploy(t *testing.T, img *manifestdeploy.ImageResult) {
 		return fake
 	}
 	t.Cleanup(func() { newManifestDeployer = orig })
+	return fake
 }
 
 func TestDeployManifestPromptPreselectsDefaultAndAsksAnyway(t *testing.T) {

@@ -21,6 +21,8 @@ const (
 	envTelemetryAPIURL = "ASTRO_TELEMETRY_API_URL"
 	// Environment variable to enable synchronous debug mode
 	envTelemetryDebug = "ASTRO_TELEMETRY_DEBUG"
+
+	osVersionProperty = "os_version"
 )
 
 // TelemetryPayload represents the data sent to the telemetry API

@@ -200,17 +200,61 @@ func TestUndeclared(t *testing.T) {
 	}
 	schema := &envschema.Schema{EnvVars: map[string]envschema.ValueSpec{"DECLARED": {}}}
 	tiers := []VaultTier{
-		{Scope: ScopeProject, Entries: []VaultEntry{{Kind: KindEnv, Name: "PROJECT_SECRET", EnvKey: "PROJECT_SECRET"}}},
-		{Scope: ScopeGlobal, Entries: []VaultEntry{
+		{Label: "vault", Scope: ScopeProject, Entries: []VaultEntry{{Kind: KindEnv, Name: "PROJECT_SECRET", EnvKey: "PROJECT_SECRET"}}},
+		{Label: "vault (global)", Scope: ScopeGlobal, Entries: []VaultEntry{
 			{Kind: KindConn, Name: "shared_db", EnvKey: "AIRFLOW_CONN_SHARED_DB"},
 			{Kind: KindConn, Name: "elsewhere", EnvKey: "AIRFLOW_CONN_ELSEWHERE", Unlinked: true},
 			{Kind: KindVar, Name: "1bad", EnvKey: "AIRFLOW_VAR_1BAD", Invalid: "starts with a digit"},
 		}},
 	}
-	got := strings.Join(src.Undeclared(schema, tiers), ",")
-	want := "AIRFLOW_CONN_SHARED_DB,FROM_PROJECT,PROJECT_SECRET"
-	if got != want {
-		t.Errorf("Undeclared = %s, want %s", got, want)
+	got := src.Undeclared(schema, tiers)
+	keys := make([]string, len(got))
+	for i, v := range got {
+		keys[i] = v.EnvKey
+	}
+	if want := "AIRFLOW_CONN_SHARED_DB,FROM_PROJECT,PROJECT_SECRET"; strings.Join(keys, ",") != want {
+		t.Fatalf("Undeclared = %s, want %s", strings.Join(keys, ","), want)
+	}
+	// Each value carries the source and the commands `astro local env list`
+	// shows for it, so a warning built from them names the same ones.
+	byKey := map[string]UndeclaredValue{}
+	for _, v := range got {
+		byKey[v.EnvKey] = v
+	}
+	for key, want := range map[string]UndeclaredValue{
+		"FROM_PROJECT": {Source: "project", DeclareHint: DeclareHint(KindEnv, "FROM_PROJECT"), RemoveHint: removeHint(KindEnv, "FROM_PROJECT", ScopeProject)},
+		"PROJECT_SECRET": {
+			Source: "vault", DeclareHint: vaultDeclareHint(KindEnv, "PROJECT_SECRET"),
+			RemoveHint: removeHint(KindEnv, "PROJECT_SECRET", ScopeProject),
+		},
+		"AIRFLOW_CONN_SHARED_DB": {
+			Source: "vault (global)", DeclareHint: DeclareHint(KindConn, "shared_db"),
+			RemoveHint: removeHint(KindConn, "shared_db", ScopeGlobal),
+		},
+	} {
+		v := byKey[key]
+		if v.Source != want.Source || v.DeclareHint != want.DeclareHint || v.RemoveHint != want.RemoveHint {
+			t.Errorf("%s = %+v, want source %q, declare %q, remove %q", key, v, want.Source, want.DeclareHint, want.RemoveHint)
+		}
+	}
+}
+
+// TestUndeclaredReportsAKeyFromTheSourceAStartUses: a key both the .env and
+// the vault hold is one value, from the .env, which a start applies over the
+// vault.
+func TestUndeclaredReportsAKeyFromTheSourceAStartUses(t *testing.T) {
+	projDir := t.TempDir()
+	if err := os.WriteFile(ProjectEnvPath(projDir), []byte("BOTH=from-file\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	src, err := LoadSources(nil, projDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tiers := []VaultTier{{Label: "vault", Scope: ScopeProject, Entries: []VaultEntry{{Kind: KindEnv, Name: "BOTH", EnvKey: "BOTH"}}}}
+	got := src.Undeclared(&envschema.Schema{}, tiers)
+	if len(got) != 1 || got[0].Source != "project" {
+		t.Fatalf("Undeclared = %+v, want one value from the project .env", got)
 	}
 }
 

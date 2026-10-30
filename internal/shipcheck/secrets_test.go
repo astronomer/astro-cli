@@ -121,20 +121,6 @@ func TestCountFiles(t *testing.T) {
 	}
 }
 
-// The note for the project's worktrees a generated build left out summarizes
-// them as the gitignored warning does: a count and the places, with words
-// agreeing with the count. None left out is no note.
-func TestLeftOutNote(t *testing.T) {
-	assert.Empty(t, LeftOutNote(&imagebuild.ProjectSurvey{}))
-	assert.Equal(t, "left out 1 git worktree of this repository, in wt/",
-		LeftOutNote(&imagebuild.ProjectSurvey{LeftOut: []string{"wt"}}))
-	assert.Equal(t, "left out 33 git worktrees of this repository, in .claude/",
-		LeftOutNote(&imagebuild.ProjectSurvey{LeftOut: worktreesUnder(".claude/worktrees", 33), Files: []string{"dags/a.py"}}))
-	assert.Equal(t, "left out 2 git worktrees of this repository, in .claude/worktrees/",
-		LeftOutNote(&imagebuild.ProjectSurvey{LeftOut: worktreesUnder(".claude/worktrees", 2), Files: []string{".claude/settings.json"}}),
-		"a place that also holds a file the image carries is never named")
-}
-
 func worktreesUnder(dir string, n int) []string {
 	out := make([]string, n)
 	for i := range out {
