@@ -207,7 +207,7 @@ func newUpgradeRuntimeCmd(c *cli) *cobra.Command {
 			"patch is out). A project with no runtime line already follows the newest build of its series, so it " +
 			"keeps doing so: nothing is pinned, and the command says which build that is.\n\n" +
 			"--python picks the Python the image and the standalone environment run, through requires-python. " +
-			"Without it, the build's default Python is used.\n\n" +
+			"Without it, requires-python stays: a project pinned to one Python keeps it, and is refused on a build that does not ship it; otherwise the build's default Python is used.\n\n" +
 			"Afterwards the runtime's constraints in [tool.uv] are refreshed and uv.lock is relocked, so a deploy " +
 			"or astro package sees the new build without a local start. If Airflow is running, restart it.",
 		Example: "  # Move to the newest build of the project's Airflow series\n" +
@@ -225,7 +225,7 @@ func newUpgradeRuntimeCmd(c *cli) *cobra.Command {
 			return c.runUpgradeRuntime(cmd.Context(), build, python)
 		},
 	}
-	cmd.Flags().StringVar(&python, flagPython, "", "Python version to run, like 3.12. Default: the build's default Python")
+	cmd.Flags().StringVar(&python, flagPython, "", "Python version to run, like 3.12. Default: the project's pinned Python, else the build's default")
 	return cmd
 }
 

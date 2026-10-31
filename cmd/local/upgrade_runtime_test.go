@@ -155,6 +155,27 @@ func TestUpgradeRuntimePicksAPython(t *testing.T) {
 	assert.Contains(t, rd.stdout.String(), "  requires-python: ==3.14.*")
 }
 
+// A project pinned to one Python (a converted -python-3.12 image, say) keeps
+// it without --python, and the constraints follow it, not the build's
+// default; a build that does not ship it is refused, writing nothing.
+func TestUpgradeRuntimeKeepsAPinnedPython(t *testing.T) {
+	rd := newRefreshDeps(t, buildManifest)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10", "--python", "3.12"))
+	rd.asked = nil
+	rd.stdout.Reset()
+
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10"))
+	assert.Contains(t, readText(t, rd.path), "requires-python = '==3.12.*'")
+	assert.NotContains(t, rd.stdout.String(), "requires-python:")
+
+	before := readText(t, rd.path)
+	err := execute(t, rd.d, "local", "upgrade", "runtime", "3.4-1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "3.13, 3.14")
+	assert.Contains(t, err.Error(), "--python")
+	assert.Equal(t, before, readText(t, rd.path))
+}
+
 // A yanked build is allowed, as the manifest checks allow it, and warned
 // about with the catalog's reason.
 func TestUpgradeRuntimeWarnsAboutAYankedBuild(t *testing.T) {
