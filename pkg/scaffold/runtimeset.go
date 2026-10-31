@@ -24,11 +24,6 @@ var ErrInvalidPython = errors.New("not a Python this runtime build runs")
 // pythonMinorRe is a Python minor version, as a caller names one.
 var pythonMinorRe = regexp.MustCompile(`^3\.\d+$`)
 
-// onePythonRe is the requires-python SetRuntimeBuildWith writes to choose one
-// Python: it admits that minor alone, so the image and the standalone venv
-// both run it whatever the build's default (runtimeversions.ProjectPython).
-var onePythonRe = regexp.MustCompile(`^==3\.\d+\.\*$`)
-
 // RuntimeBuildChange is what SetRuntimeBuildWith did to a manifest.
 type RuntimeBuildChange struct {
 	// Previous is the runtime the manifest named, "" when it named none.
@@ -65,10 +60,12 @@ type RuntimeBuildChange struct {
 //     its tag names none.
 //   - python, when given, is the Python the image and the standalone venv
 //     run: requires-python becomes "==python.*". It has to be one the build
-//     ships, when the catalog lists the build. Without it the build's default
-//     is used: a requires-python that admits the default stays, one that
-//     chose another single Python (the shape python writes) moves to the
-//     series' bound, and one that admits no Python the build ships is refused.
+//     ships, when the catalog lists the build. Without it requires-python
+//     stays as it is: a range runs the build's default when it admits it, and
+//     a single Python (the shape python writes, or astro init's from a
+//     -python-X.Y image) stays chosen when the build ships it. One that admits
+//     no Python the build ships is refused, naming the ones it does, since
+//     only python moves the project to another.
 //
 // A build beside a declared dockerfile whose FROM line picks the image is
 // refused, since the build would pick nothing; one built on the install base
@@ -160,7 +157,7 @@ func (e *runtimeBuildEdit) apply(before *manifest.Manifest, ed tomledit.Editor) 
 			return RuntimeBuildChange{}, err
 		}
 	}
-	next, python, err := e.requiresPython(rp, pin)
+	next, python, err := e.requiresPython(rp)
 	if err != nil {
 		return RuntimeBuildChange{}, err
 	}
@@ -185,16 +182,11 @@ func (e *runtimeBuildEdit) apply(before *manifest.Manifest, ed tomledit.Editor) 
 // requiresPython is the requires-python to write beside the build, given rp,
 // the one the manifest holds after any pin move, and the Python the build's
 // image then runs, "" when the catalog cannot tell.
-func (e *runtimeBuildEdit) requiresPython(rp, pin string) (next, python string, err error) {
+func (e *runtimeBuildEdit) requiresPython(rp string) (next, python string, err error) {
 	next = rp
 	def := strings.TrimSpace(e.rt.DefaultPythonVersion)
-	switch {
-	case e.python != "":
+	if e.python != "" {
 		next = "==" + e.python + ".*"
-	case e.listed && onePythonRe.MatchString(rp):
-		if p, decided := e.rt.ImagePython(rp); decided && p != def {
-			next = pythonBoundFor(pin, e.opts.Catalog)
-		}
 	}
 	if !e.listed {
 		return next, "", nil
