@@ -288,6 +288,15 @@ func netrcSecretMount(value string) bool {
 	return kv["type"] == "secret" && kv["id"] == manifest.RuntimeSecretID
 }
 
+// shellSyntax are the characters outside quotes that make a shell command
+// more than its words: escapes, chaining, redirection, subshells, expansion
+// and globbing. quotedExpansion are the ones that still expand inside double
+// quotes.
+const (
+	shellSyntax     = "\\;&|<>()`$*?{}"
+	quotedExpansion = "$`\\"
+)
+
 // plainWords splits a shell command into its words, quotes removed, stopping
 // at a comment. It reports false for anything the shell would expand, chain or
 // redirect, since the step is then more than its words.
@@ -299,7 +308,7 @@ func plainWords(s string) ([]string, bool) {
 		switch c := s[i]; {
 		case c == '#' && !inWord:
 			i = len(s)
-		case strings.IndexByte("\\;&|<>()`$*?{}", c) >= 0:
+		case strings.IndexByte(shellSyntax, c) >= 0:
 			return nil, false
 		case c == '\'' || c == '"':
 			end := strings.IndexByte(s[i+1:], c)
@@ -307,7 +316,7 @@ func plainWords(s string) ([]string, bool) {
 				return nil, false
 			}
 			quoted := s[i+1 : i+1+end]
-			if c == '"' && strings.ContainsAny(quoted, "$`\\") {
+			if c == '"' && strings.ContainsAny(quoted, quotedExpansion) {
 				return nil, false
 			}
 			cur.WriteString(quoted)
