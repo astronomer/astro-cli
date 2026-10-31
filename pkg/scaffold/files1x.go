@@ -147,8 +147,11 @@ type project1x struct {
 	apcDomain string
 	// instanceWorkspace is Options.InstanceWorkspace, and linked what
 	// instanceLinks made of it, decided once.
-	instanceWorkspace func(deploymentID string) string
+	instanceWorkspace func(deploymentID string) (workspace, reason string)
 	linked            *[]Link
+	// unlinkedWhy is why instanceLinks left an entry unlinked, by
+	// instanceKey, when it can say.
+	unlinkedWhy map[string]string
 	// apcWorkspace is Options.APCWorkspace until fillAPCWorkspace has asked
 	// it, then nil. workspaceFromContext is set when workspace was not in the
 	// file and came from it, the APC context's current workspace.

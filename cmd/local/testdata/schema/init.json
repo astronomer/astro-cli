@@ -30,5 +30,13 @@
       "spec": "x",
       "line": -1
     }
+  ],
+  "unlinked_deployments": [
+    {
+      "name": "x",
+      "deployment": "x",
+      "command": "x",
+      "reason": "x"
+    }
   ]
 }
