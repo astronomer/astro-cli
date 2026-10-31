@@ -155,7 +155,7 @@ func readAirflowSettings(data []byte) carriedSettings {
 	var doc settingsDoc
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return carriedSettings{blockers: []string{
-			SettingsRelPath + " was not carried, and is kept as it is. " + err.Error(),
+			SettingsRelPath + " was not converted, and is kept as it is. " + err.Error(),
 		}}
 	}
 
@@ -189,16 +189,16 @@ func readPools(pools []settingsPool) carriedPools {
 			continue
 		}
 		if _, dup := c.byName[name]; dup {
-			c.notes = append(c.notes, SettingsRelPath+": pool "+name+" is listed twice, and only the first was carried. Delete one entry")
+			c.notes = append(c.notes, SettingsRelPath+": pool "+name+" is listed twice, and only the first was kept. Delete one entry")
 			continue
 		}
 		if reason := manifest.PoolNameProblem(name); reason != "" {
-			c.notes = append(c.notes, SettingsRelPath+": pool "+name+" cannot be carried: "+reason)
+			c.notes = append(c.notes, SettingsRelPath+": pool "+name+" cannot be converted: "+reason)
 			continue
 		}
 		slots, err := poolSlot(p.Slot)
 		if err != nil {
-			c.notes = append(c.notes, SettingsRelPath+": pool "+name+" cannot be carried. "+err.Error())
+			c.notes = append(c.notes, SettingsRelPath+": pool "+name+" cannot be converted. "+err.Error())
 			continue
 		}
 		pool := manifest.Pool{Slots: slots, Description: strings.TrimSpace(p.Description)}
@@ -206,7 +206,7 @@ func readPools(pools []settingsPool) carriedPools {
 			// Airflow 3 refuses to change default_pool's description, so the
 			// manifest refuses to state one. Its slots are what matter.
 			pool.Description = ""
-			c.advisories = append(c.advisories, SettingsRelPath+": carried default_pool's slots and not its description, "+
+			c.advisories = append(c.advisories, SettingsRelPath+": kept default_pool's slots but not its description, "+
 				"which Airflow does not let a caller change")
 		}
 		if c.byName == nil {
@@ -282,7 +282,7 @@ func (c *carriedSettings) readConnections(conns []settingsConn) {
 		// what the connection actually is.
 		value, connType, err := connValue(sc)
 		if err != nil {
-			c.blockers = append(c.blockers, SettingsRelPath+": "+id+" cannot be carried. "+err.Error())
+			c.blockers = append(c.blockers, SettingsRelPath+": "+id+" cannot be converted. "+err.Error())
 			continue
 		}
 
@@ -306,7 +306,7 @@ func (c *carriedSettings) readConnections(conns []settingsConn) {
 		spec := envschema.ValueSpec{ConnType: connType, Secret: true}
 		if problems := spec.Check(envschema.SectionConnection); len(problems) > 0 {
 			for _, p := range problems {
-				c.blockers = append(c.blockers, SettingsRelPath+": "+id+" cannot be carried. "+p.Reason)
+				c.blockers = append(c.blockers, SettingsRelPath+": "+id+" cannot be converted. "+p.Reason)
 			}
 			continue
 		}
@@ -318,7 +318,7 @@ func (c *carriedSettings) readConnections(conns []settingsConn) {
 			// set — which is what an empty entry in the 1.x file amounted to
 			// anyway, minus the part where nothing said so.
 			c.advisories = append(c.advisories, id+
-				": declared as a required connection, with no value to carry. "+
+				": declared as a required connection, with no value. "+
 				"Set it with astro local env connection set "+id)
 			continue
 		}
@@ -368,7 +368,7 @@ func (c *carriedSettings) readVariables(vars []settingsVar) {
 			// as absent until someone sets it.
 			c.schema.AirflowVariables[name] = envschema.ValueSpec{Secret: true, HasSecret: true, Optional: true}
 			c.advisories = append(c.advisories, name+
-				": declared as an optional Airflow variable, since it had no value to carry. "+
+				": declared as an optional Airflow variable, since it had no value. "+
 				"Set it with astro local env airflow-variable set "+name)
 			continue
 		}
@@ -601,9 +601,9 @@ func (c *carriedSettings) keptFor() string {
 	case c.retirable():
 		return ""
 	case len(c.pools.notes) > 0:
-		return "for a pool entry that could not be carried"
+		return "for a pool entry that could not be converted"
 	case len(c.held) > 0:
-		return "because " + c.heldPhrase() + ", so the file's value was not carried over it"
+		return "because " + c.heldPhrase() + ", so the file's value did not replace it"
 	}
 	return "because the vault could not be read"
 }

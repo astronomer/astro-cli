@@ -62,9 +62,10 @@ type pipStepMove struct {
 	// notesBefore are the notes the Dockerfile had without the move, and
 	// notesAfter the ones the move gave instead.
 	notesBefore, notesAfter []string
-	// advisory says what moved; updatedBefore and updatedAfter are the
+	// advisories say what moved; updatedBefore and updatedAfter are the
 	// Dockerfile's Updated label without and with the move.
-	advisory, updatedBefore, updatedAfter string
+	advisories                  []string
+	updatedBefore, updatedAfter string
 	// deleted is the Dockerfile's Deleted label when the move removed it.
 	deleted string
 	// ignore is the .dockerignore change a Dockerfile the move removed would
@@ -437,23 +438,20 @@ func planPipStepMoves(move bool, from1x *project1x, out *[]byte, cs *Changeset, 
 		}
 		break
 	}
-	lines := make([]string, 0, len(rw.moved))
-	for _, m := range rw.moved {
-		lines = append(lines, fmt.Sprintf("line %d", m.Line))
-	}
-	mv.advisory = "Dockerfile: moved " + joinNames(specNames(specs)) + " (" + strings.Join(slices.Compact(lines), ", ") +
-		") into [project] dependencies, so standalone mode, astro local check and uv.lock have " + pronoun(len(specs)) + " too"
+	// The lines are in MovedPackages, for json; the text says what moved, not
+	// where from.
+	moved := fileDockerfile + ": moved " + joinNames(specNames(specs)) + " into [project] dependencies"
 	if mv.dropped {
-		mv.advisory += ". What was left of the Dockerfile builds what a project without one does, so it was removed"
+		moved += ", then removed the Dockerfile, which had nothing else left"
 		from1x.dropDockerfile = true
 	}
+	mv.advisories = []string{moved}
 	if mv.addedSecret {
-		mv.advisory += ". [tool.astro] build-secrets now names netrc, the secret the steps installed with: " +
-			"a build reads ~/.netrc, or else asks git for the credentials of the hosts the packages come from"
+		mv.advisories = append(mv.advisories, "[tool.astro] build-secrets: added netrc, which builds read from ~/.netrc or your git credentials")
 	}
 	from1x.notes = slices.DeleteFunc(from1x.notes, func(n string) bool { return slices.Contains(from1x.stepNotes, n) })
 	from1x.notes = append(from1x.notes, mv.notesAfter...)
-	cs.Advisories = append(cs.Advisories, mv.advisory)
+	cs.Advisories = append(cs.Advisories, mv.advisories...)
 	cs.MovedPackages = rw.moved
 	cs.pipMove = mv
 }
@@ -559,7 +557,7 @@ func (r *Result) RevertMovedPackages(why string) error {
 	r.Notes = slices.DeleteFunc(r.Notes, func(n string) bool { return slices.Contains(mv.notesAfter, n) })
 	r.Notes = append(r.Notes, fileDockerfile+": its pip steps stay, because uv lock could not resolve them here ("+why+")")
 	r.Notes = append(r.Notes, mv.notesBefore...)
-	r.Advisories = slices.DeleteFunc(r.Advisories, func(a string) bool { return a == mv.advisory })
+	r.Advisories = slices.DeleteFunc(r.Advisories, func(a string) bool { return slices.Contains(mv.advisories, a) })
 	r.Deleted = slices.DeleteFunc(r.Deleted, func(d string) bool { return d == mv.deleted })
 	for i, u := range r.Updated {
 		if u == mv.updatedAfter && mv.updatedAfter != "" {

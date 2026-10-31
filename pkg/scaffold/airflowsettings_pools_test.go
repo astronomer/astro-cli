@@ -70,28 +70,28 @@ func TestAPoolThatCannotBeCarriedKeepsTheFile(t *testing.T) {
 		{
 			name:     "no slots",
 			settings: "airflow:\n  pools:\n    - pool_name: etl\n",
-			note:     SettingsRelPath + ": pool etl cannot be carried. pool_slot is missing",
+			note:     SettingsRelPath + ": pool etl cannot be converted. pool_slot is missing",
 		},
 		{
 			name:     "zero slots",
 			settings: "airflow:\n  pools:\n    - pool_name: etl\n      pool_slot: 0\n",
-			note:     SettingsRelPath + ": pool etl cannot be carried. pool_slot 0 is not a slot count: use a number above zero, or -1 for no limit",
+			note:     SettingsRelPath + ": pool etl cannot be converted. pool_slot 0 is not a slot count: use a number above zero, or -1 for no limit",
 		},
 		{
 			name:     "slots that are not a number",
 			settings: "airflow:\n  pools:\n    - pool_name: etl\n      pool_slot: four\n",
-			note:     SettingsRelPath + ": pool etl cannot be carried. pool_slot \"four\" is not a number",
+			note:     SettingsRelPath + ": pool etl cannot be converted. pool_slot \"four\" is not a number",
 		},
 		{
 			name:      "listed twice",
 			settings:  "airflow:\n  pools:\n    - pool_name: etl\n      pool_slot: 4\n    - pool_name: etl\n      pool_slot: 5\n",
-			note:      SettingsRelPath + ": pool etl is listed twice, and only the first was carried. Delete one entry",
+			note:      SettingsRelPath + ": pool etl is listed twice, and only the first was kept. Delete one entry",
 			wantPools: map[string]manifest.Pool{"etl": {Slots: 4}},
 		},
 		{
 			name:     "a slash in the name",
 			settings: "airflow:\n  pools:\n    - pool_name: etl/eu\n      pool_slot: 4\n",
-			note:     SettingsRelPath + ": pool etl/eu cannot be carried: a pool name cannot contain a slash",
+			note:     SettingsRelPath + ": pool etl/eu cannot be converted: a pool name cannot contain a slash",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -126,7 +126,7 @@ func TestDefaultPoolIsCarriedWithoutItsDescription(t *testing.T) {
 	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	require.Equal(t, map[string]manifest.Pool{"default_pool": {Slots: 64}}, m.Astro.Pools)
-	require.Contains(t, res.Advisories, SettingsRelPath+": carried default_pool's slots and not its description, "+
+	require.Contains(t, res.Advisories, SettingsRelPath+": kept default_pool's slots but not its description, "+
 		"which Airflow does not let a caller change")
 }
 
@@ -153,7 +153,7 @@ func TestPoolsAreCarriedWhenTheRestOfTheFileIsNot(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
 }
 
-// A pool that cannot be carried keeps the file, and nothing else: the
+// A pool that cannot be converted keeps the file, and nothing else: the
 // connections and variables beside it still reach the vault.
 func TestAPoolThatCannotBeCarriedDoesNotStopTheValues(t *testing.T) {
 	dir := project1xWithSettings(t, `airflow:
@@ -171,9 +171,9 @@ func TestAPoolThatCannotBeCarriedDoesNotStopTheValues(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Contains(t, writer.stored, "warehouse")
-	require.Contains(t, res.Notes, SettingsRelPath+": pool etl cannot be carried. pool_slot is missing")
+	require.Contains(t, res.Notes, SettingsRelPath+": pool etl cannot be converted. pool_slot is missing")
 	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
 	require.Equal(t,
-		SettingsRelPath+" still contains warehouse in plaintext, and is kept for a pool entry that could not be carried",
+		SettingsRelPath+" still contains warehouse in plaintext, and is kept for a pool entry that could not be converted",
 		findAdvisory(t, res.Advisories, "plaintext"))
 }

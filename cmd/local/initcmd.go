@@ -34,11 +34,11 @@ func newInitCmd(c *cli) *cobra.Command {
 		Short: "Make a directory an Astro project",
 		Long: "Create a pyproject.toml-based Astro project in the given directory (default: the current one).\n\n" +
 			"Run it in the Airflow repo you already have: a directory with no pyproject.toml is scaffolded, and one that has a pyproject.toml gains a [tool.astro] section, leaving the rest of the file alone.\n\n" +
-			"Run in an Astro CLI 1.x project, it converts it in place: requirements.txt and packages.txt are carried into pyproject.toml, what airflow_settings.yaml declares is carried over, " +
+			"Run in an Astro CLI 1.x project, it converts it in place: requirements.txt and packages.txt move into pyproject.toml, as do what airflow_settings.yaml declares and pip-only install steps of the Dockerfile, " +
 			"and a Dockerfile that does more than pick a base image is kept as the project's build, moved onto the install base the CLI builds from pyproject.toml and uv.lock (FROM ${ASTRO_BASE}), " +
 			"with the runtime its FROM named recorded in pyproject.toml (astro package --base or --context-dir builds it with docker of your own). A 1.x file is removed once everything it said is in pyproject.toml, " +
 			"except requirements.txt and packages.txt when a Dockerfile left on its ONBUILD tag still installs them, and other files already there are kept. " +
-			"What init could not carry over, such as a requirements.txt line that is not a plain requirement, is listed at the end, to move across by hand.\n\n" +
+			"What init could not move, such as a requirements.txt line that is not a plain requirement, is listed at the end, to move by hand.\n\n" +
 			"Run in a project that is already an Astro project, it brings what astro writes there up to date and changes nothing else: " +
 			"a declared Dockerfile still on an ONBUILD tag, or one an earlier astro wrote install steps into (running .astro/install-project.py, which goes, or reading the astro-install build context), " +
 			"is moved onto the install base as a conversion would, with the runtime it named recorded in pyproject.toml.",
@@ -288,6 +288,8 @@ func renderInfo(w io.Writer, info []string) error {
 	return nil
 }
 
+// renderLeftToDo prints init's notes, one per line, except the Deployment
+// links a 1.x config listed: those come last, under one line, a command each.
 func renderLeftToDo(w io.Writer, notes []string) error {
 	if len(notes) == 0 {
 		return nil
@@ -295,8 +297,28 @@ func renderLeftToDo(w io.Writer, notes []string) error {
 	if _, err := fmt.Fprintf(w, "\nLeft to do:\n"); err != nil {
 		return err
 	}
+	var links []string
 	for _, note := range notes {
+		if cmd, ok := strings.CutPrefix(note, scaffold.LinkNotePrefix); ok {
+			links = append(links, cmd)
+			continue
+		}
 		if _, err := fmt.Fprintf(w, "  %s\n", note); err != nil {
+			return err
+		}
+	}
+	if len(links) == 0 {
+		return nil
+	}
+	head := "  Link the Deployments .astro/config.yaml lists:\n"
+	if len(links) == 1 {
+		head = "  Link the Deployment .astro/config.yaml lists:\n"
+	}
+	if _, err := io.WriteString(w, head); err != nil {
+		return err
+	}
+	for _, cmd := range links {
+		if _, err := fmt.Fprintf(w, "    %s\n", cmd); err != nil {
 			return err
 		}
 	}

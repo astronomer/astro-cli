@@ -157,10 +157,10 @@ func TestConfigInstancesAreReported(t *testing.T) {
 	// One note per link, so each command is a line to copy and a json
 	// consumer still groups every one under the file.
 	assert.Equal(t, []string{
-		".astro/config.yaml: its instances list links a Deployment this run did not carry into pyproject.toml. Link it with: astro link add prod --deployment cm1prod",
-		".astro/config.yaml: its instances list links a Deployment this run did not carry into pyproject.toml. Link it with: astro link add dev --deployment cm1dev",
-		".astro/config.yaml: its instances list links a Deployment this run did not carry into pyproject.toml. Link it with: astro link add <name> --deployment cm1odd",
-		".astro/config.yaml: its instances list links a Deployment this run did not carry into pyproject.toml. Link it with: astro link add orders --target mwaa",
+		".astro/config.yaml: link the Deployment it lists with: astro link add prod --deployment cm1prod",
+		".astro/config.yaml: link the Deployment it lists with: astro link add dev --deployment cm1dev",
+		".astro/config.yaml: link the Deployment it lists with: astro link add <name> --deployment cm1odd",
+		".astro/config.yaml: link the Deployment it lists with: astro link add orders --target mwaa",
 	}, about, "notes: %v", res.Notes)
 	m, err := manifest.Load(filepath.Join(res.Dir, manifest.Marker))
 	require.NoError(t, err)
@@ -178,8 +178,8 @@ func TestConfigInstancesReadTheIDUnderAuth(t *testing.T) {
 		"  - auth:\n      kind: astro_pat\n    name: example\n    source: astro\n"+
 		"  - auth:\n      deployment_id: cm1auth\n    deployment_id: cm1top\n    name: both\n    source: astro\n")
 	assert.Equal(t, []string{
-		".astro/config.yaml: its instances list links a Deployment this run did not carry into pyproject.toml. Link it with: astro link add example-dev --deployment cexampledeployment0000001",
-		".astro/config.yaml: its instances list links a Deployment this run did not carry into pyproject.toml. Link it with: astro link add example --deployment <id>",
-		".astro/config.yaml: its instances list links a Deployment this run did not carry into pyproject.toml. Link it with: astro link add both --deployment cm1top",
+		".astro/config.yaml: link the Deployment it lists with: astro link add example-dev --deployment cexampledeployment0000001",
+		".astro/config.yaml: link the Deployment it lists with: astro link add example --deployment <id>",
+		".astro/config.yaml: link the Deployment it lists with: astro link add both --deployment cm1top",
 	}, about, "notes: %v", res.Notes)
 }
