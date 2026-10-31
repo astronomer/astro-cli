@@ -51,30 +51,50 @@ func TestBaseOf(t *testing.T) {
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.3-base", BaseOf("astrocrpublic.azurecr.io/runtime:3.3-base"))
 }
 
-// A project's own Dockerfile reads the lists from the named context, and
-// mounts the netrc secret whether or not the build passes one; a generated
-// build reads them from its own context, and mounts it only when asked.
-func TestInstallDockerfileReadsTheListsFromTheNamedContext(t *testing.T) {
-	df := InstallDockerfile("img:1-base")
-	assert.True(t, strings.HasPrefix(df, "FROM img:1-base\nCOPY --from="+InstallContext+" packages.txt .\n"), df)
-	assert.Contains(t, df, "COPY --from="+InstallContext+" requirements.txt uv-lock-constraints.txt routed-requirements.txt routed-links.html ./\n")
-	assert.Contains(t, df, "RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false "+
+// The install base is the recipe alone, reading the lists from its own
+// context, and mounts the netrc secret only when asked; a generated build is
+// the same recipe, then the project's files.
+func TestInstallBaseDockerfile(t *testing.T) {
+	df := InstallBaseDockerfile("img:1-base", false)
+	assert.True(t, strings.HasPrefix(df, "FROM img:1-base\nCOPY packages.txt .\n"), df)
+	assert.Contains(t, df, "COPY requirements.txt uv-lock-constraints.txt routed-requirements.txt routed-links.html ./\n")
+	assert.NotContains(t, df, "--mount")
+	assert.NotContains(t, df, ProjectCopy, "the install base carries no project files")
+	assert.True(t, strings.HasSuffix(df, "USER astro\n"), df)
+	assert.Contains(t, InstallBaseDockerfile("img:1-base", true), "RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false "+
 		"if [ -s routed-requirements.txt ]; then pip install --no-cache-dir --root-user-action=ignore --no-index --no-deps --find-links routed-links.html -r routed-requirements.txt; fi && "+
 		"if [ -x /usr/local/bin/install-python-dependencies ]")
-	assert.NotContains(t, df, "ARG ", "no build argument, no helper stage")
-	assert.Equal(t, 1, strings.Count(df, "FROM "))
-	assert.Contains(t, InstallDockerfileWith("img:1-base", InstallOptions{ListsFrom: InstallContext, Alias: "app"}), "FROM img:1-base AS app\n")
 
-	gen := InstallDockerfileWith("img:1-base", InstallOptions{})
-	assert.Contains(t, gen, "\nCOPY packages.txt .\n")
-	assert.NotContains(t, gen, "--mount")
-	assert.Contains(t, InstallDockerfileWith("img:1-base", InstallOptions{MountNetrc: true}), "RUN --mount=type=secret,id=netrc")
+	gen := GeneratedDockerfile("img:1-base", false)
+	assert.Equal(t, df+ProjectCopy+"\n", gen)
 }
 
-func TestReadsInstallContext(t *testing.T) {
-	assert.True(t, ReadsInstallContext([]byte(InstallDockerfile("img:1-base"))))
-	assert.True(t, ReadsInstallContext([]byte("FROM x\nCOPY --from=\"astro-install\" requirements.txt .\n")))
-	assert.False(t, ReadsInstallContext([]byte(InstallDockerfileWith("img:1-base", InstallOptions{}))), "a generated build reads its own context")
-	assert.False(t, ReadsInstallContext([]byte("FROM x\n# COPY --from=astro-install packages.txt .\n")))
-	assert.False(t, ReadsInstallContext([]byte("FROM x\nCOPY --from=astro-installer a .\n")))
+func TestUsesInstallBase(t *testing.T) {
+	assert.True(t, UsesInstallBase([]byte("ARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nRUN true\n")))
+	assert.True(t, UsesInstallBase([]byte("ARG ASTRO_BASE\nFROM python:3.12 AS b\nFROM --platform=linux/amd64 $ASTRO_BASE AS app\n")))
+	assert.False(t, UsesInstallBase([]byte("ARG ASTRO_BASE\nFROM ${ASTRO_BASE} AS b\nFROM python:3.12\n")), "only the final stage counts")
+	assert.False(t, UsesInstallBase([]byte("FROM quay.io/astronomer/astro-runtime:12.6.0\n")))
+	assert.False(t, UsesInstallBase([]byte("ARG BASE\nFROM ${BASE}\n")))
+}
+
+func TestWithRegistry(t *testing.T) {
+	assert.Equal(t, "registry.example.com/astronomer/runtime:3.3-8-python-3.13",
+		WithRegistry("astrocrpublic.azurecr.io/runtime:3.3-8-python-3.13", "registry.example.com/astronomer/"))
+	assert.Equal(t, "mirror/astro-runtime:12.6.0", WithRegistry("quay.io/astronomer/astro-runtime:12.6.0", "mirror"))
+	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.3", WithRegistry("astrocrpublic.azurecr.io/runtime:3.3", ""))
+}
+
+func TestRegistryOf(t *testing.T) {
+	for image, want := range map[string]string{
+		"astrocrpublic.azurecr.io/runtime":               "",
+		"quay.io/astronomer/astro-runtime":               "",
+		"registry.corp.example/astronomer/astro-runtime": "registry.corp.example/astronomer",
+		"localhost:5000/runtime":                         "localhost:5000",
+	} {
+		got, ok := RegistryOf(image)
+		assert.True(t, ok, image)
+		assert.Equal(t, want, got, image)
+	}
+	_, ok := RegistryOf("python")
+	assert.False(t, ok)
 }

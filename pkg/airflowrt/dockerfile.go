@@ -147,8 +147,12 @@ func (s *DockerfileStage) OnBuildRuntime() bool {
 // digest, has no tag, or carries a tag that is not a Runtime version (a
 // mirror's floating one), unless that tag is a -base one. A caller that would
 // retire what ONBUILD steps read asks this, since guessing wrong there breaks
-// the build.
+// the build. The install base (BaseArg) is the CLI's own, built from a -base
+// tag, so a stage on it carries none.
 func (s *DockerfileStage) MightCarryOnBuild() bool {
+	if s.Ref == BaseArgFrom || s.Ref == "$"+BaseArg {
+		return false
+	}
 	if IsUnresolvedRef(s.Ref) {
 		return true
 	}

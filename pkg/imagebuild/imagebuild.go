@@ -191,15 +191,16 @@ const filePermRW = 0o600
 type Request struct {
 	// WorkDir is the directory the build context and Dockerfile are written
 	// under; the caller owns its location and lifetime. In Dockerfile mode it
-	// holds only the install lists a Dockerfile that reads the named context
-	// takes (ReadsInstallContext).
+	// holds only the install base a Dockerfile built on it needs
+	// (UsesInstallBase).
 	WorkDir string
 	// BaseImage is the resolved runtime image the build is of
 	// (astrocrpublic.azurecr.io/runtime:<version>). The build starts FROM its
 	// -base tag (airflowrt.BaseOf); BaseImage itself stays the runtime's own tag,
 	// which is what callers parse the runtime version out of and name in
-	// messages. Empty in Dockerfile mode: the project's own file declares what
-	// it builds on.
+	// messages. In Dockerfile mode it is the runtime the install base is built
+	// on, for a Dockerfile built on one (UsesInstallBase), and empty
+	// otherwise: that file declares what it builds on.
 	BaseImage string
 	// Secrets are docker build --secret specs ("id=mysecret[,src=/local/secret]"
 	// or "id=mysecret,env=ENV_VAR"),
@@ -220,10 +221,10 @@ type Request struct {
 	// The two modes share little. This one takes its FROM from the file
 	// rather than BaseImage, and it builds the PROJECT as its context,
 	// because a multi-stage build COPYs from the repo. It writes nothing,
-	// except for a file that reads the install lists from the named context
-	// airflowrt.InstallContext (one astro init rewrote onto a -base tag),
-	// which gets the lists (Lists) in a directory of WorkDir, passed as
-	// --build-context. The generated mode's context is
+	// except for a file built FROM the install base (UsesInstallBase, as
+	// astro init writes a converted one), whose base it builds first in a
+	// directory of WorkDir, over BaseImage with the lists (Lists), and passes
+	// as the build argument airflowrt.BaseArg. The generated mode's context is
 	// synthetic: the install lists (InstallLists.Files), plus, for an image
 	// that ships, a filtered copy of the project (ProjectFiles), which the
 	// generated Dockerfile's `COPY . .` lays down after both installs.
@@ -245,8 +246,8 @@ type Request struct {
 	// resolved. When it is set, Dependencies, FindLinks and Packages are
 	// ignored, both by the install and by Build's decision that there is
 	// nothing to install. nil installs those three as written
-	// (UnpinnedLists). In Dockerfile mode it is what a Dockerfile that reads
-	// the named context installs (ReadsInstallContext), and is otherwise
+	// (UnpinnedLists). In Dockerfile mode it is what the install base of a
+	// Dockerfile built on one installs (UsesInstallBase), and is otherwise
 	// ignored.
 	Install *InstallLists
 	// Dependencies are the manifest's Python dependencies (PEP 508);
@@ -298,6 +299,11 @@ type Request struct {
 	// where docker runs. Setting it needs a Commander that is a DirCommander,
 	// as NewExecCommander's is.
 	Dir string
+	// InstallBaseOnly builds a Dockerfile's install base alone and returns its
+	// tag (InstallBaseTag), for a caller that builds the project's Dockerfile
+	// itself (`astro package --base`). It needs a Dockerfile built on one
+	// (UsesInstallBase).
+	InstallBaseOnly bool
 	// Stdout and Stderr, when set, take the build's own stdout and stderr
 	// raw, as the container CLI writes them, in place of the lines Build
 	// otherwise hands to its callbacks. Either may be set alone; a stream
@@ -387,16 +393,21 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 		// No fast path here. An unchanged Dockerfile is the daemon's layer cache
 		// to short-circuit, not ours to skip: we cannot tell from the outside
 		// whether the file's own steps would produce something new.
-		contexts, err := installContextArgs(req)
-		if err != nil {
-			return "", err
-		}
-		if len(contexts) > 0 {
-			if err := b.checkNamedContexts(ctx, req); err != nil {
-				return "", err
+		var buildArgs []string
+		switch {
+		case req.UsesInstallBase():
+			base, err := b.buildInstallBase(ctx, req, cb)
+			if err != nil || req.InstallBaseOnly {
+				return base, err
 			}
+			buildArgs = []string{airflowrt.BaseArg + "=" + base}
+		case req.InstallBaseOnly:
+			return "", fmt.Errorf("the Dockerfile this project declares (%s) does not build FROM %s, so it has no install base to build", req.Dockerfile, airflowrt.BaseArgFrom)
 		}
-		return b.build(ctx, req, req.Dockerfile, req.Context, contexts, cb)
+		return b.build(ctx, req, req.Dockerfile, req.Context, buildArgs, cb)
+	}
+	if req.InstallBaseOnly {
+		return "", errors.New("the project declares no Dockerfile of its own, so it has no install base to build: its generated build installs over the runtime directly")
 	}
 
 	from := baseOf(req.BaseImage)
@@ -440,7 +451,7 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 // platform rule and the same streaming; only the file, the context and whether
 // the base is pulled differ, so keeping one call site is what stops the two
 // modes drifting on flags.
-func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir string, buildContexts []string, cb rt.Callbacks) (string, error) {
+func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir string, buildArgs []string, cb rt.Callbacks) (string, error) {
 	w := &rt.LineWriter{Emit: func(line string) {
 		if cb.OnLine != nil {
 			cb.OnLine(rt.LogLine{Component: "build", Time: b.now(), Text: line})
@@ -468,8 +479,8 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 	if req.Platform != "" {
 		args = append(args, "--platform", req.Platform)
 	}
-	for _, c := range buildContexts {
-		args = append(args, "--build-context", c)
+	for _, a := range buildArgs {
+		args = append(args, "--build-arg", a)
 	}
 	args = append(args, contextDir)
 	stdio := rt.Stdio{Out: w, Err: w}

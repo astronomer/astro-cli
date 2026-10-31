@@ -455,10 +455,10 @@ var validationCases = []struct {
 		wantKeys:  []string{"tool.astro.runtime"},
 	},
 	{
-		name:      "runtime beside a dockerfile",
-		wantCodes: []ProblemCode{CodeRuntimeWithDockerfile},
-		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.3.*\"]\n\n[tool.astro]\ndockerfile = 'Dockerfile'\nruntime = '3.3-8'\n",
-		wantKeys:  []string{"tool.astro.runtime"},
+		name:      "registry with a scheme",
+		wantCodes: []ProblemCode{CodeRegistryInvalid},
+		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.3.*\"]\n\n[tool.astro]\nregistry = 'https://registry.example.com'\n",
+		wantKeys:  []string{"tool.astro.registry"},
 	},
 	{
 		name:      "missing project name",

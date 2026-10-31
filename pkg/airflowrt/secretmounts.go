@@ -15,7 +15,7 @@ type SecretMount struct {
 	Line int
 	// Optional reports that every mount of the id says required=false: its
 	// author has stated the build runs without it, as the install step
-	// InstallDockerfile writes does for the netrc secret.
+	// InstallBaseDockerfile writes does for the netrc secret.
 	Optional bool
 }
 

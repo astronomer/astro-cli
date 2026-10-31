@@ -65,9 +65,13 @@ type ManifestBuild struct {
 	AirflowVersion string
 	// Runtime is [tool.astro] runtime (manifest.Airflow().Runtime), the one
 	// runtime build a generated image starts FROM instead of the newest build
-	// of AirflowVersion's series, or "" for none. The manifest never sets it
-	// beside a Dockerfile.
+	// of AirflowVersion's series, or "" for none. Beside a Dockerfile it picks
+	// the install base that file builds on.
 	Runtime string
+	// Registry is [tool.astro] registry: the registry a mirror of Astro
+	// Runtime serves the runtime images from (registry.example/astronomer),
+	// or "" for Astronomer's own.
+	Registry string
 	// RequiresPython is [project] requires-python. A generated image runs the
 	// newest Python of its runtime build that it admits, preferring the
 	// build's default (imagebuild.RuntimeImageForPython).
@@ -94,6 +98,7 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 		ProjectDir:     projectDir,
 		AirflowVersion: p.AirflowVersion,
 		Runtime:        p.Runtime,
+		Registry:       p.Registry,
 		RequiresPython: p.RequiresPython,
 		Dockerfile:     p.Dockerfile,
 		Dependencies:   p.Dependencies,
@@ -108,6 +113,7 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 func (p *Plan) SetManifestBuild(mb ManifestBuild) {
 	p.AirflowVersion = mb.AirflowVersion
 	p.Runtime = mb.Runtime
+	p.Registry = mb.Registry
 	p.RequiresPython = mb.RequiresPython
 	p.Dockerfile = mb.Dockerfile
 	p.Dependencies = mb.Dependencies
@@ -125,8 +131,10 @@ type BuildRequest struct {
 	// BaseImage is the resolved runtime image the build is of: the runtime's
 	// own tag (runtime:3.1-5), which names the runtime and is what a caller
 	// parses a version out of. The build starts FROM its -base tag, and the
-	// fast path returns that tag (ImageBuilder.Build), not this one. Empty
-	// when Dockerfile is set — that file declares its own FROM.
+	// fast path returns that tag (ImageBuilder.Build), not this one. When
+	// Dockerfile is set it is the runtime that file's install base is built
+	// on, for a file built FROM ${ASTRO_BASE}, and empty otherwise: that file
+	// declares its own FROM.
 	BaseImage string
 	// Dockerfile and Context ask the builder to run the project's own Dockerfile
 	// rather than generate one, for a project whose manifest declared it. Both
