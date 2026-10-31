@@ -548,7 +548,7 @@ func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb loca
 	if err := imageinstall.Fill(ctx, &breq, warn); err != nil {
 		return "", err
 	}
-	return imagebuild.New(imagebuild.NewExecCommander(), time.Now).Build(ctx, breq, cb)
+	return imagebuild.New(imagebuild.NewExecCommander(), time.Now).WithCredentials(imagebuild.GitCredentials).Build(ctx, breq, cb)
 }
 
 // ErrAllDeploymentsLinked reports a Deployment picker with nothing to offer

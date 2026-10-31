@@ -70,6 +70,9 @@ type pipStepMove struct {
 	// ignore is the .dockerignore change a Dockerfile the move removed would
 	// have had, which a revert makes along with putting the file back.
 	ignore *Change
+	// addedSecret reports that the move added 'id=netrc' to [tool.astro]
+	// build-secrets, for the netrc secret the moved steps mounted.
+	addedSecret bool
 }
 
 // dockerInstr is one entry of a Dockerfile's lines: an instruction with its
@@ -397,8 +400,16 @@ func planPipStepMoves(move bool, from1x *project1x, out *[]byte, cs *Changeset, 
 		mv.notesAfter = nil
 		ed.Delete([]string{"tool", "astro", manifestKeyDockerfile})
 	}
-	if rw.movedNetrc {
-		mv.notesAfter = append(mv.notesAfter, movedSecretNote(specs)...)
+	if rw.movedNetrc && !namesNetrcSecret(asStrings(mustGet(ed, "tool", "astro", manifestKeyBuildSecrets))) {
+		// The steps mounted netrc themselves; now the install base does,
+		// and only when the build is given it. A source-less entry has the
+		// build read ~/.netrc, or else git's credentials for the hosts the
+		// packages come from, as uv lock reached them.
+		secrets := append(asStrings(mustGet(ed, "tool", "astro", manifestKeyBuildSecrets)), bareNetrcSecret)
+		if ed.Set([]string{"tool", "astro", manifestKeyBuildSecrets}, asAny(secrets)) != nil {
+			return
+		}
+		mv.addedSecret = true
 	}
 	data, err := ed.Bytes()
 	if err != nil {
@@ -436,6 +447,10 @@ func planPipStepMoves(move bool, from1x *project1x, out *[]byte, cs *Changeset, 
 		mv.advisory += ". What was left of the Dockerfile builds what a project without one does, so it was removed"
 		from1x.dropDockerfile = true
 	}
+	if mv.addedSecret {
+		mv.advisory += ". [tool.astro] build-secrets now names netrc, the secret the steps installed with: " +
+			"a build reads ~/.netrc, or else asks git for the credentials of the hosts the packages come from"
+	}
 	from1x.notes = slices.DeleteFunc(from1x.notes, func(n string) bool { return slices.Contains(from1x.stepNotes, n) })
 	from1x.notes = append(from1x.notes, mv.notesAfter...)
 	cs.Advisories = append(cs.Advisories, mv.advisory)
@@ -452,12 +467,16 @@ func specNames(specs []string) []string {
 	return out
 }
 
-// movedSecretNote says how to give the build the netrc secret the moved steps
-// mounted, which the install base mounts in their place. Not naming the
-// Dockerfile, which may be gone (planRetirements reads notes for file names).
-func movedSecretNote(specs []string) []string {
-	return []string{manifest.Marker + ": " + joinNames(specNames(specs)) + " installed with the netrc build secret. " +
-		"To build without --build-secret each time, add " + netrcSecretSpec + " to build-secrets under [tool.astro]"}
+// bareNetrcSecret is the build-secrets entry for a netrc the build supplies
+// itself: ~/.netrc, or git's credentials for the hosts it installs from.
+const bareNetrcSecret = "id=" + manifest.RuntimeSecretID
+
+// namesNetrcSecret reports build-secrets that already give the netrc secret.
+func namesNetrcSecret(secrets []string) bool {
+	return slices.ContainsFunc(secrets, func(spec string) bool {
+		s, err := manifest.ParseBuildSecret(spec)
+		return err == nil && s.ID == manifest.RuntimeSecretID
+	})
 }
 
 // netrcSecretSpec is the build-secrets entry for the netrc secret, read from
@@ -510,6 +529,14 @@ func (r *Result) RevertMovedPackages(why string) error {
 		})
 		if err := ed.Set([]string{"project", "dependencies"}, asAny(deps)); err != nil {
 			return err
+		}
+		if mv.addedSecret {
+			secrets := slices.DeleteFunc(asStrings(mustGet(ed, "tool", "astro", manifestKeyBuildSecrets)), func(s string) bool { return s == bareNetrcSecret })
+			if len(secrets) == 0 {
+				ed.Delete([]string{"tool", "astro", manifestKeyBuildSecrets})
+			} else if err := ed.Set([]string{"tool", "astro", manifestKeyBuildSecrets}, asAny(secrets)); err != nil {
+				return err
+			}
 		}
 		if mv.dropped {
 			return ed.Set([]string{"tool", "astro", manifestKeyDockerfile}, fileDockerfile)

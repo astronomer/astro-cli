@@ -12,7 +12,9 @@ import (
 // image's build, the same specs --build-secret takes. Without a declared
 // Dockerfile only RuntimeSecretID reaches the build. A spec
 // names where a secret comes from, an environment variable or a file, and
-// never holds the secret, so the list is safe to commit. A --build-secret flag
+// never holds the secret, so the list is safe to commit. 'id=netrc' alone
+// names no source: the build reads ~/.netrc, or else asks git for the
+// credentials of each host it installs from. A --build-secret flag
 // replaces the list, and so does BUILD_SECRET_INPUT when no flag is given.
 
 const buildSecretsKey = astroRoot + ".build-secrets"
@@ -82,8 +84,12 @@ func ParseBuildSecret(spec string) (BuildSecret, error) {
 	return s, nil
 }
 
-// String is the spec docker reads.
+// String is the spec docker reads. A netrc with no source is the CLI's to
+// supply (see [tool.astro] build-secrets), and stays id=netrc.
 func (s BuildSecret) String() string {
+	if s.Env == "" && s.Src == "" {
+		return "id=" + s.ID
+	}
 	if s.Env != "" {
 		return "id=" + s.ID + ",env=" + s.Env
 	}
@@ -124,6 +130,9 @@ func (p *parser) buildSecrets(v any) []string {
 			p.add(CodeBuildSecretInvalid, key, "is not a build secret spec: it "+err.Error()+". "+specShape)
 		case s.ID == "":
 			p.add(CodeBuildSecretInvalid, key, "names no id. "+specShape)
+		case s.Env == "" && s.Src == "" && s.ID == RuntimeSecretID:
+			// The CLI supplies it at build time: ~/.netrc, or git's
+			// credentials for the hosts the build installs from.
 		case (s.Env == "") == (s.Src == ""):
 			p.add(CodeBuildSecretInvalid, key, "has to name exactly one source, env= or src=. "+specShape)
 		case s.Src != "" && !filepath.IsAbs(s.Src) && !strings.HasPrefix(s.Src, "/") && !strings.HasPrefix(s.Src, "~/"):

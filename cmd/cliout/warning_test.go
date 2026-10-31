@@ -13,8 +13,8 @@ import (
 // a writer that is not stderr (a buffer, stdout) always gets plain text.
 func TestWarnLeadsWithWarning(t *testing.T) {
 	var b bytes.Buffer
-	Warn(&b, "the image will carry 1 file that .gitignore ignores")
-	if got, want := b.String(), "Warning: the image will carry 1 file that .gitignore ignores\n"; got != want {
+	Warn(&b, "1 file that .gitignore ignores goes into the image")
+	if got, want := b.String(), "Warning: 1 file that .gitignore ignores goes into the image\n"; got != want {
 		t.Errorf("Warn wrote %q, want %q", got, want)
 	}
 	if got := WarningLabel(&b); got != "Warning:" {

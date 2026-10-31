@@ -50,7 +50,7 @@ func TestAstroBuildRefusesGitignoredCredentials(t *testing.T) {
 			_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, cb)
 			require.ErrorContains(t, err, "certs/prod.pem looks like credentials")
 			assert.Empty(t, builder.gotReq.Tag, "nothing was built")
-			assert.Contains(t, strings.Join(warned, "\n"), "2 files that .gitignore ignores and .dockerignore does not, in certs/ and target/",
+			assert.Contains(t, strings.Join(warned, "\n"), "2 files that .gitignore ignores go into the image, in certs/ and target/",
 				"a refused build still hands over its warnings")
 
 			require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".dockerignore"), []byte("certs/\n**/.git\n"), 0o600))
@@ -60,7 +60,7 @@ func TestAstroBuildRefusesGitignoredCredentials(t *testing.T) {
 			assert.Empty(t, lines, "warnings are not progress lines")
 			assert.Equal(t, warned, res.Warnings, "-o json's result carries every warning shown")
 			require.Len(t, warned, 1)
-			assert.Equal(t, "the image will carry 1 file that .gitignore ignores and .dockerignore does not, in target/. If it does not belong in the image, add it to .dockerignore", warned[0])
+			assert.Equal(t, "1 file that .gitignore ignores goes into the image, in target/. If it doesn't belong there, add it to .dockerignore", warned[0])
 		})
 	}
 }
