@@ -113,7 +113,7 @@ func TestDownloadFile_RefusesRedirectToOtherHost(t *testing.T) {
 	}))
 	defer other.Close()
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, other.URL+"/constraints.txt", http.StatusFound)
+		http.Redirect(w, r, other.URL+"/constraints.txt?X-Amz-Signature=secret", http.StatusFound)
 	}))
 	defer srv.Close()
 	useTestServerClient(t, srv)
@@ -121,7 +121,24 @@ func TestDownloadFile_RefusesRedirectToOtherHost(t *testing.T) {
 	dest := filepath.Join(t.TempDir(), "constraints.txt")
 	err := DownloadFile(srv.URL+"/constraints.txt", dest)
 	require.ErrorContains(t, err, "refusing redirect")
+	assert.NotContains(t, err.Error(), "secret", "a presigned target's query must not be shown")
 	assert.NoFileExists(t, dest)
+}
+
+func TestSameHostHTTPS(t *testing.T) {
+	for to, ok := range map[string]bool{
+		"https://cdn.astronomer.io/b":      true,
+		"https://CDN.astronomer.io:443/b":  true,
+		"https://cdn.astronomer.io:8443/b": false,
+		"http://cdn.astronomer.io/b":       false,
+		"https://evil.example.com/b":       false,
+	} {
+		from, err := http.NewRequest(http.MethodGet, "https://cdn.astronomer.io/a", http.NoBody)
+		require.NoError(t, err)
+		req, err := http.NewRequest(http.MethodGet, to, http.NoBody)
+		require.NoError(t, err)
+		assert.Equal(t, ok, sameHostHTTPS(req, []*http.Request{from}) == nil, to)
+	}
 }
 
 func TestDownloadFile_RefusesRedirectToHTTP(t *testing.T) {

@@ -1,9 +1,11 @@
 package airflowrt
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -84,17 +86,32 @@ func sameHostHTTPS(req *http.Request, via []*http.Request) error {
 	if len(via) >= 10 { //nolint:mnd
 		return fmt.Errorf("stopped after %d redirects", len(via))
 	}
-	orig := via[0].URL
-	if req.URL.Scheme != "https" || req.URL.Host != orig.Host {
-		return fmt.Errorf("refusing redirect from %s to %s", orig.Redacted(), req.URL.Redacted())
+	from, to := via[0].URL, req.URL
+	if to.Scheme != "https" || !strings.EqualFold(to.Hostname(), from.Hostname()) || httpsPort(to) != httpsPort(from) {
+		// Scheme, host and path only: a presigned target's query is a credential.
+		shown := url.URL{Scheme: to.Scheme, Host: to.Host, Path: to.Path}
+		return fmt.Errorf("refusing redirect to %s", shown.String())
 	}
 	return nil
 }
 
+func httpsPort(u *url.URL) string {
+	if p := u.Port(); p != "" {
+		return p
+	}
+	return "443"
+}
+
 // DownloadFile fetches a URL and writes the body to dest. Variable for testing.
-var DownloadFile = func(url, dest string) error {
-	resp, err := downloadClient.Get(url) //nolint:noctx
+var DownloadFile = func(src, dest string) error {
+	resp, err := downloadClient.Get(src) //nolint:noctx
 	if err != nil {
+		// The client's error names the last URL it tried, which after a
+		// redirect is the target, query and all. FetchConstraints names src.
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			return urlErr.Err
+		}
 		return err
 	}
 	defer resp.Body.Close()
