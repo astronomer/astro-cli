@@ -195,6 +195,25 @@ func fetchAndKeep(ctx context.Context, base, dir, name string) ([]byte, error) {
 	return data, err
 }
 
+// freezeClient reads the two files. What they say decides what a project's
+// lockfile is held to, so a redirect may only move to another path on the
+// same host, and never from https to http: anywhere else could answer with
+// pins nobody published. A mirror served over http may still redirect
+// within itself.
+var freezeClient = &http.Client{CheckRedirect: sameHostRedirect}
+
+func sameHostRedirect(req *http.Request, via []*http.Request) error {
+	const maxRedirects = 10
+	if len(via) >= maxRedirects {
+		return fmt.Errorf("stopped after %d redirects", len(via))
+	}
+	from := via[0].URL
+	if req.URL.Host != from.Host || (from.Scheme == "https" && req.URL.Scheme != "https") {
+		return fmt.Errorf("refusing a redirect to %s", runtimeversions.WithoutUser(req.URL.String()))
+	}
+	return nil
+}
+
 // fetchFile reads one file from the CDN and returns its bytes. Only a whole
 // file with a pin in it comes back, so nothing short of one is ever cached.
 // An error names the address without its user and password.
@@ -205,7 +224,7 @@ func fetchFile(ctx context.Context, url string) ([]byte, error) {
 		return nil, fmt.Errorf("reading %s: the address does not parse", shown)
 	}
 	req.Header.Set("User-Agent", "astro-cli/"+version.Current())
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := freezeClient.Do(req)
 	if err != nil {
 		// The client's error names the address as requested; this names it
 		// redacted, and keeps the cause.

@@ -69,6 +69,53 @@ func TestRuntimeConstraintsRefusesAPageWithNoPins(t *testing.T) {
 	}
 }
 
+func TestFetchFileFollowsARedirectOnTheSameHost(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/old", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/new", http.StatusFound)
+	})
+	mux.HandleFunc("/new", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("apache-airflow==3.3.2\n"))
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	got, err := fetchFile(context.Background(), srv.URL+"/old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "apache-airflow==3.3.2\n" {
+		t.Errorf("fetchFile = %q", got)
+	}
+}
+
+func TestFetchFileRefusesARedirectToAnotherHost(t *testing.T) {
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("apache-airflow==6.6.6\n"))
+	}))
+	t.Cleanup(other.Close)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, other.URL+"/file.txt", http.StatusFound)
+	}))
+	t.Cleanup(srv.Close)
+	if _, err := fetchFile(context.Background(), srv.URL+"/file.txt"); err == nil || !strings.Contains(err.Error(), "refusing a redirect") {
+		t.Errorf("err = %v, want a refused redirect", err)
+	}
+}
+
+func TestSameHostRedirectRefusesHTTPSToHTTP(t *testing.T) {
+	from, _ := http.NewRequest(http.MethodGet, "https://cdn.example.com/a.txt", http.NoBody)
+	for to, ok := range map[string]bool{
+		"https://cdn.example.com/b.txt":  true,
+		"http://cdn.example.com/b.txt":   false,
+		"https://evil.example.com/b.txt": false,
+	} {
+		req, _ := http.NewRequest(http.MethodGet, to, http.NoBody)
+		if err := sameHostRedirect(req, []*http.Request{from}); (err == nil) != ok {
+			t.Errorf("redirect to %s: err = %v, want allowed=%v", to, err, ok)
+		}
+	}
+}
+
 func TestRuntimeConstraintsRefusesANameThatIsNotAVersion(t *testing.T) {
 	serveFiles(t, "x==1\n")
 	if _, err := RuntimeConstraints(context.Background(), "../x", "3.14"); !errors.Is(err, ErrNotPublished) {
