@@ -152,3 +152,87 @@ func TestInitAgainLocksNothing(t *testing.T) {
 		t.Errorf("init in an up-to-date project locked %d times", calls)
 	}
 }
+
+// pipStepDockerfile is a 1.x Dockerfile whose only step installs a package
+// from git, which init moves into [project] dependencies.
+const pipStepDockerfile = "FROM astrocrpublic.azurecr.io/runtime:3.3-8\n" +
+	"RUN pip install --no-cache-dir \"humanize @ git+https://github.com/example-org/humanize.git@0a1b2c3\"\n"
+
+// initMovingPipSteps runs init in a 1.x project with pipStepDockerfile and Lock
+// as given, and returns init's stdout and stderr.
+func initMovingPipSteps(t *testing.T, lock func(ctx context.Context, dir string) error) (dir, stdout, stderr string, calls int) {
+	t.Helper()
+	dir = t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(pipStepDockerfile), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d, out := testDeps(t)
+	errOut := &bytes.Buffer{}
+	d.Stderr = errOut
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	d.Lock = func(ctx context.Context, dir string) error {
+		calls++
+		return lock(ctx, dir)
+	}
+	if err := execute(t, d, "init", "--name", "demo"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	return dir, out.String(), errOut.String(), calls
+}
+
+func TestInitKeepsMovedPipStepsThatLock(t *testing.T) {
+	dir, out, errOut, calls := initMovingPipSteps(t, func(_ context.Context, dir string) error {
+		writeLock(t, dir, lockOf("humanize", "4.11.0"))
+		return nil
+	})
+	if calls != 1 || strings.Count(errOut, "uv.lock: locked") != 1 {
+		t.Errorf("the move was not locked and reported once (calls %d):\n%s", calls, errOut)
+	}
+	pyproject, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(pyproject), "humanize @ git+https://github.com/example-org/humanize.git@0a1b2c3") {
+		t.Errorf("the step's package is not in pyproject.toml:\n%s", pyproject)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); !os.IsNotExist(err) {
+		t.Errorf("a Dockerfile left building what a generated build does was kept (%v)", err)
+	}
+	if !strings.Contains(out, "moved humanize (line 2) into [project] dependencies") {
+		t.Errorf("init did not say what moved:\n%s", out)
+	}
+}
+
+func TestInitPutsBackPipStepsThatDoNotLock(t *testing.T) {
+	for name, lock := range map[string]func(context.Context, string) error{
+		"lock fails": func(context.Context, string) error {
+			return errors.New("uv lock: git operation failed: authentication required\nmore")
+		},
+		"no uv": func(context.Context, string) error { return fmt.Errorf("discovering uv: %w", uv.ErrNotFound) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir, out, _, _ := initMovingPipSteps(t, lock)
+			body, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+			if err != nil {
+				t.Fatalf("the Dockerfile was not put back: %v", err)
+			}
+			if !strings.Contains(string(body), `RUN pip install --no-cache-dir "humanize @ git+`) {
+				t.Errorf("the step is not back in the Dockerfile:\n%s", body)
+			}
+			pyproject, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(pyproject), "humanize") || !strings.Contains(string(pyproject), "dockerfile = 'Dockerfile'") {
+				t.Errorf("pyproject.toml still has the move:\n%s", pyproject)
+			}
+			if !strings.Contains(out, "Dockerfile: its pip steps stay, because uv lock could not resolve them here") ||
+				!strings.Contains(out, "uv add 'humanize @ git+https://github.com/example-org/humanize.git@0a1b2c3'") {
+				t.Errorf("init did not say why the step stayed and how to move it:\n%s", out)
+			}
+			if strings.Contains(out, "moved humanize") {
+				t.Errorf("init still reports the move it put back:\n%s", out)
+			}
+		})
+	}
+}

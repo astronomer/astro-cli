@@ -23,5 +23,14 @@
   ],
   "advisories": [
     "x"
+  ],
+  "info": [
+    "x"
+  ],
+  "moved_packages": [
+    {
+      "spec": "x",
+      "line": -1
+    }
   ]
 }

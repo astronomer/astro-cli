@@ -119,6 +119,9 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 		}
 	}
 
+	// A Dockerfile's pip-only install steps move into [project] dependencies,
+	// and the lock below decides whether they stay there.
+	opts.MovePipSteps = true
 	res, err := scaffold.Run(dir, opts)
 	if err != nil {
 		return err
@@ -127,13 +130,20 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// stays offline. A lookup that fails is not reported here, since init has
 	// no to-do in it: `astro local start` makes the same lookup and says what
 	// it found. uv.lock follows what it wrote; nothing written, nothing locked.
-	if build := c.writeAstroBuild(ctx, res.Dir); build.changed {
+	build := c.writeAstroBuild(ctx, res.Dir)
+	if build.changed {
 		// What it wrote is an update like the rest, so an existing project is
 		// not reported as up to date; a manifest this run created or already
 		// lists as updated, under a label of its own, is not listed again.
 		if !listsFile(res.Created, manifest.Marker) && !listsFile(res.Updated, manifest.Marker) {
 			res.Updated = append(res.Updated, manifest.Marker)
 		}
+	}
+	locked, err := c.lockMovedPackages(ctx, res)
+	if err != nil {
+		return err
+	}
+	if !locked && build.changed {
 		c.lockAfterInit(ctx, res.Dir)
 	}
 	return r.Emit(res, func(w io.Writer) error {
@@ -248,6 +258,9 @@ func renderInit(w io.Writer, res *scaffold.Result, next string) error {
 	if err := renderChanged(w, res.Advisories); err != nil {
 		return err
 	}
+	if err := renderInfo(w, res.Info); err != nil {
+		return err
+	}
 	if err := renderLeftToDo(w, res.Notes); err != nil {
 		return err
 	}
@@ -274,6 +287,21 @@ func renderChanged(w io.Writer, advisories []string) error {
 		if _, err := fmt.Fprintf(w, "  %s\n", a); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// renderInfo prints what a person should know and has nothing to do about,
+// each as a Note.
+func renderInfo(w io.Writer, info []string) error {
+	if len(info) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+	for _, n := range info {
+		cliout.Note(w, n)
 	}
 	return nil
 }
@@ -342,4 +370,42 @@ func (l *lazyVaultWriter) writer() (*vaultenv.Writer, error) {
 		l.w = w
 	}
 	return l.w, nil
+}
+
+// lockMovedPackages locks the project once init has moved a Dockerfile's pip
+// steps into [project] dependencies (Result.MovedPackages), and reports the
+// lock as lockAfterInit does. When uv cannot lock them here (a private
+// repository this machine cannot reach, or no uv to ask) it puts them back in
+// the Dockerfile instead and reports locked false, so the caller locks what is
+// left.
+func (c *cli) lockMovedPackages(ctx context.Context, res *scaffold.Result) (locked bool, err error) {
+	if len(res.MovedPackages) == 0 {
+		return false, nil
+	}
+	o := c.relock(ctx, res.Dir)
+	var why string
+	switch o.Status {
+	case lockLocked, lockUpdated, lockUnchanged:
+		c.reportLock(o)
+		return true, nil
+	case lockFailed:
+		why = shortUVError(o.Error)
+	case lockNoUV:
+		why = "uv was not found"
+	default:
+		why = "this build of the CLI does not lock"
+	}
+	return false, res.RevertMovedPackages(why)
+}
+
+// shortUVError is the first two clauses of a uv error, which say what failed
+// and on what: uv chains every cause onto one line, and the rest (a git
+// command's stderr, a cache path) is for a person reading uv's own output.
+func shortUVError(msg string) string {
+	first, rest, _ := strings.Cut(msg, ": ")
+	second, _, _ := strings.Cut(rest, ": ")
+	if second == "" {
+		return first
+	}
+	return first + ": " + second
 }
