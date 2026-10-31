@@ -88,8 +88,9 @@ func TestBuildWritesRequirements(t *testing.T) {
 		"USER root\n"+
 		"RUN if [ -x /usr/local/bin/install-system-packages ]; then /usr/local/bin/install-system-packages; "+
 		"elif [ -s packages.txt ]; then apt-get update && cat packages.txt | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n"+
-		"COPY requirements.txt .\n"+
-		"RUN if [ -x /usr/local/bin/install-python-dependencies ]; then /usr/local/bin/install-python-dependencies; "+
+		"COPY requirements.txt uv-lock-constraints.txt routed-requirements.txt routed-links.html ./\n"+
+		"RUN if [ -s routed-requirements.txt ]; then pip install --no-cache-dir --root-user-action=ignore --no-index --no-deps --find-links routed-links.html -r routed-requirements.txt; fi && "+
+		"if [ -x /usr/local/bin/install-python-dependencies ]; then /usr/local/bin/install-python-dependencies; "+
 		"else pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; fi\n"+
 		"USER astro\n"+
 		"COPY --chown=astro:0 . .\n", string(df))
@@ -107,7 +108,7 @@ func TestBuildWritesFindLinks(t *testing.T) {
 	require.NoError(t, err)
 	got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, requirementsName))
 	require.NoError(t, err)
-	assert.Equal(t, "--find-links https://pypi.acme.example/simple/private-lib/\nprivate-lib\npandas\n", string(got))
+	assert.Equal(t, "--find-links https://pypi.acme.example/simple/private-lib/\npandas\nprivate-lib\n", string(got), "the dependencies sorted, after the links")
 }
 
 // The -base suffix is added once: a base already on a -base tag is not
@@ -133,7 +134,7 @@ func TestBuildWritesOSPackages(t *testing.T) {
 
 	got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, packagesName))
 	require.NoError(t, err)
-	assert.Equal(t, "libpq-dev\nbuild-essential\n", string(got))
+	assert.Equal(t, "build-essential\nlibpq-dev\n", string(got), "sorted")
 	// requirements.txt is still written (no extra deps here) so its own ONBUILD
 	// copy holds.
 	assert.FileExists(t, filepath.Join(req.WorkDir, buildContextDir, requirementsName))

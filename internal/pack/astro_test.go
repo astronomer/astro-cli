@@ -22,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // fakeBuilder is an ImageBuilder that records the request and never touches a
@@ -321,30 +322,103 @@ func TestAstroBuildTagIsContentAddressed(t *testing.T) {
 	assert.Equal(t, plain, withLib(map[string]string{"apache-airflow": "https://pip.astronomer.io/v2/"}), "a source the image never installs does not")
 }
 
-// A generated build's Dockerfile and find-links are part of its address: the
-// same inputs over another recipe, or reading another index page, are another
-// image. A declared Dockerfile is addressed by its own bytes and reads no
-// find-links, so neither moves its tag.
-func TestContentHashCoversTheGeneratedRecipeAndFindLinks(t *testing.T) {
+// A generated build's Dockerfile and the lists its install reads are part of
+// its address: the same project over another recipe, or installing other
+// versions, is another image. A declared Dockerfile is addressed by its own
+// bytes and reads neither, so neither moves its tag.
+func TestContentHashCoversTheGeneratedRecipeAndItsLists(t *testing.T) {
 	const base = "astrocrpublic.azurecr.io/runtime:3.1-2"
-	hash := func(recipe string, findLinks []string, df declaredDockerfile) string {
+	hash := func(recipe string, install *imagebuild.InstallLists, df declaredDockerfile) string {
 		t.Helper()
-		h, err := contentHash(base, "linux/amd64", recipe, []string{"pandas"}, findLinks, nil, "", df)
+		h, err := contentHash(base, "linux/amd64", recipe, imagebuild.Request{Install: install}, df)
 		require.NoError(t, err)
 		return h
 	}
-	page := []string{"https://pypi.acme.example/simple/private-lib/"}
+	lists := func(reqs string, constraints ...string) *imagebuild.InstallLists {
+		return &imagebuild.InstallLists{Requirements: []string{reqs}, Constraints: constraints}
+	}
 
 	assert.NotEqual(t, hash("recipe one", nil, declaredDockerfile{}), hash("recipe two", nil, declaredDockerfile{}),
 		"a changed generated recipe moves the tag")
-	assert.NotEqual(t, hash("recipe", nil, declaredDockerfile{}), hash("recipe", page, declaredDockerfile{}),
-		"a find-links page moves a generated build's tag")
+	first := hash("recipe", lists("pandas==2.2.3"), declaredDockerfile{})
+	assert.Equal(t, first, hash("recipe", lists("pandas==2.2.3"), declaredDockerfile{}))
+	assert.NotEqual(t, first, hash("recipe", lists("pandas==2.2.2"), declaredDockerfile{}), "a requirement's version is hashed")
+	assert.NotEqual(t, first, hash("recipe", lists("pandas==2.2.3", "numpy==2.1.0"), declaredDockerfile{}), "the lock's constraints are hashed")
 
 	df := filepath.Join(t.TempDir(), "Dockerfile")
 	require.NoError(t, os.WriteFile(df, []byte("FROM scratch\n"), 0o600))
 	declared := declaredDockerfile{rel: "Dockerfile", abs: df}
-	assert.Equal(t, hash("", nil, declared), hash("", page, declared),
-		"a declared Dockerfile reads no find-links, so they do not move its tag")
+	assert.Equal(t, hash("", lists("a==1"), declared), hash("", lists("a==2"), declared),
+		"a declared Dockerfile's tag does not follow the generated build's lists")
+}
+
+// The resolve runs before the content address, over the request ForManifest
+// made, and what it resolves is what the build installs and the tag covers.
+func TestAstroBuildResolvesTheInstallFirst(t *testing.T) {
+	tags := map[string]string{}
+	for _, version := range []string{"2.2.3", "2.2.2"} {
+		builder := &fakeBuilder{}
+		req := testRequest(t)
+		req.ResolveInstall = func(_ context.Context, breq *imagebuild.Request, warn func(string)) error {
+			assert.Equal(t, req.ProjectDir, breq.ManifestDir)
+			warn("resolved")
+			breq.Install = &imagebuild.InstallLists{Requirements: []string{"pandas==" + version}}
+			return nil
+		}
+		res, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+		require.NoError(t, err)
+		assert.Contains(t, res.Warnings, "resolved")
+		require.NotNil(t, builder.gotReq.Install)
+		assert.Equal(t, []string{"pandas==" + version}, builder.gotReq.Install.Requirements)
+		tags[version] = res.Image
+	}
+	assert.NotEqual(t, tags["2.2.3"], tags["2.2.2"])
+
+	req := testRequest(t)
+	req.ResolveInstall = func(context.Context, *imagebuild.Request, func(string)) error { return errors.New("export failed") }
+	_, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	assert.ErrorContains(t, err, "export failed")
+}
+
+// --context-dir writes the build context and the commands that build it, and
+// builds nothing: no engine is asked for anything.
+func TestAstroBuildWritesTheContext(t *testing.T) {
+	builder, docker := &fakeBuilder{}, &fakeDocker{}
+	req := testRequest(t)
+	req.ContextDir = filepath.Join(t.TempDir(), "build")
+	req.BuildSecrets = []string{"id=netrc,env=NETRC_CONTENT", "id=other,src=/x"}
+	req.ResolveInstall = func(_ context.Context, breq *imagebuild.Request, _ func(string)) error {
+		breq.Install = &imagebuild.InstallLists{Requirements: []string{"pandas==2.2.3"}, Packages: []string{"libpq-dev"}}
+		return nil
+	}
+	res, err := newAstro(builder, docker).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, KindContext, res.Kind)
+	assert.Equal(t, req.ContextDir, res.ContextDir)
+	assert.Equal(t, []string{
+		"docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + scaffold.ShellQuote(req.ContextDir),
+		"podman build --platform linux/amd64 --tag astro-package/my-project:latest --secret id=netrc,env=NETRC_CONTENT " + scaffold.ShellQuote(req.ContextDir),
+	}, res.NextSteps)
+	assert.Empty(t, docker.callStrings(), "no engine")
+	assert.Empty(t, builder.gotReq.Tag, "no build")
+	reqs, err := os.ReadFile(filepath.Join(req.ContextDir, "requirements.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, "pandas==2.2.3\n", string(reqs))
+	assert.FileExists(t, filepath.Join(req.ContextDir, "Dockerfile"))
+
+	_, err = newAstro(builder, docker).Build(context.Background(), req, localrt.Callbacks{})
+	assert.ErrorContains(t, err, "--context-dir writes only into a new or empty directory")
+}
+
+// A project that declares its own Dockerfile is its own build context.
+func TestAstroBuildRefusesAContextForADeclaredDockerfile(t *testing.T) {
+	req := testRequest(t)
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\n"), 0o600))
+	req.Manifest.Astro.Dockerfile = "Dockerfile"
+	req.ContextDir = filepath.Join(t.TempDir(), "build")
+	_, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
+	assert.ErrorContains(t, err, "the project is its build context")
+	assert.NoDirExists(t, req.ContextDir)
 }
 
 func TestAstroBuildTagOverrideSkipsLatest(t *testing.T) {
@@ -679,4 +753,20 @@ func TestAstroBuildWarnsAboutLocalFilesInTheContext(t *testing.T) {
 	_, err = newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, cb)
 	require.NoError(t, err)
 	assert.Empty(t, lines)
+}
+
+// The printed commands run as printed: an argument with a space, the context
+// directory or a secret's file, is quoted for the shell.
+func TestAstroBuildQuotesTheContextCommands(t *testing.T) {
+	req := testRequest(t)
+	req.ContextDir = filepath.Join(t.TempDir(), "my build")
+	req.BuildSecrets = []string{"id=netrc,src=/Users/a b/.netrc"}
+	req.ResolveInstall = func(_ context.Context, breq *imagebuild.Request, _ func(string)) error {
+		breq.Install = &imagebuild.InstallLists{}
+		return nil
+	}
+	res, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, "docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret 'id=netrc,src=/Users/a b/.netrc' '"+req.ContextDir+"'",
+		res.NextSteps[0])
 }

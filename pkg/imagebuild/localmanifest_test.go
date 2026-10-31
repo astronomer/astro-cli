@@ -47,6 +47,10 @@ func TestForLocalManifestPicksWhatForManifestPicksForAirflow3(t *testing.T) {
 	for name, tc := range cases {
 		tc.m.Dependencies, tc.m.Packages = deps, pkgs
 		tc.want.Dependencies, tc.want.Packages = deps, pkgs
+		// Either way a generated build installs from the project's manifest.
+		if tc.want.Dockerfile == "" {
+			tc.want.ManifestDir = tc.m.ProjectDir
+		}
 
 		deploy, err := ForManifest(tc.m, nil)
 		require.NoError(t, err, name)

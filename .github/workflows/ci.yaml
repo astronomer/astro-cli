@@ -203,6 +203,21 @@ jobs:
             go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-
             go-test-${{ runner.os }}-
 
+      # uv, before the unit tests: internal/imageinstall resolves its fixture
+      # projects with it, as the CLI resolves a project before an image build,
+      # and skips those tests on a machine without it. Tier 1
+      # of the e2e suite below builds a real Airflow environment with it too,
+      # and needs uv's downloads to survive between runs: ~220 MB per
+      # environment, which is the difference between that tier taking seconds
+      # and taking minutes. The suite shares that cache deliberately rather
+      # than isolating it; see uvCache in e2e/harness_test.go.
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          # The suite is told the cache directory below, so the action's own
+          # caching would be a second copy of the same thing under a different
+          # key.
+          enable-cache: false
+
       - name: Run unit tests
         env:
           HOUSTON_HOST: houston
@@ -217,18 +232,6 @@ jobs:
       # The e2e suite rides in this job rather than one of its own so that it
       # shares the Go build cache above; a job of its own would hold a cache of
       # its own and build the tree from cold.
-      #
-      # Tier 1 builds a real Airflow environment, so it needs uv — and it needs
-      # uv's downloads to survive between runs: ~220 MB per environment, which
-      # is the difference between this tier taking seconds and taking minutes.
-      # The suite shares that cache deliberately rather than isolating it; see
-      # uvCache in e2e/harness_test.go.
-      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          # The suite is told the cache directory below, so the action's own
-          # caching would be a second copy of the same thing under a different
-          # key.
-          enable-cache: false
 
       # One place the uv cache directory is written down: exported here, so the
       # e2e suite reads it from the environment and the restore and save steps

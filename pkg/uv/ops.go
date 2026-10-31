@@ -43,6 +43,48 @@ func (c *Client) Lock(ctx context.Context, project string, stdio Stdio) error {
 	return asResolution("lock", c.fetch(ctx, project, stdio, "lock"))
 }
 
+// ErrLockMissing and ErrLockStale are the two answers of LockCheck that are
+// about the lock itself: there is no uv.lock, or it no longer matches
+// pyproject.toml. Any other error is a check uv could not make.
+var (
+	ErrLockMissing = errors.New("there is no uv.lock")
+	ErrLockStale   = errors.New("uv.lock is out of date with pyproject.toml")
+)
+
+// LockCheck runs `uv lock --check`: nil when <project>/uv.lock exists and
+// matches pyproject.toml, by uv's own reading of it. A missing lock is
+// ErrLockMissing and a stale one ErrLockStale, each wrapping uv's error; any
+// other error is a check uv could not make (an index it cannot reach, a
+// resolve that fails offline), which says nothing about the lock. Nothing is
+// written.
+func (c *Client) LockCheck(ctx context.Context, project string) error {
+	err := c.fetch(ctx, project, Stdio{}, "lock", "--check")
+	var ce *CommandError
+	if !errors.As(err, &ce) {
+		return err
+	}
+	switch {
+	case strings.Contains(ce.Stderr, "Unable to find lockfile"):
+		return fmt.Errorf("%w: %w", ErrLockMissing, err)
+	case strings.Contains(ce.Stderr, "needs to be updated"):
+		return fmt.Errorf("%w: %w", ErrLockStale, err)
+	}
+	return err
+}
+
+// ExportPylock is `uv export --format pylock.toml` of <project>/uv.lock as it
+// stands (--frozen), without dev dependencies and without the project itself:
+// every package the lock installs, as PEP 751 lists it, with its version,
+// environment marker and source. It reads the lock and writes nothing.
+func (c *Client) ExportPylock(ctx context.Context, project string) ([]byte, error) {
+	var out bytes.Buffer
+	err := c.command(ctx, project, Stdio{Out: &out}, "export", "--frozen", "--no-dev", "--no-emit-project", "--format", "pylock.toml")
+	if err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
 // VenvAt creates a standalone venv at dir — not the <project>/.venv Venv
 // makes — for a scratch environment that lives outside any project (a
 // pre-flight check against a platform's Airflow version). python selects the

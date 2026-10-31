@@ -170,10 +170,10 @@ func TestBuildLocalBuildsEvenWithNothingToInstall(t *testing.T) {
 	assert.Contains(t, cmd.calls[0], "--platform linux/amd64")
 	assert.False(t, hasCall(cmd.calls, "docker pull"), "%v", cmd.calls)
 
-	// The install steps COPY both files, so both exist, and install nothing.
+	// The install steps COPY every list, so each exists, and installs nothing.
 	reqs, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, requirementsName))
 	require.NoError(t, err)
-	assert.Equal(t, "\n", string(reqs))
+	assert.Empty(t, reqs)
 	pkgs, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, packagesName))
 	require.NoError(t, err)
 	assert.Empty(t, pkgs)
@@ -247,7 +247,7 @@ func TestForManifestBuildCarriesTheProject(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"include/agents/__init__.py", "dags/blueprints.py", "pyproject.toml", ".astro/config.yaml",
 		"include/logs/fixture.json", "include/airflow.cfg", "include/sample_env", "include/environment/defaults.yaml",
-		requirementsName, packagesName,
+		requirementsName, packagesName, lockConstraintsName, routedName, routedLinksName,
 	}, contextFiles(t, ctxDir))
 	reqs, err := os.ReadFile(filepath.Join(ctxDir, requirementsName))
 	require.NoError(t, err)

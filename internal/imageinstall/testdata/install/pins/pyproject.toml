@@ -1,0 +1,8 @@
+[project]
+name = "pins"
+version = "0"
+requires-python = ">=3.10"
+dependencies = ["requests==2.32.3", "tabulate"]
+
+[project.optional-dependencies]
+idn = ["idna"]

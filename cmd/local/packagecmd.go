@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -14,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/deploy"
+	"github.com/astronomer/astro-cli/internal/imageinstall"
 	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -44,6 +46,7 @@ func newPackageCmd(c *cli) *cobra.Command {
 		tag          string
 		platform     string
 		outDir       string
+		contextDir   string
 		buildSecrets []string
 	}
 	cmd := &cobra.Command{
@@ -56,7 +59,9 @@ func newPackageCmd(c *cli) *cobra.Command {
 		Example: "  # Build the image Astro runs\n" +
 			"  astro package\n\n" +
 			"  # Build the bucket layout MWAA reads, and also write it to a zip\n" +
-			"  astro package mwaa --save dist/mwaa.zip",
+			"  astro package mwaa --save dist/mwaa.zip\n\n" +
+			"  # Write the image's build context, to build it with docker or podman yourself\n" +
+			"  astro package --context-dir ./build",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := pack.TargetAstro
@@ -68,6 +73,7 @@ func newPackageCmd(c *cli) *cobra.Command {
 				tag:          opts.tag,
 				platform:     opts.platform,
 				outDir:       opts.outDir,
+				contextDir:   opts.contextDir,
 				buildSecrets: opts.buildSecrets,
 			})
 		},
@@ -76,6 +82,7 @@ func newPackageCmd(c *cli) *cobra.Command {
 	cmd.Flags().StringVar(&opts.tag, "tag", "", "Image reference for image targets (default astro-package/<name>:<runtime>-<hash>)")
 	cmd.Flags().StringVar(&opts.platform, "platform", defaultPackagePlatform, "Build platform for image targets")
 	cmd.Flags().StringVar(&opts.outDir, "out-dir", "", "Artifact directory for bucket targets (default dist/<target>)")
+	cmd.Flags().StringVar(&opts.contextDir, "context-dir", "", "Write the astro image's build context to this new or empty directory instead of building it, and print the docker and podman commands that build it")
 	addBuildSecretFlag(cmd, &opts.buildSecrets)
 	return cmd
 }
@@ -86,6 +93,7 @@ type packageOptions struct {
 	tag          string
 	platform     string
 	outDir       string
+	contextDir   string
 	buildSecrets []string
 }
 
@@ -107,6 +115,14 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	m, err := loadCheckedManifest(dir)
 	if err != nil {
 		return err
+	}
+	if opts.contextDir != "" {
+		switch {
+		case target.Name() != pack.TargetAstro:
+			return fmt.Errorf("--context-dir writes an image's build context, and the %s target builds no image", target.Name())
+		case opts.save != "":
+			return errors.New("--context-dir builds nothing, so there is nothing for --save to write; build the context, then save the image with docker save")
+		}
 	}
 	if len(opts.buildSecrets) > 0 {
 		switch {
@@ -143,6 +159,8 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		Platform:       opts.platform,
 		BuildSecrets:   util.ResolveProjectBuildSecrets(opts.buildSecrets, m.Astro.BuildSecretSpecs()),
 		OutDir:         opts.outDir,
+		ContextDir:     opts.contextDir,
+		ResolveInstall: imageinstall.Fill,
 		CheckRuntime:   c.d.RuntimeCheck,
 		RuntimeCatalog: catalog,
 		Warn:           warn,
@@ -198,6 +216,8 @@ func renderPackage(w io.Writer, res pack.Result, links map[string]manifest.Link)
 	case pack.KindBundle:
 		_, err := fmt.Fprintf(w, "bundle: %s\n", res.BundlePath)
 		return err
+	case pack.KindContext:
+		return renderContextResult(w, res)
 	}
 	return nil
 }
@@ -282,6 +302,20 @@ func renderTreeResult(w io.Writer, res pack.Result) error {
 		}
 	}
 	return renderNextSteps(w, res.NextSteps)
+}
+
+// renderContextResult renders a written build context and the commands that
+// build it.
+func renderContextResult(w io.Writer, res pack.Result) error {
+	if _, err := fmt.Fprintf(w, "context: %s\n\nBuild it with either of:\n", res.ContextDir); err != nil {
+		return err
+	}
+	for _, step := range res.NextSteps {
+		if _, err := fmt.Fprintf(w, "  %s\n", step); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // renderNextSteps prints the upload commands under a heading.

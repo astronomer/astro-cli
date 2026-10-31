@@ -16,9 +16,9 @@ package pack
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -30,9 +30,10 @@ import (
 type Kind string
 
 const (
-	KindImage  Kind = "image"
-	KindTree   Kind = "tree"
-	KindBundle Kind = "bundle"
+	KindImage   Kind = "image"
+	KindTree    Kind = "tree"
+	KindBundle  Kind = "bundle"
+	KindContext Kind = "context"
 )
 
 // Target names the registered targets, in listing order.
@@ -89,6 +90,25 @@ type Request struct {
 	// Each is also kept on Result.Warnings. nil streams them as progress
 	// lines, "warning: …".
 	Warn func(string)
+	// ContextDir, for the image target, writes the image's build context to
+	// this directory (new or empty) instead of building it, for a container
+	// engine the CLI does not drive to build with `docker build` or `podman
+	// build`. Refused for a project that declares its own Dockerfile, whose
+	// project already is its context.
+	ContextDir string
+	// ResolveInstall resolves what a generated image installs from the
+	// project's lock, into req.Install (imageinstall.Fill), with its warnings
+	// through warn. nil installs the manifest's dependencies as written.
+	ResolveInstall func(ctx context.Context, req *imagebuild.Request, warn func(string)) error
+}
+
+// resolveInstall resolves what breq installs with ResolveInstall, when there
+// is one, its warnings through Warn.
+func (r Request) resolveInstall(ctx context.Context, breq *imagebuild.Request) error {
+	if r.ResolveInstall == nil {
+		return nil
+	}
+	return r.ResolveInstall(ctx, breq, r.Warn)
 }
 
 // warn is Request.Warn, or a progress line through cb when it is nil.
@@ -126,8 +146,12 @@ type Result struct {
 	// value [tool.astro.env] declares, which the image does not carry.
 	DeploymentEnv []DeploymentValue `json:"deployment_env,omitempty"`
 	// NextSteps are the exact commands to ship the artifact — the upload
-	// hand-off a tree target cannot do itself (it never touches the network).
+	// hand-off a tree target cannot do itself (it never touches the network) —
+	// or, for a build context, to build it.
 	NextSteps []string `json:"next_steps,omitempty"`
+	// ContextDir is the build context the image target wrote with
+	// --context-dir, which NextSteps build.
+	ContextDir string `json:"context_dir,omitempty"`
 }
 
 // Target packages a project for one Airflow platform. Build validates the
@@ -199,13 +223,4 @@ func (s stagedTarget) Name() string { return s.name }
 
 func (s stagedTarget) Build(context.Context, Request, localrt.Callbacks) (Result, error) {
 	return Result{}, &StagedError{Target: s.name}
-}
-
-// sortedCopy returns a sorted copy of ss, leaving the input untouched. The
-// content hash sorts its inputs so reordering the manifest does not change the
-// tag.
-func sortedCopy(ss []string) []string {
-	out := append([]string(nil), ss...)
-	sort.Strings(out)
-	return out
 }

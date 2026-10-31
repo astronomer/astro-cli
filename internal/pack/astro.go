@@ -1,6 +1,7 @@
 package pack
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -188,6 +189,18 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 	declared := breq.Dockerfile
+	// What a generated image installs is resolved here, from the project's
+	// lock, before the content address that covers it.
+	if err := req.resolveInstall(ctx, &breq); err != nil {
+		return Result{}, err
+	}
+	// A context is built later, by whoever runs the commands it prints, so
+	// the secrets it names need not be readable now.
+	if req.ContextDir != "" {
+		res, err := writeContext(req, breq, name)
+		res.Warnings = warnings
+		return res, err
+	}
 	missingSecrets, err := checkSecrets(req, cb)
 	if err != nil {
 		return Result{}, err
@@ -199,7 +212,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	hash, err := contentHash(breq.BaseImage, req.Platform, generatedRecipe(breq), breq.Dependencies, breq.FindLinks, breq.Packages, breq.ProjectFiles, declaredDockerfile{
+	hash, err := contentHash(breq.BaseImage, req.Platform, generatedRecipe(breq), breq, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
@@ -247,13 +260,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// load-bearing: that base is an Astro runtime by construction, so a missing
 	// label means something odd about the image rather than a choice the user made.
 	runtimeV, airflowLabel, inspected := readVersionLabels(ctx, engine, built)
-	runtimeVersion := runtimeV
-	if runtimeVersion == "" {
-		runtimeVersion = airflowLabel
-	}
-	if runtimeVersion == "" {
-		runtimeVersion = airflow.Pin
-	}
+	runtimeVersion := cmp.Or(runtimeV, airflowLabel, airflow.Pin)
 	// A declared Dockerfile that did not produce an Astro Runtime image is
 	// REPORTED, not refused.
 	//
@@ -415,19 +422,53 @@ func save(ctx context.Context, engine imagebuild.Engine, image, path string, cb 
 	return nil
 }
 
-// contentHash is a short digest of the inputs that change the image, so the
-// same inputs produce the same tag and a rebuild is a cache hit. Dependencies
-// and packages are sorted first, so reordering the manifest does not move the
-// tag.
-// contentHash is the content address of the image this request would build.
+// declaredDockerfile pairs the manifest's own slash-separated value with the
+// absolute path it resolves to.
 //
-// A generated image carries the project's files (imagebuild's ProjectFiles),
-// so the digest of the files under projectFiles is part of the address: editing include/
-// changes the image, and has to change the tag. The digest covers exactly the
-// files the image carries — the project's .dockerignore applied, and .venv,
-// .git and .astro/standalone never among them — so it does not hit the
-// problems the declared-Dockerfile context below did. "" for a declared
-// Dockerfile.
+// A struct rather than two adjacent string parameters, because the two are
+// interchangeable to the compiler and are NOT interchangeable to the hash: the
+// relative value is hashed (so the address does not depend on where the checkout
+// sits) and the absolute one is read. Transposed, contentHash would put an
+// absolute path into the field kept relative on purpose and try to read a
+// project-relative path — the first fails silently into a wrong hash, and no test
+// could see it.
+type declaredDockerfile struct {
+	rel string // the manifest value, slash-separated; "" when none is declared
+	abs string // rel resolved against the project; "" when none is declared
+}
+
+// generatedRecipe is the Dockerfile a generated build of breq runs, as its
+// content address takes it, or "" for a declared Dockerfile, which is
+// addressed by its own bytes. It is the recipe with the netrc mount, whether or
+// not this build has the secret: a secret decides what the install can reach,
+// not what a successful one installs, so a laptop and a CI runner holding a
+// token get the same tag.
+func generatedRecipe(breq imagebuild.Request) string {
+	if breq.FromDeclaredDockerfile() {
+		return ""
+	}
+	return imagebuild.GeneratedDockerfile(breq.BaseImage, true)
+}
+
+// contentHash is the content address of the image breq builds over base for
+// platform: a short digest of the inputs that change the image, so the same
+// inputs produce the same tag and a rebuild is a cache hit.
+//
+// Generated or declared is decided once, by recipe (generatedRecipe), "" being
+// a declared Dockerfile.
+//
+// A generated build contributes its recipe, the Dockerfile imagebuild writes,
+// and the lists its install reads (InstallLists.Digest: requirements.txt, the
+// lock's constraints and packages.txt, as the CLI resolved them from uv.lock).
+// The dependencies, packages and index pages are all in those, so no list of
+// them is hashed besides.
+//
+// A generated image also carries the project's files (breq.ProjectFiles), so
+// the digest of those files is part of the address: editing include/ changes
+// the image, and has to change the tag. The digest covers exactly the files the
+// image carries — the project's .dockerignore applied, and .venv, .git and
+// .astro/standalone never among them — so it does not hit the problems the
+// declared-Dockerfile context below did.
 //
 // A declared Dockerfile contributes the DECLARED path and the file's BYTES.
 //
@@ -462,59 +503,20 @@ func save(ctx context.Context, engine imagebuild.Engine, image, path string, cb 
 // image. Caught by the test for this, which builds the same project twice from
 // two temp dirs.
 //
-// Reading the file makes this fallible, which is the honest signature: a
+// Reading the files makes this fallible, which is the honest signature: a
 // declaration naming something unreadable cannot be content-addressed, and
 // imagebuild.Build refuses it a moment later anyway.
-// declaredDockerfile pairs the manifest's own slash-separated value with the
-// absolute path it resolves to.
-//
-// A struct rather than two adjacent string parameters, because the two are
-// interchangeable to the compiler and are NOT interchangeable to the hash: the
-// relative value is hashed (so the address does not depend on where the checkout
-// sits) and the absolute one is read. Transposed, contentHash would put an
-// absolute path into the field kept relative on purpose and try to read a
-// project-relative path — the first fails silently into a wrong hash, and no test
-// could see it.
-type declaredDockerfile struct {
-	rel string // the manifest value, slash-separated; "" when none is declared
-	abs string // rel resolved against the project; "" when none is declared
-}
-
-// generatedRecipe is the Dockerfile a generated build of breq runs, as its
-// content address takes it, or "" for a declared Dockerfile, which is
-// addressed by its own bytes. It is the recipe with the netrc mount, whether or
-// not this build has the secret: a secret decides what the install can reach,
-// not what a successful one installs, so a laptop and a CI runner holding a
-// token get the same tag.
-func generatedRecipe(breq imagebuild.Request) string {
-	if breq.FromDeclaredDockerfile() {
-		return ""
-	}
-	return imagebuild.GeneratedDockerfile(breq.BaseImage, true)
-}
-
-func contentHash(base, platform, recipe string, deps, findLinks, packages []string, projectFiles string, df declaredDockerfile) (string, error) {
+func contentHash(base, platform, recipe string, breq imagebuild.Request, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
 	}
 	writeField("base", base)
 	writeField("platform", platform)
-	// Generated or declared is decided once, by recipe (generatedRecipe): ""
-	// is a declared Dockerfile.
 	if recipe != "" {
-		// A generated build's Dockerfile (recipe) is imagebuild's, not the
-		// project's, and it is as much the build as the inputs below: a change
-		// to how it installs is a different image from the same manifest, so
-		// it moves the tag rather than reusing one an older recipe built. Its
-		// find-links say where that install looks.
 		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(recipe))))
-		for _, l := range findLinks {
-			writeField("find-links", l)
-		}
+		writeField("install-lists", breq.Lists().Digest())
 	} else {
-		// A declared Dockerfile installs as its own bytes say, and reads no
-		// find-links.
 		writeField("dockerfile", filepath.ToSlash(df.rel))
 		body, err := os.ReadFile(df.abs)
 		if err != nil {
@@ -522,18 +524,12 @@ func contentHash(base, platform, recipe string, deps, findLinks, packages []stri
 		}
 		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
 	}
-	if projectFiles != "" {
+	if projectFiles := breq.ProjectFiles; projectFiles != "" {
 		digest, err := imagebuild.ProjectFilesDigest(projectFiles)
 		if err != nil {
 			return "", err
 		}
 		writeField("project-files", digest)
-	}
-	for _, d := range sortedCopy(deps) {
-		writeField("dep", d)
-	}
-	for _, p := range sortedCopy(packages) {
-		writeField("pkg", p)
 	}
 	return fmt.Sprintf("%x", h.Sum(nil))[:7], nil
 }

@@ -3,6 +3,7 @@ package uv
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -992,5 +993,50 @@ func TestHermeticEnvKeepsTheKnobsAndDropsTheRedirects(t *testing.T) {
 	want := "host=unset mirror=unset timeout=300 newer=unset"
 	if got := readCount(t, seen); got != want {
 		t.Errorf("child env = %q, want %q", got, want)
+	}
+}
+
+// LockCheck and ExportPylock run the uv commands they name, and ExportPylock
+// returns what uv printed.
+func TestLockCheckAndExportPylock(t *testing.T) {
+	c := newTestClient(t, Options{}, "echo \"$*\"\n[ \"$4\" = \"--check\" ] && exit 1\nexit 0")
+
+	if err := c.LockCheck(t.Context(), t.TempDir()); err == nil {
+		t.Error("LockCheck() = nil, want the check's failure")
+	}
+	out, err := c.ExportPylock(t.Context(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "--color never export --frozen --no-dev --no-emit-project --format pylock.toml"
+	if got := strings.TrimSpace(string(out)); got != want {
+		t.Errorf("ExportPylock() = %q, want uv run with %q", got, want)
+	}
+}
+
+// LockCheck tells a missing lock and a stale one, by uv's own message, from a
+// check uv could not make, which says nothing about the lock.
+func TestLockCheckTellsTheLockFromTheCheck(t *testing.T) {
+	for name, tc := range map[string]struct {
+		stderr string
+		code   int
+		want   error
+	}{
+		"missing": {"error: Unable to find lockfile at `uv.lock`, but `--check` was provided.", 2, ErrLockMissing},
+		"stale":   {"The lockfile at `uv.lock` needs to be updated, but `--check` was provided.", 1, ErrLockStale},
+		"network": {"error: Request failed after 3 retries", 2, nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := newTestClient(t, Options{}, fmt.Sprintf("echo '%s' >&2\nexit %d", tc.stderr, tc.code))
+			err := c.LockCheck(t.Context(), t.TempDir())
+			if err == nil {
+				t.Fatal("LockCheck() = nil, want an error")
+			}
+			for _, sentinel := range []error{ErrLockMissing, ErrLockStale} {
+				if got := errors.Is(err, sentinel); got != (sentinel == tc.want) {
+					t.Errorf("errors.Is(%v, %v) = %v", err, sentinel, got)
+				}
+			}
+		})
 	}
 }

@@ -26,6 +26,10 @@ import (
 // the manifest fields or adopted from a prebuilt local image (ImageName); a
 // "both" deploy (IncludeDags) also ships the dags/ tarball.
 type ManifestImageDeployInput struct {
+	// ResolveInstall resolves what a generated image installs from the
+	// project's lock, into req.Install (imageinstall.Fill), with its warnings
+	// through warn. nil installs the manifest's dependencies as written.
+	ResolveInstall func(ctx context.Context, req *imagebuild.Request, warn func(string)) error
 	// Login is the Astro login the deploy runs under, whose host the
 	// Deployment and its registry live on; nil is the current context.
 	Login *config.Context
@@ -434,6 +438,12 @@ func buildOrAdoptImage(ctx context.Context, in *ManifestImageDeployInput, req *i
 		Now:        buildNow,
 		Progress:   in.Progress,
 		ReadLabel:  readLabel,
+		ResolveInstall: func(ctx context.Context, req *imagebuild.Request) error {
+			if in.ResolveInstall == nil {
+				return nil
+			}
+			return in.ResolveInstall(ctx, req, in.Warn)
+		},
 	})
 }
 
