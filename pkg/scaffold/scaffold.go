@@ -744,14 +744,25 @@ func setDockerfileDeclaration(ed tomledit.Editor, from1x *project1x) error {
 // requirement won, and the Dockerfile stays behind as the record of what it
 // was (dockerfileIsSpent).
 //
-// This is the one runtime line a conversion writes. An Airflow 3 tag needs
-// none, its series being the pin, and a declared Dockerfile picks its own
-// base.
+// A Dockerfile the conversion moves onto the install base (dockerfileRewrite)
+// gives its runtime the same way: the one build its tag named, when the
+// requirement is the one that tag gave, and the mirror it was on as
+// [tool.astro] registry, since the file names neither any more. An Airflow 3
+// series tag needs no runtime line, its series being the pin.
 func setRuntimeDeclaration(ed tomledit.Editor, from1x *project1x, pinned string) error {
-	if from1x.runtime == "" || pinned != from1x.airflow {
+	runtime := from1x.runtime
+	if rw := from1x.rewrite; rw != nil {
+		runtime = rw.runtime
+		if rw.registry != "" {
+			if err := ed.Set(registryPath, rw.registry); err != nil {
+				return err
+			}
+		}
+	}
+	if runtime == "" || pinned != from1x.airflow {
 		return nil
 	}
-	return ed.Set(runtimePath, from1x.runtime)
+	return ed.Set(runtimePath, runtime)
 }
 
 // namedInAny reports whether any note is about this file.

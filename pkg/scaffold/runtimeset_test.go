@@ -1,11 +1,14 @@
 package scaffold
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
@@ -131,7 +134,7 @@ func TestSetRuntimeBuildRefuses(t *testing.T) {
 		{"an unlisted Airflow 2 build", seriesProject("apache-airflow==2.11.*", ""), "13.99.0", "", true, "lists no build 13.99.0"},
 		{"an unlisted build of another series", seriesProject("apache-airflow==3.3.*", ""), "3.9-1", "", true, "not moved to Airflow 3.9"},
 		{"an Airflow 2 build offline", seriesProject("apache-airflow==2.11.*", ""), "13.11.0", "", false, "could not be read"},
-		{"a declared Dockerfile", seriesProject("apache-airflow==3.3.*", "dockerfile = 'Dockerfile'\n"), "3.3-7", "", true, "FROM line"},
+		{"a declared Dockerfile on its own FROM", seriesProject("apache-airflow==3.3.*", "dockerfile = 'Dockerfile'\n"), "3.3-7", "", true, "Run astro init to move it onto the install base"},
 		{"a range no build Python meets", "[project]\nname = 'x'\nrequires-python = '>=3.14'\ndependencies = ['apache-airflow==3.3.*']\n\n[tool.astro]\n", "3.3-7", "", true, "Pass --python"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -170,4 +173,21 @@ func TestSetRuntimeBuildTheSameBuildWritesNothing(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, change.Changed)
 	assert.Equal(t, src, readFile(t, path))
+}
+
+// A Dockerfile built on the install base takes its runtime from pyproject.toml,
+// so a build is set beside it as for a project with none; one on its own FROM
+// is refused (TestSetRuntimeBuildRefuses).
+func TestSetRuntimeBuildBesideADockerfileOnTheInstallBase(t *testing.T) {
+	dir, path := writeEditFixture(t, seriesProject("apache-airflow==3.3.*", "dockerfile = 'Dockerfile'\n"), 0o644)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, fileDockerfile),
+		[]byte(airflowrt.BaseArgCheckDirective+"\nARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nCOPY --chown=astro:0 . .\nRUN true\n"), 0o600))
+
+	change, err := SetRuntimeBuildWith(dir, nil, "3.3-10", "", AirflowPinOptions{Catalog: buildCatalog(t)})
+	require.NoError(t, err)
+	assert.Equal(t, "3.3-10", change.Runtime)
+	m, err := manifest.Parse([]byte(readFile(t, path)))
+	require.NoError(t, err)
+	assert.Equal(t, "3.3-10", m.Airflow().Runtime)
+	assert.Equal(t, "Dockerfile", m.Astro.Dockerfile)
 }

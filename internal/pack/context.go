@@ -18,11 +18,12 @@ import (
 // is the one the target builds, its lists already resolved, so a plain
 // `docker build` of it makes the same image, with nothing from the CLI.
 //
-// For a project's own Dockerfile it writes the build's inputs under the
-// directory instead (imagebuild.WriteDeclaredContext): the Dockerfile, the
-// project as the build reads it in context/, and, when the Dockerfile reads
-// them from the named context (one astro init moved onto a -base tag), the
-// lists in astro-install/, which the commands pass with --build-context.
+// For a project's own Dockerfile it writes the builds' inputs under the
+// directory instead (imagebuild.WriteDeclaredContext): the project as the
+// Dockerfile reads it in project/, and, for a Dockerfile built on the install
+// base, that base's build in base/. Its commands build the base, then the
+// project with the base's tag as ASTRO_BASE: two plain builds, which any
+// builder runs.
 func writeContext(req Request, breq imagebuild.Request, name string) (Result, error) {
 	dir, err := filepath.Abs(req.ContextDir)
 	if err != nil {
@@ -34,23 +35,28 @@ func writeContext(req Request, breq imagebuild.Request, name string) (Result, er
 		tag = fmt.Sprintf("astro-package/%s:latest", name)
 	}
 	if breq.FromDeclaredDockerfile() {
-		lists, err := imagebuild.WriteDeclaredContext(dir, breq)
+		breq.Secrets = req.BuildSecrets
+		base, err := imagebuild.WriteDeclaredContext(dir, breq)
 		if err != nil {
 			return Result{}, contextDirError(err)
 		}
-		res := Result{
+		baseTag := ""
+		if base {
+			baseTag = breq.InstallBaseTag()
+		}
+		rel, err := filepath.Rel(breq.Context, breq.Dockerfile)
+		if err != nil {
+			return Result{}, err
+		}
+		return Result{
 			Target:     TargetAstro,
 			Kind:       KindContext,
 			ContextDir: dir,
 			NextSteps: []string{
-				declaredBuildCommand("docker", req.Platform, tag, req.BuildSecrets, dir, lists),
-				declaredBuildCommand("podman", req.Platform, tag, req.BuildSecrets, dir, lists),
+				declaredBuildCommand("docker", req.Platform, tag, baseTag, filepath.ToSlash(rel), req.BuildSecrets, dir),
+				declaredBuildCommand("podman", req.Platform, tag, baseTag, filepath.ToSlash(rel), req.BuildSecrets, dir),
 			},
-		}
-		if lists {
-			res.BuildNeeds = imagebuild.NamedContextRequirement
-		}
-		return res, nil
+		}, nil
 	}
 	if err := imagebuild.WriteContext(dir, breq); err != nil {
 		return Result{}, contextDirError(err)
@@ -74,31 +80,43 @@ func contextDirError(err error) error {
 	return err
 }
 
-// declaredBuildCommand is the engine's command that builds what
-// WriteDeclaredContext wrote at dir: its Dockerfile over its context/, with
-// the lists as the named context when it wrote them (lists), and every build
-// secret, as a build of the project's own Dockerfile forwards them all.
-// Each argument is quoted for a POSIX shell when it needs it, as in
-// buildCommand.
-// Named contexts need imagebuild.NamedContextRequirement, which the result
-// says (Result.BuildNeeds).
-func declaredBuildCommand(engine, platform, tag string, secrets []string, dir string, lists bool) string {
-	args := []string{engine, "build"}
+// declaredBuildCommand is the engine's commands that build what
+// WriteDeclaredContext wrote at dir, as one line: the install base in base/,
+// tagged baseTag, with the netrc secret when secrets carry it, when there is
+// one (baseTag not ""), then the project in project/, its Dockerfile at
+// dockerfile, with the base as ASTRO_BASE and every build secret, as a build
+// of the project's own Dockerfile forwards them all. Each argument is quoted
+// for a POSIX shell when it needs it, as in buildCommand.
+func declaredBuildCommand(engine, platform, tag, baseTag, dockerfile string, secrets []string, dir string) string {
+	project := []string{engine, "build"}
 	if platform != "" {
-		args = append(args, "--platform", platform)
+		project = append(project, "--platform", platform)
 	}
-	args = append(args, "--tag", tag, "--file", filepath.Join(dir, imagebuild.DeclaredDockerfileName))
-	if lists {
-		args = append(args, "--build-context", airflowrt.InstallContext+"="+filepath.Join(dir, imagebuild.DeclaredInstallDir))
+	project = append(project, "--tag", tag)
+	if dockerfile != "Dockerfile" {
+		project = append(project, "--file", filepath.Join(dir, imagebuild.DeclaredProjectDir, filepath.FromSlash(dockerfile)))
+	}
+	if baseTag != "" {
+		project = append(project, "--build-arg", airflowrt.BaseArg+"="+baseTag)
 	}
 	for _, s := range secrets {
-		args = append(args, "--secret", s)
+		project = append(project, "--secret", s)
 	}
-	args = append(args, filepath.Join(dir, imagebuild.DeclaredContextDir))
+	project = append(project, filepath.Join(dir, imagebuild.DeclaredProjectDir))
+	if baseTag == "" {
+		return shellLine(project)
+	}
+	return buildCommand(engine, platform, baseTag, secrets, filepath.Join(dir, imagebuild.DeclaredBaseDir)) + " && " + shellLine(project)
+}
+
+// shellLine is args as one POSIX shell command line, each argument quoted when
+// it needs it.
+func shellLine(args []string) string {
+	quoted := make([]string, len(args))
 	for i, a := range args {
-		args[i] = scaffold.ShellQuote(a)
+		quoted[i] = scaffold.ShellQuote(a)
 	}
-	return strings.Join(args, " ")
+	return strings.Join(quoted, " ")
 }
 
 // buildCommand is the engine's command that builds the context at dir for
@@ -118,8 +136,5 @@ func buildCommand(engine, platform, tag string, secrets []string, dir string) st
 		}
 	}
 	args = append(args, dir)
-	for i, a := range args {
-		args[i] = scaffold.ShellQuote(a)
-	}
-	return strings.Join(args, " ")
+	return shellLine(args)
 }

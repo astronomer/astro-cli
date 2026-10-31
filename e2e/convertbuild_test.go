@@ -9,18 +9,19 @@ import (
 	"testing"
 )
 
-// A converted 1.x Dockerfile builds the same image with `docker build`, from
-// what `astro package --context-dir` writes, as with `astro package astro`.
+// A converted 1.x Dockerfile builds the same image with plain `docker build`
+// as with `astro package astro`, both ways the CLI offers: on the install base
+// `astro package --base` builds, from the project itself, and from the two
+// contexts `astro package --context-dir` writes.
 //
-// The point of moving a converted Dockerfile onto its tag's -base image: the
-// install is written in the file, reading the lists the CLI resolves from
-// pyproject.toml and uv.lock through the astro-install build context, so the
-// 1.x lists are gone and what both images carry has to have come from
-// pyproject.toml, and the project's own RUN still runs. A plain `docker build
-// .` has no such context, and fails.
+// The point of moving a converted Dockerfile onto the install base: the CLI
+// installs the lists it resolves from pyproject.toml and uv.lock into a base
+// image, and the file builds FROM it, so the 1.x lists are gone and what every
+// image carries has to have come from pyproject.toml, and the project's own
+// RUN still runs. A plain `docker build .` has no ASTRO_BASE, and fails.
 //
-// Both builds are linux/amd64, which `astro package astro` always builds and
-// the printed command carries: the platform is one of the three differences
+// Every build is linux/amd64, which `astro package astro` always builds and
+// the printed commands carry: the platform is one of the three differences
 // the manifest reference names, and the other two (labels, build secrets) do
 // not change what is installed.
 func TestAConvertedDockerfileBuildsTheSameWithDockerAsWithPackage(t *testing.T) {
@@ -38,8 +39,8 @@ func TestAConvertedDockerfileBuildsTheSameWithDockerAsWithPackage(t *testing.T) 
 
 	var res initResult
 	p.run("init", "--output", "json").requireSuccess().requireJSON(&res)
-	if !reports(res.Updated, "Dockerfile (now builds FROM astrocrpublic.azurecr.io/runtime:3.1-12-base") {
-		t.Fatalf("the conversion did not move the Dockerfile onto -base: updated %q, notes %q", res.Updated, res.Notes)
+	if !reports(res.Updated, "Dockerfile (now builds on the install base") {
+		t.Fatalf("the conversion did not move the Dockerfile onto the install base: updated %q, notes %q", res.Updated, res.Notes)
 	}
 	for _, gone := range []string{"requirements.txt", "packages.txt"} {
 		if !reports(res.Deleted, gone) {
@@ -49,16 +50,33 @@ func TestAConvertedDockerfileBuildsTheSameWithDockerAsWithPackage(t *testing.T) 
 
 	t.Cleanup(func() { removeImagesNamed(t, "astro-package/convbuild") })
 	t.Cleanup(func() { removeImagesNamed(t, "astro-package/convbuild-docker") })
+	t.Cleanup(func() { removeImagesNamed(t, "localhost/convbuild-base") })
 
-	// A plain docker build of the project has no astro-install context.
+	// A plain docker build of the project has no install base.
 	plain := exec.CommandContext(t.Context(), "docker", "build", "--platform", "linux/amd64", "-t", "astro-package/convbuild-docker:plain", ".")
 	plain.Dir = p.Dir
 	if out, err := plain.CombinedOutput(); err == nil {
-		t.Errorf("docker build . of the converted project succeeded without the astro-install context:\n%s", out)
+		t.Errorf("docker build . of the converted project succeeded without ASTRO_BASE:\n%s", out)
 	}
 
-	// Path one: docker alone, from the inputs --context-dir writes, as CI
-	// without the CLI would, with the command it prints.
+	// Path one: the CLI builds the base, docker the project, from the project.
+	var base struct {
+		Kind  string `json:"kind"`
+		Image string `json:"image"`
+	}
+	p.runSlow("package", "--base", "--output", "json").requireSuccess().requireLastJSON(&base)
+	if base.Kind != "install_base" || !strings.HasPrefix(base.Image, "localhost/convbuild-base:") {
+		t.Fatalf("--base built %+v", base)
+	}
+	const fromBaseTag = "astro-package/convbuild-docker:base"
+	fromBase := exec.CommandContext(t.Context(), "docker", "build", "--platform", "linux/amd64", "--build-arg", "ASTRO_BASE="+base.Image, "-t", fromBaseTag, ".")
+	fromBase.Dir = p.Dir
+	if out, err := fromBase.CombinedOutput(); err != nil {
+		t.Fatalf("docker build --build-arg ASTRO_BASE=%s . failed: %v\n%s", base.Image, err, out)
+	}
+
+	// Path two: docker alone, from the inputs --context-dir writes, as CI
+	// without the CLI would, with the commands it prints.
 	const dockerTag = "astro-package/convbuild-docker:e2e"
 	var written struct {
 		ContextDir string   `json:"context_dir"`
@@ -69,15 +87,15 @@ func TestAConvertedDockerfileBuildsTheSameWithDockerAsWithPackage(t *testing.T) 
 	if len(written.NextSteps) == 0 || !strings.HasPrefix(written.NextSteps[0], "docker build ") {
 		t.Fatalf("--context-dir printed no docker command: %q", written.NextSteps)
 	}
-	if !strings.Contains(written.NextSteps[0], " --build-context astro-install="+filepath.Join(dir, "astro-install")+" ") {
-		t.Errorf("the docker command does not pass the lists: %q", written.NextSteps[0])
+	if !strings.Contains(written.NextSteps[0], " "+filepath.Join(dir, "base")+" && docker build ") ||
+		!strings.Contains(written.NextSteps[0], " --build-arg ASTRO_BASE=") {
+		t.Errorf("the docker command does not build the base, then the project on it: %q", written.NextSteps[0])
 	}
-	args := strings.Fields(written.NextSteps[0])
-	if out, err := exec.CommandContext(t.Context(), args[0], args[1:]...).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "sh", "-c", written.NextSteps[0]).CombinedOutput(); err != nil {
 		t.Fatalf("%s failed on the converted project: %v\n%s", written.NextSteps[0], err, out)
 	}
 
-	// Path two: the CLI's own build of the same project.
+	// Path three: the CLI's own build of the same project.
 	var pkg struct {
 		Image string `json:"image"`
 	}
@@ -95,13 +113,16 @@ func TestAConvertedDockerfileBuildsTheSameWithDockerAsWithPackage(t *testing.T) 
 		}
 		return string(out)
 	}
-	fromDocker, fromPackage := installed(dockerTag), installed(pkg.Image)
-	for _, want := range []string{"six==1.16.0", "from-1x", "/jq"} {
-		if !strings.Contains(fromDocker, want) {
-			t.Errorf("the --context-dir build lacks %q, which the conversion carried:\n%s", want, fromDocker)
+	fromPackage := installed(pkg.Image)
+	for _, image := range []string{dockerTag, fromBaseTag} {
+		got := installed(image)
+		for _, want := range []string{"six==1.16.0", "from-1x", "/jq"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("%s lacks %q, which the conversion carried:\n%s", image, want, got)
+			}
 		}
-	}
-	if fromDocker != fromPackage {
-		t.Errorf("the --context-dir build and astro package astro installed different things:\ndocker build:\n%s\nastro package:\n%s", fromDocker, fromPackage)
+		if got != fromPackage {
+			t.Errorf("%s and astro package astro installed different things:\ndocker build:\n%s\nastro package:\n%s", image, got, fromPackage)
+		}
 	}
 }

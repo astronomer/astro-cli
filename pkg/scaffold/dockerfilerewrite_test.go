@@ -44,11 +44,6 @@ func TestDockerfileRewriteOfGates(t *testing.T) {
 			blocker: "because it reads packages.txt itself",
 		},
 		{
-			name:    "a stage named like the install's",
-			body:    "FROM python:3.12-slim AS astro-install\nRUN true\nFROM quay.io/astronomer/astro-runtime:12.1.0\nENV A=b\n",
-			blocker: "a stage named astro-install",
-		},
-		{
 			name:    "a final FROM continued onto the next line",
 			body:    "FROM quay.io/astronomer/astro-runtime:12.1.0 \\\n  AS final\nENV A=b\n",
 			blocker: "continues onto the next one",
@@ -74,20 +69,26 @@ func TestDockerfileRewriteOfGates(t *testing.T) {
 			blocker: "an earlier stage builds on mirror.example/runtime:stable",
 		},
 		{
-			name:    "a final stage named like the install's",
-			body:    "FROM quay.io/astronomer/astro-runtime:12.1.0 AS astro-install\nENV A=b\n",
-			blocker: "a stage named astro-install",
-		},
-		{
 			name:    "a floating Airflow 2 tag",
 			body:    "FROM quay.io/astronomer/astro-runtime:12\nENV A=b\n",
-			blocker: "no -base tag is published for the floating Airflow 2 tag 12",
+			blocker: "the floating Airflow 2 tag 12 names no runtime build",
+		},
+		{
+			name:    "a slim flavor",
+			body:    "FROM quay.io/astronomer/astro-runtime:13.12.0-slim\nENV A=b\n",
+			blocker: "names the slim flavor, which pyproject.toml has no way to pick",
+		},
+		{
+			name:    "a ubi9 flavor",
+			body:    "FROM quay.io/astronomer/astro-runtime:12.6.0-ubi9\nENV A=b\n",
+			blocker: "12.6.0-ubi9",
 		},
 		{name: "a file that names dev-requirements.txt, not requirements.txt", body: "FROM python:3.12-slim\nCOPY dev-requirements.txt /tmp/\n"},
 		{name: "a comment naming requirements.txt", body: "FROM quay.io/astronomer/astro-runtime:12.1.0-base\n# requirements.txt is gone\n"},
 		{name: "a final stage on an earlier -base stage", body: "FROM quay.io/astronomer/astro-runtime:12.1.0-base AS base\nFROM base\nRUN true\n"},
 		{name: "a base from a build argument", body: "ARG BASE=quay.io/astronomer/astro-runtime:12.1.0\nFROM ${BASE}\nENV A=b\n"},
 		{name: "a base already on -base", body: "FROM quay.io/astronomer/astro-runtime:12.1.0-base\nENV A=b\n"},
+		{name: "a file already on the install base", body: "ARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nCOPY --chown=astro:0 . .\nENV A=b\n"},
 		{name: "a base that is not Astro Runtime", body: "FROM python:3.12-slim\nENV A=b\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -118,25 +119,38 @@ func TestDockerfileRewriteOfKeepsEarlierStagesAndTheAlias(t *testing.T) {
 	require.Empty(t, blocker)
 	require.NotNil(t, rw)
 
-	from := "--platform=linux/amd64 astrocrpublic.azurecr.io/runtime:3.1-12-base"
-	install := airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: "app", ListsFrom: airflowrt.InstallContext})
-	want := "ARG PY=3.12\nFROM python:3.12-slim AS builder\nRUN pip wheel --wheel-dir /wheels mylib\n\n" +
-		installBlockComment + install + "\n" + ownStepsComment +
+	want := airflowrt.BaseArgCheckDirective + "\n" + airflowrt.BaseArgComment + "ARG ASTRO_BASE\n" +
+		"ARG PY=3.12\nFROM python:3.12-slim AS builder\nRUN pip wheel --wheel-dir /wheels mylib\n\n" +
+		"FROM --platform=linux/amd64 ${ASTRO_BASE} AS app\nCOPY --chown=astro:0 . .\n\n" + ownStepsComment +
 		"COPY --from=builder /wheels /wheels\nENV TZ=UTC\n"
 	assert.Equal(t, want, string(rw.body))
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1-12", rw.from)
-	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.1-12-base", rw.base)
-	assert.False(t, rw.mirror)
+	assert.Equal(t, "3.1-12", rw.runtime)
+	assert.Empty(t, rw.registry)
 
-	// No stage of the install's own: the project's stages, the final one
-	// still named "app", and nothing left on an ONBUILD tag.
+	// The project's stages, the final one still named "app", on the install
+	// base, and nothing left on an ONBUILD tag.
 	stages := airflowrt.DockerfileStages(rw.body)
 	require.Len(t, stages, 2)
 	assert.Equal(t, "app", stages[1].Alias)
+	assert.True(t, airflowrt.UsesInstallBase(rw.body))
 	for _, st := range stages {
 		assert.False(t, st.OnBuildRuntime(), "no stage is left on an ONBUILD tag: %s", st.Ref)
 	}
-	assert.Contains(t, string(rw.body), "COPY --from="+airflowrt.InstallContext+" packages.txt .\n")
+}
+
+// A file's own parser directives stay first, and the one the install base
+// needs joins them; a file that has a check directive already keeps its own.
+func TestDockerfileRewriteOfKeepsParserDirectives(t *testing.T) {
+	rw, _, _ := dockerfileRewriteOf([]byte("# syntax=docker/dockerfile:1\nFROM astrocrpublic.azurecr.io/runtime:3.3\nENV A=b\n"))
+	require.NotNil(t, rw)
+	assert.True(t, strings.HasPrefix(string(rw.body), "# syntax=docker/dockerfile:1\n"+airflowrt.BaseArgCheckDirective+"\n# Built on"), string(rw.body))
+	assert.Empty(t, rw.runtime, "a series tag is the requirement's series")
+
+	rw, _, _ = dockerfileRewriteOf([]byte("# check=error=true\nFROM astrocrpublic.azurecr.io/runtime:3.3-8\nENV A=b\n"))
+	require.NotNil(t, rw)
+	assert.True(t, strings.HasPrefix(string(rw.body), "# check=error=true\n# Built on"), string(rw.body))
+	assert.Equal(t, "3.3-8", rw.runtime)
 }
 
 // A conversion that rewrites says so in each list: the Dockerfile updated and
@@ -158,7 +172,9 @@ func TestConversionRewritesTheDockerfileAndRetiresBothLists(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(dir, staleHelperPath))
 
 	updated := strings.Join(res.Updated, "\n")
-	assert.Contains(t, updated, "Dockerfile (now builds FROM quay.io/astronomer/astro-runtime:12.6.0-base")
+	assert.Contains(t, updated, "Dockerfile (now builds on the install base the Astro CLI makes from pyproject.toml and uv.lock")
+	assert.Equal(t, "12.6.0", m.Astro.Runtime, "the runtime the Dockerfile named moves into pyproject.toml")
+	assert.Empty(t, m.Astro.Registry)
 	assert.NotContains(t, strings.Join(res.Created, "\n"), ".astro/install")
 	assert.Contains(t, strings.Join(res.Deleted, "\n"), "requirements.txt")
 	assert.Contains(t, strings.Join(res.Deleted, "\n"), "packages.txt")
@@ -187,19 +203,22 @@ func TestConversionKeepsTheONBUILDTagWhenAListWasNotCarried(t *testing.T) {
 
 	notes := strings.Join(res.Notes, "\n")
 	assert.Contains(t, notes, "Dockerfile: kept FROM quay.io/astronomer/astro-runtime:12.6.0 rather than moved onto "+
-		"quay.io/astronomer/astro-runtime:12.6.0-base, because requirements.txt has lines")
+		"the install base the Astro CLI builds, because requirements.txt has lines")
 	assert.Contains(t, notes, "packages.txt: kept, because your Dockerfile's base image reads it")
 }
 
-// A mirror is rewritten onto its own -base tag, and the run says that tag has
-// to be mirrored too.
-func TestConversionOnAMirrorAdvisesMirroringTheBaseTag(t *testing.T) {
-	_, res, _ := initWith(t, map[string]string{
+// A mirror is recorded as [tool.astro] registry, and the run says the
+// mirror has to carry the -base tag too.
+func TestConversionOnAMirrorRecordsTheRegistry(t *testing.T) {
+	_, res, m := initWith(t, map[string]string{
 		fileDockerfile: "FROM registry.corp.example/astronomer/astro-runtime:12.6.0\nENV A=b\n",
 	})
+	assert.Equal(t, "registry.corp.example/astronomer", m.Astro.Registry)
+	assert.Equal(t, "12.6.0", m.Astro.Runtime)
 	advisories := mirrorAdvisories(res)
 	require.Len(t, advisories, 1)
-	assert.Contains(t, advisories[0], "mirror registry.corp.example/astronomer/astro-runtime:12.6.0-base too")
+	assert.Contains(t, advisories[0], "[tool.astro] registry = 'registry.corp.example/astronomer'")
+	assert.Contains(t, advisories[0], "mirror its -base tag too")
 }
 
 func mirrorAdvisories(res *Result) []string {
@@ -234,7 +253,7 @@ func TestConversionRemovesAPreviewsInstallHelper(t *testing.T) {
 func TestManifestReferenceShowsTheRewrittenDockerfile(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join("..", "..", "docs", "manifest-reference.md"))
 	require.NoError(t, err)
-	want := rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", "ENV TZ=UTC\n")
+	want := rewrittenDockerfile("", "ENV TZ=UTC\n")
 	// A Windows checkout may give the page CRLF; the template is the same either way.
 	assert.Contains(t, strings.ReplaceAll(string(body), "\r\n", "\n"), "```dockerfile\n"+want+"```\n")
 }

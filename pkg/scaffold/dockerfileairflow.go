@@ -3,6 +3,7 @@ package scaffold
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -33,6 +34,19 @@ func dockerfilePath(dir string, m *manifest.Manifest) string {
 		return ""
 	}
 	return filepath.Join(dir, filepath.FromSlash(m.Astro.Dockerfile))
+}
+
+// declaredOwnBase reports a declared Dockerfile whose FROM line picks the
+// image, rather than one built on the install base (airflowrt.UsesInstallBase),
+// whose base follows pyproject.toml. A file that cannot be read picks its own,
+// as far as this can tell.
+func declaredOwnBase(dir string, m *manifest.Manifest) bool {
+	path := dockerfilePath(dir, m)
+	if path == "" {
+		return false
+	}
+	data, err := os.ReadFile(path)
+	return err != nil || !airflowrt.UsesInstallBase(data)
 }
 
 // CheckDockerfileAirflow refuses a declared Dockerfile whose FROM line names an

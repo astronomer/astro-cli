@@ -390,24 +390,50 @@ func TestDeployImageHintNamesATarget(t *testing.T) {
 	}
 }
 
-// A context whose commands pass a named context says what builder they need,
-// under the commands; one whose commands do not says nothing more.
-func TestContextResultSaysWhatItsBuildNeeds(t *testing.T) {
+// A context lists the commands that build it, and nothing more.
+func TestContextResultListsItsCommands(t *testing.T) {
 	var out bytes.Buffer
-	res := pack.Result{ContextDir: "/b", NextSteps: []string{"docker build x", "podman build x"}, BuildNeeds: "Docker with BuildKit"}
+	res := pack.Result{ContextDir: "/b", NextSteps: []string{"docker build x", "podman build x"}}
 	if err := renderContextResult(&out, res); err != nil {
 		t.Fatal(err)
 	}
-	want := "context: /b\n\nBuild it with either of:\n  docker build x\n  podman build x\nThese need Docker with BuildKit.\n"
+	want := "context: /b\n\nBuild it with either of:\n  docker build x\n  podman build x\n"
 	if got := out.String(); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
-	out.Reset()
-	res.BuildNeeds = ""
-	if err := renderContextResult(&out, res); err != nil {
+}
+
+// --base prints the install base's tag alone, so $(astro package --base) is
+// the tag.
+func TestInstallBaseResultIsTheTag(t *testing.T) {
+	var out bytes.Buffer
+	if err := renderPackage(&out, pack.Result{Target: "astro", Kind: pack.KindInstallBase, Image: "localhost/p-base:abc"}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out.String(), "These need") {
-		t.Errorf("no named context, yet: %q", out.String())
+	if got := out.String(); got != "localhost/p-base:abc\n" {
+		t.Errorf("got %q", got)
+	}
+}
+
+// --base's stdout is the install base's tag and nothing else, so
+// $(astro package --base) is the tag: the build's progress and the warnings
+// go to stderr.
+func TestPackageBaseWritesOnlyTheTagToStdout(t *testing.T) {
+	d, out := testDeps(t)
+	writeManifest(t, &d, t.TempDir())
+	d.PackageAstro = fakePackageTarget{res: pack.Result{Target: pack.TargetAstro, Kind: pack.KindInstallBase, Image: "localhost/demo-base:abc"}}
+	if err := execute(t, d, "package", "--base"); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); got != "localhost/demo-base:abc\n" {
+		t.Errorf("stdout = %q, want the tag alone", got)
+	}
+	if errOut := stderrOf(d); !strings.Contains(errOut, "step 1/9") || !strings.Contains(errOut, "found before the build") {
+		t.Errorf("stderr lacks the build's progress and warnings:\n%s", errOut)
+	}
+	for _, args := range [][]string{{"package", "--base", "--context-dir", "x"}, {"package", "--base", "--tag", "x"}, {"package", "mwaa", "--base"}} {
+		if err := execute(t, d, args...); err == nil {
+			t.Errorf("%v: want an error", args)
+		}
 	}
 }

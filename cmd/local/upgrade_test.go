@@ -197,7 +197,7 @@ func TestUpgradeAirflowWithOttoHandsOttoThePrompt(t *testing.T) {
 	want := scaffold.AirflowUpgradePrompt(&scaffold.AirflowPinChange{
 		Previous: "3.40", Version: "3.41", Changed: true,
 		Requirements:      []string{"apache-airflow==3.41.*"},
-		RemovedAirflowKey: true, RequiresPython: ">=3.14", RuntimeRemoved: true, Dockerfile: "Dockerfile",
+		RemovedAirflowKey: true, RequiresPython: ">=3.14", Runtime: "3.41-2", Dockerfile: "Dockerfile",
 	}, cliUpgradePrompt)
 	assert.Equal(t, want, *launched)
 	assert.Contains(t, *launched, "The Astro CLI has already made the mechanical edit")

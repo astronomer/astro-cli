@@ -15,6 +15,10 @@ import (
 // (setRuntimeDeclaration) because the pin alone cannot name it.
 var runtimePath = []string{"tool", "astro", "runtime"}
 
+// registryPath is [tool.astro] registry, the mirror a converted Dockerfile's
+// base was on.
+var registryPath = []string{"tool", "astro", "registry"}
+
 // RuntimeChange is what AlignRuntime or SetRuntime did to [tool.astro] runtime.
 type RuntimeChange struct {
 	// Previous is the runtime the manifest named, "" when it named none.

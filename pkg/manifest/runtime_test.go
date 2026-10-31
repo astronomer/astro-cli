@@ -242,4 +242,3 @@ func TestRuntimeProblemsCarryTheirCodeThroughLoad(t *testing.T) {
 		t.Fatalf("Load error = %v, want a ValidationError naming the path", err)
 	}
 }
-

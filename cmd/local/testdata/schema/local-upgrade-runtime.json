@@ -21,6 +21,8 @@
   "changed": true,
   "manifest": "x",
   "target": "x",
+  "floating": true,
+  "newer_airflow": "x",
   "findings": [
     {
       "kind": "x",
