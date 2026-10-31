@@ -44,9 +44,140 @@ type airflowUpgrade struct {
 	// Available is the next generation's Airflow, when no version was given and
 	// the catalog offers one. A bare upgrade never moves to it.
 	Available string `json:"available,omitempty"`
+	// Refresh is what followed the pin into [tool.uv] and uv.lock.
+	Refresh pinRefresh `json:"refresh"`
 	// RestartNeeded reports that this project's Airflow is running on the old
 	// pin. Nothing here restarts it.
 	RestartNeeded bool `json:"restart_needed,omitempty"`
+}
+
+// runtimeUpgrade is `astro local upgrade runtime --output json`.
+type runtimeUpgrade struct {
+	scaffold.RuntimeBuildChange
+	// Manifest is the pyproject.toml that was edited.
+	Manifest string `json:"manifest"`
+	// Target is the build picked from the runtime catalog when none was given.
+	// Empty when the caller named the build.
+	Target string `json:"target,omitempty"`
+	// Floating reports a project with no [tool.astro] runtime line upgraded
+	// with no build named: it is left following its series, and Target is
+	// the build its image gets now. Nothing is written for it.
+	Floating bool `json:"floating,omitempty"`
+	// NewerAirflow is a newer Airflow patch than an exact requirement pins,
+	// which a newer build of the series carries, when no build was named:
+	// `astro local upgrade airflow` moves to it.
+	NewerAirflow string `json:"newer_airflow,omitempty"`
+	// Findings are what the runtime catalog says about the build that the
+	// manifest checks warn about too: yanked, unlisted, or carrying another
+	// patch than an exact requirement pins.
+	Findings []runtimeFinding `json:"findings,omitempty"`
+	// Refresh is what followed the build into [tool.uv] and uv.lock.
+	Refresh pinRefresh `json:"refresh"`
+	// RestartNeeded reports that this project's Airflow is running on the old
+	// build. Nothing here restarts it.
+	RestartNeeded bool `json:"restart_needed,omitempty"`
+}
+
+// pinRefresh is what an upgrade brought up to date after it moved the pin, as
+// `astro local init` does after it writes one: the [tool.uv] settings that hold
+// the project to its runtime build (writeAstroBuild), then uv.lock. So a deploy
+// or `astro package` straight after sees the new runtime without a local start.
+type pinRefresh struct {
+	// Constraints is the runtime build whose constraints [tool.uv] now holds,
+	// and ConstraintsRemoved the one whose it no longer holds, when either moved.
+	Constraints        string `json:"constraints,omitempty"`
+	ConstraintsRemoved string `json:"constraints_removed,omitempty"`
+	// AstroAirflow is the Astronomer build of Airflow [tool.uv] now installs,
+	// when it moved; AstroAirflowRemoved reports that Airflow now comes from
+	// PyPI.
+	AstroAirflow        string `json:"astro_airflow,omitempty"`
+	AstroAirflowRemoved bool   `json:"astro_airflow_removed,omitempty"`
+	// Lock is what `uv lock` did. Absent when this build cannot lock.
+	Lock *lockOutcome `json:"lock,omitempty"`
+	// Warnings says what could not be refreshed, and why: offline, the index
+	// or the runtime's constraints could not be read, or uv lock failed.
+	Warnings []string `json:"warnings,omitempty"`
+}
+
+// refreshAfterUpgrade is pinRefresh's work for the project in dir. It never
+// fails the upgrade, which has done its part: what it could not do is said.
+func (c *cli) refreshAfterUpgrade(ctx context.Context, dir string) pinRefresh {
+	w := c.writeAstroBuild(ctx, dir)
+	out := pinRefresh{Constraints: w.runtime, ConstraintsRemoved: w.runtimeGone}
+	if w.changed && w.airflowChanged {
+		out.AstroAirflow, out.AstroAirflowRemoved = w.build.Airflow, w.build.Airflow == ""
+	}
+	switch {
+	case errors.Is(w.lookupErr, runtimeversions.ErrNoAstroBuild):
+		out.Warnings = append(out.Warnings, fmt.Sprintf(
+			"Airflow %s comes from PyPI: Astronomer's index has no build of it, so the environment may differ from a deployment's", w.pin))
+	case w.lookupErr != nil && w.changed:
+		out.Warnings = append(out.Warnings, fmt.Sprintf(
+			"Airflow %s comes from PyPI for now: Astronomer's index could not be read for the new build: %v", w.pin, w.lookupErr))
+	case w.lookupErr != nil:
+		out.Warnings = append(out.Warnings, fmt.Sprintf(
+			"[tool.uv] was not refreshed, so its Airflow build and runtime constraints may still be the previous runtime's, "+
+				"and uv.lock was locked against them: Astronomer's index could not be read: %v. Run this command again once it can be", w.lookupErr))
+	}
+	if w.constraintsErr != nil {
+		out.Warnings = append(out.Warnings, fmt.Sprintf(
+			"the runtime's constraints in [tool.uv] were not refreshed: %v. Run this command again once they can be", w.constraintsErr))
+	}
+	if w.writeErr != nil {
+		out.Warnings = append(out.Warnings, fmt.Sprintf("could not update %s for Astronomer's build of Airflow: %v", manifest.Marker, w.writeErr))
+	}
+	if lock := c.relock(ctx, dir); lock.Status != "" {
+		out.Lock = &lock
+		if lock.Status == lockFailed || (lock.Status == lockNoUV && lock.hadLock) {
+			out.Warnings = append(out.Warnings, lock.text())
+		}
+	}
+	return out
+}
+
+// changed reports that the refresh rewrote [tool.uv] or uv.lock, which an
+// upgrade that left the pin alone can still do: a new build shipped, or an
+// older CLI moved the pin without refreshing.
+func (p pinRefresh) changed() bool {
+	return p.Constraints != "" || p.ConstraintsRemoved != "" || p.AstroAirflow != "" || p.AstroAirflowRemoved ||
+		(p.Lock != nil && (p.Lock.Status == lockLocked || p.Lock.Status == lockUpdated))
+}
+
+// nothingChanged ends the line an upgrade that kept the pin says: nothing
+// changed, unless the refresh changed something, whose lines follow.
+func nothingChanged(p pinRefresh) string {
+	if p.changed() {
+		return " Refreshed what follows from it:"
+	}
+	return " Nothing changed."
+}
+
+// lines is what a refresh says in text: what moved, never what stayed.
+// Warnings are said apart, on stderr.
+func (p pinRefresh) lines() []string {
+	// One line per file, as uv.lock's: git diff has the details, and the json
+	// result names what moved.
+	var lines []string
+	if p.Constraints != "" || p.ConstraintsRemoved != "" || p.AstroAirflow != "" || p.AstroAirflowRemoved {
+		lines = append(lines, "  "+manifest.Marker+": updated")
+	}
+	if p.Lock != nil && p.Lock.Status != lockFailed && p.Lock.Status != lockNoUV {
+		if t := p.Lock.text(); t != "" {
+			lines = append(lines, "  "+t)
+		}
+	}
+	return lines
+}
+
+// warnRefresh says on stderr what a refresh could not do. In json mode the
+// result carries it instead.
+func (c *cli) warnRefresh(r cliout.Renderer, p pinRefresh) {
+	if r.Format == cliout.FormatJSON {
+		return
+	}
+	for _, w := range p.Warnings {
+		cliout.Warn(c.d.Stderr, w)
+	}
 }
 
 func newUpgradeCmd(c *cli) *cobra.Command {
@@ -57,8 +188,245 @@ func newUpgradeCmd(c *cli) *cobra.Command {
 		RunE:                       helpOrUnknownSubcommand,
 		SuggestionsMinimumDistance: 2,
 	}
-	cmd.AddCommand(newUpgradeAirflowCmd(c))
+	cmd.AddCommand(newUpgradeAirflowCmd(c), newUpgradeRuntimeCmd(c))
 	return cmd
+}
+
+const flagPython = "python"
+
+func newUpgradeRuntimeCmd(c *cli) *cobra.Command {
+	var python string
+	cmd := &cobra.Command{
+		Use:   "runtime [BUILD]",
+		Short: "Move this project to an Astro Runtime build",
+		Long: "Set this project's Astro Runtime build in pyproject.toml ([tool.astro] runtime), and move the " +
+			"apache-airflow requirement too when the build carries an Airflow it does not cover. Older builds " +
+			"are allowed, to match what a Deployment runs.\n\n" +
+			"With no build, a project with a runtime line moves it to the newest build of its Airflow series in the " +
+			"runtime catalog, or of its exact Airflow when the requirement pins one (it says when a newer Airflow " +
+			"patch is out). A project with no runtime line already follows the newest build of its series, so it " +
+			"keeps doing so: nothing is pinned, and the command says which build that is.\n\n" +
+			"--python picks the Python the image and the standalone environment run, through requires-python. " +
+			"Without it, the build's default Python is used.\n\n" +
+			"Afterwards the runtime's constraints in [tool.uv] are refreshed and uv.lock is relocked, so a deploy " +
+			"or astro package sees the new build without a local start. If Airflow is running, restart it.",
+		Example: "  # Move to the newest build of the project's Airflow series\n" +
+			"  astro local upgrade runtime\n\n" +
+			"  # Move to a given build, older ones included\n" +
+			"  astro local upgrade runtime 3.3-5\n\n" +
+			"  # Move to a build and run it on Python 3.12\n" +
+			"  astro local upgrade runtime 3.3-10 --python 3.12",
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			build := ""
+			if len(args) == 1 {
+				build = args[0]
+			}
+			return c.runUpgradeRuntime(cmd.Context(), build, python)
+		},
+	}
+	cmd.Flags().StringVar(&python, flagPython, "", "Python version to run, like 3.12. Default: the build's default Python")
+	return cmd
+}
+
+func (c *cli) runUpgradeRuntime(ctx context.Context, build, python string) error {
+	r := c.renderer()
+	dir, err := c.projectPath()
+	if err != nil {
+		return err
+	}
+	opts := scaffold.AirflowPinOptions{}
+	if c.d.RuntimeCatalog != nil {
+		opts.Catalog = c.d.RuntimeCatalog(ctx)
+	}
+	res := runtimeUpgrade{Manifest: filepath.Join(dir, manifest.Marker)}
+	if build == "" {
+		pin, current := currentPin(dir), currentRuntime(dir)
+		if build, res.NewerAirflow, err = pickRuntimeTarget(opts.Catalog, pin, current); err != nil {
+			return err
+		}
+		res.Target = build
+		if current == "" {
+			if python != "" {
+				return fmt.Errorf("--python with no build would pin this project, which follows the newest build of its series, to %s. "+
+					"Name the build to pin it (astro local upgrade runtime %s --python %s), or set requires-python in %s", build, build, python, manifest.Marker)
+			}
+			res.Floating = true
+		}
+	}
+	if res.Floating {
+		res.Runtime = ""
+		if r, ok := opts.Catalog.Runtime(res.Target); ok {
+			res.AirflowVersion = r.AirflowVersion
+		}
+	} else {
+		var change scaffold.RuntimeBuildChange
+		if _, err := watchManifest(dir, func(wrap func(run func() error) error) error {
+			change, err = scaffold.SetRuntimeBuildWith(dir, wrap, build, python, opts)
+			return err
+		}); err != nil {
+			return fmt.Errorf("setting the runtime build: %w", err)
+		}
+		res.RuntimeBuildChange = change
+	}
+	res.Findings = runtimeFindings(opts.Catalog, build, currentPin(dir))
+	res.Refresh = c.refreshAfterUpgrade(ctx, dir)
+	res.RestartNeeded = (res.Changed || res.Refresh.changed()) && c.airflowRunning(dir)
+	if r.Format != cliout.FormatJSON {
+		for _, f := range res.Findings {
+			cliout.Warn(c.d.Stderr, f.Message)
+		}
+	}
+	c.warnRefresh(r, res.Refresh)
+	return r.Emit(res, func(w io.Writer) error { return renderRuntimeUpgrade(w, res) })
+}
+
+// pickRuntimeTarget is the build an upgrade with none given moves to: the
+// newest published build of the series pin names (of its generation, for a
+// pin naming only that), or of its exact Airflow when pin names a patch
+// (3.3.1), since the requirement holds the project to it. Published, so the
+// build has an image to pull. A current build newer than that (one the
+// catalog dates ahead, or a cached copy predates) stays: an upgrade never
+// moves a project back. newer is a newer Airflow patch than an exact pin, which
+// the series' newest build carries, or "".
+func pickRuntimeTarget(catalog *runtimeversions.Catalog, pin, current string) (build, newer string, err error) {
+	if catalog == nil {
+		return "", "", errors.New("could not read the runtime catalog to pick the newest build. " +
+			"Pass a build instead, like astro local upgrade runtime 3.3-10")
+	}
+	if pin == "" {
+		return "", "", fmt.Errorf("could not read the Airflow version %s pins, so there is no series to pick a build of. "+
+			"Pass a build instead, like astro local upgrade runtime 3.3-10", manifest.Marker)
+	}
+	series := manifest.Airflow{Pin: pin}.Series()
+	exact := strings.Count(pin, ".") == 2
+	within := series
+	if exact {
+		within = pin
+	}
+	build, ok := catalog.NewestPublishedRuntimeFor(within)
+	if !ok {
+		return "", "", fmt.Errorf("the runtime catalog lists no build of Airflow %s", within)
+	}
+	if exact {
+		if newest, ok := catalog.AirflowFor(series, ""); ok && newest != pin && runtimeversions.CompareRuntimes(newest, pin) > 0 {
+			newer = newest
+		}
+	}
+	if t, ok := manifest.ParseRuntimeTag(current); ok && t.Build && t.Agrees(within) && !catalogExcludes(catalog, current, within) &&
+		runtimeversions.CompareRuntimes(current, build) > 0 {
+		return current, newer, nil
+	}
+	return build, newer, nil
+}
+
+// catalogExcludes reports that the catalog says build carries an Airflow pin
+// does not cover.
+func catalogExcludes(catalog *runtimeversions.Catalog, build, pin string) bool {
+	r, ok := catalog.Runtime(build)
+	return ok && r.AirflowVersion != "" && !runtimeversions.PinCovers(pin, r.AirflowVersion)
+}
+
+// currentRuntime is the [tool.astro] runtime the manifest in dir names, read
+// as for a repair. Empty when it names none or cannot be read.
+func currentRuntime(dir string) string {
+	data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	if err != nil {
+		return ""
+	}
+	m, err := manifest.ParseForRepair(data)
+	if err != nil {
+		return ""
+	}
+	return m.Astro.Runtime
+}
+
+// runtimeFindings is what the catalog says about build, as an image build's
+// runtime check says it (runtimeversions.Catalog.CheckRuntime, nil catalog
+// included: offline an Airflow 3 build's tag already said its series).
+func runtimeFindings(catalog *runtimeversions.Catalog, build, pin string) []runtimeFinding {
+	var out []runtimeFinding
+	for _, f := range catalog.CheckRuntime(build, pin) {
+		out = append(out, runtimeFinding{
+			Kind: string(f.Kind), Message: f.Message, AirflowVersion: f.AirflowVersion,
+			YankedReason: f.YankedReason, Suggested: f.Suggested,
+		})
+	}
+	return out
+}
+
+// runtimeFinding is a runtimeversions.Finding as the CLI's json says it, in
+// snake_case. Runtime and AirflowPin are the result's own runtime and pin, and
+// Blocking never reaches here: the pin moves with the build, so the two agree.
+type runtimeFinding struct {
+	Kind           string `json:"kind"`
+	Message        string `json:"message"`
+	AirflowVersion string `json:"airflow_version,omitempty"`
+	YankedReason   string `json:"yanked_reason,omitempty"`
+	Suggested      string `json:"suggested,omitempty"`
+}
+
+func renderRuntimeUpgrade(w io.Writer, res runtimeUpgrade) error {
+	var lines []string
+	if res.Target != "" && res.Changed {
+		lines = append(lines, fmt.Sprintf("Upgrading to %s (the newest build of the project's Airflow in the runtime catalog)", res.Target))
+	}
+	switch {
+	case res.Floating:
+		airflow := ""
+		if res.AirflowVersion != "" {
+			airflow = ", Airflow " + res.AirflowVersion
+		}
+		lines = append(lines, fmt.Sprintf("This project follows the newest build of its Airflow, so it builds on runtime %s%s. "+
+			"Nothing was pinned: name a build, like astro local upgrade runtime %s, to hold it to one.", res.Target, airflow, res.Target))
+	case !res.Changed:
+		lines = append(lines, fmt.Sprintf("The runtime is already %s.%s", res.Runtime, nothingChanged(res.Refresh)))
+	default:
+		from := res.Previous
+		if from == "" {
+			from = "no build"
+		}
+		lines = append(lines, fmt.Sprintf("Runtime: %s -> %s in %s", from, res.Runtime, res.Manifest))
+		// The Airflow the build runs, or the requirement's move to it: the
+		// exact version when the catalog lists the build, else the new pin.
+		airflow := res.AirflowVersion
+		if a := res.Airflow; a != nil {
+			prev := a.Previous
+			if prev == "" {
+				prev = "no version"
+			}
+			if airflow == "" {
+				airflow = a.Version
+			}
+			airflow = prev + " -> " + airflow
+		}
+		if airflow != "" {
+			lines = append(lines, "  Airflow: "+airflow)
+		}
+		if a := res.Airflow; a != nil {
+			for _, req := range a.Requirements {
+				lines = append(lines, "  requirement: "+req)
+			}
+		}
+		if res.RequiresPython != "" {
+			lines = append(lines, "  requires-python: "+res.RequiresPython)
+		}
+	}
+	if res.Python != "" {
+		lines = append(lines, "  Python: "+res.Python)
+	}
+	lines = append(lines, res.Refresh.lines()...)
+	if res.NewerAirflow != "" {
+		lines = append(lines, fmt.Sprintf("Airflow %s is out: run astro local upgrade airflow %s to move the requirement to it.", res.NewerAirflow, res.NewerAirflow))
+	}
+	if res.Airflow != nil {
+		lines = append(lines, "Not changed: providers and Dag code. Check them against the new Airflow.")
+	}
+	if res.RestartNeeded {
+		lines = append(lines, fmt.Sprintf("Airflow is still running the old build. Run %s when the project is ready.", replaceRestart))
+	}
+	_, err := io.WriteString(w, strings.Join(lines, "\n")+"\n")
+	return err
 }
 
 func newUpgradeAirflowCmd(c *cli) *cobra.Command {
@@ -139,8 +507,10 @@ func (c *cli) runUpgradeAirflow(ctx context.Context, version string, withOtto bo
 		Manifest:         filepath.Join(dir, manifest.Marker),
 		Target:           target,
 		Available:        available,
-		RestartNeeded:    change.Changed && c.airflowRunning(dir),
+		Refresh:          c.refreshAfterUpgrade(ctx, dir),
 	}
+	res.RestartNeeded = (res.Changed || res.Refresh.changed()) && c.airflowRunning(dir)
+	c.warnRefresh(r, res.Refresh)
 	if err := r.Emit(res, func(w io.Writer) error { return renderAirflowUpgrade(w, res) }); err != nil {
 		return err
 	}
@@ -234,7 +604,7 @@ func renderAirflowUpgrade(w io.Writer, res airflowUpgrade) error {
 		// Only an Airflow 2 pin is offered another generation.
 		lines = append(lines, fmt.Sprintf("Airflow is already on the newest Airflow 2 (%s). %s", res.Version, availableHint(res.Available)))
 	case !res.Changed:
-		lines = append(lines, fmt.Sprintf("Airflow is already pinned to %s. Nothing changed.", res.Version))
+		lines = append(lines, fmt.Sprintf("Airflow is already pinned to %s.%s", res.Version, nothingChanged(res.Refresh)))
 	default:
 		from := res.Previous
 		if from == "" {
@@ -260,6 +630,7 @@ func renderAirflowUpgrade(w io.Writer, res airflowUpgrade) error {
 			lines = append(lines, "  tool.astro airflow: removed. Nothing reads it any more")
 		}
 	}
+	lines = append(lines, res.Refresh.lines()...)
 	if res.Dockerfile != "" {
 		lines = append(lines, fmt.Sprintf("Not changed: %s. This project declares it, so its FROM line decides the image in Docker mode. "+
 			"Update its base image for Airflow %s yourself.", res.Dockerfile, res.Version))

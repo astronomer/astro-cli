@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/uv"
@@ -285,10 +284,10 @@ func TestFillWithoutUV(t *testing.T) {
 	assert.Contains(t, warnings[0], "uv is needed to read the lock, and it was not found")
 }
 
-// A project's own Dockerfile that reads the named context is resolved as a
-// generated build is, against the runtime its final FROM names (its -base
-// tag's build), the build and Python both read from it.
-func TestFillResolvesADeclaredDockerfileAgainstItsFrom(t *testing.T) {
+// A project's own Dockerfile built on the install base is resolved as a
+// generated build is, against the runtime the base is built on, the build and
+// Python both read from it.
+func TestFillResolvesADeclaredDockerfileAgainstItsInstallBase(t *testing.T) {
 	r := testResolver(t, []string{"urllib3==2.5.0"}, []string{"requests==2.31.0", "idna==3.7", "certifi==2024.1.1", "urllib3==2.5.0"})
 	var asked []string
 	freeze := r.Freeze
@@ -298,8 +297,8 @@ func TestFillResolvesADeclaredDockerfileAgainstItsFrom(t *testing.T) {
 	}
 	dir := fixture(t, "pins")
 	df := filepath.Join(dir, "Dockerfile")
-	require.NoError(t, os.WriteFile(df, []byte(airflowrt.InstallDockerfile(imagebuild.RuntimeImageRepo+":3.1-5-python-3.12-base")+"RUN true\n"), 0o600))
-	req := imagebuild.Request{Dockerfile: df, Context: dir, ManifestDir: dir}
+	require.NoError(t, os.WriteFile(df, []byte("ARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nRUN true\n"), 0o600))
+	req := imagebuild.Request{Dockerfile: df, Context: dir, ManifestDir: dir, BaseImage: imagebuild.RuntimeImageRepo + ":3.1-5-python-3.12"}
 	var warnings []string
 	require.NoError(t, r.Fill(t.Context(), &req, func(w string) { warnings = append(warnings, w) }))
 	assert.Empty(t, warnings)
@@ -308,8 +307,8 @@ func TestFillResolvesADeclaredDockerfileAgainstItsFrom(t *testing.T) {
 	assert.Equal(t, []string{"3.1-5 3.12"}, asked)
 }
 
-// Nothing to resolve: a declared Dockerfile that does not read the named
-// context, a request naming no project, a project with no pyproject.toml. uv
+// Nothing to resolve: a declared Dockerfile that is not built on the install
+// base, a request naming no project, a project with no pyproject.toml. uv
 // is not asked.
 func TestFillLeavesWhatItCannotResolve(t *testing.T) {
 	r := Resolver{UV: func(context.Context) (UV, error) {
@@ -362,7 +361,7 @@ func TestFillRefusesALockForAnotherAirflow(t *testing.T) {
 			name: "another airflow", installed: []string{"six==1.17.0", "apache-airflow==3.3.3+astro.1"},
 			want: []string{
 				"uv.lock was made for Airflow 3.3.2+astro.2 (Astro Runtime 3.3-9), and the image builds on runtime 3.1-5-python-3.12, which has Airflow 3.3.3+astro.1",
-				"To keep the lock's Airflow, build on a runtime with Airflow 3.3.2, such as 3.3-9; to move to the image's, run astro init",
+				"To keep the lock's Airflow, set [tool.astro] runtime in pyproject.toml to a build with Airflow 3.3.2, such as 3.3-9 (astro local upgrade runtime <build>); to move to the image's, run astro init",
 			},
 		},
 	} {
@@ -406,11 +405,12 @@ func TestFillReadsTheImagesAirflowFromTheCatalog(t *testing.T) {
 	assert.Contains(t, err.Error(), "uv.lock was made for Airflow 3.3.2+astro.2, and the image builds on runtime 3.1-5, which has Airflow 3.1.5")
 }
 
-// A declared Dockerfile's mismatch names its FROM line as the way to keep the
-// lock's Airflow (after `astro local upgrade airflow`, the Dockerfile is what
-// is behind), and astro init as the way to take the image's.
-func TestAirflowMismatchNamesTheDockerfilesFROM(t *testing.T) {
-	err := &AirflowMismatchError{Locked: "3.3.2+astro.2", Image: "3.1.7+astro.1", Recorded: "3.3-11", Base: "quay.io/astronomer/runtime:3.1-12-base", Dockerfile: "Dockerfile"}
+// A mismatch names both ways out: [tool.astro] runtime, which picks the image's
+// runtime for a generated build and a declared Dockerfile's install base alike,
+// to keep the lock's Airflow, and astro init to take the image's.
+func TestAirflowMismatchNamesBothWaysOut(t *testing.T) {
+	err := &AirflowMismatchError{Locked: "3.3.2+astro.2", Image: "3.1.7+astro.1", Recorded: "3.3-11", Base: "quay.io/astronomer/runtime:3.1-12-base"}
 	assert.Contains(t, err.Error(), "uv.lock was made for Airflow 3.3.2+astro.2 (Astro Runtime 3.3-11), and the image builds on runtime 3.1-12, which has Airflow 3.1.7+astro.1")
-	assert.Contains(t, err.Error(), "To keep the lock's Airflow, change the FROM line of Dockerfile to a runtime with Airflow 3.3.2, such as 3.3-11; to move to the image's, run astro init, which relocks uv.lock")
+	assert.Contains(t, err.Error(), "To keep the lock's Airflow, set [tool.astro] runtime in pyproject.toml to a build with Airflow 3.3.2, such as 3.3-11 "+
+		"(astro local upgrade runtime <build>); to move to the image's, run astro init, which relocks uv.lock")
 }

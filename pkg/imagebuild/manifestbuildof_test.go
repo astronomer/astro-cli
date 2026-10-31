@@ -12,9 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
-// fullManifest sets everything ManifestBuild reads. A literal rather than a
-// parsed file, because Parse refuses a runtime build beside a Dockerfile, and
-// this needs both set at once.
+// fullManifest sets everything ManifestBuild reads, as a literal.
 func fullManifest() *manifest.Manifest {
 	return &manifest.Manifest{
 		Project: manifest.Project{
@@ -24,6 +22,7 @@ func fullManifest() *manifest.Manifest {
 		},
 		Astro: manifest.Astro{
 			Runtime:    "3.1-2",
+			Registry:   "registry.example/astronomer",
 			Dockerfile: "docker/Dockerfile",
 			Packages:   []string{"libpq-dev"},
 		},
@@ -60,6 +59,7 @@ func TestManifestBuildOf(t *testing.T) {
 		LockedRuntime:  "3.1-1",
 		LockedPython:   "3.13",
 		LockedAirflow:  "3.1.3+astro.1",
+		Registry:       "registry.example/astronomer",
 		RequiresPython: "==3.13.*",
 		Dockerfile:     "docker/Dockerfile",
 		Dependencies:   []string{"apache-airflow==3.1.*", "pandas", "private-lib"},

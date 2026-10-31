@@ -198,10 +198,10 @@ func cases1x() []case1x {
 		{
 			// A Dockerfile that does more than pin becomes the project's
 			// declared build, moved off the ONBUILD tag that read both 1.x
-			// lists onto its -base image, with the install written out ahead
-			// of its own step. The install reads the lists the CLI resolves
-			// from pyproject.toml, so both 1.x lists, carried whole, go: one
-			// package list, and nothing left reading the files.
+			// lists onto the install base the CLI builds from
+			// pyproject.toml, its runtime recorded there, ahead of its own
+			// step. So both 1.x lists, carried whole, go: one package list,
+			// and nothing left reading the files.
 			name: "a Dockerfile that does more than pin",
 			files: map[string]string{
 				"Dockerfile":       runtime2Build + "RUN apt-get update && apt-get install -y curl\n",
@@ -210,14 +210,13 @@ func cases1x() []case1x {
 			},
 			airflow:       "2",
 			manifestLines: []string{"dependencies = [\n    'apache-airflow==2.*',\n    'pandas==2.1.0',\n]"},
-			manifestHas:   []string{"dockerfile = 'Dockerfile'", "packages = [\n    'libpq-dev',\n]"},
+			manifestHas:   []string{"dockerfile = 'Dockerfile'", "packages = [\n    'libpq-dev',\n]", "runtime = '9.1.0'"},
 			retired:       []string{"requirements.txt", "packages.txt"},
 			kept:          []string{"Dockerfile"},
 			keptHas: map[string]string{
-				"Dockerfile": "\nFROM quay.io/astronomer/astro-runtime:9.1.0-base\nCOPY --from=astro-install packages.txt .\n" +
-					"USER root\n",
+				"Dockerfile": "\nARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nCOPY --chown=astro:0 . .\n",
 			},
-			reportedUpdated: []string{"Dockerfile (now builds FROM quay.io/astronomer/astro-runtime:9.1.0-base"},
+			reportedUpdated: []string{"Dockerfile (now builds on the install base the Astro CLI makes from pyproject.toml and uv.lock"},
 			notes:           []string{"its RUN instructions were not read here"},
 		},
 		{
@@ -235,7 +234,7 @@ func cases1x() []case1x {
 			kept:        []string{"Dockerfile", "requirements.txt", "packages.txt"},
 			keptHas:     map[string]string{"Dockerfile": runtime3 + "RUN echo hi\n"},
 			notes: []string{
-				"rather than moved onto quay.io/astronomer/astro-runtime:3.1-12-base, because requirements.txt has lines",
+				"rather than moved onto the install base the Astro CLI builds, because requirements.txt has lines",
 				"kept, because your Dockerfile's base image reads it during the build",
 			},
 		},
@@ -259,17 +258,17 @@ func cases1x() []case1x {
 			// A declared build whose base names its Python. The manifest pins
 			// that minor, so uv locks for, and standalone mode runs, the Python
 			// the image runs rather than every one after the runtime's floor.
-			// The flavor stays on the -base tag the build moves to.
+			// The install base the build moves to follows it, and the build.
 			name: "a declared Dockerfile whose base names its Python",
 			files: map[string]string{
 				"Dockerfile":       "FROM astrocrpublic.azurecr.io/runtime:3.3-2-python-3.13\nRUN pip install --no-cache-dir uv\n",
 				"requirements.txt": "pandas==2.1.0\n",
 			},
 			airflow:     "3.3",
-			manifestHas: []string{"requires-python = '==3.13.*'", "dockerfile = 'Dockerfile'"},
+			manifestHas: []string{"requires-python = '==3.13.*'", "dockerfile = 'Dockerfile'", "runtime = '3.3-2'"},
 			retired:     []string{"requirements.txt"},
 			kept:        []string{"Dockerfile"},
-			keptHas:     map[string]string{"Dockerfile": "\nFROM astrocrpublic.azurecr.io/runtime:3.3-2-python-3.13-base\n"},
+			keptHas:     map[string]string{"Dockerfile": "\nFROM ${ASTRO_BASE}\n"},
 			notes:       []string{"its RUN instructions were not read here"},
 		},
 		{
@@ -775,8 +774,8 @@ func TestInitKeepsStdoutParseableWhenThe1xConfigWillNot(t *testing.T) {
 // one thing the context decides is the kind of link the saved deploy target
 // becomes: an apc link on the context's domain, marked default, where under
 // Astro it would be an Astro one. A Dockerfile FROM a mirror of Astro Runtime
-// is adopted there as anywhere: declared, and moved onto the mirror's own
-// -base tag.
+// is adopted there as anywhere: declared, and moved onto the install base,
+// the mirror recorded as [tool.astro] registry.
 func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 	tier(t, 0)
 
@@ -840,14 +839,15 @@ func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 	var mirroredRes initResult
 	mirrored.run("init", "--output", "json").requireSuccess().requireJSON(&mirroredRes)
 	got := read(t, filepath.Join(mirrored.Dir, "Dockerfile"))
-	if !strings.Contains(got, "\nFROM registry.corp.example/astronomer/astro-runtime:12.1.0-base\n") || !strings.HasSuffix(got, "\nENV TZ=UTC\n") {
-		t.Errorf("the mirrored-base Dockerfile is not moved onto the mirror's own -base tag, with its step kept:\n%s", got)
+	if !strings.Contains(got, "\nFROM ${ASTRO_BASE}\n") || !strings.HasSuffix(got, "\nENV TZ=UTC\n") {
+		t.Errorf("the mirrored-base Dockerfile is not moved onto the install base, with its step kept:\n%s", got)
 	}
-	if !reports(mirroredRes.Advisory, "mirror registry.corp.example/astronomer/astro-runtime:12.1.0-base too") {
+	if !reports(mirroredRes.Advisory, "mirror its -base tag too") {
 		t.Errorf("the advisories do not say to mirror the -base tag: %q", mirroredRes.Advisory)
 	}
-	if m := read(t, filepath.Join(mirrored.Dir, "pyproject.toml")); !strings.Contains(m, "dockerfile = ") {
-		t.Errorf("the mirrored-base Dockerfile is not declared under APC:\n%s", m)
+	if m := read(t, filepath.Join(mirrored.Dir, "pyproject.toml")); !strings.Contains(m, "dockerfile = ") ||
+		!strings.Contains(m, "registry = 'registry.corp.example/astronomer'") {
+		t.Errorf("the mirrored-base Dockerfile is not declared under APC with its registry:\n%s", m)
 	}
 }
 

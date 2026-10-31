@@ -12,8 +12,9 @@ import (
 
 // A v2 project whose declared Dockerfile is still on a runtime tag with
 // ONBUILD steps is refused before anything builds, with the lines to use
-// instead; astro init, run again in the project, moves it onto -base and
-// leaves the rest of the project alone.
+// instead; astro init, run again in the project, moves it onto the install
+// base and, the tag being a series one with nothing to record, leaves the rest
+// of the project alone.
 //
 // Tier 0 because both halves come before any engine: astro package refuses
 // while it reads the manifest, and init only writes files.
@@ -35,8 +36,8 @@ func TestAnONBUILDDockerfileIsRefusedAndInitMovesIt(t *testing.T) {
 	r := p.run("package", "astro").requireFailure()
 	for _, want := range []string{
 		"Dockerfile builds FROM " + base + ", whose ONBUILD steps",
-		"FROM " + base + "-base\nCOPY --from=astro-install packages.txt .",
-		"astro package --context-dir",
+		"ARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nCOPY --chown=astro:0 . .",
+		"astro package --base or --context-dir",
 		"Run astro init",
 	} {
 		if !strings.Contains(r.output(), want) {
@@ -53,7 +54,7 @@ func TestAnONBUILDDockerfileIsRefusedAndInitMovesIt(t *testing.T) {
 	if err := json.Unmarshal([]byte(out.Stdout), &res); err != nil {
 		t.Fatalf("init --output json: %v\n%s", err, out.output())
 	}
-	if !res.Existing || !reports(res.Updated, "Dockerfile (now builds FROM "+base+"-base") ||
+	if !res.Existing || !reports(res.Updated, "Dockerfile (now builds on the install base") ||
 		reports(res.Created, ".astro/install-project.py") {
 		t.Errorf("init in the project did not move the Dockerfile, or wrote the helper earlier previews did: %+v", res)
 	}

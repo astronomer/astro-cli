@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -45,6 +47,7 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 		LockedRuntime:  locked,
 		LockedPython:   lockedPython,
 		LockedAirflow:  lockedAF,
+		Registry:       m.Astro.Registry,
 		RequiresPython: m.Project.RequiresPython,
 		Dockerfile:     m.Astro.Dockerfile,
 		Dependencies:   deps,
@@ -185,7 +188,7 @@ func lockedSkipped(m ManifestBuild, catalog *runtimeversions.Catalog) string {
 // and a check of the lock's build would be of a build the image does not
 // use.
 func LockedRuntimeUsed(m ManifestBuild, catalog *runtimeversions.Catalog) bool {
-	if m.Runtime != "" || m.Dockerfile != "" || m.LockedRuntime == "" || lockedSkipped(m, catalog) != "" {
+	if m.Runtime != "" || DockerfileNamesBase(m) || m.LockedRuntime == "" || lockedSkipped(m, catalog) != "" {
 		return false
 	}
 	if catalog == nil {
@@ -216,7 +219,7 @@ func lockedRequiresPython(m ManifestBuild) string {
 // build moves the lock. Nothing when the manifest
 // names its own build, when there is no lock build, or with no catalog.
 func LockedRuntimeNotices(m ManifestBuild, catalog *runtimeversions.Catalog) []string {
-	if m.Runtime != "" || m.Dockerfile != "" || m.LockedRuntime == "" {
+	if m.Runtime != "" || DockerfileNamesBase(m) || m.LockedRuntime == "" {
 		return nil
 	}
 	if why := lockedSkipped(m, catalog); why != "" {
@@ -269,9 +272,12 @@ type BaseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // every caller building from a manifest builds the same image from it.
 //
 // A declared Dockerfile is the build: the returned Request carries the file,
-// resolved against the project, and the project as its context, and no runtime
-// base is resolved, since the file names its own FROM and asking for a base it
-// would not use only adds a way to fail. Otherwise the image is generated over
+// resolved against the project, and the project as its context. No runtime
+// base is resolved for one that names its own FROM, since asking for a base it
+// would not use only adds a way to fail. One built FROM the install base
+// (airflowrt.UsesInstallBase, as astro init writes a converted one) gets the
+// base a generated build would, to build that install base on. Otherwise the
+// image is generated over
 // the runtime base the Airflow pin, runtime build and requires-python resolve
 // to (RuntimeImageForPython), installing Dependencies and Packages; a pin it refuses is
 // the error returned. The runtime build is [tool.astro] runtime, else the build
@@ -305,8 +311,9 @@ func CatalogBase(catalog func() *runtimeversions.Catalog) BaseImageFunc {
 // ForManifestWith is ForManifest with the generated build's runtime base
 // resolved by base, for a caller that knows better than the public catalog
 // which runtime builds its target accepts. Everything else is ForManifest's
-// rule: a declared Dockerfile is the build and base is not called, and a
-// generated image ships, so it carries the project's files.
+// rule: a declared Dockerfile is the build and base is called only for one
+// built on the install base, and a generated image ships, so it carries the
+// project's files.
 func ForManifestWith(ctx context.Context, m ManifestBuild, base BaseImageFunc) (Request, error) {
 	return forManifestWith(ctx, m, shipped, base)
 }
@@ -356,9 +363,11 @@ func shortCatalog(ctx context.Context, o runtimeversions.Options) func() *runtim
 }
 
 // forManifestWith is the rule ForManifest and ForLocalManifest share, with a
-// generated build's base resolved by base. base is not called for a declared
-// Dockerfile. A generated build of an image that ships carries the project's
-// files; a declared Dockerfile's context is the project already.
+// generated build's base resolved by base. base is called for a declared
+// Dockerfile only when it builds on the install base. A generated build of an
+// image that ships carries the project's files; a declared Dockerfile's
+// context is the project already. The base is pulled from [tool.astro]
+// registry when the manifest names one (airflowrt.WithRegistry).
 func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base BaseImageFunc) (Request, error) {
 	req := Request{
 		Dependencies: m.Dependencies,
@@ -371,22 +380,43 @@ func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base Base
 		// directory, where none of the project's COPY paths exist.
 		req.Dockerfile = filepath.Join(m.ProjectDir, filepath.FromSlash(m.Dockerfile))
 		req.Context = m.ProjectDir
-		// For a Dockerfile that reads the install lists from the named
-		// context (ReadsInstallContext), which the caller resolves from the
-		// project's lock as it does a generated build's.
+		// For a Dockerfile built on the install base (UsesInstallBase), whose
+		// lists the caller resolves from the project's lock as it does a
+		// generated build's.
 		req.ManifestDir = m.ProjectDir
+		if !req.UsesInstallBase() {
+			return req, nil
+		}
+		image, err := base(ctx, m)
+		if err != nil {
+			return Request{}, err
+		}
+		req.BaseImage = airflowrt.WithRegistry(image, m.Registry)
 		return req, nil
 	}
 	image, err := base(ctx, m)
 	if err != nil {
 		return Request{}, err
 	}
-	req.BaseImage = image
+	req.BaseImage = airflowrt.WithRegistry(image, m.Registry)
 	req.ManifestDir = m.ProjectDir
 	if ships {
 		req.ProjectFiles = m.ProjectDir
 	}
 	return req, nil
+}
+
+// DockerfileNamesBase reports a project, m, whose declared Dockerfile picks the
+// image in its own FROM line, rather than building on the install base
+// (airflowrt.UsesInstallBase), which builds on the runtime m picks as a
+// generated build does. A file that cannot be read picks its own, as far as
+// this can tell: the build reports it.
+func DockerfileNamesBase(m ManifestBuild) bool {
+	if m.Dockerfile == "" {
+		return false
+	}
+	data, err := os.ReadFile(filepath.Join(m.ProjectDir, filepath.FromSlash(m.Dockerfile)))
+	return err != nil || !airflowrt.UsesInstallBase(data)
 }
 
 // FromDeclaredDockerfile reports whether the request builds the project's own

@@ -238,9 +238,17 @@ type Astro struct {
 	// "13.11.0") the image is built from instead of the newest build of the
 	// requirement's series. Empty is the common case. It selects the image
 	// only: standalone installs the requirement, and Parse refuses a build
-	// whose Airflow the tag shows to disagree with the requirement, or one
-	// beside a Dockerfile. Read it as Manifest.Airflow().Runtime.
+	// whose Airflow the tag shows to disagree with the requirement. Beside a
+	// Dockerfile it picks the install base a file built FROM ${ASTRO_BASE}
+	// builds on. Read it as Manifest.Airflow().Runtime.
 	Runtime string
+	// Registry is [tool.astro] registry, the registry and namespace a mirror
+	// of Astro Runtime serves the runtime images under
+	// (registry.example.com/astronomer), which an image then builds on in
+	// place of Astronomer's own (astrocrpublic.azurecr.io/runtime,
+	// quay.io/astronomer/astro-runtime), the repository's name kept. Empty is
+	// the common case.
+	Registry string
 	// BuildSecrets is [tool.astro] build-secrets, docker build --secret specs
 	// for Dockerfile's build, as written. Parse refuses it without a
 	// Dockerfile. Read it through BuildSecretSpecs.
@@ -474,9 +482,10 @@ const (
 	// is not the requirement's: another series for an Airflow 3 tag, another
 	// generation for either.
 	CodeRuntimeMismatch ProblemCode = "runtime_mismatch"
-	// CodeRuntimeWithDockerfile is runtime beside a declared dockerfile, whose
-	// FROM line names the base instead, so runtime would pick nothing.
-	CodeRuntimeWithDockerfile ProblemCode = "runtime_with_dockerfile"
+	// CodeRegistryInvalid is a registry that is not a registry and namespace
+	// (registry.example.com/astronomer): a scheme, a tag or a digest, or
+	// characters a repository name cannot hold.
+	CodeRegistryInvalid ProblemCode = "registry_invalid"
 	// CodeDockerfileAirflowMismatch is a declared Dockerfile whose FROM names
 	// an Astro Runtime of another Airflow than the requirement: another series
 	// for an Airflow 3 tag, another generation for an Airflow 2 one. Parse
@@ -567,8 +576,8 @@ var problemCodes = []ProblemCode{
 	CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous,
 	CodeAirflowCoreBeforeThree, CodeDependenciesDynamic, CodeAirflowRemoved,
 
-	CodeRuntimeInvalid, CodeRuntimeMismatch, CodeRuntimeWithDockerfile,
-	CodeDockerfileAirflowMismatch,
+	CodeRuntimeInvalid, CodeRuntimeMismatch,
+	CodeDockerfileAirflowMismatch, CodeRegistryInvalid,
 
 	CodeLinkNeedsName, CodeLinkNameReserved, CodeTargetUnusable,
 	CodeInheritedTargetUnusable, CodeTargetNeedsEnvironment,
@@ -677,9 +686,8 @@ func Parse(data []byte) (*Manifest, error) {
 // (CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous,
 // CodeAirflowCoreBeforeThree), alone or together: a manifest the key alone pinned,
 // before the requirement became the version, has the first two. So do the
-// problems of [tool.astro] runtime (CodeRuntimeInvalid, CodeRuntimeMismatch,
-// CodeRuntimeWithDockerfile), which the edits that move or delete the line
-// repair. Any other problem refuses it as Parse does. Readers use Parse.
+// problems of [tool.astro] runtime (CodeRuntimeInvalid, CodeRuntimeMismatch),
+// which the edits that move or delete the line repair. Any other problem refuses it as Parse does. Readers use Parse.
 //
 // The manifest it returns may state no single Airflow, so Airflow() can be the
 // zero value here, unlike on a manifest Parse loaded. AirflowUnclear and
@@ -733,7 +741,7 @@ func parse(data []byte, repair bool) (*Manifest, error) {
 // with the manifest's own reason, and writes nothing.
 var airflowVersionCodes = []ProblemCode{
 	CodeAirflowRemoved, CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous, CodeAirflowCoreBeforeThree,
-	CodeRuntimeInvalid, CodeRuntimeMismatch, CodeRuntimeWithDockerfile,
+	CodeRuntimeInvalid, CodeRuntimeMismatch,
 }
 
 func onlyAirflowVersion(problems []Problem) bool {
@@ -805,7 +813,7 @@ const astroRoot = "tool.astro"
 // link meant to be the default — would otherwise send a deploy somewhere else
 // in silence.
 var (
-	astroKeys = []string{"airflow", "build-secrets", "deployments", "dockerfile", "domain", "env", "organization", "packages", "pools", "runtime", "target", "targets", "workspace"}
+	astroKeys = []string{"airflow", "build-secrets", "deployments", "dockerfile", "domain", "env", "organization", "packages", "pools", "registry", "runtime", "target", "targets", "workspace"}
 	linkKeys  = []string{"auth", "default", "deployment", "domain", "environment", "target", "url", "workspace"}
 )
 
@@ -891,6 +899,7 @@ func (p *parser) astro(raw map[string]any) Astro {
 		// presence fallback and take the project's real Dockerfile away.
 		Dockerfile:   strings.TrimSpace(p.str(astroRoot+".dockerfile", raw["dockerfile"])),
 		Runtime:      strings.TrimSpace(p.str(runtimeKey, raw["runtime"])),
+		Registry:     p.registry(raw["registry"]),
 		BuildSecrets: p.buildSecrets(raw["build-secrets"]),
 	}
 	a.Deployments = p.links(raw["deployments"], &a)

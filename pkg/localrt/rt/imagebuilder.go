@@ -65,15 +65,16 @@ type ManifestBuild struct {
 	AirflowVersion string
 	// Runtime is [tool.astro] runtime (manifest.Airflow().Runtime), the one
 	// runtime build a generated image starts FROM instead of the newest build
-	// of AirflowVersion's series, or "" for none. The manifest never sets it
-	// beside a Dockerfile.
+	// of AirflowVersion's series, or "" for none. Beside a Dockerfile it picks
+	// the install base that file builds on.
 	Runtime string
 	// LockedRuntime is the runtime build the project's uv.lock was seeded
 	// taken from (manifest UV.RuntimeBuild), the build its uv.lock was made
 	// for, or "" for none. With Runtime empty, a local or packaged generated
 	// image starts FROM it instead of the newest build of the series, and a
-	// deploy prefers it when the Deployment offers it. Unused when a
-	// Dockerfile is declared, whose FROM names the build.
+	// deploy prefers it when the Deployment offers it, and so does the
+	// install base of a declared Dockerfile built FROM ${ASTRO_BASE}. Unused
+	// for a declared Dockerfile that names its own FROM.
 	LockedRuntime string
 	// LockedPython is the Python the uv.lock was seeded for on LockedRuntime
 	// (manifest UV.RuntimePython), or "" for none: an image of LockedRuntime
@@ -86,6 +87,10 @@ type ManifestBuild struct {
 	// carrying another Airflow release is refused, as the lock's versions were
 	// not resolved for it.
 	LockedAirflow string
+	// Registry is [tool.astro] registry: the registry a mirror of Astro
+	// Runtime serves the runtime images from (registry.example/astronomer),
+	// or "" for Astronomer's own.
+	Registry string
 	// RequiresPython is [project] requires-python. A generated image runs the
 	// newest Python of its runtime build that it admits, preferring the
 	// build's default (imagebuild.RuntimeImageForPython).
@@ -115,6 +120,7 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 		LockedRuntime:  p.LockedRuntime,
 		LockedPython:   p.LockedPython,
 		LockedAirflow:  p.LockedAirflow,
+		Registry:       p.Registry,
 		RequiresPython: p.RequiresPython,
 		Dockerfile:     p.Dockerfile,
 		Dependencies:   p.Dependencies,
@@ -132,6 +138,7 @@ func (p *Plan) SetManifestBuild(mb ManifestBuild) {
 	p.LockedRuntime = mb.LockedRuntime
 	p.LockedPython = mb.LockedPython
 	p.LockedAirflow = mb.LockedAirflow
+	p.Registry = mb.Registry
 	p.RequiresPython = mb.RequiresPython
 	p.Dockerfile = mb.Dockerfile
 	p.Dependencies = mb.Dependencies
@@ -149,8 +156,10 @@ type BuildRequest struct {
 	// BaseImage is the resolved runtime image the build is of: the runtime's
 	// own tag (runtime:3.1-5), which names the runtime and is what a caller
 	// parses a version out of. The build starts FROM its -base tag, and the
-	// fast path returns that tag (ImageBuilder.Build), not this one. Empty
-	// when Dockerfile is set — that file declares its own FROM.
+	// fast path returns that tag (ImageBuilder.Build), not this one. When
+	// Dockerfile is set it is the runtime that file's install base is built
+	// on, for a file built FROM ${ASTRO_BASE}, and empty otherwise: that file
+	// declares its own FROM.
 	BaseImage string
 	// Dockerfile and Context ask the builder to run the project's own Dockerfile
 	// rather than generate one, for a project whose manifest declared it. Both

@@ -128,8 +128,9 @@ func (m *Manifest) requirementLine() string {
 	return AirflowRequirement(m.Airflow().Pin)
 }
 
-// runtime checks [tool.astro] runtime: its shape, that no dockerfile is
-// declared beside it, and that the build agrees with the requirement.
+// runtime checks [tool.astro] runtime: its shape, and that the build agrees
+// with the requirement. A declared dockerfile beside it is fine: one built
+// FROM ${ASTRO_BASE} builds on the install base runtime picks.
 //
 // The comparison is skipped when the requirement itself is unclear, because
 // there is nothing to compare against and the requirement's own problem
@@ -137,12 +138,6 @@ func (m *Manifest) requirementLine() string {
 func (p *parser) runtime(m *Manifest) {
 	tag := m.Astro.Runtime
 	if tag == "" {
-		return
-	}
-	if m.Astro.Dockerfile != "" {
-		p.add(CodeRuntimeWithDockerfile, runtimeKey, fmt.Sprintf(
-			"picks a runtime build, and the declared dockerfile %s names its own base image in its FROM line, so this would pick nothing. "+
-				"Delete the runtime line, or change the FROM line", m.Astro.Dockerfile))
 		return
 	}
 	t, ok := ParseRuntimeTag(tag)
@@ -282,4 +277,25 @@ func (m *Manifest) DockerfileReleaseProblem(from, release string) (Problem, bool
 // when it names no minor.
 func describePin(pin string) string {
 	return Airflow{Pin: pin}.Series()
+}
+
+// registryKey is [tool.astro] registry's key, for a problem.
+const registryKey = astroRoot + ".registry"
+
+// registryRe is a registry and namespace as an image reference starts: a host
+// (with an optional port) or a Docker Hub namespace, then path segments, each
+// what a repository name may hold, lowercase.
+var registryRe = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\.[a-z0-9]+(?:[._-][a-z0-9]+)*)*(?::[0-9]+)?(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$`)
+
+// registry reads [tool.astro] registry, trimmed and without a trailing slash,
+// and refuses one that is not a registry and namespace (registryRe): a scheme,
+// a tag or a digest included.
+func (p *parser) registry(v any) string {
+	registry := strings.TrimRight(strings.TrimSpace(p.str(registryKey, v)), "/")
+	if registry != "" && !registryRe.MatchString(registry) {
+		p.add(CodeRegistryInvalid, registryKey, fmt.Sprintf(
+			"%q is not a registry and namespace like registry.example.com/astronomer. Name where the mirror serves the runtime images, "+
+				"without a scheme, an image name or a tag", registry))
+	}
+	return registry
 }

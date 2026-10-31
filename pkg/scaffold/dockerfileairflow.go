@@ -37,6 +37,19 @@ func dockerfilePath(dir string, m *manifest.Manifest) string {
 	return filepath.Join(dir, filepath.FromSlash(m.Astro.Dockerfile))
 }
 
+// declaredOwnBase reports a declared Dockerfile whose FROM line picks the
+// image, rather than one built on the install base (airflowrt.UsesInstallBase),
+// whose base follows pyproject.toml. A file that cannot be read picks its own,
+// as far as this can tell.
+func declaredOwnBase(dir string, m *manifest.Manifest) bool {
+	path := dockerfilePath(dir, m)
+	if path == "" {
+		return false
+	}
+	data, err := os.ReadFile(path)
+	return err != nil || !airflowrt.UsesInstallBase(data)
+}
+
 // CheckDockerfileAirflow refuses a declared Dockerfile whose FROM line names an
 // Astro Runtime of another Airflow than the manifest's requirement: another
 // series for an Airflow 3 tag, another generation for an Airflow 2 one. dir is
@@ -138,18 +151,32 @@ var ErrOnBuildBase = errors.New("a declared Dockerfile must not build on an Astr
 
 // onBuildRefusal is the refusal of declared, whose final stage is on an
 // ONBUILD tag astro init would move off: the lines that replace its FROM, the
-// stage's flags and name kept, as init writes them.
+// stage's flags and name kept, and what pyproject.toml has to record of the
+// runtime its tag names, as init writes them.
 func onBuildRefusal(declared string, final *airflowrt.DockerfileStage) error {
-	base := airflowrt.BaseOf(final.Ref)
-	from := strings.Join(append(append([]string{}, final.Flags...), base), " ")
+	rw, _ := installBaseRuntimeOf(final, "")
+	from := append(append([]string{"FROM"}, final.Flags...), airflowrt.BaseArgFrom)
+	if final.Alias != "" {
+		from = append(from, "AS", final.Alias)
+	}
+	lines := "ARG " + airflowrt.BaseArg + "\n" + strings.Join(from, " ") + "\n" + airflowrt.ProjectCopy + "\n"
+	var record []string
+	if rw.runtime != "" {
+		record = append(record, "runtime = '"+rw.runtime+"'")
+	}
+	if rw.registry != "" {
+		record = append(record, "registry = '"+rw.registry+"'")
+	}
+	recorded := ""
+	if len(record) > 0 {
+		recorded = ", and add " + strings.Join(record, " and ") + " under [tool.astro] in " + manifest.Marker
+	}
 	return fmt.Errorf("%w: %s builds FROM %s, whose ONBUILD steps install requirements.txt and packages.txt "+
 		"rather than what pyproject.toml lists, so the image and standalone mode would install different packages. "+
-		"Run astro init, which moves the file onto %s, or replace the FROM line with these lines, which astro init writes:\n\n%s\n"+
-		"They install the lists the Astro CLI resolves from pyproject.toml and uv.lock, which it passes to the build as the named context %s: "+
-		"build with astro package or astro deploy, or run astro package --context-dir <dir> for the docker build command",
-		ErrOnBuildBase, declared, final.Ref, base,
-		airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias, ListsFrom: airflowrt.InstallContext}),
-		airflowrt.InstallContext)
+		"Run astro init, which moves the file onto the install base the Astro CLI builds from pyproject.toml and uv.lock, "+
+		"or replace the FROM line with these lines, which astro init writes%s:\n\n%s\n"+
+		"Build it with astro package or astro deploy, or run astro package --base or --context-dir <dir> to build it with docker",
+		ErrOnBuildBase, declared, final.Ref, recorded, lines)
 }
 
 // refuseKeptDockerfileOfAnotherAirflow refuses a conversion that would keep the

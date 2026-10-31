@@ -1,7 +1,6 @@
 package scaffold
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -21,19 +20,22 @@ import (
 // can change under a project that an older one converted:
 //
 //   - a declared Dockerfile still on an Astro Runtime ONBUILD tag, which every
-//     build now refuses, moved onto its -base tag as a conversion would
+//     build now refuses, moved onto the install base as a conversion would
 //     (updateDockerfile);
 //   - a declared Dockerfile an Astro CLI preview moved onto -base, which runs
-//     the install helper those previews wrote, given the install steps this
-//     astro writes, and the helper removed (updateStaleHelper);
-//   - a declared Dockerfile whose install steps an older astro wrote, given
-//     this astro's (updateInstallBlock);
+//     the install helper those previews wrote, moved onto the install base,
+//     and the helper removed (updateStaleHelper);
+//   - a declared Dockerfile whose install steps an older astro wrote out, on
+//     a -base tag reading the astro-install build context, moved onto the
+//     install base (updateInstallBlock);
 //   - the ignore file a moved Dockerfile's context needs (updateDockerignore).
 //
 // Each is a step that adds Changes to the changeset, so a later one is a new
-// function in updateSteps. What it does not do is decide anything about the
-// manifest: the [tool.uv] lines astro keeps there are refreshed by the command
-// after Run, as on a first init.
+// function in updateSteps. A Dockerfile moved onto the install base no longer
+// names its runtime, so the move records it in the manifest as a conversion
+// does ([tool.astro] runtime, registry, requires-python; recordRuntime). The
+// [tool.uv] lines astro keeps there are refreshed by the command after Run, as
+// on a first init.
 //
 // It runs only when the caller asks (Options.UpdateExisting): a caller that
 // asks nothing gets ErrAlreadyAstroProject, as before, so Astro Desktop, which
@@ -57,6 +59,50 @@ type update struct {
 	// updateDockerfile moved it.
 	dockerfile string
 	body       []byte
+	// manifest is the manifest's bytes, and manifestLabels what the run
+	// changed in them (recordRuntime); none, and no change, when it changed
+	// nothing.
+	manifest       []byte
+	manifestLabels []string
+}
+
+// recordRuntime records in the manifest the runtime a Dockerfile moved onto
+// the install base named in its FROM, since the file names none any more: the
+// one build as [tool.astro] runtime, a mirror as registry, and a Python
+// flavor as requires-python, each only when the manifest does not say it
+// already.
+func (u *update) recordRuntime(rw *dockerfileRewrite) error {
+	ed, err := tomledit.NewSurgical(u.manifest)
+	if err != nil {
+		return fmt.Errorf("reading %s: %w", manifest.Marker, err)
+	}
+	set := func(key []string, value, label string) error {
+		if current, ok := ed.Get(key); ok && current == value {
+			return nil
+		}
+		if err := ed.Set(key, value); err != nil {
+			return err
+		}
+		u.manifestLabels = append(u.manifestLabels, label)
+		return nil
+	}
+	if rw.runtime != "" && u.m.Astro.Runtime == "" {
+		if err := set(runtimePath, rw.runtime, "[tool.astro] runtime = '"+rw.runtime+"', the build "+u.dockerfile+" named"); err != nil {
+			return err
+		}
+	}
+	if rw.registry != "" {
+		if err := set(registryPath, rw.registry, "[tool.astro] registry = '"+rw.registry+"', the mirror "+u.dockerfile+" named"); err != nil {
+			return err
+		}
+	}
+	if rw.python != "" {
+		if err := set([]string{"project", "requires-python"}, "=="+rw.python+".*", "requires-python = '=="+rw.python+".*', the Python "+u.dockerfile+" named"); err != nil {
+			return err
+		}
+	}
+	u.manifest, err = ed.Bytes()
+	return err
 }
 
 // planExisting is plan for a directory that is already an Astro project, when
@@ -87,7 +133,7 @@ func planUpdate(abs string, data []byte) (*Changeset, error) {
 		return nil, fmt.Errorf("reading %s: %w", filepath.Join(abs, manifest.Marker), err)
 	}
 	cs := &Changeset{Result: Result{Dir: abs, Name: m.Project.Name, AirflowVersion: m.Airflow().Pin, Existing: true}}
-	u := &update{dir: abs, m: m, cs: cs, dockerfile: m.Astro.Dockerfile}
+	u := &update{dir: abs, m: m, cs: cs, dockerfile: m.Astro.Dockerfile, manifest: data}
 	if u.dockerfile != "" {
 		u.body, err = os.ReadFile(filepath.Join(abs, filepath.FromSlash(u.dockerfile))) //nolint:gosec // G703: manifest.Parse refuses a dockerfile path that leaves the project
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -98,6 +144,12 @@ func planUpdate(abs string, data []byte) (*Changeset, error) {
 		if err := step(u); err != nil {
 			return nil, err
 		}
+	}
+	if len(u.manifestLabels) > 0 {
+		cs.Changes = append(cs.Changes, Change{
+			Kind: UpdateFile, Path: manifest.Marker, Content: u.manifest,
+			Labels: []string{manifest.Marker + " (" + strings.Join(u.manifestLabels, "; ") + ")"},
+		})
 	}
 	// u.body is the file as the run leaves it, rewritten when it moved.
 	cs.OnBuildKept = u.body != nil && slices.ContainsFunc(airflowrt.DockerfileStages(u.body),
@@ -118,8 +170,8 @@ func boolInt(b bool) int {
 	return 0
 }
 
-// updateDockerfile moves a declared Dockerfile still on an ONBUILD tag onto its
-// -base tag, under the gates a conversion applies (dockerfileRewriteOf), plus
+// updateDockerfile moves a declared Dockerfile still on an ONBUILD tag onto the
+// install base, under the gates a conversion applies (dockerfileRewriteOf), plus
 // one a conversion has no need of: the 1.x lists the ONBUILD steps read have
 // had all this time to drift from pyproject.toml, so each line of them has to
 // be in it already, or the move would drop what the image installs today.
@@ -145,14 +197,17 @@ func updateDockerfile(u *update) error {
 	}
 	if len(notes) > 0 {
 		u.cs.Notes = append(u.cs.Notes, notes...)
-		u.cs.Notes = append(u.cs.Notes, onBuildKeptNote(u.dockerfile+": kept FROM "+rw.from+" rather than moved onto "+rw.base+
+		u.cs.Notes = append(u.cs.Notes, onBuildKeptNote(u.dockerfile+": kept FROM "+rw.from+" rather than moved onto the install base the Astro CLI builds"+
 			", because the lists above are not all in "+manifest.Marker+". Once they are, run astro init again"))
 		return nil
 	}
+	if err := u.recordRuntime(rw); err != nil {
+		return err
+	}
 	u.cs.Changes = append(u.cs.Changes, Change{
 		Kind: UpdateFile, Path: u.dockerfile, Content: rw.body,
-		Labels: []string{u.dockerfile + " (now builds FROM " + rw.base + " and installs the packages the Astro CLI resolves from " +
-			manifest.Marker + " and uv.lock; build it with astro package or astro deploy, or astro package --context-dir for docker build)"},
+		Labels: []string{u.dockerfile + " (now builds on the install base the Astro CLI makes from " + manifest.Marker +
+			" and uv.lock; build it with astro package or astro deploy, or astro package --context-dir for docker build)"},
 	})
 	for _, name := range lists {
 		u.cs.Changes = append(u.cs.Changes, Change{
@@ -160,18 +215,24 @@ func updateDockerfile(u *update) error {
 			Labels: []string{name + " (every line is in " + manifest.Marker + ", and nothing reads it now; removed)"},
 		})
 	}
-	if rw.mirror {
-		u.cs.Advisories = append(u.cs.Advisories, u.dockerfile+" now builds FROM "+rw.base+
-			": if your registry mirrors "+rw.from+" tag by tag, mirror "+rw.base+" too")
-	}
+	u.adviseMirror(rw)
 	u.body = rw.body
 	return nil
+}
+
+// adviseMirror says, for a Dockerfile moved onto the install base from a
+// mirror, that the mirror has to carry the -base tag the base is built on.
+func (u *update) adviseMirror(rw *dockerfileRewrite) {
+	if rw.registry != "" {
+		u.cs.Advisories = append(u.cs.Advisories, manifest.Marker+" records your mirror as [tool.astro] registry = '"+rw.registry+
+			"': the install base builds FROM the runtime's -base tag there, so if your registry mirrors "+rw.from+" tag by tag, mirror its -base tag too")
+	}
 }
 
 // onBuildKeptNote is a note about a Dockerfile left on its ONBUILD tag,
 // ending with what that means for every build until it moves.
 func onBuildKeptNote(note string) string {
-	return note + ". Until it builds FROM a -base tag, each build of it warns, and installs requirements.txt and packages.txt " +
+	return note + ". Until it builds on the install base, each build of it warns, and installs requirements.txt and packages.txt " +
 		"through that tag's ONBUILD steps rather than what " + manifest.Marker + " lists"
 }
 
@@ -241,29 +302,40 @@ func listsCarried(dir string, m *manifest.Manifest) (present, notes []string, er
 
 // updateStaleHelper brings a Dockerfile an Astro CLI preview moved onto -base
 // up to date: those previews ran the install helper they wrote into the
-// project (staleHelperPath) in a stage of the file's own, and the CLI resolves
-// the install before the build now (airflowrt.InstallDockerfile). The file's
-// install block is replaced with this astro's, its own steps kept, and the
-// helper removed (planStaleHelperRemoval) once nothing runs it. A file whose
-// block this cannot find is left as it is, with a note: its build still runs
-// the helper, so the helper stays too.
+// project (staleHelperPath) in a stage of the file's own, and the CLI builds
+// the install itself now, into the install base. The file's install block is
+// replaced with the FROM the install base takes, its own steps kept, its
+// runtime recorded in the manifest, and the helper removed
+// (planStaleHelperRemoval) once nothing runs it. A file whose block this
+// cannot find is left as it is, with a note: its build still runs the helper,
+// so the helper stays too.
 func updateStaleHelper(u *update) error {
 	if u.body != nil && runsStaleHelper(u.body) {
-		body, ok := previewInstallReplaced(u.body)
+		rw, ok := previewBlockReplaced(u.body, true)
 		if !ok {
 			u.cs.Notes = append(u.cs.Notes, u.dockerfile+" runs "+staleHelperPath+", which an earlier Astro CLI preview wrote, "+
-				"and astro init cannot find the install steps it wrote around it. Replace them with the ones in "+
+				"and astro init cannot find the install steps it wrote around it. Replace them with the lines in "+
 				"docs/manifest-reference.md (Your own Dockerfile) and run astro init again, which then removes "+staleHelperPath)
 			return nil
 		}
-		u.cs.Changes = append(u.cs.Changes, Change{
-			Kind: UpdateFile, Path: u.dockerfile, Content: body,
-			Labels: []string{u.dockerfile + " (install steps replaced with the ones this astro writes: the Astro CLI resolves the packages " +
-				"before the build now, and nothing runs " + staleHelperPath + ")"},
-		})
-		u.body = body
+		if err := u.moveOntoInstallBase(rw, " (moved onto the install base the Astro CLI makes from "+manifest.Marker+
+			" and uv.lock: nothing runs "+staleHelperPath+" now)"); err != nil {
+			return err
+		}
 	}
 	return planStaleHelperRemoval(u.dir, u.cs)
+}
+
+// moveOntoInstallBase applies rw, a Dockerfile moved onto the install base by
+// an update step: the file, with label, and its runtime in the manifest.
+func (u *update) moveOntoInstallBase(rw *dockerfileRewrite, label string) error {
+	if err := u.recordRuntime(rw); err != nil {
+		return err
+	}
+	u.cs.Changes = append(u.cs.Changes, Change{Kind: UpdateFile, Path: u.dockerfile, Content: rw.body, Labels: []string{u.dockerfile + label}})
+	u.adviseMirror(rw)
+	u.body = rw.body
+	return nil
 }
 
 // runsStaleHelper reports a Dockerfile, data, with an instruction naming the
@@ -278,14 +350,18 @@ func runsStaleHelper(data []byte) bool {
 	return false
 }
 
-// previewInstallReplaced is a Dockerfile an Astro CLI preview moved onto -base,
-// data, with the install block that preview wrote replaced by this astro's.
-// The block runs from the comment every preview began it with
-// (previewBlockPrefix) to the comment ahead of the file's own steps
-// (ownStepsComment), or to the end; what is before and after stays. The final
-// stage keeps its reference, flags and name. ok is false when the block is
-// not there to find, or the final stage is not on a runtime -base tag.
-func previewInstallReplaced(data []byte) (body []byte, ok bool) {
+// previewBlockReplaced is a Dockerfile an older astro moved onto a runtime
+// -base tag, data, with the install block it wrote there replaced by the FROM
+// the install base takes (rewrittenBody), and what the manifest has to record
+// of the tag it named. The block runs from the comment every such astro began
+// it with (previewBlockPrefix) to the end of its steps: through the last line
+// every version of the steps ends with (installBlockLastLine), or, for a
+// preview that ran the helper (helper), to the comment ahead of the file's own
+// steps (ownStepsComment), or to the end. What is before and after stays, and
+// the final stage keeps its flags and name. ok is false when the block is not
+// there to find, or the final stage is not on a runtime -base tag pyproject.toml
+// can record.
+func previewBlockReplaced(data []byte, helper bool) (rw *dockerfileRewrite, ok bool) {
 	stages := airflowrt.DockerfileStages(data)
 	if len(stages) == 0 {
 		return nil, false
@@ -294,107 +370,76 @@ func previewInstallReplaced(data []byte) (body []byte, ok bool) {
 	if !strings.HasSuffix(final.Tag, "-base") || !airflowrt.IsAstroRuntimeRef(final.Image, final.Tag) {
 		return nil, false
 	}
+	recorded, blocker := installBaseRuntimeOf(&final, "")
+	if blocker != "" {
+		return nil, false
+	}
 	lines := strings.Split(string(data), "\n")
 	start := slices.IndexFunc(lines, func(l string) bool { return strings.HasPrefix(l, previewBlockPrefix) })
 	if start < 0 || start > final.Line {
 		return nil, false
 	}
-	end := slices.IndexFunc(lines[final.Line:], func(l string) bool { return l+"\n" == ownStepsComment })
-	if end < 0 {
-		// No steps of the file's own: the block runs to the end.
-		end = len(lines)
-	} else {
-		end += final.Line
+	end := len(lines)
+	switch last := slices.IndexFunc(lines[final.Line:], func(l string) bool { return strings.TrimSpace(l) == installBlockLastLine }); {
+	case last >= 0:
+		end = final.Line + last + 1
+	case !helper:
+		return nil, false
+	default:
+		if own := slices.IndexFunc(lines[final.Line:], func(l string) bool { return l+"\n" == ownStepsComment }); own >= 0 {
+			end = final.Line + own
+		}
 	}
-	from := strings.Join(append(append([]string{}, final.Flags...), final.Ref), " ")
-	var b strings.Builder
-	if start > 0 {
-		b.WriteString(strings.Join(lines[:start], "\n") + "\n")
-	}
-	b.WriteString(installBlockComment)
-	b.WriteString(airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias, ListsFrom: airflowrt.InstallContext}))
-	if end < len(lines) {
-		b.WriteString("\n" + strings.Join(lines[end:], "\n"))
-	}
-	out := b.String()
-	if !strings.HasSuffix(out, "\n") {
-		out += "\n"
-	}
-	return []byte(out), true
+	recorded.body = rewrittenBody(lines, &final, start, end)
+	return &recorded, true
 }
 
-// updateInstallBlock brings the install steps of a Dockerfile that reads the
-// lists from the astro-install context up to the ones this astro writes, when
-// an older astro wrote them: the lists it reads have grown (the routed
-// install's two files), and a file that copies fewer than this astro writes
-// installs fewer than the CLI resolved. Only the block is replaced
-// (installBlockRefreshed); a file whose block this cannot find is left alone.
+// updateInstallBlock moves a Dockerfile whose install steps an older astro
+// wrote out, over a runtime -base tag and reading the lists from the
+// astro-install build context, onto the install base, which builds those
+// steps itself: only the block is replaced (previewBlockReplaced), the file's
+// own steps kept, and its runtime recorded in the manifest. A file whose
+// block this cannot find is left alone, with a note.
 func updateInstallBlock(u *update) error {
-	if u.body == nil || runsStaleHelper(u.body) || !airflowrt.ReadsInstallContext(u.body) {
+	if u.body == nil || runsStaleHelper(u.body) || !readsAstroInstall(u.body) {
 		return nil
 	}
-	body, ok := installBlockRefreshed(u.body)
-	if !ok || bytes.Equal(body, u.body) {
+	rw, ok := previewBlockReplaced(u.body, false)
+	if !ok {
+		u.cs.Notes = append(u.cs.Notes, u.dockerfile+" reads its package lists from the astro-install build context, which the Astro CLI "+
+			"no longer passes, and astro init cannot find the install steps an earlier astro wrote around it. Replace them with the lines "+
+			"in docs/manifest-reference.md (Your own Dockerfile)")
 		return nil
 	}
-	u.cs.Changes = append(u.cs.Changes, Change{
-		Kind: UpdateFile, Path: u.dockerfile, Content: body,
-		Labels: []string{u.dockerfile + " (install steps updated to the ones this astro writes)"},
-	})
-	u.body = body
-	return nil
+	return u.moveOntoInstallBase(rw, " (moved onto the install base the Astro CLI makes from "+manifest.Marker+
+		" and uv.lock, which installs what its steps did)")
 }
 
-// installBlockRefreshed is a Dockerfile an astro rewrite wrote, data, with its
-// install block written again. The block runs from its comment
-// (previewBlockPrefix) through the last line every version of the steps ends
-// with (installBlockLastLine), so whatever follows, the file's own steps
-// whether or not their comment is still there, stays as it is. The final
-// stage keeps its reference, flags and name. ok is false when the block is
-// not there to find, or the final stage is not on a runtime -base tag.
-func installBlockRefreshed(data []byte) (body []byte, ok bool) {
-	stages := airflowrt.DockerfileStages(data)
-	if len(stages) == 0 {
-		return nil, false
+// readsAstroInstall reports a Dockerfile, data, with an instruction copying
+// from the astro-install build context an earlier astro passed. Comments are
+// not read.
+func readsAstroInstall(data []byte) bool {
+	for _, line := range strings.Split(string(data), "\n") {
+		if t := strings.TrimSpace(line); t != "" && !strings.HasPrefix(t, "#") && strings.Contains(t, "--from=astro-install") {
+			return true
+		}
 	}
-	final := stages[len(stages)-1]
-	if !strings.HasSuffix(final.Tag, "-base") || !airflowrt.IsAstroRuntimeRef(final.Image, final.Tag) {
-		return nil, false
-	}
-	lines := strings.Split(string(data), "\n")
-	start := slices.IndexFunc(lines, func(l string) bool { return strings.HasPrefix(l, previewBlockPrefix) })
-	if start < 0 || start > final.Line {
-		return nil, false
-	}
-	last := slices.IndexFunc(lines[final.Line:], func(l string) bool { return strings.TrimSpace(l) == installBlockLastLine })
-	if last < 0 {
-		return nil, false
-	}
-	end := final.Line + last + 1
-	from := strings.Join(append(append([]string{}, final.Flags...), final.Ref), " ")
-	var b strings.Builder
-	if start > 0 {
-		b.WriteString(strings.Join(lines[:start], "\n") + "\n")
-	}
-	b.WriteString(installBlockComment)
-	b.WriteString(airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias, ListsFrom: airflowrt.InstallContext}))
-	b.WriteString(strings.Join(lines[end:], "\n"))
-	return []byte(b.String()), true
+	return false
 }
 
-// installBlockLastLine is the line every version of the install steps ends
-// with (airflowrt.InstallDockerfileWith).
+// installBlockLastLine is the line every version of the install steps an
+// older astro wrote out ends with.
 const installBlockLastLine = "COPY --chown=astro:0 . ."
 
-// previewBlockPrefix is how every rewrite has begun its install block's
-// comment, an Astro CLI preview's and this astro's (installBlockComment).
+// previewBlockPrefix is how every older astro began the comment of the install
+// block it wrote out.
 const previewBlockPrefix = "# Installs this project's packages from pyproject.toml and uv.lock"
 
 // updateDockerignore keeps local secrets and per-machine files out of the
-// context of a declared Dockerfile that installs from the lists the CLI
-// resolves, as a conversion does for the file it moves (planDockerignore).
+// context of a declared Dockerfile built on the install base, as a
+// conversion does for the file it moves (planDockerignore).
 func updateDockerignore(u *update) error {
-	if u.body == nil || !airflowrt.ReadsInstallContext(u.body) {
+	if u.body == nil || !airflowrt.UsesInstallBase(u.body) {
 		return nil
 	}
 	ignore, err := planDockerignore(u.dir, u.dockerfile)

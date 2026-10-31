@@ -7,9 +7,9 @@
 //
 // Every generated build goes through Fill: local Docker mode, `astro package
 // astro` and a deploy's build alike, so the three install the same versions
-// from the same project. So does a project's own Dockerfile that astro init
-// moved onto a -base tag, which reads the lists from the named build context
-// astro-install (airflowrt.InstallDockerfile).
+// from the same project. So does a project's own Dockerfile built on the
+// install base (FROM ${ASTRO_BASE}, as astro init writes a converted one),
+// whose base installs the lists (airflowrt.InstallBaseDockerfile).
 package imageinstall
 
 import (
@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
-	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -77,9 +76,9 @@ func Fill(ctx context.Context, req *imagebuild.Request, warn func(string)) error
 // Fill sets req.Install to what the generated build req describes installs,
 // from its project's pyproject.toml and uv.lock (req.ManifestDir, else
 // req.ProjectFiles), saying through warn what it could not do. A declared
-// Dockerfile that reads the install lists from the named context
-// (imagebuild.Request.ReadsInstallContext) is resolved the same way, against
-// the runtime its final FROM names. Any other declared Dockerfile, a request
+// Dockerfile built on the install base (imagebuild.Request.UsesInstallBase)
+// is resolved the same way, against the runtime that base is built on
+// (req.BaseImage). Any other declared Dockerfile, a request
 // naming no project, and a project with no pyproject.toml are left as they
 // are, to install the request's own fields
 // unpinned (imagebuild.UnpinnedLists), and so is a project uv cannot lock.
@@ -96,16 +95,13 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 	if warn == nil {
 		warn = func(string) {}
 	}
-	// The runtime whose files the policy reads: a generated build's base, or
-	// the image a declared Dockerfile's final stage names, an exact build or
+	// The runtime whose files the policy reads: the base a generated build,
+	// or a declared Dockerfile's install base, is built on, an exact build or
 	// a series tag alike (runtimeOf).
-	base := req.BaseImage
-	if req.FromDeclaredDockerfile() {
-		if !req.ReadsInstallContext() {
-			return nil
-		}
-		base = airflowrt.ReadDeclaredBase(req.Dockerfile).Ref()
+	if req.FromDeclaredDockerfile() && !req.UsesInstallBase() {
+		return nil
 	}
+	base := req.BaseImage
 	project := req.ManifestDir
 	if project == "" {
 		project = req.ProjectFiles
@@ -153,7 +149,7 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 			}
 		}
 	}
-	if err := airflowMismatch(exported, in.baseInstalled, r.catalog(ctx), build, recordedBuild(pyproject), base, declaredRel(req, project)); err != nil {
+	if err := airflowMismatch(exported, in.baseInstalled, r.catalog(ctx), build, recordedBuild(pyproject), base); err != nil {
 		return err
 	}
 	if in.baseInstalled == nil {
@@ -219,19 +215,6 @@ func recordedBuild(pyproject []byte) string {
 		return ""
 	}
 	return m.UV.RuntimeBuild
-}
-
-// declaredRel is req's own Dockerfile relative to project, slash-separated,
-// or "" for a generated build.
-func declaredRel(req *imagebuild.Request, project string) string {
-	if !req.FromDeclaredDockerfile() {
-		return ""
-	}
-	rel, err := filepath.Rel(project, req.Dockerfile)
-	if err != nil {
-		return ""
-	}
-	return filepath.ToSlash(rel)
 }
 
 // uvProblem says why uv could not be used, for a sentence.

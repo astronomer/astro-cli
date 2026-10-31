@@ -29,8 +29,9 @@ type Plan struct {
 }
 
 // PlanRuntime reads the runtime the image will carry from what decides it: the
-// runtime base of a generated build, or the final FROM of a declared
-// Dockerfile. imageName is a prebuilt image (--image-name), "" for one built
+// runtime base of a generated build or of a declared Dockerfile's install base
+// (FROM ${ASTRO_BASE}), or the final FROM of any other declared Dockerfile.
+// imageName is a prebuilt image (--image-name), "" for one built
 // from the manifest build; req is the image the manifest builds
 // (imagebuild.ForManifest's). A prebuilt image, a declared Dockerfile FROM an
 // Airflow 2 base and a FROM this cannot read plan no version; a generated
@@ -44,7 +45,7 @@ func PlanRuntime(imageName string, req *imagebuild.Request, build *imagebuild.Ma
 		return Plan{raise: func(minimum string) string {
 			return fmt.Sprintf("rebuild %s FROM Astro Runtime %s or newer", imageName, minimum)
 		}}
-	case req.FromDeclaredDockerfile():
+	case req.FromDeclaredDockerfile() && !req.UsesInstallBase():
 		v := airflowrt.ReadDeclaredBase(req.Dockerfile).RuntimeVersion()
 		dockerfile := build.Dockerfile
 		p := Plan{raise: func(minimum string) string {

@@ -330,10 +330,11 @@ const (
 // starts: a build of another Airflow series refuses the start, and a yanked
 // build, one whose exact Airflow the pin excludes, or one the check could not
 // read the catalog for is a warning. Standalone installs the requirement and
-// builds no image, so the build decides nothing there and is not checked; a
-// declared Dockerfile never has one beside it.
+// builds no image, so the build decides nothing there and is not checked; nor
+// is a declared Dockerfile that names its own FROM, which picks its image. One
+// built on the install base is checked as a generated build is.
 func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localrt.Plan, catalog *runtimeversions.Catalog) error {
-	if p.Mode != localrt.ModeDocker || p.Dockerfile != "" || c.d.RuntimeCheck == nil || (p.Runtime == "" && p.LockedRuntime == "") {
+	if p.Mode != localrt.ModeDocker || imagebuild.DockerfileNamesBase(p.ManifestBuild(p.ProjectPath)) || c.d.RuntimeCheck == nil || (p.Runtime == "" && p.LockedRuntime == "") {
 		return nil
 	}
 	// The build the image starts FROM: [tool.astro] runtime, else the build
@@ -374,7 +375,7 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localr
 
 // checkImageDockerfile runs before a Docker-mode start builds the project's own
 // Dockerfile. It refuses one on an ONBUILD tag that astro init would move onto
-// -base, and warns about one it would not (scaffold.CheckDockerfileOnBuild),
+// the install base, and warns about one it would not (scaffold.CheckDockerfileOnBuild),
 // then about the per-machine files the build would copy into the image
 // (scaffold.LocalFilesWarning) and an install helper an earlier preview wrote
 // (scaffold.StaleHelperWarning). Standalone builds no
@@ -424,7 +425,7 @@ func noticeLockedRuntime(r cliout.Renderer, p localrt.Plan, catalog *runtimevers
 // recorded build read (noticeLockedRuntime, checkRuntimeBuild), loaded once:
 // nil when neither has a build to check, or there is no catalog to read.
 func (c *cli) startCatalog(ctx context.Context, p localrt.Plan) *runtimeversions.Catalog {
-	if p.Mode != localrt.ModeDocker || p.Dockerfile != "" || p.Runtime != "" || p.LockedRuntime == "" || c.d.RuntimeCatalog == nil {
+	if p.Mode != localrt.ModeDocker || imagebuild.DockerfileNamesBase(p.ManifestBuild(p.ProjectPath)) || p.Runtime != "" || p.LockedRuntime == "" || c.d.RuntimeCatalog == nil {
 		return nil
 	}
 	return c.d.RuntimeCatalog(ctx)

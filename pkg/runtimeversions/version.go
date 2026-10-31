@@ -23,6 +23,12 @@ func compareVersions(a, b string) int {
 	return 0
 }
 
+// CompareRuntimes orders two runtime tags of one line ("3.3-8" below
+// "3.3-10", "13.9.0" below "13.11.0"): -1, 0 or 1.
+func CompareRuntimes(a, b string) int {
+	return compareVersions(a, b)
+}
+
 func segments(v string) []string {
 	return strings.FieldsFunc(v, func(r rune) bool { return r == '.' || r == '-' })
 }

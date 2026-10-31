@@ -59,7 +59,7 @@ func TestUpdateIgnoresLinesAConversionDoesNotCarry(t *testing.T) {
 		"requirements.txt": "apache-airflow==2.10.0\npandas==2.1.0\npandas>=2\n",
 	})
 	res := runUpdate(t, dir)
-	assert.Contains(t, strings.Join(res.Updated, "\n"), "Dockerfile (now builds FROM quay.io/astronomer/astro-runtime:12.6.0-base")
+	assert.Contains(t, strings.Join(res.Updated, "\n"), "Dockerfile (now builds on the install base")
 	assert.Empty(t, res.Notes)
 }
 
@@ -76,15 +76,17 @@ func TestUpdateMovesAKeptDockerfileOntoBase(t *testing.T) {
 
 	got, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
 	require.NoError(t, err)
-	assert.Equal(t, rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", "RUN apt-get update\n"), string(got))
-	assert.NoFileExists(t, filepath.Join(dir, staleHelperPath), "the CLI resolves the install; nothing is written for the build to run")
+	assert.Equal(t, rewrittenDockerfile("", "RUN apt-get update\n"), string(got))
+	assert.NoFileExists(t, filepath.Join(dir, staleHelperPath), "the CLI builds the install; nothing is written for the build to run")
 	assert.NoFileExists(t, filepath.Join(dir, "requirements.txt"))
 	assert.NoFileExists(t, filepath.Join(dir, "packages.txt"))
 	after, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
-	assert.Equal(t, string(before), string(after), "the manifest is not astro's to change here")
+	assert.Equal(t, string(before)+"runtime = '12.6.0'\n", string(after), "the runtime the FROM named, and nothing else, is recorded")
 	assert.Len(t, res.Deleted, 2)
-	assert.Contains(t, strings.Join(res.Updated, "\n"), "Dockerfile (now builds FROM quay.io/astronomer/astro-runtime:12.6.0-base")
+	updated := strings.Join(res.Updated, "\n")
+	assert.Contains(t, updated, "Dockerfile (now builds on the install base")
+	assert.Contains(t, updated, "pyproject.toml ([tool.astro] runtime = '12.6.0', the build Dockerfile named)")
 	assert.Empty(t, res.Notes)
 }
 
@@ -110,7 +112,7 @@ func TestUpdateKeepsADockerfileWhoseListsDrifted(t *testing.T) {
 	notes := strings.Join(res.Notes, "\n")
 	assert.Contains(t, notes, "requirements.txt: requests==2.32.0 is not in [project] dependencies")
 	assert.Contains(t, notes, "packages.txt: unixodbc is not in packages under [tool.astro]")
-	assert.Contains(t, notes, "Until it builds FROM a -base tag, each build of it warns")
+	assert.Contains(t, notes, "Until it builds on the install base, each build of it warns")
 }
 
 // previewDockerfile is a Dockerfile as an Astro CLI preview moved it onto
@@ -135,10 +137,10 @@ const previewDockerfile = "FROM python:3.12-slim AS tools\nRUN true\n" +
 // previewHelper is the helper those previews wrote, by its first line.
 const previewHelper = staleHelperHeader + "\n# astro-install-helper: 5\nprint('installing')\n"
 
-// A Dockerfile a preview moved onto -base gets this astro's install block in
-// place of the one that ran the helper, keeping the stages before it, the
-// final stage's flags and name, and its own steps; the helper goes. A second
-// run changes nothing.
+// A Dockerfile a preview moved onto -base is moved onto the install base in
+// place of the block that ran the helper, keeping the stages before it, the
+// final stage's flags and name, and its own steps; its runtime goes into the
+// manifest, and the helper goes. A second run changes nothing.
 func TestUpdateReplacesAPreviewInstall(t *testing.T) {
 	dir := v2Project(t, map[string]string{"Dockerfile": previewDockerfile, staleHelperPath: previewHelper})
 
@@ -146,12 +148,15 @@ func TestUpdateReplacesAPreviewInstall(t *testing.T) {
 
 	got, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
 	require.NoError(t, err)
-	assert.Equal(t, "FROM python:3.12-slim AS tools\nRUN true\n"+installBlockComment+
-		airflowrt.InstallDockerfileWith("--platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0-base",
-			airflowrt.InstallOptions{Alias: "app", ListsFrom: airflowrt.InstallContext})+
+	assert.Equal(t, airflowrt.BaseArgCheckDirective+"\n"+airflowrt.BaseArgComment+"ARG ASTRO_BASE\n"+
+		"FROM python:3.12-slim AS tools\nRUN true\n"+
+		"FROM --platform=linux/amd64 ${ASTRO_BASE} AS app\nCOPY --chown=astro:0 . .\n"+
 		"\n"+ownStepsComment+"COPY --from=tools /usr/bin/true /tmp/true\n", string(got))
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.Equal(t, "12.6.0", m.Astro.Runtime)
 	assert.NoFileExists(t, filepath.Join(dir, staleHelperPath))
-	assert.Contains(t, strings.Join(res.Updated, "\n"), "Dockerfile (install steps replaced with the ones this astro writes")
+	assert.Contains(t, strings.Join(res.Updated, "\n"), "Dockerfile (moved onto the install base the Astro CLI makes from pyproject.toml and uv.lock: nothing runs")
 	assert.Contains(t, strings.Join(res.Deleted, "\n"), staleHelperPath)
 	assert.Contains(t, res.Created, fileDockerignore, "the build's context is the project, so it gets the ignore file a conversion writes")
 	assert.False(t, res.OnBuildKept)
@@ -164,35 +169,55 @@ func TestUpdateReplacesAPreviewInstall(t *testing.T) {
 	assert.Empty(t, res.Deleted)
 }
 
-// olderInstall is the install block an earlier astro wrote: the lists it read
-// before the routed install's two files.
-func olderInstall(from string) string {
-	return strings.NewReplacer(
-		" "+airflowrt.RoutedName+" "+airflowrt.RoutedLinksName+" ./", " ./",
-		"if [ -s "+airflowrt.RoutedName+" ]; then pip install --no-cache-dir --root-user-action=ignore --no-index --no-deps --find-links "+airflowrt.RoutedLinksName+" -r "+airflowrt.RoutedName+"; fi && ", "",
-	).Replace(airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{ListsFrom: airflowrt.InstallContext}))
+// namedContextInstall is the install block an earlier astro wrote out over
+// from, a runtime -base tag, reading the lists from the astro-install build
+// context the CLI no longer passes.
+func namedContextInstall(from string) string {
+	return "# Installs this project's packages from pyproject.toml and uv.lock. The\n" +
+		"# Astro CLI resolves them into lists it passes to the build as the named\n" +
+		"# context astro-install, so build with astro package or astro deploy.\n" +
+		"FROM " + from + "\n" +
+		"COPY --from=astro-install packages.txt .\n" +
+		"USER root\n" +
+		"RUN /usr/local/bin/install-system-packages\n" +
+		"COPY --from=astro-install requirements.txt uv-lock-constraints.txt ./\n" +
+		"RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false /usr/local/bin/install-python-dependencies\n" +
+		"USER astro\n" +
+		"COPY --chown=astro:0 . .\n"
 }
 
-// A Dockerfile whose install steps an older astro wrote gets this astro's,
-// and only those: the stages before them and the file's own steps after them
-// stay, their comment or not. A second run changes nothing.
-func TestUpdateRefreshesAnOlderInstallBlock(t *testing.T) {
-	const from = "quay.io/astronomer/astro-runtime:12.6.0-base"
-	older := olderInstall(from)
-	require.NotEqual(t, airflowrt.InstallDockerfile(from), older)
+// A Dockerfile whose install steps an older astro wrote out, reading the
+// astro-install context, is moved onto the install base: only the block is
+// replaced, the stages before it and the file's own steps after it stay,
+// their comment or not, and the runtime, Python and mirror it named go into
+// the manifest. A second run changes nothing.
+func TestUpdateMovesANamedContextInstallOntoTheInstallBase(t *testing.T) {
+	const from = "registry.corp.example/astronomer/runtime:3.1-12-python-3.12-base"
 	for name, own := range map[string]string{
 		"with its comment":    "\n" + ownStepsComment + "ENV TZ=UTC\n",
 		"without its comment": "RUN echo ours\n",
 	} {
 		t.Run(name, func(t *testing.T) {
-			dir := v2Project(t, map[string]string{"Dockerfile": "FROM python:3.12-slim AS tools\n" + installBlockComment + older + own})
+			dir := t.TempDir()
+			writeTree(t, dir, map[string]string{
+				manifest.Marker: "[project]\nname = 'orders'\nrequires-python = '>=3.11'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\ndockerfile = 'Dockerfile'\n",
+				"Dockerfile":    "FROM python:3.12-slim AS tools\n" + namedContextInstall(from) + own,
+			})
 
 			res := runUpdate(t, dir)
 
 			got, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
 			require.NoError(t, err)
-			assert.Equal(t, "FROM python:3.12-slim AS tools\n"+installBlockComment+airflowrt.InstallDockerfile(from)+own, string(got))
-			assert.Contains(t, strings.Join(res.Updated, "\n"), "Dockerfile (install steps updated to the ones this astro writes)")
+			wantOwn := strings.TrimPrefix(strings.TrimPrefix(own, "\n"), ownStepsComment)
+			assert.Equal(t, airflowrt.BaseArgCheckDirective+"\n"+airflowrt.BaseArgComment+"ARG ASTRO_BASE\n"+
+				"FROM python:3.12-slim AS tools\nFROM ${ASTRO_BASE}\nCOPY --chown=astro:0 . .\n\n"+ownStepsComment+wantOwn, string(got))
+			m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+			require.NoError(t, err)
+			assert.Equal(t, "3.1-12", m.Astro.Runtime)
+			assert.Equal(t, "registry.corp.example/astronomer", m.Astro.Registry)
+			assert.Equal(t, "==3.12.*", m.Project.RequiresPython)
+			assert.Contains(t, strings.Join(res.Updated, "\n"), "Dockerfile (moved onto the install base")
+			assert.Len(t, mirrorAdvisories(res), 1)
 			assert.Empty(t, res.Notes)
 
 			res = runUpdate(t, dir)
@@ -201,13 +226,15 @@ func TestUpdateRefreshesAnOlderInstallBlock(t *testing.T) {
 	}
 
 	// A block whose last line is gone is not one this can tell the end of.
-	edited := installBlockComment + strings.Replace(older, "COPY --chown=astro:0 . .\n", "COPY . .\n", 1)
+	edited := strings.Replace(namedContextInstall("quay.io/astronomer/astro-runtime:12.6.0-base"), "COPY --chown=astro:0 . .\n", "COPY . .\n", 1)
 	dir := v2Project(t, map[string]string{"Dockerfile": edited})
 	res := runUpdate(t, dir)
-	assert.NotContains(t, strings.Join(res.Updated, "\n"), "install steps updated")
+	assert.Empty(t, res.Updated)
 	got, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
 	require.NoError(t, err)
 	assert.Equal(t, edited, string(got))
+	require.Len(t, res.Notes, 1)
+	assert.Contains(t, res.Notes[0], "no longer passes")
 }
 
 // A preview's Dockerfile whose block cannot be found (someone rewrote the
@@ -224,7 +251,7 @@ func TestUpdateLeavesAHelperTheDockerfileStillRuns(t *testing.T) {
 	require.Len(t, res.Notes, 1)
 	assert.Contains(t, res.Notes[0], "cannot find the install steps it wrote around it")
 
-	onBase := rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", "RUN true\n")
+	onBase := rewrittenDockerfile("", "RUN true\n")
 	dir = v2Project(t, map[string]string{"Dockerfile": onBase, staleHelperPath: previewHelper})
 	res = runUpdate(t, dir)
 	assert.Equal(t, []string{staleHelperPath + " (written by an earlier Astro CLI preview, removed: the CLI resolves the install before the build now)"}, res.Deleted)
@@ -253,7 +280,7 @@ func TestStaleHelperWarning(t *testing.T) {
 	assert.Equal(t, "Dockerfile runs .astro/install-project.py, which an earlier Astro CLI preview wrote. "+
 		"Run astro init to replace it with the install this astro resolves", StaleHelperWarning(dir, "Dockerfile"))
 
-	other := v2Project(t, map[string]string{"Dockerfile": rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", "RUN true\n")})
+	other := v2Project(t, map[string]string{"Dockerfile": rewrittenDockerfile("", "RUN true\n")})
 	assert.Empty(t, StaleHelperWarning(other, "Dockerfile"), "a Dockerfile that does not run the helper")
 	assert.Empty(t, StaleHelperWarning(other, ""), "no Dockerfile, no warning")
 }
@@ -282,9 +309,9 @@ func TestCheckDockerfileOnBuild(t *testing.T) {
 		dir := v2Project(t, map[string]string{"Dockerfile": "FROM --platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0 AS app\nRUN true\n"})
 		_, err := CheckDockerfileOnBuild(dir, load(dir))
 		require.ErrorIs(t, err, ErrOnBuildBase)
-		assert.Contains(t, err.Error(), airflowrt.InstallDockerfileWith("--platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0-base",
-			airflowrt.InstallOptions{Alias: "app", ListsFrom: airflowrt.InstallContext}))
-		assert.Contains(t, err.Error(), "astro package --context-dir")
+		assert.Contains(t, err.Error(), "ARG ASTRO_BASE\nFROM --platform=linux/amd64 ${ASTRO_BASE} AS app\nCOPY --chown=astro:0 . .\n")
+		assert.Contains(t, err.Error(), "add runtime = '12.6.0' under [tool.astro]")
+		assert.Contains(t, err.Error(), "astro package --base or --context-dir")
 	})
 	t.Run("warned about when a list drifted", func(t *testing.T) {
 		dir := v2Project(t, map[string]string{"Dockerfile": onBuild, "requirements.txt": "pandas==2.1.0\nrequests==2.32.0\n"})

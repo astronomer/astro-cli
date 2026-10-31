@@ -47,6 +47,7 @@ func newPackageCmd(c *cli) *cobra.Command {
 		platform     string
 		outDir       string
 		contextDir   string
+		base         bool
 		buildSecrets []string
 	}
 	cmd := &cobra.Command{
@@ -61,7 +62,9 @@ func newPackageCmd(c *cli) *cobra.Command {
 			"  # Build the bucket layout MWAA reads, and also write it to a zip\n" +
 			"  astro package mwaa --save dist/mwaa.zip\n\n" +
 			"  # Write the image's build context, to build it with docker or podman yourself\n" +
-			"  astro package --context-dir ./build",
+			"  astro package --context-dir ./build\n\n" +
+			"  # Build only the install base your Dockerfile builds FROM ${ASTRO_BASE} on, and print its tag\n" +
+			"  astro package --base",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := pack.TargetAstro
@@ -74,6 +77,7 @@ func newPackageCmd(c *cli) *cobra.Command {
 				platform:     opts.platform,
 				outDir:       opts.outDir,
 				contextDir:   opts.contextDir,
+				base:         opts.base,
 				buildSecrets: opts.buildSecrets,
 			})
 		},
@@ -83,6 +87,7 @@ func newPackageCmd(c *cli) *cobra.Command {
 	cmd.Flags().StringVar(&opts.platform, "platform", defaultPackagePlatform, "Build platform for image targets")
 	cmd.Flags().StringVar(&opts.outDir, "out-dir", "", "Artifact directory for bucket targets (default dist/<target>)")
 	cmd.Flags().StringVar(&opts.contextDir, "context-dir", "", "Write the astro image's build context to this new or empty directory instead of building it, and print the docker and podman commands that build it")
+	cmd.Flags().BoolVar(&opts.base, "base", false, "Build only the install base your own Dockerfile builds FROM ${ASTRO_BASE} on, and print its tag, for docker build --build-arg ASTRO_BASE=<tag>")
 	addBuildSecretFlag(cmd, &opts.buildSecrets)
 	return cmd
 }
@@ -94,6 +99,7 @@ type packageOptions struct {
 	platform     string
 	outDir       string
 	contextDir   string
+	base         bool
 	buildSecrets []string
 }
 
@@ -115,6 +121,16 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	m, err := loadCheckedManifest(dir)
 	if err != nil {
 		return err
+	}
+	if opts.base {
+		switch {
+		case target.Name() != pack.TargetAstro:
+			return fmt.Errorf("--base builds an image, and the %s target builds no image", target.Name())
+		case opts.contextDir != "":
+			return errors.New("--base builds the install base and --context-dir builds nothing; use one")
+		case opts.save != "" || opts.tag != "":
+			return errors.New("--base builds the install base under its own local tag, which it prints, so --save and --tag do not apply")
+		}
 	}
 	if opts.contextDir != "" {
 		switch {
@@ -145,6 +161,13 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	// (packageRecap). shown keeps the warnings already given, for the result's
 	// warnings below.
 	cb := c.callbacks(r)
+	if opts.base && r.Format == cliout.FormatText {
+		// In text, --base's stdout is the tag alone, so `$(astro package
+		// --base)` is the tag: the build's progress goes to stderr.
+		progress := r
+		progress.Out = c.d.Stderr
+		cb = c.callbacks(progress)
+	}
 	recap := packageRecap(r)
 	shown := map[string]bool{}
 	warn := func(w string) {
@@ -160,6 +183,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		BuildSecrets:   util.ResolveProjectBuildSecrets(opts.buildSecrets, m.Astro.BuildSecretSpecs()),
 		OutDir:         opts.outDir,
 		ContextDir:     opts.contextDir,
+		BaseOnly:       opts.base,
 		ResolveInstall: imageinstall.Fill,
 		CheckRuntime:   c.d.RuntimeCheck,
 		RuntimeCatalog: catalog,
@@ -205,10 +229,16 @@ func (c *cli) packageRegistry() *pack.Registry {
 // renderer. links are the project's deployment links, for the deploy command
 // an image hands off to.
 func renderPackage(w io.Writer, res pack.Result, links map[string]manifest.Link) error {
-	if _, err := fmt.Fprintf(w, "target: %s\n", res.Target); err != nil {
-		return err
+	// The install base's tag alone, so `$(astro package --base)` is the tag.
+	if res.Kind != pack.KindInstallBase {
+		if _, err := fmt.Fprintf(w, "target: %s\n", res.Target); err != nil {
+			return err
+		}
 	}
 	switch res.Kind {
+	case pack.KindInstallBase:
+		_, err := fmt.Fprintln(w, res.Image)
+		return err
 	case pack.KindImage:
 		return renderImageResult(w, res, links)
 	case pack.KindTree:
@@ -312,11 +342,6 @@ func renderContextResult(w io.Writer, res pack.Result) error {
 	}
 	for _, step := range res.NextSteps {
 		if _, err := fmt.Fprintf(w, "  %s\n", step); err != nil {
-			return err
-		}
-	}
-	if res.BuildNeeds != "" {
-		if _, err := fmt.Fprintf(w, "These need %s.\n", res.BuildNeeds); err != nil {
 			return err
 		}
 	}

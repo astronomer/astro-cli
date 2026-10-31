@@ -57,7 +57,8 @@ type Plan struct {
 	// one Astro Runtime build, "3.3-8" or "13.11.0", or "" for none. Docker
 	// mode builds a generated image FROM that build rather than the newest one
 	// of AirflowVersion's series. Standalone ignores it: it installs the
-	// requirement. The manifest never sets it beside a Dockerfile.
+	// requirement. Beside a Dockerfile it picks the install base that file
+	// builds on.
 	Runtime string
 	// LockedRuntime is the runtime build the project's uv.lock was seeded
 	// taken from (manifest UV.RuntimeBuild), so the one its uv.lock was made
@@ -73,6 +74,10 @@ type Plan struct {
 	// beside LockedRuntime ("3.1.3+astro.2"), so the Airflow its uv.lock was
 	// made for, or "" for none. Standalone ignores it.
 	LockedAirflow string
+	// Registry is the manifest's [tool.astro] registry, the registry a mirror
+	// of Astro Runtime serves the runtime images from, or "" for Astronomer's
+	// own. Docker mode pulls the runtime from it; standalone ignores it.
+	Registry string
 	// PythonVersion is the interpreter standalone asks uv for ("3.13"), or ""
 	// to let uv pick within requires-python. A caller sets it with
 	// imagebuild.StandalonePython: the Python a generated image of the same

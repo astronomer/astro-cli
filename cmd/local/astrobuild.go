@@ -51,22 +51,10 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 	if res.writeErr != nil {
 		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf("could not update %s for Astronomer's build of Airflow: %v", manifest.Marker, res.writeErr)})
 	}
-	if res.runtime != "" {
-		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] now holds what Astro Runtime %s constrains\n", manifest.Marker, res.runtime)
-	}
-	if res.runtimeGone != "" {
-		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer holds what Astro Runtime %s constrains\n", manifest.Marker, res.runtimeGone)
-	}
-	// The Airflow line is said whenever the Airflow pins moved, beside a
-	// runtime line or not; a write that touched only the runtime's lines says
-	// only that.
-	onlyRuntime := (res.runtime != "" || res.runtimeGone != "") && !res.airflowChanged
-	switch {
-	case !res.changed || onlyRuntime:
-	case res.build.Airflow != "":
-		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] now installs Astronomer's Airflow %s\n", manifest.Marker, res.build.Airflow)
-	default:
-		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer points Airflow at Astronomer's index\n", manifest.Marker)
+	// One line, as the upgrade commands and uv.lock say it: git diff has the
+	// details.
+	if res.changed {
+		fmt.Fprintf(c.d.Stderr, "%s: updated\n", manifest.Marker)
 	}
 }
 
@@ -89,7 +77,10 @@ type astroBuildWrite struct {
 	// runtimeGone the one whose record it took out; "" when neither happened.
 	runtime, runtimeGone string
 	lookupErr            error
-	writeErr             error
+	// constraintsErr is why the runtime's constraints were left as written:
+	// the catalog or the constraints file could not be read.
+	constraintsErr error
+	writeErr       error
 }
 
 // writeAstroBuild looks up the build for the manifest in dir and writes it,
@@ -117,7 +108,8 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 	if res.lookupErr != nil && !errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild) && !stalePin(m) {
 		return res
 	}
-	rc := c.runtimeConstraints(ctx, dir, m)
+	rc, rcErr := c.runtimeConstraints(ctx, dir, m)
+	res.constraintsErr = rcErr
 	res.changed, res.writeErr = watchManifest(dir, func(wrap func(run func() error) error) error {
 		return scaffold.SetAstroBuildWith(dir, wrap, res.build, rc)
 	})
@@ -153,13 +145,14 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 // build or a file that cannot be read now. A zero one takes it out: a cutoff
 // (the runtime's versions may postdate it, and uv would find no solution), a
 // project on no runtime build, or one that publishes no such file (an Airflow
-// 2 runtime before 11.0.0).
-func (c *cli) runtimeConstraints(ctx context.Context, dir string, m *manifest.Manifest) *scaffold.RuntimeConstraints {
+// 2 runtime before 11.0.0). The error says why a nil one could not be read;
+// it is nil when this build has no way to read it.
+func (c *cli) runtimeConstraints(ctx context.Context, dir string, m *manifest.Manifest) (*scaffold.RuntimeConstraints, error) {
 	if c.d.RuntimeConstraints == nil {
-		return nil
+		return nil, nil
 	}
 	if underCutoff(dir, m) {
-		return &scaffold.RuntimeConstraints{}
+		return &scaffold.RuntimeConstraints{}, nil
 	}
 	var catalog *runtimeversions.Catalog
 	if c.d.RuntimeCatalog != nil {
@@ -168,18 +161,20 @@ func (c *cli) runtimeConstraints(ctx context.Context, dir string, m *manifest.Ma
 	build, python, err := scaffold.RuntimeBuildFor(dir, m, catalog)
 	switch {
 	case errors.Is(err, scaffold.ErrNoRuntimeBuild):
-		return &scaffold.RuntimeConstraints{}
-	case err != nil || python == "":
-		return nil
+		return &scaffold.RuntimeConstraints{}, nil
+	case err != nil:
+		return nil, err
+	case python == "":
+		return nil, fmt.Errorf("which Python runtime %s runs cannot be told: the runtime catalog could not be read, or does not list the build yet", build)
 	}
 	lines, err := c.d.RuntimeConstraints(ctx, build, python)
 	switch {
 	case errors.Is(err, runtimecatalog.ErrNotPublished):
-		return &scaffold.RuntimeConstraints{}
+		return &scaffold.RuntimeConstraints{}, nil
 	case err != nil:
-		return nil
+		return nil, err
 	}
-	return &scaffold.RuntimeConstraints{Build: build, Python: python, Lines: lines}
+	return &scaffold.RuntimeConstraints{Build: build, Python: python, Lines: lines}, nil
 }
 
 // underCutoff reports a uv resolve held to a date: the project's own

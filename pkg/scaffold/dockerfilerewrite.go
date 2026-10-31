@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -16,46 +17,87 @@ import (
 // package lists that nothing holds in step: standalone mode installs
 // pyproject.toml's, every image the 1.x files'.
 //
-// So the conversion moves the file onto the same tag's -base image, which has
-// no triggers, and writes the install out in front of the file's own steps
-// (airflowrt.InstallDockerfile): the runtime's own install steps, reading the
-// lists the CLI resolves from pyproject.toml and uv.lock, which a build passes
-// as the named context astro-install. The two 1.x files are then carried and
-// nothing reads them, so they go like any other carried file. A plain
-// `docker build .` has no astro-install context and fails at its first COPY;
-// the file's header says how to build it (astro package, astro deploy, or
-// `astro package --context-dir`, which writes the lists and prints the docker
-// command).
+// So the conversion moves the file onto the install base the CLI builds from
+// pyproject.toml and uv.lock: its final stage becomes FROM ${ASTRO_BASE}
+// (airflowrt.BaseArg), followed by the step that lays the project's files over
+// it, as the ONBUILD tag's last trigger did, and then the file's own steps.
+// The runtime the tag named moves into pyproject.toml ([tool.astro] runtime
+// for one build, requires-python for a Python flavor, [tool.astro] registry
+// for a mirror), so the runtime has one source and the file names none. The
+// two 1.x files are then carried and nothing reads them, so they go like any
+// other carried file. A plain `docker build .` has no ASTRO_BASE and fails at
+// that FROM; the file's header says how to build it (astro package, astro
+// deploy, or `astro package --context-dir`, which writes both builds and
+// prints the docker commands).
 //
 // The rewrite is all or nothing, and it happens only when the file's shape is
 // one this can rewrite without guessing (dockerfileRewriteOf). Anything else
 // keeps today's behavior, the file and both lists as they were, with a note
 // that names what stopped it.
 
-// dockerfileRewrite is a Dockerfile this conversion rewrites onto a -base tag.
+// dockerfileRewrite is a Dockerfile this conversion moves onto the install
+// base.
 type dockerfileRewrite struct {
 	// body is the rewritten file.
 	body []byte
-	// from is the final stage's reference as the file had it, and base the
-	// -base reference it builds on now.
-	from, base string
-	// mirror reports a base outside Astronomer's own repositories, whose
-	// -base tag the mirror has to carry too.
-	mirror bool
+	// from is the final stage's reference as the file had it.
+	from string
+	// runtime is the one runtime build the tag named ("3.3-8", "12.6.0"), for
+	// [tool.astro] runtime, or "" for a series tag (3.3), which the
+	// requirement's series already picks.
+	runtime string
+	// registry is the mirror the tag was on (registry.example/astronomer), for
+	// [tool.astro] registry, or "" for Astronomer's own repositories.
+	registry string
+	// python is the Python a -python-X.Y flavor named, for requires-python,
+	// or "".
+	python string
 }
 
-// installBlockComment and ownStepsComment frame the install block in a
-// rewritten Dockerfile, so a reader can tell the CLI's lines from the
-// project's.
-const (
-	installBlockComment = "# Installs this project's packages from pyproject.toml and uv.lock. The\n" +
-		"# Astro CLI resolves them into lists it passes to the build as the named\n" +
-		"# context " + airflowrt.InstallContext + ", so build with astro package or astro deploy; a\n" +
-		"# plain docker build . fails at the first COPY --from=" + airflowrt.InstallContext + ". To\n" +
-		"# build it with docker yourself, run astro package --context-dir <dir>,\n" +
-		"# which writes the lists and prints the docker build command.\n"
-	ownStepsComment = "# This project's own steps.\n"
-)
+// installBaseRuntimeOf reads what pyproject.toml has to record of final, a
+// stage on an Astro Runtime tag (an ONBUILD tag, or its -base twin), for a
+// file that builds on the install base instead: the one build its tag names,
+// the mirror it is on and the Python its flavor names (dockerfileRewrite's
+// fields). blocker, which starts with prefix, says why the tag cannot be
+// recorded: a version this cannot read, a flavor pyproject.toml has no
+// spelling for, a floating Airflow 2 tag, or a runtime astro builds no image
+// for.
+func installBaseRuntimeOf(final *airflowrt.DockerfileStage, prefix string) (rw dockerfileRewrite, blocker string) {
+	raw := strings.TrimSuffix(strings.TrimPrefix(final.Tag, "v"), "-base")
+	noPython := raw
+	if loc := airflowrt.RuntimePythonRe.FindStringIndex(raw); loc != nil {
+		noPython = raw[:loc[0]]
+	}
+	v, python := airflowrt.ParseRuntimeTagPython(raw)
+	t, ok := manifest.ParseRuntimeTag(v)
+	switch {
+	case !ok:
+		return rw, prefix + "because astro does not read a runtime version from its tag " + final.Tag
+	case noPython != v:
+		return rw, prefix + "because its tag " + final.Tag + " names the " + strings.TrimPrefix(noPython, v+"-") +
+			" flavor, which pyproject.toml has no way to pick"
+	case t.Major == "2" && !t.Build:
+		return rw, prefix + "because the floating Airflow 2 tag " + final.Tag + " names no runtime build" +
+			": pin the runtime build, such as 12.6.0, and run astro init again"
+	case t.Major == "2" && runtimeMajor(v) < minAirflow2Runtime:
+		return rw, prefix + "because runtime " + final.Tag + " is older than runtime 9 (Airflow 2.7), the oldest astro builds images for"
+	}
+	rw.from, rw.python = final.Ref, python
+	rw.registry, _ = airflowrt.RegistryOf(final.Image)
+	if t.Build {
+		rw.runtime = v
+	}
+	return rw, ""
+}
+
+// ownStepsComment marks where a rewritten Dockerfile's own steps start, so a
+// reader can tell the CLI's lines from the project's.
+const ownStepsComment = "# This project's own steps.\n"
+
+// parserDirectiveRe is a Dockerfile parser directive (# syntax=…, # check=…),
+// which docker reads only from the file's first lines, before any other
+// comment or instruction.
+var parserDirectiveRe = regexp.MustCompile(`^#\s*([a-zA-Z]+)\s*=`)
 
 // dockerfileRewriteOf works out the rewrite of a Dockerfile, data, that does
 // more than name a base; name is its path, for the notes. It returns the rewrite, or a note naming why the
@@ -67,7 +109,7 @@ const (
 // What it can judge from the file alone. Whether the two 1.x files were carried
 // is decided later, by plan, from the run's notes.
 func dockerfileRewriteOf(name string, data []byte) (rw *dockerfileRewrite, blocker string, listsRead bool) {
-	prefix := name + ": kept FROM its Astro Runtime image rather than moved onto that image's -base tag, "
+	prefix := name + ": kept FROM its Astro Runtime image rather than moved onto the install base the Astro CLI builds, "
 	stages := airflowrt.DockerfileStages(data)
 	if len(stages) == 0 {
 		return nil, "", false
@@ -96,31 +138,19 @@ func dockerfileRewriteOf(name string, data []byte) (rw *dockerfileRewrite, block
 	case airflowrt.IsUnresolvedRef(final.Ref):
 		return nil, "", true
 	case final.Digest:
-		return nil, prefix + "because its FROM pins " + final.Ref + " by digest, and the -base image has a digest of its own: " +
-			"to move it, replace the reference with " + final.Image + ":" + nonEmpty(final.Tag, "<tag>") + "-base and add the install steps astro init writes", true
+		return nil, prefix + "because its FROM pins " + final.Ref + " by digest, which names an image rather than a runtime build " +
+			"pyproject.toml can record. Name the tag instead and run astro init again", true
 	case !final.OnBuildRuntime():
 		return nil, "", true
 	}
-	// The runtimes astro builds images for, whose -base tags are checked
-	// (scripts/check-runtime-base-tags.sh): every Airflow 3 tag, the floating
+	// The runtimes astro builds images for: every Airflow 3 tag, the floating
 	// series tags (3.3) among them, and Airflow 2 builds from runtime 9
-	// (Airflow 2.7). A floating Airflow 2 tag (12) has no -base twin: none is
-	// published. A tag whose version this cannot read is left alone rather
-	// than guessed at.
-	v, _ := airflowrt.ParseRuntimeTagPython(strings.TrimPrefix(final.Tag, "v"))
-	switch t, ok := manifest.ParseRuntimeTag(v); {
-	case !ok:
-		return nil, prefix + "because astro does not read a runtime version from its tag " + final.Tag, true
-	case t.Major == "2" && !t.Build:
-		return nil, prefix + "because no -base tag is published for the floating Airflow 2 tag " + final.Tag +
-			": pin the runtime build, such as 12.6.0, and run astro init again", true
-	case t.Major == "2" && runtimeMajor(v) < minAirflow2Runtime:
-		return nil, prefix + "because runtime " + final.Tag + " is older than runtime 9 (Airflow 2.7), the oldest astro builds images for", true
-	}
-	for i := range stages {
-		if strings.EqualFold(stages[i].Alias, airflowrt.InstallContext) {
-			return nil, prefix + "because it already has a stage named " + stages[i].Alias + ", the name of the build context the install reads", true
-		}
+	// (Airflow 2.7). A floating Airflow 2 tag (12) names no build, and a flavor
+	// other than a Python one (-slim, -ubi9) has no pyproject.toml spelling, so
+	// either is left as it is rather than guessed at.
+	recorded, blocker := installBaseRuntimeOf(&final, prefix)
+	if blocker != "" {
+		return nil, blocker, true
 	}
 	lines := strings.Split(string(data), "\n")
 	if strings.HasSuffix(strings.TrimRight(lines[final.Line], " \t\r"), "\\") {
@@ -131,32 +161,52 @@ func dockerfileRewriteOf(name string, data []byte) (rw *dockerfileRewrite, block
 			return nil, prefix + "because it reads " + name + " itself, which the rewritten build would not provide", true
 		}
 	}
-
-	base := airflowrt.BaseOf(final.Ref)
-	from := strings.Join(append(append([]string{}, final.Flags...), base), " ")
-	body := rewrittenBody(lines, final.Line, airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias, ListsFrom: airflowrt.InstallContext}))
-	return &dockerfileRewrite{
-		body:   body,
-		from:   final.Ref,
-		base:   base,
-		mirror: !airflowrt.IsPublishedRuntimeRepo(final.Image),
-	}, "", true
+	recorded.body = rewrittenBody(lines, &final, final.Line, final.Line+1)
+	return &recorded, "", true
 }
 
-// rewrittenBody is a Dockerfile's lines with install, the recipe, in place of
-// its final FROM (at line final) and the file's own lines after it.
-func rewrittenBody(lines []string, final int, install string) []byte {
+// rewrittenBody is a Dockerfile's lines with its final stage, final, moved
+// onto the install base: the file's parser directives, with the one that
+// silences BuildKit's warning about an argument with no default; the header
+// and the global ARG, ahead of any earlier stage; the file's lines before
+// cut, the lines from cut to resume replaced by the final FROM on
+// ${ASTRO_BASE}, its flags and name kept, and the step that lays down the
+// project's files; then the file's own lines from resume on. A conversion cuts
+// the final FROM line alone; an update cuts the install block an older astro
+// wrote around it.
+func rewrittenBody(lines []string, final *airflowrt.DockerfileStage, cut, resume int) []byte {
 	var b strings.Builder
-	if final > 0 {
-		b.WriteString(strings.Join(lines[:final], "\n") + "\n")
+	head := 0
+	hasCheck := false
+	for head < len(lines) && head < cut {
+		m := parserDirectiveRe.FindStringSubmatch(strings.TrimSpace(lines[head]))
+		if m == nil {
+			break
+		}
+		hasCheck = hasCheck || strings.EqualFold(m[1], "check")
+		b.WriteString(lines[head] + "\n")
+		head++
 	}
-	b.WriteString(installBlockComment)
-	b.WriteString(install)
-	if own := lines[final+1:]; strings.TrimSpace(strings.Join(own, "\n")) != "" {
+	if !hasCheck {
+		b.WriteString(airflowrt.BaseArgCheckDirective + "\n")
+	}
+	b.WriteString(airflowrt.BaseArgComment)
+	b.WriteString("ARG " + airflowrt.BaseArg + "\n")
+	if cut > head {
+		b.WriteString(strings.Join(lines[head:cut], "\n") + "\n")
+	}
+	from := append(append([]string{"FROM"}, final.Flags...), airflowrt.BaseArgFrom)
+	if final.Alias != "" {
+		from = append(from, "AS", final.Alias)
+	}
+	b.WriteString(strings.Join(from, " ") + "\n")
+	b.WriteString(airflowrt.ProjectCopy + "\n")
+	if own := lines[resume:]; strings.TrimSpace(strings.Join(own, "\n")) != "" {
 		b.WriteString("\n" + ownStepsComment)
-		// The file's own lines keep their leading blank lines out of the way of
-		// the comment, and their trailing newline as the file had it.
-		for len(own) > 0 && strings.TrimSpace(own[0]) == "" {
+		// The file's own lines keep their leading blank lines, and a comment
+		// an older astro wrote ahead of them, out of the way of the comment,
+		// and their trailing newline as the file had it.
+		for len(own) > 0 && (strings.TrimSpace(own[0]) == "" || own[0]+"\n" == ownStepsComment) {
 			own = own[1:]
 		}
 		b.WriteString(strings.Join(own, "\n"))
@@ -187,13 +237,6 @@ func instructionsName(lines []string, name string) bool {
 		}
 	}
 	return false
-}
-
-func nonEmpty(s, otherwise string) string {
-	if s == "" {
-		return otherwise
-	}
-	return s
 }
 
 // staleHelperPath is where Astro CLI preview builds wrote the install helper
@@ -241,19 +284,19 @@ func planDockerfileRewrite(from1x *project1x, notes []string, cs *Changeset) {
 	for _, name := range []string{"requirements.txt", "packages.txt"} {
 		if slices.Contains(from1x.present, name) && namedInAny(notes, name) {
 			from1x.rewrite = nil
-			from1x.notes = append(from1x.notes, onBuildKeptNote("Dockerfile: kept FROM "+rw.from+" rather than moved onto "+rw.base+
+			from1x.notes = append(from1x.notes, onBuildKeptNote("Dockerfile: kept FROM "+rw.from+" rather than moved onto the install base the Astro CLI builds"+
 				", because "+name+" has lines "+manifest.Marker+" does not carry (above), and the base's ONBUILD steps "+
 				"still install them from it. Once they are in "+manifest.Marker+", run astro init again to move it"))
 			from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
 			return
 		}
 	}
-	label := fileDockerfile + " (now builds FROM " + rw.base + " and installs the packages the Astro CLI resolves from " +
-		manifest.Marker + " and uv.lock; build it with astro package or astro deploy, or astro package --context-dir for docker build)"
+	label := fileDockerfile + " (now builds on the install base the Astro CLI makes from " + manifest.Marker +
+		" and uv.lock; build it with astro package or astro deploy, or astro package --context-dir for docker build)"
 	cs.Changes = append(cs.Changes, Change{Kind: UpdateFile, Path: fileDockerfile, Content: rw.body, Labels: []string{label}})
-	if rw.mirror {
-		cs.Advisories = append(cs.Advisories, fileDockerfile+" now builds FROM "+rw.base+
-			": if your registry mirrors "+rw.from+" tag by tag, mirror "+rw.base+" too")
+	if rw.registry != "" {
+		cs.Advisories = append(cs.Advisories, manifest.Marker+" records your mirror as [tool.astro] registry = '"+rw.registry+
+			"': the install base builds FROM the runtime's -base tag there, so if your registry mirrors "+rw.from+" tag by tag, mirror its -base tag too")
 	}
 }
 
