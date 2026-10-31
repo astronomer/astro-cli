@@ -750,19 +750,19 @@ func setDockerfileDeclaration(ed tomledit.Editor, from1x *project1x) error {
 // [tool.astro] registry, since the file names neither any more. An Airflow 3
 // series tag needs no runtime line, its series being the pin.
 func setRuntimeDeclaration(ed tomledit.Editor, from1x *project1x, pinned string) error {
-	runtime := from1x.runtime
+	build := from1x.runtime
 	if rw := from1x.rewrite; rw != nil {
-		runtime = rw.runtime
+		build = rw.runtime
 		if rw.registry != "" {
 			if err := ed.Set(registryPath, rw.registry); err != nil {
 				return err
 			}
 		}
 	}
-	if runtime == "" || pinned != from1x.airflow {
+	if build == "" || pinned != from1x.airflow {
 		return nil
 	}
-	return ed.Set(runtimePath, runtime)
+	return ed.Set(runtimePath, build)
 }
 
 // namedInAny reports whether any note is about this file.

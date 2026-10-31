@@ -138,7 +138,7 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 			return nil, prefix + "because it reads " + name + " itself, which the rewritten build would not provide", true
 		}
 	}
-	rw = &dockerfileRewrite{body: rewrittenBody(lines, final), from: final.Ref, registry: registry}
+	rw = &dockerfileRewrite{body: rewrittenBody(lines, &final), from: final.Ref, registry: registry}
 	if t.Build {
 		rw.runtime = v
 	}
@@ -151,7 +151,7 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 // and the global ARG, ahead of any earlier stage; the file's lines up to the
 // final FROM; that FROM on ${ASTRO_BASE}, its flags and name kept; the step
 // that lays down the project's files; then the file's own lines after it.
-func rewrittenBody(lines []string, final airflowrt.DockerfileStage) []byte {
+func rewrittenBody(lines []string, final *airflowrt.DockerfileStage) []byte {
 	var b strings.Builder
 	head := 0
 	hasCheck := false
@@ -213,13 +213,6 @@ func instructionsName(lines []string, name string) bool {
 		}
 	}
 	return false
-}
-
-func nonEmpty(s, otherwise string) string {
-	if s == "" {
-		return otherwise
-	}
-	return s
 }
 
 // staleHelperPath is where Astro CLI preview builds wrote the install helper
