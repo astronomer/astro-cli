@@ -52,6 +52,17 @@ type dockerfileRewrite struct {
 	// python is the Python a -python-X.Y flavor named, for requires-python,
 	// or "".
 	python string
+	// moved are the requirements the final stage's leading pip steps install
+	// (movablePipSteps), and bodyMoved the rewritten file without those
+	// steps, for a run that moves them into the manifest (planPipStepMoves).
+	// emptyAfterMove reports that the file then builds nothing a generated
+	// build does not: one stage, and no instruction of its own left.
+	moved          []MovedPackage
+	bodyMoved      []byte
+	emptyAfterMove bool
+	// movedNetrc reports a moved step that mounted the netrc secret, which
+	// the install base's install then needs.
+	movedNetrc bool
 }
 
 // installBaseRuntimeOf reads what pyproject.toml has to record of final, a
@@ -162,6 +173,15 @@ func dockerfileRewriteOf(name string, data []byte) (rw *dockerfileRewrite, block
 		}
 	}
 	recorded.body = rewrittenBody(lines, &final, final.Line, final.Line+1)
+	if own, moved, netrc := movablePipSteps(lines[final.Line+1:], final.Line+1); len(moved) > 0 {
+		recorded.moved, recorded.movedNetrc = moved, netrc
+		recorded.bodyMoved = rewrittenBody(append(slices.Clone(lines[:final.Line+1]), own...), &final, final.Line, final.Line+1)
+		// Only on Airflow 3: an Airflow 2 project deploys to Astro only from a
+		// Dockerfile of its own, since a generated build is Airflow 3.
+		v, _ := airflowrt.ParseRuntimeTagPython(strings.TrimSuffix(strings.TrimPrefix(final.Tag, "v"), "-base"))
+		t, _ := manifest.ParseRuntimeTag(v)
+		recorded.emptyAfterMove = t.Major == "3" && len(stages) == 1 && !hasInstruction(own) && !hasInstruction(lines[:final.Line])
+	}
 	return &recorded, "", true
 }
 
@@ -301,11 +321,14 @@ func planDockerfileRewrite(from1x *project1x, notes []string, cs *Changeset) {
 }
 
 // planDockerfile is what a conversion does about the Dockerfile: the move onto
-// -base when it can go ahead (planDockerfileRewrite), the removal of the
-// install helper an earlier preview wrote (planStaleHelperRemoval), then the
-// ignore file the build's context needs (planKeptDockerfileIgnore).
-func planDockerfile(dir string, from1x *project1x, notes []string, cs *Changeset) error {
+// -base when it can go ahead (planDockerfileRewrite), its pip steps into the
+// manifest the run writes, manifestOut, when movePipSteps (planPipStepMoves),
+// the removal of the install helper an earlier preview wrote
+// (planStaleHelperRemoval), then the ignore file the build's context needs
+// (planKeptDockerfileIgnore).
+func planDockerfile(dir string, from1x *project1x, notes []string, cs *Changeset, movePipSteps bool, manifestOut *[]byte) error {
 	planDockerfileRewrite(from1x, notes, cs)
+	planPipStepMoves(movePipSteps, from1x, manifestOut, cs, notes)
 	if err := planStaleHelperRemoval(dir, cs); err != nil {
 		return err
 	}

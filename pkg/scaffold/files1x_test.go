@@ -746,7 +746,7 @@ func TestDockerfileSecretMountsAreReported(t *testing.T) {
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 	assert.Contains(t, res.Notes, `Dockerfile: line 2 mounts build secret "netrc". To build without --build-secret each time, `+
-		`add 'id=netrc,env=<VAR>' to build-secrets under [tool.astro], where <VAR> is the environment variable that holds it`)
+		`add 'id=netrc,src=~/.netrc' to build-secrets under [tool.astro]`)
 	pyproject, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	assert.NotContains(t, string(pyproject), "build-secrets")
@@ -1056,9 +1056,9 @@ func TestKeptDockerfilePipInstallsAreReported(t *testing.T) {
 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
-	assert.Contains(t, res.Notes, "Dockerfile: its RUN steps install "+
-		"\"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3\". "+
-		"Standalone mode and astro local check do not have it unless you add it to [project] dependencies")
+	assert.Contains(t, res.Notes, "Dockerfile: its RUN steps install example-lib, which standalone mode and "+
+		"astro local check do not have. Add it to pyproject.toml with: "+
+		"uv add 'example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3'")
 	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.NotContains(t, strings.Join(m.Project.Dependencies, "\n"), "example-lib", "the note reports; it does not add")

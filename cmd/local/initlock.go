@@ -38,7 +38,11 @@ func uvLock(ctx context.Context, dir string) error {
 // warns with uv's reason. Neither fails init, which has done its part. On
 // stderr as text in either format, since init's stdout is its one result.
 func (c *cli) lockAfterInit(ctx context.Context, dir string) {
-	o := c.relock(ctx, dir)
+	c.reportLock(c.relock(ctx, dir))
+}
+
+// reportLock says what a lock after init did, on stderr.
+func (c *cli) reportLock(o lockOutcome) {
 	switch {
 	case o.Status == lockFailed:
 		// The CLI's stderr Warning. Not emitWarning: in json mode that would put

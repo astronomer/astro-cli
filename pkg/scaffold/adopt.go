@@ -197,7 +197,7 @@ func adopt(dir string, data []byte, opts *Options, from1x *project1x, res *Resul
 	// the image is generated or built from the user's own file, so a preview
 	// without it hides the most consequential thing the run did.
 	if declaresDockerfile(from1x) {
-		labels = append(labels, manifest.Marker+" (declared "+fileDockerfile+" as this project's build)")
+		labels = append(labels, declaredDockerfileLabel)
 	}
 	if from1x.settings.declares() {
 		labels = append(labels, manifest.Marker+" (migrated "+SettingsRelPath+" into [tool.astro.env])")

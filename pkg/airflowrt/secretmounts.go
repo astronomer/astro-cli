@@ -35,6 +35,11 @@ func SecretMounts(dockerfilePath string) ([]SecretMount, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading Dockerfile: %w", err)
 	}
+	return SecretMountsIn(data), nil
+}
+
+// SecretMountsIn is SecretMounts for a Dockerfile's contents, data.
+func SecretMountsIn(data []byte) []SecretMount {
 	var mounts []SecretMount
 	seen := map[string]int{}
 	for _, in := range instructions(string(data)) {
@@ -61,7 +66,7 @@ func SecretMounts(dockerfilePath string) ([]SecretMount, error) {
 			}
 		}
 	}
-	return mounts, nil
+	return mounts
 }
 
 type instruction struct {
