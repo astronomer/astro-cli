@@ -105,6 +105,12 @@ type Deps struct {
 	// when that leaves none to offer.
 	PickDeployment func(workspaceID string, linked map[string]string) (PickedDeployment, error)
 	PickWorkspace  func() (string, error)
+	// DeploymentWorkspace is the workspace of the Astro Deployment with this
+	// id, asked of the platform through the current login without ever
+	// prompting: "" and no error when there is no login, an error when the
+	// platform cannot be asked or does not know the Deployment. init links a
+	// 1.x project's instances list with it. nil means it cannot be asked.
+	DeploymentWorkspace func(ctx context.Context, deploymentID string) (string, error)
 
 	// APC is set by the root when the current context is Astro Private
 	// Cloud's, and nil under Astro. `astro link add` then links an APC

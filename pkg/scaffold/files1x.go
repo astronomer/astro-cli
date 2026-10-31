@@ -145,6 +145,10 @@ type project1x struct {
 	// domain a saved deploy target is linked on, or empty to link it as an
 	// Astro Deployment. Not read from the 1.x files, which do not say.
 	apcDomain string
+	// instanceWorkspace is Options.InstanceWorkspace, and linked what
+	// instanceLinks made of it, decided once.
+	instanceWorkspace func(deploymentID string) string
+	linked            *[]Link
 	// apcWorkspace is Options.APCWorkspace until fillAPCWorkspace has asked
 	// it, then nil. workspaceFromContext is set when workspace was not in the
 	// file and came from it, the APC context's current workspace.

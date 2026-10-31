@@ -446,7 +446,7 @@ func planPipStepMoves(move bool, from1x *project1x, out *[]byte, cs *Changeset, 
 	}
 	mv.advisories = []string{moved}
 	if mv.addedSecret {
-		mv.advisories = append(mv.advisories, manifest.Marker + ": added the netrc build secret, read from ~/.netrc or your git credentials")
+		mv.advisories = append(mv.advisories, manifest.Marker+": added the netrc build secret, read from ~/.netrc or your git credentials")
 	}
 	from1x.notes = slices.DeleteFunc(from1x.notes, func(n string) bool { return slices.Contains(from1x.stepNotes, n) })
 	from1x.notes = append(from1x.notes, mv.notesAfter...)

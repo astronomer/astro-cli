@@ -3,11 +3,14 @@ package local
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -113,6 +116,7 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 		}
 	}
 
+	opts.InstanceWorkspace = c.instanceWorkspace(ctx)
 	// A Dockerfile's pip-only install steps move into [project] dependencies,
 	// and the lock below decides whether they stay there.
 	opts.MovePipSteps = true
@@ -135,6 +139,40 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
 	})
+}
+
+// instanceLookupTimeout bounds each Deployment lookup init makes, so a slow or
+// unreachable platform costs the run seconds, not minutes.
+const instanceLookupTimeout = 5 * time.Second
+
+// instanceWorkspace is the lookup init links a 1.x instances list with
+// (scaffold.Options.InstanceWorkspace): under Astro, with a login, each
+// Deployment's workspace. Once one lookup finds no login, times out or cannot
+// reach the platform, the rest are not asked, so an offline run waits once;
+// those entries stay notes.
+func (c *cli) instanceWorkspace(ctx context.Context) func(string) string {
+	if c.d.DeploymentWorkspace == nil || c.d.APC != nil {
+		return nil
+	}
+	gaveUp := false
+	return func(id string) string {
+		if gaveUp {
+			return ""
+		}
+		lookup, cancel := context.WithTimeout(ctx, instanceLookupTimeout)
+		defer cancel()
+		ws, err := c.d.DeploymentWorkspace(lookup, id)
+		var netErr net.Error
+		// No login, or no platform to reach, is the same for every entry; a
+		// Deployment the platform does not know is that entry's alone.
+		if (err == nil && ws == "") || errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) {
+			gaveUp = true
+		}
+		if err != nil {
+			return ""
+		}
+		return ws
+	}
 }
 
 // nextStart is the start command to suggest once init is done. Standalone
