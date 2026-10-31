@@ -53,11 +53,11 @@ func TestPipOnlyStepsMoveAndTheDockerfileGoes(t *testing.T) {
 	assert.Equal(t, "3.3-8", m.Astro.Runtime, "the runtime the FROM named stays recorded for the generated build")
 	assert.Equal(t, "==3.13.*", m.Project.RequiresPython, "and so does its Python")
 	assert.NoFileExists(t, filepath.Join(dir, "Dockerfile"))
-	assert.Contains(t, res.Deleted, "Dockerfile (pip steps moved into pyproject.toml, removed)")
+	assert.Contains(t, res.Deleted, "Dockerfile (now in pyproject.toml)")
 
 	assert.Equal(t, []string{
-		"Dockerfile: moved corona and state-client into [project] dependencies, then removed the Dockerfile, which had nothing else left",
-		"[tool.astro] build-secrets: added netrc, which builds read from ~/.netrc or your git credentials",
+		"pyproject.toml: moved in corona and state-client from the Dockerfile's pip steps",
+		"pyproject.toml: added the netrc build secret, read from ~/.netrc or your git credentials",
 	}, res.Advisories)
 	assert.Equal(t, []string{"id=netrc"}, m.Astro.BuildSecrets, "the netrc the steps mounted, for the build to supply")
 	assert.Empty(t, res.Notes, "nothing about the secret is left to do")

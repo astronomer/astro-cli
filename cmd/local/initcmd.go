@@ -1,11 +1,16 @@
 package local
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -118,6 +123,7 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 		}
 	}
 
+	opts.InstanceWorkspace = c.instanceWorkspace(ctx)
 	// A Dockerfile's pip-only install steps move into [project] dependencies,
 	// and the lock below decides whether they stay there.
 	opts.MovePipSteps = true
@@ -140,6 +146,40 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
 	})
+}
+
+// instanceLookupTimeout bounds each Deployment lookup init makes, so a slow or
+// unreachable platform costs the run seconds, not minutes.
+const instanceLookupTimeout = 5 * time.Second
+
+// instanceWorkspace is the lookup init links a 1.x instances list with
+// (scaffold.Options.InstanceWorkspace): under Astro, with a login, each
+// Deployment's workspace. Once one lookup finds no login, times out or cannot
+// reach the platform, the rest are not asked, so an offline run waits once;
+// those entries stay notes.
+func (c *cli) instanceWorkspace(ctx context.Context) func(string) string {
+	if c.d.DeploymentWorkspace == nil || c.d.APC != nil {
+		return nil
+	}
+	gaveUp := false
+	return func(id string) string {
+		if gaveUp {
+			return ""
+		}
+		lookup, cancel := context.WithTimeout(ctx, instanceLookupTimeout)
+		defer cancel()
+		ws, err := c.d.DeploymentWorkspace(lookup, id)
+		var netErr net.Error
+		// No login, or no platform to reach, is the same for every entry; a
+		// Deployment the platform does not know is that entry's alone.
+		if (err == nil && ws == "") || errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) {
+			gaveUp = true
+		}
+		if err != nil {
+			return ""
+		}
+		return ws
+	}
 }
 
 // nextStart is the start command to suggest once init is done. Standalone
@@ -214,30 +254,11 @@ func renderInit(w io.Writer, res *scaffold.Result, next string) error {
 			return err
 		}
 	}
-	for _, entry := range res.Updated {
-		if _, err := fmt.Fprintf(w, "  %s\n", entry); err != nil {
-			return err
-		}
+	rows, changed := initRows(res)
+	if err := renderRows(w, rows); err != nil {
+		return err
 	}
-	for _, entry := range res.Created {
-		if _, err := fmt.Fprintf(w, "  %s\n", entry); err != nil {
-			return err
-		}
-	}
-	for _, entry := range res.Skipped {
-		if _, err := fmt.Fprintf(w, "  %s (already existed, kept)\n", entry); err != nil {
-			return err
-		}
-	}
-	// Removed files get their own line and their own word. They arrive in their
-	// own list for the same reason: rendered beside Updated, in the unlabelled
-	// block above, a destroyed file reads exactly like an edited one.
-	for _, entry := range res.Deleted {
-		if _, err := fmt.Fprintf(w, "  Removed %s\n", entry); err != nil {
-			return err
-		}
-	}
-	if err := renderChanged(w, res.Advisories); err != nil {
+	if err := renderChanged(w, changed); err != nil {
 		return err
 	}
 	if err := renderInfo(w, res.Info); err != nil {
@@ -250,14 +271,123 @@ func renderInit(w io.Writer, res *scaffold.Result, next string) error {
 	return err
 }
 
-// renderLeftToDo prints what init could not carry over, under a heading. Each
-// line names a file and where its contents belong.
-// renderChanged prints the advisories: things this run DID that now behave
-// differently. They are not "left to do" and must not be rendered as it — a
-// carried default is applied at start now, and a connection declared with no
-// value will stop the project starting until it is set. Nothing else on screen
-// says either, and until this existed the CLI computed them and dropped them,
-// so the only reader was --json.
+// initRow is one line of init's file list: a file, or Removed or Kept, and
+// what happened to it.
+type initRow struct{ name, what string }
+
+// Labels for the rows that gather several files.
+const (
+	rowCreated = "Created"
+	rowRemoved = "Removed"
+	rowKept    = "Kept"
+)
+
+// initRows is init's file list, one change a line with the file leading, and
+// the advisories left for What changed. An advisory about one file the run
+// changed ("pyproject.toml: …") is a line of that file. Files created with
+// nothing more to say share one Created line, files only kept one Kept line
+// (leaving out any the run also changed), and removed files a Removed line
+// per reason.
+func initRows(res *scaffold.Result) (rows []initRow, changed []string) {
+	touched := map[string]bool{}
+	var created []string
+	add := func(label, fallback string) {
+		name, what := splitLabel(label)
+		touched[name] = true
+		if what == "" && fallback == "" {
+			created = append(created, name)
+			return
+		}
+		rows = append(rows, initRow{name, cmp.Or(what, fallback)})
+	}
+	for _, l := range res.Updated {
+		add(l, "updated")
+	}
+	for _, l := range res.Created {
+		add(l, "")
+	}
+	for _, a := range res.Advisories {
+		name, what, ok := strings.Cut(a, ": ")
+		if !ok || !touched[name] {
+			changed = append(changed, a)
+			continue
+		}
+		rows = append(rows, initRow{name, what})
+	}
+	// Sorted by file, stable, so a file's lines sit together in the order
+	// they were reported.
+	first := map[string]int{}
+	for i, r := range rows {
+		if _, ok := first[r.name]; !ok {
+			first[r.name] = i
+		}
+	}
+	slices.SortStableFunc(rows, func(a, b initRow) int { return first[a.name] - first[b.name] })
+
+	// A file created bare joins the Created line, unless lines above already
+	// say what went into it.
+	created = slices.DeleteFunc(created, func(name string) bool {
+		return slices.ContainsFunc(rows, func(r initRow) bool { return r.name == name })
+	})
+	if len(created) > 0 {
+		rows = append(rows, initRow{rowCreated, strings.Join(created, ", ")})
+	}
+
+	var reasons []string
+	removed := map[string][]string{}
+	for _, l := range res.Deleted {
+		name, why := splitLabel(l)
+		if _, ok := removed[why]; !ok {
+			reasons = append(reasons, why)
+		}
+		removed[why] = append(removed[why], name)
+	}
+	for _, why := range reasons {
+		what := strings.Join(removed[why], ", ")
+		if why != "" {
+			what += " (" + why + ")"
+		}
+		rows = append(rows, initRow{rowRemoved, what})
+	}
+	var kept []string
+	for _, l := range res.Skipped {
+		if name, _ := splitLabel(l); !touched[name] {
+			kept = append(kept, name)
+		}
+	}
+	if len(kept) > 0 {
+		rows = append(rows, initRow{rowKept, strings.Join(kept, ", ")})
+	}
+	return rows, changed
+}
+
+// splitLabel splits a scaffold label, "file (what happened)", into its file
+// and what happened; a bare label is all file.
+func splitLabel(label string) (name, what string) {
+	if i := strings.Index(label, " ("); i > 0 && strings.HasSuffix(label, ")") {
+		return label[:i], label[i+2 : len(label)-1]
+	}
+	return label, ""
+}
+
+// renderRows prints the file list with its first column aligned.
+func renderRows(w io.Writer, rows []initRow) error {
+	width := 0
+	for _, r := range rows {
+		width = max(width, len(r.name))
+	}
+	for _, r := range rows {
+		if _, err := fmt.Fprintf(w, "  %-*s  %s\n", width, r.name, r.what); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// renderChanged prints the advisories no file line holds: things this run DID
+// that now behave differently. They are not "left to do" and must not be
+// rendered as it: a carried default is applied at start now, and a connection
+// declared with no value will stop the project starting until it is set.
 func renderChanged(w io.Writer, advisories []string) error {
 	if len(advisories) == 0 {
 		return nil

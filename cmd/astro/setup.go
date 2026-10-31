@@ -159,6 +159,22 @@ func EnsureLogin(astroV1Client astrov1.APIClient) error {
 	return ensureLogin(false, astroV1Client)
 }
 
+// QuietLogin readies the login an API call needs without ever asking: an API
+// token or API keys from the environment, else the current login, renewed when
+// it is about to expire. It never starts the login flow, and reports false,
+// with no error, when there is no login to use.
+func QuietLogin(astroV1Client astrov1.APIClient) (bool, error) {
+	used, err := ensureEnvCredentials(false, astroV1Client)
+	if err != nil || used {
+		return used, err
+	}
+	c, err := FreshLogin("", false)
+	if err != nil {
+		return false, err
+	}
+	return c.Token != "", nil
+}
+
 // ensureLogin is Setup's auth half, shared with EnsureLogin.
 func ensureLogin(deploymentFile bool, astroV1Client astrov1.APIClient) error {
 	used, err := ensureEnvCredentials(deploymentFile, astroV1Client)

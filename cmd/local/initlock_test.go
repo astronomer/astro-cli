@@ -172,7 +172,7 @@ func TestInitKeepsMovedPipStepsThatLock(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); !os.IsNotExist(err) {
 		t.Errorf("a Dockerfile left building what a generated build does was kept (%v)", err)
 	}
-	if !strings.Contains(out, "moved humanize into [project] dependencies") {
+	if !strings.Contains(out, "pyproject.toml  moved in humanize from the Dockerfile's pip steps") {
 		t.Errorf("init did not say what moved:\n%s", out)
 	}
 }

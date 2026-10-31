@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -228,7 +229,7 @@ func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	if strings.Contains(handoff, "heavy") || strings.Contains(handoff, "airflow_settings.yaml") {
 		t.Errorf("the carried pool is still left to do:\n%s", out)
 	}
-	if !strings.Contains(out, "migrated 1 pool from airflow_settings.yaml into [tool.astro.pools]") {
+	if !strings.Contains(out, "pyproject.toml  moved in 1 pool from airflow_settings.yaml") {
 		t.Errorf("the run did not say the pool moved:\n%s", out)
 	}
 	// And not the old instruction to move the whole file by hand, which now
@@ -243,14 +244,14 @@ func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	}
 	// Scoped to the hand-off section, not the whole output, and deliberately.
 	// This assertion was written against `out` and passed only because the
-	// greenfield arm printed no label at all; now that it reports "migrated 1
-	// from requirements.txt into dependencies", the file is legitimately named
+	// greenfield arm printed no label at all; now that it reports "moved in 1
+	// package from requirements.txt", the file is legitimately named
 	// in the CREATED list. What must not happen is it appearing as work left to
 	// do, which is a different claim about the same string.
 	if strings.Contains(handoff, "requirements.txt") {
 		t.Errorf("requirements.txt was carried, so it must not be work left to do:\n%s", out)
 	}
-	if !strings.Contains(out, "migrated 1 from requirements.txt") {
+	if !strings.Contains(out, "moved in 1 package from requirements.txt") {
 		t.Errorf("the conversion did not say it carried requirements.txt:\n%s", out)
 	}
 }
@@ -269,7 +270,7 @@ func TestInitSaysCreatedWhenItWroteTheManifest(t *testing.T) {
 	if !strings.Contains(out, "Created Astro project") {
 		t.Errorf("want Created, got:\n%s", out)
 	}
-	if !strings.Contains(out, ".gitignore (added the .env rule)") {
+	if !strings.Contains(out, ".gitignore  added the .env rule") {
 		t.Errorf("gitignore edit not reported:\n%s", out)
 	}
 }
@@ -664,5 +665,104 @@ func TestTheDevStubConvertsTheRootFromBelow(t *testing.T) {
 	}
 	if n := strings.Count(err.Error(), want); n != 1 {
 		t.Errorf("the convert command is named %d times, want once:\n%v", n, err)
+	}
+}
+
+// writeInstances1x writes a 1.x project whose .astro/config.yaml lists two
+// Astro Deployments.
+func writeInstances1x(t *testing.T, dir string) {
+	t.Helper()
+	files := map[string]string{
+		"Dockerfile":         "FROM quay.io/astronomer/astro-runtime:12.6.0\n",
+		".astro/config.yaml": "project:\n  name: orders\ninstances:\n  - name: dev\n    source: astro\n    deployment_id: cmbjjd11x0bre01k5sy1rw0wl\n  - name: prod\n    source: astro\n    deployment_id: cmqzyvtpc0tpn01o1e67v6dcb\n",
+	}
+	for name, body := range files {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// With a login, init links the Deployments a 1.x config lists, each in the
+// workspace the platform says it is in, and leaves nothing to do about them.
+func TestInitLinksTheDeploymentsA1xConfigLists(t *testing.T) {
+	d, dir, stdout := initDeps(t)
+	writeInstances1x(t, dir)
+	var asked []string
+	d.DeploymentWorkspace = func(_ context.Context, id string) (string, error) {
+		asked = append(asked, id)
+		return "cmws0000000000000000000w1", nil
+	}
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init: %v", err)
+	}
+	out := stdout.String()
+	if len(asked) != 2 {
+		t.Errorf("asked about %v, want both Deployments", asked)
+	}
+	if !strings.Contains(out, "pyproject.toml  linked the Deployments .astro/config.yaml lists, dev and prod") {
+		t.Errorf("the links were not reported in the file list:\n%s", out)
+	}
+	if strings.Contains(out, "astro link add") {
+		t.Errorf("a linked Deployment is still left to do:\n%s", out)
+	}
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Astro.Deployments["prod"]; got.Deployment != "cmqzyvtpc0tpn01o1e67v6dcb" || got.Workspace != "cmws0000000000000000000w1" {
+		t.Errorf("prod link = %+v", got)
+	}
+}
+
+// Without a login nothing is linked and the platform is asked once: each
+// Deployment is left to do, with a command that names the workspace it needs.
+func TestInitLeavesTheDeploymentsToDoWithoutALogin(t *testing.T) {
+	d, dir, stdout := initDeps(t)
+	writeInstances1x(t, dir)
+	calls := 0
+	d.DeploymentWorkspace = func(context.Context, string) (string, error) {
+		calls++
+		return "", nil
+	}
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init: %v", err)
+	}
+	out := stdout.String()
+	if calls != 1 {
+		t.Errorf("asked %d times, want once", calls)
+	}
+	for _, want := range []string{
+		"Link the Deployments .astro/config.yaml lists:",
+		"astro link add dev --deployment cmbjjd11x0bre01k5sy1rw0wl --workspace <workspace-id>",
+		"astro link add prod --deployment cmqzyvtpc0tpn01o1e67v6dcb --workspace <workspace-id>",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+}
+
+// A Deployment the platform does not know stays to do; the others are linked.
+func TestInitLinksTheDeploymentsThePlatformKnows(t *testing.T) {
+	d, dir, stdout := initDeps(t)
+	writeInstances1x(t, dir)
+	d.DeploymentWorkspace = func(_ context.Context, id string) (string, error) {
+		if id == "cmbjjd11x0bre01k5sy1rw0wl" {
+			return "", errors.New("deployment not found")
+		}
+		return "cmws0000000000000000000w1", nil
+	}
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "linked the Deployment .astro/config.yaml lists, prod") ||
+		!strings.Contains(out, "astro link add dev --deployment cmbjjd11x0bre01k5sy1rw0wl --workspace <workspace-id>") {
+		t.Errorf("want prod linked and dev left to do:\n%s", out)
 	}
 }

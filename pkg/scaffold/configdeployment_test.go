@@ -20,13 +20,18 @@ import (
 // stand in for the deploy-target note and report a pass for the wrong reason.
 func convertWithConfig(t *testing.T, body string) (res *Result, about []string) {
 	t.Helper()
+	return convertWithConfigOpts(t, body, &Options{})
+}
+
+func convertWithConfigOpts(t *testing.T, body string, opts *Options) (res *Result, about []string) {
+	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(dir, filepath.FromSlash(config1xRelPath)), []byte(body), 0o600))
 	writeAll(t, dir, map[string]string{"Dockerfile": pinOnlyDockerfile})
 
-	res, err := Run(dir, Options{})
+	res, err := Run(dir, *opts)
 	require.NoError(t, err)
 
 	_, statErr := os.Stat(filepath.Join(dir, filepath.FromSlash(config1xRelPath)))
@@ -157,9 +162,9 @@ func TestConfigInstancesAreReported(t *testing.T) {
 	// One note per link, so each command is a line to copy and a json
 	// consumer still groups every one under the file.
 	assert.Equal(t, []string{
-		".astro/config.yaml: link the Deployment it lists with: astro link add prod --deployment cm1prod",
-		".astro/config.yaml: link the Deployment it lists with: astro link add dev --deployment cm1dev",
-		".astro/config.yaml: link the Deployment it lists with: astro link add <name> --deployment cm1odd",
+		".astro/config.yaml: link the Deployment it lists with: astro link add prod --deployment cm1prod --workspace <workspace-id>",
+		".astro/config.yaml: link the Deployment it lists with: astro link add dev --deployment cm1dev --workspace <workspace-id>",
+		".astro/config.yaml: link the Deployment it lists with: astro link add <name> --deployment cm1odd --workspace <workspace-id>",
 		".astro/config.yaml: link the Deployment it lists with: astro link add orders --target mwaa",
 	}, about, "notes: %v", res.Notes)
 	m, err := manifest.Load(filepath.Join(res.Dir, manifest.Marker))
@@ -178,8 +183,77 @@ func TestConfigInstancesReadTheIDUnderAuth(t *testing.T) {
 		"  - auth:\n      kind: astro_pat\n    name: example\n    source: astro\n"+
 		"  - auth:\n      deployment_id: cm1auth\n    deployment_id: cm1top\n    name: both\n    source: astro\n")
 	assert.Equal(t, []string{
-		".astro/config.yaml: link the Deployment it lists with: astro link add example-dev --deployment cexampledeployment0000001",
-		".astro/config.yaml: link the Deployment it lists with: astro link add example --deployment <id>",
-		".astro/config.yaml: link the Deployment it lists with: astro link add both --deployment cm1top",
+		".astro/config.yaml: link the Deployment it lists with: astro link add example-dev --deployment cexampledeployment0000001 --workspace <workspace-id>",
+		".astro/config.yaml: link the Deployment it lists with: astro link add example --deployment <id> --workspace <workspace-id>",
+		".astro/config.yaml: link the Deployment it lists with: astro link add both --deployment cm1top --workspace <workspace-id>",
 	}, about, "notes: %v", res.Notes)
+}
+
+// With InstanceWorkspace, each Astro entry of the instances list with a plain
+// name and a Deployment id whose workspace it tells becomes a link, as astro
+// link add writes it; the rest stay notes with their commands.
+func TestConfigInstancesAreLinkedWhenAsked(t *testing.T) {
+	res, about := convertWithConfigOpts(t, "project:\n  name: orders\n"+
+		"instances:\n"+
+		"  - name: prod\n    source: astro\n    deployment_id: cmbjjd11x0bre01k5sy1rw0wl\n"+
+		"  - name: dev\n    deployment_id: cmqzyvtpc0tpn01o1e67v6dcb\n"+
+		"  - name: not a plain name\n    source: astro\n    deployment_id: cm0000000000000000000odd1\n"+
+		"  - name: short\n    source: astro\n    deployment_id: cm1short\n"+
+		"  - name: orders\n    source: mwaa\n",
+		&Options{InstanceWorkspace: func(id string) string {
+			if id == "cm1short" {
+				t.Errorf("asked about an id that is not a Deployment id: %s", id)
+			}
+			return map[string]string{
+				"cmbjjd11x0bre01k5sy1rw0wl": "cmws00000000000000000prod",
+				"cmqzyvtpc0tpn01o1e67v6dcb": "cmws000000000000000000dev",
+			}[id]
+		}})
+	assert.Equal(t, []string{
+		".astro/config.yaml: link the Deployment it lists with: astro link add <name> --deployment cm0000000000000000000odd1 --workspace <workspace-id>",
+		".astro/config.yaml: link the Deployment it lists with: astro link add short --deployment cm1short --workspace <workspace-id>",
+		".astro/config.yaml: link the Deployment it lists with: astro link add orders --target mwaa",
+	}, about, "notes: %v", res.Notes)
+	assert.Contains(t, res.Advisories, "pyproject.toml: linked the Deployments .astro/config.yaml lists, dev and prod")
+	m, err := manifest.Load(filepath.Join(res.Dir, manifest.Marker))
+	require.NoError(t, err)
+	require.Len(t, m.Astro.Deployments, 2)
+	assert.Equal(t, "cmbjjd11x0bre01k5sy1rw0wl", m.Astro.Deployments["prod"].Deployment)
+	assert.Equal(t, "cmqzyvtpc0tpn01o1e67v6dcb", m.Astro.Deployments["dev"].Deployment)
+	assert.Equal(t, manifest.KindAstro, m.Astro.Deployments["dev"].Kind())
+	assert.Equal(t, "cmws000000000000000000dev", m.Astro.Deployments["dev"].Workspace)
+	// As two runs of astro link add leave them: the first link was the only
+	// one, so it is the default.
+	assert.True(t, m.Astro.Deployments["prod"].Default)
+	assert.False(t, m.Astro.Deployments["dev"].Default)
+}
+
+// Under an Astro Private Cloud context the entries stay notes: an apc link
+// needs a workspace the list does not hold.
+func TestConfigInstancesStayNotesUnderAPC(t *testing.T) {
+	res, about := convertWithConfigOpts(t, "project:\n  name: orders\n"+
+		"instances:\n  - name: prod\n    source: astro\n    deployment_id: cmbjjd11x0bre01k5sy1rw0wl\n",
+		&Options{InstanceWorkspace: func(string) string { return "cmws00000000000000000prod" }, APCDomain: "apc.example.com"})
+	assert.Len(t, about, 1, "notes: %v", res.Notes)
+	m, err := manifest.Load(filepath.Join(res.Dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.Empty(t, m.Astro.Deployments)
+}
+
+// A Deployment the lookup cannot place stays a note, and the rest are linked.
+func TestConfigInstanceTheLookupCannotPlaceStaysANote(t *testing.T) {
+	res, about := convertWithConfigOpts(t, "project:\n  name: orders\n"+
+		"instances:\n"+
+		"  - name: prod\n    source: astro\n    deployment_id: cmbjjd11x0bre01k5sy1rw0wl\n"+
+		"  - name: gone\n    source: astro\n    deployment_id: cmqzyvtpc0tpn01o1e67v6dcb\n",
+		&Options{InstanceWorkspace: func(id string) string {
+			if id == "cmbjjd11x0bre01k5sy1rw0wl" {
+				return "cmws00000000000000000prod"
+			}
+			return ""
+		}})
+	assert.Equal(t, []string{
+		".astro/config.yaml: link the Deployment it lists with: astro link add gone --deployment cmqzyvtpc0tpn01o1e67v6dcb --workspace <workspace-id>",
+	}, about, "notes: %v", res.Notes)
+	assert.Contains(t, res.Advisories, "pyproject.toml: linked the Deployment .astro/config.yaml lists, prod")
 }

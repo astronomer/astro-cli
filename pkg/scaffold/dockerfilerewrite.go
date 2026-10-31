@@ -315,7 +315,7 @@ func planDockerfileRewrite(from1x *project1x, notes []string, cs *Changeset) {
 		" and uv.lock; build it with astro package or astro deploy, or astro package --context-dir for docker build)"
 	cs.Changes = append(cs.Changes, Change{Kind: UpdateFile, Path: fileDockerfile, Content: rw.body, Labels: []string{label}})
 	if rw.registry != "" {
-		cs.Advisories = append(cs.Advisories, manifest.Marker+" records your mirror as [tool.astro] registry = '"+rw.registry+
+		cs.Advisories = append(cs.Advisories, manifest.Marker+": recorded your mirror as registry '"+rw.registry+
 			"': the install base builds FROM the runtime's -base tag there, so if your registry mirrors "+rw.from+" tag by tag, mirror its -base tag too")
 	}
 }

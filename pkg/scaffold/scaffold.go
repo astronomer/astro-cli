@@ -109,6 +109,13 @@ type Options struct {
 	// (Result.RevertMovedPackages); one that cannot lock leaves it unset, and
 	// the steps stay with a note naming what they install.
 	MovePipSteps bool
+	// InstanceWorkspace is the workspace of the Astro Deployment with this id,
+	// or "" when it cannot be told. With it, the Deployments a 1.x
+	// .astro/config.yaml's instances list names are linked (instanceLinks), as
+	// astro link add NAME --deployment ID --workspace WS writes them. nil, or
+	// "" for one, keeps that one a note with the command. The caller asks the
+	// platform; the conversion itself stays offline.
+	InstanceWorkspace func(deploymentID string) string
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -418,6 +425,7 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	refineAirflow2Pin(from1x, opts.RuntimeAirflow)
 	from1x.apcDomain = manifest.NormalizeAPCDomain(opts.APCDomain)
 	from1x.apcWorkspace = opts.APCWorkspace
+	from1x.instanceWorkspace = opts.InstanceWorkspace
 
 	// A manifest already there is adopted; its absence is the greenfield path.
 	// Both arms settle the manifest and write nothing.
@@ -540,6 +548,9 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	cs.Advisories = append(cs.Advisories, from1x.settings.carriedAdvisories()...)
 	cs.Advisories = append(cs.Advisories, from1x.settings.pools.advisories...)
 	if a := from1x.deployLinkAdvisory(); a != "" {
+		cs.Advisories = append(cs.Advisories, a)
+	}
+	if a := from1x.instanceLinksAdvisory(); a != "" {
 		cs.Advisories = append(cs.Advisories, a)
 	}
 
@@ -726,6 +737,9 @@ func set1xDeclarations(ed tomledit.Editor, from1x *project1x, pinned string) err
 	if err := setDeployLink(ed, from1x); err != nil {
 		return err
 	}
+	if err := setInstanceLinks(ed, from1x); err != nil {
+		return err
+	}
 	return setPools(ed, from1x.settings.pools.byName)
 }
 
@@ -838,13 +852,13 @@ func scaffoldManifest(dir string, opts *Options, from1x *project1x, res *Result)
 func migratedLabels(from1x *project1x) []string {
 	var out []string
 	if n := len(from1x.dependencies); n > 0 {
-		out = append(out, manifest.Marker+" (migrated "+strconv.Itoa(n)+" from requirements.txt into dependencies)")
+		out = append(out, manifest.Marker+" (moved in "+plural(n, "package", "packages")+" from requirements.txt)")
 	}
 	if len(from1x.packages) > 0 {
-		out = append(out, manifest.Marker+" (migrated packages.txt into packages)")
+		out = append(out, manifest.Marker+" (moved in the apt packages from packages.txt)")
 	}
 	if from1x.settings.declares() {
-		out = append(out, manifest.Marker+" (migrated "+SettingsRelPath+" into [tool.astro.env])")
+		out = append(out, manifest.Marker+" (declared the connections and variables from "+SettingsRelPath+")")
 	}
 	out = appendLabel(out, poolsLabel(from1x.settings.pools.byName))
 
@@ -1269,7 +1283,7 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	// One note per link, each with its command, since a json consumer groups
 	// notes by the file each starts with and a person copies one at a time.
 	var linkNotes []string
-	for _, cmd := range instancesNote(from1x.instances) {
+	for _, cmd := range instancesNote(from1x.unlinkedInstances()) {
 		linkNotes = append(linkNotes, LinkNotePrefix+cmd)
 	}
 	out = append(out, linkNotes...)
@@ -1314,7 +1328,7 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 			" to the Airflow this project already names"}, out...)
 	}
 	if facts.loosePython {
-		out = append([]string{"[project] requires-python admits a Python that Airflow " + version +
+		out = append([]string{manifest.Marker + ": requires-python admits a Python that Airflow " + version +
 			" cannot run: it needs " + requiresPython(version) + ", and yours has no upper bound — " +
 			"uv will build the environment on the newest interpreter it allows"}, out...)
 	}
@@ -1337,7 +1351,8 @@ func instancesNote(instances []instance1x) []string {
 		if plainDeployID(inst.deploymentID) {
 			id = inst.deploymentID
 		}
-		cmd := "astro link add " + name + " --deployment " + id
+		// --workspace too: an astro link needs one, and the list does not say.
+		cmd := "astro link add " + name + " --deployment " + id + " --workspace <workspace-id>"
 		switch {
 		case inst.source == "" || inst.source == "astro":
 		case plainDeployID(inst.source):
@@ -1448,15 +1463,15 @@ func projectInfo(dir string) []string {
 func retiredLabel(name string, from1x *project1x, cs *Changeset) string {
 	switch {
 	case name == fileDockerfile && from1x.dropDockerfile:
-		label := name + " (pip steps moved into " + manifest.Marker + ", removed)"
+		label := name + " (now in " + manifest.Marker + ")"
 		cs.pipMove.deleted = label
 		return label
 	case name == SettingsRelPath && len(cs.Secrets) > 0:
-		return name + " (migrated into the encrypted vault and " + manifest.Marker + ", removed)"
+		return name + " (now in the encrypted vault and " + manifest.Marker + ")"
 	case name == SettingsRelPath && !from1x.settings.declares() && len(from1x.settings.pools.byName) == 0:
-		return name + " (nothing in it, removed)"
+		return name + " (nothing in it)"
 	}
-	return name + " (migrated into " + manifest.Marker + ", removed)"
+	return name + " (now in " + manifest.Marker + ")"
 }
 
 // declaredDockerfileLabel is the manifest's label for declaring the

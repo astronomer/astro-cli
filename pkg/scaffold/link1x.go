@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"regexp"
+	"slices"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
@@ -101,4 +102,93 @@ func (from1x *project1x) deployLinkAdvisory() string {
 			"relink it with: astro link add " + l.Name + " --deployment " + l.Deployment + " --workspace <workspace-id> --replace"
 	}
 	return out
+}
+
+// instanceLinks are the links a 1.x .astro/config.yaml's instances list
+// becomes when the caller can tell a Deployment's workspace
+// (Options.InstanceWorkspace): each Astro entry with a plain name and a
+// Deployment id whose workspace it tells, written as astro link add NAME
+// --deployment ID --workspace WS writes it. Not under an Astro Private Cloud
+// context, whose Deployments the Astro lookup does not know, and not an entry
+// whose name another link already takes. The rest stay notes
+// (unlinkedInstances). Decided once, so the platform is asked once an entry.
+func (from1x *project1x) instanceLinks() []Link {
+	if from1x.linked != nil {
+		return *from1x.linked
+	}
+	var out []Link
+	from1x.linked = &out
+	if from1x.instanceWorkspace == nil || from1x.apcDomain != "" {
+		return nil
+	}
+	taken := map[string]bool{manifest.ReservedLinkName: true, BundleLinkName: true}
+	if l, ok := from1x.deployLink(); ok {
+		taken[l.Name] = true
+	}
+	for _, inst := range from1x.instances {
+		if inst.source != "" && inst.source != string(manifest.KindAstro) {
+			continue
+		}
+		if !plainDeployID(inst.name) || !astroIDRe.MatchString(inst.deploymentID) || taken[inst.name] {
+			continue
+		}
+		ws := from1x.instanceWorkspace(inst.deploymentID)
+		if !astroIDRe.MatchString(ws) {
+			continue
+		}
+		taken[inst.name] = true
+		out = append(out, Link{Name: inst.name, Kind: manifest.KindAstro, Deployment: inst.deploymentID, Workspace: ws})
+	}
+	return out
+}
+
+// unlinkedInstances are the instances entries instanceLinks did not link.
+func (from1x *project1x) unlinkedInstances() []instance1x {
+	linked := from1x.instanceLinks()
+	return slices.DeleteFunc(slices.Clone(from1x.instances), func(inst instance1x) bool {
+		return slices.ContainsFunc(linked, func(l Link) bool { return l.Name == inst.name && l.Deployment == inst.deploymentID })
+	})
+}
+
+// setInstanceLinks writes instanceLinks, each with SaveLink's own edit over
+// the manifest as written so far, so the defaults come out as a run of astro
+// link add would leave them.
+func setInstanceLinks(ed tomledit.Editor, from1x *project1x) error {
+	links := from1x.instanceLinks()
+	for i := range links {
+		l := &links[i]
+		if err := l.validate(); err != nil {
+			return err
+		}
+		data, err := ed.Bytes()
+		if err != nil {
+			return err
+		}
+		before, err := manifest.Parse(data)
+		if err != nil {
+			return err
+		}
+		if err := l.edit()(before, ed); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// instanceLinksAdvisory says which Deployments setInstanceLinks linked, or ""
+// when it linked none.
+func (from1x *project1x) instanceLinksAdvisory() string {
+	links := from1x.instanceLinks()
+	if len(links) == 0 {
+		return ""
+	}
+	names := make([]string, len(links))
+	for i := range links {
+		names[i] = links[i].Name
+	}
+	noun := "Deployments"
+	if len(links) == 1 {
+		noun = "Deployment"
+	}
+	return manifest.Marker + ": linked the " + noun + " " + config1xRelPath + " lists, " + joinNames(names)
 }

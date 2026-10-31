@@ -597,7 +597,7 @@ func TestAdoptMergesRequirementsWithoutTouchingExistingPins(t *testing.T) {
 
 	assert.Equal(t, manifest.DistName("python-dateutil"), manifest.DistName("Python_DateUtil==2.8.2"),
 		"the normalization the dedup relies on")
-	assert.Contains(t, strings.Join(res.Updated, "\n"), "migrated 1 from requirements.txt")
+	assert.Contains(t, strings.Join(res.Updated, "\n"), "moved in 1 package from requirements.txt")
 }
 
 // packages.txt is carried into a manifest that has another tool's packages key,
@@ -746,7 +746,7 @@ func TestDockerfileSecretMountsAreReported(t *testing.T) {
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 	assert.Contains(t, res.Notes, `Dockerfile: line 2 mounts build secret "netrc". To build without --build-secret each time, `+
-		`add 'id=netrc,src=~/.netrc' to build-secrets under [tool.astro]`)
+		`add 'id=netrc,src=~/.netrc' to build-secrets in pyproject.toml's [tool.astro]`)
 	pyproject, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	assert.NotContains(t, string(pyproject), "build-secrets")
@@ -768,8 +768,8 @@ func TestGreenfieldReportsWhatItMigrated(t *testing.T) {
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 	joined := strings.Join(res.Created, "\n")
-	assert.Contains(t, joined, "migrated 2 from requirements.txt")
-	assert.Contains(t, joined, "migrated packages.txt")
+	assert.Contains(t, joined, "moved in 2 packages from requirements.txt")
+	assert.Contains(t, joined, "moved in the apt packages from packages.txt")
 	assert.Contains(t, joined, "read Airflow 3.1 from the Dockerfile")
 }
 
