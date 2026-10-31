@@ -11,6 +11,7 @@ package scaffold
 import (
 	"errors"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -91,6 +92,10 @@ func planIgnoreRules(projectDir string) (*Change, error) {
 		}
 		labels = append(labels, fileGitignore+" (added the per-machine rules)")
 	}
+	if ignoresRootFile(s, uvLockFile) {
+		add.WriteString("\n" + uvLockUnignoreNote + "!/" + uvLockFile + "\n")
+		labels = append(labels, fileGitignore+" (stopped ignoring uv.lock, which pins what every image installs: commit it)")
+	}
 	if len(labels) == 0 {
 		return nil, nil
 	}
@@ -168,4 +173,35 @@ func coversEnv(gitignore string) bool {
 		}
 	}
 	return covered
+}
+
+// uvLockFile is the lock every image installs from, which has to be committed.
+const uvLockFile = "uv.lock"
+
+// uvLockUnignoreNote is the comment above the rule that re-includes uv.lock.
+const uvLockUnignoreNote = "# uv.lock pins what every image of this project installs, so it is committed.\n"
+
+// ignoresRootFile reports whether a .gitignore's own rules leave name, a file
+// at the project's root, ignored: the last pattern that matches it wins, and
+// a ! pattern re-includes it. It reads the plain spellings (uv.lock, /uv.lock,
+// **/uv.lock, *.lock and other globs on the name), not every git rule, and
+// not what another ignore file adds; a pattern it cannot read counts as not
+// matching, so the worst case is a rule not added.
+func ignoresRootFile(gitignore, name string) bool {
+	ignored := false
+	for _, line := range strings.Split(gitignore, "\n") {
+		line = strings.TrimRight(line, " \t\r")
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasSuffix(line, "/") {
+			continue
+		}
+		negated := strings.HasPrefix(line, "!")
+		pattern := strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(line, "!"), "/"), "**/")
+		if strings.Contains(pattern, "/") {
+			continue
+		}
+		if ok, err := path.Match(pattern, name); err == nil && ok {
+			ignored = !negated
+		}
+	}
+	return ignored
 }

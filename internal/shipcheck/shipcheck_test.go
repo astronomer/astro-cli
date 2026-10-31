@@ -73,7 +73,7 @@ func TestCheckFindsGitignoredFilesAndSecretsAmongThem(t *testing.T) {
 	assert.Empty(t, r.Unanswered)
 	w := r.Warnings()
 	require.Len(t, w, 1)
-	assert.Contains(t, w[0], "2 files that .gitignore ignores and .dockerignore does not, in keys/ and target/.")
+	assert.Contains(t, w[0], "2 files that .gitignore ignores go into the image, in keys/ and target/.")
 	assert.NotContains(t, w[0], "manifest.json", "the warning names places, not files")
 	assert.Contains(t, w[0], "add them to .dockerignore")
 	err := r.Err()
@@ -339,7 +339,7 @@ func TestSurvey(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, survey.DagsCarried)
 	require.Len(t, warned, 1)
-	assert.Contains(t, warned[0], "1 file that .gitignore ignores and .dockerignore does not, in target/.")
+	assert.Contains(t, warned[0], "1 file that .gitignore ignores goes into the image, in target/.")
 
 	writeFiles(t, dir, map[string]string{".gitignore": "target/\nid_rsa\n", "id_rsa": "k"})
 	_, err = Survey(dir, "", false, func(string) {})

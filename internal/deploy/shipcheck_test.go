@@ -53,7 +53,7 @@ func TestRun_RefusesGitignoredCredentials(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, d.imgDeploys)
 	require.Len(t, warned, 1)
-	assert.Contains(t, warned[0], "1 file that .gitignore ignores and .dockerignore does not, in build/.")
+	assert.Contains(t, warned[0], "1 file that .gitignore ignores goes into the image, in build/.")
 }
 
 // The transport's warnings reach Request.Warn, and an image deploy whose DAGs

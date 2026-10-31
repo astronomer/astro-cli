@@ -20,7 +20,7 @@ import (
 // line on stderr in text, and a warning event in json, never on stdout as if
 // it were the command's output.
 func TestEmitWarningIsAWarningOnStderr(t *testing.T) {
-	const msg = "the image will carry 5,510 files that .gitignore ignores and .dockerignore does not, in .claude/. If they do not belong in the image, add them to .dockerignore"
+	const msg = "5,510 files that .gitignore ignores go into the image, in .claude/. If they don't belong there, add them to .dockerignore"
 	var out, stderr bytes.Buffer
 	emitWarning(cliout.Renderer{Format: cliout.FormatText, Out: &out, Err: &stderr}, event{Event: "warning", Text: msg})
 	if got, want := stderr.String(), "Warning: "+msg+"\n"; got != want {

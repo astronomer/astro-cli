@@ -57,9 +57,10 @@ func TestPipOnlyStepsMoveAndTheDockerfileGoes(t *testing.T) {
 
 	assert.Contains(t, res.Advisories, "Dockerfile: moved corona and state-client (line 5, line 9) into [project] dependencies, "+
 		"so standalone mode, astro local check and uv.lock have them too. What was left of the Dockerfile builds what a project "+
-		"without one does, so it was removed")
-	assert.Contains(t, res.Notes, "pyproject.toml: corona and state-client installed with the netrc build secret. "+
-		"To build without --build-secret each time, add 'id=netrc,src=~/.netrc' to build-secrets under [tool.astro]")
+		"without one does, so it was removed. [tool.astro] build-secrets now names netrc, the secret the steps installed with: "+
+		"a build reads ~/.netrc, or else asks git for the credentials of the hosts the packages come from")
+	assert.Equal(t, []string{"id=netrc"}, m.Astro.BuildSecrets, "the netrc the steps mounted, for the build to supply")
+	assert.Empty(t, res.Notes, "nothing about the secret is left to do")
 	for _, n := range res.Notes {
 		assert.False(t, strings.HasPrefix(n, "Dockerfile:"), "a removed Dockerfile has nothing left to do: %q", n)
 	}
@@ -202,6 +203,7 @@ func TestRevertPutsTheStepsBack(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, []string{"apache-airflow==3.3.*"}, m.Project.Dependencies)
 			assert.Equal(t, "Dockerfile", m.Astro.Dockerfile)
+			assert.Empty(t, m.Astro.BuildSecrets, "the netrc entry the move added goes with it")
 			assert.Empty(t, res.MovedPackages)
 			assert.Contains(t, res.Notes, "Dockerfile: its pip steps stay, because uv lock could not resolve them here (uv lock: git operation failed)")
 			assert.Contains(t, res.Notes, "Dockerfile: its RUN steps install corona, which standalone mode and astro local check do not have. "+

@@ -38,6 +38,10 @@ type Image struct {
 	// Commander runs the build; Now is its clock.
 	Commander imagebuild.Commander
 	Now       func() time.Time
+	// Credentials is where the build reads a host's credentials from for
+	// the netrc secret it makes when the project gives it none
+	// (imagebuild.Builder.WithCredentials); nil makes none.
+	Credentials imagebuild.CredentialSource
 	// Progress takes the build's output; nil is stderr.
 	Progress io.Writer
 	// ReadLabel reads the runtime label off the built image.
@@ -78,7 +82,7 @@ func BuildImage(ctx context.Context, in *Image) (image, runtimeVersion string, e
 	if progress == nil {
 		progress = os.Stderr
 	}
-	built, err := imagebuild.New(in.Commander, in.Now).BuildLocal(ctx, req, localrt.Callbacks{
+	built, err := imagebuild.New(in.Commander, in.Now).WithCredentials(in.Credentials).BuildLocal(ctx, req, localrt.Callbacks{
 		OnLine: func(l localrt.LogLine) { fmt.Fprintf(progress, "[%s] %s\n", l.Component, l.Text) },
 	})
 	if err != nil {

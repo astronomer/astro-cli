@@ -100,7 +100,7 @@ func declaredBuildCommand(engine, platform, tag, baseTag, dockerfile string, sec
 		project = append(project, "--build-arg", airflowrt.BaseArg+"="+baseTag)
 	}
 	for _, s := range secrets {
-		project = append(project, "--secret", s)
+		project = append(project, "--secret", printedSecret(s))
 	}
 	project = append(project, filepath.Join(dir, imagebuild.DeclaredProjectDir))
 	if baseTag == "" {
@@ -132,9 +132,20 @@ func buildCommand(engine, platform, tag string, secrets []string, dir string) st
 	args = append(args, "--tag", tag)
 	for _, s := range secrets {
 		if parsed, err := manifest.ParseBuildSecret(s); err == nil && parsed.ID == manifest.RuntimeSecretID {
-			args = append(args, "--secret", s)
+			args = append(args, "--secret", printedSecret(s))
 		}
 	}
 	args = append(args, dir)
 	return shellLine(args)
+}
+
+// printedSecret is spec as a printed build command passes it. A netrc with no
+// source ('id=netrc' in build-secrets) is one the CLI's own builds supply,
+// from ~/.netrc or git's credentials; a command the user runs reads it from
+// the variable NETRC instead, which docker needs a source for.
+func printedSecret(spec string) string {
+	if s, err := manifest.ParseBuildSecret(spec); err == nil && s.ID == manifest.RuntimeSecretID && s.Env == "" && s.Src == "" {
+		return "id=" + manifest.RuntimeSecretID + ",env=NETRC"
+	}
+	return spec
 }

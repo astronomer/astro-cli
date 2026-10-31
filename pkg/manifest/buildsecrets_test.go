@@ -65,3 +65,19 @@ func TestBuildSecretSpecsExpandsHome(t *testing.T) {
 		t.Errorf("BuildSecretSpecs = %q, want %q", got, want)
 	}
 }
+
+// A netrc with no source is the CLI's to supply at build time, so it is a
+// valid entry and stays as written; any other id still needs a source.
+func TestBareNetrcSecretNamesNoSource(t *testing.T) {
+	m, err := Load(write(t, "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nbuild-secrets = ['id=netrc']\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Astro.BuildSecretSpecs(); !slices.Equal(got, []string{"id=netrc"}) {
+		t.Errorf("BuildSecretSpecs = %q, want [id=netrc]", got)
+	}
+	_, err = Load(write(t, "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\ndockerfile = 'Dockerfile'\nbuild-secrets = ['id=pip']\n"))
+	if err == nil || !strings.Contains(err.Error(), "has to name exactly one source") {
+		t.Errorf("a bare id other than netrc: err = %v, want the one-source refusal", err)
+	}
+}
