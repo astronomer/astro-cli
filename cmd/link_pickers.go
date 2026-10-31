@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -82,6 +83,27 @@ func withLinkPickers(d *local.Deps, client astrov1.APIClient, out io.Writer) {
 			return local.PickedDeployment{}, errors.New(deployment.NoDeploymentInWSMsg + " " + workspaceID)
 		}
 		return local.PickedDeployment{ID: dep.Id, Name: dep.Name, WorkspaceID: dep.WorkspaceId}, nil
+	}
+	d.DeploymentWorkspace = func(ctx context.Context, deploymentID string) (string, error) {
+		ok, err := astroCmd.QuietLogin(client)
+		if err != nil || !ok {
+			return "", err
+		}
+		c, err := config.GetCurrentContext()
+		if err != nil {
+			return "", err
+		}
+		resp, err := client.GetDeploymentWithResponse(ctx, c.Organization, deploymentID)
+		if err != nil {
+			return "", err
+		}
+		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+			return "", err
+		}
+		if resp.JSON200 == nil {
+			return "", errors.New("the platform returned no Deployment " + deploymentID)
+		}
+		return resp.JSON200.WorkspaceId, nil
 	}
 	d.PickWorkspace = func() (string, error) {
 		var id string

@@ -176,7 +176,7 @@ func adopt(dir string, data []byte, opts *Options, from1x *project1x, res *Resul
 	res.Adopted = true
 	// Returned rather than appended to a list beside the change: these lines
 	// describe the manifest write, so they belong to it.
-	labels = []string{manifest.Marker + " (added [tool.astro])"}
+	labels = []string{manifest.Marker + " (added the Astro settings)"}
 	if added != "" {
 		labels = append(labels, manifest.Marker+" (added "+added+" to dependencies)")
 	}
@@ -184,10 +184,10 @@ func adopt(dir string, data []byte, opts *Options, from1x *project1x, res *Resul
 		labels = append(labels, manifest.Marker+" (set the Airflow requirement to "+r+")")
 	}
 	if migrated > 0 {
-		labels = append(labels, manifest.Marker+" (migrated "+strconv.Itoa(migrated)+" from requirements.txt into dependencies)")
+		labels = append(labels, manifest.Marker+" (moved in "+plural(migrated, "package", "packages")+" from requirements.txt)")
 	}
 	if migratedPackages {
-		labels = append(labels, manifest.Marker+" (migrated packages.txt into packages)")
+		labels = append(labels, manifest.Marker+" (moved in the apt packages from packages.txt)")
 	}
 	// Reported because it constrains the project: it decides which interpreters
 	// uv may build the environment with, and a preview that leaves it out shows
@@ -200,7 +200,7 @@ func adopt(dir string, data []byte, opts *Options, from1x *project1x, res *Resul
 		labels = append(labels, declaredDockerfileLabel)
 	}
 	if from1x.settings.declares() {
-		labels = append(labels, manifest.Marker+" (migrated "+SettingsRelPath+" into [tool.astro.env])")
+		labels = append(labels, manifest.Marker+" (declared the connections and variables from "+SettingsRelPath+")")
 	}
 	labels = appendLabel(labels, poolsLabel(from1x.settings.pools.byName))
 	return out, labels, pin, nil
@@ -387,7 +387,7 @@ func statedPythonNotTheImagesNote(ed tomledit.Editor, python, bound string) []st
 	if python == "" || stated == "" || stated == bound {
 		return nil
 	}
-	return []string{"[project] requires-python is " + stated + ", and the Dockerfile's base image runs Python " + python +
+	return []string{manifest.Marker + ": requires-python is " + stated + ", and the Dockerfile's base image runs Python " + python +
 		": uv locks for every Python requires-python allows, and standalone mode can run one the image does not. " +
 		"Set it to " + bound + " to match the image"}
 }

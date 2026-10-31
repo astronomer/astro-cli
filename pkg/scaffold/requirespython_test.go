@@ -172,7 +172,7 @@ func TestAdoptNotesARequiresPythonThatIsNotTheImages(t *testing.T) {
 		{"the image's, so nothing is said", "requires-python = '==3.13.*'\n", "==3.13.*", ""},
 		{
 			"another, so it stays and is noted", "requires-python = '>=3.12'\n", ">=3.12",
-			"[project] requires-python is >=3.12, and the Dockerfile's base image runs Python 3.13: " +
+			"pyproject.toml: requires-python is >=3.12, and the Dockerfile's base image runs Python 3.13: " +
 				"uv locks for every Python requires-python allows, and standalone mode can run one the image does not. " +
 				"Set it to ==3.13.* to match the image",
 		},
