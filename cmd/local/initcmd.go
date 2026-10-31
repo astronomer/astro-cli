@@ -240,13 +240,8 @@ func renderInit(w io.Writer, res *scaffold.Result, next string) error {
 	if err := renderChanged(w, res.Advisories); err != nil {
 		return err
 	}
-	if len(res.Info) > 0 {
-		if _, err := fmt.Fprintln(w); err != nil {
-			return err
-		}
-		for _, n := range res.Info {
-			cliout.Note(w, n)
-		}
+	if err := renderInfo(w, res.Info); err != nil {
+		return err
 	}
 	if err := renderLeftToDo(w, res.Notes); err != nil {
 		return err
@@ -274,6 +269,21 @@ func renderChanged(w io.Writer, advisories []string) error {
 		if _, err := fmt.Fprintf(w, "  %s\n", a); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// renderInfo prints what a person should know and has nothing to do about,
+// each as a Note.
+func renderInfo(w io.Writer, info []string) error {
+	if len(info) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+	for _, n := range info {
+		cliout.Note(w, n)
 	}
 	return nil
 }
