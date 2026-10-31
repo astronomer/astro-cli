@@ -14,5 +14,19 @@
   "manifest": "x",
   "target": "x",
   "available": "x",
+  "refresh": {
+    "constraints": "x",
+    "constraints_removed": "x",
+    "astro_airflow": "x",
+    "astro_airflow_removed": true,
+    "lock": {
+      "status": "x",
+      "packages_changed": -1,
+      "error": "x"
+    },
+    "warnings": [
+      "x"
+    ]
+  },
   "restart_needed": true
 }

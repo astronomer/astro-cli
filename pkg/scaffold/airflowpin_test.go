@@ -264,6 +264,22 @@ func TestSetAirflowVersionReportsADeclaredDockerfile(t *testing.T) {
 	assert.Equal(t, dockerfile, readFile(t, filepath.Join(dir, "Dockerfile")))
 }
 
+// A Dockerfile built on the install base follows the pin, so the change names
+// no Dockerfile to move.
+func TestSetAirflowVersionBesideADockerfileOnTheInstallBase(t *testing.T) {
+	body := strings.Replace(pinFixture, "packages = ['libpq-dev']", "dockerfile = 'Dockerfile'", 1)
+	dir, path := writeEditFixture(t, body, 0o644)
+	dockerfile := "# check=skip=InvalidDefaultArgInFrom\nARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nCOPY --chown=astro:0 . .\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(dockerfile), 0o600))
+
+	change, err := SetAirflowVersionWith(dir, nil, "3.1", AirflowPinOptions{})
+	require.NoError(t, err)
+
+	assert.Empty(t, change.Dockerfile)
+	assert.Contains(t, readFile(t, path), "'apache-airflow[celery]==3.1.*'")
+	assert.Equal(t, dockerfile, readFile(t, filepath.Join(dir, "Dockerfile")))
+}
+
 func TestSetAirflowVersionNeverCreatesAManifest(t *testing.T) {
 	dir := t.TempDir()
 

@@ -46,12 +46,12 @@ type AirflowPinChange struct {
 	Runtime string `json:"runtime,omitempty"`
 	// RuntimeRemoved reports that [tool.astro] runtime was deleted: the pin
 	// moved to a series the old build is not of and no catalog was given to
-	// pick a build of the new one, or it named none, or a dockerfile is
-	// declared beside it, where it picks nothing.
+	// pick a build of the new one, or it named none.
 	RuntimeRemoved bool `json:"runtime_removed,omitempty"`
-	// Dockerfile is [tool.astro] dockerfile when the project declares one.
-	// Docker mode then builds from that file, so its FROM line, not the pin,
-	// decides the image, and changing it is the user's.
+	// Dockerfile is [tool.astro] dockerfile when the project declares one
+	// whose FROM line, not the pin, decides the image, so changing it is the
+	// user's. Empty for one built on the install base (FROM ${ASTRO_BASE}),
+	// whose base follows the pin.
 	Dockerfile string `json:"dockerfile,omitempty"`
 }
 
@@ -133,6 +133,9 @@ func SetAirflowVersionWith(dir string, wrap func(run func() error) error, versio
 	})
 	if err != nil {
 		return AirflowPinChange{}, err
+	}
+	if change.Dockerfile != "" && !declaredOwnBase(dir, &manifest.Manifest{Astro: manifest.Astro{Dockerfile: change.Dockerfile}}) {
+		change.Dockerfile = ""
 	}
 	return change, nil
 }

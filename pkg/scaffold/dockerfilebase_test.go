@@ -214,14 +214,19 @@ func notesBase(note string) string {
 // the same reference's -base tag, flags and all, with the install written out
 // ahead of its own steps; one already on -base is left as it is.
 func TestInitDeclaresADockerfileOnARuntimeBase(t *testing.T) {
-	for _, tc := range []struct{ from, rewrittenFrom string }{
-		{"astrocrpublic.azurecr.io/runtime:3.1-12", "astrocrpublic.azurecr.io/runtime:3.1-12-base"},
-		{"astrocrpublic.azurecr.io/runtime:3.1-12-base", ""},
-		{"astrocrpublic.azurecr.io/runtime:3.1-12-python-3.12", "astrocrpublic.azurecr.io/runtime:3.1-12-python-3.12-base"},
-		{"--platform=linux/amd64 astrocrpublic.azurecr.io/runtime:3.1-12", "--platform=linux/amd64 astrocrpublic.azurecr.io/runtime:3.1-12-base"},
-		{"quay.io/astronomer/astro-runtime:12.1.0", "quay.io/astronomer/astro-runtime:12.1.0-base"},
-		{"registry.corp.example/astronomer/astro-runtime:12.1.0", "registry.corp.example/astronomer/astro-runtime:12.1.0-base"},
-		{"mirror/runtime:3.1-12", "mirror/runtime:3.1-12-base"},
+	for _, tc := range []struct {
+		from         string
+		rewritten    bool
+		flags        string
+		runtime, reg string
+	}{
+		{from: "astrocrpublic.azurecr.io/runtime:3.1-12", rewritten: true, runtime: "3.1-12"},
+		{from: "astrocrpublic.azurecr.io/runtime:3.1-12-base"},
+		{from: "astrocrpublic.azurecr.io/runtime:3.1-12-python-3.12", rewritten: true, runtime: "3.1-12"},
+		{from: "--platform=linux/amd64 astrocrpublic.azurecr.io/runtime:3.1-12", rewritten: true, flags: "--platform=linux/amd64", runtime: "3.1-12"},
+		{from: "quay.io/astronomer/astro-runtime:12.1.0", rewritten: true, runtime: "12.1.0"},
+		{from: "registry.corp.example/astronomer/astro-runtime:12.1.0", rewritten: true, runtime: "12.1.0", reg: "registry.corp.example/astronomer"},
+		{from: "mirror/runtime:3.1-12", rewritten: true, runtime: "3.1-12", reg: "mirror"},
 	} {
 		t.Run(tc.from, func(t *testing.T) {
 			body := "FROM " + tc.from + "\nENV TZ=UTC\n"
@@ -230,10 +235,12 @@ func TestInitDeclaresADockerfileOnARuntimeBase(t *testing.T) {
 			assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
 			got, err := os.ReadFile(filepath.Join(dir, fileDockerfile))
 			require.NoError(t, err)
-			if tc.rewrittenFrom == "" {
+			if !tc.rewritten {
 				assert.Equal(t, body, string(got))
 			} else {
-				assert.Equal(t, rewrittenDockerfile(tc.rewrittenFrom, "ENV TZ=UTC\n"), string(got))
+				assert.Equal(t, rewrittenDockerfile(tc.flags, "ENV TZ=UTC\n"), string(got))
+				assert.Equal(t, tc.runtime, m.Astro.Runtime)
+				assert.Equal(t, tc.reg, m.Astro.Registry)
 			}
 			for _, n := range res.Notes {
 				assert.NotContains(t, n, "not an Astro Runtime image")
@@ -242,10 +249,16 @@ func TestInitDeclaresADockerfileOnARuntimeBase(t *testing.T) {
 	}
 }
 
-// rewrittenDockerfile is what a conversion writes for a Dockerfile moved onto
-// from (a -base reference, with any stage flags) whose own steps are own.
-func rewrittenDockerfile(from, own string) string {
-	return installBlockComment + airflowrt.InstallDockerfile(from) + "\n" + ownStepsComment + own
+// rewrittenDockerfile is what a conversion writes for a single-stage
+// Dockerfile moved onto the install base, with flags on its FROM (none for
+// ""), whose own steps are own.
+func rewrittenDockerfile(flags, own string) string {
+	from := "FROM " + airflowrt.BaseArgFrom
+	if flags != "" {
+		from = "FROM " + flags + " " + airflowrt.BaseArgFrom
+	}
+	return airflowrt.BaseArgCheckDirective + "\n" + airflowrt.BaseArgComment + "ARG " + airflowrt.BaseArg + "\n" +
+		from + "\n" + airflowrt.ProjectCopy + "\n\n" + ownStepsComment + own
 }
 
 // A FROM built from a build argument is unknown, whatever its defaults name:
@@ -478,7 +491,7 @@ func TestConvert1xDockerfileByBase(t *testing.T) {
 		assert.Contains(t, m.Project.Dependencies, "pandas==2.1.0")
 		got, err := os.ReadFile(filepath.Join(dir, fileDockerfile))
 		require.NoError(t, err)
-		assert.Equal(t, rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.1.0-base", "ENV FOO=bar\n"), string(got))
+		assert.Equal(t, rewrittenDockerfile("", "ENV FOO=bar\n"), string(got))
 		assert.NotContains(t, strings.Join(res.Notes, "\n"), "kept, because your Dockerfile's base image reads it")
 	})
 	foreign := map[string]string{
@@ -533,6 +546,6 @@ func TestAConversionUnderAPCIsAstros(t *testing.T) {
 	assert.Equal(t, fileDockerfile, m.Astro.Dockerfile, "a mirrored-base Dockerfile is adopted under APC")
 	got, err := os.ReadFile(filepath.Join(dir, fileDockerfile))
 	require.NoError(t, err)
-	assert.Equal(t, rewrittenDockerfile("registry.corp.example/astronomer/astro-runtime:12.1.0-base", "ENV TZ=UTC\n"), string(got),
-		"moved onto the mirror's own -base tag, not Astronomer's")
+	assert.Equal(t, rewrittenDockerfile("", "ENV TZ=UTC\n"), string(got))
+	assert.Equal(t, "registry.corp.example/astronomer", m.Astro.Registry, "the mirror is recorded, not Astronomer's registry")
 }

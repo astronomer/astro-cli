@@ -37,6 +37,7 @@ var publishedPayloads = []schemaCase{
 	{"local-list-row", listRow{}},
 	{"local-reset", localrt.ResetReport{}},
 	{"local-upgrade-airflow", airflowUpgrade{}},
+	{"local-upgrade-runtime", runtimeUpgrade{}},
 	{"check-summary", checkSummary{}},
 	{"dev-removed", DevRemoved{}},
 	{"env-result", envResult{}},
@@ -158,10 +159,13 @@ func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
 // write down why, and whoever reads it later can check the claim — which is
 // the part a heuristic cannot do.
 var notPublished = map[string]string{
-	"fileStore": "an adapter around localenv.Store; embeds it for the methods, never marshaled",
-	"query":     "a command receiver carrying *cli and its target; never marshaled",
-	"reachJSON": "never emitted alone; nested in env-value and env-link-result, whose goldens pin it",
-	"reachPath": "never emitted alone; nested in reachJSON, pinned by the same goldens",
+	"fileStore":      "an adapter around localenv.Store; embeds it for the methods, never marshaled",
+	"query":          "a command receiver carrying *cli and its target; never marshaled",
+	"reachJSON":      "never emitted alone; nested in env-value and env-link-result, whose goldens pin it",
+	"reachPath":      "never emitted alone; nested in reachJSON, pinned by the same goldens",
+	"pinRefresh":     "never emitted alone; nested in local-upgrade-airflow and local-upgrade-runtime, whose goldens pin it",
+	"lockOutcome":    "never emitted alone; nested in pinRefresh, pinned by the same goldens",
+	"runtimeFinding": "never emitted alone; nested in local-upgrade-runtime, whose golden pins it",
 }
 
 func TestEveryJSONPayloadTypeIsPinned(t *testing.T) {

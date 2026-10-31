@@ -207,11 +207,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	if err := req.resolveInstall(ctx, &breq); err != nil {
 		return Result{}, err
 	}
-	// A context is built later, by whoever runs the commands it prints, so
-	// the secrets it names need not be readable now.
-	if req.ContextDir != "" {
-		res, err := writeContext(req, breq, name)
-		res.Warnings = warnings
+	if res, err, done := t.buildNoImage(ctx, req, breq, name, warnings, cb); done {
 		return res, err
 	}
 	missingSecrets, err := checkSecrets(req, cb)
@@ -536,15 +532,21 @@ func contentHash(base, platform, recipe string, breq imagebuild.Request, df decl
 			return "", fmt.Errorf("reading the Dockerfile this project declares (%s): %w", df.rel, err)
 		}
 		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
-		// A declared Dockerfile that installs as a generated build does
-		// (airflowrt.InstallDockerfile, which astro init writes into a
-		// converted one) reads the lists the CLI resolved from the project's
-		// lock, through the named context: their digest is part of the
-		// address, so an edit to the lock moves the tag, as it does for a
-		// generated build.
-		if breq.ReadsInstallContext() {
-			writeField("install-lists", breq.Lists().Digest())
+		// A declared Dockerfile built on the install base (as astro init
+		// writes a converted one) installs the lists the CLI resolved from the
+		// project's lock, over the runtime pyproject.toml picks: the base's tag
+		// covers both, so an edit to the lock or the runtime moves the
+		// address, as it does for a generated build.
+		if breq.UsesInstallBase() {
+			writeField("install-base", breq.InstallBaseTag())
 		}
+		// The files the Dockerfile's build reads, under the rules a generated
+		// build copies them by, so an edit to a Dag or a plugin moves the tag.
+		digest, err := imagebuild.ProjectFilesDigest(breq.Context)
+		if err != nil {
+			return "", err
+		}
+		writeField("project-files", digest)
 	}
 	if projectFiles := breq.ProjectFiles; projectFiles != "" {
 		digest, err := imagebuild.ProjectFilesDigest(projectFiles)
@@ -554,4 +556,58 @@ func contentHash(base, platform, recipe string, breq imagebuild.Request, df decl
 		writeField("project-files", digest)
 	}
 	return fmt.Sprintf("%x", h.Sum(nil))[:7], nil
+}
+
+// buildInstallBase builds the install base the project's own Dockerfile
+// builds on (Request.BaseOnly) and reports its local tag, for a caller that
+// then builds the Dockerfile itself with `--build-arg ASTRO_BASE=<tag>`.
+func (t *AstroTarget) buildInstallBase(ctx context.Context, req Request, breq imagebuild.Request, warnings []string, cb localrt.Callbacks) (Result, error) {
+	switch {
+	case !breq.FromDeclaredDockerfile():
+		return Result{}, errors.New("--base builds the install base a project's own Dockerfile builds on, and this project declares no Dockerfile: astro package builds its image directly")
+	case !breq.UsesInstallBase():
+		return Result{}, fmt.Errorf("--base builds the install base a project's own Dockerfile builds FROM %s on, and %s names its own FROM. Run astro init to move it onto the install base",
+			airflowrt.BaseArgFrom, req.Manifest.Astro.Dockerfile)
+	}
+	engine, err := t.reachEngine(ctx, req.ProjectDir)
+	if err != nil {
+		return Result{}, err
+	}
+	workDir := req.WorkDir
+	if workDir == "" {
+		workDir, err = os.MkdirTemp("", "astro-package-")
+		if err != nil {
+			return Result{}, fmt.Errorf("creating a build directory: %w", err)
+		}
+		defer os.RemoveAll(workDir) //nolint:errcheck // scratch dir; a leftover temp dir is harmless
+	}
+	breq.WorkDir = workDir
+	breq.Platform = req.Platform
+	breq.Secrets = req.BuildSecrets
+	breq.Bin = engine.Bin
+	breq.Env = engine.Env
+	breq.InstallBaseOnly = true
+	tag, err := t.builder.BuildLocal(ctx, breq, cb)
+	if err != nil {
+		return Result{}, err
+	}
+	return Result{Target: TargetAstro, Kind: KindInstallBase, Image: tag, Warnings: warnings}, nil
+}
+
+// buildNoImage is Build for the two requests that do not build the image: the
+// install base alone (Request.BaseOnly), and a build context written for
+// someone else to build (Request.ContextDir), which is built later, by whoever
+// runs the commands it prints, so the secrets it names need not be readable
+// now. done is false for any other request.
+func (t *AstroTarget) buildNoImage(ctx context.Context, req Request, breq imagebuild.Request, name string, warnings []string, cb localrt.Callbacks) (res Result, err error, done bool) {
+	switch {
+	case req.BaseOnly:
+		res, err = t.buildInstallBase(ctx, req, breq, warnings, cb)
+		return res, err, true
+	case req.ContextDir != "":
+		res, err = writeContext(req, breq, name)
+		res.Warnings = warnings
+		return res, err, true
+	}
+	return Result{}, nil, false
 }

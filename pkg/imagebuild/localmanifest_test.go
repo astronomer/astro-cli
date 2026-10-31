@@ -47,8 +47,8 @@ func TestForLocalManifestPicksWhatForManifestPicksForAirflow3(t *testing.T) {
 	for name, tc := range cases {
 		tc.m.Dependencies, tc.m.Packages = deps, pkgs
 		tc.want.Dependencies, tc.want.Packages = deps, pkgs
-		// Every build installs from the project.s manifest, a declared
-		// Dockerfile that reads the named context too.
+		// Every build installs from the project's manifest, a declared
+		// Dockerfile's install base too.
 		tc.want.ManifestDir = tc.m.ProjectDir
 
 		deploy, err := ForManifest(tc.m, nil)

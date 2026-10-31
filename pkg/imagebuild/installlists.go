@@ -188,13 +188,13 @@ const installFindLinksName = "install-find-links.txt"
 
 // generatedDockerfile is the Dockerfile a generated build runs over from, the
 // -base image: the runtime's ONBUILD steps written out
-// (airflowrt.InstallDockerfileWith), reading the lists from the context
+// (airflowrt.GeneratedDockerfile), reading the lists from the context
 // (InstallLists.Files). The netrc mount is written only when mountNetrc is
 // set, which Build sets when the request carries that secret, so a build with
 // no secret to mount keeps to a plain RUN, which the legacy builder and an
 // older Podman also run.
 func generatedDockerfile(from string, mountNetrc bool) string {
-	return airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{MountNetrc: mountNetrc})
+	return airflowrt.GeneratedDockerfile(from, mountNetrc)
 }
 
 // GeneratedDockerfile is the Dockerfile a generated build over the runtime

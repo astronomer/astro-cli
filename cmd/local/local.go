@@ -341,7 +341,7 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localr
 
 // checkImageDockerfile runs before a Docker-mode start builds the project's own
 // Dockerfile. It refuses one on an ONBUILD tag that astro init would move onto
-// -base, and warns about one it would not (scaffold.CheckDockerfileOnBuild),
+// the install base, and warns about one it would not (scaffold.CheckDockerfileOnBuild),
 // then about the per-machine files the build would copy into the image
 // (scaffold.LocalFilesWarning) and an install helper an earlier preview wrote
 // (scaffold.StaleHelperWarning). Standalone builds no

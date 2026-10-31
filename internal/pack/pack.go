@@ -34,6 +34,9 @@ const (
 	KindTree    Kind = "tree"
 	KindBundle  Kind = "bundle"
 	KindContext Kind = "context"
+	// KindInstallBase is the install base a project's own Dockerfile builds
+	// on (Request.BaseOnly): an image in the local store, Result.Image.
+	KindInstallBase Kind = "install_base"
 )
 
 // Target names the registered targets, in listing order.
@@ -93,10 +96,15 @@ type Request struct {
 	// ContextDir, for the image target, writes the image's build context to
 	// this directory (new or empty) instead of building it, for a container
 	// engine the CLI does not drive to build with `docker build` or `podman
-	// build`. For a project that declares its own Dockerfile it writes that
-	// Dockerfile, the project as its context, and the install lists the
-	// Dockerfile reads from the named context (imagebuild.WriteDeclaredContext).
+	// build`. For a project that declares its own Dockerfile it writes the
+	// project as that Dockerfile's context and, for one built on the install
+	// base, that base's build (imagebuild.WriteDeclaredContext).
 	ContextDir string
+	// BaseOnly, for the image target, builds the install base the project's
+	// own Dockerfile builds on (FROM ${ASTRO_BASE}) and reports its local tag,
+	// for a caller that builds the Dockerfile itself:
+	// `docker build --build-arg ASTRO_BASE=<tag> .`.
+	BaseOnly bool
 	// ResolveInstall resolves what a generated image installs from the
 	// project's lock, into req.Install (imageinstall.Fill), with its warnings
 	// through warn. nil installs the manifest's dependencies as written.
@@ -153,10 +161,6 @@ type Result struct {
 	// ContextDir is the build context the image target wrote with
 	// --context-dir, which NextSteps build.
 	ContextDir string `json:"context_dir,omitempty"`
-	// BuildNeeds is what NextSteps need of the builder, when they pass the
-	// install lists as a named context (imagebuild.NamedContextRequirement),
-	// which Docker's legacy builder and Podman before 4.2 do not take.
-	BuildNeeds string `json:"build_needs,omitempty"`
 }
 
 // Target packages a project for one Airflow platform. Build validates the
