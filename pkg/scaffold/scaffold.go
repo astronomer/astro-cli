@@ -42,6 +42,9 @@ const manifestKeyAirflow = "airflow"
 // Dockerfile, written by both manifest arms whenever a run keeps one.
 const manifestKeyDockerfile = "dockerfile"
 
+// manifestKeyBuildSecrets is [tool.astro] build-secrets.
+const manifestKeyBuildSecrets = "build-secrets"
+
 // Options adjust what Run scaffolds.
 type Options struct {
 	// Name is the [project] name. Empty derives it from the directory name.

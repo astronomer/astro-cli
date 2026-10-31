@@ -119,6 +119,9 @@ var (
 	newImageBuildCommander = imagebuild.NewExecCommander
 	// buildNow is the build clock; a var so tests keep log timestamps fixed.
 	buildNow = time.Now
+	// buildCredentials is where the build reads a host's credentials from for
+	// the netrc secret it makes; a var so tests never reach a real helper.
+	buildCredentials imagebuild.CredentialSource = imagebuild.GitCredentials
 )
 
 // DeployManifestImage builds (or adopts) a project's image, pushes it to the
@@ -433,13 +436,14 @@ func buildOrAdoptImage(ctx context.Context, in *ManifestImageDeployInput, req *i
 	req.Bin = engine.Bin
 	req.Env = engine.Env
 	return deploybuild.BuildImage(ctx, &deploybuild.Image{
-		Request:    *req,
-		ProjectDir: in.Build.ProjectDir,
-		Dockerfile: in.Build.Dockerfile,
-		Commander:  engine.Cmd,
-		Now:        buildNow,
-		Progress:   in.Progress,
-		ReadLabel:  readLabel,
+		Request:     *req,
+		ProjectDir:  in.Build.ProjectDir,
+		Dockerfile:  in.Build.Dockerfile,
+		Commander:   engine.Cmd,
+		Now:         buildNow,
+		Credentials: buildCredentials,
+		Progress:    in.Progress,
+		ReadLabel:   readLabel,
 		ResolveInstall: func(ctx context.Context, req *imagebuild.Request) error {
 			if in.ResolveInstall == nil {
 				return nil

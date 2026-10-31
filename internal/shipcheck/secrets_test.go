@@ -50,12 +50,12 @@ func TestMessagesAgreeWithTheirCount(t *testing.T) {
 	one := Report{IgnoreFile: ".dockerignore", Gitignored: []string{"build/out.txt"}, Unchecked: []string{"prod.pem"}}
 	several := Report{IgnoreFile: ".dockerignore", Gitignored: []string{"build/a", "build/b"}, Unchecked: []string{"a.pem", "b.pem"}}
 	assert.Equal(t, []string{
-		"the image will carry 1 file that .gitignore ignores and .dockerignore does not, in build/. If it does not belong in the image, add it to .dockerignore",
-		"the image will carry this file that looks like credentials, which git could not say is committed: prod.pem. If it does not belong in the image, add it to .dockerignore",
+		"1 file that .gitignore ignores goes into the image, in build/. If it doesn't belong there, add it to .dockerignore",
+		"this file that looks like credentials, which git could not say is committed, goes into the image: prod.pem. If it doesn't belong there, add it to .dockerignore",
 	}, one.Warnings())
 	assert.Equal(t, []string{
-		"the image will carry 2 files that .gitignore ignores and .dockerignore does not, in build/. If they do not belong in the image, add them to .dockerignore",
-		"the image will carry these files that look like credentials, which git could not say are committed: a.pem, b.pem. If they do not belong in the image, add them to .dockerignore",
+		"2 files that .gitignore ignores go into the image, in build/. If they don't belong there, add them to .dockerignore",
+		"these files that look like credentials, which git could not say are committed, go into the image: a.pem, b.pem. If they don't belong there, add them to .dockerignore",
 	}, several.Warnings())
 
 	refusals := map[string]struct {

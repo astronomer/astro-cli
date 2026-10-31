@@ -220,7 +220,7 @@ func (c *cli) packageRegistry() *pack.Registry {
 		return pack.NewRegistry(c.d.PackageAstro)
 	}
 	cmd := imagebuild.NewExecCommander()
-	astro := pack.NewAstroTarget(imagebuild.New(cmd, time.Now), cmd, containercfg.Engine)
+	astro := pack.NewAstroTarget(imagebuild.New(cmd, time.Now).WithCredentials(imagebuild.GitCredentials), cmd, containercfg.Engine)
 	return pack.NewRegistry(astro)
 }
 

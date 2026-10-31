@@ -44,6 +44,9 @@ var (
 	newManifestCommander = imagebuild.NewExecCommander
 	// manifestBuildNow is the build's clock.
 	manifestBuildNow = time.Now
+	// manifestCredentials is where the build reads a host's credentials from for
+	// the netrc secret it makes; a var so tests never reach a real helper.
+	manifestCredentials imagebuild.CredentialSource = imagebuild.GitCredentials
 )
 
 // ManifestImage is an image deploy to an Astro Private Cloud Deployment,
@@ -604,13 +607,14 @@ func buildManifestImage(ctx context.Context, in *ManifestImage, req *imagebuild.
 		req.Labels = append(req.Labels, labelRevisionDescription+in.Description)
 	}
 	return deploybuild.BuildImage(ctx, &deploybuild.Image{
-		Request:    *req,
-		ProjectDir: in.Build.ProjectDir,
-		Dockerfile: in.Build.Dockerfile,
-		Commander:  engine.Cmd,
-		Now:        manifestBuildNow,
-		Progress:   progress,
-		ReadLabel:  readLabel,
+		Request:     *req,
+		ProjectDir:  in.Build.ProjectDir,
+		Dockerfile:  in.Build.Dockerfile,
+		Commander:   engine.Cmd,
+		Now:         manifestBuildNow,
+		Credentials: manifestCredentials,
+		Progress:    progress,
+		ReadLabel:   readLabel,
 		ResolveInstall: func(ctx context.Context, req *imagebuild.Request) error {
 			if in.ResolveInstall == nil {
 				return nil

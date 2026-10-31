@@ -317,6 +317,9 @@ type Request struct {
 type Builder struct {
 	cmd Commander
 	now func() time.Time
+	// creds is where the netrc secret the build makes reads a host's
+	// credentials from (WithCredentials); nil makes none.
+	creds CredentialSource
 }
 
 // New builds a Builder over the given command runner and clock.
@@ -371,6 +374,10 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 		if req, err = absPaths(req); err != nil {
 			return "", err
 		}
+	}
+	req, err := b.withNetrc(ctx, req)
+	if err != nil {
+		return "", err
 	}
 	if req.Dockerfile != "" {
 		// Checked here rather than in each caller, because this is where they
