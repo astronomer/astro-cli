@@ -95,6 +95,12 @@ type Options struct {
 	// It is a func so it is asked only when the link is decided, after a rerun
 	// on a converted project has been refused. nil, or "", keeps the note.
 	APCWorkspace func() string
+	// MovePipSteps moves a converted Dockerfile's pip-only install steps into
+	// [project] dependencies (planPipStepMoves). A caller that sets it locks
+	// the result and puts them back if that fails
+	// (Result.RevertMovedPackages); one that cannot lock leaves it unset, and
+	// the steps stay with a note naming what they install.
+	MovePipSteps bool
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -136,6 +142,15 @@ type Result struct {
 	// pending classification — as the desktop's preview does — hides this too,
 	// and this is the half that describes a change the user did not ask for.
 	Advisories []string `json:"advisories,omitempty"`
+	// Info is what a person should know about the project and has nothing to
+	// do about, such as a file only Docker mode reads. Printed as notes.
+	Info []string `json:"info,omitempty"`
+	// MovedPackages are the requirements this run moved from the Dockerfile's
+	// pip steps into [project] dependencies (Options.MovePipSteps). The caller
+	// locks next, and puts them back if that fails (RevertMovedPackages).
+	MovedPackages []MovedPackage `json:"moved_packages,omitempty"`
+	// pipMove is what RevertMovedPackages needs to undo that move.
+	pipMove *pipStepMove
 }
 
 // ErrAlreadyAstroProject reports a directory whose pyproject.toml already
@@ -412,6 +427,8 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	// add files, so they go ahead of the manifest like every other addition.
 	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x)
 	planDockerfileRewrite(from1x, slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs)
+	planPipStepMoves(opts.MovePipSteps, from1x, &out, cs, slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire))
+	cs.Info = projectInfo(abs)
 	if err := planStaleHelperRemoval(abs, cs); err != nil {
 		return nil, err
 	}
@@ -425,10 +442,10 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	// dies part-way through is safe to repeat only while the manifest is still
 	// absent. Deletions then go after the manifest — see below, where the
 	// invariant is "manifest before any deletion, deletions last".
-	manifestChange := Change{Kind: UpdateFile, Path: manifest.Marker, Content: out, Labels: manifestLabels}
+	manifestChange := Change{Kind: UpdateFile, Path: manifest.Marker, Content: out, Labels: withoutDroppedDeclaration(manifestLabels, from1x)}
 	if !cs.Adopted {
 		manifestChange.Kind = CreateFile
-		manifestChange.Labels = append([]string{manifest.Marker}, pin.migratedLabels...)
+		manifestChange.Labels = append([]string{manifest.Marker}, withoutDroppedDeclaration(pin.migratedLabels, from1x)...)
 	}
 	cs.Changes = append(cs.Changes, manifestChange)
 
@@ -488,19 +505,10 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	// whose dependencies are intact is the better half of the trade.
 	for _, name := range planRetirements(from1x,
 		slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion) {
-		label := name + " (migrated into " + manifest.Marker + ", removed)"
-		if name == SettingsRelPath {
-			switch {
-			case len(cs.Secrets) > 0:
-				label = name + " (migrated into the encrypted vault and " + manifest.Marker + ", removed)"
-			case !from1x.settings.declares() && len(from1x.settings.pools.byName) == 0:
-				label = name + " (nothing to carry, removed)"
-			}
-		}
 		cs.Changes = append(cs.Changes, Change{
 			Kind:   Delete,
 			Path:   name,
-			Labels: []string{label},
+			Labels: []string{retiredLabel(name, from1x, cs)},
 		})
 	}
 
@@ -591,7 +599,7 @@ func planRetirements(from1x *project1x, notes []string, pinned string) []string 
 		if namedInAny(notes, name) {
 			continue
 		}
-		if name == "Dockerfile" && !dockerfileIsSpent(from1x, pinned) {
+		if name == "Dockerfile" && !dockerfileIsSpent(from1x, pinned) && !from1x.dropDockerfile {
 			continue
 		}
 		// airflow_settings.yaml is retired only when nothing in it stays
@@ -669,7 +677,7 @@ func dockerfileIsSpent(from1x *project1x, pinned string) bool {
 // times, any refinement (a file with only comments and a FROM, an ARG-only one)
 // lands in some of them and the label and the declaration disagree.
 func declaresDockerfile(from1x *project1x) bool {
-	return len(from1x.dockerfileBody) > 0 && !from1x.dockerfilePinOnly && !from1x.dockerfileForeign
+	return len(from1x.dockerfileBody) > 0 && !from1x.dockerfilePinOnly && !from1x.dockerfileForeign && !from1x.dropDockerfile
 }
 
 // buildPython is the Python this project's image runs when its Dockerfile is
@@ -830,7 +838,7 @@ func migratedLabels(from1x *project1x) []string {
 	// is the rule Plan's own comment states: a change performed but unreported
 	// cannot be reviewed.
 	if declaresDockerfile(from1x) {
-		out = append(out, manifest.Marker+" (declared "+fileDockerfile+" as this project's build)")
+		out = append(out, declaredDockerfileLabel)
 	}
 	return out
 }
@@ -1238,11 +1246,14 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	}
 	// Kept out of forRetirement for the reason deployNote is: planRetirements
 	// matches file names as substrings of notes, and link names are the user's.
-	var linksNote string
-	if len(from1x.instances) > 0 {
-		linksNote = config1xRelPath + ": " + instancesNote(from1x.instances)
-		out = append(out, linksNote)
+	// One note per link, each with its command, since a json consumer groups
+	// notes by the file each starts with and a person copies one at a time.
+	var linkNotes []string
+	for _, cmd := range instancesNote(from1x.instances) {
+		linkNotes = append(linkNotes, config1xRelPath+": its instances list links a Deployment this run did not carry into "+
+			manifest.Marker+". Link it with: "+cmd)
 	}
+	out = append(out, linkNotes...)
 	// A pin-only Dockerfile whose pin lost to --airflow-version or an existing
 	// pin is kept (dockerfileIsSpent) and not declared. When its reader had
 	// nothing to say about it, it would stay without a word; when it did, that
@@ -1260,7 +1271,6 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	checks := []struct{ file, note string }{
 		{"docker-compose.yml", "not read — astro local start replaces it"},
 		{"docker-compose.yaml", "not read — astro local start replaces it"},
-		{"docker-compose.override.yml", "read in Docker mode — astro local start --docker merges it over the services it generates; standalone mode does not run it"},
 		{"docker-compose.override.yaml", "not read — Docker mode merges docker-compose.override.yml, so rename it to use it there"},
 	}
 	for _, c := range checks {
@@ -1289,16 +1299,16 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 			" cannot run: it needs " + requiresPython(version) + ", and yours has no upper bound — " +
 			"uv will build the environment on the newest interpreter it allows"}, out...)
 	}
-	if deployNote == "" && linksNote == "" {
+	if deployNote == "" && len(linkNotes) == 0 {
 		return out, out
 	}
-	return out, slices.DeleteFunc(slices.Clone(out), func(n string) bool { return n == deployNote || n == linksNote })
+	return out, slices.DeleteFunc(slices.Clone(out), func(n string) bool { return n == deployNote || slices.Contains(linkNotes, n) })
 }
 
 // instancesNote names the deployment links .astro/config.yaml's `instances:`
 // list holds and the command that links each one. A name or id that is not
 // plain is not printed, for the reason deployTargetNote gives.
-func instancesNote(instances []instance1x) string {
+func instancesNote(instances []instance1x) []string {
 	cmds := make([]string, 0, len(instances))
 	for _, inst := range instances {
 		name, id := "<name>", "<id>"
@@ -1320,8 +1330,7 @@ func instancesNote(instances []instance1x) string {
 			cmds = append(cmds, cmd)
 		}
 	}
-	return "its instances list names deployment links this run did not carry into " + manifest.Marker +
-		". Link each one with " + strings.Join(cmds, "; ")
+	return cmds
 }
 
 // deployTargetNote says that .astro/config.yaml's saved deploy target was not
@@ -1405,4 +1414,41 @@ func joinNames(names []string) string {
 		return names[0]
 	}
 	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}
+
+// projectInfo is what a person should know about files the conversion keeps
+// as they are and that need nothing done (Result.Info).
+func projectInfo(dir string) []string {
+	if _, err := os.Stat(filepath.Join(dir, "docker-compose.override.yml")); err != nil {
+		return nil
+	}
+	return []string{"docker-compose.override.yml: astro local start --docker merges it over the services it generates; standalone mode does not run it"}
+}
+
+// retiredLabel is the Deleted entry for a 1.x file a run removes.
+func retiredLabel(name string, from1x *project1x, cs *Changeset) string {
+	switch {
+	case name == fileDockerfile && from1x.dropDockerfile:
+		label := name + " (its pip steps moved into " + manifest.Marker + ", and the rest is what a project without one builds, removed)"
+		cs.pipMove.deleted = label
+		return label
+	case name == SettingsRelPath && len(cs.Secrets) > 0:
+		return name + " (migrated into the encrypted vault and " + manifest.Marker + ", removed)"
+	case name == SettingsRelPath && !from1x.settings.declares() && len(from1x.settings.pools.byName) == 0:
+		return name + " (nothing to carry, removed)"
+	}
+	return name + " (migrated into " + manifest.Marker + ", removed)"
+}
+
+// declaredDockerfileLabel is the manifest's label for declaring the
+// project's Dockerfile as its build.
+const declaredDockerfileLabel = manifest.Marker + " (declared " + fileDockerfile + " as this project's build)"
+
+// withoutDroppedDeclaration is labels without declaredDockerfileLabel when
+// the run removed the Dockerfile after all (planPipStepMoves).
+func withoutDroppedDeclaration(labels []string, from1x *project1x) []string {
+	if !from1x.dropDockerfile {
+		return labels
+	}
+	return slices.DeleteFunc(slices.Clone(labels), func(l string) bool { return l == declaredDockerfileLabel })
 }

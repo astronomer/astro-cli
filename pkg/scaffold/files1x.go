@@ -114,6 +114,14 @@ type project1x struct {
 	// two 1.x lists were not carried whole (planDockerfileRewrite), so once
 	// plan has run, non-nil means the run rewrites the file.
 	rewrite *dockerfileRewrite
+	// stepNotes are the notes about the Dockerfile's own steps (stepNotes),
+	// which a move of its pip steps into the manifest replaces
+	// (planPipStepMoves).
+	stepNotes []string
+	// dropDockerfile reports a Dockerfile that, once its pip steps moved,
+	// builds what a generated build does, so the run removes it and declares
+	// none (planPipStepMoves).
+	dropDockerfile bool
 	// listsRead reports a Dockerfile that is the build and has a stage that
 	// might run ONBUILD steps, which read requirements.txt and packages.txt
 	// from the build's context (dockerfileRewriteOf). When none can, the two
@@ -327,10 +335,9 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 		}
 	}
 	build := buildStepsNote(data)
+	from1x.stepNotes = stepNotes(data, false)
 	from1x.notes = append(from1x.notes, notes...)
-	from1x.notes = append(from1x.notes, build...)
-	from1x.notes = append(from1x.notes, pipInstallNote(data)...)
-	from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, fileDockerfile))...)
+	from1x.notes = append(from1x.notes, from1x.stepNotes...)
 	base := airflowrt.NewDeclaredBase(image, tag, err)
 	if base.RuntimeVersion() != "" {
 		_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
@@ -848,14 +855,10 @@ func buildStepsNote(data []byte) []string {
 			kinds = append(kinds, kind)
 		}
 	}
-	// "were not read" is the accurate half: nothing here parses a RUN or a COPY.
-	// The old second half said "v2 builds no Dockerfile: move what they install
-	// or set into pyproject.toml", which the dockerfile key made false — the file
-	// IS the build now, so these instructions run, and moving them into the
-	// manifest would be work for nothing. Saying so kept a 1.x-era sentence
-	// giving v2 users the opposite of the right advice.
-	return []string{"Dockerfile: its " + strings.Join(kinds, ", ") +
-		" instructions were not read here, so the manifest does not describe them. The Dockerfile stays your build and they still run"}
+	// The file IS the build, so its steps run in every image; what the user
+	// needs to know is the one place they do not.
+	return []string{"Dockerfile: its own " + strings.Join(kinds, ", ") +
+		" steps run in every image build. Standalone mode does not run them"}
 }
 
 // pipInstallNote names the packages a RUN step installs with pip or uv pip.
@@ -871,13 +874,15 @@ func pipInstallNote(data []byte) []string {
 	if len(specs) == 0 {
 		return nil
 	}
-	quoted := make([]string, len(specs))
+	// One note, and one command, per package: the json notes are grouped by
+	// the file each starts with, so a command has to be a note of its own.
+	notes := make([]string, len(specs))
 	for i, s := range specs {
-		quoted[i] = `"` + s + `"`
+		notes[i] = "Dockerfile: its RUN steps install " + manifest.DistName(s) +
+			", which standalone mode and astro local check do not have. Add it to " + manifest.Marker +
+			" with: uv add " + shellQuote(s, "linux")
 	}
-	return []string{"Dockerfile: its RUN steps install " + strings.Join(quoted, ", ") +
-		". Standalone mode and astro local check do not have " + pronoun(len(specs)) +
-		" unless you add " + pronoun(len(specs)) + " to [project] dependencies"}
+	return notes
 }
 
 // pipCommandRe is the word that runs pip: pip, pip3, pip3.12, or a path to one.
@@ -1046,18 +1051,20 @@ func isPackageSpec(arg string) bool {
 	return !strings.HasSuffix(name, ".whl") && !strings.HasSuffix(name, ".tar.gz") && !strings.HasSuffix(name, ".zip")
 }
 
-// buildSecretNotes suggests a [tool.astro] build-secrets entry for each secret
-// the Dockerfile mounts. Where each secret comes from is not in the file, so
-// the conversion writes no entry itself.
-func buildSecretNotes(path string) []string {
-	mounts, err := airflowrt.SecretMounts(path)
-	if err != nil {
-		return nil
-	}
+// buildSecretNotesOf suggests a [tool.astro] build-secrets entry for each
+// secret the Dockerfile, data, mounts. Where each secret comes from is not in
+// the file, so the conversion writes no entry itself: the suggestion reads it
+// from a file, netrc from where it conventionally lives.
+func buildSecretNotesOf(data []byte) []string {
+	mounts := airflowrt.SecretMountsIn(data)
 	notes := make([]string, 0, len(mounts))
 	for _, m := range mounts {
+		entry := fmt.Sprintf("'id=%s,src=<file>', where <file> holds it", m.ID)
+		if m.ID == manifest.RuntimeSecretID {
+			entry = netrcSecretSpec
+		}
 		notes = append(notes, fmt.Sprintf("Dockerfile: line %d mounts build secret %q. To build without --build-secret each time, "+
-			"add 'id=%s,env=<VAR>' to build-secrets under [tool.astro], where <VAR> is the environment variable that holds it", m.Line, m.ID, m.ID))
+			"add %s to build-secrets under [tool.astro]", m.Line, m.ID, entry))
 	}
 	return notes
 }

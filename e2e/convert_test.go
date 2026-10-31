@@ -217,7 +217,7 @@ func cases1x() []case1x {
 				"Dockerfile": "\nARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nCOPY --chown=astro:0 . .\n",
 			},
 			reportedUpdated: []string{"Dockerfile (now builds on the install base the Astro CLI makes from pyproject.toml and uv.lock"},
-			notes:           []string{"its RUN instructions were not read here"},
+			notes:           []string{"its own RUN steps run in every image build"},
 		},
 		{
 			// A requirements.txt line pyproject.toml cannot carry keeps the
@@ -269,7 +269,7 @@ func cases1x() []case1x {
 			retired:     []string{"requirements.txt"},
 			kept:        []string{"Dockerfile"},
 			keptHas:     map[string]string{"Dockerfile": "\nFROM ${ASTRO_BASE}\n"},
-			notes:       []string{"its RUN instructions were not read here"},
+			notes:       []string{"its own RUN steps run in every image build"},
 		},
 		{
 			// A kept Dockerfile builds with the project as its context, so the
@@ -288,7 +288,7 @@ func cases1x() []case1x {
 				".dockerignore": "astro\n.git\n.env\n.venv\n\n# Local secrets and per-machine files. Keep them out of the image.\n**/.git\n**/.env\n",
 			},
 			reportedUpdated: []string{".dockerignore (added the per-machine rules)"},
-			notes:           []string{"its RUN instructions were not read here"},
+			notes:           []string{"its own RUN steps run in every image build"},
 		},
 		{
 			// Four kinds of line [project.dependencies] cannot express. Each

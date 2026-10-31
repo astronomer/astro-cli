@@ -49,6 +49,17 @@ type dockerfileRewrite struct {
 	// registry is the mirror the tag was on (registry.example/astronomer), for
 	// [tool.astro] registry, or "" for Astronomer's own repositories.
 	registry string
+	// moved are the requirements the final stage's leading pip steps install
+	// (movablePipSteps), and bodyMoved the rewritten file without those
+	// steps, for a run that moves them into the manifest (planPipStepMoves).
+	// emptyAfterMove reports that the file then builds nothing a generated
+	// build does not: one stage, and no instruction of its own left.
+	moved          []MovedPackage
+	bodyMoved      []byte
+	emptyAfterMove bool
+	// movedNetrc reports a moved step that mounted the netrc secret, which
+	// the install base's install then needs.
+	movedNetrc bool
 }
 
 // ownStepsComment marks where a rewritten Dockerfile's own steps start, so a
@@ -139,6 +150,13 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 		}
 	}
 	rw = &dockerfileRewrite{body: rewrittenBody(lines, &final), from: final.Ref, registry: registry}
+	if own, moved, netrc := movablePipSteps(lines[final.Line+1:], final.Line+1); len(moved) > 0 {
+		rw.moved, rw.movedNetrc = moved, netrc
+		rw.bodyMoved = rewrittenBody(append(slices.Clone(lines[:final.Line+1]), own...), &final)
+		// Only on Airflow 3: an Airflow 2 project deploys to Astro only from a
+		// Dockerfile of its own, since a generated build is Airflow 3.
+		rw.emptyAfterMove = t.Major == "3" && len(stages) == 1 && !hasInstruction(own) && !hasInstruction(lines[:final.Line])
+	}
 	if t.Build {
 		rw.runtime = v
 	}
