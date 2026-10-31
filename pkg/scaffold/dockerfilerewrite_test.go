@@ -217,7 +217,7 @@ func TestConversionOnAMirrorRecordsTheRegistry(t *testing.T) {
 	assert.Equal(t, "12.6.0", m.Astro.Runtime)
 	advisories := mirrorAdvisories(res)
 	require.Len(t, advisories, 1)
-	assert.Contains(t, advisories[0], "[tool.astro] registry = 'registry.corp.example/astronomer'")
+	assert.Contains(t, advisories[0], "recorded your mirror as registry 'registry.corp.example/astronomer'")
 	assert.Contains(t, advisories[0], "mirror its -base tag too")
 }
 

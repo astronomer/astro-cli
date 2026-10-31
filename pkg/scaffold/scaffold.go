@@ -821,13 +821,13 @@ func scaffoldManifest(dir string, opts *Options, from1x *project1x, res *Result)
 func migratedLabels(from1x *project1x) []string {
 	var out []string
 	if n := len(from1x.dependencies); n > 0 {
-		out = append(out, manifest.Marker+" (migrated "+strconv.Itoa(n)+" from requirements.txt into dependencies)")
+		out = append(out, manifest.Marker+" (moved in "+plural(n, "package", "packages")+" from requirements.txt)")
 	}
 	if len(from1x.packages) > 0 {
-		out = append(out, manifest.Marker+" (migrated packages.txt into packages)")
+		out = append(out, manifest.Marker+" (moved in the apt packages from packages.txt)")
 	}
 	if from1x.settings.declares() {
-		out = append(out, manifest.Marker+" (migrated "+SettingsRelPath+" into [tool.astro.env])")
+		out = append(out, manifest.Marker+" (declared the connections and variables from "+SettingsRelPath+")")
 	}
 	out = appendLabel(out, poolsLabel(from1x.settings.pools.byName))
 
@@ -1297,7 +1297,7 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 			" to the Airflow this project already names"}, out...)
 	}
 	if facts.loosePython {
-		out = append([]string{"[project] requires-python admits a Python that Airflow " + version +
+		out = append([]string{manifest.Marker + ": requires-python admits a Python that Airflow " + version +
 			" cannot run: it needs " + requiresPython(version) + ", and yours has no upper bound — " +
 			"uv will build the environment on the newest interpreter it allows"}, out...)
 	}
@@ -1431,15 +1431,15 @@ func projectInfo(dir string) []string {
 func retiredLabel(name string, from1x *project1x, cs *Changeset) string {
 	switch {
 	case name == fileDockerfile && from1x.dropDockerfile:
-		label := name + " (pip steps moved into " + manifest.Marker + ", removed)"
+		label := name + " (now in " + manifest.Marker + ")"
 		cs.pipMove.deleted = label
 		return label
 	case name == SettingsRelPath && len(cs.Secrets) > 0:
-		return name + " (migrated into the encrypted vault and " + manifest.Marker + ", removed)"
+		return name + " (now in the encrypted vault and " + manifest.Marker + ")"
 	case name == SettingsRelPath && !from1x.settings.declares() && len(from1x.settings.pools.byName) == 0:
-		return name + " (nothing in it, removed)"
+		return name + " (nothing in it)"
 	}
-	return name + " (migrated into " + manifest.Marker + ", removed)"
+	return name + " (now in " + manifest.Marker + ")"
 }
 
 // declaredDockerfileLabel is the manifest's label for declaring the

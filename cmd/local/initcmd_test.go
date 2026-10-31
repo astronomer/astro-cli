@@ -185,7 +185,7 @@ func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	if strings.Contains(handoff, "heavy") || strings.Contains(handoff, "airflow_settings.yaml") {
 		t.Errorf("the carried pool is still left to do:\n%s", out)
 	}
-	if !strings.Contains(out, "migrated 1 pool from airflow_settings.yaml into [tool.astro.pools]") {
+	if !strings.Contains(out, "pyproject.toml  moved in 1 pool from airflow_settings.yaml") {
 		t.Errorf("the run did not say the pool moved:\n%s", out)
 	}
 	// And not the old instruction to move the whole file by hand, which now
@@ -200,14 +200,14 @@ func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	}
 	// Scoped to the hand-off section, not the whole output, and deliberately.
 	// This assertion was written against `out` and passed only because the
-	// greenfield arm printed no label at all; now that it reports "migrated 1
-	// from requirements.txt into dependencies", the file is legitimately named
+	// greenfield arm printed no label at all; now that it reports "moved in 1
+	// package from requirements.txt", the file is legitimately named
 	// in the CREATED list. What must not happen is it appearing as work left to
 	// do, which is a different claim about the same string.
 	if strings.Contains(handoff, "requirements.txt") {
 		t.Errorf("requirements.txt was carried, so it must not be work left to do:\n%s", out)
 	}
-	if !strings.Contains(out, "migrated 1 from requirements.txt") {
+	if !strings.Contains(out, "moved in 1 package from requirements.txt") {
 		t.Errorf("the conversion did not say it carried requirements.txt:\n%s", out)
 	}
 }
@@ -226,7 +226,7 @@ func TestInitSaysCreatedWhenItWroteTheManifest(t *testing.T) {
 	if !strings.Contains(out, "Created Astro project") {
 		t.Errorf("want Created, got:\n%s", out)
 	}
-	if !strings.Contains(out, ".gitignore (added the .env rule)") {
+	if !strings.Contains(out, ".gitignore  added the .env rule") {
 		t.Errorf("gitignore edit not reported:\n%s", out)
 	}
 }

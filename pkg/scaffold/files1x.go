@@ -1064,7 +1064,7 @@ func buildSecretNotesOf(data []byte) []string {
 			entry = netrcSecretSpec
 		}
 		notes = append(notes, fmt.Sprintf("Dockerfile: line %d mounts build secret %q. To build without --build-secret each time, "+
-			"add %s to build-secrets under [tool.astro]", m.Line, m.ID, entry))
+			"add %s to build-secrets in pyproject.toml's [tool.astro]", m.Line, m.ID, entry))
 	}
 	return notes
 }
