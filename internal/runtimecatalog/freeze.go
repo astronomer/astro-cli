@@ -128,7 +128,11 @@ func readPins(ctx context.Context, f pinFile, build, python string) ([]string, e
 	if data == nil {
 		fetchCtx, cancel := context.WithTimeout(ctx, freezeTimeout)
 		defer cancel()
-		if data, err = fetchAndKeep(fetchCtx, base, dir, name); err != nil {
+		client := cdnClient
+		if base != f.baseURL {
+			client = mirrorClient
+		}
+		if data, err = fetchAndKeep(fetchCtx, client, base, dir, name); err != nil {
 			return nil, err
 		}
 	}
@@ -182,8 +186,8 @@ func cachedFile(dir, name string) ([]byte, error) {
 // fetchAndKeep fetches name from the directory at base and keeps what it
 // learned under dir: the file, or that there is none. A cache that cannot be
 // written is not a failure: the read worked.
-func fetchAndKeep(ctx context.Context, base, dir, name string) ([]byte, error) {
-	data, err := fetchFile(ctx, base+"/"+name)
+func fetchAndKeep(ctx context.Context, client *http.Client, base, dir, name string) ([]byte, error) {
+	data, err := fetchFile(ctx, client, base+"/"+name)
 	if dir == "" || (err != nil && !errors.Is(err, ErrNotPublished)) || os.MkdirAll(dir, freezeDirPerm) != nil {
 		return data, err
 	}
@@ -195,36 +199,59 @@ func fetchAndKeep(ctx context.Context, base, dir, name string) ([]byte, error) {
 	return data, err
 }
 
-// freezeClient reads the two files. What they say decides what a project's
-// lockfile is held to, so a redirect may only move to another path on the
-// same host, and never from https to http: anywhere else could answer with
-// pins nobody published. A mirror served over http may still redirect
-// within itself.
-var freezeClient = &http.Client{CheckRedirect: sameHostRedirect}
+// What the two files say decides what a project's lockfile is held to, so
+// their reads never follow a redirect from https to http. The CDN's are held
+// to its own host too: anywhere else could answer with pins nobody
+// published. A mirror the user named may hand off to another host, as
+// Artifactory and Nexus do to the object store behind them.
+var (
+	cdnClient    = &http.Client{CheckRedirect: pinRedirectPolicy(false)}
+	mirrorClient = &http.Client{CheckRedirect: pinRedirectPolicy(true)}
+)
 
-func sameHostRedirect(req *http.Request, via []*http.Request) error {
-	const maxRedirects = 10
-	if len(via) >= maxRedirects {
-		return fmt.Errorf("stopped after %d redirects", len(via))
+func pinRedirectPolicy(anyHost bool) func(*http.Request, []*http.Request) error {
+	return func(req *http.Request, via []*http.Request) error {
+		const maxRedirects = 10
+		if len(via) >= maxRedirects {
+			return fmt.Errorf("stopped after %d redirects", len(via))
+		}
+		from, to := via[0].URL, req.URL
+		if (from.Scheme == "https" && to.Scheme != "https") || (!anyHost && !sameHost(from, to)) {
+			// Scheme, host and path only: a presigned target's query is a credential.
+			shown := neturl.URL{Scheme: to.Scheme, Host: to.Host, Path: to.Path}
+			return fmt.Errorf("refusing a redirect to %s", shown.String())
+		}
+		return nil
 	}
-	from := via[0].URL
-	if req.URL.Host != from.Host || (from.Scheme == "https" && req.URL.Scheme != "https") {
-		return fmt.Errorf("refusing a redirect to %s", runtimeversions.WithoutUser(req.URL.String()))
-	}
-	return nil
 }
 
-// fetchFile reads one file from the CDN and returns its bytes. Only a whole
+// sameHost says a and b name one host and port, as DNS and the scheme's
+// default port read them: CDN.example.com:443 is cdn.example.com over https.
+func sameHost(a, b *neturl.URL) bool {
+	return strings.EqualFold(a.Hostname(), b.Hostname()) && portOf(a) == portOf(b)
+}
+
+func portOf(u *neturl.URL) string {
+	if p := u.Port(); p != "" {
+		return p
+	}
+	if u.Scheme == "http" {
+		return "80"
+	}
+	return "443"
+}
+
+// fetchFile reads one file with client and returns its bytes. Only a whole
 // file with a pin in it comes back, so nothing short of one is ever cached.
 // An error names the address without its user and password.
-func fetchFile(ctx context.Context, url string) ([]byte, error) {
+func fetchFile(ctx context.Context, client *http.Client, url string) ([]byte, error) {
 	shown := runtimeversions.WithoutUser(url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: the address does not parse", shown)
 	}
 	req.Header.Set("User-Agent", "astro-cli/"+version.Current())
-	resp, err := freezeClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		// The client's error names the address as requested; this names it
 		// redacted, and keeps the cause.
