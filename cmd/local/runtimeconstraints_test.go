@@ -71,12 +71,12 @@ func TestStartWritesWhatTheRuntimeConstrains(t *testing.T) {
 	if strings.Contains(got, "apache-airflow==3.3.2+astro.2") || strings.Contains(got, "task-sdk==1.3.2+astro.1',\n    'apache-airflow-task-sdk") {
 		t.Errorf("the runtime's own Airflow line was written beside the build pin:\n%s", got)
 	}
-	if !strings.Contains(out, "now holds what Astro Runtime 3.3-9 constrains") {
+	if !strings.Contains(out, "pyproject.toml: updated") {
 		t.Errorf("the start did not say it recorded the runtime:\n%s", out)
 	}
 
 	again, out, _ := startWithConstraints(t, got, runtimeFile, nil)
-	if again != got || strings.Contains(out, "now holds") {
+	if again != got || strings.Contains(out, "pyproject.toml: updated") {
 		t.Errorf("a second start with the same runtime changed the manifest:\n%s", again)
 	}
 }
@@ -123,21 +123,16 @@ func TestACutoffTakesOutTheRuntimesLines(t *testing.T) {
 	if len(asked) != 0 || strings.Contains(got, constraints339) || strings.Contains(got, "constrains these") {
 		t.Errorf("a cutoff kept the runtime's lines (asked %q):\n%s", asked, got)
 	}
-	if !strings.Contains(out, "no longer holds what Astro Runtime 3.3-9 constrains") {
+	if !strings.Contains(out, "pyproject.toml: updated") {
 		t.Errorf("the start did not say it took the runtime's lines out:\n%s", out)
 	}
 }
 
-// When a write moves both the Airflow build and the runtime's record, both
-// are said: the Airflow change is never hidden behind the runtime's.
-func TestStartSaysBothAnAirflowAndARuntimeChange(t *testing.T) {
+// A write that moves both the Airflow build and the runtime's record is one
+// line, as uv.lock's is: git diff has the details.
+func TestStartSaysAnAirflowAndARuntimeChangeOnce(t *testing.T) {
 	_, out, _ := startWithConstraints(t, buildManifest, runtimeFile, nil)
-	for _, want := range []string{
-		"now installs Astronomer's Airflow 3.3.2+astro.1",
-		"now holds what Astro Runtime 3.3-9 constrains",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("the start did not say %q:\n%s", want, out)
-		}
+	if n := strings.Count(out, "pyproject.toml: updated"); n != 1 {
+		t.Errorf("the start said the manifest changed %d times, want once:\n%s", n, out)
 	}
 }

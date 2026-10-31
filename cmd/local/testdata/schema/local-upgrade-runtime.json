@@ -1,0 +1,48 @@
+{
+  "previous": "x",
+  "runtime": "x",
+  "airflow_version": "x",
+  "airflow": {
+    "previous": "x",
+    "version": "x",
+    "changed": true,
+    "requirements": [
+      "x"
+    ],
+    "core_replaced": true,
+    "removed_airflow_key": true,
+    "requires_python": "x",
+    "runtime": "x",
+    "runtime_removed": true,
+    "dockerfile": "x"
+  },
+  "requires_python": "x",
+  "python": "x",
+  "changed": true,
+  "manifest": "x",
+  "target": "x",
+  "findings": [
+    {
+      "kind": "x",
+      "message": "x",
+      "airflow_version": "x",
+      "yanked_reason": "x",
+      "suggested": "x"
+    }
+  ],
+  "refresh": {
+    "constraints": "x",
+    "constraints_removed": "x",
+    "astro_airflow": "x",
+    "astro_airflow_removed": true,
+    "lock": {
+      "status": "x",
+      "packages_changed": -1,
+      "error": "x"
+    },
+    "warnings": [
+      "x"
+    ]
+  },
+  "restart_needed": true
+}
