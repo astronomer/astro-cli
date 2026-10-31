@@ -118,7 +118,14 @@ func (from1x *project1x) instanceLinks() []Link {
 	}
 	var out []Link
 	from1x.linked = &out
-	if from1x.instanceWorkspace == nil || from1x.apcDomain != "" {
+	from1x.unlinkedWhy = map[string]string{}
+	if from1x.instanceWorkspace == nil {
+		return nil
+	}
+	if from1x.apcDomain != "" {
+		for _, inst := range from1x.instances {
+			from1x.unlinkedWhy[instanceKey(inst)] = "your current context is Astro Private Cloud"
+		}
 		return nil
 	}
 	taken := map[string]bool{manifest.ReservedLinkName: true, BundleLinkName: true}
@@ -126,14 +133,24 @@ func (from1x *project1x) instanceLinks() []Link {
 		taken[l.Name] = true
 	}
 	for _, inst := range from1x.instances {
-		if inst.source != "" && inst.source != string(manifest.KindAstro) {
+		key := instanceKey(inst)
+		switch {
+		case inst.source != "" && inst.source != string(manifest.KindAstro):
+			from1x.unlinkedWhy[key] = "not an Astro Deployment"
+			continue
+		case !plainDeployID(inst.name) || !astroIDRe.MatchString(inst.deploymentID):
+			from1x.unlinkedWhy[key] = "its name or Deployment id is not one a link can take"
+			continue
+		case taken[inst.name]:
+			from1x.unlinkedWhy[key] = "a link named " + inst.name + " already exists"
 			continue
 		}
-		if !plainDeployID(inst.name) || !astroIDRe.MatchString(inst.deploymentID) || taken[inst.name] {
-			continue
-		}
-		ws := from1x.instanceWorkspace(inst.deploymentID)
+		ws, reason := from1x.instanceWorkspace(inst.deploymentID)
 		if !astroIDRe.MatchString(ws) {
+			if reason == "" {
+				reason = "its workspace could not be told"
+			}
+			from1x.unlinkedWhy[key] = reason
 			continue
 		}
 		taken[inst.name] = true
@@ -142,12 +159,26 @@ func (from1x *project1x) instanceLinks() []Link {
 	return out
 }
 
-// unlinkedInstances are the instances entries instanceLinks did not link.
-func (from1x *project1x) unlinkedInstances() []instance1x {
+// unlinkedDeployments are the instances entries instanceLinks did not link,
+// each with its command and, when the platform was asked, why.
+func (from1x *project1x) unlinkedDeployments() []UnlinkedDeployment {
 	linked := from1x.instanceLinks()
-	return slices.DeleteFunc(slices.Clone(from1x.instances), func(inst instance1x) bool {
-		return slices.ContainsFunc(linked, func(l Link) bool { return l.Name == inst.name && l.Deployment == inst.deploymentID })
-	})
+	var out []UnlinkedDeployment
+	for _, inst := range from1x.instances {
+		if slices.ContainsFunc(linked, func(l Link) bool { return l.Name == inst.name && l.Deployment == inst.deploymentID }) {
+			continue
+		}
+		u := UnlinkedDeployment{Name: inst.name, Deployment: inst.deploymentID, Command: instanceCommand(inst), Reason: from1x.unlinkedWhy[instanceKey(inst)]}
+		if !slices.ContainsFunc(out, func(o UnlinkedDeployment) bool { return o.Command == u.Command && o.Reason == u.Reason }) {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
+// instanceKey keys an instances entry for unlinkedWhy.
+func instanceKey(inst instance1x) string {
+	return inst.source + "\x00" + inst.name + "\x00" + inst.deploymentID
 }
 
 // setInstanceLinks writes instanceLinks, each with SaveLink's own edit over
@@ -190,5 +221,5 @@ func (from1x *project1x) instanceLinksAdvisory() string {
 	if len(links) == 1 {
 		noun = "Deployment"
 	}
-	return manifest.Marker + ": linked the " + noun + " " + config1xRelPath + " lists, " + joinNames(names)
+	return manifest.Marker + ": linked " + noun + " " + joinNames(names) + " (from " + config1xRelPath + ")"
 }

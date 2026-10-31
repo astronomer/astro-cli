@@ -110,12 +110,13 @@ type Options struct {
 	// the steps stay with a note naming what they install.
 	MovePipSteps bool
 	// InstanceWorkspace is the workspace of the Astro Deployment with this id,
-	// or "" when it cannot be told. With it, the Deployments a 1.x
-	// .astro/config.yaml's instances list names are linked (instanceLinks), as
-	// astro link add NAME --deployment ID --workspace WS writes them. nil, or
-	// "" for one, keeps that one a note with the command. The caller asks the
+	// or "" and why it cannot be told ("not logged in", "not found in your
+	// organization"). With it, the Deployments a 1.x .astro/config.yaml's
+	// instances list names are linked (instanceLinks), as astro link add NAME
+	// --deployment ID --workspace WS writes them. nil, or "" for one, keeps
+	// that one a note with the command and the reason. The caller asks the
 	// platform; the conversion itself stays offline.
-	InstanceWorkspace func(deploymentID string) string
+	InstanceWorkspace func(deploymentID string) (workspace, reason string)
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -175,8 +176,23 @@ type Result struct {
 	// pip steps into [project] dependencies (Options.MovePipSteps). The caller
 	// locks next, and puts them back if that fails (RevertMovedPackages).
 	MovedPackages []MovedPackage `json:"moved_packages,omitempty"`
+	// UnlinkedDeployments are the Deployments a 1.x .astro/config.yaml's
+	// instances list names that this run did not link, each with the command
+	// that links it and, when known, why it was not linked. Their Notes say the
+	// same in text.
+	UnlinkedDeployments []UnlinkedDeployment `json:"unlinked_deployments,omitempty"`
 	// pipMove is what RevertMovedPackages needs to undo that move.
 	pipMove *pipStepMove
+}
+
+// UnlinkedDeployment is one Result.UnlinkedDeployments entry.
+type UnlinkedDeployment struct {
+	Name       string `json:"name"`
+	Deployment string `json:"deployment"`
+	Command    string `json:"command"`
+	// Reason is why it was not linked, or empty when the caller did not ask
+	// the platform (Options.InstanceWorkspace nil).
+	Reason string `json:"reason,omitempty"`
 }
 
 // ErrAlreadyAstroProject reports a directory whose pyproject.toml already
@@ -460,6 +476,7 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	// add files, so they go ahead of the manifest like every other addition.
 	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x)
 	cs.Info = projectInfo(abs)
+	cs.UnlinkedDeployments = from1x.unlinkedDeployments()
 	if err := planDockerfile(abs, from1x, slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs, opts.MovePipSteps, &out); err != nil {
 		return nil, err
 	}
@@ -1283,8 +1300,14 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	// One note per link, each with its command, since a json consumer groups
 	// notes by the file each starts with and a person copies one at a time.
 	var linkNotes []string
-	for _, cmd := range instancesNote(from1x.unlinkedInstances()) {
-		linkNotes = append(linkNotes, LinkNotePrefix+cmd)
+	for _, u := range from1x.unlinkedDeployments() {
+		note := LinkNotePrefix + u.Command
+		if u.Reason != "" {
+			note += LinkReasonSep + u.Reason
+		}
+		if !slices.Contains(linkNotes, note) {
+			linkNotes = append(linkNotes, note)
+		}
 	}
 	out = append(out, linkNotes...)
 	// A pin-only Dockerfile whose pin lost to --airflow-version or an existing
@@ -1338,33 +1361,27 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	return out, slices.DeleteFunc(slices.Clone(out), func(n string) bool { return n == deployNote || slices.Contains(linkNotes, n) })
 }
 
-// instancesNote names the deployment links .astro/config.yaml's `instances:`
-// list holds and the command that links each one. A name or id that is not
-// plain is not printed, for the reason deployTargetNote gives.
-func instancesNote(instances []instance1x) []string {
-	cmds := make([]string, 0, len(instances))
-	for _, inst := range instances {
-		name, id := "<name>", "<id>"
-		if plainDeployID(inst.name) {
-			name = inst.name
-		}
-		if plainDeployID(inst.deploymentID) {
-			id = inst.deploymentID
-		}
-		// --workspace too: an astro link needs one, and the list does not say.
-		cmd := "astro link add " + name + " --deployment " + id + " --workspace <workspace-id>"
-		switch {
-		case inst.source == "" || inst.source == "astro":
-		case plainDeployID(inst.source):
-			cmd = "astro link add " + name + " --target " + inst.source
-		default:
-			cmd = "astro link add " + name + " --target <platform>"
-		}
-		if !slices.Contains(cmds, cmd) {
-			cmds = append(cmds, cmd)
-		}
+// instanceCommand is the command that links one entry of .astro/config.yaml's
+// `instances:` list. A name or id that is not plain is not printed, for the
+// reason deployTargetNote gives.
+func instanceCommand(inst instance1x) string {
+	name, id := "<name>", "<id>"
+	if plainDeployID(inst.name) {
+		name = inst.name
 	}
-	return cmds
+	if plainDeployID(inst.deploymentID) {
+		id = inst.deploymentID
+	}
+	// --workspace too: an astro link needs one, and the list does not say.
+	cmd := "astro link add " + name + " --deployment " + id + " --workspace <workspace-id>"
+	switch {
+	case inst.source == "" || inst.source == "astro":
+	case plainDeployID(inst.source):
+		cmd = "astro link add " + name + " --target " + inst.source
+	default:
+		cmd = "astro link add " + name + " --target <platform>"
+	}
+	return cmd
 }
 
 // deployTargetNote says that .astro/config.yaml's saved deploy target was not

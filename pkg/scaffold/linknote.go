@@ -6,3 +6,7 @@ package scaffold
 // consumer gets each command on its own; the CLI's text output groups them
 // under one line by this prefix.
 const LinkNotePrefix = config1xRelPath + ": link the Deployment it lists with: "
+
+// LinkReasonSep separates a link note's command from why the run did not link
+// it. A shell comment, so the line still copies and runs as is.
+const LinkReasonSep = "  # "
