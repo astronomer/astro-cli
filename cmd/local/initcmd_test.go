@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
@@ -704,7 +706,7 @@ func TestInitLinksTheDeploymentsA1xConfigLists(t *testing.T) {
 	if len(asked) != 2 {
 		t.Errorf("asked about %v, want both Deployments", asked)
 	}
-	if !strings.Contains(out, "pyproject.toml  linked the Deployments .astro/config.yaml lists, dev and prod") {
+	if !strings.Contains(out, "pyproject.toml  linked Deployments dev and prod (from .astro/config.yaml)") {
 		t.Errorf("the links were not reported in the file list:\n%s", out)
 	}
 	if strings.Contains(out, "astro link add") {
@@ -738,8 +740,8 @@ func TestInitLeavesTheDeploymentsToDoWithoutALogin(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Link the Deployments .astro/config.yaml lists:",
-		"astro link add dev --deployment cmbjjd11x0bre01k5sy1rw0wl --workspace <workspace-id>",
-		"astro link add prod --deployment cmqzyvtpc0tpn01o1e67v6dcb --workspace <workspace-id>",
+		"astro link add dev --deployment cmbjjd11x0bre01k5sy1rw0wl --workspace <workspace-id>  # not logged in",
+		"astro link add prod --deployment cmqzyvtpc0tpn01o1e67v6dcb --workspace <workspace-id>  # not logged in",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q:\n%s", want, out)
@@ -753,7 +755,7 @@ func TestInitLinksTheDeploymentsThePlatformKnows(t *testing.T) {
 	writeInstances1x(t, dir)
 	d.DeploymentWorkspace = func(_ context.Context, id string) (string, error) {
 		if id == "cmbjjd11x0bre01k5sy1rw0wl" {
-			return "", errors.New("deployment not found")
+			return "", &httputil.StatusError{StatusCode: http.StatusNotFound}
 		}
 		return "cmws0000000000000000000w1", nil
 	}
@@ -761,8 +763,25 @@ func TestInitLinksTheDeploymentsThePlatformKnows(t *testing.T) {
 		t.Fatalf("astro init: %v", err)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "linked the Deployment .astro/config.yaml lists, prod") ||
-		!strings.Contains(out, "astro link add dev --deployment cmbjjd11x0bre01k5sy1rw0wl --workspace <workspace-id>") {
+	if !strings.Contains(out, "linked Deployment prod (from .astro/config.yaml)") ||
+		!strings.Contains(out, "astro link add dev --deployment cmbjjd11x0bre01k5sy1rw0wl --workspace <workspace-id>  # not found in your organization") {
 		t.Errorf("want prod linked and dev left to do:\n%s", out)
+	}
+}
+
+// A platform that does not answer in time is said once, for every Deployment
+// it was not asked about either.
+func TestInitSaysThePlatformDidNotAnswer(t *testing.T) {
+	d, dir, stdout := initDeps(t)
+	writeInstances1x(t, dir)
+	d.DeploymentWorkspace = func(context.Context, string) (string, error) {
+		return "", context.DeadlineExceeded
+	}
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init: %v", err)
+	}
+	out := stdout.String()
+	if n := strings.Count(out, "# the platform didn't answer in time"); n != 2 {
+		t.Errorf("want both Deployments to say the platform didn't answer, got %d:\n%s", n, out)
 	}
 }

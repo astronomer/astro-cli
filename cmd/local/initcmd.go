@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -154,31 +156,40 @@ const instanceLookupTimeout = 5 * time.Second
 
 // instanceWorkspace is the lookup init links a 1.x instances list with
 // (scaffold.Options.InstanceWorkspace): under Astro, with a login, each
-// Deployment's workspace. Once one lookup finds no login, times out or cannot
-// reach the platform, the rest are not asked, so an offline run waits once;
-// those entries stay notes.
-func (c *cli) instanceWorkspace(ctx context.Context) func(string) string {
+// Deployment's workspace, or why it cannot be told. Once one lookup finds no
+// login, times out or cannot reach the platform, the rest are not asked, so
+// an offline run waits once; those entries stay notes with the same reason.
+func (c *cli) instanceWorkspace(ctx context.Context) func(string) (string, string) {
 	if c.d.DeploymentWorkspace == nil || c.d.APC != nil {
 		return nil
 	}
-	gaveUp := false
-	return func(id string) string {
-		if gaveUp {
-			return ""
+	gaveUp := ""
+	return func(id string) (string, string) {
+		if gaveUp != "" {
+			return "", gaveUp
 		}
 		lookup, cancel := context.WithTimeout(ctx, instanceLookupTimeout)
 		defer cancel()
 		ws, err := c.d.DeploymentWorkspace(lookup, id)
-		var netErr net.Error
 		// No login, or no platform to reach, is the same for every entry; a
 		// Deployment the platform does not know is that entry's alone.
-		if (err == nil && ws == "") || errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) {
-			gaveUp = true
+		var netErr net.Error
+		var status *httputil.StatusError
+		switch {
+		case err == nil && ws == "":
+			gaveUp = "not logged in"
+		case errors.Is(err, context.DeadlineExceeded):
+			gaveUp = "the platform didn't answer in time"
+		case errors.As(err, &netErr):
+			gaveUp = "the platform could not be reached"
+		case errors.As(err, &status) && (status.StatusCode == http.StatusNotFound || status.StatusCode == http.StatusForbidden):
+			return "", "not found in your organization"
+		case err != nil:
+			return "", "the platform could not look it up: " + err.Error()
+		default:
+			return ws, ""
 		}
-		if err != nil {
-			return ""
-		}
-		return ws
+		return "", gaveUp
 	}
 }
 
@@ -424,7 +435,7 @@ func renderLeftToDo(w io.Writer, notes []string) error {
 	if len(notes) == 0 {
 		return nil
 	}
-	if _, err := fmt.Fprintf(w, "\nLeft to do:\n"); err != nil {
+	if _, err := fmt.Fprintf(w, "\n%s\n", cliout.TodoLabel(w)); err != nil {
 		return err
 	}
 	var links []string

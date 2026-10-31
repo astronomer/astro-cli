@@ -78,6 +78,27 @@ func TestNextLabelColorsOnStdoutAndStderr(t *testing.T) {
 	}
 }
 
+// Left to do: is cyan like Next:, which it sits beside, and plain off a
+// terminal or under NO_COLOR.
+func TestTodoLabelColorsLikeNext(t *testing.T) {
+	forced := ansi.ForceColors
+	ansi.ForceColors = true
+	t.Cleanup(func() { ansi.ForceColors = forced })
+	t.Setenv("NO_COLOR", "")
+
+	if got := TodoLabel(os.Stdout); !strings.Contains(got, "\x1b[36m") || !strings.Contains(got, "Left to do:") {
+		t.Errorf("TodoLabel on stdout = %q, want a cyan Left to do:", got)
+	}
+	var b bytes.Buffer
+	if got := TodoLabel(&b); got != "Left to do:" {
+		t.Errorf("TodoLabel on a buffer = %q, want plain", got)
+	}
+	t.Setenv("NO_COLOR", "1")
+	if got := TodoLabel(os.Stdout); got != "Left to do:" {
+		t.Errorf("TodoLabel on stdout under NO_COLOR = %q, want plain", got)
+	}
+}
+
 // Every label follows one rule: it colors on a terminal stdout too, as a Note:
 // in a command's own text output (local reset, check) does.
 func TestLabelsColorOnStdout(t *testing.T) {
