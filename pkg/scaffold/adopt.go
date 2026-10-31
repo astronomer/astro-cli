@@ -248,10 +248,10 @@ func mergeDependencies(ed tomledit.Editor, reqs []string, extras *[]string) (int
 			// keeps planRetirements from deleting it.
 			if fromManifest[name] {
 				*extras = append(*extras, "requirements.txt: "+r+
-					" was not carried, because pyproject.toml already pins "+name+" and the manifest wins")
+					" was skipped, because pyproject.toml already pins "+name+", and the manifest wins")
 			} else {
 				*extras = append(*extras, "requirements.txt: "+r+
-					" names a distribution listed earlier in the same file, so this specifier was not carried")
+					" names a distribution listed earlier in the same file, so this specifier was skipped")
 			}
 			continue
 		}

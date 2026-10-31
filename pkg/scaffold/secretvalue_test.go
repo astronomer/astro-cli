@@ -47,10 +47,10 @@ func TestAnEqualHeldValueIsCarried(t *testing.T) {
 	// advisory says where it is.
 	require.NotContains(t, writer.stored, "warehouse")
 	require.Equal(t, "warehouse: kept the value already in .env. "+SettingsRelPath+
-		" holds a different one, which was not carried over it", findAdvisory(t, res.Advisories, "kept the value"))
+		" holds a different one, which was not used", findAdvisory(t, res.Advisories, "kept the value"))
 	require.Equal(t,
 		SettingsRelPath+" still contains API_TOKEN and warehouse in plaintext, and is kept because .env "+
-			"already held warehouse, so the file's value was not carried over it",
+			"already held warehouse, so the file's value did not replace it",
 		findAdvisory(t, res.Advisories, "plaintext"))
 }
 
@@ -81,7 +81,7 @@ func TestAWriterThatCannotCompareSaysOnlyThatOneIsHeld(t *testing.T) {
 	require.NoError(t, err)
 	require.NotContains(t, writer.stored, "API_TOKEN")
 	require.Equal(t, "API_TOKEN: kept the value already in your vault. "+SettingsRelPath+
-		" holds one too, which was not carried over it", findAdvisory(t, res.Advisories, "kept the value"))
+		" holds one too, which was not used", findAdvisory(t, res.Advisories, "kept the value"))
 }
 
 // "Not compared" keeps the conservative behavior, even for a value that is
@@ -98,5 +98,5 @@ func TestANotComparedHeldValueIsKept(t *testing.T) {
 	require.NotContains(t, writer.stored, "API_TOKEN")
 	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
 	require.Equal(t, "API_TOKEN: kept the value already in your vault. "+SettingsRelPath+
-		" holds one too, which was not carried over it", findAdvisory(t, res.Advisories, "kept the value"))
+		" holds one too, which was not used", findAdvisory(t, res.Advisories, "kept the value"))
 }

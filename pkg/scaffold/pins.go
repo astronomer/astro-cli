@@ -51,7 +51,7 @@ func airflowExtrasNote(spec string) []string {
 		return nil
 	}
 	return []string{"requirements.txt: " + spec + " declares extras " + spec[lb:rb+1] +
-		", which the generated Airflow requirement does not carry: add them to the apache-airflow entry in [project.dependencies]"}
+		", which the generated Airflow requirement does not include: add them to the apache-airflow entry in [project.dependencies]"}
 }
 
 // requiresPython is the [project] requires-python for a project pinned to this

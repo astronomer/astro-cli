@@ -340,7 +340,7 @@ func renderDevRemoved(p DevRemoved) string {
 			run = "Converting it"
 		}
 		fmt.Fprintf(&b, "\n\n%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
-			"%s moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
+			"%s moves requirements.txt, packages.txt and what airflow_settings.yaml declares into pyproject.toml, "+
 			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.V1Dir, run)
 	}
 	return b.String()

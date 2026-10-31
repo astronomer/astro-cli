@@ -1003,7 +1003,7 @@ func renderPyproject(name string, pick airflowPick, from1x *project1x) (pyprojec
 			// user's to know, and until this said so the losing pin was dropped
 			// in silence and the file holding it was then retired.
 			notes = append(notes, "requirements.txt: "+d+
-				" names a distribution the manifest already lists, so this specifier was not carried")
+				" names a distribution the manifest already lists, so this specifier was skipped")
 			continue
 		}
 		seen[name] = true
@@ -1253,8 +1253,7 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	// notes by the file each starts with and a person copies one at a time.
 	var linkNotes []string
 	for _, cmd := range instancesNote(from1x.instances) {
-		linkNotes = append(linkNotes, config1xRelPath+": its instances list links a Deployment this run did not carry into "+
-			manifest.Marker+". Link it with: "+cmd)
+		linkNotes = append(linkNotes, LinkNotePrefix+cmd)
 	}
 	out = append(out, linkNotes...)
 	// A pin-only Dockerfile whose pin lost to --airflow-version or an existing
@@ -1425,20 +1424,20 @@ func projectInfo(dir string) []string {
 	if _, err := os.Stat(filepath.Join(dir, "docker-compose.override.yml")); err != nil {
 		return nil
 	}
-	return []string{"docker-compose.override.yml: astro local start --docker merges it over the services it generates; standalone mode does not run it"}
+	return []string{"docker-compose.override.yml applies to astro local start --docker only"}
 }
 
 // retiredLabel is the Deleted entry for a 1.x file a run removes.
 func retiredLabel(name string, from1x *project1x, cs *Changeset) string {
 	switch {
 	case name == fileDockerfile && from1x.dropDockerfile:
-		label := name + " (its pip steps moved into " + manifest.Marker + ", and the rest is what a project without one builds, removed)"
+		label := name + " (pip steps moved into " + manifest.Marker + ", removed)"
 		cs.pipMove.deleted = label
 		return label
 	case name == SettingsRelPath && len(cs.Secrets) > 0:
 		return name + " (migrated into the encrypted vault and " + manifest.Marker + ", removed)"
 	case name == SettingsRelPath && !from1x.settings.declares() && len(from1x.settings.pools.byName) == 0:
-		return name + " (nothing to carry, removed)"
+		return name + " (nothing in it, removed)"
 	}
 	return name + " (migrated into " + manifest.Marker + ", removed)"
 }
