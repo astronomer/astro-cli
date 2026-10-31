@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/plan"
+	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -32,7 +33,7 @@ func loadCheckedManifest(project string) (*manifest.Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := scaffold.CheckDockerfileAirflow(project, m); err != nil {
+	if err := scaffold.CheckDockerfileAirflowWith(project, m, runtimecatalog.ForDockerfileCheck); err != nil {
 		return nil, err
 	}
 	return m, nil

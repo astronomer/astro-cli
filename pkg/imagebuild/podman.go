@@ -10,6 +10,9 @@ import (
 	rt "github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
+// podmanName is podman's binary name, and the word its --version prints.
+const podmanName = "podman"
+
 // IsPodman reports whether the engine CLI bin is podman, by asking it through
 // cmd: `<bin> --version` names podman whatever the binary is called, so the
 // podman-docker shim and a docker alias for podman count too. env is the
@@ -27,7 +30,7 @@ func IsPodman(ctx context.Context, cmd Commander, bin string, env []string) bool
 	var out bytes.Buffer
 	if err := cmd.Run(ctx, env, rt.Stdio{Out: &out}, bin, "--version"); err != nil {
 		name := strings.TrimSuffix(strings.ToLower(filepath.Base(bin)), ".exe")
-		return name == "podman"
+		return name == podmanName
 	}
-	return strings.Contains(strings.ToLower(out.String()), "podman")
+	return strings.Contains(strings.ToLower(out.String()), podmanName)
 }

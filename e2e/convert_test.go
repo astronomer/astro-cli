@@ -197,45 +197,78 @@ func cases1x() []case1x {
 		},
 		{
 			// A Dockerfile that does more than pin becomes the project's
-			// declared build, which makes BOTH 1.x lists load-bearing again:
-			// the base image's ONBUILD reads them during the build, so deleting
-			// either would change what the image contains.
-			//
-			// Both, because that is the bug planRetirements describes fixing —
-			// an ordinary conversion deleted the two files and left a build
-			// that either failed on the missing COPY or produced an image with
-			// none of the project's packages.
+			// declared build, moved off the ONBUILD tag that read both 1.x
+			// lists onto the install base the CLI builds from
+			// pyproject.toml, its runtime recorded there, ahead of its own
+			// step. So both 1.x lists, carried whole, go: one package list,
+			// and nothing left reading the files.
 			name: "a Dockerfile that does more than pin",
 			files: map[string]string{
-				"Dockerfile":       runtime2 + "RUN apt-get update && apt-get install -y curl\n",
+				"Dockerfile":       runtime2Build + "RUN apt-get update && apt-get install -y curl\n",
 				"requirements.txt": "pandas==2.1.0\n",
 				"packages.txt":     "libpq-dev\n",
 			},
 			airflow:       "2",
 			manifestLines: []string{"dependencies = [\n    'apache-airflow==2.*',\n    'pandas==2.1.0',\n]"},
-			manifestHas:   []string{"dockerfile = 'Dockerfile'", "packages = [\n    'libpq-dev',\n]"},
-			kept:          []string{"Dockerfile", "requirements.txt", "packages.txt"},
+			manifestHas:   []string{"dockerfile = 'Dockerfile'", "packages = [\n    'libpq-dev',\n]", "runtime = '9.1.0'"},
+			retired:       []string{"requirements.txt", "packages.txt"},
+			kept:          []string{"Dockerfile"},
 			keptHas: map[string]string{
-				"requirements.txt": "pandas==2.1.0",
-				"packages.txt":     "libpq-dev",
+				"Dockerfile": "\nARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nCOPY --chown=astro:0 . .\n",
 			},
+			reportedUpdated: []string{"Dockerfile (now builds on the install base the Astro CLI makes from pyproject.toml and uv.lock"},
+			notes:           []string{"its RUN instructions were not read here"},
+		},
+		{
+			// A requirements.txt line pyproject.toml cannot carry keeps the
+			// file, as its only record, and so the Dockerfile stays on the
+			// ONBUILD tag that installs it, with both lists beside it.
+			name: "a Dockerfile left on its ONBUILD tag for a line not carried",
+			files: map[string]string{
+				"Dockerfile":       runtime3 + "RUN echo hi\n",
+				"requirements.txt": "--extra-index-url https://pypi.corp.example/simple\npandas==2.1.0\n",
+				"packages.txt":     "libpq-dev\n",
+			},
+			airflow:     "3.1",
+			manifestHas: []string{"dockerfile = 'Dockerfile'", "'pandas==2.1.0'"},
+			kept:        []string{"Dockerfile", "requirements.txt", "packages.txt"},
+			keptHas:     map[string]string{"Dockerfile": runtime3 + "RUN echo hi\n"},
 			notes: []string{
-				"its RUN instructions were not read here",
+				"rather than moved onto the install base the Astro CLI builds, because requirements.txt has lines",
 				"kept, because your Dockerfile's base image reads it during the build",
+			},
+		},
+		{
+			// An earlier stage on an ONBUILD tag would still read the 1.x
+			// lists, so the file is left as it is, and the note says what to
+			// move.
+			name: "a Dockerfile with an earlier stage on an ONBUILD tag",
+			files: map[string]string{
+				"Dockerfile":       "FROM quay.io/astronomer/astro-runtime:3.1-12 AS deps\nRUN true\n" + runtime3 + "COPY --from=deps /tmp /tmp\n",
+				"requirements.txt": "pandas==2.1.0\n",
+			},
+			airflow: "3.1",
+			kept:    []string{"Dockerfile", "requirements.txt"},
+			notes: []string{
+				"because an earlier stage builds on quay.io/astronomer/astro-runtime:3.1-12",
+				"requirements.txt: kept, because your Dockerfile's base image reads it during the build",
 			},
 		},
 		{
 			// A declared build whose base names its Python. The manifest pins
 			// that minor, so uv locks for, and standalone mode runs, the Python
 			// the image runs rather than every one after the runtime's floor.
+			// The install base the build moves to follows it, and the build.
 			name: "a declared Dockerfile whose base names its Python",
 			files: map[string]string{
 				"Dockerfile":       "FROM astrocrpublic.azurecr.io/runtime:3.3-2-python-3.13\nRUN pip install --no-cache-dir uv\n",
 				"requirements.txt": "pandas==2.1.0\n",
 			},
 			airflow:     "3.3",
-			manifestHas: []string{"requires-python = '==3.13.*'", "dockerfile = 'Dockerfile'"},
-			kept:        []string{"Dockerfile", "requirements.txt"},
+			manifestHas: []string{"requires-python = '==3.13.*'", "dockerfile = 'Dockerfile'", "runtime = '3.3-2'"},
+			retired:     []string{"requirements.txt"},
+			kept:        []string{"Dockerfile"},
+			keptHas:     map[string]string{"Dockerfile": "\nFROM ${ASTRO_BASE}\n"},
 			notes:       []string{"its RUN instructions were not read here"},
 		},
 		{
@@ -741,7 +774,8 @@ func TestInitKeepsStdoutParseableWhenThe1xConfigWillNot(t *testing.T) {
 // one thing the context decides is the kind of link the saved deploy target
 // becomes: an apc link on the context's domain, marked default, where under
 // Astro it would be an Astro one. A Dockerfile FROM a mirror of Astro Runtime
-// is adopted there as anywhere, declared and kept as written.
+// is adopted there as anywhere: declared, and moved onto the install base,
+// the mirror recorded as [tool.astro] registry.
 func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 	tier(t, 0)
 
@@ -802,12 +836,18 @@ func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 	write(t, filepath.Join(mirrored.Dir, ".astro", "config.yaml"), "project:\n  name: mirrored\n")
 	const dockerfile = "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\nENV TZ=UTC\n"
 	write(t, filepath.Join(mirrored.Dir, "Dockerfile"), dockerfile)
-	mirrored.run("init", "--output", "json").requireSuccess()
-	if got := read(t, filepath.Join(mirrored.Dir, "Dockerfile")); got != dockerfile {
-		t.Errorf("the mirrored-base Dockerfile changed: %q", got)
+	var mirroredRes initResult
+	mirrored.run("init", "--output", "json").requireSuccess().requireJSON(&mirroredRes)
+	got := read(t, filepath.Join(mirrored.Dir, "Dockerfile"))
+	if !strings.Contains(got, "\nFROM ${ASTRO_BASE}\n") || !strings.HasSuffix(got, "\nENV TZ=UTC\n") {
+		t.Errorf("the mirrored-base Dockerfile is not moved onto the install base, with its step kept:\n%s", got)
 	}
-	if m := read(t, filepath.Join(mirrored.Dir, "pyproject.toml")); !strings.Contains(m, "dockerfile = ") {
-		t.Errorf("the mirrored-base Dockerfile is not declared under APC:\n%s", m)
+	if !reports(mirroredRes.Advisory, "mirror its -base tag too") {
+		t.Errorf("the advisories do not say to mirror the -base tag: %q", mirroredRes.Advisory)
+	}
+	if m := read(t, filepath.Join(mirrored.Dir, "pyproject.toml")); !strings.Contains(m, "dockerfile = ") ||
+		!strings.Contains(m, "registry = 'registry.corp.example/astronomer'") {
+		t.Errorf("the mirrored-base Dockerfile is not declared under APC with its registry:\n%s", m)
 	}
 }
 

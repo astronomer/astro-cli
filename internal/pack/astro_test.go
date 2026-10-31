@@ -410,15 +410,94 @@ func TestAstroBuildWritesTheContext(t *testing.T) {
 	assert.ErrorContains(t, err, "--context-dir writes only into a new or empty directory")
 }
 
-// A project that declares its own Dockerfile is its own build context.
-func TestAstroBuildRefusesAContextForADeclaredDockerfile(t *testing.T) {
+// baseDockerfile is a Dockerfile astro init moved onto the install base.
+const baseDockerfile = "# check=skip=InvalidDefaultArgInFrom\nARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nCOPY --chown=astro:0 . .\nRUN true\n"
+
+// For a project's own Dockerfile built on the install base, --context-dir
+// writes the project as its context and the base's build, and the commands
+// build the base, then the project with it as ASTRO_BASE and every secret:
+// two plain builds.
+func TestAstroBuildWritesADeclaredDockerfilesContext(t *testing.T) {
+	builder, docker := &fakeBuilder{}, &fakeDocker{}
 	req := testRequest(t)
-	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "Dockerfile"), []byte(baseDockerfile), 0o600))
 	req.Manifest.Astro.Dockerfile = "Dockerfile"
 	req.ContextDir = filepath.Join(t.TempDir(), "build")
-	_, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
-	assert.ErrorContains(t, err, "the project is its build context")
-	assert.NoDirExists(t, req.ContextDir)
+	req.BuildSecrets = []string{"id=netrc,env=NETRC_CONTENT", "id=other,src=/x"}
+	var baseTag string
+	req.ResolveInstall = func(_ context.Context, breq *imagebuild.Request, _ func(string)) error {
+		require.True(t, breq.UsesInstallBase())
+		breq.Install = &imagebuild.InstallLists{Requirements: []string{"pandas==2.2.3"}}
+		return nil
+	}
+	res, err := newAstro(builder, docker).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, KindContext, res.Kind)
+	dir := req.ContextDir
+	require.Len(t, res.NextSteps, 2)
+	base, project, ok := strings.Cut(res.NextSteps[0], " && ")
+	require.True(t, ok, res.NextSteps[0])
+	baseTag = strings.Fields(base)[5]
+	assert.True(t, strings.HasPrefix(baseTag, "localhost/"), baseTag)
+	assert.Equal(t, "docker build --platform linux/amd64 --tag "+baseTag+" --secret id=netrc,env=NETRC_CONTENT "+scaffold.ShellQuote(filepath.Join(dir, "base")), base)
+	assert.Equal(t, "docker build --platform linux/amd64 --tag astro-package/my-project:latest --build-arg ASTRO_BASE="+baseTag+
+		" --secret id=netrc,env=NETRC_CONTENT --secret id=other,src=/x "+scaffold.ShellQuote(filepath.Join(dir, "project")), project)
+	assert.True(t, strings.HasPrefix(res.NextSteps[1], "podman build"))
+	assert.Empty(t, docker.callStrings(), "no engine")
+	assert.Empty(t, builder.gotReq.Tag, "no build")
+	reqs, err := os.ReadFile(filepath.Join(dir, "base", "requirements.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, "pandas==2.2.3\n", string(reqs))
+	baseDF, err := os.ReadFile(filepath.Join(dir, "base", "Dockerfile"))
+	require.NoError(t, err)
+	assert.Contains(t, string(baseDF), "--mount=type=secret,id=netrc", "the netrc secret was given")
+	assert.FileExists(t, filepath.Join(dir, "project", "Dockerfile"))
+}
+
+// A declared Dockerfile built on the install base is addressed by the base's
+// tag too, so a change to the lists moves it; one that names its own FROM is
+// addressed by its bytes and the project's files.
+func TestContentHashCoversADeclaredDockerfilesInstallBase(t *testing.T) {
+	project := t.TempDir()
+	df := filepath.Join(project, "Dockerfile")
+	require.NoError(t, os.WriteFile(df, []byte(baseDockerfile), 0o600))
+	hash := func(lists *imagebuild.InstallLists) string {
+		t.Helper()
+		breq := imagebuild.Request{Dockerfile: df, Context: project, BaseImage: "astrocrpublic.azurecr.io/runtime:3.3-8", Install: lists}
+		got, err := contentHash("", "linux/amd64", "", breq, declaredDockerfile{rel: "Dockerfile", abs: df})
+		require.NoError(t, err)
+		return got
+	}
+	a := hash(&imagebuild.InstallLists{Requirements: []string{"pandas==2.2.3"}})
+	b := hash(&imagebuild.InstallLists{Requirements: []string{"pandas==2.2.2"}})
+	assert.NotEqual(t, a, b, "the lists are hashed")
+
+	require.NoError(t, os.MkdirAll(filepath.Join(project, "dags"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(project, "dags", "d.py"), []byte("x = 1\n"), 0o600))
+	assert.NotEqual(t, a, hash(&imagebuild.InstallLists{Requirements: []string{"pandas==2.2.3"}}), "the project's files are hashed")
+
+	require.NoError(t, os.WriteFile(df, []byte("FROM img:1\n"), 0o600))
+	assert.Equal(t, hash(&imagebuild.InstallLists{Requirements: []string{"pandas==2.2.3"}}),
+		hash(&imagebuild.InstallLists{Requirements: []string{"pandas==2.2.2"}}), "a Dockerfile on its own FROM")
+}
+
+// --base builds the install base alone and reports its tag; a project with
+// no Dockerfile on it is refused.
+func TestAstroBuildBaseOnly(t *testing.T) {
+	builder := &fakeBuilder{}
+	req := testRequest(t)
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "Dockerfile"), []byte(baseDockerfile), 0o600))
+	req.Manifest.Astro.Dockerfile = "Dockerfile"
+	req.BaseOnly = true
+	res, err := newAstro(builder, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, KindInstallBase, res.Kind)
+	assert.True(t, builder.gotReq.InstallBaseOnly)
+
+	req = testRequest(t)
+	req.BaseOnly = true
+	_, err = newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
+	assert.ErrorContains(t, err, "declares no Dockerfile")
 }
 
 func TestAstroBuildTagOverrideSkipsLatest(t *testing.T) {
@@ -769,4 +848,22 @@ func TestAstroBuildQuotesTheContextCommands(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret 'id=netrc,src=/Users/a b/.netrc' '"+req.ContextDir+"'",
 		res.NextSteps[0])
+}
+
+// A declared Dockerfile's printed commands are quoted for the shell too.
+func TestAstroBuildQuotesADeclaredDockerfilesCommands(t *testing.T) {
+	req := testRequest(t)
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "Dockerfile"), []byte(baseDockerfile), 0o600))
+	req.Manifest.Astro.Dockerfile = "Dockerfile"
+	req.ContextDir = filepath.Join(t.TempDir(), "my build")
+	req.ResolveInstall = func(_ context.Context, breq *imagebuild.Request, _ func(string)) error {
+		breq.Install = &imagebuild.InstallLists{}
+		return nil
+	}
+	res, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	dir := req.ContextDir
+	_, project, _ := strings.Cut(res.NextSteps[0], " && ")
+	assert.True(t, strings.HasSuffix(project, " '"+filepath.Join(dir, "project")+"'"), project)
+	assert.Contains(t, res.NextSteps[0], " '"+filepath.Join(dir, "base")+"' && ")
 }

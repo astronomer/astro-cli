@@ -20,6 +20,18 @@ func TestSecretMounts(t *testing.T) {
 			want: []SecretMount{{ID: "netrc", Line: 2}},
 		},
 		{
+			name: "an optional mount, and one that is optional only once",
+			body: "FROM x\nRUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false a\n" +
+				"RUN --mount=type=secret,id=pip,required=false b\nRUN --mount=type=secret,id=pip,required c\n",
+			want: []SecretMount{{ID: "netrc", Line: 2, Optional: true}, {ID: "pip", Line: 3}},
+		},
+		{
+			name: "required read as BuildKit reads it",
+			body: "FROM x\nRUN --mount=type=secret,id=a,required=0 a\nRUN --mount=type=secret,id=b,required=F b\n" +
+				"RUN --mount=type=secret,id=c,required c\nRUN --mount=type=secret,id=d,required=maybe d\n",
+			want: []SecretMount{{ID: "a", Line: 2, Optional: true}, {ID: "b", Line: 3, Optional: true}, {ID: "c", Line: 4}, {ID: "d", Line: 5}},
+		},
+		{
 			name: "continued over lines with a comment inside",
 			body: "FROM x\n\nRUN \\\n  # private index\n  --mount=type=secret,id=pip,target=/etc/pip.conf \\\n  pip install foo\n",
 			want: []SecretMount{{ID: "pip", Line: 3}},

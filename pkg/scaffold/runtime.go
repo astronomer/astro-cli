@@ -15,6 +15,10 @@ import (
 // (setRuntimeDeclaration) because the pin alone cannot name it.
 var runtimePath = []string{"tool", "astro", "runtime"}
 
+// registryPath is [tool.astro] registry, the mirror a converted Dockerfile's
+// base was on.
+var registryPath = []string{"tool", "astro", "registry"}
+
 // RuntimeChange is what AlignRuntime or SetRuntime did to [tool.astro] runtime.
 type RuntimeChange struct {
 	// Previous is the runtime the manifest named, "" when it named none.
@@ -49,17 +53,15 @@ func alignRuntime(before *manifest.Manifest, ed tomledit.Editor, pin string, cat
 	if current == "" {
 		return "", false, nil
 	}
-	if before.Astro.Dockerfile == "" {
-		if t, ok := manifest.ParseRuntimeTag(current); ok && t.Build && t.Agrees(pin) && !catalogExcludes(catalog, current, pin) {
-			return "", false, nil
-		}
-		if catalog != nil {
-			if next, ok := catalog.NewestRuntimeFor(pin); ok {
-				if err := ed.Set(runtimePath, next); err != nil {
-					return "", false, err
-				}
-				return next, false, nil
+	if t, ok := manifest.ParseRuntimeTag(current); ok && t.Build && t.Agrees(pin) && !catalogExcludes(catalog, current, pin) {
+		return "", false, nil
+	}
+	if catalog != nil {
+		if next, ok := catalog.NewestRuntimeFor(pin); ok {
+			if err := ed.Set(runtimePath, next); err != nil {
+				return "", false, err
 			}
+			return next, false, nil
 		}
 	}
 	return "", ed.Delete(runtimePath), nil
@@ -86,11 +88,10 @@ func catalogExcludes(catalog *runtimeversions.Catalog, runtime, pin string) bool
 var errAirflowUnclear = errors.New("the Airflow requirement in [project] dependencies does not state one version, so no runtime build can be checked against it. Pin the requirement first")
 
 // AlignRuntime repairs [tool.astro] runtime, through EditManifest: the fix for
-// manifest.CodeRuntimeMismatch, CodeRuntimeInvalid and
-// CodeRuntimeWithDockerfile, which the desktop's attention card offers. A build
-// that agrees with the requirement (with opts.Catalog, by the Airflow it
-// carries too) is left alone; one beside a declared
-// dockerfile is deleted; any other moves to the newest non-yanked build
+// manifest.CodeRuntimeMismatch and CodeRuntimeInvalid, which the desktop's
+// attention card offers. A build that agrees with the requirement (with
+// opts.Catalog, by the Airflow it carries too) is left alone; any other moves
+// to the newest non-yanked build
 // carrying the requirement's pin when opts.Catalog names one, and is deleted
 // when not. The requirement itself never changes: moving it to the build's
 // series is SetAirflowVersionWith, the caller's to offer.
@@ -130,7 +131,7 @@ func AlignRuntime(dir string, wrap func(run func() error) error, opts AirflowPin
 // when runtime is empty: the edit behind choosing a newer build of the same
 // series, which the desktop's upgrade offer makes. The result is held to the
 // manifest's own rules, so a build of another series than the requirement, a
-// value that is not a build, or a runtime beside a declared dockerfile is
+// value that is not a build is
 // refused (ErrEditRefused, wrapping the manifest.ValidationError that names
 // it) and nothing is written. Whether the catalog lists the build, and whether
 // it is yanked, is checked where an image is built, not here.

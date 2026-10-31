@@ -3,11 +3,14 @@ package imagebuild
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -82,6 +85,39 @@ func TestCheckBuildSecretEnv(t *testing.T) {
 	err = checkBuildSecretEnv([]string{"id=pw,env=hunter2,def"})
 	assert.ErrorContains(t, err, "not a key=value pair")
 	assert.NotContains(t, err.Error(), "hunter2")
+}
+
+// A mount that says required=false, as the install step's netrc mount does, is
+// not warned about on every build; a mount of the project's own still
+// is, and a failed build names only that one: the build ran the install step
+// without netrc, so its absence is not why it failed.
+func TestMissingBuildSecretsLeavesTheInstallStepsMountOutOfTheWarnings(t *testing.T) {
+	dir := t.TempDir()
+	body := airflowrt.InstallBaseDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", true) +
+		"RUN --mount=type=secret,id=pip,target=/etc/pip.conf pip install foo\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(body), 0o600))
+
+	m := MissingBuildSecrets(dir, "Dockerfile", nil)
+	require.Len(t, m.Mounts, 2)
+	warnings := m.Warnings()
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], `build secret "pip"`)
+	explained := m.Explain(fmt.Errorf("%w: exit status 1", ErrDockerfileBuild)).Error()
+	assert.Contains(t, explained, `build secret "pip", which was not given`)
+	assert.NotContains(t, explained, "netrc")
+}
+
+// A failed build of a Dockerfile whose only missing mount is optional comes
+// back as it is: nothing blames the secret.
+func TestExplainLeavesAFailureAloneWhenOnlyAnOptionalMountIsMissing(t *testing.T) {
+	m := MissingSecrets{Dockerfile: "Dockerfile", Mounts: []airflowrt.SecretMount{{ID: "netrc", Line: 9, Optional: true}}}
+	failed := fmt.Errorf("%w: exit status 1", ErrDockerfileBuild)
+	assert.Equal(t, failed, m.Explain(failed))
+}
+
+// The install step mounts the secret the manifest names for a private index.
+func TestInstallBaseMountsTheRuntimeSecret(t *testing.T) {
+	assert.Contains(t, airflowrt.InstallBaseDockerfile("x", true), "--mount=type=secret,id="+manifest.RuntimeSecretID+",")
 }
 
 func TestMissingSecretsNameNoToolWithoutAHint(t *testing.T) {

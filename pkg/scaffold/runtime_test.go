@@ -169,8 +169,8 @@ func TestAlignRuntime(t *testing.T) {
 		{name: "a malformed tag moves", body: withRuntime("apache-airflow==3.3.*", "newest"), catalog: true, wantRuntime: "3.3-8", wantChanged: true},
 		{name: "a floating tag moves", body: withRuntime("apache-airflow==3.3.*", "3.3"), catalog: true, wantRuntime: "3.3-8", wantChanged: true},
 		{
-			name: "beside a dockerfile it goes", body: withRuntime("apache-airflow==3.3.*", "3.3-8") + "dockerfile = 'Dockerfile'\n",
-			catalog: true, wantRemoved: true, wantChanged: true,
+			name: "beside a dockerfile an agreeing build is left", body: withRuntime("apache-airflow==3.3.*", "3.3-8") + "dockerfile = 'Dockerfile'\n",
+			catalog: true, wantRuntime: "3.3-8",
 		},
 		{name: "no runtime", body: "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.3.*']\n\n[tool.astro]\n", catalog: true},
 	}

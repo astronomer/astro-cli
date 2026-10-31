@@ -1,5 +1,5 @@
-// Package imageinstall decides what a generated Airflow image installs, on the
-// host, before the build: it resolves the project with the host's uv and
+// Package imageinstall decides what an Airflow image installs, on the host,
+// before the build: it resolves the project with the host's uv and
 // applies the image's policy to the lock (apply), handing the build its
 // requirements.txt, uv-lock-constraints.txt and packages.txt ready-made
 // (imagebuild.InstallLists). The build resolves nothing, so its context is
@@ -7,7 +7,9 @@
 //
 // Every generated build goes through Fill: local Docker mode, `astro package
 // astro` and a deploy's build alike, so the three install the same versions
-// from the same project.
+// from the same project. So does a project's own Dockerfile built on the
+// install base (FROM ${ASTRO_BASE}, as astro init writes a converted one),
+// whose base installs the lists (airflowrt.InstallBaseDockerfile).
 package imageinstall
 
 import (
@@ -73,8 +75,11 @@ func Fill(ctx context.Context, req *imagebuild.Request, warn func(string)) error
 // Fill sets req.Install to what the generated build req describes installs,
 // from its project's pyproject.toml and uv.lock (req.ManifestDir, else
 // req.ProjectFiles), saying through warn what it could not do. A declared
-// Dockerfile, a request naming no project, and a project with no
-// pyproject.toml are left as they are, to install the request's own fields
+// Dockerfile built on the install base (imagebuild.Request.UsesInstallBase)
+// is resolved the same way, against the runtime that base is built on
+// (req.BaseImage). Any other declared Dockerfile, a request
+// naming no project, and a project with no pyproject.toml are left as they
+// are, to install the request's own fields
 // unpinned (imagebuild.UnpinnedLists), and so is a project uv cannot lock.
 //
 // A uv.lock that is missing or out of date with pyproject.toml, by `uv lock
@@ -87,9 +92,13 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 	if warn == nil {
 		warn = func(string) {}
 	}
-	if req.FromDeclaredDockerfile() {
+	// The runtime whose files the policy reads: the base a generated build,
+	// or a declared Dockerfile's install base, is built on, an exact build or
+	// a series tag alike (runtimeOf).
+	if req.FromDeclaredDockerfile() && !req.UsesInstallBase() {
 		return nil
 	}
+	base := req.BaseImage
 	project := req.ManifestDir
 	if project == "" {
 		project = req.ProjectFiles
@@ -124,7 +133,7 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 	}
 
 	in := policyInput{pyproject: pyproject, pylock: exported, packages: req.Packages}
-	build, python := r.runtimeOf(ctx, req.BaseImage)
+	build, python := r.runtimeOf(ctx, base)
 	if build != "" && python != "" {
 		if r.Constraints != nil {
 			if pins, err := r.Constraints(ctx, build, python); err == nil {
@@ -138,7 +147,7 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 		}
 	}
 	if in.baseInstalled == nil {
-		warn(fmt.Sprintf("the package list of %s could not be read, so the image pins the project's own dependencies to uv.lock's versions and leaves the rest to the install", baseName(req.BaseImage)))
+		warn(fmt.Sprintf("the package list of %s could not be read, so the image pins the project's own dependencies to uv.lock's versions and leaves the rest to the install", baseName(base)))
 	}
 	lists, warnings, err := apply(&in)
 	if err != nil {

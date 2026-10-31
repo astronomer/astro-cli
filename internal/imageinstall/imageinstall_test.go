@@ -283,8 +283,32 @@ func TestFillWithoutUV(t *testing.T) {
 	assert.Contains(t, warnings[0], "uv is needed to read the lock, and it was not found")
 }
 
-// Nothing to resolve: a declared Dockerfile, a request naming no project, a
-// project with no pyproject.toml. uv is not asked.
+// A project's own Dockerfile built on the install base is resolved as a
+// generated build is, against the runtime the base is built on, the build and
+// Python both read from it.
+func TestFillResolvesADeclaredDockerfileAgainstItsInstallBase(t *testing.T) {
+	r := testResolver(t, []string{"urllib3==2.5.0"}, []string{"requests==2.31.0", "idna==3.7", "certifi==2024.1.1", "urllib3==2.5.0"})
+	var asked []string
+	freeze := r.Freeze
+	r.Freeze = func(ctx context.Context, build, python string) ([]string, error) {
+		asked = append(asked, build+" "+python)
+		return freeze(ctx, build, python)
+	}
+	dir := fixture(t, "pins")
+	df := filepath.Join(dir, "Dockerfile")
+	require.NoError(t, os.WriteFile(df, []byte("ARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nRUN true\n"), 0o600))
+	req := imagebuild.Request{Dockerfile: df, Context: dir, ManifestDir: dir, BaseImage: imagebuild.RuntimeImageRepo + ":3.1-5-python-3.12"}
+	var warnings []string
+	require.NoError(t, r.Fill(t.Context(), &req, func(w string) { warnings = append(warnings, w) }))
+	assert.Empty(t, warnings)
+	require.NotNil(t, req.Install)
+	assert.Equal(t, []string{"idna==3.20", "requests==2.32.3", "tabulate==0.10.0"}, req.Install.Requirements)
+	assert.Equal(t, []string{"3.1-5 3.12"}, asked)
+}
+
+// Nothing to resolve: a declared Dockerfile that is not built on the install
+// base, a request naming no project, a project with no pyproject.toml. uv
+// is not asked.
 func TestFillLeavesWhatItCannotResolve(t *testing.T) {
 	r := Resolver{UV: func(context.Context) (UV, error) {
 		t.Fatal("uv asked for")

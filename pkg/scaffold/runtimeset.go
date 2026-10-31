@@ -24,11 +24,6 @@ var ErrInvalidPython = errors.New("not a Python this runtime build runs")
 // pythonMinorRe is a Python minor version, as a caller names one.
 var pythonMinorRe = regexp.MustCompile(`^3\.\d+$`)
 
-// onePythonRe is the requires-python SetRuntimeBuildWith writes to choose one
-// Python: it admits that minor alone, so the image and the standalone venv
-// both run it whatever the build's default (runtimeversions.ProjectPython).
-var onePythonRe = regexp.MustCompile(`^==3\.\d+\.\*$`)
-
 // RuntimeBuildChange is what SetRuntimeBuildWith did to a manifest.
 type RuntimeBuildChange struct {
 	// Previous is the runtime the manifest named, "" when it named none.
@@ -65,13 +60,16 @@ type RuntimeBuildChange struct {
 //     its tag names none.
 //   - python, when given, is the Python the image and the standalone venv
 //     run: requires-python becomes "==python.*". It has to be one the build
-//     ships, when the catalog lists the build. Without it the build's default
-//     is used: a requires-python that admits the default stays, one that
-//     chose another single Python (the shape python writes) moves to the
-//     series' bound, and one that admits no Python the build ships is refused.
+//     ships, when the catalog lists the build. Without it requires-python
+//     stays as it is: a range runs the build's default when it admits it, and
+//     a single Python (the shape python writes, or astro init's from a
+//     -python-X.Y image) stays chosen when the build ships it. One that admits
+//     no Python the build ships is refused, naming the ones it does, since
+//     only python moves the project to another.
 //
-// A build beside a declared dockerfile is refused: the Dockerfile's FROM line
-// picks the image there. Whether the build is yanked, or listed at all, is the
+// A build beside a declared dockerfile whose FROM line picks the image is
+// refused, since the build would pick nothing; one built on the install base
+// (FROM ${ASTRO_BASE}, as astro init writes a converted one) takes it. Whether the build is yanked, or listed at all, is the
 // caller's to report (runtimeversions.Catalog.CheckRuntime): a build published
 // after the catalog was cached is an ordinary reason to name one it lacks.
 func SetRuntimeBuildWith(dir string, wrap func(run func() error) error, build, python string, opts AirflowPinOptions) (RuntimeBuildChange, error) {
@@ -82,6 +80,10 @@ func SetRuntimeBuildWith(dir string, wrap func(run func() error) error, build, p
 	var out RuntimeBuildChange
 	err = EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
 		var err error
+		if declaredOwnBase(dir, before) {
+			return fmt.Errorf("this project declares %s in [tool.astro] dockerfile, and its FROM line picks the runtime. "+
+				"Run astro init to move it onto the install base, whose runtime pyproject.toml picks, then run this again", before.Astro.Dockerfile)
+		}
 		out, err = e.apply(before, ed)
 		return err
 	})
@@ -128,9 +130,6 @@ func newRuntimeBuildEdit(build, python string, opts AirflowPinOptions) (*runtime
 
 // apply is the edit itself.
 func (e *runtimeBuildEdit) apply(before *manifest.Manifest, ed tomledit.Editor) (RuntimeBuildChange, error) {
-	if before.Astro.Dockerfile != "" {
-		return RuntimeBuildChange{}, fmt.Errorf("this project declares %s in [tool.astro] dockerfile, so its FROM line picks the runtime. Change the FROM line instead", before.Astro.Dockerfile)
-	}
 	out := RuntimeBuildChange{Previous: before.Astro.Runtime, Runtime: e.build, AirflowVersion: e.rt.AirflowVersion}
 	current := before.Airflow().Pin
 	if before.AirflowUnclear() {
@@ -158,7 +157,7 @@ func (e *runtimeBuildEdit) apply(before *manifest.Manifest, ed tomledit.Editor) 
 			return RuntimeBuildChange{}, err
 		}
 	}
-	next, python, err := e.requiresPython(rp, pin)
+	next, python, err := e.requiresPython(rp)
 	if err != nil {
 		return RuntimeBuildChange{}, err
 	}
@@ -183,16 +182,11 @@ func (e *runtimeBuildEdit) apply(before *manifest.Manifest, ed tomledit.Editor) 
 // requiresPython is the requires-python to write beside the build, given rp,
 // the one the manifest holds after any pin move, and the Python the build's
 // image then runs, "" when the catalog cannot tell.
-func (e *runtimeBuildEdit) requiresPython(rp, pin string) (next, python string, err error) {
+func (e *runtimeBuildEdit) requiresPython(rp string) (next, python string, err error) {
 	next = rp
 	def := strings.TrimSpace(e.rt.DefaultPythonVersion)
-	switch {
-	case e.python != "":
+	if e.python != "" {
 		next = "==" + e.python + ".*"
-	case e.listed && onePythonRe.MatchString(rp):
-		if p, decided := e.rt.ImagePython(rp); decided && p != def {
-			next = pythonBoundFor(pin, e.opts.Catalog)
-		}
 	}
 	if !e.listed {
 		return next, "", nil

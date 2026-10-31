@@ -128,8 +128,9 @@ func (m *Manifest) requirementLine() string {
 	return AirflowRequirement(m.Airflow().Pin)
 }
 
-// runtime checks [tool.astro] runtime: its shape, that no dockerfile is
-// declared beside it, and that the build agrees with the requirement.
+// runtime checks [tool.astro] runtime: its shape, and that the build agrees
+// with the requirement. A declared dockerfile beside it is fine: one built
+// FROM ${ASTRO_BASE} builds on the install base runtime picks.
 //
 // The comparison is skipped when the requirement itself is unclear, because
 // there is nothing to compare against and the requirement's own problem
@@ -137,12 +138,6 @@ func (m *Manifest) requirementLine() string {
 func (p *parser) runtime(m *Manifest) {
 	tag := m.Astro.Runtime
 	if tag == "" {
-		return
-	}
-	if m.Astro.Dockerfile != "" {
-		p.add(CodeRuntimeWithDockerfile, runtimeKey, fmt.Sprintf(
-			"picks a runtime build, and the declared dockerfile %s names its own base image in its FROM line, so this would pick nothing. "+
-				"Delete the runtime line, or change the FROM line", m.Astro.Dockerfile))
 		return
 	}
 	t, ok := ParseRuntimeTag(tag)
@@ -254,8 +249,53 @@ func (m *Manifest) DockerfileRuntimeProblem(from, tag string) (Problem, bool) {
 	}, true
 }
 
+// DockerfileReleaseProblem is DockerfileRuntimeProblem for the Airflow release
+// a declared Dockerfile's base carries, when the caller knows it (an Airflow 2
+// tag names only the generation, so only the catalog does: runtime 12.6.0
+// carries 2.10.4). It reports the requirement not covering that release, a pin
+// of 2.11 against a 2.10 image, with the same code and key, so a caller shows it
+// as it does the tag's own disagreement. false when the pin covers it, or when
+// there is no pin or no release to compare.
+func (m *Manifest) DockerfileReleaseProblem(from, release string) (Problem, bool) {
+	pin := m.Airflow().Pin
+	release = strings.TrimSpace(release)
+	if pin == "" || release == "" || release == pin || strings.HasPrefix(release, pin+".") {
+		return Problem{}, false
+	}
+	series := Airflow{Pin: release}.Series()
+	req := m.requirementLine()
+	return Problem{
+		Code: CodeDockerfileAirflowMismatch,
+		Key:  astroRoot + ".dockerfile",
+		Reason: fmt.Sprintf("%s builds FROM %s, which carries Airflow %s, and the requirement %s in [project] dependencies is Airflow %s: "+
+			"Docker mode would run one and standalone the other. To fix it, change the requirement to %s, or change the FROM line to a runtime that carries Airflow %s",
+			m.Astro.Dockerfile, from, release, req, describePin(pin), requirementFor(DistName(req), series), describePin(pin)),
+	}, true
+}
+
 // describePin is a pin as a message names it: its series, or its generation
 // when it names no minor.
 func describePin(pin string) string {
 	return Airflow{Pin: pin}.Series()
+}
+
+// registryKey is [tool.astro] registry's key, for a problem.
+const registryKey = astroRoot + ".registry"
+
+// registryRe is a registry and namespace as an image reference starts: a host
+// (with an optional port) or a Docker Hub namespace, then path segments, each
+// what a repository name may hold, lowercase.
+var registryRe = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\.[a-z0-9]+(?:[._-][a-z0-9]+)*)*(?::[0-9]+)?(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$`)
+
+// registry reads [tool.astro] registry, trimmed and without a trailing slash,
+// and refuses one that is not a registry and namespace (registryRe): a scheme,
+// a tag or a digest included.
+func (p *parser) registry(v any) string {
+	registry := strings.TrimRight(strings.TrimSpace(p.str(registryKey, v)), "/")
+	if registry != "" && !registryRe.MatchString(registry) {
+		p.add(CodeRegistryInvalid, registryKey, fmt.Sprintf(
+			"%q is not a registry and namespace like registry.example.com/astronomer. Name where the mirror serves the runtime images, "+
+				"without a scheme, an image name or a tag", registry))
+	}
+	return registry
 }

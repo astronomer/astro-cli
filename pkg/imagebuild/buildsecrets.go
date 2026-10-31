@@ -105,13 +105,20 @@ func MissingBuildSecrets(projectDir, dockerfile string, secrets []string) Missin
 
 // Warnings are the lines a caller prints before the build, one per missing
 // secret. A warning and not a refusal, because a secret mount is optional
-// unless it says required=true.
+// unless it says required=true. None for a mount that says required=false
+// (SecretMount.Optional), such as the netrc mount of the install step a
+// rewritten Dockerfile carries: it is optional by its author's say, and a
+// build without it is the ordinary case. Explain still names it, should the
+// build fail.
 func (m MissingSecrets) Warnings() []string {
 	var warnings []string
 	for _, id := range m.Dropped {
 		warnings = append(warnings, fmt.Sprintf("build secret %q is not used: an image built without a Dockerfile reads only the %s secret", id, manifest.RuntimeSecretID))
 	}
 	for _, mount := range m.Mounts {
+		if mount.Optional {
+			continue
+		}
 		warnings = append(warnings, fmt.Sprintf("%s mounts build secret %q (line %d) but none was given%s",
 			m.Dockerfile, mount.ID, mount.Line, m.hint([]string{mount.ID})))
 	}
@@ -127,16 +134,24 @@ func (m MissingSecrets) hint(ids []string) string {
 
 // Explain adds the missing secrets to a failed build of the project's
 // Dockerfile, where the warning printed before the build has scrolled out of
-// sight. Any other error comes back as it is.
+// sight. Any other error comes back as it is. Like Warnings it leaves out a
+// mount that says required=false (SecretMount.Optional): the build runs that
+// step without it, so its absence is not why the build failed, and naming it
+// would send the user after a secret while the real cause sits in the output.
 func (m MissingSecrets) Explain(err error) error {
-	if len(m.Mounts) == 0 || !errors.Is(err, ErrDockerfileBuild) {
+	if !errors.Is(err, ErrDockerfileBuild) {
 		return err
 	}
-	ids := make([]string, len(m.Mounts))
-	quoted := make([]string, len(m.Mounts))
-	for i, mount := range m.Mounts {
-		ids[i] = mount.ID
-		quoted[i] = strconv.Quote(mount.ID)
+	var ids, quoted []string
+	for _, mount := range m.Mounts {
+		if mount.Optional {
+			continue
+		}
+		ids = append(ids, mount.ID)
+		quoted = append(quoted, strconv.Quote(mount.ID))
+	}
+	if len(ids) == 0 {
+		return err
 	}
 	if len(ids) == 1 {
 		return fmt.Errorf("%w. %s mounts build secret %s, which was not given%s", err, m.Dockerfile, quoted[0], m.hint(ids))

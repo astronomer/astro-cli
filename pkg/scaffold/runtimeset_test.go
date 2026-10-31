@@ -1,11 +1,15 @@
 package scaffold
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
@@ -91,11 +95,33 @@ func TestSetRuntimeBuildPicksAPython(t *testing.T) {
 	assert.Equal(t, "3.12", change.Python)
 	assert.Contains(t, readFile(t, path), "requires-python = '==3.12.*'")
 
-	// Without --python again, the build's default comes back.
+	// Without --python again, the chosen Python stays: only python moves it.
 	change, err = SetRuntimeBuildWith(dir, nil, "3.3-10", "", AirflowPinOptions{Catalog: buildCatalog(t)})
 	require.NoError(t, err)
-	assert.Equal(t, ">=3.12", change.RequiresPython, "the series' bound, from the catalog")
-	assert.Equal(t, "3.13", change.Python)
+	assert.Empty(t, change.RequiresPython)
+	assert.Equal(t, "3.12", change.Python)
+	assert.Contains(t, readFile(t, path), "requires-python = '==3.12.*'")
+}
+
+// A project on one Python (an earlier --python, or astro init's from a
+// -python-X.Y image) keeps it on a build that ships it, not the build's
+// default, and is refused on one that does not.
+func TestSetRuntimeBuildKeepsAPinnedPython(t *testing.T) {
+	src := strings.Replace(seriesProject("apache-airflow==3.3.*", ""), "requires-python = '>=3.12'", "requires-python = '==3.12.*'", 1)
+
+	dir, path := writeEditFixture(t, src, 0o644)
+	change, err := SetRuntimeBuildWith(dir, nil, "3.3-10", "", AirflowPinOptions{Catalog: buildCatalog(t)})
+	require.NoError(t, err)
+	assert.Empty(t, change.RequiresPython, "3.3-10 ships 3.12, so it stays")
+	assert.Equal(t, "3.12", change.Python, "not the build's default, 3.13")
+	assert.Contains(t, readFile(t, path), "requires-python = '==3.12.*'")
+
+	dir, path = writeEditFixture(t, src, 0o644)
+	_, err = SetRuntimeBuildWith(dir, nil, "3.4-1", "", AirflowPinOptions{Catalog: buildCatalog(t)})
+	require.ErrorIs(t, err, ErrInvalidPython)
+	assert.Contains(t, err.Error(), "3.13, 3.14")
+	assert.Contains(t, err.Error(), "--python")
+	assert.Equal(t, src, readFile(t, path), "a refused move writes nothing")
 }
 
 // A Python given across a series move is the one requires-python reports,
@@ -131,7 +157,7 @@ func TestSetRuntimeBuildRefuses(t *testing.T) {
 		{"an unlisted Airflow 2 build", seriesProject("apache-airflow==2.11.*", ""), "13.99.0", "", true, "lists no build 13.99.0"},
 		{"an unlisted build of another series", seriesProject("apache-airflow==3.3.*", ""), "3.9-1", "", true, "not moved to Airflow 3.9"},
 		{"an Airflow 2 build offline", seriesProject("apache-airflow==2.11.*", ""), "13.11.0", "", false, "could not be read"},
-		{"a declared Dockerfile", seriesProject("apache-airflow==3.3.*", "dockerfile = 'Dockerfile'\n"), "3.3-7", "", true, "FROM line"},
+		{"a declared Dockerfile on its own FROM", seriesProject("apache-airflow==3.3.*", "dockerfile = 'Dockerfile'\n"), "3.3-7", "", true, "Run astro init to move it onto the install base"},
 		{"a range no build Python meets", "[project]\nname = 'x'\nrequires-python = '>=3.14'\ndependencies = ['apache-airflow==3.3.*']\n\n[tool.astro]\n", "3.3-7", "", true, "Pass --python"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -170,4 +196,21 @@ func TestSetRuntimeBuildTheSameBuildWritesNothing(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, change.Changed)
 	assert.Equal(t, src, readFile(t, path))
+}
+
+// A Dockerfile built on the install base takes its runtime from pyproject.toml,
+// so a build is set beside it as for a project with none; one on its own FROM
+// is refused (TestSetRuntimeBuildRefuses).
+func TestSetRuntimeBuildBesideADockerfileOnTheInstallBase(t *testing.T) {
+	dir, path := writeEditFixture(t, seriesProject("apache-airflow==3.3.*", "dockerfile = 'Dockerfile'\n"), 0o644)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, fileDockerfile),
+		[]byte(airflowrt.BaseArgCheckDirective+"\nARG ASTRO_BASE\nFROM ${ASTRO_BASE}\nCOPY --chown=astro:0 . .\nRUN true\n"), 0o600))
+
+	change, err := SetRuntimeBuildWith(dir, nil, "3.3-10", "", AirflowPinOptions{Catalog: buildCatalog(t)})
+	require.NoError(t, err)
+	assert.Equal(t, "3.3-10", change.Runtime)
+	m, err := manifest.Parse([]byte(readFile(t, path)))
+	require.NoError(t, err)
+	assert.Equal(t, "3.3-10", m.Airflow().Runtime)
+	assert.Equal(t, "Dockerfile", m.Astro.Dockerfile)
 }

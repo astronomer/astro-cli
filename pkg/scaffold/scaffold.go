@@ -54,6 +54,13 @@ type Options struct {
 	// nil means runtimeversions.FallbackAirflowSeries, with no lookup, reported
 	// as runtimeversions.SourceBuiltIn.
 	Default DefaultAirflow
+	// RuntimeAirflow answers the Airflow an Astro Runtime build carries
+	// ("12.6.0" → "2.10.4"), or "" when it does not know. A 1.x Dockerfile on
+	// one Airflow 2 build then pins that Airflow's series (2.10) rather than
+	// the generation (2), whose newest Airflow 2 is not what the image runs.
+	// Asked at most once, and only for such a Dockerfile; nil keeps the pin
+	// "2" and its note, which is what Plan does offline.
+	RuntimeAirflow func(build string) string
 	// GOOS overrides runtime.GOOS, so tests can check the Windows layout
 	// (no CLAUDE.md symlink) from any host.
 	GOOS string
@@ -368,6 +375,7 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	if err != nil {
 		return nil, err
 	}
+	refineAirflow2Pin(from1x, opts.RuntimeAirflow)
 	from1x.apcDomain = manifest.NormalizeAPCDomain(opts.APCDomain)
 	from1x.apcWorkspace = opts.APCWorkspace
 
@@ -395,6 +403,18 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	if err := planFiles(abs, goos != windowsOS, cs); err != nil {
 		return nil, err
 	}
+
+	// Whether the Dockerfile moves onto its -base tag rests on whether the
+	// two 1.x lists were carried whole, which the notes so far say: a line
+	// either could not carry is in a note naming it. So it is decided here,
+	// once the manifest is settled, and before the ignore file, which then
+	// has to keep what the rewritten build reads. The rewrite's own changes
+	// add files, so they go ahead of the manifest like every other addition.
+	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x)
+	planDockerfileRewrite(from1x, slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs)
+	if err := planStaleHelperRemoval(abs, cs); err != nil {
+		return nil, err
+	}
 	if err := planKeptDockerfileIgnore(abs, from1x, cs); err != nil {
 		return nil, err
 	}
@@ -419,7 +439,6 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	// The 1.x notes lead: they are about the files this run just read, so they
 	// describe what it could not carry. leftovers is about files it did not read
 	// at all, which is a weaker statement and belongs after.
-	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x)
 	cs.Notes = slices.Concat(from1x.notes, pin.migrationNotes, lefts)
 
 	// The values airflow_settings.yaml supplied. They ride the changeset rather
@@ -603,7 +622,13 @@ func planRetirements(from1x *project1x, notes []string, pinned string) []string 
 	// Kept rather than un-migrated: the manifest lists stay, because a project
 	// that later drops its Dockerfile needs them, and they cost nothing while the
 	// declaration stands. The note below tells the user both exist.
-	if declaresDockerfile(from1x) {
+	//
+	// Not for a Dockerfile this run moves onto its -base tag: nothing reads
+	// either file then, and the rewrite happened only because both were carried
+	// whole (planDockerfileRewrite).
+	// Nor for one no stage of which can run ONBUILD steps (listsRead): nothing
+	// reads the lists then either.
+	if declaresDockerfile(from1x) && from1x.rewrite == nil && from1x.listsRead {
 		out = slices.DeleteFunc(out, func(name string) bool {
 			return name == "requirements.txt" || name == "packages.txt"
 		})
@@ -614,9 +639,9 @@ func planRetirements(from1x *project1x, notes []string, pinned string) []string 
 	// and packages.txt is consumed the same way by the runtime image's ONBUILD
 	// step, from the build context.
 	if !slices.Contains(out, "Dockerfile") && len(from1x.dockerfileBody) > 0 {
-		body := string(from1x.dockerfileBody)
+		lines := strings.Split(string(from1x.dockerfileBody), "\n")
 		out = slices.DeleteFunc(out, func(name string) bool {
-			return strings.Contains(body, name)
+			return instructionsName(lines, name)
 		})
 	}
 	return out
@@ -719,14 +744,25 @@ func setDockerfileDeclaration(ed tomledit.Editor, from1x *project1x) error {
 // requirement won, and the Dockerfile stays behind as the record of what it
 // was (dockerfileIsSpent).
 //
-// This is the one runtime line a conversion writes. An Airflow 3 tag needs
-// none, its series being the pin, and a declared Dockerfile picks its own
-// base.
+// A Dockerfile the conversion moves onto the install base (dockerfileRewrite)
+// gives its runtime the same way: the one build its tag named, when the
+// requirement is the one that tag gave, and the mirror it was on as
+// [tool.astro] registry, since the file names neither any more. An Airflow 3
+// series tag needs no runtime line, its series being the pin.
 func setRuntimeDeclaration(ed tomledit.Editor, from1x *project1x, pinned string) error {
-	if from1x.runtime == "" || pinned != from1x.airflow {
+	build := from1x.runtime
+	if rw := from1x.rewrite; rw != nil {
+		build = rw.runtime
+		if rw.registry != "" {
+			if err := ed.Set(registryPath, rw.registry); err != nil {
+				return err
+			}
+		}
+	}
+	if build == "" || pinned != from1x.airflow {
 		return nil
 	}
-	return ed.Set(runtimePath, from1x.runtime)
+	return ed.Set(runtimePath, build)
 }
 
 // namedInAny reports whether any note is about this file.

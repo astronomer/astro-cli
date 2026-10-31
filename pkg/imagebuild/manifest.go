@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -34,6 +35,7 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 		ProjectDir:     dir,
 		AirflowVersion: airflow.Pin,
 		Runtime:        airflow.Runtime,
+		Registry:       m.Astro.Registry,
 		RequiresPython: m.Project.RequiresPython,
 		Dockerfile:     m.Astro.Dockerfile,
 		Dependencies:   deps,
@@ -55,9 +57,12 @@ type BaseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // every caller building from a manifest builds the same image from it.
 //
 // A declared Dockerfile is the build: the returned Request carries the file,
-// resolved against the project, and the project as its context, and no runtime
-// base is resolved, since the file names its own FROM and asking for a base it
-// would not use only adds a way to fail. Otherwise the image is generated over
+// resolved against the project, and the project as its context. No runtime
+// base is resolved for one that names its own FROM, since asking for a base it
+// would not use only adds a way to fail. One built FROM the install base
+// (airflowrt.UsesInstallBase, as astro init writes a converted one) gets the
+// base a generated build would, to build that install base on. Otherwise the
+// image is generated over
 // the runtime base the Airflow pin, runtime build and requires-python resolve
 // to (RuntimeImageForPython), installing Dependencies and Packages; a pin it refuses is
 // the error returned.
@@ -89,8 +94,9 @@ func CatalogBase(catalog func() *runtimeversions.Catalog) BaseImageFunc {
 // ForManifestWith is ForManifest with the generated build's runtime base
 // resolved by base, for a caller that knows better than the public catalog
 // which runtime builds its target accepts. Everything else is ForManifest's
-// rule: a declared Dockerfile is the build and base is not called, and a
-// generated image ships, so it carries the project's files.
+// rule: a declared Dockerfile is the build and base is called only for one
+// built on the install base, and a generated image ships, so it carries the
+// project's files.
 func ForManifestWith(ctx context.Context, m ManifestBuild, base BaseImageFunc) (Request, error) {
 	return forManifestWith(ctx, m, shipped, base)
 }
@@ -116,9 +122,11 @@ func ForLocalManifest(ctx context.Context, m ManifestBuild, o runtimeversions.Op
 }
 
 // forManifestWith is the rule ForManifest and ForLocalManifest share, with a
-// generated build's base resolved by base. base is not called for a declared
-// Dockerfile. A generated build of an image that ships carries the project's
-// files; a declared Dockerfile's context is the project already.
+// generated build's base resolved by base. base is called for a declared
+// Dockerfile only when it builds on the install base. A generated build of an
+// image that ships carries the project's files; a declared Dockerfile's
+// context is the project already. The base is pulled from [tool.astro]
+// registry when the manifest names one (airflowrt.WithRegistry).
 func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base BaseImageFunc) (Request, error) {
 	req := Request{
 		Dependencies: m.Dependencies,
@@ -131,13 +139,25 @@ func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base Base
 		// directory, where none of the project's COPY paths exist.
 		req.Dockerfile = filepath.Join(m.ProjectDir, filepath.FromSlash(m.Dockerfile))
 		req.Context = m.ProjectDir
+		// For a Dockerfile built on the install base (UsesInstallBase), whose
+		// lists the caller resolves from the project's lock as it does a
+		// generated build's.
+		req.ManifestDir = m.ProjectDir
+		if !req.UsesInstallBase() {
+			return req, nil
+		}
+		image, err := base(ctx, m)
+		if err != nil {
+			return Request{}, err
+		}
+		req.BaseImage = airflowrt.WithRegistry(image, m.Registry)
 		return req, nil
 	}
 	image, err := base(ctx, m)
 	if err != nil {
 		return Request{}, err
 	}
-	req.BaseImage = image
+	req.BaseImage = airflowrt.WithRegistry(image, m.Registry)
 	req.ManifestDir = m.ProjectDir
 	if ships {
 		req.ProjectFiles = m.ProjectDir

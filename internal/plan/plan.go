@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
@@ -126,7 +127,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 	// In both modes, and standalone most of all: standalone installs the
 	// requirement, so a declared Dockerfile whose FROM names another Airflow is
 	// exactly the silent split between the two modes this refuses.
-	if err := scaffold.CheckDockerfileAirflow(proj.Dir, m); err != nil {
+	if err := scaffold.CheckDockerfileAirflowWith(proj.Dir, m, runtimecatalog.ForDockerfileCheck); err != nil {
 		return nil, err
 	}
 	us, err := userstate.Load(proj.Dir)

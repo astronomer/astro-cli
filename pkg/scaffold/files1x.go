@@ -60,6 +60,13 @@ type project1x struct {
 	// pin is "2" and the next image build would move it to the newest
 	// Airflow 2. An Airflow 3 tag needs none: the pin names its series.
 	runtime string
+	// airflow2Build is the one Airflow 2 runtime build the Dockerfile's final
+	// stage is FROM ("12.6.0"), on any registry, whatever else the file does,
+	// or "". Its tag names no Airflow minor, so airflow reads "2" until plan
+	// asks Options.RuntimeAirflow which Airflow the build carries
+	// (refineAirflow2Pin). A flavor ("12.6.0-python-3.11") or floating
+	// ("12") tag leaves it empty.
+	airflow2Build string
 	// basePython is the Python the Dockerfile's Astro Runtime base runs, when
 	// its tag names one ("3.13" from runtime:3.3-2-python-3.13), or "".
 	basePython string
@@ -102,6 +109,16 @@ type project1x struct {
 	// inside it, and deleting that file while keeping the build that reads it is
 	// worse than either outcome alone.
 	dockerfileBody []byte
+	// rewrite is the Dockerfile moved onto its base's -base tag, when its
+	// shape allows one (dockerfileRewriteOf), or nil. plan clears it when the
+	// two 1.x lists were not carried whole (planDockerfileRewrite), so once
+	// plan has run, non-nil means the run rewrites the file.
+	rewrite *dockerfileRewrite
+	// listsRead reports a Dockerfile that is the build and has a stage that
+	// might run ONBUILD steps, which read requirements.txt and packages.txt
+	// from the build's context (dockerfileRewriteOf). When none can, the two
+	// lists are read by nothing, and are retired like any carried file.
+	listsRead bool
 	// projectName is the name .astro/config.yaml states, before any
 	// sanitizing. Empty when the file is absent, says nothing, or will not
 	// parse.
@@ -297,6 +314,11 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 		// says the minor was not read. Nor does a mirror: a generated build
 		// pulls the build from Astronomer's own repository, so the file is
 		// the only record of where this project's base comes from.
+		if bare := strings.TrimPrefix(tag, "v"); version == "2" {
+			if t, ok := manifest.ParseRuntimeTag(bare); ok && t.Major == "2" && t.Build {
+				from1x.airflow2Build = bare
+			}
+		}
 		if bare := strings.TrimPrefix(tag, "v"); version == "2" && from1x.dockerfilePinOnly && image == airflow2RuntimeImage {
 			if t, ok := manifest.ParseRuntimeTag(bare); ok && t.Major == "2" && t.Build && runtimeMajor(bare) >= minAirflow2Runtime {
 				from1x.runtime = bare
@@ -313,22 +335,17 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 	if base.RuntimeVersion() != "" {
 		_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
 	}
-	// Two sources for one list, so say it rather than let someone find out.
-	//
-	// A declared Dockerfile is the build, and imagebuild ignores the
-	// manifest's dependencies and packages in that mode, so requirements.txt
-	// and packages.txt are KEPT (planRetirements spares them) because the
-	// runtime base's ONBUILD reads them from the context. The manifest gets
-	// the lists too, for the day the Dockerfile goes away. Both being live
-	// at once is deliberate and is exactly the kind of thing that reads as a
-	// conversion bug when nothing mentions it.
+	// A Dockerfile that is the build and sits on an ONBUILD tag is moved onto
+	// the tag's -base image, so the two 1.x lists stop being read and can go
+	// (dockerfileRewriteOf). Whether they were carried whole is only known once
+	// the manifest is settled, so plan makes the final call
+	// (planDockerfileRewrite), and it is plan that adds the notes for the lists
+	// a file kept on its ONBUILD tag still needs.
 	if !from1x.dockerfilePinOnly {
-		for _, kept := range []string{"requirements.txt", "packages.txt"} {
-			if slices.Contains(from1x.present, kept) {
-				from1x.notes = append(from1x.notes, kept+": kept, because your Dockerfile's base image reads it "+
-					"during the build. Its contents are in pyproject.toml as well, which is what a project "+
-					"without a Dockerfile installs from")
-			}
+		var blocker string
+		from1x.rewrite, blocker, from1x.listsRead = dockerfileRewriteOf(data)
+		if blocker != "" {
+			from1x.notes = append(from1x.notes, blocker)
 		}
 	}
 	// A Dockerfile that is not pin-only and drew no note is kept and
@@ -764,11 +781,42 @@ func airflowFromDockerfile(image, tag string, err error) (version string, stated
 		p := runtimeTagRe.FindStringSubmatch(bare)
 		return p[1] + "." + p[2], true, nil
 	case oldRuntimeTagRe.MatchString(bare):
-		return "2", true, []string{prefix + "runtime " + tag + " is an Airflow 2 image whose tag does not name the Airflow minor, " +
-			"so the pin is \"2\", meaning the newest Airflow 2. Set it explicitly if this project needs a particular one"}
+		return "2", true, []string{airflow2MinorNote(tag)}
 	default:
 		return "", true, []string{prefix + "the tag " + tag + " is not an Astro Runtime version, so the Airflow version was not read from it"}
 	}
+}
+
+// airflow2MinorNote is what a run says about an Airflow 2 tag whose Airflow it
+// could not read: the pin is the generation. refineAirflow2Pin takes it back
+// out when the catalog names the build's Airflow after all.
+func airflow2MinorNote(tag string) string {
+	return "Dockerfile: runtime " + tag + " is an Airflow 2 image whose tag does not name the Airflow minor, " +
+		"so the pin is \"2\", meaning the newest Airflow 2. Set it explicitly if this project needs a particular one"
+}
+
+// refineAirflow2Pin reads the Airflow an Airflow 2 Dockerfile's build carries
+// from runtimeAirflow (the catalog, through Options.RuntimeAirflow) and pins
+// its series: runtime 12.6.0 carries 2.10.4, so the pin is "2.10" and the
+// manifest writes apache-airflow==2.10.*. Without it the pin stayed "2", the
+// newest Airflow 2, and the lockfile and standalone ran a newer Airflow than
+// the image the Dockerfile builds. The pin-only Dockerfile's recorded runtime
+// (#2380) still applies: it is written when the chosen pin is from1x.airflow,
+// which this changes in step. Nothing is asked when there is no exact build,
+// no resolver, or the Dockerfile already named a series.
+func refineAirflow2Pin(from1x *project1x, runtimeAirflow func(build string) string) {
+	if from1x.airflow != "2" || from1x.airflow2Build == "" || runtimeAirflow == nil {
+		return
+	}
+	major, rest, _ := strings.Cut(strings.TrimSpace(runtimeAirflow(from1x.airflow2Build)), ".")
+	minor, _, _ := strings.Cut(rest, ".")
+	if major != "2" || minor == "" {
+		return
+	}
+	from1x.airflow = major + "." + minor
+	from1x.notes = slices.DeleteFunc(from1x.notes, func(n string) bool {
+		return strings.HasPrefix(n, "Dockerfile: runtime ") && strings.Contains(n, "does not name the Airflow minor")
+	})
 }
 
 // buildInstructionRe finds a Dockerfile instruction that is not FROM.

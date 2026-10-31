@@ -49,10 +49,9 @@ func TestDockerStartPicksTheImageDeployPicks(t *testing.T) {
 	for name, tc := range cases {
 		tc.m.Dependencies, tc.m.Packages = deps, pkgs
 		tc.want.Dependencies, tc.want.Packages = deps, pkgs
-		// A generated build installs from the project's own manifest.
-		if tc.want.Dockerfile == "" {
-			tc.want.ManifestDir = tc.m.ProjectDir
-		}
+		// Every build installs from the project's own manifest, a declared
+		// Dockerfile's install base too.
+		tc.want.ManifestDir = tc.m.ProjectDir
 
 		got, err := start.Request(context.Background(), tc.m)
 		require.NoError(t, err, name)
