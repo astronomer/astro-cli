@@ -92,7 +92,7 @@ func TestDockerfileRewriteOfGates(t *testing.T) {
 		{name: "a base that is not Astro Runtime", body: "FROM python:3.12-slim\nENV A=b\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rw, blocker, _ := dockerfileRewriteOf([]byte(tc.body))
+			rw, blocker, _ := dockerfileRewriteOf(fileDockerfile, []byte(tc.body))
 			assert.Nil(t, rw)
 			if tc.blocker == "" {
 				assert.Empty(t, blocker)
@@ -115,7 +115,7 @@ func TestDockerfileRewriteOfKeepsEarlierStagesAndTheAlias(t *testing.T) {
 		"\n" +
 		"COPY --from=builder /wheels /wheels\n" +
 		"ENV TZ=UTC"
-	rw, blocker, _ := dockerfileRewriteOf([]byte(body))
+	rw, blocker, _ := dockerfileRewriteOf(fileDockerfile, []byte(body))
 	require.Empty(t, blocker)
 	require.NotNil(t, rw)
 
@@ -142,12 +142,12 @@ func TestDockerfileRewriteOfKeepsEarlierStagesAndTheAlias(t *testing.T) {
 // A file's own parser directives stay first, and the one the install base
 // needs joins them; a file that has a check directive already keeps its own.
 func TestDockerfileRewriteOfKeepsParserDirectives(t *testing.T) {
-	rw, _, _ := dockerfileRewriteOf([]byte("# syntax=docker/dockerfile:1\nFROM astrocrpublic.azurecr.io/runtime:3.3\nENV A=b\n"))
+	rw, _, _ := dockerfileRewriteOf(fileDockerfile, []byte("# syntax=docker/dockerfile:1\nFROM astrocrpublic.azurecr.io/runtime:3.3\nENV A=b\n"))
 	require.NotNil(t, rw)
 	assert.True(t, strings.HasPrefix(string(rw.body), "# syntax=docker/dockerfile:1\n"+airflowrt.BaseArgCheckDirective+"\n# Built on"), string(rw.body))
 	assert.Empty(t, rw.runtime, "a series tag is the requirement's series")
 
-	rw, _, _ = dockerfileRewriteOf([]byte("# check=error=true\nFROM astrocrpublic.azurecr.io/runtime:3.3-8\nENV A=b\n"))
+	rw, _, _ = dockerfileRewriteOf(fileDockerfile, []byte("# check=error=true\nFROM astrocrpublic.azurecr.io/runtime:3.3-8\nENV A=b\n"))
 	require.NotNil(t, rw)
 	assert.True(t, strings.HasPrefix(string(rw.body), "# check=error=true\n# Built on"), string(rw.body))
 	assert.Equal(t, "3.3-8", rw.runtime)

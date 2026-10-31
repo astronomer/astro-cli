@@ -268,6 +268,13 @@ docker build --tag localhost/<project>-base:<digest> <dir>/base && docker build 
 
 The image is the one `astro package astro` builds, except for three things the CLI adds: `--platform linux/amd64`, the labels a Deployment reads, and the build secrets you pass with `--build-secret`, `BUILD_SECRET_INPUT` or [`build-secrets`](#build-secrets), which the printed commands carry as `--secret` (the base's only `netrc`).
 
+A Dockerfile still on an ONBUILD tag is judged by whether `astro init` can move it. Run in a project that is already an Astro project, `astro init` brings what astro writes there up to date: it moves a declared Dockerfile on an ONBUILD tag onto the install base under the gates above, plus one more, that every line of a `requirements.txt` or `packages.txt` beside it is already in `pyproject.toml` (the lists have had time to drift), and records the runtime its `FROM` named in `pyproject.toml` as a conversion does. A Dockerfile an earlier astro wrote install steps into, over a `-base` tag (an earlier preview's, which runs `.astro/install-project.py` in a stage of its own, or one reading its lists from an `astro-install` build context the CLI no longer passes), is moved onto the install base too: the block, from its comment through its last step, is replaced by `FROM ${ASTRO_BASE}` and `COPY --chown=astro:0 . .`, everything before and after it kept, its runtime recorded, and the helper removed. Until then each build warns about the helper. So:
+
+- when `astro init` would move the file, every build of it refuses it (`onbuild_base`): `astro local start --docker` and `restart`, `astro package astro` and `astro deploy`. The message shows the lines that replace the `FROM`, the stage's name and flags kept, and the `runtime` (and `registry`) to add to `pyproject.toml`, and says to run `astro init`, which does it. `astro local check` and `astro package mwaa` or `composer` build no image from the file, and are not held to it.
+- when a gate stops the move, the build goes ahead on the ONBUILD tag as it always has, the tag's steps installing `requirements.txt` and `packages.txt`, and warns each time with what `astro init` would say: the line that is not in `pyproject.toml`, or the earlier stage.
+
+Standalone mode builds no image, and is held to neither.
+
 ### `build-secrets`
 
 The build secrets the image build needs, as a list of `--build-secret` specs. Each entry names where a secret comes from and never holds the secret, so the list is safe to commit:

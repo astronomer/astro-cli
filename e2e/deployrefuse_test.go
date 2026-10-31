@@ -302,6 +302,19 @@ func declareDockerfile(t *testing.T, p *project) {
 	addAstroKey(t, p, `dockerfile = "Dockerfile"`)
 }
 
+// declareDockerfileOnBase declares the project's Dockerfile, written FROM a
+// runtime tag with ONBUILD steps, and has astro init move it onto the install
+// base the CLI builds, as it does for any project: every
+// build refuses the ONBUILD tag itself, and the rewrite is what a person runs.
+func declareDockerfileOnBase(t *testing.T, p *project) {
+	t.Helper()
+	declareDockerfile(t, p)
+	p.run("init").requireSuccess()
+	if !strings.Contains(read(t, filepath.Join(p.Dir, "Dockerfile")), "\nFROM ${ASTRO_BASE}\n") {
+		t.Fatalf("astro init did not move the Dockerfile onto the install base:\n%s", read(t, filepath.Join(p.Dir, "Dockerfile")))
+	}
+}
+
 // addAstroKey inserts one line under the manifest's [tool.astro] table.
 //
 // One copy of the anchor. It was written out twice — once here and once for the

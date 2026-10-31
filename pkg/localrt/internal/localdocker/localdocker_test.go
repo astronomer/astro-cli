@@ -794,7 +794,7 @@ func dockerfilePlan(t *testing.T) rt.Plan {
 	// file runs Airflow as the `astro` user and reads its service set off the
 	// runtime tag, so another base cannot come up. See refusebase_test.go.
 	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),
-		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN echo hi\n"), 0o600))
+		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2-base\nRUN echo hi\n"), 0o600))
 	p.Dockerfile = "Dockerfile"
 	p.Dependencies = []string{"pandas"}
 	p.Packages = []string{"libaio"}
@@ -1358,7 +1358,7 @@ func TestStartResolvesADeclaredDockerfileInASubdirectory(t *testing.T) {
 	p := testPlan(t)
 	require.NoError(t, os.MkdirAll(filepath.Join(p.ProjectPath, "docker"), 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "docker", "Dockerfile"),
-		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN echo hi\n"), 0o600))
+		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2-base\nRUN echo hi\n"), 0o600))
 	p.Dockerfile = "docker/Dockerfile"
 
 	_, err := e.Start(context.Background(), p, rt.Callbacks{})
@@ -1386,20 +1386,20 @@ func TestStartReadsTheGenerationFromTheDeclaredDockerfile(t *testing.T) {
 		{
 			name: "pin says 3, file is airflow 2",
 			pin:  "3.1",
-			body: "FROM astrocrpublic.azurecr.io/runtime:12.1.0\nRUN echo hi\n",
+			body: "FROM astrocrpublic.azurecr.io/runtime:12.1.0-base\nRUN echo hi\n",
 			// runtime 12.x is an Airflow 2 image.
 			wantMajor: "2",
 		},
 		{
 			name:      "pin says 2, file is airflow 3",
 			pin:       "2",
-			body:      "FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN echo hi\n",
+			body:      "FROM astrocrpublic.azurecr.io/runtime:3.1-2-base\nRUN echo hi\n",
 			wantMajor: "3",
 		},
 		{
 			name:      "multi-stage takes the final stage",
 			pin:       "2",
-			body:      "FROM python:3.12-slim AS builder\nFROM astrocrpublic.azurecr.io/runtime:3.1-2\n",
+			body:      "FROM python:3.12-slim AS builder\nFROM astrocrpublic.azurecr.io/runtime:3.1-2-base\n",
 			wantMajor: "3",
 		},
 		{
@@ -1407,13 +1407,13 @@ func TestStartReadsTheGenerationFromTheDeclaredDockerfile(t *testing.T) {
 			// its generation reads the same way as the published image's.
 			name:      "a mirrored airflow 2 runtime beside a pin of 3",
 			pin:       "3.1",
-			body:      "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\nRUN echo hi\n",
+			body:      "FROM registry.corp.example/astronomer/astro-runtime:12.1.0-base\nRUN echo hi\n",
 			wantMajor: "2",
 		},
 		{
 			name:      "a mirrored airflow 3 runtime beside a pin of 2",
 			pin:       "2",
-			body:      "FROM mirror/runtime:3.1-12\n",
+			body:      "FROM mirror/runtime:3.1-12-base\n",
 			wantMajor: "3",
 		},
 		// A non-runtime base used to appear here, falling back to the pin.

@@ -343,9 +343,9 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 	// a file kept on its ONBUILD tag still needs.
 	if !from1x.dockerfilePinOnly {
 		var blocker string
-		from1x.rewrite, blocker, from1x.listsRead = dockerfileRewriteOf(data)
+		from1x.rewrite, blocker, from1x.listsRead = dockerfileRewriteOf(fileDockerfile, data)
 		if blocker != "" {
-			from1x.notes = append(from1x.notes, blocker)
+			from1x.notes = append(from1x.notes, onBuildKeptNote(blocker))
 		}
 	}
 	// A Dockerfile that is not pin-only and drew no note is kept and

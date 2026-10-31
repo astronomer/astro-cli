@@ -145,15 +145,58 @@ func TestInitAdoptsAnExistingManifest(t *testing.T) {
 	}
 }
 
-func TestInitRefusesAnAstroProject(t *testing.T) {
-	d, dir, _ := initDeps(t)
+// A project whose Dockerfile init leaves on its ONBUILD tag is not reported up
+// to date: the headline says so and points at the notes, and the json says
+// onbuild_kept.
+func TestInitSaysWhenItKeepsADockerfileOnItsONBUILDBase(t *testing.T) {
+	d, dir, stdout := initDeps(t)
+	files := map[string]string{
+		"pyproject.toml":   "[project]\nname = 'orders'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\ndockerfile = 'Dockerfile'\n",
+		"Dockerfile":       "FROM astrocrpublic.azurecr.io/runtime:3.1-12\nRUN true\n",
+		"requirements.txt": "pandas==2.1.0\n",
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "Astro project orders in "+dir+": its Dockerfile is kept on its ONBUILD base; see below") ||
+		strings.Contains(out, "is up to date") {
+		t.Errorf("the headline does not say the Dockerfile stayed on its ONBUILD base:\n%s", out)
+	}
+	if !strings.Contains(out, "requirements.txt: pandas==2.1.0 is not in [project] dependencies") {
+		t.Errorf("the notes do not say why:\n%s", out)
+	}
+}
+
+// init in a project that is already one brings what astro writes up to date,
+// and with nothing to bring says so and leaves the project alone. The name and
+// the Airflow version are not parts it keeps, so asking for either there is
+// refused.
+func TestInitInAnAstroProjectBringsItUpToDate(t *testing.T) {
+	d, dir, stdout := initDeps(t)
 	existing := "[project]\nname = 'orders'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n"
 	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(existing), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	err := execute(t, d, "init")
-	if err == nil || !strings.Contains(err.Error(), "already an Astro project") {
-		t.Errorf("want a clear refusal, got: %v", err)
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("astro init in an Astro project: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Astro project orders in "+dir+" is up to date") {
+		t.Errorf("want it reported up to date, got:\n%s", stdout)
+	}
+	if got, err := os.ReadFile(filepath.Join(dir, "pyproject.toml")); err != nil || string(got) != existing {
+		t.Errorf("the manifest changed: %q, %v", got, err)
+	}
+	for _, flag := range []string{"--airflow-version=3.2", "--name=other"} {
+		err := execute(t, d, "init", flag)
+		if err == nil || !strings.Contains(err.Error(), "already an Astro project") {
+			t.Errorf("init %s: want a clear refusal, got: %v", flag, err)
+		}
 	}
 }
 

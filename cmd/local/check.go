@@ -36,6 +36,10 @@ func loadCheckedManifest(project string) (*manifest.Manifest, error) {
 	if err := scaffold.CheckDockerfileAirflowWith(project, m, runtimecatalog.ForDockerfileCheck); err != nil {
 		return nil, err
 	}
+	// Not held to a Dockerfile on an ONBUILD tag here (scaffold.CheckDockerfileOnBuild):
+	// a check and an mwaa or composer package build no image from it. The paths
+	// that do refuse one astro init would move: a Docker-mode start or restart,
+	// astro package astro and astro deploy.
 	return m, nil
 }
 

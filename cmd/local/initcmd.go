@@ -37,7 +37,10 @@ func newInitCmd(c *cli) *cobra.Command {
 			"and a Dockerfile that does more than pick a base image is kept as the project's build, moved onto the install base the CLI builds from pyproject.toml and uv.lock (FROM ${ASTRO_BASE}), " +
 			"with the runtime its FROM named recorded in pyproject.toml (astro package --base or --context-dir builds it with docker of your own). A 1.x file is removed once everything it said is in pyproject.toml, " +
 			"except requirements.txt and packages.txt when a Dockerfile left on its ONBUILD tag still installs them, and other files already there are kept. " +
-			"What init could not carry over, such as a requirements.txt line that is not a plain requirement, is listed at the end, to move across by hand.",
+			"What init could not carry over, such as a requirements.txt line that is not a plain requirement, is listed at the end, to move across by hand.\n\n" +
+			"Run in a project that is already an Astro project, it brings what astro writes there up to date and changes nothing else: " +
+			"a declared Dockerfile still on an ONBUILD tag, or one an earlier astro wrote install steps into (running .astro/install-project.py, which goes, or reading the astro-install build context), " +
+			"is moved onto the install base as a conversion would, with the runtime it named recorded in pyproject.toml.",
 		Example: "  # Make the current directory an Astro project\n" +
 			"  astro init\n\n" +
 			"  # Create a new project in its own directory, pinned to Airflow 3.1\n" +
@@ -67,6 +70,10 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// the shared vault at this project's scope rather than into the manifest.
 	// The writer is what knows that scope; see scaffold.SecretWriter.
 	opts.SecretWriter = &lazyVaultWriter{dir: dir}
+	// A project that is already one is brought up to date rather than
+	// refused: init is the one command that writes what astro keeps in a
+	// project, so it is the one that refreshes it.
+	opts.UpdateExisting = true
 	// Called by scaffold only when nothing in the project states an Airflow,
 	// so converting a pinned project makes no request. The lookup never fails
 	// init: offline, it answers the built-in series.
@@ -180,8 +187,23 @@ func renderInit(w io.Writer, res *scaffold.Result, next string) error {
 	if res.Adopted {
 		verb = "Adopted"
 	}
-	if _, err := fmt.Fprintf(w, "%s Astro project %s (Airflow %s%s) in %s\n", verb, res.Name, res.AirflowVersion, defaultSourceNote(res.AirflowDefaultSource), res.Dir); err != nil {
-		return err
+	switch {
+	case res.Existing && res.OnBuildKept:
+		if _, err := fmt.Fprintf(w, "Astro project %s in %s: its Dockerfile is kept on its ONBUILD base; see below\n", res.Name, res.Dir); err != nil {
+			return err
+		}
+	case res.Existing && len(res.Created)+len(res.Updated)+len(res.Deleted) == 0:
+		if _, err := fmt.Fprintf(w, "Astro project %s in %s is up to date\n", res.Name, res.Dir); err != nil {
+			return err
+		}
+	case res.Existing:
+		if _, err := fmt.Fprintf(w, "Brought Astro project %s in %s up to date\n", res.Name, res.Dir); err != nil {
+			return err
+		}
+	default:
+		if _, err := fmt.Fprintf(w, "%s Astro project %s (Airflow %s%s) in %s\n", verb, res.Name, res.AirflowVersion, defaultSourceNote(res.AirflowDefaultSource), res.Dir); err != nil {
+			return err
+		}
 	}
 	for _, entry := range res.Updated {
 		if _, err := fmt.Fprintf(w, "  %s\n", entry); err != nil {

@@ -1157,7 +1157,7 @@ func TestDeployManifestDeployActionInvocations(t *testing.T) {
 			fake := &fakeCmdDeployer{}
 			setupManifestDeployWith(t, fake, tc.manifest)
 			t.Setenv("Y", "secret")
-			require.NoError(t, os.WriteFile(filepath.Join(config.WorkingPath, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-1\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(config.WorkingPath, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-1-base\n"), 0o600))
 
 			_, err := execDeployCapture(tc.args...)
 			require.NoError(t, err)

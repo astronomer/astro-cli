@@ -315,7 +315,7 @@ func TestDockerModeBuildsTheProjectsOwnDockerfile(t *testing.T) {
 	write(t, filepath.Join(p.Dir, "Dockerfile"),
 		"FROM "+runtimeImageFor(t, p)+"\n"+
 			"RUN echo built-from-my-dockerfile > /tmp/astro-marker\n")
-	declareDockerfile(t, p)
+	declareDockerfileOnBase(t, p)
 
 	p.runSlow("local", "start", "--docker").requireSuccess()
 	if st := p.status(); st.State != "running" {
@@ -379,7 +379,7 @@ func TestAFailedDockerBuildSaysSoAndLeavesNothingBehind(t *testing.T) {
 	// contain the word "Dockerfile".
 	write(t, filepath.Join(p.Dir, "Dockerfile"),
 		"FROM "+runtimeImageFor(t, p)+"\nRUN exit 1\n")
-	declareDockerfile(t, p)
+	declareDockerfileOnBase(t, p)
 
 	r := p.runSlow("local", "start", "--docker").requireFailure()
 

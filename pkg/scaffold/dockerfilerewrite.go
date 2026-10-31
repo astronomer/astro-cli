@@ -49,6 +49,45 @@ type dockerfileRewrite struct {
 	// registry is the mirror the tag was on (registry.example/astronomer), for
 	// [tool.astro] registry, or "" for Astronomer's own repositories.
 	registry string
+	// python is the Python a -python-X.Y flavor named, for requires-python,
+	// or "".
+	python string
+}
+
+// installBaseRuntimeOf reads what pyproject.toml has to record of final, a
+// stage on an Astro Runtime tag (an ONBUILD tag, or its -base twin), for a
+// file that builds on the install base instead: the one build its tag names,
+// the mirror it is on and the Python its flavor names (dockerfileRewrite's
+// fields). blocker, which starts with prefix, says why the tag cannot be
+// recorded: a version this cannot read, a flavor pyproject.toml has no
+// spelling for, a floating Airflow 2 tag, or a runtime astro builds no image
+// for.
+func installBaseRuntimeOf(final *airflowrt.DockerfileStage, prefix string) (rw dockerfileRewrite, blocker string) {
+	raw := strings.TrimSuffix(strings.TrimPrefix(final.Tag, "v"), "-base")
+	noPython := raw
+	if loc := airflowrt.RuntimePythonRe.FindStringIndex(raw); loc != nil {
+		noPython = raw[:loc[0]]
+	}
+	v, python := airflowrt.ParseRuntimeTagPython(raw)
+	t, ok := manifest.ParseRuntimeTag(v)
+	switch {
+	case !ok:
+		return rw, prefix + "because astro does not read a runtime version from its tag " + final.Tag
+	case noPython != v:
+		return rw, prefix + "because its tag " + final.Tag + " names the " + strings.TrimPrefix(noPython, v+"-") +
+			" flavor, which pyproject.toml has no way to pick"
+	case t.Major == "2" && !t.Build:
+		return rw, prefix + "because the floating Airflow 2 tag " + final.Tag + " names no runtime build" +
+			": pin the runtime build, such as 12.6.0, and run astro init again"
+	case t.Major == "2" && runtimeMajor(v) < minAirflow2Runtime:
+		return rw, prefix + "because runtime " + final.Tag + " is older than runtime 9 (Airflow 2.7), the oldest astro builds images for"
+	}
+	rw.from, rw.python = final.Ref, python
+	rw.registry, _ = airflowrt.RegistryOf(final.Image)
+	if t.Build {
+		rw.runtime = v
+	}
+	return rw, ""
 }
 
 // ownStepsComment marks where a rewritten Dockerfile's own steps start, so a
@@ -60,8 +99,8 @@ const ownStepsComment = "# This project's own steps.\n"
 // comment or instruction.
 var parserDirectiveRe = regexp.MustCompile(`^#\s*([a-zA-Z]+)\s*=`)
 
-// dockerfileRewriteOf works out the rewrite of a 1.x Dockerfile, data, that
-// does more than name a base. It returns the rewrite, or a note naming why the
+// dockerfileRewriteOf works out the rewrite of a Dockerfile, data, that does
+// more than name a base; name is its path, for the notes. It returns the rewrite, or a note naming why the
 // file's shape rules one out, or neither when the file is not on an ONBUILD
 // tag at all. listsRead reports whether any stage might run ONBUILD steps,
 // which read requirements.txt and packages.txt: when none can, the two lists
@@ -69,8 +108,8 @@ var parserDirectiveRe = regexp.MustCompile(`^#\s*([a-zA-Z]+)\s*=`)
 //
 // What it can judge from the file alone. Whether the two 1.x files were carried
 // is decided later, by plan, from the run's notes.
-func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, listsRead bool) {
-	const prefix = "Dockerfile: kept FROM its Astro Runtime image rather than moved onto the install base the Astro CLI builds, "
+func dockerfileRewriteOf(name string, data []byte) (rw *dockerfileRewrite, blocker string, listsRead bool) {
+	prefix := name + ": kept FROM its Astro Runtime image rather than moved onto the install base the Astro CLI builds, "
 	stages := airflowrt.DockerfileStages(data)
 	if len(stages) == 0 {
 		return nil, "", false
@@ -109,26 +148,10 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 	// (Airflow 2.7). A floating Airflow 2 tag (12) names no build, and a flavor
 	// other than a Python one (-slim, -ubi9) has no pyproject.toml spelling, so
 	// either is left as it is rather than guessed at.
-	raw := strings.TrimPrefix(final.Tag, "v")
-	noPython := raw
-	if loc := airflowrt.RuntimePythonRe.FindStringIndex(raw); loc != nil {
-		noPython = raw[:loc[0]]
+	recorded, blocker := installBaseRuntimeOf(&final, prefix)
+	if blocker != "" {
+		return nil, blocker, true
 	}
-	v, _ := airflowrt.ParseRuntimeTagPython(raw)
-	t, ok := manifest.ParseRuntimeTag(v)
-	switch {
-	case !ok:
-		return nil, prefix + "because astro does not read a runtime version from its tag " + final.Tag, true
-	case noPython != v:
-		return nil, prefix + "because its tag " + final.Tag + " names the " + strings.TrimPrefix(noPython, v+"-") +
-			" flavor, which pyproject.toml has no way to pick", true
-	case t.Major == "2" && !t.Build:
-		return nil, prefix + "because the floating Airflow 2 tag " + final.Tag + " names no runtime build" +
-			": pin the runtime build, such as 12.6.0, and run astro init again", true
-	case t.Major == "2" && runtimeMajor(v) < minAirflow2Runtime:
-		return nil, prefix + "because runtime " + final.Tag + " is older than runtime 9 (Airflow 2.7), the oldest astro builds images for", true
-	}
-	registry, _ := airflowrt.RegistryOf(final.Image)
 	lines := strings.Split(string(data), "\n")
 	if strings.HasSuffix(strings.TrimRight(lines[final.Line], " \t\r"), "\\") {
 		return nil, prefix + "because its final FROM line continues onto the next one", true
@@ -138,24 +161,24 @@ func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, li
 			return nil, prefix + "because it reads " + name + " itself, which the rewritten build would not provide", true
 		}
 	}
-	rw = &dockerfileRewrite{body: rewrittenBody(lines, &final), from: final.Ref, registry: registry}
-	if t.Build {
-		rw.runtime = v
-	}
-	return rw, "", true
+	recorded.body = rewrittenBody(lines, &final, final.Line, final.Line+1)
+	return &recorded, "", true
 }
 
 // rewrittenBody is a Dockerfile's lines with its final stage, final, moved
 // onto the install base: the file's parser directives, with the one that
 // silences BuildKit's warning about an argument with no default; the header
-// and the global ARG, ahead of any earlier stage; the file's lines up to the
-// final FROM; that FROM on ${ASTRO_BASE}, its flags and name kept; the step
-// that lays down the project's files; then the file's own lines after it.
-func rewrittenBody(lines []string, final *airflowrt.DockerfileStage) []byte {
+// and the global ARG, ahead of any earlier stage; the file's lines before
+// cut, the lines from cut to resume replaced by the final FROM on
+// ${ASTRO_BASE}, its flags and name kept, and the step that lays down the
+// project's files; then the file's own lines from resume on. A conversion cuts
+// the final FROM line alone; an update cuts the install block an older astro
+// wrote around it.
+func rewrittenBody(lines []string, final *airflowrt.DockerfileStage, cut, resume int) []byte {
 	var b strings.Builder
 	head := 0
 	hasCheck := false
-	for head < len(lines) && head < final.Line {
+	for head < len(lines) && head < cut {
 		m := parserDirectiveRe.FindStringSubmatch(strings.TrimSpace(lines[head]))
 		if m == nil {
 			break
@@ -169,8 +192,8 @@ func rewrittenBody(lines []string, final *airflowrt.DockerfileStage) []byte {
 	}
 	b.WriteString(airflowrt.BaseArgComment)
 	b.WriteString("ARG " + airflowrt.BaseArg + "\n")
-	if final.Line > head {
-		b.WriteString(strings.Join(lines[head:final.Line], "\n") + "\n")
+	if cut > head {
+		b.WriteString(strings.Join(lines[head:cut], "\n") + "\n")
 	}
 	from := append(append([]string{"FROM"}, final.Flags...), airflowrt.BaseArgFrom)
 	if final.Alias != "" {
@@ -178,11 +201,12 @@ func rewrittenBody(lines []string, final *airflowrt.DockerfileStage) []byte {
 	}
 	b.WriteString(strings.Join(from, " ") + "\n")
 	b.WriteString(airflowrt.ProjectCopy + "\n")
-	if own := lines[final.Line+1:]; strings.TrimSpace(strings.Join(own, "\n")) != "" {
+	if own := lines[resume:]; strings.TrimSpace(strings.Join(own, "\n")) != "" {
 		b.WriteString("\n" + ownStepsComment)
-		// The file's own lines keep their leading blank lines out of the way of
-		// the comment, and their trailing newline as the file had it.
-		for len(own) > 0 && strings.TrimSpace(own[0]) == "" {
+		// The file's own lines keep their leading blank lines, and a comment
+		// an older astro wrote ahead of them, out of the way of the comment,
+		// and their trailing newline as the file had it.
+		for len(own) > 0 && (strings.TrimSpace(own[0]) == "" || own[0]+"\n" == ownStepsComment) {
 			own = own[1:]
 		}
 		b.WriteString(strings.Join(own, "\n"))
@@ -260,9 +284,9 @@ func planDockerfileRewrite(from1x *project1x, notes []string, cs *Changeset) {
 	for _, name := range []string{"requirements.txt", "packages.txt"} {
 		if slices.Contains(from1x.present, name) && namedInAny(notes, name) {
 			from1x.rewrite = nil
-			from1x.notes = append(from1x.notes, "Dockerfile: kept FROM "+rw.from+" rather than moved onto the install base the Astro CLI builds"+
+			from1x.notes = append(from1x.notes, onBuildKeptNote("Dockerfile: kept FROM "+rw.from+" rather than moved onto the install base the Astro CLI builds"+
 				", because "+name+" has lines "+manifest.Marker+" does not carry (above), and the base's ONBUILD steps "+
-				"still install them from it. Once they are in "+manifest.Marker+", run astro init again to move it")
+				"still install them from it. Once they are in "+manifest.Marker+", run astro init again to move it"))
 			from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
 			return
 		}
@@ -274,6 +298,18 @@ func planDockerfileRewrite(from1x *project1x, notes []string, cs *Changeset) {
 		cs.Advisories = append(cs.Advisories, manifest.Marker+" records your mirror as [tool.astro] registry = '"+rw.registry+
 			"': the install base builds FROM the runtime's -base tag there, so if your registry mirrors "+rw.from+" tag by tag, mirror its -base tag too")
 	}
+}
+
+// planDockerfile is what a conversion does about the Dockerfile: the move onto
+// -base when it can go ahead (planDockerfileRewrite), the removal of the
+// install helper an earlier preview wrote (planStaleHelperRemoval), then the
+// ignore file the build's context needs (planKeptDockerfileIgnore).
+func planDockerfile(dir string, from1x *project1x, notes []string, cs *Changeset) error {
+	planDockerfileRewrite(from1x, notes, cs)
+	if err := planStaleHelperRemoval(dir, cs); err != nil {
+		return err
+	}
+	return planKeptDockerfileIgnore(dir, from1x, cs)
 }
 
 // keptListNotes are the notes for a declared Dockerfile kept on its ONBUILD

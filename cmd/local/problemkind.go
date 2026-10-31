@@ -7,6 +7,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // The kinds a core command can fail with. The mechanism they plug into — the
@@ -47,6 +48,11 @@ const (
 	// an Astro Runtime image, so docker mode refuses before starting anything.
 	// Not transient and not about the machine: the project has to change.
 	KindUnsupportedBase cliout.ProblemKind = "unsupported_base"
+	// KindOnBuildBase: the project's declared Dockerfile builds on an Astro
+	// Runtime tag with ONBUILD steps, which install requirements.txt and
+	// packages.txt rather than pyproject.toml's lists, so every build refuses
+	// it. The message holds the lines to use instead; astro init rewrites it.
+	KindOnBuildBase cliout.ProblemKind = "onbuild_base"
 	// KindDatabaseNewerThanAirflow: a newer Airflow already upgraded the
 	// project's metadata database, and the Airflow it now runs cannot migrate it
 	// back. Not transient: the pin has to go back up, or the database has to go.
@@ -100,6 +106,7 @@ var ProblemKinds = cliout.Kinds{
 	{Kind: KindHealthTimeout, Match: cliout.Sentinel(localrt.ErrHealthTimeout)},
 	{Kind: KindStartTimedOut, Match: cliout.Sentinel(localrt.ErrStartTimedOut)},
 	{Kind: KindUnsupportedBase, Match: cliout.Sentinel(localrt.ErrUnsupportedBase)},
+	{Kind: KindOnBuildBase, Match: cliout.Sentinel(scaffold.ErrOnBuildBase)},
 	{Kind: KindDatabaseNewerThanAirflow, Match: cliout.Sentinel(localrt.ErrDatabaseNewerThanAirflow)},
 	// ErrStartInProgress, not a second name for it: pkg/localrt already
 	// exports this sentinel, and adding another public alias to a module with

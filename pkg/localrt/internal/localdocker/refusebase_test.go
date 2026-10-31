@@ -117,7 +117,7 @@ func TestStartAcceptsAMirroredRuntimeBase(t *testing.T) {
 
 	p := testPlan(t)
 	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),
-		[]byte("FROM registry.corp.example/astronomer/astro-runtime:12.1.0\nRUN echo hi\n"), 0o600))
+		[]byte("FROM registry.corp.example/astronomer/astro-runtime:12.1.0-base\nRUN echo hi\n"), 0o600))
 	p.Dockerfile = "Dockerfile"
 
 	_, err := e.Start(context.Background(), p, rt.Callbacks{})
