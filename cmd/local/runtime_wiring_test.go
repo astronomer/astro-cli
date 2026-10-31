@@ -200,6 +200,65 @@ func TestStartChecksTheRuntimeBuildInDockerModeOnly(t *testing.T) {
 	}
 }
 
+// lockedPins is a project whose pyproject.toml records 3.1-12, with no
+// [tool.astro] runtime: the build a Docker-mode start and a package build on.
+const lockedPins = "\n[tool.uv]\nconstraint-dependencies = [\n" +
+	"    'apache-airflow==3.1.8+astro.1',\n" +
+	"    # Astro Runtime 3.1-12 (Python 3.12) constrains these. astro writes them.\n" +
+	"    'SQLAlchemy==2.0.48',\n]\n"
+
+// With no [tool.astro] runtime, the build pyproject.toml records is the one the
+// image starts FROM, so a Docker-mode start and a package hold it to the
+// catalog as they would a named runtime: a yanked one is warned about, naming
+// the pins, and a refusal says to move them with astro init.
+func TestTheRuntimePinsBuildIsCheckedLikeANamedRuntime(t *testing.T) {
+	findings := []runtimeversions.Finding{
+		{Kind: runtimeversions.FindingAirflowExcluded, Message: "runtime 3.1-12 carries Airflow 3.1.0"},
+		// The notices say a yank of the lock's build, once, with the build to
+		// move to; the check does not say it again.
+		{Kind: runtimeversions.FindingYanked, Message: "runtime 3.1-12 is yanked"},
+	}
+	d, _ := testDeps(t)
+	started := false
+	d.Runtime = startRecorder{started: &started}
+	rec := &runtimeCheckRecorder{warnings: findings}
+	d.RuntimeCheck = rec.check
+	wiringProject(t, &d, lockedPins, "")
+
+	_ = execute(t, d, "local", "start", "--docker")
+	if len(rec.calls) != 1 || rec.calls[0] != [2]string{"3.1-12", "3.1"} {
+		t.Errorf("calls = %v, want one for the pins' 3.1-12 against 3.1", rec.calls)
+	}
+	// Text-mode warnings print on stderr, as the message alone.
+	errOut := stderrOf(d)
+	if !strings.Contains(errOut, "the build pyproject.toml records, Astro Runtime 3.1-12, which the image builds on: runtime 3.1-12 carries Airflow 3.1.0") {
+		t.Errorf("the warning did not name the pins' build: %q", errOut)
+	}
+	if strings.Contains(errOut, "is yanked") {
+		t.Errorf("the check repeated the yank the notices say: %q", errOut)
+	}
+
+	// The key that files the warning is in the json event.
+	d, stdout := testDeps(t)
+	d.Runtime = startRecorder{started: &started}
+	d.RuntimeCheck = (&runtimeCheckRecorder{warnings: findings}).check
+	wiringProject(t, &d, lockedPins, "")
+	_ = execute(t, d, "local", "start", "--docker", "-o", "json")
+	if !strings.Contains(stdout.String(), "tool.uv.constraint-dependencies") {
+		t.Errorf("the warning is not filed under [tool.uv] constraint-dependencies, whose record names the build: %q", stdout.String())
+	}
+
+	d, _ = testDeps(t)
+	blocking := errors.New("another series")
+	refuse := &runtimeCheckRecorder{err: blocking}
+	d.RuntimeCheck = refuse.check
+	wiringProject(t, &d, lockedPins, "")
+	err := execute(t, d, "package", "astro")
+	if !errors.Is(err, blocking) || !strings.Contains(err.Error(), "run astro init") {
+		t.Fatalf("err = %v, want the refusal, with astro init to move the pins", err)
+	}
+}
+
 func TestADockerStartRefusedByTheRuntimeCheckStartsNothing(t *testing.T) {
 	for _, tc := range []struct {
 		name string

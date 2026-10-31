@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -251,7 +252,9 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	if err := checkImageDockerfile(r, built.Plan); err != nil {
 		return err
 	}
-	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
+	catalog := c.startCatalog(ctx, built.Plan)
+	noticeLockedRuntime(r, built.Plan, catalog)
+	if err := c.checkRuntimeBuild(ctx, r, built.Plan, catalog); err != nil {
 		return err
 	}
 	af, err := c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
@@ -313,28 +316,59 @@ func schedulesOn(p localrt.Plan, mode localrt.Mode) bool {
 	return ok && slices.Contains([]string{"t", "true", "1"}, strings.ToLower(strings.TrimSpace(v)))
 }
 
-// runtimeKey is the manifest key a runtime-build finding is about.
-const runtimeKey = "tool.astro.runtime"
+// runtimeKey is the manifest key a runtime-build finding is about, and
+// lockBuildKey the one a finding about the recorded build is: [tool.uv]
+// constraint-dependencies, whose runtime record names it.
+const (
+	runtimeKey   = "tool.astro.runtime"
+	lockBuildKey = "tool.uv.constraint-dependencies"
+)
 
-// checkRuntimeBuild holds a Docker-mode start's [tool.astro] runtime build to
+// checkRuntimeBuild holds a Docker-mode start's runtime build, [tool.astro]
+// runtime or else the build pyproject.toml records (Plan.LockedRuntime), to
 // the pin with the runtime catalog (Deps.RuntimeCheck), before anything
 // starts: a build of another Airflow series refuses the start, and a yanked
 // build, one whose exact Airflow the pin excludes, or one the check could not
 // read the catalog for is a warning. Standalone installs the requirement and
-// builds no image, so the build decides nothing there and is not checked; a
-// declared Dockerfile never has one beside it.
-func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localrt.Plan) error {
-	if p.Mode != localrt.ModeDocker || p.Runtime == "" || p.Dockerfile != "" || c.d.RuntimeCheck == nil {
+// builds no image, so the build decides nothing there and is not checked; nor
+// is a declared Dockerfile that names its own FROM, which picks its image. One
+// built on the install base is checked as a generated build is.
+func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localrt.Plan, catalog *runtimeversions.Catalog) error {
+	if p.Mode != localrt.ModeDocker || imagebuild.DockerfileNamesBase(p.ManifestBuild(p.ProjectPath)) || c.d.RuntimeCheck == nil || (p.Runtime == "" && p.LockedRuntime == "") {
 		return nil
 	}
-	warnings, err := c.d.RuntimeCheck(ctx, p.Runtime, p.AirflowVersion)
+	// The build the image starts FROM: [tool.astro] runtime, else the build
+	// the runtime record in [tool.uv] names, when the image does start from it
+	// (imagebuild.LockedRuntimeUsed).
+	build, key := p.Runtime, runtimeKey
+	if build == "" {
+		if !imagebuild.LockedRuntimeUsed(p.ManifestBuild(p.ProjectPath), catalog) {
+			return nil
+		}
+		build, key = p.LockedRuntime, lockBuildKey
+	}
+	if build == "" {
+		return nil
+	}
+	warnings, err := c.d.RuntimeCheck(ctx, build, p.AirflowVersion)
 	for _, w := range warnings {
+		if p.Runtime == "" && w.Kind == runtimeversions.FindingYanked {
+			// noticeLockedRuntime said so already, with the build to move to.
+			continue
+		}
+		text := w.Message
+		if p.Runtime == "" {
+			text = fmt.Sprintf("the build pyproject.toml records, Astro Runtime %s, which the image builds on: %s", build, w.Message)
+		}
 		emitWarning(r, event{
 			Event:  "warning",
-			Text:   fmt.Sprintf("%s: %s: %s", manifest.Marker, runtimeKey, w.Message),
-			Key:    runtimeKey,
-			Reason: w.Message,
+			Text:   fmt.Sprintf("%s: %s: %s", manifest.Marker, key, text),
+			Key:    key,
+			Reason: text,
 		})
+	}
+	if err != nil && p.Runtime == "" {
+		return fmt.Errorf("the build pyproject.toml records, Astro Runtime %s, which the image builds on: %w; run astro init to record another build", build, err)
 	}
 	return err
 }
@@ -369,6 +403,32 @@ func checkImageDockerfile(r cliout.Renderer, p localrt.Plan) error {
 		emitWarning(r, event{Event: "warning", Text: w})
 	}
 	return nil
+}
+
+// noticeLockedRuntime says, before a Docker-mode start builds, what the build
+// the project's uv.lock was made for means for it
+// (imagebuild.LockedRuntimeNotices): a newer build is available, which only
+// astro init moves to, or requires-python excludes the lock's build, so the
+// image builds on the newest one instead. A Docker-only project never runs the
+// standalone refresh that moves the pins, so this is where it hears of a new
+// build. Standalone builds no image.
+func noticeLockedRuntime(r cliout.Renderer, p localrt.Plan, catalog *runtimeversions.Catalog) {
+	if p.Mode != localrt.ModeDocker || catalog == nil {
+		return
+	}
+	for _, n := range imagebuild.LockedRuntimeNotices(p.ManifestBuild(p.ProjectPath), catalog) {
+		emitWarning(r, event{Event: "warning", Text: n})
+	}
+}
+
+// startCatalog is the runtime catalog a Docker-mode start's two checks of the
+// recorded build read (noticeLockedRuntime, checkRuntimeBuild), loaded once:
+// nil when neither has a build to check, or there is no catalog to read.
+func (c *cli) startCatalog(ctx context.Context, p localrt.Plan) *runtimeversions.Catalog {
+	if p.Mode != localrt.ModeDocker || imagebuild.DockerfileNamesBase(p.ManifestBuild(p.ProjectPath)) || p.Runtime != "" || p.LockedRuntime == "" || c.d.RuntimeCatalog == nil {
+		return nil
+	}
+	return c.d.RuntimeCatalog(ctx)
 }
 
 // warnManifest reports the manifest's findings that do not stop a start: a
@@ -676,8 +736,10 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	if err := checkImageDockerfile(r, built.Plan); err != nil {
 		return err
 	}
+	catalog := c.startCatalog(ctx, built.Plan)
+	noticeLockedRuntime(r, built.Plan, catalog)
 	// Before the stop, like the build: a refusal leaves Airflow running.
-	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
+	if err := c.checkRuntimeBuild(ctx, r, built.Plan, catalog); err != nil {
 		return err
 	}
 	if err := af.Stop(ctx, localrt.StopOptions{Force: force}); err != nil {

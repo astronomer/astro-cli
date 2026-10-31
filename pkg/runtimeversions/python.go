@@ -117,6 +117,14 @@ func (r *Runtime) ImagePython(requiresPython string) (python string, ok bool) {
 	return python, true
 }
 
+// RequiresPythonAdmits reports whether requires-python admits some patch of
+// minor ("3.13"), as ImagePython judges a shipped Python. An empty or
+// unreadable requires-python admits it: nothing says otherwise.
+func RequiresPythonAdmits(requiresPython, minor string) bool {
+	clauses, ok := parsePythonSpecifier(requiresPython)
+	return !ok || admitsMinor(clauses, strings.TrimSpace(minor))
+}
+
 type pythonClause struct {
 	op       string
 	version  string

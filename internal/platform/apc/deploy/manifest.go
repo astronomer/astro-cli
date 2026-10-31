@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
@@ -190,7 +192,7 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 	// its label's, read below.
 	var req imagebuild.Request
 	if in.ImageName == "" {
-		if req, err = imagebuild.ForManifestWith(ctx, in.Build, houstonBase(listed, in.Catalog)); err != nil {
+		if req, err = imagebuild.ForManifestWith(ctx, in.Build, houstonBase(listed, in.Catalog, warn)); err != nil {
 			return ManifestImageResult{}, err
 		}
 	}
@@ -539,21 +541,33 @@ func listedRuntimes(client houston.ClientInterface, clusterID, workspaceID, depl
 // listedReleases is APC's deploybuild.RuntimeOffer.
 var _ deploybuild.RuntimeOffer = listedReleases(nil)
 
-// NewestFor is the newest runtime build listed that carries the Airflow the
-// pin names: that exact version for a pin with a patch ("2.10.3"), any of its
-// series for one without ("3.1"). "" when none is listed.
-func (l listedReleases) NewestFor(pin string) string {
-	newest := ""
+// BuildsFor are the runtime builds listed that carry the Airflow the pin
+// names, newest first: that exact version for a pin with a patch ("2.10.3"),
+// any of its series for one without ("3.1"). None for a bare "3", which every
+// other path refuses to resolve.
+func (l listedReleases) BuildsFor(pin string) []string {
+	pin = strings.TrimSpace(pin)
+	if pin == "" || pin == "3" {
+		return nil
+	}
+	var out []string
 	for i := range l {
-		av := l[i].AirflowVersion
-		if av != pin && !strings.HasPrefix(av, pin+".") && !strings.HasPrefix(av, pin+"+") {
-			continue
-		}
-		if newest == "" || airflowversions.CompareRuntimeVersions(l[i].Version, newest) > 0 {
-			newest = l[i].Version
+		if manifest.PinCovers(pin, l[i].AirflowVersion) {
+			out = append(out, l[i].Version)
 		}
 	}
-	return newest
+	slices.SortFunc(out, func(a, b string) int { return airflowversions.CompareRuntimeVersions(b, a) })
+	return out
+}
+
+// AirflowOf is the Airflow Houston lists for a runtime build, or "".
+func (l listedReleases) AirflowOf(build string) string {
+	for i := range l {
+		if l[i].Version == build {
+			return l[i].AirflowVersion
+		}
+	}
+	return ""
 }
 
 // houstonBase resolves a generated build's runtime base by local Docker
@@ -566,14 +580,14 @@ func (l listedReleases) NewestFor(pin string) string {
 // catalog has; with that unreadable too, the deploy is refused, naming
 // [tool.astro] runtime. The offer half is deploybuild.OfferedBase, the rule
 // Astro's deploy follows over its own offer.
-func houstonBase(listed listedReleases, o runtimeversions.Options) imagebuild.BaseImageFunc {
+func houstonBase(listed listedReleases, o runtimeversions.Options, warn func(string)) imagebuild.BaseImageFunc {
 	return deploybuild.OfferedBase(listed, func(ctx context.Context, m imagebuild.ManifestBuild) (string, error) {
 		base, err := imagebuild.LocalRuntimeImageWith(ctx, m.AirflowVersion, m.Runtime, m.RequiresPython, o)
 		if err != nil && m.Runtime == "" && strings.HasPrefix(m.AirflowVersion, "2") {
 			return "", fmt.Errorf("the platform lists no Astro Runtime for Airflow %s, and the public runtime catalog gave none either: set [tool.astro] runtime in pyproject.toml to the runtime build to deploy: %w", m.AirflowVersion, err)
 		}
 		return base, err
-	})
+	}, warn)
 }
 
 // buildManifestImage builds the image a manifest deploy pushes, at

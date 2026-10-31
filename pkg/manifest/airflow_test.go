@@ -451,3 +451,48 @@ func TestParseForRepair(t *testing.T) {
 		t.Errorf("a clean manifest reports something to repair")
 	}
 }
+
+// An Astronomer build of Airflow pinned in constraint-dependencies is covered
+// while the pin admits its release; other lines, and none, are no
+// disagreement.
+func TestAstroBuildCovered(t *testing.T) {
+	for _, tt := range []struct {
+		pin         string
+		constraints []string
+		want        bool
+	}{
+		{"3.3", []string{"apache-airflow==3.3.2+astro.2", "apache-airflow-task-sdk==1.3.2+astro.1"}, true},
+		{"3.3.2", []string{"Apache_Airflow==3.3.2+astro.2"}, true},
+		{"3.4", []string{"apache-airflow==3.3.2+astro.2"}, false},
+		{"2.11", []string{"apache-airflow==2.10.4+astro.1"}, false},
+		{"3.4", []string{"apache-airflow==3.3.2", "sqlalchemy<2.1"}, true},
+		{"3.4", nil, true},
+	} {
+		if got := AstroBuildCovered(tt.pin, tt.constraints); got != tt.want {
+			t.Errorf("AstroBuildCovered(%q, %q) = %v, want %v", tt.pin, tt.constraints, got, tt.want)
+		}
+	}
+}
+
+// A pin covers the releases apache-airflow==<pin>.* admits, an Astronomer
+// build's local label not compared, and a pin PEP 440 cannot read covers none.
+func TestPinCovers(t *testing.T) {
+	for _, tt := range []struct {
+		pin, release string
+		want         bool
+	}{
+		{"3.3", "3.3.2", true},
+		{"3.3", "3.3.2+astro.2", true},
+		{"3.3.2", "3.3.2+astro.2", true},
+		{"3", "3.3.2", true},
+		{"3.3", "3.30.0", false},
+		{"3.3", "3.4.0", false},
+		{"3.3.1", "3.3.2", false},
+		{"", "3.3.2", false},
+		{"3.x", "3.3.2", false},
+	} {
+		if got := PinCovers(tt.pin, tt.release); got != tt.want {
+			t.Errorf("PinCovers(%q, %q) = %v, want %v", tt.pin, tt.release, got, tt.want)
+		}
+	}
+}

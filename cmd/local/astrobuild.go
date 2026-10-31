@@ -96,7 +96,15 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 	}
 	airflow := m.Airflow()
 	res := astroBuildWrite{pin: airflow.Pin}
-	res.build, res.lookupErr = c.d.AstroBuild(ctx, airflow.Pin, airflow.Runtime)
+	// The build the project names: [tool.astro] runtime, else the one its
+	// declared Dockerfile is FROM, whose Airflow is what the image runs. Not
+	// the newest build of the pin, which for an Airflow 2 Dockerfile can carry
+	// a newer Airflow than its base.
+	runtime := airflow.Runtime
+	if runtime == "" {
+		runtime = scaffold.DockerfileBuild(dir, m)
+	}
+	res.build, res.lookupErr = c.d.AstroBuild(ctx, airflow.Pin, runtime)
 	if res.lookupErr != nil && !errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild) && !stalePin(m) {
 		return res
 	}

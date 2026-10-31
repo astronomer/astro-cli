@@ -60,6 +60,20 @@ type Plan struct {
 	// requirement. Beside a Dockerfile it picks the install base that file
 	// builds on.
 	Runtime string
+	// LockedRuntime is the runtime build the project's uv.lock was seeded
+	// taken from (manifest UV.RuntimeBuild), so the one its uv.lock was made
+	// for, or "" for none. With Runtime empty, Docker mode builds FROM it
+	// rather than the newest build of the series, so the image is the build
+	// the lock matches. Standalone ignores it.
+	LockedRuntime string
+	// LockedPython is the Python the uv.lock was seeded for on LockedRuntime
+	// (manifest UV.RuntimePython), or "" for none: the Python Docker mode's
+	// image of LockedRuntime runs, when requires-python admits it.
+	LockedPython string
+	// LockedAirflow is the Astronomer build of Airflow pyproject.toml records
+	// beside LockedRuntime ("3.1.3+astro.2"), so the Airflow its uv.lock was
+	// made for, or "" for none. Standalone ignores it.
+	LockedAirflow string
 	// Registry is the manifest's [tool.astro] registry, the registry a mirror
 	// of Astro Runtime serves the runtime images from, or "" for Astronomer's
 	// own. Docker mode pulls the runtime from it; standalone ignores it.

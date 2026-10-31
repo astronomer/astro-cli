@@ -67,6 +67,24 @@ func RuntimeBuildFor(dir string, m *manifest.Manifest, c *runtimeversions.Catalo
 	return build, BuildPython(build, m.Project.RequiresPython, c), nil
 }
 
+// DockerfileBuild is the one Astro Runtime build a declared Dockerfile's final
+// stage is FROM ("12.6.0", "3.3-11"), read offline from the file, or "" when
+// the project declares none or its FROM names no single build (a floating or
+// flavor tag, a build argument, a non-runtime base). It is what the
+// Astronomer-build lookup asks about instead of the newest build of the pin,
+// so the lockfile's Airflow is the image's.
+func DockerfileBuild(dir string, m *manifest.Manifest) string {
+	path := dockerfilePath(dir, m)
+	if path == "" {
+		return ""
+	}
+	v := airflowrt.ReadDeclaredBase(path).RuntimeVersion()
+	if t, ok := manifest.ParseRuntimeTag(v); ok && t.Build {
+		return v
+	}
+	return ""
+}
+
 // BuildPython is the Python a generated image of build runs for a project's
 // requires-python (runtimeversions.Runtime.ImagePython): the build's default
 // when requires-python admits it, else the newest it ships that it admits. An

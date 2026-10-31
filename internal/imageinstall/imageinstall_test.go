@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
@@ -338,4 +339,78 @@ func TestRuntimeOf(t *testing.T) {
 		build, python := r.runtimeOf(t.Context(), image)
 		assert.Equal(t, want, [2]string{build, python}, image)
 	}
+}
+
+// A lock made for another Airflow release than the image's base runs refuses
+// the build before it starts, naming both Airflows, the runtime
+// pyproject.toml records for the lock, and astro init. Another Astronomer
+// build of the same release, or PyPI's, is no other Airflow; an image whose
+// Airflow is not known (no package list, no catalog) is not held to it. The
+// fixture's Airflow is a stub wheel, so its lock is small.
+func TestFillRefusesALockForAnotherAirflow(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		installed []string
+		want      []string
+	}{
+		{name: "same airflow", installed: []string{"apache-airflow==3.3.2+astro.2"}},
+		{name: "same release, another astro build", installed: []string{"apache-airflow==3.3.2+astro.3"}},
+		{name: "same release from pypi", installed: []string{"Apache_Airflow==3.3.2"}},
+		{name: "image airflow unknown"},
+		{
+			name: "another airflow", installed: []string{"six==1.17.0", "apache-airflow==3.3.3+astro.1"},
+			want: []string{
+				"uv.lock was made for Airflow 3.3.2+astro.2 (Astro Runtime 3.3-9), and the image builds on runtime 3.1-5-python-3.12, which has Airflow 3.3.3+astro.1",
+				"To keep the lock's Airflow, set [tool.astro] runtime in pyproject.toml to a build with Airflow 3.3.2, such as 3.3-9 (astro local upgrade runtime <build>); to move to the image's, run astro init",
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			r := testResolver(t, nil, tt.installed)
+			req := imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.1-5-python-3.12", ManifestDir: fixture(t, "airflow")}
+			err := r.Fill(t.Context(), &req, nil)
+			if len(tt.want) == 0 {
+				require.NoError(t, err)
+				require.NotNil(t, req.Install)
+				return
+			}
+			var mismatch *AirflowMismatchError
+			require.ErrorAs(t, err, &mismatch)
+			for _, s := range tt.want {
+				assert.Contains(t, err.Error(), s)
+			}
+			assert.Nil(t, req.Install, "nothing is handed to a build that is refused")
+		})
+	}
+}
+
+// The image's Airflow comes from the catalog when its package list cannot be
+// read, and the lock's runtime is named only from the record astro writes.
+func TestFillReadsTheImagesAirflowFromTheCatalog(t *testing.T) {
+	r := testResolver(t, nil, nil)
+	catalog, err := runtimeversions.Parse([]byte(`{"runtimeVersionsV3": {"3.1-5": {"metadata": ` +
+		`{"airflowVersion": "3.1.5", "channel": "stable", "releaseDate": "2025-10-01", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}}}}`))
+	require.NoError(t, err)
+	r.Catalog = func(context.Context) *runtimeversions.Catalog { return catalog }
+	dir := fixture(t, "airflow")
+	pyproject := filepath.Join(dir, "pyproject.toml")
+	data, err := os.ReadFile(pyproject)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(pyproject, []byte(strings.Replace(string(data),
+		"    # Astro Runtime 3.3-9 (Python 3.12) constrains these. astro writes them.\n", "", 1)), 0o600))
+	req := imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.1-5-base", ManifestDir: dir}
+	err = r.Fill(t.Context(), &req, nil)
+	var mismatch *AirflowMismatchError
+	require.ErrorAs(t, err, &mismatch)
+	assert.Contains(t, err.Error(), "uv.lock was made for Airflow 3.3.2+astro.2, and the image builds on runtime 3.1-5, which has Airflow 3.1.5")
+}
+
+// A mismatch names both ways out: [tool.astro] runtime, which picks the image's
+// runtime for a generated build and a declared Dockerfile's install base alike,
+// to keep the lock's Airflow, and astro init to take the image's.
+func TestAirflowMismatchNamesBothWaysOut(t *testing.T) {
+	err := &AirflowMismatchError{Locked: "3.3.2+astro.2", Image: "3.1.7+astro.1", Recorded: "3.3-11", Base: "quay.io/astronomer/runtime:3.1-12-base"}
+	assert.Contains(t, err.Error(), "uv.lock was made for Airflow 3.3.2+astro.2 (Astro Runtime 3.3-11), and the image builds on runtime 3.1-12, which has Airflow 3.1.7+astro.1")
+	assert.Contains(t, err.Error(), "To keep the lock's Airflow, set [tool.astro] runtime in pyproject.toml to a build with Airflow 3.3.2, such as 3.3-11 "+
+		"(astro local upgrade runtime <build>); to move to the image's, run astro init, which relocks uv.lock")
 }

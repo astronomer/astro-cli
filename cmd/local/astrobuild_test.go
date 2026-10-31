@@ -3,9 +3,11 @@ package local
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -142,5 +144,41 @@ func TestStartLeavesTheManifestAloneWhenTheIndexCannotBeRead(t *testing.T) {
 	}
 	if !strings.Contains(out, "has no build of it") || strings.Contains(out, "could not be read") {
 		t.Errorf("the start did not say the index has no build:\n%s", out)
+	}
+}
+
+// A new project's manifest is created, and the build init writes into it is
+// part of that: it is listed once, as created, never again as updated.
+func TestInitListsTheNewManifestOnce(t *testing.T) {
+	d, stdout := testDeps(t)
+	dir := t.TempDir()
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	d.AstroBuild = func(context.Context, string, string) (runtimeversions.AstroBuild, error) { return build332, nil }
+
+	if err := execute(t, d, "init", "--name", "demo", "--airflow-version", "3.3", "-o", "json"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	var res struct {
+		Created []string `json:"created"`
+		Updated []string `json:"updated"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &res); err != nil {
+		t.Fatalf("init -o json: %v\n%s", err, stdout)
+	}
+	if !slices.Contains(res.Created, "pyproject.toml") || slices.Contains(res.Updated, "pyproject.toml") {
+		t.Errorf("created %v, updated %v: want pyproject.toml created only", res.Created, res.Updated)
+	}
+}
+
+func TestListsFile(t *testing.T) {
+	for entries, want := range map[string]bool{
+		"pyproject.toml":                        true,
+		"pyproject.toml (added [tool.astro])":   true,
+		"pyproject.toml.bak":                    false,
+		"dags/pyproject.toml (added something)": false,
+	} {
+		if got := listsFile([]string{entries}, "pyproject.toml"); got != want {
+			t.Errorf("listsFile(%q) = %v, want %v", entries, got, want)
+		}
 	}
 }

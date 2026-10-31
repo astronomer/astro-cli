@@ -281,7 +281,7 @@ func TestDeployManifestImage_Airflow2(t *testing.T) {
 // The deployment's offer is matched by the Airflow each release carries: a
 // patch pin to that release, a series or generation pin to any under it, and
 // an Astronomer build of Airflow by its release.
-func TestOfferedReleasesNewestFor(t *testing.T) {
+func TestOfferedReleasesBuildsFor(t *testing.T) {
 	o := offeredReleases{
 		{Version: "12.6.0", AirflowVersion: "2.10.4"},
 		{Version: "12.10.0", AirflowVersion: "2.10.5"},
@@ -302,31 +302,41 @@ func TestOfferedReleasesNewestFor(t *testing.T) {
 		"3":      "", // a bare Airflow 3 pin is refused, not resolved to a series
 		"":       "",
 	} {
-		assert.Equal(t, want, o.NewestFor(pin), pin)
+		assert.Equal(t, want, newestOf(o.BuildsFor(pin)), pin)
 	}
 }
 
 // An offered Airflow 3 build that ships no Python requires-python admits
-// gives way to the catalog's rule, which a newer build of the series can
-// satisfy, rather than refusing the deploy over a build the user never named.
+// gives way to the next build the Deployment offers that ships one, with a
+// warning naming both, so the image stays a runtime the Deployment takes.
+// With none offered that ships one, the deploy is refused rather than built on
+// a catalog build the Deployment does not offer.
 func TestAstroBaseFallsBackWhenTheOfferedBuildShipsNoAdmittedPython(t *testing.T) {
 	catalog, err := runtimeversions.Parse([]byte(`{"runtimeVersionsV3": {
-		"3.1-3": {"metadata": {"airflowVersion": "3.1.0", "channel": "stable", "releaseDate": "2025-01-01", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}},
-		"3.1-8": {"metadata": {"airflowVersion": "3.1.2", "channel": "stable", "releaseDate": "2025-06-01", "pythonVersions": ["3.12", "3.13"], "defaultPythonVersion": "3.12"}}}}`))
+		"3.1-3": {"metadata": {"airflowVersion": "3.1.0", "channel": "stable", "releaseDate": "2025-01-01", "pythonVersions": ["3.12", "3.13"], "defaultPythonVersion": "3.12"}},
+		"3.1-8": {"metadata": {"airflowVersion": "3.1.2", "channel": "stable", "releaseDate": "2025-06-01", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}}}}`))
 	require.NoError(t, err)
-	offer := offeredReleases{{Version: "3.1-3", AirflowVersion: "3.1.0"}}
+	read := func() *runtimeversions.Catalog { return catalog }
+	offer := offeredReleases{{Version: "3.1-3", AirflowVersion: "3.1.0"}, {Version: "3.1-8", AirflowVersion: "3.1.2"}}
 
-	ref, err := astroBase(offer, func() *runtimeversions.Catalog { return catalog })(context.Background(),
+	var warnings []string
+	ref, err := astroBase(offer, read, func(s string) { warnings = append(warnings, s) })(context.Background(),
 		imagebuild.ManifestBuild{AirflowVersion: "3.1", RequiresPython: ">=3.13"})
 	require.NoError(t, err)
-	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1-8-python-3.13", ref)
+	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1-3-python-3.13", ref)
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "builds on Astro Runtime 3.1-3, not 3.1-8")
+
+	_, err = astroBase(offeredReleases{{Version: "3.1-8", AirflowVersion: "3.1.2"}}, read, nil)(context.Background(),
+		imagebuild.ManifestBuild{AirflowVersion: "3.1", RequiresPython: ">=3.13"})
+	require.ErrorContains(t, err, "none of the builds the Deployment offers for Airflow 3.1")
 }
 
 // An Airflow 2 pin the Deployment offers nothing for, with no catalog to
 // fall back on, says the Deployment offers none, which is the cause.
 func TestAstroBaseNamesAnAirflow2PinTheDeploymentDoesNotOffer(t *testing.T) {
 	offer := offeredReleases{{Version: "3.1-5", AirflowVersion: "3.1.8"}}
-	_, err := astroBase(offer, nil)(context.Background(), imagebuild.ManifestBuild{AirflowVersion: "2.10"})
+	_, err := astroBase(offer, nil, nil)(context.Background(), imagebuild.ManifestBuild{AirflowVersion: "2.10"})
 	require.ErrorContains(t, err, "the Deployment offers no Astro Runtime for Airflow 2.10")
 	assert.ErrorContains(t, err, "[tool.astro] runtime")
 }
@@ -346,20 +356,20 @@ func TestAstroBaseBuildsOnTheOfferedRuntime(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	ref, err := astroBase(offer, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10"})
+	ref, err := astroBase(offer, read, nil)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10"})
 	require.NoError(t, err)
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0", ref)
 	assert.Zero(t, reads, "an offered Airflow 2 build needs no catalog")
 
-	ref, err = astroBase(offer, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "3.1"})
+	ref, err = astroBase(offer, read, nil)(ctx, imagebuild.ManifestBuild{AirflowVersion: "3.1"})
 	require.NoError(t, err)
 	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1-5", ref, "Airflow 3 takes the offered build over the series tag")
 
-	ref, err = astroBase(offer, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10", Runtime: "12.9.0"})
+	ref, err = astroBase(offer, read, nil)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10", Runtime: "12.9.0"})
 	require.NoError(t, err)
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", ref, "the manifest's runtime wins")
 
-	ref, err = astroBase(nil, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10"})
+	ref, err = astroBase(nil, read, nil)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10"})
 	require.NoError(t, err)
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", ref, "nothing offered falls back to the catalog")
 }
@@ -381,7 +391,7 @@ func TestOfferedRuntimesAsksForTheOrganization(t *testing.T) {
 	offer, err := offeredRuntimes(context.Background(), "org-id", client)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"12.6.0"}, offer.versions())
-	assert.Equal(t, "12.6.0", offer.NewestFor("2.10"))
+	assert.Equal(t, "12.6.0", newestOf(offer.BuildsFor("2.10")))
 	client.AssertExpectations(t)
 }
 

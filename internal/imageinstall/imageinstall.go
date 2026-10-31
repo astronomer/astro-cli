@@ -24,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/uv"
 )
@@ -86,8 +87,10 @@ func Fill(ctx context.Context, req *imagebuild.Request, warn func(string)) error
 // --check`, is written again with `uv lock`, in the project, with a warning
 // to commit it: what is installed is then what the project would run. When
 // uv cannot check or relock, a committed uv.lock is installed as it stands
-// (settleLock). An error is returned only for a lock that could not be
-// listed, or a pyproject.toml that cannot be read.
+// (settleLock). An error is returned for a lock that could not be listed, a
+// pyproject.toml that cannot be read, and a lock made for another Airflow
+// release than the image's base runs (*AirflowMismatchError), which refuses
+// the build before it starts.
 func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(string)) error {
 	if warn == nil {
 		warn = func(string) {}
@@ -146,6 +149,9 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 			}
 		}
 	}
+	if err := airflowMismatch(exported, in.baseInstalled, r.catalog(ctx), build, recordedBuild(pyproject), base); err != nil {
+		return err
+	}
 	if in.baseInstalled == nil {
 		warn(fmt.Sprintf("the package list of %s could not be read, so the image pins the project's own dependencies to uv.lock's versions and leaves the rest to the install", baseName(base)))
 	}
@@ -191,6 +197,24 @@ func settleLock(ctx context.Context, client UV, project string, warn func(string
 	}
 	warn("uv could not lock the project, so the image installs pyproject.toml's dependencies without a lock's versions: " + lockErr.Error())
 	return false, false
+}
+
+// catalog is the runtime catalog, or nil without one.
+func (r Resolver) catalog(ctx context.Context) *runtimeversions.Catalog {
+	if r.Catalog == nil {
+		return nil
+	}
+	return r.Catalog(ctx)
+}
+
+// recordedBuild is the build pyproject.toml records for the lock (its
+// [tool.uv] runtime record), or "".
+func recordedBuild(pyproject []byte) string {
+	m, err := manifest.Parse(pyproject)
+	if err != nil {
+		return ""
+	}
+	return m.UV.RuntimeBuild
 }
 
 // uvProblem says why uv could not be used, for a sentence.

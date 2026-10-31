@@ -68,6 +68,25 @@ type ManifestBuild struct {
 	// of AirflowVersion's series, or "" for none. Beside a Dockerfile it picks
 	// the install base that file builds on.
 	Runtime string
+	// LockedRuntime is the runtime build the project's uv.lock was seeded
+	// taken from (manifest UV.RuntimeBuild), the build its uv.lock was made
+	// for, or "" for none. With Runtime empty, a local or packaged generated
+	// image starts FROM it instead of the newest build of the series, and a
+	// deploy prefers it when the Deployment offers it, and so does the
+	// install base of a declared Dockerfile built FROM ${ASTRO_BASE}. Unused
+	// for a declared Dockerfile that names its own FROM.
+	LockedRuntime string
+	// LockedPython is the Python the uv.lock was seeded for on LockedRuntime
+	// (manifest UV.RuntimePython), or "" for none: an image of LockedRuntime
+	// runs it, when requires-python admits it, so the image runs the Python
+	// the lock was made for.
+	LockedPython string
+	// LockedAirflow is the Astronomer build of Airflow pyproject.toml records
+	// beside LockedRuntime ("3.1.3+astro.2"), the Airflow its uv.lock was made
+	// for, or "" for none: a build that falls back from LockedRuntime to one
+	// carrying another Airflow release is refused, as the lock's versions were
+	// not resolved for it.
+	LockedAirflow string
 	// Registry is [tool.astro] registry: the registry a mirror of Astro
 	// Runtime serves the runtime images from (registry.example/astronomer),
 	// or "" for Astronomer's own.
@@ -98,6 +117,9 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 		ProjectDir:     projectDir,
 		AirflowVersion: p.AirflowVersion,
 		Runtime:        p.Runtime,
+		LockedRuntime:  p.LockedRuntime,
+		LockedPython:   p.LockedPython,
+		LockedAirflow:  p.LockedAirflow,
 		Registry:       p.Registry,
 		RequiresPython: p.RequiresPython,
 		Dockerfile:     p.Dockerfile,
@@ -113,6 +135,9 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 func (p *Plan) SetManifestBuild(mb ManifestBuild) {
 	p.AirflowVersion = mb.AirflowVersion
 	p.Runtime = mb.Runtime
+	p.LockedRuntime = mb.LockedRuntime
+	p.LockedPython = mb.LockedPython
+	p.LockedAirflow = mb.LockedAirflow
 	p.Registry = mb.Registry
 	p.RequiresPython = mb.RequiresPython
 	p.Dockerfile = mb.Dockerfile

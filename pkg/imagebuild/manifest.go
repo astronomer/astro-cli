@@ -2,7 +2,12 @@ package imagebuild
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
@@ -31,10 +36,17 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 	}
 	airflow := m.Airflow()
 	deps := m.Requirements()
+	locked, lockedPython, lockedAF := lockedRuntime(m), "", ""
+	if locked != "" {
+		lockedPython, lockedAF = m.UV.RuntimePython, lockedAirflow(m.UV.ConstraintDependencies)
+	}
 	return ManifestBuild{
 		ProjectDir:     dir,
 		AirflowVersion: airflow.Pin,
 		Runtime:        airflow.Runtime,
+		LockedRuntime:  locked,
+		LockedPython:   lockedPython,
+		LockedAirflow:  lockedAF,
 		Registry:       m.Astro.Registry,
 		RequiresPython: m.Project.RequiresPython,
 		Dockerfile:     m.Astro.Dockerfile,
@@ -46,6 +58,209 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 		FindLinks: m.UV.IndexPagesFor(runtimeDeps(deps)),
 		Packages:  m.Astro.Packages,
 	}
+}
+
+// lockedRuntime is the build m's pyproject.toml records, the one its
+// uv.lock was made for, while it still carries the Airflow the pin asks for: its
+// tag agrees with the pin, and so does the Astronomer build of Airflow pinned
+// beside it, which names the exact release (an Airflow 2 build's tag shows
+// only the generation). A pin moved since the build was recorded leaves it to
+// the next refresh, and the base to the pin. A [tool.astro] runtime or a
+// declared Dockerfile still decides over it; the resolution, not this,
+// applies that.
+func lockedRuntime(m *manifest.Manifest) string {
+	build, pin := m.UV.RuntimeBuild, m.Airflow().Pin
+	if build == "" {
+		return ""
+	}
+	if t, ok := manifest.ParseRuntimeTag(build); !ok || !t.Build || !t.Agrees(pin) {
+		return ""
+	}
+	if !manifest.AstroBuildCovered(pin, m.UV.ConstraintDependencies) {
+		return ""
+	}
+	return build
+}
+
+// lockedAirflow is the Astronomer build of Airflow the [tool.uv]
+// constraint-dependencies pin (manifest.AstroPin), "3.1.3+astro.2", or "".
+func lockedAirflow(constraints []string) string {
+	for _, c := range constraints {
+		if manifest.AstroPin(c) && manifest.DistName(c) == "apache-airflow" {
+			_, version, _ := strings.Cut(c, "==")
+			return strings.TrimSpace(version)
+		}
+	}
+	return ""
+}
+
+// lockedBase is base with the build the project's lock was made for
+// (ManifestBuild.LockedRuntime) named as its runtime when the manifest names
+// none, so a local or packaged image starts FROM the build the lock matches
+// rather than the newest build of the series. A deploy goes through
+// deploybuild.OfferedBase instead, which takes it only when the Deployment
+// offers it.
+//
+// The image runs the recorded Python (LockedPython), so it is
+// the image the lock was made for. A requires-python that excludes that
+// Python, or admits none the lock's build ships (edited since the build was
+// recorded), falls back to the rule without the lock's build, the newest build
+// of the series, rather than failing the build; so does a lock's build whose
+// Airflow, by the catalog, is a release the pin no longer covers.
+// LockedRuntimeNotices says which. A fallback that carries another Airflow
+// release than the lock is refused instead (lockedFallbackRefusal), before the
+// build, as the lock's versions were not resolved for it.
+func lockedBase(base BaseImageFunc, catalog func() *runtimeversions.Catalog) BaseImageFunc {
+	return func(ctx context.Context, m ManifestBuild) (string, error) {
+		if m.Runtime != "" || m.LockedRuntime == "" {
+			return base(ctx, m)
+		}
+		cat := catalog()
+		if why := lockedSkipped(m, cat); why != "" {
+			if err := lockedFallbackRefusal(m, cat, why); err != nil {
+				return "", err
+			}
+			return base(ctx, m)
+		}
+		locked := m
+		locked.Runtime = m.LockedRuntime
+		if m.LockedPython != "" {
+			locked.RequiresPython = "==" + m.LockedPython + ".*"
+		}
+		image, err := base(ctx, locked)
+		if notShipped := (*runtimeversions.PythonNotShippedError)(nil); errors.As(err, &notShipped) {
+			if err := lockedFallbackRefusal(m, cat, notShipped.Error()); err != nil {
+				return "", err
+			}
+			return base(ctx, m)
+		}
+		return image, err
+	}
+}
+
+// lockedFallbackRefusal is the LockedBuildError for an image of m that cannot
+// start FROM its lock's build, for why, when the build it falls back to, the
+// newest of the series by catalog, carries another Airflow release than the
+// lock (LockedAirflow). nil when they agree, and when either is not known, a
+// nil catalog included.
+func lockedFallbackRefusal(m ManifestBuild, catalog *runtimeversions.Catalog, why string) error {
+	if catalog == nil || m.LockedAirflow == "" {
+		return nil
+	}
+	newest, ok := catalog.NewestPublishedRuntimeFor(m.AirflowVersion)
+	if !ok {
+		return nil
+	}
+	r, ok := catalog.Runtime(newest)
+	if !ok || SameAirflowRelease(m.LockedAirflow, r.AirflowVersion) {
+		return nil
+	}
+	return &LockedBuildError{
+		Locked: m.LockedRuntime, LockedAirflow: m.LockedAirflow, Why: why,
+		Fallback: newest, FallbackAirflow: r.AirflowVersion,
+		Fix: "Run astro init to move the project to " + newest + ", which relocks uv.lock",
+	}
+}
+
+// lockedSkipped says why an image of m does not start FROM the build its
+// lock was made for, though there is one: requires-python excludes the
+// recorded Python, or the catalog says the build carries an
+// Airflow release the pin no longer covers. "" when nothing rules it out, a
+// nil catalog included.
+func lockedSkipped(m ManifestBuild, catalog *runtimeversions.Catalog) string {
+	if p := m.LockedPython; p != "" && !runtimeversions.RequiresPythonAdmits(m.RequiresPython, p) {
+		return fmt.Sprintf("requires-python %s excludes Python %s, the one this project's pyproject.toml records for Astro Runtime %s", m.RequiresPython, p, m.LockedRuntime)
+	}
+	if catalog == nil {
+		return ""
+	}
+	if r, ok := catalog.Runtime(m.LockedRuntime); ok && r.AirflowVersion != "" && !manifest.PinCovers(m.AirflowVersion, r.AirflowVersion) {
+		return fmt.Sprintf("Astro Runtime %s, the build this project's pyproject.toml records, carries Airflow %s, which the requirement %s no longer covers", m.LockedRuntime, r.AirflowVersion, m.AirflowVersion)
+	}
+	return ""
+}
+
+// LockedRuntimeUsed reports whether a local or packaged image of m starts
+// FROM the build its lock was made for (LockedRuntime): there is one, the
+// manifest names no build of its own, nothing rules it out (lockedSkipped),
+// and requires-python admits one of its Pythons, or the catalog that would
+// say otherwise is nil. Otherwise the image builds on another (lockedBase),
+// and a check of the lock's build would be of a build the image does not
+// use.
+func LockedRuntimeUsed(m ManifestBuild, catalog *runtimeversions.Catalog) bool {
+	if m.Runtime != "" || DockerfileNamesBase(m) || m.LockedRuntime == "" || lockedSkipped(m, catalog) != "" {
+		return false
+	}
+	if catalog == nil {
+		return true
+	}
+	_, _, err := runtimeversions.ProjectPython(m.AirflowVersion, m.LockedRuntime, lockedRequiresPython(m),
+		func() *runtimeversions.Catalog { return catalog })
+	notShipped := (*runtimeversions.PythonNotShippedError)(nil)
+	return !errors.As(err, &notShipped)
+}
+
+// lockedRequiresPython is the requires-python an image of the lock's build
+// is resolved under: the lock's own Python when it has one, else the
+// project's.
+func lockedRequiresPython(m ManifestBuild) string {
+	if m.LockedPython != "" {
+		return "==" + m.LockedPython + ".*"
+	}
+	return m.RequiresPython
+}
+
+// LockedRuntimeNotices are what a local or packaged build of m has to say
+// about the build its lock was made for (LockedRuntime), read against
+// catalog: that requires-python admits none of that build's Pythons, so the
+// image builds on the newest build of the series instead; else that the
+// build is yanked, or else that a newer build of the pin is available, either
+// of which the project moves off only by running astro init, since moving the
+// build moves the lock. Nothing when the manifest
+// names its own build, when there is no lock build, or with no catalog.
+func LockedRuntimeNotices(m ManifestBuild, catalog *runtimeversions.Catalog) []string {
+	if m.Runtime != "" || DockerfileNamesBase(m) || m.LockedRuntime == "" {
+		return nil
+	}
+	if why := lockedSkipped(m, catalog); why != "" {
+		if lockedFallbackRefusal(m, catalog, why) != nil {
+			return nil // the build is refused instead (lockedBase)
+		}
+		return []string{why + ", so the image builds on the newest build of Airflow " + m.AirflowVersion + " instead. Run astro init to record the build again"}
+	}
+	if catalog == nil {
+		return nil
+	}
+	_, _, err := runtimeversions.ProjectPython(m.AirflowVersion, m.LockedRuntime, lockedRequiresPython(m),
+		func() *runtimeversions.Catalog { return catalog })
+	if notShipped := (*runtimeversions.PythonNotShippedError)(nil); errors.As(err, &notShipped) {
+		if lockedFallbackRefusal(m, catalog, notShipped.Error()) != nil {
+			return nil // the build is refused instead (lockedBase)
+		}
+		if m.LockedPython != "" {
+			return []string{fmt.Sprintf(
+				"Astro Runtime %s ships no Python %s (it ships %s), the one this project's pyproject.toml records, so the image builds on the newest build of Airflow %s instead. Run astro init to record the build again",
+				m.LockedRuntime, m.LockedPython, strings.Join(notShipped.Pythons, ", "), m.AirflowVersion)}
+		}
+		return []string{fmt.Sprintf(
+			"requires-python %s admits none of the Pythons Astro Runtime %s ships (%s), the build this project's uv.lock was made for, so the image builds on the newest build of Airflow %s instead. Run astro init to move the lock to a build it admits",
+			notShipped.RequiresPython, m.LockedRuntime, strings.Join(notShipped.Pythons, ", "), m.AirflowVersion)}
+	}
+	if r, ok := catalog.Runtime(m.LockedRuntime); ok && r.Yanked {
+		why := ""
+		if reason := strings.TrimSpace(r.YankedReason); reason != "" {
+			why = " (" + reason + ")"
+		}
+		move := "Run astro init to move to another build"
+		if newest, ok := catalog.NewestPublishedRuntimeFor(m.AirflowVersion); ok {
+			move = "Run astro init to move to " + newest
+		}
+		return []string{fmt.Sprintf("Astro Runtime %s, which this project builds on, is yanked%s. %s", m.LockedRuntime, why, move)}
+	}
+	if newer, ok := catalog.NewerBuildFor(m.AirflowVersion, m.LockedRuntime); ok {
+		return []string{fmt.Sprintf("Astro Runtime %s is available; this project builds on %s. Run astro init to move to it", newer, m.LockedRuntime)}
+	}
+	return nil
 }
 
 // BaseImageFunc resolves the runtime base a generated build starts FROM, from
@@ -65,7 +280,9 @@ type BaseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // image is generated over
 // the runtime base the Airflow pin, runtime build and requires-python resolve
 // to (RuntimeImageForPython), installing Dependencies and Packages; a pin it refuses is
-// the error returned.
+// the error returned. The runtime build is [tool.astro] runtime, else the build
+// the project's lock was made for (LockedRuntime), else none, which is the
+// newest build of the series.
 // Dependencies and Packages are carried in both cases, since Build ignores
 // them in Dockerfile mode rather than rejecting them.
 //
@@ -80,7 +297,7 @@ type BaseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // deploy), Bin, Env, and Secrets. A generated build reads only the
 // manifest.RuntimeSecretID secret.
 func ForManifest(m ManifestBuild, catalog func() *runtimeversions.Catalog) (Request, error) {
-	return ForManifestWith(context.Background(), m, CatalogBase(catalog))
+	return ForManifestWith(context.Background(), m, lockedBase(CatalogBase(catalog), catalogOrNil(catalog)))
 }
 
 // CatalogBase is ForManifest's base: RuntimeImageForPython over catalog, for
@@ -116,8 +333,32 @@ const (
 func ForLocalManifest(ctx context.Context, m ManifestBuild, o runtimeversions.Options) (Request, error) {
 	// Local start runs the project mounted, so its image holds the
 	// dependencies alone.
-	return forManifestWith(ctx, m, mounted, func(ctx context.Context, m ManifestBuild) (string, error) {
+	return forManifestWith(ctx, m, mounted, lockedBase(func(ctx context.Context, m ManifestBuild) (string, error) {
 		return LocalRuntimeImageWith(ctx, m.AirflowVersion, m.Runtime, m.RequiresPython, o)
+	}, shortCatalog(ctx, o)))
+}
+
+// catalogOrNil is catalog, or a func answering nil for a nil catalog.
+func catalogOrNil(catalog func() *runtimeversions.Catalog) func() *runtimeversions.Catalog {
+	if catalog == nil {
+		return func() *runtimeversions.Catalog { return nil }
+	}
+	return catalog
+}
+
+// shortCatalog reads the catalog o describes once, with the short wait a
+// Python lookup takes (pythonCatalogTimeout): what it answers only checks the
+// lock's build, so a catalog that cannot be read is nil, not a wait.
+func shortCatalog(ctx context.Context, o runtimeversions.Options) func() *runtimeversions.Catalog {
+	return sync.OnceValue(func() *runtimeversions.Catalog {
+		if o.Timeout <= 0 || o.Timeout > pythonCatalogTimeout {
+			o.Timeout = pythonCatalogTimeout
+		}
+		catalog, _, err := runtimeversions.Load(ctx, o)
+		if err != nil {
+			return nil
+		}
+		return catalog
 	})
 }
 
@@ -163,6 +404,19 @@ func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base Base
 		req.ProjectFiles = m.ProjectDir
 	}
 	return req, nil
+}
+
+// DockerfileNamesBase reports a project, m, whose declared Dockerfile picks the
+// image in its own FROM line, rather than building on the install base
+// (airflowrt.UsesInstallBase), which builds on the runtime m picks as a
+// generated build does. A file that cannot be read picks its own, as far as
+// this can tell: the build reports it.
+func DockerfileNamesBase(m ManifestBuild) bool {
+	if m.Dockerfile == "" {
+		return false
+	}
+	data, err := os.ReadFile(filepath.Join(m.ProjectDir, filepath.FromSlash(m.Dockerfile)))
+	return err != nil || !airflowrt.UsesInstallBase(data)
 }
 
 // FromDeclaredDockerfile reports whether the request builds the project's own

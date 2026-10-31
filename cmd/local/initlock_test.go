@@ -126,3 +126,29 @@ func TestInitLocksNothingWhenToolUVIsUnchanged(t *testing.T) {
 		t.Errorf("init locked though it changed nothing in [tool.uv] (%d calls)", calls)
 	}
 }
+
+// init in a project it already brought up to date changes nothing in
+// [tool.uv], so it does not lock again.
+func TestInitAgainLocksNothing(t *testing.T) {
+	dir := t.TempDir()
+	if _, calls := initWithLock(t, dir, func(_ context.Context, dir string) error {
+		writeLock(t, dir, lockOf("sqlalchemy", "2.0.50"))
+		return nil
+	}); calls != 1 {
+		t.Fatalf("the first init locked %d times", calls)
+	}
+	d, _ := testDeps(t)
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	d.AstroBuild = func(context.Context, string, string) (runtimeversions.AstroBuild, error) { return build332, nil }
+	calls := 0
+	d.Lock = func(context.Context, string) error {
+		calls++
+		return nil
+	}
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("init again: %v", err)
+	}
+	if calls != 0 {
+		t.Errorf("init in an up-to-date project locked %d times", calls)
+	}
+}
