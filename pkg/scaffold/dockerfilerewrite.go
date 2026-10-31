@@ -239,13 +239,6 @@ func instructionsName(lines []string, name string) bool {
 	return false
 }
 
-func nonEmpty(s, otherwise string) string {
-	if s == "" {
-		return otherwise
-	}
-	return s
-}
-
 // staleHelperPath is where Astro CLI preview builds wrote the install helper
 // a rewritten Dockerfile ran inside the build, and staleHelperHeader the line
 // each of them began it with. The CLI resolves the install itself now, so a
