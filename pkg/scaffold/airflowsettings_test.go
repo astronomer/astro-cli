@@ -156,7 +156,7 @@ func TestAnEmptyConnectionIsDeclaredAndNotStored(t *testing.T) {
 	manifest, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	require.Contains(t, string(manifest), "warehouse = {conn_type = 'snowflake'}")
-	require.True(t, anyContains(cs.Advisories, "no value to carry"),
+	require.True(t, anyContains(cs.Advisories, "with no value"),
 		"nothing told the user the connection is declared but unset: %v", cs.Advisories)
 }
 
@@ -327,7 +327,7 @@ func TestAFileWhoseValueTheVaultHeldIsKept(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
 	require.Equal(t,
 		SettingsRelPath+" still contains API_TOKEN and warehouse in plaintext, and is kept because the vault "+
-			"already held API_TOKEN, so the file's value was not carried over it",
+			"already held API_TOKEN, so the file's value did not replace it",
 		findAdvisory(t, res.Advisories, "plaintext"))
 	require.Equal(t, "1 connection from "+SettingsRelPath+": values stored in this machine's encrypted vault, "+
 		"scoped to this project. pyproject.toml declares them without their values",
@@ -506,7 +506,7 @@ func TestAnEmptyVariableIsDeclaredOptionalAndNotStored(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(raw), "region = {optional = true, secret = true}")
 	require.Contains(t, res.Advisories,
-		"region: declared as an optional Airflow variable, since it had no value to carry. Set it with astro local env airflow-variable set region")
+		"region: declared as an optional Airflow variable, since it had no value. Set it with astro local env airflow-variable set region")
 	for _, a := range res.Advisories {
 		require.NotContains(t, a, "required")
 	}
@@ -625,7 +625,7 @@ func TestThePreviewSaysThePlaintextIsStillInTheFile(t *testing.T) {
 	got := findAdvisory(t, cs.Advisories, "plaintext")
 	require.Equal(t,
 		SettingsRelPath+" still contains batch_size and warehouse in plaintext, and is kept "+
-			"because the vault already held batch_size, so the file's value was not carried over it",
+			"because the vault already held batch_size, so the file's value did not replace it",
 		got)
 
 	// It does NOT instruct a deletion. Apply may decline to overwrite a name
@@ -797,7 +797,7 @@ func TestTheStock1xSettingsFileIsRetired(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoFileExists(t, filepath.Join(dir, SettingsRelPath))
-	require.Contains(t, res.Deleted, SettingsRelPath+" (nothing to carry, removed)")
+	require.Contains(t, res.Deleted, SettingsRelPath+" (nothing in it, removed)")
 	require.False(t, anyContains(res.Notes, SettingsRelPath), "%v", res.Notes)
 	require.Empty(t, res.Advisories)
 	require.Empty(t, writer.stored)

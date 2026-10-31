@@ -201,7 +201,7 @@ func (cs *Changeset) applySecrets() error {
 		if held[i].conflicts() {
 			cs.Advisories = append(cs.Advisories, w.Name+
 				": kept the value already in "+held[i].yours()+". "+SettingsRelPath+
-				" holds "+held[i].other()+", which was not carried over it")
+				" holds "+held[i].other()+", which was not used")
 			continue
 		}
 		if err := cs.secrets.SetSecret(w.Kind, w.Name, w.value); err != nil {

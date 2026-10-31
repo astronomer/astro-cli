@@ -305,7 +305,7 @@ func planDockerfileRewrite(from1x *project1x, notes []string, cs *Changeset) {
 		if slices.Contains(from1x.present, name) && namedInAny(notes, name) {
 			from1x.rewrite = nil
 			from1x.notes = append(from1x.notes, onBuildKeptNote("Dockerfile: kept FROM "+rw.from+" rather than moved onto the install base the Astro CLI builds"+
-				", because "+name+" has lines "+manifest.Marker+" does not carry (above), and the base's ONBUILD steps "+
+				", because "+name+" has lines "+manifest.Marker+" cannot hold (above), and the base's ONBUILD steps "+
 				"still install them from it. Once they are in "+manifest.Marker+", run astro init again to move it"))
 			from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
 			return
