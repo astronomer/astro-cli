@@ -20,10 +20,10 @@ import (
 // stand in for the deploy-target note and report a pass for the wrong reason.
 func convertWithConfig(t *testing.T, body string) (res *Result, about []string) {
 	t.Helper()
-	return convertWithConfigOpts(t, body, Options{})
+	return convertWithConfigOpts(t, body, &Options{})
 }
 
-func convertWithConfigOpts(t *testing.T, body string, opts Options) (res *Result, about []string) {
+func convertWithConfigOpts(t *testing.T, body string, opts *Options) (res *Result, about []string) {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
@@ -31,7 +31,7 @@ func convertWithConfigOpts(t *testing.T, body string, opts Options) (res *Result
 		filepath.Join(dir, filepath.FromSlash(config1xRelPath)), []byte(body), 0o600))
 	writeAll(t, dir, map[string]string{"Dockerfile": pinOnlyDockerfile})
 
-	res, err := Run(dir, opts)
+	res, err := Run(dir, *opts)
 	require.NoError(t, err)
 
 	_, statErr := os.Stat(filepath.Join(dir, filepath.FromSlash(config1xRelPath)))
@@ -200,7 +200,7 @@ func TestConfigInstancesAreLinkedWhenAsked(t *testing.T) {
 		"  - name: not a plain name\n    source: astro\n    deployment_id: cm0000000000000000000odd1\n"+
 		"  - name: short\n    source: astro\n    deployment_id: cm1short\n"+
 		"  - name: orders\n    source: mwaa\n",
-		Options{InstanceWorkspace: func(id string) string {
+		&Options{InstanceWorkspace: func(id string) string {
 			if id == "cm1short" {
 				t.Errorf("asked about an id that is not a Deployment id: %s", id)
 			}
@@ -233,7 +233,7 @@ func TestConfigInstancesAreLinkedWhenAsked(t *testing.T) {
 func TestConfigInstancesStayNotesUnderAPC(t *testing.T) {
 	res, about := convertWithConfigOpts(t, "project:\n  name: orders\n"+
 		"instances:\n  - name: prod\n    source: astro\n    deployment_id: cmbjjd11x0bre01k5sy1rw0wl\n",
-		Options{InstanceWorkspace: func(string) string { return "cmws00000000000000000prod" }, APCDomain: "apc.example.com"})
+		&Options{InstanceWorkspace: func(string) string { return "cmws00000000000000000prod" }, APCDomain: "apc.example.com"})
 	assert.Len(t, about, 1, "notes: %v", res.Notes)
 	m, err := manifest.Load(filepath.Join(res.Dir, manifest.Marker))
 	require.NoError(t, err)
@@ -246,7 +246,7 @@ func TestConfigInstanceTheLookupCannotPlaceStaysANote(t *testing.T) {
 		"instances:\n"+
 		"  - name: prod\n    source: astro\n    deployment_id: cmbjjd11x0bre01k5sy1rw0wl\n"+
 		"  - name: gone\n    source: astro\n    deployment_id: cmqzyvtpc0tpn01o1e67v6dcb\n",
-		Options{InstanceWorkspace: func(id string) string {
+		&Options{InstanceWorkspace: func(id string) string {
 			if id == "cmbjjd11x0bre01k5sy1rw0wl" {
 				return "cmws00000000000000000prod"
 			}

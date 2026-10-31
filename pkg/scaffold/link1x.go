@@ -154,7 +154,9 @@ func (from1x *project1x) unlinkedInstances() []instance1x {
 // the manifest as written so far, so the defaults come out as a run of astro
 // link add would leave them.
 func setInstanceLinks(ed tomledit.Editor, from1x *project1x) error {
-	for _, l := range from1x.instanceLinks() {
+	links := from1x.instanceLinks()
+	for i := range links {
+		l := &links[i]
 		if err := l.validate(); err != nil {
 			return err
 		}
@@ -181,8 +183,8 @@ func (from1x *project1x) instanceLinksAdvisory() string {
 		return ""
 	}
 	names := make([]string, len(links))
-	for i, l := range links {
-		names[i] = l.Name
+	for i := range links {
+		names[i] = links[i].Name
 	}
 	noun := "Deployments"
 	if len(links) == 1 {
