@@ -94,6 +94,10 @@ type UV struct {
 	// Sources maps a package to the [[tool.uv.index]] URL its
 	// [tool.uv.sources] entry names, for the entries that name an index.
 	Sources map[string]string
+	// DefaultIndex and DefaultIndexName are the URL and name of the
+	// [[tool.uv.index]] entry marked default = true, which serves every
+	// package no source routes elsewhere. Empty when there is none.
+	DefaultIndex, DefaultIndexName string
 	// DirectURLs maps a package to the PEP 508 URL its [tool.uv.sources]
 	// entry stands for, for the entries that name a git repository or a URL.
 	DirectURLs map[string]string
@@ -137,12 +141,36 @@ func (u UV) IndexPagesFor(deps []string) []string {
 	return u.indexPages(func(pkg string) bool { return wanted[DistName(pkg)] })
 }
 
-// indexPages are the pages of the sources whose package keep accepts.
+// indexPages are the pages of the sources whose package keep accepts. With a
+// default index and no source for it, an Astronomer build the constraints pin
+// (AstroPin) is found on the default index, so its page there counts too.
 //
 //nolint:gocritic // a value receiver, as its callers have
 func (u UV) indexPages(keep func(pkg string) bool) []string {
-	pkgs := make([]string, 0, len(u.Sources))
-	for pkg := range u.Sources {
+	where := make(map[string]string, len(u.Sources))
+	for pkg, index := range u.Sources {
+		where[pkg] = index
+	}
+	if u.DefaultIndex != "" {
+		for _, c := range u.ConstraintDependencies {
+			if !AstroPin(c) {
+				continue
+			}
+			// Airflow 3's build of apache-airflow requires the same build of
+			// core, which the pins leave to it; only Airflow 3 has a Task SDK.
+			pkgs := []string{DistName(c)}
+			if pkgs[0] == taskSDKDist {
+				pkgs = append(pkgs, airflowCoreDist)
+			}
+			for _, pkg := range pkgs {
+				if where[pkg] == "" {
+					where[pkg] = u.DefaultIndex
+				}
+			}
+		}
+	}
+	pkgs := make([]string, 0, len(where))
+	for pkg := range where {
 		if keep(pkg) {
 			pkgs = append(pkgs, pkg)
 		}
@@ -150,7 +178,7 @@ func (u UV) indexPages(keep func(pkg string) bool) []string {
 	sort.Strings(pkgs)
 	pages := make([]string, 0, len(pkgs))
 	for _, pkg := range pkgs {
-		pages = append(pages, strings.TrimSuffix(u.Sources[pkg], "/")+"/"+pkg+"/")
+		pages = append(pages, strings.TrimSuffix(where[pkg], "/")+"/"+pkg+"/")
 	}
 	return pages
 }
@@ -764,6 +792,9 @@ func uvTable(t map[string]any) UV {
 		address, _ := index["url"].(string)
 		if name != "" && address != "" {
 			urls[name] = address
+		}
+		if isDefault, _ := index["default"].(bool); isDefault && address != "" {
+			out.DefaultIndex, out.DefaultIndexName = address, name
 		}
 	}
 	sources, _ := t["sources"].(map[string]any)

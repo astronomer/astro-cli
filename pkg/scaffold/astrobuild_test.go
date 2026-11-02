@@ -1,10 +1,8 @@
 package scaffold
 
 import (
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -56,14 +54,12 @@ const astroHead = "[project]\nname = 'demo'\nrequires-python = '>=3.12'\ndepende
 func TestSetAstroBuildWritesWhatUVNeeds(t *testing.T) {
 	_, v := withBuild(t, astroHead, build332)
 
-	assert.Equal(t, []string{"apache-airflow==3.3.*", "apache-airflow-core", "apache-airflow-task-sdk"}, v.Project.Dependencies,
-		"sources apply only to direct dependencies, so core and the SDK are listed")
+	assert.Equal(t, []string{"apache-airflow==3.3.*"}, v.Project.Dependencies,
+		"the default index serves core and the SDK, so nothing else is listed")
 	assert.Equal(t, AstroEnvironments, v.Tool.UV.Environments)
 	assert.Equal(t, []string{"apache-airflow==3.3.2+astro.1", "apache-airflow-task-sdk==1.3.2+astro.1"}, v.Tool.UV.ConstraintDependencies)
-	assert.Equal(t, []map[string]any{{"name": "astronomer", "url": "https://pip.astronomer.io/v2/", "explicit": true}}, v.Tool.UV.Index)
-	for _, d := range []string{"apache-airflow", "apache-airflow-core", "apache-airflow-task-sdk"} {
-		assert.Equal(t, map[string]any{"index": "astronomer"}, v.Tool.UV.Sources[d], d)
-	}
+	assert.Equal(t, []map[string]any{{"name": "astronomer", "url": "https://pip.astronomer.io/v2/", "default": true}}, v.Tool.UV.Index)
+	assert.Empty(t, v.Tool.UV.Sources, "the default index needs no source")
 	assert.Equal(t, map[string]any{"apache-airflow": false, "apache-airflow-core": false, "apache-airflow-task-sdk": false},
 		v.Tool.UV.ExcludeNewerPackage, "the index lists no upload times, so any cutoff would hide every build")
 }
@@ -111,7 +107,7 @@ func TestSetAstroBuildMovesToANewBuild(t *testing.T) {
 	require.NoError(t, toml.Unmarshal(data, &v))
 	assert.Equal(t, []string{"apache-airflow==3.3.2+astro.1", "apache-airflow-task-sdk==1.3.2+astro.1"}, v.Tool.UV.ConstraintDependencies)
 	assert.Len(t, v.Tool.UV.Index, 1)
-	assert.Len(t, v.Project.Dependencies, 3)
+	assert.Len(t, v.Project.Dependencies, 1)
 }
 
 // An Airflow with no Astronomer build comes from PyPI, so what points uv at
@@ -140,22 +136,18 @@ func TestSetAstroBuildForAirflow2AndForCore(t *testing.T) {
 	_, v := withBuild(t, "[project]\nname = 'old'\ndependencies = ['apache-airflow==2.11.*']\n\n[tool.astro]\n", af2)
 	assert.Equal(t, []string{"apache-airflow==2.11.*"}, v.Project.Dependencies)
 	assert.Equal(t, []string{"apache-airflow==2.11.2+astro.7"}, v.Tool.UV.ConstraintDependencies)
-	assert.Equal(t, []string{"apache-airflow"}, keys(v.Tool.UV.Sources))
+	assert.Empty(t, v.Tool.UV.Sources)
 
 	moved, _ := withBuild(t, astroHead, build332)
 	moved = strings.Replace(moved, "apache-airflow==3.3.*", "apache-airflow==2.11.*", 1)
 	_, v = withBuild(t, moved, af2)
 	assert.Equal(t, []string{"apache-airflow==2.11.*"}, v.Project.Dependencies, "Airflow 2 publishes no core or Task SDK")
 	assert.Equal(t, []string{"apache-airflow==2.11.2+astro.7"}, v.Tool.UV.ConstraintDependencies)
-	assert.Equal(t, []string{"apache-airflow"}, keys(v.Tool.UV.Sources))
+	assert.Empty(t, v.Tool.UV.Sources)
 
 	_, v = withBuild(t, "[project]\nname = 'slim'\ndependencies = ['apache-airflow-core==3.3.*']\n\n[tool.astro]\n", build332)
-	assert.Equal(t, []string{"apache-airflow-core==3.3.*", "apache-airflow-task-sdk"}, v.Project.Dependencies,
+	assert.Equal(t, []string{"apache-airflow-core==3.3.*"}, v.Project.Dependencies,
 		"a project on the distribution without providers does not gain it")
-}
-
-func keys(m map[string]map[string]any) []string {
-	return slices.Sorted(maps.Keys(m))
 }
 
 // With no build, a project moved to Airflow 2 loses the bare Airflow 3
@@ -202,5 +194,40 @@ func TestSetAstroBuildAppendsToAnInlineIndexArray(t *testing.T) {
 	_, v := withBuild(t, src, build332)
 
 	require.Len(t, v.Tool.UV.Index, 2)
+	assert.Equal(t, map[string]any{"name": "astronomer", "url": "https://pip.astronomer.io/v2/", "default": true}, v.Tool.UV.Index[1])
+}
+
+// A project with a default index of its own (a mirror) keeps it: uv takes one
+// default, so Astronomer's index stays explicit and the Airflow distributions
+// are routed to it, listed as direct dependencies so their sources apply.
+func TestSetAstroBuildRoutesBesideTheProjectsOwnDefaultIndex(t *testing.T) {
+	src := astroHead + "\n[[tool.uv.index]]\nname = 'mirror'\nurl = 'https://mirror.example/simple'\ndefault = true\n"
+
+	_, v := withBuild(t, src, build332)
+
+	require.Len(t, v.Tool.UV.Index, 2)
+	assert.Equal(t, map[string]any{"name": "mirror", "url": "https://mirror.example/simple", "default": true}, v.Tool.UV.Index[0])
 	assert.Equal(t, map[string]any{"name": "astronomer", "url": "https://pip.astronomer.io/v2/", "explicit": true}, v.Tool.UV.Index[1])
+	for _, d := range []string{"apache-airflow", "apache-airflow-core", "apache-airflow-task-sdk"} {
+		assert.Equal(t, map[string]any{"index": "astronomer"}, v.Tool.UV.Sources[d], d)
+	}
+	assert.Equal(t, []string{"apache-airflow==3.3.*", "apache-airflow-core", "apache-airflow-task-sdk"}, v.Project.Dependencies)
+}
+
+// A project an earlier astro wrote, with the index explicit and the Airflow
+// distributions routed to it, moves to the default index: the sources and the
+// bare entries that served them go, and the project's own stay.
+func TestSetAstroBuildMovesRoutedProjectsToTheDefaultIndex(t *testing.T) {
+	src := "[project]\nname = 'demo'\nrequires-python = '>=3.12'\n" +
+		"dependencies = ['apache-airflow==3.3.*', 'pandas', 'apache-airflow-core', 'apache-airflow-task-sdk']\n\n[tool.astro]\n\n" +
+		"[tool.uv]\nconstraint-dependencies = ['apache-airflow==3.3.2+astro.1', 'apache-airflow-task-sdk==1.3.2+astro.1']\n\n" +
+		"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\nexplicit = true\n\n" +
+		"[tool.uv.sources]\napache-airflow = { index = 'astronomer' }\napache-airflow-core = { index = 'astronomer' }\n" +
+		"apache-airflow-task-sdk = { index = 'astronomer' }\nmylib = { path = '../mylib' }\n"
+
+	_, v := withBuild(t, src, build332)
+
+	assert.Equal(t, []string{"apache-airflow==3.3.*", "pandas"}, v.Project.Dependencies)
+	assert.Equal(t, []map[string]any{{"name": "astronomer", "url": "https://pip.astronomer.io/v2/", "default": true}}, v.Tool.UV.Index)
+	assert.Equal(t, map[string]map[string]any{"mylib": {"path": "../mylib"}}, v.Tool.UV.Sources)
 }

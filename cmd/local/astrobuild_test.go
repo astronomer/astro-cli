@@ -51,15 +51,17 @@ func TestStartWritesTheAstroBuildIntoTheManifest(t *testing.T) {
 	got, out := startWithBuild(t, buildManifest, build332, nil)
 
 	for _, want := range []string{
-		"'apache-airflow-core'",
 		"apache-airflow==3.3.2+astro.1",
 		"apache-airflow-task-sdk==1.3.2+astro.1",
 		"[[tool.uv.index]]",
-		"[tool.uv.sources]",
+		"default = true",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("manifest lacks %q:\n%s", want, got)
 		}
+	}
+	if strings.Contains(got, "[tool.uv.sources]") || strings.Contains(got, "'apache-airflow-core'") {
+		t.Errorf("the default index needs no sources and no bare core entry:\n%s", got)
 	}
 	if !strings.Contains(out, "pyproject.toml: updated") {
 		t.Errorf("the start did not say it changed the manifest:\n%s", out)
@@ -119,6 +121,37 @@ func TestInitWritesTheAstroBuild(t *testing.T) {
 	}
 	if strings.Contains(stdout.String(), "warning") {
 		t.Errorf("init printed a warning:\n%s", stdout)
+	}
+}
+
+// A project adopted with a default index of its own keeps it, and init says
+// why Astronomer's index is routed per package instead.
+func TestInitNotesAProjectsOwnDefaultIndex(t *testing.T) {
+	d, _ := testDeps(t)
+	stderr := &bytes.Buffer{}
+	d.Stderr = stderr
+	dir := t.TempDir()
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	d.AstroBuild = func(context.Context, string, string) (runtimeversions.AstroBuild, error) { return build332, nil }
+	own := "[project]\nname = 'demo'\nrequires-python = '>=3.12'\ndependencies = ['apache-airflow==3.3.*']\n\n" +
+		"[[tool.uv.index]]\nname = 'mirror'\nurl = 'https://mirror.example/simple'\ndefault = true\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(own), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "apache-airflow = {index = 'astronomer'}") {
+		t.Errorf("beside the project's own default index, Airflow is not routed to Astronomer's:\n%s", data)
+	}
+	if !strings.Contains(stderr.String(), "keeps its own default index, mirror") {
+		t.Errorf("init did not say why:\n%s", stderr)
 	}
 }
 

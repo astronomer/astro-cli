@@ -1,6 +1,7 @@
 package scaffold
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"reflect"
@@ -25,14 +26,16 @@ import (
 //	[tool.uv]
 //	environments = [linux, arm64 macOS]
 //	constraint-dependencies = ["apache-airflow==3.3.2+astro.1", "apache-airflow-task-sdk==1.3.2+astro.1"]
-//	[[tool.uv.index]]  name = "astronomer", explicit = true
-//	[tool.uv.sources]  apache-airflow, -core, -task-sdk = { index = "astronomer" }
+//	[[tool.uv.index]]  name = "astronomer", default = true
 //	[tool.uv.exclude-newer-package]  the same three = false
 //
-// The index is explicit, so it serves only the packages a source names, and
-// every other package still resolves from PyPI. Sources apply only to direct
-// dependencies, which is why apache-airflow-core and apache-airflow-task-sdk
-// are listed in [project] dependencies beside the requirement.
+// The index is the project's default: it serves Astronomer's builds and
+// passes every other package through from PyPI, so no source is needed. A
+// project with a default index of its own (a mirror) keeps that one; there the
+// index is explicit, each Airflow distribution gets a source naming it, and
+// apache-airflow-core and apache-airflow-task-sdk are listed in [project]
+// dependencies beside the requirement, since sources apply only to direct
+// dependencies.
 //
 // environments limits the lockfile to the platforms a project runs on. Locking
 // for every platform lets one package's Intel-macOS-only marker (shap's
@@ -104,10 +107,23 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 	if err := setAstroPins(ed, b, dists, rc); err != nil {
 		return err
 	}
-	if err := setAstroSources(ed, dists); err != nil {
+	// With Astronomer's index as the default, every package resolves from it
+	// and no source is needed; a project with a default index of its own
+	// keeps the index explicit and the Airflow distributions routed to it.
+	routed := OwnDefaultIndex(ed) != ""
+	if !routed {
+		// The bare core and Task SDK entries were listed only so a source
+		// could route them: they go with the sources this wrote.
+		for _, d := range []string{runtimeversions.DistCore, runtimeversions.DistTaskSDK} {
+			if v, _ := ed.Get(append(slices.Clone(sourcesKey), d)); reflect.DeepEqual(v, map[string]any{"index": astroIndexName}) {
+				dropBareDists(ed, d)
+			}
+		}
+	}
+	if err := setAstroSources(ed, routedDists(routed, dists)); err != nil {
 		return err
 	}
-	if err := setAstroIndex(ed, b); err != nil {
+	if err := setAstroIndex(ed, b, routed); err != nil {
 		return err
 	}
 	for _, d := range astroDists {
@@ -134,7 +150,7 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 		}
 		return nil
 	}
-	if err := addDirectDists(before, ed, dists); err != nil {
+	if err := addDirectDists(before, ed, routedDists(routed, dists)); err != nil {
 		return err
 	}
 	if _, ok := ed.Get(environmentsKey); !ok {
@@ -281,9 +297,35 @@ func setAstroSources(ed tomledit.Editor, dists []string) error {
 	return nil
 }
 
+// OwnDefaultIndex is the name of a [[tool.uv.index]] entry the project marks
+// default = true other than Astronomer's, or "" when there is none. uv takes
+// one default index, so beside the project's own Astronomer's stays explicit.
+func OwnDefaultIndex(ed tomledit.Editor) string {
+	current, _ := ed.Get(indexKey)
+	entries, _ := current.([]any)
+	for _, e := range entries {
+		entry, _ := e.(map[string]any)
+		if isDefault, _ := entry["default"].(bool); isDefault && entry["name"] != astroIndexName {
+			name, _ := entry["name"].(string)
+			return cmp.Or(name, "unnamed")
+		}
+	}
+	return ""
+}
+
+// routedDists is dists when the Airflow distributions are routed to an
+// explicit index, and none when the index is the default.
+func routedDists(routed bool, dists []string) []string {
+	if routed {
+		return dists
+	}
+	return nil
+}
+
 // setAstroIndex adds the index entry, or corrects its url, and removes it
-// when b is zero.
-func setAstroIndex(ed tomledit.Editor, b runtimeversions.AstroBuild) error {
+// when b is zero. The entry is the default index unless routed, when the
+// project has a default of its own and the entry is explicit.
+func setAstroIndex(ed tomledit.Editor, b runtimeversions.AstroBuild, routed bool) error {
 	current, _ := ed.Get(indexKey)
 	entries, _ := current.([]any)
 	at := -1
@@ -301,7 +343,11 @@ func setAstroIndex(ed tomledit.Editor, b runtimeversions.AstroBuild) error {
 		}
 		return nil
 	}
-	values := map[string]any{"name": astroIndexName, "url": b.Index, "explicit": true}
+	kind, other := "default", "explicit"
+	if routed {
+		kind, other = other, kind
+	}
+	values := map[string]any{"name": astroIndexName, "url": b.Index, kind: true}
 	switch {
 	case at >= 0:
 	case len(entries) > 0 && ed.Set(append(slices.Clone(indexKey), strconv.Itoa(len(entries))), values) == nil:
@@ -317,10 +363,13 @@ func setAstroIndex(ed tomledit.Editor, b runtimeversions.AstroBuild) error {
 	for _, kv := range []struct {
 		key   string
 		value any
-	}{{"name", astroIndexName}, {"url", b.Index}, {"explicit", true}} {
+	}{{"name", astroIndexName}, {"url", b.Index}, {kind, true}} {
 		if err := setIfDifferent(ed, append(slices.Clone(entry), kv.key), kv.value); err != nil {
 			return err
 		}
+	}
+	if _, ok := ed.Get(append(slices.Clone(entry), other)); ok {
+		ed.Delete(append(slices.Clone(entry), other))
 	}
 	return nil
 }

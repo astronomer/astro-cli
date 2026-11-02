@@ -105,11 +105,25 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// no to-do in it: `astro local start` makes the same lookup and says what
 	// it found. uv.lock follows what it wrote; nothing written, nothing locked.
 	if build := c.writeAstroBuild(ctx, res.Dir); build.changed {
+		c.noteOwnDefaultIndex(res.Dir)
 		c.lockAfterInit(ctx, res.Dir)
 	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
 	})
+}
+
+// noteOwnDefaultIndex says why a project with a default index of its own keeps
+// Astronomer's index explicit, with a source per Airflow distribution, where
+// any other project gets Astronomer's index as its default (scaffold's
+// setAstroBuild). On stderr, as init's other notes beside its result.
+func (c *cli) noteOwnDefaultIndex(dir string) {
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	if err != nil || m.UV.DefaultIndexName == "" || m.UV.DefaultIndex == runtimeversions.PublicIndexURL() {
+		return
+	}
+	cliout.Note(c.d.Stderr, fmt.Sprintf("%s keeps its own default index, %s, so Astronomer's Airflow build comes from %s through a source for each Airflow package",
+		manifest.Marker, m.UV.DefaultIndexName, runtimeversions.PublicIndexURL()))
 }
 
 // nextStart is the start command to suggest once init is done. Standalone
