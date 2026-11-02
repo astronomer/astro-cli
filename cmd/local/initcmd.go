@@ -1,10 +1,13 @@
 package local
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -34,8 +37,9 @@ func newInitCmd(c *cli) *cobra.Command {
 		Long: "Create a pyproject.toml-based Astro project in the given directory (default: the current one).\n\n" +
 			"Run it in the Airflow repo you already have: a directory with no pyproject.toml is scaffolded, and one that has a pyproject.toml gains a [tool.astro] section, leaving the rest of the file alone.\n\n" +
 			"Run in an Astro CLI 1.x project, it converts it in place: requirements.txt and packages.txt are carried into pyproject.toml, what airflow_settings.yaml declares is carried over, " +
-			"and a Dockerfile that does more than pick a base image is kept as the project's build. A 1.x file is removed once everything it said is in pyproject.toml, " +
-			"except requirements.txt and packages.txt when the Dockerfile it keeps still installs them, and other files already there are kept. " +
+			"and a Dockerfile that only picks a runtime is removed, its runtime version and Python recorded in pyproject.toml. Any other Dockerfile is kept as the project's build, as written. " +
+			"A 1.x file is removed once everything it said is in pyproject.toml, " +
+			"except requirements.txt and packages.txt when a kept Dockerfile still installs them, and other files already there are kept. " +
 			"What init could not carry over, such as a requirements.txt line that is not a plain requirement, is listed at the end, to move across by hand.",
 		Example: "  # Make the current directory an Astro project\n" +
 			"  astro init\n\n" +
@@ -169,30 +173,14 @@ func renderInit(w io.Writer, res *scaffold.Result, next string) error {
 	if _, err := fmt.Fprintf(w, "%s Astro project %s (Airflow %s%s) in %s\n", verb, res.Name, res.AirflowVersion, defaultSourceNote(res.AirflowDefaultSource), res.Dir); err != nil {
 		return err
 	}
-	for _, entry := range res.Updated {
-		if _, err := fmt.Fprintf(w, "  %s\n", entry); err != nil {
-			return err
-		}
+	rows, changed := initRows(res)
+	if err := renderRows(w, rows); err != nil {
+		return err
 	}
-	for _, entry := range res.Created {
-		if _, err := fmt.Fprintf(w, "  %s\n", entry); err != nil {
-			return err
-		}
+	if err := renderChanged(w, changed); err != nil {
+		return err
 	}
-	for _, entry := range res.Skipped {
-		if _, err := fmt.Fprintf(w, "  %s (already existed, kept)\n", entry); err != nil {
-			return err
-		}
-	}
-	// Removed files get their own line and their own word. They arrive in their
-	// own list for the same reason: rendered beside Updated, in the unlabelled
-	// block above, a destroyed file reads exactly like an edited one.
-	for _, entry := range res.Deleted {
-		if _, err := fmt.Fprintf(w, "  Removed %s\n", entry); err != nil {
-			return err
-		}
-	}
-	if err := renderChanged(w, res.Advisories); err != nil {
+	if err := renderInfo(w, res.Info); err != nil {
 		return err
 	}
 	if err := renderLeftToDo(w, res.Notes); err != nil {
@@ -202,14 +190,121 @@ func renderInit(w io.Writer, res *scaffold.Result, next string) error {
 	return err
 }
 
-// renderLeftToDo prints what init could not carry over, under a heading. Each
-// line names a file and where its contents belong.
-// renderChanged prints the advisories: things this run DID that now behave
-// differently. They are not "left to do" and must not be rendered as it — a
-// carried default is applied at start now, and a connection declared with no
-// value will stop the project starting until it is set. Nothing else on screen
-// says either, and until this existed the CLI computed them and dropped them,
-// so the only reader was --json.
+type initRow struct{ name, what string }
+
+// Labels for the rows that gather several files.
+const (
+	rowCreated = "Created"
+	rowRemoved = "Removed"
+	rowKept    = "Kept"
+)
+
+// initRows is init's file list, one change a line with the file leading, and
+// the advisories left for What changed. An advisory about one file the run
+// changed ("pyproject.toml: …") is a line of that file. Files created with
+// nothing more to say share one Created line, files only kept one Kept line
+// (leaving out any the run also changed), and removed files a Removed line
+// per reason.
+func initRows(res *scaffold.Result) (rows []initRow, changed []string) {
+	touched := map[string]bool{}
+	var created []string
+	add := func(label, fallback string) {
+		name, what := splitLabel(label)
+		touched[name] = true
+		if what == "" && fallback == "" {
+			created = append(created, name)
+			return
+		}
+		rows = append(rows, initRow{name, cmp.Or(what, fallback)})
+	}
+	for _, l := range res.Updated {
+		add(l, "updated")
+	}
+	for _, l := range res.Created {
+		add(l, "")
+	}
+	for _, a := range res.Advisories {
+		name, what, ok := strings.Cut(a, ": ")
+		if !ok || !touched[name] {
+			changed = append(changed, a)
+			continue
+		}
+		rows = append(rows, initRow{name, what})
+	}
+	// Sorted by file, stable, so a file's lines sit together in the order
+	// they were reported.
+	first := map[string]int{}
+	for i, r := range rows {
+		if _, ok := first[r.name]; !ok {
+			first[r.name] = i
+		}
+	}
+	slices.SortStableFunc(rows, func(a, b initRow) int { return first[a.name] - first[b.name] })
+
+	// A file created bare joins the Created line, unless lines above already
+	// say what went into it.
+	created = slices.DeleteFunc(created, func(name string) bool {
+		return slices.ContainsFunc(rows, func(r initRow) bool { return r.name == name })
+	})
+	if len(created) > 0 {
+		rows = append(rows, initRow{rowCreated, strings.Join(created, ", ")})
+	}
+
+	var reasons []string
+	removed := map[string][]string{}
+	for _, l := range res.Deleted {
+		name, why := splitLabel(l)
+		if _, ok := removed[why]; !ok {
+			reasons = append(reasons, why)
+		}
+		removed[why] = append(removed[why], name)
+	}
+	for _, why := range reasons {
+		what := strings.Join(removed[why], ", ")
+		if why != "" {
+			what += " (" + why + ")"
+		}
+		rows = append(rows, initRow{rowRemoved, what})
+	}
+	var kept []string
+	for _, l := range res.Skipped {
+		if name, _ := splitLabel(l); !touched[name] {
+			kept = append(kept, name)
+		}
+	}
+	if len(kept) > 0 {
+		rows = append(rows, initRow{rowKept, strings.Join(kept, ", ")})
+	}
+	return rows, changed
+}
+
+// splitLabel splits a scaffold label, "file (what happened)", into its file
+// and what happened; a bare label is all file.
+func splitLabel(label string) (name, what string) {
+	if i := strings.Index(label, " ("); i > 0 && strings.HasSuffix(label, ")") {
+		return label[:i], label[i+2 : len(label)-1]
+	}
+	return label, ""
+}
+
+// renderRows prints the file list with its first column aligned.
+func renderRows(w io.Writer, rows []initRow) error {
+	width := 0
+	for _, r := range rows {
+		width = max(width, len(r.name))
+	}
+	for _, r := range rows {
+		if _, err := fmt.Fprintf(w, "  %-*s  %s\n", width, r.name, r.what); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// renderChanged prints the advisories no file line holds: things this run DID
+// that now behave differently. They are not "left to do" and must not be
+// rendered as it: a carried default is applied at start now, and a connection
+// declared with no value will stop the project starting until it is set.
 func renderChanged(w io.Writer, advisories []string) error {
 	if len(advisories) == 0 {
 		return nil
@@ -225,15 +320,52 @@ func renderChanged(w io.Writer, advisories []string) error {
 	return nil
 }
 
+// renderInfo prints what a person should know and has nothing to do about,
+// each as a Note.
+func renderInfo(w io.Writer, info []string) error {
+	if len(info) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintln(w); err != nil {
+		return err
+	}
+	for _, n := range info {
+		cliout.Note(w, n)
+	}
+	return nil
+}
+
+// renderLeftToDo prints init's notes, one per line, except the Deployment
+// links a 1.x config listed: those come last, under one line, a command each.
 func renderLeftToDo(w io.Writer, notes []string) error {
 	if len(notes) == 0 {
 		return nil
 	}
-	if _, err := fmt.Fprintf(w, "\nLeft to do:\n"); err != nil {
+	if _, err := fmt.Fprintf(w, "\n%s\n", cliout.TodoLabel(w)); err != nil {
 		return err
 	}
+	var links []string
 	for _, note := range notes {
+		if cmd, ok := strings.CutPrefix(note, scaffold.LinkNotePrefix); ok {
+			links = append(links, cmd)
+			continue
+		}
 		if _, err := fmt.Fprintf(w, "  %s\n", note); err != nil {
+			return err
+		}
+	}
+	if len(links) == 0 {
+		return nil
+	}
+	head := "  Link the Deployments .astro/config.yaml lists:\n"
+	if len(links) == 1 {
+		head = "  Link the Deployment .astro/config.yaml lists:\n"
+	}
+	if _, err := io.WriteString(w, head); err != nil {
+		return err
+	}
+	for _, cmd := range links {
+		if _, err := fmt.Fprintf(w, "    %s\n", cmd); err != nil {
 			return err
 		}
 	}

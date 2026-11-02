@@ -24,6 +24,9 @@ var (
 	NoteLabel = ansi.NoteLabel
 	// NextLabel is the cyan "Next:" that leads the command a run suggests next.
 	NextLabel = ansi.NextLabel
+	// TodoLabel is the cyan "Left to do:" that heads the work a run leaves to
+	// do by hand.
+	TodoLabel = ansi.TodoLabel
 	// DangerLabel is the red "WARNING:" that leads a confirmation of something
 	// that cannot be undone.
 	DangerLabel = ansi.DangerLabel
