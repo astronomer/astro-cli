@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -89,6 +90,8 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 		warn = func(string) {}
 	}
 	if req.FromDeclaredDockerfile() && !req.UsesInstallBase() {
+		warn(filepath.Base(req.Dockerfile) + " doesn't build FROM " + airflowrt.InstallBaseRepo +
+			", so this image installs what the Dockerfile installs, not uv.lock")
 		return nil
 	}
 	project := req.ManifestDir

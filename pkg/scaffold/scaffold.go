@@ -129,6 +129,9 @@ type Result struct {
 	// pending classification — as the desktop's preview does — hides this too,
 	// and this is the half that describes a change the user did not ask for.
 	Advisories []string `json:"advisories,omitempty"`
+	// Info is what a person should know and has nothing to do about, such
+	// as a docker-compose override only Docker mode reads.
+	Info []string `json:"info,omitempty"`
 }
 
 // ErrAlreadyAstroProject reports a directory whose pyproject.toml already
@@ -395,6 +398,9 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	if err := planFiles(abs, goos != windowsOS, cs); err != nil {
 		return nil, err
 	}
+	if from1x.rewrite != nil {
+		cs.Changes = append(cs.Changes, rewriteChange(from1x.rewrite))
+	}
 	if err := planKeptDockerfileIgnore(abs, from1x, cs); err != nil {
 		return nil, err
 	}
@@ -421,6 +427,8 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	// at all, which is a weaker statement and belongs after.
 	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x)
 	cs.Notes = slices.Concat(from1x.notes, pin.migrationNotes, lefts)
+	cs.Info = slices.DeleteFunc(slices.Clone(cs.Notes), func(n string) bool { return !slices.Contains(infoNotes, n) })
+	cs.Notes = slices.DeleteFunc(cs.Notes, func(n string) bool { return slices.Contains(infoNotes, n) })
 
 	// The values airflow_settings.yaml supplied. They ride the changeset rather
 	// than being written here because Plan writes nothing, and they are a
@@ -469,13 +477,13 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	// whose dependencies are intact is the better half of the trade.
 	for _, name := range planRetirements(from1x,
 		slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion) {
-		label := name + " (migrated into " + manifest.Marker + ", removed)"
+		label := name + " (now in " + manifest.Marker + ")"
 		if name == SettingsRelPath {
 			switch {
 			case len(cs.Secrets) > 0:
-				label = name + " (migrated into the encrypted vault and " + manifest.Marker + ", removed)"
+				label = name + " (now in " + manifest.Marker + " and the encrypted vault)"
 			case !from1x.settings.declares() && len(from1x.settings.pools.byName) == 0:
-				label = name + " (nothing to carry, removed)"
+				label = name + " (nothing in it to keep)"
 			}
 		}
 		cs.Changes = append(cs.Changes, Change{
@@ -603,7 +611,7 @@ func planRetirements(from1x *project1x, notes []string, pinned string) []string 
 	// Kept rather than un-migrated: the manifest lists stay, because a project
 	// that later drops its Dockerfile needs them, and they cost nothing while the
 	// declaration stands. The note below tells the user both exist.
-	if declaresDockerfile(from1x) {
+	if declaresDockerfile(from1x) && from1x.rewrite == nil {
 		out = slices.DeleteFunc(out, func(name string) bool {
 			return name == "requirements.txt" || name == "packages.txt"
 		})
@@ -615,6 +623,9 @@ func planRetirements(from1x *project1x, notes []string, pinned string) []string 
 	// step, from the build context.
 	if !slices.Contains(out, "Dockerfile") && len(from1x.dockerfileBody) > 0 {
 		body := string(from1x.dockerfileBody)
+		if from1x.rewrite != nil {
+			body = string(from1x.rewrite.body)
+		}
 		out = slices.DeleteFunc(out, func(name string) bool {
 			return strings.Contains(body, name)
 		})
@@ -652,7 +663,7 @@ func declaresDockerfile(from1x *project1x) bool {
 // pin gives nothing here: the image is then generated from the runtime series
 // and runs that runtime's default Python.
 func (from1x *project1x) buildPython() string {
-	if !declaresDockerfile(from1x) {
+	if !declaresDockerfile(from1x) && !from1x.pinRecorded {
 		return ""
 	}
 	return from1x.basePython
@@ -666,6 +677,11 @@ func set1xDeclarations(ed tomledit.Editor, from1x *project1x, pinned string) err
 	}
 	if err := setRuntimeDeclaration(ed, from1x, pinned); err != nil {
 		return err
+	}
+	if from1x.registry != "" {
+		if err := ed.Set([]string{"tool", "astro", "registry"}, from1x.registry); err != nil {
+			return err
+		}
 	}
 	if err := setEnvDeclarations(ed, &from1x.settings); err != nil {
 		return err
@@ -774,13 +790,13 @@ func scaffoldManifest(dir string, opts *Options, from1x *project1x, res *Result)
 func migratedLabels(from1x *project1x) []string {
 	var out []string
 	if n := len(from1x.dependencies); n > 0 {
-		out = append(out, manifest.Marker+" (migrated "+strconv.Itoa(n)+" from requirements.txt into dependencies)")
+		out = append(out, manifest.Marker+" (moved in "+plural(n, "package", "packages")+" from requirements.txt)")
 	}
 	if len(from1x.packages) > 0 {
-		out = append(out, manifest.Marker+" (migrated packages.txt into packages)")
+		out = append(out, manifest.Marker+" (moved in the apt packages from packages.txt)")
 	}
 	if from1x.settings.declares() {
-		out = append(out, manifest.Marker+" (migrated "+SettingsRelPath+" into [tool.astro.env])")
+		out = append(out, manifest.Marker+" (moved in the values "+SettingsRelPath+" declares)")
 	}
 	out = appendLabel(out, poolsLabel(from1x.settings.pools.byName))
 
@@ -1202,11 +1218,8 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	}
 	// Kept out of forRetirement for the reason deployNote is: planRetirements
 	// matches file names as substrings of notes, and link names are the user's.
-	var linksNote string
-	if len(from1x.instances) > 0 {
-		linksNote = config1xRelPath + ": " + instancesNote(from1x.instances)
-		out = append(out, linksNote)
-	}
+	linkNotes := instancesNotes(from1x.instances)
+	out = append(out, linkNotes...)
 	// A pin-only Dockerfile whose pin lost to --airflow-version or an existing
 	// pin is kept (dockerfileIsSpent) and not declared. When its reader had
 	// nothing to say about it, it would stay without a word; when it did, that
@@ -1216,7 +1229,7 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	if from1x.dockerfilePinOnly && !dockerfileIsSpent(from1x, version) && !readerNoted {
 		base := "Airflow " + from1x.airflow
 		if from1x.runtime != "" {
-			base = "Astro Runtime " + from1x.runtime + " (Airflow 2)"
+			base = "Astro Runtime " + from1x.runtime + " (Airflow " + from1x.airflow + ")"
 		}
 		out = append(out, "Dockerfile: kept and not declared as this project's build. It names only a base image, on "+
 			base+", and this project's pin is Airflow "+version+"; delete it if the pin is right")
@@ -1224,7 +1237,7 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	checks := []struct{ file, note string }{
 		{"docker-compose.yml", "not read — astro local start replaces it"},
 		{"docker-compose.yaml", "not read — astro local start replaces it"},
-		{"docker-compose.override.yml", "read in Docker mode — astro local start --docker merges it over the services it generates; standalone mode does not run it"},
+		{"docker-compose.override.yml", "applies to astro local start --docker only"},
 		{"docker-compose.override.yaml", "not read — Docker mode merges docker-compose.override.yml, so rename it to use it there"},
 	}
 	for _, c := range checks {
@@ -1253,17 +1266,21 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 			" cannot run: it needs " + requiresPython(version) + ", and yours has no upper bound — " +
 			"uv will build the environment on the newest interpreter it allows"}, out...)
 	}
-	if deployNote == "" && linksNote == "" {
+	if deployNote == "" && len(linkNotes) == 0 {
 		return out, out
 	}
-	return out, slices.DeleteFunc(slices.Clone(out), func(n string) bool { return n == deployNote || n == linksNote })
+	return out, slices.DeleteFunc(slices.Clone(out), func(n string) bool { return n == deployNote || slices.Contains(linkNotes, n) })
 }
 
-// instancesNote names the deployment links .astro/config.yaml's `instances:`
-// list holds and the command that links each one. A name or id that is not
-// plain is not printed, for the reason deployTargetNote gives.
-func instancesNote(instances []instance1x) string {
-	cmds := make([]string, 0, len(instances))
+// infoNotes are notes that need nothing done, which Info carries instead.
+var infoNotes = []string{"docker-compose.override.yml: applies to astro local start --docker only"}
+
+// instancesNotes are a note per deployment link .astro/config.yaml's
+// `instances:` list holds, each the command that links it (LinkNotePrefix). A
+// name or id that is not plain is not printed, for the reason deployTargetNote
+// gives.
+func instancesNotes(instances []instance1x) []string {
+	var notes []string
 	for _, inst := range instances {
 		name, id := "<name>", "<id>"
 		if plainDeployID(inst.name) {
@@ -1272,7 +1289,7 @@ func instancesNote(instances []instance1x) string {
 		if plainDeployID(inst.deploymentID) {
 			id = inst.deploymentID
 		}
-		cmd := "astro link add " + name + " --deployment " + id
+		cmd := "astro link add " + name + " --deployment " + id + " --workspace <workspace-id>"
 		switch {
 		case inst.source == "" || inst.source == "astro":
 		case plainDeployID(inst.source):
@@ -1280,12 +1297,11 @@ func instancesNote(instances []instance1x) string {
 		default:
 			cmd = "astro link add " + name + " --target <platform>"
 		}
-		if !slices.Contains(cmds, cmd) {
-			cmds = append(cmds, cmd)
+		if note := LinkNotePrefix + cmd; !slices.Contains(notes, note) {
+			notes = append(notes, note)
 		}
 	}
-	return "its instances list names deployment links this run did not carry into " + manifest.Marker +
-		". Link each one with " + strings.Join(cmds, "; ")
+	return notes
 }
 
 // deployTargetNote says that .astro/config.yaml's saved deploy target was not
