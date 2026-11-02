@@ -71,9 +71,10 @@ func Fill(ctx context.Context, req *imagebuild.Request, warn func(string)) error
 }
 
 // Fill sets req.Install to what the generated build req describes installs,
-// from its project's pyproject.toml and uv.lock (req.ManifestDir, else
-// req.ProjectFiles), saying through warn what it could not do. A declared
-// Dockerfile, a request naming no project, and a project with no
+// or the install base of a Dockerfile built on one (UsesInstallBase), from
+// its project's pyproject.toml and uv.lock (req.ManifestDir, else
+// req.ProjectFiles), saying through warn what it could not do. Any other
+// declared Dockerfile, a request naming no project, and a project with no
 // pyproject.toml are left as they are, to install the request's own fields
 // unpinned (imagebuild.UnpinnedLists), and so is a project uv cannot lock.
 //
@@ -87,7 +88,7 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 	if warn == nil {
 		warn = func(string) {}
 	}
-	if req.FromDeclaredDockerfile() {
+	if req.FromDeclaredDockerfile() && !req.UsesInstallBase() {
 		return nil
 	}
 	project := req.ManifestDir

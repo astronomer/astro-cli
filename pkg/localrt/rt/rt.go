@@ -57,8 +57,13 @@ type Plan struct {
 	// one Astro Runtime build, "3.3-8" or "13.11.0", or "" for none. Docker
 	// mode builds a generated image FROM that build rather than the newest one
 	// of AirflowVersion's series. Standalone ignores it: it installs the
-	// requirement. The manifest never sets it beside a Dockerfile.
+	// requirement. Beside a Dockerfile it picks the install base a file
+	// built FROM localhost/astro-base builds on.
 	Runtime string
+	// Registry is [tool.astro] registry (ManifestBuild.Registry), and Name
+	// [project] name (ManifestBuild.Name). Standalone ignores both.
+	Registry string
+	Name     string
 	// PythonVersion is the interpreter standalone asks uv for ("3.13"), or ""
 	// to let uv pick within requires-python. A caller sets it with
 	// imagebuild.StandalonePython: the Python a generated image of the same

@@ -2,8 +2,10 @@ package imagebuild
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -32,8 +34,10 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 	deps := m.Requirements()
 	return ManifestBuild{
 		ProjectDir:     dir,
+		Name:           m.Project.Name,
 		AirflowVersion: airflow.Pin,
 		Runtime:        airflow.Runtime,
+		Registry:       m.Astro.Registry,
 		RequiresPython: m.Project.RequiresPython,
 		Dockerfile:     m.Astro.Dockerfile,
 		Dependencies:   deps,
@@ -55,9 +59,11 @@ type BaseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // every caller building from a manifest builds the same image from it.
 //
 // A declared Dockerfile is the build: the returned Request carries the file,
-// resolved against the project, and the project as its context, and no runtime
-// base is resolved, since the file names its own FROM and asking for a base it
-// would not use only adds a way to fail. Otherwise the image is generated over
+// resolved against the project, and the project as its context. No runtime
+// base is resolved for one that names its own FROM, since asking for a base it
+// would not use only adds a way to fail; one built FROM the install base
+// (UsesInstallBase) gets the base a generated build would, to build that
+// install base on. Otherwise the image is generated over
 // the runtime base the Airflow pin, runtime build and requires-python resolve
 // to (RuntimeImageForPython), installing Dependencies and Packages; a pin it refuses is
 // the error returned.
@@ -131,15 +137,22 @@ func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base Base
 		// directory, where none of the project's COPY paths exist.
 		req.Dockerfile = filepath.Join(m.ProjectDir, filepath.FromSlash(m.Dockerfile))
 		req.Context = m.ProjectDir
-		return req, nil
+		// A file built FROM the install base gets the base a generated
+		// build would, to build that install base on; any other names its
+		// own, and asking for one it would not use only adds a way to fail.
+		data, err := os.ReadFile(req.Dockerfile)
+		if err != nil || !airflowrt.UsesInstallBase(data) {
+			return req, nil
+		}
+		req.InstallBase, req.Project = airflowrt.InstallBaseRepo, m.Name
 	}
 	image, err := base(ctx, m)
 	if err != nil {
 		return Request{}, err
 	}
-	req.BaseImage = image
+	req.BaseImage = WithRegistry(image, m.Registry)
 	req.ManifestDir = m.ProjectDir
-	if ships {
+	if ships && m.Dockerfile == "" {
 		req.ProjectFiles = m.ProjectDir
 	}
 	return req, nil

@@ -46,10 +46,10 @@ type AirflowPinChange struct {
 	Runtime string `json:"runtime,omitempty"`
 	// RuntimeRemoved reports that [tool.astro] runtime was deleted: the pin
 	// moved to a series the old build is not of and no catalog was given to
-	// pick a build of the new one, or it named none, or a dockerfile is
-	// declared beside it, where it picks nothing.
+	// pick a build of the new one, or it named none.
 	RuntimeRemoved bool `json:"runtime_removed,omitempty"`
-	// Dockerfile is [tool.astro] dockerfile when the project declares one.
+	// Dockerfile is [tool.astro] dockerfile when the project declares one
+	// whose FROM line picks the image (not one built on the install base).
 	// Docker mode then builds from that file, so its FROM line, not the pin,
 	// decides the image, and changing it is the user's.
 	Dockerfile string `json:"dockerfile,omitempty"`
@@ -128,7 +128,7 @@ func SetAirflowVersionWith(dir string, wrap func(run func() error) error, versio
 	var change AirflowPinChange
 	err := EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
 		var err error
-		change, err = setAirflowVersion(before, ed, version, opts)
+		change, err = setAirflowVersion(dir, before, ed, version, opts)
 		return err
 	})
 	if err != nil {
@@ -139,11 +139,16 @@ func SetAirflowVersionWith(dir string, wrap func(run func() error) error, versio
 
 // setAirflowVersion is SetAirflowVersionWith's edit, for the callers that
 // decide the version inside the edit they run (MatchAirflowToDockerfile).
-func setAirflowVersion(before *manifest.Manifest, ed tomledit.Editor, version string, opts AirflowPinOptions) (AirflowPinChange, error) {
+// dir is the project's root, for its declared Dockerfile.
+func setAirflowVersion(dir string, before *manifest.Manifest, ed tomledit.Editor, version string, opts AirflowPinOptions) (AirflowPinChange, error) {
 	change := AirflowPinChange{
-		Previous:   before.Airflow().Pin,
-		Version:    version,
-		Dockerfile: before.Astro.Dockerfile,
+		Previous: before.Airflow().Pin,
+		Version:  version,
+	}
+	// A Dockerfile built on the install base follows the pin, as a generated
+	// build does; only one whose FROM picks the image is left behind by it.
+	if ownsBase(dir, before) {
+		change.Dockerfile = before.Astro.Dockerfile
 	}
 	// A manifest whose requirement states no single version has none to
 	// read the previous one from; a leftover key is what its image ran.
@@ -179,7 +184,7 @@ func setAirflowVersion(before *manifest.Manifest, ed tomledit.Editor, version st
 			change.RequiresPython = next
 		}
 	}
-	if change.Runtime, change.RuntimeRemoved, err = alignRuntime(before, ed, version, opts.Catalog); err != nil {
+	if change.Runtime, change.RuntimeRemoved, err = alignRuntime(before, ed, version, opts.Catalog, ownsBase(dir, before)); err != nil {
 		return AirflowPinChange{}, err
 	}
 	change.Changed = len(change.Requirements) > 0 || change.RemovedAirflowKey || change.RequiresPython != "" ||

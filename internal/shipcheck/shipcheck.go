@@ -91,16 +91,16 @@ func Check(dir string, survey *imagebuild.ProjectSurvey) Report {
 func (r *Report) Warnings() []string {
 	var out []string
 	if n := len(r.Gitignored); n > 0 {
-		out = append(out, fmt.Sprintf("the image will carry %s that .gitignore ignores and %s does not, in %s. If %s not belong in the image, add %s to %s",
-			countFiles(n), r.IgnoreFile, placesOf(r.Gitignored, r.carried), agree(n, "it does", "they do"), agree(n, "it", "them"), r.IgnoreFile))
+		out = append(out, fmt.Sprintf("%s that .gitignore ignores and %s does not %s into the image, in %s. If %s belong there, add %s to %s",
+			countFiles(n), r.IgnoreFile, agree(n, "goes", "go"), placesOf(r.Gitignored, r.carried), agree(n, "it doesn't", "they don't"), agree(n, "it", "them"), r.IgnoreFile))
 	}
 	for _, u := range r.Unanswered {
 		out = append(out, fmt.Sprintf("could not ask git which files it tracks in %s, so files there that look like credentials were not checked", u))
 	}
 	if n := len(r.Unchecked); n > 0 {
-		out = append(out, fmt.Sprintf("the image will carry %s, which git could not say %s committed: %s. If %s not belong in the image, add %s to %s",
-			agree(n, "this file that looks like credentials", "these files that look like credentials"), agree(n, "is", "are"),
-			cappedList(r.Unchecked), agree(n, "it does", "they do"), agree(n, "it", "them"), r.IgnoreFile))
+		out = append(out, fmt.Sprintf("%s, which git could not say %s committed, %s into the image: %s. If %s belong there, add %s to %s",
+			agree(n, "a file that looks like credentials", "files that look like credentials"), agree(n, "is", "are"), agree(n, "goes", "go"),
+			cappedList(r.Unchecked), agree(n, "it doesn't", "they don't"), agree(n, "it", "them"), r.IgnoreFile))
 	}
 	return out
 }

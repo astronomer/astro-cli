@@ -84,13 +84,12 @@ func TestRuntimeAgainstTheRequirement(t *testing.T) {
 		{name: "runtime 3 era tag", requirement: "apache-airflow==3.3.*", runtime: "3.0.4", want: CodeRuntimeInvalid},
 		{name: "floating series names no build", requirement: "apache-airflow==3.3.*", runtime: "3.3", want: CodeRuntimeInvalid, mention: []string{"3.3-1"}},
 		{name: "floating airflow 2 names no build", requirement: "apache-airflow==2.11.*", runtime: "13", want: CodeRuntimeInvalid},
+		// A Dockerfile built FROM ${ASTRO_BASE} builds on the install base the
+		// runtime picks, so the two go together.
+		{name: "beside a dockerfile", requirement: "apache-airflow==3.3.*", runtime: "3.3-8", extra: "dockerfile = 'docker/Dockerfile'\n"},
 		{
-			name: "beside a dockerfile", requirement: "apache-airflow==3.3.*", runtime: "3.3-8", extra: "dockerfile = 'docker/Dockerfile'\n",
-			want: CodeRuntimeWithDockerfile, mention: []string{"docker/Dockerfile", "FROM"},
-		},
-		{
-			name: "beside a dockerfile, whatever the tag", requirement: "apache-airflow==3.3.*", runtime: "3.2-1", extra: "dockerfile = 'Dockerfile'\n",
-			want: CodeRuntimeWithDockerfile,
+			name: "beside a dockerfile, still held to the requirement", requirement: "apache-airflow==3.3.*", runtime: "3.2-1", extra: "dockerfile = 'Dockerfile'\n",
+			want: CodeRuntimeMismatch,
 		},
 	}
 	for _, tc := range cases {
@@ -149,7 +148,6 @@ func TestParseForRepairLetsRuntimeProblemsThrough(t *testing.T) {
 	for _, content := range []string{
 		runtimeManifest("apache-airflow==3.3.*", "3.2-10", ""),
 		runtimeManifest("apache-airflow==3.3.*", "nope", ""),
-		runtimeManifest("apache-airflow==3.3.*", "3.3-8", "dockerfile = 'Dockerfile'\n"),
 	} {
 		m, err := ParseForRepair([]byte(content))
 		if err != nil {

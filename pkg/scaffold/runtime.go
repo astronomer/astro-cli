@@ -37,19 +37,20 @@ type RuntimeChange struct {
 //     another series, or a build an exact pin excludes, does not stay to fail or
 //     warn at the next image build. A build the catalog does not list is judged
 //     by its tag.
-//   - Beside a declared dockerfile the line picks nothing, and it is deleted.
+//   - Beside a declared dockerfile whose FROM picks the image (ownBase, by
+//     ownsBase) the line picks nothing, and it is deleted.
 //   - Otherwise the build no longer agrees with the requirement, or was never a
 //     build. It moves to the newest non-yanked build carrying pin when catalog
 //     names one, and is deleted when not: a runtime this package cannot vouch
 //     for is worse than none, which builds from the newest build of the series.
 //
 // It never adds a line that was not there.
-func alignRuntime(before *manifest.Manifest, ed tomledit.Editor, pin string, catalog *runtimeversions.Catalog) (moved string, removed bool, err error) {
+func alignRuntime(before *manifest.Manifest, ed tomledit.Editor, pin string, catalog *runtimeversions.Catalog, ownBase bool) (moved string, removed bool, err error) {
 	current := before.Astro.Runtime
 	if current == "" {
 		return "", false, nil
 	}
-	if before.Astro.Dockerfile == "" {
+	if !ownBase {
 		if t, ok := manifest.ParseRuntimeTag(current); ok && t.Build && t.Agrees(pin) && !catalogExcludes(catalog, current, pin) {
 			return "", false, nil
 		}
@@ -86,13 +87,12 @@ func catalogExcludes(catalog *runtimeversions.Catalog, runtime, pin string) bool
 var errAirflowUnclear = errors.New("the Airflow requirement in [project] dependencies does not state one version, so no runtime build can be checked against it. Pin the requirement first")
 
 // AlignRuntime repairs [tool.astro] runtime, through EditManifest: the fix for
-// manifest.CodeRuntimeMismatch, CodeRuntimeInvalid and
-// CodeRuntimeWithDockerfile, which the desktop's attention card offers. A build
-// that agrees with the requirement (with opts.Catalog, by the Airflow it
-// carries too) is left alone; one beside a declared
-// dockerfile is deleted; any other moves to the newest non-yanked build
-// carrying the requirement's pin when opts.Catalog names one, and is deleted
-// when not. The requirement itself never changes: moving it to the build's
+// manifest.CodeRuntimeMismatch and CodeRuntimeInvalid, which the desktop's
+// attention card offers. A build that agrees with the requirement (with
+// opts.Catalog, by the Airflow it carries too) is left alone; one beside a
+// declared dockerfile whose FROM picks the image is deleted; any other moves
+// to the newest non-yanked build carrying the requirement's pin when
+// opts.Catalog names one, and is deleted when not. The requirement itself never changes: moving it to the build's
 // series is SetAirflowVersionWith, the caller's to offer.
 //
 // A manifest with no runtime line is left as it is. With opts.DryRun the
@@ -108,7 +108,7 @@ func AlignRuntime(dir string, wrap func(run func() error) error, opts AirflowPin
 		if pin == "" || before.AirflowUnclear() {
 			return errAirflowUnclear
 		}
-		moved, removed, err := alignRuntime(before, ed, pin, opts.Catalog)
+		moved, removed, err := alignRuntime(before, ed, pin, opts.Catalog, ownsBase(dir, before))
 		if err != nil {
 			return err
 		}

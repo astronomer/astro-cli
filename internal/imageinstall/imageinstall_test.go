@@ -283,6 +283,18 @@ func TestFillWithoutUV(t *testing.T) {
 	assert.Contains(t, warnings[0], "uv is needed to read the lock, and it was not found")
 }
 
+// A Dockerfile built FROM its install base resolves as a generated build
+// does, since the base installs what a generated build installs.
+func TestFillResolvesTheInstallBase(t *testing.T) {
+	r := Resolver{UV: func(context.Context) (UV, error) { return nil, uv.ErrNotFound }}
+	dir := project(t, "[project]\nname = 'p'\n", "")
+	req := imagebuild.Request{Dockerfile: dir + "/Dockerfile", Context: dir, InstallBase: "localhost/p-base", ManifestDir: dir}
+	var warnings []string
+	require.NoError(t, r.Fill(t.Context(), &req, func(w string) { warnings = append(warnings, w) }))
+	require.Len(t, warnings, 1, "uv was asked for")
+	assert.Contains(t, warnings[0], "uv is needed to read the lock")
+}
+
 // Nothing to resolve: a declared Dockerfile, a request naming no project, a
 // project with no pyproject.toml. uv is not asked.
 func TestFillLeavesWhatItCannotResolve(t *testing.T) {

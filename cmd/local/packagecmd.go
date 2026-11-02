@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	goruntime "runtime"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -47,6 +48,7 @@ func newPackageCmd(c *cli) *cobra.Command {
 		platform     string
 		outDir       string
 		contextDir   string
+		base         bool
 		buildSecrets []string
 	}
 	cmd := &cobra.Command{
@@ -61,7 +63,10 @@ func newPackageCmd(c *cli) *cobra.Command {
 			"  # Build the bucket layout MWAA reads, and also write it to a zip\n" +
 			"  astro package mwaa --save dist/mwaa.zip\n\n" +
 			"  # Write the image's build context, to build it with docker or podman yourself\n" +
-			"  astro package --context-dir ./build",
+			"  astro package --context-dir ./build\n\n" +
+			"  # Build the install base a Dockerfile built FROM localhost/astro-base uses,\n" +
+			"  # then build the project with docker build . yourself\n" +
+			"  astro package --base",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := pack.TargetAstro
@@ -74,6 +79,7 @@ func newPackageCmd(c *cli) *cobra.Command {
 				platform:     opts.platform,
 				outDir:       opts.outDir,
 				contextDir:   opts.contextDir,
+				base:         opts.base,
 				buildSecrets: opts.buildSecrets,
 			})
 		},
@@ -83,6 +89,7 @@ func newPackageCmd(c *cli) *cobra.Command {
 	cmd.Flags().StringVar(&opts.platform, "platform", defaultPackagePlatform, "Build platform for image targets")
 	cmd.Flags().StringVar(&opts.outDir, "out-dir", "", "Artifact directory for bucket targets (default dist/<target>)")
 	cmd.Flags().StringVar(&opts.contextDir, "context-dir", "", "Write the astro image's build context to this new or empty directory instead of building it, and print the docker and podman commands that build it")
+	cmd.Flags().BoolVar(&opts.base, "base", false, "Build only the install base a Dockerfile built FROM localhost/astro-base uses, tag it localhost/astro-base, and print that tag")
 	addBuildSecretFlag(cmd, &opts.buildSecrets)
 	return cmd
 }
@@ -94,6 +101,7 @@ type packageOptions struct {
 	platform     string
 	outDir       string
 	contextDir   string
+	base         bool
 	buildSecrets []string
 }
 
@@ -124,6 +132,14 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 			return errors.New("--context-dir builds nothing, so there is nothing for --save to write; build the context, then save the image with docker save")
 		}
 	}
+	if opts.base {
+		switch {
+		case target.Name() != pack.TargetAstro:
+			return fmt.Errorf("--base builds the astro image's install base, and the %s target builds no image", target.Name())
+		case opts.contextDir != "" || opts.save != "" || opts.tag != "":
+			return errors.New("--base builds only the install base and prints its tag, so it takes none of --context-dir, --save and --tag")
+		}
+	}
 	if len(opts.buildSecrets) > 0 {
 		switch {
 		case target.Name() != pack.TargetAstro:
@@ -144,7 +160,13 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	// cannot scroll it away, or before the error a failed build returns
 	// (packageRecap). shown keeps the warnings already given, for the result's
 	// warnings below.
-	cb := c.callbacks(r)
+	// With --base, stdout is the base's tag alone, for $(astro package --base),
+	// so the build's own output goes to stderr.
+	progress := r
+	if opts.base && r.Err != nil {
+		progress.Out = r.Err
+	}
+	cb := c.callbacks(progress)
 	recap := packageRecap(r)
 	shown := map[string]bool{}
 	warn := func(w string) {
@@ -160,6 +182,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		BuildSecrets:   util.ResolveProjectBuildSecrets(opts.buildSecrets, m.Astro.BuildSecretSpecs()),
 		OutDir:         opts.outDir,
 		ContextDir:     opts.contextDir,
+		BaseOnly:       opts.base,
 		ResolveInstall: imageinstall.Fill,
 		CheckRuntime:   c.d.RuntimeCheck,
 		RuntimeCatalog: catalog,
@@ -178,6 +201,12 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 				recap.Warn(w)
 			}
 		}
+	}
+	// A base for another platform than the machine's is not one a plain
+	// docker build here finds: it looks for the machine's own, and goes to a
+	// registry for it.
+	if res.Kind == pack.KindBase && opts.platform != "linux/"+goruntime.GOARCH {
+		recap.Note(fmt.Sprintf("the install base is built for %s, so build the project on it with docker build --platform %s .", opts.platform, opts.platform))
 	}
 	recap.Flush()
 	// An event rather than a result: an image build streamed its progress
@@ -205,6 +234,11 @@ func (c *cli) packageRegistry() *pack.Registry {
 // renderer. links are the project's deployment links, for the deploy command
 // an image hands off to.
 func renderPackage(w io.Writer, res pack.Result, links map[string]manifest.Link) error {
+	// The install base is its tag alone, so $(astro package --base) is it.
+	if res.Kind == pack.KindBase {
+		_, err := fmt.Fprintln(w, res.Image)
+		return err
+	}
 	if _, err := fmt.Fprintf(w, "target: %s\n", res.Target); err != nil {
 		return err
 	}
@@ -218,6 +252,8 @@ func renderPackage(w io.Writer, res pack.Result, links map[string]manifest.Link)
 		return err
 	case pack.KindContext:
 		return renderContextResult(w, res)
+	case pack.KindBase:
+		// Returned above: the tag alone, with no target line.
 	}
 	return nil
 }
