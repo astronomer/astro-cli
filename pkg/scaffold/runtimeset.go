@@ -125,7 +125,7 @@ func newRuntimeBuildEdit(build, python string, opts AirflowPinOptions) (*runtime
 // apply is the edit itself.
 func (e *runtimeBuildEdit) apply(before *manifest.Manifest, ed tomledit.Editor) (RuntimeBuildChange, error) {
 	if before.Astro.Dockerfile != "" {
-		return RuntimeBuildChange{}, fmt.Errorf("this project declares %s in [tool.astro] dockerfile, so its FROM line picks the runtime. Change the FROM line instead", before.Astro.Dockerfile)
+		return RuntimeBuildChange{}, DockerfilePicksRuntime(before.Astro.Dockerfile)
 	}
 	out := RuntimeBuildChange{Previous: before.Astro.Runtime, Runtime: e.build, AirflowVersion: e.rt.AirflowVersion}
 	current := before.Airflow().Pin
@@ -176,27 +176,44 @@ func (e *runtimeBuildEdit) apply(before *manifest.Manifest, ed tomledit.Editor) 
 	return out, nil
 }
 
+// DockerfilePicksRuntime is why a project that declares dockerfile, a path,
+// takes no runtime build: its Dockerfile's FROM line picks the image.
+func DockerfilePicksRuntime(dockerfile string) error {
+	return fmt.Errorf("this project declares %s in [tool.astro] dockerfile, so its FROM line picks the runtime. Change the FROM line instead", dockerfile)
+}
+
 // requiresPython is the requires-python to write beside the build, given rp,
 // the one the manifest holds after any pin move, and the Python the build's
 // image then runs, "" when the catalog cannot tell.
 func (e *runtimeBuildEdit) requiresPython(rp string) (next, python string, err error) {
 	next = rp
-	def := strings.TrimSpace(e.rt.DefaultPythonVersion)
 	if e.python != "" {
 		next = "==" + e.python + ".*"
 	}
 	if !e.listed {
 		return next, "", nil
 	}
-	p, decided := e.rt.ImagePython(next)
+	python, err = RuntimePython(&e.rt, next, e.build)
+	if err != nil {
+		return "", "", fmt.Errorf("%w. Pass --python to pick one", err)
+	}
+	return next, python, nil
+}
+
+// RuntimePython is the Python the image of build, whose catalog entry is rt,
+// runs for requiresPython: the build's default when requires-python admits it
+// or does not decide, else the newest it ships that requires-python admits.
+// One that admits none of them is ErrInvalidPython, naming the ones it ships.
+func RuntimePython(rt *runtimeversions.Runtime, requiresPython, build string) (string, error) {
+	p, decided := rt.ImagePython(requiresPython)
 	switch {
 	case !decided:
-		return next, def, nil
+		return strings.TrimSpace(rt.DefaultPythonVersion), nil
 	case p == "":
-		return "", "", fmt.Errorf("%w: requires-python %s admits none of the Pythons runtime %s ships (%s). Pass --python to pick one",
-			ErrInvalidPython, next, e.build, strings.Join(e.rt.PythonVersions, ", "))
+		return "", fmt.Errorf("%w: requires-python %s admits none of the Pythons runtime %s ships (%s)",
+			ErrInvalidPython, requiresPython, build, strings.Join(rt.PythonVersions, ", "))
 	}
-	return next, p, nil
+	return p, nil
 }
 
 // runtimeAirflowPin is the Airflow pin a project moves to beside build: its
@@ -227,7 +244,7 @@ func runtimeAirflowPin(current, build string, tag manifest.RuntimeTag, carried s
 	if current != "" && runtimeversions.PinCovers(current, carried) {
 		return current, nil
 	}
-	if strings.Count(current, ".") == 2 {
+	if (manifest.Airflow{Pin: current}).Exact() {
 		return carried, nil
 	}
 	major, rest, _ := strings.Cut(carried, ".")

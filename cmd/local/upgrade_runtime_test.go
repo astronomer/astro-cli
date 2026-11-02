@@ -286,3 +286,65 @@ func TestUpgradeRuntimeWithNoBuildKeepsAnExactAirflow(t *testing.T) {
 	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10"))
 	assert.Contains(t, readText(t, rd.path), "'apache-airflow==3.3.2'", "a named build still moves the pin")
 }
+
+// A project whose own Dockerfile picks the image is refused with no build
+// named too, as with one: its FROM line, not a runtime line, is what to move.
+func TestUpgradeRuntimeWithNoBuildRefusesADeclaredDockerfile(t *testing.T) {
+	src := buildManifest + "dockerfile = 'Dockerfile'\n"
+	rd := newRefreshDeps(t, src)
+	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(rd.path), "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.3-7\n"), 0o600))
+
+	err := execute(t, rd.d, "local", "upgrade", "runtime")
+	require.ErrorContains(t, err, "so its FROM line picks the runtime")
+	assert.Equal(t, src, readText(t, rd.path))
+	assert.Zero(t, rd.locks)
+}
+
+// A floating project's bare upgrade holds requires-python to the build it
+// gets, as a named build does, and says which Python that build runs.
+func TestUpgradeRuntimeWithNoBuildChecksThePython(t *testing.T) {
+	rd := newRefreshDeps(t, buildManifest)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "-o", "json"))
+	var res map[string]any
+	require.NoError(t, json.Unmarshal(rd.stdout.Bytes(), &res))
+	assert.Equal(t, "3.13", res["python"])
+
+	src := strings.Replace(strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.4.*", 1), ">=3.12", "==3.12.*", 1)
+	rd = newRefreshDeps(t, src)
+	err := execute(t, rd.d, "local", "upgrade", "runtime")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "3.13, 3.14")
+	assert.Contains(t, err.Error(), "--python")
+	assert.Equal(t, src, readText(t, rd.path))
+	assert.Zero(t, rd.locks)
+}
+
+// A bare upgrade never moves a runtime line back, even when the build it names
+// carries another patch than an exact requirement: it stays, and the catalog's
+// finding says so.
+func TestUpgradeRuntimeWithNoBuildNeverMovesBackForAnExactAirflow(t *testing.T) {
+	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.1", 1) + "runtime = '3.3-10'\n"
+	rd := newRefreshDeps(t, src)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime"))
+	assert.Contains(t, readText(t, rd.path), "runtime = '3.3-10'")
+	assert.Contains(t, rd.stdout.String(), "The runtime is already 3.3-10.")
+	assert.Contains(t, rd.stderr.String(), "3.3.2")
+}
+
+// An exact requirement no published build carries is pointed at the patch
+// that has one, rather than left with a bare catalog error.
+func TestUpgradeRuntimeWithNoBuildForAnExactAirflowPointsAtANewerPatch(t *testing.T) {
+	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.0", 1)
+	rd := newRefreshDeps(t, src)
+	err := execute(t, rd.d, "local", "upgrade", "runtime")
+	require.ErrorContains(t, err, "no published build carries Airflow 3.3.0; run astro local upgrade airflow 3.3.2 to move to one")
+}
+
+// What the catalog says is said of the build written, not of the argument as
+// typed.
+func TestUpgradeRuntimeFindingsAreOfTheBuildWritten(t *testing.T) {
+	rd := newRefreshDeps(t, buildManifest)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", " 3.3-8 "))
+	assert.Contains(t, readText(t, rd.path), "runtime = '3.3-8'")
+	assert.Contains(t, rd.stderr.String(), "bad scheduler")
+}
