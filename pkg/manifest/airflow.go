@@ -59,6 +59,13 @@ func (a Airflow) Major() string {
 	return major
 }
 
+// Exact reports a pin of one Airflow release (3.3.2) rather than a series
+// (3.3, 3). A pin has at most three numeric parts, and an exact one always has
+// all three: AirflowPin pads "==3.3" to 3.3.0.
+func (a Airflow) Exact() bool {
+	return strings.Count(a.Pin, ".") == 2
+}
+
 // Series is the pin to its minor: "3.3" for 3.3 and for 3.3.2, and "3" for a
 // pin that names only the generation.
 func (a Airflow) Series() string {
@@ -84,7 +91,7 @@ func AirflowRequirement(version string) string {
 }
 
 func requirementFor(dist, version string) string {
-	if strings.Count(version, ".") < 2 {
+	if !(Airflow{Pin: version}).Exact() {
 		return dist + "==" + version + ".*"
 	}
 	return dist + "==" + version
