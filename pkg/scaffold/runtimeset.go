@@ -28,48 +28,53 @@ var pythonMinorRe = regexp.MustCompile(`^3\.\d+$`)
 type RuntimeBuildChange struct {
 	// Previous is the runtime the manifest named, "" when it named none.
 	Previous string `json:"previous,omitempty"`
-	// Runtime is the build now written.
+	// Runtime is the runtime version now written.
 	Runtime string `json:"runtime"`
-	// AirflowVersion is the exact Airflow the catalog says the build carries,
-	// "" when the catalog does not list it.
+	// AirflowVersion is the exact Airflow the catalog says the runtime version
+	// carries, "" when the catalog does not list it.
 	AirflowVersion string `json:"airflow_version,omitempty"`
-	// Airflow is the change to the Airflow requirement, when the build carries
-	// an Airflow the requirement did not cover. nil when it stayed.
+	// Airflow is the change to the Airflow requirement, when the runtime
+	// version carries an Airflow the requirement did not cover. nil when it
+	// stayed.
 	Airflow *AirflowPinChange `json:"airflow,omitempty"`
 	// RequiresPython is the [project] requires-python now written, when it
 	// changed. Empty when it was left alone.
 	RequiresPython string `json:"requires_python,omitempty"`
-	// Python is the Python the image of the build runs for the requires-python
-	// written, "" when the catalog cannot tell.
+	// Python is the Python the image of the runtime version runs for the
+	// requires-python written, "" when the catalog cannot tell.
 	Python string `json:"python,omitempty"`
 	// Changed reports that the file was written.
 	Changed bool `json:"changed"`
 }
 
-// SetRuntimeBuildWith picks one Astro Runtime build for the project in dir,
+// SetRuntimeBuildWith picks one Astro Runtime version for the project in dir,
 // through EditManifest: it writes [tool.astro] runtime, and moves what has to
-// move with it so the manifest stays loadable and the build is the one used.
+// move with it so the manifest stays loadable and the runtime version is the
+// one used.
 //
-//   - The Airflow requirement moves when the build carries an Airflow it does
-//     not cover, with SetAirflowVersionWith's edit: to the build's exact
-//     Airflow when the requirement pinned an exact one, else to its series.
-//     Which Airflow a build carries comes from opts.Catalog. A build it does
-//     not list is taken within the requirement's series (it may be newer than
-//     the copy read), and refused outside it. Without a catalog an Airflow 3
-//     build's tag names its series, and an Airflow 2 build is refused, since
-//     its tag names none.
+//   - The Airflow requirement moves when the runtime version carries an Airflow
+//     it does not cover, with SetAirflowVersionWith's edit: to the runtime
+//     version's exact Airflow when the requirement pinned an exact one, else to
+//     its series. Which Airflow a runtime version carries comes from
+//     opts.Catalog. A runtime version it does not list is taken within the
+//     requirement's series (it may be newer than the copy read), and refused
+//     outside it. Without a catalog an Airflow 3 runtime version's tag names
+//     its series, and an Airflow 2 runtime version is refused, since its tag
+//     names none.
 //   - python, when given, is the Python the image and the standalone venv
-//     run: requires-python becomes "==python.*". It has to be one the build
-//     ships, when the catalog lists the build. Without it requires-python
-//     stays as it is: a range runs the build's default when it admits it, and
-//     a single Python (the shape python writes) stays chosen when the build
-//     ships it. One that admits no Python the build ships is refused, naming
-//     the ones it does, since only python moves the project to another.
+//     run: requires-python becomes "==python.*". It has to be one the runtime
+//     version ships, when the catalog lists the runtime version. Without it
+//     requires-python stays as it is: a range runs the runtime version's
+//     default when it admits it, and a single Python (the shape python writes)
+//     stays chosen when the runtime version ships it. One that admits no Python
+//     the runtime version ships is refused, naming the ones it does, since only
+//     python moves the project to another.
 //
-// A build beside a declared dockerfile is refused: the Dockerfile's FROM line
-// picks the image there. Whether the build is yanked, or listed at all, is the
-// caller's to report (runtimeversions.Catalog.CheckRuntime): a build published
-// after the catalog was cached is an ordinary reason to name one it lacks.
+// A runtime version beside a declared dockerfile is refused: the Dockerfile's
+// FROM line picks the image there. Whether the runtime version is yanked, or
+// listed at all, is the caller's to report
+// (runtimeversions.Catalog.CheckRuntime): a runtime version published after the
+// catalog was cached is an ordinary reason to name one it lacks.
 func SetRuntimeBuildWith(dir string, wrap func(run func() error) error, build, python string, opts AirflowPinOptions) (RuntimeBuildChange, error) {
 	e, err := newRuntimeBuildEdit(build, python, opts)
 	if err != nil {
@@ -177,7 +182,7 @@ func (e *runtimeBuildEdit) apply(before *manifest.Manifest, ed tomledit.Editor) 
 }
 
 // DockerfilePicksRuntime is why a project that declares dockerfile, a path,
-// takes no runtime build: its Dockerfile's FROM line picks the image.
+// takes no runtime version: its Dockerfile's FROM line picks the image.
 func DockerfilePicksRuntime(dockerfile string) error {
 	return fmt.Errorf("this project declares %s in [tool.astro] dockerfile, so its FROM line picks the runtime. Change the FROM line instead", dockerfile)
 }
@@ -200,10 +205,11 @@ func (e *runtimeBuildEdit) requiresPython(rp string) (next, python string, err e
 	return next, python, nil
 }
 
-// RuntimePython is the Python the image of build, whose catalog entry is rt,
-// runs for requiresPython: the build's default when requires-python admits it
-// or does not decide, else the newest it ships that requires-python admits.
-// One that admits none of them is ErrInvalidPython, naming the ones it ships.
+// RuntimePython is the Python runtime version build, whose catalog entry is rt,
+// runs for requiresPython: the runtime version's default when requires-python
+// admits it or does not decide, else the newest it ships that requires-python
+// admits. One that admits none of them is ErrInvalidPython, naming the ones it
+// ships.
 func RuntimePython(rt *runtimeversions.Runtime, requiresPython, build string) (string, error) {
 	p, decided := rt.ImagePython(requiresPython)
 	switch {

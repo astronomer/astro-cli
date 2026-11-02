@@ -156,8 +156,8 @@ func TestUpgradeRuntimePicksAPython(t *testing.T) {
 }
 
 // A project pinned to one Python (a converted -python-3.12 image, say) keeps
-// it without --python, and the constraints follow it, not the build's
-// default; a build that does not ship it is refused, writing nothing.
+// it without --python, and the constraints follow it, not the runtime version's
+// default; a runtime version that does not ship it is refused, writing nothing.
 func TestUpgradeRuntimeKeepsAPinnedPython(t *testing.T) {
 	rd := newRefreshDeps(t, buildManifest)
 	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10", "--python", "3.12"))
@@ -245,9 +245,10 @@ func TestUpgradeAirflowSaysWhenTheConstraintsCouldNotBeRead(t *testing.T) {
 	assert.Equal(t, 1, rd.locks, "the requirement moved, so the lock still follows it")
 }
 
-// A project with no runtime line already follows the newest build of its
-// series, so a bare upgrade leaves it so: nothing is pinned, the build it gets
-// is named, and the constraints and lock follow that build.
+// A project with no runtime line already follows the newest runtime version of
+// its series, so a bare upgrade leaves it so: nothing is pinned, the runtime
+// version it gets is named, and the constraints and lock follow that runtime
+// version.
 func TestUpgradeRuntimeWithNoBuildLeavesAFloatingProjectFloating(t *testing.T) {
 	rd := newRefreshDeps(t, buildManifest)
 	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime"))
@@ -271,8 +272,8 @@ func TestUpgradeRuntimeWithNoBuildLeavesAFloatingProjectFloating(t *testing.T) {
 	assert.Equal(t, buildManifest, readText(t, rd.path))
 }
 
-// An exact requirement holds a bare upgrade to builds of that Airflow patch,
-// and the command says when a newer patch is out.
+// An exact requirement holds a bare upgrade to runtime versions of that Airflow
+// patch, and the command says when a newer patch is out.
 func TestUpgradeRuntimeWithNoBuildKeepsAnExactAirflow(t *testing.T) {
 	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.1", 1) + "runtime = '3.3-3'\n"
 	rd := newRefreshDeps(t, src)
@@ -287,8 +288,9 @@ func TestUpgradeRuntimeWithNoBuildKeepsAnExactAirflow(t *testing.T) {
 	assert.Contains(t, readText(t, rd.path), "'apache-airflow==3.3.2'", "a named build still moves the pin")
 }
 
-// A project whose own Dockerfile picks the image is refused with no build
-// named too, as with one: its FROM line, not a runtime line, is what to move.
+// A project whose own Dockerfile picks the image is refused with no runtime
+// version named too, as with one: its FROM line, not a runtime line, is what to
+// move.
 func TestUpgradeRuntimeWithNoBuildRefusesADeclaredDockerfile(t *testing.T) {
 	src := buildManifest + "dockerfile = 'Dockerfile'\n"
 	rd := newRefreshDeps(t, src)
@@ -300,8 +302,9 @@ func TestUpgradeRuntimeWithNoBuildRefusesADeclaredDockerfile(t *testing.T) {
 	assert.Zero(t, rd.locks)
 }
 
-// A floating project's bare upgrade holds requires-python to the build it
-// gets, as a named build does, and says which Python that build runs.
+// A floating project's bare upgrade holds requires-python to the runtime
+// version it gets, as a named runtime version does, and says which Python that
+// runtime version runs.
 func TestUpgradeRuntimeWithNoBuildChecksThePython(t *testing.T) {
 	rd := newRefreshDeps(t, buildManifest)
 	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "-o", "json"))
@@ -319,9 +322,9 @@ func TestUpgradeRuntimeWithNoBuildChecksThePython(t *testing.T) {
 	assert.Zero(t, rd.locks)
 }
 
-// A bare upgrade never moves a runtime line back, even when the build it names
-// carries another patch than an exact requirement: it stays, and the catalog's
-// finding says so.
+// A bare upgrade never moves a runtime line back, even when the runtime version
+// it names carries another patch than an exact requirement: it stays, and the
+// catalog's finding says so.
 func TestUpgradeRuntimeWithNoBuildNeverMovesBackForAnExactAirflow(t *testing.T) {
 	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.1", 1) + "runtime = '3.3-10'\n"
 	rd := newRefreshDeps(t, src)
@@ -331,8 +334,8 @@ func TestUpgradeRuntimeWithNoBuildNeverMovesBackForAnExactAirflow(t *testing.T) 
 	assert.Contains(t, rd.stderr.String(), "3.3.2")
 }
 
-// An exact requirement no published build carries is pointed at the patch
-// that has one, rather than left with a bare catalog error.
+// An exact requirement no published runtime version carries is pointed at the
+// patch that has one, rather than left with a bare catalog error.
 func TestUpgradeRuntimeWithNoBuildForAnExactAirflowPointsAtANewerPatch(t *testing.T) {
 	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.0", 1)
 	rd := newRefreshDeps(t, src)
@@ -340,8 +343,8 @@ func TestUpgradeRuntimeWithNoBuildForAnExactAirflowPointsAtANewerPatch(t *testin
 	require.ErrorContains(t, err, "no runtime version ships Airflow 3.3.0; run astro local upgrade airflow 3.3.2 to move to one")
 }
 
-// What the catalog says is said of the build written, not of the argument as
-// typed.
+// What the catalog says is said of the runtime version written, not of the
+// argument as typed.
 func TestUpgradeRuntimeFindingsAreOfTheBuildWritten(t *testing.T) {
 	rd := newRefreshDeps(t, buildManifest)
 	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", " 3.3-8 "))

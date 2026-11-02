@@ -56,19 +56,20 @@ type runtimeUpgrade struct {
 	scaffold.RuntimeBuildChange
 	// Manifest is the pyproject.toml that was edited.
 	Manifest string `json:"manifest"`
-	// Target is the build picked from the runtime catalog when none was given.
-	// Empty when the caller named the build.
+	// Target is the runtime version picked from the runtime catalog when none
+	// was given. Empty when the caller named the runtime version.
 	Target string `json:"target,omitempty"`
 	// Floating reports a project with no [tool.astro] runtime line upgraded
-	// with no build named: it is left following its series, and Target is
-	// the build its image gets now. Nothing is written for it.
+	// with no runtime version named: it is left following its series, and
+	// Target is the runtime version its image gets now. Nothing is written for
+	// it.
 	Floating bool `json:"floating,omitempty"`
 	// NewerAirflow is a newer Airflow patch than an exact requirement pins,
-	// which a newer build of the series carries, when no build was named:
-	// `astro local upgrade airflow` moves to it.
+	// which a newer runtime version of the series carries, when no runtime
+	// version was named: `astro local upgrade airflow` moves to it.
 	NewerAirflow string `json:"newer_airflow,omitempty"`
-	// Findings are what the runtime catalog says about the build that the
-	// manifest checks warn about too: yanked, unlisted, or carrying another
+	// Findings are what the runtime catalog says about the runtime version that
+	// the manifest checks warn about too: yanked, unlisted, or carrying another
 	// patch than an exact requirement pins.
 	Findings []runtimeFinding `json:"findings,omitempty"`
 	// Refresh is what followed the build into [tool.uv] and uv.lock.
@@ -272,11 +273,12 @@ func (c *cli) runUpgradeRuntime(ctx context.Context, build, python string) error
 	return r.Emit(res, func(w io.Writer) error { return renderRuntimeUpgrade(w, res) })
 }
 
-// pickBareRuntime is the build an upgrade with none named moves to, filling
-// res for it: a floating project is left floating, with the build it gets and
-// the Python that build runs; one already on the newest build for its Airflow
-// keeps it (keep), so a bare upgrade never moves the requirement or the build
-// back. A project whose own Dockerfile picks the image is refused.
+// pickBareRuntime is the runtime version an upgrade with none named moves to,
+// filling res for it: a floating project is left floating, with the runtime
+// version it gets and the Python that runtime version runs; one already on the
+// newest runtime version for its Airflow keeps it (keep), so a bare upgrade
+// never moves the requirement or the runtime version back. A project whose own
+// Dockerfile picks the image is refused.
 func pickBareRuntime(dir, python string, catalog *runtimeversions.Catalog, res *runtimeUpgrade) (build string, keep bool, err error) {
 	m := repairManifest(dir)
 	if m.Astro.Dockerfile != "" {
@@ -312,14 +314,15 @@ func pickBareRuntime(dir, python string, catalog *runtimeversions.Catalog, res *
 	return build, keep, nil
 }
 
-// pickRuntimeTarget is the build an upgrade with none given moves to: the
-// newest published build of the series pin names (of its generation, for a
-// pin naming only that), or of its exact Airflow when pin names a patch
-// (3.3.1), since the requirement holds the project to it. Published, so the
-// build has an image to pull. A current build newer than that (one the
-// catalog dates ahead, or a cached copy predates) stays: an upgrade never
-// moves a project back. newer is a newer Airflow patch than an exact pin, which
-// the series' newest build carries, or "".
+// pickRuntimeTarget is the runtime version an upgrade with none given moves to:
+// the newest published runtime version of the series pin names (of its
+// generation, for a pin naming only that), or of its exact Airflow when pin
+// names a patch (3.3.1), since the requirement holds the project to it.
+// Published, so the runtime version has an image to pull. A current runtime
+// version newer than that (one the catalog dates ahead, or a cached copy
+// predates) stays: an upgrade never moves a project back. newer is a newer
+// Airflow patch than an exact pin, which the series' newest runtime version
+// carries, or "".
 func pickRuntimeTarget(catalog *runtimeversions.Catalog, pin, current string) (build, newer string, err error) {
 	if catalog == nil {
 		return "", "", errors.New("could not read the runtime catalog to pick the newest runtime version. " +

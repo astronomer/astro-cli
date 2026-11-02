@@ -101,8 +101,8 @@ func TestSetRuntimeBuildPicksAPython(t *testing.T) {
 }
 
 // A project on one Python (an earlier --python, or astro init's from a
-// -python-X.Y image) keeps it on a build that ships it, not the build's
-// default, and is refused on one that does not.
+// -python-X.Y image) keeps it on a runtime version that ships it, not the
+// runtime version's default, and is refused on one that does not.
 func TestSetRuntimeBuildKeepsAPinnedPython(t *testing.T) {
 	src := strings.Replace(seriesProject("apache-airflow==3.3.*", ""), "requires-python = '>=3.12'", "requires-python = '==3.12.*'", 1)
 
