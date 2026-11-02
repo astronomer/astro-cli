@@ -23,9 +23,10 @@ var ErrRuntimeUnknown = errors.New("which Astro Runtime this project builds on c
 // and the Python that image runs. It is named in one place, by the first of
 // these that applies:
 //
-//   - a declared Dockerfile's FROM: its exact build, or for a floating tag
-//     ("3.3", "12") the newest published build the tag serves; the Python
-//     its tag names, or else the build's own;
+//   - a declared Dockerfile's FROM, unless it builds on the install base
+//     (ownsBase): its exact build, or for a floating tag ("3.3", "12") the
+//     newest published build the tag serves; the Python its tag names, or
+//     else the build's own;
 //   - [tool.astro] runtime;
 //   - the Airflow pin: the newest published build carrying a release the pin
 //     covers, an exact patch when the pin names one. That is the release
@@ -40,8 +41,8 @@ var ErrRuntimeUnknown = errors.New("which Astro Runtime this project builds on c
 // ErrNoRuntimeBuild means the project has no build; ErrRuntimeUnknown means
 // it cannot be told, as without a catalog (c nil) and no build named.
 func RuntimeBuildFor(dir string, m *manifest.Manifest, c *runtimeversions.Catalog) (build, python string, err error) {
-	if path := dockerfilePath(dir, m); path != "" {
-		return dockerfileRuntimeBuild(airflowrt.ReadDeclaredBase(path), c)
+	if ownsBase(dir, m) {
+		return dockerfileRuntimeBuild(airflowrt.ReadDeclaredBase(dockerfilePath(dir, m)), c)
 	}
 	airflow := m.Airflow()
 	build = strings.TrimSpace(airflow.Runtime)

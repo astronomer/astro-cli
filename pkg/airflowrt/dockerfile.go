@@ -40,7 +40,17 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("error reading Dockerfile: %w", err)
 	}
+	ref, ok := finalRef(data)
+	if !ok {
+		return "", "", fmt.Errorf("no FROM instruction found in Dockerfile")
+	}
+	image, tag = splitImageRef(ref)
+	return image, tag, nil
+}
 
+// finalRef is the image reference the final stage of a Dockerfile, data,
+// builds on, and false for a file with no FROM.
+func finalRef(data []byte) (string, bool) {
 	// The LAST stage, not the first, and then back through any alias it names.
 	//
 	// docker builds the final image from the final FROM, so the first one answers
@@ -84,7 +94,7 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 		stages = append(stages, stage{alias: alias, ref: ref})
 	}
 	if len(stages) == 0 {
-		return "", "", fmt.Errorf("no FROM instruction found in Dockerfile")
+		return "", false
 	}
 
 	ref := stages[len(stages)-1].ref
@@ -100,9 +110,7 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 		}
 		ref = stages[earlier].ref
 	}
-
-	image, tag = splitImageRef(ref)
-	return image, tag, nil
+	return ref, true
 }
 
 // splitImageRef separates an image reference into its name and tag.

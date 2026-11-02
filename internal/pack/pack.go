@@ -34,6 +34,9 @@ const (
 	KindTree    Kind = "tree"
 	KindBundle  Kind = "bundle"
 	KindContext Kind = "context"
+	// KindBase is the install base alone (Request.BaseOnly): a local image tag
+	// a project's own Dockerfile builds FROM.
+	KindBase Kind = "base"
 )
 
 // Target names the registered targets, in listing order.
@@ -93,9 +96,15 @@ type Request struct {
 	// ContextDir, for the image target, writes the image's build context to
 	// this directory (new or empty) instead of building it, for a container
 	// engine the CLI does not drive to build with `docker build` or `podman
-	// build`. Refused for a project that declares its own Dockerfile, whose
-	// project already is its context.
+	// build`. For a project's own Dockerfile built FROM its install base it
+	// writes the install base's context and the project's, and is refused for
+	// any other declared Dockerfile, whose project already is its context.
 	ContextDir string
+	// BaseOnly, for the image target, builds only the install base a
+	// project's own Dockerfile built FROM localhost/astro-base uses, tagged
+	// that too, and reports that tag (KindBase), for a plain `docker build`
+	// of the project.
+	BaseOnly bool
 	// ResolveInstall resolves what a generated image installs from the
 	// project's lock, into req.Install (imageinstall.Fill), with its warnings
 	// through warn. nil installs the manifest's dependencies as written.

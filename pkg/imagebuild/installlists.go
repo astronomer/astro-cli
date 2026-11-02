@@ -228,6 +228,13 @@ const installFindLinksName = "install-find-links.txt"
 // an apache-airflow pin, which the lists never carry. The test is POSIX,
 // since a runtime's SHELL is not the same on every line.
 func generatedDockerfile(from string, mountNetrc bool) string {
+	return installSteps(from, mountNetrc) + "COPY --chown=astro:0 . .\n"
+}
+
+// installSteps is generatedDockerfile without its last step, the project's
+// files: the install over from alone, which is also the install base a
+// project's own Dockerfile builds on (UsesInstallBase).
+func installSteps(from string, mountNetrc bool) string {
 	run := "RUN "
 	if mountNetrc {
 		run = "RUN --mount=type=secret,id=" + manifest.RuntimeSecretID + ",target=/root/.netrc,required=false "
@@ -242,8 +249,7 @@ func generatedDockerfile(from string, mountNetrc bool) string {
 		"if [ -s " + routedName + " ]; then pip install --no-cache-dir --root-user-action=ignore --no-index --no-deps --find-links " + routedLinksName + " -r " + routedName + "; fi && " +
 		"if [ -x " + installPythonDependencies + " ]; then " + installPythonDependencies + "; " +
 		"else pip install --no-cache-dir --root-user-action=ignore -r " + requirementsName + "; fi\n" +
-		"USER astro\n" +
-		"COPY --chown=astro:0 . .\n"
+		"USER astro\n"
 }
 
 // GeneratedDockerfile is the Dockerfile a generated build over the runtime

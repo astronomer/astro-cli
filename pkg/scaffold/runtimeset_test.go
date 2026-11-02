@@ -1,6 +1,8 @@
 package scaffold
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -161,6 +163,26 @@ func TestSetRuntimeBuildOfflineReadsTheSeriesOffTheTag(t *testing.T) {
 	m, err := manifest.Parse([]byte(readFile(t, path)))
 	require.NoError(t, err)
 	assert.Equal(t, manifest.Airflow{Pin: "3.4", Runtime: "3.4-9"}, m.Airflow())
+}
+
+// A Dockerfile built FROM its install base takes the build from
+// [tool.astro] runtime, as a generated build does, so the edit goes through;
+// so does an Airflow upgrade, without telling the user to move a FROM line.
+func TestRuntimeEditsBesideADockerfileOnTheInstallBase(t *testing.T) {
+	src := seriesProject("apache-airflow==3.3.*", "dockerfile = 'Dockerfile'\n")
+	dir, path := writeEditFixture(t, src, 0o644)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM localhost/astro-base\nRUN echo hi\n"), 0o600))
+
+	change, err := SetRuntimeBuildWith(dir, nil, "3.3-10", "", AirflowPinOptions{Catalog: buildCatalog(t)})
+	require.NoError(t, err)
+	assert.True(t, change.Changed)
+	m, err := manifest.Parse([]byte(readFile(t, path)))
+	require.NoError(t, err)
+	assert.Equal(t, "3.3-10", m.Airflow().Runtime)
+
+	pin, err := SetAirflowVersionWith(dir, nil, "3.3", AirflowPinOptions{Catalog: buildCatalog(t)})
+	require.NoError(t, err)
+	assert.Empty(t, pin.Dockerfile, "the base follows the pin; no FROM line to move")
 }
 
 func TestSetRuntimeBuildTheSameBuildWritesNothing(t *testing.T) {

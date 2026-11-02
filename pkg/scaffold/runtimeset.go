@@ -70,8 +70,9 @@ type RuntimeBuildChange struct {
 //     chose another single Python (the shape python writes) moves to the
 //     series' bound, and one that admits no Python the build ships is refused.
 //
-// A build beside a declared dockerfile is refused: the Dockerfile's FROM line
-// picks the image there. Whether the build is yanked, or listed at all, is the
+// A build beside a declared dockerfile whose FROM line picks the image is
+// refused (ownsBase); one built on the install base takes it, as a generated
+// build does. Whether the build is yanked, or listed at all, is the
 // caller's to report (runtimeversions.Catalog.CheckRuntime): a build published
 // after the catalog was cached is an ordinary reason to name one it lacks.
 func SetRuntimeBuildWith(dir string, wrap func(run func() error) error, build, python string, opts AirflowPinOptions) (RuntimeBuildChange, error) {
@@ -79,6 +80,7 @@ func SetRuntimeBuildWith(dir string, wrap func(run func() error) error, build, p
 	if err != nil {
 		return RuntimeBuildChange{}, err
 	}
+	e.dir = dir
 	var out RuntimeBuildChange
 	err = EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
 		var err error
@@ -94,6 +96,8 @@ func SetRuntimeBuildWith(dir string, wrap func(run func() error) error, build, p
 // runtimeBuildEdit is one SetRuntimeBuildWith, checked before the manifest is
 // read: the build, the Python asked for, and what the catalog says of the build.
 type runtimeBuildEdit struct {
+	// dir is the project's root, for its declared Dockerfile (ownsBase).
+	dir           string
 	build, python string
 	tag           manifest.RuntimeTag
 	// rt is the catalog's entry for build, and listed reports that there is
@@ -128,7 +132,7 @@ func newRuntimeBuildEdit(build, python string, opts AirflowPinOptions) (*runtime
 
 // apply is the edit itself.
 func (e *runtimeBuildEdit) apply(before *manifest.Manifest, ed tomledit.Editor) (RuntimeBuildChange, error) {
-	if before.Astro.Dockerfile != "" {
+	if ownsBase(e.dir, before) {
 		return RuntimeBuildChange{}, fmt.Errorf("this project declares %s in [tool.astro] dockerfile, so its FROM line picks the runtime. Change the FROM line instead", before.Astro.Dockerfile)
 	}
 	out := RuntimeBuildChange{Previous: before.Astro.Runtime, Runtime: e.build, AirflowVersion: e.rt.AirflowVersion}
@@ -142,7 +146,7 @@ func (e *runtimeBuildEdit) apply(before *manifest.Manifest, ed tomledit.Editor) 
 	}
 	rp := before.Project.RequiresPython
 	if pin != current {
-		change, err := setAirflowVersion(before, ed, pin, e.opts)
+		change, err := setAirflowVersion(e.dir, before, ed, pin, e.opts)
 		if err != nil {
 			return RuntimeBuildChange{}, err
 		}

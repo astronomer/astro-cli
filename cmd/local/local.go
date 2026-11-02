@@ -318,10 +318,10 @@ const runtimeKey = "tool.astro.runtime"
 // starts: a build of another Airflow series refuses the start, and a yanked
 // build, one whose exact Airflow the pin excludes, or one the check could not
 // read the catalog for is a warning. Standalone installs the requirement and
-// builds no image, so the build decides nothing there and is not checked; a
-// declared Dockerfile never has one beside it.
+// builds no image, so the build decides nothing there and is not checked. A
+// declared Dockerfile built FROM its install base builds on it too.
 func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localrt.Plan) error {
-	if p.Mode != localrt.ModeDocker || p.Runtime == "" || p.Dockerfile != "" || c.d.RuntimeCheck == nil {
+	if p.Mode != localrt.ModeDocker || p.Runtime == "" || c.d.RuntimeCheck == nil {
 		return nil
 	}
 	warnings, err := c.d.RuntimeCheck(ctx, p.Runtime, p.AirflowVersion)

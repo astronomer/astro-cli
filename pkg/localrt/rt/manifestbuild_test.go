@@ -16,8 +16,10 @@ import (
 func TestPlanCarriesEveryManifestBuildField(t *testing.T) {
 	want := ManifestBuild{
 		ProjectDir:     "/project",
+		Name:           "p",
 		AirflowVersion: "3.1",
 		Runtime:        "3.1-2",
+		Registry:       "registry.example.com/astronomer",
 		RequiresPython: "==3.13.*",
 		Dockerfile:     "docker/Dockerfile",
 		Dependencies:   []string{"apache-airflow==3.1.*", "pandas"},

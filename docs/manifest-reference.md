@@ -125,7 +125,7 @@ The value is one build: `3.3-8` for Airflow 3, or `13.11.0` for Airflow 2, whose
 - an Airflow 3 build must be of the requirement's series, so `runtime = '3.2-10'` beside `apache-airflow==3.3.*` is refused (`runtime_mismatch`);
 - an Airflow 2 build names a runtime version, not an Airflow one, so only its generation is checked here: an Airflow 2 build beside an Airflow 3 requirement, or the reverse, is refused (`runtime_mismatch`);
 - a value that is not one build — `latest`, a floating `3.3`, a flavor such as `3.3-8-python-3.12` — is refused (`runtime_invalid`). To run another Python, set [`requires-python`](#requires-python);
-- beside a [`dockerfile`](#dockerfile), whose `FROM` names the base instead, it would pick nothing, and is refused (`runtime_with_dockerfile`).
+- beside a [`dockerfile`](#dockerfile) built on the [install base](#building-on-the-install-base), it picks the build that base is made from, as for a generated image. Beside one whose `FROM` names a runtime itself it picks nothing, and changing the requirement deletes it.
 
 The rest needs Astronomer's runtime catalog, so it is checked where an image is about to be built from the build — a Docker-mode start, `astro deploy`, `astro package` — and not when the manifest is only read:
 
@@ -135,11 +135,22 @@ The rest needs Astronomer's runtime catalog, so it is checked where an image is 
 
 Changing the requirement through Astro Desktop (or anything else calling `SetAirflowVersionWith`) keeps `runtime` while the build still agrees with it, and otherwise moves it to the newest build carrying the new pin that is not yanked, or deletes the line when there is none to name. Without the catalog, agreeing means what the tag shows, so a series pin's patch move leaves it alone and a move to another series deletes it. With the catalog, the build must also carry an Airflow the new requirement covers: an exact pin the build does not carry (`==3.3.2` beside `3.3-5`, which carries 3.3.1), or an Airflow 2 build of another series, moves it.
 
+### `registry`
+
+A registry and namespace that mirrors Astro Runtime's images, for a project whose builds cannot reach Astronomer's registry. Omit it, which is the common case, and images build on `astrocrpublic.azurecr.io/runtime` (Airflow 3) or `quay.io/astronomer/astro-runtime` (Airflow 2).
+
+```toml
+[tool.astro]
+registry = 'registry.example.com/astronomer'
+```
+
+Set it and every image the CLI builds, with no Dockerfile or on the [install base](#building-on-the-install-base), starts from the same repository name and tag under it: `registry.example.com/astronomer/runtime:3.3-8-base`. A value with a scheme, an image name, a tag or a digest is refused (`registry_invalid`).
+
 ### `dockerfile`
 
 A project-relative path to the project's own Dockerfile — the escape hatch for a multi-stage build, or anything else this section cannot express. Omit it, which is the common case, and the image is generated for you from the Airflow requirement, `packages`, and the rest of `[project] dependencies`.
 
-Set it and **that file is the build**: the Airflow requirement, `packages` and your other dependencies stop describing the image, because the Dockerfile decides what goes in. Install your Python and OS packages inside the file itself. The Airflow requirement is still required and still read — standalone mode installs it, and it tells the CLI which Airflow generation to run (the service set differs between 2 and 3) — but it no longer picks the image. [`runtime`](#runtime) is refused beside it, since the `FROM` line picks the base.
+Set it and **that file is the build**: the Airflow requirement, `packages` and your other dependencies stop describing the image, because the Dockerfile decides what goes in. Install your Python and OS packages inside the file itself. The Airflow requirement is still required and still read — standalone mode installs it, and it tells the CLI which Airflow generation to run (the service set differs between 2 and 3) — but it no longer picks the image, unless the file builds on the [install base](#building-on-the-install-base).
 
 Docker mode builds only on an Astro Runtime image, and refuses a final stage on any other base (`unsupported_base`) before it starts anything. That is one of Astronomer's published repositories, `astrocrpublic.azurecr.io/runtime` or `quay.io/astronomer/astro-runtime`, with any tag, or a mirror of one in another registry: a repository whose last path segment is exactly `runtime` or `astro-runtime` and whose tag is an exact Runtime version, such as `registry.example.com/astronomer/astro-runtime:12.1.0` or `mirror/runtime:3.1-12` (a `-python-X.Y`, `-base` or `-slim` flavor is fine). A mirror is recognized by both because the name alone is not enough: `mcr.microsoft.com/dotnet/runtime:8.0`, `ghcr.io/x/runtime:latest`, a mirror on a floating tag (`:3.1`, `:stable`) or none, one pinned by digest alone, and a Docker Hub official name (`runtime`, `docker.io/library/runtime`) are refused, as are `myco/our-runtime` and `python`.
 
@@ -208,6 +219,36 @@ astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT
 Without the flag, each of these commands reads `BUILD_SECRET_INPUT`, one secret per line, the way `astro deploy` does. Without either, they use [`build-secrets`](#build-secrets), so a project whose build always needs a secret can declare it once. The CLI passes on only the spec and Docker reads the value itself, so the CLI never writes the value to disk. For that reason, a flag or `BUILD_SECRET_INPUT` has to be given again on each later start or restart that builds the image. A generated image's build mounts only a `netrc` secret, while it installs your dependencies, so a flag with any other id is refused there rather than accepted and dropped. A `BUILD_SECRET_INPUT` line with another id is dropped for a generated image, since a CI runner may set the variable for every job. `astro package` refuses it for a bucket target too. Standalone mode builds no image, so it warns and starts without the secret.
 
 Before each of these commands builds, it reads the Dockerfile for `RUN --mount=type=secret` steps. For each secret id that no flag, `BUILD_SECRET_INPUT` line or `build-secrets` entry supplies, it prints a warning that names the id, the line and the flag. It is a warning and not a refusal, because a secret mount is optional unless it sets `required=true`. If the build then fails, the build output has usually pushed the warning out of sight, so the final error names the missing ids and the flag again.
+
+#### Building on the install base
+
+A Dockerfile can keep your own steps and still install from `pyproject.toml` and `uv.lock`, the way an image without one does. Build its final stage on the project's install base:
+
+```dockerfile
+# Built on the install base the Astro CLI makes from pyproject.toml and uv.lock.
+# Build with astro package or astro deploy, or run astro package --base first.
+FROM localhost/astro-base
+COPY --chown=astro:0 . .
+
+RUN echo "your own steps"
+```
+
+The line is the same in every project. The install base is the runtime's `-base` image with the project's packages installed, exactly as an image without a Dockerfile installs them: the build comes from the requirement and [`runtime`](#runtime), the Python from [`requires-python`](#requires-python), and the registry from [`registry`](#registry). Nothing is written into the project, and the file names no runtime, so `astro local upgrade runtime` and `upgrade airflow` move it with the rest.
+
+`astro package`, `astro deploy` and `astro local start --docker` build the base, tagged `localhost/astro-base:<digest>` of what it installs, and then your Dockerfile, from a copy in their own work directory whose `FROM` names that exact tag. Your file is never changed, and any number of projects, or checkouts of one, built at once each build on their own base.
+
+To build it yourself, any builder works, the legacy one and any Podman included:
+
+- `astro package --base && docker build .` builds the base, also tags it `localhost/astro-base`, prints that tag, and then builds your Dockerfile from the project as it stands. That build reads the most recently built base on the machine, whichever project built it. A missing base fails the build: `localhost/` names no registry, so it is never pulled from Docker Hub. The base is built for `linux/amd64`, what Astro runs, unless `--platform` says otherwise, so on a machine of another architecture (Apple silicon) build with `docker build --platform linux/amd64 .`, as `--base` notes.
+- `astro package --context-dir <dir>` writes two plain contexts, `<dir>/base` and `<dir>/project` (whose Dockerfile names the exact base tag), and prints the two `docker build` commands, in order. This is the deterministic path, for CI.
+
+The install base carries labels, which an image built on it inherits: the project's `[project] name`, and a digest of the runtime image it is built over and what it installs. `astro deploy --image-name` reads them and refuses an image built on another project's base, or on one that no longer matches `uv.lock`, before anything is pushed:
+
+```
+Error: this image was built on an install base that no longer matches uv.lock. Rebuild it with: astro package --base && docker build .
+```
+
+An image without the labels deploys as before.
 
 A conversion sets this for you when it finds a Dockerfile it cannot carry — one doing more than naming a base image. A Dockerfile that only pins a runtime is retired instead, since the Airflow requirement now says the same thing. A kept Dockerfile's `FROM` is where the conversion reads the version from, so the two agree; when `--airflow-version`, or the requirement an existing `pyproject.toml` already carries, names another Airflow than that `FROM`, the conversion refuses with the message above rather than write a project that would not start.
 

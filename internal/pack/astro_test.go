@@ -421,6 +421,65 @@ func TestAstroBuildRefusesAContextForADeclaredDockerfile(t *testing.T) {
 	assert.NoDirExists(t, req.ContextDir)
 }
 
+// baseRequest is testRequest with the project's own Dockerfile built FROM the
+// install base, dockerfile, and lists the install resolves.
+func baseRequest(t *testing.T, dockerfile, pandas string) Request {
+	t.Helper()
+	req := testRequest(t)
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "Dockerfile"), []byte(dockerfile), 0o600))
+	req.Manifest.Astro.Dockerfile = "Dockerfile"
+	req.ResolveInstall = func(_ context.Context, breq *imagebuild.Request, _ func(string)) error {
+		breq.Install = &imagebuild.InstallLists{Requirements: []string{"pandas==" + pandas}}
+		return nil
+	}
+	return req
+}
+
+// A Dockerfile built FROM its install base writes the base's context and the
+// project's, the project's Dockerfile naming the exact base, and each
+// engine's command builds the two in turn.
+func TestAstroBuildWritesTheContextOfADockerfileOnTheInstallBase(t *testing.T) {
+	req := baseRequest(t, "FROM localhost/astro-base\nRUN echo hi\n", "2.2.3")
+	req.ContextDir = filepath.Join(t.TempDir(), "build")
+	res, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	require.Len(t, res.NextSteps, 2)
+	base := filepath.Join(req.ContextDir, imagebuild.DeclaredBaseDir)
+	project := filepath.Join(req.ContextDir, imagebuild.DeclaredProjectDir)
+	assert.Regexp(t, `^docker build --platform linux/amd64 --tag localhost/astro-base:[0-9a-f]{12} `+regexp.QuoteMeta(scaffold.ShellQuote(base))+
+		` && docker build --platform linux/amd64 --tag astro-package/my-project:latest `+regexp.QuoteMeta(scaffold.ShellQuote(project))+`$`, res.NextSteps[0])
+	df, err := os.ReadFile(filepath.Join(project, "Dockerfile"))
+	require.NoError(t, err)
+	assert.Regexp(t, `^FROM localhost/astro-base:[0-9a-f]{12}\nRUN echo hi\n$`, string(df))
+}
+
+// --base builds the install base alone and reports its plain tag.
+func TestAstroBuildBaseOnly(t *testing.T) {
+	builder := &fakeBuilder{returns: "localhost/astro-base"}
+	req := baseRequest(t, "FROM localhost/astro-base\n", "2.2.3")
+	req.BaseOnly = true
+	res, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, Result{Target: TargetAstro, Kind: KindBase, Image: "localhost/astro-base"}, res)
+	assert.True(t, builder.gotReq.InstallBaseOnly)
+}
+
+// The image's tag moves with what its install base installs.
+func TestAstroBuildOnTheInstallBase(t *testing.T) {
+	req := baseRequest(t, "FROM localhost/astro-base\n", "2.2.3")
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, "localhost/astro-base", builder.gotReq.InstallBase)
+	assert.Equal(t, "my-project", builder.gotReq.Project)
+	first := builder.gotReq.Tag
+
+	req = baseRequest(t, "FROM localhost/astro-base\n", "2.2.4")
+	_, err = newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.NotEqual(t, first, builder.gotReq.Tag, "the tag covers what the base installs")
+}
+
 func TestAstroBuildTagOverrideSkipsLatest(t *testing.T) {
 	docker := &fakeDocker{inspectOut: "3.1-2"}
 	req := testRequest(t)

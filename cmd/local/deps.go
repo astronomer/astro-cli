@@ -501,6 +501,8 @@ func (b imageBuilder) Request(ctx context.Context, m imagebuild.ManifestBuild) (
 	}
 	return localrt.BuildRequest{
 		BaseImage:    req.BaseImage,
+		InstallBase:  req.InstallBase,
+		Project:      req.Project,
 		Dockerfile:   req.Dockerfile,
 		Context:      req.Context,
 		ManifestDir:  req.ManifestDir,
@@ -529,6 +531,8 @@ func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb loca
 	breq := imagebuild.Request{
 		WorkDir:      req.WorkDir,
 		BaseImage:    req.BaseImage,
+		InstallBase:  req.InstallBase,
+		Project:      req.Project,
 		Dockerfile:   req.Dockerfile,
 		Context:      req.Context,
 		Secrets:      req.Secrets,

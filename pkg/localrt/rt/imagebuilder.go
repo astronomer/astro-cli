@@ -59,15 +59,21 @@ type ManifestBuild struct {
 	// ProjectDir is the project's root, absolute. A declared Dockerfile resolves
 	// against it and builds with it as the context.
 	ProjectDir string
+	// Name is [project] name, which the install base a declared Dockerfile
+	// builds FROM is labeled with.
+	Name string
 	// AirflowVersion is the version the manifest's Airflow requirement pins
 	// (manifest.Airflow().Pin), which a generated build's runtime base
 	// resolves from. Unused when a Dockerfile is declared.
 	AirflowVersion string
 	// Runtime is [tool.astro] runtime (manifest.Airflow().Runtime), the one
 	// runtime build a generated image starts FROM instead of the newest build
-	// of AirflowVersion's series, or "" for none. The manifest never sets it
-	// beside a Dockerfile.
+	// of AirflowVersion's series, or "" for none. Beside a Dockerfile it
+	// picks the install base a file built FROM localhost/astro-base builds on.
 	Runtime string
+	// Registry is [tool.astro] registry, the mirror the runtime base is
+	// pulled from in place of Astronomer's own registry, or "" for none.
+	Registry string
 	// RequiresPython is [project] requires-python. A generated image runs the
 	// newest Python of its runtime build that it admits, preferring the
 	// build's default (imagebuild.RuntimeImageForPython).
@@ -92,8 +98,10 @@ type ManifestBuild struct {
 func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 	return ManifestBuild{
 		ProjectDir:     projectDir,
+		Name:           p.Name,
 		AirflowVersion: p.AirflowVersion,
 		Runtime:        p.Runtime,
+		Registry:       p.Registry,
 		RequiresPython: p.RequiresPython,
 		Dockerfile:     p.Dockerfile,
 		Dependencies:   p.Dependencies,
@@ -106,8 +114,10 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 // inverse of ManifestBuild. mb.ProjectDir is not copied: ProjectPath is the
 // plan's own, set by its builder.
 func (p *Plan) SetManifestBuild(mb ManifestBuild) {
+	p.Name = mb.Name
 	p.AirflowVersion = mb.AirflowVersion
 	p.Runtime = mb.Runtime
+	p.Registry = mb.Registry
 	p.RequiresPython = mb.RequiresPython
 	p.Dockerfile = mb.Dockerfile
 	p.Dependencies = mb.Dependencies
@@ -126,8 +136,14 @@ type BuildRequest struct {
 	// own tag (runtime:3.1-5), which names the runtime and is what a caller
 	// parses a version out of. The build starts FROM its -base tag, and the
 	// fast path returns that tag (ImageBuilder.Build), not this one. Empty
-	// when Dockerfile is set — that file declares its own FROM.
+	// when Dockerfile is set — that file declares its own FROM — unless it
+	// builds FROM the install base (InstallBase), which is built on this.
 	BaseImage string
+	// InstallBase is the repository of the install base a declared Dockerfile
+	// builds FROM (localhost/astro-base), or "" for none, and Project the
+	// [project] name it is labeled with (imagebuild.Request.InstallBase).
+	InstallBase string
+	Project     string
 	// Dockerfile and Context ask the builder to run the project's own Dockerfile
 	// rather than generate one, for a project whose manifest declared it. Both
 	// absolute, set together, and both empty for a generated build. Dependencies
