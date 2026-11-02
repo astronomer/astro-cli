@@ -3,6 +3,7 @@ package scaffold
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,11 +94,33 @@ func TestSetRuntimeBuildPicksAPython(t *testing.T) {
 	assert.Equal(t, "3.12", change.Python)
 	assert.Contains(t, readFile(t, path), "requires-python = '==3.12.*'")
 
-	// Without --python again, the build's default comes back.
+	// Without --python again, the chosen Python stays: only python moves it.
 	change, err = SetRuntimeBuildWith(dir, nil, "3.3-10", "", AirflowPinOptions{Catalog: buildCatalog(t)})
 	require.NoError(t, err)
-	assert.Equal(t, ">=3.12", change.RequiresPython, "the series' bound, from the catalog")
-	assert.Equal(t, "3.13", change.Python)
+	assert.Empty(t, change.RequiresPython)
+	assert.Equal(t, "3.12", change.Python)
+	assert.Contains(t, readFile(t, path), "requires-python = '==3.12.*'")
+}
+
+// A project on one Python (an earlier --python, or astro init's from a
+// -python-X.Y image) keeps it on a runtime version that ships it, not the
+// runtime version's default, and is refused on one that does not.
+func TestSetRuntimeBuildKeepsAPinnedPython(t *testing.T) {
+	src := strings.Replace(seriesProject("apache-airflow==3.3.*", ""), "requires-python = '>=3.12'", "requires-python = '==3.12.*'", 1)
+
+	dir, path := writeEditFixture(t, src, 0o644)
+	change, err := SetRuntimeBuildWith(dir, nil, "3.3-10", "", AirflowPinOptions{Catalog: buildCatalog(t)})
+	require.NoError(t, err)
+	assert.Empty(t, change.RequiresPython, "3.3-10 ships 3.12, so it stays")
+	assert.Equal(t, "3.12", change.Python, "not the build's default, 3.13")
+	assert.Contains(t, readFile(t, path), "requires-python = '==3.12.*'")
+
+	dir, path = writeEditFixture(t, src, 0o644)
+	_, err = SetRuntimeBuildWith(dir, nil, "3.4-1", "", AirflowPinOptions{Catalog: buildCatalog(t)})
+	require.ErrorIs(t, err, ErrInvalidPython)
+	assert.Contains(t, err.Error(), "3.13, 3.14")
+	assert.Contains(t, err.Error(), "--python")
+	assert.Equal(t, src, readFile(t, path), "a refused move writes nothing")
 }
 
 // A Python given across a series move is the one requires-python reports,
@@ -125,12 +148,12 @@ func TestSetRuntimeBuildRefuses(t *testing.T) {
 		catalog                  bool
 		want                     string
 	}{
-		{"a floating tag", seriesProject("apache-airflow==3.3.*", ""), "3.3", "", true, "not one build"},
-		{"not a tag", seriesProject("apache-airflow==3.3.*", ""), "latest", "", true, "not one build"},
+		{"a floating tag", seriesProject("apache-airflow==3.3.*", ""), "3.3", "", true, "not one runtime version"},
+		{"not a tag", seriesProject("apache-airflow==3.3.*", ""), "latest", "", true, "not one runtime version"},
 		{"a Python the build lacks", seriesProject("apache-airflow==3.3.*", ""), "3.3-7", "3.14", true, "ships Python 3.12, 3.13"},
 		{"a Python that is not one", seriesProject("apache-airflow==3.3.*", ""), "3.3-7", "3", true, "not a Python version"},
 		{"a Python for Airflow 2", seriesProject("apache-airflow==2.11.*", ""), "13.11.0", "3.12", true, "Airflow 2 runtime"},
-		{"an unlisted Airflow 2 build", seriesProject("apache-airflow==2.11.*", ""), "13.99.0", "", true, "lists no build 13.99.0"},
+		{"an unlisted Airflow 2 build", seriesProject("apache-airflow==2.11.*", ""), "13.99.0", "", true, "lists no runtime version 13.99.0"},
 		{"an unlisted build of another series", seriesProject("apache-airflow==3.3.*", ""), "3.9-1", "", true, "not moved to Airflow 3.9"},
 		{"an Airflow 2 build offline", seriesProject("apache-airflow==2.11.*", ""), "13.11.0", "", false, "could not be read"},
 		{"a declared Dockerfile", seriesProject("apache-airflow==3.3.*", "dockerfile = 'Dockerfile'\n"), "3.3-7", "", true, "FROM line"},
