@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -89,8 +90,10 @@ var signupVerificationPattern = regexp.MustCompile(`(?i)verif\w*\s+(your\s+)?ema
 var (
 	callbackChannel = make(chan CallbackMessage, 1)
 	callbackTimeout = time.Second * 300
-	redirectURI     = "http://localhost:12345/callback"
-	callbackServer  = "localhost:12345"
+	// Auth0 matches redirect URIs exactly, so every port here must also be an
+	// Allowed Callback URL of the CLI client in astro-auth. 12346 belongs to
+	// another client there.
+	callbackPorts = []int{12345, 12350, 12351, 12352, 12353, 12354}
 )
 
 var authenticator = Authenticator{
@@ -130,7 +133,7 @@ func requestUserInfo(authConfig Config, accessToken string) (UserInfo, error) {
 
 // request a device code from auth0 for the user's cli
 // Get user's token using PKCE flow
-func requestToken(authConfig Config, verifier, code string) (Result, error) {
+func requestToken(authConfig Config, verifier, code, redirectURI string) (Result, error) {
 	addr := authConfig.DomainURL + "oauth/token"
 	data := url.Values{
 		"client_id":     {authConfig.ClientID},
@@ -183,10 +186,28 @@ func authorizeError(errorCode, errorDescription []string) error {
 // browser's authorization code, with its warnings (a callback server that
 // would not shut down) going to errOut.
 func authorizeCallbackHandlerTo(errOut io.Writer) AuthorizeCallbackHandler {
-	return func() (string, error) { return authorizeCallback(errOut) }
+	return func(listener net.Listener) (string, error) { return authorizeCallback(errOut, listener) }
 }
 
-func authorizeCallback(errOut io.Writer) (string, error) {
+// listenForCallback binds the first free port of callbackPorts. It binds
+// before the authorize URL is built, because that URL names the port.
+func listenForCallback() (net.Listener, error) {
+	var firstErr error
+	for _, port := range callbackPorts {
+		listener, err := net.Listen("tcp", net.JoinHostPort("localhost", strconv.Itoa(port)))
+		if err == nil {
+			return listener, nil
+		}
+		firstErr = cmp.Or(firstErr, err)
+	}
+	return nil, fmt.Errorf("cannot open the login callback on any of the ports %v: %w. Close any other astro login and try again", callbackPorts, firstErr)
+}
+
+func callbackRedirectURI(listener net.Listener) string {
+	return fmt.Sprintf("http://localhost:%d/callback", listener.Addr().(*net.TCPAddr).Port)
+}
+
+func authorizeCallback(errOut io.Writer, listener net.Listener) (string, error) {
 	m := http.NewServeMux()
 	s := http.Server{Handler: m, ReadHeaderTimeout: 0}
 	m.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
@@ -201,17 +222,18 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 			http.Redirect(w, resp, "https://auth.astronomer.io/device/success", http.StatusFound)
 		}
 	})
-	// Bind before serving, so an address already taken reaches the caller as an
-	// error rather than ending the process from inside the goroutine below.
-	listener, err := net.Listen("tcp", callbackServer)
-	if err != nil {
-		return "", fmt.Errorf("cannot open the login callback on %s: %w. Close any other astro login and try again", callbackServer, err)
-	}
 	go func() {
 		if err := s.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			// The caller selects on this channel, so it hears a server that
 			// stops early instead of waiting out the callback timeout.
 			callbackChannel <- CallbackMessage{err: fmt.Errorf("the login callback server stopped: %w", err)}
+		}
+	}()
+	// Shut down on every return, so a server left running cannot post a stale
+	// error to callbackChannel when its listener is closed later.
+	defer func() {
+		if err := s.Shutdown(http_context.Background()); err != nil {
+			ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
 		}
 	}()
 
@@ -225,16 +247,8 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 			}
 			authorizationCode = callbackMessage.authorizationCode
 		case <-time.After(callbackTimeout):
-			err := s.Shutdown(http_context.Background())
-			if err != nil {
-				ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
-			}
 			return "", errors.New("the operation has timed out")
 		}
-	}
-	err = s.Shutdown(http_context.Background())
-	if err != nil {
-		ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
 	}
 
 	// return code
@@ -274,6 +288,13 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	challenge := util.Base64URLEncode(hash)
 	spinnerMessage := "Waiting for login to complete in browser"
 	var res Result
+
+	listener, err := listenForCallback()
+	if err != nil {
+		return Result{}, err
+	}
+	defer listener.Close() //nolint:errcheck // the callback server has usually closed it already
+	redirectURI := callbackRedirectURI(listener)
 
 	authorizeURL := fmt.Sprintf(
 		"%sauthorize?audience=%s&client_id=%s&redirect_uri=%s&scope=openid profile email offline_access&response_type=code&response_mode=query&code_challenge=%s&code_challenge_method=S256",
@@ -318,11 +339,11 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 			fmt.Fprintln(os.Stderr)
 		}
 		err = ansi.Spinner(spinnerMessage, func() error {
-			authorizationCode, err := a.callbackHandler()
+			authorizationCode, err := a.callbackHandler(listener)
 			if err != nil {
 				return err
 			}
-			res, err = a.tokenRequester(authConfig, verifier, authorizationCode)
+			res, err = a.tokenRequester(authConfig, verifier, authorizationCode, redirectURI)
 			return err
 		})
 		if err != nil {
@@ -330,11 +351,11 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 		}
 	} else {
 		fmt.Fprintln(os.Stderr, "Please visit the following link on a device with a browser: "+authorizeURL)
-		authorizationCode, err := a.callbackHandler()
+		authorizationCode, err := a.callbackHandler(listener)
 		if err != nil {
 			return Result{}, err
 		}
-		res, err = a.tokenRequester(authConfig, verifier, authorizationCode)
+		res, err = a.tokenRequester(authConfig, verifier, authorizationCode, redirectURI)
 		if err != nil {
 			return Result{}, err
 		}
