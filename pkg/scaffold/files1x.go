@@ -102,6 +102,16 @@ type project1x struct {
 	// inside it, and deleting that file while keeping the build that reads it is
 	// worse than either outcome alone.
 	dockerfileBody []byte
+	// rewrite is the Dockerfile moved onto the install base, when its shape
+	// allows it (installBaseRewriteOf); nil leaves the file as it is.
+	rewrite *dockerfileRewrite
+	// registry is the mirror the Dockerfile's runtime tag was on, for
+	// [tool.astro] registry, when the file is rewritten or retired.
+	registry string
+	// pinRecorded reports a pin-only Dockerfile whose runtime, Python and
+	// mirror pyproject.toml records (recordRuntime), so retiring it loses
+	// nothing.
+	pinRecorded bool
 	// projectName is the name .astro/config.yaml states, before any
 	// sanitizing. Empty when the file is absent, says nothing, or will not
 	// parse.
@@ -288,61 +298,41 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 		if stated {
 			from1x.statedVersion = true
 		}
-		// A pin-only Dockerfile on one Airflow 2 build has that build to give
-		// the manifest, and once it is there the file has nothing left to say
-		// and its note nothing left to do. A flavor ("12.6.0-python-3.11") or
-		// a floating tag ("12") is no one build, and stays as it was. Nor does
-		// a build older than runtime 9 (Airflow 2.7), which no image is built
-		// FROM: the pin "2" moves it to the newest Airflow 2, and the note
-		// says the minor was not read. Nor does a mirror: a generated build
-		// pulls the build from Astronomer's own repository, so the file is
-		// the only record of where this project's base comes from.
-		if bare := strings.TrimPrefix(tag, "v"); version == "2" && from1x.dockerfilePinOnly && image == airflow2RuntimeImage {
-			if t, ok := manifest.ParseRuntimeTag(bare); ok && t.Major == "2" && t.Build && runtimeMajor(bare) >= minAirflow2Runtime {
-				from1x.runtime = bare
-				notes = nil
+		// A pin-only Dockerfile has its runtime, Python and mirror to give
+		// pyproject.toml (recordRuntime), and once they are there the file has
+		// nothing left to say. A tag that cannot be recorded (a floating
+		// Airflow 2 tag, a -slim flavor) leaves it as it was.
+		if from1x.dockerfilePinOnly && kind == baseRuntime && !strings.Contains(tag, "-base") {
+			if rec, why := recordRuntime(image, tag); why == "" {
+				from1x.runtime, from1x.registry, from1x.basePython, from1x.pinRecorded = rec.runtime, rec.registry, rec.python, true
+				if version == "2" {
+					notes = nil
+				}
 			}
 		}
 	}
-	build := buildStepsNote(data)
 	from1x.notes = append(from1x.notes, notes...)
-	from1x.notes = append(from1x.notes, build...)
-	from1x.notes = append(from1x.notes, pipInstallNote(data)...)
-	from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, fileDockerfile))...)
-	base := airflowrt.NewDeclaredBase(image, tag, err)
-	if base.RuntimeVersion() != "" {
-		_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
+	if !from1x.dockerfilePinOnly && kind == baseRuntime {
+		from1x.planRewrite(data)
 	}
-	// Two sources for one list, so say it rather than let someone find out.
-	//
-	// A declared Dockerfile is the build, and imagebuild ignores the
-	// manifest's dependencies and packages in that mode, so requirements.txt
-	// and packages.txt are KEPT (planRetirements spares them) because the
-	// runtime base's ONBUILD reads them from the context. The manifest gets
-	// the lists too, for the day the Dockerfile goes away. Both being live
-	// at once is deliberate and is exactly the kind of thing that reads as a
-	// conversion bug when nothing mentions it.
-	if !from1x.dockerfilePinOnly {
+	from1x.notes = append(from1x.notes, pipInstallNotes(data)...)
+	from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, fileDockerfile))...)
+	if !from1x.pinRecorded {
+		base := airflowrt.NewDeclaredBase(image, tag, err)
+		if base.RuntimeVersion() != "" {
+			_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
+		}
+	}
+	// A Dockerfile kept on its ONBUILD tag still installs requirements.txt
+	// and packages.txt from the build context, so planRetirements keeps both,
+	// and pyproject.toml has their contents as well, for standalone mode.
+	if !from1x.dockerfilePinOnly && from1x.rewrite == nil {
 		for _, kept := range []string{"requirements.txt", "packages.txt"} {
 			if slices.Contains(from1x.present, kept) {
 				from1x.notes = append(from1x.notes, kept+": kept, because your Dockerfile's base image reads it "+
-					"during the build. Its contents are in pyproject.toml as well, which is what a project "+
-					"without a Dockerfile installs from")
+					"during the build. Its contents are in pyproject.toml as well, for standalone mode")
 			}
 		}
-	}
-	// A Dockerfile that is not pin-only and drew no note is kept and
-	// unmentioned, which it must not be: the point of keeping it
-	// is that the project still has a build the manifest does not describe,
-	// and the user has to be told. buildStepsNote covers the RUN/COPY/ENV
-	// shapes; this covers the rest — a second stage, an instruction no
-	// regex here knows — where the file survives precisely because nothing
-	// recognized it.
-	if !from1x.dockerfilePinOnly && len(notes) == 0 && len(build) == 0 {
-		from1x.notes = append(from1x.notes,
-			"Dockerfile: it does more than name a base image, so it was kept and declared as this "+
-				"project's build. What it does is not described in pyproject.toml, which is the point of "+
-				"declaring it")
 	}
 }
 
@@ -771,65 +761,18 @@ func airflowFromDockerfile(image, tag string, err error) (version string, stated
 	}
 }
 
-// buildInstructionRe finds a Dockerfile instruction that is not FROM.
-var buildInstructionRe = regexp.MustCompile(`(?im)^[ \t]*(RUN|COPY|ADD|ENV|ARG|USER|WORKDIR|ENTRYPOINT|CMD|VOLUME|EXPOSE|LABEL|HEALTHCHECK|SHELL|STOPSIGNAL|ONBUILD)\b`)
-
-// buildStepsNote reports that the Dockerfile does more than name a base image.
-//
-// Reading the tag is not reading the file. A 1.x Dockerfile commonly carries
-// `RUN apt-get install -y unixodbc-dev`, a COPY of certificates, an ENV — real
-// build customization that v2 does not perform, because there is no Dockerfile
-// in the shape it produces. leftovers used to say so with an unconditional
-// "Dockerfile: not read" entry; taking that out because the TAG is now read
-// meant a Dockerfile that parsed cleanly went unmentioned entirely, which is a
-// worse answer than the one it replaced.
-//
-// Only the instructions are named, never their arguments: the point is to say
-// there is work here, and a COPY line's paths are the user's own to read.
-func buildStepsNote(data []byte) []string {
-	found := buildInstructionRe.FindAllStringSubmatch(string(data), -1)
-	if len(found) == 0 {
-		return nil
+// pipInstallNotes name each package a RUN step installs with pip or uv pip,
+// with the command that gives standalone mode it too: the Dockerfile still
+// installs it in an image, but standalone mode and astro local check install
+// only pyproject.toml's dependencies. Moving it is the user's call: a package
+// from a private index behind a build secret does not resolve the same way
+// outside the build.
+func pipInstallNotes(data []byte) []string {
+	var notes []string
+	for _, spec := range runPipSpecs(data) {
+		notes = append(notes, "Dockerfile: a pip step installs "+spec+". For standalone mode too, run: uv add '"+spec+"'")
 	}
-	seen := map[string]bool{}
-	var kinds []string
-	for _, m := range found {
-		kind := strings.ToUpper(m[1])
-		if !seen[kind] {
-			seen[kind] = true
-			kinds = append(kinds, kind)
-		}
-	}
-	// "were not read" is the accurate half: nothing here parses a RUN or a COPY.
-	// The old second half said "v2 builds no Dockerfile: move what they install
-	// or set into pyproject.toml", which the dockerfile key made false — the file
-	// IS the build now, so these instructions run, and moving them into the
-	// manifest would be work for nothing. Saying so kept a 1.x-era sentence
-	// giving v2 users the opposite of the right advice.
-	return []string{"Dockerfile: its " + strings.Join(kinds, ", ") +
-		" instructions were not read here, so the manifest does not describe them. The Dockerfile stays your build and they still run"}
-}
-
-// pipInstallNote names the packages a RUN step installs with pip or uv pip.
-// The Dockerfile still installs them in Docker mode, but standalone mode and
-// `astro local check` install only [project] dependencies, so a DAG importing
-// one of these fails there with nothing pointing at why.
-//
-// Report only. Moving them into the manifest is the user's call: a package
-// installed from a private index behind a build secret does not resolve the
-// same way outside the build.
-func pipInstallNote(data []byte) []string {
-	specs := runPipSpecs(data)
-	if len(specs) == 0 {
-		return nil
-	}
-	quoted := make([]string, len(specs))
-	for i, s := range specs {
-		quoted[i] = `"` + s + `"`
-	}
-	return []string{"Dockerfile: its RUN steps install " + strings.Join(quoted, ", ") +
-		". Standalone mode and astro local check do not have " + pronoun(len(specs)) +
-		" unless you add " + pronoun(len(specs)) + " to [project] dependencies"}
+	return notes
 }
 
 // pipCommandRe is the word that runs pip: pip, pip3, pip3.12, or a path to one.
@@ -1008,8 +951,12 @@ func buildSecretNotes(path string) []string {
 	}
 	notes := make([]string, 0, len(mounts))
 	for _, m := range mounts {
-		notes = append(notes, fmt.Sprintf("Dockerfile: line %d mounts build secret %q. To build without --build-secret each time, "+
-			"add 'id=%s,env=<VAR>' to build-secrets under [tool.astro], where <VAR> is the environment variable that holds it", m.Line, m.ID, m.ID))
+		spec := "id=" + m.ID + ",env=<VAR>"
+		if m.ID == "netrc" {
+			spec = "id=netrc,src=~/.netrc"
+		}
+		notes = append(notes, fmt.Sprintf("Dockerfile: line %d mounts the build secret %s. To pass it on every build, "+
+			"add build-secrets = ['%s'] to the Astro settings in %s", m.Line, m.ID, spec, manifest.Marker))
 	}
 	return notes
 }

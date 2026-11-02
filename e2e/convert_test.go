@@ -220,23 +220,24 @@ func cases1x() []case1x {
 				"packages.txt":     "libpq-dev",
 			},
 			notes: []string{
-				"its RUN instructions were not read here",
+				"left as it is, because the floating Airflow 2 tag",
 				"kept, because your Dockerfile's base image reads it during the build",
 			},
 		},
 		{
-			// A declared build whose base names its Python. The manifest pins
-			// that minor, so uv locks for, and standalone mode runs, the Python
-			// the image runs rather than every one after the runtime's floor.
+			// A declared build on an ONBUILD tag moves onto the install base,
+			// and the runtime and Python its tag names move into the manifest,
+			// so uv locks for, and standalone mode runs, the Python the image
+			// runs. requirements.txt, now in the manifest, goes.
 			name: "a declared Dockerfile whose base names its Python",
 			files: map[string]string{
 				"Dockerfile":       "FROM astrocrpublic.azurecr.io/runtime:3.3-2-python-3.13\nRUN pip install --no-cache-dir uv\n",
 				"requirements.txt": "pandas==2.1.0\n",
 			},
 			airflow:     "3.3",
-			manifestHas: []string{"requires-python = '==3.13.*'", "dockerfile = 'Dockerfile'"},
-			kept:        []string{"Dockerfile", "requirements.txt"},
-			notes:       []string{"its RUN instructions were not read here"},
+			manifestHas: []string{"requires-python = '==3.13.*'", "dockerfile = 'Dockerfile'", "runtime = '3.3-2'"},
+			kept:        []string{"Dockerfile"},
+			keptHas:     map[string]string{"Dockerfile": "FROM localhost/astro-base\nCOPY --chown=astro:0 . .\n\nRUN pip install --no-cache-dir uv\n"},
 		},
 		{
 			// A kept Dockerfile builds with the project as its context, so the
@@ -255,7 +256,6 @@ func cases1x() []case1x {
 				".dockerignore": "astro\n.git\n.env\n.venv\n\n# Local secrets and per-machine files. Keep them out of the image.\n**/.git\n**/.env\n",
 			},
 			reportedUpdated: []string{".dockerignore (added the per-machine rules)"},
-			notes:           []string{"its RUN instructions were not read here"},
 		},
 		{
 			// Four kinds of line [project.dependencies] cannot express. Each
@@ -803,8 +803,11 @@ func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 	const dockerfile = "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\nENV TZ=UTC\n"
 	write(t, filepath.Join(mirrored.Dir, "Dockerfile"), dockerfile)
 	mirrored.run("init", "--output", "json").requireSuccess()
-	if got := read(t, filepath.Join(mirrored.Dir, "Dockerfile")); got != dockerfile {
-		t.Errorf("the mirrored-base Dockerfile changed: %q", got)
+	if got := read(t, filepath.Join(mirrored.Dir, "Dockerfile")); !strings.Contains(got, "FROM localhost/astro-base\n") {
+		t.Errorf("the mirrored-base Dockerfile was not moved onto the install base: %q", got)
+	}
+	if m := read(t, filepath.Join(mirrored.Dir, "pyproject.toml")); !strings.Contains(m, "registry = 'registry.corp.example/astronomer'") {
+		t.Errorf("the mirror is not recorded under APC:\n%s", m)
 	}
 	if m := read(t, filepath.Join(mirrored.Dir, "pyproject.toml")); !strings.Contains(m, "dockerfile = ") {
 		t.Errorf("the mirrored-base Dockerfile is not declared under APC:\n%s", m)

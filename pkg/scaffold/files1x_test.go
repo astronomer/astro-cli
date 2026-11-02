@@ -465,8 +465,8 @@ func TestPlanRetiresOnlyAPinOnlyDockerfile(t *testing.T) {
 		{
 			name:    "an Airflow 2 build from a mirror",
 			body:    "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\n",
-			retired: false,
-			why:     "a generated build pulls from quay.io, so the file is the only record of the mirror",
+			retired: true,
+			why:     "the mirror becomes [tool.astro] registry, so the manifest carries all the tag said",
 		},
 		{
 			name:    "an Airflow 2 build below the 2.7 floor",
@@ -483,8 +483,8 @@ func TestPlanRetiresOnlyAPinOnlyDockerfile(t *testing.T) {
 		{
 			name:    "an Airflow 2 build's Python flavor",
 			body:    "FROM astrocrpublic.azurecr.io/runtime:12.1.0-python-3.11\n",
-			retired: false,
-			why:     "a flavor is not a [tool.astro] runtime value, so the tag is still this file's alone",
+			retired: true,
+			why:     "the Python flavor becomes requires-python, so the manifest carries all the tag said",
 		},
 		{
 			name:    "a tag that is not a runtime version",
@@ -597,7 +597,7 @@ func TestAdoptMergesRequirementsWithoutTouchingExistingPins(t *testing.T) {
 
 	assert.Equal(t, manifest.DistName("python-dateutil"), manifest.DistName("Python_DateUtil==2.8.2"),
 		"the normalization the dedup relies on")
-	assert.Contains(t, strings.Join(res.Updated, "\n"), "migrated 1 from requirements.txt")
+	assert.Contains(t, strings.Join(res.Updated, "\n"), "moved in 1 package from requirements.txt")
 }
 
 // packages.txt is carried into a manifest that has another tool's packages key,
@@ -703,35 +703,22 @@ func TestAirflowExtrasAreReportedWhenDropped(t *testing.T) {
 	}
 }
 
-// A Dockerfile that does more than name a base image is still reported, even
-// when its tag parses cleanly.
-//
-// Removing the unconditional "Dockerfile: not read" entry from leftovers —
-// correct, since the tag IS read now — meant a Dockerfile with real build steps
-// went unmentioned entirely, which is a worse answer than the one it replaced.
-func TestDockerfileBuildStepsAreReported(t *testing.T) {
+// A Dockerfile that does more than name a base image keeps its steps, word for
+// word, after the line that moves it onto the install base.
+func TestDockerfileBuildStepsSurviveTheMove(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(
-		"FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"+
-			"RUN apt-get install -y unixodbc-dev\n"+
-			"COPY certs/ /usr/local/share/ca-certificates/\n"+
-			"ENV PYTHONPATH=/usr/local/airflow\n"), 0o600))
+	steps := "RUN apt-get install -y unixodbc-dev\n" +
+		"COPY certs/ /usr/local/share/ca-certificates/\n" +
+		"ENV PYTHONPATH=/usr/local/airflow\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"+steps), 0o600))
 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 	assert.Equal(t, "3.1", res.AirflowVersion, "the tag is still read")
-	joined := strings.Join(res.Notes, "\n")
-	assert.Contains(t, joined, "RUN, COPY, ENV")
-	// The instructions are named; their arguments are the user's own.
-	assert.NotContains(t, joined, "unixodbc-dev")
-
-	// A Dockerfile that only names a base image has nothing to report.
-	plain := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(plain, "Dockerfile"),
-		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"), 0o600))
-	res, err = Run(plain, Options{})
+	got, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
 	require.NoError(t, err)
-	assert.NotContains(t, strings.Join(res.Notes, "\n"), "instructions were not read")
+	assert.Equal(t, installBaseHeader+"FROM localhost/astro-base\n"+projectCopy+"\n\n"+steps, string(got))
+	assert.Empty(t, res.Notes)
 }
 
 // A secret the Dockerfile mounts gets a note with the build-secrets entry to
@@ -745,8 +732,8 @@ func TestDockerfileSecretMountsAreReported(t *testing.T) {
 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
-	assert.Contains(t, res.Notes, `Dockerfile: line 2 mounts build secret "netrc". To build without --build-secret each time, `+
-		`add 'id=netrc,env=<VAR>' to build-secrets under [tool.astro], where <VAR> is the environment variable that holds it`)
+	assert.Contains(t, res.Notes, "Dockerfile: line 2 mounts the build secret netrc. To pass it on every build, "+
+		"add build-secrets = ['id=netrc,src=~/.netrc'] to the Astro settings in pyproject.toml")
 	pyproject, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	assert.NotContains(t, string(pyproject), "build-secrets")
@@ -768,8 +755,8 @@ func TestGreenfieldReportsWhatItMigrated(t *testing.T) {
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 	joined := strings.Join(res.Created, "\n")
-	assert.Contains(t, joined, "migrated 2 from requirements.txt")
-	assert.Contains(t, joined, "migrated packages.txt")
+	assert.Contains(t, joined, "moved in 2 packages from requirements.txt")
+	assert.Contains(t, joined, "moved in the apt packages from packages.txt")
 	assert.Contains(t, joined, "read Airflow 3.1 from the Dockerfile")
 }
 
@@ -1056,9 +1043,8 @@ func TestKeptDockerfilePipInstallsAreReported(t *testing.T) {
 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
-	assert.Contains(t, res.Notes, "Dockerfile: its RUN steps install "+
-		"\"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3\". "+
-		"Standalone mode and astro local check do not have it unless you add it to [project] dependencies")
+	assert.Contains(t, res.Notes, "Dockerfile: a pip step installs example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3. "+
+		"For standalone mode too, run: uv add 'example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3'")
 	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.NotContains(t, strings.Join(m.Project.Dependencies, "\n"), "example-lib", "the note reports; it does not add")

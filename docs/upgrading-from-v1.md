@@ -12,7 +12,7 @@ astro init
 
 `astro init` converts a 1.x project in place (see [A project is a `pyproject.toml`](#a-project-is-a-pyprojecttoml) and [install.md](install.md#step-4-check-the-conversion-and-finish-it)). Until a project is converted, `astro deploy` in it fails with `this project uses the Astro CLI 1.x layout …, and Astro CLI v2 deploys only pyproject.toml projects. Convert it with astro init, or deploy it with Astro CLI 1.x`, and `astro dev` commands point at `astro init` too. `astro deploy --image-name` too: a prebuilt image deployed from a 1.x checkout would leave its DAGs stale. Outside any project, `--image-name` deploys an image you already built, alone, with no DAGs.
 
-A conversion removes the 1.x files whose contents it carried: `requirements.txt` and `packages.txt` (unless a Dockerfile `init` keeps still installs them), `airflow_settings.yaml` once everything in it is carried, and a Dockerfile that only picks a base image. After that, Astro CLI 1.x no longer builds the project, so convert on a branch and move everyone who works on it to v2 together.
+A conversion removes the 1.x files whose contents it carried: `requirements.txt` and `packages.txt` (unless a Dockerfile `init` leaves on its ONBUILD tag still installs them), `airflow_settings.yaml` once everything in it is carried, and a Dockerfile that only picks a base image. After that, Astro CLI 1.x no longer builds the project, so convert on a branch and move everyone who works on it to v2 together.
 
 `init` stores the connection and variable values in `airflow_settings.yaml` in the encrypted vault, whose key is in your OS keyring. On a machine with no reachable keyring (headless Linux, most CI), converting a project whose `airflow_settings.yaml` holds values fails, saying the keyring is unreachable, before it writes anything. Run `astro init` where a keyring is available, such as your own machine.
 
@@ -29,7 +29,18 @@ A v2 project is a directory whose `pyproject.toml` has a `[tool.astro]` table. T
 - `airflow_settings.yaml` connections and variables go into the encrypted vault, and its pools go into `[tool.astro.pools]`;
 - a deploy target saved in `.astro/config.yaml` becomes a linked Deployment when the file holds both a Deployment id (`project.deployment`) and its workspace (`project.workspace`): an Astro link, or under an Astro Private Cloud context an `apc` link on that context's domain. `astro deploy --save` writes only the first. Under an Astro Private Cloud context `init` takes the workspace from the context's current one, where 1.x looked the saved id up, and links it (if that is the wrong workspace, `astro deploy` says the Deployment is not in it, and `astro link add default --deployment <id> --workspace <workspace-id> --replace` fixes the link); on Astro, and with no current workspace, `init` leaves a note saying the Deployment was not linked, with the `astro link add` and `astro link default` commands that link it.
 
-A Dockerfile that only picks a base image is dropped (an Airflow 2 build such as `astro-runtime:12.6.0` is kept as `[tool.astro] runtime`), and any other Dockerfile is kept as the project's build. `init` ends by listing anything it could not carry. Step by step: [install.md](install.md).
+A Dockerfile that only picks a base image is dropped, the runtime build, Python flavor and mirror its tag named recorded in `pyproject.toml` (`[tool.astro] runtime`, `requires-python`, `[tool.astro] registry`). A Dockerfile that does more is kept as the project's build. On an Astro Runtime ONBUILD tag, its final stage moves onto the install base the CLI builds from `pyproject.toml` and `uv.lock`, and its own steps follow unchanged:
+
+```dockerfile
+# Built on the install base the Astro CLI makes from pyproject.toml and uv.lock.
+# Build with astro package or astro deploy, or run astro package --base first.
+FROM localhost/astro-base
+COPY --chown=astro:0 . .
+
+# The project's own steps.
+```
+
+Any other Dockerfile is left exactly as it is and builds as written, keeping `requirements.txt` and `packages.txt` when its base still installs them: one on a pinned digest, a `-slim` or `-ubi9` flavor, a floating Airflow 2 tag, an earlier stage on an ONBUILD tag, or one that reads `requirements.txt` or `packages.txt` itself. A `pip install` in the Dockerfile stays there; `init` prints the `uv add` that gives standalone mode the same package. `init` ends by listing anything it could not carry. Step by step: [install.md](install.md).
 
 ### Local Airflow without Docker: `astro local`
 
