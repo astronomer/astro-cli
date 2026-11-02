@@ -373,7 +373,7 @@ func TestHoustonBase(t *testing.T) {
 		{"Airflow 2 below 2.7", imagebuild.ManifestBuild{AirflowVersion: "2.6"}, houston.RuntimeReleases{{Version: "8.8.0", AirflowVersion: "2.6.3"}}, "", "needs Airflow 2.7 or later"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := houstonBase(listedReleases(tc.listed), offline)(context.Background(), tc.build)
+			got, err := houstonBase(listedReleases(tc.listed), offline, nil)(context.Background(), tc.build)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)

@@ -20,6 +20,8 @@ func TestPlanCarriesEveryManifestBuildField(t *testing.T) {
 		AirflowVersion: "3.1",
 		Runtime:        "3.1-2",
 		Registry:       "registry.example.com/astronomer",
+		LockedRuntime:  "3.1-2",
+		LockedAirflow:  "3.1.2+astro.1",
 		RequiresPython: "==3.13.*",
 		Dockerfile:     "docker/Dockerfile",
 		Dependencies:   []string{"apache-airflow==3.1.*", "pandas"},

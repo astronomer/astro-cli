@@ -74,6 +74,14 @@ type ManifestBuild struct {
 	// Registry is [tool.astro] registry, the mirror the runtime base is
 	// pulled from in place of Astronomer's own registry, or "" for none.
 	Registry string
+	// LockedRuntime is the runtime version the project's uv.lock was made
+	// for, as pyproject.toml records it ([tool.uv], manifest.UV.RuntimeBuild),
+	// or "" when there is no record. With no Runtime, an image builds on it
+	// while the Airflow requirement still covers LockedAirflow.
+	LockedRuntime string
+	// LockedAirflow is the Airflow the lock installs, by the +astro pin
+	// pyproject.toml holds for it ("3.3.2+astro.1"), or "".
+	LockedAirflow string
 	// RequiresPython is [project] requires-python. A generated image runs the
 	// newest Python of its runtime build that it admits, preferring the
 	// build's default (imagebuild.RuntimeImageForPython).
@@ -102,6 +110,8 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 		AirflowVersion: p.AirflowVersion,
 		Runtime:        p.Runtime,
 		Registry:       p.Registry,
+		LockedRuntime:  p.LockedRuntime,
+		LockedAirflow:  p.LockedAirflow,
 		RequiresPython: p.RequiresPython,
 		Dockerfile:     p.Dockerfile,
 		Dependencies:   p.Dependencies,
@@ -118,6 +128,8 @@ func (p *Plan) SetManifestBuild(mb ManifestBuild) {
 	p.AirflowVersion = mb.AirflowVersion
 	p.Runtime = mb.Runtime
 	p.Registry = mb.Registry
+	p.LockedRuntime = mb.LockedRuntime
+	p.LockedAirflow = mb.LockedAirflow
 	p.RequiresPython = mb.RequiresPython
 	p.Dockerfile = mb.Dockerfile
 	p.Dependencies = mb.Dependencies

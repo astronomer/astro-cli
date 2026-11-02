@@ -38,6 +38,8 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 		AirflowVersion: airflow.Pin,
 		Runtime:        airflow.Runtime,
 		Registry:       m.Astro.Registry,
+		LockedRuntime:  m.UV.RuntimeBuild,
+		LockedAirflow:  lockedAirflow(m.UV.ConstraintDependencies),
 		RequiresPython: m.Project.RequiresPython,
 		Dockerfile:     m.Astro.Dockerfile,
 		Dependencies:   deps,
@@ -81,7 +83,7 @@ type BaseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // deploy), Bin, Env, and Secrets. A generated build reads only the
 // manifest.RuntimeSecretID secret.
 func ForManifest(m ManifestBuild, catalog func() *runtimeversions.Catalog) (Request, error) {
-	return ForManifestWith(context.Background(), m, CatalogBase(catalog))
+	return ForManifestWith(context.Background(), m, lockedBase(CatalogBase(catalog)))
 }
 
 // CatalogBase is ForManifest's base: RuntimeImageForPython over catalog, for
@@ -116,9 +118,9 @@ const (
 func ForLocalManifest(ctx context.Context, m ManifestBuild, o runtimeversions.Options) (Request, error) {
 	// Local start runs the project mounted, so its image holds the
 	// dependencies alone.
-	return forManifestWith(ctx, m, mounted, func(ctx context.Context, m ManifestBuild) (string, error) {
+	return forManifestWith(ctx, m, mounted, lockedBase(func(ctx context.Context, m ManifestBuild) (string, error) {
 		return LocalRuntimeImageWith(ctx, m.AirflowVersion, m.Runtime, m.RequiresPython, o)
-	})
+	}))
 }
 
 // forManifestWith is the rule ForManifest and ForLocalManifest share, with a
