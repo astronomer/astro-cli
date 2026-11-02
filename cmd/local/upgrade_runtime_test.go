@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -82,7 +83,7 @@ func TestUpgradeRuntimeWritesTheBuildRefreshesConstraintsAndLocks(t *testing.T) 
 	assert.Equal(t, 1, rd.locks)
 	out := rd.stdout.String()
 	for _, want := range []string{
-		"Runtime: no build -> 3.3-10 in " + rd.path,
+		"Runtime: none -> 3.3-10 in " + rd.path,
 		"  Airflow: 3.3.2",
 		"  Python: 3.13",
 		"  pyproject.toml: updated",
@@ -119,7 +120,7 @@ func TestUpgradeRuntimeWithNoBuildPicksTheNewestOfTheSeries(t *testing.T) {
 	rd.d.RuntimeCatalog = nil
 	err := execute(t, rd.d, "local", "upgrade", "runtime")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Pass a build instead")
+	assert.Contains(t, err.Error(), "Pass a version instead")
 }
 
 // A build newer than the newest published one (the catalog dates it ahead,
@@ -152,6 +153,27 @@ func TestUpgradeRuntimePicksAPython(t *testing.T) {
 	assert.Contains(t, readText(t, rd.path), "requires-python = '==3.14.*'")
 	assert.Equal(t, []string{"3.3-10/3.14"}, rd.asked, "the constraints follow the Python picked")
 	assert.Contains(t, rd.stdout.String(), "  requires-python: ==3.14.*")
+}
+
+// A project pinned to one Python (a converted -python-3.12 image, say) keeps
+// it without --python, and the constraints follow it, not the runtime version's
+// default; a runtime version that does not ship it is refused, writing nothing.
+func TestUpgradeRuntimeKeepsAPinnedPython(t *testing.T) {
+	rd := newRefreshDeps(t, buildManifest)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10", "--python", "3.12"))
+	rd.asked = nil
+	rd.stdout.Reset()
+
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10"))
+	assert.Contains(t, readText(t, rd.path), "requires-python = '==3.12.*'")
+	assert.NotContains(t, rd.stdout.String(), "requires-python:")
+
+	before := readText(t, rd.path)
+	err := execute(t, rd.d, "local", "upgrade", "runtime", "3.4-1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "3.13, 3.14")
+	assert.Contains(t, err.Error(), "--python")
+	assert.Equal(t, before, readText(t, rd.path))
 }
 
 // A yanked build is allowed, as the manifest checks allow it, and warned
@@ -192,7 +214,7 @@ func TestUpgradeRuntimeRefusesAFloatingTag(t *testing.T) {
 	rd := newRefreshDeps(t, buildManifest)
 	err := execute(t, rd.d, "local", "upgrade", "runtime", "3.3")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not one build like 3.3-10")
+	assert.Contains(t, err.Error(), "not one runtime version like 3.3-10")
 	assert.Equal(t, buildManifest, readText(t, rd.path))
 	assert.Zero(t, rd.locks)
 }
@@ -221,4 +243,111 @@ func TestUpgradeAirflowSaysWhenTheConstraintsCouldNotBeRead(t *testing.T) {
 	require.NoError(t, execute(t, rd.d, "local", "upgrade", "airflow", "3.4"))
 	assert.Contains(t, rd.stderr.String(), "the runtime's constraints in [tool.uv] were not refreshed: cdn.astronomer.io: timeout")
 	assert.Equal(t, 1, rd.locks, "the requirement moved, so the lock still follows it")
+}
+
+// A project with no runtime line already follows the newest runtime version of
+// its series, so a bare upgrade leaves it so: nothing is pinned, the runtime
+// version it gets is named, and the constraints and lock follow that runtime
+// version.
+func TestUpgradeRuntimeWithNoBuildLeavesAFloatingProjectFloating(t *testing.T) {
+	rd := newRefreshDeps(t, buildManifest)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime"))
+	got := readText(t, rd.path)
+	assert.NotContains(t, got, "runtime = ")
+	assert.Equal(t, []string{"3.3-10/3.13"}, rd.asked)
+	assert.Equal(t, 1, rd.locks)
+	assert.Contains(t, rd.stdout.String(), "This project follows the newest runtime version for its Airflow, 3.3-10, Airflow 3.3.2. Nothing was pinned")
+
+	rd = newRefreshDeps(t, buildManifest)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "-o", "json"))
+	var res map[string]any
+	require.NoError(t, json.Unmarshal(rd.stdout.Bytes(), &res))
+	assert.Equal(t, true, res["floating"])
+	assert.Equal(t, "3.3-10", res["target"])
+	assert.Equal(t, false, res["changed"])
+
+	rd = newRefreshDeps(t, buildManifest)
+	err := execute(t, rd.d, "local", "upgrade", "runtime", "--python", "3.12")
+	require.ErrorContains(t, err, "would pin this project")
+	assert.Equal(t, buildManifest, readText(t, rd.path))
+}
+
+// An exact requirement holds a bare upgrade to runtime versions of that Airflow
+// patch, and the command says when a newer patch is out.
+func TestUpgradeRuntimeWithNoBuildKeepsAnExactAirflow(t *testing.T) {
+	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.1", 1) + "runtime = '3.3-3'\n"
+	rd := newRefreshDeps(t, src)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime"))
+	got := readText(t, rd.path)
+	assert.Contains(t, got, "runtime = '3.3-7'", "the newest build carrying 3.3.1")
+	assert.Contains(t, got, "'apache-airflow==3.3.1'")
+	assert.Contains(t, rd.stdout.String(), "Airflow 3.3.2 is out: run astro local upgrade airflow 3.3.2")
+
+	rd = newRefreshDeps(t, src)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10"))
+	assert.Contains(t, readText(t, rd.path), "'apache-airflow==3.3.2'", "a named build still moves the pin")
+}
+
+// A project whose own Dockerfile picks the image is refused with no runtime
+// version named too, as with one: its FROM line, not a runtime line, is what to
+// move.
+func TestUpgradeRuntimeWithNoBuildRefusesADeclaredDockerfile(t *testing.T) {
+	src := buildManifest + "dockerfile = 'Dockerfile'\n"
+	rd := newRefreshDeps(t, src)
+	require.NoError(t, os.WriteFile(filepath.Join(filepath.Dir(rd.path), "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.3-7\n"), 0o600))
+
+	err := execute(t, rd.d, "local", "upgrade", "runtime")
+	require.ErrorContains(t, err, "so its FROM line picks the runtime")
+	assert.Equal(t, src, readText(t, rd.path))
+	assert.Zero(t, rd.locks)
+}
+
+// A floating project's bare upgrade holds requires-python to the runtime
+// version it gets, as a named runtime version does, and says which Python that
+// runtime version runs.
+func TestUpgradeRuntimeWithNoBuildChecksThePython(t *testing.T) {
+	rd := newRefreshDeps(t, buildManifest)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "-o", "json"))
+	var res map[string]any
+	require.NoError(t, json.Unmarshal(rd.stdout.Bytes(), &res))
+	assert.Equal(t, "3.13", res["python"])
+
+	src := strings.Replace(strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.4.*", 1), ">=3.12", "==3.12.*", 1)
+	rd = newRefreshDeps(t, src)
+	err := execute(t, rd.d, "local", "upgrade", "runtime")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "3.13, 3.14")
+	assert.Contains(t, err.Error(), "--python")
+	assert.Equal(t, src, readText(t, rd.path))
+	assert.Zero(t, rd.locks)
+}
+
+// A bare upgrade never moves a runtime line back, even when the runtime version
+// it names carries another patch than an exact requirement: it stays, and the
+// catalog's finding says so.
+func TestUpgradeRuntimeWithNoBuildNeverMovesBackForAnExactAirflow(t *testing.T) {
+	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.1", 1) + "runtime = '3.3-10'\n"
+	rd := newRefreshDeps(t, src)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime"))
+	assert.Contains(t, readText(t, rd.path), "runtime = '3.3-10'")
+	assert.Contains(t, rd.stdout.String(), "The runtime is already 3.3-10.")
+	assert.Contains(t, rd.stderr.String(), "3.3.2")
+}
+
+// An exact requirement no published runtime version carries is pointed at the
+// patch that has one, rather than left with a bare catalog error.
+func TestUpgradeRuntimeWithNoBuildForAnExactAirflowPointsAtANewerPatch(t *testing.T) {
+	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.0", 1)
+	rd := newRefreshDeps(t, src)
+	err := execute(t, rd.d, "local", "upgrade", "runtime")
+	require.ErrorContains(t, err, "no runtime version ships Airflow 3.3.0; run astro local upgrade airflow 3.3.2 to move to one")
+}
+
+// What the catalog says is said of the runtime version written, not of the
+// argument as typed.
+func TestUpgradeRuntimeFindingsAreOfTheBuildWritten(t *testing.T) {
+	rd := newRefreshDeps(t, buildManifest)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", " 3.3-8 "))
+	assert.Contains(t, readText(t, rd.path), "runtime = '3.3-8'")
+	assert.Contains(t, rd.stderr.String(), "bad scheduler")
 }
