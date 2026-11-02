@@ -451,3 +451,11 @@ func TestParseForRepair(t *testing.T) {
 		t.Errorf("a clean manifest reports something to repair")
 	}
 }
+
+func TestAirflowExact(t *testing.T) {
+	for pin, want := range map[string]bool{"3": false, "3.3": false, "3.3.2": true, "": false} {
+		if got := (Airflow{Pin: pin}).Exact(); got != want {
+			t.Errorf("Airflow{Pin: %q}.Exact() = %v, want %v", pin, got, want)
+		}
+	}
+}

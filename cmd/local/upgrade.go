@@ -56,11 +56,20 @@ type runtimeUpgrade struct {
 	scaffold.RuntimeBuildChange
 	// Manifest is the pyproject.toml that was edited.
 	Manifest string `json:"manifest"`
-	// Target is the build picked from the runtime catalog when none was given.
-	// Empty when the caller named the build.
+	// Target is the runtime version picked from the runtime catalog when none
+	// was given. Empty when the caller named the runtime version.
 	Target string `json:"target,omitempty"`
-	// Findings are what the runtime catalog says about the build that the
-	// manifest checks warn about too: yanked, unlisted, or carrying another
+	// Floating reports a project with no [tool.astro] runtime line upgraded
+	// with no runtime version named: it is left following its series, and
+	// Target is the runtime version its image gets now. Nothing is written for
+	// it.
+	Floating bool `json:"floating,omitempty"`
+	// NewerAirflow is a newer Airflow patch than an exact requirement pins,
+	// which a newer runtime version of the series carries, when no runtime
+	// version was named: `astro local upgrade airflow` moves to it.
+	NewerAirflow string `json:"newer_airflow,omitempty"`
+	// Findings are what the runtime catalog says about the runtime version that
+	// the manifest checks warn about too: yanked, unlisted, or carrying another
 	// patch than an exact requirement pins.
 	Findings []runtimeFinding `json:"findings,omitempty"`
 	// Refresh is what followed the build into [tool.uv] and uv.lock.
@@ -189,21 +198,24 @@ const flagPython = "python"
 func newUpgradeRuntimeCmd(c *cli) *cobra.Command {
 	var python string
 	cmd := &cobra.Command{
-		Use:   "runtime [BUILD]",
-		Short: "Move this project to an Astro Runtime build",
-		Long: "Set this project's Astro Runtime build in pyproject.toml ([tool.astro] runtime), and move the " +
-			"apache-airflow requirement too when the build carries an Airflow it does not cover. Older builds " +
-			"are allowed, to match what a Deployment runs. With no build, use the newest build of the project's " +
-			"Airflow series in the runtime catalog.\n\n" +
+		Use:   "runtime [VERSION]",
+		Short: "Move this project to an Astro Runtime version",
+		Long: "Set this project's Astro Runtime version in pyproject.toml ([tool.astro] runtime), and move the " +
+			"apache-airflow requirement too when that version ships an Airflow it does not cover. Older versions " +
+			"are allowed, to match what a Deployment runs.\n\n" +
+			"With no version, a project with a runtime line moves it to the newest runtime version for its Airflow series in the " +
+			"runtime catalog, or for its exact Airflow when the requirement pins one (it says when a newer Airflow " +
+			"patch is out). A project with no runtime line already follows the newest runtime version for its series, so it " +
+			"keeps doing so: nothing is pinned, and the command says which version that is.\n\n" +
 			"--python picks the Python the image and the standalone environment run, through requires-python. " +
-			"Without it, the build's default Python is used.\n\n" +
+			"Without it, requires-python stays: a project pinned to one Python keeps it, and is refused on a runtime version that doesn't ship it; otherwise the runtime version's default Python is used.\n\n" +
 			"Afterwards the runtime's constraints in [tool.uv] are refreshed and uv.lock is relocked, so a deploy " +
-			"or astro package sees the new build without a local start. If Airflow is running, restart it.",
-		Example: "  # Move to the newest build of the project's Airflow series\n" +
+			"or astro package sees the new runtime version without a local start. If Airflow is running, restart it.",
+		Example: "  # Move to the newest runtime version for the project's Airflow\n" +
 			"  astro local upgrade runtime\n\n" +
-			"  # Move to a given build, older ones included\n" +
+			"  # Move to a given runtime version, older ones included\n" +
 			"  astro local upgrade runtime 3.3-5\n\n" +
-			"  # Move to a build and run it on Python 3.12\n" +
+			"  # Move to a runtime version and run it on Python 3.12\n" +
 			"  astro local upgrade runtime 3.3-10 --python 3.12",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -214,7 +226,7 @@ func newUpgradeRuntimeCmd(c *cli) *cobra.Command {
 			return c.runUpgradeRuntime(cmd.Context(), build, python)
 		},
 	}
-	cmd.Flags().StringVar(&python, flagPython, "", "Python version to run, like 3.12. Default: the build's default Python")
+	cmd.Flags().StringVar(&python, flagPython, "", "Python version to run, like 3.12. Default: the project's pinned Python, else the runtime version's default")
 	return cmd
 }
 
@@ -228,28 +240,30 @@ func (c *cli) runUpgradeRuntime(ctx context.Context, build, python string) error
 	if c.d.RuntimeCatalog != nil {
 		opts.Catalog = c.d.RuntimeCatalog(ctx)
 	}
-	target := ""
+	res := runtimeUpgrade{Manifest: filepath.Join(dir, manifest.Marker)}
+	keep := false
 	if build == "" {
-		if build, err = pickRuntimeTarget(opts.Catalog, currentPin(dir), currentRuntime(dir)); err != nil {
+		if build, keep, err = pickBareRuntime(dir, python, opts.Catalog, &res); err != nil {
 			return err
 		}
-		target = build
 	}
-	var change scaffold.RuntimeBuildChange
-	if _, err := watchManifest(dir, func(wrap func(run func() error) error) error {
-		change, err = scaffold.SetRuntimeBuildWith(dir, wrap, build, python, opts)
-		return err
-	}); err != nil {
-		return fmt.Errorf("setting the runtime build: %w", err)
+	if !res.Floating && !keep {
+		var change scaffold.RuntimeBuildChange
+		if _, err := watchManifest(dir, func(wrap func(run func() error) error) error {
+			change, err = scaffold.SetRuntimeBuildWith(dir, wrap, build, python, opts)
+			return err
+		}); err != nil {
+			return fmt.Errorf("setting the runtime version: %w", err)
+		}
+		res.RuntimeBuildChange = change
 	}
-	res := runtimeUpgrade{
-		RuntimeBuildChange: change,
-		Manifest:           filepath.Join(dir, manifest.Marker),
-		Target:             target,
-		Findings:           runtimeFindings(opts.Catalog, change.Runtime, currentPin(dir)),
-		Refresh:            c.refreshAfterUpgrade(ctx, dir),
+	written := res.Runtime
+	if res.Floating {
+		written = res.Target
 	}
-	res.RestartNeeded = (change.Changed || res.Refresh.changed()) && c.airflowRunning(dir)
+	res.Findings = runtimeFindings(opts.Catalog, written, currentPin(dir))
+	res.Refresh = c.refreshAfterUpgrade(ctx, dir)
+	res.RestartNeeded = (res.Changed || res.Refresh.changed()) && c.airflowRunning(dir)
 	if r.Format != cliout.FormatJSON {
 		for _, f := range res.Findings {
 			cliout.Warn(c.d.Stderr, f.Message)
@@ -259,44 +273,98 @@ func (c *cli) runUpgradeRuntime(ctx context.Context, build, python string) error
 	return r.Emit(res, func(w io.Writer) error { return renderRuntimeUpgrade(w, res) })
 }
 
-// pickRuntimeTarget is the build an upgrade with none given moves to: the
-// newest published build of the series pin names (of its generation, for a
-// pin naming only that). Published, so the build has an image to pull. A
-// current build of the series newer than that (one the catalog dates ahead,
-// or a cached copy predates) stays: an upgrade never moves a project back.
-func pickRuntimeTarget(catalog *runtimeversions.Catalog, pin, current string) (string, error) {
-	if catalog == nil {
-		return "", errors.New("could not read the runtime catalog to pick the newest build. " +
-			"Pass a build instead, like astro local upgrade runtime 3.3-10")
+// pickBareRuntime is the runtime version an upgrade with none named moves to,
+// filling res for it: a floating project is left floating, with the runtime
+// version it gets and the Python that runtime version runs; one already on the
+// newest runtime version for its Airflow keeps it (keep), so a bare upgrade
+// never moves the requirement or the runtime version back. A project whose own
+// Dockerfile picks the image is refused.
+func pickBareRuntime(dir, python string, catalog *runtimeversions.Catalog, res *runtimeUpgrade) (build string, keep bool, err error) {
+	m := repairManifest(dir)
+	if scaffold.OwnsBase(dir, m) {
+		return "", false, fmt.Errorf("setting the runtime version: %w", scaffold.DockerfilePicksRuntime(m.Astro.Dockerfile))
 	}
-	if pin == "" {
-		return "", fmt.Errorf("could not read the Airflow version %s pins, so there is no series to pick a build of. "+
-			"Pass a build instead, like astro local upgrade runtime 3.3-10", manifest.Marker)
+	current := m.Astro.Runtime
+	if build, res.NewerAirflow, err = pickRuntimeTarget(catalog, currentPin(dir), current); err != nil {
+		return "", false, err
 	}
-	series := manifest.Airflow{Pin: pin}.Series()
-	build, ok := catalog.NewestPublishedRuntimeFor(series)
+	res.Target = build
+	switch {
+	case current == "" && python != "":
+		return "", false, fmt.Errorf("--python with no runtime version would pin this project, which follows the newest runtime version for its series, to %s. "+
+			"Name the version to pin it (astro local upgrade runtime %s --python %s), or set requires-python in %s", build, build, python, manifest.Marker)
+	case current == "":
+		res.Floating = true
+	case build == current && python == "":
+		keep = true
+	default:
+		return build, false, nil
+	}
+	res.Previous, res.Runtime = current, current
+	rt, ok := catalog.Runtime(build)
 	if !ok {
-		return "", fmt.Errorf("the runtime catalog lists no build of Airflow %s", series)
+		return build, keep, nil
 	}
-	if t, ok := manifest.ParseRuntimeTag(current); ok && t.Build && t.Agrees(series) &&
-		runtimeversions.CompareRuntimes(current, build) > 0 {
-		return current, nil
+	res.AirflowVersion = rt.AirflowVersion
+	if res.Floating {
+		if res.Python, err = scaffold.RuntimePython(&rt, m.Project.RequiresPython, build); err != nil {
+			return "", false, fmt.Errorf("%w. Pin a runtime version and pick a Python with astro local upgrade runtime %s --python <version>", err, build)
+		}
 	}
-	return build, nil
+	return build, keep, nil
 }
 
-// currentRuntime is the [tool.astro] runtime the manifest in dir names, read
-// as for a repair. Empty when it names none or cannot be read.
-func currentRuntime(dir string) string {
-	data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
-	if err != nil {
-		return ""
+// pickRuntimeTarget is the runtime version an upgrade with none given moves to:
+// the newest published runtime version of the series pin names (of its
+// generation, for a pin naming only that), or of its exact Airflow when pin
+// names a patch (3.3.1), since the requirement holds the project to it.
+// Published, so the runtime version has an image to pull. A current runtime
+// version newer than that (one the catalog dates ahead, or a cached copy
+// predates) stays: an upgrade never moves a project back. newer is a newer
+// Airflow patch than an exact pin, which the series' newest runtime version
+// carries, or "".
+func pickRuntimeTarget(catalog *runtimeversions.Catalog, pin, current string) (build, newer string, err error) {
+	if catalog == nil {
+		return "", "", errors.New("could not read the runtime catalog to pick the newest runtime version. " +
+			"Pass a version instead, like astro local upgrade runtime 3.3-10")
 	}
-	m, err := manifest.ParseForRepair(data)
-	if err != nil {
-		return ""
+	if pin == "" {
+		return "", "", fmt.Errorf("could not read the Airflow version %s pins, so there is no series to pick a runtime version from. "+
+			"Pass a version instead, like astro local upgrade runtime 3.3-10", manifest.Marker)
 	}
-	return m.Astro.Runtime
+	airflow := manifest.Airflow{Pin: pin}
+	series := airflow.Series()
+	within := series
+	if airflow.Exact() {
+		within = pin
+	}
+	if airflow.Exact() {
+		if newest, ok := catalog.AirflowFor(series, ""); ok && runtimeversions.CompareRuntimes(newest, pin) > 0 {
+			newer = newest
+		}
+	}
+	build, ok := catalog.NewestPublishedRuntimeFor(within)
+	switch {
+	case !ok && newer != "":
+		return "", "", fmt.Errorf("no runtime version ships Airflow %s; run astro local upgrade airflow %s to move to one", pin, newer)
+	case !ok:
+		return "", "", fmt.Errorf("the runtime catalog lists no runtime version for Airflow %s", within)
+	}
+	if t, ok := manifest.ParseRuntimeTag(current); ok && t.Build && t.Agrees(series) && runtimeversions.CompareRuntimes(current, build) > 0 {
+		return current, newer, nil
+	}
+	return build, newer, nil
+}
+
+// repairManifest is the manifest in dir, read as for a repair. Empty when it
+// cannot be read: the edit that follows reports why.
+func repairManifest(dir string) *manifest.Manifest {
+	if data, err := os.ReadFile(filepath.Join(dir, manifest.Marker)); err == nil {
+		if m, err := manifest.ParseForRepair(data); err == nil {
+			return m
+		}
+	}
+	return &manifest.Manifest{}
 }
 
 // runtimeFindings is what the catalog says about build, as an image build's
@@ -327,14 +395,22 @@ type runtimeFinding struct {
 func renderRuntimeUpgrade(w io.Writer, res runtimeUpgrade) error {
 	var lines []string
 	if res.Target != "" && res.Changed {
-		lines = append(lines, fmt.Sprintf("Upgrading to %s (the newest build of the project's Airflow series in the runtime catalog)", res.Target))
+		lines = append(lines, fmt.Sprintf("Upgrading to %s (the newest runtime version for the project's Airflow in the runtime catalog)", res.Target))
 	}
-	if !res.Changed {
+	switch {
+	case res.Floating:
+		airflow := ""
+		if res.AirflowVersion != "" {
+			airflow = ", Airflow " + res.AirflowVersion
+		}
+		lines = append(lines, fmt.Sprintf("This project follows the newest runtime version for its Airflow, %s%s. "+
+			"Nothing was pinned: name a version to pin it, like astro local upgrade runtime %s.", res.Target, airflow, res.Target))
+	case !res.Changed:
 		lines = append(lines, fmt.Sprintf("The runtime is already %s.%s", res.Runtime, nothingChanged(res.Refresh)))
-	} else {
+	default:
 		from := res.Previous
 		if from == "" {
-			from = "no build"
+			from = "none"
 		}
 		lines = append(lines, fmt.Sprintf("Runtime: %s -> %s in %s", from, res.Runtime, res.Manifest))
 		// The Airflow the build runs, or the requirement's move to it: the
@@ -366,11 +442,14 @@ func renderRuntimeUpgrade(w io.Writer, res runtimeUpgrade) error {
 		lines = append(lines, "  Python: "+res.Python)
 	}
 	lines = append(lines, res.Refresh.lines()...)
+	if res.NewerAirflow != "" {
+		lines = append(lines, fmt.Sprintf("Airflow %s is out: run astro local upgrade airflow %s to move the requirement to it.", res.NewerAirflow, res.NewerAirflow))
+	}
 	if res.Airflow != nil {
 		lines = append(lines, "Not changed: providers and Dag code. Check them against the new Airflow.")
 	}
 	if res.RestartNeeded {
-		lines = append(lines, fmt.Sprintf("Airflow is still running the old build. Run %s when the project is ready.", replaceRestart))
+		lines = append(lines, fmt.Sprintf("Airflow is still running the old runtime version. Run %s when the project is ready.", replaceRestart))
 	}
 	_, err := io.WriteString(w, strings.Join(lines, "\n")+"\n")
 	return err
@@ -456,7 +535,7 @@ func (c *cli) runUpgradeAirflow(ctx context.Context, version string, withOtto bo
 		Available:        available,
 		Refresh:          c.refreshAfterUpgrade(ctx, dir),
 	}
-	res.RestartNeeded = (change.Changed || res.Refresh.changed()) && c.airflowRunning(dir)
+	res.RestartNeeded = (res.Changed || res.Refresh.changed()) && c.airflowRunning(dir)
 	c.warnRefresh(r, res.Refresh)
 	if err := r.Emit(res, func(w io.Writer) error { return renderAirflowUpgrade(w, res) }); err != nil {
 		return err
