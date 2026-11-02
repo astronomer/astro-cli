@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -154,6 +155,27 @@ func TestUpgradeRuntimePicksAPython(t *testing.T) {
 	assert.Contains(t, rd.stdout.String(), "  requires-python: ==3.14.*")
 }
 
+// A project pinned to one Python (a converted -python-3.12 image, say) keeps
+// it without --python, and the constraints follow it, not the build's
+// default; a build that does not ship it is refused, writing nothing.
+func TestUpgradeRuntimeKeepsAPinnedPython(t *testing.T) {
+	rd := newRefreshDeps(t, buildManifest)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10", "--python", "3.12"))
+	rd.asked = nil
+	rd.stdout.Reset()
+
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10"))
+	assert.Contains(t, readText(t, rd.path), "requires-python = '==3.12.*'")
+	assert.NotContains(t, rd.stdout.String(), "requires-python:")
+
+	before := readText(t, rd.path)
+	err := execute(t, rd.d, "local", "upgrade", "runtime", "3.4-1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "3.13, 3.14")
+	assert.Contains(t, err.Error(), "--python")
+	assert.Equal(t, before, readText(t, rd.path))
+}
+
 // A yanked build is allowed, as the manifest checks allow it, and warned
 // about with the catalog's reason.
 func TestUpgradeRuntimeWarnsAboutAYankedBuild(t *testing.T) {
@@ -221,4 +243,46 @@ func TestUpgradeAirflowSaysWhenTheConstraintsCouldNotBeRead(t *testing.T) {
 	require.NoError(t, execute(t, rd.d, "local", "upgrade", "airflow", "3.4"))
 	assert.Contains(t, rd.stderr.String(), "the runtime's constraints in [tool.uv] were not refreshed: cdn.astronomer.io: timeout")
 	assert.Equal(t, 1, rd.locks, "the requirement moved, so the lock still follows it")
+}
+
+// A project with no runtime line already follows the newest build of its
+// series, so a bare upgrade leaves it so: nothing is pinned, the build it gets
+// is named, and the constraints and lock follow that build.
+func TestUpgradeRuntimeWithNoBuildLeavesAFloatingProjectFloating(t *testing.T) {
+	rd := newRefreshDeps(t, buildManifest)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime"))
+	got := readText(t, rd.path)
+	assert.NotContains(t, got, "runtime = ")
+	assert.Equal(t, []string{"3.3-10/3.13"}, rd.asked)
+	assert.Equal(t, 1, rd.locks)
+	assert.Contains(t, rd.stdout.String(), "This project follows the newest build of its Airflow, so it builds on runtime 3.3-10, Airflow 3.3.2. Nothing was pinned")
+
+	rd = newRefreshDeps(t, buildManifest)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "-o", "json"))
+	var res map[string]any
+	require.NoError(t, json.Unmarshal(rd.stdout.Bytes(), &res))
+	assert.Equal(t, true, res["floating"])
+	assert.Equal(t, "3.3-10", res["target"])
+	assert.Equal(t, false, res["changed"])
+
+	rd = newRefreshDeps(t, buildManifest)
+	err := execute(t, rd.d, "local", "upgrade", "runtime", "--python", "3.12")
+	require.ErrorContains(t, err, "would pin this project")
+	assert.Equal(t, buildManifest, readText(t, rd.path))
+}
+
+// An exact requirement holds a bare upgrade to builds of that Airflow patch,
+// and the command says when a newer patch is out.
+func TestUpgradeRuntimeWithNoBuildKeepsAnExactAirflow(t *testing.T) {
+	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.1", 1) + "runtime = '3.3-3'\n"
+	rd := newRefreshDeps(t, src)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime"))
+	got := readText(t, rd.path)
+	assert.Contains(t, got, "runtime = '3.3-7'", "the newest build carrying 3.3.1")
+	assert.Contains(t, got, "'apache-airflow==3.3.1'")
+	assert.Contains(t, rd.stdout.String(), "Airflow 3.3.2 is out: run astro local upgrade airflow 3.3.2")
+
+	rd = newRefreshDeps(t, src)
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10"))
+	assert.Contains(t, readText(t, rd.path), "'apache-airflow==3.3.2'", "a named build still moves the pin")
 }
