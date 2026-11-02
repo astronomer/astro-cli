@@ -14,12 +14,12 @@ import (
 
 // ErrInvalidRuntimeBuild reports a value SetRuntimeBuildWith refused before
 // reading the manifest: not one Astro Runtime build.
-var ErrInvalidRuntimeBuild = errors.New("not an Astro Runtime build")
+var ErrInvalidRuntimeBuild = errors.New("not an Astro Runtime version")
 
 // ErrInvalidPython reports a Python SetRuntimeBuildWith cannot set: not a
 // minor like 3.13, one the build does not ship, or any Python for an Airflow 2
 // build, whose image runs its own.
-var ErrInvalidPython = errors.New("not a Python this runtime build runs")
+var ErrInvalidPython = errors.New("not a Python this runtime version runs")
 
 // pythonMinorRe is a Python minor version, as a caller names one.
 var pythonMinorRe = regexp.MustCompile(`^3\.\d+$`)
@@ -103,7 +103,7 @@ func newRuntimeBuildEdit(build, python string, opts AirflowPinOptions) (*runtime
 	e := &runtimeBuildEdit{build: strings.TrimSpace(build), python: python, opts: opts}
 	tag, ok := manifest.ParseRuntimeTag(e.build)
 	if !ok || !tag.Build {
-		return nil, fmt.Errorf("%w: %q is not one build like 3.3-10 or 13.11.0", ErrInvalidRuntimeBuild, e.build)
+		return nil, fmt.Errorf("%w: %q is not one runtime version like 3.3-10 or 13.11.0", ErrInvalidRuntimeBuild, e.build)
 	}
 	e.tag = tag
 	if opts.Catalog != nil {
@@ -225,9 +225,9 @@ func runtimeAirflowPin(current, build string, tag manifest.RuntimeTag, carried s
 	if carried == "" {
 		if tag.Major == "2" {
 			if !haveCatalog {
-				return "", fmt.Errorf("the runtime catalog could not be read, so which Airflow runtime %s carries cannot be told. Try again online", build)
+				return "", fmt.Errorf("the runtime catalog could not be read, so which Airflow runtime %s ships cannot be told. Try again online", build)
 			}
-			return "", fmt.Errorf("the runtime catalog lists no build %s, so which Airflow it carries cannot be told", build)
+			return "", fmt.Errorf("the runtime catalog lists no runtime version %s, so which Airflow it ships cannot be told", build)
 		}
 		if current != "" && tag.Agrees(current) {
 			return current, nil
@@ -236,8 +236,8 @@ func runtimeAirflowPin(current, build string, tag manifest.RuntimeTag, carried s
 		// catalog could have answered: refused when it was read, and made
 		// from the tag only offline.
 		if haveCatalog {
-			return "", fmt.Errorf("the runtime catalog lists no build %s, so the Airflow requirement is not moved to Airflow %s for it. "+
-				"Check the build, or move the requirement first with astro local upgrade airflow", build, tag.Series)
+			return "", fmt.Errorf("the runtime catalog lists no runtime version %s, so the Airflow requirement is not moved to Airflow %s for it. "+
+				"Check the version, or move the requirement first with astro local upgrade airflow", build, tag.Series)
 		}
 		return tag.Series, nil
 	}

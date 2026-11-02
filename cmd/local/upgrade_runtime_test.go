@@ -83,7 +83,7 @@ func TestUpgradeRuntimeWritesTheBuildRefreshesConstraintsAndLocks(t *testing.T) 
 	assert.Equal(t, 1, rd.locks)
 	out := rd.stdout.String()
 	for _, want := range []string{
-		"Runtime: no build -> 3.3-10 in " + rd.path,
+		"Runtime: none -> 3.3-10 in " + rd.path,
 		"  Airflow: 3.3.2",
 		"  Python: 3.13",
 		"  pyproject.toml: updated",
@@ -120,7 +120,7 @@ func TestUpgradeRuntimeWithNoBuildPicksTheNewestOfTheSeries(t *testing.T) {
 	rd.d.RuntimeCatalog = nil
 	err := execute(t, rd.d, "local", "upgrade", "runtime")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Pass a build instead")
+	assert.Contains(t, err.Error(), "Pass a version instead")
 }
 
 // A build newer than the newest published one (the catalog dates it ahead,
@@ -214,7 +214,7 @@ func TestUpgradeRuntimeRefusesAFloatingTag(t *testing.T) {
 	rd := newRefreshDeps(t, buildManifest)
 	err := execute(t, rd.d, "local", "upgrade", "runtime", "3.3")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not one build like 3.3-10")
+	assert.Contains(t, err.Error(), "not one runtime version like 3.3-10")
 	assert.Equal(t, buildManifest, readText(t, rd.path))
 	assert.Zero(t, rd.locks)
 }
@@ -255,7 +255,7 @@ func TestUpgradeRuntimeWithNoBuildLeavesAFloatingProjectFloating(t *testing.T) {
 	assert.NotContains(t, got, "runtime = ")
 	assert.Equal(t, []string{"3.3-10/3.13"}, rd.asked)
 	assert.Equal(t, 1, rd.locks)
-	assert.Contains(t, rd.stdout.String(), "This project follows the newest build of its Airflow, so it builds on runtime 3.3-10, Airflow 3.3.2. Nothing was pinned")
+	assert.Contains(t, rd.stdout.String(), "This project follows the newest runtime version for its Airflow, 3.3-10, Airflow 3.3.2. Nothing was pinned")
 
 	rd = newRefreshDeps(t, buildManifest)
 	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "-o", "json"))
@@ -337,7 +337,7 @@ func TestUpgradeRuntimeWithNoBuildForAnExactAirflowPointsAtANewerPatch(t *testin
 	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.0", 1)
 	rd := newRefreshDeps(t, src)
 	err := execute(t, rd.d, "local", "upgrade", "runtime")
-	require.ErrorContains(t, err, "no published build carries Airflow 3.3.0; run astro local upgrade airflow 3.3.2 to move to one")
+	require.ErrorContains(t, err, "no runtime version ships Airflow 3.3.0; run astro local upgrade airflow 3.3.2 to move to one")
 }
 
 // What the catalog says is said of the build written, not of the argument as
