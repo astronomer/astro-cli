@@ -190,7 +190,7 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 	// its label's, read below.
 	var req imagebuild.Request
 	if in.ImageName == "" {
-		if req, err = imagebuild.ForManifestWith(ctx, in.Build, houstonBase(listed, in.Catalog)); err != nil {
+		if req, err = imagebuild.ForManifestWith(ctx, in.Build, houstonBase(listed, in.Catalog, in.Warn)); err != nil {
 			return ManifestImageResult{}, err
 		}
 	}
@@ -562,6 +562,17 @@ func (l listedReleases) NewestFor(pin string) string {
 	return newest
 }
 
+// AirflowOf is the Airflow the platform lists for build, or "" when it does
+// not list it.
+func (l listedReleases) AirflowOf(build string) string {
+	for i := range l {
+		if l[i].Version == build {
+			return l[i].AirflowVersion
+		}
+	}
+	return ""
+}
+
 // houstonBase resolves a generated build's runtime base by local Docker
 // mode's rule (imagebuild.LocalRuntimeImageWith), so Airflow 2 from 2.7 and
 // Airflow 3 both build. With no [tool.astro] runtime it builds on the newest
@@ -572,14 +583,14 @@ func (l listedReleases) NewestFor(pin string) string {
 // catalog has; with that unreadable too, the deploy is refused, naming
 // [tool.astro] runtime. The offer half is deploybuild.OfferedBase, the rule
 // Astro's deploy follows over its own offer.
-func houstonBase(listed listedReleases, o runtimeversions.Options) imagebuild.BaseImageFunc {
+func houstonBase(listed listedReleases, o runtimeversions.Options, warn func(string)) imagebuild.BaseImageFunc {
 	return deploybuild.OfferedBase(listed, func(ctx context.Context, m imagebuild.ManifestBuild) (string, error) {
 		base, err := imagebuild.LocalRuntimeImageWith(ctx, m.AirflowVersion, m.Runtime, m.RequiresPython, o)
 		if err != nil && m.Runtime == "" && strings.HasPrefix(m.AirflowVersion, "2") {
 			return "", fmt.Errorf("the platform lists no Astro Runtime for Airflow %s, and the public runtime catalog gave none either: set [tool.astro] runtime in pyproject.toml to the runtime build to deploy: %w", m.AirflowVersion, err)
 		}
 		return base, err
-	})
+	}, warn)
 }
 
 // buildManifestImage builds the image a manifest deploy pushes, at

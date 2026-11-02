@@ -64,6 +64,10 @@ type Plan struct {
 	// [project] name (ManifestBuild.Name). Standalone ignores both.
 	Registry string
 	Name     string
+	// LockedRuntime and LockedAirflow are the runtime version uv.lock was made
+	// for and its Airflow (ManifestBuild.LockedRuntime, LockedAirflow).
+	// Standalone ignores both.
+	LockedRuntime, LockedAirflow string
 	// PythonVersion is the interpreter standalone asks uv for ("3.13"), or ""
 	// to let uv pick within requires-python. A caller sets it with
 	// imagebuild.StandalonePython: the Python a generated image of the same

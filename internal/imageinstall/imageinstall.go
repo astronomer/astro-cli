@@ -138,6 +138,13 @@ func (r Resolver) Fill(ctx context.Context, req *imagebuild.Request, warn func(s
 			}
 		}
 	}
+	var catalog *runtimeversions.Catalog
+	if r.Catalog != nil {
+		catalog = r.Catalog(ctx)
+	}
+	if err := airflowMismatch(exported, pyproject, in.baseInstalled, catalog, build, req.BaseImage); err != nil {
+		return err
+	}
 	if in.baseInstalled == nil {
 		warn(fmt.Sprintf("the package list of %s could not be read, so the image pins the project's own dependencies to uv.lock's versions and leaves the rest to the install", baseName(req.BaseImage)))
 	}
