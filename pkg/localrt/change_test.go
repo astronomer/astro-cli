@@ -1,6 +1,7 @@
 package localrt
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -237,6 +238,50 @@ func TestClassifyChangeWithoutAManifestRestarts(t *testing.T) {
 	for _, pair := range [][2]*manifest.Manifest{{nil, m}, {m, nil}, {nil, nil}} {
 		got := ClassifyChange(pair[0], pair[1], ModeStandalone)
 		require.Equal(t, ChangeRestart, got.Action)
-		require.Len(t, got.Reasons, 1)
+		require.Equal(t, []Reason{{Code: ReasonUncompared}}, got.Reasons)
 	}
+}
+
+// A caller that words reasons itself, as Desktop does, branches on the code
+// and the distribution, so those are part of the answer and not only the text.
+func TestClassifyChangeReasonCodes(t *testing.T) {
+	src := "\n[tool.uv.sources]\nmy-lib = { git = \"https://example.com/my-lib.git\" }\n"
+	before := pyproject(t, baseDeps, src)
+	after := pyproject(t, `"apache-airflow==3.2.*", "Pandas>=2.2", "my_lib"`, src+"\n[tool.uv]\noverride-dependencies = [\"pydantic<2\"]\n")
+	got := ClassifyChange(before, after, ModeStandalone)
+	require.Equal(t, []Reason{
+		{Code: ReasonAirflow},
+		{Code: ReasonRepinned, Dist: "pandas"},
+		{Code: ReasonSourced, Dist: "my-lib"},
+		{Code: ReasonUV},
+	}, got.Reasons)
+
+	docker := ClassifyChange(pyproject(t, baseDeps, ""), pyproject(t, baseDeps+`, "requests"`, "dockerfile = \"Dockerfile\"\n"), ModeDocker)
+	require.Equal(t, []Reason{{Code: ReasonImageDependencies}, {Code: ReasonDockerfile}}, docker.Reasons)
+}
+
+// Every code has its own words: one that fell through to the bare code would
+// print "uv" to a user.
+func TestReasonStringCoversEveryCode(t *testing.T) {
+	codes := []ReasonCode{
+		ReasonUncompared, ReasonRequiresPython, ReasonAirflow, ReasonImageDependencies,
+		ReasonRepinned, ReasonSourced, ReasonUV, ReasonEnv, ReasonWorkspace, ReasonPools,
+		ReasonPackages, ReasonDockerfile, ReasonRuntime, ReasonBuildSecrets,
+	}
+	seen := map[string]bool{}
+	for _, code := range codes {
+		s := Reason{Code: code, Dist: "pandas"}.String()
+		require.NotEqual(t, string(code), s)
+		require.False(t, seen[s], "two codes read %q", s)
+		seen[s] = true
+	}
+	require.Equal(t, "the requirement on pandas changed, and it is already installed in the running Airflow",
+		Reason{Code: ReasonRepinned, Dist: "pandas"}.String())
+}
+
+// The JSON a desktop frontend receives: codes, not sentences.
+func TestChangeJSON(t *testing.T) {
+	b, err := json.Marshal(Change{Action: ChangeRestart, Reasons: []Reason{{Code: ReasonRepinned, Dist: "pandas"}, {Code: ReasonUV}}})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"action":"restart","reasons":[{"code":"repinned","dist":"pandas"},{"code":"uv"}]}`, string(b))
 }

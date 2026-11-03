@@ -26,21 +26,96 @@ const (
 	ChangeRestart ChangeAction = "restart"
 )
 
+// ReasonCode names one thing that forced a restart. The values are stable, for
+// a caller that branches on them or words them itself, as Astro Desktop does
+// in the user's language; Reason.String is the CLI's English.
+type ReasonCode string
+
+const (
+	// ReasonUncompared: one side had no manifest to compare.
+	ReasonUncompared ReasonCode = "uncompared"
+	// ReasonRequiresPython: [project] requires-python changed.
+	ReasonRequiresPython ReasonCode = "requires-python"
+	// ReasonAirflow: apache-airflow, apache-airflow-core or the task SDK changed.
+	ReasonAirflow ReasonCode = "airflow"
+	// ReasonImageDependencies: dependencies changed in docker mode, where they
+	// are installed into the image.
+	ReasonImageDependencies ReasonCode = "image-dependencies"
+	// ReasonRepinned: the requirement on Reason.Dist, already installed in the
+	// running Airflow, changed.
+	ReasonRepinned ReasonCode = "repinned"
+	// ReasonSourced: Reason.Dist was added and has a [tool.uv.sources] entry,
+	// which a hot install cannot read.
+	ReasonSourced ReasonCode = "sourced"
+	// ReasonUV: [tool.uv] or the runtime record changed.
+	ReasonUV ReasonCode = "uv"
+	// ReasonEnv: [tool.astro.env] changed.
+	ReasonEnv ReasonCode = "env"
+	// ReasonWorkspace: the workspace, domain or organization env values are
+	// read from changed.
+	ReasonWorkspace ReasonCode = "workspace"
+	// ReasonPools: [tool.astro.pools] changed.
+	ReasonPools ReasonCode = "pools"
+	// ReasonPackages, ReasonDockerfile, ReasonRuntime and ReasonBuildSecrets:
+	// that [tool.astro] key changed in docker mode, where it shapes the image.
+	ReasonPackages     ReasonCode = "packages"
+	ReasonDockerfile   ReasonCode = "dockerfile"
+	ReasonRuntime      ReasonCode = "runtime"
+	ReasonBuildSecrets ReasonCode = "build-secrets"
+)
+
+// Reason is one thing that forced a restart.
+type Reason struct {
+	Code ReasonCode `json:"code"`
+	// Dist is the distribution a ReasonRepinned or ReasonSourced is about,
+	// normalized as manifest.DistName does. Empty for the other codes.
+	Dist string `json:"dist,omitempty"`
+}
+
+// String is the reason in the CLI's words.
+func (r Reason) String() string {
+	switch r.Code {
+	case ReasonUncompared:
+		return "the manifest could not be compared with the running one"
+	case ReasonRequiresPython:
+		return "requires-python changed"
+	case ReasonAirflow:
+		return "the Airflow requirement changed"
+	case ReasonImageDependencies:
+		return "dependencies changed, and docker mode installs them into the image"
+	case ReasonRepinned:
+		return fmt.Sprintf("the requirement on %s changed, and it is already installed in the running Airflow", r.Dist)
+	case ReasonSourced:
+		return fmt.Sprintf("%s comes from [tool.uv.sources], which a hot install cannot read", r.Dist)
+	case ReasonUV:
+		return "[tool.uv] changed how dependencies resolve"
+	case ReasonEnv:
+		return "[tool.astro.env] changed"
+	case ReasonWorkspace:
+		return "[tool.astro] workspace, domain or organization changed, which env values are read from"
+	case ReasonPools:
+		return "[tool.astro.pools] changed"
+	case ReasonPackages, ReasonDockerfile, ReasonRuntime, ReasonBuildSecrets:
+		return fmt.Sprintf("[tool.astro] %s changed", r.Code)
+	}
+	return string(r.Code)
+}
+
 // Change is ClassifyChange's answer.
 type Change struct {
-	Action ChangeAction
+	Action ChangeAction `json:"action"`
 	// Install are the requirements to hot install, as the new manifest writes
 	// them: every requirement of each distribution the new manifest added.
 	// Empty unless Action is ChangeHotInstall.
-	Install []string
+	Install []string `json:"install,omitempty"`
 	// Removed are requirements the new manifest no longer declares. A hot
 	// install leaves them in the environment, since uninstalling under a live
 	// scheduler is the reconcile HotInstall exists to avoid; they go at the
 	// next restart. Reported whatever the Action, so a caller can say so.
-	Removed []string
+	Removed []string `json:"removed,omitempty"`
 	// Reasons say why Action is ChangeRestart, one per thing that forced it,
 	// in manifest order. Empty otherwise.
-	Reasons []string
+	Reasons []Reason `json:"reasons,omitempty"`
 }
 
 // ClassifyChange decides what a project running in mode needs after its
@@ -73,59 +148,59 @@ type Change struct {
 // manifest change, so a watcher that sees one asks for a restart itself.
 func ClassifyChange(before, after *manifest.Manifest, mode Mode) Change {
 	if before == nil || after == nil {
-		return Change{Action: ChangeRestart, Reasons: []string{"the manifest could not be compared with the running one"}}
+		return Change{Action: ChangeRestart, Reasons: []Reason{{Code: ReasonUncompared}}}
 	}
 	if mode == "" {
 		mode = ModeStandalone
 	}
 	var c Change
-	restart := func(why string) { c.Reasons = append(c.Reasons, why) }
+	restart := func(code ReasonCode) { c.Reasons = append(c.Reasons, Reason{Code: code}) }
 
 	if before.Project.RequiresPython != after.Project.RequiresPython {
-		restart("requires-python changed")
+		restart(ReasonRequiresPython)
 	}
 	d := diffDependencies(before.Project.Dependencies, after.Project.Dependencies)
 	c.Removed = d.removed
 	if d.airflow {
-		restart("the Airflow requirement changed")
+		restart(ReasonAirflow)
 	}
 	if mode == ModeDocker {
 		if len(d.added) > 0 || len(d.changed) > 0 || len(d.removed) > 0 {
 			// The packages live in the image, so changing them is a rebuild.
-			restart("dependencies changed, and docker mode installs them into the image")
+			restart(ReasonImageDependencies)
 		}
 	} else {
 		c.Reasons = append(c.Reasons, notHotInstallable(&d, &after.UV)...)
 	}
 
 	if !uvEqual(&before.UV, &after.UV) {
-		restart("[tool.uv] changed how dependencies resolve")
+		restart(ReasonUV)
 	}
 	if !reflect.DeepEqual(before.Astro.Env, after.Astro.Env) {
-		restart("[tool.astro.env] changed")
+		restart(ReasonEnv)
 	} else if len(after.Astro.Env) > 0 && !sameWorkspace(&before.Astro, &after.Astro) {
 		// A source = "workspace" value is read from the workspace these name,
 		// so a re-link changes the values without touching the env table.
-		restart("[tool.astro] workspace, domain or organization changed, which env values are read from")
+		restart(ReasonWorkspace)
 	}
 	if !reflect.DeepEqual(before.Astro.Pools, after.Astro.Pools) {
-		restart("[tool.astro.pools] changed")
+		restart(ReasonPools)
 	}
 	if mode == ModeDocker {
 		// Standalone has no image: it warns about packages and ignores the
 		// Dockerfile, the runtime build and its secrets.
 		b, a := &before.Astro, &after.Astro
 		if !slices.Equal(b.Packages, a.Packages) {
-			restart("[tool.astro] packages changed")
+			restart(ReasonPackages)
 		}
 		if b.Dockerfile != a.Dockerfile {
-			restart("[tool.astro] dockerfile changed")
+			restart(ReasonDockerfile)
 		}
 		if b.Runtime != a.Runtime {
-			restart("[tool.astro] runtime changed")
+			restart(ReasonRuntime)
 		}
 		if !slices.Equal(b.BuildSecrets, a.BuildSecrets) {
-			restart("[tool.astro] build-secrets changed")
+			restart(ReasonBuildSecrets)
 		}
 	}
 
@@ -146,17 +221,17 @@ func ClassifyChange(before, after *manifest.Manifest, mode Mode) Change {
 // has, and an added package the project sources from somewhere uv pip cannot
 // see, since uv pip install reads no [tool.uv] table and would fetch whatever
 // public package has that name instead.
-func notHotInstallable(d *depDiff, uv *manifest.UV) []string {
-	var reasons []string
+func notHotInstallable(d *depDiff, uv *manifest.UV) []Reason {
+	var reasons []Reason
 	for _, dist := range d.changedDists {
 		if namesAirflowRuntime(dist) {
 			continue // the Airflow requirement is its own reason
 		}
-		reasons = append(reasons, fmt.Sprintf("the requirement on %s changed, and it is already installed in the running Airflow", dist))
+		reasons = append(reasons, Reason{Code: ReasonRepinned, Dist: dist})
 	}
 	for _, dist := range d.addedDists {
 		if hasSource(uv, dist) {
-			reasons = append(reasons, fmt.Sprintf("%s comes from [tool.uv.sources], which a hot install cannot read", dist))
+			reasons = append(reasons, Reason{Code: ReasonSourced, Dist: dist})
 		}
 	}
 	return reasons
