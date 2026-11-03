@@ -46,6 +46,10 @@ type Deps struct {
 
 	// Runtime is the pkg/localrt surface the commands call.
 	Runtime Runtime
+	// Watch is localrt's WatchProject, behind `astro local start --watch`.
+	// A field rather than a Runtime method, so the runtime fakes need not
+	// grow one. nil makes --watch refuse.
+	Watch func(ctx context.Context, o localrt.WatchOptions) error
 	// ProxyDir is where the proxy routes and the daemon's record live
 	// (proxydaemon.Dir), resolved once per run. Empty when there is no home
 	// directory: HomeErr then says why, and Runtime is a stand-in returning it.
@@ -270,7 +274,9 @@ func NewDeps() Deps {
 		d.Runtime = homelessRuntime{err: err}
 	} else {
 		d.ProxyDir = dir
-		d.Runtime = newRuntime(dir)
+		rt := newRuntime(dir)
+		d.Runtime = rt
+		d.Watch = rt.WatchProject
 	}
 	return d
 }

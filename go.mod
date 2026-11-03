@@ -143,7 +143,7 @@ require (
 	github.com/astronomer/astro-cli/pkg/platformversions v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/scaffold v0.0.0-00010101000000-000000000000
 	github.com/fatih/color v1.18.0
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/gofrs/flock v0.13.0
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect

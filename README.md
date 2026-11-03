@@ -38,6 +38,8 @@ That's it. `init` scaffolds an Astro project, `start` installs the right Airflow
 
 Airflow keeps running after you close the terminal. Stop it with `astro local stop`, or pass `--stop-with-session` at start to tie it to your terminal session instead.
 
+Edits to your Dags show up on their own. For dependencies, `astro local start --watch` stays in the foreground and keeps Airflow in step with `pyproject.toml` and `.env`: a package you add is installed into the running Airflow, and a change Airflow only reads at start (a re-pin, the Airflow version, the env) restarts it. Ctrl-C stops it.
+
 ## Why it feels different
 
 If you run Airflow today — open source on a hand-rolled compose file, MWAA, or Cloud Composer — this is the loop you've been missing:
@@ -58,7 +60,7 @@ If you run Airflow today — open source on a hand-rolled compose file, MWAA, or
 
 ```
 astro init            Make a directory an Astro project (run it in the Airflow repo you have)
-astro local start     Start local Airflow for this project (--docker, --port, --stop-with-session)
+astro local start     Start local Airflow for this project (--docker, --port, --stop-with-session, --watch)
 astro local stop      Stop it (--force, --clean)
 astro local restart   Stop and start
 astro local status    Show state, mode, and URL

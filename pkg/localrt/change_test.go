@@ -267,6 +267,7 @@ func TestReasonStringCoversEveryCode(t *testing.T) {
 		ReasonUncompared, ReasonRequiresPython, ReasonAirflow, ReasonImageDependencies,
 		ReasonRepinned, ReasonSourced, ReasonUV, ReasonEnv, ReasonWorkspace, ReasonPools,
 		ReasonPackages, ReasonDockerfile, ReasonRuntime, ReasonBuildSecrets,
+		ReasonDotenv, ReasonDockerfileEdited, ReasonHotInstallUnavailable,
 	}
 	seen := map[string]bool{}
 	for _, code := range codes {

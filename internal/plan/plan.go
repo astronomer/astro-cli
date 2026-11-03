@@ -105,6 +105,9 @@ type Built struct {
 	// updates once Airflow answers. They are not part of the Plan: the
 	// runtime starts Airflow, and the pools go in over its API afterwards.
 	Pools map[string]manifest.Pool
+	// Manifest is the manifest the plan was built from: what a watch of the
+	// started project compares its first edit with (localrt.WatchProject).
+	Manifest *manifest.Manifest
 }
 
 // Build discovers the project containing workingDir, loads and validates its
@@ -181,6 +184,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 		ManifestWarnings: m.Warnings,
 		Pools:            m.Astro.Pools,
 		Plan:             p,
+		Manifest:         m,
 	}, nil
 }
 
