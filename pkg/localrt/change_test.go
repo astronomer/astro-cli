@@ -55,10 +55,76 @@ func TestClassifyChange(t *testing.T) {
 			wantInstall: []string{"requests"},
 		},
 		{
-			name:       "a re-pinned package hot installs its new requirement",
+			name:       "a re-pinned package is a restart, since uv would replace it under the scheduler",
 			beforeDeps: baseDeps, afterDeps: `"apache-airflow==3.1.*", "pandas>=2.2"`,
-			wantAction:  ChangeHotInstall,
-			wantInstall: []string{"pandas>=2.2"},
+			wantAction: ChangeRestart, wantReasonsCount: 1,
+		},
+		{
+			name:       "a downgrade is a restart",
+			beforeDeps: baseDeps, afterDeps: `"apache-airflow==3.1.*", "pandas<2"`,
+			wantAction: ChangeRestart, wantReasonsCount: 1,
+		},
+		{
+			name:       "respacing a requirement is not a change",
+			beforeDeps: baseDeps, afterDeps: `"apache-airflow == 3.1.*", "pandas >= 2.1"`,
+			wantAction: ChangeNone,
+		},
+		{
+			name:       "a name's case and separators are not a change",
+			beforeDeps: baseDeps + `, "typing_extensions"`, afterDeps: `"Apache-Airflow==3.1.*", "Pandas>=2.1", "typing-extensions"`,
+			wantAction: ChangeNone,
+		},
+		{
+			name:       "respacing a marker outside its quotes is not a change",
+			beforeDeps: baseDeps + `, "pywin32; sys_platform == 'win32'"`, afterDeps: baseDeps + `, "pywin32;sys_platform=='win32'"`,
+			wantAction: ChangeNone,
+		},
+		{
+			name:       "an added package from a git source is a restart, since uv pip cannot read the source",
+			beforeDeps: baseDeps, afterDeps: baseDeps + `, "my_lib"`,
+			beforeTool: "\n[tool.uv.sources]\nmy-lib = { git = \"https://example.com/my-lib.git\" }\n",
+			afterTool:  "\n[tool.uv.sources]\nmy-lib = { git = \"https://example.com/my-lib.git\" }\n",
+			wantAction: ChangeRestart, wantReasonsCount: 1,
+		},
+		{
+			name:       "an added package from a path source is a restart",
+			beforeDeps: baseDeps, afterDeps: baseDeps + `, "my-lib"`,
+			beforeTool: "\n[tool.uv.sources]\nmy-lib = { path = \"../my-lib\" }\n",
+			afterTool:  "\n[tool.uv.sources]\nmy-lib = { path = \"../my-lib\" }\n",
+			wantAction: ChangeRestart, wantReasonsCount: 1,
+		},
+		{
+			name:       "an override changes how everything resolves",
+			beforeDeps: baseDeps, afterDeps: baseDeps,
+			afterTool:  "\n[tool.uv]\noverride-dependencies = [\"pydantic<2\"]\n",
+			wantAction: ChangeRestart, wantReasonsCount: 1,
+		},
+		{
+			name:       "a new default index changes how everything resolves",
+			beforeDeps: baseDeps, afterDeps: baseDeps,
+			afterTool:  "\n[tool.uv]\nindex-url = \"https://mirror.example.com/simple\"\n",
+			wantAction: ChangeRestart, wantReasonsCount: 1,
+		},
+		{
+			name:       "reordering constraints is not a change",
+			beforeDeps: baseDeps, afterDeps: baseDeps,
+			beforeTool: "\n[tool.uv]\nconstraint-dependencies = [\"urllib3<2\", \"idna>=3\"]\n",
+			afterTool:  "\n[tool.uv]\nconstraint-dependencies = [\"idna >= 3\", \"urllib3<2\"]\n",
+			wantAction: ChangeNone,
+		},
+		{
+			name:       "a re-linked workspace changes the env values read from it",
+			beforeDeps: baseDeps, afterDeps: baseDeps,
+			beforeTool: "workspace = \"ws-one\"\n[tool.astro.env.FOO]\ndefault = \"bar\"\n",
+			afterTool:  "workspace = \"ws-two\"\n[tool.astro.env.FOO]\ndefault = \"bar\"\n",
+			wantAction: ChangeRestart, wantReasonsCount: 1,
+		},
+		{
+			name:       "a re-linked workspace with no env is nothing Airflow reads",
+			beforeDeps: baseDeps, afterDeps: baseDeps,
+			beforeTool: "workspace = \"ws-one\"\n",
+			afterTool:  "workspace = \"ws-two\"\n",
+			wantAction: ChangeNone,
 		},
 		{
 			name:       "a provider is an ordinary package",
@@ -162,4 +228,15 @@ func TestClassifyChangeRestartCarriesNoInstall(t *testing.T) {
 	got := ClassifyChange(before, after, ModeStandalone)
 	require.Equal(t, ChangeRestart, got.Action)
 	require.Empty(t, got.Install)
+}
+
+// A watcher that has no manifest to compare must not panic, and must not
+// guess that nothing changed.
+func TestClassifyChangeWithoutAManifestRestarts(t *testing.T) {
+	m := pyproject(t, baseDeps, "")
+	for _, pair := range [][2]*manifest.Manifest{{nil, m}, {m, nil}, {nil, nil}} {
+		got := ClassifyChange(pair[0], pair[1], ModeStandalone)
+		require.Equal(t, ChangeRestart, got.Action)
+		require.Len(t, got.Reasons, 1)
+	}
 }
