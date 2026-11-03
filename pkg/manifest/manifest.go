@@ -84,6 +84,10 @@ func (m *Manifest) RemovedAirflowKey() string {
 // project's own environment itself; astro reads them for the scratch
 // environments it builds outside the project, which uv cannot see the project
 // from, so a check there resolves the way the project does.
+// AstronomerIndexName is the name of the [[tool.uv.index]] entry `astro init`
+// writes for Astronomer's builds of Airflow.
+const AstronomerIndexName = "astronomer"
+
 type UV struct {
 	// ConstraintDependencies is [tool.uv] constraint-dependencies: version
 	// limits on packages the project may pull in, without requiring them.
@@ -94,10 +98,11 @@ type UV struct {
 	// Sources maps a package to the [[tool.uv.index]] URL its
 	// [tool.uv.sources] entry names, for the entries that name an index.
 	Sources map[string]string
-	// DefaultIndex and DefaultIndexName are the URL and name of the
-	// [[tool.uv.index]] entry marked default = true, which serves every
-	// package no source routes elsewhere. Empty when there is none.
-	DefaultIndex, DefaultIndexName string
+	// AstronomerIndex is the URL of the [[tool.uv.index]] entry named
+	// AstronomerIndexName, the one `astro init` writes for Astronomer's
+	// builds, whether it is the project's default or explicit. Empty when
+	// there is none.
+	AstronomerIndex string
 	// DirectURLs maps a package to the PEP 508 URL its [tool.uv.sources]
 	// entry stands for, for the entries that name a git repository or a URL.
 	DirectURLs map[string]string
@@ -113,18 +118,21 @@ type UV struct {
 	ExcludeNewer string
 }
 
-// IndexPages are the per-package pages of the indexes Sources names, the
-// PEP 503 layout <index>/<package>/, for an install that happens outside the
-// project, where uv cannot read [tool.uv.sources]: a page lists one package's
-// files, so passing it as find-links scopes the index to that package the way
-// the source does.
+// IndexPages are the per-package pages, the PEP 503 layout
+// <index>/<package>/, of the indexes Sources names, and of Astronomer's index
+// (AstronomerIndex) for each Astronomer build the constraints pin (AstroPin)
+// that no source routes: a project with Astronomer's index as its default
+// needs no source for them. They are for an install that happens outside the
+// project, where uv cannot read [tool.uv.sources] or [[tool.uv.index]]: a page
+// lists one package's files, so passing it as find-links scopes the index to
+// that package the way the project's settings do.
 //
 //nolint:gocritic // a value receiver, as Astro Desktop calls it: UV outgrew the hugeParam limit after this shipped
 func (u UV) IndexPages() []string {
 	return u.indexPages(func(string) bool { return true })
 }
 
-// IndexPagesFor is IndexPages for the sources of deps alone: the page of each
+// IndexPagesFor is IndexPages for the packages of deps alone: the page of each
 // package a requirement in deps names, matched by distribution name
 // (DistName). An install that never asks for a package has no use for its
 // index, and reading the page anyway makes the install reach that index: a
@@ -141,9 +149,10 @@ func (u UV) IndexPagesFor(deps []string) []string {
 	return u.indexPages(func(pkg string) bool { return wanted[DistName(pkg)] })
 }
 
-// indexPages are the pages of the sources whose package keep accepts. With a
-// default index and no source for it, an Astronomer build the constraints pin
-// (AstroPin) is found on the default index, so its page there counts too.
+// indexPages are the pages of the sources whose package keep accepts, and of
+// Astronomer's index for the Astronomer builds the constraints pin that no
+// source routes. Only the index named AstronomerIndexName carries them: a
+// default index of the project's own (a mirror) may not.
 //
 //nolint:gocritic // a value receiver, as its callers have
 func (u UV) indexPages(keep func(pkg string) bool) []string {
@@ -151,7 +160,7 @@ func (u UV) indexPages(keep func(pkg string) bool) []string {
 	for pkg, index := range u.Sources {
 		where[pkg] = index
 	}
-	if u.DefaultIndex != "" {
+	if u.AstronomerIndex != "" {
 		for _, c := range u.ConstraintDependencies {
 			if !AstroPin(c) {
 				continue
@@ -164,7 +173,7 @@ func (u UV) indexPages(keep func(pkg string) bool) []string {
 			}
 			for _, pkg := range pkgs {
 				if where[pkg] == "" {
-					where[pkg] = u.DefaultIndex
+					where[pkg] = u.AstronomerIndex
 				}
 			}
 		}
@@ -793,8 +802,8 @@ func uvTable(t map[string]any) UV {
 		if name != "" && address != "" {
 			urls[name] = address
 		}
-		if isDefault, _ := index["default"].(bool); isDefault && address != "" {
-			out.DefaultIndex, out.DefaultIndexName = address, name
+		if name == AstronomerIndexName && address != "" {
+			out.AstronomerIndex = address
 		}
 	}
 	sources, _ := t["sources"].(map[string]any)

@@ -124,8 +124,8 @@ func TestInitWritesTheAstroBuild(t *testing.T) {
 	}
 }
 
-// A project adopted with a default index of its own keeps it, and init says
-// why Astronomer's index is routed per package instead.
+// A project adopted with an index of its own keeps it, and init says why
+// Astronomer's index is routed per package instead.
 func TestInitNotesAProjectsOwnDefaultIndex(t *testing.T) {
 	d, _ := testDeps(t)
 	stderr := &bytes.Buffer{}
@@ -150,7 +150,7 @@ func TestInitNotesAProjectsOwnDefaultIndex(t *testing.T) {
 	if !strings.Contains(string(data), "apache-airflow = {index = 'astronomer'}") {
 		t.Errorf("beside the project's own default index, Airflow is not routed to Astronomer's:\n%s", data)
 	}
-	if !strings.Contains(stderr.String(), "keeps its own default index, mirror") {
+	if !strings.Contains(stderr.String(), "not as the default index, because pyproject.toml lists its own index, mirror") {
 		t.Errorf("init did not say why:\n%s", stderr)
 	}
 }
@@ -175,5 +175,44 @@ func TestStartLeavesTheManifestAloneWhenTheIndexCannotBeRead(t *testing.T) {
 	}
 	if !strings.Contains(out, "has no build of it") || strings.Contains(out, "could not be read") {
 		t.Errorf("the start did not say the index has no build:\n%s", out)
+	}
+}
+
+// routedManifest is a project an earlier astro wrote with Astronomer's index
+// explicit and the Airflow distributions routed to it.
+const routedManifest = "[project]\nname = 'demo'\nrequires-python = '>=3.12'\n" +
+	"dependencies = ['apache-airflow==3.3.*', 'apache-airflow-core', 'apache-airflow-task-sdk']\n\n[tool.astro]\n\n" +
+	"[tool.uv]\nconstraint-dependencies = ['apache-airflow==3.3.2+astro.1', 'apache-airflow-task-sdk==1.3.2+astro.1']\n\n" +
+	"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\nexplicit = true\n\n" +
+	"[tool.uv.sources]\napache-airflow = { index = 'astronomer' }\napache-airflow-core = { index = 'astronomer' }\n" +
+	"apache-airflow-task-sdk = { index = 'astronomer' }\n"
+
+// A start keeps the layout a project has: moving it to the default index would
+// change every package's registry in uv.lock, which only an upgrade does.
+func TestStartKeepsARoutedProjectsLayout(t *testing.T) {
+	got, out := startWithBuild(t, routedManifest, build332, nil)
+
+	if !strings.Contains(got, "explicit = true") || !strings.Contains(got, "apache-airflow = { index = 'astronomer' }") {
+		t.Errorf("a start moved the project off its explicit index:\n%s", got)
+	}
+	if strings.Contains(out, "default index") {
+		t.Errorf("a start said something about the index it did not change:\n%s", out)
+	}
+}
+
+// An upgrade moves the project to the default index and says uv.lock's
+// registries change with it.
+func TestUpgradeMovesARoutedProjectToTheDefaultIndex(t *testing.T) {
+	rd := newRefreshDeps(t, routedManifest)
+	if err := execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10"); err != nil {
+		t.Fatalf("upgrade: %v", err)
+	}
+
+	got := readText(t, rd.path)
+	if !strings.Contains(got, "default = true") || strings.Contains(got, "[tool.uv.sources]") {
+		t.Errorf("the upgrade did not move the project to the default index:\n%s", got)
+	}
+	if !strings.Contains(rd.stderr.String(), "now has Astronomer's index as its default index, so uv.lock records it as every package's registry") {
+		t.Errorf("the upgrade did not say uv.lock's registries change:\n%s", rd.stderr)
 	}
 }

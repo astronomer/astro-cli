@@ -1634,8 +1634,8 @@ func TestIndexPagesFindTheAstroPinsOnTheDefaultIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m.UV.DefaultIndex != "https://pip.astronomer.io/v2/" || m.UV.DefaultIndexName != "astronomer" {
-		t.Errorf("DefaultIndex = %q (%q), want Astronomer's", m.UV.DefaultIndex, m.UV.DefaultIndexName)
+	if m.UV.AstronomerIndex != "https://pip.astronomer.io/v2/" {
+		t.Errorf("AstronomerIndex = %q, want Astronomer's", m.UV.AstronomerIndex)
 	}
 	want := []string{
 		"https://pip.astronomer.io/v2/apache-airflow/",
@@ -1647,6 +1647,22 @@ func TestIndexPagesFindTheAstroPinsOnTheDefaultIndex(t *testing.T) {
 	}
 	if got := m.UV.IndexPagesFor([]string{"pandas"}); len(got) != 0 {
 		t.Errorf("IndexPagesFor(no Airflow) = %#v, want none", got)
+	}
+}
+
+// A default index of the project's own (a mirror) is not where Astronomer's
+// builds are: an unrouted pin takes its page from the index named astronomer,
+// explicit here, and the mirror gives none.
+func TestIndexPagesTakeTheAstroPinsFromAstronomersIndexNotTheDefault(t *testing.T) {
+	m, err := Load(write(t, "[project]\nname = \"etl\"\ndependencies = [\"apache-airflow==3.3.*\"]\n\n[tool.astro]\n\n"+
+		"[tool.uv]\nconstraint-dependencies = [\"apache-airflow==3.3.2+astro.1\"]\n\n"+
+		"[[tool.uv.index]]\nname = \"mirror\"\nurl = \"https://mirror.example/simple\"\ndefault = true\n\n"+
+		"[[tool.uv.index]]\nname = \"astronomer\"\nurl = \"https://pip.astronomer.io/v2/\"\nexplicit = true\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"https://pip.astronomer.io/v2/apache-airflow/"}; !reflect.DeepEqual(m.UV.IndexPages(), want) {
+		t.Errorf("IndexPages() = %#v, want Astronomer's page only: %#v", m.UV.IndexPages(), want)
 	}
 }
 
