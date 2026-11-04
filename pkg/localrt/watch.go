@@ -267,6 +267,10 @@ type watchLoop struct {
 	// watchDir adds a project-relative directory to the watch. nil in tests
 	// that do not look.
 	watchDir func(rel string)
+	// onReady is called once the check of what changed while the start ran
+	// is done, before the first event is read. For tests, which must not
+	// edit the project before that check reads it. Optional.
+	onReady func()
 
 	// owed are the reasons of a restart that failed: whatever left Airflow
 	// down may be fixed in a file the watch does not read, so the next burst
@@ -286,8 +290,12 @@ func (w *watchLoop) run(ctx context.Context, names <-chan string, running *manif
 	// An edit made while the start ran happened before the watch began, so no
 	// event will report it: compare what is on disk with what was started.
 	running, carry := w.apply(ctx, []string{manifest.Marker}, running, true)
+	w.watchDockerfileDir(running)
 	for _, f := range carry {
 		pending[f] = true
+	}
+	if w.onReady != nil {
+		w.onReady()
 	}
 
 	var timer *time.Timer

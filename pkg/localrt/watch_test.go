@@ -86,12 +86,21 @@ func newLoopHarnessOnDisk(t *testing.T, mode Mode, running, onDisk *manifest.Man
 			h.watched = append(h.watched, rel)
 		},
 	}
+	// Edits a test makes must come after the check of what changed during
+	// the start, or that check would apply them instead of their events.
+	ready := make(chan struct{})
+	w.onReady = func() { close(ready) }
 	ctx, cancel := context.WithCancel(context.Background())
 	h.cancel = cancel
 	go func() {
 		defer close(h.done)
 		w.run(ctx, h.names, running)
 	}()
+	select {
+	case <-ready:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the watch loop never became ready")
+	}
 	t.Cleanup(func() {
 		cancel()
 		<-h.done
