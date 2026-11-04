@@ -58,6 +58,27 @@ builds:
       - amd64
       - arm64
     ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
+# Sign the macOS binaries with Astronomer's Developer ID Application certificate and
+# notarize them with Apple, so Gatekeeper and endpoint-security tools that trust by
+# Team ID accept each release without per-version allowlisting. goreleaser's quill
+# backend signs bare Mach-O binaries with the hardened runtime, before they are archived.
+# A bare binary can't carry a stapled ticket; Gatekeeper looks the ticket up online.
+# Disabled when the certificate is unset or empty (forks, local snapshots, and Actions,
+# which passes a missing secret as an empty string).
+notarize:
+  macos:
+    - enabled: '{{ ne (envOrDefault "MACOS_SIGN_P12" "") "" }}'
+      ids:
+        - darwin-build
+      sign:
+        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
+        password: "{{ .Env.MACOS_SIGN_PASSWORD }}"
+      notarize:
+        issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
+        key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
+        key: "{{ .Env.MACOS_NOTARY_KEY }}"
+        wait: true
+        timeout: 20m
 brews:
   - name: astro
     repository:
