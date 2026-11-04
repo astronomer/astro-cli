@@ -23,6 +23,48 @@ const DefaultWatchDebounce = 500 * time.Millisecond
 // dotenvFile is the env file both engines read at start.
 const dotenvFile = ".env"
 
+// WatchedFile is one file beside the manifest whose edits the running Airflow
+// needs a restart for. The manifest itself is not one: what an edit to it
+// needs is ClassifyChange's to decide.
+type WatchedFile struct {
+	// Path is the file's project-relative, slash-separated path, given the
+	// manifest the running Airflow reflects, or "" when there is none to
+	// watch: a Dockerfile the manifest does not declare. Required.
+	//
+	// A file, not a directory: the watch is not recursive.
+	Path func(m *manifest.Manifest) string
+	// Modes are the modes it is read in. Empty is every mode.
+	Modes []Mode
+	// Reason is what an edit to it restarts Airflow for. WatchProject sets
+	// its Path to the file's, so a caller wording an unfamiliar code can say
+	// which file changed.
+	Reason Reason
+}
+
+// builtinWatchedFiles are the files every watch acts on beside the manifest.
+var builtinWatchedFiles = []WatchedFile{
+	{Path: fixedPath(dotenvFile), Reason: Reason{Code: ReasonDotenv}},
+	{Path: declaredDockerfile, Modes: []Mode{ModeDocker}, Reason: Reason{Code: ReasonDockerfileEdited}},
+}
+
+// fixedPath is a WatchedFile.Path that does not depend on the manifest.
+func fixedPath(rel string) func(*manifest.Manifest) string {
+	return func(*manifest.Manifest) string { return rel }
+}
+
+// watchedPath is the path f watches in mode, given m: "" when f is not read in
+// mode or names no file in m.
+func watchedPath(f *WatchedFile, mode Mode, m *manifest.Manifest) string {
+	if len(f.Modes) > 0 && !slices.Contains(f.Modes, mode) {
+		return ""
+	}
+	p := f.Path(m)
+	if p == "" {
+		return ""
+	}
+	return filepath.ToSlash(filepath.Clean(filepath.FromSlash(p)))
+}
+
 // rescanAll stands in for every file a watch acts on, when the event queue
 // overflowed and which of them changed is unknown. Not a path: it contains a
 // NUL, which no file name can.
@@ -97,11 +139,15 @@ type WatchOptions struct {
 	OnEvent func(WatchEvent)
 	// Callbacks carry a hot install's output.
 	Callbacks Callbacks
+	// Files are watched beside the built-in ones (.env, and in docker mode a
+	// declared Dockerfile): a file a caller's own start reads, which an edit
+	// to should restart Airflow for. Each needs a Path.
+	Files []WatchedFile
 }
 
 // WatchProject keeps a running project's Airflow in step with edits to its
-// manifest, its .env and, in docker mode, a Dockerfile the manifest declares,
-// until ctx is done. It returns nil then, or an error only if it could not
+// manifest, its .env, in docker mode a Dockerfile the manifest declares, and
+// any file the caller adds (WatchOptions.Files), until ctx is done. It returns nil then, or an error only if it could not
 // begin watching.
 //
 // Each burst of edits is classified by ClassifyChange against the manifest
@@ -125,6 +171,11 @@ func (r *Runtime) WatchProject(ctx context.Context, o WatchOptions) error {
 	}
 	if o.Restart == nil {
 		return errors.New("WatchProject needs a Restart")
+	}
+	for i := range o.Files {
+		if o.Files[i].Path == nil {
+			return fmt.Errorf("WatchProject: Files[%d] needs a Path", i)
+		}
 	}
 	dir, err := filepath.Abs(o.ProjectPath)
 	if err != nil {
@@ -155,6 +206,7 @@ func (r *Runtime) WatchProject(ctx context.Context, o WatchOptions) error {
 	w := watchLoop{
 		mode:     mode,
 		debounce: o.Debounce,
+		files:    append(slices.Clone(builtinWatchedFiles), o.Files...),
 		load:     load,
 		hotInstall: func(ctx context.Context, deps []string) error {
 			return r.HotInstall(ctx, dir, deps, o.Callbacks)
@@ -258,8 +310,11 @@ func declaredDockerfile(m *manifest.Manifest) string {
 // watchLoop is WatchProject without the filesystem, so its decisions can be
 // tested against events a test writes.
 type watchLoop struct {
-	mode       Mode
-	debounce   time.Duration
+	mode     Mode
+	debounce time.Duration
+	// files are the files watched beside the manifest. nil is
+	// builtinWatchedFiles alone.
+	files      []WatchedFile
 	load       func() (*manifest.Manifest, error)
 	hotInstall func(ctx context.Context, deps []string) error
 	restart    func(ctx context.Context, c Change) (*manifest.Manifest, error)
@@ -271,6 +326,9 @@ type watchLoop struct {
 	// is done, before the first event is read. For tests, which must not
 	// edit the project before that check reads it. Optional.
 	onReady func()
+
+	// dirs are the directories watchDir was given, so each is given once.
+	dirs map[string]bool
 
 	// owed are the reasons of a restart that failed: whatever left Airflow
 	// down may be fixed in a file the watch does not read, so the next burst
@@ -286,11 +344,11 @@ func (w *watchLoop) run(ctx context.Context, names <-chan string, running *manif
 		debounce = DefaultWatchDebounce
 	}
 	pending := map[string]bool{}
-	w.watchDockerfileDir(running)
+	w.watchFileDirs(running)
 	// An edit made while the start ran happened before the watch began, so no
 	// event will report it: compare what is on disk with what was started.
 	running, carry := w.apply(ctx, []string{manifest.Marker}, running, true)
-	w.watchDockerfileDir(running)
+	w.watchFileDirs(running)
 	for _, f := range carry {
 		pending[f] = true
 	}
@@ -330,7 +388,7 @@ func (w *watchLoop) run(ctx context.Context, names <-chan string, running *manif
 			files := slices.Sorted(maps.Keys(pending))
 			clear(pending)
 			running, carry = w.apply(ctx, files, running, false)
-			w.watchDockerfileDir(running)
+			w.watchFileDirs(running)
 			// Files whose edit could not be acted on yet, because the
 			// manifest did not load, are acted on with the next burst.
 			for _, f := range carry {
@@ -340,38 +398,71 @@ func (w *watchLoop) run(ctx context.Context, names <-chan string, running *manif
 	}
 }
 
-// expand is the files an event for name stands for that the running Airflow
-// could see: the manifest, the .env, or in docker mode the declared
-// Dockerfile. An overflow stands for all of them.
-func (w *watchLoop) expand(name string, running *manifest.Manifest) []string {
-	dockerfile := ""
-	if w.mode == ModeDocker {
-		dockerfile = declaredDockerfile(running)
+// watched are the paths of the files watched beside the manifest, given m, in
+// the order the table lists them: those read in this mode that name a file.
+func (w *watchLoop) watched(m *manifest.Manifest) []string {
+	files := w.files
+	if files == nil {
+		files = builtinWatchedFiles
 	}
+	var out []string
+	for i := range files {
+		if p := watchedPath(&files[i], w.mode, m); p != "" && !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// reasonFor is the restart reason of the watched file at path, given m, and
+// whether one watches it. The first in the table wins.
+func (w *watchLoop) reasonFor(path string, m *manifest.Manifest) (Reason, bool) {
+	files := w.files
+	if files == nil {
+		files = builtinWatchedFiles
+	}
+	for i := range files {
+		if watchedPath(&files[i], w.mode, m) == path {
+			why := files[i].Reason
+			why.Path = path
+			return why, true
+		}
+	}
+	return Reason{}, false
+}
+
+// expand is the files an event for name stands for that the running Airflow
+// could see: the manifest, or a watched file. An overflow stands for all of
+// them.
+func (w *watchLoop) expand(name string, running *manifest.Manifest) []string {
+	watched := w.watched(running)
 	switch {
 	case name == rescanAll:
-		out := []string{manifest.Marker, dotenvFile}
-		if dockerfile != "" {
-			out = append(out, dockerfile)
-		}
-		return out
-	case name == manifest.Marker, name == dotenvFile, dockerfile != "" && name == dockerfile:
+		return append([]string{manifest.Marker}, watched...)
+	case name == manifest.Marker, slices.Contains(watched, name):
 		return []string{name}
 	}
 	return nil
 }
 
-// watchDockerfileDir makes sure the directory of the Dockerfile running
-// declares is watched, in docker mode: a manifest that moves it to a new
-// directory would otherwise leave its edits unseen.
-func (w *watchLoop) watchDockerfileDir(running *manifest.Manifest) {
-	if w.mode != ModeDocker || w.watchDir == nil {
+// watchFileDirs makes sure the directory of each watched file is watched: a
+// file below the project root (a Dockerfile in docker/), or one the manifest
+// moves to a new directory, would otherwise have its edits go unseen. The
+// project root is watched from the start.
+func (w *watchLoop) watchFileDirs(running *manifest.Manifest) {
+	if w.watchDir == nil {
 		return
 	}
-	if d := declaredDockerfile(running); d != "" {
-		if sub := filepath.Dir(d); sub != "." {
-			w.watchDir(sub)
+	for _, p := range w.watched(running) {
+		sub := filepath.ToSlash(filepath.Dir(filepath.FromSlash(p)))
+		if sub == "." || w.dirs[sub] {
+			continue
 		}
+		if w.dirs == nil {
+			w.dirs = map[string]bool{}
+		}
+		w.dirs[sub] = true
+		w.watchDir(sub)
 	}
 }
 
@@ -390,12 +481,19 @@ func (w *watchLoop) apply(ctx context.Context, files []string, running *manifest
 	}
 
 	c := ClassifyChange(running, next, w.mode)
-	if slices.Contains(files, dotenvFile) {
-		c = needsRestart(c, Reason{Code: ReasonDotenv})
-	}
-	if w.mode == ModeDocker {
-		if d := declaredDockerfile(next); d != "" && slices.Contains(files, d) {
-			c = needsRestart(c, Reason{Code: ReasonDockerfileEdited})
+	for _, f := range files {
+		if f == manifest.Marker {
+			continue
+		}
+		// The new manifest first: an edit to a file it now names counts. The
+		// old one as well, so an edit to a file it named still counts in the
+		// burst that stops naming it.
+		why, ok := w.reasonFor(f, next)
+		if !ok {
+			why, ok = w.reasonFor(f, running)
+		}
+		if ok {
+			c = needsRestart(c, why)
 		}
 	}
 	for _, why := range w.owed {

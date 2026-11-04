@@ -83,6 +83,10 @@ type Reason struct {
 	// Dist is the distribution a ReasonRepinned or ReasonSourced is about,
 	// normalized as manifest.DistName does. Empty for the other codes.
 	Dist string `json:"dist,omitempty"`
+	// Path is the project-relative file whose edit forced a WatchProject
+	// restart (ReasonDotenv, ReasonDockerfileEdited, or a caller's own
+	// WatchedFile), slash-separated. Empty for a manifest change.
+	Path string `json:"path,omitempty"`
 }
 
 // String is the reason in the CLI's words.
@@ -116,6 +120,11 @@ func (r Reason) String() string {
 		return "the Dockerfile changed"
 	case ReasonHotInstallUnavailable:
 		return "the running Airflow cannot take a hot install"
+	}
+	// A caller's own code (WatchOptions.Files) has no words here; the file
+	// it is about says enough.
+	if r.Path != "" {
+		return r.Path + " changed"
 	}
 	return string(r.Code)
 }

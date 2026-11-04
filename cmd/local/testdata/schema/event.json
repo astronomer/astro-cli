@@ -22,7 +22,8 @@
   "reasons": [
     {
       "code": "x",
-      "dist": "x"
+      "dist": "x",
+      "path": "x"
     }
   ]
 }

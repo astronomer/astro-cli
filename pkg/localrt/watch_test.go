@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -45,6 +46,18 @@ func newLoopHarness(t *testing.T, mode Mode, running *manifest.Manifest) *loopHa
 // is already onDisk when the watch begins, edited while the start ran.
 func newLoopHarnessOnDisk(t *testing.T, mode Mode, running, onDisk *manifest.Manifest) *loopHarness {
 	t.Helper()
+	return newLoopHarnessWith(t, mode, running, onDisk, nil)
+}
+
+// newLoopHarnessWithFiles is newLoopHarness watching extra beside the
+// built-in files, as WatchOptions.Files does.
+func newLoopHarnessWithFiles(t *testing.T, mode Mode, running *manifest.Manifest, extra ...WatchedFile) *loopHarness {
+	t.Helper()
+	return newLoopHarnessWith(t, mode, running, running, append(slices.Clone(builtinWatchedFiles), extra...))
+}
+
+func newLoopHarnessWith(t *testing.T, mode Mode, running, onDisk *manifest.Manifest, files []WatchedFile) *loopHarness {
+	t.Helper()
 	h := &loopHarness{
 		t:       t,
 		names:   make(chan string),
@@ -55,6 +68,7 @@ func newLoopHarnessOnDisk(t *testing.T, mode Mode, running, onDisk *manifest.Man
 	w := watchLoop{
 		mode:     mode,
 		debounce: 20 * time.Millisecond,
+		files:    files,
 		load: func() (*manifest.Manifest, error) {
 			h.mu.Lock()
 			defer h.mu.Unlock()
@@ -214,7 +228,7 @@ func TestWatchRestartsForADotenvEdit(t *testing.T) {
 
 	e := h.next()
 	require.Equal(t, WatchRestarting, e.Kind)
-	require.Equal(t, []Reason{{Code: ReasonDotenv}}, e.Change.Reasons)
+	require.Equal(t, []Reason{{Code: ReasonDotenv, Path: dotenvFile}}, e.Change.Reasons)
 	require.Equal(t, WatchRestarted, h.next().Kind)
 	require.Len(t, h.restarts, 1)
 }
@@ -230,7 +244,7 @@ func TestWatchCarriesADotenvEditPastAnUnreadableManifest(t *testing.T) {
 	e := h.next()
 	require.Equal(t, WatchRestarting, e.Kind)
 	require.Equal(t, []string{dotenvFile, manifest.Marker}, e.Files)
-	require.Equal(t, []Reason{{Code: ReasonDotenv}}, e.Change.Reasons)
+	require.Equal(t, []Reason{{Code: ReasonDotenv, Path: dotenvFile}}, e.Change.Reasons)
 }
 
 // A restart reason in the same burst overrides the install: installing into
@@ -319,7 +333,7 @@ func TestWatchRestartsForAnEditedDockerfileInDockerMode(t *testing.T) {
 
 	e := h.next()
 	require.Equal(t, WatchRestarting, e.Kind)
-	require.Equal(t, []Reason{{Code: ReasonDockerfileEdited}}, e.Change.Reasons)
+	require.Equal(t, []Reason{{Code: ReasonDockerfileEdited, Path: "docker/Dockerfile"}}, e.Change.Reasons)
 }
 
 // Standalone builds no image, so its Dockerfile is not something to restart for.
@@ -370,7 +384,7 @@ func TestWatchProjectSeesEditsOnDisk(t *testing.T) {
 	}
 
 	require.NoError(t, os.WriteFile(filepath.Join(dir, dotenvFile), []byte("FOO=bar\n"), 0o600))
-	require.Equal(t, []Reason{{Code: ReasonDotenv}}, waitRestart().Reasons)
+	require.Equal(t, []Reason{{Code: ReasonDotenv, Path: dotenvFile}}, waitRestart().Reasons)
 
 	tmp := filepath.Join(dir, ".pyproject.toml.swp")
 	require.NoError(t, os.WriteFile(tmp, []byte(head+"[tool.astro.pools.etl]\nslots = 4\n"), 0o600))
@@ -429,7 +443,7 @@ func TestWatchRetriesAnOwedRestart(t *testing.T) {
 	h.save(m, nil, manifest.Marker)
 	e := h.next()
 	require.Equal(t, WatchRestarting, e.Kind)
-	require.Equal(t, []Reason{{Code: ReasonDotenv}}, e.Change.Reasons)
+	require.Equal(t, []Reason{{Code: ReasonDotenv, Path: dotenvFile}}, e.Change.Reasons)
 	require.Equal(t, WatchRestarted, h.next().Kind)
 
 	// Paid: the next unchanged save is nothing again.
@@ -486,7 +500,7 @@ func TestWatchFollowsAMovedDockerfile(t *testing.T) {
 	h.save(moved, nil, "build/Dockerfile")
 	e := h.next()
 	require.Equal(t, WatchRestarting, e.Kind)
-	require.Equal(t, []Reason{{Code: ReasonDockerfileEdited}}, e.Change.Reasons)
+	require.Equal(t, []Reason{{Code: ReasonDockerfileEdited, Path: "build/Dockerfile"}}, e.Change.Reasons)
 }
 
 // An overflowed event queue lost edits to files nobody can name, so every
@@ -527,4 +541,82 @@ func TestForwardQueuesWhileTheReaderIsBusy(t *testing.T) {
 		t.Fatalf("each name is queued once, got another: %q", n)
 	case <-time.After(50 * time.Millisecond):
 	}
+}
+
+// settingsFile is a caller's own watched file: one its start reads, which the
+// built-in table knows nothing about.
+var settingsFile = WatchedFile{
+	Path:   fixedPath("config/settings.yaml"),
+	Reason: Reason{Code: "settings"},
+}
+
+// A caller's file restarts Airflow for the caller's own code, carrying the
+// path so even a frontend with no words for the code can say what changed.
+func TestWatchRestartsForACallersFile(t *testing.T) {
+	m := pyproject(t, baseDeps, "")
+	h := newLoopHarnessWithFiles(t, ModeStandalone, m, settingsFile)
+	h.mu.Lock()
+	require.Equal(t, []string{"config"}, h.watched, "a file below the root has its directory watched")
+	h.mu.Unlock()
+
+	h.save(m, nil, "config/settings.yaml")
+	e := h.next()
+	require.Equal(t, WatchRestarting, e.Kind)
+	require.Equal(t, []Reason{{Code: "settings", Path: "config/settings.yaml"}}, e.Change.Reasons)
+	require.Equal(t, "config/settings.yaml changed", e.Change.Reasons[0].String())
+}
+
+// A file listed for some modes is not watched in the others.
+func TestWatchIgnoresACallersFileOutsideItsModes(t *testing.T) {
+	m := pyproject(t, baseDeps, "")
+	dockerOnly := settingsFile
+	dockerOnly.Modes = []Mode{ModeDocker}
+	h := newLoopHarnessWithFiles(t, ModeStandalone, m, dockerOnly)
+	h.save(m, nil, "config/settings.yaml")
+	h.quiet()
+}
+
+// ...and is watched in the modes it lists.
+func TestWatchRestartsForACallersFileInItsMode(t *testing.T) {
+	m := pyproject(t, baseDeps, "")
+	dockerOnly := settingsFile
+	dockerOnly.Modes = []Mode{ModeDocker}
+	h := newLoopHarnessWithFiles(t, ModeDocker, m, dockerOnly)
+	h.save(m, nil, "config/settings.yaml")
+	e := h.next()
+	require.Equal(t, WatchRestarting, e.Kind)
+	require.Equal(t, []Reason{{Code: "settings", Path: "config/settings.yaml"}}, e.Change.Reasons)
+}
+
+// An overflow stands for a caller's files too.
+func TestWatchRescansACallersFileAfterAnOverflow(t *testing.T) {
+	m := pyproject(t, baseDeps, "")
+	h := newLoopHarnessWithFiles(t, ModeStandalone, m, settingsFile)
+	h.save(m, nil, rescanAll)
+	e := h.next()
+	require.Equal(t, WatchRestarting, e.Kind)
+	require.Equal(t, []string{dotenvFile, "config/settings.yaml", manifest.Marker}, e.Files)
+	require.Equal(t, []Reason{
+		{Code: ReasonDotenv, Path: dotenvFile},
+		{Code: "settings", Path: "config/settings.yaml"},
+	}, e.Change.Reasons)
+}
+
+// A path is compared as the event reports it: cleaned and slash-separated,
+// however the caller spelled it.
+func TestWatchCleansACallersPath(t *testing.T) {
+	m := pyproject(t, baseDeps, "")
+	h := newLoopHarnessWithFiles(t, ModeStandalone, m, WatchedFile{Path: fixedPath("./config//settings.yaml"), Reason: Reason{Code: "settings"}})
+	h.save(m, nil, "config/settings.yaml")
+	require.Equal(t, WatchRestarting, h.next().Kind)
+}
+
+func TestWatchProjectRefusesAWatchedFileWithoutAPath(t *testing.T) {
+	var r Runtime
+	err := r.WatchProject(context.Background(), WatchOptions{
+		ProjectPath: t.TempDir(),
+		Restart:     func(context.Context, Change) (*manifest.Manifest, error) { return nil, nil },
+		Files:       []WatchedFile{{Reason: Reason{Code: "settings"}}},
+	})
+	require.ErrorContains(t, err, "Files[0] needs a Path")
 }
