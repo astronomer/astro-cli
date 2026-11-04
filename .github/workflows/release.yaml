@@ -54,7 +54,8 @@ jobs:
   release:
     needs: detect
     runs-on: macos-15
-    timeout-minutes: 30
+    # Notarization waits on Apple, which can take up to 20 minutes per binary.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -116,6 +117,12 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-token.outputs.token }}
           GORELEASER_CURRENT_TAG: ${{ needs.detect.outputs.tag }}
           GORELEASER_PREVIOUS_TAG: ${{ steps.prev-tag.outputs.tag }}
+          # macOS signing and notarization (notarize.macos in .goreleaser.yml); skipped when unset.
+          MACOS_SIGN_P12: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          MACOS_NOTARY_KEY: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
 
   # install.astronomer.io fetches godownloader.sh from main, so this job keeps
   # that path current. Pinned installs use the install.sh release asset instead,
