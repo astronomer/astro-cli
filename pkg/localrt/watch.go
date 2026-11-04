@@ -23,6 +23,11 @@ const DefaultWatchDebounce = 500 * time.Millisecond
 // dotenvFile is the env file both engines read at start.
 const dotenvFile = ".env"
 
+// rescanAll stands in for every file a watch acts on, when the event queue
+// overflowed and which of them changed is unknown. Not a path: it contains a
+// NUL, which no file name can.
+const rescanAll = "\x00rescan"
+
 // WatchEventKind is what WatchProject did about one burst of edits.
 type WatchEventKind string
 
@@ -43,6 +48,8 @@ const (
 	WatchInstallFailed WatchEventKind = "install-failed"
 	// WatchRestarting and WatchRestarted bracket WatchOptions.Restart, for
 	// Change.Reasons; WatchRestartFailed replaces WatchRestarted when it fails.
+	// A failed restart is owed: the next burst restarts again, for its own
+	// reasons and the failed one's.
 	WatchRestarting    WatchEventKind = "restarting"
 	WatchRestarted     WatchEventKind = "restarted"
 	WatchRestartFailed WatchEventKind = "restart-failed"
@@ -67,9 +74,10 @@ type WatchOptions struct {
 	// Mode is the mode the project is running in. Empty reads it from the
 	// project's record.
 	Mode Mode
-	// Manifest is the manifest the running Airflow was started from, the one
-	// the first edit is compared with. Nil loads it when the watch begins,
-	// which misses an edit made between the start and the watch.
+	// Manifest is the manifest the running Airflow was started from. The
+	// watch compares the project with it as soon as it begins, so an edit made
+	// while the start ran is applied rather than missed. Nil loads it when the
+	// watch begins, which cannot tell such an edit from what was started.
 	Manifest *manifest.Manifest
 	// Debounce overrides DefaultWatchDebounce.
 	Debounce time.Duration
@@ -77,7 +85,14 @@ type WatchOptions struct {
 	// Airflow and starts it again from the project as it now is, which is the
 	// caller's to define (the CLI rebuilds its plan and warnings; Astro
 	// Desktop has its own). Required.
-	Restart func(ctx context.Context, c Change) error
+	//
+	// It returns the manifest the new start was built from, which later edits
+	// are compared with. That matters when the restart writes the manifest
+	// itself, as the CLI's does when it moves the Astronomer build pin: the
+	// write is then already in what it returns, and not an edit to restart
+	// for again. Nil has the watch reload the manifest after the restart,
+	// which is right unless the manifest was edited while the restart ran.
+	Restart func(ctx context.Context, c Change) (*manifest.Manifest, error)
 	// OnEvent receives every WatchEvent, synchronously and in order. Optional.
 	OnEvent func(WatchEvent)
 	// Callbacks carry a hot install's output.
@@ -100,8 +115,10 @@ type WatchOptions struct {
 // its project, and two loops would drift in what they watch, how they wait,
 // and which manifest they compare against.
 //
-// Edits are applied one burst at a time. Edits made while a restart runs are
-// queued and applied, against what the restart started, once it finishes.
+// Edits are applied one burst at a time. Edits made while an install or a
+// restart runs are queued and applied, against what it left running, once it
+// finishes. An install or restart that ctx ends partway reports nothing: the
+// caller ended the watch, and is about to say so itself.
 func (r *Runtime) WatchProject(ctx context.Context, o WatchOptions) error {
 	if o.ProjectPath == "" {
 		return errors.New("WatchProject needs a project path")
@@ -121,18 +138,15 @@ func (r *Runtime) WatchProject(ctx context.Context, o WatchOptions) error {
 		}
 		mode = st.Mode
 	}
+	load := func() (*manifest.Manifest, error) { return manifest.Load(filepath.Join(dir, manifest.Marker)) }
 	running := o.Manifest
 	if running == nil {
-		if running, err = manifest.Load(filepath.Join(dir, manifest.Marker)); err != nil {
+		if running, err = load(); err != nil {
 			return fmt.Errorf("reading the manifest the running Airflow was started from: %w", err)
 		}
 	}
 
-	var extra []string
-	if d := declaredDockerfile(running); d != "" && mode == ModeDocker {
-		extra = append(extra, filepath.Dir(filepath.Join(dir, d)))
-	}
-	names, closeWatch, err := watchDirs(ctx, dir, extra)
+	names, addDir, closeWatch, err := watchDirs(ctx, dir)
 	if err != nil {
 		return err
 	}
@@ -141,28 +155,32 @@ func (r *Runtime) WatchProject(ctx context.Context, o WatchOptions) error {
 	w := watchLoop{
 		mode:     mode,
 		debounce: o.Debounce,
-		load:     func() (*manifest.Manifest, error) { return manifest.Load(filepath.Join(dir, manifest.Marker)) },
+		load:     load,
 		hotInstall: func(ctx context.Context, deps []string) error {
 			return r.HotInstall(ctx, dir, deps, o.Callbacks)
 		},
 		restart: o.Restart,
 		emit:    o.OnEvent,
+		watchDir: func(rel string) {
+			//nolint:errcheck // best effort: a Dockerfile in a directory that does not exist yet is a start failure the restart reports
+			addDir(filepath.Join(dir, rel))
+		},
 	}
 	w.run(ctx, names, running)
 	return nil
 }
 
 // watchDirs reports the path, relative to dir and slash-separated, of every
-// file created, written, renamed or removed in dir or in one of extra, until
-// ctx is done. close releases the watch.
+// file created, written, renamed or removed in dir, or in a directory addDir
+// adds, until ctx is done. closeWatch releases the watch.
 //
 // Directories, not files: an editor that saves by renaming a temp file over
 // the original replaces the inode a file watch is on, and every edit after the
 // first would go unseen.
-func watchDirs(ctx context.Context, dir string, extra []string) (names <-chan string, closeWatch func(), err error) {
+func watchDirs(ctx context.Context, dir string) (names <-chan string, addDir func(string) error, closeWatch func(), err error) {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	closeWatch = func() {
 		//nolint:errcheck // closing a watch has nothing left to report to
@@ -170,45 +188,62 @@ func watchDirs(ctx context.Context, dir string, extra []string) (names <-chan st
 	}
 	if err := fsw.Add(dir); err != nil {
 		closeWatch()
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	for _, d := range extra {
-		if d != dir {
-			//nolint:errcheck // best effort: a Dockerfile in a directory that does not exist yet is a start failure the restart reports
-			fsw.Add(d)
+	out := make(chan string)
+	go forward(ctx, dir, fsw.Events, fsw.Errors, out)
+	return out, fsw.Add, closeWatch, nil
+}
+
+// forward turns fsnotify's events into project-relative names on out, until
+// ctx is done or fsnotify closes.
+//
+// It never blocks fsnotify on the reader: names wait in a queue, each once,
+// while the reader is busy with a restart that takes minutes, rather than
+// leaving the events in the operating system's queue, which overflows. An
+// overflow, if one happens anyway, is reported as rescanAll, since which
+// files it lost edits to is not known.
+func forward(ctx context.Context, dir string, events <-chan fsnotify.Event, errs <-chan error, out chan<- string) {
+	defer close(out)
+	var queue []string
+	queued := map[string]bool{}
+	push := func(name string) {
+		if !queued[name] {
+			queued[name] = true
+			queue = append(queue, name)
 		}
 	}
-
-	out := make(chan string)
-	go func() {
-		defer close(out)
-		for {
-			select {
-			case <-ctx.Done():
+	for {
+		// A nil channel is never ready, so nothing is sent while the queue
+		// is empty.
+		var send chan<- string
+		var head string
+		if len(queue) > 0 {
+			send, head = out, queue[0]
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case send <- head:
+			queue = queue[1:]
+			delete(queued, head)
+		case ev, ok := <-events:
+			if !ok {
 				return
-			case ev, ok := <-fsw.Events:
-				if !ok {
-					return
-				}
-				rel, err := filepath.Rel(dir, ev.Name)
-				if ev.Op == fsnotify.Chmod || err != nil {
-					continue
-				}
-				select {
-				case out <- filepath.ToSlash(rel):
-				case <-ctx.Done():
-					return
-				}
-			case _, ok := <-fsw.Errors:
-				// An overflowed queue or a vanished directory. Neither is
-				// actionable here, and the next event still arrives.
-				if !ok {
-					return
-				}
+			}
+			rel, err := filepath.Rel(dir, ev.Name)
+			if ev.Op != fsnotify.Chmod && err == nil {
+				push(filepath.ToSlash(rel))
+			}
+		case err, ok := <-errs:
+			if !ok {
+				return
+			}
+			if errors.Is(err, fsnotify.ErrEventOverflow) {
+				push(rescanAll)
 			}
 		}
-	}()
-	return out, closeWatch, nil
+	}
 }
 
 // declaredDockerfile is the project-relative path of the Dockerfile the
@@ -227,8 +262,16 @@ type watchLoop struct {
 	debounce   time.Duration
 	load       func() (*manifest.Manifest, error)
 	hotInstall func(ctx context.Context, deps []string) error
-	restart    func(ctx context.Context, c Change) error
+	restart    func(ctx context.Context, c Change) (*manifest.Manifest, error)
 	emit       func(WatchEvent)
+	// watchDir adds a project-relative directory to the watch. nil in tests
+	// that do not look.
+	watchDir func(rel string)
+
+	// owed are the reasons of a restart that failed: whatever left Airflow
+	// down may be fixed in a file the watch does not read, so the next burst
+	// restarts for them even if it changes nothing itself.
+	owed []Reason
 }
 
 // run applies each debounced burst of names to running, until names closes or
@@ -239,6 +282,14 @@ func (w *watchLoop) run(ctx context.Context, names <-chan string, running *manif
 		debounce = DefaultWatchDebounce
 	}
 	pending := map[string]bool{}
+	w.watchDockerfileDir(running)
+	// An edit made while the start ran happened before the watch began, so no
+	// event will report it: compare what is on disk with what was started.
+	running, carry := w.apply(ctx, []string{manifest.Marker}, running, true)
+	for _, f := range carry {
+		pending[f] = true
+	}
+
 	var timer *time.Timer
 	var fire <-chan time.Time
 	stopTimer := func() {
@@ -255,10 +306,14 @@ func (w *watchLoop) run(ctx context.Context, names <-chan string, running *manif
 			if !ok {
 				return
 			}
-			if !w.relevant(name, running) {
+			added := false
+			for _, n := range w.expand(name, running) {
+				pending[n] = true
+				added = true
+			}
+			if !added {
 				continue
 			}
-			pending[name] = true
 			stopTimer()
 			timer = time.NewTimer(debounce)
 			fire = timer.C
@@ -266,8 +321,8 @@ func (w *watchLoop) run(ctx context.Context, names <-chan string, running *manif
 			fire = nil
 			files := slices.Sorted(maps.Keys(pending))
 			clear(pending)
-			var carry []string
-			running, carry = w.apply(ctx, files, running)
+			running, carry = w.apply(ctx, files, running, false)
+			w.watchDockerfileDir(running)
 			// Files whose edit could not be acted on yet, because the
 			// manifest did not load, are acted on with the next burst.
 			for _, f := range carry {
@@ -277,19 +332,46 @@ func (w *watchLoop) run(ctx context.Context, names <-chan string, running *manif
 	}
 }
 
-// relevant reports whether an edit to name is one the running Airflow could
-// see: the manifest, the .env, or in docker mode the declared Dockerfile.
-func (w *watchLoop) relevant(name string, running *manifest.Manifest) bool {
-	switch name {
-	case manifest.Marker, dotenvFile:
-		return true
+// expand is the files an event for name stands for that the running Airflow
+// could see: the manifest, the .env, or in docker mode the declared
+// Dockerfile. An overflow stands for all of them.
+func (w *watchLoop) expand(name string, running *manifest.Manifest) []string {
+	dockerfile := ""
+	if w.mode == ModeDocker {
+		dockerfile = declaredDockerfile(running)
 	}
-	return w.mode == ModeDocker && name != "" && name == declaredDockerfile(running)
+	switch {
+	case name == rescanAll:
+		out := []string{manifest.Marker, dotenvFile}
+		if dockerfile != "" {
+			out = append(out, dockerfile)
+		}
+		return out
+	case name == manifest.Marker, name == dotenvFile, dockerfile != "" && name == dockerfile:
+		return []string{name}
+	}
+	return nil
+}
+
+// watchDockerfileDir makes sure the directory of the Dockerfile running
+// declares is watched, in docker mode: a manifest that moves it to a new
+// directory would otherwise leave its edits unseen.
+func (w *watchLoop) watchDockerfileDir(running *manifest.Manifest) {
+	if w.mode != ModeDocker || w.watchDir == nil {
+		return
+	}
+	if d := declaredDockerfile(running); d != "" {
+		if sub := filepath.Dir(d); sub != "." {
+			w.watchDir(sub)
+		}
+	}
 }
 
 // apply acts on one burst and returns the manifest the running Airflow now
-// reflects, with the files to fold into the next burst.
-func (w *watchLoop) apply(ctx context.Context, files []string, running *manifest.Manifest) (applied *manifest.Manifest, carry []string) {
+// reflects, with the files to fold into the next burst. quiet leaves out the
+// report of a burst that changed nothing, for the check run makes when the
+// watch begins.
+func (w *watchLoop) apply(ctx context.Context, files []string, running *manifest.Manifest, quiet bool) (applied *manifest.Manifest, carry []string) {
 	next, err := w.load()
 	if err != nil {
 		// Nothing is applied while the manifest does not load, not even a
@@ -308,10 +390,17 @@ func (w *watchLoop) apply(ctx context.Context, files []string, running *manifest
 			c = needsRestart(c, Reason{Code: ReasonDockerfileEdited})
 		}
 	}
+	for _, why := range w.owed {
+		if !slices.Contains(c.Reasons, why) {
+			c = needsRestart(c, why)
+		}
+	}
 
 	switch c.Action {
 	case ChangeNone:
-		w.send(WatchEvent{Kind: WatchUnchanged, Files: files, Change: c})
+		if !quiet || len(c.Removed) > 0 {
+			w.send(WatchEvent{Kind: WatchUnchanged, Files: files, Change: c})
+		}
 		return next, nil
 	case ChangeHotInstall:
 		w.send(WatchEvent{Kind: WatchInstalling, Files: files, Change: c})
@@ -320,6 +409,10 @@ func (w *watchLoop) apply(ctx context.Context, files []string, running *manifest
 		case err == nil:
 			w.send(WatchEvent{Kind: WatchInstalled, Files: files, Change: c})
 			return next, nil
+		case ctx.Err() != nil:
+			// The watch is ending, and the install with it: not a failure
+			// to report, and not one to retry.
+			return running, nil
 		case errors.Is(err, ErrNotImplemented):
 			// The project stopped under the watch, or its engine takes no
 			// hot install: a start applies the change instead.
@@ -335,16 +428,31 @@ func (w *watchLoop) apply(ctx context.Context, files []string, running *manifest
 	}
 
 	w.send(WatchEvent{Kind: WatchRestarting, Files: files, Change: c})
-	if err := w.restart(ctx, c); err != nil {
+	started, err := w.restart(ctx, c)
+	if ctx.Err() != nil {
+		return running, nil
+	}
+	if err != nil {
 		// What is running now is unknown: the restart may have stopped
-		// Airflow before failing. Comparing the next save with the manifest
-		// from before means it is applied in full, and a hot install into a
-		// project that is no longer running falls back to a restart.
+		// Airflow before failing. The next save is compared with the
+		// manifest from before, so it is applied in full, and the reasons are
+		// owed, so it restarts even if what failed was outside the files
+		// this watches.
+		w.owed = c.Reasons
 		w.send(WatchEvent{Kind: WatchRestartFailed, Files: files, Change: c, Err: err})
 		return running, nil
 	}
+	w.owed = nil
 	w.send(WatchEvent{Kind: WatchRestarted, Files: files, Change: c})
-	return next, nil
+	if started == nil {
+		if started, err = w.load(); err != nil {
+			// Edited into an unreadable state while the restart ran: the
+			// queued event for that edit reports it, against what was
+			// classified.
+			started = next
+		}
+	}
+	return started, nil
 }
 
 // needsRestart is c with one more reason to restart, which overrides any hot

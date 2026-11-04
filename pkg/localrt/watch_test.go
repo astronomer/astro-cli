@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -27,18 +28,28 @@ type loopHarness struct {
 	installs  [][]string
 	installFn func([]string) error
 	restarts  []Change
-	restartFn func(Change) error
+	// restartFn answers a restart; nil succeeds, returning no manifest.
+	restartFn func(context.Context, Change) (*manifest.Manifest, error)
+	watched   []string
 
 	events chan WatchEvent
+	cancel context.CancelFunc
 }
 
 func newLoopHarness(t *testing.T, mode Mode, running *manifest.Manifest) *loopHarness {
+	t.Helper()
+	return newLoopHarnessOnDisk(t, mode, running, running)
+}
+
+// newLoopHarnessOnDisk is newLoopHarness for a project whose manifest on disk
+// is already onDisk when the watch begins, edited while the start ran.
+func newLoopHarnessOnDisk(t *testing.T, mode Mode, running, onDisk *manifest.Manifest) *loopHarness {
 	t.Helper()
 	h := &loopHarness{
 		t:       t,
 		names:   make(chan string),
 		done:    make(chan struct{}),
-		current: running,
+		current: onDisk,
 		events:  make(chan WatchEvent, 64),
 	}
 	w := watchLoop{
@@ -58,18 +69,25 @@ func newLoopHarness(t *testing.T, mode Mode, running *manifest.Manifest) *loopHa
 			}
 			return nil
 		},
-		restart: func(_ context.Context, c Change) error {
+		restart: func(ctx context.Context, c Change) (*manifest.Manifest, error) {
 			h.mu.Lock()
-			defer h.mu.Unlock()
 			h.restarts = append(h.restarts, c)
-			if h.restartFn != nil {
-				return h.restartFn(c)
+			fn := h.restartFn
+			h.mu.Unlock()
+			if fn != nil {
+				return fn(ctx, c)
 			}
-			return nil
+			return nil, nil
 		},
 		emit: func(e WatchEvent) { h.events <- e },
+		watchDir: func(rel string) {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			h.watched = append(h.watched, rel)
+		},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	h.cancel = cancel
 	go func() {
 		defer close(h.done)
 		w.run(ctx, h.names, running)
@@ -258,7 +276,7 @@ func TestWatchRestartsWhenAHotInstallIsUnavailable(t *testing.T) {
 // compared with the manifest from before the failure, and applied in full.
 func TestWatchReappliesAfterAFailedRestart(t *testing.T) {
 	h := newLoopHarness(t, ModeStandalone, pyproject(t, baseDeps, ""))
-	h.restartFn = func(Change) error { return errors.New("port in use") }
+	h.restartFn = func(context.Context, Change) (*manifest.Manifest, error) { return nil, errors.New("port in use") }
 	newAirflow := pyproject(t, `"apache-airflow==3.2.*", "pandas>=2.1"`, "")
 	h.save(newAirflow, nil, manifest.Marker)
 	require.Equal(t, WatchRestarting, h.next().Kind)
@@ -321,9 +339,9 @@ func TestWatchProjectSeesEditsOnDisk(t *testing.T) {
 			ProjectPath: dir,
 			Mode:        ModeStandalone,
 			Debounce:    50 * time.Millisecond,
-			Restart: func(_ context.Context, c Change) error {
+			Restart: func(_ context.Context, c Change) (*manifest.Manifest, error) {
 				restarts <- c
-				return nil
+				return nil, nil
 			},
 		})
 	}()
@@ -363,4 +381,141 @@ func TestWatchProjectRefusesIncompleteOptions(t *testing.T) {
 	var r Runtime
 	require.ErrorContains(t, r.WatchProject(context.Background(), WatchOptions{}), "project path")
 	require.ErrorContains(t, r.WatchProject(context.Background(), WatchOptions{ProjectPath: t.TempDir()}), "Restart")
+}
+
+// A restart that rewrites the manifest itself (the CLI's moves the Astronomer
+// build pin) returns what it started from, so its own write is not an edit to
+// restart for again.
+func TestWatchComparesWithWhatTheRestartStarted(t *testing.T) {
+	h := newLoopHarness(t, ModeStandalone, pyproject(t, baseDeps, ""))
+	rewritten := pyproject(t, `"apache-airflow==3.2.*", "pandas>=2.1"`, "\n[tool.uv]\nconstraint-dependencies = [\"apache-airflow==3.2.1+astro.1\"]\n")
+	h.restartFn = func(context.Context, Change) (*manifest.Manifest, error) {
+		h.mu.Lock()
+		h.current = rewritten // the restart's own write, before it starts
+		h.mu.Unlock()
+		return rewritten, nil
+	}
+	h.save(pyproject(t, `"apache-airflow==3.2.*", "pandas>=2.1"`, ""), nil, manifest.Marker)
+	require.Equal(t, []WatchEventKind{WatchRestarting, WatchRestarted}, h.kinds(2))
+
+	// The event for the restart's write arrives after it.
+	h.save(rewritten, nil, manifest.Marker)
+	require.Equal(t, WatchUnchanged, h.next().Kind)
+	require.Len(t, h.restarts, 1)
+}
+
+// A restart that failed for a reason outside the watched files (a busy port,
+// a missing vault value) is retried by the next save, even one that changes
+// nothing, rather than leaving Airflow down.
+func TestWatchRetriesAnOwedRestart(t *testing.T) {
+	m := pyproject(t, baseDeps, "")
+	h := newLoopHarness(t, ModeStandalone, m)
+	h.restartFn = func(context.Context, Change) (*manifest.Manifest, error) { return nil, errors.New("port in use") }
+	h.save(m, nil, dotenvFile)
+	require.Equal(t, []WatchEventKind{WatchRestarting, WatchRestartFailed}, h.kinds(2))
+
+	h.mu.Lock()
+	h.restartFn = nil
+	h.mu.Unlock()
+	h.save(m, nil, manifest.Marker)
+	e := h.next()
+	require.Equal(t, WatchRestarting, e.Kind)
+	require.Equal(t, []Reason{{Code: ReasonDotenv}}, e.Change.Reasons)
+	require.Equal(t, WatchRestarted, h.next().Kind)
+
+	// Paid: the next unchanged save is nothing again.
+	h.save(m, nil, manifest.Marker)
+	require.Equal(t, WatchUnchanged, h.next().Kind)
+}
+
+// An edit made while the start ran happened before the watch began, so no
+// event reports it: the watch compares the disk with what was started.
+func TestWatchAppliesAnEditMadeDuringTheStart(t *testing.T) {
+	h := newLoopHarnessOnDisk(t, ModeStandalone, pyproject(t, baseDeps, ""), pyproject(t, baseDeps+`, "requests"`, ""))
+	require.Equal(t, []WatchEventKind{WatchInstalling, WatchInstalled}, h.kinds(2))
+	require.Equal(t, [][]string{{"requests"}}, h.installs)
+}
+
+// Beginning a watch on a project that matches what was started says nothing.
+func TestWatchBeginsQuietly(t *testing.T) {
+	h := newLoopHarness(t, ModeStandalone, pyproject(t, baseDeps, ""))
+	h.quiet()
+}
+
+// Ctrl-C during a restart ends the watch, not the restart's prospects: no
+// "restart failed, save again" for an interrupt the user made.
+func TestWatchSaysNothingWhenInterruptedMidRestart(t *testing.T) {
+	m := pyproject(t, baseDeps, "")
+	h := newLoopHarness(t, ModeStandalone, m)
+	h.restartFn = func(ctx context.Context, _ Change) (*manifest.Manifest, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	h.save(m, nil, dotenvFile)
+	require.Equal(t, WatchRestarting, h.next().Kind)
+	h.cancel()
+	<-h.done
+	select {
+	case e := <-h.events:
+		t.Fatalf("unexpected watch event after the interrupt: %+v", e)
+	default:
+	}
+}
+
+// A Dockerfile moved to another directory is watched there too.
+func TestWatchFollowsAMovedDockerfile(t *testing.T) {
+	m := pyproject(t, baseDeps, "dockerfile = \"docker/Dockerfile\"\n")
+	h := newLoopHarness(t, ModeDocker, m)
+	moved := pyproject(t, baseDeps, "dockerfile = \"build/Dockerfile\"\n")
+	h.save(moved, nil, manifest.Marker)
+	require.Equal(t, []WatchEventKind{WatchRestarting, WatchRestarted}, h.kinds(2))
+	h.mu.Lock()
+	require.Contains(t, h.watched, "docker")
+	require.Contains(t, h.watched, "build")
+	h.mu.Unlock()
+
+	h.save(moved, nil, "build/Dockerfile")
+	e := h.next()
+	require.Equal(t, WatchRestarting, e.Kind)
+	require.Equal(t, []Reason{{Code: ReasonDockerfileEdited}}, e.Change.Reasons)
+}
+
+// An overflowed event queue lost edits to files nobody can name, so every
+// file the watch acts on is checked.
+func TestWatchRescansAfterAnOverflow(t *testing.T) {
+	m := pyproject(t, baseDeps, "")
+	h := newLoopHarness(t, ModeStandalone, m)
+	h.save(pyproject(t, baseDeps+`, "requests"`, ""), nil, rescanAll)
+	e := h.next()
+	require.Equal(t, WatchRestarting, e.Kind, "the .env is among the files an overflow stands for")
+	require.Equal(t, []string{dotenvFile, manifest.Marker}, e.Files)
+}
+
+// forward never makes fsnotify wait on a reader busy with a restart: events
+// queue, each name once, and an overflow becomes a rescan.
+func TestForwardQueuesWhileTheReaderIsBusy(t *testing.T) {
+	dir := t.TempDir()
+	events := make(chan fsnotify.Event)
+	errs := make(chan error)
+	out := make(chan string)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go forward(ctx, dir, events, errs, out)
+
+	// Nobody reads out yet: every send must still be taken at once.
+	for range 100 {
+		events <- fsnotify.Event{Name: filepath.Join(dir, manifest.Marker), Op: fsnotify.Write}
+	}
+	events <- fsnotify.Event{Name: filepath.Join(dir, dotenvFile), Op: fsnotify.Chmod}
+	events <- fsnotify.Event{Name: filepath.Join(dir, dotenvFile), Op: fsnotify.Create}
+	errs <- fsnotify.ErrEventOverflow
+
+	require.Equal(t, manifest.Marker, <-out)
+	require.Equal(t, dotenvFile, <-out)
+	require.Equal(t, rescanAll, <-out)
+	select {
+	case n := <-out:
+		t.Fatalf("each name is queued once, got another: %q", n)
+	case <-time.After(50 * time.Millisecond):
+	}
 }
