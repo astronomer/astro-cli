@@ -13,7 +13,6 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/secretenv"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
@@ -46,12 +45,11 @@ func (e *Engine) buildEnv(p rt.Plan, projectPath, stateDir, airflowHome string, 
 	for _, k := range sortedKeys(p.Env) {
 		env = setEnv(env, k, p.Env[k])
 	}
-	// SecretEnv is layered in like any other environment, so precedence is
-	// decided in one place: after Env, so a key in both resolves the way the
-	// contract says (secret wins), and before the blocks below, which the
-	// engine keeps. A start then moves what survived out of the launch
-	// environment and onto the handoff (splitSecretEnv); a command run against
-	// a stopped project uses this environment as it is.
+	// SecretEnv is ordinary environment here. The distinction exists because
+	// docker mode persists a compose file and standalone persists nothing, so
+	// there is no second treatment for this engine to give it — and applying it
+	// after Env means a key in both resolves the way the contract says, secret
+	// wins.
 	for _, k := range sortedKeys(p.SecretEnv) {
 		env = setEnv(env, k, p.SecretEnv[k])
 	}
@@ -265,46 +263,6 @@ func hasKey(env []string, key string) bool {
 		}
 	}
 	return false
-}
-
-// secretEnvFD is the descriptor the supervisor reads a start's secret values
-// from: the first of exec.Cmd.ExtraFiles, after stdin, stdout and stderr.
-const secretEnvFD = 3
-
-// splitSecretEnv separates a fully built launch environment into what the
-// supervisor is launched with and the secret values it is handed instead
-// (internal/secretenv, launchDetached).
-//
-// It works on the finished environment, not on the plan, so precedence stays
-// what buildEnv decided. A secret only moves when the environment still holds
-// its value. A key a later block overrode (the engine's own settings) keeps
-// the engine's value and stays where it is, which is the same outcome a
-// single environment gave it. A value the handoff cannot carry stays too, so
-// nothing is lost that used to arrive.
-func splitSecretEnv(env []string, secret map[string]string) (rest []string, moved map[string]string) {
-	if len(secret) == 0 {
-		return env, nil
-	}
-	// The value each key resolves to: os/exec keeps the last duplicate.
-	final := make(map[string]string, len(env))
-	for _, kv := range env {
-		k, v, _ := strings.Cut(kv, "=")
-		final[k] = v
-	}
-	moved = make(map[string]string, len(secret))
-	for k, v := range secret {
-		if fv, ok := final[k]; ok && fv == v && secretenv.Valid(k, v) {
-			moved[k] = v
-		}
-	}
-	rest = make([]string, 0, len(env))
-	for _, kv := range env {
-		k, _, _ := strings.Cut(kv, "=")
-		if _, ok := moved[k]; !ok {
-			rest = append(rest, kv)
-		}
-	}
-	return rest, moved
 }
 
 // sortedKeys orders a map's keys so env construction is deterministic.

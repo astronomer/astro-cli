@@ -14,15 +14,14 @@ volumes:
   postgres_data:
     driver: local
 {{- with .SecretEnv}}
-  # The secret handoff's file lives here, in memory only. See secretEnvSpec in
-  # compose.go: env set in this file would put the values in each container's
-  # configuration, which the daemon keeps on disk.
-  {{.Volume}}:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-      o: "size={{.SizeBytes}},mode=1777"
+
+# The project's secret values, read from the compose process's environment at
+# creation and copied into each container that names the secret. Not
+# environment: that would put them in each container's configuration, which
+# `docker inspect` prints. See secretEnvSpec in compose.go.
+secrets:
+  {{.Name}}:
+    environment: {{.PayloadVar}}
 {{- end}}
 
 services:
@@ -55,37 +54,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10m
-{{- with .SecretEnv}}
-
-  # Holds the handoff volume mounted, so its contents outlive any one Airflow
-  # container's restart, and reports healthy once the start has written the
-  # file. Does nothing else: no network, no command of its own.
-  {{.Service}}:
-    image: {{$.Image}}
-    entrypoint: ["sleep", "infinity"]
-    init: true
-    restart: unless-stopped
-    network_mode: none
-    user: astro
-    labels:
-      io.astronomer.docker: "true"
-      io.astronomer.docker.cli: "true"
-      io.astronomer.docker.component: "airflow-{{.Service}}"
-    volumes:
-      - {{.Volume}}:{{.Dir}}
-    healthcheck:
-      test: ["CMD", "test", "-s", "{{.File}}"]
-      interval: 1s
-      timeout: 5s
-      retries: 3
-      start_period: 1m
-{{- end}}
 
   db-migration:
     depends_on:
       postgres:
         condition: service_healthy
-{{- template "secretdep" $}}
     image: {{.Image}}
     command:
 {{- range .DBCommand}}
@@ -97,12 +70,8 @@ services:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
       io.astronomer.docker.component: "airflow-db-migration"
-{{- template "secretrev" $}}
+{{- template "secretenv" $}}
     environment: *common-env
-{{- with .SecretEnv}}
-    volumes:
-      - {{.Volume}}:{{.Dir}}:ro
-{{- end}}
 {{- range .Services}}
 
   {{.Name}}:
@@ -113,7 +82,6 @@ services:
     depends_on:
       db-migration:
         condition: service_completed_successfully
-{{- template "secretdep" $}}
     image: {{$.Image}}
     command:
 {{- range .Command}}
@@ -127,7 +95,7 @@ services:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
       io.astronomer.docker.component: "airflow-{{.Name}}"
-{{- template "secretrev" $}}
+{{- template "secretenv" $}}
     environment: *common-env
 {{- if .Publish}}
     ports:
@@ -137,26 +105,19 @@ services:
 {{- end}}
 
 {{- define "mounts"}}
-{{- if or .Mounts .SecretEnv}}
+{{- if .Mounts}}
     volumes:
 {{- range .Mounts}}
       - {{.Host}}:{{.Container}}:z
 {{- end}}
-{{- with .SecretEnv}}
-      - {{.Volume}}:{{.Dir}}:ro
-{{- end}}
 {{- end}}
 {{- end}}
 
-{{- define "secretrev"}}
+{{- /* Continues a service's labels: the start's revision, then the secret. */}}
+{{- define "secretenv"}}
 {{- with .SecretEnv}}
       io.astronomer.docker.secret-env-rev: "{{.Rev}}"
-{{- end}}
-{{- end}}
-
-{{- define "secretdep"}}
-{{- with .SecretEnv}}
-      {{.Service}}:
-        condition: service_healthy
+    secrets:
+      - {{.Name}}
 {{- end}}
 {{- end}}

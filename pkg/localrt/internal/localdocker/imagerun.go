@@ -105,11 +105,14 @@ func (e *Engine) RunInImage(ctx context.Context, projectPath string, req rt.Imag
 		// key it cannot resolve is dropped from the container silently.
 		//
 		// Unlike Start, this passes the values as container environment: the
-		// container is a one-off --rm that bypasses the image's entrypoint and
-		// hands its stdin to the caller, so neither the handoff volume nor the
-		// loader is available. They sit in that container's configuration for
-		// its lifetime (rt.Plan.SecretEnv).
-		extraEnv: environ,
+		// container is a one-off --rm that replaces the service's command, and
+		// the loader with it. They sit in that container's configuration for its
+		// lifetime (rt.Plan.SecretEnv).
+		//
+		// The secret's own variable is set too, empty, because the file declares
+		// the secret whenever the last start had values, and compose refuses to
+		// create a container when a declared secret's variable is unset.
+		extraEnv: append(environ, secretEnvComposeEnv(nil)...),
 	}
 
 	// --pull never: the image was built locally and never pushed, so a pull can

@@ -1,11 +1,9 @@
 package localdocker
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
@@ -37,58 +35,16 @@ func (e *Engine) composeUp(ctx context.Context, up *composeLine, cb rt.Callbacks
 	if err := e.runCompose(ctx, *up, cb, "up", "--no-start", "--quiet-pull"); err != nil {
 		return err
 	}
-	if up.secretPayload != nil {
-		if err := e.handOffSecretEnv(ctx, up, cb); err != nil {
-			return err
-		}
-	}
 	upCtx, cancel := context.WithTimeout(ctx, e.healthTimeout)
 	defer cancel()
 	// --quiet-pull here too: nothing should be left to pull, but a pull_policy
 	// in an override, or an image removed between the two steps, would
 	// otherwise stream progress bars through cb.OnLine.
-	// --remove-orphans: a container of this project whose service the file no
-	// longer names is stale by definition. The one it matters most for is the
-	// secret handoff's holder after a start with no secret values, which would
-	// otherwise keep the previous values mounted in memory until a down.
-	err := e.runCompose(upCtx, *up, cb, "up", "--detach", "--quiet-pull", "--remove-orphans")
+	err := e.runCompose(upCtx, *up, cb, "up", "--detach", "--quiet-pull")
 	if err != nil && ctx.Err() == nil && errors.Is(upCtx.Err(), context.DeadlineExceeded) {
 		// The deadline, not the caller's patience: a Ctrl-C keeps the plain
 		// error. Either way the caller cleans up.
 		return fmt.Errorf("%w after %s", ErrStartTimedOut, e.healthTimeout)
 	}
 	return err
-}
-
-// handOffSecretEnv delivers a start's secret values before anything that reads
-// them runs: it starts the service that holds the handoff volume, alone, and
-// writes the values into the volume through `compose exec` stdin. The up that
-// follows starts the Airflow containers, which compose holds back until that
-// service reports the file present (secretEnvSpec).
-//
-// Stdin is the one channel here the daemon does not keep. The command line
-// names only the file, and the write goes through a temporary name and a
-// rename, so a reader never sees half a file.
-//
-// The file is read-only to every user rather than owner-only. Every container
-// that mounts the volume is this project's own, but not every one runs as the
-// writer: the Airflow services run as astro, and the migration as whatever
-// user the image names, which a project Dockerfile is free to change. An
-// owner-only file would fail that migration with a permission error.
-func (e *Engine) handOffSecretEnv(ctx context.Context, up *composeLine, cb rt.Callbacks) error {
-	if err := e.runCompose(ctx, *up, cb, "up", "--detach", "--no-deps", secretEnvService); err != nil {
-		return fmt.Errorf("starting the %s service: %w", secretEnvService, err)
-	}
-	tmp := secretEnvFile + ".tmp"
-	write := "rm -f " + tmp + " && umask 0222 && cat > " + tmp + " && mv -f " + tmp + " " + secretEnvFile
-	var stderr bytes.Buffer
-	stdio := rt.Stdio{In: bytes.NewReader(up.secretPayload), Err: &stderr}
-	args := up.argv("exec", "-T", secretEnvService, "sh", "-c", write)
-	if err := e.cmd.Run(ctx, up.env(), stdio, up.conn.bin, args...); err != nil {
-		if msg := strings.TrimSpace(stderr.String()); msg != "" {
-			return fmt.Errorf("handing secret values to the containers: %w: %s", err, msg)
-		}
-		return fmt.Errorf("handing secret values to the containers: %w", err)
-	}
-	return nil
 }

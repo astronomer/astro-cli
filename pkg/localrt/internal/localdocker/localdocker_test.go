@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -241,7 +240,7 @@ func TestStartBringsProjectUp(t *testing.T) {
 		"the pre-flight probe must ask about the project the teardown would remove")
 	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --no-start --quiet-pull",
 		composeFile, p.ProjectPath, name), cmd.calls[3])
-	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --detach --quiet-pull --remove-orphans",
+	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --detach --quiet-pull",
 		composeFile, p.ProjectPath, name), cmd.calls[4])
 	assert.FileExists(t, composeFile)
 
@@ -950,44 +949,39 @@ func TestStartWithProjectDockerfileStillUsesPlanGeneration(t *testing.T) {
 // --- SecretEnv reaches the containers, and nothing else ---
 
 // The helpers are unit-tested in compose_test.go; this is the wiring that makes
-// them matter: the values arrive on the handoff's stdin, after the holder
-// service starts and before the up that starts Airflow, and on no command line,
-// no compose environment and no file.
-func TestStartHandsSecretValuesOffThroughStdin(t *testing.T) {
-	const secret = "postgres://u:pw@h/db"
-	var delivered []byte
+// them matter: the values reach both up commands as the secret's payload
+// variable, and nowhere else: no command line, no other variable, no file.
+func TestStartHandsSecretValuesToComposeAsTheSecretPayload(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
-	cmd.run = func(call string, s rt.Stdio) error {
-		if strings.Contains(call, " exec -T "+secretEnvService+" ") {
-			b, err := io.ReadAll(s.In)
-			delivered = b
-			return err
-		}
-		return nil
-	}
 	e := testEngine(t, cmd)
 	p := testPlan(t)
-	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": secret}
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
 
 	_, err := e.Start(context.Background(), p, rt.Callbacks{})
 	require.NoError(t, err)
 
-	assert.JSONEq(t, `{"AIRFLOW_CONN_DB":"postgres://u:pw@h/db"}`, string(delivered))
-
-	create := callIndex(cmd.calls, "up --no-start")
-	holder := callIndex(cmd.calls, "up --detach --no-deps "+secretEnvService)
-	write := callIndex(cmd.calls, "exec -T "+secretEnvService)
-	upAll := callIndex(cmd.calls, "up --detach --quiet-pull")
-	require.True(t, create >= 0 && holder >= 0 && write >= 0 && upAll >= 0, "calls: %v", cmd.calls)
-	assert.True(t, create < holder && holder < write && write < upAll,
-		"the values must be in place before the up that starts Airflow: %v", cmd.calls)
+	for _, up := range []string{"up --no-start", "up --detach"} {
+		env, ok := cmd.envFor(up)
+		require.True(t, ok, "no %q call: %v", up, cmd.calls)
+		var payload string
+		for _, kv := range env {
+			if v, ok := strings.CutPrefix(kv, secretEnvPayloadVar+"="); ok {
+				payload = v
+			}
+		}
+		assert.JSONEq(t, `{"AIRFLOW_CONN_DB":"postgres://u:pw@h/db"}`, payload,
+			"%q creates containers from the file, so it must carry the secret's payload", up)
+	}
 
 	for _, call := range cmd.calls {
 		assert.NotContains(t, call, "pw@h", "a secret value reached a command line")
 	}
 	for call, env := range cmd.env {
 		for _, kv := range env {
-			assert.NotContains(t, kv, "pw@h", "a secret value reached the environment of %q", call)
+			if strings.HasPrefix(kv, secretEnvPayloadVar+"=") {
+				continue
+			}
+			assert.NotContains(t, kv, "pw@h", "a secret value reached the environment of %q outside the payload", call)
 		}
 	}
 	stateDir, err := rt.StateDir(p.ProjectPath)
@@ -1026,8 +1020,9 @@ func TestStartLabelsEachHandoffWithANewRevision(t *testing.T) {
 	assert.NotEqual(t, first, rev())
 }
 
-// A payload past the volume's size fails the start before anything is created,
-// with a message that names the limit rather than a `cat` write error.
+// A payload past what one environment variable can carry fails the start
+// before anything is created, with a message that names the limit rather than
+// an exec error on Linux hosts only.
 func TestStartRefusesSecretValuesPastTheLimit(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
@@ -1055,44 +1050,18 @@ func TestStartWarnsWhenAnOverrideReplacesALoadedCommand(t *testing.T) {
 	assert.NotEmpty(t, linesWith(lines, "scheduler will start without its vault and workspace values"), "lines: %v", lines)
 }
 
-// The full up removes orphans, so a holder left from an earlier start with
-// secret values does not keep them mounted after a start without any.
-func TestStartRemovesOrphans(t *testing.T) {
-	cmd := &fakeCmd{output: noProjects}
-	e := testEngine(t, cmd)
-	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
-	require.NoError(t, err)
-	assert.True(t, hasCall(cmd.calls, "up --detach --quiet-pull --remove-orphans"), "calls: %v", cmd.calls)
-}
-
-// A start with no secret values does not run the handoff at all.
+// A start with no secret values carries no payload variable, and its file
+// declares no secret.
 func TestStartWithoutSecretsSkipsTheHandoff(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
 	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
 	require.NoError(t, err)
-	assert.False(t, hasCall(cmd.calls, secretEnvService), "calls: %v", cmd.calls)
-}
-
-// A handoff that fails fails the start, and the containers it created are
-// taken back down like any failed up's.
-func TestStartFailsWhenTheHandoffFails(t *testing.T) {
-	cmd := &fakeCmd{output: noProjects}
-	cmd.run = func(call string, s rt.Stdio) error {
-		if strings.Contains(call, " exec -T "+secretEnvService+" ") {
-			_, _ = io.WriteString(s.Err, "no space left on device")
-			return errors.New("exit status 1")
+	for call, env := range cmd.env {
+		for _, kv := range env {
+			assert.False(t, strings.HasPrefix(kv, secretEnvPayloadVar+"="), "%q carries a payload", call)
 		}
-		return nil
 	}
-	e := testEngine(t, cmd)
-	p := testPlan(t)
-	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
-
-	_, err := e.Start(context.Background(), p, rt.Callbacks{})
-	require.ErrorContains(t, err, "no space left on device")
-	assert.False(t, hasCall(cmd.calls, "up --detach --quiet-pull"), "Airflow must not start without its values")
-	assert.True(t, hasCall(cmd.calls, " down "), "the containers the start created must be removed: %v", cmd.calls)
 }
 
 // The engine connection has to win a collision, because os/exec keeps the last

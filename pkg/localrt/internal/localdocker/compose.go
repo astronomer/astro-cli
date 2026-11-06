@@ -105,10 +105,10 @@ type composeInput struct {
 	// components that wait on it.
 	DBCommand []string
 	Services  []service
-	// SecretEnv, when set, adds the secret handoff: the tmpfs volume, the
-	// service that holds it mounted, and the mount and dependency on it in
-	// every Airflow container. Nil when the plan has no secret values, which
-	// leaves the file exactly as it was before the handoff existed.
+	// SecretEnv, when set, adds the secret handoff: the compose secret, and
+	// the secret and the start's revision label on every Airflow container.
+	// Nil when the plan has no secret values, which leaves the file exactly as
+	// it was before the handoff existed.
 	SecretEnv *secretEnvSpec
 }
 
@@ -313,8 +313,8 @@ func quoteYAML(s string) string {
 // and omits the variable entirely when unset.
 //
 // SecretEnv keys are not among them. A value compose resolves this way is baked
-// into the container's configuration, which the daemon keeps on disk and
-// `docker inspect` prints, so secret values take the handoff instead
+// into the container's configuration, which `docker inspect` prints and the
+// engine GUIs show, so secret values take the handoff instead
 // (secretEnvSpec).
 //
 // A stop or a down needs none of these values, and not for the reason it first
@@ -360,28 +360,34 @@ func secretEnviron(secretEnv map[string]string) []string {
 }
 
 // The secret handoff: how a docker start gives Airflow its SecretEnv values
-// without the daemon recording them.
+// without putting them in a container's environment configuration.
 //
 // Environment set through compose is part of a container's configuration,
-// which the daemon writes to disk (config.v2.json, inside the engine's VM on
-// macOS) and `docker inspect` prints to anyone who can reach the socket. So
-// secret values do not go through compose at all. The start writes them, as
-// one JSON file, into a tmpfs volume through `compose exec` stdin, and each
-// Airflow container runs its command through secretEnvLoader, which reads the
-// file into the environment and execs the real command. tmpfs lives in the
-// engine's memory, and a volume's configuration records the mount, not what
-// is in it.
+// which `docker inspect` prints, which the engine's GUIs show in their
+// environment panels, and which diagnostic bundles collect. Those are where a
+// credential gets seen by accident: pasted into an issue, shown on a shared
+// screen. So secret values travel as one compose secret instead. The start
+// puts the JSON payload in secretEnvPayloadVar on the compose process, the
+// file declares a secret read from that variable, and compose copies it into
+// each Airflow container as a file under /run/secrets. Each container runs its
+// command through secretEnvLoader, which reads the file into the environment
+// and execs the real command.
 //
-// A tmpfs volume is unmounted, and its contents lost, when the last container
-// using it stops, so a service of its own holds it mounted for the project's
-// lifetime. The Airflow containers depend on that service being healthy, which
-// its healthcheck makes mean "the file is there": the ordering is compose's to
-// enforce, not a wait loop's.
+// What this does not do is keep the values off disk: compose writes the secret
+// into the container's own filesystem layer, which lives as long as the
+// container. That is what lets a container the engine restarts on its own (a
+// reboot, an engine restart) come back with its values, with no CLI present.
+// Reading them takes deliberate access to the engine, which can read a running
+// Airflow's environment anyway.
 const (
-	secretEnvService = "secret-env"
-	secretEnvVolume  = "secret_env"
-	secretEnvDir     = "/run/astro-secret-env" //nolint:gosec // a mount path, not a credential
-	secretEnvFile    = secretEnvDir + "/env.json"
+	// secretEnvName is the compose secret, and the file under /run/secrets.
+	secretEnvName = "astro_secret_env"
+	// secretEnvPayloadVar is the compose process variable the secret is read
+	// from. Set on every compose command that creates containers from the
+	// generated file, because compose refuses to create one when a declared
+	// secret's variable is unset.
+	secretEnvPayloadVar = "ASTRO_SECRET_ENV_PAYLOAD" //nolint:gosec // a variable's name, not a credential
+	secretEnvFile       = "/run/secrets/" + secretEnvName
 )
 
 // secretEnvLoader is the Python program an Airflow container runs its command
@@ -397,26 +403,27 @@ const (
 // same as before.
 //
 // Its arguments are the file, a mode, and the command. "required" refuses to
-// start without the file: the values are lost whenever the engine restarts, and
-// an Airflow that came back without its connections would fail every task that
-// uses one, far from the cause. "optional" is for exec into a running
-// container, which a project with no secret values has no file for.
+// start without the file: compose always provides it to a container that
+// declares the secret, so a missing one means something replaced how the
+// container was started, and an Airflow without its connections would fail
+// every task that uses one, far from the cause. "optional" is for exec into a
+// running container, which a project with no secret values has no file for.
 //
 // One line, because the compose file renders it as a single-quoted YAML scalar
 // and YAML folds a newline inside one into a space.
 const secretEnvLoader = "import json,os,sys;" +
 	"p,m,a=sys.argv[1],sys.argv[2],sys.argv[3:];e=os.path.exists(p);" +
-	"m=='required' and not e and sys.exit('astro: this container has no secret values. They live only in memory and are lost when the container engine restarts. Restart the project: astro local stop, then astro local start --docker');" +
+	"m=='required' and not e and sys.exit('astro: this container is missing its secret values ('+p+'). Restart the project: astro local stop, then astro local start --docker');" +
 	"os.environ.update(json.load(open(p)) if e else {});" +
 	"os.execvp(a[0],a)"
 
-// secretEnvMaxBytes caps the handoff file, and so the tmpfs volume holding it.
-// It is far above what a process environment can carry (Linux refuses an exec
-// whose arguments and environment pass a quarter of the stack limit, 2 MiB by
-// default), so a payload this size could not have started Airflow by any
-// route; the cap exists to say so plainly instead of letting `cat` fail with
-// "No space left on device".
-const secretEnvMaxBytes = 4 << 20
+// secretEnvMaxBytes caps the payload. It travels as one environment variable
+// on the compose process, and Linux refuses to exec a process carrying a
+// single environment string past 128 KiB (MAX_ARG_STRLEN), name included. The
+// cap sits under that with room for the name, so a payload too large fails
+// with a message naming the limit, on every host, rather than as an exec
+// error on Linux only.
+const secretEnvMaxBytes = 120 << 10
 
 // secretEnvRevBytes is how much randomness a start's handoff revision carries:
 // enough that two starts never share one.
@@ -428,25 +435,30 @@ const dbMigrationService = "db-migration"
 
 // secretEnvSpec is what the compose template needs to render the handoff.
 type secretEnvSpec struct {
-	Service, Volume, Dir, File string
-	// SizeBytes is the tmpfs volume's size: secretEnvMaxBytes.
-	SizeBytes int
+	Name, PayloadVar string
 	// Rev differs on every start that hands values off, and labels each
-	// container that reads them. The values themselves are not in any
-	// container's configuration, so without it compose would see nothing
-	// changed and keep a running Airflow on the values it started with — a
-	// start against containers that are still up (the state record is gone
-	// but they are not) would rewrite the file and leave Airflow on rotated-out
-	// credentials. A new label makes compose recreate those containers, and
-	// only those: the holder keeps the volume mounted throughout.
+	// container that reads them. Compose does not recreate a container when
+	// only a secret's value changed, so without it a start against containers
+	// that are still up (the state record is gone but they are not) would leave
+	// Airflow on the values it started with: rotated-out credentials. A new
+	// label makes compose recreate those containers.
 	Rev string
 }
 
 func newSecretEnvSpec(rev string) *secretEnvSpec {
-	return &secretEnvSpec{
-		Service: secretEnvService, Volume: secretEnvVolume, Dir: secretEnvDir, File: secretEnvFile,
-		SizeBytes: secretEnvMaxBytes, Rev: rev,
+	return &secretEnvSpec{Name: secretEnvName, PayloadVar: secretEnvPayloadVar, Rev: rev}
+}
+
+// secretEnvComposeEnv is the compose process environment that carries a
+// payload for the secret the file declares. With no payload it carries an
+// empty object, so a compose command against a file that declares the secret
+// (RunInImage, after a start that had values) is not refused for the
+// variable being unset.
+func secretEnvComposeEnv(payload []byte) []string {
+	if payload == nil {
+		payload = []byte("{}")
 	}
+	return []string{secretEnvPayloadVar + "=" + string(payload)}
 }
 
 // overrideReplacedCommands lists the services among names whose command the

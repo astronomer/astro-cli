@@ -24,19 +24,12 @@ const Subcommand = "__supervise"
 const (
 	parentPIDFlagName = "parent-pid"
 	logFileFlagName   = "log-file"
-	envFDFlagName     = "env-fd"
 )
 
-// ParentPIDFlag, LogFileFlag and EnvFDFlag are the flag tokens (with leading
-// dashes) callers pass when building the supervisor command line. Derived from
-// the flag names so the two forms cannot drift.
-//
-// EnvFDFlag names an inherited descriptor carrying the child's secret values
-// (internal/secretenv): the supervisor reads it to end of file, closes it, and
-// adds the values to the child's environment only, so they never sit on a
-// command line or in the supervisor's own environment.
+// ParentPIDFlag and LogFileFlag are the flag tokens (with leading dashes)
+// callers pass when building the supervisor command line. Derived from the
+// flag names so the two forms cannot drift.
 const (
 	ParentPIDFlag = "--" + parentPIDFlagName
 	LogFileFlag   = "--" + logFileFlagName
-	EnvFDFlag     = "--" + envFDFlagName
 )

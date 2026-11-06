@@ -285,9 +285,10 @@ func TestHandoffEnvLeavesOutWhatTheEngineKeeps(t *testing.T) {
 	assert.Equal(t, map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}, handoffEnv(secretEnv, env))
 }
 
-// With secret values, every container that runs Airflow reads them through the
-// loader and waits for the holder service; the file names the handoff's path
-// and never a value.
+// With secret values, the file declares one secret read from the compose
+// process's environment, and every container that runs Airflow names it, runs
+// its command through the loader, and carries the start's revision. The file
+// names the variable, never a value.
 func TestGenerateComposeWithSecretHandoff(t *testing.T) {
 	in := goldenInput()
 	in.SecretEnv = newSecretEnvSpec("rev1")
@@ -299,47 +300,31 @@ func TestGenerateComposeWithSecretHandoff(t *testing.T) {
 	require.NoError(t, err)
 
 	var doc struct {
-		Volumes  map[string]map[string]any `yaml:"volumes"`
+		Secrets  map[string]map[string]string `yaml:"secrets"`
 		Services map[string]struct {
-			Command     []string                  `yaml:"command"`
-			Labels      map[string]string         `yaml:"labels"`
-			Entrypoint  []string                  `yaml:"entrypoint"`
-			Volumes     []string                  `yaml:"volumes"`
-			DependsOn   map[string]map[string]any `yaml:"depends_on"`
-			NetworkMode string                    `yaml:"network_mode"`
-			Healthcheck struct {
-				Test []string `yaml:"test"`
-			} `yaml:"healthcheck"`
+			Command []string          `yaml:"command"`
+			Labels  map[string]string `yaml:"labels"`
+			Secrets []string          `yaml:"secrets"`
+			Volumes []string          `yaml:"volumes"`
 		} `yaml:"services"`
 	}
 	require.NoError(t, yaml.Unmarshal([]byte(got), &doc), got)
 
-	vol, ok := doc.Volumes[secretEnvVolume]
-	require.True(t, ok, "the handoff volume must be declared")
-	opts, _ := vol["driver_opts"].(map[string]any)
-	assert.Equal(t, "tmpfs", opts["type"], "the handoff volume must live in memory")
-	assert.Equal(t, "size="+strconv.Itoa(secretEnvMaxBytes)+",mode=1777", opts["o"])
-
-	holder, ok := doc.Services[secretEnvService]
-	require.True(t, ok, "a service must hold the volume mounted")
-	assert.Equal(t, []string{"sleep", "infinity"}, holder.Entrypoint)
-	assert.Equal(t, "none", holder.NetworkMode)
-	assert.Contains(t, holder.Volumes, secretEnvVolume+":"+secretEnvDir)
-	assert.Equal(t, []string{"CMD", "test", "-s", secretEnvFile}, holder.Healthcheck.Test,
-		"healthy must mean the file is there, which is what the containers wait on")
+	assert.Equal(t, map[string]map[string]string{secretEnvName: {"environment": secretEnvPayloadVar}}, doc.Secrets,
+		"one secret, read from the compose process's environment")
 
 	for _, name := range []string{"db-migration", "scheduler", "api-server"} {
 		svc := doc.Services[name]
 		require.GreaterOrEqual(t, len(svc.Command), 5, name)
 		assert.Equal(t, []string{"python3", "-c", secretEnvLoader, secretEnvFile, "required"}, svc.Command[:5],
 			"%s must run its command through the loader, intact after YAML", name)
-		assert.Contains(t, svc.Volumes, secretEnvVolume+":"+secretEnvDir+":ro", name)
-		assert.Equal(t, "service_healthy", svc.DependsOn[secretEnvService]["condition"], name)
+		assert.Equal(t, []string{secretEnvName}, svc.Secrets, name)
 		assert.Equal(t, "rev1", svc.Labels["io.astronomer.docker.secret-env-rev"],
 			"%s must carry the start's revision, so a re-start recreates it onto the new values", name)
 	}
-	assert.Empty(t, doc.Services[secretEnvService].Labels["io.astronomer.docker.secret-env-rev"],
-		"the holder must not be recreated, or the volume could lose its file")
+	assert.Contains(t, doc.Services["scheduler"].Volumes, "/home/me/demo/dags:/usr/local/airflow/dags:z",
+		"the project mounts must survive next to the secret")
+	assert.Nil(t, doc.Services["postgres"].Secrets, "postgres has no use for the values")
 	assert.NotContains(t, got, "pw@", "the file must never carry a value")
 }
 
@@ -360,8 +345,8 @@ func TestOverrideReplacedCommands(t *testing.T) {
 func TestGenerateComposeWithoutSecretsHasNoHandoff(t *testing.T) {
 	got, err := generateCompose(goldenInput())
 	require.NoError(t, err)
-	assert.NotContains(t, got, secretEnvService)
-	assert.NotContains(t, got, secretEnvVolume)
+	assert.NotContains(t, got, "secrets:")
+	assert.NotContains(t, got, secretEnvName)
 	assert.NotContains(t, got, "python3")
 }
 

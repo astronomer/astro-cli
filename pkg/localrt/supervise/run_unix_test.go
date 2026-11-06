@@ -6,8 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
-	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -76,53 +74,3 @@ func TestRunReportsChildFailure(t *testing.T) {
 // is not unit-testable in-process: the supervisor signals its own process
 // group, which here would be the test runner's. The end-to-end smoke and
 // the desktop lineage of this code cover it.
-
-// handoffFD returns an inheritable read descriptor whose pipe holds payload,
-// standing in for the one the engine passes through ExtraFiles. Go's own
-// descriptors are close-on-exec; a dup is not, so only the supervisor closing
-// it keeps the child from inheriting it, which is the behavior under test.
-func handoffFD(t *testing.T, payload string) int {
-	t.Helper()
-	r, w, err := os.Pipe()
-	require.NoError(t, err)
-	fd, err := syscall.Dup(int(r.Fd()))
-	require.NoError(t, err)
-	require.NoError(t, r.Close())
-	_, err = w.WriteString(payload)
-	require.NoError(t, err)
-	require.NoError(t, w.Close())
-	return fd
-}
-
-// The values on the descriptor reach the child's environment intact, a pair no
-// environment can hold is dropped, and the descriptor itself is closed before
-// the child starts.
-//
-// Not parallel: the descriptor is inheritable by any process the test binary
-// starts meanwhile.
-func TestRunHandsSecretEnvToTheChildOnly(t *testing.T) {
-	value := `pa$$ 'w"o` + "\nrd"
-	fd := handoffFD(t, `{"HANDOFF_TEST":`+strconv.Quote(value)+`,"BAD=KEY":"x"}`)
-
-	logPath := filepath.Join(t.TempDir(), "airflow.log")
-	script := `printf '[%s]' "$HANDOFF_TEST"; if (: <&` + strconv.Itoa(fd) + `) 2>/dev/null; then echo fd-leaked; fi`
-	require.NoError(t, Run([]string{LogFileFlag, logPath, EnvFDFlag, strconv.Itoa(fd), "--", "/bin/sh", "-c", script}))
-
-	data, err := os.ReadFile(logPath)
-	require.NoError(t, err)
-	assert.Contains(t, string(data), "["+value+"]", "the value must reach the child byte for byte")
-	assert.NotContains(t, string(data), "fd-leaked",
-		"the supervisor must close the descriptor after reading it, or the child inherits it")
-}
-
-// A payload that cannot be read stops the start rather than launching Airflow
-// without its values.
-func TestRunRefusesAnUnreadableSecretEnv(t *testing.T) {
-	fd := handoffFD(t, "not json")
-
-	logPath := filepath.Join(t.TempDir(), "airflow.log")
-	marker := filepath.Join(t.TempDir(), "ran")
-	err := Run([]string{LogFileFlag, logPath, EnvFDFlag, strconv.Itoa(fd), "--", "/bin/sh", "-c", "touch " + marker})
-	require.ErrorContains(t, err, "reading secret values")
-	assert.NoFileExists(t, marker, "the child must not start without its values")
-}

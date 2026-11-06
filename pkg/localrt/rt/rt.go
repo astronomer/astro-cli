@@ -124,24 +124,27 @@ type Plan struct {
 	// runtime without writing the values to disk. Standalone mode ignores
 	// it: the Airflow process inherits the shell environment directly.
 	PassthroughEnv []string
-	// SecretEnv is environment the consumer does not want written anywhere: not
-	// into the runtime's own configuration, not onto a command line, and not into
-	// a container's configuration. It reaches Airflow's environment like Env, but
-	// through a handoff rather than as configuration (internal/secretenv). In
-	// docker mode the values go into a tmpfs volume through `compose exec`
-	// stdin, and each Airflow container's command reads them in before running;
-	// the compose file names neither the keys nor the values, and the daemon
-	// never sees them as container environment, so `docker inspect` and its
-	// on-disk container config hold none of them. In standalone mode the values
-	// go to the supervisor on an inherited pipe, and into Airflow's environment
-	// only.
+	// SecretEnv is environment the consumer does not want written into the
+	// runtime's own configuration, onto a command line, or where it is easily
+	// happened upon. It reaches Airflow's environment like Env. In docker mode it
+	// travels as one compose secret rather than as container environment: the
+	// compose file names neither the keys nor the values, compose copies the
+	// payload into each Airflow container as a file, and each container's
+	// command reads it into its environment before running. So `docker inspect`,
+	// the engine GUIs' environment panels and diagnostic bundles show none of
+	// it. Standalone mode has no such surfaces and passes it as ordinary process
+	// environment.
 	//
 	// Be precise about what is left, because a consumer sizing a threat model off
-	// the wrong sentence will get it wrong. Once Airflow runs, the values are in
-	// its processes' environment, readable by the same user and root as any
-	// process environment is, and in docker mode in the engine's memory. A
-	// command run with RunInImage receives them as ordinary container
-	// environment for the lifetime of that one --rm container.
+	// the wrong sentence will get it wrong. This hides the values from accidental
+	// view; it does not keep them from anyone with access to the engine. In
+	// docker mode the secret file sits in each container's filesystem layer, on
+	// the engine's disk, until the containers are removed, which is what lets a
+	// container the engine restarts on its own come back with its values. Once
+	// Airflow runs, the values are in its processes' environment, readable by
+	// the same user and root. A command run with RunInImage receives them as
+	// ordinary container environment for the lifetime of that one --rm
+	// container.
 	//
 	// The distinction is not stylistic. Env is written into a compose file that
 	// outlives the containers, and a consumer whose values come from a keyring —

@@ -1,14 +1,14 @@
 package secretenv
 
 import (
-	"strings"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRoundTripKeepsValuesByteForByte(t *testing.T) {
+func TestEncodeKeepsValuesByteForByte(t *testing.T) {
 	in := map[string]string{
 		"AIRFLOW_CONN_DB": `postgres://u:pa$$ 'w"o@h/db`,
 		"MULTILINE":       "-----BEGIN KEY-----\nabc\n-----END KEY-----",
@@ -16,32 +16,26 @@ func TestRoundTripKeepsValuesByteForByte(t *testing.T) {
 	}
 	b, err := Encode(in)
 	require.NoError(t, err)
-	out, err := Decode(strings.NewReader(string(b)))
-	require.NoError(t, err)
+	var out map[string]string
+	require.NoError(t, json.Unmarshal(b, &out))
 	assert.Equal(t, in, out)
 }
 
-// A pair no environment can hold is dropped at both ends: Encode never sends
-// it, and Decode never trusts a payload that has it.
-func TestInvalidPairsAreDropped(t *testing.T) {
-	b, err := Encode(map[string]string{"": "x", "A=B": "x", "NUL\x00": "x", "V": "a\x00b"})
+// A pair no environment can hold is never sent.
+func TestEncodeDropsInvalidPairs(t *testing.T) {
+	b, err := Encode(map[string]string{"": "x", "A=B": "x", "NUL\x00": "x", "V": "a\x00b", "OK": "1"})
 	require.NoError(t, err)
-	assert.Nil(t, b, "nothing valid means no handoff at all")
-
-	out, err := Decode(strings.NewReader(`{"OK":"1","A=B":"2"}`))
-	require.NoError(t, err)
-	assert.Equal(t, map[string]string{"OK": "1"}, out)
+	assert.JSONEq(t, `{"OK":"1"}`, string(b))
 }
 
 func TestEncodeNothingIsNoHandoff(t *testing.T) {
 	b, err := Encode(nil)
 	require.NoError(t, err)
 	assert.Nil(t, b)
-}
 
-func TestDecodeRefusesGarbage(t *testing.T) {
-	_, err := Decode(strings.NewReader("not json"))
-	assert.ErrorContains(t, err, "reading secret values")
+	b, err = Encode(map[string]string{"A=B": "x"})
+	require.NoError(t, err)
+	assert.Nil(t, b, "nothing valid means no handoff at all")
 }
 
 func TestEnvironIsSorted(t *testing.T) {

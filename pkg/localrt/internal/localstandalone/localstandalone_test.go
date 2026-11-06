@@ -95,7 +95,7 @@ func testEngine(t *testing.T) (*Engine, *fakeProcs, *[]string) {
 	var launches []string
 	e := New(filepath.Join(t.TempDir(), "proxy"), nil, UVOptions{})
 	e.uv = func(context.Context, func(rt.LogLine)) (venvSyncer, error) { return fakeUV{}, nil }
-	e.launch = func(_ string, _ []string, _ []byte, name string, args ...string) (int, error) {
+	e.launch = func(_ string, _ []string, name string, args ...string) (int, error) {
 		launches = append(launches, name+" "+strings.Join(args, " "))
 		procs.alive[fakePID] = true
 		return fakePID, nil

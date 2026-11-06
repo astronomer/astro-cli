@@ -13,8 +13,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	"github.com/astronomer/astro-cli/pkg/localrt/internal/secretenv"
 )
 
 const (
@@ -42,7 +40,6 @@ func Run(args []string) error {
 	fs.SetOutput(io.Discard)
 	parentPID := fs.Int(parentPIDFlagName, 0, "PID to watch; the supervisor kills the child when this PID exits (0 watches nothing)")
 	logPath := fs.String(logFileFlagName, "", "file the child's output and the supervisor's diagnostics are written to")
-	envFD := fs.Int(envFDFlagName, 0, "inherited descriptor to read the child's secret values from (0 reads none)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -86,17 +83,6 @@ func Run(args []string) error {
 	// user is expected to key off it.
 	lg := log.New(out, "supervise: ", log.LstdFlags)
 
-	// Before anything else that can block: the spawner's write waits on this
-	// read once the payload outgrows the pipe's buffer.
-	var secretEnv []string
-	if *envFD > 0 {
-		var err error
-		if secretEnv, err = readSecretEnv(*envFD); err != nil {
-			lg.Printf("%v", err)
-			return err
-		}
-	}
-
 	// Trap SIGTERM/SIGINT so signaling our own pgid (below) doesn't kill us
 	// before we finish cleaning up the Airflow subprocesses. Also covers the
 	// normal stop path, where the engine signals the pgid directly — we stay
@@ -116,13 +102,6 @@ func Run(args []string) error {
 		cmd.Stderr = os.Stderr
 	}
 	cmd.Stdin = nil
-	if secretEnv != nil {
-		// Appended, so a value here wins over the supervisor's own: os/exec
-		// keeps the last duplicate. The spawner only moved keys whose final
-		// value this is (localstandalone.splitSecretEnv), so there is nothing
-		// for it to wrongly override.
-		cmd.Env = append(os.Environ(), secretEnv...)
-	}
 	// No Setpgid here: the child inherits the supervisor's pgid, so a
 	// single kill(-pgid, ...) from the stop path reaches everyone.
 	if err := cmd.Start(); err != nil {
@@ -188,24 +167,4 @@ func shutdownVerdict(err error) error {
 		return nil
 	}
 	return err
-}
-
-// readSecretEnv reads the spawner's secret values from an inherited
-// descriptor, to end of file, and closes it. Closing matters as much as
-// reading: the descriptor is inheritable, so leaving it open would hand it to
-// Airflow and to everything Airflow starts.
-func readSecretEnv(fd int) ([]string, error) {
-	f := os.NewFile(uintptr(fd), "secret-env")
-	defer func() { _ = f.Close() }()
-	// os.NewFile wraps any number it is given, so ask the descriptor itself:
-	// a spawner that passed the flag without the descriptor gets this, rather
-	// than a decode error about a file nobody opened.
-	if _, err := f.Stat(); err != nil {
-		return nil, fmt.Errorf("reading secret values: descriptor %d is not open: %w", fd, err)
-	}
-	values, err := secretenv.Decode(f)
-	if err != nil {
-		return nil, err
-	}
-	return secretenv.Environ(values), nil
 }

@@ -387,15 +387,19 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	existing, probeErr := e.projectContainers(ctx, conn, name)
 	mayCleanUp := probeErr == nil && existing == 0
 
-	// The secret values travel on the up's handoff and nowhere else: not in its
-	// environment, where compose would resolve them into the containers'
-	// configuration, and not on any command line. See secretEnvSpec.
+	// The secret values travel as the payload of the one compose secret the
+	// file declares (secretEnvSpec), in the up's environment and nowhere else:
+	// not as container environment, and not on any command line. Only on the
+	// up: it is the one command here that creates containers from the file.
+	// Stop and down are run with no --file and never read the declaration.
 	up := composeLine{
-		conn:          conn,
-		files:         composeFiles(composePath, projectPath),
-		name:          name,
-		projectDir:    projectPath,
-		secretPayload: secretPayload,
+		conn:       conn,
+		files:      composeFiles(composePath, projectPath),
+		name:       name,
+		projectDir: projectPath,
+	}
+	if secretPayload != nil {
+		up.extraEnv = secretEnvComposeEnv(secretPayload)
 	}
 	if err := e.bringUp(ctx, &up, mayCleanUp, cb); err != nil {
 		return nil, err
@@ -1145,13 +1149,10 @@ type composeLine struct {
 	name       string
 	projectDir string
 	// extraEnv is added to the compose process environment on top of the engine
-	// connection's own. It carries RunInImage's values, which it names with bare
+	// connection's own. It carries the secret handoff's payload variable
+	// (secretEnvComposeEnv), and RunInImage's values, which it names with bare
 	// -e flags.
 	extraEnv []string
-	// secretPayload is the secret handoff a start delivers before the Airflow
-	// containers start (composeUp, handOffSecretEnv). Nil for every other
-	// command, and for a start with no secret values.
-	secretPayload []byte
 }
 
 // argv is the compose command line for this invocation.
