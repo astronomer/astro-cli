@@ -83,7 +83,7 @@ func (e *Engine) RunInImage(ctx context.Context, projectPath string, req rt.Imag
 	if err != nil {
 		return err
 	}
-	if err := e.composeAvail(ctx, conn); err != nil {
+	if _, err := e.composeAvail(ctx, conn); err != nil {
 		return err
 	}
 

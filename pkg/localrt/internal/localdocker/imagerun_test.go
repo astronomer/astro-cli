@@ -253,9 +253,9 @@ func TestRunInImageBringsTheEngineUpBeforeRunning(t *testing.T) {
 
 	var order []string
 	e.ensureEngine = func(rt.Callbacks, string) error { order = append(order, "ensureEngine"); return nil }
-	e.composeAvail = func(context.Context, engineConn) error {
+	e.composeAvail = func(context.Context, engineConn) (composeInfo, error) {
 		order = append(order, "composeAvail")
-		return nil
+		return composeInfo{}, nil
 	}
 
 	require.NoError(t, e.RunInImage(context.Background(), project, rt.ImageRun{
@@ -287,7 +287,7 @@ func TestRunInImageStopsWithoutTheComposePlugin(t *testing.T) {
 	withComposeFile(t, project)
 
 	missing := errors.New("compose v2 is not installed")
-	e.composeAvail = func(context.Context, engineConn) error { return missing }
+	e.composeAvail = func(context.Context, engineConn) (composeInfo, error) { return composeInfo{}, missing }
 
 	require.ErrorIs(t, e.RunInImage(context.Background(), project, rt.ImageRun{
 		Argv: []string{"python"},

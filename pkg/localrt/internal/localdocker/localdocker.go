@@ -78,15 +78,12 @@ type Engine struct {
 
 	// ensureEngine brings a stopped Docker daemon up, or checks a podman
 	// machine is running, before the start touches it. composeAvail checks
-	// the Compose v2 plugin is present. startSession spawns the detached session watcher for
+	// the Compose v2 plugin is present, and reports what it can do
+	// (composeInfo). startSession spawns the detached session watcher for
 	// --stop-with-session. All three are seams so tests never touch a daemon.
 	ensureEngine func(cb rt.Callbacks, projectPath string) error
-	composeAvail func(ctx context.Context, conn engineConn) error
-	// composeSecrets reports whether the engine's compose can take a secret
-	// from the environment, which decides how a start delivers SecretEnv
-	// (planHandoff).
-	composeSecrets func(ctx context.Context, conn engineConn) bool
-	startSession   func(projectPath string, parentPID int) error
+	composeAvail func(ctx context.Context, conn engineConn) (composeInfo, error)
+	startSession func(projectPath string, parentPID int) error
 
 	healthTimeout time.Duration
 
@@ -146,7 +143,6 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 		return ensureEngineUp(cb, e.now, e.binaryFor(projectPath))
 	}
 	e.composeAvail = e.probeCompose
-	e.composeSecrets = e.probeComposeSecrets
 	return e
 }
 
@@ -307,7 +303,8 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	}
 	// A missing Compose v2 plugin otherwise surfaces as an opaque "exit status
 	// 125"; catch it here with an actionable message before any compose call.
-	if err := e.composeAvail(ctx, conn); err != nil {
+	compose, err := e.composeAvail(ctx, conn)
+	if err != nil {
 		return nil, err
 	}
 
@@ -344,7 +341,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	}
 
 	env := airflowEnv(name, webPort, major, p.Env, p.SecretEnv)
-	h, err := e.planHandoff(ctx, conn, p, env, projectPath, major, cb)
+	h, err := e.planHandoff(compose, p, env, projectPath, major, cb)
 	if err != nil {
 		return nil, err
 	}
@@ -449,14 +446,14 @@ type handoffPlan struct {
 // That is podman-compose, which `podman compose` runs when no docker-compose
 // is installed; refusing those starts outright would trade a visibility
 // improvement for a broken start.
-func (e *Engine) planHandoff(ctx context.Context, conn engineConn, p rt.Plan, env []envVar, projectPath, major string, cb rt.Callbacks) (handoffPlan, error) {
+func (e *Engine) planHandoff(compose composeInfo, p rt.Plan, env []envVar, projectPath, major string, cb rt.Callbacks) (handoffPlan, error) {
 	h := handoffPlan{dbCommand: dbCommand(major), services: airflowServices(major)}
 	values := handoffEnv(p.SecretEnv, env)
 	payload, err := secretenv.Encode(values)
 	if err != nil || payload == nil {
 		return h, err
 	}
-	if !e.composeSecrets(ctx, conn) {
+	if !compose.envSecrets {
 		for k, v := range values {
 			if secretenv.Valid(k, v) {
 				h.passKeys = append(h.passKeys, k)

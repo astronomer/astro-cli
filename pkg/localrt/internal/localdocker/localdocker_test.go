@@ -130,8 +130,7 @@ func testEngine(t *testing.T, cmd *fakeCmd) *Engine {
 	e.health = func(context.Context, []string, time.Duration) error { return nil }
 	e.now = func() time.Time { return time.Date(2026, 7, 21, 10, 0, 0, 0, time.UTC) }
 	e.ensureEngine = func(rt.Callbacks, string) error { return nil }
-	e.composeAvail = func(context.Context, engineConn) error { return nil }
-	e.composeSecrets = func(context.Context, engineConn) bool { return true }
+	e.composeAvail = func(context.Context, engineConn) (composeInfo, error) { return composeInfo{envSecrets: true}, nil }
 	e.startSession = func(string, int) error { return nil }
 	return e
 }
@@ -457,7 +456,7 @@ func TestStartFailsWhenEngineCannotStart(t *testing.T) {
 func TestStartReportsMissingCompose(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
-	e.composeAvail = func(context.Context, engineConn) error { return ErrComposeMissing }
+	e.composeAvail = func(context.Context, engineConn) (composeInfo, error) { return composeInfo{}, ErrComposeMissing }
 	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
 	assert.ErrorIs(t, err, ErrComposeMissing)
 	assert.False(t, hasCall(cmd.calls, "up"), "no compose up when the plugin is missing")
@@ -1058,7 +1057,7 @@ func TestStartWarnsWhenAnOverrideReplacesALoadedCommand(t *testing.T) {
 func TestStartFallsBackToEnvWhereComposeCannotTakeASecret(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
-	e.composeSecrets = func(context.Context, engineConn) bool { return false }
+	e.composeAvail = func(context.Context, engineConn) (composeInfo, error) { return composeInfo{envSecrets: false}, nil }
 	p := testPlan(t)
 	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
 
@@ -1078,6 +1077,55 @@ func TestStartFallsBackToEnvWhereComposeCannotTakeASecret(t *testing.T) {
 	assert.NotContains(t, string(compose), secretEnvName)
 	assert.NotContains(t, string(compose), "python3")
 	assert.NotEmpty(t, linesWith(lines, "docker inspect"), "the start must say the values are visible: %v", lines)
+}
+
+// The real probe, through the commander: one `compose version` decides both
+// that compose is there and whether it takes a secret from the environment,
+// and a start runs it once.
+func TestProbeComposeReadsTheProviderFromOneVersionCall(t *testing.T) {
+	for out, want := range map[string]bool{
+		"Docker Compose version v2.29.7":                     true,
+		"podman version 5.8.2\npodman-compose version 1.6.0": false,
+	} {
+		cmd := &fakeCmd{output: func(string) ([]byte, error) { return []byte(out), nil }}
+		e := testEngine(t, cmd)
+		info, err := e.probeCompose(context.Background(), engineConn{bin: "docker"})
+		require.NoError(t, err)
+		assert.Equal(t, want, info.envSecrets, "%q", out)
+		assert.Equal(t, []string{"docker compose version"}, cmd.calls)
+	}
+
+	cmd := &fakeCmd{output: func(string) ([]byte, error) { return nil, errors.New("unknown command") }}
+	e := testEngine(t, cmd)
+	_, err := e.probeCompose(context.Background(), engineConn{bin: "docker"})
+	require.ErrorIs(t, err, ErrComposeMissing)
+}
+
+// A start asks compose for its version once, not once per question.
+func TestStartAsksComposeForItsVersionOnce(t *testing.T) {
+	cmd := &fakeCmd{output: func(call string) ([]byte, error) {
+		if strings.HasSuffix(call, "compose version") {
+			return []byte("Docker Compose version v2.29.7"), nil
+		}
+		return nil, nil
+	}}
+	e := testEngine(t, cmd)
+	e.composeAvail = e.probeCompose
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	n := 0
+	for _, c := range cmd.calls {
+		if strings.HasSuffix(c, "compose version") {
+			n++
+		}
+	}
+	assert.Equal(t, 1, n, "calls: %v", cmd.calls)
+	env, ok := cmd.envFor("up --detach")
+	require.True(t, ok)
+	assert.Contains(t, strings.Join(env, "\n"), secretEnvPayloadVar+"=", "the probe's answer must reach the handoff")
 }
 
 // A start with no secret values carries no payload variable, and its file
