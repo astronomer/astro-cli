@@ -282,7 +282,7 @@ func (s *Suite) TestCreate() {
 		}
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockDeploymentListResponse, nil)
 		res, err := CreateOrUpdate("test-ws-id", "", "", "", "", "", 0, 0, 0, false, mockV1Client, out)
-		s.EqualError(err, "no Deployments found in workspace test-ws-id", "nothing to change is a failure, not a note and exit 0")
+		s.EqualError(err, "no Deployments found in workspace test-ws-id: create one with astro deployment create", "nothing to change is a failure, not a note and exit 0")
 		s.Nil(res)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -863,7 +863,7 @@ func (s *Suite) TestDelete() {
 		out := new(bytes.Buffer)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil)
 		_, err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockV1Client, out)
-		s.EqualError(err, "no Deployments found in workspace test-ws-id", "nothing to delete is a failure, not a note and exit 0")
+		s.ErrorContains(err, "the Deployment specified was not found in this workspace", "a named Deployment in a workspace with none is not found")
 		mockV1Client.AssertExpectations(s.T())
 	})
 }

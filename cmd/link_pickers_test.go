@@ -76,7 +76,7 @@ var (
 )
 
 // The link pickers are wired to deploy's own Deployment picker, over the client
-// given, with the create flow off, after deploy's login check. Deployments the
+// given, after deploy's login check. Deployments the
 // project already links are not shown. This drives the wired function rather
 // than the seam, so a root that forgot to wire it, or wired another client,
 // fails.
@@ -119,7 +119,7 @@ func TestLinkPickersWithNothingToOffer(t *testing.T) {
 	_, err = d.PickDeployment("ws_A", nil)
 	require.Error(t, err)
 	assert.NotErrorIs(t, err, local.ErrAllDeploymentsLinked)
-	assert.Contains(t, err.Error(), "no Deployments found in workspace ws_A")
+	assert.Contains(t, err.Error(), "no Deployments found in workspace ws_A: create one with astro deployment create")
 }
 
 // A 401 gets the login renewed and one more try, which then lists as usual.

@@ -56,13 +56,9 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		nodePools                            []astrov1.NodePool
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, nil, astroV1Client)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, deployment.ToChange, nil, astroV1Client)
 	if err != nil {
 		return nil, err
-	}
-
-	if requestedDeployment.Id == "" {
-		return nil, errNoDeployment(ws)
 	}
 
 	getDeploymentOptions := astrov1.GetDeploymentOptionsParams{
@@ -508,13 +504,9 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 		hybridWorkerQueuesToKeep []astrov1.HybridWorkerQueueRequest
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, nil, astroV1Client)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, deployment.ToChange, nil, astroV1Client)
 	if err != nil {
 		return nil, err
-	}
-
-	if requestedDeployment.Id == "" {
-		return nil, errNoDeployment(ws)
 	}
 
 	// prompt for queue name if one was not provided

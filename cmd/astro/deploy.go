@@ -681,13 +681,14 @@ func (d manifestDeployer) ListDeployments(workspaceID string) ([]manifestdeploy.
 // workspace's Deployments. A var so a test can shorten it.
 var listDeploymentsTimeout = 15 * time.Second
 
-// ResolveUnlinked runs the workspace-level pick/create flow and returns the
-// chosen Deployment.
+// ResolveUnlinked asks which of the workspace's Deployments to ship to and
+// returns the one picked. A workspace with none is an error naming astro
+// deployment create: a deploy never creates its target.
 func (d manifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeploy.Deployment, error) {
 	if !d.login.current {
 		return manifestdeploy.Deployment{}, errPickerOtherHost(d.login.context.Domain)
 	}
-	dep, err := deployment.GetDeployment(workspaceID, "", "", false, nil, d.login.client)
+	dep, err := deployment.GetDeployment(workspaceID, "", "", deployment.ToChange, nil, d.login.client)
 	if err != nil {
 		return manifestdeploy.Deployment{}, err
 	}

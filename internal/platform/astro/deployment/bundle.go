@@ -163,7 +163,7 @@ func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBund
 		return errDagBundleNonDagFlags
 	}
 
-	dep, err := GetDeployment(wsID, deploymentID, "", false, nil, astroV1Client)
+	dep, err := GetDeployment(wsID, deploymentID, "", ToChange, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription strin
 		return errUpdateBundleNoOp
 	}
 
-	dep, err := GetDeployment(wsID, deploymentID, "", false, nil, astroV1Client)
+	dep, err := GetDeployment(wsID, deploymentID, "", ToChange, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -304,7 +304,7 @@ func nonEmpty(s string) *string {
 // listBundlesData fetches every bundle configured on a deployment, paging through
 // all results.
 func listBundlesData(wsID, deploymentID string, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) (*BundleList, error) {
-	dep, err := GetDeployment(wsID, deploymentID, "", false, nil, astroV1Client)
+	dep, err := GetDeployment(wsID, deploymentID, "", ToRead, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +452,7 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 		return err
 	}
 
-	dep, err := GetDeployment(wsID, deploymentID, "", false, nil, astroV1Client)
+	dep, err := GetDeployment(wsID, deploymentID, "", ToChange, nil, astroV1Client)
 	if err != nil {
 		return err
 	}

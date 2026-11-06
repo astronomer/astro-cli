@@ -346,12 +346,9 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 			return "", nil, login, fmt.Errorf("failed to find a valid workspace: %w", err)
 		}
 	}
-	picked, err := deployment.GetDeployment(ws, "", "", false, nil, login.client)
+	picked, err := deployment.GetDeployment(ws, "", "", deployment.ToChange, nil, login.client)
 	if err != nil {
 		return "", nil, login, err
-	}
-	if picked.Id == "" {
-		return "", nil, login, deployment.ErrNothingTo(ws, "", "", "")
 	}
 	return picked.Id, &picked, login, nil
 }

@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strings"
 
 	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/cmd/local"
@@ -64,22 +63,21 @@ func withLinkPickers(d *local.Deps, client astrov1.APIClient, out io.Writer) {
 		}
 		var dep astrov1.Deployment
 		err := withLinkLogin(client, func() error {
-			// The create flow is off: linking names a Deployment that exists.
+			// A link is written into the project, so it is a Deployment the
+			// person picked, never one taken for being the only one.
 			var err error
-			dep, err = deployment.GetDeployment(workspaceID, "", "", true, unlinked, client)
+			dep, err = deployment.GetDeployment(workspaceID, "", "", deployment.ToChange, unlinked, client)
 			return err
 		})
-		// With the create flow off, a workspace with Deployments that the
-		// filter leaves none of is this error; an empty workspace returns no
-		// Deployment and no error.
-		if err != nil && strings.HasPrefix(err.Error(), deployment.NoDeploymentInWSMsg) {
+		// An empty workspace is a *NoDeploymentsError, which says how to
+		// create one; one whose every Deployment the filter leaves out is
+		// already linked.
+		var noneLeft *deployment.NoneEligibleError
+		if errors.As(err, &noneLeft) {
 			return local.PickedDeployment{}, local.ErrAllDeploymentsLinked
 		}
 		if err != nil {
 			return local.PickedDeployment{}, err
-		}
-		if dep.Id == "" {
-			return local.PickedDeployment{}, errors.New(deployment.NoDeploymentInWSMsg + " " + workspaceID)
 		}
 		return local.PickedDeployment{ID: dep.Id, Name: dep.Name, WorkspaceID: dep.WorkspaceId}, nil
 	}
