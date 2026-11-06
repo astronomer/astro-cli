@@ -19,7 +19,7 @@ type unknownCommand struct {
 // trackUnknownCommand records a command the CLI does not have. It only
 // listens: the refusal itself is cliout.Execute's, which reports an unknown
 // command by the output contract (an ErrorObject under --output json, cobra's
-// wording otherwise) and exits 2. Execute calls it after a run that failed as
+// error and a pointer to help otherwise) and exits 2. Execute calls it after a run that failed as
 // a usage error, so a run that worked sends nothing here, and by then cobra
 // has added the help and completion commands, which would otherwise make
 // `astro help` read as a command we do not have.
