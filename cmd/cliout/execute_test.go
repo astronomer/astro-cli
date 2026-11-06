@@ -161,22 +161,176 @@ func TestAnUnclassifiedJSONFailureOmitsKind(t *testing.T) {
 	assert.NotContains(t, r.stdout, "kind")
 }
 
-func TestATextFailureIsCobrasError(t *testing.T) {
+// A runtime failure is the error alone: the command was invoked rightly, so
+// neither its usage nor a pointer to its help follows.
+func TestATextFailureIsTheErrorAlone(t *testing.T) {
 	r := execTree(context.Background(), testTree(errBoom), "thing", "list")
 	require.Error(t, r.err)
 	assert.Empty(t, r.stdout)
-	assert.True(t, strings.HasPrefix(r.stderr, "Error: boom\n"), "stderr: %q", r.stderr)
-	// Not silenced, so the usage follows the error, as cobra prints it.
-	assert.Contains(t, r.stderr, "Usage:")
+	assert.Equal(t, "Error: boom\n", r.stderr)
+	assert.Equal(t, ExitFailure, ExitCode(context.Background(), r.err))
 }
 
-func TestSilencedUsageIsHonoured(t *testing.T) {
-	root := testTree(errBoom)
+// A usage error names what was wrong and points at the failing command's
+// help, never printing the help itself.
+func TestATextUsageErrorPointsAtHelp(t *testing.T) {
+	cases := map[string]struct {
+		args   []string
+		stderr string
+	}{
+		"unknown flag": {
+			[]string{"thing", "list", "--bogus"},
+			"Error: unknown flag: --bogus\nRun astro thing list --help for usage.\n",
+		},
+		"unknown shorthand": {
+			[]string{"thing", "list", "-z"},
+			"Error: unknown shorthand flag: 'z' in -z\nRun astro thing list --help for usage.\n",
+		},
+		"bad flag value": {
+			[]string{"thing", "list", "--all=maybe"},
+			"Error: invalid argument \"maybe\" for \"--all\" flag: strconv.ParseBool: parsing \"maybe\": invalid syntax\n" +
+				"Run astro thing list --help for usage.\n",
+		},
+		"wrong argument count": {
+			[]string{"thing", "list", "extra"},
+			"Error: unknown command \"extra\" for \"astro thing list\"\nRun astro thing list --help for usage.\n",
+		},
+		"missing required flag": {
+			[]string{"thing", "create"},
+			"Error: required flag(s) \"name\" not set\nRun astro thing create --help for usage.\n",
+		},
+		"unknown subcommand of a group": {
+			[]string{"thing", "bogus"},
+			"Error: unknown command \"bogus\" for \"astro thing\"\nRun astro thing --help for usage.\n",
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := execTree(context.Background(), testTree(nil), c.args...)
+			require.Error(t, r.err)
+			assert.Equal(t, ExitUsage, ExitCode(context.Background(), r.err))
+			assert.Empty(t, r.stdout)
+			assert.Equal(t, c.stderr, r.stderr)
+		})
+	}
+}
+
+// An unknown flag that one of the command's flags is clearly close to
+// suggests it, between the error and the pointer to help. At most one: two
+// equally close are a guess, and a shorthand is close to every other letter.
+func TestAnUnknownFlagSuggestsTheOneItIsCloseTo(t *testing.T) {
+	cases := map[string]struct {
+		args    []string
+		suggest string
+	}{
+		"a typo":                             {[]string{"thing", "list", "--outptu", "json"}, "--output"},
+		"a typo with its value":              {[]string{"thing", "list", "--alll=true"}, "--all"},
+		"a different case":                   {[]string{"thing", "list", "--OUTPUT", "json"}, "--output"},
+		"a prefix":                           {[]string{"thing", "create", "--na", "x"}, "--name"},
+		"an inherited flag":                  {[]string{"thing", "list", "--verbos"}, "--verbose"},
+		"nothing close":                      {[]string{"thing", "list", "--bogus"}, ""},
+		"two equally close":                  {[]string{"thing", "list", "--al"}, ""},
+		"a shorthand":                        {[]string{"thing", "list", "-p"}, ""},
+		"a hidden flag is never offered":     {[]string{"thing", "list", "--secre"}, ""},
+		"a deprecated flag is never offered": {[]string{"thing", "list", "--olds"}, ""},
+		"a short name is held closer":        {[]string{"thing", "list", "--ws"}, ""},
+		"a short name one edit away":         {[]string{"thing", "list", "--i"}, "--id"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			root := testTree(nil)
+			root.PersistentFlags().Bool("verbose", false, "")
+			leaf, _, err := root.Find([]string{"thing", "list"})
+			require.NoError(t, err)
+			leaf.Flags().Bool("ali", false, "")
+			leaf.Flags().Bool("secret", false, "")
+			require.NoError(t, leaf.Flags().MarkHidden("secret"))
+			leaf.Flags().Bool("old", false, "")
+			require.NoError(t, leaf.Flags().MarkDeprecated("old", "gone"))
+			leaf.Flags().Bool("id", false, "")
+
+			r := execTree(context.Background(), root, c.args...)
+			require.Error(t, r.err)
+			assert.Equal(t, ExitUsage, ExitCode(context.Background(), r.err))
+			lines := strings.Split(strings.TrimSuffix(r.stderr, "\n"), "\n")
+			if c.suggest == "" {
+				assert.Len(t, lines, 2, "stderr: %q", r.stderr)
+				assert.NotContains(t, r.stderr, "Did you mean")
+				return
+			}
+			require.Len(t, lines, 3, "stderr: %q", r.stderr)
+			assert.Equal(t, "Did you mean "+c.suggest+"?", lines[1])
+			assert.Equal(t, "Run astro "+c.args[0]+" "+c.args[1]+" --help for usage.", lines[2])
+		})
+	}
+}
+
+// Flag suggestions follow the settings command suggestions do: none when a
+// command on the way disables them.
+func TestFlagSuggestionsHonourDisableSuggestions(t *testing.T) {
+	root := testTree(nil)
+	root.DisableSuggestions = true
+	r := execTree(context.Background(), root, "thing", "list", "--alll")
+	assert.Equal(t, "Error: unknown flag: --alll\nRun astro thing list --help for usage.\n", r.stderr)
+}
+
+// Under --output json a usage error is the error object alone: no
+// suggestion, no pointer to help, nothing on stderr.
+func TestAJSONUsageErrorCarriesNoSuggestion(t *testing.T) {
+	r := execTree(context.Background(), testTree(nil), "thing", "list", "--alll", "-o", "json")
+	require.Error(t, r.err)
+	assert.Empty(t, r.stderr)
+	assert.Equal(t, ErrorObject{Error: "unknown flag: --alll", Code: ExitUsage, Kind: KindUsage}, decodeOne(t, r.stdout))
+}
+
+// A command invoked wrongly points at its help even when it silenced its
+// usage up front, as all of astro local does: that kept cobra's usage block
+// out, and its help is still where the right invocation is.
+func TestAMisinvokedSilencedCommandStillPointsAtHelp(t *testing.T) {
+	root := testTree(nil)
+	root.SilenceUsage = true
 	leaf, _, err := root.Find([]string{"thing", "list"})
 	require.NoError(t, err)
 	leaf.SilenceUsage = true
-	r := execTree(context.Background(), root, "thing", "list")
-	assert.Equal(t, "Error: boom\n", r.stderr)
+	r := execTree(context.Background(), root, "thing", "list", "--alll")
+	assert.Equal(t, "Error: unknown flag: --alll\nDid you mean --all?\nRun astro thing list --help for usage.\n", r.stderr)
+	r = execTree(context.Background(), root, "thing", "list", "extra")
+	assert.Equal(t, "Error: unknown command \"extra\" for \"astro thing list\"\nRun astro thing list --help for usage.\n", r.stderr)
+}
+
+// A usage error the command returns once it runs points at its help unless
+// the command silenced its usage first, which is how it says its help would
+// not settle it (a Deployment name several Deployments share).
+func TestAUsageErrorFromTheRunHonoursSilenceUsage(t *testing.T) {
+	ambiguous := Usage(errors.New("2 Deployments are named prod"))
+
+	r := execTree(context.Background(), testTree(ambiguous), "thing", "list")
+	assert.Equal(t, ExitUsage, ExitCode(context.Background(), r.err))
+	assert.Equal(t, "Error: 2 Deployments are named prod\nRun astro thing list --help for usage.\n", r.stderr)
+
+	root := testTree(nil)
+	leaf, _, err := root.Find([]string{"thing", "list"})
+	require.NoError(t, err)
+	leaf.RunE = func(cmd *cobra.Command, _ []string) error {
+		cmd.SilenceUsage = true
+		return ambiguous
+	}
+	r = execTree(context.Background(), root, "thing", "list")
+	assert.Equal(t, ExitUsage, ExitCode(context.Background(), r.err))
+	assert.Equal(t, "Error: 2 Deployments are named prod\n", r.stderr)
+}
+
+// A removed command's stub is hidden and its message names what replaced it,
+// so its refusal is the message alone.
+func TestARemovedCommandIsItsMessageAlone(t *testing.T) {
+	root := testTree(nil)
+	root.AddCommand(RemovedCommand("dev", nil, "Removed in v2", func(*cobra.Command, []string) error {
+		return Usage(errors.New("astro dev was removed in Astro CLI v2. Use astro local instead."))
+	}))
+	r := execTree(context.Background(), root, "dev", "start", "--bogus")
+	require.Error(t, r.err)
+	assert.Equal(t, ExitUsage, ExitCode(context.Background(), r.err))
+	assert.Equal(t, "Error: astro dev was removed in Astro CLI v2. Use astro local instead.\n", r.stderr)
 }
 
 func TestASilencedRootPrintsNothing(t *testing.T) {
@@ -278,24 +432,21 @@ func TestTheRootsOwnFlagErrorFuncStillRuns(t *testing.T) {
 	assert.True(t, IsUsage(r.err))
 }
 
-// Find's failure carries cobra's pointer to help rather than the usage block.
+// Find's failure is cobra's error and suggestions, then the same pointer to
+// help as every other usage error.
 func TestAnUnknownRootCommandPointsAtHelp(t *testing.T) {
 	r := execTree(context.Background(), testTree(nil), "bogus")
-	assert.Equal(t, "Error: unknown command \"bogus\" for \"astro\"\nRun 'astro --help' for usage.\n", r.stderr)
+	assert.Equal(t, "Error: unknown command \"bogus\" for \"astro\"\nRun astro --help for usage.\n", r.stderr)
 }
 
-// Execute forces the root's SilenceUsage on for the run, so the root failing
-// itself is the case where that forced value must not be read as its own.
-func TestARootFailurePrintsTheRootsUsage(t *testing.T) {
-	r := execTree(context.Background(), testTree(nil), "--bogus")
-	require.Error(t, r.err)
-	assert.True(t, strings.HasPrefix(r.stderr, "Error: unknown flag: --bogus\n"), "stderr: %q", r.stderr)
-	assert.Contains(t, r.stderr, "Usage:")
-
+// The root failing itself points at the root's help, and Execute puts the
+// root's own SilenceUsage back after the run that forced it on.
+func TestARootUsageErrorPointsAtTheRootsHelp(t *testing.T) {
 	root := testTree(nil)
-	root.SilenceUsage = true
-	r = execTree(context.Background(), root, "--bogus")
-	assert.Equal(t, "Error: unknown flag: --bogus\n", r.stderr, "a root that silenced its usage keeps it silent")
+	r := execTree(context.Background(), root, "--bogus")
+	require.Error(t, r.err)
+	assert.Equal(t, "Error: unknown flag: --bogus\nRun astro --help for usage.\n", r.stderr)
+	assert.False(t, root.SilenceUsage, "Execute restores the root's own setting")
 }
 
 // cobra adds its completion commands during execution, after markUsageErrors

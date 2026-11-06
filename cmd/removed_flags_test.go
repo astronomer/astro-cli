@@ -373,7 +373,9 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 					assert.Zero(t, *preRuns, "a pre-run started before the refusal")
 					if !asJSON {
 						assert.Empty(t, stdout)
-						assert.Contains(t, stderr, "Error: "+want)
+						// The message, and a pointer to help with no guess at
+						// a flag: the message already names what replaced it.
+						assert.Equal(t, "Error: "+want+"\nRun "+target.CommandPath()+" --help for usage.\n", stderr)
 						return
 					}
 					assert.Empty(t, stderr)

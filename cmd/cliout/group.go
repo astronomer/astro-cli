@@ -32,7 +32,7 @@ func GroupHelp(cmd *cobra.Command, args []string) error {
 	if !isJSON(cmd) {
 		return cmd.Help()
 	}
-	return Usage(needsSubcommand(cmd))
+	return misinvoked(needsSubcommand(cmd))
 }
 
 // UnknownSubcommand is the usage error for arg, which names none of cmd's
@@ -45,7 +45,7 @@ func UnknownSubcommand(cmd *cobra.Command, arg string) error {
 			msg += "\t" + s + "\n"
 		}
 	}
-	return Usage(errors.New(msg))
+	return misinvoked(errors.New(msg))
 }
 
 // suggestionsFor is what cobra's own refusal of an unknown command would
@@ -119,7 +119,7 @@ func bareGroups(root, target *cobra.Command) (refused func(ran *cobra.Command) e
 		case len(extra) > 0:
 			err = UnknownSubcommand(c, extra[0])
 		case isJSON(c):
-			err = Usage(needsSubcommand(c))
+			err = misinvoked(needsSubcommand(c))
 		default:
 			help(c, args)
 			return
