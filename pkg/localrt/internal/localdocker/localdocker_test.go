@@ -130,7 +130,7 @@ func testEngine(t *testing.T, cmd *fakeCmd) *Engine {
 	e.health = func(context.Context, []string, time.Duration) error { return nil }
 	e.now = func() time.Time { return time.Date(2026, 7, 21, 10, 0, 0, 0, time.UTC) }
 	e.ensureEngine = func(rt.Callbacks, string) error { return nil }
-	e.composeAvail = func(context.Context, engineConn) error { return nil }
+	e.composeAvail = func(context.Context, engineConn) (composeInfo, error) { return composeInfo{envSecrets: true}, nil }
 	e.startSession = func(string, int) error { return nil }
 	return e
 }
@@ -456,7 +456,7 @@ func TestStartFailsWhenEngineCannotStart(t *testing.T) {
 func TestStartReportsMissingCompose(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
-	e.composeAvail = func(context.Context, engineConn) error { return ErrComposeMissing }
+	e.composeAvail = func(context.Context, engineConn) (composeInfo, error) { return composeInfo{}, ErrComposeMissing }
 	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
 	assert.ErrorIs(t, err, ErrComposeMissing)
 	assert.False(t, hasCall(cmd.calls, "up"), "no compose up when the plugin is missing")
@@ -729,11 +729,15 @@ func TestRunExecsInScheduler(t *testing.T) {
 		return nil, nil
 	}
 
+	// Through the loader, optional: an exec inherits only the container's
+	// configuration, which holds no secret values, and a project started with
+	// none has no file for the loader to read.
+	loader := strings.Join(withSecretEnv(false, nil), " ")
 	require.NoError(t, af.Run(context.Background(), []string{"airflow", "version"}, rt.Stdio{}))
-	assert.Equal(t, "docker compose -p "+name+" exec scheduler airflow version", cmd.calls[len(cmd.calls)-1])
+	assert.Equal(t, "docker compose -p "+name+" exec scheduler "+loader+" airflow version", cmd.calls[len(cmd.calls)-1])
 
 	require.NoError(t, af.Shell(context.Background(), rt.Stdio{}))
-	assert.Equal(t, "docker compose -p "+name+" exec scheduler /bin/bash", cmd.calls[len(cmd.calls)-1])
+	assert.Equal(t, "docker compose -p "+name+" exec scheduler "+loader+" /bin/bash", cmd.calls[len(cmd.calls)-1])
 }
 
 func TestRunWhenNotRunning(t *testing.T) {
@@ -945,10 +949,9 @@ func TestStartWithProjectDockerfileStillUsesPlanGeneration(t *testing.T) {
 // --- SecretEnv reaches the containers, and nothing else ---
 
 // The helpers are unit-tested in compose_test.go; this is the wiring that makes
-// them matter. Delete the extraEnv line in Start and every one of those tests
-// still passes while no secret ever reaches a container, which is why this asserts
-// on the engine rather than the helpers.
-func TestStartHandsSecretValuesToTheComposeUp(t *testing.T) {
+// them matter: the values reach both up commands as the secret's payload
+// variable, and nowhere else: no command line, no other variable, no file.
+func TestStartHandsSecretValuesToComposeAsTheSecretPayload(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
 	p := testPlan(t)
@@ -957,10 +960,186 @@ func TestStartHandsSecretValuesToTheComposeUp(t *testing.T) {
 	_, err := e.Start(context.Background(), p, rt.Callbacks{})
 	require.NoError(t, err)
 
-	env, ok := cmd.envFor("compose")
-	require.True(t, ok, "no compose call was recorded")
-	assert.Contains(t, env, "AIRFLOW_CONN_DB=postgres://u:pw@h/db",
-		"the up must carry the values for the declarations the file makes, or the variable is declared and never resolved")
+	for _, up := range []string{"up --no-start", "up --detach"} {
+		env, ok := cmd.envFor(up)
+		require.True(t, ok, "no %q call: %v", up, cmd.calls)
+		var payload string
+		for _, kv := range env {
+			if v, ok := strings.CutPrefix(kv, secretEnvPayloadVar+"="); ok {
+				payload = v
+			}
+		}
+		assert.JSONEq(t, `{"AIRFLOW_CONN_DB":"postgres://u:pw@h/db"}`, payload,
+			"%q creates containers from the file, so it must carry the secret's payload", up)
+	}
+
+	for _, call := range cmd.calls {
+		assert.NotContains(t, call, "pw@h", "a secret value reached a command line")
+	}
+	for call, env := range cmd.env {
+		for _, kv := range env {
+			if strings.HasPrefix(kv, secretEnvPayloadVar+"=") {
+				continue
+			}
+			assert.NotContains(t, kv, "pw@h", "a secret value reached the environment of %q outside the payload", call)
+		}
+	}
+	stateDir, err := rt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	compose, err := os.ReadFile(filepath.Join(stateDir, composeFileName))
+	require.NoError(t, err)
+	assert.NotContains(t, string(compose), "pw@h", "a secret value reached the compose file")
+	assert.NotContains(t, string(compose), "AIRFLOW_CONN_DB", "a secret key must not be declared for compose to resolve")
+}
+
+// Each start that hands values off labels its Airflow containers with a new
+// revision, so compose recreates them onto the new values even when nothing
+// else about them changed (a start against containers whose record was lost).
+func TestStartLabelsEachHandoffWithANewRevision(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+	stateDir, err := rt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	rev := func() string {
+		b, err := os.ReadFile(filepath.Join(stateDir, composeFileName))
+		require.NoError(t, err)
+		_, after, ok := strings.Cut(string(b), "secret-env-rev: \"")
+		require.True(t, ok, "no revision label in the compose file")
+		r, _, _ := strings.Cut(after, "\"")
+		return r
+	}
+
+	_, err = e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	first := rev()
+	require.NoError(t, localstate.Remove(p.ProjectPath)) // the lost-record case
+	_, err = e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.NotEqual(t, first, rev())
+}
+
+// A payload past what one environment variable can carry fails the start
+// before anything is created, with a message that names the limit rather than
+// an exec error on Linux hosts only.
+func TestStartRefusesSecretValuesPastTheLimit(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"BIG": strings.Repeat("x", secretEnvMaxBytes)}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.ErrorContains(t, err, "more than the")
+	assert.False(t, hasCall(cmd.calls, " up "), "nothing may be created: %v", cmd.calls)
+}
+
+// An override that replaces a service's command drops the loader with it, and
+// the start says so instead of letting tasks fail later without their values.
+func TestStartWarnsWhenAnOverrideReplacesALoadedCommand(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+	override := "services:\n  scheduler:\n    command: [airflow, scheduler]\n"
+	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, rt.ComposeOverrideFile), []byte(override), 0o600))
+
+	var lines []string
+	_, err := e.Start(context.Background(), p, rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l.Text) }})
+	require.NoError(t, err)
+	assert.NotEmpty(t, linesWith(lines, "scheduler will start without its vault and workspace values"), "lines: %v", lines)
+}
+
+// A compose that cannot take a secret from the environment (podman-compose)
+// gets the values as environment, the way every start did before the
+// handoff, rather than a start that fails: declared in the file without a
+// value, resolved from the up's environment, and said once.
+func TestStartFallsBackToEnvWhereComposeCannotTakeASecret(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	e.composeAvail = func(context.Context, engineConn) (composeInfo, error) { return composeInfo{envSecrets: false}, nil }
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+
+	var lines []string
+	_, err := e.Start(context.Background(), p, rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l.Text) }})
+	require.NoError(t, err)
+
+	env, ok := cmd.envFor("up --detach")
+	require.True(t, ok)
+	assert.Contains(t, env, "AIRFLOW_CONN_DB=postgres://u:pw@h/db")
+	stateDir, err := rt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	compose, err := os.ReadFile(filepath.Join(stateDir, composeFileName))
+	require.NoError(t, err)
+	assert.Contains(t, string(compose), "'AIRFLOW_CONN_DB':", "the key must be declared for compose to resolve")
+	assert.NotContains(t, string(compose), "pw@h", "the value still never reaches the file")
+	assert.NotContains(t, string(compose), secretEnvName)
+	assert.NotContains(t, string(compose), "python3")
+	assert.NotEmpty(t, linesWith(lines, "docker inspect"), "the start must say the values are visible: %v", lines)
+}
+
+// The real probe, through the commander: one `compose version` decides both
+// that compose is there and whether it takes a secret from the environment,
+// and a start runs it once.
+func TestProbeComposeReadsTheProviderFromOneVersionCall(t *testing.T) {
+	for out, want := range map[string]bool{
+		"Docker Compose version v2.29.7":                     true,
+		"podman version 5.8.2\npodman-compose version 1.6.0": false,
+	} {
+		cmd := &fakeCmd{output: func(string) ([]byte, error) { return []byte(out), nil }}
+		e := testEngine(t, cmd)
+		info, err := e.probeCompose(context.Background(), engineConn{bin: "docker"})
+		require.NoError(t, err)
+		assert.Equal(t, want, info.envSecrets, "%q", out)
+		assert.Equal(t, []string{"docker compose version"}, cmd.calls)
+	}
+
+	cmd := &fakeCmd{output: func(string) ([]byte, error) { return nil, errors.New("unknown command") }}
+	e := testEngine(t, cmd)
+	_, err := e.probeCompose(context.Background(), engineConn{bin: "docker"})
+	require.ErrorIs(t, err, ErrComposeMissing)
+}
+
+// A start asks compose for its version once, not once per question.
+func TestStartAsksComposeForItsVersionOnce(t *testing.T) {
+	cmd := &fakeCmd{output: func(call string) ([]byte, error) {
+		if strings.HasSuffix(call, "compose version") {
+			return []byte("Docker Compose version v2.29.7"), nil
+		}
+		return nil, nil
+	}}
+	e := testEngine(t, cmd)
+	e.composeAvail = e.probeCompose
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	n := 0
+	for _, c := range cmd.calls {
+		if strings.HasSuffix(c, "compose version") {
+			n++
+		}
+	}
+	assert.Equal(t, 1, n, "calls: %v", cmd.calls)
+	env, ok := cmd.envFor("up --detach")
+	require.True(t, ok)
+	assert.Contains(t, strings.Join(env, "\n"), secretEnvPayloadVar+"=", "the probe's answer must reach the handoff")
+}
+
+// A start with no secret values carries no payload variable, and its file
+// declares no secret.
+func TestStartWithoutSecretsSkipsTheHandoff(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
+	require.NoError(t, err)
+	for call, env := range cmd.env {
+		for _, kv := range env {
+			assert.False(t, strings.HasPrefix(kv, secretEnvPayloadVar+"="), "%q carries a payload", call)
+		}
+	}
 }
 
 // The engine connection has to win a collision, because os/exec keeps the last

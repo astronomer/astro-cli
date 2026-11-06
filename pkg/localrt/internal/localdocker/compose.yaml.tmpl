@@ -13,6 +13,16 @@ networks:
 volumes:
   postgres_data:
     driver: local
+{{- with .SecretEnv}}
+
+# The project's secret values, read from the compose process's environment at
+# creation and copied into each container that names the secret. Not
+# environment: that would put them in each container's configuration, which
+# `docker inspect` prints. See secretEnvSpec in compose.go.
+secrets:
+  {{.Name}}:
+    environment: {{.PayloadVar}}
+{{- end}}
 
 services:
   postgres:
@@ -60,6 +70,7 @@ services:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
       io.astronomer.docker.component: "airflow-db-migration"
+{{- template "secretenv" $}}
     environment: *common-env
 {{- range .Services}}
 
@@ -84,6 +95,7 @@ services:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
       io.astronomer.docker.component: "airflow-{{.Name}}"
+{{- template "secretenv" $}}
     environment: *common-env
 {{- if .Publish}}
     ports:
@@ -98,5 +110,16 @@ services:
 {{- range .Mounts}}
       - {{.Host}}:{{.Container}}:z
 {{- end}}
+{{- end}}
+{{- end}}
+
+{{- /* Continues a service's labels: the start's revision, then the secret. */}}
+{{- define "secretenv"}}
+{{- with .SecretEnv}}
+      io.astronomer.docker.secret-env-rev: "{{.Rev}}"
+    secrets:
+      - source: {{.Name}}
+        target: {{.File}}
+        mode: {{.Mode}}
 {{- end}}
 {{- end}}

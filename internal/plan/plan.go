@@ -164,9 +164,9 @@ func Build(workingDir string, opts Options) (*Built, error) {
 		// The vault's values, kept out of Env on purpose: docker mode
 		// writes Env into the compose file it leaves in the state
 		// directory, and a decrypted credential on disk would undo the
-		// reason the vault exists. SecretEnv is declared there without a
-		// value and handed to the compose process instead; standalone
-		// treats it as ordinary environment.
+		// reason the vault exists. SecretEnv stays out of that file, and in
+		// docker mode out of the containers' environment configuration too:
+		// pkg/localrt hands it over as a compose secret.
 		SecretEnv:      resolved.secretEnv,
 		PassthroughEnv: resolved.passthrough,
 		Hostname:       proj.Hostname,
@@ -408,10 +408,9 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	in := envresolve.Inputs{Schema: schema, Providers: src.Providers(vault.Providers())}
 	if opts.WorkspaceProvider != nil {
 		// reveal = true: start needs the real values to run Airflow. Both modes:
-		// a value resolved here travels as SecretEnv (below), which docker mode
-		// hands to the compose process rather than writing into the compose
-		// file, so it stays off disk either way — the posture Astro Desktop
-		// already runs its docker starts under.
+		// a value resolved here travels as SecretEnv (below), which pkg/localrt
+		// keeps out of the compose file and, in docker mode, out of what
+		// `docker inspect` shows.
 		in.WorkspaceProvider = opts.WorkspaceProvider(&m.Astro, true)
 	}
 	res, err := envresolve.Resolve(in)
@@ -530,8 +529,8 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 // rather than injected as a blank, and a secret the org withheld never
 // resolves, the rules Astro Desktop injects by.
 //
-// Travels as SecretEnv, like a declared workspace value, so docker hands it to
-// the compose process rather than writing it into the compose file.
+// Travels as SecretEnv, like a declared workspace value, so it stays out of the
+// compose file and out of what `docker inspect` shows.
 func workspaceUndeclared(wp envresolve.Provider, schema *envschema.Schema, src localenv.Sources, inj, secretInj map[string]string) []string {
 	declared := map[string]bool{}
 	for _, k := range envschema.DeclaredEnvKeys(schema) {

@@ -83,7 +83,7 @@ func (e *Engine) RunInImage(ctx context.Context, projectPath string, req rt.Imag
 	if err != nil {
 		return err
 	}
-	if err := e.composeAvail(ctx, conn); err != nil {
+	if _, err := e.composeAvail(ctx, conn); err != nil {
 		return err
 	}
 
@@ -100,11 +100,19 @@ func (e *Engine) RunInImage(ctx context.Context, projectPath string, req rt.Imag
 		files:      composeFiles(path, projectPath),
 		name:       name,
 		projectDir: projectPath,
-		// Compose resolves two kinds of valueless entry from this: the
-		// PassthroughEnv and SecretEnv keys the file declares, and the bare
-		// -e KEY flags below. A key it cannot resolve is dropped from the
-		// container silently.
-		extraEnv: environ,
+		// Compose resolves the bare -e KEY flags below from this (and the
+		// PassthroughEnv keys the file declares from its own environment). A
+		// key it cannot resolve is dropped from the container silently.
+		//
+		// Unlike Start, this passes the values as container environment: the
+		// container is a one-off --rm that replaces the service's command, and
+		// the loader with it. They sit in that container's configuration for its
+		// lifetime (rt.Plan.SecretEnv).
+		//
+		// The secret's own variable is set too, empty, because the file declares
+		// the secret whenever the last start had values, and compose refuses to
+		// create a container when a declared secret's variable is unset.
+		extraEnv: append(environ, secretEnvComposeEnv(nil)...),
 	}
 
 	// --pull never: the image was built locally and never pushed, so a pull can
