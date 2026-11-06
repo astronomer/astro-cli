@@ -1885,8 +1885,46 @@ func (s *Suite) TestDockerComposeBash() {
 	})
 }
 
+func (s *Suite) TestAirflowMajorVersionFromLabels() {
+	tests := []struct {
+		name   string
+		labels map[string]string
+		want   uint64
+	}{
+		{"release airflow label", map[string]string{airflowVersionLabelName: "3.3.2+astro.3"}, 3},
+		{"pep440 dev airflow label", map[string]string{airflowVersionLabelName: "3.4.0.dev26657+astro.1"}, 3},
+		{"airflow label wins over runtime label", map[string]string{airflowVersionLabelName: "2.11.0", runtimeVersionLabelName: "3.0-1"}, 2},
+		{"runtime label only", map[string]string{runtimeVersionLabelName: "3.1-5"}, 3},
+		{"unsupported airflow major", map[string]string{airflowVersionLabelName: "1.10.15"}, 2},
+		{"no labels", map[string]string{}, 2},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, airflowMajorVersionFromLabels(tt.labels))
+		})
+	}
+}
+
 func (s *Suite) TestDockerComposeSettings() {
 	mockDockerCompose := DockerCompose{projectName: "test"}
+	s.Run("import uses airflow 3 API for pep440 dev airflow version", func() {
+		imageHandler := new(mocks.ImageHandler)
+		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "3.4.0.dev26657+astro.1", runtimeVersionLabelName: "3.4-1-alpha8"}, nil).Once()
+
+		var gotURL string
+		initSettings = func(airflowURL, authHeader, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, connections, variables, pools bool) error {
+			gotURL = airflowURL
+			return nil
+		}
+
+		mockDockerCompose.imageHandler = imageHandler
+
+		err := mockDockerCompose.ImportSettings("./testfiles/airflow_settings.yaml", ".env", true, true, true)
+		s.NoError(err)
+		s.Contains(gotURL, "/api/v2")
+		imageHandler.AssertExpectations(s.T())
+	})
+
 	s.Run("import success", func() {
 		imageHandler := new(mocks.ImageHandler)
 		imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: airflowVersionLabel}, nil).Once()

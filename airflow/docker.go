@@ -1600,27 +1600,25 @@ func (d *DockerCompose) checkAirflowVersion() (uint64, error) {
 		return 0, err
 	}
 
-	airflowDockerVersion := defaultAirflowVersion
-	airflowVersion, ok := imageLabels[airflowVersionLabelName]
-	if ok {
-		if version, err := semver.NewVersion(airflowVersion); err == nil {
-			airflowDockerVersion = version.Major()
-		} else {
-			fmt.Printf("unable to parse Airflow version, defaulting to major version 2, error: %s", err.Error())
-		}
-	} else {
-		runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
-		if ok {
-			airflowDockerVersion, err = strconv.ParseUint(airflowversions.AirflowMajorVersionForRuntimeVersion(runtimeVersion), 10, 64)
-			if err != nil {
-				fmt.Printf("unable to parse runtime version, defaulting to major version 2")
-			}
-		} else {
-			fmt.Printf("unable to detect Airflow or runtime versions in image labels, defaulting to major version 2")
-		}
-	}
+	return airflowMajorVersionFromLabels(imageLabels), nil
+}
 
-	return airflowDockerVersion, nil
+// airflowMajorVersionFromLabels returns 2 or 3 from the image's Airflow version label (or its runtime version label
+// when the Airflow one is missing), defaulting to 2.
+func airflowMajorVersionFromLabels(imageLabels map[string]string) uint64 {
+	// Read only the leading number: Airflow versions are PEP 440, not semver (e.g. 3.4.0.dev1+astro.1).
+	version, ok := imageLabels[airflowVersionLabelName]
+	if !ok {
+		version = airflowversions.AirflowMajorVersionForRuntimeVersion(imageLabels[runtimeVersionLabelName])
+	}
+	switch afMajor, _, _ := strings.Cut(version, "."); afMajor {
+	case "2":
+		return airflowMajorVersion2
+	case "3":
+		return airflowMajorVersion3
+	}
+	fmt.Printf("unable to determine Airflow major version from image labels %q, defaulting to 2\n", version)
+	return defaultAirflowVersion
 }
 
 // createProject creates project with yaml config as context
