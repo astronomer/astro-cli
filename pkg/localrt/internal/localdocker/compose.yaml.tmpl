@@ -13,6 +13,17 @@ networks:
 volumes:
   postgres_data:
     driver: local
+{{- with .SecretEnv}}
+  # The secret handoff's file lives here, in memory only. See secretEnvSpec in
+  # compose.go: env set in this file would put the values in each container's
+  # configuration, which the daemon keeps on disk.
+  {{.Volume}}:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=4m,mode=1777"
+{{- end}}
 
 services:
   postgres:
@@ -44,11 +55,37 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10m
+{{- with .SecretEnv}}
+
+  # Holds the handoff volume mounted, so its contents outlive any one Airflow
+  # container's restart, and reports healthy once the start has written the
+  # file. Does nothing else: no network, no command of its own.
+  {{.Service}}:
+    image: {{$.Image}}
+    entrypoint: ["sleep", "infinity"]
+    init: true
+    restart: unless-stopped
+    network_mode: none
+    user: astro
+    labels:
+      io.astronomer.docker: "true"
+      io.astronomer.docker.cli: "true"
+      io.astronomer.docker.component: "airflow-{{.Service}}"
+    volumes:
+      - {{.Volume}}:{{.Dir}}
+    healthcheck:
+      test: ["CMD", "test", "-s", "{{.File}}"]
+      interval: 1s
+      timeout: 5s
+      retries: 3
+      start_period: 1m
+{{- end}}
 
   db-migration:
     depends_on:
       postgres:
         condition: service_healthy
+{{- template "secretdep" $}}
     image: {{.Image}}
     command:
 {{- range .DBCommand}}
@@ -61,6 +98,10 @@ services:
       io.astronomer.docker.cli: "true"
       io.astronomer.docker.component: "airflow-db-migration"
     environment: *common-env
+{{- with .SecretEnv}}
+    volumes:
+      - {{.Volume}}:{{.Dir}}:ro
+{{- end}}
 {{- range .Services}}
 
   {{.Name}}:
@@ -71,6 +112,7 @@ services:
     depends_on:
       db-migration:
         condition: service_completed_successfully
+{{- template "secretdep" $}}
     image: {{$.Image}}
     command:
 {{- range .Command}}
@@ -93,10 +135,20 @@ services:
 {{- end}}
 
 {{- define "mounts"}}
-{{- if .Mounts}}
+{{- if or .Mounts .SecretEnv}}
     volumes:
 {{- range .Mounts}}
       - {{.Host}}:{{.Container}}:z
 {{- end}}
+{{- with .SecretEnv}}
+      - {{.Volume}}:{{.Dir}}:ro
+{{- end}}
+{{- end}}
+{{- end}}
+
+{{- define "secretdep"}}
+{{- with .SecretEnv}}
+      {{.Service}}:
+        condition: service_healthy
 {{- end}}
 {{- end}}

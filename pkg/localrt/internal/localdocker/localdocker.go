@@ -29,6 +29,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localprune"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localshared"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
+	"github.com/astronomer/astro-cli/pkg/localrt/internal/secretenv"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/proxy"
@@ -336,6 +337,21 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	}
 
 	env := airflowEnv(name, webPort, major, p.Env, p.SecretEnv)
+	// The values the handoff delivers, encoded once: nil when there are none,
+	// which leaves the compose file and the up exactly as they were.
+	secretPayload, err := secretenv.Encode(handoffEnv(p.SecretEnv, env))
+	if err != nil {
+		return nil, err
+	}
+	dbCmd, services := dbCommand(major), airflowServices(major)
+	var secretSpec *secretEnvSpec
+	if secretPayload != nil {
+		secretSpec = newSecretEnvSpec()
+		dbCmd = withSecretEnv(true, dbCmd)
+		for i := range services {
+			services[i].Command = withSecretEnv(true, services[i].Command)
+		}
+	}
 	composePath, err := e.writeComposeFile(stateDir, composeInput{
 		ProjectName: name,
 		Image:       image,
@@ -346,10 +362,11 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		WebPort:      webPort,
 		PostgresPort: pgPort,
 		Env:          env,
-		PassEnv:      passEnv(p.PassthroughEnv, p.SecretEnv, env),
+		PassEnv:      passEnv(p.PassthroughEnv, env),
 		Mounts:       projectMounts(projectPath),
-		DBCommand:    dbCommand(major),
-		Services:     airflowServices(major),
+		DBCommand:    dbCmd,
+		Services:     services,
+		SecretEnv:    secretSpec,
 	})
 	if err != nil {
 		return nil, err
@@ -378,16 +395,15 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	existing, probeErr := e.projectContainers(ctx, conn, name)
 	mayCleanUp := probeErr == nil && existing == 0
 
-	// The values for the declarations passEnv wrote. Only on the up: it is the one
-	// command that creates containers, and compose bakes the resolved value in at
-	// creation. Stop and down are run with no --file, so they never read the
-	// declarations at all — see passEnv.
+	// The secret values travel on the up's handoff and nowhere else: not in its
+	// environment, where compose would resolve them into the containers'
+	// configuration, and not on any command line. See secretEnvSpec.
 	up := composeLine{
-		conn:       conn,
-		files:      composeFiles(composePath, projectPath),
-		name:       name,
-		projectDir: projectPath,
-		extraEnv:   secretEnviron(p.SecretEnv),
+		conn:          conn,
+		files:         composeFiles(composePath, projectPath),
+		name:          name,
+		projectDir:    projectPath,
+		secretPayload: secretPayload,
 	}
 	if err := e.bringUp(ctx, &up, mayCleanUp, cb); err != nil {
 		return nil, err
@@ -1035,7 +1051,11 @@ func (a *airflow) exec(ctx context.Context, argv []string, s rt.Stdio) error {
 	if name == "" {
 		return errContainersDown
 	}
-	args := append([]string{"compose", "-p", name, "exec", execService}, argv...)
+	// Through the loader, so a command run here sees the secret values the
+	// services do: they are not in the container's configuration, which is all
+	// an exec inherits. Optional, because a project started with none has no
+	// file to read.
+	args := append([]string{"compose", "-p", name, "exec", execService}, withSecretEnv(false, argv)...)
 	return a.eng.cmd.Run(ctx, conn.env, s, conn.bin, args...)
 }
 
@@ -1092,9 +1112,13 @@ type composeLine struct {
 	name       string
 	projectDir string
 	// extraEnv is added to the compose process environment on top of the engine
-	// connection's own. It carries SecretEnv values, which the file declares
-	// without recording (see passEnv) and RunInImage names with bare -e flags.
+	// connection's own. It carries RunInImage's values, which it names with bare
+	// -e flags.
 	extraEnv []string
+	// secretPayload is the secret handoff a start delivers before the Airflow
+	// containers start (composeUp, handOffSecretEnv). Nil for every other
+	// command, and for a start with no secret values.
+	secretPayload []byte
 }
 
 // argv is the compose command line for this invocation.

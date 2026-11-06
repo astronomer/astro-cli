@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -729,11 +730,15 @@ func TestRunExecsInScheduler(t *testing.T) {
 		return nil, nil
 	}
 
+	// Through the loader, optional: an exec inherits only the container's
+	// configuration, which holds no secret values, and a project started with
+	// none has no file for the loader to read.
+	loader := strings.Join(withSecretEnv(false, nil), " ")
 	require.NoError(t, af.Run(context.Background(), []string{"airflow", "version"}, rt.Stdio{}))
-	assert.Equal(t, "docker compose -p "+name+" exec scheduler airflow version", cmd.calls[len(cmd.calls)-1])
+	assert.Equal(t, "docker compose -p "+name+" exec scheduler "+loader+" airflow version", cmd.calls[len(cmd.calls)-1])
 
 	require.NoError(t, af.Shell(context.Background(), rt.Stdio{}))
-	assert.Equal(t, "docker compose -p "+name+" exec scheduler /bin/bash", cmd.calls[len(cmd.calls)-1])
+	assert.Equal(t, "docker compose -p "+name+" exec scheduler "+loader+" /bin/bash", cmd.calls[len(cmd.calls)-1])
 }
 
 func TestRunWhenNotRunning(t *testing.T) {
@@ -945,22 +950,82 @@ func TestStartWithProjectDockerfileStillUsesPlanGeneration(t *testing.T) {
 // --- SecretEnv reaches the containers, and nothing else ---
 
 // The helpers are unit-tested in compose_test.go; this is the wiring that makes
-// them matter. Delete the extraEnv line in Start and every one of those tests
-// still passes while no secret ever reaches a container, which is why this asserts
-// on the engine rather than the helpers.
-func TestStartHandsSecretValuesToTheComposeUp(t *testing.T) {
+// them matter: the values arrive on the handoff's stdin, after the holder
+// service starts and before the up that starts Airflow, and on no command line,
+// no compose environment and no file.
+func TestStartHandsSecretValuesOffThroughStdin(t *testing.T) {
+	const secret = "postgres://u:pw@h/db"
+	var delivered []byte
 	cmd := &fakeCmd{output: noProjects}
+	cmd.run = func(call string, s rt.Stdio) error {
+		if strings.Contains(call, " exec -T "+secretEnvService+" ") {
+			b, err := io.ReadAll(s.In)
+			delivered = b
+			return err
+		}
+		return nil
+	}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": secret}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	assert.JSONEq(t, `{"AIRFLOW_CONN_DB":"postgres://u:pw@h/db"}`, string(delivered))
+
+	create := callIndex(cmd.calls, "up --no-start")
+	holder := callIndex(cmd.calls, "up --detach --no-deps "+secretEnvService)
+	write := callIndex(cmd.calls, "exec -T "+secretEnvService)
+	upAll := callIndex(cmd.calls, "up --detach --quiet-pull")
+	require.True(t, create >= 0 && holder >= 0 && write >= 0 && upAll >= 0, "calls: %v", cmd.calls)
+	assert.True(t, create < holder && holder < write && write < upAll,
+		"the values must be in place before the up that starts Airflow: %v", cmd.calls)
+
+	for _, call := range cmd.calls {
+		assert.NotContains(t, call, "pw@h", "a secret value reached a command line")
+	}
+	for call, env := range cmd.env {
+		for _, kv := range env {
+			assert.NotContains(t, kv, "pw@h", "a secret value reached the environment of %q", call)
+		}
+	}
+	stateDir, err := rt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	compose, err := os.ReadFile(filepath.Join(stateDir, composeFileName))
+	require.NoError(t, err)
+	assert.NotContains(t, string(compose), "pw@h", "a secret value reached the compose file")
+	assert.NotContains(t, string(compose), "AIRFLOW_CONN_DB", "a secret key must not be declared for compose to resolve")
+}
+
+// A start with no secret values does not run the handoff at all.
+func TestStartWithoutSecretsSkipsTheHandoff(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
+	require.NoError(t, err)
+	assert.False(t, hasCall(cmd.calls, secretEnvService), "calls: %v", cmd.calls)
+}
+
+// A handoff that fails fails the start, and the containers it created are
+// taken back down like any failed up's.
+func TestStartFailsWhenTheHandoffFails(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	cmd.run = func(call string, s rt.Stdio) error {
+		if strings.Contains(call, " exec -T "+secretEnvService+" ") {
+			_, _ = io.WriteString(s.Err, "no space left on device")
+			return errors.New("exit status 1")
+		}
+		return nil
+	}
 	e := testEngine(t, cmd)
 	p := testPlan(t)
 	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
 
 	_, err := e.Start(context.Background(), p, rt.Callbacks{})
-	require.NoError(t, err)
-
-	env, ok := cmd.envFor("compose")
-	require.True(t, ok, "no compose call was recorded")
-	assert.Contains(t, env, "AIRFLOW_CONN_DB=postgres://u:pw@h/db",
-		"the up must carry the values for the declarations the file makes, or the variable is declared and never resolved")
+	require.ErrorContains(t, err, "no space left on device")
+	assert.False(t, hasCall(cmd.calls, "up --detach --quiet-pull"), "Airflow must not start without its values")
+	assert.True(t, hasCall(cmd.calls, " down "), "the containers the start created must be removed: %v", cmd.calls)
 }
 
 // The engine connection has to win a collision, because os/exec keeps the last

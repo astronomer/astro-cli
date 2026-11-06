@@ -45,7 +45,11 @@ A name more than one source holds goes to the highest in the chain. To keep a gl
 
 **Declarations are requirements.** A declared name no source supplies refuses `astro local start` (`--allow-missing` starts without it). Types, enums and `conn_type` are validated and reported as warnings. `astro local env list` shows each undeclared value the project gets, and `astro local check` warns about the local ones, since they will not follow the project to a Deployment or a teammate's clone: a line per value with its source and the two commands `astro local env list` offers for it, one that declares it if the project needs it and one that deletes it if not.
 
-**Vault and workspace values stay off disk.** In Docker mode they are passed to the containers through the environment of the compose process, never written into the compose file the CLI generates and never put on a command line. Plain `.env` values are written into that file, as docker-compose would read them anyway. As with any container, `docker inspect` can show a running container's environment.
+**Vault and workspace values stay off disk.** They are never written into the compose file the CLI generates, never put on a command line, and never set as container environment, so `docker inspect` and the container engine's on-disk container config don't hold them. In Docker mode the CLI writes them into an in-memory (tmpfs) volume when the project starts, and each Airflow container reads them into its environment before running; `astro local run` and `astro local shell` read them the same way. In standalone mode the CLI hands them to the Airflow supervisor on a pipe. Either way they end up in the running Airflow processes' environment, which the same user and root can read.
+
+Because the Docker copy lives only in memory, it is gone when the container engine restarts. Airflow containers that restart without it stop with a message; run `astro local stop` and `astro local start --docker` again.
+
+Plain `.env` values are written into the compose file, as docker-compose would read them anyway.
 
 ## Which projects a global reaches: links
 

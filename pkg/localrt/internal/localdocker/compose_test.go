@@ -3,7 +3,9 @@ package localdocker
 import (
 	"flag"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -188,7 +190,7 @@ func TestGenerateComposePassEnv(t *testing.T) {
 // key would be invalid, and the on-disk value already reaches the container.
 func TestPassEnvDedupes(t *testing.T) {
 	env := []envVar{{Name: "MY_SECRET", Value: "'x'"}}
-	got := passEnv([]string{"MY_SECRET", "ZED", "ALPHA"}, nil, env)
+	got := passEnv([]string{"MY_SECRET", "ZED", "ALPHA"}, env)
 	assert.Equal(t, []string{"ALPHA", "ZED"}, got)
 }
 
@@ -229,20 +231,22 @@ func TestProjectMounts(t *testing.T) {
 	}, got)
 }
 
-// --- SecretEnv: declared in the file, never recorded in it ---
+// --- SecretEnv: never in the file, delivered by the handoff ---
 
 // The property the field exists for, across both halves that produce it: a
 // consumer whose values come from a keyring must be able to deliver them without
 // decrypting secrets onto disk as a side effect of starting Airflow. Absent from
-// what the file records, present in what it declares.
+// the file, entirely: not recorded, and not declared either, since a declared
+// key's value is resolved into the container's configuration, which the daemon
+// keeps on disk. Present in what the handoff delivers.
 //
 // Deliberately asserts both halves rather than just the absence. Absence alone
 // passes trivially — airflowEnv never had the key to begin with, since it builds
 // from planEnv — so a test that only checked the file would still pass with the
-// declaration broken, and the variable would silently never reach the container.
+// delivery broken, and the variable would silently never reach the container.
 // The withholding logic in airflowEnv is the guard for a caller that puts a key in
 // BOTH maps, which TestSecretEnvWinsOverEnv covers.
-func TestSecretEnvIsDeclaredButNotRecorded(t *testing.T) {
+func TestSecretEnvIsDeliveredButNotInTheFile(t *testing.T) {
 	const secret = "AIRFLOW_CONN_DB"
 	secretEnv := map[string]string{secret: "postgres://user:pw@host/db"}
 	env := airflowEnv("proj", 8080, "3", map[string]string{"PLAIN": "written"}, secretEnv)
@@ -263,13 +267,116 @@ func TestSecretEnvIsDeclaredButNotRecorded(t *testing.T) {
 		t.Error("a non-secret value must still be written; only SecretEnv is withheld")
 	}
 
-	declared := passEnv(nil, secretEnv, env)
-	if len(declared) != 1 || declared[0] != secret {
-		t.Fatalf("passEnv = %v, want %s declared so compose has an entry to resolve", declared, secret)
+	assert.Empty(t, passEnv(nil, env), "a secret must not be declared for compose to resolve into the container's configuration")
+	assert.Equal(t, secretEnv, handoffEnv(secretEnv, env), "the handoff must carry the secret instead")
+}
+
+// A secret colliding with a setting the engine keeps is not applied in either
+// mode. In docker mode that means leaving it out of the handoff too, or the
+// loader would override the engine's value inside the container.
+func TestHandoffEnvLeavesOutWhatTheEngineKeeps(t *testing.T) {
+	secretEnv := map[string]string{
+		"AIRFLOW__CORE__EXECUTOR": "CeleryExecutor", // the engine's
+		"AIRFLOW_CONN_DB":         "postgres://u:pw@h/db",
 	}
-	if got := secretEnviron(secretEnv); len(got) != 1 || got[0] != secret+"=postgres://user:pw@host/db" {
-		t.Fatalf("secretEnviron = %v, want the value handed to the compose process instead", got)
+	env := airflowEnv("proj", 8080, "3", nil, secretEnv)
+	assert.Equal(t, map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}, handoffEnv(secretEnv, env))
+}
+
+// With secret values, every container that runs Airflow reads them through the
+// loader and waits for the holder service; the file names the handoff's path
+// and never a value.
+func TestGenerateComposeWithSecretHandoff(t *testing.T) {
+	in := goldenInput()
+	in.SecretEnv = newSecretEnvSpec()
+	in.DBCommand = withSecretEnv(true, in.DBCommand)
+	for i := range in.Services {
+		in.Services[i].Command = withSecretEnv(true, in.Services[i].Command)
 	}
+	got, err := generateCompose(in)
+	require.NoError(t, err)
+
+	var doc struct {
+		Volumes  map[string]map[string]any `yaml:"volumes"`
+		Services map[string]struct {
+			Command     []string                  `yaml:"command"`
+			Entrypoint  []string                  `yaml:"entrypoint"`
+			Volumes     []string                  `yaml:"volumes"`
+			DependsOn   map[string]map[string]any `yaml:"depends_on"`
+			NetworkMode string                    `yaml:"network_mode"`
+			Healthcheck struct {
+				Test []string `yaml:"test"`
+			} `yaml:"healthcheck"`
+		} `yaml:"services"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(got), &doc), got)
+
+	vol, ok := doc.Volumes[secretEnvVolume]
+	require.True(t, ok, "the handoff volume must be declared")
+	opts, _ := vol["driver_opts"].(map[string]any)
+	assert.Equal(t, "tmpfs", opts["type"], "the handoff volume must live in memory")
+
+	holder, ok := doc.Services[secretEnvService]
+	require.True(t, ok, "a service must hold the volume mounted")
+	assert.Equal(t, []string{"sleep", "infinity"}, holder.Entrypoint)
+	assert.Equal(t, "none", holder.NetworkMode)
+	assert.Contains(t, holder.Volumes, secretEnvVolume+":"+secretEnvDir)
+	assert.Equal(t, []string{"CMD", "test", "-s", secretEnvFile}, holder.Healthcheck.Test,
+		"healthy must mean the file is there, which is what the containers wait on")
+
+	for _, name := range []string{"db-migration", "scheduler", "api-server"} {
+		svc := doc.Services[name]
+		require.GreaterOrEqual(t, len(svc.Command), 5, name)
+		assert.Equal(t, []string{"python3", "-c", secretEnvLoader, secretEnvFile, "required"}, svc.Command[:5],
+			"%s must run its command through the loader, intact after YAML", name)
+		assert.Contains(t, svc.Volumes, secretEnvVolume+":"+secretEnvDir+":ro", name)
+		assert.Equal(t, "service_healthy", svc.DependsOn[secretEnvService]["condition"], name)
+	}
+	assert.NotContains(t, got, "pw@", "the file must never carry a value")
+}
+
+// Without secret values the file has no trace of the handoff, so a project that
+// never uses one starts exactly as it did before it existed.
+func TestGenerateComposeWithoutSecretsHasNoHandoff(t *testing.T) {
+	got, err := generateCompose(goldenInput())
+	require.NoError(t, err)
+	assert.NotContains(t, got, secretEnvService)
+	assert.NotContains(t, got, secretEnvVolume)
+	assert.NotContains(t, got, "python3")
+}
+
+// The loader is real Python, run here against a real interpreter when one is
+// on PATH: it loads the file into the environment of the command it execs, a
+// required run refuses to start without the file, and an optional run execs the
+// command untouched.
+func TestSecretEnvLoaderRunsUnderPython(t *testing.T) {
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not on PATH")
+	}
+	dir := t.TempDir()
+	file := filepath.Join(dir, "env.json")
+	value := `pa$$ 'w"o` + "\nrd"
+	require.NoError(t, os.WriteFile(file, []byte(`{"HANDOFF_TEST":`+strconv.Quote(value)+`}`), 0o600))
+
+	run := func(path, mode string) (string, error) {
+		cmd := exec.Command(py, "-I", "-c", secretEnvLoader, path, mode, py, "-I", "-c", "import os;print(os.environ.get('HANDOFF_TEST','<unset>'),end='')")
+		cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
+		out, err := cmd.CombinedOutput()
+		return string(out), err
+	}
+
+	out, err := run(file, "required")
+	require.NoError(t, err, out)
+	assert.Equal(t, value, out, "the value must arrive byte for byte")
+
+	out, err = run(filepath.Join(dir, "missing.json"), "required")
+	require.Error(t, err, "a required run must not start without its values")
+	assert.Contains(t, out, "astro local start --docker")
+
+	out, err = run(filepath.Join(dir, "missing.json"), "optional")
+	require.NoError(t, err, out)
+	assert.Equal(t, "<unset>", out)
 }
 
 // DAGs start unpaused with the scheduler's own runs off, in both generations,
@@ -297,7 +404,7 @@ func TestAirflowEnvRunsDAGsOnlyWhenTriggered(t *testing.T) {
 		secret := map[string]string{schedule: "True"}
 		env = airflowEnv("proj", 8080, major, nil, secret)
 		assert.Empty(t, value(env, schedule), "a secret value must replace the default, not lose to it")
-		assert.Contains(t, passEnv(nil, secret, env), schedule)
+		assert.Equal(t, secret, handoffEnv(secret, env))
 	}
 }
 
@@ -314,22 +421,11 @@ func TestSecretEnvWinsOverEnv(t *testing.T) {
 			t.Fatalf("%s was written as %s; a key in both maps must be treated as secret", key, e.Value)
 		}
 	}
-	if got := passEnv(nil, map[string]string{key: "from-secret"}, env); len(got) != 1 || got[0] != key {
-		t.Fatalf("passEnv = %v, want %s declared", got, key)
-	}
+	assert.Equal(t, map[string]string{key: "from-secret"}, handoffEnv(map[string]string{key: "from-secret"}, env))
 }
 
-// PassthroughEnv and SecretEnv both render as a valueless entry, so a key in both
-// lists must not be declared twice — duplicate keys in a YAML mapping are invalid.
-func TestPassEnvDoesNotDuplicateAcrossBothSources(t *testing.T) {
-	got := passEnv([]string{"SHARED"}, map[string]string{"SHARED": "v"}, nil)
-	// Identity, not just count: a result of length one holding the wrong key
-	// satisfies a length check while declaring a variable nobody asked for.
-	assert.Equal(t, []string{"SHARED"}, got)
-}
-
-// The values have to reach the compose process, since that is what resolves the
-// declarations at container-creation time.
+// RunInImage's values have to reach its compose process, since that is what
+// resolves its bare -e flags.
 func TestSecretEnvironRendersSortedKeyValues(t *testing.T) {
 	got := secretEnviron(map[string]string{"B_KEY": "2", "A_KEY": "1"})
 	want := []string{"A_KEY=1", "B_KEY=2"}

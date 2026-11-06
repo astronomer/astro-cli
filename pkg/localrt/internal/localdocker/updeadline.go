@@ -1,9 +1,11 @@
 package localdocker
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
@@ -35,6 +37,11 @@ func (e *Engine) composeUp(ctx context.Context, up *composeLine, cb rt.Callbacks
 	if err := e.runCompose(ctx, *up, cb, "up", "--no-start", "--quiet-pull"); err != nil {
 		return err
 	}
+	if up.secretPayload != nil {
+		if err := e.handOffSecretEnv(ctx, up, cb); err != nil {
+			return err
+		}
+	}
 	upCtx, cancel := context.WithTimeout(ctx, e.healthTimeout)
 	defer cancel()
 	// --quiet-pull here too: nothing should be left to pull, but a pull_policy
@@ -47,4 +54,31 @@ func (e *Engine) composeUp(ctx context.Context, up *composeLine, cb rt.Callbacks
 		return fmt.Errorf("%w after %s", ErrStartTimedOut, e.healthTimeout)
 	}
 	return err
+}
+
+// handOffSecretEnv delivers a start's secret values before anything that reads
+// them runs: it starts the service that holds the handoff volume, alone, and
+// writes the values into the volume through `compose exec` stdin. The up that
+// follows starts the Airflow containers, which compose holds back until that
+// service reports the file present (secretEnvSpec).
+//
+// Stdin is the one channel here the daemon does not keep. The command line
+// names only the file, and the write goes through a temporary name and a
+// rename, so a reader never sees half a file. umask makes it owner-only.
+func (e *Engine) handOffSecretEnv(ctx context.Context, up *composeLine, cb rt.Callbacks) error {
+	if err := e.runCompose(ctx, *up, cb, "up", "--detach", "--no-deps", secretEnvService); err != nil {
+		return fmt.Errorf("starting the %s service: %w", secretEnvService, err)
+	}
+	tmp := secretEnvFile + ".tmp"
+	write := "umask 077 && cat > " + tmp + " && mv " + tmp + " " + secretEnvFile
+	var stderr bytes.Buffer
+	stdio := rt.Stdio{In: bytes.NewReader(up.secretPayload), Err: &stderr}
+	args := up.argv("exec", "-T", secretEnvService, "sh", "-c", write)
+	if err := e.cmd.Run(ctx, up.env(), stdio, up.conn.bin, args...); err != nil {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return fmt.Errorf("handing secret values to the containers: %w: %s", err, msg)
+		}
+		return fmt.Errorf("handing secret values to the containers: %w", err)
+	}
+	return nil
 }

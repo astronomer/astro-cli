@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
+	"github.com/astronomer/astro-cli/pkg/localrt/internal/secretenv"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
 )
@@ -102,6 +103,11 @@ type composeInput struct {
 	// components that wait on it.
 	DBCommand []string
 	Services  []service
+	// SecretEnv, when set, adds the secret handoff: the tmpfs volume, the
+	// service that holds it mounted, and the mount and dependency on it in
+	// every Airflow container. Nil when the plan has no secret values, which
+	// leaves the file exactly as it was before the handoff existed.
+	SecretEnv *secretEnvSpec
 }
 
 // airflowServices lists the components to run for an Airflow generation.
@@ -300,17 +306,20 @@ func quoteYAML(s string) string {
 }
 
 // passEnv returns the keys the compose file declares with no value: the plan's
-// PassthroughEnv, which the runtime's own environment satisfies, plus every
-// SecretEnv key, whose value the engine hands to the compose process instead.
+// PassthroughEnv, which the runtime's own environment satisfies. It renders as
+// `KEY:`, because compose resolves a valueless entry from its own environment
+// and omits the variable entirely when unset.
 //
-// Both end up as the same YAML — `KEY:` — because compose resolves a valueless
-// entry from its own environment and omits the variable entirely when unset.
+// SecretEnv keys are not among them. A value compose resolves this way is baked
+// into the container's configuration, which the daemon keeps on disk and
+// `docker inspect` prints, so secret values take the handoff instead
+// (secretEnvSpec).
 //
 // A stop or a down needs none of these values, and not for the reason it first
 // looks: those commands are run with no --file at all. Down resolves the project
 // from container labels, so the declarations are never even read. The valueless
 // form would also be harmless if they were, which is the belt to that braces.
-func passEnv(names []string, secretEnv map[string]string, env []envVar) []string {
+func passEnv(names []string, env []envVar) []string {
 	held := make(map[string]bool, len(env))
 	for _, e := range env {
 		held[e.Name] = true
@@ -329,35 +338,110 @@ func passEnv(names []string, secretEnv map[string]string, env []envVar) []string
 	for _, n := range names {
 		add(n)
 	}
-	for n := range secretEnv {
-		add(n)
-	}
 	sort.Strings(out)
 	return out
 }
 
 // secretEnviron renders SecretEnv as KEY=VALUE for a child process environment,
-// sorted so the result is deterministic. The compose child reads these to
-// resolve valueless entries: the ones passEnv declared, and RunInImage's bare
-// -e KEY flags. The values belong in an environment only, never on a command
-// line, where any local user can read them through ps.
+// sorted so the result is deterministic. RunInImage's compose child reads these
+// to resolve its bare -e KEY flags. The values belong in an environment only,
+// never on a command line, where any local user can read them through ps.
+//
+// A key that cannot survive KEY=VALUE is dropped rather than rendered: "A=B"
+// would reach the OS as key "A" holding "B=<value>", so the variable would be
+// named and never resolved, and the command would run silently missing it.
 func secretEnviron(secretEnv map[string]string) []string {
 	if len(secretEnv) == 0 {
 		return nil
 	}
-	out := make([]string, 0, len(secretEnv))
-	for k, v := range secretEnv {
-		// A key that cannot survive KEY=VALUE is dropped rather than rendered.
-		// "A=B" would reach the OS as key "A" holding "B=<value>", while the
-		// compose file declared "A=B" — so the variable would be declared, never
-		// resolved, and Airflow would start silently missing it. An empty key
-		// makes the file itself invalid. Neither is worth a half-delivery.
-		if k == "" || strings.Contains(k, "=") {
-			continue
-		}
-		out = append(out, k+"="+v)
+	return secretenv.Environ(secretEnv)
+}
+
+// The secret handoff: how a docker start gives Airflow its SecretEnv values
+// without the daemon recording them.
+//
+// Environment set through compose is part of a container's configuration,
+// which the daemon writes to disk (config.v2.json, inside the engine's VM on
+// macOS) and `docker inspect` prints to anyone who can reach the socket. So
+// secret values do not go through compose at all. The start writes them, as
+// one JSON file, into a tmpfs volume through `compose exec` stdin, and each
+// Airflow container runs its command through secretEnvLoader, which reads the
+// file into the environment and execs the real command. tmpfs lives in the
+// engine's memory, and a volume's configuration records the mount, not what
+// is in it.
+//
+// A tmpfs volume is unmounted, and its contents lost, when the last container
+// using it stops, so a service of its own holds it mounted for the project's
+// lifetime. The Airflow containers depend on that service being healthy, which
+// its healthcheck makes mean "the file is there": the ordering is compose's to
+// enforce, not a wait loop's.
+const (
+	secretEnvService = "secret-env"
+	secretEnvVolume  = "secret_env"
+	secretEnvDir     = "/run/astro-secret-env" //nolint:gosec // a mount path, not a credential
+	secretEnvFile    = secretEnvDir + "/env.json"
+)
+
+// secretEnvLoader is the Python program an Airflow container runs its command
+// through. It adds the handoff file's values to the environment and execs the
+// rest of its arguments, so the command runs as itself, with the same PID, TTY
+// and signals. Python because every Airflow image has it and its JSON parser
+// takes any value as it is, where a sourced shell file would need quoting that
+// a password with a quote or a newline in it breaks.
+//
+// It runs after the image's entrypoint, as the service's command. Astro
+// Runtime's entrypoint reads nothing a secret supplies in local mode (the
+// metadata database URL and the UI theme are the engine's), so it behaves the
+// same as before.
+//
+// Its arguments are the file, a mode, and the command. "required" refuses to
+// start without the file: the values are lost whenever the engine restarts, and
+// an Airflow that came back without its connections would fail every task that
+// uses one, far from the cause. "optional" is for exec into a running
+// container, which a project with no secret values has no file for.
+//
+// One line, because the compose file renders it as a single-quoted YAML scalar
+// and YAML folds a newline inside one into a space.
+const secretEnvLoader = "import json,os,sys;" +
+	"p,m,a=sys.argv[1],sys.argv[2],sys.argv[3:];e=os.path.exists(p);" +
+	"m=='required' and not e and sys.exit('astro: this container has no secret values. They live only in memory and are lost when the container engine restarts. Restart the project: astro local stop, then astro local start --docker');" +
+	"os.environ.update(json.load(open(p)) if e else {});" +
+	"os.execvp(a[0],a)"
+
+// secretEnvSpec is what the compose template needs to render the handoff.
+type secretEnvSpec struct {
+	Service, Volume, Dir, File string
+}
+
+func newSecretEnvSpec() *secretEnvSpec {
+	return &secretEnvSpec{Service: secretEnvService, Volume: secretEnvVolume, Dir: secretEnvDir, File: secretEnvFile}
+}
+
+// withSecretEnv runs argv through secretEnvLoader.
+func withSecretEnv(required bool, argv []string) []string {
+	mode := "optional"
+	if required {
+		mode = "required"
 	}
-	sort.Strings(out)
+	return append([]string{"python3", "-c", secretEnvLoader, secretEnvFile, mode}, argv...)
+}
+
+// handoffEnv is the part of secretEnv the handoff delivers: every key the
+// compose file does not already hold. airflowEnv removed the keys a secret may
+// replace, so a key still in env is a baseline or generation setting the engine
+// keeps, and delivering the secret's value for it would let the loader override
+// what standalone never lets a secret override either.
+func handoffEnv(secretEnv map[string]string, env []envVar) map[string]string {
+	held := make(map[string]bool, len(env))
+	for _, e := range env {
+		held[e.Name] = true
+	}
+	out := make(map[string]string, len(secretEnv))
+	for k, v := range secretEnv {
+		if !held[k] {
+			out[k] = v
+		}
+	}
 	return out
 }
 

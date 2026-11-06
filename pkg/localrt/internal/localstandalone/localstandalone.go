@@ -33,6 +33,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localprune"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localshared"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
+	"github.com/astronomer/astro-cli/pkg/localrt/internal/secretenv"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 	"github.com/astronomer/astro-cli/pkg/localrt/supervise"
 	"github.com/astronomer/astro-cli/pkg/proxy"
@@ -69,8 +70,9 @@ type venvSyncer interface {
 
 // launchFunc starts the supervisor process detached: its own process
 // group, no tie to the caller's lifetime. It returns the child's PID,
-// which Setpgid makes the process group ID too.
-type launchFunc func(dir string, env []string, name string, args ...string) (int, error)
+// which Setpgid makes the process group ID too. secretPayload, when set, is
+// handed to the child on secretEnvFD rather than through env.
+type launchFunc func(dir string, env []string, secretPayload []byte, name string, args ...string) (int, error)
 
 // Engine implements standalone mode. The function fields are seams:
 // production values come from New, tests replace them so no real uv,
@@ -254,7 +256,15 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	// plan that relocated the state directory and name a file that is not the
 	// one being written.
 	logPath := filepath.Join(stateDir, logFileName)
-	bin, args, err = e.superviseArgs(bin, args, logPath, p.StopWithSession)
+	// The secret values leave the launch environment here and travel on the
+	// handoff instead (launchDetached), resolved first so precedence is exactly
+	// what one environment gave them.
+	env, secrets := splitSecretEnv(e.buildEnv(p, projectPath, stateDir, airflowHome, port), p.SecretEnv)
+	secretPayload, err := secretenv.Encode(secrets)
+	if err != nil {
+		return nil, err
+	}
+	bin, args, err = e.superviseArgs(bin, args, logPath, p.StopWithSession, secretPayload != nil)
 	if err != nil {
 		return nil, err
 	}
@@ -269,8 +279,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		return nil, &startInterrupted{err: ctx.Err(), left: "Airflow was not started"}
 	}
 
-	env := e.buildEnv(p, projectPath, stateDir, airflowHome, port)
-	pid, err := e.launch(projectPath, env, bin, args...)
+	pid, err := e.launch(projectPath, env, secretPayload, bin, args...)
 	if err != nil {
 		return nil, fmt.Errorf("starting airflow: %w", err)
 	}
@@ -569,7 +578,7 @@ func clearDarwinAF2(projectPath string) error {
 // keep logging after that. stopWithSession additionally arms the parent
 // watch, which kills Airflow when this process exits — how StopWithSession
 // holds even when the starter dies without running its stop path.
-func (e *Engine) superviseArgs(bin string, args []string, logPath string, stopWithSession bool) (wrappedBin string, wrappedArgs []string, err error) {
+func (e *Engine) superviseArgs(bin string, args []string, logPath string, stopWithSession, secretHandoff bool) (wrappedBin string, wrappedArgs []string, err error) {
 	exe, err := e.selfExe()
 	if err != nil {
 		return "", nil, fmt.Errorf("resolving the astro binary for supervision: %w", err)
@@ -577,6 +586,9 @@ func (e *Engine) superviseArgs(bin string, args []string, logPath string, stopWi
 	wrapped := []string{supervise.Subcommand, supervise.LogFileFlag, logPath}
 	if stopWithSession {
 		wrapped = append(wrapped, supervise.ParentPIDFlag, strconv.Itoa(os.Getpid()))
+	}
+	if secretHandoff {
+		wrapped = append(wrapped, supervise.EnvFDFlag, strconv.Itoa(secretEnvFD))
 	}
 	wrapped = append(wrapped, "--", bin)
 	wrapped = append(wrapped, args...)

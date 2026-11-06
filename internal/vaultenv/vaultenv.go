@@ -478,9 +478,9 @@ func (s *Source) readErrFor(vaultKey string) error {
 // SecretInjection is the map to layer into a run's environment, and it must be
 // layered as SECRET env rather than plain: docker mode writes Plan.Env into the
 // compose file it leaves on disk, so a decrypted credential there would undo
-// the reason the vault exists. Plan.SecretEnv is declared in that file without
-// a value and handed to the compose process instead (pkg/localrt), and
-// standalone treats it as ordinary environment.
+// the reason the vault exists. Plan.SecretEnv stays out of that file and out of
+// the containers' configuration: pkg/localrt hands it to Airflow through its
+// secret handoff in both modes.
 //
 // Both tiers inject everything they hold for this checkout, declared or not.
 // The project tier is this project's own secrets, like its .env. The global

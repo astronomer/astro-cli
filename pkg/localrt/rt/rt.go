@@ -124,21 +124,24 @@ type Plan struct {
 	// runtime without writing the values to disk. Standalone mode ignores
 	// it: the Airflow process inherits the shell environment directly.
 	PassthroughEnv []string
-	// SecretEnv is environment the consumer does not want written into the
-	// runtime's own configuration. Same delivery as Env, different persistence:
-	// docker mode declares these keys in its compose file with no value and
-	// supplies the values to the compose process itself, so the file records that
-	// the variable exists and never what it holds.
+	// SecretEnv is environment the consumer does not want written anywhere: not
+	// into the runtime's own configuration, not onto a command line, and not into
+	// a container's configuration. It reaches Airflow's environment like Env, but
+	// through a handoff rather than as configuration (internal/secretenv). In
+	// docker mode the values go into a tmpfs volume through `compose exec`
+	// stdin, and each Airflow container's command reads them in before running;
+	// the compose file names neither the keys nor the values, and the daemon
+	// never sees them as container environment, so `docker inspect` and its
+	// on-disk container config hold none of them. In standalone mode the values
+	// go to the supervisor on an inherited pipe, and into Airflow's environment
+	// only.
 	//
-	// Be precise about what that buys, because it is narrower than "never written
-	// anywhere" and a consumer sizing a threat model off the wrong sentence will
-	// get it wrong. The compose file is protected, and it is the artifact that
-	// outlives the containers — it sits in the state directory until a --clean
-	// stop removes it. The container is not: compose resolves the declarations at
-	// creation and the daemon persists the result into the container's own config,
-	// where `docker inspect` reads it back for as long as the container exists.
-	// The property delivered is "not in our file, and gone when the containers
-	// are gone".
+	// Be precise about what is left, because a consumer sizing a threat model off
+	// the wrong sentence will get it wrong. Once Airflow runs, the values are in
+	// its processes' environment, readable by the same user and root as any
+	// process environment is, and in docker mode in the engine's memory. A
+	// command run with RunInImage receives them as ordinary container
+	// environment for the lifetime of that one --rm container.
 	//
 	// The distinction is not stylistic. Env is written into a compose file that
 	// outlives the containers, and a consumer whose values come from a keyring —
@@ -152,8 +155,8 @@ type Plan struct {
 	// is what this field is for.
 	//
 	// A key in both Env and SecretEnv is treated as secret — the safer reading of
-	// a caller that contradicts itself. Standalone mode makes no distinction: it
-	// has no file, so both maps go to the process and neither is persisted.
+	// a caller that contradicts itself. A SecretEnv key that collides with a
+	// setting the engine keeps loses to it in both modes, as it always has.
 	SecretEnv map[string]string
 	// Hostname is the display hostname for this project, computed by the
 	// caller (e.g. from pkg/proxy's derivation). localrt persists it into
