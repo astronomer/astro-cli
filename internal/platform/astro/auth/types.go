@@ -1,15 +1,17 @@
 package auth
 
 import (
+	"net"
+
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/astroauth"
 )
 
 // higher order functions to facilate writing unit test cases
 type (
-	RequestToken             func(authConfig Config, verifier, code string) (Result, error)
+	RequestToken             func(authConfig Config, verifier, code, redirectURI string) (Result, error)
 	RequestUserInfo          func(authConfig Config, accessToken string) (UserInfo, error)
-	AuthorizeCallbackHandler func() (string, error)
+	AuthorizeCallbackHandler func(listener net.Listener) (string, error)
 )
 
 type Authenticator struct {
