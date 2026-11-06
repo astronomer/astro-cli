@@ -62,6 +62,19 @@ const (
 	ReasonDockerfile   ReasonCode = "dockerfile"
 	ReasonRuntime      ReasonCode = "runtime"
 	ReasonBuildSecrets ReasonCode = "build-secrets"
+
+	// The codes below are WatchProject's, not ClassifyChange's: they come from
+	// files the manifest does not describe, or from the attempt to apply it.
+
+	// ReasonDotenv: the project's .env changed. Both modes read it at start.
+	ReasonDotenv ReasonCode = "dotenv"
+	// ReasonDockerfileEdited: the Dockerfile [tool.astro] dockerfile names was
+	// edited in place, in docker mode, where it builds the image.
+	ReasonDockerfileEdited ReasonCode = "dockerfile-edited"
+	// ReasonHotInstallUnavailable: the change could have been hot installed,
+	// but the running project cannot take one (it stopped, or its engine does
+	// not support it), so a start applies it instead.
+	ReasonHotInstallUnavailable ReasonCode = "hot-install-unavailable"
 )
 
 // Reason is one thing that forced a restart.
@@ -70,6 +83,10 @@ type Reason struct {
 	// Dist is the distribution a ReasonRepinned or ReasonSourced is about,
 	// normalized as manifest.DistName does. Empty for the other codes.
 	Dist string `json:"dist,omitempty"`
+	// Path is the project-relative file whose edit forced a WatchProject
+	// restart (ReasonDotenv, ReasonDockerfileEdited, or a caller's own
+	// WatchedFile), slash-separated. Empty for a manifest change.
+	Path string `json:"path,omitempty"`
 }
 
 // String is the reason in the CLI's words.
@@ -97,6 +114,17 @@ func (r Reason) String() string {
 		return "[tool.astro.pools] changed"
 	case ReasonPackages, ReasonDockerfile, ReasonRuntime, ReasonBuildSecrets:
 		return fmt.Sprintf("[tool.astro] %s changed", r.Code)
+	case ReasonDotenv:
+		return ".env changed"
+	case ReasonDockerfileEdited:
+		return "the Dockerfile changed"
+	case ReasonHotInstallUnavailable:
+		return "the running Airflow cannot take a hot install"
+	}
+	// A caller's own code (WatchOptions.Files) has no words here; the file
+	// it is about says enough.
+	if r.Path != "" {
+		return r.Path + " changed"
 	}
 	return string(r.Code)
 }

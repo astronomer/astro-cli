@@ -8,5 +8,22 @@
   "section": "x",
   "key": "x",
   "reason": "x",
-  "already_stopped": true
+  "already_stopped": true,
+  "watch": "x",
+  "files": [
+    "x"
+  ],
+  "install": [
+    "x"
+  ],
+  "removed": [
+    "x"
+  ],
+  "reasons": [
+    {
+      "code": "x",
+      "dist": "x",
+      "path": "x"
+    }
+  ]
 }

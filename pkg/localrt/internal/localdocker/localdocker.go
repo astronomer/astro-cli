@@ -327,6 +327,9 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	build.Secrets = p.BuildSecrets
 	build.Bin = conn.bin
 	build.Env = conn.env
+	// What the tag names before this build, so the image a dependency change
+	// replaces can go once the new one runs (removeSupersededImage).
+	previousImage := e.builtImageID(ctx, conn, name)
 	image, err := e.images.Build(ctx, build, cb)
 	if err != nil {
 		return nil, err
@@ -402,6 +405,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	// The route landed before the health wait so status/stop worked during it;
 	// start the daemon now that Airflow answers, so <name>.localhost resolves.
 	localshared.EnsureDaemon(e.daemon, cb, e.now(), rec.Hostname)
+	e.removeSupersededImage(ctx, conn, name, previousImage)
 	rt.OnState(cb, rt.StateRunning, nil)
 	return &airflow{eng: e, rec: rec}, nil
 }

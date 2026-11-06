@@ -33,6 +33,15 @@ type event struct {
 	// AlreadyStopped marks the state event of a stop that found nothing
 	// running.
 	AlreadyStopped bool `json:"already_stopped,omitempty"`
+	// Watch, Files, Install, Removed and Reasons carry a --watch event: the
+	// localrt.WatchEventKind, the files the edit covered, the requirements
+	// installed and dropped, and the codes of what forced a restart. Empty
+	// for every other event.
+	Watch   string           `json:"watch,omitempty"`
+	Files   []string         `json:"files,omitempty"`
+	Install []string         `json:"install,omitempty"`
+	Removed []string         `json:"removed,omitempty"`
+	Reasons []localrt.Reason `json:"reasons,omitempty"`
 }
 
 // callbacks bridges localrt progress into the renderer. Write errors are
