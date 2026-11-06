@@ -1885,6 +1885,16 @@ func (s *Suite) TestDockerComposeBash() {
 	})
 }
 
+func (s *Suite) TestCheckAirflowVersionReadsPEP440DevLabel() {
+	imageHandler := new(mocks.ImageHandler)
+	imageHandler.On("ListLabels").Return(map[string]string{airflowVersionLabelName: "3.4.0.dev26657+astro.1"}, nil).Once()
+	d := DockerCompose{imageHandler: imageHandler}
+
+	version, err := d.checkAirflowVersion()
+	s.NoError(err)
+	s.Equal(uint64(3), version)
+}
+
 func (s *Suite) TestDockerComposeSettings() {
 	mockDockerCompose := DockerCompose{projectName: "test"}
 	s.Run("import success", func() {

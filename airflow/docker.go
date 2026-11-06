@@ -1603,8 +1603,10 @@ func (d *DockerCompose) checkAirflowVersion() (uint64, error) {
 	airflowDockerVersion := defaultAirflowVersion
 	airflowVersion, ok := imageLabels[airflowVersionLabelName]
 	if ok {
-		if version, err := semver.NewVersion(airflowVersion); err == nil {
-			airflowDockerVersion = version.Major()
+		// The label is a PEP 440 version ("3.4.0.dev26657+astro.1"), which semver rejects for dev and pre-releases.
+		major, _, _ := strings.Cut(airflowVersion, ".")
+		if version, err := strconv.ParseUint(major, 10, 64); err == nil {
+			airflowDockerVersion = version
 		} else {
 			fmt.Printf("unable to parse Airflow version, defaulting to major version 2, error: %s", err.Error())
 		}
