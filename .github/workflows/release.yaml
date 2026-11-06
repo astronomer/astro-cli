@@ -54,6 +54,10 @@ jobs:
   release:
     needs: detect
     runs-on: macos-15
+    # The Apple signing secrets are environment secrets here, not repository secrets, so
+    # only jobs deploying to this environment (release tags, by its deployment policy) can
+    # read them; a workflow pushed to any other branch cannot.
+    environment: macos-signing
     # Notarization waits on Apple, which can take up to 20 minutes per binary.
     timeout-minutes: 60
     steps:
