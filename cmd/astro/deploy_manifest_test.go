@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/userstate"
@@ -1290,6 +1291,22 @@ func TestDeployManifestPickerRefusesAnotherHost(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--deployment <id>")
 	assert.Contains(t, err.Error(), "astro context switch astronomer.io")
+}
+
+// A workspace with no Deployment is an error naming astro deployment create:
+// a deploy never creates its target. The client fails on any call, a create
+// among them.
+func TestDeployManifestPickerNeverCreatesADeployment(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	orig := deployment.ListDeployments
+	t.Cleanup(func() { deployment.ListDeployments = orig })
+	deployment.ListDeployments = func(string, string, astrov1.APIClient) ([]astrov1.Deployment, error) { return nil, nil }
+
+	d := manifestDeployer{login: &deployLogin{current: true, client: new(astrov1_mocks.ClientWithResponsesInterface)}}
+	_, err := d.ResolveUnlinked("clw-ws")
+	var none *deployment.NoDeploymentsError
+	require.ErrorAs(t, err, &none)
+	assert.EqualError(t, err, "no Deployments found in workspace clw-ws: create one with astro deployment create")
 }
 
 // The prompt waits on the workspace's list, so a list that does not answer is

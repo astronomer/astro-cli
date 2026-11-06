@@ -12,7 +12,6 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/output"
 )
 
@@ -124,14 +123,9 @@ const notApplicable = "N/A"
 // which is how deploy-action reads it.
 func Print(wsID, deploymentName, deploymentID string, astroV1Client astrov1.APIClient, out io.Writer, r output.Emitter, requestedField string, showWorkloadIdentity bool) error {
 	// get or select the deployment
-	requestedDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, true, nil, astroV1Client)
+	requestedDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, deployment.ToRead, nil, astroV1Client)
 	if err != nil {
 		return err
-	}
-
-	if requestedDeployment.Id == "" {
-		fmt.Printf("%s %s\n", deployment.NoDeploymentInWSMsg, ansi.Bold(wsID))
-		return nil
 	}
 	printableDeployment, err := getPrintable(&requestedDeployment, astroV1Client, showWorkloadIdentity)
 	if err != nil {

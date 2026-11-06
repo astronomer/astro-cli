@@ -13,6 +13,7 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
+	"golang.org/x/term"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
@@ -23,7 +24,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
-	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/picker"
@@ -44,18 +44,13 @@ var (
 	errInvalidTokenName          = errors.New("no name provided for the deployment token. Retry with a valid name")
 
 	// Monkey patched to write unit tests
-	createDeployment = createAndPrint
-	canCiCdDeploy    = CanCiCdDeploy
-	parseToken       = util.ParseAPIToken
-	CleanOutput      = false
+	canCiCdDeploy = CanCiCdDeploy
+	parseToken    = util.ParseAPIToken
+	CleanOutput   = false
 
-	// latestRuntimeVersion is the runtime a Deployment created from the
-	// selection flow gets: the newest stable one, read from Astronomer's
-	// runtime catalog over the network. Replaced in tests.
-	latestRuntimeVersion = func() (string, error) {
-		client := airflowversions.NewClient(httputil.NewHTTPClient(), false, false)
-		return airflowversions.GetDefaultImageTag(client, "", "", false)
-	}
+	// stdinIsTerminal reports whether someone is at the keyboard to pick a
+	// Deployment. A var so a test can stand in for a terminal.
+	stdinIsTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
 )
 
 const (
@@ -267,7 +262,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 	}
 
 	// get deployment
-	deployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
+	deployment, err := GetDeployment(ws, deploymentID, deploymentName, ToRead, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -649,22 +644,6 @@ func getDefaultNodePoolID(nodePools *[]astrov1.NodePool) string {
 	return ""
 }
 
-// createAndPrint is Create for the picker's "create a new Deployment" choice,
-// which has no command of its own to render what it made: it prints what
-// `astro deployment create` prints in text.
-func createAndPrint(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration) error { //nolint:gocritic,staticcheck // Create's parameters, passed through
-	// The picker runs inside another command, whose stdout is its own; the
-	// create's progress goes to stderr.
-	d, err := Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity, deploymentType, schedulerAU, schedulerReplicas, remoteExecutionEnabled, allowedIpAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment, os.Stderr)
-	if d.Id == "" {
-		return err
-	}
-	if werr := WriteCreated(os.Stdout, workspaceID, &d); werr != nil {
-		return werr
-	}
-	return err
-}
-
 // WriteCreated writes what `astro deployment create` prints in text for d, a
 // Deployment it made in workspaceID: its row in the Deployment table, and
 // where to reach it.
@@ -969,7 +948,7 @@ var airflowAnswering = func(d astrov1.Deployment, token string) bool {
 func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astrov1.WorkerQueueRequest, hybridQueueList []astrov1.HybridWorkerQueueRequest, newEnvironmentVariables []astrov1.DeploymentEnvironmentVariableRequest, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogUrlPattern *string, force bool, astroV1Client astrov1.APIClient, notes io.Writer) (UpdateResult, error) { //nolint:gocognit,gocyclo,gocritic,staticcheck // v1 complexity, refactor tracked separately
 	var confirmWithUser bool
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToChange, nil, astroV1Client)
 	if err != nil {
 		return UpdateResult{}, err
 	}
@@ -1582,41 +1561,49 @@ func updateResourceQuotaMemory(resourceQuotaMemory string, deployment *astrov1.D
 	return deployment.ResourceQuotaMemory
 }
 
-// ErrNothingTo is the failure of a command that acts on one Deployment when
-// the Workspace has none it could act on. A Deployment named by id or name is
-// one that was not found, the same failure as in a Workspace that has others;
-// with none named, there was nothing to pick from.
-func ErrNothingTo(ws, deploymentID, deploymentName, what string) error {
-	if deploymentID != "" || deploymentName != "" {
-		return errInvalidDeployment
-	}
-	return fmt.Errorf("%s %s %s", NoDeploymentInWSMsg, ws, what)
-}
+var (
+	// errDeleteNeedsTarget is a delete with no Deployment named and nobody to
+	// pick one. --yes answers the confirmation, never which Deployment.
+	errDeleteNeedsTarget = errors.New("astro deployment delete needs the Deployment to delete, and there is no terminal to pick it from: pass --deployment, or the Deployment id as the argument. --yes skips the confirmation and never chooses the Deployment")
+	// errDeleteNeedsConfirmation is a delete without --yes and nobody to
+	// type the confirmation.
+	errDeleteNeedsConfirmation = errors.New("astro deployment delete asks for the Deployment's name to confirm, and there is no terminal to type it at: pass --yes")
+	// errDeleteNotConfirmed is a confirmation answered with anything but the
+	// Deployment's name.
+	errDeleteNotConfirmed = errors.New("the name typed does not match the Deployment's name")
+)
 
-// Delete deletes a Deployment, after asking unless forceDelete. It returns
-// what it deleted, or nil when the question was declined.
+// Delete deletes a Deployment, after the person types its name unless
+// forceDelete. A run with no terminal must name the Deployment: it is never
+// picked for it, whatever forceDelete says.
 func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Client astrov1.APIClient) (*Removal, error) {
-	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, true, nil, astroV1Client)
+	if deploymentID == "" && deploymentName == "" && !stdinIsTerminal() {
+		return nil, input.Required(errDeleteNeedsTarget)
+	}
+
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToChange, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
 
-	if currentDeployment.Id == "" {
-		return nil, ErrNothingTo(ws, deploymentID, deploymentName, "to delete")
-	}
-
-	// prompt user
+	// A delete cannot be undone, so the confirmation is the Deployment's
+	// name typed out, not a y that a habit or a pipe can supply.
+	// The name is shown as it is, unescaped, so what is shown is what to type.
 	if !forceDelete {
-		i, err := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to delete the %s Deployment?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
+		typed, err := input.Text(
+			fmt.Sprintf("\nThis permanently deletes the Deployment %s and all of its data.\n", ansi.ForStderr().Bold(currentDeployment.Name))+
+				`To confirm, type the Deployment name "`+currentDeployment.Name+`": `,
+			input.About("the Deployment's name, to confirm the delete"), input.AnsweredBy("--yes"))
 		if err != nil {
 			return nil, err
 		}
-
-		if !i {
-			fmt.Println("Canceling deployment deletion")
-			return nil, nil
+		// Nothing typed with no terminal is nobody there to type it: say
+		// what answers the question, not that the answer was wrong.
+		if typed == "" && !stdinIsTerminal() {
+			return nil, input.Required(errDeleteNeedsConfirmation)
+		}
+		if typed != currentDeployment.Name {
+			return nil, fmt.Errorf("%w (\"%s\"): the Deployment was not deleted", errDeleteNotConfirmed, currentDeployment.Name)
 		}
 	}
 
@@ -1647,12 +1634,9 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, true, isDevelopmentDeployment, astroV1Client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToChange, isDevelopmentDeployment, astroV1Client)
 	if err != nil {
 		return nil, err
-	}
-	if currentDeployment.Id == "" {
-		return nil, ErrNothingTo(ws, deploymentID, deploymentName, "to "+action)
 	}
 
 	if currentDeployment.IsDevelopmentMode == nil || !*currentDeployment.IsDevelopmentMode {
@@ -1721,15 +1705,9 @@ func WaitForHibernationOverride(progress io.Writer, deploymentID string, isHiber
 // question was declined.
 func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string, force bool, astroV1Client astrov1.APIClient) (*HibernationResult, error) {
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, true, isDevelopmentDeployment, astroV1Client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToChange, isDevelopmentDeployment, astroV1Client)
 	if err != nil {
 		return nil, err
-	}
-	if currentDeployment.Id == "" {
-		if deploymentID != "" || deploymentName != "" {
-			return nil, errInvalidDeployment
-		}
-		return nil, fmt.Errorf("no Deployments with a hibernation override that can be removed found in Workspace %s", ws)
 	}
 
 	if currentDeployment.IsDevelopmentMode == nil || !*currentDeployment.IsDevelopmentMode {
@@ -2026,22 +2004,11 @@ var getDeploymentLogs = func(orgID string, deploymentID string, getDeploymentLog
 	return DeploymentLog, nil
 }
 
+// SelectDeployment asks which of deployments to act on, with a numbered
+// table on stderr. It never answers for the person: GetDeployment decides
+// when a run may take a workspace's only Deployment without asking.
+// deployments is never empty.
 var SelectDeployment = func(deployments []astrov1.Deployment, message string) (astrov1.Deployment, error) {
-	// select deployment
-	if len(deployments) == 0 {
-		return astrov1.Deployment{}, nil
-	}
-
-	if len(deployments) == 1 && (astrosession.HasAPIToken() || os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != "" || config.CFG.AutoSelect.GetBool()) {
-		if !CleanOutput {
-			fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
-				fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Name)) +
-				fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].Id)))
-		}
-
-		return deployments[0], nil
-	}
-
 	sort.Slice(deployments, func(i, j int) bool {
 		return deployments[i].CreatedAt.Before(deployments[j].CreatedAt)
 	})
@@ -2062,103 +2029,135 @@ var SelectDeployment = func(deployments []astrov1.Deployment, message string) (a
 	return deployments[i], nil
 }
 
-func GetDeployment(ws, deploymentID, deploymentName string, disableCreateFlow bool, selectionFilter func(deployment astrov1.Deployment) bool, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+// Use is what a caller of GetDeployment will do with the Deployment it gets,
+// which decides whether a run that named none may have one chosen for it.
+type Use int
+
+const (
+	// ToRead only reads the Deployment (inspect, logs, variable list). With
+	// no Deployment named, a workspace's only one is taken without asking
+	// when the run is authenticated by an API token or deployment.auto_select
+	// is on, as 1.x did for every command.
+	ToRead Use = iota
+	// ToChange changes the Deployment or ships to it. It acts only on a
+	// Deployment the run named or the person picked, never on one taken
+	// because it was the only one.
+	ToChange
+)
+
+// NoDeploymentsError is a command that needed a Deployment picked in a
+// workspace that has none. Nothing is created in its place.
+type NoDeploymentsError struct {
+	// Workspace is the workspace that has none.
+	Workspace string
+}
+
+func (e *NoDeploymentsError) Error() string {
+	return fmt.Sprintf("%s %s: create one with astro deployment create", NoDeploymentInWSMsg, e.Workspace)
+}
+
+// NoneEligibleError is a workspace with Deployments, none of which the
+// command can act on (hibernate takes development Deployments alone, and a
+// link picker leaves out what the project already links).
+type NoneEligibleError struct {
+	// Workspace is the workspace looked in.
+	Workspace string
+}
+
+func (e *NoneEligibleError) Error() string {
+	return fmt.Sprintf("none of the Deployments in workspace %s is one this command can act on", e.Workspace)
+}
+
+// TargetsDisagreeError is a run that named its Deployment both by id and by
+// name, where the two are different Deployments. It is a usage error: which
+// one the run meant is not something to guess.
+type TargetsDisagreeError struct {
+	// ID and Name are what the run gave; IDsName is the name of the
+	// Deployment with that id.
+	ID, Name, IDsName string
+}
+
+func (e *TargetsDisagreeError) Error() string {
+	return fmt.Sprintf("the Deployment id %s and the name %q name different Deployments (%s is %q): pass one of them", e.ID, e.Name, e.ID, e.IDsName)
+}
+
+// IsUsageError marks TargetsDisagreeError as a usage error for
+// cliout.IsUsage, which this package cannot import.
+func (e *TargetsDisagreeError) IsUsageError() bool { return true }
+
+// mayAutoSelect reports whether this run is set up to take a workspace's only
+// Deployment without asking: authenticated by an API token, or with
+// deployment.auto_select on.
+func mayAutoSelect() bool {
+	return astrosession.HasAPIToken() || os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != "" || config.CFG.AutoSelect.GetBool()
+}
+
+// GetDeployment is the Deployment in workspace ws that deploymentID or
+// deploymentName names, or, with neither, the one the person picks. Given
+// both, they must name the same Deployment. selectionFilter, when set, limits
+// what a name or a pick can choose (hibernate takes development Deployments
+// alone). use says what the caller will do with it (see Use). It never
+// creates a Deployment: a workspace with none to pick from is a
+// *NoDeploymentsError.
+func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFilter func(deployment astrov1.Deployment) bool, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
 	deployments, err := ListDeployments(ws, "", astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
 	}
 
-	if len(deployments) == 0 && disableCreateFlow {
-		return astrov1.Deployment{}, nil
-	}
-
-	if deploymentID != "" && deploymentName != "" && !CleanOutput {
-		fmt.Printf("Both a Deployment ID and Deployment name have been supplied. The Deployment ID %s will be used\n", deploymentID)
-	}
-	// find deployment by name
-	if deploymentID == "" && deploymentName != "" {
-		id, err := oneNamed(deployments, deploymentName, ws, selectionFilter)
+	var id string
+	switch {
+	case deploymentID != "":
+		i := slices.IndexFunc(deployments, func(d astrov1.Deployment) bool { return d.Id == deploymentID })
+		if i < 0 {
+			return astrov1.Deployment{}, errInvalidDeployment
+		}
+		if deploymentName != "" && deployments[i].Name != deploymentName {
+			return astrov1.Deployment{}, &TargetsDisagreeError{ID: deploymentID, Name: deploymentName, IDsName: deployments[i].Name}
+		}
+		id = deploymentID
+	case deploymentName != "":
+		if id, err = oneNamed(deployments, deploymentName, ws, selectionFilter); err != nil {
+			return astrov1.Deployment{}, err
+		}
+	default:
+		picked, err := deploymentSelectionProcess(ws, deployments, selectionFilter, use)
 		if err != nil {
 			return astrov1.Deployment{}, err
 		}
-		currentDeployment, err := GetDeploymentByID("", id, astroV1Client)
-		if err != nil {
-			return astrov1.Deployment{}, err
-		}
-		return currentDeployment, nil
+		id = picked.Id
 	}
-
-	var currentDeployment astrov1.Deployment
-
-	// select deployment if deploymentID is empty
-	if deploymentID == "" {
-		currentDeployment, err = deploymentSelectionProcess(ws, deployments, selectionFilter, astroV1Client, disableCreateFlow)
-		if err != nil {
-			return astrov1.Deployment{}, err
-		}
-	}
-	// find deployment by ID
-	for i := range deployments {
-		if deployments[i].Id == deploymentID {
-			currentDeployment = deployments[i]
-		}
-	}
-	if currentDeployment.Id == "" {
-		return astrov1.Deployment{}, errInvalidDeployment
-	}
-
-	currentDeployment, err = GetDeploymentByID("", currentDeployment.Id, astroV1Client)
-	if err != nil {
-		return astrov1.Deployment{}, err
-	}
-	return currentDeployment, nil
+	return GetDeploymentByID("", id, astroV1Client)
 }
 
-func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, deploymentFilter func(deployment astrov1.Deployment) bool, astroV1Client astrov1.APIClient, disableCreateFlow bool) (astrov1.Deployment, error) {
-	// filter deployments
-	if deploymentFilter != nil {
-		deployments = util.Filter(deployments, deploymentFilter)
+// deploymentSelectionProcess is the Deployment, of those in ws that filter
+// leaves, that the person picks, or for a ToRead caller the only one when
+// mayAutoSelect.
+func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, filter func(deployment astrov1.Deployment) bool, use Use) (astrov1.Deployment, error) {
+	if len(deployments) == 0 {
+		return astrov1.Deployment{}, &NoDeploymentsError{Workspace: ws}
 	}
-	if len(deployments) == 0 && disableCreateFlow {
-		return astrov1.Deployment{}, fmt.Errorf("%s %s", NoDeploymentInWSMsg, ws)
+	if filter != nil {
+		deployments = util.Filter(deployments, filter)
 	}
-	currentDeployment, err := SelectDeployment(deployments, "Select a Deployment")
-	if err != nil {
-		return astrov1.Deployment{}, err
+	if len(deployments) == 0 {
+		return astrov1.Deployment{}, &NoneEligibleError{Workspace: ws}
 	}
-	if currentDeployment.Id == "" {
-		// get latest runtime version
-		runtimeVersion, err := latestRuntimeVersion()
-		if err != nil {
-			return astrov1.Deployment{}, err
+	if len(deployments) == 1 && mayAutoSelect() {
+		if use == ToRead {
+			if !CleanOutput {
+				fmt.Fprintf(os.Stderr, "Only one Deployment was found. Using the following Deployment by default: \n\n Deployment Name: %s\n Deployment ID: %s\n",
+					ansi.ForStderr().Bold(deployments[0].Name), ansi.ForStderr().Bold(deployments[0].Id))
+			}
+			return deployments[0], nil
 		}
-		cicdEnforcement := disable
-		// walk user through creating a deployment
-		var coreDeploymentType astrov1.DeploymentType
-		var dagDeploy string
-		if !organization.IsOrgHosted() {
-			coreDeploymentType = astrov1.DeploymentTypeHYBRID
-			dagDeploy = disable
-		} else {
-			coreDeploymentType = astrov1.DeploymentTypeSTANDARD
-			dagDeploy = enable
-		}
-
-		err = createDeployment("", ws, "", "", runtimeVersion, dagDeploy, CeleryExecutor, "azure", "", "", "", "disable", cicdEnforcement, "", "", "", "", "", coreDeploymentType, 0, 0, false, nil, nil, nil, astroV1Client, false, 0*time.Second)
-		if err != nil {
-			return astrov1.Deployment{}, err
-		}
-		// get a new deployment list
-		deployments, err = ListDeployments(ws, "", astroV1Client)
-		if err != nil {
-			return astrov1.Deployment{}, err
-		}
-		currentDeployment, err = SelectDeployment(deployments, "Select which Deployment you want to update")
-		if err != nil {
-			return astrov1.Deployment{}, err
+		// 1.x took it here for every command. A change waits for someone to
+		// pick it, and a run with nobody to ask is told to name it.
+		if !stdinIsTerminal() {
+			return astrov1.Deployment{}, input.Required(fmt.Errorf("%s (%s) is the only Deployment in workspace %s this command can act on, but a command that changes a Deployment does not choose one by itself: pass --deployment", deployments[0].Name, deployments[0].Id, ws))
 		}
 	}
-	return currentDeployment, nil
+	return SelectDeployment(deployments, "Select a Deployment")
 }
 
 // GetDeploymentURL takes a deploymentID, WorkspaceID as parameters

@@ -228,16 +228,18 @@ func TestDeploymentCoreText(t *testing.T) {
 				expectDelete(m)
 				return m
 			},
-			answers: "y\n",
+			answers: "etl-prod\n",
 			args:    []string{"delete", coreDeploymentID},
-			check:   says("Are you sure you want to delete the", "etl-prod", "Deployment?", "Successfully deleted deployment ", "etl-prod"),
+			check:   says(`To confirm, type the Deployment name "etl-prod"`, "Successfully deleted deployment ", "etl-prod"),
 		},
 		{
-			name:    "delete, declined",
+			// A y, as 1.x asked for, is not the name: nothing is deleted,
+			// and the run fails rather than exiting 0.
+			name:    "delete, not confirmed",
 			client:  func(t *testing.T) astrov1.APIClient { return coreMock(t, coreDeployment()) },
-			answers: "n\n",
+			answers: "y\n",
 			args:    []string{"delete", coreDeploymentID},
-			check:   says("Are you sure you want to delete the", "etl-prod", "Canceling deployment deletion"),
+			wantErr: `the name typed does not match the Deployment's name ("etl-prod"): the Deployment was not deleted`,
 		},
 		{
 			name: "hibernate --yes, until further notice",
@@ -553,26 +555,30 @@ func TestDeploymentCoreJSONNeverAsks(t *testing.T) {
 
 // Asked to act on a Deployment in a Workspace that has none, each of these
 // used to print that there were none and exit 0, having done nothing. Now it
-// fails, exit 1, in both formats: a Deployment named by id or name is not
-// found, as it is not in a Workspace that has others, and with none named
-// there is nothing to act on.
+// fails in both formats, and nothing is created in its place: a Deployment
+// named by id or name is not found, as it is not in a Workspace that has
+// others (a name that names none is a usage error there too), and with none
+// named there is nothing to act on. A delete naming none with nobody to ask
+// is refused before it looks: --yes never chooses what to delete.
 func TestDeploymentCoreNothingToActOnFails(t *testing.T) {
+	const noneHere = "no Deployments found in workspace ws-empty: create one with astro deployment create"
 	cases := []struct {
 		name string
 		args []string
 		want string
+		code int
 	}{
-		{"delete, naming none", []string{"delete", "--yes"}, "no Deployments found in workspace ws-empty to delete"},
-		{"delete, naming one", []string{"delete", coreDeploymentID, "--yes"}, "the Deployment specified was not found in this workspace"},
-		{"hibernate, naming none", []string{"hibernate", "--yes"}, "no Deployments found in workspace ws-empty to hibernate"},
-		{"wake-up, naming one by name", []string{"wake-up", "--deployment-name", "etl-dev", "--yes"}, "the Deployment specified was not found in this workspace"},
-		{"--remove-override, naming none", []string{"wake-up", "--remove-override", "--yes"}, "no Deployments with a hibernation override that can be removed found in Workspace ws-empty"},
+		{"delete, naming none", []string{"delete", "--yes"}, "pass --deployment", cliout.ExitFailure},
+		{"delete, naming one", []string{"delete", coreDeploymentID, "--yes"}, "the Deployment specified was not found in this workspace", cliout.ExitFailure},
+		{"hibernate, naming none", []string{"hibernate", "--yes"}, noneHere, cliout.ExitFailure},
+		{"wake-up, naming one by name", []string{"wake-up", "--deployment-name", "etl-dev", "--yes"}, `no Deployment named "etl-dev" in workspace ws-empty`, cliout.ExitUsage},
+		{"--remove-override, naming none", []string{"wake-up", "--remove-override", "--yes"}, noneHere, cliout.ExitFailure},
 	}
 	for _, tc := range cases {
 		for _, format := range []string{"text", "json"} {
 			t.Run(tc.name+" "+format, func(t *testing.T) {
 				r := execDeploymentRun(t, coreMock(t), "", append(tc.args, "--workspace-id", "ws-empty", "-o", format)...)
-				assert.Equal(t, cliout.ExitFailure, r.code)
+				assert.Equal(t, tc.code, r.code)
 				require.Error(t, r.err)
 				assert.Contains(t, r.err.Error(), tc.want)
 				if format == "json" {

@@ -16,12 +16,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -266,18 +268,20 @@ const (
 
 var mockV1Client *astrov1_mocks.ClientWithResponsesInterface
 
-// stubRuntimeVersion is the runtime the create flow is told is newest. The
-// real answer is fetched from updates.astronomer.io, which no unit test may
-// reach.
-const stubRuntimeVersion = "13.0.0"
+// standInForATerminal makes stdinIsTerminal answer terminal, until the test
+// ends: the tests pipe what a person would type.
+func standInForATerminal(t *testing.T, terminal bool) {
+	t.Helper()
+	previous := stdinIsTerminal
+	stdinIsTerminal = func() bool { return terminal }
+	t.Cleanup(func() { stdinIsTerminal = previous })
+}
 
 func (s *Suite) SetupTest() {
 	// init mocks
 	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 
-	previous := latestRuntimeVersion
-	latestRuntimeVersion = func() (string, error) { return stubRuntimeVersion, nil }
-	s.T().Cleanup(func() { latestRuntimeVersion = previous })
+	standInForATerminal(s.T(), true)
 
 	// init responses object
 	MockResponseInit()
@@ -455,7 +459,7 @@ func (s *Suite) TestGetDeployment() {
 	s.Run("invalid deployment ID", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		_, err := GetDeployment(ws, deploymentID, "", false, nil, mockV1Client)
+		_, err := GetDeployment(ws, deploymentID, "", ToRead, nil, mockV1Client)
 		s.ErrorIs(err, errInvalidDeployment)
 
 		mockV1Client.AssertExpectations(s.T())
@@ -465,7 +469,7 @@ func (s *Suite) TestGetDeployment() {
 	s.Run("error after invalid deployment Name", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		_, err := GetDeployment(ws, "", deploymentName, false, nil, mockV1Client)
+		_, err := GetDeployment(ws, "", deploymentName, ToRead, nil, mockV1Client)
 		s.ErrorIs(err, errInvalidDeployment)
 
 		mockV1Client.AssertExpectations(s.T())
@@ -474,7 +478,7 @@ func (s *Suite) TestGetDeployment() {
 	s.Run("no deployments in workspace", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		_, err := GetDeployment(ws, "", deploymentName, true, nil, mockV1Client)
+		_, err := GetDeployment(ws, "", deploymentName, ToRead, nil, mockV1Client)
 		s.ErrorIs(err, errInvalidDeployment)
 
 		mockV1Client.AssertExpectations(s.T())
@@ -483,7 +487,7 @@ func (s *Suite) TestGetDeployment() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
-		deployment, err := GetDeployment(ws, deploymentID, "", false, nil, mockV1Client)
+		deployment, err := GetDeployment(ws, deploymentID, "", ToRead, nil, mockV1Client)
 
 		s.NoError(err)
 		s.Equal(deploymentID, deployment.Id)
@@ -495,7 +499,7 @@ func (s *Suite) TestGetDeployment() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
-		deployment, err := GetDeployment(ws, "", deploymentName, false, nil, mockV1Client)
+		deployment, err := GetDeployment(ws, "", deploymentName, ToRead, nil, mockV1Client)
 		s.NoError(err)
 		s.Equal(deploymentName, deployment.Name)
 
@@ -515,7 +519,7 @@ func (s *Suite) TestGetDeployment() {
 		}
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&sameName, nil).Once()
 
-		_, err := GetDeployment(ws, "", deploymentName, false, nil, mockV1Client)
+		_, err := GetDeployment(ws, "", deploymentName, ToRead, nil, mockV1Client)
 		s.EqualError(err, `2 Deployments are named "test" in workspace `+ws+`: pass --deployment with one's id (test-id-1, test-id-2)`)
 		var nameErr *NameError
 		s.ErrorAs(err, &nameErr)
@@ -537,145 +541,125 @@ func (s *Suite) TestGetDeployment() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&sameName, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-id-dev").Return(&deploymentResponse, nil).Once()
 
-		_, err := GetDeployment(ws, "", deploymentName, false, isDevelopmentDeployment, mockV1Client)
+		_, err := GetDeployment(ws, "", deploymentName, ToRead, isDevelopmentDeployment, mockV1Client)
 		s.NoError(err)
 
 		mockV1Client.AssertExpectations(s.T())
 	})
 
-	s.Run("deployment name and deployment id", func() {
+	// Named twice, by id and by name, the two must be one Deployment.
+	s.Run("deployment name and deployment id of the same deployment", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-id-1").Return(&deploymentResponse, nil).Once()
 
-		deployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, mockV1Client)
+		deployment, err := GetDeployment(ws, "test-id-1", "test-1", ToChange, nil, mockV1Client)
 		s.NoError(err)
-		s.Equal(deploymentID, deployment.Id)
-
-		mockV1Client.AssertExpectations(s.T())
+		s.Equal("test-id-1", deployment.Id)
 	})
 
-	s.Run("create deployment error", func() {
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
+	// Two different Deployments named at once is a usage error, not the
+	// id winning with a note on stdout.
+	s.Run("deployment name and deployment id of different deployments", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		// Mock createDeployment
-		createDeployment = func(
-			name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement,
-			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string,
-			deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string,
-			astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration,
-		) error {
-			s.Equal(stubRuntimeVersion, runtimeVersion)
-			return errMock
-		}
-
-		// Mock os.Stdin
-		input := []byte("y")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(input)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
-		_, err = GetDeployment(ws, "", "", false, nil, mockV1Client)
-		s.ErrorIs(err, errMock)
-
-		mockV1Client.AssertExpectations(s.T())
+		stdout := captureStdout(s.T(), func() {
+			_, err := GetDeployment(ws, "test-id-1", "test", ToRead, nil, mockV1Client)
+			var disagree *TargetsDisagreeError
+			s.Require().ErrorAs(err, &disagree)
+			s.True(disagree.IsUsageError())
+			s.EqualError(err, `the Deployment id test-id-1 and the name "test" name different Deployments (test-id-1 is "test-1"): pass one of them`)
+		})
+		s.Empty(stdout)
 	})
 
-	s.Run("get deployments after creation error", func() {
-		// Assuming org, ws, and errMock are predefined
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
+	// A workspace with no Deployment, and none named: the run fails naming
+	// the workspace and how to create one, and nothing is created (the mock
+	// would fail on a create call).
+	for _, use := range []Use{ToRead, ToChange} {
+		s.Run(fmt.Sprintf("no deployments in workspace, none named, use %d", use), func() {
+			mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
+			defer testUtil.MockUserInput(s.T(), "y\n1\n")()
 
-		// Mock createDeployment
-		createDeployment = func(
-			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string,
-			deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string,
-			astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration,
-		) error {
-			return nil
-		}
+			_, err := GetDeployment(ws, "", "", use, nil, mockV1Client)
+			var none *NoDeploymentsError
+			s.Require().ErrorAs(err, &none)
+			s.EqualError(err, NoDeploymentInWSMsg+" "+ws+": create one with astro deployment create")
+		})
+	}
+}
 
-		// Second ListDeployments call with an error to simulate an error after deployment creation
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMock).Once()
+// Named nothing, with an API token, deployment.auto_select, or ASTRONOMER_KEY_*
+// set and one Deployment in the workspace: a read takes it, saying so on
+// stderr; a change never does. With a terminal it asks, and with none it
+// fails, naming the flag.
+func (s *Suite) TestGetDeploymentAutoSelectsOnlyToRead() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	s.T().Setenv("ASTRONOMER_KEY_ID", "")
+	s.T().Setenv("ASTRONOMER_KEY_SECRET", "")
+	s.T().Setenv("ASTRO_API_TOKEN", "ci-token")
+	one := astrov1.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		JSON200:      &astrov1.DeploymentsPaginated{Deployments: []astrov1.Deployment{{Id: "test-id-1", Name: "only"}}},
+	}
 
-		// Mock os.Stdin
-		input := []byte("y")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(input)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
+	s.Run("a read takes the only one", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&one, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-id-1").Return(&deploymentResponse, nil).Once()
+		standInForATerminal(s.T(), false)
 
-		_, err = GetDeployment(ws, "", "", false, nil, mockV1Client)
-		s.ErrorIs(err, errMock)
-
-		mockV1Client.AssertExpectations(s.T())
+		var got astrov1.Deployment
+		stdout := captureStdout(s.T(), func() {
+			var err error
+			got, err = GetDeployment(ws, "", "", ToRead, nil, mockV1Client)
+			s.NoError(err)
+		})
+		s.Equal("test-id-1", got.Id)
+		s.Empty(stdout, "the note is not the result")
 	})
 
-	s.Run("test automatic deployment creation", func() {
-		// Assuming org, ws, and deploymentID are predefined
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
+	s.Run("a change without a terminal is told to name it", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&one, nil).Once()
+		standInForATerminal(s.T(), false)
 
-		// Mock createDeployment
-		createDeployment = func(
-			label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement,
-			defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string,
-			deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string,
-			astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration,
-		) error {
-			return nil
-		}
-
-		mockCoreDeploymentResponse = []astrov1.Deployment{
-			{
-				Id:            "test-id-1",
-				Name:          "test",
-				Status:        "HEALTHY",
-				Type:          &standardType,
-				Region:        &testRegion,
-				CloudProvider: &testProvider,
-			},
-		}
-
-		mockListOneDeploymentsResponse := astrov1.ListDeploymentsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrov1.DeploymentsPaginated{
-				Deployments: mockCoreDeploymentResponse,
-			},
-		}
-
-		// Second ListDeployments call after successful deployment creation
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListOneDeploymentsResponse, nil).Once()
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
-
-		// Mock os.Stdin
-		input := []byte("1")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(input)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
-		deployment, err := GetDeployment(ws, "", "", false, nil, mockV1Client)
-		s.NoError(err)
-		s.Equal(deploymentID, deployment.Id)
-
-		mockV1Client.AssertExpectations(s.T())
+		_, err := GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
+		s.Require().Error(err)
+		s.True(input.IsRequired(err), "%v", err)
+		s.Contains(err.Error(), "pass --deployment")
 	})
+
+	s.Run("a change with a terminal asks", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&one, nil).Once()
+
+		// Nothing typed is no pick.
+		defer testUtil.MockUserInput(s.T(), "")()
+		_, err := GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
+		s.ErrorIs(err, ErrInvalidDeploymentKey)
+	})
+
+	s.Run("a change with a terminal takes what is picked", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&one, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-id-1").Return(&deploymentResponse, nil).Once()
+
+		defer testUtil.MockUserInput(s.T(), "1\n")()
+		got, err := GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
+		s.NoError(err)
+		s.Equal("test-id-1", got.Id)
+	})
+}
+
+// captureStdout is what f wrote to os.Stdout.
+func captureStdout(t *testing.T, f func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	saved := os.Stdout
+	os.Stdout = w
+	defer func() { os.Stdout = saved }()
+	f()
+	w.Close()
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	return string(out)
 }
 
 func (s *Suite) TestGetDeploymentByID() {
@@ -765,10 +749,10 @@ func (s *Suite) TestSelectRegion() {
 		mockV1Client.On("GetClusterOptionsWithResponse", mock.Anything, mock.Anything, getSharedClusterOptionsParams).Return(mockOKRegionResponse, nil).Once()
 
 		// mock os.Stdin
-		input := []byte("1")
+		answer := []byte("1")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -800,10 +784,10 @@ func (s *Suite) TestSelectRegion() {
 		mockV1Client.On("GetClusterOptionsWithResponse", mock.Anything, mock.Anything, getSharedClusterOptionsParams).Return(mockOKRegionResponse, nil).Once()
 
 		// mock os.Stdin
-		input := []byte("1")
+		answer := []byte("1")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -835,10 +819,10 @@ func (s *Suite) TestSelectRegion() {
 		mockV1Client.On("GetClusterOptionsWithResponse", mock.Anything, mock.Anything, getSharedClusterOptionsParams).Return(mockOKRegionResponse, nil).Once()
 
 		// mock os.Stdin
-		input := []byte("4")
+		answer := []byte("4")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -969,10 +953,10 @@ func (s *Suite) TestLogs() {
 		mockV1Client.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, nil).Once()
 
 		// Mock os.Stdin
-		input := []byte("1")
+		answer := []byte("1")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -1703,10 +1687,10 @@ func (s *Suite) TestSelectCluster() {
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 
 		// mock os.Stdin
-		input := []byte("1")
+		answer := []byte("1")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -1723,10 +1707,10 @@ func (s *Suite) TestSelectCluster() {
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 
 		// mock os.Stdin
-		input := []byte("4")
+		answer := []byte("4")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -1788,8 +1772,8 @@ func (s *Suite) TestCanCiCdDeploy() {
 // TestCanCiCdDeployTokenForms runs the real parser over every form a stored
 // token can take. One that does not show it carries permissions is not one
 // that may deploy past CI/CD enforcement — and is never a panic.
-// SelectDeployment takes the only Deployment without asking when CI supplied
-// an ASTRO_API_TOKEN, read by the one rule: one holding only the scheme is no
+// A read takes the only Deployment without asking when CI supplied an
+// ASTRO_API_TOKEN, read by the one rule: one holding only the scheme is no
 // token, so it asks (and, with nothing to read, fails).
 func (s *Suite) TestSelectDeploymentReadsTheAPITokenByTheOneRule() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -1800,7 +1784,7 @@ func (s *Suite) TestSelectDeploymentReadsTheAPITokenByTheOneRule() {
 		s.Run(env, func() {
 			s.T().Setenv("ASTRO_API_TOKEN", env)
 			defer testUtil.MockUserInput(s.T(), "")()
-			got, err := SelectDeployment(only, "Which?")
+			got, err := deploymentSelectionProcess(ws, only, nil, ToRead)
 			if asks {
 				s.Error(err)
 				return
@@ -2053,8 +2037,8 @@ func (s *Suite) TestUpdate() {
 	s.Run("successfully update worker queues with standard type", func() {
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(i astrov1.UpdateDeploymentRequest) bool {
-			input, _ := i.AsUpdateStandardDeploymentRequest()
-			return input.WorkerQueues != nil && len(*input.WorkerQueues) == 1 && (*input.WorkerQueues)[0].Name == "worker-name"
+			req, _ := i.AsUpdateStandardDeploymentRequest()
+			return req.WorkerQueues != nil && len(*req.WorkerQueues) == 1 && (*req.WorkerQueues)[0].Name == "worker-name"
 		})).Return(&mockUpdateDeploymentResponse, nil).Times(2)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
@@ -2094,8 +2078,8 @@ func (s *Suite) TestUpdate() {
 	s.Run("successfully update worker queues", func() {
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(i astrov1.UpdateDeploymentRequest) bool {
-			input, _ := i.AsUpdateDedicatedDeploymentRequest()
-			return input.WorkerQueues != nil && len(*input.WorkerQueues) == 1 && (*input.WorkerQueues)[0].Name == "worker-name"
+			req, _ := i.AsUpdateDedicatedDeploymentRequest()
+			return req.WorkerQueues != nil && len(*req.WorkerQueues) == 1 && (*req.WorkerQueues)[0].Name == "worker-name"
 		})).Return(&mockUpdateDeploymentResponse, nil).Times(2)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
@@ -2445,17 +2429,29 @@ func (s *Suite) TestDelete() {
 		},
 	}
 
+	// Asked, the person types the Deployment's name to confirm.
 	s.Run("success", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("DeleteDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockDeleteDeploymentResponse, nil).Times(1)
 
-		// mock os.Stdin
-		defer testUtil.MockUserInput(s.T(), "y")()
+		defer testUtil.MockUserInput(s.T(), "test\n")()
 
 		removal, err := Delete("test-id-1", ws, "", false, mockV1Client)
 		s.NoError(err)
 		s.Equal(&Removal{DeploymentID: "test-id-1", Name: deploymentResponse.JSON200.Name, WorkspaceID: deploymentResponse.JSON200.WorkspaceId, Action: actionDeleted}, removal)
+		mockV1Client.AssertExpectations(s.T())
+	})
+
+	s.Run("--yes skips the confirmation", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
+		mockV1Client.On("DeleteDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockDeleteDeploymentResponse, nil).Times(1)
+		standInForATerminal(s.T(), false)
+
+		removal, err := Delete("test-id-1", ws, "", true, mockV1Client)
+		s.NoError(err)
+		s.Equal("test-id-1", removal.DeploymentID)
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -2483,7 +2479,8 @@ func (s *Suite) TestDelete() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Times(1)
 
 		_, err := Delete("", ws, "", false, mockV1Client)
-		s.EqualError(err, fmt.Sprintf("%s %s to delete", NoDeploymentInWSMsg, ws))
+		var none *NoDeploymentsError
+		s.ErrorAs(err, &none)
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -2498,15 +2495,59 @@ func (s *Suite) TestDelete() {
 		mockV1Client.AssertExpectations(s.T())
 	})
 
-	s.Run("cancel update", func() {
+	// With no terminal, the Deployment must be named: --yes answers the
+	// confirmation, not which Deployment, and nothing is listed or deleted
+	// (the mock fails on any call). An API token changes nothing.
+	s.Run("nothing named and no terminal, with --yes", func() {
+		standInForATerminal(s.T(), false)
+		s.T().Setenv("ASTRO_API_TOKEN", "ci-token")
+
+		removal, err := Delete("", ws, "", true, mockV1Client)
+		s.Nil(removal)
+		s.Require().Error(err)
+		s.True(input.IsRequired(err), "%v", err)
+		s.ErrorIs(err, errDeleteNeedsTarget)
+		mockV1Client.AssertExpectations(s.T())
+	})
+
+	// Anything but the name, a y included, deletes nothing and fails.
+	for _, answer := range []string{"y\n", "n\n", "\n", "tes\n"} {
+		s.Run("confirmation answered "+strings.TrimSpace(answer), func() {
+			mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+			mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
+			defer testUtil.MockUserInput(s.T(), answer)()
+
+			removal, err := Delete("test-id-1", ws, "", false, mockV1Client)
+			s.ErrorIs(err, errDeleteNotConfirmed)
+			s.Nil(removal)
+			mockV1Client.AssertExpectations(s.T())
+		})
+	}
+
+	// A named Deployment, no --yes, and no terminal: nothing to read is
+	// nobody to type the name, and the failure names --yes.
+	s.Run("confirmation with no terminal", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		// mock os.Stdin
-		defer testUtil.MockUserInput(s.T(), "n")()
+		standInForATerminal(s.T(), false)
+		defer testUtil.MockUserInput(s.T(), "")()
 
 		removal, err := Delete("test-id-1", ws, "", false, mockV1Client)
-		s.NoError(err)
-		s.Nil(removal, "a declined deletion deleted nothing")
+		s.Nil(removal)
+		s.True(input.IsRequired(err), "%v", err)
+		s.ErrorIs(err, errDeleteNeedsConfirmation)
+		mockV1Client.AssertExpectations(s.T())
+	})
+
+	// Under -o json the confirmation is refused, naming --yes.
+	s.Run("confirmation refused when it may not ask", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
+		s.T().Cleanup(input.SetGuard(func() string { return "with --output json it cannot" }))
+
+		_, err := Delete("test-id-1", ws, "", false, mockV1Client)
+		s.True(input.IsRequired(err), "%v", err)
+		s.Contains(err.Error(), "pass --yes")
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -2515,8 +2556,7 @@ func (s *Suite) TestDelete() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("DeleteDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockDeleteDeploymentResponse, errMock).Times(1)
 
-		// mock os.Stdin
-		defer testUtil.MockUserInput(s.T(), "y")()
+		defer testUtil.MockUserInput(s.T(), "test\n")()
 
 		_, err := Delete("test-id-1", ws, "", false, mockV1Client)
 		s.ErrorIs(err, errMock)
@@ -2734,7 +2774,8 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 
 		_, err := UpdateDeploymentHibernationOverride("", ws, "", true, nil, false, mockV1Client)
 		s.Error(err)
-		s.Equal(err.Error(), fmt.Sprintf("%s %s", NoDeploymentInWSMsg, ws))
+		var noneLeft *NoneEligibleError
+		s.ErrorAs(err, &noneLeft, "the workspace has Deployments, none for development")
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -2756,7 +2797,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 
 		res, err := UpdateDeploymentHibernationOverride("", ws, "", true, nil, false, mockV1Client)
-		s.EqualError(err, fmt.Sprintf("%s %s to hibernate", NoDeploymentInWSMsg, ws))
+		s.EqualError(err, fmt.Sprintf("%s %s: create one with astro deployment create", NoDeploymentInWSMsg, ws))
 		s.Nil(res)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -2955,7 +2996,7 @@ func (s *Suite) TestDeleteDeploymentHibernationOverride() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 
 		_, err := DeleteDeploymentHibernationOverride("", ws, "", false, mockV1Client)
-		s.EqualError(err, "no Deployments with a hibernation override that can be removed found in Workspace "+ws)
+		s.EqualError(err, fmt.Sprintf("%s %s: create one with astro deployment create", NoDeploymentInWSMsg, ws))
 		mockV1Client.AssertExpectations(s.T())
 	})
 }
