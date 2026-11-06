@@ -1369,11 +1369,18 @@ func newResetCmd(c *cli) *cobra.Command {
 
 func (c *cli) runReset(ctx context.Context, yes bool) error {
 	r := c.renderer()
-	if err := c.confirmUnless(yes, "Wipe this project's local Airflow state?"); err != nil {
-		return err
-	}
+	// Everything that can fail without consent fails first: a directory with
+	// no project, or a run with no home for the state reset would wipe, is
+	// refused before it is asked to wipe anything, and the question names the
+	// project it would wipe.
 	dir, err := c.projectPath()
 	if err != nil {
+		return err
+	}
+	if c.d.HomeErr != nil {
+		return c.d.HomeErr
+	}
+	if err := c.confirmUnless(yes, fmt.Sprintf("Wipe the local Airflow state (database, logs, environment) of %s?", dir)); err != nil {
 		return err
 	}
 	// Runtime.Reset rather than Stop with Clean: stop goes through Attach,
