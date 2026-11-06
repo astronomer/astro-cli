@@ -196,10 +196,13 @@ func shutdownVerdict(err error) error {
 // Airflow and to everything Airflow starts.
 func readSecretEnv(fd int) ([]string, error) {
 	f := os.NewFile(uintptr(fd), "secret-env")
-	if f == nil {
-		return nil, fmt.Errorf("reading secret values: descriptor %d is not open", fd)
-	}
 	defer func() { _ = f.Close() }()
+	// os.NewFile wraps any number it is given, so ask the descriptor itself:
+	// a spawner that passed the flag without the descriptor gets this, rather
+	// than a decode error about a file nobody opened.
+	if _, err := f.Stat(); err != nil {
+		return nil, fmt.Errorf("reading secret values: descriptor %d is not open: %w", fd, err)
+	}
 	values, err := secretenv.Decode(f)
 	if err != nil {
 		return nil, err

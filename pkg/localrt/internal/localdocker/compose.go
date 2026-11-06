@@ -9,6 +9,8 @@ import (
 	"strings"
 	"text/template"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/secretenv"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
@@ -408,13 +410,74 @@ const secretEnvLoader = "import json,os,sys;" +
 	"os.environ.update(json.load(open(p)) if e else {});" +
 	"os.execvp(a[0],a)"
 
+// secretEnvMaxBytes caps the handoff file, and so the tmpfs volume holding it.
+// It is far above what a process environment can carry (Linux refuses an exec
+// whose arguments and environment pass a quarter of the stack limit, 2 MiB by
+// default), so a payload this size could not have started Airflow by any
+// route; the cap exists to say so plainly instead of letting `cat` fail with
+// "No space left on device".
+const secretEnvMaxBytes = 4 << 20
+
+// secretEnvRevBytes is how much randomness a start's handoff revision carries:
+// enough that two starts never share one.
+const secretEnvRevBytes = 8
+
+// dbMigrationService is the compose template's one-shot migration service,
+// which reads the handoff like the components do.
+const dbMigrationService = "db-migration"
+
 // secretEnvSpec is what the compose template needs to render the handoff.
 type secretEnvSpec struct {
 	Service, Volume, Dir, File string
+	// SizeBytes is the tmpfs volume's size: secretEnvMaxBytes.
+	SizeBytes int
+	// Rev differs on every start that hands values off, and labels each
+	// container that reads them. The values themselves are not in any
+	// container's configuration, so without it compose would see nothing
+	// changed and keep a running Airflow on the values it started with — a
+	// start against containers that are still up (the state record is gone
+	// but they are not) would rewrite the file and leave Airflow on rotated-out
+	// credentials. A new label makes compose recreate those containers, and
+	// only those: the holder keeps the volume mounted throughout.
+	Rev string
 }
 
-func newSecretEnvSpec() *secretEnvSpec {
-	return &secretEnvSpec{Service: secretEnvService, Volume: secretEnvVolume, Dir: secretEnvDir, File: secretEnvFile}
+func newSecretEnvSpec(rev string) *secretEnvSpec {
+	return &secretEnvSpec{
+		Service: secretEnvService, Volume: secretEnvVolume, Dir: secretEnvDir, File: secretEnvFile,
+		SizeBytes: secretEnvMaxBytes, Rev: rev,
+	}
+}
+
+// overrideReplacedCommands lists the services among names whose command the
+// project's compose override sets. An override's command replaces the
+// generated one whole, loader included, so such a service would start without
+// the secret values; the caller says so rather than let tasks fail later, far
+// from the cause. An override that cannot be read says nothing, and compose
+// will say what is wrong with it.
+func overrideReplacedCommands(projectPath string, names []string) []string {
+	if !rt.HasComposeOverride(projectPath) {
+		return nil
+	}
+	b, err := os.ReadFile(filepath.Join(projectPath, rt.ComposeOverrideFile))
+	if err != nil {
+		return nil
+	}
+	var spec struct {
+		Services map[string]struct {
+			Command any `yaml:"command"`
+		} `yaml:"services"`
+	}
+	if yaml.Unmarshal(b, &spec) != nil {
+		return nil
+	}
+	var out []string
+	for _, n := range names {
+		if svc, ok := spec.Services[n]; ok && svc.Command != nil {
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 // withSecretEnv runs argv through secretEnvLoader.

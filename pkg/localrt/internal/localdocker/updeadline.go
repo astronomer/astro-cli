@@ -47,7 +47,11 @@ func (e *Engine) composeUp(ctx context.Context, up *composeLine, cb rt.Callbacks
 	// --quiet-pull here too: nothing should be left to pull, but a pull_policy
 	// in an override, or an image removed between the two steps, would
 	// otherwise stream progress bars through cb.OnLine.
-	err := e.runCompose(upCtx, *up, cb, "up", "--detach", "--quiet-pull")
+	// --remove-orphans: a container of this project whose service the file no
+	// longer names is stale by definition. The one it matters most for is the
+	// secret handoff's holder after a start with no secret values, which would
+	// otherwise keep the previous values mounted in memory until a down.
+	err := e.runCompose(upCtx, *up, cb, "up", "--detach", "--quiet-pull", "--remove-orphans")
 	if err != nil && ctx.Err() == nil && errors.Is(upCtx.Err(), context.DeadlineExceeded) {
 		// The deadline, not the caller's patience: a Ctrl-C keeps the plain
 		// error. Either way the caller cleans up.
@@ -64,13 +68,19 @@ func (e *Engine) composeUp(ctx context.Context, up *composeLine, cb rt.Callbacks
 //
 // Stdin is the one channel here the daemon does not keep. The command line
 // names only the file, and the write goes through a temporary name and a
-// rename, so a reader never sees half a file. umask makes it owner-only.
+// rename, so a reader never sees half a file.
+//
+// The file is read-only to every user rather than owner-only. Every container
+// that mounts the volume is this project's own, but not every one runs as the
+// writer: the Airflow services run as astro, and the migration as whatever
+// user the image names, which a project Dockerfile is free to change. An
+// owner-only file would fail that migration with a permission error.
 func (e *Engine) handOffSecretEnv(ctx context.Context, up *composeLine, cb rt.Callbacks) error {
 	if err := e.runCompose(ctx, *up, cb, "up", "--detach", "--no-deps", secretEnvService); err != nil {
 		return fmt.Errorf("starting the %s service: %w", secretEnvService, err)
 	}
 	tmp := secretEnvFile + ".tmp"
-	write := "umask 077 && cat > " + tmp + " && mv " + tmp + " " + secretEnvFile
+	write := "rm -f " + tmp + " && umask 0222 && cat > " + tmp + " && mv -f " + tmp + " " + secretEnvFile
 	var stderr bytes.Buffer
 	stdio := rt.Stdio{In: bytes.NewReader(up.secretPayload), Err: &stderr}
 	args := up.argv("exec", "-T", secretEnvService, "sh", "-c", write)

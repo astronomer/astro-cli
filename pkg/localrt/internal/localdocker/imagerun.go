@@ -100,10 +100,15 @@ func (e *Engine) RunInImage(ctx context.Context, projectPath string, req rt.Imag
 		files:      composeFiles(path, projectPath),
 		name:       name,
 		projectDir: projectPath,
-		// Compose resolves two kinds of valueless entry from this: the
-		// PassthroughEnv and SecretEnv keys the file declares, and the bare
-		// -e KEY flags below. A key it cannot resolve is dropped from the
-		// container silently.
+		// Compose resolves the bare -e KEY flags below from this (and the
+		// PassthroughEnv keys the file declares from its own environment). A
+		// key it cannot resolve is dropped from the container silently.
+		//
+		// Unlike Start, this passes the values as container environment: the
+		// container is a one-off --rm that bypasses the image's entrypoint and
+		// hands its stdin to the caller, so neither the handoff volume nor the
+		// loader is available. They sit in that container's configuration for
+		// its lifetime (rt.Plan.SecretEnv).
 		extraEnv: environ,
 	}
 

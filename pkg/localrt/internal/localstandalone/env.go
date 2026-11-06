@@ -267,7 +267,6 @@ func hasKey(env []string, key string) bool {
 	return false
 }
 
-// sortedKeys orders a map's keys so env construction is deterministic.
 // secretEnvFD is the descriptor the supervisor reads a start's secret values
 // from: the first of exec.Cmd.ExtraFiles, after stdin, stdout and stderr.
 const secretEnvFD = 3
@@ -308,6 +307,7 @@ func splitSecretEnv(env []string, secret map[string]string) (rest []string, move
 	return rest, moved
 }
 
+// sortedKeys orders a map's keys so env construction is deterministic.
 func sortedKeys(m map[string]string) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {

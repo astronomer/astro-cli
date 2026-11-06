@@ -241,7 +241,7 @@ func TestStartBringsProjectUp(t *testing.T) {
 		"the pre-flight probe must ask about the project the teardown would remove")
 	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --no-start --quiet-pull",
 		composeFile, p.ProjectPath, name), cmd.calls[3])
-	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --detach --quiet-pull",
+	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --detach --quiet-pull --remove-orphans",
 		composeFile, p.ProjectPath, name), cmd.calls[4])
 	assert.FileExists(t, composeFile)
 
@@ -996,6 +996,73 @@ func TestStartHandsSecretValuesOffThroughStdin(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(compose), "pw@h", "a secret value reached the compose file")
 	assert.NotContains(t, string(compose), "AIRFLOW_CONN_DB", "a secret key must not be declared for compose to resolve")
+}
+
+// Each start that hands values off labels its Airflow containers with a new
+// revision, so compose recreates them onto the new values even when nothing
+// else about them changed (a start against containers whose record was lost).
+func TestStartLabelsEachHandoffWithANewRevision(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+	stateDir, err := rt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	rev := func() string {
+		b, err := os.ReadFile(filepath.Join(stateDir, composeFileName))
+		require.NoError(t, err)
+		_, after, ok := strings.Cut(string(b), "secret-env-rev: \"")
+		require.True(t, ok, "no revision label in the compose file")
+		r, _, _ := strings.Cut(after, "\"")
+		return r
+	}
+
+	_, err = e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	first := rev()
+	require.NoError(t, localstate.Remove(p.ProjectPath)) // the lost-record case
+	_, err = e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.NotEqual(t, first, rev())
+}
+
+// A payload past the volume's size fails the start before anything is created,
+// with a message that names the limit rather than a `cat` write error.
+func TestStartRefusesSecretValuesPastTheLimit(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"BIG": strings.Repeat("x", secretEnvMaxBytes)}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.ErrorContains(t, err, "more than the")
+	assert.False(t, hasCall(cmd.calls, " up "), "nothing may be created: %v", cmd.calls)
+}
+
+// An override that replaces a service's command drops the loader with it, and
+// the start says so instead of letting tasks fail later without their values.
+func TestStartWarnsWhenAnOverrideReplacesALoadedCommand(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+	override := "services:\n  scheduler:\n    command: [airflow, scheduler]\n"
+	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, rt.ComposeOverrideFile), []byte(override), 0o600))
+
+	var lines []string
+	_, err := e.Start(context.Background(), p, rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l.Text) }})
+	require.NoError(t, err)
+	assert.NotEmpty(t, linesWith(lines, "scheduler will start without its vault and workspace values"), "lines: %v", lines)
+}
+
+// The full up removes orphans, so a holder left from an earlier start with
+// secret values does not keep them mounted after a start without any.
+func TestStartRemovesOrphans(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
+	require.NoError(t, err)
+	assert.True(t, hasCall(cmd.calls, "up --detach --quiet-pull --remove-orphans"), "calls: %v", cmd.calls)
 }
 
 // A start with no secret values does not run the handoff at all.

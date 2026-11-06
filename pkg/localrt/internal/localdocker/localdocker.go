@@ -16,6 +16,8 @@ package localdocker
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -337,21 +339,11 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	}
 
 	env := airflowEnv(name, webPort, major, p.Env, p.SecretEnv)
-	// The values the handoff delivers, encoded once: nil when there are none,
-	// which leaves the compose file and the up exactly as they were.
-	secretPayload, err := secretenv.Encode(handoffEnv(p.SecretEnv, env))
+	h, err := e.planHandoff(p, env, projectPath, major, cb)
 	if err != nil {
 		return nil, err
 	}
-	dbCmd, services := dbCommand(major), airflowServices(major)
-	var secretSpec *secretEnvSpec
-	if secretPayload != nil {
-		secretSpec = newSecretEnvSpec()
-		dbCmd = withSecretEnv(true, dbCmd)
-		for i := range services {
-			services[i].Command = withSecretEnv(true, services[i].Command)
-		}
-	}
+	secretPayload, secretSpec, dbCmd, services := h.payload, h.spec, h.dbCommand, h.services
 	composePath, err := e.writeComposeFile(stateDir, composeInput{
 		ProjectName: name,
 		Image:       image,
@@ -424,6 +416,47 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	e.removeSupersededImage(ctx, conn, name, previousImage)
 	rt.OnState(cb, rt.StateRunning, nil)
 	return &airflow{eng: e, rec: rec}, nil
+}
+
+// handoffPlan is what a start renders and runs for its secret values: the
+// payload (nil when there are none), the compose spec for it, and the
+// commands the containers run, wrapped in the loader when there is a payload.
+type handoffPlan struct {
+	payload   []byte
+	spec      *secretEnvSpec
+	dbCommand []string
+	services  []service
+}
+
+// planHandoff decides how a start delivers its secret values (secretEnvSpec).
+// With none, the commands are the plain ones and the compose file is what it
+// was before the handoff existed.
+func (e *Engine) planHandoff(p rt.Plan, env []envVar, projectPath, major string, cb rt.Callbacks) (handoffPlan, error) {
+	h := handoffPlan{dbCommand: dbCommand(major), services: airflowServices(major)}
+	payload, err := secretenv.Encode(handoffEnv(p.SecretEnv, env))
+	if err != nil || payload == nil {
+		return h, err
+	}
+	if len(payload) > secretEnvMaxBytes {
+		return h, fmt.Errorf("this project's secret values come to %d bytes, more than the %d a local start can hand to Airflow (or a process environment can hold)", len(payload), secretEnvMaxBytes)
+	}
+	rev := make([]byte, secretEnvRevBytes)
+	if _, err := rand.Read(rev); err != nil {
+		return h, fmt.Errorf("generating the secret handoff revision: %w", err)
+	}
+	h.payload, h.spec = payload, newSecretEnvSpec(hex.EncodeToString(rev))
+	h.dbCommand = withSecretEnv(true, h.dbCommand)
+	names := []string{dbMigrationService}
+	for i := range h.services {
+		h.services[i].Command = withSecretEnv(true, h.services[i].Command)
+		names = append(names, h.services[i].Name)
+	}
+	if replaced := overrideReplacedCommands(projectPath, names); len(replaced) > 0 && cb.OnLine != nil {
+		cb.OnLine(rt.LogLine{Component: "system", Time: e.now(), Text: fmt.Sprintf(
+			"%s sets the command of %s, which replaces the step that loads this project's secret values: %s will start without its vault and workspace values",
+			rt.ComposeOverrideFile, strings.Join(replaced, ", "), strings.Join(replaced, ", "))})
+	}
+	return h, nil
 }
 
 // bringUp creates the containers, and cleans up after itself when it cannot.

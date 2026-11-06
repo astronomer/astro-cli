@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	yaml "gopkg.in/yaml.v3"
+
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 var updateGolden = flag.Bool("update", false, "rewrite golden files")
@@ -288,7 +290,7 @@ func TestHandoffEnvLeavesOutWhatTheEngineKeeps(t *testing.T) {
 // and never a value.
 func TestGenerateComposeWithSecretHandoff(t *testing.T) {
 	in := goldenInput()
-	in.SecretEnv = newSecretEnvSpec()
+	in.SecretEnv = newSecretEnvSpec("rev1")
 	in.DBCommand = withSecretEnv(true, in.DBCommand)
 	for i := range in.Services {
 		in.Services[i].Command = withSecretEnv(true, in.Services[i].Command)
@@ -300,6 +302,7 @@ func TestGenerateComposeWithSecretHandoff(t *testing.T) {
 		Volumes  map[string]map[string]any `yaml:"volumes"`
 		Services map[string]struct {
 			Command     []string                  `yaml:"command"`
+			Labels      map[string]string         `yaml:"labels"`
 			Entrypoint  []string                  `yaml:"entrypoint"`
 			Volumes     []string                  `yaml:"volumes"`
 			DependsOn   map[string]map[string]any `yaml:"depends_on"`
@@ -315,6 +318,7 @@ func TestGenerateComposeWithSecretHandoff(t *testing.T) {
 	require.True(t, ok, "the handoff volume must be declared")
 	opts, _ := vol["driver_opts"].(map[string]any)
 	assert.Equal(t, "tmpfs", opts["type"], "the handoff volume must live in memory")
+	assert.Equal(t, "size="+strconv.Itoa(secretEnvMaxBytes)+",mode=1777", opts["o"])
 
 	holder, ok := doc.Services[secretEnvService]
 	require.True(t, ok, "a service must hold the volume mounted")
@@ -331,8 +335,24 @@ func TestGenerateComposeWithSecretHandoff(t *testing.T) {
 			"%s must run its command through the loader, intact after YAML", name)
 		assert.Contains(t, svc.Volumes, secretEnvVolume+":"+secretEnvDir+":ro", name)
 		assert.Equal(t, "service_healthy", svc.DependsOn[secretEnvService]["condition"], name)
+		assert.Equal(t, "rev1", svc.Labels["io.astronomer.docker.secret-env-rev"],
+			"%s must carry the start's revision, so a re-start recreates it onto the new values", name)
 	}
+	assert.Empty(t, doc.Services[secretEnvService].Labels["io.astronomer.docker.secret-env-rev"],
+		"the holder must not be recreated, or the volume could lose its file")
 	assert.NotContains(t, got, "pw@", "the file must never carry a value")
+}
+
+// Only a service whose command the override sets is named: an override that
+// touches something else leaves the loader in place.
+func TestOverrideReplacedCommands(t *testing.T) {
+	project := t.TempDir()
+	assert.Nil(t, overrideReplacedCommands(project, []string{"scheduler"}), "no override, nothing replaced")
+
+	override := "services:\n  scheduler:\n    command: [airflow, scheduler]\n  api-server:\n    environment:\n      X: y\n"
+	require.NoError(t, os.WriteFile(filepath.Join(project, rt.ComposeOverrideFile), []byte(override), 0o600))
+	assert.Equal(t, []string{"scheduler"},
+		overrideReplacedCommands(project, []string{"db-migration", "scheduler", "api-server"}))
 }
 
 // Without secret values the file has no trace of the handoff, so a project that

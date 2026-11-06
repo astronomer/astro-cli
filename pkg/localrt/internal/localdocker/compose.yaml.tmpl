@@ -22,7 +22,7 @@ volumes:
     driver_opts:
       type: tmpfs
       device: tmpfs
-      o: "size=4m,mode=1777"
+      o: "size={{.SizeBytes}},mode=1777"
 {{- end}}
 
 services:
@@ -97,6 +97,7 @@ services:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
       io.astronomer.docker.component: "airflow-db-migration"
+{{- template "secretrev" $}}
     environment: *common-env
 {{- with .SecretEnv}}
     volumes:
@@ -126,6 +127,7 @@ services:
       io.astronomer.docker: "true"
       io.astronomer.docker.cli: "true"
       io.astronomer.docker.component: "airflow-{{.Name}}"
+{{- template "secretrev" $}}
     environment: *common-env
 {{- if .Publish}}
     ports:
@@ -143,6 +145,12 @@ services:
 {{- with .SecretEnv}}
       - {{.Volume}}:{{.Dir}}:ro
 {{- end}}
+{{- end}}
+{{- end}}
+
+{{- define "secretrev"}}
+{{- with .SecretEnv}}
+      io.astronomer.docker.secret-env-rev: "{{.Rev}}"
 {{- end}}
 {{- end}}
 
