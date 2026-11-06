@@ -56,16 +56,18 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Astro Workspaces",
 		Long:    "Create and manage Workspaces on Astro. Workspaces can contain multiple Deployments and can be shared across users.",
 	}
+	deleteCmd := newWorkspaceDeleteCmd(out)
 	cmd.AddCommand(
 		newWorkspaceListCmd(out),
 		newWorkspaceSwitchCmd(out),
 		newWorkspaceCreateCmd(out),
 		newWorkspaceUpdateCmd(out),
-		newWorkspaceDeleteCmd(out),
+		deleteCmd,
 		newWorkspaceUserRootCmd(out),
 		newWorkspaceTokenRootCmd(out),
 		newWorkspaceTeamRootCmd(out),
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	applyPreferredFlagsIn(cmd)
 	return cmd
 }
@@ -170,7 +172,7 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [WORKSPACE_ID]",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete an Astro Workspace",
 		Long:    "Permanently delete a Workspace. The Workspace must have zero Deployments — delete or transfer all Deployments first. Deletion also removes all Workspace-scoped API tokens and revokes Workspace-level roles from Organization tokens that had access. This action cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Args:    cobra.MaximumNArgs(1),
@@ -294,15 +296,17 @@ func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 		Long:    "Manage tokens in your Astro Workspace.",
 	}
 	cmd.SetOut(out)
+	deleteCmd := newWorkspaceTokenDeleteCmd(out)
 	cmd.AddCommand(
 		newWorkspaceTokenListCmd(out),
 		newWorkspaceTokenCreateCmd(out),
 		newWorkspaceTokenUpdateCmd(out),
 		newWorkspaceTokenRotateCmd(out),
-		newWorkspaceTokenDeleteCmd(out),
+		deleteCmd,
 		newWorkspaceTokenAddOrgTokenCmd(out),
 		newWorkspaceOrgTokenManageCmd(out),
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	addWorkspaceFlag(cmd.PersistentFlags(), &workspaceID, "", "Workspace whose tokens you'd like to manage", oneXWorkspaceID)
 	cliout.AddOutputFlag(cmd, &workspaceTokenOutput)
 	return cmd
@@ -443,7 +447,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete a Workspace API token or remove an Organization API token from a Workspace",
 		Long:    "Delete a Workspace API token or remove an Organization token's Workspace role. Deleting a Workspace token revokes it permanently. Removing an Organization token only revokes its Workspace role — the token continues to work at other scopes.",
 		Example: `

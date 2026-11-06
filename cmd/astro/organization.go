@@ -380,13 +380,15 @@ func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
 		Long:    "Manage teams in your Astro Organization.",
 	}
 	cmd.SetOut(out)
+	deleteCmd := newTeamDeleteCmd(out)
 	cmd.AddCommand(
 		newTeamCreateCmd(out),
 		newOrganizationTeamListCmd(out),
 		newTeamUpdateCmd(out),
-		newTeamDeleteCmd(out),
+		deleteCmd,
 		newOrganizationTeamUserRootCmd(out),
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	cliout.AddOutputFlag(cmd, &organizationTeamOutput)
 	return cmd
 }
@@ -504,7 +506,7 @@ func teamCreate(cmd *cobra.Command, out io.Writer) error {
 func newTeamDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TEAM_ID]",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete an Astro Team",
 		Long:    "Permanently delete a team. All Workspace and Deployment role bindings for the team are removed, and members lose any access they had through the team (but keep directly assigned roles). This action cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Args:    cobra.MaximumNArgs(1),
@@ -687,14 +689,16 @@ func newOrganizationTokenRootCmd(out io.Writer) *cobra.Command {
 		Long:    "Manage tokens in your Astro Organization.",
 	}
 	cmd.SetOut(out)
+	deleteCmd := newOrganizationTokenDeleteCmd(out)
 	cmd.AddCommand(
 		newOrganizationTokenListCmd(out),
 		newOrganizationTokenListRolesCmd(out),
 		newOrganizationTokenCreateCmd(out),
 		newOrganizationTokenUpdateCmd(out),
 		newOrganizationTokenRotateCmd(out),
-		newOrganizationTokenDeleteCmd(out),
+		deleteCmd,
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	cmd.PersistentFlags().StringVar(&organizationID, "organization-id", "", "Organization where you would like to manage tokens")
 	cliout.AddOutputFlag(cmd, &organizationTokenOutput)
 	return cmd
@@ -816,7 +820,7 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
 func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete a Organization API token or remove an Organization API token from a Organization",
 		Long:    "Permanently revoke an Organization API token. All access the token grants — including any Workspace and Deployment roles — is immediately revoked.",
 		Example: `

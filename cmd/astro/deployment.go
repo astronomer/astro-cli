@@ -136,9 +136,10 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		Long:    "Create or manage Deployments running on Astro according to your Organization and Workspace permissions.",
 	}
 	cmd.PersistentPreRunE = followProjectPreRun(cmd)
+	deleteCmd := newDeploymentDeleteCmd(out)
 	cmd.AddCommand(
 		newDeploymentListCmd(out),
-		newDeploymentDeleteCmd(out),
+		deleteCmd,
 		newDeploymentCreateCmd(out),
 		newDeploymentLogsCmd(out),
 		newDeploymentUpdateCmd(out),
@@ -152,6 +153,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentHibernateCmd(out),
 		newDeploymentWakeUpCmd(out),
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	cmd.AddCommand(newRemovedDeploymentObjectCmds()...)
 	for _, c := range cmd.Commands() {
 		switch c.Name() {
@@ -585,7 +587,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [DEPLOYMENT_ID]",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete an Astro Deployment",
 		Long:    "Permanently delete a Deployment and all of its data including Dags, task logs, Airflow metadata, environment variables, connections, API tokens, and alerts. Running tasks are terminated without waiting. Cluster resources are deallocated asynchronously. This action cannot be undone.",
 		Example: `  # Delete a Deployment
@@ -1228,15 +1230,17 @@ func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
 		Long:    "Manage tokens in your Astro Deployment.",
 	}
 	cmd.SetOut(out)
+	deleteCmd := newDeploymentTokenDeleteCmd(out)
 	cmd.AddCommand(
 		newDeploymentTokenListCmd(out),
 		newDeploymentTokenCreateCmd(out),
 		newDeploymentTokenUpdateCmd(out),
 		newDeploymentTokenRotateCmd(out),
-		newDeploymentTokenDeleteCmd(out),
+		deleteCmd,
 		newWorkspaceTokenManageCmd(out),
 		newOrgTokenManageCmd(out),
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID(""))
 	cliout.AddOutputFlag(cmd, &deploymentTokenOutput)
 	return cmd
@@ -1334,7 +1338,7 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
 func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete a Deployment API token",
 		Long:    "Permanently revoke a Deployment API token. All access the token grants is immediately revoked.",
 		Example: `  # Delete a token

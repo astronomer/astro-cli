@@ -27,11 +27,13 @@ func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Deployment worker queues",
 		Long:    "Manage worker queues for an Astro Deployment.",
 	}
+	deleteCmd := newDeploymentWorkerQueueDeleteCmd(out)
 	cmd.AddCommand(
 		newDeploymentWorkerQueueCreateCmd(out),
 		newDeploymentWorkerQueueUpdateCmd(out),
-		newDeploymentWorkerQueueDeleteCmd(out),
+		deleteCmd,
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	cliout.AddOutputFlag(cmd, &deploymentWorkerQueueOutput)
 	addDeploymentWorkspaceFlag(cmd.PersistentFlags())
 	return cmd
@@ -94,7 +96,7 @@ func newDeploymentWorkerQueueUpdateCmd(out io.Writer) *cobra.Command {
 func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete a Deployment's worker queue",
 		Long:    "Delete a worker queue from a Deployment. Tasks currently running on the queue may be interrupted. The default queue cannot be deleted.",
 		Example: `  # Delete a worker queue

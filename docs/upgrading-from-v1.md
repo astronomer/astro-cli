@@ -114,6 +114,7 @@ Everything below fails with an error naming the replacement, instead of an "unkn
 | `astro env … create`, `astro env … update` | `astro env … set`, which creates or updates |
 | `astro dbt deploy [DEPLOYMENT_ID]` | `astro deploy bundle [PATH] --deployment <id, name or link name>`: PATH replaces `--project-path`, `--deployment` the argument and `--deployment-name`, `--workspace` `--workspace-id`; `-m`, `-w` and `-t` are unchanged. Under `-o json`, `project` and `project_path` are now `bundle_name` and `bundle_path`, beside `bundle_type` |
 | `astro dbt delete [DEPLOYMENT_ID]` | `astro deploy bundle --delete [PATH] --deployment <id, name or link name>`, with the same flags |
+| `de` for `delete`, as in `astro deployment de` or `astro de de` | `delete` or `rm`, as in `astro deployment rm`. `de` still means `astro deployment`; it no longer means `delete` under it or anywhere else (Deployments, Deployment tokens and worker queues, Workspaces and Workspace tokens, Organization teams and tokens, contexts, and APC service accounts) |
 
 Run inside a 1.x project, an `astro dev` command also tells you to convert it with `astro init`. One with a replacement says so in its first line (convert, then use the replacement); bare `astro dev`, `upgrade-test` and `proxy` say it after the list of `astro local` commands.
 
