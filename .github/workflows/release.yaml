@@ -108,6 +108,28 @@ jobs:
           fi
           echo "Stamped install.sh with ${TAG}"
 
+      # goreleaser skips signing when the certificate is empty, so local snapshots and forks
+      # still build. An official release must not ship unsigned: fail here, before anything
+      # is published, when a signing secret is missing or misnamed.
+      - name: Require macOS signing secrets
+        if: github.repository == 'astronomer/astro-cli'
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=0
+          for name in MACOS_CERTIFICATE_P12_BASE64 MACOS_CERTIFICATE_PASSWORD APPLE_API_ISSUER_ID APPLE_API_KEY_ID APPLE_API_KEY_P8_BASE64 APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Repository secret ${name} is not set; refusing to release unsigned macOS binaries."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
           version: v2.15.2
@@ -117,12 +139,37 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-token.outputs.token }}
           GORELEASER_CURRENT_TAG: ${{ needs.detect.outputs.tag }}
           GORELEASER_PREVIOUS_TAG: ${{ steps.prev-tag.outputs.tag }}
-          # macOS signing and notarization (notarize.macos in .goreleaser.yml); skipped when unset.
+          # macOS signing and notarization (notarize.macos in .goreleaser.yml). Required above
+          # for official releases; goreleaser itself skips it when unset (snapshots, forks).
           MACOS_SIGN_P12: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
           MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+
+      # Belt and braces after the secrets check: the binaries we built must carry a valid
+      # signature from our Team ID, not just any certificate someone put in the secret.
+      - name: Verify macOS binaries are signed by Astronomer
+        if: github.repository == 'astronomer/astro-cli'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          bins=(dist/darwin-build_darwin_*/astro)
+          if [ "${#bins[@]}" -eq 0 ]; then
+            echo "::error::No darwin binaries found under dist/ to verify."
+            exit 1
+          fi
+          for bin in "${bins[@]}"; do
+            codesign --verify --strict --verbose=2 "$bin"
+            team=$(codesign -dv "$bin" 2>&1 | sed -n 's/^TeamIdentifier=//p')
+            if [ "$team" != "$APPLE_TEAM_ID" ]; then
+              echo "::error::${bin} is signed by team '${team}', expected the Astronomer team."
+              exit 1
+            fi
+            echo "${bin}: signed by team ${team}"
+          done
 
   # install.astronomer.io fetches godownloader.sh from main, so this job keeps
   # that path current. Pinned installs use the install.sh release asset instead,
