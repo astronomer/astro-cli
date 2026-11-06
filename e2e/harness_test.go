@@ -585,6 +585,9 @@ func (p *project) runBounded(bound time.Duration, extra map[string]string, args 
 	cmd.Env = p.env(extra)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	// A command that outlives its bound fails its test with where it hung,
+	// not only that it did: its stderr ends with every goroutine's stack.
+	dumpStacksOnTimeout(cmd)
 
 	err := cmd.Run()
 	r := &result{t: p.t, Args: args, Stdout: stdout.String(), Stderr: stderr.String()}
