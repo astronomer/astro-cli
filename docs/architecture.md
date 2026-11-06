@@ -159,7 +159,9 @@ There is one choke point. `cliout.Execute` installs a process-level guard for th
 
 A call site passes `input.AnsweredBy("--yes")` to name its flag, and `input.About("a workspace")` when its prompt text is a bare `> `. The guard is process-level rather than a context value because the shell platform packages ask from call chains that carry no context.
 
-A command that already refuses to ask when it has no terminal marks that refusal with `input.Required(err)`, so it keeps its own words and gains the kind. `astro deploy` with no target is one. Others are `astro local`'s confirmations without `--yes`, a link picker with no NAME, and a deployment several links make ambiguous. In text mode with no terminal, nothing else changes: other prompts still read stdin as before.
+A command that already refuses to ask when it has no terminal marks that refusal with `input.Required(err)`, so it keeps its own words and gains the kind. `astro deploy` with no target is one. Others are `astro local`'s confirmations without `--yes`, a link picker with no NAME, and a deployment several links make ambiguous. In text mode with no terminal, nothing else changes: other prompts still read stdin as before. `astro local`'s `[y/N]` reads a piped answer without writing the question ahead of it, then records the question and the answer as one line on stderr; with nothing piped, the refusal is all it writes.
+
+A command resolves its context before it asks: it finds the project, the Airflow or the links it acts on, and checks its flags, before the question. So a directory with no project fails as `no_project`, not with a question about a project that is not there, and the question names the concrete target (`astro local reset` names the project's path) rather than "this project".
 
 ### Exit codes
 
