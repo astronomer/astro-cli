@@ -47,11 +47,13 @@ func newContextCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Comman
 		Annotations: map[string]string{astroCmd.NoLoginAnnotation: "true"},
 		Long:        "Context represent a connection to Astro or APC in the form of a Domain URL. If your context is set to astronomer.io, for example, you are connected to Astro",
 	}
+	deleteCmd := newContextDeleteCmd()
 	cmd.AddCommand(
 		newContextListCmd(out),
 		newContextSwitchCmd(astroV1Client, out),
-		newContextDeleteCmd(),
+		deleteCmd,
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	return cmd
 }
 
@@ -240,7 +242,7 @@ func newContextDeleteCmd() *cobra.Command {
 	var output cliout.Format
 	cmd := &cobra.Command{
 		Use:     "delete <DOMAIN>",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete a context",
 		Long:    "Delete a locally stored context to Astro or APC",
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -49,11 +49,13 @@ func newDeploymentSaRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage APC service accounts",
 		Long:    "Service accounts represent revocable tokens with access to the APC platform",
 	}
+	deleteCmd := newDeploymentSaDeleteCmd(out)
 	cmd.AddCommand(
 		newDeploymentSaCreateCmd(out),
 		newDeploymentSaListCmd(out),
-		newDeploymentSaDeleteCmd(out),
+		deleteCmd,
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	return cmd
 }
 
@@ -100,7 +102,7 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete <SERVICE_ACCOUNT_ID>",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete a service account in the APC platform",
 		Long:    "Delete a service account in the APC platform. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Example: deploymentSaDeleteExample,
