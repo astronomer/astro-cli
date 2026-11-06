@@ -82,7 +82,11 @@ type Engine struct {
 	// --stop-with-session. All three are seams so tests never touch a daemon.
 	ensureEngine func(cb rt.Callbacks, projectPath string) error
 	composeAvail func(ctx context.Context, conn engineConn) error
-	startSession func(projectPath string, parentPID int) error
+	// composeSecrets reports whether the engine's compose can take a secret
+	// from the environment, which decides how a start delivers SecretEnv
+	// (planHandoff).
+	composeSecrets func(ctx context.Context, conn engineConn) bool
+	startSession   func(projectPath string, parentPID int) error
 
 	healthTimeout time.Duration
 
@@ -142,6 +146,7 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 		return ensureEngineUp(cb, e.now, e.binaryFor(projectPath))
 	}
 	e.composeAvail = e.probeCompose
+	e.composeSecrets = e.probeComposeSecrets
 	return e
 }
 
@@ -339,11 +344,10 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	}
 
 	env := airflowEnv(name, webPort, major, p.Env, p.SecretEnv)
-	h, err := e.planHandoff(p, env, projectPath, major, cb)
+	h, err := e.planHandoff(ctx, conn, p, env, projectPath, major, cb)
 	if err != nil {
 		return nil, err
 	}
-	secretPayload, secretSpec, dbCmd, services := h.payload, h.spec, h.dbCommand, h.services
 	composePath, err := e.writeComposeFile(stateDir, composeInput{
 		ProjectName: name,
 		Image:       image,
@@ -354,11 +358,11 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		WebPort:      webPort,
 		PostgresPort: pgPort,
 		Env:          env,
-		PassEnv:      passEnv(p.PassthroughEnv, env),
+		PassEnv:      passEnv(append(slices.Clone(p.PassthroughEnv), h.passKeys...), env),
 		Mounts:       projectMounts(projectPath),
-		DBCommand:    dbCmd,
-		Services:     services,
-		SecretEnv:    secretSpec,
+		DBCommand:    h.dbCommand,
+		Services:     h.services,
+		SecretEnv:    h.spec,
 	})
 	if err != nil {
 		return nil, err
@@ -387,19 +391,18 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	existing, probeErr := e.projectContainers(ctx, conn, name)
 	mayCleanUp := probeErr == nil && existing == 0
 
-	// The secret values travel as the payload of the one compose secret the
-	// file declares (secretEnvSpec), in the up's environment and nowhere else:
-	// not as container environment, and not on any command line. Only on the
+	// The secret values travel in the up's environment and nowhere else, never
+	// on a command line: as the payload of the one compose secret the file
+	// declares (secretEnvSpec), or, where the compose provider cannot take one,
+	// as the values for the keys the file declares without them. Only on the
 	// up: it is the one command here that creates containers from the file.
-	// Stop and down are run with no --file and never read the declaration.
+	// Stop and down are run with no --file and never read the declarations.
 	up := composeLine{
 		conn:       conn,
 		files:      composeFiles(composePath, projectPath),
 		name:       name,
 		projectDir: projectPath,
-	}
-	if secretPayload != nil {
-		up.extraEnv = secretEnvComposeEnv(secretPayload)
+		extraEnv:   h.upEnv,
 	}
 	if err := e.bringUp(ctx, &up, mayCleanUp, cb); err != nil {
 		return nil, err
@@ -423,23 +426,47 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 }
 
 // handoffPlan is what a start renders and runs for its secret values: the
-// payload (nil when there are none), the compose spec for it, and the
-// commands the containers run, wrapped in the loader when there is a payload.
+// compose spec for the secret (nil without one), the commands the containers
+// run, wrapped in the loader when there is a secret, the compose process
+// environment the up carries, and the keys the file declares without a value
+// when the values travel as environment instead.
 type handoffPlan struct {
-	payload   []byte
 	spec      *secretEnvSpec
 	dbCommand []string
 	services  []service
+	upEnv     []string
+	passKeys  []string
 }
 
 // planHandoff decides how a start delivers its secret values (secretEnvSpec).
 // With none, the commands are the plain ones and the compose file is what it
 // was before the handoff existed.
-func (e *Engine) planHandoff(p rt.Plan, env []envVar, projectPath, major string, cb rt.Callbacks) (handoffPlan, error) {
+//
+// A compose provider that cannot take a secret from the environment gets the
+// values as environment instead, declared in the file without them and
+// resolved from the up's environment: what every start did before the
+// handoff. They then show in `docker inspect`, which the start says once.
+// That is podman-compose, which `podman compose` runs when no docker-compose
+// is installed; refusing those starts outright would trade a visibility
+// improvement for a broken start.
+func (e *Engine) planHandoff(ctx context.Context, conn engineConn, p rt.Plan, env []envVar, projectPath, major string, cb rt.Callbacks) (handoffPlan, error) {
 	h := handoffPlan{dbCommand: dbCommand(major), services: airflowServices(major)}
-	payload, err := secretenv.Encode(handoffEnv(p.SecretEnv, env))
+	values := handoffEnv(p.SecretEnv, env)
+	payload, err := secretenv.Encode(values)
 	if err != nil || payload == nil {
 		return h, err
+	}
+	if !e.composeSecrets(ctx, conn) {
+		for k, v := range values {
+			if secretenv.Valid(k, v) {
+				h.passKeys = append(h.passKeys, k)
+			}
+		}
+		h.upEnv = secretEnviron(values)
+		if cb.OnLine != nil {
+			cb.OnLine(rt.LogLine{Component: "system", Time: e.now(), Text: "this container engine's compose cannot pass secret values as a compose secret, so they reach the containers as environment, where `docker inspect` shows them; installing Docker Compose (docker-compose) avoids that"})
+		}
+		return h, nil
 	}
 	if len(payload) > secretEnvMaxBytes {
 		return h, fmt.Errorf("this project's secret values come to %d bytes, more than the %d a local start can hand to Airflow (or a process environment can hold)", len(payload), secretEnvMaxBytes)
@@ -448,7 +475,7 @@ func (e *Engine) planHandoff(p rt.Plan, env []envVar, projectPath, major string,
 	if _, err := rand.Read(rev); err != nil {
 		return h, fmt.Errorf("generating the secret handoff revision: %w", err)
 	}
-	h.payload, h.spec = payload, newSecretEnvSpec(hex.EncodeToString(rev))
+	h.spec, h.upEnv = newSecretEnvSpec(hex.EncodeToString(rev)), secretEnvComposeEnv(payload)
 	h.dbCommand = withSecretEnv(true, h.dbCommand)
 	names := []string{dbMigrationService}
 	for i := range h.services {

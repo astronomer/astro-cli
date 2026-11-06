@@ -369,7 +369,7 @@ func secretEnviron(secretEnv map[string]string) []string {
 // screen. So secret values travel as one compose secret instead. The start
 // puts the JSON payload in secretEnvPayloadVar on the compose process, the
 // file declares a secret read from that variable, and compose copies it into
-// each Airflow container as a file under /run/secrets. Each container runs its
+// each Airflow container as a file (secretEnvFile). Each container runs its
 // command through secretEnvLoader, which reads the file into the environment
 // and execs the real command.
 //
@@ -380,14 +380,22 @@ func secretEnviron(secretEnv map[string]string) []string {
 // Reading them takes deliberate access to the engine, which can read a running
 // Airflow's environment anyway.
 const (
-	// secretEnvName is the compose secret, and the file under /run/secrets.
+	// secretEnvName is the compose secret.
 	secretEnvName = "astro_secret_env"
 	// secretEnvPayloadVar is the compose process variable the secret is read
 	// from. Set on every compose command that creates containers from the
 	// generated file, because compose refuses to create one when a declared
 	// secret's variable is unset.
 	secretEnvPayloadVar = "ASTRO_SECRET_ENV_PAYLOAD" //nolint:gosec // a variable's name, not a credential
-	secretEnvFile       = "/run/secrets/" + secretEnvName
+	// secretEnvFile is where the secret lands in each container. Not compose's
+	// default /run/secrets/<name>: podman mounts a /run/secrets of its own when
+	// a container starts (its subscription-secrets mount), which hides a file
+	// compose copied there, so the loader would find nothing.
+	secretEnvFile = "/run/astro/secret-env.json" //nolint:gosec // a path, not a credential
+	// secretEnvMode makes the file readable whoever the container runs as.
+	// Docker Compose has varied its default (440 owned by root in some
+	// releases), which the astro user the components run as could not read.
+	secretEnvMode = "0444"
 )
 
 // secretEnvLoader is the Python program an Airflow container runs its command
@@ -435,7 +443,7 @@ const dbMigrationService = "db-migration"
 
 // secretEnvSpec is what the compose template needs to render the handoff.
 type secretEnvSpec struct {
-	Name, PayloadVar string
+	Name, PayloadVar, File, Mode string
 	// Rev differs on every start that hands values off, and labels each
 	// container that reads them. Compose does not recreate a container when
 	// only a secret's value changed, so without it a start against containers
@@ -446,7 +454,7 @@ type secretEnvSpec struct {
 }
 
 func newSecretEnvSpec(rev string) *secretEnvSpec {
-	return &secretEnvSpec{Name: secretEnvName, PayloadVar: secretEnvPayloadVar, Rev: rev}
+	return &secretEnvSpec{Name: secretEnvName, PayloadVar: secretEnvPayloadVar, File: secretEnvFile, Mode: secretEnvMode, Rev: rev}
 }
 
 // secretEnvComposeEnv is the compose process environment that carries a

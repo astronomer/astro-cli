@@ -132,8 +132,10 @@ type Plan struct {
 	// payload into each Airflow container as a file, and each container's
 	// command reads it into its environment before running. So `docker inspect`,
 	// the engine GUIs' environment panels and diagnostic bundles show none of
-	// it. Standalone mode has no such surfaces and passes it as ordinary process
-	// environment.
+	// it. A compose that cannot take a secret from the environment
+	// (podman-compose) gets it as container environment instead, with a note
+	// through the callbacks. Standalone mode has no such surfaces and passes it
+	// as ordinary process environment.
 	//
 	// Be precise about what is left, because a consumer sizing a threat model off
 	// the wrong sentence will get it wrong. This hides the values from accidental

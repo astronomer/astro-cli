@@ -131,6 +131,7 @@ func testEngine(t *testing.T, cmd *fakeCmd) *Engine {
 	e.now = func() time.Time { return time.Date(2026, 7, 21, 10, 0, 0, 0, time.UTC) }
 	e.ensureEngine = func(rt.Callbacks, string) error { return nil }
 	e.composeAvail = func(context.Context, engineConn) error { return nil }
+	e.composeSecrets = func(context.Context, engineConn) bool { return true }
 	e.startSession = func(string, int) error { return nil }
 	return e
 }
@@ -1048,6 +1049,35 @@ func TestStartWarnsWhenAnOverrideReplacesALoadedCommand(t *testing.T) {
 	_, err := e.Start(context.Background(), p, rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l.Text) }})
 	require.NoError(t, err)
 	assert.NotEmpty(t, linesWith(lines, "scheduler will start without its vault and workspace values"), "lines: %v", lines)
+}
+
+// A compose that cannot take a secret from the environment (podman-compose)
+// gets the values as environment, the way every start did before the
+// handoff, rather than a start that fails: declared in the file without a
+// value, resolved from the up's environment, and said once.
+func TestStartFallsBackToEnvWhereComposeCannotTakeASecret(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	e.composeSecrets = func(context.Context, engineConn) bool { return false }
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+
+	var lines []string
+	_, err := e.Start(context.Background(), p, rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l.Text) }})
+	require.NoError(t, err)
+
+	env, ok := cmd.envFor("up --detach")
+	require.True(t, ok)
+	assert.Contains(t, env, "AIRFLOW_CONN_DB=postgres://u:pw@h/db")
+	stateDir, err := rt.StateDir(p.ProjectPath)
+	require.NoError(t, err)
+	compose, err := os.ReadFile(filepath.Join(stateDir, composeFileName))
+	require.NoError(t, err)
+	assert.Contains(t, string(compose), "'AIRFLOW_CONN_DB':", "the key must be declared for compose to resolve")
+	assert.NotContains(t, string(compose), "pw@h", "the value still never reaches the file")
+	assert.NotContains(t, string(compose), secretEnvName)
+	assert.NotContains(t, string(compose), "python3")
+	assert.NotEmpty(t, linesWith(lines, "docker inspect"), "the start must say the values are visible: %v", lines)
 }
 
 // A start with no secret values carries no payload variable, and its file

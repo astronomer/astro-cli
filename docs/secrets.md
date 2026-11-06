@@ -51,6 +51,8 @@ This keeps values from being seen by accident; it does not hide them from someon
 
 A `command:` that a project's `docker-compose.override.yml` sets for an Airflow service replaces the step that loads the values, so that service starts without them; `astro local start` warns when it sees one.
 
+This needs Docker Compose v2.6.1 or later, which Docker Desktop, OrbStack and `podman compose` with `docker-compose` installed all provide. When `podman compose` runs podman-compose instead (no `docker-compose` installed), which cannot pass secrets this way, `astro local start` passes the values as container environment and says so; installing `docker-compose` avoids that.
+
 Plain `.env` values are written into the compose file, as docker-compose would read them anyway.
 
 ## Which projects a global reaches: links

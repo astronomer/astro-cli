@@ -118,6 +118,8 @@ services:
 {{- with .SecretEnv}}
       io.astronomer.docker.secret-env-rev: "{{.Rev}}"
     secrets:
-      - {{.Name}}
+      - source: {{.Name}}
+        target: {{.File}}
+        mode: {{.Mode}}
 {{- end}}
 {{- end}}

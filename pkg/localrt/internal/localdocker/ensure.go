@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/container"
@@ -43,6 +45,45 @@ func (e *Engine) probeCompose(ctx context.Context, conn engineConn) error {
 		return ErrComposeMissing
 	}
 	return nil
+}
+
+// probeComposeSecrets reports whether the engine's compose can create a secret
+// from an environment variable, which Docker Compose has done since v2.6.1.
+// `podman compose` runs whichever provider it finds, Docker Compose first; the
+// other, podman-compose, refuses an environment-sourced secret at runtime
+// ("not supported for runtime secrets in podman-compose", as of 1.6.0), and
+// so does anything that does not say it is Docker Compose. A probe that fails
+// says no, which costs only the handoff, never the start.
+func (e *Engine) probeComposeSecrets(ctx context.Context, conn engineConn) bool {
+	out, err := e.cmd.Output(ctx, conn.env, conn.bin, "compose", "version")
+	if err != nil {
+		return false
+	}
+	return composeTakesEnvSecrets(string(out))
+}
+
+// composeVersionRe finds Docker Compose's own version line, which `podman
+// compose` prints after a banner naming the provider it runs.
+var composeVersionRe = regexp.MustCompile(`Docker Compose version v?(\d+)\.(\d+)\.(\d+)`)
+
+// composeTakesEnvSecrets reads `compose version` output: Docker Compose at
+// v2.6.1 or later.
+func composeTakesEnvSecrets(versionOutput string) bool {
+	m := composeVersionRe.FindStringSubmatch(versionOutput)
+	if m == nil {
+		return false
+	}
+	v := [3]int{}
+	for i := range v {
+		v[i], _ = strconv.Atoi(m[i+1]) //nolint:errcheck // the regexp matched digits only
+	}
+	minimum := [3]int{2, 6, 1}
+	for i := range v {
+		if v[i] != minimum[i] {
+			return v[i] > minimum[i]
+		}
+	}
+	return true
 }
 
 // callbackFeedback adapts container.Feedback onto rt.Callbacks so the

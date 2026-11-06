@@ -302,10 +302,10 @@ func TestGenerateComposeWithSecretHandoff(t *testing.T) {
 	var doc struct {
 		Secrets  map[string]map[string]string `yaml:"secrets"`
 		Services map[string]struct {
-			Command []string          `yaml:"command"`
-			Labels  map[string]string `yaml:"labels"`
-			Secrets []string          `yaml:"secrets"`
-			Volumes []string          `yaml:"volumes"`
+			Command []string            `yaml:"command"`
+			Labels  map[string]string   `yaml:"labels"`
+			Secrets []map[string]string `yaml:"secrets"`
+			Volumes []string            `yaml:"volumes"`
 		} `yaml:"services"`
 	}
 	require.NoError(t, yaml.Unmarshal([]byte(got), &doc), got)
@@ -318,7 +318,8 @@ func TestGenerateComposeWithSecretHandoff(t *testing.T) {
 		require.GreaterOrEqual(t, len(svc.Command), 5, name)
 		assert.Equal(t, []string{"python3", "-c", secretEnvLoader, secretEnvFile, "required"}, svc.Command[:5],
 			"%s must run its command through the loader, intact after YAML", name)
-		assert.Equal(t, []string{secretEnvName}, svc.Secrets, name)
+		assert.Equal(t, []map[string]string{{"source": secretEnvName, "target": secretEnvFile, "mode": secretEnvMode}}, svc.Secrets,
+			"%s must take the secret at a path podman does not mount over, readable whoever it runs as", name)
 		assert.Equal(t, "rev1", svc.Labels["io.astronomer.docker.secret-env-rev"],
 			"%s must carry the start's revision, so a re-start recreates it onto the new values", name)
 	}
@@ -326,6 +327,25 @@ func TestGenerateComposeWithSecretHandoff(t *testing.T) {
 		"the project mounts must survive next to the secret")
 	assert.Nil(t, doc.Services["postgres"].Secrets, "postgres has no use for the values")
 	assert.NotContains(t, got, "pw@", "the file must never carry a value")
+}
+
+// Docker Compose from v2.6.1 takes a secret from the environment, including
+// through `podman compose`'s banner; podman-compose and anything unrecognized
+// do not.
+func TestComposeTakesEnvSecrets(t *testing.T) {
+	for out, want := range map[string]bool{
+		"Docker Compose version v2.6.1":  true,
+		"Docker Compose version v2.40.3": true,
+		"Docker Compose version v5.5.0":  true,
+		"Docker Compose version 2.29.7":  true,
+		">>>> Executing external compose provider \"/usr/local/bin/docker-compose\". <<<<\n\nDocker Compose version v5.5.0": true,
+		"Docker Compose version v2.6.0":                      false,
+		"Docker Compose version v1.29.2":                     false,
+		"podman version 5.8.2\npodman-compose version 1.6.0": false,
+		"": false,
+	} {
+		assert.Equal(t, want, composeTakesEnvSecrets(out), "%q", out)
+	}
 }
 
 // Only a service whose command the override sets is named: an override that
