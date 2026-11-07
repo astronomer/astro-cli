@@ -220,8 +220,8 @@ func cases1x() []case1x {
 				"packages.txt":     "libpq-dev",
 			},
 			notes: []string{
-				"its RUN instructions were not read here",
-				"kept, because your Dockerfile's base image reads it during the build",
+				"Dockerfile: kept as this project's build. It builds as written and doesn't install from uv.lock yet",
+				"its base installs requirements.txt and packages.txt, so they stay too",
 			},
 		},
 		{
@@ -236,7 +236,7 @@ func cases1x() []case1x {
 			airflow:     "3.3",
 			manifestHas: []string{"requires-python = '==3.13.*'", "dockerfile = 'Dockerfile'"},
 			kept:        []string{"Dockerfile", "requirements.txt"},
-			notes:       []string{"its RUN instructions were not read here"},
+			notes:       []string{"Dockerfile: kept as this project's build. It builds as written"},
 		},
 		{
 			// A kept Dockerfile builds with the project as its context, so the
@@ -255,7 +255,7 @@ func cases1x() []case1x {
 				".dockerignore": "astro\n.git\n.env\n.venv\n\n# Local secrets and per-machine files. Keep them out of the image.\n**/.git\n**/.env\n",
 			},
 			reportedUpdated: []string{".dockerignore (added the per-machine rules)"},
-			notes:           []string{"its RUN instructions were not read here"},
+			notes:           []string{"Dockerfile: kept as this project's build. It builds as written"},
 		},
 		{
 			// Four kinds of line [project.dependencies] cannot express. Each

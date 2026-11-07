@@ -462,7 +462,7 @@ func TestConvert1xDockerfileByBase(t *testing.T) {
 		})
 		assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
 		assert.FileExists(t, filepath.Join(dir, "requirements.txt"))
-		assert.Contains(t, strings.Join(res.Notes, "\n"), "requirements.txt: kept, because your Dockerfile's base image reads it")
+		assert.Contains(t, strings.Join(res.Notes, "\n"), "its base installs requirements.txt, so it stays too")
 	})
 	foreign := map[string]string{
 		fileDockerfile:       "FROM apache/airflow:2.9.0\nUSER airflow\n",
