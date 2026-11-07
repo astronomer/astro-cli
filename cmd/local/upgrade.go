@@ -98,13 +98,19 @@ type pinRefresh struct {
 	// Warnings says what could not be refreshed, and why: offline, the index
 	// or the runtime's constraints could not be read, or uv lock failed.
 	Warnings []string `json:"warnings,omitempty"`
+	// Notes says what the refresh did to Astronomer's index worth knowing:
+	// why it is explicit, or that it became the project's default.
+	Notes []string `json:"notes,omitempty"`
 }
 
 // refreshAfterUpgrade is pinRefresh's work for the project in dir. It never
 // fails the upgrade, which has done its part: what it could not do is said.
 func (c *cli) refreshAfterUpgrade(ctx context.Context, dir string) pinRefresh {
-	w := c.writeAstroBuild(ctx, dir)
+	w := c.writeAstroBuild(ctx, dir, true)
 	out := pinRefresh{Constraints: w.runtime, ConstraintsRemoved: w.runtimeGone}
+	if w.changed {
+		out.Notes = indexNotes(w.index)
+	}
 	if w.changed && w.airflowChanged {
 		out.AstroAirflow, out.AstroAirflowRemoved = w.build.Airflow, w.build.Airflow == ""
 	}
@@ -178,6 +184,9 @@ func (c *cli) warnRefresh(r cliout.Renderer, p pinRefresh) {
 	}
 	for _, w := range p.Warnings {
 		cliout.Warn(c.d.Stderr, w)
+	}
+	for _, n := range p.Notes {
+		cliout.Note(c.d.Stderr, n)
 	}
 }
 

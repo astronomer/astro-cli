@@ -25,14 +25,16 @@ import (
 //	[tool.uv]
 //	environments = [linux, arm64 macOS]
 //	constraint-dependencies = ["apache-airflow==3.3.2+astro.1", "apache-airflow-task-sdk==1.3.2+astro.1"]
-//	[[tool.uv.index]]  name = "astronomer", explicit = true
-//	[tool.uv.sources]  apache-airflow, -core, -task-sdk = { index = "astronomer" }
+//	[[tool.uv.index]]  name = "astronomer", default = true
 //	[tool.uv.exclude-newer-package]  the same three = false
 //
-// The index is explicit, so it serves only the packages a source names, and
-// every other package still resolves from PyPI. Sources apply only to direct
-// dependencies, which is why apache-airflow-core and apache-airflow-task-sdk
-// are listed in [project] dependencies beside the requirement.
+// The index is the project's default: it serves Astronomer's builds and
+// passes every other package through from PyPI, so no source is needed. A
+// project with a default index of its own (a mirror) keeps that one; there the
+// index is explicit, each Airflow distribution gets a source naming it, and
+// apache-airflow-core and apache-airflow-task-sdk are listed in [project]
+// dependencies beside the requirement, since sources apply only to direct
+// dependencies.
 //
 // environments limits the lockfile to the platforms a project runs on. Locking
 // for every platform lets one package's Intel-macOS-only marker (shap's
@@ -44,7 +46,7 @@ import (
 // rather than guessed.
 
 // astroIndexName names the [[tool.uv.index]] entry this file writes.
-const astroIndexName = "astronomer"
+const astroIndexName = manifest.AstronomerIndexName
 
 // AstroEnvironments are the platforms an Astro project's lockfile resolves
 // for when the project names none: Linux, which the runtime image is, and
@@ -88,28 +90,84 @@ type RuntimeConstraints struct {
 // are; a zero one takes them out. Where the array cannot hold a comment (an
 // inline [tool.uv]), no record and no lines are written.
 func SetAstroBuildWith(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, rc *RuntimeConstraints) error {
-	return EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		return setAstroBuild(before, ed, b, rc)
-	})
+	_, err := SetAstroBuildOpts(dir, wrap, b, AstroBuildOptions{Constraints: rc})
+	return err
 }
 
-func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, rc *RuntimeConstraints) error {
+// AstroBuildOptions are SetAstroBuildOpts's choices beyond the build.
+type AstroBuildOptions struct {
+	// Constraints is SetAstroBuildWith's rc.
+	Constraints *RuntimeConstraints
+	// MoveToDefaultIndex lets the write make Astronomer's index the project's
+	// default where an earlier astro wrote it explicit, with a source per
+	// Airflow distribution. Without it a project keeps the layout it has, so a
+	// start never rewrites every package's registry in uv.lock unasked.
+	MoveToDefaultIndex bool
+}
+
+// The layouts of Astronomer's index: the [[tool.uv.index]] key that marks
+// the entry.
+const (
+	AstroIndexDefault  = "default"
+	AstroIndexExplicit = "explicit"
+)
+
+// AstroIndex is how the write left Astronomer's index.
+type AstroIndex struct {
+	// Layout is AstroIndexDefault, AstroIndexExplicit, or "" when no entry
+	// was written (an Airflow Astronomer has no build of).
+	Layout string
+	// Reason says why the index is explicit when ExplicitIndexReason gave
+	// one; "" when the project only kept the explicit layout it had.
+	Reason string
+	// Moved reports that an explicit index became the default, which moves
+	// every package's registry in uv.lock to Astronomer's index.
+	Moved bool
+}
+
+// SetAstroBuildOpts is SetAstroBuildWith with opts, and says how it left
+// Astronomer's index.
+func SetAstroBuildOpts(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, opts AstroBuildOptions) (AstroIndex, error) {
+	var out AstroIndex
+	err := EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
+		var err error
+		out, err = setAstroBuild(before, ed, b, opts, ExplicitIndexReason(dir, ed))
+		return err
+	})
+	return out, err
+}
+
+func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, opts AstroBuildOptions, reason string) (AstroIndex, error) {
+	rc := opts.Constraints
 	dists := b.Dists()
 	if b.Airflow == "" {
 		dists = nil
 	}
 	if err := checkNotTheUsers(ed, dists); err != nil {
-		return err
+		return AstroIndex{}, err
 	}
 	if err := setAstroPins(ed, b, dists, rc); err != nil {
-		return err
+		return AstroIndex{}, err
 	}
-	if err := setAstroSources(ed, dists); err != nil {
-		return err
+	// With Astronomer's index as the default, every package resolves from it
+	// and no source is needed. It stays explicit, each Airflow distribution
+	// routed to it, where another index could answer for Airflow first
+	// (reason), and where an earlier astro wrote it explicit and the caller
+	// did not ask to move it. The bare core and Task SDK entries a routed
+	// layout listed stay when it moves: a project may have listed them itself.
+	was := astroIndexLayout(ed)
+	routed := reason != "" || (was == AstroIndexExplicit && !opts.MoveToDefaultIndex)
+	if err := setAstroSources(ed, routedDists(routed, dists)); err != nil {
+		return AstroIndex{}, err
 	}
-	if err := setAstroIndex(ed, b); err != nil {
-		return err
+	if err := setAstroIndex(ed, b, routed); err != nil {
+		return AstroIndex{}, err
 	}
+	out := AstroIndex{Layout: astroIndexLayout(ed)}
+	if out.Layout == AstroIndexExplicit {
+		out.Reason = reason
+	}
+	out.Moved = was == AstroIndexExplicit && out.Layout == AstroIndexDefault
 	for _, d := range astroDists {
 		key := append(slices.Clone(excludeNewerPkg), d)
 		if v, ok := ed.Get(key); ok && v == false && !slices.Contains(dists, d) {
@@ -132,14 +190,14 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 		if v, ok := ed.Get(environmentsKey); ok && reflect.DeepEqual(v, asAny(AstroEnvironments)) {
 			ed.Delete(environmentsKey)
 		}
-		return nil
+		return out, nil
 	}
-	if err := addDirectDists(before, ed, dists); err != nil {
-		return err
+	if err := addDirectDists(before, ed, routedDists(routed, dists)); err != nil {
+		return out, err
 	}
 	if _, ok := ed.Get(environmentsKey); !ok {
 		if err := ed.Set(environmentsKey, asAny(AstroEnvironments)); err != nil {
-			return err
+			return out, err
 		}
 	}
 	// Astronomer's index shows upload times only in its page text, which uv
@@ -148,10 +206,10 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 	// environment, uv would treat every build as too new.
 	for _, d := range dists {
 		if err := setIfDifferent(ed, append(slices.Clone(excludeNewerPkg), d), false); err != nil {
-			return err
+			return out, err
 		}
 	}
-	return nil
+	return out, nil
 }
 
 // ErrNotAstrosToWrite reports [tool.uv] settings the project wrote itself
@@ -281,9 +339,38 @@ func setAstroSources(ed tomledit.Editor, dists []string) error {
 	return nil
 }
 
+// astroIndexLayout is how the project's [[tool.uv.index]] entry for
+// Astronomer's index is marked: AstroIndexDefault, AstroIndexExplicit, or ""
+// with no entry.
+func astroIndexLayout(ed tomledit.Editor) string {
+	current, _ := ed.Get(indexKey)
+	entries, _ := current.([]any)
+	for _, e := range entries {
+		entry, _ := e.(map[string]any)
+		if entry["name"] != astroIndexName {
+			continue
+		}
+		if isDefault, _ := entry[AstroIndexDefault].(bool); isDefault {
+			return AstroIndexDefault
+		}
+		return AstroIndexExplicit
+	}
+	return ""
+}
+
+// routedDists is dists when the Airflow distributions are routed to an
+// explicit index, and none when the index is the default.
+func routedDists(routed bool, dists []string) []string {
+	if routed {
+		return dists
+	}
+	return nil
+}
+
 // setAstroIndex adds the index entry, or corrects its url, and removes it
-// when b is zero.
-func setAstroIndex(ed tomledit.Editor, b runtimeversions.AstroBuild) error {
+// when b is zero. The entry is the default index unless routed, when the
+// project has a default of its own and the entry is explicit.
+func setAstroIndex(ed tomledit.Editor, b runtimeversions.AstroBuild, routed bool) error {
 	current, _ := ed.Get(indexKey)
 	entries, _ := current.([]any)
 	at := -1
@@ -301,7 +388,11 @@ func setAstroIndex(ed tomledit.Editor, b runtimeversions.AstroBuild) error {
 		}
 		return nil
 	}
-	values := map[string]any{"name": astroIndexName, "url": b.Index, "explicit": true}
+	kind, other := AstroIndexDefault, AstroIndexExplicit
+	if routed {
+		kind, other = other, kind
+	}
+	values := map[string]any{"name": astroIndexName, "url": b.Index, kind: true}
 	switch {
 	case at >= 0:
 	case len(entries) > 0 && ed.Set(append(slices.Clone(indexKey), strconv.Itoa(len(entries))), values) == nil:
@@ -317,10 +408,13 @@ func setAstroIndex(ed tomledit.Editor, b runtimeversions.AstroBuild) error {
 	for _, kv := range []struct {
 		key   string
 		value any
-	}{{"name", astroIndexName}, {"url", b.Index}, {"explicit", true}} {
+	}{{"name", astroIndexName}, {"url", b.Index}, {kind, true}} {
 		if err := setIfDifferent(ed, append(slices.Clone(entry), kv.key), kv.value); err != nil {
 			return err
 		}
+	}
+	if _, ok := ed.Get(append(slices.Clone(entry), other)); ok {
+		ed.Delete(append(slices.Clone(entry), other))
 	}
 	return nil
 }

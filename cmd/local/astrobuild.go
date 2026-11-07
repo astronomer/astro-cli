@@ -36,7 +36,7 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 	if err != nil {
 		return
 	}
-	res := c.writeAstroBuild(ctx, proj.Dir)
+	res := c.writeAstroBuild(ctx, proj.Dir, false)
 	switch {
 	case errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild):
 		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf(
@@ -55,7 +55,25 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 	// details.
 	if res.changed {
 		fmt.Fprintf(c.d.Stderr, "%s: updated\n", manifest.Marker)
+		for _, n := range indexNotes(res.index) {
+			cliout.Note(c.d.Stderr, n)
+		}
 	}
+}
+
+// indexNotes says what a write did to Astronomer's index worth knowing: why it
+// is explicit, when ExplicitIndexReason gave a reason, and that it became the
+// default, which moves every package's registry in uv.lock. Nothing when the
+// write left no entry, or kept the layout the project had.
+func indexNotes(idx scaffold.AstroIndex) []string {
+	switch {
+	case idx.Layout == scaffold.AstroIndexExplicit && idx.Reason != "":
+		return []string{fmt.Sprintf("%s routes Airflow to Astronomer's index with a source per package, not as the default index, because %s",
+			manifest.Marker, idx.Reason)}
+	case idx.Moved:
+		return []string{fmt.Sprintf("%s now has Astronomer's index as its default index, so uv.lock records it as every package's registry", manifest.Marker)}
+	}
+	return nil
 }
 
 // stalePin reports a manifest whose pin to an Astronomer build of Airflow is of
@@ -76,7 +94,9 @@ type astroBuildWrite struct {
 	// runtime is the build whose constraints the write newly recorded, and
 	// runtimeGone the one whose record it took out; "" when neither happened.
 	runtime, runtimeGone string
-	lookupErr            error
+	// index is how the write left Astronomer's index.
+	index     scaffold.AstroIndex
+	lookupErr error
 	// constraintsErr is why the runtime's constraints were left as written:
 	// the catalog or the constraints file could not be read.
 	constraintsErr error
@@ -86,7 +106,10 @@ type astroBuildWrite struct {
 // writeAstroBuild looks up the build for the manifest in dir and writes it,
 // or takes the settings out when the index has none. It writes nothing when
 // the lookup could not be made, or when there is no lookup to make.
-func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
+// moveToDefault lets it make Astronomer's index the project's default where
+// an earlier astro wrote it explicit (scaffold.AstroBuildOptions): init and
+// the upgrade commands ask for it, a start does not.
+func (c *cli) writeAstroBuild(ctx context.Context, dir string, moveToDefault bool) astroBuildWrite {
 	if c.d.AstroBuild == nil {
 		return astroBuildWrite{}
 	}
@@ -103,7 +126,9 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 	rc, rcErr := c.runtimeConstraints(ctx, dir, m)
 	res.constraintsErr = rcErr
 	res.changed, res.writeErr = watchManifest(dir, func(wrap func(run func() error) error) error {
-		return scaffold.SetAstroBuildWith(dir, wrap, res.build, rc)
+		var err error
+		res.index, err = scaffold.SetAstroBuildOpts(dir, wrap, res.build, scaffold.AstroBuildOptions{Constraints: rc, MoveToDefaultIndex: moveToDefault})
+		return err
 	})
 	if !res.changed || res.writeErr != nil {
 		return res

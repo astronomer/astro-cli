@@ -70,7 +70,7 @@ dependencies = [
 ]
 ```
 
-`astro init` also lists `apache-airflow-core` and `apache-airflow-task-sdk` beside the requirement, with no version. They state nothing: `[tool.uv.sources]` applies only to direct dependencies, and listing them is what lets uv take them from Astronomer's index (see [`[tool.uv]`](#tooluv)). A bare `apache-airflow-core` beside the `apache-airflow` requirement is not a second statement of the version.
+A bare `apache-airflow-core` or `apache-airflow-task-sdk` beside the requirement is not a second statement of the version. `astro init` lists both only where Astronomer's index is routed per package, so a source can apply to them (see [`[tool.uv]`](#tooluv)); with that index as the project's default they are not needed. Moving a project to the default index leaves them in place, since you may have listed them yourself.
 
 Pin one series (`==3.3.*`, which tracks its patch releases) or one release (`==3.3.2`). Mind the wildcard: without it, `==3.3` is the one release 3.3.0, as it is to pip and uv, not the newest 3.3. Extras and environment markers are fine. The manifest is refused, in every mode, when the requirement leaves the version unclear:
 
@@ -627,15 +627,10 @@ constraint-dependencies = [
     'SQLAlchemy==2.0.50',
 ]
 
-[tool.uv.sources]
-apache-airflow = {index = 'astronomer'}
-apache-airflow-core = {index = 'astronomer'}
-apache-airflow-task-sdk = {index = 'astronomer'}
-
 [[tool.uv.index]]
 name = 'astronomer'
 url = 'https://pip.astronomer.io/v2/'
-explicit = true
+default = true
 
 [tool.uv.exclude-newer-package]
 apache-airflow = false
@@ -645,13 +640,19 @@ apache-airflow-task-sdk = false
 
 - **The pins** are the ones the runtime image pins. The release is the one the runtime catalog says a deployment runs: the one the [`runtime`](#runtime) build carries when it is set, and otherwise the one the newest runtime of the requirement's series carries. The catalog does not name the build, so the newest `+astro` build of that release on the index is taken.
 - **The runtime's own constraints** follow them, under one comment that records the build and Python they come from. They are the runtime's constraints file, which its image installs under (`/etc/pip-constraints.txt` in the image), read from `https://cdn.astronomer.io/runtime-constraints/` for the build the project builds on: the declared Dockerfile's `FROM`, else [`runtime`](#runtime), else the newest build of the Airflow pin, on the Python the project runs. Besides Airflow and the Task SDK, which the pins above hold, that is SQLAlchemy on Airflow 3. The comment is also the committed record of which runtime build the project builds on. Set `ASTRO_RUNTIME_CONSTRAINTS_URL` to read the files from a mirror. A runtime that publishes no such file (Airflow 2 before 11.0.0) gets none; one that cannot be read keeps what is written; under an `exclude-newer` cutoff (in `[tool.uv]`, the project's `uv.toml`, or a `UV_EXCLUDE_NEWER`) they are taken out, since the runtime's versions may postdate it. A line you write above the comment or below them stays yours, an exact pin of another package right under them included: only packages the runtime constrains are its.
-- **The index is explicit**, so uv takes only the three packages the sources name from it. Every other package still comes from PyPI, or from the indexes you add.
+- **The index is the project's default.** It serves Astronomer's builds and passes every other package through from PyPI, so no `[tool.uv.sources]` entry is needed, and the image's installs use the same index. uv asks a project's other indexes before the default and stops at the first that has a package, and settings outside the project replace the default, so the index is written `explicit = true` instead, with a `[tool.uv.sources]` entry naming it for each of the three packages and `apache-airflow-core` and `apache-airflow-task-sdk` listed in `dependencies` (sources apply only to direct dependencies), whenever, at the time the CLI writes:
+    - the project lists another `[[tool.uv.index]]`, default or not, or sets `[tool.uv]` `index-url`, `extra-index-url` or `find-links`;
+    - `UV_DEFAULT_INDEX`, `UV_INDEX_URL`, `UV_INDEX`, `UV_EXTRA_INDEX_URL` or `UV_FIND_LINKS` is set;
+    - a `uv.toml` beside `pyproject.toml`, your user one (`$XDG_CONFIG_HOME/uv/uv.toml` or `~/.config/uv/uv.toml`; `%APPDATA%\uv\uv.toml` on Windows) or the system one sets `index`, `index-url`, `extra-index-url` or `find-links`;
+    - `ASTRO_AIRFLOW_INDEX_URL` points at a mirror of Astronomer's index rather than Astronomer's own address, since a mirror may carry only Astronomer's builds.
+
+  The CLI says which one applied. Settings only another machine has, such as a CI job's `UV_INDEX_URL`, cannot be seen when the CLI writes: if your CI sets one, keep the index explicit by listing your index in `pyproject.toml`.
 - **`environments`** limits the lockfile to the platforms Airflow runs on locally. Without it, uv also locks for Intel macOS, where one package's marker (shap's `numba<0.63`) pulls numba and llvmlite back to releases that do not build. A project that names its own `environments` keeps them. On an Intel Mac, `astro local start` stops before uv and says so: run Docker mode with `--docker`, or add `"sys_platform == 'darwin' and platform_machine == 'x86_64'"` to the list. Windows is left out too: standalone does not run there, so a Docker-mode project on Windows that runs `uv sync`, `uv run` or `uv add` on the host needs `"sys_platform == 'win32'"` added.
 - **`exclude-newer-package`** turns any `exclude-newer` cutoff off for the three packages, `false` for each. Astronomer's index shows upload times only in the text of its pages, which uv does not read, so under a cutoff, the project's own or a `UV_EXCLUDE_NEWER`, uv would treat every build as too new. This is why the CLI needs uv 0.9.25 or later.
 
 When `astro init` writes or changes these settings, it runs `uv lock` so `uv.lock` follows them: it creates the lock for a new project and updates an existing one, and says which, with how many packages moved. Without uv it says to run `uv lock`; a lock that fails warns with uv's reason, and init still succeeds.
 
-A standalone `astro local start` keeps these settings current. When the pin or `runtime` moves, or Astronomer ships a newer build of the release, it rewrites them and says so. It leaves your other keys and your comments alone, and it never takes over an index named `astronomer` at another address, or a source you wrote for one of the three packages: it warns and writes nothing instead. When Astronomer's index has no build the requirement covers, it takes out the pins, the sources, the index and the `environments` it wrote, and Airflow comes from PyPI; the bare `apache-airflow-core` and `apache-airflow-task-sdk` stay, except on Airflow 2, which has neither. When the index cannot be read, it leaves the settings as they are, unless the pin has moved off the build's release, in which case it takes out everything it wrote, as for an index with no build.
+A standalone `astro local start` keeps these settings current. When the pin or `runtime` moves, or Astronomer ships a newer build of the release, it rewrites them and says so. It leaves your other keys and your comments alone, and it never takes over an index named `astronomer` at another address, or a source you wrote for one of the three packages: it warns and writes nothing instead. It keeps the layout the project has: a project an earlier release wrote, with the index `explicit` and a source per package, stays so, since moving it changes every package's registry in `uv.lock`. `astro local upgrade airflow` and `astro local upgrade runtime` move it to the default index when nothing above calls for explicit routing, take out the sources they wrote, keep your own, and say that `uv.lock`'s registries change. A start does move a project on the default index back to explicit routing once something above calls for it. When Astronomer's index has no build the requirement covers, it takes out the pins, the sources, the index and the `environments` it wrote, and Airflow comes from PyPI. When the index cannot be read, it leaves the settings as they are, unless the pin has moved off the build's release, in which case it takes out everything it wrote, as for an index with no build.
 
 To add a dependency, run `uv add <package>`. It keeps the pins, and a running standalone Airflow picks the package up.
 

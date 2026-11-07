@@ -104,7 +104,10 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// stays offline. A lookup that fails is not reported here, since init has
 	// no to-do in it: `astro local start` makes the same lookup and says what
 	// it found. uv.lock follows what it wrote; nothing written, nothing locked.
-	if build := c.writeAstroBuild(ctx, res.Dir); build.changed {
+	if build := c.writeAstroBuild(ctx, res.Dir, true); build.changed {
+		for _, n := range indexNotes(build.index) {
+			cliout.Note(c.d.Stderr, n)
+		}
 		c.lockAfterInit(ctx, res.Dir)
 	}
 	return r.Emit(res, func(w io.Writer) error {

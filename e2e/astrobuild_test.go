@@ -26,10 +26,13 @@ func TestInitHoldsAirflowToAstronomersBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	manifest := string(data)
-	for _, want := range []string{"'apache-airflow-core'", "'apache-airflow-task-sdk'", "apache-airflow==3.3.", "+astro.", "https://pip.astronomer.io/v2/", "explicit = true"} {
+	for _, want := range []string{"apache-airflow==3.3.", "+astro.", "https://pip.astronomer.io/v2/", "default = true"} {
 		if !strings.Contains(manifest, want) {
 			t.Errorf("pyproject.toml lacks %q:\n%s", want, manifest)
 		}
+	}
+	if strings.Contains(manifest, "[tool.uv.sources]") {
+		t.Errorf("the default index needs no sources:\n%s", manifest)
 	}
 	builds, err := filepath.Glob(filepath.Join(p.Dir, ".venv", "lib", "python*", "site-packages", "apache_airflow-*+astro.*.dist-info"))
 	if err != nil || len(builds) != 1 {
