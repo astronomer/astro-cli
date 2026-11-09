@@ -512,7 +512,7 @@ func AddWorkspaceTeam(id, role, workspaceID string, client astrov1.APIClient) (T
 // (under --output json), whose refusal names what answers it, or the run was
 // interrupted at it, which is the interrupt, not an invalid team.
 func pickFailed(err error) error {
-	if input.IsRequired(err) || errors.Is(err, input.ErrInterrupted) {
+	if input.Unanswered(err) {
 		return err
 	}
 	return ErrInvalidTeamKey

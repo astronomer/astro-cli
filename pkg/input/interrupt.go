@@ -5,9 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"runtime"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/term"
 )
 
 // runDone is the done channel of the run questions are asked in, or nil.
@@ -96,7 +99,7 @@ func ReadLine(r *bufio.Reader, w io.Writer) (string, error) {
 	waitingForALine()
 	select {
 	case g := <-got:
-		if g.err != nil && interruptedWithin(done, endedReadGrace) {
+		if g.err != nil && interruptedWithin(done, endedReadGrace()) {
 			return "", endLine(w)
 		}
 		return g.line, g.err
@@ -115,14 +118,15 @@ func ReadLine(r *bufio.Reader, w io.Writer) (string, error) {
 // returned. Read as it arrives, that EOF is "stdin ended" (pass --yes) or a
 // no, not the interrupt it is. The wait covers that gap. On Unix a terminal
 // turns Ctrl-C into the signal alone and the read goes on waiting, so an
-// ended read there is ended input, read at once: a script whose stdin is
-// /dev/null is not slowed.
+// ended read there is ended input, read at once. So is one from a pipe or a
+// file on Windows: only a console turns Ctrl-C into an ended read, so a script
+// whose stdin is NUL or a pipe is not slowed.
 var endedReadGrace = func() time.Duration {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == "windows" && term.IsTerminal(int(os.Stdin.Fd())) {
 		return windowsConsoleInterruptGap
 	}
 	return 0
-}()
+}
 
 // windowsConsoleInterruptGap bounds the gap between a console read ending on
 // Ctrl-C and the signal reaching the run: the console control handler runs on

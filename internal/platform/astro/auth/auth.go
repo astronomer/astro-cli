@@ -348,7 +348,7 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 // one interrupted, is refused instead, since that is neither answer.
 func askToCreateOrganization(domain string, out io.Writer) (bool, error) {
 	create, err := input.Confirm(noOrganizationPrompt(domain, out), input.AnsweredBy("--signup to astro login"))
-	if input.IsRequired(err) || errors.Is(err, input.ErrInterrupted) {
+	if input.Unanswered(err) {
 		return false, err
 	}
 	return create, nil

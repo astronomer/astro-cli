@@ -71,7 +71,7 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 		// A refusal and an interrupt (Ctrl-C at the raw prompt, or the run
 		// canceled) stop here; a read that ends falls through to the empty
 		// answer, as it always has.
-		if input.IsRequired(err) || errors.Is(err, input.ErrInterrupted) {
+		if input.Unanswered(err) {
 			return "", err
 		}
 	}

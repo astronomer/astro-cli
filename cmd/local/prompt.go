@@ -34,9 +34,12 @@ func (c *cli) confirm(question string) error {
 		return err
 	}
 	line = strings.TrimSpace(line)
-	if err != nil && line == "" {
-		// End the prompt's line, so the error starts on a fresh one.
+	if err != nil {
+		// Input that ended left the prompt's line open: end it, so what
+		// follows starts on a fresh one.
 		fmt.Fprintln(c.d.Stderr)
+	}
+	if err != nil && line == "" {
 		if errors.Is(err, io.EOF) {
 			return input.Required(errors.New("confirmation needed but stdin is not interactive; pass --yes to proceed"))
 		}

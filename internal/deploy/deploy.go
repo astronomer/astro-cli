@@ -532,10 +532,11 @@ type Deployment struct {
 	WorkspaceID string
 }
 
-// ErrAborted reports a deploy prompt that ended with no deployment picked:
-// every answer was not one of the choices, which the picker has said after
-// each. It is exported so cmd can keep quiet about it, since that line is the
-// last word. The run still exits non-zero. It is not input.ErrAborted, the
+// ErrAborted reports a deploy prompt that ended with no deployment picked,
+// most often because no answer was one of the choices, which the picker says
+// after each. It is exported so cmd can keep quiet about it rather than add
+// "Error: no deployment selected" to what the prompt said. The run still exits
+// non-zero. It is not input.ErrAborted, the
 // answer no to a yes/no question, which this prompt does not ask: invalid
 // answers publish no kind rather than "aborted".
 var ErrAborted = errors.New("no deployment selected")

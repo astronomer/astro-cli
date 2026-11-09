@@ -1,7 +1,6 @@
 package context
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 
@@ -118,20 +117,18 @@ func (s *Suite) TestIsCloudContextNeverResolvesTheLogin() {
 
 func (s *Suite) TestDelete() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	out := new(bytes.Buffer)
-	removal, err := Delete("astronomer.io", true, out)
+	removal, err := Delete("astronomer.io", true)
 	s.NoError(err)
 	s.Equal(&Removal{Domain: "astronomer.io", Action: "deleted"}, removal)
 	s.False(Exists("astronomer.io"))
 	_, err = config.GetCurrentDomain()
 	s.ErrorIs(err, config.ErrGetHomeString, "deleting the current context leaves none current")
-	s.Empty(out.String(), "the success line is the command's to print")
 
-	removal, err = Delete("astronomer.io", true, out)
+	removal, err = Delete("astronomer.io", true)
 	s.ErrorIs(err, config.ErrContextNotExist)
 	s.Nil(removal)
 
-	_, err = Delete("", false, out)
+	_, err = Delete("", false)
 	s.ErrorIs(err, config.ErrCtxConfigErr)
 }
 
@@ -144,16 +141,14 @@ func (s *Suite) TestDeleteThatCannotSave() {
 	config.InitConfig(afero.NewReadOnlyFs(fs))
 	s.T().Cleanup(func() { testUtil.InitTestConfig(testUtil.LocalPlatform) })
 
-	out := new(bytes.Buffer)
-	removal, err := Delete("localhost", true, out)
+	removal, err := Delete("localhost", true)
 	s.Nil(removal)
 	s.ErrorContains(err, "deleting context localhost: ")
-	s.Empty(out.String())
 }
 
 func (s *Suite) TestDeleteWithoutConfig() {
 	testUtil.InitTestConfig(testUtil.Initial)
-	removal, err := Delete("nope.example.com", true, new(bytes.Buffer))
+	removal, err := Delete("nope.example.com", true)
 	s.ErrorIs(err, config.ErrContextNotExist)
 	s.ErrorContains(err, "nope.example.com")
 	s.Nil(removal)

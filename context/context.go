@@ -3,7 +3,6 @@ package context
 import (
 	"errors"
 	"fmt"
-	"io"
 	"maps"
 	"regexp"
 	"slices"
@@ -163,9 +162,9 @@ func SwitchTo(domain string) (Info, error) {
 }
 
 // Delete removes the saved context for domain. Deleting the current one asks
-// first, unless noPrompt; a declined delete is input.ErrAborted. What it says
-// along the way goes to out.
-func Delete(domain string, noPrompt bool, out io.Writer) (*Removal, error) {
+// first, unless noPrompt; a declined delete is input.ErrAborted. It prints
+// nothing: what it did is the command's to render.
+func Delete(domain string, noPrompt bool) (*Removal, error) {
 	currentCtx, _ := GetCurrentContext() //nolint:errcheck // error deliberately ignored in this shell code
 	if currentCtx.Domain != "" && currentCtx.Domain == domain && !noPrompt {
 		if err := input.ConfirmOrAbort(fmt.Sprintf(contextDeleteWarnMsg, domain), input.AnsweredBy("--yes")); err != nil {

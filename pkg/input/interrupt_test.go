@@ -3,6 +3,7 @@ package input
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -114,25 +115,30 @@ func (s *Suite) TestAnEOFJustBeforeTheInterruptIsTheInterrupt() {
 	saved := endedReadGrace
 	s.T().Cleanup(func() { endedReadGrace = saved })
 
-	read := func() error {
+	// interruptLater cancels the run 20ms after the read ends, or never.
+	read := func(interruptLater bool) error {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer SetInterrupt(ctx)()
 		defer cancel()
 		r, w := io.Pipe()
 		s.Require().NoError(w.Close()) // the read ends with io.EOF at once
-		go func() {
-			time.Sleep(20 * time.Millisecond)
-			cancel()
-		}()
+		if interruptLater {
+			go func() {
+				time.Sleep(20 * time.Millisecond)
+				cancel()
+			}()
+		}
 		_, err := ReadLine(bufio.NewReader(r), io.Discard)
 		return err
 	}
 
-	endedReadGrace = time.Second
-	s.ErrorIs(read(), ErrInterrupted)
+	endedReadGrace = func() time.Duration { return time.Second }
+	s.ErrorIs(read(true), ErrInterrupted)
 
-	endedReadGrace = 0
-	s.ErrorIs(read(), io.EOF)
+	// With no grace, or no interrupt within it, ended input is ended input.
+	s.ErrorIs(read(false), io.EOF)
+	endedReadGrace = func() time.Duration { return 0 }
+	s.ErrorIs(read(false), io.EOF)
 }
 
 // The bufio.Reader an interrupted read was left reading is dropped, so a
@@ -152,6 +158,16 @@ func (s *Suite) TestAnInterruptedReadLetsGoOfTheSharedReader() {
 	restore()
 
 	s.NotSame(r, stdin(), "the next question shares the reader the old read still holds")
+}
+
+// A refusal and an interrupt are unanswered questions; an ended read or a no
+// is an answer of sorts.
+func (s *Suite) TestUnanswered() {
+	s.True(Unanswered(Required(io.EOF)))
+	s.True(Unanswered(fmt.Errorf("asking: %w", ErrInterrupted)))
+	s.False(Unanswered(io.EOF))
+	s.False(Unanswered(ErrAborted))
+	s.False(Unanswered(nil))
 }
 
 // With no run installed, or one never interrupted, a line is read as before.

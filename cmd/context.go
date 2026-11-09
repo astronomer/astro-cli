@@ -246,7 +246,7 @@ func newContextDeleteCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			out := cmd.OutOrStdout()
-			removal, err := context.Delete(domainutil.ExpandShortName(args[0]), noPrompt, cliout.NotesTo(cmd, output, out))
+			removal, err := context.Delete(domainutil.ExpandShortName(args[0]), noPrompt)
 			if err != nil {
 				return err
 			}

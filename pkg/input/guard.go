@@ -107,7 +107,7 @@ func (e *RequiredError) Error() string {
 	case e.About != "":
 		asked = "for " + e.About
 	case prompt != "":
-		asked = "\"" + prompt + "\""
+		asked = fmt.Sprintf("%q", prompt)
 	}
 	answer := "pass the answer as a flag"
 	if e.Flag != "" {
@@ -130,6 +130,14 @@ func Required(err error) error {
 		return nil
 	}
 	return &RequiredError{err: err}
+}
+
+// Unanswered reports whether err is a question that got no answer at all:
+// one this run could not ask (IsRequired), or one the run was interrupted at
+// (ErrInterrupted). A caller that reads any other failed read as an empty
+// answer, as a few always have, still stops on these.
+func Unanswered(err error) bool {
+	return IsRequired(err) || errors.Is(err, ErrInterrupted)
 }
 
 // IsRequired reports whether err is a question this run could not ask.

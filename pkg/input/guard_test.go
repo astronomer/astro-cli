@@ -118,6 +118,11 @@ func (s *Suite) TestRequiredErrorMessage() {
 			`this command needs to ask "Are you sure you want to delete the prod Deployment?"; with --output json it cannot — pass --yes`,
 		},
 		{
+			"a quote stays escaped, and other escapes are stripped",
+			MayAsk("Delete \"x\"\x1b[?25l \x1b]8;;https://example.com\x07link\x1b]8;;\x07?", AnsweredBy("--yes")),
+			`this command needs to ask "Delete \"x\" link?"; with --output json it cannot — pass --yes`,
+		},
+		{
 			"trailing prompt punctuation is dropped",
 			MayAsk("Enter a name for the new token: "),
 			`this command needs to ask "Enter a name for the new token"; with --output json it cannot — pass the answer as a flag`,
