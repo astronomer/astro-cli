@@ -1492,9 +1492,10 @@ func updateWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out i
 
 func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "remove [ORG_TOKEN_ID]",
-		Short: "Remove an Organization API token's Deployment Role",
-		Long:  "Remove an Organization API token's Deployment Role. Name the token by its ID or with --org-token-name.",
+		Use:     "remove [ORG_TOKEN_ID]",
+		Aliases: []string{"rm"},
+		Short:   "Remove an Organization API token's Deployment Role",
+		Long:    "Remove an Organization API token's Deployment Role. Name the token by its ID or with --org-token-name.",
 		Example: `  # Remove an Organization token's role in a Deployment
   astro deployment token organization-token remove <ORG_TOKEN_ID> --deployment <DEPLOYMENT_ID>
 
@@ -1511,9 +1512,10 @@ func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 
 func newRemoveWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "remove [WORKSPACE_TOKEN_ID]",
-		Short: "Remove a Workspace API token's Deployment Role",
-		Long:  "Remove a Workspace API token's Deployment Role. Name the token by its ID or with --workspace-token-name.",
+		Use:     "remove [WORKSPACE_TOKEN_ID]",
+		Aliases: []string{"rm"},
+		Short:   "Remove a Workspace API token's Deployment Role",
+		Long:    "Remove a Workspace API token's Deployment Role. Name the token by its ID or with --workspace-token-name.",
 		Example: `  # Remove a Workspace token's role in a Deployment
   astro deployment token workspace-token remove <WORKSPACE_TOKEN_ID> --deployment <DEPLOYMENT_ID>
 

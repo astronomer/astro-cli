@@ -50,9 +50,39 @@ func TestRemovedAliasNamesTheCommandAndRunsNothing(t *testing.T) {
 	}
 
 	var ran bool
-	stub, _, err := build(&ran).Find([]string{"deployment", "de"})
+	root := build(&ran)
+	stub, _, err := root.Find([]string{"deployment", "de"})
 	require.NoError(t, err)
 	assert.True(t, IsRemovedCommand(stub))
 	assert.True(t, stub.Hidden)
-	assert.Equal(t, "Removed in v2 — use delete or rm", stub.Short)
+	assert.Equal(t, "delete", RemovedAliasTarget(stub).Name())
+	// Before the tree is built, the Short has only the path the stub was
+	// built with; once it is, the whole path.
+	assert.Equal(t, "Removed in v2 — use delete, or its alias rm", stub.Short)
+	NameRemovedAliasTargets(root)
+	assert.Equal(t, "Removed in v2 — use astro deployment delete, or its alias rm", stub.Short)
+}
+
+// The guidance names the command by its whole path with every alias it has,
+// however many.
+func TestRemovedAliasNamesEveryAlias(t *testing.T) {
+	for _, tc := range []struct {
+		aliases []string
+		want    string
+	}{
+		{nil, "astro context delete"},
+		{[]string{"rm"}, "astro context delete, or its alias rm"},
+		{[]string{"rm", "remove"}, "astro context delete, or one of its aliases rm, remove"},
+	} {
+		root := &cobra.Command{Use: "astro", SilenceErrors: true, SilenceUsage: true}
+		group := &cobra.Command{Use: "context"}
+		del := &cobra.Command{Use: "delete", Aliases: tc.aliases, RunE: func(*cobra.Command, []string) error { return nil }}
+		stub := RemovedAlias("de", del)
+		group.AddCommand(del, stub)
+		root.AddCommand(group)
+		NameRemovedAliasTargets(root)
+		assert.Equal(t, "Removed in v2 — use "+tc.want, stub.Short)
+		root.SetArgs([]string{"context", "de"})
+		assert.EqualError(t, root.Execute(), "astro context de was removed in Astro CLI v2: de is no longer short for delete. Use "+tc.want+".")
+	}
 }

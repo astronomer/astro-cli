@@ -81,6 +81,7 @@ The shapes 1.x printed changed once, for v2. The cloud `list` commands and `astr
 - **The upgrade notice** only suggests releases within the major version you're running.
 - **`astro organization cluster`** manages clusters.
 - **`astro config list`** shows the CLI's settings.
+- **Every `delete` and `remove` command answers to `rm`**, such as `astro deployment rm`, `astro workspace user rm` and `astro link rm`. 1.x's `de` for `delete` is gone (see [Breaking changes](#commands)).
 
 ## Breaking changes
 

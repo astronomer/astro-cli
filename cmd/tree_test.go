@@ -104,21 +104,19 @@ func TestCommandGroupHasNoStaleEntries(t *testing.T) {
 	}
 }
 
-// TestDeleteAnswersOnlyToRmOrDel keeps a destructive verb's short spellings to
-// the two nobody types by accident. 1.x gave every delete the alias de, which
-// is also astro deployment's own, so astro de de <id> deleted a Deployment;
-// v2 keeps de as a stub that names delete (cliout.RemovedAlias). remove is
-// held to the same two.
-func TestDeleteAnswersOnlyToRmOrDel(t *testing.T) {
+// TestDeleteAndRemoveAnswerToRm gives every delete and remove the same one
+// short spelling, rm, and no other: a destructive verb's alias is one nobody
+// types by accident, and the same everywhere. 1.x gave every delete the alias
+// de, which is also astro deployment's own, so astro de de <id> deleted a
+// Deployment; v2 keeps de as a stub that names delete (cliout.RemovedAlias).
+func TestDeleteAndRemoveAnswerToRm(t *testing.T) {
 	for _, tree := range rootsUnderTest(t) {
 		walkCmd(tree.root, func(cmd *cobra.Command) {
-			if cmd.Name() != "delete" && cmd.Name() != "remove" {
+			if cmd.Name() != "delete" && cmd.Name() != "remove" || cmd.Hidden || cliout.IsRemovedCommand(cmd) {
 				return
 			}
-			for _, alias := range cmd.Aliases {
-				if alias != "rm" && alias != "del" {
-					t.Errorf("[%s] %s answers to %q; a %s takes only rm or del", tree.name, cmd.CommandPath(), alias, cmd.Name())
-				}
+			if !slices.Equal(cmd.Aliases, []string{"rm"}) {
+				t.Errorf("[%s] %s answers to %v; a %s answers to rm and nothing else", tree.name, cmd.CommandPath(), cmd.Aliases, cmd.Name())
 			}
 		})
 	}

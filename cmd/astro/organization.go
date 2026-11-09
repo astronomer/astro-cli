@@ -562,12 +562,12 @@ func newOrganizationTeamUserRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl // the duplication is acceptable here
 func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "remove",
-		Short: "Remove a user from an Astro Team",
-		Long:  "Remove a user from a team. The user loses all Workspace and Deployment roles inherited through the team but keeps any directly assigned roles.",
+		Use:     "remove",
+		Aliases: []string{"rm"},
+		Short:   "Remove a user from an Astro Team",
+		Long:    "Remove a user from a team. The user loses all Workspace and Deployment roles inherited through the team but keeps any directly assigned roles.",
 		Example: `
   astro organization team user remove --team-id <TEAM_ID> --user-id <USER_ID>
 `,
@@ -609,7 +609,6 @@ func mayPickTeamAndUser(userWhat string) error {
 	return nil
 }
 
-//nolint:dupl // the duplication is acceptable here
 func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add",

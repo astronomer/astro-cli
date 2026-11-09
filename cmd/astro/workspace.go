@@ -545,9 +545,10 @@ func newUpdateOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 
 func newRemoveOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "remove [ORG_TOKEN_ID]",
-		Short: "Remove an Organization API token's Workspace Role",
-		Long:  "Remove an Organization API token's Workspace Role. Identify the token by its ID or by its name (--org-token-name).",
+		Use:     "remove [ORG_TOKEN_ID]",
+		Aliases: []string{"rm"},
+		Short:   "Remove an Organization API token's Workspace Role",
+		Long:    "Remove an Organization API token's Workspace Role. Identify the token by its ID or by its name (--org-token-name).",
 		Example: `  # Remove an Organization token from the current Workspace
   astro workspace token organization-token remove <ORG_TOKEN_ID>
 

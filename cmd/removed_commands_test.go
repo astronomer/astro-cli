@@ -340,6 +340,59 @@ func TestRemovedCommandStubsNeedNoLoginAndAreRecorded(t *testing.T) {
 	assert.Empty(t, recorded)
 }
 
+// A dropped 1.x alias (cliout.RemovedAlias) never runs the command it used to
+// spell, on the real trees: every run and pre-run of that command is replaced
+// by a recorder, and the stub is run with the confirmation-skipping flags a
+// 1.x script would pass. The other stub tests disarm every command that is not
+// a stub, so they would not see a stub that ran its command and then failed.
+func TestRemovedAliasStubsNeverRunTheirCommand(t *testing.T) {
+	origPlatform := platformPreRun
+	platformPreRun = func(astrov1.APIClient) func(*cobra.Command, []string) error {
+		return func(*cobra.Command, []string) error { return errors.New("the login and version check ran") }
+	}
+	origRecord := recordRemovedCommand
+	recordRemovedCommand = func(*cobra.Command) {}
+	t.Cleanup(func() { platformPreRun, recordRemovedCommand = origPlatform, origRecord })
+
+	for _, tc := range v1CommandTrees {
+		t.Run(tc.tree.name, func(t *testing.T) {
+			root := buildTree(t, tc.tree).root
+			var stubs []*cobra.Command
+			walkCmd(root, func(cmd *cobra.Command) {
+				if cliout.IsRemovedCommand(cmd) && cmd.Annotations[cliout.RemovedAliasOfAnnotation] != "" {
+					stubs = append(stubs, cmd)
+				}
+			})
+			require.NotEmpty(t, stubs)
+			for _, stub := range stubs {
+				target := cliout.RemovedAliasTarget(stub)
+				if !assert.NotNil(t, target, "%s names no sibling it was an alias of", stub.CommandPath()) {
+					continue
+				}
+				var ran []string
+				record := func(hook string) func(*cobra.Command, []string) error {
+					return func(*cobra.Command, []string) error { ran = append(ran, hook); return nil }
+				}
+				target.PersistentPreRunE, target.PreRunE, target.RunE, target.PostRunE = record("PersistentPreRunE"), record("PreRunE"), record("RunE"), record("PostRunE")
+				target.PersistentPreRun, target.PreRun, target.Run = nil, nil, nil
+
+				path := strings.Fields(strings.TrimPrefix(stub.CommandPath(), "astro "))
+				for _, extra := range [][]string{{"some-id"}, {"some-id", "--yes"}, {"some-id", "-f", "-o", "json"}} {
+					args := append(slices.Clone(path), extra...)
+					label := tc.tree.name + ": astro " + strings.Join(args, " ")
+					ran = nil
+					_, _, err := executeRoot(root, args...)
+					assert.Empty(t, ran, "%s ran %s", label, target.CommandPath())
+					if assert.Error(t, err, label) {
+						assert.Equal(t, cliout.ExitUsage, cliout.ExitCode(t.Context(), err), "%s: %v", label, err)
+						assert.Contains(t, err.Error(), "Use "+target.CommandPath()+", or its alias rm.", label)
+					}
+				}
+			}
+		})
+	}
+}
+
 // A stub parses no flags, so the root's --verbosity is read from its raw
 // arguments before logging is set up, in each spelling pflag takes for it,
 // wherever on the line, and not after "--".

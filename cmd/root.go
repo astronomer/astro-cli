@@ -204,6 +204,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// is recorded by Execute, after the run it failed.
 	rootCmd.SetFlagErrorFunc(flagError)
 	markV1Tree(rootCmd, o.platform)
+	cliout.NameRemovedAliasTargets(rootCmd)
 	installHelp(rootCmd, o.platform, houstonVersion)
 
 	return rootCmd
