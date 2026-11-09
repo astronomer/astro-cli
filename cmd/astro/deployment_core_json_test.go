@@ -603,6 +603,12 @@ func TestDeploymentCoreNothingToActOnFails(t *testing.T) {
 				assert.Equal(t, tc.code, r.code)
 				require.Error(t, r.err)
 				assert.Contains(t, r.err.Error(), tc.want)
+				if tc.want == noneHere {
+					// Reaches the root as the type the no_deployments kind
+					// matches, not flattened to its text.
+					var none *deployment.NoDeploymentsError
+					assert.ErrorAs(t, r.err, &none)
+				}
 				if format == "json" {
 					var got errorJSON
 					decodeOne(t, r.stdout, &got)

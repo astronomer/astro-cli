@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -1635,7 +1636,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	}
 
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToChange, isDevelopmentDeployment, astroV1Client)
+	currentDeployment, err := getDevelopmentDeployment(ws, deploymentID, deploymentName, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -1706,7 +1707,7 @@ func WaitForHibernationOverride(progress io.Writer, deploymentID string, isHiber
 // question was declined.
 func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string, force bool, astroV1Client astrov1.APIClient) (*HibernationResult, error) {
 	// get deployment
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToChange, isDevelopmentDeployment, astroV1Client)
+	currentDeployment, err := getDevelopmentDeployment(ws, deploymentID, deploymentName, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -2087,7 +2088,7 @@ func fromToken(ws string, deployments []astrov1.Deployment, filter func(astrov1.
 	}
 	d := deployments[i]
 	if filter != nil && !filter(d) {
-		return astrov1.Deployment{}, true, fmt.Errorf("the Deployment ASTRO_API_TOKEN is scoped to, %s (%s), is not one this command can act on", d.Name, d.Id)
+		return astrov1.Deployment{}, true, &NoneEligibleError{Workspace: ws, Token: d.Name + " (" + d.Id + ")"}
 	}
 	NoteTokenDeployment(os.Stderr, d.Name+" ("+d.Id+")")
 	return d, true, nil
@@ -2118,10 +2119,21 @@ func (e *NoDeploymentsError) Error() string {
 type NoneEligibleError struct {
 	// Workspace is the workspace looked in.
 	Workspace string
+	// Token, when set, is the Deployment the run's ASTRO_API_TOKEN is scoped
+	// to (its name and id), which the command cannot act on.
+	Token string
+	// Need, when set, says what the command can act on ("a development
+	// Deployment"); the message says so instead of "one this command can act
+	// on".
+	Need string
 }
 
 func (e *NoneEligibleError) Error() string {
-	return fmt.Sprintf("none of the Deployments in workspace %s is one this command can act on", e.Workspace)
+	need := cmp.Or(e.Need, "one this command can act on")
+	if e.Token != "" {
+		return fmt.Sprintf("the Deployment ASTRO_API_TOKEN is scoped to, %s, is not %s", e.Token, need)
+	}
+	return fmt.Sprintf("none of the Deployments in workspace %s is %s", e.Workspace, need)
 }
 
 // TargetsDisagreeError is a run that named its Deployment both by id and by
@@ -2191,13 +2203,13 @@ func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFi
 // a delete), else for a ToRead caller the only one when mayAutoSelect, else
 // the one the person picks.
 func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, filter func(deployment astrov1.Deployment) bool, use Use) (astrov1.Deployment, error) {
+	if len(deployments) == 0 {
+		return astrov1.Deployment{}, &NoDeploymentsError{Workspace: ws}
+	}
 	if use != ToPick {
 		if d, ok, err := fromToken(ws, deployments, filter); ok || err != nil {
 			return d, err
 		}
-	}
-	if len(deployments) == 0 {
-		return astrov1.Deployment{}, &NoDeploymentsError{Workspace: ws}
 	}
 	if filter != nil {
 		deployments = util.Filter(deployments, filter)
@@ -2257,6 +2269,17 @@ func getCoreCloudProvider(cloudProvider string) astrov1.GetDeploymentOptionsPara
 
 func isDevelopmentDeployment(deployment astrov1.Deployment) bool { //nolint:gocritic // intentional in this shell code
 	return deployment.IsDevelopmentMode != nil && *deployment.IsDevelopmentMode
+}
+
+// getDevelopmentDeployment is GetDeployment for hibernate and wake-up, which
+// act on development Deployments alone, and say so when there is none.
+func getDevelopmentDeployment(ws, deploymentID, deploymentName string, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+	d, err := GetDeployment(ws, deploymentID, deploymentName, ToChange, isDevelopmentDeployment, astroV1Client)
+	var none *NoneEligibleError
+	if errors.As(err, &none) {
+		none.Need = "a development Deployment, which hibernate and wake-up act on"
+	}
+	return d, err
 }
 
 // convertWorkerQueues is a generic function to convert a slice of WorkerQueue to a slice of T (WorkerQueueRequest or HybridWorkerQueueRequest)

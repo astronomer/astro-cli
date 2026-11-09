@@ -196,8 +196,8 @@ The command-specific 2s predate the usage 2. A script that runs one of those com
 | `not_found` | the Astro API has no such object (404) |
 | `conflict` | the Astro API refused because of the object's current state, such as one that already exists (409) |
 | `api_unavailable` | the Astro API failed on its side (5xx); try again |
-| `no_deployments` | a command that needed a Deployment picked found none in the workspace, and created none in its place; create one with `astro deployment create` |
-| `no_eligible_deployment` | the workspace has Deployments, but none the command can act on (`hibernate` and `wake-up` with no development Deployment, `astro link add` with every Deployment already linked) |
+| `no_deployments` | an Astro command that needed a Deployment picked found none in the workspace, and created none in its place; create one with `astro deployment create` |
+| `no_eligible_deployment` | the Astro workspace has Deployments, but none the command can act on, such as `hibernate` and `wake-up` with no development Deployment (or with a Deployment API token scoped to one that is not for development) |
 
 The cloud kinds come from the status on the `*httputil.StatusError` that every Astro API failure is normalized into, and `unauthenticated` also from the "no context" and "not logged in" errors raised before any request. `no_deployments` and `no_eligible_deployment` come from the Astro Deployment selector's own error types (`deployment.NoDeploymentsError`, `deployment.NoneEligibleError`), matched by type, not by status. APC (Houston) failures carry no kind: its client reports them as text.
 

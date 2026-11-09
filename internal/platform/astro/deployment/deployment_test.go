@@ -728,6 +728,27 @@ func (s *Suite) TestGetDeploymentFromADeploymentToken() {
 
 		_, err := GetDeployment(ws, "", "", ToChange, isDevelopmentDeployment, mockV1Client)
 		s.ErrorContains(err, "is not one this command can act on")
+		var none *NoneEligibleError
+		s.ErrorAs(err, &none, "the same kind as without a token")
+	})
+
+	// hibernate says what it needs, with a token or without.
+	s.Run("hibernate says it needs a development Deployment", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		withTokenDeployment(s.T(), "test-id-2") // not for development
+
+		_, err := UpdateDeploymentHibernationOverride("", ws, "", true, nil, true, mockV1Client)
+		s.EqualError(err, "the Deployment ASTRO_API_TOKEN is scoped to, test (test-id-2), is not a development Deployment, which hibernate and wake-up act on")
+	})
+
+	// An empty workspace is no_deployments whatever the token says.
+	s.Run("an empty workspace with a token", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
+		withTokenDeployment(s.T(), "test-id-2")
+
+		_, err := GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
+		var none *NoDeploymentsError
+		s.ErrorAs(err, &none)
 	})
 
 	s.Run("a delete never takes it", func() {
