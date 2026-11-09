@@ -265,7 +265,8 @@ func TestAnUnknownFlagSuggestsTheOneItIsCloseTo(t *testing.T) {
 		"two edits on a short name":          {[]string{"thing", "list", "--bogs"}, ""},
 		"swapped neighbors":                  {[]string{"thing", "list", "--tgas"}, "--tags"},
 		"swapped neighbors mid-word":         {[]string{"thing", "list", "--froce"}, "--force"},
-		"a long prefix":                      {[]string{"thing", "list", "--workspac", "x"}, "--workspace"},
+		"one edit short":                     {[]string{"thing", "list", "--workspac", "x"}, "--workspace"},
+		"a prefix past the distance":         {[]string{"thing", "list", "--works", "x"}, "--workspace"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -371,8 +372,8 @@ func TestAMisinvokedSilencedCommandStillPointsAtHelp(t *testing.T) {
 			root.AddCommand(runner)
 			// Every command below the root silenced, as astro local silences
 			// its whole tree when it builds it.
-			for _, c := range root.Commands() {
-				walk(c, func(c *cobra.Command) { c.SilenceUsage = true })
+			for _, sub := range root.Commands() {
+				walk(sub, func(cmd *cobra.Command) { cmd.SilenceUsage = true })
 			}
 			r := execTree(context.Background(), root, c.args...)
 			assert.Equal(t, ExitUsage, ExitCode(context.Background(), r.err))

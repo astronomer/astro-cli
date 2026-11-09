@@ -95,29 +95,39 @@ func TestUnknownCommandSuggestionIsTheOneShown(t *testing.T) {
 		}
 		return ""
 	}
-	for name, set := range map[string]func(root *cobra.Command){
-		"by default":                          func(*cobra.Command) {},
-		"the root disables suggestions":       func(root *cobra.Command) { root.DisableSuggestions = true },
-		"the root holds them to one edit":     func(root *cobra.Command) { root.SuggestionsMinimumDistance = 1 },
-		"the parent's own distance is unread": func(root *cobra.Command) { root.Commands()[0].SuggestionsMinimumDistance = 1 },
+	devOf := func(t *testing.T, root *cobra.Command) *cobra.Command {
+		t.Helper()
+		dev, _, err := root.Find([]string{"dev"})
+		require.NoError(t, err)
+		require.Equal(t, "dev", dev.Name())
+		return dev
+	}
+	// srtat is two edits from start: within cobra's default distance, past 1.
+	for name, c := range map[string]struct {
+		set  func(t *testing.T, root *cobra.Command)
+		want string
+	}{
+		"by default":                    {func(*testing.T, *cobra.Command) {}, "start"},
+		"the root disables suggestions": {func(_ *testing.T, root *cobra.Command) { root.DisableSuggestions = true }, ""},
+		"the root holds them to one edit": {
+			func(_ *testing.T, root *cobra.Command) { root.SuggestionsMinimumDistance = 1 }, "",
+		},
+		"the parent's own distance is unread": {
+			func(t *testing.T, root *cobra.Command) { devOf(t, root).SuggestionsMinimumDistance = 1 }, "start",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			root := newUnknownTestTree()
-			set(root)
-			dev := root.Commands()[0]
-			require.Equal(t, "dev", dev.Name())
+			c.set(t, root)
+			dev := devOf(t, root)
 			own := dev.SuggestionsMinimumDistance
 
 			got := findUnknownCommand(root, []string{"dev", "srtat"}).suggestion()
-			assert.Equal(t, shown(root, "dev", "srtat"), got)
+			assert.Equal(t, c.want, got)
+			assert.Equal(t, shown(root, "dev", "srtat"), got, "telemetry recorded another suggestion than the refusal shows")
 			assert.Equal(t, own, dev.SuggestionsMinimumDistance, "the lookup left a distance on the command")
 		})
 	}
-
-	root := newUnknownTestTree()
-	assert.Equal(t, "start", findUnknownCommand(root, []string{"dev", "srtat"}).suggestion(), "two edits, within cobra's default")
-	root.DisableSuggestions = true
-	assert.Empty(t, findUnknownCommand(root, []string{"dev", "srtat"}).suggestion(), "the root's switch reaches a group under it")
 }
 
 // TestFindUnknownCommandLeavesCobrasOwnCommandsAlone guards the commands cobra

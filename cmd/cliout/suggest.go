@@ -17,8 +17,8 @@ import (
 // (suggestionDistance): nothing when a command on the way disables
 // suggestions, else within the root's distance by EditDistance, or the typed
 // name a prefix of the flag's. A short name is held to fewer edits than half
-// its length, so neither --ws nor --bogs (two edits from --id and --tags)
-// becomes a guess. EditDistance counts swapped neighbors as one edit, so
+// its length, and one at the least, so neither --ws nor --bogs (two edits
+// from --id and --tags) becomes a guess, while --i still finds --id. EditDistance counts swapped neighbors as one edit, so
 // --froce is one from --force; subcommand suggestions keep cobra's own
 // matcher (SubcommandSuggestions), where that is two. Clearly is one flag
 // nearest: two equally close are a guess, and a wrong guess costs a second
@@ -68,9 +68,10 @@ func UnknownFlag(err error) (name string, isShorthand bool, spelling string) {
 	return name, false, "--" + name
 }
 
-// Closest are the candidates nearest to name by cobra's rule for "Did you
-// mean", ignoring case: within distance edits, or name a prefix of them, which
-// counts as distance. Every candidate at the nearest distance, in the order
+// Closest are the candidates nearest to name, ignoring case: within distance
+// edits by EditDistance, or name a prefix of them, which counts as distance.
+// That is cobra's rule for "Did you mean" except that a swap of neighbors is
+// one edit here and two in cobra. Every candidate at the nearest distance, in the order
 // given, not one picked by that order, so the caller decides what a tie means.
 // None for an empty name, which is a prefix of everything.
 func Closest(name string, candidates []string, distance int) []string {

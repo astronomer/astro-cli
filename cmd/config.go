@@ -53,8 +53,9 @@ func suggestSettings(name string) string {
 	return ""
 }
 
-// closestSettings are the names nearest to name by cobra's rule for "Did you
-// mean": within cliout.DefaultSuggestionDistance edits, or name a prefix of them. Every
+// closestSettings are the names nearest to name by cliout.Closest: within
+// cliout.DefaultSuggestionDistance edits, a swap of neighbors counting as one,
+// or name a prefix of them. Every
 // name at the nearest distance, not one picked by sort order, since a partial
 // name such as "telemetry" is equally close to each setting under it. current
 // holds listed settings, with a renamed setting's 1.x name mapped to its
