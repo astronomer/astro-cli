@@ -29,7 +29,10 @@ func (c *cli) confirm(question string) error {
 		return err
 	}
 	fmt.Fprintf(c.d.Stderr, "%s [y/N] ", question)
-	line, err := input.Reader(c.d.Stdin).ReadString('\n')
+	line, err := input.ReadLine(input.Reader(c.d.Stdin))
+	if errors.Is(err, input.ErrInterrupted) {
+		return err
+	}
 	line = strings.TrimSpace(line)
 	if err != nil && line == "" {
 		if errors.Is(err, io.EOF) {

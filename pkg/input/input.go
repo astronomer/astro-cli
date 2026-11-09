@@ -29,7 +29,10 @@ func ConfirmOrAbort(promptText string, opts ...Option) error {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "%s (y/n) ", promptText)
-	line, err := stdin().ReadString('\n')
+	line, err := ReadLine(stdin())
+	if errors.Is(err, ErrInterrupted) {
+		return err
+	}
 	answer := strings.ToLower(strings.TrimSpace(line))
 	if err != nil && answer == "" {
 		e := &RequiredError{Prompt: promptText, Reason: "stdin ended before an answer"}
@@ -54,14 +57,19 @@ func Text(promptText string, opts ...Option) (string, error) {
 	if promptText != "" {
 		fmt.Fprint(os.Stderr, promptText)
 	}
-	text, _ := reader.ReadString('\n') //nolint:errcheck // error deliberately ignored in this shell code
+	// A read that ends is the answer so far, as it always was; an
+	// interrupt is not an answer.
+	text, err := ReadLine(reader)
+	if errors.Is(err, ErrInterrupted) {
+		return "", err
+	}
 	return strings.Trim(text, "\r\n"), nil
 }
 
 // Confirm requests a user to confirm their input. It returns a *RequiredError,
 // and reads nothing, when this run may not ask (see SetGuard): a refused
 // confirmation is neither a yes nor a no, so a caller must not read the bool
-// as one.
+// as one. Nor is an interrupt (ErrInterrupted).
 func Confirm(promptText string, opts ...Option) (bool, error) {
 	if err := MayAsk(promptText, opts...); err != nil {
 		return false, err
@@ -69,7 +77,10 @@ func Confirm(promptText string, opts ...Option) (bool, error) {
 	reader := stdin()
 	fmt.Fprintf(os.Stderr, "%s (y/n) ", promptText)
 
-	text, _ := reader.ReadString('\n') //nolint:errcheck // error deliberately ignored in this shell code
+	text, err := ReadLine(reader)
+	if errors.Is(err, ErrInterrupted) {
+		return false, err
+	}
 	return strings.Trim(text, "\r\n") == "y", nil
 }
 
