@@ -202,6 +202,8 @@ func markUsageErrors(root *cobra.Command) {
 		return misinvoked(err)
 	})
 	walk(root, func(c *cobra.Command) {
+		// Not a usage error, but this is the one walk over the built tree.
+		nameRemovedAlias(c)
 		validate := c.Args
 		if validate == nil {
 			return

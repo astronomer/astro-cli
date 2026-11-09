@@ -370,11 +370,14 @@ func TestRemovedAliasStubsNeverRunTheirCommand(t *testing.T) {
 					continue
 				}
 				var ran []string
+				// Every hook cobra runs for a command, so a stub that reached
+				// any part of it is seen.
 				record := func(hook string) func(*cobra.Command, []string) error {
 					return func(*cobra.Command, []string) error { ran = append(ran, hook); return nil }
 				}
-				target.PersistentPreRunE, target.PreRunE, target.RunE, target.PostRunE = record("PersistentPreRunE"), record("PreRunE"), record("RunE"), record("PostRunE")
-				target.PersistentPreRun, target.PreRun, target.Run = nil, nil, nil
+				target.PersistentPreRunE, target.PreRunE, target.RunE = record("PersistentPreRunE"), record("PreRunE"), record("RunE")
+				target.PostRunE, target.PersistentPostRunE = record("PostRunE"), record("PersistentPostRunE")
+				target.PersistentPreRun, target.PreRun, target.Run, target.PostRun, target.PersistentPostRun = nil, nil, nil, nil, nil
 
 				path := strings.Fields(strings.TrimPrefix(stub.CommandPath(), "astro "))
 				for _, extra := range [][]string{{"some-id"}, {"some-id", "--yes"}, {"some-id", "-f", "-o", "json"}} {
@@ -388,6 +391,9 @@ func TestRemovedAliasStubsNeverRunTheirCommand(t *testing.T) {
 						assert.Contains(t, err.Error(), "Use "+target.CommandPath()+", or its alias rm.", label)
 					}
 				}
+				// The run named the stub's command in its Short too, as its
+				// help shows it.
+				assert.Equal(t, "Removed in v2 — use "+target.CommandPath()+", or its alias rm", stub.Short, stub.CommandPath())
 			}
 		})
 	}

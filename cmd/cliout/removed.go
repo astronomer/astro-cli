@@ -62,16 +62,16 @@ func RemovedCommand(use string, aliases []string, short string, run func(cmd *co
 // removed command, so a 1.x script using it fails naming cmd rather than
 // being told only that the word is unknown, and never runs cmd.
 //
-// The stub's Short names cmd by its whole path, which is known only once the
-// tree is built: NameRemovedAliasTargets sets it then. Until that runs it
-// names cmd by the path it has so far.
+// The stub's Short names cmd by its whole path, as its error does, which is
+// known only once the tree is built. Execute sets it then, in the walk it
+// already makes over the tree (nameRemovedAlias); until then it says only
+// "Removed in v2".
 func RemovedAlias(alias string, cmd *cobra.Command) *cobra.Command {
-	stub := RemovedCommand(alias, nil, "", func(stub *cobra.Command, _ []string) error {
+	stub := RemovedCommand(alias, nil, "Removed in v2", func(stub *cobra.Command, _ []string) error {
 		return Usage(fmt.Errorf("%s was removed in Astro CLI v2: %s is no longer short for %s. Use %s.",
 			stub.CommandPath(), alias, cmd.Name(), useInstead(cmd)))
 	})
 	stub.Annotations[RemovedAliasOfAnnotation] = cmd.Name()
-	stub.Short = removedAliasShort(cmd)
 	return stub
 }
 
@@ -94,19 +94,13 @@ func RemovedAliasTarget(stub *cobra.Command) *cobra.Command {
 	return nil
 }
 
-// NameRemovedAliasTargets sets the Short of every RemovedAlias stub under root
-// to name its command by the whole path, once root is built.
-func NameRemovedAliasTargets(root *cobra.Command) {
-	for _, c := range root.Commands() {
-		if target := RemovedAliasTarget(c); target != nil {
-			c.Short = removedAliasShort(target)
-		}
-		NameRemovedAliasTargets(c)
+// nameRemovedAlias sets the Short of c, when it is a RemovedAlias stub, to
+// name its command by the whole path. Execute calls it on every command of the
+// built tree.
+func nameRemovedAlias(c *cobra.Command) {
+	if target := RemovedAliasTarget(c); target != nil {
+		c.Short = "Removed in v2 — use " + useInstead(target)
 	}
-}
-
-func removedAliasShort(cmd *cobra.Command) string {
-	return "Removed in v2 — use " + useInstead(cmd)
 }
 
 // useInstead names cmd by its path, and its aliases after it:

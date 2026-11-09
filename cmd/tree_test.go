@@ -112,7 +112,10 @@ func TestCommandGroupHasNoStaleEntries(t *testing.T) {
 func TestDeleteAndRemoveAnswerToRm(t *testing.T) {
 	for _, tree := range rootsUnderTest(t) {
 		walkCmd(tree.root, func(cmd *cobra.Command) {
-			if cmd.Name() != "delete" && cmd.Name() != "remove" || cmd.Hidden || cliout.IsRemovedCommand(cmd) {
+			// A hidden command still answers when typed, so it is held to
+			// this too; a stub (a removed command's, or the stand-in for one
+			// the platform is too old for) runs nothing.
+			if cmd.Name() != "delete" && cmd.Name() != "remove" || cliout.IsRemovedCommand(cmd) || isVersionGateStub(cmd) {
 				return
 			}
 			if !slices.Equal(cmd.Aliases, []string{"rm"}) {

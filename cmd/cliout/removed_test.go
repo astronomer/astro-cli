@@ -56,10 +56,10 @@ func TestRemovedAliasNamesTheCommandAndRunsNothing(t *testing.T) {
 	assert.True(t, IsRemovedCommand(stub))
 	assert.True(t, stub.Hidden)
 	assert.Equal(t, "delete", RemovedAliasTarget(stub).Name())
-	// Before the tree is built, the Short has only the path the stub was
-	// built with; once it is, the whole path.
-	assert.Equal(t, "Removed in v2 — use delete, or its alias rm", stub.Short)
-	NameRemovedAliasTargets(root)
+	// Until Execute walks the built tree, the Short names nothing; then the
+	// command, by its whole path.
+	assert.Equal(t, "Removed in v2", stub.Short)
+	markUsageErrors(root)
 	assert.Equal(t, "Removed in v2 — use astro deployment delete, or its alias rm", stub.Short)
 }
 
@@ -80,7 +80,7 @@ func TestRemovedAliasNamesEveryAlias(t *testing.T) {
 		stub := RemovedAlias("de", del)
 		group.AddCommand(del, stub)
 		root.AddCommand(group)
-		NameRemovedAliasTargets(root)
+		markUsageErrors(root)
 		assert.Equal(t, "Removed in v2 — use "+tc.want, stub.Short)
 		root.SetArgs([]string{"context", "de"})
 		assert.EqualError(t, root.Execute(), "astro context de was removed in Astro CLI v2: de is no longer short for delete. Use "+tc.want+".")
