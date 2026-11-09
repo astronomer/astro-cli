@@ -54,8 +54,7 @@ func renderLines(format cliout.Format, out io.Writer, v any, lines ...string) er
 }
 
 // renderTeamUpdate renders what an organization team update did, naming the
-// team as it now is. upd is nil when the person declined to change an
-// IdP-managed team, which prints nothing.
+// team as it now is. A declined question is err, input.ErrAborted.
 func renderTeamUpdate(format cliout.Format, out io.Writer, upd *team.Update, err error) error {
 	if err != nil {
 		return err

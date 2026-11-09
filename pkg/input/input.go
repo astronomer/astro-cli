@@ -12,10 +12,37 @@ import (
 
 // ErrAborted is a confirmation answered no. A command returns it, rather than
 // printing that it stopped and exiting 0: declining is not success, and the
-// run did not do what it was asked. Every declined confirmation in the CLI
-// fails with it, so it reads "aborted" and exits 1 everywhere, and under
-// --output json publishes kind aborted.
+// run did not do what it was asked. A declined confirmation fails with it
+// (ConfirmOrAbort), so it reads "aborted" and exits 1 wherever it is used,
+// and cliout publishes it as kind aborted.
 var ErrAborted = errors.New("aborted")
+
+// ConfirmOrAbort asks promptText as a y/n question and returns nil for a yes
+// (y or yes, in any case) and ErrAborted for anything else. A run that may
+// not ask is refused as Confirm refuses it. Input that ends before any answer
+// (a script with stdin closed or from /dev/null) is not a no: nobody
+// answered, so it is a *RequiredError naming the flag that answers it, as
+// under --output json. It is the confirmation a command that changes
+// something asks, so a decline is one failure everywhere.
+func ConfirmOrAbort(promptText string, opts ...Option) error {
+	if err := MayAsk(promptText, opts...); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "%s (y/n) ", promptText)
+	line, err := stdin().ReadString('\n')
+	answer := strings.ToLower(strings.TrimSpace(line))
+	if err != nil && answer == "" {
+		e := &RequiredError{Prompt: promptText, Reason: "stdin ended before an answer"}
+		for _, o := range opts {
+			o(e)
+		}
+		return e
+	}
+	if answer == "y" || answer == "yes" {
+		return nil
+	}
+	return ErrAborted
+}
 
 // Text requests a user for input text and returns it. It returns a
 // *RequiredError, and reads nothing, when this run may not ask (see SetGuard).

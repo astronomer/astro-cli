@@ -41,6 +41,6 @@ func (c *cli) confirm(question string) error {
 	case "y", "yes":
 		return nil
 	default:
-		return errAborted
+		return input.ErrAborted
 	}
 }

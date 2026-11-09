@@ -534,8 +534,10 @@ type Deployment struct {
 
 // ErrAborted reports a deploy prompt the user declined. It is exported so cmd
 // can keep quiet about it: someone who was asked and said no does not need the
-// answer read back to them as an error. The run still exits non-zero.
-var ErrAborted = errors.New("no deployment selected")
+// answer read back to them as an error. The run still exits non-zero, and it
+// wraps input.ErrAborted, so under --output json, or to a caller that reads
+// kinds, it is aborted like every other declined question.
+var ErrAborted = fmt.Errorf("%w: no deployment selected", input.ErrAborted)
 
 // resolveTarget settles which deployment this run ships to.
 //

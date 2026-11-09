@@ -165,14 +165,7 @@ func confirmTokenChange(warning, question string) error {
 	if warning != "" {
 		fmt.Fprintln(os.Stderr, cliout.DangerLabel(os.Stderr), warning)
 	}
-	ok, err := input.Confirm(question, input.AnsweredBy("--yes"))
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return input.ErrAborted
-	}
-	return nil
+	return input.ConfirmOrAbort(question, input.AnsweredBy("--yes"))
 }
 
 // mayPickRole refuses, under --output json, a command about to offer a role

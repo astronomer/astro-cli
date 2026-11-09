@@ -20,12 +20,5 @@ func confirmRemoval(question string) error {
 	if skipPrompt {
 		return nil
 	}
-	ok, err := input.Confirm(question, input.AnsweredBy("--yes"))
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return input.ErrAborted
-	}
-	return nil
+	return input.ConfirmOrAbort(question, input.AnsweredBy("--yes"))
 }

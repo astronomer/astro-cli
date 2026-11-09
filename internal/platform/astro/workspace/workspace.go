@@ -342,14 +342,10 @@ func Delete(id string, yes bool, out io.Writer, client astrov1.APIClient) (*Remo
 		return nil, err
 	}
 	if !yes {
-		ok, err := input.Confirm(
+		if err := input.ConfirmOrAbort(
 			fmt.Sprintf("\nAre you sure you want to delete the %s Workspace (%s)? This cannot be undone.", ansi.Bold(workspace.Name), workspace.Id),
-			input.AnsweredBy("--yes"))
-		if err != nil {
+			input.AnsweredBy("--yes")); err != nil {
 			return nil, err
-		}
-		if !ok {
-			return nil, input.ErrAborted
 		}
 	}
 	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspace.Id)

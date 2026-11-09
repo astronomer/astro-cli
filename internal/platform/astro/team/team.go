@@ -39,14 +39,7 @@ func confirmOperation(force bool) error {
 	if force {
 		return nil
 	}
-	y, err := input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?", input.AnsweredBy("--yes"))
-	if err != nil {
-		return err
-	}
-	if !y {
-		return input.ErrAborted
-	}
-	return nil
+	return input.ConfirmOrAbort("This is an IDP-managed team. Are you sure you want to continue the operation?", input.AnsweredBy("--yes"))
 }
 
 // Info is t as a team command reports it, with no role: the caller sets the
@@ -574,12 +567,8 @@ func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemov
 		if team.IsIdpManaged {
 			question = "\nThis is an IDP-managed team." + question
 		}
-		y, err := input.Confirm(question, input.AnsweredBy("--yes"))
-		if err != nil {
+		if err := input.ConfirmOrAbort(question, input.AnsweredBy("--yes")); err != nil {
 			return nil, err
-		}
-		if !y {
-			return nil, input.ErrAborted
 		}
 	}
 	teamID := team.Id

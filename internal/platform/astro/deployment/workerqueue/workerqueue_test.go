@@ -518,6 +518,7 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("cancels update if user does not confirm", func() {
+		defer testUtil.MockUserInput(s.T(), "n\n")()
 		deploymentResponse.JSON200.Type = &hybridType
 		out := new(bytes.Buffer)
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil)

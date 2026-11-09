@@ -74,20 +74,21 @@ func readSetValue(cmd *cobra.Command, flagName, flagValue, prompt string) (strin
 // no is input.ErrAborted.
 var errAbortedDelete = errors.New("aborted: pass --yes (or confirm interactively) to delete")
 
-// confirmTTY returns true if the user confirms y/Y at an interactive prompt.
-// On a non-TTY it reads nothing and returns errAbortedDelete, marked as a
-// question this run could not ask; callers must require an explicit --yes
-// flag for non-interactive use. A run that may not ask at all (--output json)
-// returns that refusal, naming --yes, rather than an answer.
-func confirmTTY(prompt string) (bool, error) {
+// confirmTTY asks prompt at an interactive prompt: nil for a yes (y or yes,
+// in any case), input.ErrAborted for any other answer. On a non-TTY it reads
+// nothing and returns errAbortedDelete, marked as a question this run could
+// not ask; callers must require an explicit --yes flag for non-interactive
+// use. A run that may not ask at all (--output json) returns that refusal,
+// naming --yes, rather than an answer.
+func confirmTTY(prompt string) error {
 	yes := input.AnsweredBy("--yes")
 	if err := input.MayAsk(prompt, yes); err != nil {
-		return false, err
+		return err
 	}
 	if !stdinIsTerminal() {
-		return false, input.Required(errAbortedDelete)
+		return input.Required(errAbortedDelete)
 	}
-	return input.Confirm(prompt, yes)
+	return input.ConfirmOrAbort(prompt, yes)
 }
 
 // hasPipedStdin reports whether stdin appears to be a pipe rather than a TTY.
@@ -226,12 +227,8 @@ func runEnvDelete(cmd *cobra.Command, out io.Writer, noun, idOrKey string, del f
 	cmd.SilenceUsage = true
 
 	if !envYes {
-		ok, err := confirmTTY(fmt.Sprintf("Delete %s %q?", noun, idOrKey))
-		if err != nil {
+		if err := confirmTTY(fmt.Sprintf("Delete %s %q?", noun, idOrKey)); err != nil {
 			return err
-		}
-		if !ok {
-			return input.ErrAborted
 		}
 	}
 	deleted, err := del(idOrKey, scope, astroV1Client)

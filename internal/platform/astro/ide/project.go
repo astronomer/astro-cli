@@ -537,13 +537,8 @@ func ImportProject(ctx httpContext.Context, client astrov1alpha1.APIClient, expo
 		return nil, fmt.Errorf("failed to read current directory: %w", err)
 	}
 	if len(entries) > 0 && !yes {
-		proceed, err := input.Confirm(fmt.Sprintf("Current directory is not empty. Do you want to import the project here? %s", dir), input.AnsweredBy("--yes"))
-		if err != nil {
+		if err := input.ConfirmOrAbort(fmt.Sprintf("Current directory is not empty. Do you want to import the project here? %s", dir), input.AnsweredBy("--yes")); err != nil {
 			return nil, err
-		}
-
-		if !proceed {
-			return nil, input.ErrAborted
 		}
 	}
 

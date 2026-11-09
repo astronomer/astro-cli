@@ -79,8 +79,7 @@ type BundleResult struct {
 // The API removes a bundle in the background (bundle list shows it with
 // deletion_is_pending until it is gone), so the action of a delete is
 // deletion_requested, not the deleted of a removal that is done when it
-// returns. canceled is a question answered no, which a run under --output
-// json never sees: there it is refused, and the run passes --yes.
+// returns. A question answered no publishes nothing: it is input.ErrAborted.
 type BundleRemoval struct {
 	ID              string `json:"id"`
 	Name            string `json:"name,omitempty"`
@@ -463,12 +462,8 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 	removal := BundleRemoval{ID: bundleID, Name: bundleName, NonDagMountPath: bundleMountPath, DeploymentID: dep.Id}
 
 	if !force {
-		confirmed, err := input.Confirm(fmt.Sprintf("Are you sure you want to delete bundle %s from deployment %s?", bundleID, dep.Id), input.AnsweredBy("--yes"))
-		if err != nil {
+		if err := input.ConfirmOrAbort(fmt.Sprintf("Are you sure you want to delete bundle %s from deployment %s?", bundleID, dep.Id), input.AnsweredBy("--yes")); err != nil {
 			return err
-		}
-		if !confirmed {
-			return input.ErrAborted
 		}
 	}
 

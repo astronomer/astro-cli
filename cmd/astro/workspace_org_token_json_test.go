@@ -206,6 +206,20 @@ var (
 // meaning, less the quirks a later change fixed. A rotate by ID names the
 // token it found, each picker asks for a token for what the command is doing,
 // and an update to a role the token holds is refused before anything is sent.
+// A confirmation whose stdin ends before any answer, as a script's does, was
+// not answered no: it is input_required naming --yes, not aborted, and
+// nothing is rotated (the client mocks no rotate).
+func TestATokenConfirmationNobodyAnswersIsInputRequired(t *testing.T) {
+	ws, org := wsOrgTokenFixtures()
+	r := execAstroCmd(t, fakeTokens([]astrov1.ApiToken{ws, org})(t), "", newWorkspaceCmd, "workspace", "token", "rotate", "tok-ws")
+	require.Error(t, r.err)
+	assert.True(t, input.IsRequired(r.err), "%v", r.err)
+	assert.NotErrorIs(t, r.err, input.ErrAborted)
+	assert.Contains(t, r.err.Error(), "pass --yes")
+	assert.Equal(t, cliout.ExitFailure, r.code)
+	assert.Empty(t, r.stdout)
+}
+
 func TestWorkspaceTokenText(t *testing.T) {
 	ws, org := wsOrgTokenFixtures()
 	both := []astrov1.ApiToken{ws, org}
