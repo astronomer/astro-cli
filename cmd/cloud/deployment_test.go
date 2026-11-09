@@ -1634,7 +1634,7 @@ func TestIsValidCloudProvider(t *testing.T) {
 	})
 }
 
-func TestDeploymentUI(t *testing.T) {
+func TestDeploymentOpen(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	t.Run("returns an error when the Deployment name is not found", func(t *testing.T) {
@@ -1642,7 +1642,7 @@ func TestDeploymentUI(t *testing.T) {
 		astroV1Client = mockV1Client
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		_, err := execDeploymentCmd("ui", "--deployment-name", "missing")
+		_, err := execDeploymentCmd("open", "--deployment-name", "missing")
 		assert.ErrorContains(t, err, "the Deployment specified was not found in this workspace")
 		mockV1Client.AssertExpectations(t)
 	})

@@ -146,7 +146,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentBundleRootCmd(out),
 		newDeploymentHibernateCmd(),
 		newDeploymentWakeUpCmd(),
-		newDeploymentUICmd(out),
+		newDeploymentOpenCmd(out),
 	)
 	return cmd
 }
@@ -683,16 +683,16 @@ func newDeploymentWakeUpCmd() *cobra.Command {
 	return cmd
 }
 
-func newDeploymentUICmd(out io.Writer) *cobra.Command {
+func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "ui [DEPLOYMENT-ID]",
+		Use:   "open [DEPLOYMENT-ID]",
 		Short: "Open a Deployment's Airflow UI in your browser",
 		Long:  "Open the Airflow UI of an Astro Deployment in your default browser. If the browser cannot be opened, the CLI prints the Airflow UI URL instead.",
 		Example: `
-  $ astro deployment ui <deployment-id>
-  $ astro deployment ui --deployment-name my-deployment
+  $ astro deployment open <deployment-id>
+  $ astro deployment open --deployment-name my-deployment
 `,
-		RunE: func(cmd *cobra.Command, args []string) error { return deploymentUI(cmd, args, out) },
+		RunE: func(cmd *cobra.Command, args []string) error { return deploymentOpen(cmd, args, out) },
 	}
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to open the Airflow UI for")
 	return cmd
@@ -1029,7 +1029,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, astroV1Client)
 }
 
-func deploymentUI(cmd *cobra.Command, args []string, out io.Writer) error {
+func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
