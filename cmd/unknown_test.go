@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -178,21 +179,21 @@ func TestUnknownFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, spelling := unknownFlag(parseError(t, tt.args...))
+			_, _, spelling := cliout.UnknownFlag(parseError(t, tt.args...))
 			assert.Equal(t, tt.want, spelling)
 		})
 	}
 
 	for _, err := range []error{nil, errors.New("something else")} {
-		name, isShorthand, spelling := unknownFlag(err)
+		name, isShorthand, spelling := cliout.UnknownFlag(err)
 		assert.Empty(t, name)
 		assert.False(t, isShorthand)
 		assert.Empty(t, spelling)
 	}
-	name, isShorthand, _ := unknownFlag(parseError(t, "-aZ"))
+	name, isShorthand, _ := cliout.UnknownFlag(parseError(t, "-aZ"))
 	assert.Equal(t, "Z", name)
 	assert.True(t, isShorthand)
-	name, isShorthand, _ = unknownFlag(parseError(t, "--api-token=sekret-123"))
+	name, isShorthand, _ = cliout.UnknownFlag(parseError(t, "--api-token=sekret-123"))
 	assert.Equal(t, "api-token", name)
 	assert.False(t, isShorthand)
 }

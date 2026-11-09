@@ -54,7 +54,7 @@ func suggestSettings(name string) string {
 }
 
 // closestSettings are the names nearest to name by cobra's rule for "Did you
-// mean": within suggestionDistance edits, or name a prefix of them. Every
+// mean": within cliout.DefaultSuggestionDistance edits, or name a prefix of them. Every
 // name at the nearest distance, not one picked by sort order, since a partial
 // name such as "telemetry" is equally close to each setting under it. current
 // holds listed settings, with a renamed setting's 1.x name mapped to its
@@ -68,7 +68,7 @@ func closestSettings(name string) (current, removed []string) {
 		}
 	}
 	candidates = append(candidates, config.RemovedSettingNames()...)
-	matches := cliout.Closest(name, candidates, suggestionDistance)
+	matches := cliout.Closest(name, candidates, cliout.DefaultSuggestionDistance)
 	for _, match := range matches {
 		if renamed, ok := config.LegacySettingNames[match]; ok {
 			current = append(current, renamed)

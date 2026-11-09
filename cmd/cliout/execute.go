@@ -123,19 +123,21 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	// A failure that is not a usage error is the whole message: the command
 	// was invoked rightly, so its usage would only bury the error. A usage
 	// error points at the failing command's help rather than printing it, with
-	// the flag that was likely meant when one is clearly close. One found
-	// before the command ran always does: its help is where the right
-	// invocation is, and a command that silences its usage up front (all of
-	// astro local) silenced the block, not this. One the command returned
-	// itself does unless the command silenced its usage, which is how it says
-	// its help would not settle it (a removed command's stub, a Deployment
-	// name several Deployments share). The root's own SilenceUsage is forced
-	// on for the run, so for the root only quietUsage, its setting from
-	// before, decides. Only a run that exits as a usage error gets it: an
-	// interrupt ends the run with 130 whatever the error says, and nothing
-	// about how it was invoked needs fixing.
-	silenced := quietUsage || (cmd != root && cmd.SilenceUsage)
-	if ExitCode(ctx, err) != ExitUsage || (silenced && !isMisinvoked(err)) {
+	// the flag that was likely meant when one is clearly close. Only a run
+	// that exits as a usage error gets it: an interrupt ends the run with 130
+	// whatever the error says, and nothing about how it was invoked needs
+	// fixing.
+	//
+	// A root that silenced its usage silences the pointer everywhere (its
+	// setting from before the run, quietUsage, since the run forces it on).
+	// Below the root, one found before the command ran always gets it: its
+	// help is where the right invocation is, and a command that silences its
+	// usage up front (all of astro local) silenced the block, not this. One
+	// the command returned itself does unless the command silenced its usage,
+	// which is how it says its help would not settle it (a removed command's
+	// stub, a Deployment name several Deployments share).
+	silencedRun := cmd != root && cmd.SilenceUsage && !isMisinvoked(err)
+	if quietUsage || silencedRun || ExitCode(ctx, err) != ExitUsage {
 		return err
 	}
 	if flag := suggestFlag(cmd, err); flag != "" {

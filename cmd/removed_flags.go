@@ -411,7 +411,7 @@ func (e *removedFlagErr) Error() string { return e.msg }
 // before any pre-run logs in or asks an API anything, and as a usage error
 // (exit 2), which Execute reports under --output json as the error object.
 func removedFlagError(cmd *cobra.Command, err error) error {
-	typed, isShorthand, spelling := unknownFlag(err)
+	typed, isShorthand, spelling := cliout.UnknownFlag(err)
 	if spelling == "" {
 		return nil
 	}

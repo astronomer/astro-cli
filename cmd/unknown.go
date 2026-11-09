@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 )
 
@@ -59,7 +59,7 @@ func flagError(cmd *cobra.Command, err error) error {
 // recorded the same way: the event is what tells us when nobody passes one
 // any more, and its tombstone can go.
 func trackUnknownFlag(cmd *cobra.Command, err error) error {
-	if _, _, spelling := unknownFlag(err); spelling != "" {
+	if _, _, spelling := cliout.UnknownFlag(err); spelling != "" {
 		recordUnknownFlag(cmd, spelling)
 	}
 	return err
@@ -79,24 +79,6 @@ func trackRemovedCommand(cmd *cobra.Command, _ []string) error {
 
 // recordRemovedCommand sends the event; a test swaps it to see what was sent.
 var recordRemovedCommand = telemetry.TrackRemovedCommand
-
-// unknownFlag reports the flag pflag has no such flag for: its name as typed
-// (a shorthand's letter alone), whether it was a shorthand, and its spelling
-// ("--force", "-f"). The spelling is "" for every other parse error: a
-// missing value, or a value of the wrong type, is a mistake on a flag we do
-// have. pflag reports the name on its own, so `--api-token=secret` arrives
-// here as `--api-token`.
-func unknownFlag(err error) (name string, isShorthand bool, spelling string) {
-	var notExist *pflag.NotExistError
-	if !errors.As(err, &notExist) {
-		return "", false, ""
-	}
-	name = notExist.GetSpecifiedName()
-	if notExist.GetSpecifiedShortnames() != "" {
-		return name, true, "-" + name
-	}
-	return name, false, "--" + name
-}
 
 // isShellCompletion reports whether the shell is asking cobra for completions.
 func isShellCompletion(args []string) bool {
@@ -147,17 +129,14 @@ func (u *unknownCommand) suggestion() string {
 	return u.suggestions[0]
 }
 
-// suggestionDistance is the edit distance cobra uses for "Did you mean this?".
-// SuggestionsFor reads it from the command, which cobra fills in only on its
-// own error path.
-const suggestionDistance = 2
-
 func suggestionsFor(parent *cobra.Command, word string) []string {
 	if parent.DisableSuggestions {
 		return nil
 	}
 	if parent.SuggestionsMinimumDistance <= 0 {
-		parent.SuggestionsMinimumDistance = suggestionDistance
+		// SuggestionsFor reads the distance from the command, which cobra
+		// fills in only on its own error path.
+		parent.SuggestionsMinimumDistance = cliout.DefaultSuggestionDistance
 	}
 	return parent.SuggestionsFor(word)
 }

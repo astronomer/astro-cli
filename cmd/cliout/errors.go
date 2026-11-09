@@ -87,11 +87,13 @@ var cobraUsagePrefixes = []string{
 
 // isMisinvoked reports whether err is a usage error found before the command
 // ran (misinvoked), including the ones cobra returns untyped, all of which it
-// finds before then.
+// finds before then. An error a command marked Usage itself is judged by its
+// mark alone, whatever its wording: astro local's refusal of a 1.x verb reads
+// "unknown command ..." too, and comes from its run.
 func isMisinvoked(err error) bool {
 	var u *usageError
-	if errors.As(err, &u) && u.beforeRun {
-		return true
+	if errors.As(err, &u) {
+		return u.beforeRun
 	}
 	return hasCobraUsagePrefix(err)
 }

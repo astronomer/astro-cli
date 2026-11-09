@@ -25,19 +25,13 @@ import (
 // By the time pflag reports a flag it has no such flag for, cobra has merged
 // the parents' persistent flags into cmd.Flags(), so they are candidates too.
 func suggestFlag(cmd *cobra.Command, err error) string {
-	var notExist *pflag.NotExistError
-	if !errors.As(err, &notExist) || notExist.GetSpecifiedShortnames() != "" {
+	typed, isShorthand, spelling := UnknownFlag(err)
+	if spelling == "" || isShorthand {
 		return ""
 	}
-	for c := cmd; c != nil; c = c.Parent() {
-		if c.DisableSuggestions {
-			return ""
-		}
-	}
-	typed := notExist.GetSpecifiedName()
-	distance := cmd.Root().SuggestionsMinimumDistance
-	if distance <= 0 {
-		distance = defaultSuggestionDistance
+	distance, ok := suggestionDistance(cmd)
+	if !ok {
+		return ""
 	}
 	distance = min(distance, max(1, utf8.RuneCountInString(typed)/2))
 
@@ -51,6 +45,24 @@ func suggestFlag(cmd *cobra.Command, err error) string {
 		return "--" + matches[0]
 	}
 	return ""
+}
+
+// UnknownFlag reports the flag pflag has no such flag for: its name as typed
+// (a shorthand's letter alone), whether it was a shorthand, and its spelling
+// ("--force", "-f"). The spelling is "" for every other parse error: a
+// missing value, or a value of the wrong type, is a mistake on a flag the
+// command does have. pflag reports the name on its own, so
+// --api-token=secret arrives here as --api-token.
+func UnknownFlag(err error) (name string, isShorthand bool, spelling string) {
+	var notExist *pflag.NotExistError
+	if !errors.As(err, &notExist) {
+		return "", false, ""
+	}
+	name = notExist.GetSpecifiedName()
+	if notExist.GetSpecifiedShortnames() != "" {
+		return name, true, "-" + name
+	}
+	return name, false, "--" + name
 }
 
 // Closest are the candidates nearest to name by cobra's rule for "Did you

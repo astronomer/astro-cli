@@ -56,14 +56,9 @@ func UnknownSubcommand(cmd *cobra.Command, arg string) error {
 // reads the distance off the command it is called on, so cmd carries the
 // root's for the call and gets its own back after.
 func suggestionsFor(cmd *cobra.Command, arg string) []string {
-	for c := cmd; c != nil; c = c.Parent() {
-		if c.DisableSuggestions {
-			return nil
-		}
-	}
-	distance := cmd.Root().SuggestionsMinimumDistance
-	if distance <= 0 {
-		distance = defaultSuggestionDistance
+	distance, ok := suggestionDistance(cmd)
+	if !ok {
+		return nil
 	}
 	own := cmd.SuggestionsMinimumDistance
 	defer func() { cmd.SuggestionsMinimumDistance = own }()
@@ -71,9 +66,27 @@ func suggestionsFor(cmd *cobra.Command, arg string) []string {
 	return cmd.SuggestionsFor(arg)
 }
 
-// defaultSuggestionDistance is cobra's, which findSuggestions applies when the
-// root sets none.
-const defaultSuggestionDistance = 2
+// suggestionDistance is how far a suggestion for something typed on cmd may
+// be, by the settings cobra's own refusal reads: not at all (ok false) when
+// cmd or a command on the way up disables suggestions, else the root's
+// SuggestionsMinimumDistance, DefaultSuggestionDistance when that is unset.
+// Subcommand and flag suggestions both read it, so they agree.
+func suggestionDistance(cmd *cobra.Command) (distance int, ok bool) {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.DisableSuggestions {
+			return 0, false
+		}
+	}
+	distance = cmd.Root().SuggestionsMinimumDistance
+	if distance <= 0 {
+		distance = DefaultSuggestionDistance
+	}
+	return distance, true
+}
+
+// DefaultSuggestionDistance is cobra's distance for "Did you mean", which
+// findSuggestions applies when the root sets none.
+const DefaultSuggestionDistance = 2
 
 // isJSON reports whether cmd's parsed --output is json.
 func isJSON(cmd *cobra.Command) bool {

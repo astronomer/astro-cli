@@ -315,7 +315,6 @@ func TestAJSONUsageErrorCarriesNoSuggestion(t *testing.T) {
 // out, and its help is still where the right invocation is.
 func TestAMisinvokedSilencedCommandStillPointsAtHelp(t *testing.T) {
 	root := testTree(nil)
-	root.SilenceUsage = true
 	leaf, _, err := root.Find([]string{"thing", "list"})
 	require.NoError(t, err)
 	leaf.SilenceUsage = true
@@ -323,6 +322,34 @@ func TestAMisinvokedSilencedCommandStillPointsAtHelp(t *testing.T) {
 	assert.Equal(t, "Error: unknown flag: --alll\nDid you mean --all?\nRun astro thing list --help for usage.\n", r.stderr)
 	r = execTree(context.Background(), root, "thing", "list", "extra")
 	assert.Equal(t, "Error: unknown command \"extra\" for \"astro thing list\"\nRun astro thing list --help for usage.\n", r.stderr)
+}
+
+// A root that silenced its usage silences the pointer for the whole tree,
+// and Execute puts the setting back after the run that forced it on.
+func TestASilencedRootPrintsTheErrorAlone(t *testing.T) {
+	root := testTree(nil)
+	root.SilenceUsage = true
+	for _, args := range [][]string{{"--bogus"}, {"thing", "list", "--alll"}, {"bogus"}} {
+		r := execTree(context.Background(), root, args...)
+		assert.Equal(t, ExitUsage, ExitCode(context.Background(), r.err))
+		assert.Equal(t, "Error: "+r.err.Error()+"\n", r.stderr, "%v", args)
+	}
+	assert.True(t, root.SilenceUsage)
+}
+
+// A usage error a silenced command returns from its run is judged by its own
+// mark, not by its wording: astro local's refusal of a 1.x verb reads like
+// cobra's unknown command, and still gets no pointer.
+func TestARunsUsageErrorIsNotTakenForCobrasByItsWording(t *testing.T) {
+	root := testTree(nil)
+	leaf, _, err := root.Find([]string{"thing", "list"})
+	require.NoError(t, err)
+	leaf.SilenceUsage = true
+	leaf.RunE = func(*cobra.Command, []string) error {
+		return Usage(errors.New(`unknown command "init" for "astro thing list". Use astro init`))
+	}
+	r := execTree(context.Background(), root, "thing", "list")
+	assert.Equal(t, "Error: unknown command \"init\" for \"astro thing list\". Use astro init\n", r.stderr)
 }
 
 // A usage error the command returns once it runs points at its help unless
