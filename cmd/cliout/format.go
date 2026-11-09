@@ -85,7 +85,7 @@ func AddOutputFlag(cmd *cobra.Command, target *Format, extras ...Format) {
 	cmd.PersistentFlags().VarP(&formatValue{target: target, extras: extras}, "output", "o", usage)
 	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		if bad := badFormat(err); bad != nil {
-			return bad.refusal()
+			return misinvoked(bad.refusal())
 		}
 		if cmd.HasParent() {
 			// A func that returns nil must not turn a flag error into
@@ -94,10 +94,7 @@ func AddOutputFlag(cmd *cobra.Command, target *Format, extras ...Format) {
 				err = e
 			}
 		}
-		if IsUsage(err) {
-			return err
-		}
-		return Usage(err)
+		return misinvoked(err)
 	})
 }
 

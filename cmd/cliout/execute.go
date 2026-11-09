@@ -55,8 +55,11 @@ func ExitCode(ctx context.Context, err error) int {
 //
 //   - a command whose --output resolves to json publishes one ErrorObject on
 //     stdout and nothing on stderr;
-//   - any other command prints cobra's "Error: ..." on stderr, and its usage
-//     unless it silenced that, exactly as cobra would;
+//   - any other command prints "Error: ..." on stderr, and for a usage error
+//     a pointer to the failing command's help, with the flag it likely meant
+//     when one is clearly close (see the text-mode branch below for when a
+//     command's SilenceUsage drops the pointer). Never the usage block
+//     itself: cobra's automatic usage is off for every command;
 //   - a command that already reported its failure — an ExitError, or an error
 //     marked JSONShown — gets nothing added in either mode.
 //
@@ -109,27 +112,38 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 		return err
 	}
 
-	// Text mode: what cobra itself would have printed, in its order. A root
+	// Text mode: "Error: ..." on stderr, in red, as Warning: is yellow
+	// (ErrorLabel); a command that set its own ErrPrefix keeps it. A root
 	// that silenced errors silences them everywhere; otherwise the failing
 	// command's own setting decides.
 	if quietErrors || (cmd != root && cmd.SilenceErrors) {
 		return err
 	}
-	if cmd.CalledAs() == "" {
-		// Find failed (an unknown command at the root): cobra prints a pointer
-		// to help instead of the usage block.
-		cmd.PrintErrln(errorPrefixFor(cmd.ErrPrefix(), cmd.ErrOrStderr()), err.Error())
-		cmd.PrintErrf("Run '%v --help' for usage.\n", cmd.CommandPath())
+	root.PrintErrln(errorPrefixFor(cmd.ErrPrefix(), root.ErrOrStderr()), err.Error())
+	// A failure that is not a usage error is the whole message: the command
+	// was invoked rightly, so its usage would only bury the error. A usage
+	// error points at the failing command's help rather than printing it, with
+	// the flag that was likely meant when one is clearly close. Only a run
+	// that exits as a usage error gets it: an interrupt ends the run with 130
+	// whatever the error says, and nothing about how it was invoked needs
+	// fixing.
+	//
+	// A root that silenced its usage silences the pointer everywhere (its
+	// setting from before the run, quietUsage, since the run forces it on).
+	// Below the root, one found before the command ran always gets it: its
+	// help is where the right invocation is, and a command that silences its
+	// usage up front (all of astro local) silenced the block, not this. One
+	// the command returned itself does unless the command silenced its usage,
+	// which is how it says its help would not settle it (a removed command's
+	// stub, a Deployment name several Deployments share).
+	silencedRun := cmd != root && cmd.SilenceUsage && !isMisinvoked(err)
+	if quietUsage || silencedRun || ExitCode(ctx, err) != ExitUsage {
 		return err
 	}
-	// "Error:" in red, as Warning: is yellow (ErrorLabel); a command that
-	// set its own ErrPrefix keeps it.
-	root.PrintErrln(errorPrefixFor(cmd.ErrPrefix(), root.ErrOrStderr()), err.Error())
-	// The root's own SilenceUsage is forced on for the run, so for the root
-	// only quietUsage, its setting from before, decides.
-	if !quietUsage && (cmd == root || !cmd.SilenceUsage) {
-		root.Println(cmd.UsageString())
+	if flag := suggestFlag(cmd, err); flag != "" {
+		root.PrintErrf("Did you mean %s?\n", flag)
 	}
+	root.PrintErrf("Run %s --help for usage.\n", cmd.CommandPath())
 	return err
 }
 
@@ -185,10 +199,7 @@ func markUsageErrors(root *cobra.Command) {
 		if e := own(c, err); e != nil {
 			err = e
 		}
-		if IsUsage(err) {
-			return err
-		}
-		return Usage(err)
+		return misinvoked(err)
 	})
 	walk(root, func(c *cobra.Command) {
 		validate := c.Args
@@ -196,7 +207,7 @@ func markUsageErrors(root *cobra.Command) {
 			return
 		}
 		c.Args = func(cmd *cobra.Command, args []string) error {
-			return Usage(validate(cmd, args))
+			return misinvoked(validate(cmd, args))
 		}
 	})
 }
