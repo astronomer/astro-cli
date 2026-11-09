@@ -159,7 +159,9 @@ There is one choke point. `cliout.Execute` installs a process-level guard for th
 
 A call site passes `input.AnsweredBy("--yes")` to name its flag, and `input.About("a workspace")` when its prompt text is a bare `> `. The guard is process-level rather than a context value because the shell platform packages ask from call chains that carry no context.
 
-A command that already refuses to ask when it has no terminal marks that refusal with `input.Required(err)`, so it keeps its own words and gains the kind. `astro deploy` with no target is one. Others are `astro local`'s confirmations without `--yes`, a link picker with no NAME, and a deployment several links make ambiguous. In text mode with no terminal, nothing else changes: other prompts still read stdin as before. `astro local`'s `[y/N]` reads a piped answer without writing the question ahead of it, then records the question and the answer as one line on stderr; with nothing piped, the refusal is all it writes.
+Ctrl-C at a question ends it at once. The first interrupt of a run cancels the run's context rather than killing the process, so a question blocked reading a line from stdin would echo `^C` and go on waiting until a second Ctrl-C or an Enter. `cliout.Execute` hands the run's context to `pkg/input` too (`input.SetInterrupt`, beside the guard), and every question `pkg/input`, `pkg/picker` and `astro local`'s `[y/N]` ask reads its line through `input.ReadLine`, which returns `input.ErrInterrupted` as soon as the context is canceled, after ending the prompt's line so the error starts on a fresh one; a question reached after the interrupt is refused before it is printed (`input.MayAsk`). The login flow's "Press Enter" handles Ctrl-C itself. The run exits 130. A password prompt reads a raw terminal and returns the same error for the Ctrl-C keypress.
+
+A command that already refuses to ask when it has no terminal marks that refusal with `input.Required(err)`, so it keeps its own words and gains the kind. `astro deploy` with no target is one. Others are `astro local`'s confirmations without `--yes`, a link picker with no NAME, and a deployment several links make ambiguous. In text mode with no terminal, other prompts still read stdin as before. `astro local`'s `[y/N]` is the one difference: with no terminal on stdin nobody would read the question, so it does not write it ahead of the answer. A piped answer is recorded with its question as one line on stderr; with nothing piped, the refusal naming `--yes` is all it writes. At a terminal it asks first, and ends the question's line before any error, Ctrl-C or input that ended. Any answer but yes is `input.ErrAborted` (kind `aborted`, exit 1).
 
 A command resolves its context before it asks: it finds the project, the Airflow or the links it acts on, and checks its flags, before the question. So a directory with no project fails as `no_project`, not with a question about a project that is not there, and the question names the concrete target (`astro local reset` names the project's path) rather than "this project".
 
@@ -170,19 +172,20 @@ A command resolves its context before it asks: it finds the project, the Airflow
 | 0 | success |
 | 1 | the command failed, including `input_required`: a question it could not ask. Not 2, because a question can come after work has started, so the "nothing ran" that 2 promises would not hold. The same refusal without a terminal has always exited 1. A script that needs to tell it from other failures reads `kind` |
 | 2 | usage error: an unknown flag or subcommand, a flag value the command does not accept (`--output yaml` included), the wrong number of arguments, a missing required flag, a group run with no subcommand under `--output json`, whether it has a RunE of its own (`cliout.GroupHelp`) or not (`cliout.Execute` answers it); in text mode it prints its help and exits 0, as before. Nothing ran |
-| 130 | interrupted (Ctrl-C or SIGTERM); the command unwound what it had started |
+| 130 | interrupted (Ctrl-C or SIGTERM); the command unwound what it had started. The first Ctrl-C at a question ends it at once (`input.ErrInterrupted`) |
 | the command's own | `astro local check`: 1 when a check failed, 2 when it could not reach a verdict (no environment, no project). `astro af runs trigger-wait`, `astro af runs wait` and `astro af tasks wait` (and their `astro local af` forms): 1 when the run failed, or for `tasks wait` when the task cannot reach the state, 2 when the wait timed out. `astro local run`: the child's status |
 
 The command-specific 2s predate the usage 2. A script that runs one of those commands tells them apart by what it published: a usage error under `--output json` is an error object with kind `usage`, while `check`, `trigger-wait`, `runs wait` and `tasks wait` publish their own result.
 
 ### Kinds
 
-`cmd/local` names the failures of its commands ([`cmd/local/problemkind.go`](../cmd/local/problemkind.go)), the root names the cloud ones ([`cmd/problemkind.go`](../cmd/problemkind.go)), and `cliout` names `usage` and `input_required`. The root composes the tables, `cmd/local`'s first, and the first match wins.
+`cmd/local` names the failures of its commands ([`cmd/local/problemkind.go`](../cmd/local/problemkind.go)), the root names the cloud ones ([`cmd/problemkind.go`](../cmd/problemkind.go)), and `cliout` names `usage`, `input_required` and `aborted`, which it tries in that order before any table. The root composes the tables, `cmd/local`'s first, and the first match wins.
 
 | kind | meaning |
 | --- | --- |
 | `usage` | the command was invoked wrongly; exit status 2 |
 | `input_required` | the command needed an answer it would have asked for, and this run could not ask: under `--output json`, or without a terminal where the command refuses to guess. The message names the question and the flag that answers it. Exit status 1 (see [Prompts](#prompts)) |
+| `aborted` | the command asked for confirmation and was answered no, so it did nothing it was asked to (`input.ErrAborted`, which a declined confirmation returns in `astro local`, the Astro commands, `astro context delete`, and the Astro Private Cloud workspace and service-account deletes: `Error: aborted`, and nothing on stdout). Exit status 1: declining is not success. Not 130, which is an interrupt. Under `--output json` no confirmation is asked, so it is a text-mode failure in practice |
 | `no_project` | no project here: no `pyproject.toml` with `[tool.astro]` |
 | `foreign_mode` | the project is running in the other mode |
 | `already_running` | the project is already running |
@@ -198,8 +201,10 @@ The command-specific 2s predate the usage 2. A script that runs one of those com
 | `not_found` | the Astro API has no such object (404) |
 | `conflict` | the Astro API refused because of the object's current state, such as one that already exists (409) |
 | `api_unavailable` | the Astro API failed on its side (5xx); try again |
+| `no_deployments` | an Astro command that needed a Deployment picked found none in the workspace, and created none in its place; create one with `astro deployment create` |
+| `no_eligible_deployment` | the Astro workspace has Deployments, but none the command can act on, such as `hibernate` and `wake-up` with no development Deployment (or with a Deployment API token scoped to one that is not for development) |
 
-The cloud kinds come from the status on the `*httputil.StatusError` that every Astro API failure is normalized into, and `unauthenticated` also from the "no context" and "not logged in" errors raised before any request. APC (Houston) failures carry no kind: its client reports them as text.
+The cloud kinds come from the status on the `*httputil.StatusError` that every Astro API failure is normalized into, and `unauthenticated` also from the "no context" and "not logged in" errors raised before any request. `no_deployments` and `no_eligible_deployment` come from the Astro Deployment selector's own error types (`deployment.NoDeploymentsError`, `deployment.NoneEligibleError`), matched by type, not by status. APC (Houston) failures carry no kind: its client reports them as text.
 
 A failure with no kind publishes no `kind` key rather than an `unknown` catch-all. A kind is added only when the CLI can recognise the failure reliably (a sentinel it wraps, a type it can assert, or a status on one), never for a failure nothing emits. Changing a kind breaks whatever reads it.
 

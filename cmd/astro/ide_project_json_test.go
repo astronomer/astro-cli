@@ -119,7 +119,7 @@ func ideTextCases() []ideCase {
 		{
 			name: "import into a directory that is not empty, declined", projects: both,
 			files: map[string]string{"README.md": "hi\n"}, answers: "n\n", args: []string{"project", "import", "-p", "proj-etl"},
-			check: then(says("Current directory is not empty.", " (y/n) "), lacks("Successfully")), wantErr: "import canceled by user", after: importedNothing,
+			check: then(says("Current directory is not empty.", " (y/n) "), lacks("Successfully")), wantErr: "aborted", after: importedNothing,
 		},
 		{
 			name: "import into a directory that is not empty --yes", projects: both, more: []ideMockOpt{opensSession(ro)},

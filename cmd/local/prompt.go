@@ -23,30 +23,42 @@ func (c *cli) confirmUnless(yes bool, question string) error {
 // confirm asks a yes/no question, defaulting to no. A run that may not ask
 // (--output json) is refused before anything is written or read, and a closed
 // or empty stdin (EOF) is an error, not a silent "no": in scripts
-// the caller must decide with --yes. Both are input_required.
+// the caller must decide with --yes. Both are input_required. Anything but
+// a yes is input.ErrAborted, and Ctrl-C ends the question at once with
+// input.ErrInterrupted.
 //
 // Without a terminal on stdin nobody is there to read the question, so it is
-// not written ahead of the answer: a script that pipes one in gets the
-// question and its answer as one line on stderr, a record of what it agreed
-// to, and a script that pipes nothing gets the refusal alone rather than a
-// question left hanging with the error run onto the end of its line.
+// not written ahead of the answer: a piped answer is recorded with its
+// question as one line on stderr, a record of what the script agreed to, and
+// with nothing piped the refusal is all stderr gets. Only a question that was
+// written has a line to end, so only then is one ended, on Ctrl-C (ReadLine)
+// or on input that ended.
 func (c *cli) confirm(question string) error {
 	if err := input.MayAsk(question, input.AnsweredBy("--yes")); err != nil {
 		return err
 	}
 	prompt := question + " [y/N] "
 	asked := c.interactive()
+	open := io.Discard // the line ReadLine ends on Ctrl-C, if one is open
 	if asked {
 		fmt.Fprint(c.d.Stderr, prompt) //nolint:errcheck // a failed write to the terminal still reads the answer
+		open = c.d.Stderr
 	}
-	line, err := input.Reader(c.d.Stdin).ReadString('\n')
+	line, err := input.ReadLine(input.Reader(c.d.Stdin), open)
+	if errors.Is(err, input.ErrInterrupted) {
+		return err
+	}
 	line = strings.TrimSpace(line)
+	switch {
+	case !asked && (err == nil || line != ""):
+		// An answer came, even an empty line (a no): record it.
+		fmt.Fprintln(c.d.Stderr, prompt+line)
+	case asked && err != nil:
+		// Input that ended left the prompt's line open: end it, so what
+		// follows starts on a fresh one.
+		fmt.Fprintln(c.d.Stderr)
+	}
 	if err != nil && line == "" {
-		if asked {
-			// The question is still open on the terminal's line (Ctrl-D);
-			// end it so the error starts on a line of its own.
-			fmt.Fprintln(c.d.Stderr)
-		}
 		if errors.Is(err, io.EOF) {
 			return input.Required(errors.New("confirmation needed but stdin is not interactive; pass --yes to proceed"))
 		}
@@ -56,13 +68,10 @@ func (c *cli) confirm(question string) error {
 		}
 		return err
 	}
-	if !asked {
-		fmt.Fprintln(c.d.Stderr, prompt+line)
-	}
 	switch strings.ToLower(line) {
 	case "y", "yes":
 		return nil
 	default:
-		return errAborted
+		return input.ErrAborted
 	}
 }

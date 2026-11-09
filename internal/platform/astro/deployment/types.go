@@ -34,7 +34,8 @@ type DeploymentList struct {
 
 // UpdateResult is what Update did. Deployment is the Deployment as the update
 // left it when Updated, and as it was otherwise: when it already had the DAG
-// deploy setting asked for, or the question before the update was declined.
+// deploy setting asked for. A declined question is input.ErrAborted, with no
+// result.
 type UpdateResult struct {
 	Deployment astrov1.Deployment
 	Updated    bool

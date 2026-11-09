@@ -334,6 +334,13 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 		return dep.Id, dep, login, nil
 	}
 
+	// A Deployment-scoped ASTRO_API_TOKEN names the one Deployment it can act
+	// on, as astro deploy reads it. The token is the current context's login,
+	// so it names nothing for a project on another host.
+	if id := deployment.TokenDeployment(); id != "" && login.current {
+		deployment.NoteTokenDeployment(os.Stderr, id)
+		return id, nil, login, nil
+	}
 	if format != cliout.FormatText || !stdinIsTerminal() {
 		return "", nil, login, input.Required(errBundleNoTarget)
 	}
@@ -346,12 +353,9 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 			return "", nil, login, fmt.Errorf("failed to find a valid workspace: %w", err)
 		}
 	}
-	picked, err := deployment.GetDeployment(ws, "", "", false, nil, login.client)
+	picked, err := deployment.GetDeployment(ws, "", "", deployment.ToChange, nil, login.client)
 	if err != nil {
 		return "", nil, login, err
-	}
-	if picked.Id == "" {
-		return "", nil, login, deployment.ErrNothingTo(ws, "", "", "")
 	}
 	return picked.Id, &picked, login, nil
 }

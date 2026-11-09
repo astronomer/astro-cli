@@ -1,12 +1,110 @@
 package local
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
+
+// confirmLines drives confirm with stdin and reports what it returned and
+// wrote to stderr, at a terminal or not.
+func confirmLines(t *testing.T, interactive bool, stdin string) (string, error) {
+	t.Helper()
+	d, _ := testDeps(t)
+	d.Stdin = strings.NewReader(stdin)
+	d.Interactive = func() bool { return interactive }
+	c := &cli{d: d}
+	err := c.confirm("Wipe it?")
+	return stderrOf(d), err
+}
+
+// Every way a confirmation ends leaves stderr with whole lines: the question
+// is written only where someone reads it, a line that was opened is ended
+// before the error, and nothing writes a blank line of its own.
+func TestConfirmLeavesWholeLines(t *testing.T) {
+	const q = "Wipe it? [y/N] "
+	for name, tc := range map[string]struct {
+		interactive bool
+		stdin       string
+		stderr      string
+		err         error // nil for a yes
+	}{
+		"terminal, yes":               {true, "y\n", q, nil},
+		"terminal, no":                {true, "n\n", q, input.ErrAborted},
+		"terminal, input ended":       {true, "", q + "\n", nil},
+		"terminal, yes then ended":    {true, "y", q + "\n", nil},
+		"piped, yes":                  {false, "y\n", q + "y\n", nil},
+		"piped, no":                   {false, "n\n", q + "n\n", input.ErrAborted},
+		"piped, yes with no newline":  {false, "y", q + "y\n", nil},
+		"piped nothing":               {false, "", "", nil},
+		"piped, an empty line (a no)": {false, "\n", q + "\n", input.ErrAborted},
+	} {
+		t.Run(name, func(t *testing.T) {
+			stderr, err := confirmLines(t, tc.interactive, tc.stdin)
+			if stderr != tc.stderr {
+				t.Errorf("stderr = %q, want %q", stderr, tc.stderr)
+			}
+			switch {
+			case tc.stdin == "":
+				if !input.IsRequired(err) || !strings.Contains(err.Error(), "pass --yes") {
+					t.Errorf("err = %v, want the refusal naming --yes", err)
+				}
+			case tc.err == nil && err != nil:
+				t.Errorf("err = %v, want a yes", err)
+			case tc.err != nil && !errors.Is(err, tc.err):
+				t.Errorf("err = %v, want %v", err, tc.err)
+			}
+		})
+	}
+}
+
+// blockingStdin is a stdin nobody answers: its read interrupts the run, as
+// Ctrl-C would while the question waits, then blocks until the test ends.
+type blockingStdin struct {
+	cancel  context.CancelFunc
+	release chan struct{}
+}
+
+func (b blockingStdin) Read([]byte) (int, error) {
+	b.cancel()
+	<-b.release
+	return 0, context.Canceled
+}
+
+// Ctrl-C ends a question at once, with ErrInterrupted, and ends its line only
+// where one was written.
+func TestConfirmInterruptedEndsOnlyAnOpenLine(t *testing.T) {
+	for name, interactive := range map[string]bool{"terminal": true, "piped": false} {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			t.Cleanup(input.SetInterrupt(ctx))
+			stdin := blockingStdin{cancel: cancel, release: make(chan struct{})}
+			t.Cleanup(func() { close(stdin.release) })
+
+			d, _ := testDeps(t)
+			d.Stdin = stdin
+			d.Stderr = &bytes.Buffer{}
+			d.Interactive = func() bool { return interactive }
+			err := (&cli{d: d}).confirm("Wipe it?")
+			if !errors.Is(err, input.ErrInterrupted) {
+				t.Fatalf("err = %v, want ErrInterrupted", err)
+			}
+			want := ""
+			if interactive {
+				want = "Wipe it? [y/N] \n"
+			}
+			if got := stderrOf(d); got != want {
+				t.Errorf("stderr = %q, want %q", got, want)
+			}
+		})
+	}
+}
 
 // A confirmation asks about a target the command has already found. Every
 // failure that needs no consent (no project here, no home for the state) comes

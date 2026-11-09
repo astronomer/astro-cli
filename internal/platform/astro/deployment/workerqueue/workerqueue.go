@@ -56,13 +56,9 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		nodePools                            []astrov1.NodePool
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, nil, astroV1Client)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, deployment.ToChange, nil, astroV1Client)
 	if err != nil {
 		return nil, err
-	}
-
-	if requestedDeployment.Id == "" {
-		return nil, errNoDeployment(ws)
 	}
 
 	getDeploymentOptions := astrov1.GetDeploymentOptionsParams{
@@ -209,15 +205,9 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	case updateAction:
 		if queueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
 			if !force {
-				i, err := input.Confirm(
-					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your Dags assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.ForStderr().Bold(name)), input.AnsweredBy("--yes"))
-				if err != nil {
+				if err := input.ConfirmOrAbort(
+					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your Dags assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.ForStderr().Bold(name)), input.AnsweredBy("--yes")); err != nil {
 					return nil, err
-				}
-
-				if !i {
-					fmt.Fprintf(out, "Canceling worker queue %s\n", action)
-					return nil, nil
 				}
 			}
 			// user requested an update and queueToCreateOrUpdate exists
@@ -508,13 +498,9 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 		hybridWorkerQueuesToKeep []astrov1.HybridWorkerQueueRequest
 	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, nil, astroV1Client)
+	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, deployment.ToChange, nil, astroV1Client)
 	if err != nil {
 		return nil, err
-	}
-
-	if requestedDeployment.Id == "" {
-		return nil, errNoDeployment(ws)
 	}
 
 	// prompt for queue name if one was not provided
@@ -542,15 +528,9 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 
 	if queueExists(existingQueues, queueToDelete, queueToDeleteHybrid) {
 		if !force {
-			i, err := input.Confirm(
-				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your Dags assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.ForStderr().Bold(queueToDelete.Name)), input.AnsweredBy("--yes"))
-			if err != nil {
+			if err := input.ConfirmOrAbort(
+				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your Dags assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.ForStderr().Bold(queueToDelete.Name)), input.AnsweredBy("--yes")); err != nil {
 				return nil, err
-			}
-
-			if !i {
-				fmt.Fprintf(out, "Canceling worker queue deletion\n")
-				return nil, nil
 			}
 		}
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {

@@ -51,7 +51,7 @@ func emitDeployment(r cliout.Renderer, d *astrov1.Deployment, text func(io.Write
 }
 
 // emitUpdated publishes an update. One that sent nothing (the DAG deploy
-// setting was already as asked, or the question was declined) has already
+// setting was already as asked) has already
 // said so in text, and prints no table; in json it publishes the Deployment
 // as it is, which is what the run left.
 func emitUpdated(r cliout.Renderer, res *deployment.UpdateResult) error {

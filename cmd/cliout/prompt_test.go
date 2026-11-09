@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -155,4 +156,78 @@ func TestInputRequiredKind(t *testing.T) {
 	assert.Equal(t, KindInputRequired, testKinds.Of(errors.Join(errBoom, refused)), "it wins over a table's row")
 	assert.Equal(t, KindUsage, testKinds.Of(Usage(refused)))
 	assert.Equal(t, ExitFailure, ExitCode(context.Background(), refused))
+}
+
+// Execute hands the run's context to the questions: the first Ctrl-C (the
+// context canceled) ends a (y/n) waiting for a line at once, and the run
+// exits 130 with the error on a line of its own.
+func TestAnInterruptEndsAQuestionAtOnce(t *testing.T) {
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	stdin := os.Stdin
+	os.Stdin = r
+	t.Cleanup(func() { os.Stdin = stdin; w.Close(); r.Close() })
+
+	root := &cobra.Command{Use: "astro"}
+	root.AddCommand(&cobra.Command{
+		Use: "delete",
+		RunE: func(*cobra.Command, []string) error {
+			return input.ConfirmOrAbort("Delete prod?", input.AnsweredBy("--yes"))
+		},
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan run, 1)
+	go func() { done <- execTree(ctx, root, "delete") }()
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case got := <-done:
+		require.ErrorIs(t, got.err, input.ErrInterrupted)
+		assert.Equal(t, ExitInterrupted, ExitCode(ctx, got.err))
+		assert.Empty(t, got.stdout)
+	case <-time.After(2 * time.Second):
+		t.Fatal("the question went on waiting after the interrupt")
+	}
+}
+
+// A command that ends declined, as every converted confirmation does, is
+// reported like any failure: in text, "Error: aborted" on stderr and nothing
+// on stdout; under --output json, the one error object, kind aborted, and
+// nothing on stderr. Exit 1 either way.
+func TestADeclinedRunFailsAborted(t *testing.T) {
+	tree := func() *cobra.Command {
+		var output Format
+		root := &cobra.Command{Use: "astro"}
+		AddOutputFlag(root, &output)
+		root.AddCommand(&cobra.Command{
+			Use:  "delete",
+			RunE: func(*cobra.Command, []string) error { return fmt.Errorf("deleting: %w", input.ErrAborted) },
+		})
+		return root
+	}
+
+	r := execTree(context.Background(), tree(), "delete")
+	assert.ErrorIs(t, r.err, input.ErrAborted)
+	assert.Equal(t, ExitFailure, ExitCode(context.Background(), r.err))
+	assert.Empty(t, r.stdout)
+	assert.Contains(t, r.stderr, "Error: deleting: aborted")
+
+	r = execTree(context.Background(), tree(), "delete", "-o", "json")
+	obj := decodeOne(t, r.stdout)
+	assert.Equal(t, KindAborted, obj.Kind)
+	assert.Equal(t, ExitFailure, obj.Code)
+	assert.Equal(t, "deleting: aborted", obj.Error)
+	assert.Empty(t, r.stderr)
+}
+
+// aborted is cliout's own kind for a confirmation answered no, found through
+// any wrap, exit 1 (not 130, an interrupt). A question that could not be asked
+// is input_required, never aborted.
+func TestAbortedKind(t *testing.T) {
+	declined := fmt.Errorf("deleting: %w", input.ErrAborted)
+	assert.Equal(t, KindAborted, testKinds.Of(declined))
+	assert.Equal(t, KindAborted, testKinds.Of(errors.Join(errBoom, input.ErrAborted)), "it wins over a table's row")
+	assert.Equal(t, ExitFailure, ExitCode(context.Background(), declined))
+	assert.Equal(t, KindInputRequired, testKinds.Of(input.Required(fmt.Errorf("asked: %w", input.ErrAborted))))
 }

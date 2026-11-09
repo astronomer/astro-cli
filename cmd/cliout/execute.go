@@ -80,6 +80,9 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	defer func() { root.SilenceErrors, root.SilenceUsage = quietErrors, quietUsage }()
 
 	defer input.SetGuard(refuseUnderJSON(root, args))()
+	// The run's first Ctrl-C cancels ctx; a question waiting for a line ends
+	// at once on it, rather than after a second Ctrl-C or an Enter.
+	defer input.SetInterrupt(ctx)()
 
 	refusedBareGroup, restoreHelp := bareGroups(root, findTarget(root, args))
 	defer restoreHelp()

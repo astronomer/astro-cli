@@ -9,11 +9,13 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // The commands that delete something for good ask first, as Astro's do: a
 // yes deletes, --yes skips the question, --output json without --yes is
-// refused before anything is read or sent, and a no changes nothing.
+// refused before anything is read or sent, and a no changes nothing and fails
+// aborted, exit 1, with nothing on stdout.
 func TestRemovalsAskFirst(t *testing.T) {
 	for _, c := range []struct {
 		name     string
@@ -76,11 +78,12 @@ func TestRemovalsAskFirst(t *testing.T) {
 			api.AssertNotCalled(t, c.method, mock.Anything)
 		})
 
-		t.Run(c.name+": a no changes nothing", func(t *testing.T) {
+		t.Run(c.name+": a no changes nothing, and fails aborted", func(t *testing.T) {
 			api := client()
 			run := runAPC(t, api, "n\n", c.args...)
-			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-			assert.Contains(t, run.stdout, "Canceling")
+			require.Equal(t, 1, run.code, "stderr:\n%s", run.stderr)
+			assert.Empty(t, run.stdout)
+			assert.ErrorIs(t, run.err, input.ErrAborted)
 			api.AssertNotCalled(t, c.method, mock.Anything)
 		})
 	}
