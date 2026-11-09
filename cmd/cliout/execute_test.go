@@ -263,8 +263,8 @@ func TestAnUnknownFlagSuggestsTheOneItIsCloseTo(t *testing.T) {
 		"a short name is held closer":        {[]string{"thing", "list", "--ws"}, ""},
 		"a short name one edit away":         {[]string{"thing", "list", "--i"}, "--id"},
 		"two edits on a short name":          {[]string{"thing", "list", "--bogs"}, ""},
-		"swapped neighbours":                 {[]string{"thing", "list", "--tgas"}, "--tags"},
-		"swapped neighbours mid-word":        {[]string{"thing", "list", "--froce"}, "--force"},
+		"swapped neighbors":                  {[]string{"thing", "list", "--tgas"}, "--tags"},
+		"swapped neighbors mid-word":         {[]string{"thing", "list", "--froce"}, "--force"},
 		"a long prefix":                      {[]string{"thing", "list", "--workspac", "x"}, "--workspace"},
 	}
 	for name, c := range cases {
@@ -357,8 +357,8 @@ func TestAMisinvokedSilencedCommandStillPointsAtHelp(t *testing.T) {
 			"Error: unknown command \"bogus\" for \"astro thing\"\nRun astro thing --help for usage.\n",
 		},
 		"unknown subcommand of a group answering with GroupHelp": {
-			[]string{"runner", "strat"},
-			"Error: unknown command \"strat\" for \"astro runner\"\n\nDid you mean this?\n\tstart\n\n" +
+			[]string{"runner", "srtat"},
+			"Error: unknown command \"srtat\" for \"astro runner\"\n\nDid you mean this?\n\tstart\n\n" +
 				"Run astro runner --help for usage.\n",
 		},
 	}

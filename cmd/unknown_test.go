@@ -108,16 +108,16 @@ func TestUnknownCommandSuggestionIsTheOneShown(t *testing.T) {
 			require.Equal(t, "dev", dev.Name())
 			own := dev.SuggestionsMinimumDistance
 
-			got := findUnknownCommand(root, []string{"dev", "strat"}).suggestion()
-			assert.Equal(t, shown(root, "dev", "strat"), got)
+			got := findUnknownCommand(root, []string{"dev", "srtat"}).suggestion()
+			assert.Equal(t, shown(root, "dev", "srtat"), got)
 			assert.Equal(t, own, dev.SuggestionsMinimumDistance, "the lookup left a distance on the command")
 		})
 	}
 
 	root := newUnknownTestTree()
-	assert.Equal(t, "start", findUnknownCommand(root, []string{"dev", "strat"}).suggestion(), "two edits, within cobra's default")
+	assert.Equal(t, "start", findUnknownCommand(root, []string{"dev", "srtat"}).suggestion(), "two edits, within cobra's default")
 	root.DisableSuggestions = true
-	assert.Empty(t, findUnknownCommand(root, []string{"dev", "strat"}).suggestion(), "the root's switch reaches a group under it")
+	assert.Empty(t, findUnknownCommand(root, []string{"dev", "srtat"}).suggestion(), "the root's switch reaches a group under it")
 }
 
 // TestFindUnknownCommandLeavesCobrasOwnCommandsAlone guards the commands cobra

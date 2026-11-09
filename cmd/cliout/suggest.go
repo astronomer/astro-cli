@@ -18,7 +18,7 @@ import (
 // suggestions, else within the root's distance by EditDistance, or the typed
 // name a prefix of the flag's. A short name is held to fewer edits than half
 // its length, so neither --ws nor --bogs (two edits from --id and --tags)
-// becomes a guess. EditDistance counts swapped neighbours as one edit, so
+// becomes a guess. EditDistance counts swapped neighbors as one edit, so
 // --froce is one from --force; subcommand suggestions keep cobra's own
 // matcher (SubcommandSuggestions), where that is two. Clearly is one flag
 // nearest: two equally close are a guess, and a wrong guess costs a second
@@ -99,7 +99,7 @@ func Closest(name string, candidates []string, distance int) []string {
 }
 
 // EditDistance is the edit distance between a and b counting an insertion,
-// a deletion, a substitution, or two neighbours swapped as one edit each
+// a deletion, a substitution, or two neighbors swapped as one edit each
 // (optimal string alignment), by character rather than byte, so an accented
 // letter is one edit, not two. A swap is the commonest typo (--froce,
 // apc.page_siez), and plain Levenshtein counts it as two.
