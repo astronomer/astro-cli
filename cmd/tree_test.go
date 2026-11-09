@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // claimant is who answers to one spelling under a parent, and how it claimed it.
@@ -115,6 +118,28 @@ func TestDeleteAnswersOnlyToRmOrDel(t *testing.T) {
 			for _, alias := range cmd.Aliases {
 				if alias != "rm" && alias != "del" {
 					t.Errorf("[%s] %s answers to %q; a %s takes only rm or del", tree.name, cmd.CommandPath(), alias, cmd.Name())
+				}
+			}
+		})
+	}
+}
+
+// TestNoCommandAnswersToAWordAnAncestorAnswersTo is the general form of the
+// hazard above: astro de de <id> ran a delete because the child answered to the
+// word its parent did, which reads as a typo repeated rather than a command. A
+// removed command's stub is exempt: it only says what replaced it
+// (astro deployment de).
+func TestNoCommandAnswersToAWordAnAncestorAnswersTo(t *testing.T) {
+	for _, tree := range rootsUnderTest(t) {
+		walkCmd(tree.root, func(cmd *cobra.Command) {
+			if cliout.IsRemovedCommand(cmd) {
+				return
+			}
+			for up := cmd.Parent(); up != nil && up != tree.root; up = up.Parent() {
+				for _, word := range spellings(cmd) {
+					if slices.Contains(spellings(up), word) {
+						t.Errorf("[%s] %s answers to %q, as %s does", tree.name, cmd.CommandPath(), word, up.CommandPath())
+					}
 				}
 			}
 		})

@@ -1,8 +1,8 @@
 package cliout
 
 import (
-	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -63,19 +63,21 @@ func RemovedCommand(use string, aliases []string, short string, run func(cmd *co
 // removed command, so a 1.x script using it fails naming cmd rather than
 // being told only that the word is unknown, and never runs cmd.
 func RemovedAlias(alias string, cmd *cobra.Command) *cobra.Command {
-	spellings := strings.Join(append([]string{cmd.Name()}, cmd.Aliases...), " or ")
-	short := "Removed in v2 — use " + spellings
+	// Both the Short and the message read cmd's aliases here, as it is built,
+	// so the stub's help and its error never disagree.
+	aliases := slices.Clone(cmd.Aliases)
+	short := "Removed in v2 — use " + strings.Join(append([]string{cmd.Name()}, aliases...), " or ")
+	var others string
+	switch len(aliases) {
+	case 0:
+	case 1:
+		others = ", or its alias " + aliases[0]
+	default:
+		others = ", or one of its aliases " + strings.Join(aliases, ", ")
+	}
 	return RemovedCommand(alias, nil, short, func(stub *cobra.Command, _ []string) error {
-		msg := fmt.Sprintf("%s was removed in Astro CLI v2: %s is no longer short for %s. Use %s",
-			stub.CommandPath(), alias, cmd.Name(), cmd.CommandPath())
-		switch len(cmd.Aliases) {
-		case 0:
-		case 1:
-			msg += ", or its alias " + cmd.Aliases[0]
-		default:
-			msg += ", or one of its aliases " + strings.Join(cmd.Aliases, ", ")
-		}
-		return Usage(errors.New(msg + "."))
+		return Usage(fmt.Errorf("%s was removed in Astro CLI v2: %s is no longer short for %s. Use %s%s.",
+			stub.CommandPath(), alias, cmd.Name(), cmd.CommandPath(), others))
 	})
 }
 
