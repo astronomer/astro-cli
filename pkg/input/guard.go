@@ -59,11 +59,17 @@ func About(what string) Option {
 	return func(e *RequiredError) { e.About = what }
 }
 
-// MayAsk returns nil when this run may ask prompt, and otherwise the
-// *RequiredError a prompt refuses with. A caller that reads its answer from a
+// MayAsk returns nil when this run may ask prompt, ErrInterrupted once the
+// run has been interrupted, and otherwise the *RequiredError a prompt refuses
+// with. A caller that reads its answer from a
 // reader of its own (a table picker, a y/N on stderr) calls it first, so it
 // refuses the same way the primitives here do.
 func MayAsk(prompt string, opts ...Option) error {
+	// A run already interrupted asks nothing more: it is ending, and a
+	// question it printed would only be left unanswered.
+	if isInterrupted() {
+		return ErrInterrupted
+	}
 	reason := refusal()
 	if reason == "" {
 		return nil

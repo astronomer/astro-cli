@@ -1,6 +1,7 @@
 package input
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"os"
@@ -8,8 +9,8 @@ import (
 )
 
 // stdinNeverAnswering makes os.Stdin a pipe nothing is ever written to, open
-// until the subtest ends, and returns its write end.
-func (s *Suite) stdinNeverAnswering() *os.File {
+// until the subtest ends.
+func (s *Suite) stdinNeverAnswering() {
 	r, w, err := os.Pipe()
 	s.Require().NoError(err)
 	saved := os.Stdin
@@ -19,7 +20,16 @@ func (s *Suite) stdinNeverAnswering() *os.File {
 		w.Close()
 		r.Close()
 	})
-	return w
+}
+
+// onceWaiting returns a channel closed when a read is blocked waiting for its
+// line, until the subtest ends.
+func (s *Suite) onceWaiting() <-chan struct{} {
+	waiting := make(chan struct{})
+	saved := waitingForALine
+	waitingForALine = func() { close(waiting) }
+	s.T().Cleanup(func() { waitingForALine = saved })
+	return waiting
 }
 
 // Canceling the run while a question waits for a line ends it at once with
@@ -34,12 +44,17 @@ func (s *Suite) TestALineQuestionEndsOnInterrupt() {
 	for name, ask := range asks {
 		s.Run(name, func() {
 			s.stdinNeverAnswering()
+			waiting := s.onceWaiting()
 			ctx, cancel := context.WithCancel(context.Background())
 			s.T().Cleanup(SetInterrupt(ctx))
 
 			got := make(chan error, 1)
 			go func() { got <- ask() }()
-			time.Sleep(50 * time.Millisecond) // blocked on the read by now
+			select {
+			case <-waiting:
+			case <-time.After(2 * time.Second):
+				s.FailNow("the question never started reading")
+			}
 			cancel()
 
 			select {
@@ -52,8 +67,8 @@ func (s *Suite) TestALineQuestionEndsOnInterrupt() {
 	}
 }
 
-// A question asked after the run was interrupted reads nothing: the answer
-// waiting on stdin is still there.
+// A question reached after the run was interrupted is refused before it is
+// asked or reads anything: the answer waiting on stdin is still there.
 func (s *Suite) TestAQuestionAfterTheInterruptReadsNothing() {
 	r, w, err := os.Pipe()
 	s.Require().NoError(err)
@@ -69,9 +84,46 @@ func (s *Suite) TestAQuestionAfterTheInterruptReadsNothing() {
 	s.T().Cleanup(SetInterrupt(ctx))
 
 	s.ErrorIs(ConfirmOrAbort("Delete it?", AnsweredBy("--yes")), ErrInterrupted)
+	s.ErrorIs(MayAsk("Delete it?"), ErrInterrupted)
+	_, err = Password("Password: ")
+	s.ErrorIs(err, ErrInterrupted)
 	left, err := io.ReadAll(r)
 	s.Require().NoError(err)
 	s.Equal("y\n", string(left), "the answer was consumed")
+}
+
+// A read that ends (a console read returns nothing on Ctrl-C on Windows)
+// while the run is being interrupted is the interrupt, not ended input.
+func (s *Suite) TestAnEndedReadDuringTheInterruptIsTheInterrupt() {
+	ctx, cancel := context.WithCancel(context.Background())
+	s.T().Cleanup(SetInterrupt(ctx))
+	saved := waitingForALine
+	waitingForALine = cancel // the run is interrupted as the read ends
+	s.T().Cleanup(func() { waitingForALine = saved })
+
+	r, w := io.Pipe()
+	s.Require().NoError(w.Close())
+	_, err := ReadLine(bufio.NewReader(r), io.Discard)
+	s.ErrorIs(err, ErrInterrupted)
+}
+
+// The shared reader an interrupted read was left reading is dropped, so a
+// question in a later run starts a reader of its own.
+func (s *Suite) TestAnInterruptedReadLetsGoOfTheSharedReader() {
+	s.stdinNeverAnswering()
+	waiting := s.onceWaiting()
+	ctx, cancel := context.WithCancel(context.Background())
+	restore := SetInterrupt(ctx)
+	r := stdin()
+
+	got := make(chan error, 1)
+	go func() { _, err := ReadLine(r, io.Discard); got <- err }()
+	<-waiting
+	cancel()
+	s.ErrorIs(<-got, ErrInterrupted)
+	restore()
+
+	s.NotSame(r, stdin(), "the next question shares the reader the old read still holds")
 }
 
 // With no run installed, or one never interrupted, a line is read as before.

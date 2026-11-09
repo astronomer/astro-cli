@@ -29,7 +29,7 @@ func ConfirmOrAbort(promptText string, opts ...Option) error {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "%s (y/n) ", promptText)
-	line, err := ReadLine(stdin())
+	line, err := ReadLine(stdin(), os.Stderr)
 	if errors.Is(err, ErrInterrupted) {
 		return err
 	}
@@ -59,7 +59,7 @@ func Text(promptText string, opts ...Option) (string, error) {
 	}
 	// A read that ends is the answer so far, as it always was; an
 	// interrupt is not an answer.
-	text, err := ReadLine(reader)
+	text, err := ReadLine(reader, os.Stderr)
 	if errors.Is(err, ErrInterrupted) {
 		return "", err
 	}
@@ -77,7 +77,7 @@ func Confirm(promptText string, opts ...Option) (bool, error) {
 	reader := stdin()
 	fmt.Fprintf(os.Stderr, "%s (y/n) ", promptText)
 
-	text, err := ReadLine(reader)
+	text, err := ReadLine(reader, os.Stderr)
 	if errors.Is(err, ErrInterrupted) {
 		return false, err
 	}

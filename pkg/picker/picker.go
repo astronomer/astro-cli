@@ -157,7 +157,7 @@ func (l *List) Choose(out io.Writer, in io.Reader) (Choice, error) {
 	for attempt := 1; ; attempt++ {
 		// A failed read ends the input: whatever it returned is the last
 		// answer there will be.
-		line, readErr := input.ReadLine(r)
+		line, readErr := input.ReadLine(r, out)
 		if errors.Is(readErr, input.ErrInterrupted) {
 			return Choice{}, readErr
 		}
