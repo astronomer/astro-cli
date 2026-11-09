@@ -13,6 +13,7 @@ import (
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrov1alpha1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -105,6 +106,19 @@ func TestDeploymentBundleDeleteCmd(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, out, "Requested deletion of bundle bundle-1")
 		mockAlpha.AssertExpectations(t)
+	})
+
+	// Answered no, nothing is deleted and the run fails aborted, with no
+	// "Canceling" on stdout.
+	t.Run("declined", func(t *testing.T) {
+		mockAlpha := setupBundleCmdMocks(t)
+		defer testUtil.MockUserInput(t, "n\n")()
+
+		out, err := execDeploymentCmd("bundle", "delete", "bundle-1", "--deployment-id", "test-id-1")
+		assert.ErrorIs(t, err, input.ErrAborted)
+		assert.NotContains(t, out, "Canceling")
+		assert.NotContains(t, out, "Requested deletion")
+		mockAlpha.AssertNotCalled(t, "DeleteBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("resolves the bundle ID from --name", func(t *testing.T) {

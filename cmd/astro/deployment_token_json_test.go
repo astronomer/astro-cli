@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"maps"
 	"net/http"
@@ -22,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -481,10 +483,10 @@ func TestDeploymentTokenText(t *testing.T) {
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out,
 					"WARNING: API Token rotation will invalidate the current token and cannot be undone.",
-					"Are you sure you want to rotate the ci-deploy API token? (y/n)",
-					"Canceling token rotation")
+					"Are you sure you want to rotate the ci-deploy API token? (y/n)")
 				assert.NotContains(t, out, tokSecret)
 			},
+			wantErr: "aborted",
 		},
 		{
 			name: "delete --yes",
@@ -520,8 +522,8 @@ func TestDeploymentTokenText(t *testing.T) {
 			args:    []string{"token", "delete", "tok-dep", d},
 			check: says(
 				"WARNING: API token deletion cannot be undone.",
-				"Are you sure you want to delete the ci-deploy API token? (y/n)",
-				"Canceling API Token deletion"),
+				"Are you sure you want to delete the ci-deploy API token? (y/n)"),
+			wantErr: "aborted",
 		},
 		{
 			// A Workspace token is not the Deployment's to delete: deleting it
@@ -547,8 +549,8 @@ func TestDeploymentTokenText(t *testing.T) {
 			answers: "n\n",
 			args:    []string{"token", "delete", "tok-ws", d},
 			check: says(
-				"Are you sure you want to remove the ws-token API token from the Deployment? (y/n)",
-				"Canceling API Token removal"),
+				"Are you sure you want to remove the ws-token API token from the Deployment? (y/n)"),
+			wantErr: "aborted",
 		},
 		{
 			name: "organization-token add",
@@ -622,6 +624,9 @@ func TestDeploymentTokenText(t *testing.T) {
 				require.Error(t, r.err)
 				assert.Equal(t, tc.wantErr, r.err.Error())
 				assert.Equal(t, cliout.ExitFailure, r.code)
+				if errors.Is(r.err, input.ErrAborted) {
+					assert.Empty(t, r.stdout, "a decline is not a result")
+				}
 			} else {
 				require.NoError(t, r.err)
 				assert.Equal(t, 0, r.code)

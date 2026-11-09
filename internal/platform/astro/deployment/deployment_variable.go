@@ -20,7 +20,7 @@ import (
 // file, not a line on stderr: the caller decides whether a partial file is
 // fatal.
 func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string, useEnvFile bool, astroV1Client astrov1.APIClient) (*DeploymentVariables, error) {
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToRead, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func VariableModify(
 	useEnvFile, makeSecret, updateVars bool,
 	astroV1Client astrov1.APIClient,
 ) (*VariableModifyResult, error) {
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToChange, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}

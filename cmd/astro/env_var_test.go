@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -130,6 +131,26 @@ func TestEnvVarDeleteRequiresYes(t *testing.T) {
 	_, err := execEnvCmd("var", "delete", "FOO", "--workspace-id", "ws-test")
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "--yes"))
+	mc.AssertExpectations(t)
+}
+
+// Asked at a terminal and answered no, a delete deletes nothing and fails
+// aborted (the client mocks no delete). The harness writes stdout and
+// stderr to one buffer: it holds the error alone, which is stderr's.
+func TestEnvVarDeleteDeclinedFailsAborted(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	defer resetEnvFlags()
+	orig := stdinIsTerminal
+	stdinIsTerminal = func() bool { return true }
+	t.Cleanup(func() { stdinIsTerminal = orig })
+	defer testUtil.MockUserInput(t, "n\n")()
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = mc
+
+	out, err := execEnvCmd("var", "delete", "FOO", "--workspace-id", "ws-test")
+	assert.ErrorIs(t, err, input.ErrAborted)
+	assert.Equal(t, "Error: aborted", strings.TrimSpace(out))
 	mc.AssertExpectations(t)
 }
 

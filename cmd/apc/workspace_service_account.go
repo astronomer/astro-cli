@@ -152,8 +152,7 @@ func workspaceSaDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	ok, err := confirmRemoval(out, serviceAccountDeleteQuestion(args[0]), serviceAccountDeleteCanceled)
-	if err != nil || !ok {
+	if err := confirmRemoval(serviceAccountDeleteQuestion(args[0])); err != nil {
 		return err
 	}
 	deleted, err := sa.DeleteUsingWorkspaceUUID(args[0], ws, houstonClient)

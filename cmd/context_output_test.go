@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	stdcontext "context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -178,6 +180,27 @@ func (s *CmdSuite) TestContextDeleteOutput() {
 		s.Equal(cliout.KindInputRequired, failure.Kind)
 		s.Contains(failure.Error, "--yes")
 		s.True(context.Exists("astronomer.io"), "nothing deleted")
+	})
+
+	// Declined, nothing is deleted and the run fails aborted, exit 1, with
+	// nothing on stdout; 1.x printed "Canceling context delete..." and
+	// exited 0. Y is a yes too.
+	s.Run("text, declining to delete the current context", func() {
+		s.savedContexts()
+		defer testUtil.MockUserInput(s.T(), "n\n")()
+		stdout, _, err := runContextCmd("delete", "astronomer.io")
+		s.ErrorIs(err, input.ErrAborted)
+		s.Equal(cliout.ExitFailure, cliout.ExitCode(stdcontext.Background(), err))
+		s.Empty(stdout)
+		s.True(context.Exists("astronomer.io"), "nothing deleted")
+	})
+
+	s.Run("text, confirming with Y", func() {
+		s.savedContexts()
+		defer testUtil.MockUserInput(s.T(), "Y\n")()
+		stdout, _, err := runContextCmd("delete", "astronomer.io")
+		s.NoError(err)
+		s.Equal("Successfully deleted context: astronomer.io\n", stdout)
 	})
 
 	s.Run("json deletes the current context with --yes", func() {

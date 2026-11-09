@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -218,9 +219,9 @@ func TestDeploymentVariableListJSON(t *testing.T) {
 		m.AssertExpectations(t)
 	})
 
-	// The platform code prints a note on bare stdout when both an id and a
-	// name are given. Under json it must not reach stdout.
-	t.Run("stray platform note goes to stderr", func(t *testing.T) {
+	// An id and a name of the same Deployment are that Deployment, with no
+	// note anywhere.
+	t.Run("an id and the name of the same Deployment", func(t *testing.T) {
 		withDeploymentVariables(t, nil)
 		m := listMocks()
 		astroV1Client = m
@@ -231,13 +232,30 @@ func TestDeploymentVariableListJSON(t *testing.T) {
 		var got variableListJSON
 		decodeOne(t, run.stdout, &got)
 		assert.Empty(t, got.Variables)
-		assert.Contains(t, run.stderr, "Both a Deployment ID and Deployment name have been supplied")
+		assert.Empty(t, run.stderr)
+		m.AssertExpectations(t)
+	})
+
+	// An id and a name of two different Deployments are a usage error: 1.x
+	// went on with the id after a note on stdout.
+	t.Run("an id and the name of another Deployment", func(t *testing.T) {
+		m := new(astrov1_mocks.ClientWithResponsesInterface)
+		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		astroV1Client = m
+
+		run := runVariableCmd(t, "variable", "list", "--deployment-id", "test-id-1", "--deployment-name", "test-2", "-o", "json")
+
+		assert.Equal(t, cliout.ExitUsage, run.code)
+		var got errorJSON
+		decodeOne(t, run.stdout, &got)
+		assert.Equal(t, "usage", got.Kind)
+		assert.Contains(t, got.Error, `the Deployment id test-id-1 and the name "test-2" name different Deployments`)
+		assert.Empty(t, run.stderr)
 		m.AssertExpectations(t)
 	})
 }
 
-// In text mode the same note stays on stdout, where it has always been, ahead
-// of the table, and a secret shows masked.
+// In text mode the table is all of stdout, and a secret shows masked.
 func TestDeploymentVariableListTextUnchanged(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	withDeploymentVariables(t, twoVariables())
@@ -247,9 +265,7 @@ func TestDeploymentVariableListTextUnchanged(t *testing.T) {
 	run := runVariableCmd(t, "variable", "list", "--deployment-id", "test-id-1", "--deployment-name", "test")
 
 	assert.Equal(t, 0, run.code)
-	assert.True(t, strings.HasPrefix(run.stdout,
-		"Both a Deployment ID and Deployment name have been supplied. The Deployment ID test-id-1 will be used\n"),
-		"the note heads stdout:\n%s", run.stdout)
+	assert.True(t, strings.HasPrefix(run.stdout, " #"), "the table heads stdout:\n%s", run.stdout)
 	requireRow(t, run.stdout, "#", "KEY", "VALUE", "SECRET")
 	requireRow(t, run.stdout, "1", "test-key-1", "test-value-1", "false")
 	requireRow(t, run.stdout, "2", "SECRET_KEY", maskedSecret, "true")
@@ -316,6 +332,25 @@ func TestDeploymentVariableCreateJSON(t *testing.T) {
 		assert.Equal(t, []outcomeJSON{{Kind: "created", Key: "NEW"}}, got.Outcomes)
 		assert.Equal(t, twoVariablesJSON(), got.Variables)
 		assert.Empty(t, run.stderr)
+		m.AssertExpectations(t)
+	})
+
+	// Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, the
+	// variable goes on that Deployment, said on stderr.
+	t.Run("naming nothing takes the token's Deployment", func(t *testing.T) {
+		deployment.UseTokenDeployment("test-id-1")
+		t.Cleanup(func() { deployment.UseTokenDeployment("") })
+		withDeploymentVariables(t, twoVariables())
+		m := modifyMocks()
+		astroV1Client = m
+
+		run := runVariableCmd(t, "variable", "create", "NEW=value", "-o", "json")
+
+		assert.Equal(t, 0, run.code)
+		var got variableModifyJSON
+		decodeOne(t, run.stdout, &got)
+		assert.Equal(t, []outcomeJSON{{Kind: "created", Key: "NEW"}}, got.Outcomes)
+		assert.Contains(t, run.stderr, "test-id-1), the one ASTRO_API_TOKEN is scoped to")
 		m.AssertExpectations(t)
 	})
 

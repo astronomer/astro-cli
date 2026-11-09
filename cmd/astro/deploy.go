@@ -6,6 +6,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -292,12 +293,19 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		warnings = append(warnings, msg)
 		recap.Warn(msg)
 	}
-	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, manifestDeployment)
+	// The token is the current context's login: a project on another host is
+	// deployed under that host's, which names no Deployment.
+	tokenID := ""
+	if login.current {
+		tokenID = deployment.TokenDeployment()
+	}
+	target := targetOrTokenDeployment(errOut, m, linkName, manifestDeployment, tokenID)
+	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, target)
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
 		ProjectDir:       config.WorkingPath,
 		Manifest:         m,
 		LinkName:         linkName,
-		Deployment:       manifestDeployment,
+		Deployment:       target,
 		WorkspaceID:      overrideWorkspace,
 		ContextWorkspace: login.context.Workspace,
 		DagsOnly:         dags,
@@ -400,6 +408,31 @@ func announceDeployTarget(w io.Writer, target manifestdeploy.Target) {
 		return
 	}
 	fmt.Fprintf(w, "→ %s (astro deployment %s)\n", target.LinkName, target.DeploymentID)
+}
+
+// targetOrTokenDeployment is --deployment, or, for a deploy that names no
+// target, the Deployment the run's ASTRO_API_TOKEN is scoped to, named as the
+// command line would name it: the one Deployment such a token can ship to, as
+// 1.x deployed to it in CI. In a project that links Deployments it is taken
+// only when one of the project's Astro links points at it, and by that link's
+// name, so the deploy reads the link as it would a named one; a project that
+// links others is left to ask or refuse, never shipped to a Deployment it does
+// not link. Taking it says so on w, never on stdout.
+func targetOrTokenDeployment(w io.Writer, m *manifest.Manifest, linkName, flag, id string) string {
+	if linkName != "" || flag != "" || id == "" {
+		return flag
+	}
+	if m != nil && len(m.Astro.Deployments) > 0 {
+		for _, name := range slices.Sorted(maps.Keys(m.Astro.Deployments)) {
+			if l := m.Astro.Deployments[name]; l.Kind() == manifest.KindAstro && l.Deployment == id {
+				deployment.NoteTokenDeployment(w, name+" ("+id+")")
+				return name
+			}
+		}
+		return ""
+	}
+	deployment.NoteTokenDeployment(w, id)
+	return id
 }
 
 // noteIgnoredDeploymentEnv says, before the prompt, that an exported
@@ -568,9 +601,10 @@ func deployTargetName(res *manifestdeploy.Result) string {
 // text mode (cliout.Execute, as for every command).
 func manifestDeployErr(cmd *cobra.Command, err error) error {
 	if goerrors.Is(err, manifestdeploy.ErrAborted) {
-		// The user was asked and said no. Reading their own answer back at them
-		// as "Error: no deployment selected" adds nothing; the exit code carries
-		// the whole message. Only an interactive run can reach here, which is
+		// The prompt ended with no deployment picked, and the picker has
+		// said why ("Not one of the choices." after each answer). Adding
+		// "Error: no deployment selected" says nothing more; the exit code
+		// carries the rest. Only an interactive run can reach here, which is
 		// text mode, so this never eats the object json mode promises.
 		cmd.SilenceErrors = true
 	}
@@ -681,13 +715,14 @@ func (d manifestDeployer) ListDeployments(workspaceID string) ([]manifestdeploy.
 // workspace's Deployments. A var so a test can shorten it.
 var listDeploymentsTimeout = 15 * time.Second
 
-// ResolveUnlinked runs the workspace-level pick/create flow and returns the
-// chosen Deployment.
+// ResolveUnlinked asks which of the workspace's Deployments to ship to and
+// returns the one picked. A workspace with none is an error naming astro
+// deployment create: a deploy never creates its target.
 func (d manifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeploy.Deployment, error) {
 	if !d.login.current {
 		return manifestdeploy.Deployment{}, errPickerOtherHost(d.login.context.Domain)
 	}
-	dep, err := deployment.GetDeployment(workspaceID, "", "", false, nil, d.login.client)
+	dep, err := deployment.GetDeployment(workspaceID, "", "", deployment.ToChange, nil, d.login.client)
 	if err != nil {
 		return manifestdeploy.Deployment{}, err
 	}

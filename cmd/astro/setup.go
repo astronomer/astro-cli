@@ -542,6 +542,7 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 	// Read as every reader of the variable reads it: one holding only the
 	// scheme ("Bearer ") is no token, and one holding the scheme too is the
 	// token after it, so the login below does not carry it twice.
+	deployment.UseTokenDeployment("")
 	stored, ok := astrosession.APIToken()
 	if !ok {
 		return false, nil
@@ -575,9 +576,10 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 
 	var wsID, orgID string
 	for _, permission := range claims.Permissions {
-		splitPermission := strings.Split(permission, ":")
-		permissionType := splitPermission[0]
-		id := splitPermission[1]
+		permissionType, id, ok := strings.Cut(permission, ":")
+		if !ok {
+			continue
+		}
 		switch permissionType {
 		case "workspaceId":
 			wsID = id
@@ -596,7 +598,29 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 	}
 
 	useEnvironmentSelection(&c, orgID, orgProduct, wsID)
+	// A Deployment-scoped token can act on one Deployment, so a run that names
+	// none acts on it. For this process only, like the selection above, and
+	// only once the login is set up.
+	deployment.UseTokenDeployment(tokenDeploymentID(claims.Permissions))
 	return true, nil
+}
+
+// tokenDeploymentID is the Deployment an API token's permissions scope it to:
+// the id of its one deploymentId permission, or "" for a token with none, or
+// with several, which is not scoped to one Deployment.
+func tokenDeploymentID(permissions []string) string {
+	id := ""
+	for _, permission := range permissions {
+		v, ok := strings.CutPrefix(permission, "deploymentId:")
+		if !ok {
+			continue
+		}
+		if id != "" || v == "" {
+			return ""
+		}
+		id = v
+	}
+	return id
 }
 
 // environmentDomain returns the domain a credential from the environment is

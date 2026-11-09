@@ -579,7 +579,7 @@ func (s *Suite) TestDelete() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "n")()
 		got, err := Delete(team1.Id, false, mockClient)
-		s.NoError(err)
+		s.ErrorIs(err, input.ErrAborted)
 		s.Nil(got, "declined, so nothing to report")
 	})
 
@@ -599,7 +599,7 @@ func (s *Suite) TestDelete() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "n")()
 		got, err := Delete(team2.Id, false, mockClient)
-		s.NoError(err)
+		s.ErrorIs(err, input.ErrAborted)
 		s.Nil(got, "declined, so nothing to report")
 	})
 
@@ -794,7 +794,7 @@ func (s *Suite) TestUpdate() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "n")()
 		got, err := UpdateTeam(team2.Id, "name", "description", "", false, mockClient)
-		s.NoError(err)
+		s.ErrorIs(err, input.ErrAborted)
 		s.Nil(got, "declined, so nothing to report")
 	})
 
@@ -990,7 +990,7 @@ func (s *Suite) TestAddUser() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "n")()
 		got, err := AddUser(team2.Id, user1.Id, false, mockClient)
-		s.NoError(err)
+		s.ErrorIs(err, input.ErrAborted)
 		s.Nil(got, "declined, so nothing to report")
 	})
 
@@ -1189,7 +1189,7 @@ func (s *Suite) TestRemoveUser() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "n")()
 		got, err := RemoveUser(team2.Id, user1.Id, false, mockClient)
-		s.NoError(err)
+		s.ErrorIs(err, input.ErrAborted)
 		s.Nil(got, "declined, so nothing to report")
 	})
 

@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // What `astro deployment create`, `update`, `delete`, `hibernate` and
@@ -209,7 +211,8 @@ func TestDeploymentCoreText(t *testing.T) {
 			},
 			answers: "n\n",
 			args:    []string{"update", coreDeploymentID, "--executor", "KubernetesExecutor"},
-			check:   says("Are you sure you want to update the", "etl-prod", "Deployment?", "Canceling Deployment update"),
+			check:   says("Are you sure you want to update the", "etl-prod", "Deployment?"),
+			wantErr: "aborted",
 		},
 		{
 			name: "delete --yes",
@@ -228,16 +231,18 @@ func TestDeploymentCoreText(t *testing.T) {
 				expectDelete(m)
 				return m
 			},
-			answers: "y\n",
+			answers: "etl-prod\n",
 			args:    []string{"delete", coreDeploymentID},
-			check:   says("Are you sure you want to delete the", "etl-prod", "Deployment?", "Successfully deleted deployment ", "etl-prod"),
+			check:   says(`To confirm, type the Deployment name "etl-prod"`, "Successfully deleted deployment ", "etl-prod"),
 		},
 		{
-			name:    "delete, declined",
+			// A y, as 1.x asked for, is not the name: nothing is deleted,
+			// and the run fails rather than exiting 0.
+			name:    "delete, not confirmed",
 			client:  func(t *testing.T) astrov1.APIClient { return coreMock(t, coreDeployment()) },
-			answers: "n\n",
+			answers: "y\n",
 			args:    []string{"delete", coreDeploymentID},
-			check:   says("Are you sure you want to delete the", "etl-prod", "Canceling deployment deletion"),
+			wantErr: `the name typed does not match the Deployment's name ("etl-prod"): the Deployment was not deleted`,
 		},
 		{
 			name: "hibernate --yes, until further notice",
@@ -277,7 +282,8 @@ func TestDeploymentCoreText(t *testing.T) {
 			client:  func(t *testing.T) astrov1.APIClient { return coreMock(t, devDeployment()) },
 			answers: "n\n",
 			args:    []string{"wake-up", coreDeploymentID},
-			check:   says("Are you sure you want to override to", "wake up", "etl-dev", "Canceling wake up override"),
+			check:   says("Are you sure you want to override to", "wake up", "etl-dev"),
+			wantErr: "aborted",
 		},
 		{
 			name: "hibernate --remove-override --yes",
@@ -294,7 +300,8 @@ func TestDeploymentCoreText(t *testing.T) {
 			client:  func(t *testing.T) astrov1.APIClient { return coreMock(t, devDeployment()) },
 			answers: "n\n",
 			args:    []string{"wake-up", coreDeploymentID, "--remove-override"},
-			check:   says("Are you sure you want to remove the hibernation override", "etl-dev", "Canceling hibernation override removal"),
+			check:   says("Are you sure you want to remove the hibernation override", "etl-dev"),
+			wantErr: "aborted",
 		},
 		{
 			name:    "hibernate a Deployment that is not for development",
@@ -310,6 +317,14 @@ func TestDeploymentCoreText(t *testing.T) {
 			if tc.wantErr != "" {
 				assert.Equal(t, 1, run.code)
 				assert.ErrorContains(t, run.err, tc.wantErr)
+				if errors.Is(run.err, input.ErrAborted) {
+					// A decline asked its question, and wrote nothing to
+					// stdout: it is not a result.
+					if tc.check != nil {
+						tc.check(t, run.asked)
+					}
+					assert.Empty(t, run.stdout)
+				}
 				return
 			}
 			require.NoError(t, run.err, "stdout:\n%s", run.stdout)
@@ -396,6 +411,28 @@ func TestDeploymentCoreJSON(t *testing.T) {
 		decodeOne(t, r.stdout, &got)
 		assert.Equal(t, coreDeploymentID, got.Deployment.Metadata.DeploymentID)
 		assert.Equal(t, "etl-prod-2", got.Deployment.Configuration.Name)
+		m.AssertExpectations(t)
+	})
+
+	// Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, the
+	// update is to that Deployment, said on stderr; stdout is the result.
+	t.Run("an update naming nothing takes the token's Deployment", func(t *testing.T) {
+		deployment.UseTokenDeployment(coreDeploymentID)
+		t.Cleanup(func() { deployment.UseTokenDeployment("") })
+		updated := coreDeployment()
+		updated.Name = "etl-prod-2"
+		m := new(astrov1_mocks.ClientWithResponsesInterface)
+		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(listDeploymentsResp(coreDeployment()), nil).Once()
+		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, coreDeploymentID).Return(getDeploymentResp(coreDeployment()), nil).Once()
+		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, coreDeploymentID).Return(getDeploymentResp(updated), nil).Once()
+		m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
+		expectUpdate(m, updated)
+		r := execDeploymentRun(t, m, "", "update", "--name", "etl-prod-2", "-o", "json")
+		require.NoError(t, r.err)
+		var got formattedJSON
+		decodeOne(t, r.stdout, &got)
+		assert.Equal(t, coreDeploymentID, got.Deployment.Metadata.DeploymentID)
+		assert.Contains(t, r.asked, coreDeploymentID+"), the one ASTRO_API_TOKEN is scoped to")
 		m.AssertExpectations(t)
 	})
 
@@ -553,28 +590,38 @@ func TestDeploymentCoreJSONNeverAsks(t *testing.T) {
 
 // Asked to act on a Deployment in a Workspace that has none, each of these
 // used to print that there were none and exit 0, having done nothing. Now it
-// fails, exit 1, in both formats: a Deployment named by id or name is not
-// found, as it is not in a Workspace that has others, and with none named
-// there is nothing to act on.
+// fails in both formats, and nothing is created in its place: a Deployment
+// named by id or name is not found, as it is not in a Workspace that has
+// others (a name that names none is a usage error there too), and with none
+// named there is nothing to act on. A delete naming none with nobody to ask
+// is refused before it looks: --yes never chooses what to delete.
 func TestDeploymentCoreNothingToActOnFails(t *testing.T) {
+	const noneHere = "no Deployments found in workspace ws-empty: create one with astro deployment create"
 	cases := []struct {
 		name string
 		args []string
 		want string
+		code int
 	}{
-		{"delete, naming none", []string{"delete", "--yes"}, "no Deployments found in workspace ws-empty to delete"},
-		{"delete, naming one", []string{"delete", coreDeploymentID, "--yes"}, "the Deployment specified was not found in this workspace"},
-		{"hibernate, naming none", []string{"hibernate", "--yes"}, "no Deployments found in workspace ws-empty to hibernate"},
-		{"wake-up, naming one by name", []string{"wake-up", "--deployment-name", "etl-dev", "--yes"}, "the Deployment specified was not found in this workspace"},
-		{"--remove-override, naming none", []string{"wake-up", "--remove-override", "--yes"}, "no Deployments with a hibernation override that can be removed found in Workspace ws-empty"},
+		{"delete, naming none", []string{"delete", "--yes"}, "pass --deployment", cliout.ExitFailure},
+		{"delete, naming one", []string{"delete", coreDeploymentID, "--yes"}, "the Deployment specified was not found in this workspace", cliout.ExitFailure},
+		{"hibernate, naming none", []string{"hibernate", "--yes"}, noneHere, cliout.ExitFailure},
+		{"wake-up, naming one by name", []string{"wake-up", "--deployment-name", "etl-dev", "--yes"}, `no Deployment named "etl-dev" in workspace ws-empty`, cliout.ExitUsage},
+		{"--remove-override, naming none", []string{"wake-up", "--remove-override", "--yes"}, noneHere, cliout.ExitFailure},
 	}
 	for _, tc := range cases {
 		for _, format := range []string{"text", "json"} {
 			t.Run(tc.name+" "+format, func(t *testing.T) {
 				r := execDeploymentRun(t, coreMock(t), "", append(tc.args, "--workspace-id", "ws-empty", "-o", format)...)
-				assert.Equal(t, cliout.ExitFailure, r.code)
+				assert.Equal(t, tc.code, r.code)
 				require.Error(t, r.err)
 				assert.Contains(t, r.err.Error(), tc.want)
+				if tc.want == noneHere {
+					// Reaches the root as the type the no_deployments kind
+					// matches, not flattened to its text.
+					var none *deployment.NoDeploymentsError
+					assert.ErrorAs(t, r.err, &none)
+				}
 				if format == "json" {
 					var got errorJSON
 					decodeOne(t, r.stdout, &got)
