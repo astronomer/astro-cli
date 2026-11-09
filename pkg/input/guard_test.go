@@ -113,6 +113,11 @@ func (s *Suite) TestRequiredErrorMessage() {
 			"this command needs to ask for an answer; with --output json it cannot — pass the answer as a flag",
 		},
 		{
+			"a styled prompt is quoted as plain text, on one line",
+			MayAsk("\nAre you sure you want to delete the \x1b[1mprod\x1b[0m Deployment?", AnsweredBy("--yes")),
+			`this command needs to ask "Are you sure you want to delete the prod Deployment?"; with --output json it cannot — pass --yes`,
+		},
+		{
 			"trailing prompt punctuation is dropped",
 			MayAsk("Enter a name for the new token: "),
 			`this command needs to ask "Enter a name for the new token"; with --output json it cannot — pass the answer as a flag`,

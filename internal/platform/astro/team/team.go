@@ -509,9 +509,10 @@ func AddWorkspaceTeam(id, role, workspaceID string, client astrov1.APIClient) (T
 
 // pickFailed is the error of a team picker that returned err, or no team:
 // ErrInvalidTeamKey, as it has always been, unless the picker refused to ask
-// (under --output json), whose refusal names what answers it.
+// (under --output json), whose refusal names what answers it, or the run was
+// interrupted at it, which is the interrupt, not an invalid team.
 func pickFailed(err error) error {
-	if input.IsRequired(err) {
+	if input.IsRequired(err) || errors.Is(err, input.ErrInterrupted) {
 		return err
 	}
 	return ErrInvalidTeamKey

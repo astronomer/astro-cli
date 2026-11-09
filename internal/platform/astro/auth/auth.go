@@ -629,8 +629,12 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 	// neither, so it is refused before anything is printed.
 	if token == "" {
 		var refused *input.RequiredError
-		if errors.As(input.MayAsk("Log in to Astro"), &refused) {
+		switch err := input.MayAsk("Log in to Astro"); {
+		case errors.As(err, &refused):
 			return fmt.Errorf("%w; %s — run astro login first, or set ASTRO_API_TOKEN", ErrLoginNeeded, refused.Reason)
+		case errors.Is(err, input.ErrInterrupted):
+			// An interrupted run starts no login: it is ending.
+			return err
 		}
 	}
 

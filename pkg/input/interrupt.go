@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"runtime"
 	"sync/atomic"
+	"time"
 )
 
 // runDone is the done channel of the run questions are asked in, or nil.
@@ -68,10 +70,12 @@ var waitingForALine = func() {}
 // wait for it. When the interrupt wins, that goroutine stays blocked on stdin
 // until a line comes or the process exits. It cannot take an answer meant for
 // a later question of the run: the run is ending, and every question after
-// the interrupt is refused before it reads (MayAsk). The process-wide reader
-// it holds is also dropped (forget), so a question in a later run in the same
-// process (an embedder, a test) starts a reader of its own rather than share
-// one another goroutine is reading.
+// the interrupt is refused before it reads (MayAsk). The binary exits right
+// after. In a process that goes on to another run (an embedder, a test), the
+// process-wide bufio.Reader it holds is dropped (forget), so the next question
+// does not share a bufio.Reader with it; but the goroutine still reads the
+// same file, and the next line typed goes to whichever read gets it first.
+// Nothing short of closing stdin stops a blocked read portably.
 func ReadLine(r *bufio.Reader, w io.Writer) (string, error) {
 	done := interrupted()
 	if done == nil {
@@ -92,16 +96,52 @@ func ReadLine(r *bufio.Reader, w io.Writer) (string, error) {
 	waitingForALine()
 	select {
 	case g := <-got:
-		// A Ctrl-C can end the read too (a console read returns nothing
-		// on Windows) while the signal is still canceling the run. An
-		// ended read the run was interrupted during is the interrupt.
-		if g.err != nil && isInterrupted() {
+		if g.err != nil && interruptedWithin(done, endedReadGrace) {
 			return "", endLine(w)
 		}
 		return g.line, g.err
 	case <-done:
 		forget(r)
 		return "", endLine(w)
+	}
+}
+
+// endedReadGrace is how long a read that ended in an error waits for the
+// interrupt that may have ended it, before it is taken as ended input.
+//
+// On Windows a console read that gets Ctrl-C returns no bytes, which Go
+// reports as io.EOF, and the signal cancels the run separately, from the
+// runtime's console control handler thread, usually just after the read has
+// returned. Read as it arrives, that EOF is "stdin ended" (pass --yes) or a
+// no, not the interrupt it is. The wait covers that gap. On Unix a terminal
+// turns Ctrl-C into the signal alone and the read goes on waiting, so an
+// ended read there is ended input, read at once: a script whose stdin is
+// /dev/null is not slowed.
+var endedReadGrace = func() time.Duration {
+	if runtime.GOOS == "windows" {
+		return windowsConsoleInterruptGap
+	}
+	return 0
+}()
+
+// windowsConsoleInterruptGap bounds the gap between a console read ending on
+// Ctrl-C and the signal reaching the run: the console control handler runs on
+// a thread of its own, and is scheduled within a few milliseconds; 100ms is
+// well past that and still too short for a person to notice.
+const windowsConsoleInterruptGap = 100 * time.Millisecond
+
+// interruptedWithin reports whether done is closed now or within wait.
+func interruptedWithin(done <-chan struct{}, wait time.Duration) bool {
+	if wait <= 0 {
+		return isInterrupted()
+	}
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	select {
+	case <-done:
+		return true
+	case <-t.C:
+		return false
 	}
 }
 

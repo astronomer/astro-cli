@@ -1,6 +1,9 @@
 package input
 
-import "os"
+import (
+	"io"
+	"os"
+)
 
 // stdinHolding makes os.Stdin a pipe holding answer, then closed, until the
 // subtest ends.
@@ -36,7 +39,16 @@ func (s *Suite) TestConfirmOrAbort() {
 
 	s.Run("ended input", func() {
 		s.stdinHolding("")
+		r, w, err := os.Pipe()
+		s.Require().NoError(err)
+		stderr := os.Stderr
+		os.Stderr = w
 		got := ConfirmOrAbort("Delete it?", AnsweredBy("--yes"))
+		os.Stderr = stderr
+		s.Require().NoError(w.Close())
+		asked, err := io.ReadAll(r)
+		s.Require().NoError(err)
+		s.Equal("Delete it? (y/n) \n", string(asked), "the prompt's line is ended before the error")
 		s.True(IsRequired(got), "%v", got)
 		s.NotErrorIs(got, ErrAborted)
 		s.Contains(got.Error(), "pass --yes")

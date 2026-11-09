@@ -68,9 +68,10 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 	if password == "" {
 		var err error
 		password, err = input.Password(inputPassword)
-		// Only a refusal stops here; a read that fails falls through to the
-		// empty answer, as it always has.
-		if input.IsRequired(err) {
+		// A refusal and an interrupt (Ctrl-C at the raw prompt, or the run
+		// canceled) stop here; a read that ends falls through to the empty
+		// answer, as it always has.
+		if input.IsRequired(err) || errors.Is(err, input.ErrInterrupted) {
 			return "", err
 		}
 	}

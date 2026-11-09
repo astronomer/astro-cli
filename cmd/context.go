@@ -247,7 +247,7 @@ func newContextDeleteCmd() *cobra.Command {
 			cmd.SilenceUsage = true
 			out := cmd.OutOrStdout()
 			removal, err := context.Delete(domainutil.ExpandShortName(args[0]), noPrompt, cliout.NotesTo(cmd, output, out))
-			if err != nil || removal == nil {
+			if err != nil {
 				return err
 			}
 			return cliout.Renderer{Format: output, Out: out}.Emit(removal, cliout.Text(func(b *bufio.Writer) {

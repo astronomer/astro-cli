@@ -18,7 +18,6 @@ var (
 	// CloudDomainRegex is used to differentiate cloud domain from software domain
 	CloudDomainRegex     = regexp.MustCompile(`(?:https:\/\/|^)(?:(pr\d{4,6})\.|)(?:cloud\.|)astronomer(?:-(dev|stage|perf))?\.io(?:\/|)$`)
 	contextDeleteWarnMsg = "Are you sure you want to delete currently used context: %s"
-	cancelCtxDeleteMsg   = "Canceling context delete..."
 )
 
 // ContextExists checks to see if context exist in config
@@ -164,18 +163,13 @@ func SwitchTo(domain string) (Info, error) {
 }
 
 // Delete removes the saved context for domain. Deleting the current one asks
-// first, unless noPrompt; a declined delete returns no removal. What it says
+// first, unless noPrompt; a declined delete is input.ErrAborted. What it says
 // along the way goes to out.
 func Delete(domain string, noPrompt bool, out io.Writer) (*Removal, error) {
 	currentCtx, _ := GetCurrentContext() //nolint:errcheck // error deliberately ignored in this shell code
 	if currentCtx.Domain != "" && currentCtx.Domain == domain && !noPrompt {
-		i, err := input.Confirm(fmt.Sprintf(contextDeleteWarnMsg, domain), input.AnsweredBy("--yes"))
-		if err != nil {
+		if err := input.ConfirmOrAbort(fmt.Sprintf(contextDeleteWarnMsg, domain), input.AnsweredBy("--yes")); err != nil {
 			return nil, err
-		}
-		if !i {
-			fmt.Fprintln(out, cancelCtxDeleteMsg)
-			return nil, nil
 		}
 	}
 

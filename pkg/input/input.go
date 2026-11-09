@@ -35,6 +35,8 @@ func ConfirmOrAbort(promptText string, opts ...Option) error {
 	}
 	answer := strings.ToLower(strings.TrimSpace(line))
 	if err != nil && answer == "" {
+		// End the prompt's line, so the error starts on a fresh one.
+		fmt.Fprintln(os.Stderr)
 		e := &RequiredError{Prompt: promptText, Reason: "stdin ended before an answer"}
 		for _, o := range opts {
 			o(e)

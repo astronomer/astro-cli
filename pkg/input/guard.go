@@ -103,11 +103,11 @@ func (e *RequiredError) Error() string {
 		return e.err.Error()
 	}
 	asked := "for an answer"
-	switch prompt := strings.TrimRight(strings.TrimSpace(e.Prompt), ": >"); {
+	switch prompt := strings.TrimRight(plain(e.Prompt), ": >"); {
 	case e.About != "":
 		asked = "for " + e.About
 	case prompt != "":
-		asked = fmt.Sprintf("%q", prompt)
+		asked = "\"" + prompt + "\""
 	}
 	answer := "pass the answer as a flag"
 	if e.Flag != "" {

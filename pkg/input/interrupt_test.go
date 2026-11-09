@@ -107,8 +107,36 @@ func (s *Suite) TestAnEndedReadDuringTheInterruptIsTheInterrupt() {
 	s.ErrorIs(err, ErrInterrupted)
 }
 
-// The shared reader an interrupted read was left reading is dropped, so a
-// question in a later run starts a reader of its own.
+// The Windows ordering: the console read returns EOF for the Ctrl-C first,
+// and the signal cancels the run a moment later. Within endedReadGrace that
+// EOF is the interrupt; with no grace (Unix), it is ended input, at once.
+func (s *Suite) TestAnEOFJustBeforeTheInterruptIsTheInterrupt() {
+	saved := endedReadGrace
+	s.T().Cleanup(func() { endedReadGrace = saved })
+
+	read := func() error {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer SetInterrupt(ctx)()
+		defer cancel()
+		r, w := io.Pipe()
+		s.Require().NoError(w.Close()) // the read ends with io.EOF at once
+		go func() {
+			time.Sleep(20 * time.Millisecond)
+			cancel()
+		}()
+		_, err := ReadLine(bufio.NewReader(r), io.Discard)
+		return err
+	}
+
+	endedReadGrace = time.Second
+	s.ErrorIs(read(), ErrInterrupted)
+
+	endedReadGrace = 0
+	s.ErrorIs(read(), io.EOF)
+}
+
+// The bufio.Reader an interrupted read was left reading is dropped, so a
+// question in a later run does not share it.
 func (s *Suite) TestAnInterruptedReadLetsGoOfTheSharedReader() {
 	s.stdinNeverAnswering()
 	waiting := s.onceWaiting()
