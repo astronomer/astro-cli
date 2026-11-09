@@ -117,15 +117,10 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 		return err
 	}
 	if !forceRotate {
-		ok, err := confirmTokenChange(
+		if err := confirmTokenChange(
 			"API Token rotation will invalidate the current token and cannot be undone.",
-			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
-		if err != nil {
+			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name))); err != nil {
 			return err
-		}
-		if !ok {
-			fmt.Fprintln(out, "Canceling token rotation")
-			return nil
 		}
 	}
 	rotated, err := workspacetoken.RotateToken(token, ws, astroV1Client)
@@ -153,19 +148,13 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 	isWS := string(token.Scope) == string(workspacetoken.TokenTypeWORKSPACE)
 	if !forceDelete {
-		warning, question, canceled := "", fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Workspace?", ansi.Bold(token.Name)), "Canceling API Token removal"
+		warning, question := "", fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Workspace?", ansi.Bold(token.Name))
 		if isWS {
 			warning = "API token deletion cannot be undone."
 			question = fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name))
-			canceled = "Canceling API Token deletion"
 		}
-		ok, err := confirmTokenChange(warning, question)
-		if err != nil {
+		if err := confirmTokenChange(warning, question); err != nil {
 			return err
-		}
-		if !ok {
-			fmt.Fprintln(out, canceled)
-			return nil
 		}
 	}
 	removal, err := workspacetoken.DeleteToken(token, ws, astroV1Client)

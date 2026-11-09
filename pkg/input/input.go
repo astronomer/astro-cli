@@ -1,6 +1,7 @@
 package input
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -8,6 +9,13 @@ import (
 
 // Every prompt here is written to stderr: stdout carries a command's results
 // only, and a question is not one.
+
+// ErrAborted is a confirmation answered no. A command returns it, rather than
+// printing that it stopped and exiting 0: declining is not success, and the
+// run did not do what it was asked. Every declined confirmation in the CLI
+// fails with it, so it reads "aborted" and exits 1 everywhere, and under
+// --output json publishes kind aborted.
+var ErrAborted = errors.New("aborted")
 
 // Text requests a user for input text and returns it. It returns a
 // *RequiredError, and reads nothing, when this run may not ask (see SetGuard).

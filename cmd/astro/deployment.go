@@ -1091,8 +1091,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 
 	if removeOverride {
 		res, err := deployment.DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName, forceOverride, astroV1Client)
-		if err != nil || res == nil {
-			// nil, nil is a declined question, which has said so.
+		if err != nil {
 			return err
 		}
 		return emitHibernation(r, res, action)
@@ -1104,7 +1103,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 	}
 
 	res, err := deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, astroV1Client)
-	if err != nil || res == nil {
+	if err != nil {
 		return err
 	}
 	// The override is set, and said so, before the wait for it starts.

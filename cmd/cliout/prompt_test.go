@@ -156,3 +156,44 @@ func TestInputRequiredKind(t *testing.T) {
 	assert.Equal(t, KindUsage, testKinds.Of(Usage(refused)))
 	assert.Equal(t, ExitFailure, ExitCode(context.Background(), refused))
 }
+
+// A command that ends declined, as every converted confirmation does, is
+// reported like any failure: in text, "Error: aborted" on stderr and nothing
+// on stdout; under --output json, the one error object, kind aborted, and
+// nothing on stderr. Exit 1 either way.
+func TestADeclinedRunFailsAborted(t *testing.T) {
+	tree := func() *cobra.Command {
+		var output Format
+		root := &cobra.Command{Use: "astro"}
+		AddOutputFlag(root, &output)
+		root.AddCommand(&cobra.Command{
+			Use:  "delete",
+			RunE: func(*cobra.Command, []string) error { return fmt.Errorf("deleting: %w", input.ErrAborted) },
+		})
+		return root
+	}
+
+	r := execTree(context.Background(), tree(), "delete")
+	assert.ErrorIs(t, r.err, input.ErrAborted)
+	assert.Equal(t, ExitFailure, ExitCode(context.Background(), r.err))
+	assert.Empty(t, r.stdout)
+	assert.Contains(t, r.stderr, "Error: deleting: aborted")
+
+	r = execTree(context.Background(), tree(), "delete", "-o", "json")
+	obj := decodeOne(t, r.stdout)
+	assert.Equal(t, KindAborted, obj.Kind)
+	assert.Equal(t, ExitFailure, obj.Code)
+	assert.Equal(t, "deleting: aborted", obj.Error)
+	assert.Empty(t, r.stderr)
+}
+
+// aborted is cliout's own kind for a confirmation answered no, found through
+// any wrap, exit 1 (not 130, an interrupt). A question that could not be asked
+// is input_required, never aborted.
+func TestAbortedKind(t *testing.T) {
+	declined := fmt.Errorf("deleting: %w", input.ErrAborted)
+	assert.Equal(t, KindAborted, testKinds.Of(declined))
+	assert.Equal(t, KindAborted, testKinds.Of(errors.Join(errBoom, input.ErrAborted)), "it wins over a table's row")
+	assert.Equal(t, ExitFailure, ExitCode(context.Background(), declined))
+	assert.Equal(t, KindInputRequired, testKinds.Of(input.Required(fmt.Errorf("asked: %w", input.ErrAborted))))
+}

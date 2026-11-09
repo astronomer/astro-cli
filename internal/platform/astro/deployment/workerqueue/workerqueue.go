@@ -212,8 +212,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 				}
 
 				if !i {
-					fmt.Fprintf(out, "Canceling worker queue %s\n", action)
-					return nil, nil
+					return nil, input.ErrAborted
 				}
 			}
 			// user requested an update and queueToCreateOrUpdate exists
@@ -541,8 +540,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 			}
 
 			if !i {
-				fmt.Fprintf(out, "Canceling worker queue deletion\n")
-				return nil, nil
+				return nil, input.ErrAborted
 			}
 		}
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {

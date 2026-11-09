@@ -33,12 +33,20 @@ var (
 )
 
 // confirmOperation asks before changing an IDP-managed team, unless force. A
-// run that may not ask returns the refusal rather than an answer.
-func confirmOperation(force bool) (bool, error) {
+// run that may not ask returns the refusal, and one answered no
+// input.ErrAborted.
+func confirmOperation(force bool) error {
 	if force {
-		return true, nil
+		return nil
 	}
-	return input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?", input.AnsweredBy("--yes"))
+	y, err := input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?", input.AnsweredBy("--yes"))
+	if err != nil {
+		return err
+	}
+	if !y {
+		return input.ErrAborted
+	}
+	return nil
 }
 
 // Info is t as a team command reports it, with no role: the caller sets the
@@ -257,8 +265,8 @@ func orgTeam(id string, client astrov1.APIClient) (astrov1.Team, error) {
 
 // UpdateTeam changes the name, description and Organization role of the team
 // with id, or of the one picked when id is "": only what is given, so "" keeps
-// each as it is. It returns nil, and changes nothing, when the team is
-// IdP-managed and the person declines to go on.
+// each as it is. A team that is IdP-managed, where the person declines to
+// go on, is input.ErrAborted, and nothing is changed.
 //
 // A role that is not an Organization role is refused before anything is
 // asked or sent. The role is changed before the name and description, so a
@@ -282,12 +290,8 @@ func UpdateTeam(id, name, description, role string, force bool, client astrov1.A
 		return nil, err
 	}
 	if team.IsIdpManaged {
-		y, err := confirmOperation(force)
-		if err != nil {
+		if err := confirmOperation(force); err != nil {
 			return nil, err
-		}
-		if !y {
-			return nil, nil
 		}
 	}
 	teamID := team.Id
@@ -526,8 +530,8 @@ func GetOrgTeams(client astrov1.APIClient) ([]astrov1.Team, error) {
 }
 
 // Delete deletes the team with id, or the one picked when id is "", and
-// returns which team it deleted, asking first unless force. It returns nil,
-// and deletes nothing, when the person declines.
+// returns which team it deleted, asking first unless force. Declined, it is
+// input.ErrAborted, and nothing is deleted.
 func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemoval, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -575,7 +579,7 @@ func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemov
 			return nil, err
 		}
 		if !y {
-			return nil, nil
+			return nil, input.ErrAborted
 		}
 	}
 	teamID := team.Id
@@ -617,8 +621,8 @@ func listTeamMembers(client astrov1.APIClient, orgID, teamID string) ([]astrov1.
 
 // RemoveUser removes the member with teamMemberID, or the one picked when it
 // is "", from the team with teamID, or the one picked when it is "", and
-// returns which user it removed from which team. It returns nil, and removes
-// no one, when the team is IdP-managed and the person declines to go on.
+// returns which user it removed from which team. A team that is IdP-managed,
+// where the person declines to go on, is input.ErrAborted.
 func RemoveUser(teamID, teamMemberID string, force bool, client astrov1.APIClient) (*Membership, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -648,12 +652,8 @@ func RemoveUser(teamID, teamMemberID string, force bool, client astrov1.APIClien
 		}
 	}
 	if team.IsIdpManaged {
-		y, err := confirmOperation(force)
-		if err != nil {
+		if err := confirmOperation(force); err != nil {
 			return nil, err
-		}
-		if !y {
-			return nil, nil
 		}
 	}
 	teamID = team.Id
@@ -696,8 +696,8 @@ func RemoveUser(teamID, teamMemberID string, force bool, client astrov1.APIClien
 
 // AddUser adds the Organization user with userID, or the one picked when it
 // is "", to the team with teamID, or the one picked when it is "", and
-// returns which user it added to which team. It returns nil, and adds no one,
-// when the team is IdP-managed and the person declines to go on.
+// returns which user it added to which team. A team that is IdP-managed,
+// where the person declines to go on, is input.ErrAborted.
 func AddUser(teamID, userID string, force bool, client astrov1.APIClient) (*Membership, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -732,12 +732,8 @@ func AddUser(teamID, userID string, force bool, client astrov1.APIClient) (*Memb
 		}
 	}
 	if team.IsIdpManaged {
-		y, err := confirmOperation(force)
-		if err != nil {
+		if err := confirmOperation(force); err != nil {
 			return nil, err
-		}
-		if !y {
-			return nil, nil
 		}
 	}
 	teamID = team.Id

@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -517,7 +518,6 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("cancels update if user does not confirm", func() {
-		expectedOutMessage := "Canceling worker queue update\n"
 		deploymentResponse.JSON200.Type = &hybridType
 		out := new(bytes.Buffer)
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil)
@@ -526,8 +526,9 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 		deploymentResponse.JSON200.WorkerQueues = &[]astrov1.WorkerQueue{{Name: "default", NodePoolId: &testPoolID}}
 		res, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type-1", 0, 20, 175, false, mockV1Client, out)
-		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String()+reported(res))
+		s.ErrorIs(err, input.ErrAborted)
+		s.Nil(res)
+		s.Empty(out.String(), "a decline says nothing on out")
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("prompts user for queue name if one was not provided", func() {
@@ -798,14 +799,14 @@ func (s *Suite) TestDelete() {
 		})
 		s.Run("cancels deletion if user does not confirm", func() {
 			defer testUtil.MockUserInput(s.T(), "n")()
-			expectedOutMessage = "Canceling worker queue deletion\n"
 			out := new(bytes.Buffer)
 			mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 			mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 
 			res, err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockV1Client, out)
-			s.NoError(err)
-			s.Equal(expectedOutMessage, out.String()+reported(res))
+			s.ErrorIs(err, input.ErrAborted)
+			s.Nil(res)
+			s.Empty(out.String(), "a decline says nothing on out")
 			mockV1Client.AssertExpectations(s.T())
 		})
 	})

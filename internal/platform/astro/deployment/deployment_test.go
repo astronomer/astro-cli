@@ -2297,7 +2297,7 @@ func (s *Suite) TestUpdate() {
 		defer testUtil.MockUserInput(s.T(), "n")()
 
 		_, err := Update("test-id-1", "", ws, "update", "", "disable", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
-		s.NoError(err)
+		s.ErrorIs(err, input.ErrAborted)
 	})
 
 	s.Run("update deployment failure", func() {
@@ -2334,7 +2334,7 @@ func (s *Suite) TestUpdate() {
 		// notes, never to stdout.
 		var notes bytes.Buffer
 		_, err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "enable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, &notes)
-		s.NoError(err)
+		s.ErrorIs(err, input.ErrAborted)
 		s.Contains(notes.String(), "Warning: You are trying to update the dag deploy setting with ci-cd enforcement enabled.")
 	})
 
@@ -2431,7 +2431,7 @@ func (s *Suite) TestUpdate() {
 		defer testUtil.MockUserInput(s.T(), "n")()
 
 		_, err := Update("test-id-1", "", ws, "update", "", "", CeleryExecutor, "medium", "enable", "", "disable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, nil)
-		s.NoError(err)
+		s.ErrorIs(err, input.ErrAborted)
 	})
 
 	s.Run("no node pools on hybrid cluster", func() {
@@ -2910,7 +2910,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 		defer testUtil.MockUserInput(s.T(), "n")()
 
 		_, err := UpdateDeploymentHibernationOverride("test-id-1", ws, "", true, nil, false, mockV1Client)
-		s.NoError(err)
+		s.ErrorIs(err, input.ErrAborted)
 		mockV1Client.AssertExpectations(s.T())
 	})
 
@@ -3108,7 +3108,7 @@ func (s *Suite) TestDeleteDeploymentHibernationOverride() {
 		defer testUtil.MockUserInput(s.T(), "n")()
 
 		_, err := DeleteDeploymentHibernationOverride("test-id-1", ws, "", false, mockV1Client)
-		s.NoError(err)
+		s.ErrorIs(err, input.ErrAborted)
 		mockV1Client.AssertExpectations(s.T())
 	})
 

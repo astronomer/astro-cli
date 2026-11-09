@@ -92,7 +92,6 @@ type BundleRemoval struct {
 // The actions a BundleRemoval publishes.
 const (
 	bundleDeletionRequested = "deletion_requested"
-	bundleDeletionCanceled  = "canceled"
 )
 
 func bundleToInfo(b *astrov1alpha1.DeploymentBundle) BundleInfo {
@@ -445,8 +444,8 @@ func ListBundlesWithFormat(wsID, deploymentID string, r output.Emitter, astroV1C
 
 // DeleteBundle removes a bundle from a deployment, after asking unless force.
 // The bundle is identified by id, DAG bundle name, or non-DAG mount path. It
-// publishes what it did (BundleRemoval): the deletion it requested, or that the
-// question was declined.
+// publishes the deletion it requested (BundleRemoval); a declined question is
+// input.ErrAborted.
 func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID string, force bool, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 	if err := validateBundleSelector(bundleID, bundleName, bundleMountPath); err != nil {
 		return err
@@ -469,11 +468,7 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 			return err
 		}
 		if !confirmed {
-			removal.Action = bundleDeletionCanceled
-			return r.Emit(removal, func(w io.Writer) error {
-				_, err := fmt.Fprintln(w, "Canceling bundle deletion")
-				return err
-			})
+			return input.ErrAborted
 		}
 	}
 

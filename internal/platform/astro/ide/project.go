@@ -543,7 +543,7 @@ func ImportProject(ctx httpContext.Context, client astrov1alpha1.APIClient, expo
 		}
 
 		if !proceed {
-			return nil, fmt.Errorf("import canceled by user")
+			return nil, input.ErrAborted
 		}
 	}
 

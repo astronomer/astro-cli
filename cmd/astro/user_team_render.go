@@ -57,7 +57,7 @@ func renderLines(format cliout.Format, out io.Writer, v any, lines ...string) er
 // team as it now is. upd is nil when the person declined to change an
 // IdP-managed team, which prints nothing.
 func renderTeamUpdate(format cliout.Format, out io.Writer, upd *team.Update, err error) error {
-	if err != nil || upd == nil {
+	if err != nil {
 		return err
 	}
 	lines := []string{fmt.Sprintf("Astro Team %s was successfully updated", upd.Team.Name)}
@@ -68,12 +68,8 @@ func renderTeamUpdate(format cliout.Format, out io.Writer, upd *team.Update, err
 }
 
 // renderMembership renders a team user add or remove, naming the user by
-// email, or by ID when it has none. m is nil when the person declined to
-// change an IdP-managed team, which prints nothing.
+// email, or by ID when it has none.
 func renderMembership(format cliout.Format, out io.Writer, m *team.Membership) error {
-	if m == nil {
-		return nil
-	}
 	verb := "added to"
 	if m.Action == team.Removed {
 		verb = "removed from"

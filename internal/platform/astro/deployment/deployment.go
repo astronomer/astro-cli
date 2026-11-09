@@ -985,8 +985,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			}
 
 			if !y {
-				fmt.Println("Canceling Deployment update")
-				return UpdateResult{Deployment: currentDeployment}, nil
+				return UpdateResult{}, input.ErrAborted
 			}
 		}
 	}
@@ -1400,8 +1399,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			}
 
 			if !y {
-				fmt.Println("Canceling Deployment update")
-				return UpdateResult{Deployment: currentDeployment}, nil
+				return UpdateResult{}, input.ErrAborted
 			}
 		}
 	}
@@ -1571,8 +1569,9 @@ var (
 	// type the confirmation.
 	errDeleteNeedsConfirmation = errors.New("astro deployment delete asks for the Deployment's name to confirm, and there is no terminal to type it at: pass --yes")
 	// errDeleteNotConfirmed is a confirmation answered with anything but the
-	// Deployment's name.
-	errDeleteNotConfirmed = errors.New("the name typed does not match the Deployment's name")
+	// Deployment's name: declined, as every declined confirmation is
+	// (input.ErrAborted), saying why.
+	errDeleteNotConfirmed = fmt.Errorf("%w: the name typed does not match the Deployment's name", input.ErrAborted)
 )
 
 // Delete deletes a Deployment, after the person types its name unless
@@ -1624,7 +1623,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 // UpdateDeploymentHibernationOverride sets a development Deployment to
 // hibernate, or to stay awake, until overrideUntil, or until the override is
 // removed when it is nil. It asks first unless force, and returns the
-// override the Deployment now has, or nil when the question was declined.
+// override the Deployment now has; a declined question is input.ErrAborted.
 // WaitForHibernationOverride waits for the Deployment to get there.
 func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string, isHibernating bool, overrideUntil *time.Time, force bool, astroV1Client astrov1.APIClient) (*HibernationResult, error) {
 	// Set wording based on the hibernation action
@@ -1654,8 +1653,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 		}
 
 		if !i {
-			fmt.Printf("\nCanceling %s override", action)
-			return nil, nil
+			return nil, input.ErrAborted
 		}
 	}
 
@@ -1703,8 +1701,8 @@ func WaitForHibernationOverride(progress io.Writer, deploymentID string, isHiber
 
 // DeleteDeploymentHibernationOverride removes a development Deployment's
 // hibernation override, so its schedule applies again. It asks first unless
-// force, and returns the Deployment with no override, or nil when the
-// question was declined.
+// force, and returns the Deployment with no override; a declined question
+// is input.ErrAborted.
 func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string, force bool, astroV1Client astrov1.APIClient) (*HibernationResult, error) {
 	// get deployment
 	currentDeployment, err := getDevelopmentDeployment(ws, deploymentID, deploymentName, astroV1Client)
@@ -1725,8 +1723,7 @@ func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 		}
 
 		if !i {
-			fmt.Println("Canceling hibernation override removal")
-			return nil, nil
+			return nil, input.ErrAborted
 		}
 	}
 

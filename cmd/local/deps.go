@@ -30,6 +30,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
@@ -314,8 +315,9 @@ func markSkipPreRun(cmd *cobra.Command) {
 	}
 }
 
-// errAborted reports a confirmation answered "no".
-var errAborted = errors.New("aborted")
+// errAborted reports a confirmation answered "no": the one every tree fails
+// with (input.ErrAborted), so it publishes kind aborted.
+var errAborted = input.ErrAborted
 
 // proxyDaemon adapts internal/proxydaemon's daemon lifecycle to the engines'
 // localrt.ProxyDaemon seam, for the routes under dir. The engines see only the

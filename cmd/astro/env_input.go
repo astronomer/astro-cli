@@ -70,8 +70,8 @@ func readSetValue(cmd *cobra.Command, flagName, flagValue, prompt string) (strin
 	return v, nil
 }
 
-// errAbortedDelete is a delete that was not confirmed: answered no, or asked
-// where nobody could answer.
+// errAbortedDelete is a delete asked where nobody could answer. One answered
+// no is input.ErrAborted.
 var errAbortedDelete = errors.New("aborted: pass --yes (or confirm interactively) to delete")
 
 // confirmTTY returns true if the user confirms y/Y at an interactive prompt.
@@ -84,7 +84,7 @@ func confirmTTY(prompt string) (bool, error) {
 	if err := input.MayAsk(prompt, yes); err != nil {
 		return false, err
 	}
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
+	if !stdinIsTerminal() {
 		return false, input.Required(errAbortedDelete)
 	}
 	return input.Confirm(prompt, yes)
@@ -231,7 +231,7 @@ func runEnvDelete(cmd *cobra.Command, out io.Writer, noun, idOrKey string, del f
 			return err
 		}
 		if !ok {
-			return errAbortedDelete
+			return input.ErrAborted
 		}
 	}
 	deleted, err := del(idOrKey, scope, astroV1Client)

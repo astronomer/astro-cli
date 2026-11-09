@@ -2,6 +2,7 @@ package astro
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // What the `astro workspace token` and `astro organization token` families
@@ -120,6 +122,10 @@ type tokenCase struct {
 	args    []string
 	check   func(t *testing.T, stdout string)
 	wantErr string
+	// picksOnStdout is a run whose picker, or its note about the only
+	// choice, is drawn on the command's stdout ahead of the question, as
+	// the Workspace picker is in text mode: a decline adds nothing to it.
+	picksOnStdout bool
 }
 
 func runTokenCases(t *testing.T, cases []tokenCase) {
@@ -131,6 +137,9 @@ func runTokenCases(t *testing.T, cases []tokenCase) {
 				require.Error(t, r.err)
 				assert.Equal(t, tc.wantErr, r.err.Error())
 				assert.Equal(t, cliout.ExitFailure, r.code)
+				if errors.Is(r.err, input.ErrAborted) && !tc.picksOnStdout {
+					assert.Empty(t, r.stdout, "a decline is not a result")
+				}
 			} else {
 				require.NoError(t, r.err)
 				assert.Equal(t, 0, r.code)
@@ -263,8 +272,9 @@ func TestWorkspaceTokenText(t *testing.T) {
 		{
 			// The client mocks no rotate, so going on after "n" would panic.
 			name: "rotate declined", root: newWorkspaceCmd, client: fakeTokens(both), answers: "n\n",
-			args:  []string{"workspace", "token", "rotate", "tok-ws"},
-			check: says("WARNING: API Token rotation", "Are you sure you want to rotate the ws-token API token? (y/n)", "Canceling token rotation"),
+			args:    []string{"workspace", "token", "rotate", "tok-ws"},
+			check:   says("WARNING: API Token rotation", "Are you sure you want to rotate the ws-token API token? (y/n)"),
+			wantErr: "aborted",
 		},
 		{name: "rotate --clean-output", root: newWorkspaceCmd, client: fakeTokens(both, rotatesToken(ws)), args: []string{"workspace", "token", "rotate", "tok-ws", "--yes", "--clean-output"}, check: onlyTheSecret},
 		{
@@ -282,8 +292,9 @@ func TestWorkspaceTokenText(t *testing.T) {
 		},
 		{
 			name: "delete declined", root: newWorkspaceCmd, client: fakeTokens(both), answers: "n\n",
-			args:  []string{"workspace", "token", "delete", "tok-ws"},
-			check: says("WARNING: API token deletion cannot be undone.", "Are you sure you want to delete the ws-token API token? (y/n)", "Canceling API Token deletion"),
+			args:    []string{"workspace", "token", "delete", "tok-ws"},
+			check:   says("WARNING: API token deletion cannot be undone.", "Are you sure you want to delete the ws-token API token? (y/n)"),
+			wantErr: "aborted",
 		},
 		{
 			name: "delete through the picker", root: newWorkspaceCmd, client: fakeTokens(both, deletesToken("tok-ws")), answers: "1\n",
@@ -307,8 +318,9 @@ func TestWorkspaceTokenText(t *testing.T) {
 		},
 		{
 			name: "remove declined", root: newWorkspaceCmd, client: fakeTokens(both), answers: "n\n",
-			args:  []string{"workspace", "token", "delete", "tok-org"},
-			check: says("Are you sure you want to remove the org-token API token from the Workspace? (y/n)", "Canceling API Token removal"),
+			args:    []string{"workspace", "token", "delete", "tok-org"},
+			check:   says("Are you sure you want to remove the org-token API token from the Workspace? (y/n)"),
+			wantErr: "aborted",
 		},
 		{name: "add", root: newWorkspaceCmd, client: fakeTokens([]astrov1.ApiToken{orgOnly(org)}, setsRoles("tok-org")), args: []string{"workspace", "token", "add", "tok-org", "--role", "WORKSPACE_MEMBER"}, check: says("Astro Organization API token org-token was successfully added to the Workspace")},
 		{
@@ -486,8 +498,9 @@ func TestOrganizationTokenText(t *testing.T) {
 		},
 		{
 			name: "rotate declined", root: newOrganizationCmd, client: fakeTokens(orgs), answers: "n\n",
-			args:  []string{"organization", "token", "rotate", "tok-org"},
-			check: says("WARNING: API Token rotation", "Are you sure you want to rotate the org-token API token? (y/n)", "Canceling token rotation"),
+			args:    []string{"organization", "token", "rotate", "tok-org"},
+			check:   says("WARNING: API Token rotation", "Are you sure you want to rotate the org-token API token? (y/n)"),
+			wantErr: "aborted",
 		},
 		{name: "rotate --clean-output", root: newOrganizationCmd, client: fakeTokens(orgs, rotatesToken(org)), args: []string{"organization", "token", "rotate", "tok-org", "--yes", "--clean-output"}, check: onlyTheSecret},
 		{name: "delete --yes", root: newOrganizationCmd, client: fakeTokens(orgs, deletesToken("tok-org")), args: []string{"organization", "token", "delete", "tok-org", "--yes"}, check: says("Astro Organization API token org-token was successfully deleted")},
@@ -498,8 +511,9 @@ func TestOrganizationTokenText(t *testing.T) {
 		},
 		{
 			name: "delete declined", root: newOrganizationCmd, client: fakeTokens(orgs), answers: "n\n",
-			args:  []string{"organization", "token", "delete", "tok-org"},
-			check: says("WARNING: API token deletion cannot be undone.", "Are you sure you want to delete the org-token API token? (y/n)", "Canceling API Token deletion"),
+			args:    []string{"organization", "token", "delete", "tok-org"},
+			check:   says("WARNING: API token deletion cannot be undone.", "Are you sure you want to delete the org-token API token? (y/n)"),
+			wantErr: "aborted",
 		},
 		{
 			name: "delete through the picker", root: newOrganizationCmd, client: fakeTokens(orgs, deletesToken("tok-org")), answers: "1\n",
