@@ -23,9 +23,11 @@ func confirmLines(t *testing.T, interactive bool, stdin string) (string, error) 
 	return stderrOf(d), err
 }
 
-// Every way a confirmation ends leaves stderr with whole lines: the question
-// is written only where someone reads it, a line that was opened is ended
-// before the error, and nothing writes a blank line of its own.
+// Every way a confirmation ends leaves stderr with whole lines. The question
+// is always written first, a terminal or not, since someone may be reading it
+// either way. A terminal echoes the answer itself; a piped answer, which
+// nothing echoes, is written after the question as plain text; and input
+// that ended has its line ended before the error.
 func TestConfirmLeavesWholeLines(t *testing.T) {
 	const q = "Wipe it? [y/N] "
 	for name, tc := range map[string]struct {
@@ -35,15 +37,17 @@ func TestConfirmLeavesWholeLines(t *testing.T) {
 		refused     bool  // the input_required refusal naming --yes
 		err         error // otherwise; nil for a yes
 	}{
-		"terminal, yes":               {true, "y\n", q, false, nil},
-		"terminal, no":                {true, "n\n", q, false, input.ErrAborted},
-		"terminal, input ended":       {true, "", q + "\n", true, nil},
-		"terminal, yes then ended":    {true, "y", q + "\n", false, nil},
-		"piped, yes":                  {false, "y\n", q + "y\n", false, nil},
-		"piped, no":                   {false, "n\n", q + "n\n", false, input.ErrAborted},
-		"piped, yes with no newline":  {false, "y", q + "y\n", false, nil},
-		"piped nothing":               {false, "", "", true, nil},
-		"piped, an empty line (a no)": {false, "\n", "Wipe it? [y/N]\n", false, input.ErrAborted},
+		"terminal, yes":                   {true, "y\n", q, false, nil},
+		"terminal, no":                    {true, "n\n", q, false, input.ErrAborted},
+		"terminal, input ended":           {true, "", q + "\n", true, nil},
+		"terminal, yes then ended":        {true, "y", q + "\n", false, nil},
+		"piped, yes":                      {false, "y\n", q + "y\n", false, nil},
+		"piped, no":                       {false, "n\n", q + "n\n", false, input.ErrAborted},
+		"piped, yes with no newline":      {false, "y", q + "y\n", false, nil},
+		"piped nothing":                   {false, "", q + "\n", true, nil},
+		"piped, an empty line (a no)":     {false, "\n", q + "\n", false, input.ErrAborted},
+		"piped, escapes are not echoed":   {false, "n\x1b[2J\x1b]0;title\x07\x08\n", q + "n\n", false, input.ErrAborted},
+		"piped, a long answer on one row": {false, "no  way\tthanks\r\n", q + "no way thanks\n", false, input.ErrAborted},
 	} {
 		t.Run(name, func(t *testing.T) {
 			stderr, err := confirmLines(t, tc.interactive, tc.stdin)
@@ -77,9 +81,10 @@ func (b blockingStdin) Read([]byte) (int, error) {
 	return 0, context.Canceled
 }
 
-// Ctrl-C ends a question at once, with ErrInterrupted, and ends its line only
-// where one was written.
-func TestConfirmInterruptedEndsOnlyAnOpenLine(t *testing.T) {
+// Ctrl-C ends a question at once, with ErrInterrupted, and ends the
+// question's line first, a terminal on stdin or not, so the error does not
+// run onto it ("^CError: interrupted").
+func TestConfirmInterruptedEndsTheQuestionsLine(t *testing.T) {
 	for name, interactive := range map[string]bool{"terminal": true, "piped": false} {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -96,11 +101,7 @@ func TestConfirmInterruptedEndsOnlyAnOpenLine(t *testing.T) {
 			if !errors.Is(err, input.ErrInterrupted) {
 				t.Fatalf("err = %v, want ErrInterrupted", err)
 			}
-			want := ""
-			if interactive {
-				want = "Wipe it? [y/N] \n"
-			}
-			if got := stderrOf(d); got != want {
+			if got, want := stderrOf(d), "Wipe it? [y/N] \n"; got != want {
 				t.Errorf("stderr = %q, want %q", got, want)
 			}
 		})
@@ -161,20 +162,22 @@ func TestResetWithNoHomeFailsBeforeAsking(t *testing.T) {
 	}
 }
 
-// With no terminal and no answer, the refusal is all stderr gets: no question
-// left open with the error run onto the end of it.
-func TestResetWithNoTerminalRefusesWithoutAsking(t *testing.T) {
+// With no terminal and no answer, reset still asks, ends the question's line,
+// and refuses naming --yes: the error starts on a line of its own rather than
+// running onto the question.
+func TestResetWithNoTerminalAsksThenRefuses(t *testing.T) {
 	d, rt, _ := resetDeps(t)
+	dir, _ := d.WorkingDir()
 	err := execute(t, d, "local", "reset")
-	if err == nil || !strings.HasPrefix(err.Error(), `confirmation needed for "Wipe the local Airflow state`) ||
-		!strings.HasSuffix(err.Error(), "but stdin is not interactive; pass --yes to proceed") {
-		t.Fatalf("err = %v, want the refusal naming the question and --yes", err)
+	if err == nil || err.Error() != "confirmation needed but stdin is not interactive; pass --yes to proceed" {
+		t.Fatalf("err = %v, want the refusal naming --yes", err)
 	}
 	if kind := ProblemKinds.Of(err); kind != cliout.KindInputRequired {
 		t.Errorf("kind %q, want %q", kind, cliout.KindInputRequired)
 	}
-	if stderr := stderrOf(d); stderr != "" {
-		t.Errorf("stderr = %q, want nothing before the error", stderr)
+	want := "Wipe the local Airflow state (database, logs, environment) of " + dir + "? [y/N] \n"
+	if stderr := stderrOf(d); stderr != want {
+		t.Errorf("stderr = %q, want %q", stderr, want)
 	}
 	if rt.called != "" {
 		t.Error("reset ran without consent")
@@ -182,7 +185,7 @@ func TestResetWithNoTerminalRefusesWithoutAsking(t *testing.T) {
 }
 
 // The question names the project it would wipe. At a terminal it is asked
-// before the answer is read; from a pipe it is recorded with the answer.
+// before the answer is read; from a pipe the answer completes its line.
 func TestResetQuestionNamesTheProject(t *testing.T) {
 	for name, interactive := range map[string]bool{"terminal": true, "piped": false} {
 		t.Run(name, func(t *testing.T) {

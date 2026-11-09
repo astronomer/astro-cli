@@ -27,46 +27,41 @@ func (c *cli) confirmUnless(yes bool, question string) error {
 // a yes is input.ErrAborted, and Ctrl-C ends the question at once with
 // input.ErrInterrupted.
 //
-// Without a terminal on stdin nobody is there to read the question, so it is
-// not written ahead of the answer: a piped answer is recorded with its
-// question as one line on stderr, a record of what the script agreed to, and
-// with nothing piped the refusal is all stderr gets. Only a question that was
-// written has a line to end, so only then is one ended, on Ctrl-C (ReadLine)
-// or on input that ended.
+// The question is always written before the answer is read, whatever stdin
+// is: a stdin that is not a terminal still often has a person behind it (ssh
+// or exec without a tty, mintty), or a tool that waits for the question
+// before it answers. So every way the read ends leaves its line whole: Ctrl-C
+// and input that ended close it before the error, and an answer from a pipe,
+// which nothing echoes, is written after the question as plain text, so a log
+// reads "…? [y/N] n" on one line.
 func (c *cli) confirm(question string) error {
 	if err := input.MayAsk(question, input.AnsweredBy("--yes")); err != nil {
 		return err
 	}
-	prompt := question + " [y/N] "
-	asked := c.interactive()
-	open := io.Discard // the line ReadLine ends on Ctrl-C, if one is open
-	if asked {
-		fmt.Fprint(c.d.Stderr, prompt) //nolint:errcheck // a failed write to the terminal still reads the answer
-		open = c.d.Stderr
-	}
-	line, err := input.ReadLine(input.Reader(c.d.Stdin), open)
+	fmt.Fprint(c.d.Stderr, question+" [y/N] ") //nolint:errcheck // a failed write to the terminal still reads the answer
+	line, err := input.ReadLine(input.Reader(c.d.Stdin), c.d.Stderr)
 	if errors.Is(err, input.ErrInterrupted) {
-		return err
+		return err // ReadLine ended the line
 	}
 	line = strings.TrimSpace(line)
 	answered := err == nil || line != "" // an empty line is an answer: a no
 	switch {
-	case asked && err != nil:
-		// Input that ended left the prompt's line open: end it, so what
-		// follows starts on a fresh one.
+	case answered && !c.interactive():
+		// A terminal echoed what was typed; a pipe did not.
+		fmt.Fprintln(c.d.Stderr, input.Plain(line))
+	case err != nil:
+		// Input that ended left the line open: end it, so what follows
+		// starts on a fresh one.
 		fmt.Fprintln(c.d.Stderr)
-	case !asked && answered:
-		fmt.Fprintln(c.d.Stderr, strings.TrimRight(prompt+line, " "))
 	}
 	if !answered {
 		switch {
-		case asked && errors.Is(err, io.EOF):
+		case errors.Is(err, io.EOF) && c.interactive():
 			return input.Required(errors.New("confirmation needed but input ended with no answer; pass --yes to proceed"))
 		case errors.Is(err, io.EOF):
-			// The question was never written, so the refusal names it.
-			return input.Required(fmt.Errorf("confirmation needed for %q but stdin is not interactive; pass --yes to proceed", question))
-		case !asked:
-			return fmt.Errorf("reading the answer to %q: %w", question, err)
+			return input.Required(errors.New("confirmation needed but stdin is not interactive; pass --yes to proceed"))
+		case !c.interactive():
+			return fmt.Errorf("reading the answer to %s: %w", input.Quote(question), err)
 		}
 		return err
 	}

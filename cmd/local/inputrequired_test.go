@@ -55,15 +55,14 @@ func TestAJSONConfirmationIsNeverAsked(t *testing.T) {
 	}
 }
 
-// The same refusal without a terminal keeps its exit status and gains the
-// kind. The question was never written there, so the refusal names it.
+// The same refusal without a terminal keeps its words and its exit status;
+// only the kind is new.
 func TestAConfirmationWithNoTerminalIsInputRequired(t *testing.T) {
 	stub := newAirflowStub(t)
 	d, _, _ := queryDeps(t)
 	err := execute(t, d, afName, "runs", "delete", "orders_etl", "run_1", "--url", stub.URL)
-	want := `confirmation needed for "Delete run run_1 of orders_etl? This cannot be undone." but stdin is not interactive; pass --yes to proceed`
-	if err == nil || err.Error() != want {
-		t.Fatalf("err = %v, want %q", err, want)
+	if err == nil || err.Error() != "confirmation needed but stdin is not interactive; pass --yes to proceed" {
+		t.Fatalf("err = %v, want the refusal in its own words", err)
 	}
 	if code := cliout.ExitCode(t.Context(), err); code != cliout.ExitFailure {
 		t.Errorf("exit %d, want %d", code, cliout.ExitFailure)

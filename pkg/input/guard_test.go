@@ -123,6 +123,16 @@ func (s *Suite) TestRequiredErrorMessage() {
 			`this command needs to ask "Delete \"x\" link?"; with --output json it cannot — pass --yes`,
 		},
 		{
+			"a Windows path keeps single backslashes",
+			MayAsk(`Wipe the local Airflow state of C:\Users\me\proj?`, AnsweredBy("--yes")),
+			`this command needs to ask "Wipe the local Airflow state of C:\Users\me\proj?"; with --output json it cannot — pass --yes`,
+		},
+		{
+			"control characters escapes leave behind are dropped",
+			MayAsk("Delete\x07 \x1bprod\x08?", AnsweredBy("--yes")),
+			`this command needs to ask "Delete prod?"; with --output json it cannot — pass --yes`,
+		},
+		{
 			"trailing prompt punctuation is dropped",
 			MayAsk("Enter a name for the new token: "),
 			`this command needs to ask "Enter a name for the new token"; with --output json it cannot — pass the answer as a flag`,
