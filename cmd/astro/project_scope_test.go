@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
@@ -330,6 +331,37 @@ func TestDeploymentVariableListFindsAnIDInTheProjectWorkspace(t *testing.T) {
 	mc.AssertExpectations(t)
 }
 
+// A Deployment id argument and a --deployment link to another Deployment are
+// two targets: the run is refused before anything is asked of the API (the
+// mock fails on any call), rather than the argument winning.
+func TestDeploymentDeleteRefusesAnArgumentAndALinkThatDisagree(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	inProject(t, testProjectManifest)
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = mc
+
+	_, err := execDeploymentCmd("delete", otherDep, "--deployment", "test", "--yes")
+	require.Error(t, err)
+	assert.True(t, cliout.IsUsage(err), "%v", err)
+	assert.Contains(t, err.Error(), "name different Deployments")
+	mc.AssertExpectations(t)
+
+	// The same Deployment both ways is that Deployment.
+	mc = new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, inWorkspace(projectWS)).Return(projectDeploymentsResponse(projectDep), nil).Once()
+	mc.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, projectDep).Return(&astrov1.GetDeploymentResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200:      &astrov1.Deployment{Id: projectDep, Name: "dep", WorkspaceId: projectWS},
+	}, nil).Once()
+	mc.On("DeleteDeploymentWithResponse", mock.Anything, mock.Anything, projectDep).Return(&astrov1.DeleteDeploymentResponse{HTTPResponse: &http.Response{StatusCode: 204}}, nil).Once()
+	expectWorkspaceName(mc)
+	astroV1Client = mc
+
+	_, err = execDeploymentCmd("delete", projectDep, "--deployment", "test", "--yes")
+	require.NoError(t, err)
+	mc.AssertExpectations(t)
+}
+
 func TestDeploymentDeleteOfALinkStillAsks(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	inProject(t, testProjectManifest)
@@ -351,8 +383,9 @@ func TestDeploymentDeleteOfALinkStillAsks(t *testing.T) {
 	expectWorkspaceName(mc)
 	astroV1Client = mc
 
+	// "n" is not the Deployment's name, so nothing is deleted.
 	_, err = execDeploymentCmd("delete", "test")
-	require.NoError(t, err)
+	require.ErrorContains(t, err, "the name typed does not match the Deployment's name")
 	mc.AssertNotCalled(t, "DeleteDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)
 	mc.AssertExpectations(t)
 }

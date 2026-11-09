@@ -29,8 +29,16 @@ func (c *cli) confirm(question string) error {
 		return err
 	}
 	fmt.Fprintf(c.d.Stderr, "%s [y/N] ", question)
-	line, err := input.Reader(c.d.Stdin).ReadString('\n')
+	line, err := input.ReadLine(input.Reader(c.d.Stdin), c.d.Stderr)
+	if errors.Is(err, input.ErrInterrupted) {
+		return err
+	}
 	line = strings.TrimSpace(line)
+	if err != nil {
+		// Input that ended left the prompt's line open: end it, so what
+		// follows starts on a fresh one.
+		fmt.Fprintln(c.d.Stderr)
+	}
 	if err != nil && line == "" {
 		if errors.Is(err, io.EOF) {
 			return input.Required(errors.New("confirmation needed but stdin is not interactive; pass --yes to proceed"))
@@ -41,6 +49,6 @@ func (c *cli) confirm(question string) error {
 	case "y", "yes":
 		return nil
 	default:
-		return errAborted
+		return input.ErrAborted
 	}
 }

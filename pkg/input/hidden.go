@@ -13,10 +13,11 @@ import (
 	"golang.org/x/term"
 )
 
-// ErrInterrupted is HiddenValue's answer to Ctrl-C. The terminal is raw while
-// it reads, so the keypress arrives as a byte rather than a signal, and the
-// read has to say what the signal would have; cliout.ExitCode turns it into
-// the 130 an interrupt exits with.
+// ErrInterrupted is a question's answer to Ctrl-C, which cliout.ExitCode turns
+// into the 130 an interrupt exits with. HiddenValue reads a raw terminal, so
+// the keypress arrives as a byte rather than a signal and it has to say what
+// the signal would have; a line read (ReadLine) returns it when the signal
+// cancels the run.
 var ErrInterrupted = errors.New("interrupted")
 
 const (

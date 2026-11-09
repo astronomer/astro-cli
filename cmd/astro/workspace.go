@@ -780,8 +780,7 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 	}
 	cmd.SilenceUsage = true
 	removal, err := workspace.Delete(id, workspaceDeleteYes, cliout.NotesTo(cmd, workspaceLifecycleOutput, out), astroV1Client)
-	if err != nil || removal == nil {
-		// nil, nil is a declined question, which has said so.
+	if err != nil {
 		return err
 	}
 	return emitWorkspaceRemoval(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, removal)

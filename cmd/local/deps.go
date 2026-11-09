@@ -314,9 +314,6 @@ func markSkipPreRun(cmd *cobra.Command) {
 	}
 }
 
-// errAborted reports a confirmation answered "no".
-var errAborted = errors.New("aborted")
-
 // proxyDaemon adapts internal/proxydaemon's daemon lifecycle to the engines'
 // localrt.ProxyDaemon seam, for the routes under dir. The engines see only the
 // interface.

@@ -52,7 +52,7 @@ The selection is per user and per project, never committed: `state.json` in the 
 
 ## Deploy always asks
 
-`astro deploy` never resolves from ambient state. Shipping code is too consequential to decide from a selection, an exported variable or a marker in a file nobody looked at. The target is named on the command line, or an interactive run asks. Only `default = true` (or a project's only link) preselects the entry in that prompt. `ASTRO_DEPLOYMENT` and your selection play no part in it: they choose which Airflow the query commands read, and where code ships is the project's, so the CLI and Astro Desktop highlight the same entry. A run that cannot be asked and names nothing fails. Details are in [deploy.md](deploy.md#3-selecting-the-deployment).
+`astro deploy` never resolves from ambient state. Shipping code is too consequential to decide from a selection, an exported variable or a marker in a file nobody looked at. The target is named on the command line, or an interactive run asks. Only `default = true` (or a project's only link) preselects the entry in that prompt. `ASTRO_DEPLOYMENT` and your selection play no part in it: they choose which Airflow the query commands read, and where code ships is the project's, so the CLI and Astro Desktop highlight the same entry. A run that cannot be asked and names nothing fails. The one exception is a credential that can only reach one Deployment: under an `ASTRO_API_TOKEN` scoped to a single Deployment, a deploy that names nothing ships to that Deployment and says so on stderr. Details are in [deploy.md](deploy.md#3-selecting-the-deployment).
 
 ## Link kinds and authentication
 

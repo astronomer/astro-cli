@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // What `astro deployment worker-queue create`, `update` and `delete`, and
@@ -110,6 +111,9 @@ func TestDeploymentWorkerQueueAndLogsText(t *testing.T) {
 		answers string
 		args    []string
 		says    []string
+		// declined is a question answered no: the run fails aborted, exit
+		// 1, with nothing on stdout.
+		declined bool
 	}{
 		{
 			name: "worker-queue create",
@@ -132,11 +136,12 @@ func TestDeploymentWorkerQueueAndLogsText(t *testing.T) {
 			says: []string{"worker queue etl-queue for etl-dev in workspace-id workspace updated"},
 		},
 		{
-			name:    "worker-queue update, declined",
-			client:  func(t *testing.T) astrov1.APIClient { return wqMock(t) },
-			answers: "n\n",
-			args:    wqArgs("worker-queue", "update", "--name", "etl-queue", "--max-count", "8"),
-			says:    []string{"Are you sure you want to update the", "etl-queue", "Canceling worker queue update"},
+			name:     "worker-queue update, declined",
+			client:   func(t *testing.T) astrov1.APIClient { return wqMock(t) },
+			answers:  "n\n",
+			args:     wqArgs("worker-queue", "update", "--name", "etl-queue", "--max-count", "8"),
+			says:     []string{"Are you sure you want to update the", "etl-queue"},
+			declined: true,
 		},
 		{
 			name: "worker-queue delete --yes",
@@ -149,11 +154,12 @@ func TestDeploymentWorkerQueueAndLogsText(t *testing.T) {
 			says: []string{"worker queue etl-queue for etl-dev in workspace-id workspace deleted"},
 		},
 		{
-			name:    "worker-queue delete, declined",
-			client:  func(t *testing.T) astrov1.APIClient { return wqMock(t) },
-			answers: "n\n",
-			args:    wqArgs("worker-queue", "delete", "--name", "etl-queue"),
-			says:    []string{"Are you sure you want to delete the", "etl-queue", "Canceling worker queue deletion"},
+			name:     "worker-queue delete, declined",
+			client:   func(t *testing.T) astrov1.APIClient { return wqMock(t) },
+			answers:  "n\n",
+			args:     wqArgs("worker-queue", "delete", "--name", "etl-queue"),
+			says:     []string{"Are you sure you want to delete the", "etl-queue"},
+			declined: true,
 		},
 		{
 			name:   "logs",
@@ -175,8 +181,14 @@ func TestDeploymentWorkerQueueAndLogsText(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := tc.client(t)
 			run := execAstroCmd(t, client, tc.answers, newDeploymentRootCmd, append([]string{"deployment"}, tc.args...)...)
-			require.NoError(t, run.err, "stdout:\n%s", run.stdout)
-			assert.Equal(t, 0, run.code)
+			if tc.declined {
+				require.ErrorIs(t, run.err, input.ErrAborted)
+				assert.Equal(t, cliout.ExitFailure, run.code)
+				assert.Empty(t, run.stdout)
+			} else {
+				require.NoError(t, run.err, "stdout:\n%s", run.stdout)
+				assert.Equal(t, 0, run.code)
+			}
 			requireInOrder(t, run.terminal(), tc.says...)
 			client.(*astrov1_mocks.ClientWithResponsesInterface).AssertExpectations(t)
 		})

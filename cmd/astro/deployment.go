@@ -773,10 +773,6 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
-	// The Deployment lookup prints its notes to bare stdout; under json they
-	// are notes, not log records.
-	defer strayStdoutToStderr(deploymentLogsOutput)()
-
 	// Get release name from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
@@ -1013,8 +1009,7 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	removal, err := deployment.Delete(deploymentID, ws, deploymentName, forceDelete, astroV1Client)
-	if err != nil || removal == nil {
-		// nil, nil is a declined question, which has said so.
+	if err != nil {
 		return err
 	}
 	return emitRemoval(cliout.Renderer{Format: deploymentOutput, Out: out}, removal)
@@ -1098,8 +1093,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 
 	if removeOverride {
 		res, err := deployment.DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName, forceOverride, astroV1Client)
-		if err != nil || res == nil {
-			// nil, nil is a declined question, which has said so.
+		if err != nil {
 			return err
 		}
 		return emitHibernation(r, res, action)
@@ -1111,7 +1105,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 	}
 
 	res, err := deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, astroV1Client)
-	if err != nil || res == nil {
+	if err != nil {
 		return err
 	}
 	// The override is set, and said so, before the wait for it starts.

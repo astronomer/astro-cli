@@ -59,11 +59,17 @@ func About(what string) Option {
 	return func(e *RequiredError) { e.About = what }
 }
 
-// MayAsk returns nil when this run may ask prompt, and otherwise the
-// *RequiredError a prompt refuses with. A caller that reads its answer from a
+// MayAsk returns nil when this run may ask prompt, ErrInterrupted once the
+// run has been interrupted, and otherwise the *RequiredError a prompt refuses
+// with. A caller that reads its answer from a
 // reader of its own (a table picker, a y/N on stderr) calls it first, so it
 // refuses the same way the primitives here do.
 func MayAsk(prompt string, opts ...Option) error {
+	// A run already interrupted asks nothing more: it is ending, and a
+	// question it printed would only be left unanswered.
+	if isInterrupted() {
+		return ErrInterrupted
+	}
 	reason := refusal()
 	if reason == "" {
 		return nil
@@ -97,7 +103,7 @@ func (e *RequiredError) Error() string {
 		return e.err.Error()
 	}
 	asked := "for an answer"
-	switch prompt := strings.TrimRight(strings.TrimSpace(e.Prompt), ": >"); {
+	switch prompt := strings.TrimRight(plain(e.Prompt), ": >"); {
 	case e.About != "":
 		asked = "for " + e.About
 	case prompt != "":
@@ -124,6 +130,14 @@ func Required(err error) error {
 		return nil
 	}
 	return &RequiredError{err: err}
+}
+
+// Unanswered reports whether err is a question that got no answer at all:
+// one this run could not ask (IsRequired), or one the run was interrupted at
+// (ErrInterrupted). A caller that reads any other failed read as an empty
+// answer, as a few always have, still stops on these.
+func Unanswered(err error) bool {
+	return IsRequired(err) || errors.Is(err, ErrInterrupted)
 }
 
 // IsRequired reports whether err is a question this run could not ask.

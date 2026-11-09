@@ -11,11 +11,14 @@ import (
 
 	pkgerrors "github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
+	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
@@ -38,10 +41,12 @@ var cloudSamples = map[cliout.ProblemKind][]error{
 		// A login a run under --output json may not start, as Login words it.
 		fmt.Errorf("%w; with --output json it cannot — run astro login first", astroAuth.ErrLoginNeeded),
 	},
-	KindForbidden:      {apiFailure(http.StatusForbidden)},
-	KindNotFound:       {apiFailure(http.StatusNotFound)},
-	KindConflict:       {apiFailure(http.StatusConflict)},
-	KindAPIUnavailable: {apiFailure(http.StatusInternalServerError), apiFailure(http.StatusServiceUnavailable)},
+	KindForbidden:            {apiFailure(http.StatusForbidden)},
+	KindNotFound:             {apiFailure(http.StatusNotFound)},
+	KindConflict:             {apiFailure(http.StatusConflict)},
+	KindAPIUnavailable:       {apiFailure(http.StatusInternalServerError), apiFailure(http.StatusServiceUnavailable)},
+	KindNoDeployments:        {&deployment.NoDeploymentsError{Workspace: "ws"}},
+	KindNoEligibleDeployment: {&deployment.NoneEligibleError{Workspace: "ws"}},
 }
 
 func TestEveryCloudKindResolvesThroughAWrap(t *testing.T) {
@@ -69,7 +74,7 @@ func TestAnUnnamedStatusHasNoKind(t *testing.T) {
 }
 
 func TestCloudKindOrderIsPinned(t *testing.T) {
-	want := []cliout.ProblemKind{KindUnauthenticated, KindForbidden, KindNotFound, KindConflict, KindAPIUnavailable}
+	want := []cliout.ProblemKind{KindUnauthenticated, KindForbidden, KindNotFound, KindConflict, KindAPIUnavailable, KindNoDeployments, KindNoEligibleDeployment}
 	if len(cloudKinds) != len(want) {
 		t.Fatalf("%d kinds in the table, %d pinned here", len(cloudKinds), len(want))
 	}
@@ -141,6 +146,47 @@ func TestACloudCommandFailsAsOneJSONObject(t *testing.T) {
 				t.Errorf("json mode wrote to stderr: %q", stderr)
 			}
 		})
+	}
+}
+
+// A change command in a workspace with no Deployment publishes kind
+// no_deployments, exit 1, through the root's reporting. The command's run is
+// the real selection over a workspace that lists none; the pre-run is skipped
+// because it reads the machine's login.
+func TestAChangeInAnEmptyWorkspaceIsKindNoDeployments(t *testing.T) {
+	for _, tree := range treesToExecute(t) {
+		if tree.name != "astro" {
+			continue
+		}
+		update, _, err := tree.root.Find([]string{"deployment", "update"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		client := astrov1_mocks.NewClientWithResponsesInterface(t)
+		client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(listResponse(http.StatusOK), nil).Once()
+		update.Annotations = map[string]string{telemetry.SkipPreRunAnnotation: "true"}
+		update.RunE = func(*cobra.Command, []string) error {
+			_, err := deployment.GetDeployment("ws-empty", "", "", deployment.ToChange, nil, client)
+			return err
+		}
+
+		stdout, stderr, err := executeRoot(tree.root, "deployment", "update", "--description", "d", "-o", "json")
+		if code := cliout.ExitCode(context.Background(), err); code != cliout.ExitFailure {
+			t.Errorf("exit %d, want %d (err %v)", code, cliout.ExitFailure, err)
+		}
+		var obj cliout.ErrorObject
+		if jerr := json.Unmarshal([]byte(stdout), &obj); jerr != nil {
+			t.Fatalf("stdout is not one error object: %q (%v)", stdout, jerr)
+		}
+		if obj.Kind != KindNoDeployments || obj.Code != cliout.ExitFailure {
+			t.Errorf("got %+v, want kind %q and code %d", obj, KindNoDeployments, cliout.ExitFailure)
+		}
+		if !strings.Contains(obj.Error, "create one with astro deployment create") {
+			t.Errorf("the error does not say how to create one: %q", obj.Error)
+		}
+		if stderr != "" {
+			t.Errorf("json mode wrote to stderr: %q", stderr)
+		}
 	}
 }
 

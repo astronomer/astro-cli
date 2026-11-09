@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -98,6 +99,9 @@ func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 		if !ok || l.Kind() != manifest.KindAstro {
 			break
 		}
+		if err := refuseArgumentAgainstLink(cmd, args, m, *d.name, l.Deployment); err != nil {
+			return projectPick{}, err
+		}
 		link = *d.name
 		deploymentID = l.Deployment
 		*d.name = ""
@@ -166,6 +170,25 @@ func credentialFromEnv() bool {
 
 // projectDeployment reads ref as a Deployment link name, then as a Deployment
 // id, and returns the id and the name of the link it belongs to, if any.
+// refuseArgumentAgainstLink fails when cmd takes a Deployment-id argument,
+// args has one, and it names a Deployment other than id, the one the link
+// given as --deployment points at. The command's RunE takes the argument over
+// --deployment, so it would otherwise win without a word: two Deployments
+// named at once is a usage error.
+func refuseArgumentAgainstLink(cmd *cobra.Command, args []string, m *manifest.Manifest, link, id string) error {
+	if cmd.Annotations[deploymentArgAnnotation] == "" || len(args) == 0 {
+		return nil
+	}
+	argID, _, err := projectDeployment(m, args[0])
+	if err != nil {
+		return err
+	}
+	if argID != id {
+		return cliout.Usage(fmt.Errorf("the argument %s and --deployment %s (a link to %s) name different Deployments: pass one of them", args[0], link, id))
+	}
+	return nil
+}
+
 func projectDeployment(m *manifest.Manifest, ref string) (id, link string, err error) {
 	if l, ok := m.Astro.Deployments[ref]; ok {
 		if l.Kind() != manifest.KindAstro {

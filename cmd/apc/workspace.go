@@ -201,8 +201,7 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	ok, err := confirmRemoval(out, fmt.Sprintf("\nAre you sure you want to delete Workspace %s? This cannot be undone.", args[0]), "Canceling Workspace deletion")
-	if err != nil || !ok {
+	if err := confirmRemoval(fmt.Sprintf("\nAre you sure you want to delete Workspace %s? This cannot be undone.", args[0])); err != nil {
 		return err
 	}
 	w, err := workspace.Delete(args[0], houstonClient)

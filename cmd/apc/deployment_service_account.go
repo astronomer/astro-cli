@@ -119,12 +119,10 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 // serviceAccountDeleteQuestion is what a service-account delete asks before
-// it deletes id, and serviceAccountDeleteCanceled what it says when told no.
+// it deletes id.
 func serviceAccountDeleteQuestion(id string) string {
 	return fmt.Sprintf("\nAre you sure you want to delete service account %s? This cannot be undone.", id)
 }
-
-const serviceAccountDeleteCanceled = "Canceling service account deletion"
 
 func deploymentSaCreate(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
@@ -158,8 +156,7 @@ func deploymentSaDelete(cmd *cobra.Command, args []string, out io.Writer) error 
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	ok, err := confirmRemoval(out, serviceAccountDeleteQuestion(args[0]), serviceAccountDeleteCanceled)
-	if err != nil || !ok {
+	if err := confirmRemoval(serviceAccountDeleteQuestion(args[0])); err != nil {
 		return err
 	}
 	deleted, err := sa.DeleteUsingDeploymentUUID(args[0], deploymentID, houstonClient)

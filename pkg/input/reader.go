@@ -50,5 +50,16 @@ func Reader(in io.Reader) *bufio.Reader {
 	return bufio.NewReader(in)
 }
 
+// forget drops r as the shared reader, when it is that: a read interrupted
+// mid-line leaves a goroutine reading it, and a bufio.Reader is not one two
+// readers can share. The next question builds a reader of its own.
+func forget(r *bufio.Reader) {
+	shared.Lock()
+	defer shared.Unlock()
+	if shared.r == r {
+		shared.src, shared.r = nil, nil
+	}
+}
+
 // stdin is the reader on os.Stdin as it is now.
 func stdin() *bufio.Reader { return Reader(os.Stdin) }
