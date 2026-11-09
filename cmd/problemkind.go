@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
@@ -38,6 +39,14 @@ const (
 	// KindAPIUnavailable: the API failed on its side (5xx). Transient as far as
 	// the CLI can tell; try again.
 	KindAPIUnavailable cliout.ProblemKind = "api_unavailable"
+	// KindNoDeployments: a command that needed a Deployment picked found
+	// none in the workspace (deployment.NoDeploymentsError). Nothing is
+	// created in its place; create one with astro deployment create.
+	KindNoDeployments cliout.ProblemKind = "no_deployments"
+	// KindNoEligibleDeployment: the workspace has Deployments, but none the
+	// command can act on (deployment.NoneEligibleError), such as hibernate
+	// with no development Deployment.
+	KindNoEligibleDeployment cliout.ProblemKind = "no_eligible_deployment"
 )
 
 // cloudKinds recognizes cloud failures.
@@ -66,6 +75,14 @@ var cloudKinds = cliout.Kinds{
 	{Kind: KindAPIUnavailable, Match: func(err error) bool {
 		var se *httputil.StatusError
 		return errors.As(err, &se) && se.StatusCode >= http.StatusInternalServerError
+	}},
+	{Kind: KindNoDeployments, Match: func(err error) bool {
+		var none *deployment.NoDeploymentsError
+		return errors.As(err, &none)
+	}},
+	{Kind: KindNoEligibleDeployment, Match: func(err error) bool {
+		var none *deployment.NoneEligibleError
+		return errors.As(err, &none)
 	}},
 }
 

@@ -196,8 +196,10 @@ The command-specific 2s predate the usage 2. A script that runs one of those com
 | `not_found` | the Astro API has no such object (404) |
 | `conflict` | the Astro API refused because of the object's current state, such as one that already exists (409) |
 | `api_unavailable` | the Astro API failed on its side (5xx); try again |
+| `no_deployments` | a command that needed a Deployment picked found none in the workspace, and created none in its place; create one with `astro deployment create` |
+| `no_eligible_deployment` | the workspace has Deployments, but none the command can act on (`hibernate` and `wake-up` with no development Deployment, `astro link add` with every Deployment already linked) |
 
-The cloud kinds come from the status on the `*httputil.StatusError` that every Astro API failure is normalized into, and `unauthenticated` also from the "no context" and "not logged in" errors raised before any request. APC (Houston) failures carry no kind: its client reports them as text.
+The cloud kinds come from the status on the `*httputil.StatusError` that every Astro API failure is normalized into, and `unauthenticated` also from the "no context" and "not logged in" errors raised before any request. `no_deployments` and `no_eligible_deployment` come from the Astro Deployment selector's own error types (`deployment.NoDeploymentsError`, `deployment.NoneEligibleError`), matched by type, not by status. APC (Houston) failures carry no kind: its client reports them as text.
 
 A failure with no kind publishes no `kind` key rather than an `unknown` catch-all. A kind is added only when the CLI can recognise the failure reliably (a sentinel it wraps, a type it can assert, or a status on one), never for a failure nothing emits. Changing a kind breaks whatever reads it.
 
