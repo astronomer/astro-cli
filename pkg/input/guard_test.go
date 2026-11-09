@@ -133,6 +133,11 @@ func (s *Suite) TestRequiredErrorMessage() {
 			`this command needs to ask "Delete prod?"; with --output json it cannot — pass --yes`,
 		},
 		{
+			"invisible format characters are dropped, so the text reads as it is",
+			MayAsk("Delete run \u202egnp.exe\u200b of x?", AnsweredBy("--yes")),
+			`this command needs to ask "Delete run gnp.exe of x?"; with --output json it cannot — pass --yes`,
+		},
+		{
 			"trailing prompt punctuation is dropped",
 			MayAsk("Enter a name for the new token: "),
 			`this command needs to ask "Enter a name for the new token"; with --output json it cannot — pass the answer as a flag`,

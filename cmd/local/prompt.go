@@ -38,17 +38,20 @@ func (c *cli) confirm(question string) error {
 	if err := input.MayAsk(question, input.AnsweredBy("--yes")); err != nil {
 		return err
 	}
+	tty := c.interactive()
 	fmt.Fprint(c.d.Stderr, question+" [y/N] ") //nolint:errcheck // a failed write to the terminal still reads the answer
 	line, err := input.ReadLine(input.Reader(c.d.Stdin), c.d.Stderr)
 	if errors.Is(err, input.ErrInterrupted) {
 		return err // ReadLine ended the line
 	}
-	line = strings.TrimSpace(line)
-	answered := err == nil || line != "" // an empty line is an answer: a no
+	answered := err == nil || strings.TrimSpace(line) != "" // an empty line is an answer: a no
+	// The answer is decided on the text a log shows, so the line written
+	// below never reads as a yes for a run that went on to abort.
+	answer := input.Plain(line)
 	switch {
-	case answered && !c.interactive():
+	case answered && !tty:
 		// A terminal echoed what was typed; a pipe did not.
-		fmt.Fprintln(c.d.Stderr, input.Plain(line))
+		fmt.Fprintln(c.d.Stderr, answer)
 	case err != nil:
 		// Input that ended left the line open: end it, so what follows
 		// starts on a fresh one.
@@ -56,16 +59,16 @@ func (c *cli) confirm(question string) error {
 	}
 	if !answered {
 		switch {
-		case errors.Is(err, io.EOF) && c.interactive():
+		case errors.Is(err, io.EOF) && tty:
 			return input.Required(errors.New("confirmation needed but input ended with no answer; pass --yes to proceed"))
 		case errors.Is(err, io.EOF):
 			return input.Required(errors.New("confirmation needed but stdin is not interactive; pass --yes to proceed"))
-		case !c.interactive():
+		case !tty:
 			return fmt.Errorf("reading the answer to %s: %w", input.Quote(question), err)
 		}
 		return err
 	}
-	switch strings.ToLower(line) {
+	switch strings.ToLower(answer) {
 	case "y", "yes":
 		return nil
 	default:

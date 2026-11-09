@@ -107,7 +107,7 @@ func (e *RequiredError) Error() string {
 	case e.About != "":
 		asked = "for " + e.About
 	case prompt != "":
-		asked = Quote(prompt)
+		asked = quotePlain(prompt)
 	}
 	answer := "pass the answer as a flag"
 	if e.Flag != "" {

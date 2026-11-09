@@ -184,7 +184,7 @@ The command-specific 2s predate the usage 2. A script that runs one of those com
 | kind | meaning |
 | --- | --- |
 | `usage` | the command was invoked wrongly; exit status 2 |
-| `input_required` | the command needed an answer it would have asked for, and this run could not ask: under `--output json`, or without a terminal where the command refuses to guess. The message names the question and the flag that answers it. Exit status 1 (see [Prompts](#prompts)) |
+| `input_required` | the command needed an answer it would have asked for, and this run could not ask: under `--output json`, or without a terminal where the command refuses to guess. The message names the flag that answers it, and the question unless it was just written above the error (astro local's `[y/N]` with nothing piped). Exit status 1 (see [Prompts](#prompts)) |
 | `aborted` | the command asked for confirmation and was answered no, so it did nothing it was asked to (`input.ErrAborted`, which a declined confirmation returns in `astro local`, the Astro commands, `astro context delete`, and the Astro Private Cloud workspace and service-account deletes: `Error: aborted`, and nothing on stdout). Exit status 1: declining is not success. Not 130, which is an interrupt. Under `--output json` no confirmation is asked, so it is a text-mode failure in practice |
 | `no_project` | no project here: no `pyproject.toml` with `[tool.astro]` |
 | `foreign_mode` | the project is running in the other mode |

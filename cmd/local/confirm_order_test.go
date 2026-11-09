@@ -37,17 +37,18 @@ func TestConfirmLeavesWholeLines(t *testing.T) {
 		refused     bool  // the input_required refusal naming --yes
 		err         error // otherwise; nil for a yes
 	}{
-		"terminal, yes":                   {true, "y\n", q, false, nil},
-		"terminal, no":                    {true, "n\n", q, false, input.ErrAborted},
-		"terminal, input ended":           {true, "", q + "\n", true, nil},
-		"terminal, yes then ended":        {true, "y", q + "\n", false, nil},
-		"piped, yes":                      {false, "y\n", q + "y\n", false, nil},
-		"piped, no":                       {false, "n\n", q + "n\n", false, input.ErrAborted},
-		"piped, yes with no newline":      {false, "y", q + "y\n", false, nil},
-		"piped nothing":                   {false, "", q + "\n", true, nil},
-		"piped, an empty line (a no)":     {false, "\n", q + "\n", false, input.ErrAborted},
-		"piped, escapes are not echoed":   {false, "n\x1b[2J\x1b]0;title\x07\x08\n", q + "n\n", false, input.ErrAborted},
-		"piped, a long answer on one row": {false, "no  way\tthanks\r\n", q + "no way thanks\n", false, input.ErrAborted},
+		"terminal, yes":                                {true, "y\n", q, false, nil},
+		"terminal, no":                                 {true, "n\n", q, false, input.ErrAborted},
+		"terminal, input ended":                        {true, "", q + "\n", true, nil},
+		"terminal, yes then ended":                     {true, "y", q + "\n", false, nil},
+		"piped, yes":                                   {false, "y\n", q + "y\n", false, nil},
+		"piped, no":                                    {false, "n\n", q + "n\n", false, input.ErrAborted},
+		"piped, yes with no newline":                   {false, "y", q + "y\n", false, nil},
+		"piped nothing":                                {false, "", q + "\n", true, nil},
+		"piped, an empty line (a no)":                  {false, "\n", q + "\n", false, input.ErrAborted},
+		"piped, escapes are not echoed":                {false, "n\x1b[2J\x1b]0;title\x07\x08\n", q + "n\n", false, input.ErrAborted},
+		"piped, a long answer on one row":              {false, "no  way\tthanks\r\n", q + "no way thanks\n", false, input.ErrAborted},
+		"piped, a styled yes is the yes the log shows": {false, "y\x1b[0m\x07\n", q + "y\n", false, nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			stderr, err := confirmLines(t, tc.interactive, tc.stdin)
