@@ -49,21 +49,23 @@ func (c *cli) confirm(question string) error {
 		return err
 	}
 	line = strings.TrimSpace(line)
+	answered := err == nil || line != "" // an empty line is an answer: a no
 	switch {
-	case !asked && (err == nil || line != ""):
-		// An answer came, even an empty line (a no): record it.
-		fmt.Fprintln(c.d.Stderr, prompt+line)
 	case asked && err != nil:
 		// Input that ended left the prompt's line open: end it, so what
 		// follows starts on a fresh one.
 		fmt.Fprintln(c.d.Stderr)
+	case !asked && answered:
+		fmt.Fprintln(c.d.Stderr, strings.TrimRight(prompt+line, " "))
 	}
-	if err != nil && line == "" {
-		if errors.Is(err, io.EOF) {
-			return input.Required(errors.New("confirmation needed but stdin is not interactive; pass --yes to proceed"))
-		}
-		if !asked {
-			// The question was never written, so the error carries it.
+	if !answered {
+		switch {
+		case asked && errors.Is(err, io.EOF):
+			return input.Required(errors.New("confirmation needed but input ended with no answer; pass --yes to proceed"))
+		case errors.Is(err, io.EOF):
+			// The question was never written, so the refusal names it.
+			return input.Required(fmt.Errorf("confirmation needed for %q but stdin is not interactive; pass --yes to proceed", question))
+		case !asked:
 			return fmt.Errorf("reading the answer to %q: %w", question, err)
 		}
 		return err

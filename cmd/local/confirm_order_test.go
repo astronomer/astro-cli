@@ -32,17 +32,18 @@ func TestConfirmLeavesWholeLines(t *testing.T) {
 		interactive bool
 		stdin       string
 		stderr      string
-		err         error // nil for a yes
+		refused     bool  // the input_required refusal naming --yes
+		err         error // otherwise; nil for a yes
 	}{
-		"terminal, yes":               {true, "y\n", q, nil},
-		"terminal, no":                {true, "n\n", q, input.ErrAborted},
-		"terminal, input ended":       {true, "", q + "\n", nil},
-		"terminal, yes then ended":    {true, "y", q + "\n", nil},
-		"piped, yes":                  {false, "y\n", q + "y\n", nil},
-		"piped, no":                   {false, "n\n", q + "n\n", input.ErrAborted},
-		"piped, yes with no newline":  {false, "y", q + "y\n", nil},
-		"piped nothing":               {false, "", "", nil},
-		"piped, an empty line (a no)": {false, "\n", q + "\n", input.ErrAborted},
+		"terminal, yes":               {true, "y\n", q, false, nil},
+		"terminal, no":                {true, "n\n", q, false, input.ErrAborted},
+		"terminal, input ended":       {true, "", q + "\n", true, nil},
+		"terminal, yes then ended":    {true, "y", q + "\n", false, nil},
+		"piped, yes":                  {false, "y\n", q + "y\n", false, nil},
+		"piped, no":                   {false, "n\n", q + "n\n", false, input.ErrAborted},
+		"piped, yes with no newline":  {false, "y", q + "y\n", false, nil},
+		"piped nothing":               {false, "", "", true, nil},
+		"piped, an empty line (a no)": {false, "\n", "Wipe it? [y/N]\n", false, input.ErrAborted},
 	} {
 		t.Run(name, func(t *testing.T) {
 			stderr, err := confirmLines(t, tc.interactive, tc.stdin)
@@ -50,7 +51,7 @@ func TestConfirmLeavesWholeLines(t *testing.T) {
 				t.Errorf("stderr = %q, want %q", stderr, tc.stderr)
 			}
 			switch {
-			case tc.stdin == "":
+			case tc.refused:
 				if !input.IsRequired(err) || !strings.Contains(err.Error(), "pass --yes") {
 					t.Errorf("err = %v, want the refusal naming --yes", err)
 				}
@@ -165,8 +166,9 @@ func TestResetWithNoHomeFailsBeforeAsking(t *testing.T) {
 func TestResetWithNoTerminalRefusesWithoutAsking(t *testing.T) {
 	d, rt, _ := resetDeps(t)
 	err := execute(t, d, "local", "reset")
-	if err == nil || err.Error() != "confirmation needed but stdin is not interactive; pass --yes to proceed" {
-		t.Fatalf("err = %v, want the refusal naming --yes", err)
+	if err == nil || !strings.HasPrefix(err.Error(), `confirmation needed for "Wipe the local Airflow state`) ||
+		!strings.HasSuffix(err.Error(), "but stdin is not interactive; pass --yes to proceed") {
+		t.Fatalf("err = %v, want the refusal naming the question and --yes", err)
 	}
 	if kind := ProblemKinds.Of(err); kind != cliout.KindInputRequired {
 		t.Errorf("kind %q, want %q", kind, cliout.KindInputRequired)
