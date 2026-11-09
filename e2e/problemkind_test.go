@@ -100,12 +100,21 @@ func TestATextFailurePrintsNoUsageBlock(t *testing.T) {
 		code   int
 		stderr string
 	}{
-		{[]string{"deployment", "list", "--bogus"}, 2,
-			"Error: unknown flag: --bogus\nRun astro deployment list --help for usage.\n"},
-		{[]string{"deployment", "list", "--workspac", "x"}, 2,
-			"Error: unknown flag: --workspac\nDid you mean --workspace?\nRun astro deployment list --help for usage.\n"},
-		{[]string{"--version"}, 2,
-			"Error: unknown flag: --version\nRun astro --help for usage.\n"},
+		{
+			[]string{"deployment", "list", "--bogus"},
+			2,
+			"Error: unknown flag: --bogus\nRun astro deployment list --help for usage.\n",
+		},
+		{
+			[]string{"deployment", "list", "--workspac", "x"},
+			2,
+			"Error: unknown flag: --workspac\nDid you mean --workspace?\nRun astro deployment list --help for usage.\n",
+		},
+		{
+			[]string{"--version"},
+			2,
+			"Error: unknown flag: --version\nRun astro --help for usage.\n",
+		},
 	} {
 		r := p.run(c.args...)
 		if r.ExitCode != c.code || r.Stderr != c.stderr {
