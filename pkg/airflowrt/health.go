@@ -9,8 +9,10 @@ import (
 )
 
 // healthPollInterval is how often the wait re-asks. The first ask does not
-// wait for it; see CheckHealth.
-const healthPollInterval = time.Second
+// wait for it; see CheckHealth. A start returns up to one interval after
+// Airflow answers, and an ask of a port nobody listens on yet costs a refused
+// connection.
+const healthPollInterval = 100 * time.Millisecond
 
 // ErrHealthTimeout reports that Airflow did not answer in the time allowed.
 //
