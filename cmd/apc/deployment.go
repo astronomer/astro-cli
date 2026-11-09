@@ -153,11 +153,12 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage APC Deployments",
 		Long:    "Deployments are individual Airflow clusters running on an installation of the APC platform.",
 	}
+	deleteCmd := newDeploymentDeleteCmd(out)
 	cmd.AddCommand(
 		newDeploymentCreateCmd(out),
 		newDeploymentListCmd(out),
 		newDeploymentUpdateCmd(out),
-		newDeploymentDeleteCmd(out),
+		deleteCmd,
 		newDeploymentHibernateCmd(out),
 		newDeploymentWakeUpCmd(out),
 		newDeploymentAdoptCmd(out),
@@ -168,6 +169,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentAirflowRootCmd(out),
 		newDeploymentTeamRootCmd(out),
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 
 	if appConfig != nil && appConfig.Flags.AstroRuntimeEnabled {
 		cmd.AddCommand(newDeploymentRuntimeRootCmd(out))
@@ -301,7 +303,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [DEPLOYMENT_ID]",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete an Airflow Deployment",
 		Long:    "Delete an Airflow Deployment, named by its id or with --deployment, which takes a link name from the project's manifest too",
 		Example: `  # Delete a Deployment and all of its data, after you confirm

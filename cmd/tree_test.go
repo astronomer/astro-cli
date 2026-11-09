@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // claimant is who answers to one spelling under a parent, and how it claimed it.
@@ -98,6 +101,49 @@ func TestCommandGroupHasNoStaleEntries(t *testing.T) {
 		if !existing[name] {
 			t.Errorf("commandGroup has %q, which is no longer a top-level command in any tree; drop the line", name)
 		}
+	}
+}
+
+// TestDeleteAndRemoveAnswerToRm gives every delete and remove the same one
+// short spelling, rm, and no other: a destructive verb's alias is one nobody
+// types by accident, and the same everywhere. 1.x gave every delete the alias
+// de, which is also astro deployment's own, so astro de de <id> deleted a
+// Deployment; v2 keeps de as a stub that names delete (cliout.RemovedAlias).
+func TestDeleteAndRemoveAnswerToRm(t *testing.T) {
+	for _, tree := range rootsUnderTest(t) {
+		walkCmd(tree.root, func(cmd *cobra.Command) {
+			// A hidden command still answers when typed, so it is held to
+			// this too; a stub (a removed command's, or the stand-in for one
+			// the platform is too old for) runs nothing.
+			if cmd.Name() != "delete" && cmd.Name() != "remove" || cliout.IsRemovedCommand(cmd) || isVersionGateStub(cmd) {
+				return
+			}
+			if !slices.Equal(cmd.Aliases, []string{"rm"}) {
+				t.Errorf("[%s] %s answers to %v; a %s answers to rm and nothing else", tree.name, cmd.CommandPath(), cmd.Aliases, cmd.Name())
+			}
+		})
+	}
+}
+
+// TestNoCommandAnswersToAWordAnAncestorAnswersTo is the general form of the
+// hazard above: astro de de <id> ran a delete because the child answered to the
+// word its parent did, which reads as a typo repeated rather than a command. A
+// removed command's stub is exempt: it only says what replaced it
+// (astro deployment de).
+func TestNoCommandAnswersToAWordAnAncestorAnswersTo(t *testing.T) {
+	for _, tree := range rootsUnderTest(t) {
+		walkCmd(tree.root, func(cmd *cobra.Command) {
+			if cliout.IsRemovedCommand(cmd) {
+				return
+			}
+			for up := cmd.Parent(); up != nil && up != tree.root; up = up.Parent() {
+				for _, word := range spellings(cmd) {
+					if slices.Contains(spellings(up), word) {
+						t.Errorf("[%s] %s answers to %q, as %s does", tree.name, cmd.CommandPath(), word, up.CommandPath())
+					}
+				}
+			}
+		})
 	}
 }
 

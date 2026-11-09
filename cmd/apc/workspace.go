@@ -44,16 +44,18 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage APC Workspaces",
 		Long:    "Workspaces contain a group of Airflow Cluster Deployments. The creator of the workspace can invite other users into it",
 	}
+	deleteCmd := newWorkspaceDeleteCmd(out)
 	cmd.AddCommand(
 		newWorkspaceListCmd(out),
 		newWorkspaceCreateCmd(out),
-		newWorkspaceDeleteCmd(out),
+		deleteCmd,
 		newWorkspaceSwitchCmd(out),
 		newWorkspaceUpdateCmd(out),
 		newWorkspaceUserRootCmd(out),
 		newWorkspaceSaRootCmd(out),
 		newWorkspaceTeamRootCmd(out),
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	applyPreferredFlagsIn(cmd)
 	return cmd
 }
@@ -97,7 +99,7 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete <WORKSPACE_ID>",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete an APC Workspace",
 		Long:    "Delete an APC Workspace. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Example: workspaceDeleteExample,

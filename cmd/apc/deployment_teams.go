@@ -74,6 +74,7 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // th
 func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "remove <TEAM_ID>",
+		Aliases: []string{"rm"},
 		Short:   "Remove a team from a deployment",
 		Long:    "Remove a team from a deployment",
 		Args:    cobra.ExactArgs(1),

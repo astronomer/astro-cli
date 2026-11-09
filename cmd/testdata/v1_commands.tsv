@@ -4,7 +4,11 @@
 # non-hosted organization (astro) and a hosted one (astro-hosted), and its
 # APC tree (apc).
 #
-# It records 1.x, so nothing in v2 changes it. Only the tests read it
+# It records 1.x, so nothing in v2 changes it, with one exception: a 1.x
+# alias v2 dropped is listed as a path of its own, since otherwise only the
+# name is checked. Today that is 1.x's de on every delete (deployment de),
+# which v2 gave up because de is also deployment's own alias; each reaches a
+# stub that names the command it spelled. Only the tests read it
 # (removed_commands_test.go): every path here is a command v2 still has, or
 # reaches a hidden stub that says what replaced it.
 astro,astro-hosted,apc	api
@@ -25,6 +29,7 @@ astro,astro-hosted,apc	config
 astro,astro-hosted,apc	config get
 astro,astro-hosted,apc	config set
 astro,astro-hosted,apc	context
+astro,astro-hosted,apc	context de
 astro,astro-hosted,apc	context delete
 astro,astro-hosted,apc	context list
 astro,astro-hosted,apc	context switch
@@ -52,6 +57,7 @@ astro,astro-hosted	deployment connection create
 astro,astro-hosted	deployment connection list
 astro,astro-hosted	deployment connection update
 astro,astro-hosted,apc	deployment create
+astro,astro-hosted,apc	deployment de
 astro,astro-hosted,apc	deployment delete
 astro,astro-hosted	deployment hibernate
 astro,astro-hosted	deployment inspect
@@ -67,6 +73,7 @@ astro,astro-hosted	deployment pool list
 astro,astro-hosted	deployment pool update
 apc	deployment service-account
 apc	deployment service-account create
+apc	deployment service-account de
 apc	deployment service-account delete
 apc	deployment service-account list
 astro,astro-hosted,apc	deployment team
@@ -76,6 +83,7 @@ astro,astro-hosted,apc	deployment team remove
 astro,astro-hosted,apc	deployment team update
 astro,astro-hosted	deployment token
 astro,astro-hosted	deployment token create
+astro,astro-hosted	deployment token de
 astro,astro-hosted	deployment token delete
 astro,astro-hosted	deployment token list
 astro,astro-hosted	deployment token organization-token
@@ -103,6 +111,7 @@ astro,astro-hosted	deployment variable update
 astro,astro-hosted	deployment wake-up
 astro,astro-hosted	deployment worker-queue
 astro,astro-hosted	deployment worker-queue create
+astro,astro-hosted	deployment worker-queue de
 astro,astro-hosted	deployment worker-queue delete
 astro,astro-hosted	deployment worker-queue update
 astro,astro-hosted,apc	dev
@@ -171,6 +180,7 @@ astro,astro-hosted	organization role list
 astro,astro-hosted	organization switch
 astro,astro-hosted	organization team
 astro,astro-hosted	organization team create
+astro,astro-hosted	organization team de
 astro,astro-hosted	organization team delete
 astro,astro-hosted	organization team list
 astro,astro-hosted	organization team update
@@ -180,6 +190,7 @@ astro,astro-hosted	organization team user list
 astro,astro-hosted	organization team user remove
 astro,astro-hosted	organization token
 astro,astro-hosted	organization token create
+astro,astro-hosted	organization token de
 astro,astro-hosted	organization token delete
 astro,astro-hosted	organization token list
 astro,astro-hosted	organization token roles
@@ -205,10 +216,12 @@ apc	user create
 astro,astro-hosted,apc	version
 astro,astro-hosted,apc	workspace
 astro,astro-hosted,apc	workspace create
+astro,astro-hosted,apc	workspace de
 astro,astro-hosted,apc	workspace delete
 astro,astro-hosted,apc	workspace list
 apc	workspace service-account
 apc	workspace service-account create
+apc	workspace service-account de
 apc	workspace service-account delete
 apc	workspace service-account list
 astro,astro-hosted,apc	workspace switch
@@ -220,6 +233,7 @@ astro,astro-hosted,apc	workspace team update
 astro,astro-hosted	workspace token
 astro,astro-hosted	workspace token add
 astro,astro-hosted	workspace token create
+astro,astro-hosted	workspace token de
 astro,astro-hosted	workspace token delete
 astro,astro-hosted	workspace token list
 astro,astro-hosted	workspace token organization-token
