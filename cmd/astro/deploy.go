@@ -297,7 +297,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		ProjectDir:       config.WorkingPath,
 		Manifest:         m,
 		LinkName:         linkName,
-		Deployment:       manifestDeployment,
+		Deployment:       targetOrTokenDeployment(errOut, linkName, manifestDeployment),
 		WorkspaceID:      overrideWorkspace,
 		ContextWorkspace: login.context.Workspace,
 		DagsOnly:         dags,
@@ -408,6 +408,22 @@ func announceDeployTarget(w io.Writer, target manifestdeploy.Target) {
 // another Deployment unannounced. Nothing is said when it names the project's
 // default anyway, the row the prompt highlights, or when no prompt is coming:
 // a run that cannot be asked, or one that names its target.
+// targetOrTokenDeployment is --deployment, or, for a deploy that names no
+// target, the Deployment the run's ASTRO_API_TOKEN is scoped to, as a
+// Deployment id named on the command line: the one Deployment such a token
+// can ship to, as 1.x deployed to it in CI. Taking it says so on w, never on
+// stdout.
+func targetOrTokenDeployment(w io.Writer, linkName, flag string) string {
+	if linkName != "" || flag != "" {
+		return flag
+	}
+	id := deployment.TokenDeployment()
+	if id != "" {
+		cliout.Note(w, "Deploying to Deployment "+id+", the one ASTRO_API_TOKEN is scoped to")
+	}
+	return id
+}
+
 func noteIgnoredDeploymentEnv(w io.Writer, m *manifest.Manifest, interactive bool, named ...string) {
 	env := os.Getenv(instances.EnvVar)
 	// Outside a project (an --image-name deploy) there are no links for the

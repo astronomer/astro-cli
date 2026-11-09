@@ -650,16 +650,118 @@ func (s *Suite) TestGetDeploymentAutoSelectsOnlyToRead() {
 // captureStdout is what f wrote to os.Stdout.
 func captureStdout(t *testing.T, f func()) string {
 	t.Helper()
+	return capture(t, &os.Stdout, f)
+}
+
+// capture is what f wrote to *stream, one of os.Stdout and os.Stderr.
+func capture(t *testing.T, stream **os.File, f func()) string {
+	t.Helper()
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
-	saved := os.Stdout
-	os.Stdout = w
-	defer func() { os.Stdout = saved }()
+	saved := *stream
+	*stream = w
+	defer func() { *stream = saved }()
 	f()
 	w.Close()
 	out, err := io.ReadAll(r)
 	require.NoError(t, err)
 	return string(out)
+}
+
+// withTokenDeployment has the run's ASTRO_API_TOKEN scoped to Deployment id
+// until the test ends.
+func withTokenDeployment(t *testing.T, id string) {
+	t.Helper()
+	UseTokenDeployment(id)
+	t.Cleanup(func() { UseTokenDeployment("") })
+}
+
+// Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, a change
+// or a read acts on that Deployment, with nobody asked and a note on stderr.
+// A delete never does, and one the workspace does not list is an error.
+func (s *Suite) TestGetDeploymentFromADeploymentToken() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	s.T().Setenv("ASTRO_API_TOKEN", "deployment-token")
+
+	for _, use := range []Use{ToChange, ToRead} {
+		s.Run(fmt.Sprintf("use %d takes the token's Deployment", use), func() {
+			mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+			mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-id-2").Return(&deploymentResponse, nil).Once()
+			standInForATerminal(s.T(), false)
+			withTokenDeployment(s.T(), "test-id-2")
+
+			var stdout string
+			stderr := capture(s.T(), &os.Stderr, func() {
+				stdout = captureStdout(s.T(), func() {
+					_, err := GetDeployment(ws, "", "", use, nil, mockV1Client)
+					s.NoError(err)
+				})
+			})
+			s.Empty(stdout)
+			s.Contains(stderr, "test-id-2), the one ASTRO_API_TOKEN is scoped to")
+		})
+	}
+
+	s.Run("a named Deployment wins", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-id-1").Return(&deploymentResponse, nil).Once()
+		withTokenDeployment(s.T(), "test-id-2")
+
+		_, err := GetDeployment(ws, "test-id-1", "", ToChange, nil, mockV1Client)
+		s.NoError(err)
+	})
+
+	s.Run("one the workspace does not list is an error", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		withTokenDeployment(s.T(), "elsewhere")
+
+		// An answer is waiting, so a picker that did ask would go on.
+		defer testUtil.MockUserInput(s.T(), "1\n")()
+		_, err := GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
+		s.ErrorIs(err, ErrTokenDeploymentNotFound)
+		s.ErrorContains(err, "elsewhere is not in workspace "+ws)
+	})
+
+	s.Run("one the command cannot act on is an error", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		withTokenDeployment(s.T(), "test-id-2") // not for development
+
+		_, err := GetDeployment(ws, "", "", ToChange, isDevelopmentDeployment, mockV1Client)
+		s.ErrorContains(err, "is not one this command can act on")
+	})
+
+	s.Run("a delete never takes it", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		withTokenDeployment(s.T(), "test-id-2")
+
+		defer testUtil.MockUserInput(s.T(), "")() // nothing typed: no pick
+		got, err := GetDeployment(ws, "", "", ToDelete, nil, mockV1Client)
+		s.ErrorIs(err, ErrInvalidDeploymentKey, "asked, not taken: %v", got.Id)
+	})
+
+	s.Run("a delete with --yes and no terminal still needs its target", func() {
+		standInForATerminal(s.T(), false)
+		withTokenDeployment(s.T(), "test-id-2")
+
+		_, err := Delete("", ws, "", true, mockV1Client)
+		s.True(input.IsRequired(err), "%v", err)
+		s.ErrorIs(err, errDeleteNeedsTarget)
+	})
+
+	// A workspace or organization token names no Deployment: a change in a
+	// workspace with one still refuses with no terminal.
+	s.Run("a workspace token with one Deployment", func() {
+		one := astrov1.ListDeploymentsResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200:      &astrov1.DeploymentsPaginated{Deployments: []astrov1.Deployment{{Id: "test-id-1", Name: "only"}}},
+		}
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&one, nil).Once()
+		standInForATerminal(s.T(), false)
+		withTokenDeployment(s.T(), "")
+
+		_, err := GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
+		s.True(input.IsRequired(err), "%v", err)
+	})
 }
 
 func (s *Suite) TestGetDeploymentByID() {

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -1581,7 +1582,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 		return nil, input.Required(errDeleteNeedsTarget)
 	}
 
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToChange, nil, astroV1Client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToDelete, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -2040,10 +2041,57 @@ const (
 	// is on, as 1.x did for every command.
 	ToRead Use = iota
 	// ToChange changes the Deployment or ships to it. It acts only on a
-	// Deployment the run named or the person picked, never on one taken
-	// because it was the only one.
+	// Deployment the run named, the person picked, or the run's
+	// Deployment-scoped ASTRO_API_TOKEN is for (see UseTokenDeployment);
+	// never on one taken because it was the only one.
 	ToChange
+	// ToDelete is ToChange for a delete, which also never takes the token's
+	// Deployment: what a delete removes is named or picked.
+	ToDelete
 )
+
+// tokenDeployment is the Deployment this process's ASTRO_API_TOKEN is scoped
+// to, or "" (see UseTokenDeployment).
+var tokenDeployment atomic.Value
+
+// UseTokenDeployment records, for this process only, the Deployment the run's
+// ASTRO_API_TOKEN is scoped to: "" for a token scoped to a workspace or an
+// organization, or for none. A run that names no Deployment acts on it (see
+// Use), since it is the one Deployment such a token can act on.
+func UseTokenDeployment(id string) { tokenDeployment.Store(id) }
+
+// TokenDeployment is the Deployment UseTokenDeployment recorded, or "".
+func TokenDeployment() string {
+	id, _ := tokenDeployment.Load().(string)
+	return id
+}
+
+// ErrTokenDeploymentNotFound is a run that named no Deployment, whose
+// ASTRO_API_TOKEN is scoped to a Deployment the workspace does not list.
+var ErrTokenDeploymentNotFound = errors.New("the Deployment ASTRO_API_TOKEN is scoped to was not found")
+
+// fromToken is the Deployment of deployments, listed in ws, that the run's
+// Deployment-scoped token is for, and whether the token names one. One the
+// workspace does not list is an error, as is one filter leaves out: nothing
+// else is picked in its place.
+func fromToken(ws string, deployments []astrov1.Deployment, filter func(astrov1.Deployment) bool) (astrov1.Deployment, bool, error) {
+	id := TokenDeployment()
+	if id == "" {
+		return astrov1.Deployment{}, false, nil
+	}
+	i := slices.IndexFunc(deployments, func(d astrov1.Deployment) bool { return d.Id == id })
+	if i < 0 {
+		return astrov1.Deployment{}, true, fmt.Errorf("%w: %s is not in workspace %s. Pass --deployment, or --workspace with its workspace", ErrTokenDeploymentNotFound, id, ws)
+	}
+	d := deployments[i]
+	if filter != nil && !filter(d) {
+		return astrov1.Deployment{}, true, fmt.Errorf("the Deployment ASTRO_API_TOKEN is scoped to, %s (%s), is not one this command can act on", d.Name, d.Id)
+	}
+	if !CleanOutput {
+		fmt.Fprintf(os.Stderr, "Using Deployment %s (%s), the one ASTRO_API_TOKEN is scoped to\n", ansi.ForStderr().Bold(d.Name), d.Id)
+	}
+	return d, true, nil
+}
 
 // NoDeploymentsError is a command that needed a Deployment picked in a
 // workspace that has none. Nothing is created in its place.
@@ -2131,9 +2179,15 @@ func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFi
 }
 
 // deploymentSelectionProcess is the Deployment, of those in ws that filter
-// leaves, that the person picks, or for a ToRead caller the only one when
-// mayAutoSelect.
+// leaves, that the run's Deployment-scoped ASTRO_API_TOKEN is for (except for
+// a delete), else for a ToRead caller the only one when mayAutoSelect, else
+// the one the person picks.
 func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, filter func(deployment astrov1.Deployment) bool, use Use) (astrov1.Deployment, error) {
+	if use != ToDelete {
+		if d, ok, err := fromToken(ws, deployments, filter); ok || err != nil {
+			return d, err
+		}
+	}
 	if len(deployments) == 0 {
 		return astrov1.Deployment{}, &NoDeploymentsError{Workspace: ws}
 	}

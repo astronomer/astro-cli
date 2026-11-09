@@ -334,6 +334,12 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 		return dep.Id, dep, login, nil
 	}
 
+	// A Deployment-scoped ASTRO_API_TOKEN names the one Deployment it can act
+	// on, as astro deploy reads it.
+	if id := deployment.TokenDeployment(); id != "" {
+		cliout.Note(os.Stderr, "Using Deployment "+id+", the one ASTRO_API_TOKEN is scoped to")
+		return id, nil, login, nil
+	}
 	if format != cliout.FormatText || !stdinIsTerminal() {
 		return "", nil, login, input.Required(errBundleNoTarget)
 	}

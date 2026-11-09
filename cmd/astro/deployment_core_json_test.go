@@ -401,6 +401,28 @@ func TestDeploymentCoreJSON(t *testing.T) {
 		m.AssertExpectations(t)
 	})
 
+	// Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, the
+	// update is to that Deployment, said on stderr; stdout is the result.
+	t.Run("an update naming nothing takes the token's Deployment", func(t *testing.T) {
+		deployment.UseTokenDeployment(coreDeploymentID)
+		t.Cleanup(func() { deployment.UseTokenDeployment("") })
+		updated := coreDeployment()
+		updated.Name = "etl-prod-2"
+		m := new(astrov1_mocks.ClientWithResponsesInterface)
+		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(listDeploymentsResp(coreDeployment()), nil).Once()
+		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, coreDeploymentID).Return(getDeploymentResp(coreDeployment()), nil).Once()
+		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, coreDeploymentID).Return(getDeploymentResp(updated), nil).Once()
+		m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
+		expectUpdate(m, updated)
+		r := execDeploymentRun(t, m, "", "update", "--name", "etl-prod-2", "-o", "json")
+		require.NoError(t, r.err)
+		var got formattedJSON
+		decodeOne(t, r.stdout, &got)
+		assert.Equal(t, coreDeploymentID, got.Deployment.Metadata.DeploymentID)
+		assert.Contains(t, r.asked, coreDeploymentID+"), the one ASTRO_API_TOKEN is scoped to")
+		m.AssertExpectations(t)
+	})
+
 	t.Run("an update with nothing to send publishes the Deployment as it is", func(t *testing.T) {
 		m := coreMock(t, coreDeployment())
 		r := execDeploymentRun(t, m, "", "update", coreDeploymentID, "--dag-deploy", "enable", "-o", "json")

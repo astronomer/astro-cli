@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -331,6 +332,25 @@ func TestDeploymentVariableCreateJSON(t *testing.T) {
 		assert.Equal(t, []outcomeJSON{{Kind: "created", Key: "NEW"}}, got.Outcomes)
 		assert.Equal(t, twoVariablesJSON(), got.Variables)
 		assert.Empty(t, run.stderr)
+		m.AssertExpectations(t)
+	})
+
+	// Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, the
+	// variable goes on that Deployment, said on stderr.
+	t.Run("naming nothing takes the token's Deployment", func(t *testing.T) {
+		deployment.UseTokenDeployment("test-id-1")
+		t.Cleanup(func() { deployment.UseTokenDeployment("") })
+		withDeploymentVariables(t, twoVariables())
+		m := modifyMocks()
+		astroV1Client = m
+
+		run := runVariableCmd(t, "variable", "create", "NEW=value", "-o", "json")
+
+		assert.Equal(t, 0, run.code)
+		var got variableModifyJSON
+		decodeOne(t, run.stdout, &got)
+		assert.Equal(t, []outcomeJSON{{Kind: "created", Key: "NEW"}}, got.Outcomes)
+		assert.Contains(t, run.stderr, "test-id-1), the one ASTRO_API_TOKEN is scoped to")
 		m.AssertExpectations(t)
 	})
 

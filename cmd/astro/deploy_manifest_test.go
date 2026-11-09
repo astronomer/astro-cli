@@ -933,6 +933,32 @@ func TestDeployManifestNonInteractiveMustNameTheTarget(t *testing.T) {
 	assert.NotContains(t, out, "Building your project image")
 }
 
+// A deploy that names nothing, under an ASTRO_API_TOKEN scoped to one
+// Deployment, ships to that Deployment, as 1.x did in CI. The note naming it
+// is on stderr; stdout holds the result alone.
+func TestDeployManifestShipsToTheTokensDeployment(t *testing.T) {
+	fake := &fakeCmdDeployer{}
+	setupManifestDeploy(t, fake)
+	deployment.UseTokenDeployment(actionDeploymentID)
+	t.Cleanup(func() { deployment.UseTokenDeployment("") })
+
+	out, errOut, err := execDeployIO("", "--dags", "-o", "json")
+	require.NoError(t, err)
+	require.NotNil(t, fake.dagInput)
+	assert.Equal(t, actionDeploymentID, fake.dagInput.DeploymentID)
+	assert.Contains(t, errOut, "Deploying to Deployment "+actionDeploymentID+", the one ASTRO_API_TOKEN is scoped to")
+	assert.NotContains(t, out, "ASTRO_API_TOKEN")
+	var got map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &got), out)
+
+	// Named on the command line, the target is what was named.
+	fake.dagInput = nil
+	_, errOut, err = execDeployIO("", "--dags", "--deployment", "prod")
+	require.NoError(t, err)
+	assert.Equal(t, "clx-dep", fake.dagInput.DeploymentID)
+	assert.NotContains(t, errOut, "ASTRO_API_TOKEN")
+}
+
 // A pin is ambient state, and ambient state never decides a deploy — not even
 // the one the query commands would resolve to.
 func TestDeployManifestPinDoesNotDecideANonInteractiveDeploy(t *testing.T) {
