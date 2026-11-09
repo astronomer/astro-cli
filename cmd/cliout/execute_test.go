@@ -171,6 +171,33 @@ func TestATextFailureIsTheErrorAlone(t *testing.T) {
 	assert.Equal(t, ExitFailure, ExitCode(context.Background(), r.err))
 }
 
+// A declined confirmation and an interrupt are the error alone, and so is a
+// usage error a run returns after it was interrupted: it exits 130, and
+// nothing about how it was invoked needs fixing.
+func TestAnAbortOrInterruptIsTheErrorAlone(t *testing.T) {
+	for name, fail := range map[string]error{
+		"aborted":     input.ErrAborted,
+		"interrupted": input.ErrInterrupted,
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := execTree(context.Background(), testTree(fail), "thing", "list")
+			assert.Equal(t, "Error: "+name+"\n", r.stderr)
+		})
+	}
+
+	canceled, cancel := context.WithCancel(context.Background())
+	root := testTree(nil)
+	leaf, _, err := root.Find([]string{"thing", "list"})
+	require.NoError(t, err)
+	leaf.RunE = func(*cobra.Command, []string) error {
+		cancel()
+		return Usage(errBoom)
+	}
+	r := execTree(canceled, root, "thing", "list")
+	assert.Equal(t, ExitInterrupted, ExitCode(canceled, r.err))
+	assert.Equal(t, "Error: boom\n", r.stderr)
+}
+
 // A usage error names what was wrong and points at the failing command's
 // help, never printing the help itself.
 func TestATextUsageErrorPointsAtHelp(t *testing.T) {

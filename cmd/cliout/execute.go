@@ -131,9 +131,11 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	// its help would not settle it (a removed command's stub, a Deployment
 	// name several Deployments share). The root's own SilenceUsage is forced
 	// on for the run, so for the root only quietUsage, its setting from
-	// before, decides.
+	// before, decides. Only a run that exits as a usage error gets it: an
+	// interrupt ends the run with 130 whatever the error says, and nothing
+	// about how it was invoked needs fixing.
 	silenced := quietUsage || (cmd != root && cmd.SilenceUsage)
-	if !IsUsage(err) || (silenced && !isMisinvoked(err)) {
+	if ExitCode(ctx, err) != ExitUsage || (silenced && !isMisinvoked(err)) {
 		return err
 	}
 	if flag := suggestFlag(cmd, err); flag != "" {
