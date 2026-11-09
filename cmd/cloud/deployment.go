@@ -146,6 +146,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentBundleRootCmd(out),
 		newDeploymentHibernateCmd(),
 		newDeploymentWakeUpCmd(),
+		newDeploymentOpenCmd(out),
 	)
 	return cmd
 }
@@ -682,6 +683,21 @@ func newDeploymentWakeUpCmd() *cobra.Command {
 	return cmd
 }
 
+func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "open [DEPLOYMENT-ID]",
+		Short: "Open a Deployment's Airflow UI in your browser",
+		Long:  "Open the Airflow UI of an Astro Deployment in your default browser. If the browser cannot be opened, the CLI prints the Airflow UI URL instead.",
+		Example: `
+  $ astro deployment open <deployment-id>
+  $ astro deployment open --deployment-name my-deployment
+`,
+		RunE: func(cmd *cobra.Command, args []string) error { return deploymentOpen(cmd, args, out) },
+	}
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to open the Airflow UI for")
+	return cmd
+}
+
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -1011,6 +1027,20 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 	}
 
 	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, astroV1Client)
+}
+
+func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+	}
+
+	if len(args) > 0 {
+		deploymentID = args[0]
+	}
+
+	cmd.SilenceUsage = true
+	return deployment.OpenUI(ws, deploymentID, deploymentName, out, astroV1Client)
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.
