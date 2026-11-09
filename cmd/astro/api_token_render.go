@@ -156,15 +156,16 @@ func organizationTokenPicker(nameFlag, question string) apitoken.Picker {
 }
 
 // confirmTokenChange asks question, after warning when there is one. Under
-// --output json it refuses, naming --yes, before it writes anything.
-func confirmTokenChange(warning, question string) (bool, error) {
+// --output json it refuses, naming --yes, before it writes anything. Answered
+// no, it is input.ErrAborted.
+func confirmTokenChange(warning, question string) error {
 	if err := input.MayAsk(question, input.AnsweredBy("--yes")); err != nil {
-		return false, err
+		return err
 	}
 	if warning != "" {
 		fmt.Fprintln(os.Stderr, cliout.DangerLabel(os.Stderr), warning)
 	}
-	return input.Confirm(question, input.AnsweredBy("--yes"))
+	return input.ConfirmOrAbort(question, input.AnsweredBy("--yes"))
 }
 
 // mayPickRole refuses, under --output json, a command about to offer a role

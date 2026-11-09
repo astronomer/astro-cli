@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -929,7 +930,7 @@ func TestDeploymentUpdate(t *testing.T) {
 	})
 	// Changing DAG deploys under CI/CD enforcement asks first, since the CLI
 	// cannot deploy the DAGs afterwards. Declining leaves the Deployment as it
-	// was; --yes answers the question.
+	// was and fails aborted; --yes answers the question.
 	t.Run("declining the ci-cd enforcement question updates nothing", func(t *testing.T) {
 		// A user's token, which carries no deploy permissions. The check
 		// strips "Bearer " by position, so the token needs it.
@@ -942,7 +943,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 		defer testUtil.MockUserInput(t, "n")()
 		_, err = execDeploymentCmd("update", "test-id-1", "--workspace-id", ws, "--cicd-enforcement", "enable", "--dag-deploy", "enable")
-		assert.NoError(t, err)
+		assert.ErrorIs(t, err, input.ErrAborted)
 		m.AssertExpectations(t)
 		m.AssertNotCalled(t, "UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})

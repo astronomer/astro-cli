@@ -34,15 +34,15 @@ func Create(email, password string, client houston.ClientInterface) (Created, er
 	}
 	if password == "" {
 		inputPassword, err := input.Password("Password: ", input.AnsweredBy("--password"))
-		// Only a refusal stops here; a read that fails falls through to the
-		// empty answer, as it always has.
-		if input.IsRequired(err) {
+		// A refusal and an interrupt stop here; a read that ends falls
+		// through to the empty answer, as it always has.
+		if input.Unanswered(err) {
 			return Created{}, err
 		}
 		inputPassword2, err := input.Password("Re-enter Password: ", input.AnsweredBy("--password"))
-		// Only a refusal stops here; a read that fails falls through to the
-		// empty answer, as it always has.
-		if input.IsRequired(err) {
+		// A refusal and an interrupt stop here; a read that ends falls
+		// through to the empty answer, as it always has.
+		if input.Unanswered(err) {
 			return Created{}, err
 		}
 		if inputPassword != inputPassword2 {

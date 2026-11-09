@@ -601,9 +601,10 @@ func deployTargetName(res *manifestdeploy.Result) string {
 // text mode (cliout.Execute, as for every command).
 func manifestDeployErr(cmd *cobra.Command, err error) error {
 	if goerrors.Is(err, manifestdeploy.ErrAborted) {
-		// The user was asked and said no. Reading their own answer back at them
-		// as "Error: no deployment selected" adds nothing; the exit code carries
-		// the whole message. Only an interactive run can reach here, which is
+		// The prompt ended with no deployment picked, and the picker has
+		// said why ("Not one of the choices." after each answer). Adding
+		// "Error: no deployment selected" says nothing more; the exit code
+		// carries the rest. Only an interactive run can reach here, which is
 		// text mode, so this never eats the object json mode promises.
 		cmd.SilenceErrors = true
 	}

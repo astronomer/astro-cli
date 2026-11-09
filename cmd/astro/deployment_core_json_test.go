@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // What `astro deployment create`, `update`, `delete`, `hibernate` and
@@ -209,7 +211,8 @@ func TestDeploymentCoreText(t *testing.T) {
 			},
 			answers: "n\n",
 			args:    []string{"update", coreDeploymentID, "--executor", "KubernetesExecutor"},
-			check:   says("Are you sure you want to update the", "etl-prod", "Deployment?", "Canceling Deployment update"),
+			check:   says("Are you sure you want to update the", "etl-prod", "Deployment?"),
+			wantErr: "aborted",
 		},
 		{
 			name: "delete --yes",
@@ -279,7 +282,8 @@ func TestDeploymentCoreText(t *testing.T) {
 			client:  func(t *testing.T) astrov1.APIClient { return coreMock(t, devDeployment()) },
 			answers: "n\n",
 			args:    []string{"wake-up", coreDeploymentID},
-			check:   says("Are you sure you want to override to", "wake up", "etl-dev", "Canceling wake up override"),
+			check:   says("Are you sure you want to override to", "wake up", "etl-dev"),
+			wantErr: "aborted",
 		},
 		{
 			name: "hibernate --remove-override --yes",
@@ -296,7 +300,8 @@ func TestDeploymentCoreText(t *testing.T) {
 			client:  func(t *testing.T) astrov1.APIClient { return coreMock(t, devDeployment()) },
 			answers: "n\n",
 			args:    []string{"wake-up", coreDeploymentID, "--remove-override"},
-			check:   says("Are you sure you want to remove the hibernation override", "etl-dev", "Canceling hibernation override removal"),
+			check:   says("Are you sure you want to remove the hibernation override", "etl-dev"),
+			wantErr: "aborted",
 		},
 		{
 			name:    "hibernate a Deployment that is not for development",
@@ -312,6 +317,14 @@ func TestDeploymentCoreText(t *testing.T) {
 			if tc.wantErr != "" {
 				assert.Equal(t, 1, run.code)
 				assert.ErrorContains(t, run.err, tc.wantErr)
+				if errors.Is(run.err, input.ErrAborted) {
+					// A decline asked its question, and wrote nothing to
+					// stdout: it is not a result.
+					if tc.check != nil {
+						tc.check(t, run.asked)
+					}
+					assert.Empty(t, run.stdout)
+				}
 				return
 			}
 			require.NoError(t, run.err, "stdout:\n%s", run.stdout)

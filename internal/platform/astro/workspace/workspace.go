@@ -323,8 +323,8 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 }
 
 // Delete deletes the Workspace id names, or, with no id, the one picked from
-// a menu drawn on out, after asking unless yes. It returns what it deleted,
-// or nil when the question was declined, which it says on out.
+// a menu drawn on out, after asking unless yes. It returns what it deleted;
+// a declined question is input.ErrAborted.
 func Delete(id string, yes bool, out io.Writer, client astrov1.APIClient) (*Removal, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -342,15 +342,10 @@ func Delete(id string, yes bool, out io.Writer, client astrov1.APIClient) (*Remo
 		return nil, err
 	}
 	if !yes {
-		ok, err := input.Confirm(
+		if err := input.ConfirmOrAbort(
 			fmt.Sprintf("\nAre you sure you want to delete the %s Workspace (%s)? This cannot be undone.", ansi.Bold(workspace.Name), workspace.Id),
-			input.AnsweredBy("--yes"))
-		if err != nil {
+			input.AnsweredBy("--yes")); err != nil {
 			return nil, err
-		}
-		if !ok {
-			fmt.Fprintln(out, "Canceling Workspace deletion")
-			return nil, nil
 		}
 	}
 	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspace.Id)

@@ -159,6 +159,8 @@ There is one choke point. `cliout.Execute` installs a process-level guard for th
 
 A call site passes `input.AnsweredBy("--yes")` to name its flag, and `input.About("a workspace")` when its prompt text is a bare `> `. The guard is process-level rather than a context value because the shell platform packages ask from call chains that carry no context.
 
+Ctrl-C at a question ends it at once. The first interrupt of a run cancels the run's context rather than killing the process, so a question blocked reading a line from stdin would echo `^C` and go on waiting until a second Ctrl-C or an Enter. `cliout.Execute` hands the run's context to `pkg/input` too (`input.SetInterrupt`, beside the guard), and every question `pkg/input`, `pkg/picker` and `astro local`'s `[y/N]` ask reads its line through `input.ReadLine`, which returns `input.ErrInterrupted` as soon as the context is canceled, after ending the prompt's line so the error starts on a fresh one; a question reached after the interrupt is refused before it is printed (`input.MayAsk`). The login flow's "Press Enter" handles Ctrl-C itself. The run exits 130. A password prompt reads a raw terminal and returns the same error for the Ctrl-C keypress.
+
 A command that already refuses to ask when it has no terminal marks that refusal with `input.Required(err)`, so it keeps its own words and gains the kind. `astro deploy` with no target is one. Others are `astro local`'s confirmations without `--yes`, a link picker with no NAME, and a deployment several links make ambiguous. In text mode with no terminal, nothing else changes: other prompts still read stdin as before.
 
 ### Exit codes
@@ -168,19 +170,20 @@ A command that already refuses to ask when it has no terminal marks that refusal
 | 0 | success |
 | 1 | the command failed, including `input_required`: a question it could not ask. Not 2, because a question can come after work has started, so the "nothing ran" that 2 promises would not hold. The same refusal without a terminal has always exited 1. A script that needs to tell it from other failures reads `kind` |
 | 2 | usage error: an unknown flag or subcommand, a flag value the command does not accept (`--output yaml` included), the wrong number of arguments, a missing required flag, a group run with no subcommand under `--output json`, whether it has a RunE of its own (`cliout.GroupHelp`) or not (`cliout.Execute` answers it); in text mode it prints its help and exits 0, as before. Nothing ran |
-| 130 | interrupted (Ctrl-C or SIGTERM); the command unwound what it had started |
+| 130 | interrupted (Ctrl-C or SIGTERM); the command unwound what it had started. The first Ctrl-C at a question ends it at once (`input.ErrInterrupted`) |
 | the command's own | `astro local check`: 1 when a check failed, 2 when it could not reach a verdict (no environment, no project). `astro af runs trigger-wait`, `astro af runs wait` and `astro af tasks wait` (and their `astro local af` forms): 1 when the run failed, or for `tasks wait` when the task cannot reach the state, 2 when the wait timed out. `astro local run`: the child's status |
 
 The command-specific 2s predate the usage 2. A script that runs one of those commands tells them apart by what it published: a usage error under `--output json` is an error object with kind `usage`, while `check`, `trigger-wait`, `runs wait` and `tasks wait` publish their own result.
 
 ### Kinds
 
-`cmd/local` names the failures of its commands ([`cmd/local/problemkind.go`](../cmd/local/problemkind.go)), the root names the cloud ones ([`cmd/problemkind.go`](../cmd/problemkind.go)), and `cliout` names `usage` and `input_required`. The root composes the tables, `cmd/local`'s first, and the first match wins.
+`cmd/local` names the failures of its commands ([`cmd/local/problemkind.go`](../cmd/local/problemkind.go)), the root names the cloud ones ([`cmd/problemkind.go`](../cmd/problemkind.go)), and `cliout` names `usage`, `input_required` and `aborted`, which it tries in that order before any table. The root composes the tables, `cmd/local`'s first, and the first match wins.
 
 | kind | meaning |
 | --- | --- |
 | `usage` | the command was invoked wrongly; exit status 2 |
 | `input_required` | the command needed an answer it would have asked for, and this run could not ask: under `--output json`, or without a terminal where the command refuses to guess. The message names the question and the flag that answers it. Exit status 1 (see [Prompts](#prompts)) |
+| `aborted` | the command asked for confirmation and was answered no, so it did nothing it was asked to (`input.ErrAborted`, which a declined confirmation returns in `astro local`, the Astro commands, `astro context delete`, and the Astro Private Cloud workspace and service-account deletes: `Error: aborted`, and nothing on stdout). Exit status 1: declining is not success. Not 130, which is an interrupt. Under `--output json` no confirmation is asked, so it is a text-mode failure in practice |
 | `no_project` | no project here: no `pyproject.toml` with `[tool.astro]` |
 | `foreign_mode` | the project is running in the other mode |
 | `already_running` | the project is already running |

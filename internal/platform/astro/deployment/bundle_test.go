@@ -12,6 +12,7 @@ import (
 
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrov1alpha1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -268,8 +269,8 @@ func (s *Suite) TestDeleteBundle() {
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 
 		err := DeleteBundle("bundle-1", "", "", ws, testBundleDeploymentID, false, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
-		s.NoError(err)
-		s.Contains(out.String(), "Canceling bundle deletion")
+		s.ErrorIs(err, input.ErrAborted)
+		s.Empty(out.String(), "a decline publishes nothing")
 		mockV1Alpha1Client.AssertNotCalled(s.T(), "DeleteBundleWithResponse")
 	})
 
