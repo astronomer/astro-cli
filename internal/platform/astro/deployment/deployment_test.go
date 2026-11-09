@@ -735,7 +735,7 @@ func (s *Suite) TestGetDeploymentFromADeploymentToken() {
 		withTokenDeployment(s.T(), "test-id-2")
 
 		defer testUtil.MockUserInput(s.T(), "")() // nothing typed: no pick
-		got, err := GetDeployment(ws, "", "", ToDelete, nil, mockV1Client)
+		got, err := GetDeployment(ws, "", "", ToPick, nil, mockV1Client)
 		s.ErrorIs(err, ErrInvalidDeploymentKey, "asked, not taken: %v", got.Id)
 	})
 

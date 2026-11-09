@@ -1582,7 +1582,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 		return nil, input.Required(errDeleteNeedsTarget)
 	}
 
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToDelete, nil, astroV1Client)
+	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToPick, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -2045,9 +2045,11 @@ const (
 	// Deployment-scoped ASTRO_API_TOKEN is for (see UseTokenDeployment);
 	// never on one taken because it was the only one.
 	ToChange
-	// ToDelete is ToChange for a delete, which also never takes the token's
-	// Deployment: what a delete removes is named or picked.
-	ToDelete
+	// ToPick is ToChange for a Deployment that is always named or picked,
+	// never taken from the token either: a delete, since what it removes is
+	// on the command line, and a link, which the person writes into the
+	// project.
+	ToPick
 )
 
 // tokenDeployment is the Deployment this process's ASTRO_API_TOKEN is scoped
@@ -2087,10 +2089,16 @@ func fromToken(ws string, deployments []astrov1.Deployment, filter func(astrov1.
 	if filter != nil && !filter(d) {
 		return astrov1.Deployment{}, true, fmt.Errorf("the Deployment ASTRO_API_TOKEN is scoped to, %s (%s), is not one this command can act on", d.Name, d.Id)
 	}
-	if !CleanOutput {
-		fmt.Fprintf(os.Stderr, "Using Deployment %s (%s), the one ASTRO_API_TOKEN is scoped to\n", ansi.ForStderr().Bold(d.Name), d.Id)
-	}
+	NoteTokenDeployment(os.Stderr, d.Name+" ("+d.Id+")")
 	return d, true, nil
+}
+
+// NoteTokenDeployment writes to w, the run's stderr, that the run acts on
+// deployment (as it is to be shown: a name and id, or an id) because its
+// ASTRO_API_TOKEN is scoped to it. Every command that takes the token's
+// Deployment says so in these words.
+func NoteTokenDeployment(w io.Writer, deployment string) {
+	ansi.Note(w, "Using Deployment "+deployment+", the one ASTRO_API_TOKEN is scoped to")
 }
 
 // NoDeploymentsError is a command that needed a Deployment picked in a
@@ -2183,7 +2191,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFi
 // a delete), else for a ToRead caller the only one when mayAutoSelect, else
 // the one the person picks.
 func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, filter func(deployment astrov1.Deployment) bool, use Use) (astrov1.Deployment, error) {
-	if use != ToDelete {
+	if use != ToPick {
 		if d, ok, err := fromToken(ws, deployments, filter); ok || err != nil {
 			return d, err
 		}

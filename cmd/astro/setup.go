@@ -574,15 +574,12 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 		return false, err
 	}
 
-	// A Deployment-scoped token can act on one Deployment, so a run that names
-	// none acts on it. For this process only, like the selection below.
-	deployment.UseTokenDeployment(tokenDeploymentID(claims.Permissions))
-
 	var wsID, orgID string
 	for _, permission := range claims.Permissions {
-		splitPermission := strings.Split(permission, ":")
-		permissionType := splitPermission[0]
-		id := splitPermission[1]
+		permissionType, id, ok := strings.Cut(permission, ":")
+		if !ok {
+			continue
+		}
 		switch permissionType {
 		case "workspaceId":
 			wsID = id
@@ -601,6 +598,10 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 	}
 
 	useEnvironmentSelection(&c, orgID, orgProduct, wsID)
+	// A Deployment-scoped token can act on one Deployment, so a run that names
+	// none acts on it. For this process only, like the selection above, and
+	// only once the login is set up.
+	deployment.UseTokenDeployment(tokenDeploymentID(claims.Permissions))
 	return true, nil
 }
 

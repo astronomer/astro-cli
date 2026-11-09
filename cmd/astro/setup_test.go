@@ -561,6 +561,24 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.Empty(t, deployment.TokenDeployment(), "a workspace token names no Deployment")
 	})
 
+	// A login that fails to set up records no Deployment, and a permission
+	// without a colon is skipped rather than a crash.
+	t.Run("a token whose organization cannot be looked up records no Deployment", func(t *testing.T) {
+		t.Cleanup(func() { deployment.UseTokenDeployment("") })
+		deployment.UseTokenDeployment("left-over")
+		deploymentClaims := mockClaims
+		deploymentClaims.Permissions = []string{"admin", "deploymentId:deployment-id", "organizationId:org-ID"}
+		parseAPIToken = func(string) (*util.CustomClaims, error) { return &deploymentClaims, nil }
+		failed := astrov1.ListOrganizationsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusTooManyRequests}}
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&failed, nil).Once()
+		t.Setenv("ASTRO_API_TOKEN", "token")
+		require.NoError(t, context.Switch("astronomer-dev.io"))
+
+		_, err := checkAPIToken(mockV1Client)
+		require.ErrorIs(t, err, ErrAPITokenOrganization)
+		assert.Empty(t, deployment.TokenDeployment())
+	})
+
 	t.Run("an organization that can't be looked up is an error", func(t *testing.T) {
 		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
 			return &mockClaims, nil

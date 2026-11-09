@@ -937,8 +937,15 @@ func TestDeployManifestNonInteractiveMustNameTheTarget(t *testing.T) {
 // Deployment, ships to that Deployment, as 1.x did in CI. The note naming it
 // is on stderr; stdout holds the result alone.
 func TestDeployManifestShipsToTheTokensDeployment(t *testing.T) {
+	const unlinkedProject = `[project]
+name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+workspace = "clw-ws"
+`
 	fake := &fakeCmdDeployer{}
-	setupManifestDeploy(t, fake)
+	setupManifestDeployWith(t, fake, unlinkedProject)
 	deployment.UseTokenDeployment(actionDeploymentID)
 	t.Cleanup(func() { deployment.UseTokenDeployment("") })
 
@@ -946,16 +953,40 @@ func TestDeployManifestShipsToTheTokensDeployment(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, fake.dagInput)
 	assert.Equal(t, actionDeploymentID, fake.dagInput.DeploymentID)
-	assert.Contains(t, errOut, "Deploying to Deployment "+actionDeploymentID+", the one ASTRO_API_TOKEN is scoped to")
+	assert.Contains(t, errOut, "Using Deployment "+actionDeploymentID+", the one ASTRO_API_TOKEN is scoped to")
 	assert.NotContains(t, out, "ASTRO_API_TOKEN")
 	var got map[string]any
 	require.NoError(t, json.Unmarshal([]byte(out), &got), out)
+}
 
-	// Named on the command line, the target is what was named.
+// In a project that links Deployments, the token's Deployment is taken by
+// the link that points at it. One the project does not link is never shipped
+// to: the deploy refuses as one naming nothing does. A target named on the
+// command line wins.
+func TestDeployManifestTokensDeploymentInALinkedProject(t *testing.T) {
+	fake := &fakeCmdDeployer{}
+	setupManifestDeploy(t, fake)
+	t.Cleanup(func() { deployment.UseTokenDeployment("") })
+
+	deployment.UseTokenDeployment("clx-dev")
+	_, errOut, err := execDeployIO("", "--dags")
+	require.NoError(t, err)
+	assert.Equal(t, "clx-dev", fake.dagInput.DeploymentID)
+	assert.Contains(t, errOut, "Using Deployment dev (clx-dev), the one ASTRO_API_TOKEN is scoped to")
+
 	fake.dagInput = nil
 	_, errOut, err = execDeployIO("", "--dags", "--deployment", "prod")
 	require.NoError(t, err)
 	assert.Equal(t, "clx-dep", fake.dagInput.DeploymentID)
+	assert.NotContains(t, errOut, "ASTRO_API_TOKEN")
+
+	fake.dagInput = nil
+	deployment.UseTokenDeployment(actionDeploymentID)
+	_, errOut, err = execDeployIO("", "--dags")
+	require.Error(t, err)
+	assert.True(t, input.IsRequired(err), "%v", err)
+	assert.Contains(t, err.Error(), "a deploy must name the deployment it ships to")
+	assert.Nil(t, fake.dagInput)
 	assert.NotContains(t, errOut, "ASTRO_API_TOKEN")
 }
 

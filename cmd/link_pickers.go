@@ -66,7 +66,7 @@ func withLinkPickers(d *local.Deps, client astrov1.APIClient, out io.Writer) {
 			// A link is written into the project, so it is a Deployment the
 			// person picked, never one taken for being the only one.
 			var err error
-			dep, err = deployment.GetDeployment(workspaceID, "", "", deployment.ToChange, unlinked, client)
+			dep, err = deployment.GetDeployment(workspaceID, "", "", deployment.ToPick, unlinked, client)
 			return err
 		})
 		// An empty workspace is a *NoDeploymentsError, which says how to

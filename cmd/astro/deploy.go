@@ -6,6 +6,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -292,12 +293,19 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		warnings = append(warnings, msg)
 		recap.Warn(msg)
 	}
-	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, manifestDeployment)
+	// The token is the current context's login: a project on another host is
+	// deployed under that host's, which names no Deployment.
+	tokenID := ""
+	if login.current {
+		tokenID = deployment.TokenDeployment()
+	}
+	target := targetOrTokenDeployment(errOut, m, linkName, manifestDeployment, tokenID)
+	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, target)
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
 		ProjectDir:       config.WorkingPath,
 		Manifest:         m,
 		LinkName:         linkName,
-		Deployment:       targetOrTokenDeployment(errOut, linkName, manifestDeployment),
+		Deployment:       target,
 		WorkspaceID:      overrideWorkspace,
 		ContextWorkspace: login.context.Workspace,
 		DagsOnly:         dags,
@@ -402,28 +410,37 @@ func announceDeployTarget(w io.Writer, target manifestdeploy.Target) {
 	fmt.Fprintf(w, "→ %s (astro deployment %s)\n", target.LinkName, target.DeploymentID)
 }
 
+// targetOrTokenDeployment is --deployment, or, for a deploy that names no
+// target, the Deployment the run's ASTRO_API_TOKEN is scoped to, named as the
+// command line would name it: the one Deployment such a token can ship to, as
+// 1.x deployed to it in CI. In a project that links Deployments it is taken
+// only when one of the project's Astro links points at it, and by that link's
+// name, so the deploy reads the link as it would a named one; a project that
+// links others is left to ask or refuse, never shipped to a Deployment it does
+// not link. Taking it says so on w, never on stdout.
+func targetOrTokenDeployment(w io.Writer, m *manifest.Manifest, linkName, flag, id string) string {
+	if linkName != "" || flag != "" || id == "" {
+		return flag
+	}
+	if m != nil && len(m.Astro.Deployments) > 0 {
+		for _, name := range slices.Sorted(maps.Keys(m.Astro.Deployments)) {
+			if l := m.Astro.Deployments[name]; l.Kind() == manifest.KindAstro && l.Deployment == id {
+				deployment.NoteTokenDeployment(w, name+" ("+id+")")
+				return name
+			}
+		}
+		return ""
+	}
+	deployment.NoteTokenDeployment(w, id)
+	return id
+}
+
 // noteIgnoredDeploymentEnv says, before the prompt, that an exported
 // ASTRO_DEPLOYMENT does not steer it. The variable once moved the prompt's
 // cursor, and someone who answers by habit should not find Enter now lands on
 // another Deployment unannounced. Nothing is said when it names the project's
 // default anyway, the row the prompt highlights, or when no prompt is coming:
 // a run that cannot be asked, or one that names its target.
-// targetOrTokenDeployment is --deployment, or, for a deploy that names no
-// target, the Deployment the run's ASTRO_API_TOKEN is scoped to, as a
-// Deployment id named on the command line: the one Deployment such a token
-// can ship to, as 1.x deployed to it in CI. Taking it says so on w, never on
-// stdout.
-func targetOrTokenDeployment(w io.Writer, linkName, flag string) string {
-	if linkName != "" || flag != "" {
-		return flag
-	}
-	id := deployment.TokenDeployment()
-	if id != "" {
-		cliout.Note(w, "Deploying to Deployment "+id+", the one ASTRO_API_TOKEN is scoped to")
-	}
-	return id
-}
-
 func noteIgnoredDeploymentEnv(w io.Writer, m *manifest.Manifest, interactive bool, named ...string) {
 	env := os.Getenv(instances.EnvVar)
 	// Outside a project (an --image-name deploy) there are no links for the

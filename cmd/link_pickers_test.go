@@ -99,6 +99,26 @@ func TestLinkPickersUseDeploysDeploymentPicker(t *testing.T) {
 	assert.Zero(t, calls.refreshes)
 }
 
+// A link is what the person picks: a Deployment-scoped ASTRO_API_TOKEN does
+// not choose it, and the picker is shown.
+func TestLinkPickersIgnoreTheTokensDeployment(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	stubLinkLogin(t, nil, nil)
+	shown := stubSelectDeployment(t)
+	deployment.UseTokenDeployment(linkedDep.Id)
+	t.Cleanup(func() { deployment.UseTokenDeployment("") })
+	client := astrov1_mocks.NewClientWithResponsesInterface(t)
+	client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(listResponse(http.StatusOK, linkedDep, pickedDep), nil).Once()
+	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(getResponse(&pickedDep), nil).Once()
+
+	var d local.Deps
+	withLinkPickers(&d, client, &bytes.Buffer{})
+	got, err := d.PickDeployment("ws_A", map[string]string{"clx1": "prod"})
+	require.NoError(t, err)
+	assert.Equal(t, "clx9", got.ID)
+	assert.Equal(t, []astrov1.Deployment{pickedDep}, *shown, "the picker was not shown")
+}
+
 // A workspace whose every Deployment is linked is its own error, with no
 // picker shown; one with no Deployments is an error, not an offer to create one.
 func TestLinkPickersWithNothingToOffer(t *testing.T) {
