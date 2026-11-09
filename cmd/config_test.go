@@ -309,6 +309,7 @@ func (s *CmdSuite) TestConfigUnknownSettingSuggestsTheClosest() {
 		{"a typo", []string{"config", "set", "apc.page_sise", "30", "-g"}, " Did you mean apc.page_size? "},
 		{"a typo", []string{"config", "get", "deploy.git_metdata", "-g"}, " Did you mean deploy.git_metadata? "},
 		{"an accented letter is one edit", []string{"config", "get", "apc.page_sizé", "-g"}, " Did you mean apc.page_size? "},
+		{"swapped neighbours are one edit", []string{"config", "get", "telemetry.enalbed", "-g"}, " Did you mean telemetry.enabled? "},
 		{
 			"every setting under a partial name",
 			[]string{"config", "get", "telemetry", "-g"},

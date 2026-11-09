@@ -262,6 +262,10 @@ func TestAnUnknownFlagSuggestsTheOneItIsCloseTo(t *testing.T) {
 		"a deprecated flag is never offered": {[]string{"thing", "list", "--olds"}, ""},
 		"a short name is held closer":        {[]string{"thing", "list", "--ws"}, ""},
 		"a short name one edit away":         {[]string{"thing", "list", "--i"}, "--id"},
+		"two edits on a short name":          {[]string{"thing", "list", "--bogs"}, ""},
+		"swapped neighbours":                 {[]string{"thing", "list", "--tgas"}, "--tags"},
+		"swapped neighbours mid-word":        {[]string{"thing", "list", "--froce"}, "--force"},
+		"a long prefix":                      {[]string{"thing", "list", "--workspac", "x"}, "--workspace"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -275,6 +279,9 @@ func TestAnUnknownFlagSuggestsTheOneItIsCloseTo(t *testing.T) {
 			leaf.Flags().Bool("old", false, "")
 			require.NoError(t, leaf.Flags().MarkDeprecated("old", "gone"))
 			leaf.Flags().Bool("id", false, "")
+			leaf.Flags().String("tags", "", "")
+			leaf.Flags().Bool("force", false, "")
+			leaf.Flags().String("workspace", "", "")
 
 			r := execTree(context.Background(), root, c.args...)
 			require.Error(t, r.err)
@@ -295,10 +302,21 @@ func TestAnUnknownFlagSuggestsTheOneItIsCloseTo(t *testing.T) {
 // Flag suggestions follow the settings command suggestions do: none when a
 // command on the way disables them.
 func TestFlagSuggestionsHonourDisableSuggestions(t *testing.T) {
-	root := testTree(nil)
-	root.DisableSuggestions = true
-	r := execTree(context.Background(), root, "thing", "list", "--alll")
-	assert.Equal(t, "Error: unknown flag: --alll\nRun astro thing list --help for usage.\n", r.stderr)
+	for _, on := range []string{"root", "parent"} {
+		t.Run(on, func(t *testing.T) {
+			root := testTree(nil)
+			disabled := root
+			if on == "parent" {
+				group, _, err := root.Find([]string{"thing"})
+				require.NoError(t, err)
+				disabled = group
+			}
+			disabled.DisableSuggestions = true
+			// A prefix, so it would be suggested at any distance, 0 included.
+			r := execTree(context.Background(), root, "thing", "list", "--outp", "json")
+			assert.Equal(t, "Error: unknown flag: --outp\nRun astro thing list --help for usage.\n", r.stderr)
+		})
+	}
 }
 
 // Under --output json a usage error is the error object alone: no
@@ -314,14 +332,53 @@ func TestAJSONUsageErrorCarriesNoSuggestion(t *testing.T) {
 // usage up front, as all of astro local does: that kept cobra's usage block
 // out, and its help is still where the right invocation is.
 func TestAMisinvokedSilencedCommandStillPointsAtHelp(t *testing.T) {
-	root := testTree(nil)
-	leaf, _, err := root.Find([]string{"thing", "list"})
-	require.NoError(t, err)
-	leaf.SilenceUsage = true
-	r := execTree(context.Background(), root, "thing", "list", "--alll")
-	assert.Equal(t, "Error: unknown flag: --alll\nDid you mean --all?\nRun astro thing list --help for usage.\n", r.stderr)
-	r = execTree(context.Background(), root, "thing", "list", "extra")
-	assert.Equal(t, "Error: unknown command \"extra\" for \"astro thing list\"\nRun astro thing list --help for usage.\n", r.stderr)
+	cases := map[string]struct {
+		args   []string
+		stderr string
+	}{
+		"unknown flag": {
+			[]string{"thing", "list", "--alll"},
+			"Error: unknown flag: --alll\nDid you mean --all?\nRun astro thing list --help for usage.\n",
+		},
+		"wrong argument count": {
+			[]string{"thing", "list", "extra"},
+			"Error: unknown command \"extra\" for \"astro thing list\"\nRun astro thing list --help for usage.\n",
+		},
+		"bad --output value": {
+			[]string{"thing", "list", "-o", "yaml"},
+			"Error: unknown output format \"yaml\" (supported: text, json)\nRun astro thing list --help for usage.\n",
+		},
+		"missing required flag": {
+			[]string{"thing", "create"},
+			"Error: required flag(s) \"name\" not set\nRun astro thing create --help for usage.\n",
+		},
+		"unknown subcommand of a group with no RunE": {
+			[]string{"thing", "bogus"},
+			"Error: unknown command \"bogus\" for \"astro thing\"\nRun astro thing --help for usage.\n",
+		},
+		"unknown subcommand of a group answering with GroupHelp": {
+			[]string{"runner", "strat"},
+			"Error: unknown command \"strat\" for \"astro runner\"\n\nDid you mean this?\n\tstart\n\n" +
+				"Run astro runner --help for usage.\n",
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			root := testTree(nil)
+			// A group with a RunE of its own, as astro local is.
+			runner := &cobra.Command{Use: "runner", Args: cobra.ArbitraryArgs, RunE: GroupHelp}
+			runner.AddCommand(&cobra.Command{Use: "start", RunE: func(*cobra.Command, []string) error { return nil }})
+			root.AddCommand(runner)
+			// Every command below the root silenced, as astro local silences
+			// its whole tree when it builds it.
+			for _, c := range root.Commands() {
+				walk(c, func(c *cobra.Command) { c.SilenceUsage = true })
+			}
+			r := execTree(context.Background(), root, c.args...)
+			assert.Equal(t, ExitUsage, ExitCode(context.Background(), r.err))
+			assert.Equal(t, c.stderr, r.stderr)
+		})
+	}
 }
 
 // A root that silenced its usage silences the pointer for the whole tree,

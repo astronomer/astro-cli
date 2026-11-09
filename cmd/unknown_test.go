@@ -82,6 +82,44 @@ func TestUnknownCommandSuggestion(t *testing.T) {
 	assert.Empty(t, findUnknownCommand(root, []string{"deploi"}).suggestion())
 }
 
+// Telemetry records the suggestion the refusal shows: by the root's settings,
+// which cliout.UnknownSubcommand reads, and without leaving a distance behind
+// on the command it looked under.
+func TestUnknownCommandSuggestionIsTheOneShown(t *testing.T) {
+	shown := func(root *cobra.Command, args ...string) string {
+		parent, _, err := root.Find(args[:len(args)-1])
+		require.NoError(t, err)
+		msg := cliout.UnknownSubcommand(parent, args[len(args)-1]).Error()
+		if _, after, ok := strings.Cut(msg, "Did you mean this?\n\t"); ok {
+			return strings.TrimSpace(after)
+		}
+		return ""
+	}
+	for name, set := range map[string]func(root *cobra.Command){
+		"by default":                          func(*cobra.Command) {},
+		"the root disables suggestions":       func(root *cobra.Command) { root.DisableSuggestions = true },
+		"the root holds them to one edit":     func(root *cobra.Command) { root.SuggestionsMinimumDistance = 1 },
+		"the parent's own distance is unread": func(root *cobra.Command) { root.Commands()[0].SuggestionsMinimumDistance = 1 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := newUnknownTestTree()
+			set(root)
+			dev := root.Commands()[0]
+			require.Equal(t, "dev", dev.Name())
+			own := dev.SuggestionsMinimumDistance
+
+			got := findUnknownCommand(root, []string{"dev", "strat"}).suggestion()
+			assert.Equal(t, shown(root, "dev", "strat"), got)
+			assert.Equal(t, own, dev.SuggestionsMinimumDistance, "the lookup left a distance on the command")
+		})
+	}
+
+	root := newUnknownTestTree()
+	assert.Equal(t, "start", findUnknownCommand(root, []string{"dev", "strat"}).suggestion(), "two edits, within cobra's default")
+	root.DisableSuggestions = true
+	assert.Empty(t, findUnknownCommand(root, []string{"dev", "strat"}).suggestion(), "the root's switch reaches a group under it")
+}
+
 // TestFindUnknownCommandLeavesCobrasOwnCommandsAlone guards the commands cobra
 // adds inside Execute. Execute looks for an unknown command after the run, so
 // they are in the tree by then; this adds them the way cobra does.

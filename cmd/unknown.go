@@ -118,7 +118,7 @@ func findUnknownCommand(root *cobra.Command, args []string) *unknownCommand {
 	return &unknownCommand{
 		parent:      matched,
 		word:        operands[0],
-		suggestions: suggestionsFor(matched, operands[0]),
+		suggestions: cliout.SubcommandSuggestions(matched, operands[0]),
 	}
 }
 
@@ -127,18 +127,6 @@ func (u *unknownCommand) suggestion() string {
 		return ""
 	}
 	return u.suggestions[0]
-}
-
-func suggestionsFor(parent *cobra.Command, word string) []string {
-	if parent.DisableSuggestions {
-		return nil
-	}
-	if parent.SuggestionsMinimumDistance <= 0 {
-		// SuggestionsFor reads the distance from the command, which cobra
-		// fills in only on its own error path.
-		parent.SuggestionsMinimumDistance = cliout.DefaultSuggestionDistance
-	}
-	return parent.SuggestionsFor(word)
 }
 
 // stripFlags drops flags and their values, leaving the words cobra would read

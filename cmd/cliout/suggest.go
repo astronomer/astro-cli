@@ -13,14 +13,17 @@ import (
 // err reports, spelled "--name", or "" when err is no such error or no flag
 // is clearly the one meant.
 //
-// Close is cobra's rule for "Did you mean this?", read from the same settings
-// UnknownSubcommand's suggestions are (suggestionsFor): nothing when a command
-// on the way disables suggestions, else within the root's distance, or the
-// typed name a prefix of the flag's. A name shorter than twice that distance
-// is held to half its length, so --ws does not become --id. Clearly is one
-// flag nearest: two equally close are a guess, and a wrong guess costs a
-// second error. A shorthand gets nothing, since one letter is close to every
-// other, and hidden and deprecated flags are never offered.
+// Close reads the same settings subcommand suggestions do
+// (suggestionDistance): nothing when a command on the way disables
+// suggestions, else within the root's distance by EditDistance, or the typed
+// name a prefix of the flag's. A short name is held to fewer edits than half
+// its length, so neither --ws nor --bogs (two edits from --id and --tags)
+// becomes a guess. EditDistance counts swapped neighbours as one edit, so
+// --froce is one from --force; subcommand suggestions keep cobra's own
+// matcher (SubcommandSuggestions), where that is two. Clearly is one flag
+// nearest: two equally close are a guess, and a wrong guess costs a second
+// error. A shorthand gets nothing, since one letter is close to every other,
+// and hidden and deprecated flags are never offered.
 //
 // By the time pflag reports a flag it has no such flag for, cobra has merged
 // the parents' persistent flags into cmd.Flags(), so they are candidates too.
@@ -33,7 +36,7 @@ func suggestFlag(cmd *cobra.Command, err error) string {
 	if !ok {
 		return ""
 	}
-	distance = min(distance, max(1, utf8.RuneCountInString(typed)/2))
+	distance = min(distance, max(1, (utf8.RuneCountInString(typed)-1)/2))
 
 	var names []string
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
@@ -95,16 +98,19 @@ func Closest(name string, candidates []string, distance int) []string {
 	return matches
 }
 
-// EditDistance is the Levenshtein distance between a and b, by character
-// rather than byte, so an accented letter is one edit, not two.
+// EditDistance is the edit distance between a and b counting an insertion,
+// a deletion, a substitution, or two neighbours swapped as one edit each
+// (optimal string alignment), by character rather than byte, so an accented
+// letter is one edit, not two. A swap is the commonest typo (--froce,
+// apc.page_siez), and plain Levenshtein counts it as two.
 func EditDistance(a, b string) int {
 	ra, rb := []rune(a), []rune(b)
-	prev := make([]int, len(rb)+1)
+	// Three rows: the one two back is what a swap is measured from.
+	back, prev, cur := make([]int, len(rb)+1), make([]int, len(rb)+1), make([]int, len(rb)+1)
 	for j := range prev {
 		prev[j] = j
 	}
 	for i := 1; i <= len(ra); i++ {
-		cur := make([]int, len(rb)+1)
 		cur[0] = i
 		for j := 1; j <= len(rb); j++ {
 			cost := 1
@@ -112,8 +118,11 @@ func EditDistance(a, b string) int {
 				cost = 0
 			}
 			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+			if i > 1 && j > 1 && ra[i-1] == rb[j-2] && ra[i-2] == rb[j-1] {
+				cur[j] = min(cur[j], back[j-2]+1)
+			}
 		}
-		prev = cur
+		back, prev, cur = prev, cur, back
 	}
 	return prev[len(rb)]
 }

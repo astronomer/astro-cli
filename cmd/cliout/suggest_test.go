@@ -28,8 +28,25 @@ func TestClosest(t *testing.T) {
 }
 
 func TestEditDistance(t *testing.T) {
-	assert.Equal(t, 0, EditDistance("output", "output"))
-	assert.Equal(t, 2, EditDistance("outptu", "output"))
-	assert.Equal(t, 1, EditDistance("sizé", "size"), "an accented letter is one edit")
-	assert.Equal(t, 3, EditDistance("", "abc"))
+	for _, c := range []struct {
+		a, b string
+		want int
+		why  string
+	}{
+		{"output", "output", 0, "the same"},
+		{"", "abc", 3, "insertions"},
+		{"workspac", "workspace", 1, "a deletion"},
+		{"bogs", "tags", 2, "two substitutions"},
+		{"sizé", "size", 1, "an accented letter is one edit"},
+		{"outptu", "output", 1, "swapped neighbours at the end"},
+		{"tgas", "tags", 1, "swapped neighbours"},
+		{"froce", "force", 1, "swapped neighbours mid-word"},
+		{"ab", "ba", 1, "a whole word swapped"},
+		{"éa", "aé", 1, "a swap is by character, not byte"},
+		{"froce", "forec", 2, "two separate swaps"},
+		{"ca", "abc", 3, "optimal string alignment edits no substring twice"},
+	} {
+		assert.Equal(t, c.want, EditDistance(c.a, c.b), "%s: %q to %q", c.why, c.a, c.b)
+		assert.Equal(t, c.want, EditDistance(c.b, c.a), "%s, reversed: %q to %q", c.why, c.b, c.a)
+	}
 }

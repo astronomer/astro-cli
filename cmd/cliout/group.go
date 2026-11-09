@@ -39,7 +39,7 @@ func GroupHelp(cmd *cobra.Command, args []string) error {
 // subcommands, with the suggestions cobra's own refusal would carry.
 func UnknownSubcommand(cmd *cobra.Command, arg string) error {
 	msg := fmt.Sprintf("unknown command %q for %q", arg, cmd.CommandPath())
-	if suggestions := suggestionsFor(cmd, arg); len(suggestions) > 0 {
+	if suggestions := SubcommandSuggestions(cmd, arg); len(suggestions) > 0 {
 		msg += "\n\nDid you mean this?\n"
 		for _, s := range suggestions {
 			msg += "\t" + s + "\n"
@@ -48,14 +48,16 @@ func UnknownSubcommand(cmd *cobra.Command, arg string) error {
 	return misinvoked(errors.New(msg))
 }
 
-// suggestionsFor is what cobra's own refusal of an unknown command would
-// suggest for arg among cmd's subcommands. Cobra refuses from the root, so it
-// reads the root's settings: nothing when the root (or here, any command on
-// the way to cmd) disables suggestions, and otherwise the subcommands within
-// the root's SuggestionsMinimumDistance, 2 when that is unset. SuggestionsFor
-// reads the distance off the command it is called on, so cmd carries the
-// root's for the call and gets its own back after.
-func suggestionsFor(cmd *cobra.Command, arg string) []string {
+// SubcommandSuggestions is what cobra's own refusal of an unknown command
+// would suggest for arg among cmd's subcommands, by cobra's own matcher
+// (plain Levenshtein or a prefix; unlike suggestFlag's, a transposition is
+// two edits). Cobra refuses from the root, so it reads the root's settings
+// (suggestionDistance): nothing when the root, or here any command on the
+// way to cmd, disables suggestions. It is what a refusal shows and what
+// telemetry records for it, so the two agree. SuggestionsFor reads the
+// distance off the command it is called on, so cmd carries the root's for
+// the call and gets its own back after.
+func SubcommandSuggestions(cmd *cobra.Command, arg string) []string {
 	distance, ok := suggestionDistance(cmd)
 	if !ok {
 		return nil
