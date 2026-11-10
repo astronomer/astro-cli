@@ -157,8 +157,13 @@ func TestBadHostLists(t *testing.T) {
 // A socket nobody is listening on is a clear error naming where the path came
 // from, not a silent fall back to the network.
 func TestMissingSocket(t *testing.T) {
+	// A short directory, as in listen, so the dial fails for want of a
+	// listener rather than for a path too long to be a socket.
+	dir, err := os.MkdirTemp("", "hs")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(dir) })
 	direct := &directRecorder{}
-	rt, err := NewRouter(filepath.Join(t.TempDir(), "absent"), DefaultHosts, direct)
+	rt, err := NewRouter(filepath.Join(dir, "absent"), DefaultHosts, direct)
 	require.NoError(t, err)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://api.astronomer.io/v1/x", http.NoBody)
 	require.NoError(t, err)
@@ -188,6 +193,21 @@ func TestInstall(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), HostsEnv)
 		assert.Same(t, original, http.DefaultTransport)
+	})
+
+	t.Run("a relative path is resolved once, against the starting directory", func(t *testing.T) {
+		t.Cleanup(func() { http.DefaultTransport = original })
+		want, err := filepath.Abs("rel.sock")
+		require.NoError(t, err)
+		require.NoError(t, Install(env(map[string]string{SocketEnv: "rel.sock"})))
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://api.astronomer.io/v1/x", http.NoBody)
+		require.NoError(t, err)
+		resp, err := (&http.Client{}).Do(req)
+		if resp != nil {
+			resp.Body.Close()
+		}
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), want)
 	})
 
 	t.Run("set routes a default client through the socket", func(t *testing.T) {

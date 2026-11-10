@@ -20,7 +20,7 @@ Everything else leaves the way it always did: local Airflow, Docker, the login s
 
 To choose the hosts yourself, set `ASTRO_HTTP_UNIX_SOCKET_HOSTS` to a comma-separated list. Each entry is a host name, or `*.suffix` for every host below `suffix` (not `suffix` itself). The list replaces the default rather than adding to it. An empty value means the default. An entry that is neither form is an error, reported before any command runs.
 
-A socket nobody is listening on is an error that names `ASTRO_HTTP_UNIX_SOCKET`. The CLI never falls back to the network for a host on the list.
+A relative path is resolved once, against the directory the command started in. A socket nobody is listening on is an error that names `ASTRO_HTTP_UNIX_SOCKET`. The CLI never falls back to the network for a host on the list.
 
 ## Credentials
 

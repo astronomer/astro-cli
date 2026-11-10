@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 )
 
@@ -64,8 +65,16 @@ func Install(getenv func(string) string) error {
 	if socket == "" {
 		return nil
 	}
+	// Resolved once, so a relative path means the directory the command
+	// started in, not wherever the process happens to be when it dials.
+	socket, err := filepath.Abs(socket)
+	if err != nil {
+		return fmt.Errorf("%s: %w", SocketEnv, err)
+	}
 	hosts := DefaultHosts
-	if raw, ok := lookup(getenv, HostsEnv); ok {
+	// Empty counts as unset, so ASTRO_HTTP_UNIX_SOCKET_HOSTS= in a wrapper's
+	// environment means the default rather than "no hosts".
+	if raw := strings.TrimSpace(getenv(HostsEnv)); raw != "" {
 		hosts = strings.Split(raw, ",")
 	}
 	rt, err := NewRouter(socket, hosts, http.DefaultTransport)
@@ -74,14 +83,6 @@ func Install(getenv func(string) string) error {
 	}
 	http.DefaultTransport = rt
 	return nil
-}
-
-// lookup reads an env var through getenv, treating an empty value as unset,
-// so ASTRO_HTTP_UNIX_SOCKET_HOSTS= in a wrapper's environment means the
-// default rather than "no hosts".
-func lookup(getenv func(string) string, key string) (string, bool) {
-	v := strings.TrimSpace(getenv(key))
-	return v, v != ""
 }
 
 // Router sends a request to the socket when its host matches, and to the
@@ -134,7 +135,6 @@ func socketTransport(socketPath string) *http.Transport {
 		return conn, nil
 	}
 	return &http.Transport{
-		Proxy:             nil,
 		DialContext:       dial,
 		DialTLSContext:    dial,
 		DisableKeepAlives: true,
