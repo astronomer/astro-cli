@@ -762,7 +762,8 @@ func ensureProjectName(args []string, projectName string) (string, error) {
 		}
 	} else {
 		projectDirectory := filepath.Base(config.WorkingPath)
-		projectName = strings.Replace(strcase.ToSnake(projectDirectory), "_", "-", -1)
+		// A leading or trailing dash would make the image tag invalid once a "_<hash>" suffix is added.
+		projectName = strings.Trim(strings.ReplaceAll(strcase.ToSnake(projectDirectory), "_", "-"), "-")
 	}
 
 	return projectName, nil

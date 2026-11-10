@@ -78,6 +78,20 @@ var (
 	_ suite.TearDownSubTest = (*AirflowSuite)(nil)
 )
 
+func (s *AirflowSuite) TestEnsureProjectNameFromDirectory() {
+	tests := map[string]string{
+		"myProject":   "my-project",
+		"tmp5c16s6e_": "tmp-5-c-16-s-6-e",
+		"_my_project": "my-project",
+	}
+	for dir, want := range tests {
+		config.WorkingPath = filepath.Join(s.tempDir, dir)
+		got, err := ensureProjectName(nil, "")
+		s.NoError(err)
+		s.Equal(want, got, dir)
+	}
+}
+
 func (s *AirflowSuite) TestDevRootCommand() {
 	output, err := executeCommand("dev")
 	s.NoError(err)
