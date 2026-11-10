@@ -59,8 +59,20 @@ jobs:
     # (release tags, by its deployment policy) can read them; a workflow pushed to any
     # other branch cannot.
     environment: release-signing
-    # Notarization waits on Apple, which can take up to 20 minutes per binary.
-    timeout-minutes: 60
+    # A cold-cache build takes up to ~30 minutes, and notarization waits on Apple for up
+    # to 20 minutes per darwin binary, one after the other.
+    timeout-minutes: 90
+    outputs:
+      # "true" when the published darwin binaries failed signature verification, so the
+      # announcement jobs below hold back.
+      signature_failed: ${{ steps.verify-signatures.outputs.failed }}
+    env:
+      # Signing is required, and checked, only for releases of this repository. Forks
+      # and local snapshots build unsigned.
+      OFFICIAL_RELEASE: ${{ github.repository == 'astronomer/astro-cli' }}
+      # Public (it's in every binary we sign), so not a secret: a fixed expectation that
+      # whoever can edit the signing secrets can't change.
+      APPLE_TEAM_ID: XM6XZGXXH8
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -117,23 +129,32 @@ jobs:
       # still build. An official release must not ship unsigned: fail here, before anything
       # is published, when a signing secret is missing or misnamed.
       - name: Require macOS signing secrets
-        if: github.repository == 'astronomer/astro-cli'
+        if: env.OFFICIAL_RELEASE == 'true'
         env:
           MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           missing=0
-          for name in MACOS_CERTIFICATE_P12_BASE64 MACOS_CERTIFICATE_PASSWORD APPLE_API_ISSUER_ID APPLE_API_KEY_ID APPLE_API_KEY_P8_BASE64 APPLE_TEAM_ID; do
+          for name in MACOS_CERTIFICATE_P12_BASE64 MACOS_CERTIFICATE_PASSWORD APPLE_API_ISSUER_ID APPLE_API_KEY_ID APPLE_API_KEY_P8_BASE64; do
             if [ -z "${!name}" ]; then
-              echo "::error::Repository secret ${name} is not set; refusing to release unsigned macOS binaries."
+              echo "::error::Secret ${name} is not set in the release-signing environment; refusing to release unsigned macOS binaries."
               missing=1
             fi
           done
           exit "$missing"
+
+      # Also before anything is published: the certificate must open with its password and
+      # be an in-date Developer ID Application identity for our team, not just any
+      # certificate that happens to be in the secret.
+      - name: Check the macOS signing certificate
+        if: env.OFFICIAL_RELEASE == 'true'
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: scripts/release/check-macos-signing-cert.sh
 
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
@@ -144,44 +165,32 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-token.outputs.token }}
           GORELEASER_CURRENT_TAG: ${{ needs.detect.outputs.tag }}
           GORELEASER_PREVIOUS_TAG: ${{ steps.prev-tag.outputs.tag }}
-          # macOS signing and notarization (notarize.macos in .goreleaser.yml). Required above
-          # for official releases; goreleaser itself skips it when unset (snapshots, forks).
+          # macOS signing and notarization (notarize.macos in .goreleaser.yml). Required and
+          # checked above for official releases; goreleaser skips it when unset. With
+          # notarize.wait, an Apple rejection fails goreleaser before it publishes.
           MACOS_SIGN_P12: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
           MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
           MACOS_NOTARY_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
           MACOS_NOTARY_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           MACOS_NOTARY_KEY: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
 
-      # Belt and braces after the secrets check: the binaries we built must carry a valid
-      # signature from our Team ID, not just any certificate someone put in the secret.
+      # A second line after the checks above: the binaries goreleaser actually built must
+      # carry a valid signature from our team with the hardened runtime. goreleaser has
+      # published by now, so a failure here can't stop the release, but it fails the run
+      # and its signature_failed output holds back the announcement jobs below.
       - name: Verify macOS binaries are signed by Astronomer
-        if: github.repository == 'astronomer/astro-cli'
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        id: verify-signatures
+        if: env.OFFICIAL_RELEASE == 'true'
         run: |
-          set -euo pipefail
           shopt -s nullglob
-          bins=(dist/darwin-build_darwin_*/astro)
-          if [ "${#bins[@]}" -eq 0 ]; then
-            echo "::error::No darwin binaries found under dist/ to verify."
-            exit 1
-          fi
-          for bin in "${bins[@]}"; do
-            codesign --verify --strict --verbose=2 "$bin"
-            team=$(codesign -dv "$bin" 2>&1 | sed -n 's/^TeamIdentifier=//p')
-            if [ "$team" != "$APPLE_TEAM_ID" ]; then
-              echo "::error::${bin} is signed by team '${team}', expected the Astronomer team."
-              exit 1
-            fi
-            echo "${bin}: signed by team ${team}"
-          done
+          scripts/release/verify-macos-signatures.sh dist/darwin-build_darwin_*/astro
 
   # install.astronomer.io fetches godownloader.sh from main, so this job keeps
   # that path current. Pinned installs use the install.sh release asset instead,
   # which carries its own version and does not depend on the PR this job opens.
   update-godownloader:
     needs: [detect, release]
-    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.detect.outputs.stable == 'true' && needs.release.result != 'skipped'
+    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.detect.outputs.stable == 'true' && needs.release.result != 'skipped' && needs.release.outputs.signature_failed != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Verify GitHub release exists
@@ -233,7 +242,7 @@ jobs:
 
   update-winget:
     needs: [detect, release]
-    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.detect.outputs.stable == 'true' && needs.release.result != 'skipped'
+    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.detect.outputs.stable == 'true' && needs.release.result != 'skipped' && needs.release.outputs.signature_failed != 'true'
     runs-on: windows-latest
     steps:
       - name: Verify GitHub release exists
@@ -291,7 +300,7 @@ jobs:
 
   notify:
     needs: [detect, release, update-godownloader, update-winget]
-    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.release.result != 'skipped'
+    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.release.result != 'skipped' && needs.release.outputs.signature_failed != 'true'
     runs-on: ubuntu-latest
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
