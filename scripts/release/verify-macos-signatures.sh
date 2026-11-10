@@ -28,7 +28,8 @@ for bin in "$@"; do
   [ "$team" = "$APPLE_TEAM_ID" ] || fail "${bin} is signed by team '${team}', expected ${APPLE_TEAM_ID}."
 
   # e.g. "CodeDirectory v=20500 size=... flags=0x10000(runtime) hashes=..."
-  printf '%s\n' "$details" | grep -Eq '^CodeDirectory .*flags=0x[0-9a-f]+\([^)]*runtime' \
+  # A here-string rather than a pipe, so grep -q exiting early can't fail it under pipefail.
+  grep -Eq '^CodeDirectory .*flags=0x[0-9a-f]+\([^)]*runtime' <<<"$details" \
     || fail "${bin} is signed without the hardened runtime, so notarization would not hold."
 
   echo "${bin}: signed by team ${team}, hardened runtime on"

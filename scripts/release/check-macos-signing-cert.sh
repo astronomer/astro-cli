@@ -33,8 +33,11 @@ if ! security import "$work/cert.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PASS
 fi
 
 # find-identity -v lists only identities that have their private key, are in date and
-# chain to Apple's root. The name ends in "(TEAMID)".
-if ! security find-identity -v -p codesigning "$keychain" | grep -q "\"Developer ID Application: .* (${APPLE_TEAM_ID})\""; then
+# chain to Apple's root. The name ends in "(TEAMID)". Capture the output first: piping
+# into grep -q under pipefail can fail a good certificate, because grep exits on the
+# first match and security can then die of SIGPIPE.
+identities=$(security find-identity -v -p codesigning "$keychain")
+if ! grep -q "\"Developer ID Application: .* (${APPLE_TEAM_ID})\"" <<<"$identities"; then
   echo "::error::The signing certificate is not a valid Developer ID Application identity for team ${APPLE_TEAM_ID}. It may belong to another team, be expired or revoked, or be missing its private key."
   security find-identity -p codesigning "$keychain" | sed 's/^/  /'
   exit 1
