@@ -74,11 +74,12 @@ jobs:
       # Public (it's in every binary we sign), so not a secret: a fixed expectation that
       # whoever can edit the signing secrets can't change.
       APPLE_TEAM_ID: XM6XZGXXH8
-      # Azure Artifact Signing account and certificate profile for Windows (Authenticode)
-      # signing; the publisher name comes from the identity validated for this profile.
+      # Azure Artifact Signing for Windows (Authenticode) signing. The account and
+      # certificate profile are release-signing environment variables; the publisher name
+      # users see comes from the identity validated for the profile, not from these names.
       WINDOWS_SIGNING_ENDPOINT: eus.codesigning.azure.net
-      WINDOWS_SIGNING_ACCOUNT: orbitersigner
-      WINDOWS_SIGNING_PROFILE: Orbiter-Studio
+      WINDOWS_SIGNING_ACCOUNT: ${{ vars.WINDOWS_SIGNING_ACCOUNT }}
+      WINDOWS_SIGNING_PROFILE: ${{ vars.WINDOWS_SIGNING_PROFILE }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -155,7 +156,8 @@ jobs:
               missing=1
             fi
           done
-          for name in AZURE_CLIENT_ID AZURE_TENANT_ID; do
+          # WINDOWS_SIGNING_ACCOUNT and WINDOWS_SIGNING_PROFILE come from the job env.
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID WINDOWS_SIGNING_ACCOUNT WINDOWS_SIGNING_PROFILE; do
             if [ -z "${!name}" ]; then
               echo "::error::Variable ${name} is not set in the release-signing environment; refusing to release unsigned Windows binaries."
               missing=1
