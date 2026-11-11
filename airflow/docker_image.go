@@ -185,6 +185,13 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		"--name",
 		"astro-pytest",
 	}
+	// Bind-mount the project dirs, as astro dev start does, so files pytest
+	// writes to include/ (junit xml, coverage) stay on the host.
+	for _, dir := range []string{"dags", "tests", "plugins", "include"} {
+		if exists, _ := util.Exists(airflowHome + "/" + dir); exists {
+			args = append(args, "-v", airflowHome+"/"+dir+":/usr/local/airflow/"+dir+":z")
+		}
+	}
 	fileExist, err := util.Exists(airflowHome + "/" + envFile)
 	if err != nil {
 		return "", err
@@ -210,19 +217,10 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		return "", err
 	}
 
-	// Copy host directories into the container using docker cp.
-	// This ensures fresh files from the host are used (not stale from
-	// image build cache) and works with remote Docker daemons (CI).
-	copyDirs := []string{"dags", "tests", "plugins", "include", ".astro"}
-	for _, dir := range copyDirs {
-		srcPath := airflowHome + "/" + dir
-		if exists, _ := util.Exists(srcPath); !exists {
-			continue
-		}
-		docErr := cmdExec(containerRuntime, stdout, stderr, "cp", srcPath, "astro-pytest:/usr/local/airflow/")
-		if docErr != nil {
-			return "", docErr
-		}
+	// .astro is dockerignored on some machines, so copy it explicitly.
+	docErr := cmdExec(containerRuntime, stdout, stderr, "cp", airflowHome+"/.astro", "astro-pytest:/usr/local/airflow/")
+	if docErr != nil {
+		return "", docErr
 	}
 
 	// start pytest container

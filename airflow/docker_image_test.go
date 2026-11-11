@@ -257,6 +257,23 @@ func (s *Suite) TestDockerImagePytest() {
 		s.Error(err)
 	})
 
+	s.Run("include bind-mounted", func() {
+		home := s.T().TempDir()
+		s.NoError(os.Mkdir(home+"/include", os.ModePerm))
+
+		var createArgs []string
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			if args[0] == "create" {
+				createArgs = args
+			}
+			return nil
+		}
+		_, err = handler.Pytest("", home, "", "", []string{}, false, options)
+		s.NoError(err)
+		s.Contains(createArgs, home+"/include:/usr/local/airflow/include:z")
+		s.NotContains(createArgs, home+"/dags:/usr/local/airflow/dags:z")
+	})
+
 	s.Run("pytest error", func() {
 		options = airflowTypes.ImageBuildConfig{
 			Path:            cwd,
