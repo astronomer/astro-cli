@@ -30,12 +30,21 @@ fi
 : "${MACOS_SIGN_KEYCHAIN:?}" "${MACOS_NOTARY_KEY_PATH:?}" "${APPLE_API_KEY_ID:?}" "${APPLE_API_ISSUER_ID:?}" "${APPLE_TEAM_ID:?}"
 
 here=$(cd "$(dirname "$0")" && pwd)
+name=$(basename "$(dirname "$bin")")  # e.g. darwin-build_darwin_arm64_v8.0, to tell the two parallel hooks apart
 
-codesign --force --timestamp --options runtime \
-  --identifier com.astronomer.astro \
-  --keychain "$MACOS_SIGN_KEYCHAIN" \
-  --sign "$MACOS_SIGN_IDENTITY" \
-  "$bin"
+sign() {
+  codesign --force --timestamp --options runtime \
+    --identifier com.astronomer.astro \
+    --keychain "$MACOS_SIGN_KEYCHAIN" \
+    --sign "$MACOS_SIGN_IDENTITY" \
+    "$bin"
+}
+# --timestamp calls Apple's timestamp server, the usual source of a transient failure.
+if ! sign; then
+  echo "[${name}] codesign failed; retrying once in 30s." >&2
+  sleep 30
+  sign
+fi
 
 # Team ID, hardened runtime and a valid signature, before spending time on notarization.
 # GITHUB_OUTPUT is unset so this check doesn't write the release step's outputs.
@@ -48,17 +57,31 @@ trap 'rm -rf "$work"' EXIT
 ditto -c -k --keepParent "$bin" "$work/astro.zip"
 
 notary_auth=(--key "$MACOS_NOTARY_KEY_PATH" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID")
-xcrun notarytool submit "$work/astro.zip" "${notary_auth[@]}" \
-  --wait --timeout 20m --output-format json > "$work/result.json"
+submission="" status=""
+notarize() {
+  # Don't let a non-zero exit (a --wait timeout, a network error, or a rejection on
+  # notarytool versions that exit non-zero for it) skip the diagnostics below.
+  xcrun notarytool submit "$work/astro.zip" "${notary_auth[@]}" \
+    --wait --timeout 20m --output-format json > "$work/result.json" 2> "$work/submit.err" || true
+  submission=$(plutil -extract id raw -o - "$work/result.json" 2>/dev/null || true)
+  status=$(plutil -extract status raw -o - "$work/result.json" 2>/dev/null || true)
+}
+notarize
+# Retry only when Apple gave no verdict at all (the submission never got a status); a
+# rejection or a timeout on a real submission is not retried.
+if [ -z "$status" ] && [ -z "$submission" ]; then
+  echo "[${name}] notarytool returned no result; retrying once in 30s." >&2
+  cat "$work/submit.err" >&2
+  sleep 30
+  notarize
+fi
 
-submission=$(plutil -extract id raw -o - "$work/result.json" 2>/dev/null || echo "")
-status=$(plutil -extract status raw -o - "$work/result.json" 2>/dev/null || echo "unknown")
 if [ "$status" != "Accepted" ]; then
-  echo "::error::Notarization of ${bin} finished with status '${status}' (submission ${submission:-unknown})."
-  cat "$work/result.json" >&2
+  echo "::error::Notarization of ${bin} finished with status '${status:-none}' (submission ${submission:-none})."
+  cat "$work/result.json" "$work/submit.err" >&2 2>/dev/null || true
   if [ -n "$submission" ]; then
     xcrun notarytool log "$submission" "${notary_auth[@]}" >&2 || true
   fi
   exit 1
 fi
-echo "${bin}: notarized (submission ${submission})"
+echo "[${name}] notarized (submission ${submission})"

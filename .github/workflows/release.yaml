@@ -59,8 +59,9 @@ jobs:
     # (release tags, by its deployment policy) can read them; a workflow pushed to any
     # other branch cannot.
     environment: release-signing
-    # A cold-cache build takes up to ~30 minutes, and notarization waits on Apple for up
-    # to 20 minutes per darwin binary, one after the other.
+    # A cold-cache build takes up to ~30 minutes. Each darwin binary's signing hook then
+    # waits on Apple's notarization for up to 20 minutes; the two run in parallel, but a
+    # retry after a failed submission can add another wait.
     timeout-minutes: 90
     outputs:
       # "true" when the published darwin binaries failed signature verification, so the

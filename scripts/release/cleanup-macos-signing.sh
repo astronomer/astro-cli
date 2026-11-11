@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
-# Removes what scripts/release/setup-macos-signing.sh left on the runner. Safe to run when
-# setup never ran or failed partway.
+# Removes what scripts/release/setup-macos-signing.sh created on the runner. Safe to run
+# when setup never ran or failed partway: the paths come from macos-signing-paths.sh, not
+# from anything setup exported. Deleting the keychain also takes it off the search list.
 set -uo pipefail
 
-if [ -n "${MACOS_SIGN_KEYCHAIN:-}" ]; then
-  security delete-keychain "$MACOS_SIGN_KEYCHAIN" 2>/dev/null || true
+[ -n "${RUNNER_TEMP:-}" ] || exit 0
+# shellcheck source=scripts/release/macos-signing-paths.sh
+. "$(dirname "$0")/macos-signing-paths.sh"
+
+if [ -e "$MACOS_SIGN_KEYCHAIN" ]; then
+  security delete-keychain "$MACOS_SIGN_KEYCHAIN" || echo "::warning::Could not delete the signing keychain at ${MACOS_SIGN_KEYCHAIN}."
 fi
-rm -f "${MACOS_NOTARY_KEY_PATH:-}" "${RUNNER_TEMP:-/nonexistent}/astro-signing.p12" "${RUNNER_TEMP:-/nonexistent}/astro-notary-key.p8"
+rm -f "$MACOS_NOTARY_KEY_PATH" "$MACOS_SIGN_P12_PATH"
 exit 0
