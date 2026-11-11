@@ -251,6 +251,16 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 		}
 	}
 
+	// Copy include/ back out: the docs tell users to write test artifacts
+	// (junit xml, coverage) there, and the container is removed below.
+	includePath := airflowHome + "/include"
+	if exists, _ := util.Exists(includePath); exists {
+		cpErr := cmdExec(containerRuntime, nil, stderr, "cp", "astro-pytest:/usr/local/airflow/include/.", includePath)
+		if cpErr != nil {
+			logger.Debugf("Error copying include/ from the pytest container: %s", cpErr.Error())
+		}
+	}
+
 	// delete container
 	rmErr := cmdExec(containerRuntime, nil, stderr, "rm", "astro-pytest")
 	if rmErr != nil {
