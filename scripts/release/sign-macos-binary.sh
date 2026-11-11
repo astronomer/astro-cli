@@ -12,10 +12,11 @@
 #   APPLE_API_KEY_ID        its key ID
 #   APPLE_API_ISSUER_ID     its issuer ID
 #   APPLE_TEAM_ID           the team the signature must carry
+#   OFFICIAL_RELEASE        "true" in the release workflow for astronomer/astro-cli
 #
-# When MACOS_SIGN_IDENTITY is unset or empty (forks, local snapshots) it signs nothing and
-# exits 0; the release workflow requires signing for official releases before goreleaser
-# runs.
+# When MACOS_SIGN_IDENTITY is unset or empty it signs nothing: exit 0 for forks and local
+# snapshots, but exit 1 when OFFICIAL_RELEASE is "true", so an official release whose
+# identity never reached this hook fails before publishing instead of shipping unsigned.
 #
 # Uses Apple's codesign rather than a reimplementation so the signature records the Team
 # ID (codesign -dv's TeamIdentifier), which is what endpoint tools match Team ID rules on.
@@ -24,6 +25,10 @@ set -euo pipefail
 bin="${1:?usage: sign-macos-binary.sh <binary>}"
 
 if [ -z "${MACOS_SIGN_IDENTITY:-}" ]; then
+  if [ "${OFFICIAL_RELEASE:-}" = "true" ]; then
+    echo "::error::Official release but no macOS signing identity; refusing to leave ${bin} unsigned."
+    exit 1
+  fi
   echo "No macOS signing identity configured; leaving ${bin} unsigned." >&2
   exit 0
 fi
