@@ -12,6 +12,12 @@
 # Identity Verification Root CA 2020 (Windows trusts it), so it's kept in this repo,
 # pinned by fingerprint, and passed for both the signing and the timestamp chain.
 #
+# By default osslsigncode also downloads Microsoft's CRLs to check the signing and
+# timestamp certificates haven't been revoked, so a CRL server outage fails the check.
+# WINDOWS_VERIFY_SKIP_CRL=true skips that (-ignore-crl): the signing hook sets it, so a
+# blip there can't fail the release before publishing, while the post-publish check
+# still verifies revocation.
+#
 # When GITHUB_OUTPUT is set, writes failed=true or failed=false to it so later jobs can
 # hold back announcements for a release that failed this check.
 set -uo pipefail
@@ -37,12 +43,22 @@ fingerprint=$(openssl x509 -in "$root" -noout -fingerprint -sha256 2>/dev/null |
 [ "$fingerprint" = "$root_sha256" ] || fail "${root} is not the pinned Microsoft Identity Verification root (got '${fingerprint}')."
 [ "$#" -gt 0 ] || fail "No Windows executables found to verify."
 
+crl_args=()
+if [ "${WINDOWS_VERIFY_SKIP_CRL:-}" = "true" ]; then
+  crl_args=(-ignore-crl)
+  echo "Skipping the CRL revocation check here; the post-publish check runs it."
+fi
+
 for exe in "$@"; do
   [ -f "$exe" ] || fail "${exe} does not exist."
   # Capture first and grep a here-string: piping into grep -q under pipefail can fail a
   # good result when grep exits early.
-  report=$(osslsigncode verify -CAfile "$root" -TSA-CAfile "$root" -in "$exe" 2>&1)
+  report=$(osslsigncode verify ${crl_args[@]+"${crl_args[@]}"} -CAfile "$root" -TSA-CAfile "$root" -in "$exe" 2>&1)
   status=$?
+  if [ "$status" -ne 0 ] && grep -q '^Failed to get CRL from' <<<"$report"; then
+    grep '^Failed to get CRL from' <<<"$report" >&2
+    fail "${exe}: couldn't download Microsoft's certificate revocation list, so revocation wasn't checked. This is usually a temporary outage of Microsoft's CRL server, not a signature problem; re-run the check."
+  fi
   if [ "$status" -ne 0 ] || ! grep -q '^Signature verification: ok' <<<"$report"; then
     printf '%s\n' "$report" | tail -20 >&2
     fail "${exe} has no valid Authenticode signature chaining to Microsoft's Identity Verification root."

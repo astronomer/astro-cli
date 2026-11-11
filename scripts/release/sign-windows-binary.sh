@@ -68,6 +68,8 @@ if ! sign; then
 fi
 
 # Signer, chain and timestamp, before goreleaser archives it. GITHUB_OUTPUT is unset so
-# this check doesn't write the release step's outputs.
-env -u GITHUB_OUTPUT "$here/verify-windows-signatures.sh" "$exe"
+# this check doesn't write the release step's outputs. It skips the CRL download, so a
+# Microsoft CRL server blip can't fail the release here; the post-publish check verifies
+# revocation.
+env -u GITHUB_OUTPUT WINDOWS_VERIFY_SKIP_CRL=true "$here/verify-windows-signatures.sh" "$exe"
 echo "[${name}] signed"
