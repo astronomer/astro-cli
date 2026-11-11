@@ -69,6 +69,15 @@ builds:
       - amd64
       - arm64
     ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
+    # Sign each .exe with Authenticode through Azure Artifact Signing (publisher
+    # "Astronomer, Inc."), timestamped, before anything is archived or published, so
+    # SmartScreen and endpoint tools that trust by publisher accept each release. Does
+    # nothing when signing isn't set up (forks, local snapshots); the release workflow
+    # requires it for official releases.
+    hooks:
+      post:
+        - cmd: scripts/release/sign-windows-binary.sh "{{ .Path }}"
+          output: true
 brews:
   - name: astro
     repository:
