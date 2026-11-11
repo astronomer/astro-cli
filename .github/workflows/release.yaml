@@ -202,6 +202,7 @@ jobs:
         run: scripts/release/setup-windows-signing.sh
 
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        id: goreleaser
         with:
           version: v2.15.2
           args: release --clean
@@ -221,10 +222,11 @@ jobs:
       # a second line on what was actually packaged: if anything after the hook replaced or
       # stripped a signature, the run fails and its signature_failed output holds back the
       # announcement jobs below. goreleaser has published by now, so it can't stop the
-      # release itself.
+      # release itself. Each platform's check runs whenever goreleaser succeeded, whatever
+      # the other's result, so one failure doesn't hide the other.
       - name: Verify macOS binaries are signed by Astronomer
         id: verify-signatures
-        if: env.OFFICIAL_RELEASE == 'true'
+        if: ${{ !cancelled() && env.OFFICIAL_RELEASE == 'true' && steps.goreleaser.outcome == 'success' }}
         run: |
           shopt -s nullglob
           scripts/release/verify-macos-signatures.sh dist/darwin-build_darwin_*/astro
@@ -233,14 +235,16 @@ jobs:
       # what was packaged.
       - name: Verify Windows binaries are signed by Astronomer
         id: verify-windows-signatures
-        if: env.OFFICIAL_RELEASE == 'true'
+        if: ${{ !cancelled() && env.OFFICIAL_RELEASE == 'true' && steps.goreleaser.outcome == 'success' }}
         run: |
           shopt -s nullglob
           scripts/release/verify-windows-signatures.sh dist/windows-build_windows_*/astro.exe
 
-      - name: Remove the signing keychain and notary key
+      - name: Remove signing material
         if: always()
-        run: scripts/release/cleanup-macos-signing.sh
+        run: |
+          scripts/release/cleanup-macos-signing.sh
+          scripts/release/cleanup-windows-signing.sh
 
   # install.astronomer.io fetches godownloader.sh from main, so this job keeps
   # that path current. Pinned installs use the install.sh release asset instead,
