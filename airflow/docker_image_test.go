@@ -257,21 +257,21 @@ func (s *Suite) TestDockerImagePytest() {
 		s.Error(err)
 	})
 
-	s.Run("include copied back to host", func() {
+	s.Run("include bind-mounted", func() {
 		home := s.T().TempDir()
-		includeDir := home + "/include"
-		s.NoError(os.Mkdir(includeDir, os.ModePerm))
+		s.NoError(os.Mkdir(home+"/include", os.ModePerm))
 
-		var copiedBack bool
+		var createArgs []string
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			if args[0] == "cp" && args[1] == "astro-pytest:/usr/local/airflow/include/." && args[2] == includeDir {
-				copiedBack = true
+			if args[0] == "create" {
+				createArgs = args
 			}
 			return nil
 		}
 		_, err = handler.Pytest("", home, "", "", []string{}, false, options)
 		s.NoError(err)
-		s.True(copiedBack)
+		s.Contains(createArgs, home+"/include:/usr/local/airflow/include:z")
+		s.NotContains(createArgs, home+"/dags:/usr/local/airflow/dags:z")
 	})
 
 	s.Run("pytest error", func() {
