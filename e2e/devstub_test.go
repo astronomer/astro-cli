@@ -32,7 +32,7 @@ var devMapping = []struct {
 	{"parse", "astro local check"},
 	{"build", "astro package"},
 	{"kill", "astro local reset --yes"},
-	{"pytest", "uv run pytest"},
+	{"pytest", "astro local run pytest"},
 	{"init", "astro init"},
 	// v1 bulk-loaded connections and variables into a running Airflow. v2
 	// declares them per name, so these name the command that does the job
@@ -212,8 +212,8 @@ func TestDevJSONFlagSpellings(t *testing.T) {
 }
 
 // A classic 1.x project that also keeps a pyproject.toml for tool settings is
-// still 1.x, so the stub leads with the conversion: `uv run pytest` does not
-// work until `astro init` has made the directory a project.
+// still 1.x, so the stub leads with the conversion: `astro local run pytest`
+// does not work until `astro init` has made the directory a project.
 func TestDevInA1xProjectLeadsWithTheConversion(t *testing.T) {
 	tier(t, 0)
 
@@ -228,7 +228,7 @@ func TestDevInA1xProjectLeadsWithTheConversion(t *testing.T) {
 
 	p.run("dev", "pytest").
 		requireFailure().
-		requireStderr("Convert with astro init, then use uv run pytest").
+		requireStderr("Convert with astro init, then use astro local run pytest").
 		requireStderr("project made by Astro CLI 1.x (Dockerfile and .astro/)")
 
 	var payload struct {

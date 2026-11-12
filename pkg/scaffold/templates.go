@@ -67,7 +67,7 @@ Layout:
 - ` + "`dags/`" + `: Airflow Dag definitions
 - ` + "`include/`" + `: files Dags load or import
 - ` + "`plugins/`" + `: Airflow plugins
-- ` + "`tests/`" + `: tests; run them with ` + "`uv run pytest`" + `
+- ` + "`tests/`" + `: tests; run them with ` + "`astro local run pytest`" + `
 - ` + "`.venv/`" + `: derived environment; never commit or edit it by hand
 
 Add a Python dependency with ` + "`uv add <package>`" + ` rather than editing

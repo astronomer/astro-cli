@@ -367,7 +367,7 @@ func TestEveryReplacementNamesARealCommand(t *testing.T) {
 	root := newRootCmd(d)
 	for _, m := range devReplacements() {
 		if !strings.HasPrefix(m.Replacement, "astro ") {
-			continue // uv run pytest, and anything else outside this tree
+			continue // anything outside this tree
 		}
 		var path []string
 		for _, word := range strings.Fields(strings.TrimPrefix(m.Replacement, "astro ")) {
@@ -376,7 +376,12 @@ func TestEveryReplacementNamesARealCommand(t *testing.T) {
 			}
 			path = append(path, word)
 		}
-		found, _, err := root.Find(path)
+		found, rest, err := root.Find(path)
+		// astro local run pytest: run takes the command to run as arguments,
+		// so what is left past it is not a subcommand to resolve.
+		if err == nil && found != nil && found.CommandPath() == "astro local run" && len(rest) > 0 {
+			path = path[:len(path)-len(rest)]
+		}
 		if err != nil || found == nil || found.CommandPath() != "astro "+strings.Join(path, " ") {
 			t.Errorf("astro dev %s points at %q, which does not resolve; the table and the tree disagree",
 				m.Command, m.Replacement)
