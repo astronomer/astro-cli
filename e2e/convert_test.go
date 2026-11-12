@@ -427,7 +427,8 @@ func cases1x() []case1x {
 			// identity, and what `astro package` names an artifact after.
 			projectName: "orders-pipeline",
 			manifestHas: []string{"name = 'orders-pipeline'"},
-			kept:        []string{"Dockerfile", ".astro/config.yaml"},
+			kept:        []string{"Dockerfile"},
+			retired:     []string{".astro/config.yaml"},
 			// Untouched, which is the point of reporting them separately from
 			// what this run wrote.
 			keptHas: map[string]string{"dags/my_dag.py": "the project's own dag"},
@@ -437,7 +438,8 @@ func cases1x() []case1x {
 			},
 			// No note about .astro/config.yaml. This is what `astro dev init`
 			// writes, it saved no deploy target, and the name it does state was
-			// carried. The case below is the one that earns the note.
+			// carried, so the file goes. The case below is the one that earns
+			// the note.
 		},
 		{
 			// A 1.x repository that also keeps a pyproject.toml, holding only
@@ -455,8 +457,7 @@ func cases1x() []case1x {
 			adopted:         true,
 			projectName:     "orders-pipeline",
 			manifestHas:     []string{"'pandas==2.1.0'", "'apache-airflow==3.1.*'", "[tool.astro]", "[tool.ruff]", "line-length = 120", "[tool.pytest.ini_options]"},
-			retired:         []string{"Dockerfile", "requirements.txt"},
-			kept:            []string{".astro/config.yaml"},
+			retired:         []string{"Dockerfile", "requirements.txt", ".astro/config.yaml"},
 			reportedUpdated: []string{"pyproject.toml"},
 		},
 		{
@@ -472,7 +473,8 @@ func cases1x() []case1x {
 			},
 			airflow:     "2",
 			projectName: "orders-pipeline",
-			kept:        []string{"Dockerfile", ".astro/config.yaml"},
+			kept:        []string{"Dockerfile"},
+			retired:     []string{".astro/config.yaml"},
 			notes: []string{
 				"saved deploy target cm1orders was not linked",
 				"astro link add prod --deployment cm1orders --workspace cm1ws, then: astro link default prod",
@@ -490,7 +492,8 @@ func cases1x() []case1x {
 			},
 			airflow:     "2",
 			projectName: "orders-pipeline",
-			kept:        []string{"Dockerfile", ".astro/config.yaml"},
+			kept:        []string{"Dockerfile"},
+			retired:     []string{".astro/config.yaml"},
 			manifestHas: []string{
 				"[tool.astro.deployments]\ndefault = {deployment = 'cm1ordersdeployment000001', workspace = 'cm1ordersworkspace0000001', default = true}",
 			},
@@ -509,7 +512,8 @@ func cases1x() []case1x {
 			},
 			airflow:     "2",
 			projectName: "example-project",
-			kept:        []string{"Dockerfile", ".astro/config.yaml"},
+			kept:        []string{"Dockerfile"},
+			retired:     []string{".astro/config.yaml"},
 			notes:       []string{"astro link add example-dev --deployment cexampledeployment0000001"},
 		},
 		{
@@ -524,7 +528,7 @@ func cases1x() []case1x {
 			airflow:     "3.1",
 			projectName: "orders-pipeline",
 			manifestHas: []string{"name = 'orders-pipeline'"},
-			kept:        []string{".astro/config.yaml"},
+			retired:     []string{".astro/config.yaml"},
 			// An advisory, not a note: it is already named that.
 			//
 			// And no config note, which is the whole rule: leftovers fires it

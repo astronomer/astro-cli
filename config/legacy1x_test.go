@@ -41,3 +41,30 @@ func (s *Suite) TestLegacy1xValueWithNoHomeConfig() {
 	value, _, _ := Legacy1xValue("webserver.port")
 	s.Empty(value)
 }
+
+// What astro init says about each setting a converted 1.x project's file held:
+// its v2 name to set globally, what replaces a removed one, or nothing.
+func (s *Suite) TestProjectSetting1x() {
+	global, removed, ok := ProjectSetting1x("remote.client_registry", "quay.io/acme/client")
+	s.True(ok)
+	s.Equal("deploy.remote_execution.client_registry", global, "a 1.x name is set under its v2 one")
+	s.Empty(removed)
+
+	global, _, ok = ProjectSetting1x("container.binary", "podman")
+	s.True(ok)
+	s.Equal("container.binary", global)
+
+	global, removed, ok = ProjectSetting1x("webserver.port", "8099")
+	s.True(ok)
+	s.Empty(global)
+	s.Equal(removedSettings["webserver.port"].replacement, removed)
+
+	_, _, ok = ProjectSetting1x("webserver.port", "8080")
+	s.False(ok, "a removed setting at the value it shipped with")
+	_, _, ok = ProjectSetting1x("show_warnings", CFG.ShowWarnings.Default)
+	s.False(ok, "a setting at its default")
+	_, _, ok = ProjectSetting1x("not.a.setting", "x")
+	s.False(ok)
+	_, _, ok = ProjectSetting1x(contextsKey, "x")
+	s.False(ok, "logins are never a project's")
+}

@@ -90,7 +90,7 @@ const (
 	errInitRemoteExecRemoved = "astro init writes no client image files. " +
 		"To deploy a client image for remote execution, add a Dockerfile.client to the project and use astro remote deploy"
 	errInitRemoteRepoRemoved = "set the repository astro remote deploy pushes the client image to with " +
-		"astro config set deploy.remote_execution.client_registry <registry>/<repository>"
+		"astro config set -g deploy.remote_execution.client_registry <registry>/<repository>"
 	errInitACRemoved = "a project runs Apache Airflow, on Astro Runtime in Docker mode, " +
 		"and there is no Astronomer Certified image to choose. Pin Airflow with --airflow-version"
 	errInitDockerRemoved     = "astro init makes one project for both modes. Choose Docker when you start it, with astro local start --docker"

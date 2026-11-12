@@ -88,6 +88,13 @@ type Options struct {
 	// It is a func so it is asked only when the link is decided, after a rerun
 	// on a converted project has been refused. nil, or "", keeps the note.
 	APCWorkspace func() string
+	// Setting1x says what replaces key, a CLI setting a 1.x project's
+	// .astro/config.yaml sets to value. The conversion deletes that file, and
+	// reports each setting in it with a note built from the answer. ok false
+	// is a key that needs no note: one the caller does not know as a setting,
+	// or a value the setting shipped with. nil reports every key the file
+	// sets, without a replacement.
+	Setting1x func(key, value string) (r SettingReplacement, ok bool)
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -373,6 +380,7 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	}
 	from1x.apcDomain = manifest.NormalizeAPCDomain(opts.APCDomain)
 	from1x.apcWorkspace = opts.APCWorkspace
+	from1x.setting1x = opts.Setting1x
 
 	// A manifest already there is adopted; its absence is the greenfield path.
 	// Both arms settle the manifest and write nothing.
@@ -475,6 +483,9 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	for _, name := range planRetirements(from1x,
 		slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion) {
 		label := name + " (now in " + manifest.Marker + ")"
+		if name == config1xRelPath {
+			label = name + " (what it said is in " + manifest.Marker + " or in the notes)"
+		}
 		if name == SettingsRelPath {
 			switch {
 			case len(cs.Secrets) > 0:
@@ -499,6 +510,9 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	cs.Advisories = append(cs.Advisories, from1x.settings.pools.advisories...)
 	if a := from1x.deployLinkAdvisory(); a != "" {
 		cs.Advisories = append(cs.Advisories, a)
+	}
+	if slices.ContainsFunc(cs.Changes, func(c Change) bool { return c.Kind == Delete && c.Path == config1xRelPath }) {
+		cs.Advisories = append(cs.Advisories, config1xDeletedAdvisory)
 	}
 
 	// The project said what it was called and this run did not use that. An
@@ -608,6 +622,11 @@ func planRetirements(from1x *project1x, notes []string, pinned string) []string 
 	// Kept rather than un-migrated: the manifest lists stay, because a project
 	// that later drops its Dockerfile needs them, and they cost nothing while the
 	// declaration stands. The note below tells the user both exist.
+	// .astro/config.yaml is decided on what it held rather than on the notes,
+	// every one of which about it names it: see config1xRetirable.
+	if from1x.config1xRetirable() {
+		out = append(out, config1xRelPath)
+	}
 	if declaresDockerfile(from1x) {
 		out = slices.DeleteFunc(out, func(name string) bool {
 			return name == "requirements.txt" || name == "packages.txt"
@@ -1216,6 +1235,9 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	// matches file names as substrings of notes, and link names are the user's.
 	linkNotes := instancesNotes(from1x.instances)
 	out = append(out, linkNotes...)
+	// The same again for the settings: their keys and values are the user's.
+	settingNotes := from1x.settingNotes()
+	out = append(out, settingNotes...)
 	// A pin-only Dockerfile whose pin lost to --airflow-version or an existing
 	// pin is kept (dockerfileIsSpent) and not declared. When its reader had
 	// nothing to say about it, it would stay without a word; when it did, that
@@ -1262,10 +1284,12 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 			" cannot run: it needs " + requiresPython(version) + ", and yours has no upper bound — " +
 			"uv will build the environment on the newest interpreter it allows"}, out...)
 	}
-	if deployNote == "" && len(linkNotes) == 0 {
+	if deployNote == "" && len(linkNotes) == 0 && len(settingNotes) == 0 {
 		return out, out
 	}
-	return out, slices.DeleteFunc(slices.Clone(out), func(n string) bool { return n == deployNote || slices.Contains(linkNotes, n) })
+	return out, slices.DeleteFunc(slices.Clone(out), func(n string) bool {
+		return n == deployNote || slices.Contains(linkNotes, n) || slices.Contains(settingNotes, n)
+	})
 }
 
 // infoNotes are notes that need nothing done, which Info carries instead.

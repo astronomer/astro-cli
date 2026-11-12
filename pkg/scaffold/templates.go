@@ -35,7 +35,7 @@ __pycache__/
 .DS_Store
 
 # Per-machine files Astro tools write into the project: local Airflow
-# state, credentials and tokens. .astro/config.yaml is shared; keep committing it.
+# state, credentials and tokens.
 .astro/standalone/
 .astro/worktrees/
 .astro/*.local.yaml

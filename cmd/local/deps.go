@@ -203,6 +203,14 @@ type Deps struct {
 	// it, because the read touches config/, which this tree never imports.
 	// nil reads as nothing set.
 	Legacy1xSetting func(key string) (value, file, replacement string)
+
+	// ProjectSetting1x says what replaces a CLI setting a 1.x project's
+	// .astro/config.yaml sets, for the note init writes about it when it
+	// converts the project and deletes the file (scaffold.Options.Setting1x):
+	// the v2 name to set it globally under, or what replaces a removed one.
+	// The root wires it, because the settings are config/'s. nil names every
+	// setting without a replacement.
+	ProjectSetting1x func(key, value string) (global, removed string, ok bool)
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an
