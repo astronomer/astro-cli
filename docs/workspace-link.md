@@ -154,7 +154,8 @@ Which commands read it:
 
 - `astro local start` and `restart`, in both modes.
 - `astro local run` and `astro local shell` with `--with-workspace`. Without
-  it, a stopped project's run stays offline and warns which
+  it, a stopped project's run stays offline (apart from syncing `.venv`, which
+  uses your package index, not the Environment Manager) and warns which
   `source = "workspace"` names it runs without.
 - `astro local env list` and `get`. `list` reads names and metadata only, never
   secret values, and never blocks: a failed read prints

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
+	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
 // runAirflow is a fake localrt.Airflow whose Run returns a fixed error, so a
@@ -56,7 +58,60 @@ type stoppedRuntime struct {
 	calls *stoppedCalls
 }
 
-type stoppedCalls struct{ stopped, started localrt.Plan }
+type stoppedCalls struct {
+	stopped, started localrt.Plan
+	// synced holds the plan of each Sync; order records Sync and Stopped as
+	// they happen, so a test can see the sync came first.
+	synced []localrt.Plan
+	order  []string
+	// syncLines are written through the sync's OnLine; syncErr is what it
+	// returns.
+	syncLines []string
+	syncErr   error
+	// syncErrs are returned by successive Syncs before syncErr applies.
+	syncErrs []error
+	// onSync runs inside each Sync, as a slow install would be.
+	onSync func()
+}
+
+func (r stoppedRuntime) Sync(_ context.Context, p localrt.Plan, cb localrt.Callbacks) error {
+	r.calls.synced = append(r.calls.synced, p)
+	r.calls.order = append(r.calls.order, "sync")
+	for _, l := range r.calls.syncLines {
+		cb.OnLine(localrt.LogLine{Component: "uv", Text: l})
+	}
+	if r.calls.onSync != nil {
+		r.calls.onSync()
+	}
+	if len(r.calls.syncErrs) > 0 {
+		err := r.calls.syncErrs[0]
+		r.calls.syncErrs = r.calls.syncErrs[1:]
+		return err
+	}
+	if r.calls.syncErr == nil {
+		// What a successful sync leaves behind.
+		makeVenv(nil, p.ProjectPath, true)
+	}
+	return r.calls.syncErr
+}
+
+// makeVenv writes the files a built venv has: the interpreter, and astro's
+// install marker when marked. t may be nil, for the fake runtime.
+func makeVenv(t *testing.T, project string, marked bool) {
+	bin := filepath.Join(project, ".venv", "bin")
+	errs := []error{
+		os.MkdirAll(bin, 0o750),
+		os.WriteFile(filepath.Join(bin, "python"), nil, 0o600),
+	}
+	if marked {
+		errs = append(errs, os.WriteFile(filepath.Join(project, ".venv", uv.MarkerName), nil, 0o600))
+	}
+	for _, err := range errs {
+		if err != nil && t != nil {
+			t.Fatal(err)
+		}
+	}
+}
 
 func (r stoppedRuntime) ReadStatus(dir string) (localrt.Status, error) {
 	return localrt.Status{ProjectPath: dir, State: localrt.StateStopped, Mode: r.mode}, nil
@@ -65,7 +120,12 @@ func (r stoppedRuntime) ReadStatus(dir string) (localrt.Status, error) {
 func (r stoppedRuntime) Attach(string) (localrt.Airflow, error) { return nil, localrt.ErrNotRunning }
 
 func (r stoppedRuntime) Stopped(p localrt.Plan) (localrt.Airflow, error) {
+	// Refuses a project with no venv, as the engine does.
+	if _, err := os.Stat(filepath.Join(p.ProjectPath, ".venv", "bin", "python")); err != nil {
+		return nil, fmt.Errorf("%w, and it has no environment yet: astro local start builds one", localrt.ErrNotRunning)
+	}
 	r.calls.stopped = p
+	r.calls.order = append(r.calls.order, "stopped")
 	return runAirflow{}, nil
 }
 
@@ -83,6 +143,9 @@ func stoppedProject(t *testing.T, mode localrt.Mode) (d Deps, stdout *bytes.Buff
 		t.Fatal(err)
 	}
 	d.WorkingDir = func() (string, error) { return project, nil }
+	// A complete venv by default, so a sync reads as an update and stays
+	// quiet; a test of a missing or unmarked venv replaces it.
+	makeVenv(t, project, true)
 	calls = &stoppedCalls{}
 	d.Runtime = stoppedRuntime{mode: mode, calls: calls}
 	return d, stdout, calls
