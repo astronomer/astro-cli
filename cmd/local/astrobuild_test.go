@@ -51,15 +51,17 @@ func TestStartWritesTheAstroBuildIntoTheManifest(t *testing.T) {
 	got, out := startWithBuild(t, buildManifest, build332, nil)
 
 	for _, want := range []string{
-		"'apache-airflow-core'",
 		"apache-airflow==3.3.2+astro.1",
 		"apache-airflow-task-sdk==1.3.2+astro.1",
 		"[[tool.uv.index]]",
-		"[tool.uv.sources]",
+		"default = true",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("manifest lacks %q:\n%s", want, got)
 		}
+	}
+	if strings.Contains(got, "[tool.uv.sources]") || strings.Contains(got, "'apache-airflow-core'") {
+		t.Errorf("the default index needs no sources and no bare core entry:\n%s", got)
 	}
 	if !strings.Contains(out, "pyproject.toml: updated") {
 		t.Errorf("the start did not say it changed the manifest:\n%s", out)
@@ -122,6 +124,37 @@ func TestInitWritesTheAstroBuild(t *testing.T) {
 	}
 }
 
+// A project adopted with an index of its own keeps it, and init says why
+// Astronomer's index is routed per package instead.
+func TestInitNotesAProjectsOwnDefaultIndex(t *testing.T) {
+	d, _ := testDeps(t)
+	stderr := &bytes.Buffer{}
+	d.Stderr = stderr
+	dir := t.TempDir()
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	d.AstroBuild = func(context.Context, string, string) (runtimeversions.AstroBuild, error) { return build332, nil }
+	own := "[project]\nname = 'demo'\nrequires-python = '>=3.12'\ndependencies = ['apache-airflow==3.3.*']\n\n" +
+		"[[tool.uv.index]]\nname = 'mirror'\nurl = 'https://mirror.example/simple'\ndefault = true\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(own), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "apache-airflow = {index = 'astronomer'}") {
+		t.Errorf("beside the project's own default index, Airflow is not routed to Astronomer's:\n%s", data)
+	}
+	if !strings.Contains(stderr.String(), "not as the default index, because pyproject.toml lists its own index, mirror") {
+		t.Errorf("init did not say why:\n%s", stderr)
+	}
+}
+
 // An index that cannot be read says nothing about whether a build exists, so
 // the manifest is left as it stands; one that has no build takes the settings
 // out, and Airflow comes from PyPI.
@@ -142,5 +175,107 @@ func TestStartLeavesTheManifestAloneWhenTheIndexCannotBeRead(t *testing.T) {
 	}
 	if !strings.Contains(out, "has no build of it") || strings.Contains(out, "could not be read") {
 		t.Errorf("the start did not say the index has no build:\n%s", out)
+	}
+}
+
+// routedManifest is a project an earlier astro wrote with Astronomer's index
+// explicit and the Airflow distributions routed to it.
+const routedManifest = "[project]\nname = 'demo'\nrequires-python = '>=3.12'\n" +
+	"dependencies = ['apache-airflow==3.3.*', 'apache-airflow-core', 'apache-airflow-task-sdk']\n\n[tool.astro]\n\n" +
+	"[tool.uv]\nconstraint-dependencies = ['apache-airflow==3.3.2+astro.1', 'apache-airflow-task-sdk==1.3.2+astro.1']\n\n" +
+	"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\nexplicit = true\n\n" +
+	"[tool.uv.sources]\napache-airflow = { index = 'astronomer' }\napache-airflow-core = { index = 'astronomer' }\n" +
+	"apache-airflow-task-sdk = { index = 'astronomer' }\n"
+
+// A start keeps the layout a project has: moving it to the default index would
+// change every package's registry in uv.lock, which only an upgrade does.
+func TestStartKeepsARoutedProjectsLayout(t *testing.T) {
+	got, out := startWithBuild(t, routedManifest, build332, nil)
+
+	if !strings.Contains(got, "explicit = true") || !strings.Contains(got, "apache-airflow = { index = 'astronomer' }") {
+		t.Errorf("a start moved the project off its explicit index:\n%s", got)
+	}
+	if strings.Contains(out, "default index") {
+		t.Errorf("a start said something about the index it did not change:\n%s", out)
+	}
+}
+
+// An upgrade moves the project to the default index and says uv.lock's
+// registries change with it.
+func TestUpgradeMovesARoutedProjectToTheDefaultIndex(t *testing.T) {
+	rd := newRefreshDeps(t, routedManifest)
+	if err := execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10"); err != nil {
+		t.Fatalf("upgrade: %v", err)
+	}
+
+	got := readText(t, rd.path)
+	if !strings.Contains(got, "default = true") || strings.Contains(got, "[tool.uv.sources]") {
+		t.Errorf("the upgrade did not move the project to the default index:\n%s", got)
+	}
+	if !strings.Contains(rd.stderr.String(), "now has Astronomer's index as its default index, so uv.lock records it as every package's registry") {
+		t.Errorf("the upgrade did not say uv.lock's registries change:\n%s", rd.stderr)
+	}
+}
+
+// A setting only this machine has changes nothing in a committed manifest on a
+// start: the project stays on the default index, and one Note names the
+// setting and says uv may not find Astronomer's build.
+func TestStartLeavesTheManifestAloneForAMachineSetting(t *testing.T) {
+	t.Setenv("UV_INDEX_URL", "https://corp.example/simple")
+
+	got, out := startWithBuild(t, buildManifest, build332, nil)
+
+	if !strings.Contains(got, "default = true") || strings.Contains(got, "[tool.uv.sources]") || strings.Contains(got, "explicit = true") {
+		t.Errorf("a machine's UV_INDEX_URL changed the project's routing:\n%s", got)
+	}
+	if n := strings.Count(out, "Note: UV_INDEX_URL is set, which may stop uv from finding Astronomer's build of Airflow"); n != 1 {
+		t.Errorf("want one note naming UV_INDEX_URL, got %d:\n%s", n, out)
+	}
+}
+
+// What the project itself holds does switch it back to explicit routing on a
+// start, since another index of its own is asked first on every machine.
+func TestStartRoutesForAnIndexTheProjectHolds(t *testing.T) {
+	t.Setenv("UV_INDEX_URL", "")
+	src := buildManifest + "\n[[tool.uv.index]]\nname = 'corp'\nurl = 'https://corp.example/simple'\n"
+
+	got, out := startWithBuild(t, src, build332, nil)
+
+	if !strings.Contains(got, "explicit = true") || !strings.Contains(got, "apache-airflow = {index = 'astronomer'}") {
+		t.Errorf("the project's own index did not keep Astronomer's explicit:\n%s", got)
+	}
+	if !strings.Contains(out, "because pyproject.toml lists its own index, corp") {
+		t.Errorf("the start did not say why:\n%s", out)
+	}
+}
+
+// Init is a run the user expects to change files, so it heeds this machine's
+// settings and says which one.
+func TestInitRoutesForAMachineSetting(t *testing.T) {
+	t.Setenv("UV_INDEX_URL", "https://corp.example/simple")
+	d, _ := testDeps(t)
+	stderr := &bytes.Buffer{}
+	d.Stderr = stderr
+	dir := t.TempDir()
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	d.AstroBuild = func(context.Context, string, string) (runtimeversions.AstroBuild, error) { return build332, nil }
+	adopted := "[project]\nname = 'demo'\nrequires-python = '>=3.12'\ndependencies = ['apache-airflow==3.3.*']\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(adopted), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "apache-airflow = {index = 'astronomer'}") {
+		t.Errorf("init did not route Airflow to Astronomer's index:\n%s", data)
+	}
+	if !strings.Contains(stderr.String(), "because UV_INDEX_URL is set") {
+		t.Errorf("init did not name the setting:\n%s", stderr)
 	}
 }
