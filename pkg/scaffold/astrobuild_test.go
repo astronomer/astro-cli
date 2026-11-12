@@ -82,8 +82,7 @@ func TestSetAstroBuildWritesWhatUVNeeds(t *testing.T) {
 	assert.Equal(t, []string{"apache-airflow==3.3.2+astro.1", "apache-airflow-task-sdk==1.3.2+astro.1"}, v.Tool.UV.ConstraintDependencies)
 	assert.Equal(t, []map[string]any{{"name": "astronomer", "url": "https://pip.astronomer.io/v2/", "default": true}}, v.Tool.UV.Index)
 	assert.Empty(t, v.Tool.UV.Sources, "the default index needs no source")
-	assert.Equal(t, map[string]any{"apache-airflow": false, "apache-airflow-core": false, "apache-airflow-task-sdk": false},
-		v.Tool.UV.ExcludeNewerPackage, "the index lists no upload times, so any cutoff would hide every build")
+	assert.Empty(t, v.Tool.UV.ExcludeNewerPackage, "the index's pages carry upload times, so a cutoff needs no override")
 }
 
 // The table is the user's too: their keys, their constraints and their
@@ -102,8 +101,8 @@ func TestSetAstroBuildKeepsTheUsersTable(t *testing.T) {
 	require.Len(t, v.Tool.UV.Index, 2)
 	assert.Equal(t, "corp", v.Tool.UV.Index[0]["name"])
 	assert.Equal(t, map[string]any{"path": "../mylib"}, v.Tool.UV.Sources["mylib"])
-	assert.Equal(t, map[string]any{"apache-airflow": false, "apache-airflow-core": false, "apache-airflow-task-sdk": false},
-		v.Tool.UV.ExcludeNewerPackage, "the project's cutoff would hide every build")
+	assert.Empty(t, v.Tool.UV.ExcludeNewerPackage)
+	assert.Equal(t, "1 week", v.Tool.UV.ExcludeNewer)
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, manifest.Marker)
@@ -284,20 +283,23 @@ func TestSetAstroBuildRoutesBesideAnyOtherIndex(t *testing.T) {
 	assert.Equal(t, "pyproject.toml sets [tool.uv] extra-index-url", idx.Reason)
 }
 
-// Settings outside the project that replace or add an index keep the index
-// explicit too: the environment, a uv.toml beside the manifest or the user's,
-// and an Astronomer mirror that may carry only Astronomer's builds.
-func TestSetAstroBuildRoutesWhenSettingsOutsideAddAnIndex(t *testing.T) {
+// Settings on this machine that replace or add an index keep the index
+// explicit for a write the user asked for (init, an upgrade): the
+// environment, a uv.toml the user's or UV_CONFIG_FILE names, and an Astronomer
+// mirror that may carry only Astronomer's builds.
+func TestSetAstroBuildRoutesWhenMachineSettingsAddAnIndex(t *testing.T) {
+	asked := AstroBuildOptions{HeedMachineSettings: true}
+
 	withEnv(t, map[string]string{"UV_DEFAULT_INDEX": "https://corp.example/simple"})
-	_, _, idx := withBuildOpts(t, astroHead, build332, AstroBuildOptions{})
+	_, _, idx := withBuildOpts(t, astroHead, build332, asked)
 	assert.Equal(t, AstroIndex{Layout: "explicit", Reason: "UV_DEFAULT_INDEX is set"}, idx)
 
 	withEnv(t, map[string]string{runtimeversions.IndexURLEnv: "https://mirror.example/astro/"})
-	_, _, idx = withBuildOpts(t, astroHead, build332, AstroBuildOptions{})
+	_, _, idx = withBuildOpts(t, astroHead, build332, asked)
 	assert.Equal(t, "ASTRO_AIRFLOW_INDEX_URL points at another index", idx.Reason)
 
 	withEnv(t, map[string]string{runtimeversions.IndexURLEnv: "https://pip.astronomer.io/v2"})
-	_, _, idx = withBuildOpts(t, astroHead, build332, AstroBuildOptions{})
+	_, _, idx = withBuildOpts(t, astroHead, build332, asked)
 	assert.Equal(t, AstroIndex{Layout: AstroIndexDefault}, idx, "Astronomer's own address is no mirror")
 
 	withEnv(t, nil)
@@ -306,8 +308,74 @@ func TestSetAstroBuildRoutesWhenSettingsOutsideAddAnIndex(t *testing.T) {
 	prev := uvConfigFiles
 	uvConfigFiles = func() []string { return []string{user} }
 	t.Cleanup(func() { uvConfigFiles = prev })
-	_, _, idx = withBuildOpts(t, astroHead, build332, AstroBuildOptions{})
+	_, _, idx = withBuildOpts(t, astroHead, build332, asked)
 	assert.Equal(t, user+" sets index-url", idx.Reason)
+}
+
+// The file UV_CONFIG_FILE names is a reason too, when it sets an index.
+func TestMachineIndexReasonReadsUVConfigFile(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "ci-uv.toml")
+	withEnv(t, map[string]string{"UV_CONFIG_FILE": file})
+	assert.Empty(t, MachineIndexReason(), "no such file")
+
+	require.NoError(t, os.WriteFile(file, []byte("python-preference = 'managed'\n"), 0o600))
+	assert.Empty(t, MachineIndexReason(), "a file that sets no index")
+
+	require.NoError(t, os.WriteFile(file, []byte("extra-index-url = ['https://corp.example/simple']\n"), 0o600))
+	assert.Equal(t, file+" sets extra-index-url", MachineIndexReason())
+
+	_, _, idx := withBuildOpts(t, astroHead, build332, AstroBuildOptions{HeedMachineSettings: true})
+	assert.Equal(t, AstroIndex{Layout: "explicit", Reason: file + " sets extra-index-url"}, idx)
+}
+
+// A start leaves a default-layout project on the default index for a setting
+// only this machine has: the committed file does not change for one machine.
+func TestSetAstroBuildIgnoresMachineSettingsUnlessAsked(t *testing.T) {
+	onDefault, _ := withBuild(t, astroHead, build332)
+	for _, env := range []map[string]string{
+		{"UV_INDEX_URL": "https://corp.example/simple"},
+		{runtimeversions.IndexURLEnv: "https://mirror.example/astro/"},
+	} {
+		withEnv(t, env)
+		out, v, idx := withBuildOpts(t, onDefault, build332, AstroBuildOptions{})
+		assert.Equal(t, AstroIndex{Layout: AstroIndexDefault}, idx, "%v", env)
+		assert.Equal(t, onDefault, out, "%v", env)
+		assert.Empty(t, v.Tool.UV.Sources)
+
+		_, _, idx = withBuildOpts(t, astroHead, build332, AstroBuildOptions{})
+		assert.Equal(t, AstroIndex{Layout: AstroIndexDefault}, idx, "a project with no entry yet: %v", env)
+	}
+}
+
+// A uv.toml beside the project travels with it, so it keeps the index explicit
+// on a start too.
+func TestSetAstroBuildRoutesBesideAProjectUVTOML(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(astroHead), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "uv.toml"), []byte("index-url = 'https://corp.example/simple'\n"), 0o600))
+
+	idx, err := SetAstroBuildOpts(dir, nil, build332, AstroBuildOptions{})
+
+	require.NoError(t, err)
+	assert.Equal(t, AstroIndex{Layout: "explicit", Reason: filepath.Join(dir, "uv.toml") + " sets index-url"}, idx)
+}
+
+// An explicit index of the project's own is asked only for the packages that
+// name it, so it cannot answer for apache-airflow and is no reason; one that
+// is not explicit is, default or not.
+func TestSetAstroBuildIgnoresTheProjectsExplicitIndexes(t *testing.T) {
+	explicit := astroHead + "\n[[tool.uv.index]]\nname = 'torch'\nurl = 'https://download.pytorch.org/whl/cpu'\nexplicit = true\n"
+
+	_, v, idx := withBuildOpts(t, explicit, build332, AstroBuildOptions{HeedMachineSettings: true})
+
+	assert.Equal(t, AstroIndex{Layout: AstroIndexDefault}, idx)
+	require.Len(t, v.Tool.UV.Index, 2)
+	assert.Equal(t, true, v.Tool.UV.Index[1]["default"])
+	assert.Empty(t, v.Tool.UV.Sources)
+
+	plain := astroHead + "\n[[tool.uv.index]]\nname = 'corp'\nurl = 'https://corp.example/simple'\nexplicit = false\n"
+	_, _, idx = withBuildOpts(t, plain, build332, AstroBuildOptions{})
+	assert.Equal(t, "pyproject.toml lists its own index, corp", idx.Reason)
 }
 
 // A project already on the default index moves back to explicit routing once
@@ -321,14 +389,23 @@ func TestSetAstroBuildRoutesADefaultLayoutOnceAnotherIndexAppears(t *testing.T) 
 	assert.Contains(t, v.Project.Dependencies, "apache-airflow-core", "listed so the source applies")
 }
 
-// The default index keeps the exclude-newer overrides for Astronomer's builds,
-// whose pages give uv no upload time yet; PyPI's packages, passed through,
-// keep the project's cutoff.
-func TestSetAstroBuildOnTheDefaultIndexKeepsTheExcludeNewerOverrides(t *testing.T) {
-	_, v := withBuild(t, astroHead+"\n[tool.uv]\nexclude-newer = '1 week'\n", build332)
+// Astronomer's index pages carry upload times, so no exclude-newer-package
+// override is written, and the one an earlier astro wrote (exactly false, for
+// the three Airflow distributions) goes. A project's own entries stay.
+func TestSetAstroBuildDropsTheExcludeNewerOverridesItWrote(t *testing.T) {
+	src := astroHead + "\n[tool.uv]\nexclude-newer = '1 week'\n\n[tool.uv.exclude-newer-package]\n" +
+		"apache-airflow = false\napache-airflow-core = false\napache-airflow-task-sdk = false\n"
 
-	assert.Equal(t, map[string]any{"apache-airflow": false, "apache-airflow-core": false, "apache-airflow-task-sdk": false}, v.Tool.UV.ExcludeNewerPackage)
+	_, v := withBuild(t, src, build332)
+
+	assert.Empty(t, v.Tool.UV.ExcludeNewerPackage)
+	assert.Equal(t, "1 week", v.Tool.UV.ExcludeNewer, "the project's own cutoff stays")
 	assert.Equal(t, true, v.Tool.UV.Index[0]["default"])
+
+	own := astroHead + "\n[tool.uv.exclude-newer-package]\napache-airflow = false\nmylib = false\n" +
+		"apache-airflow-core = '2026-01-01T00:00:00Z'\n"
+	out, v := withBuild(t, own, build332)
+	assert.Equal(t, map[string]any{"mylib": false, "apache-airflow-core": "2026-01-01T00:00:00Z"}, v.Tool.UV.ExcludeNewerPackage, "%s", out)
 }
 
 // No build, no index entry: nothing to say about routing.

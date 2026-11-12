@@ -216,3 +216,66 @@ func TestUpgradeMovesARoutedProjectToTheDefaultIndex(t *testing.T) {
 		t.Errorf("the upgrade did not say uv.lock's registries change:\n%s", rd.stderr)
 	}
 }
+
+// A setting only this machine has changes nothing in a committed manifest on a
+// start: the project stays on the default index, and one Note names the
+// setting and says uv may not find Astronomer's build.
+func TestStartLeavesTheManifestAloneForAMachineSetting(t *testing.T) {
+	t.Setenv("UV_INDEX_URL", "https://corp.example/simple")
+
+	got, out := startWithBuild(t, buildManifest, build332, nil)
+
+	if !strings.Contains(got, "default = true") || strings.Contains(got, "[tool.uv.sources]") || strings.Contains(got, "explicit = true") {
+		t.Errorf("a machine's UV_INDEX_URL changed the project's routing:\n%s", got)
+	}
+	if n := strings.Count(out, "Note: UV_INDEX_URL is set, which may stop uv from finding Astronomer's build of Airflow"); n != 1 {
+		t.Errorf("want one note naming UV_INDEX_URL, got %d:\n%s", n, out)
+	}
+}
+
+// What the project itself holds does switch it back to explicit routing on a
+// start, since another index of its own is asked first on every machine.
+func TestStartRoutesForAnIndexTheProjectHolds(t *testing.T) {
+	t.Setenv("UV_INDEX_URL", "")
+	src := buildManifest + "\n[[tool.uv.index]]\nname = 'corp'\nurl = 'https://corp.example/simple'\n"
+
+	got, out := startWithBuild(t, src, build332, nil)
+
+	if !strings.Contains(got, "explicit = true") || !strings.Contains(got, "apache-airflow = {index = 'astronomer'}") {
+		t.Errorf("the project's own index did not keep Astronomer's explicit:\n%s", got)
+	}
+	if !strings.Contains(out, "because pyproject.toml lists its own index, corp") {
+		t.Errorf("the start did not say why:\n%s", out)
+	}
+}
+
+// Init is a run the user expects to change files, so it heeds this machine's
+// settings and says which one.
+func TestInitRoutesForAMachineSetting(t *testing.T) {
+	t.Setenv("UV_INDEX_URL", "https://corp.example/simple")
+	d, _ := testDeps(t)
+	stderr := &bytes.Buffer{}
+	d.Stderr = stderr
+	dir := t.TempDir()
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	d.AstroBuild = func(context.Context, string, string) (runtimeversions.AstroBuild, error) { return build332, nil }
+	adopted := "[project]\nname = 'demo'\nrequires-python = '>=3.12'\ndependencies = ['apache-airflow==3.3.*']\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(adopted), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := execute(t, d, "init"); err != nil {
+		t.Fatalf("init: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "apache-airflow = {index = 'astronomer'}") {
+		t.Errorf("init did not route Airflow to Astronomer's index:\n%s", data)
+	}
+	if !strings.Contains(stderr.String(), "because UV_INDEX_URL is set") {
+		t.Errorf("init did not name the setting:\n%s", stderr)
+	}
+}

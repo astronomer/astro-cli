@@ -58,11 +58,21 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 		for _, n := range indexNotes(res.index) {
 			cliout.Note(c.d.Stderr, n)
 		}
+		// A setting on this machine did not change the committed file, but
+		// may stop uv here from finding the build it just wrote. Looked for
+		// only after a write, so a start that changed nothing reads none.
+		if res.index.Layout == scaffold.AstroIndexDefault {
+			if why := scaffold.MachineIndexReason(); why != "" {
+				cliout.Note(c.d.Stderr, fmt.Sprintf(
+					"%s, which may stop uv from finding Astronomer's build of Airflow. %s keeps Astronomer's index as its default index",
+					why, manifest.Marker))
+			}
+		}
 	}
 }
 
 // indexNotes says what a write did to Astronomer's index worth knowing: why it
-// is explicit, when ExplicitIndexReason gave a reason, and that it became the
+// is explicit, when a reason was found, and that it became the
 // default, which moves every package's registry in uv.lock. Nothing when the
 // write left no entry, or kept the layout the project had.
 func indexNotes(idx scaffold.AstroIndex) []string {
@@ -106,10 +116,13 @@ type astroBuildWrite struct {
 // writeAstroBuild looks up the build for the manifest in dir and writes it,
 // or takes the settings out when the index has none. It writes nothing when
 // the lookup could not be made, or when there is no lookup to make.
-// moveToDefault lets it make Astronomer's index the project's default where
-// an earlier astro wrote it explicit (scaffold.AstroBuildOptions): init and
-// the upgrade commands ask for it, a start does not.
-func (c *cli) writeAstroBuild(ctx context.Context, dir string, moveToDefault bool) astroBuildWrite {
+// userRun marks a run the user expects to change files (init, the upgrade
+// commands): it lets the write make Astronomer's index the project's default
+// where an earlier astro wrote it explicit, and lets settings on this machine
+// keep the index explicit (scaffold.AstroBuildOptions). A start is not one: it
+// keeps the layout the project has, and switches it only for what the project
+// itself holds.
+func (c *cli) writeAstroBuild(ctx context.Context, dir string, userRun bool) astroBuildWrite {
 	if c.d.AstroBuild == nil {
 		return astroBuildWrite{}
 	}
@@ -127,7 +140,7 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string, moveToDefault boo
 	res.constraintsErr = rcErr
 	res.changed, res.writeErr = watchManifest(dir, func(wrap func(run func() error) error) error {
 		var err error
-		res.index, err = scaffold.SetAstroBuildOpts(dir, wrap, res.build, scaffold.AstroBuildOptions{Constraints: rc, MoveToDefaultIndex: moveToDefault})
+		res.index, err = scaffold.SetAstroBuildOpts(dir, wrap, res.build, scaffold.AstroBuildOptions{Constraints: rc, MoveToDefaultIndex: userRun, HeedMachineSettings: userRun})
 		return err
 	})
 	if !res.changed || res.writeErr != nil {

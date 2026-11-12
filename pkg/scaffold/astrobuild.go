@@ -26,7 +26,6 @@ import (
 //	environments = [linux, arm64 macOS]
 //	constraint-dependencies = ["apache-airflow==3.3.2+astro.1", "apache-airflow-task-sdk==1.3.2+astro.1"]
 //	[[tool.uv.index]]  name = "astronomer", default = true
-//	[tool.uv.exclude-newer-package]  the same three = false
 //
 // The index is the project's default: it serves Astronomer's builds and
 // passes every other package through from PyPI, so no source is needed. A
@@ -103,6 +102,12 @@ type AstroBuildOptions struct {
 	// Airflow distribution. Without it a project keeps the layout it has, so a
 	// start never rewrites every package's registry in uv.lock unasked.
 	MoveToDefaultIndex bool
+	// HeedMachineSettings makes the settings on this machine (MachineIndexReason)
+	// keep the index explicit, as the project's own (ProjectIndexReason)
+	// always do. Init and the upgrade commands set it: they are runs the user
+	// expects to change files. A start leaves it off, so one machine's
+	// environment never rewrites a committed pyproject.toml.
+	HeedMachineSettings bool
 }
 
 // The layouts of Astronomer's index: the [[tool.uv.index]] key that marks
@@ -117,8 +122,9 @@ type AstroIndex struct {
 	// Layout is AstroIndexDefault, AstroIndexExplicit, or "" when no entry
 	// was written (an Airflow Astronomer has no build of).
 	Layout string
-	// Reason says why the index is explicit when ExplicitIndexReason gave
-	// one; "" when the project only kept the explicit layout it had.
+	// Reason says why the index is explicit when ProjectIndexReason or
+	// MachineIndexReason gave one; "" when the project only kept the explicit
+	// layout it had.
 	Reason string
 	// Moved reports that an explicit index became the default, which moves
 	// every package's registry in uv.lock to Astronomer's index.
@@ -131,13 +137,13 @@ func SetAstroBuildOpts(dir string, wrap func(run func() error) error, b runtimev
 	var out AstroIndex
 	err := EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
 		var err error
-		out, err = setAstroBuild(before, ed, b, opts, ExplicitIndexReason(dir, ed))
+		out, err = setAstroBuild(dir, before, ed, b, opts)
 		return err
 	})
 	return out, err
 }
 
-func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, opts AstroBuildOptions, reason string) (AstroIndex, error) {
+func setAstroBuild(dir string, before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, opts AstroBuildOptions) (AstroIndex, error) {
 	rc := opts.Constraints
 	dists := b.Dists()
 	if b.Airflow == "" {
@@ -155,8 +161,15 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 	// (reason), and where an earlier astro wrote it explicit and the caller
 	// did not ask to move it. The bare core and Task SDK entries a routed
 	// layout listed stay when it moves: a project may have listed them itself.
+	// The reason is looked for only when the entry is written and the layout
+	// is not already decided: a start is a hot path.
 	was := astroIndexLayout(ed)
-	routed := reason != "" || (was == AstroIndexExplicit && !opts.MoveToDefaultIndex)
+	keep := was == AstroIndexExplicit && !opts.MoveToDefaultIndex
+	reason := ""
+	if b.Airflow != "" && !keep {
+		reason = explicitReason(dir, ed, opts)
+	}
+	routed := reason != "" || keep
 	if err := setAstroSources(ed, routedDists(routed, dists)); err != nil {
 		return AstroIndex{}, err
 	}
@@ -168,17 +181,7 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 		out.Reason = reason
 	}
 	out.Moved = was == AstroIndexExplicit && out.Layout == AstroIndexDefault
-	for _, d := range astroDists {
-		key := append(slices.Clone(excludeNewerPkg), d)
-		if v, ok := ed.Get(key); ok && v == false && !slices.Contains(dists, d) {
-			ed.Delete(key)
-		}
-	}
-	if v, ok := ed.Get(excludeNewerPkg); ok {
-		if m, _ := v.(map[string]any); len(m) == 0 {
-			ed.Delete(excludeNewerPkg)
-		}
-	}
+	dropExcludeNewerOverrides(ed)
 	// Airflow 2 has no core or Task SDK distribution: a project moved back to
 	// it loses the bare entries a build of Airflow 3 added, build or no build.
 	if before.Airflow().Major() == "2" {
@@ -200,16 +203,36 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 			return out, err
 		}
 	}
-	// Astronomer's index shows upload times only in its page text, which uv
-	// does not read, so under any
-	// exclude-newer, the project's own or a UV_EXCLUDE_NEWER in the
-	// environment, uv would treat every build as too new.
-	for _, d := range dists {
-		if err := setIfDifferent(ed, append(slices.Clone(excludeNewerPkg), d), false); err != nil {
-			return out, err
+	return out, nil
+}
+
+// explicitReason is why Astronomer's index must be explicit: what the project
+// holds, and, for a run the user asked for, what this machine has.
+func explicitReason(dir string, ed tomledit.Editor, opts AstroBuildOptions) string {
+	if reason := ProjectIndexReason(dir, ed); reason != "" || !opts.HeedMachineSettings {
+		return reason
+	}
+	return MachineIndexReason()
+}
+
+// dropExcludeNewerOverrides takes out the exclude-newer-package entries an
+// earlier astro wrote, and the table once they leave it empty.
+func dropExcludeNewerOverrides(ed tomledit.Editor) {
+	// They were false for the Airflow distributions, when Astronomer's index
+	// pages carried no upload times. They do now, so a cutoff applies to the
+	// builds as it does to PyPI's files; the override goes where it is exactly
+	// what was written, and a project's own entries stay.
+	for _, d := range astroDists {
+		key := append(slices.Clone(excludeNewerPkg), d)
+		if v, ok := ed.Get(key); ok && v == false {
+			ed.Delete(key)
 		}
 	}
-	return out, nil
+	if v, ok := ed.Get(excludeNewerPkg); ok {
+		if m, _ := v.(map[string]any); len(m) == 0 {
+			ed.Delete(excludeNewerPkg)
+		}
+	}
 }
 
 // ErrNotAstrosToWrite reports [tool.uv] settings the project wrote itself

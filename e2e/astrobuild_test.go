@@ -34,6 +34,9 @@ func TestInitHoldsAirflowToAstronomersBuild(t *testing.T) {
 	if strings.Contains(manifest, "[tool.uv.sources]") {
 		t.Errorf("the default index needs no sources:\n%s", manifest)
 	}
+	if strings.Contains(manifest, "exclude-newer-package") {
+		t.Errorf("Astronomer's index pages carry upload times, so no exclude-newer override is written:\n%s", manifest)
+	}
 	builds, err := filepath.Glob(filepath.Join(p.Dir, ".venv", "lib", "python*", "site-packages", "apache_airflow-*+astro.*.dist-info"))
 	if err != nil || len(builds) != 1 {
 		t.Errorf("uv sync installed no Astronomer build of Airflow: %v (%v)", builds, err)

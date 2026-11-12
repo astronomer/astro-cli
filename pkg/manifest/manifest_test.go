@@ -1666,6 +1666,27 @@ func TestIndexPagesTakeTheAstroPinsFromAstronomersIndexNotTheDefault(t *testing.
 	}
 }
 
+// A [tool.uv.sources] key is a package name as uv reads it, so it is matched
+// by PEP 503 name: a source written apache_airflow routes the same package the
+// pin names, and the pin does not add Astronomer's page a second time.
+func TestIndexPagesNormalizeSourceKeys(t *testing.T) {
+	m, err := Load(write(t, "[project]\nname = \"etl\"\ndependencies = [\"apache-airflow==3.3.*\"]\n\n[tool.astro]\n\n"+
+		"[tool.uv]\nconstraint-dependencies = [\"apache-airflow==3.3.2+astro.1\"]\n\n"+
+		"[[tool.uv.index]]\nname = \"astronomer\"\nurl = \"https://pip.astronomer.io/v2/\"\nexplicit = true\n\n"+
+		"[[tool.uv.index]]\nname = \"corp\"\nurl = \"https://corp.example/simple\"\nexplicit = true\n\n"+
+		"[tool.uv.sources]\nApache_Airflow = { index = \"corp\" }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"https://corp.example/simple/Apache_Airflow/"}
+	if got := m.UV.IndexPages(); !reflect.DeepEqual(got, want) {
+		t.Errorf("IndexPages() = %#v, want the source's page only: %#v", got, want)
+	}
+	if got := m.UV.IndexPagesFor([]string{"apache.airflow==3.3.*"}); !reflect.DeepEqual(got, want) {
+		t.Errorf("IndexPagesFor() = %#v, want %#v", got, want)
+	}
+}
+
 // IndexPagesFor keeps the page of a source only when a requirement names its
 // package, matching names as uv does: a generated image installs without
 // Airflow, so the Airflow sources `astro init` writes reach no page.

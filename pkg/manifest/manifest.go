@@ -80,14 +80,14 @@ func (m *Manifest) RemovedAirflowKey() string {
 	return m.repair.removedKey
 }
 
-// UV is the [tool.uv] table, the fields astro reads. uv applies them to the
-// project's own environment itself; astro reads them for the scratch
-// environments it builds outside the project, which uv cannot see the project
-// from, so a check there resolves the way the project does.
 // AstronomerIndexName is the name of the [[tool.uv.index]] entry `astro init`
 // writes for Astronomer's builds of Airflow.
 const AstronomerIndexName = "astronomer"
 
+// UV is the [tool.uv] table, the fields astro reads. uv applies them to the
+// project's own environment itself; astro reads them for the scratch
+// environments it builds outside the project, which uv cannot see the project
+// from, so a check there resolves the way the project does.
 type UV struct {
 	// ConstraintDependencies is [tool.uv] constraint-dependencies: version
 	// limits on packages the project may pull in, without requiring them.
@@ -162,9 +162,15 @@ func (u UV) IndexPagesFor(deps []string) []string {
 //
 //nolint:gocritic // a value receiver, as its callers have
 func (u UV) indexPages(keep func(pkg string) bool) []string {
+	// where is keyed by DistName; spelled keeps a source's own spelling, which
+	// its page is asked for as written.
 	where := make(map[string]string, len(u.Sources))
+	spelled := make(map[string]string, len(u.Sources))
 	for pkg, index := range u.Sources {
-		where[pkg] = index
+		// uv reads a source's key as a package name, so apache_airflow and
+		// Apache-Airflow are the one package the pins name.
+		where[DistName(pkg)] = index
+		spelled[DistName(pkg)] = pkg
 	}
 	if u.AstronomerIndex != "" {
 		for _, c := range u.ConstraintDependencies {
@@ -193,7 +199,11 @@ func (u UV) indexPages(keep func(pkg string) bool) []string {
 	sort.Strings(pkgs)
 	pages := make([]string, 0, len(pkgs))
 	for _, pkg := range pkgs {
-		pages = append(pages, strings.TrimSuffix(where[pkg], "/")+"/"+pkg+"/")
+		name := pkg
+		if s := spelled[pkg]; s != "" {
+			name = s
+		}
+		pages = append(pages, strings.TrimSuffix(where[pkg], "/")+"/"+name+"/")
 	}
 	return pages
 }
