@@ -482,22 +482,10 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	// whose dependencies are intact is the better half of the trade.
 	for _, name := range planRetirements(from1x,
 		slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion) {
-		label := name + " (now in " + manifest.Marker + ")"
-		if name == config1xRelPath {
-			label = name + " (what it said is in " + manifest.Marker + " or in the notes)"
-		}
-		if name == SettingsRelPath {
-			switch {
-			case len(cs.Secrets) > 0:
-				label = name + " (now in " + manifest.Marker + " and the encrypted vault)"
-			case !from1x.settings.declares() && len(from1x.settings.pools.byName) == 0:
-				label = name + " (nothing in it to keep)"
-			}
-		}
 		cs.Changes = append(cs.Changes, Change{
 			Kind:   Delete,
 			Path:   name,
-			Labels: []string{label},
+			Labels: []string{retirementLabel(name, from1x, len(cs.Secrets) > 0)},
 		})
 	}
 
@@ -568,6 +556,21 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 		}
 	}
 	return cs, nil
+}
+
+// retirementLabel is the line a deletion of name is reported with: where what
+// it said went. stored reports that airflow_settings.yaml's values reach the
+// encrypted vault.
+func retirementLabel(name string, from1x *project1x, stored bool) string {
+	switch {
+	case name == config1xRelPath:
+		return name + " (what it said is in " + manifest.Marker + " or in the notes)"
+	case name == SettingsRelPath && stored:
+		return name + " (now in " + manifest.Marker + " and the encrypted vault)"
+	case name == SettingsRelPath && !from1x.settings.declares() && len(from1x.settings.pools.byName) == 0:
+		return name + " (nothing in it to keep)"
+	}
+	return name + " (now in " + manifest.Marker + ")"
 }
 
 // planRetirements names the 1.x files this run may delete.
