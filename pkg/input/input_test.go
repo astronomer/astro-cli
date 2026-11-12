@@ -155,7 +155,6 @@ func (s *Suite) TestPassword() {
 		s.Run(tt.name, func() {
 			// No terminal on stdin: a hidden answer is refused, not read.
 			defer SetTerminals(false, true)()
-			defer SetGuard(func() string { return Refusal(false, nil) })()
 			// mock os.Stdin
 			input := []byte(tt.inputString)
 			r, w, err := os.Pipe()

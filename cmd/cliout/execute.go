@@ -152,7 +152,8 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 
 // refuseToAsk is the prompt guard for one run, and the one place its
 // interaction mode is resolved (input.Refusal): a run asks nothing under
-// --output json, with CI set, or with --non-interactive (pkg/input.SetGuard).
+// --output json, with stdin or stderr not a terminal, with CI set (or Jenkins
+// or Azure Pipelines saying so), or with --non-interactive (pkg/input.SetGuard).
 // A question with the run blocked on stdin is not a result a program can
 // parse, and an agent, a script or a CI job driving the CLI has nobody to
 // answer it — it hangs. The answer has to come with the invocation instead, and
@@ -162,7 +163,7 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 // flags read only when a question comes up: by then cobra has parsed them, so
 // the guard answers from the values the command itself sees, with no reading
 // of raw arguments. A line that resolves to no command still gets the guard,
-// for the environment's part of the rule.
+// for the terminals' and the environment's part of the rule.
 func refuseToAsk(root *cobra.Command, args []string) func() string {
 	cmd := findTarget(root, args)
 	return func() string {

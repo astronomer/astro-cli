@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/mattn/go-isatty"
 	"github.com/spf13/pflag"
+	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/pkg/telemetry"
 )
@@ -63,11 +63,8 @@ func Refusal(json bool, flag *pflag.Flag) string {
 	if asked && flag.Value.String() != falseValue {
 		return reasonFlag
 	}
-	if !StdinIsTerminal() {
-		return reasonStdin
-	}
-	if !StderrIsTerminal() {
-		return reasonStderr
+	if r := terminalRefusal(); r != "" {
+		return r
 	}
 	if asked {
 		return ""
@@ -94,7 +91,7 @@ func truthy(v string) bool {
 
 // CanAsk reports whether this run may ask a question at all (see Refusal): the
 // one accessor for a command deciding whether to prompt or to fail for a
-// missing answer. A run with no guard installed (a test, a library caller) may.
+// missing answer. A run with no guard installed (a test, a library caller) is held to the terminals alone.
 func CanAsk() bool { return refusal() == "" }
 
 // terminals is the answer a test gives for stdin and stderr, in place of the
@@ -103,7 +100,8 @@ var terminals atomic.Pointer[[2]bool]
 
 // StdinIsTerminal reports whether stdin is a terminal: the one answer to the
 // question, which Refusal asks and which a command that only needs to know
-// (not to decide whether to ask) may too. A Cygwin or MSYS pty (mintty) counts.
+// (not to decide whether to ask) may too. It is the plain console check, the one a
+// hidden prompt needs to turn echo off: a Cygwin or MSYS pty (mintty) is not one.
 func StdinIsTerminal() bool {
 	if t := terminals.Load(); t != nil {
 		return t[0]
@@ -125,6 +123,18 @@ func StderrIsTerminal() bool {
 	return isTerminal(os.Stderr)
 }
 
-func isTerminal(f *os.File) bool {
-	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
+func isTerminal(f *os.File) bool { return term.IsTerminal(int(f.Fd())) }
+
+// terminalRefusal is the part of the rule that needs no command: no terminal on
+// stdin or stderr. It is what a prompt asked outside cliout.Execute (no guard
+// installed) is held to, so a library caller or a test of a prompt that
+// switches the terminals off is refused too.
+func terminalRefusal() string {
+	switch {
+	case !StdinIsTerminal():
+		return reasonStdin
+	case !StderrIsTerminal():
+		return reasonStderr
+	}
+	return ""
 }

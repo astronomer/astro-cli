@@ -153,7 +153,7 @@ Whether a run may ask a question is decided once, by one rule, and every prompt 
 **Non-interactive.** A run is non-interactive when any of these holds:
 
 - `--output json`;
-- stdin is not a terminal, or stderr is not a terminal (`input.StdinIsTerminal`, `input.StderrIsTerminal`; a Cygwin or MSYS pty such as mintty counts as a terminal);
+- stdin is not a terminal, or stderr is not a terminal (`input.StdinIsTerminal`, `input.StderrIsTerminal`, the plain console check a hidden prompt needs; a Cygwin or MSYS pty such as mintty is not one);
 - the `CI` environment variable is set to a truthy value (anything but empty, `0` or `false`, in any case, surrounding spaces ignored), or a CI system that does not set `CI` says so (`JENKINS_URL` or `HUDSON_URL` set and not empty, or a truthy `TF_BUILD` for Azure Pipelines; found by the list telemetry uses, `telemetry.IsCISystemSet`);
 - the global `--non-interactive` flag is passed. It is declared once, persistent, on the root, so every command at every depth takes it, a removed command's stub included (a stub parses no flags and asks nothing).
 

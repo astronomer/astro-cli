@@ -39,7 +39,9 @@ func SetGuard(refuse func() string) (restore func()) {
 func refusal() string {
 	g := guard.Load()
 	if g == nil {
-		return ""
+		// No command to read flags from (a library caller, a test): the
+		// terminals alone decide.
+		return terminalRefusal()
 	}
 	return (*g)()
 }
