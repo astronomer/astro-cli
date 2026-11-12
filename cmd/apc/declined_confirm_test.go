@@ -304,3 +304,47 @@ func TestDagDeployQuestionOnlyForDagDeploy(t *testing.T) {
 		assert.False(t, run.stdinRead)
 	})
 }
+
+// An update that names no type does not touch the type, so a dag_deploy
+// Deployment is renamed or resized without a question about erasing its Dags.
+func TestUpdateWithoutATypeAsksNothingOnDagDeploy(t *testing.T) {
+	api := apcAt("2.1.0")
+	api.On("GetDeployment", "dep-1").Return(&houston.Deployment{ID: "dep-1", DagDeployment: houston.DagDeploymentConfig{Type: houston.DagOnlyDeploymentType}}, nil)
+	api.On("UpdateDeployment", mock.Anything).Return(&certifiedDep, nil)
+
+	run := runAPCGated(t, api, true, "", "deployment", "update", "dep-1", "--name", "renamed")
+
+	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+	assert.False(t, run.stdinRead)
+	assert.NotContains(t, run.stderr, "erase all of the currently deployed Dags")
+	api.AssertCalled(t, "UpdateDeployment", mock.Anything)
+}
+
+// What was asked for is checked before the question: a line that is going to
+// be refused asks nothing.
+func TestDagDeployQuestionFollowsValidation(t *testing.T) {
+	t.Run("update with an executor that is not one", func(t *testing.T) {
+		api := apcAt("2.1.0")
+		api.On("GetDeployment", "dep-1").Return(&houston.Deployment{ID: "dep-1", DagDeployment: houston.DagDeploymentConfig{Type: houston.ImageDeploymentType}}, nil)
+
+		run := runAPCGated(t, api, true, "y\n", "deployment", "update", "dep-1", "--dag-deployment-type", "dag_deploy", "--executor", "bogus")
+
+		assert.Equal(t, 1, run.code)
+		require.ErrorIs(t, run.err, errInvalidExecutorType)
+		assert.False(t, run.stdinRead)
+		assert.NotContains(t, run.stderr, "experimental feature")
+		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
+	})
+	t.Run("update to volume with no mount", func(t *testing.T) {
+		api := apcAt("2.1.0")
+		api.On("GetDeployment", "dep-1").Return(&houston.Deployment{ID: "dep-1", DagDeployment: houston.DagDeploymentConfig{Type: houston.DagOnlyDeploymentType}}, nil)
+
+		run := runAPCGated(t, api, true, "y\n", "deployment", "update", "dep-1", "--dag-deployment-type", "volume")
+
+		assert.Equal(t, 1, run.code)
+		require.Error(t, run.err)
+		assert.NotErrorIs(t, run.err, input.ErrAborted)
+		assert.False(t, run.stdinRead)
+		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
+	})
+}

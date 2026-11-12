@@ -12,11 +12,12 @@ func addYesFlag(cmd *cobra.Command, usage string) {
 	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, usage)
 }
 
-// confirmRemoval asks question before a command removes something that cannot
-// be brought back, unless --yes answered it already. A declined question is
-// input.ErrAborted, as it is on Astro. A run that may not ask (under --output
-// json) is refused, naming --yes, before anything is read.
-func confirmRemoval(question string) error {
+// confirm asks question before a command changes something that is not
+// easily changed back (a removal, a hibernation, a move onto dag_deploy),
+// unless --yes answered it already. A declined question is input.ErrAborted,
+// as it is on Astro. A run that may not ask (under --output json) is refused,
+// naming --yes, before anything is read.
+func confirm(question string) error {
 	if skipPrompt {
 		return nil
 	}

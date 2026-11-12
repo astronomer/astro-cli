@@ -15,7 +15,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
-	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 const (
@@ -704,17 +703,18 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		createTriggererReplicas = -1
 	}
 
-	// If it's a dag_deploy type, validate from the user first
-	if !skipPrompt && dagDeploymentType == houston.DagOnlyDeploymentType {
-		if err := input.ConfirmOrAbort(CreateDeploymentWithTypeDagDeployPromptMsg, input.AnsweredBy("--yes")); err != nil {
-			return err
-		}
-	}
-
 	// we should validate only in case when this feature has been enabled
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
 		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, false)
 		if err != nil {
+			return err
+		}
+	}
+
+	// A dag_deploy type is confirmed with the person first, once what was
+	// asked for is known to be valid.
+	if dagDeploymentType == houston.DagOnlyDeploymentType {
+		if err := confirm(CreateDeploymentWithTypeDagDeployPromptMsg); err != nil {
 			return err
 		}
 	}
@@ -774,14 +774,12 @@ func deploymentHibernate(cmd *cobra.Command, hibernate bool, out io.Writer) erro
 	if hibernate {
 		verb = "hibernate"
 	}
-	if !skipPrompt {
-		question := fmt.Sprintf("\nAre you sure you want to %s this Deployment?", verb)
-		if hibernateRemove {
-			question = "\nAre you sure you want to remove the hibernation override on this Deployment?"
-		}
-		if err := input.ConfirmOrAbort(question, input.AnsweredBy("--yes")); err != nil {
-			return err
-		}
+	question := fmt.Sprintf("\nAre you sure you want to %s this Deployment?", verb)
+	if hibernateRemove {
+		question = "\nAre you sure you want to remove the hibernation override on this Deployment?"
+	}
+	if err := confirm(question); err != nil {
+		return err
 	}
 
 	var d *houston.Deployment
@@ -841,16 +839,14 @@ func deploymentDelete(cmd *cobra.Command, out io.Writer) error {
 	// Deletions are always hard deletes now (PLX-575): all data associated with
 	// the Deployment, including the database, is permanently removed. Confirm
 	// before proceeding, unless --yes already did.
-	if !skipPrompt {
-		prompt := dangerPrompt(cliDeploymentHardDeletePrompt)
-		if deploymentLink != "" {
-			// The run named a link: say which Deployment that is before
-			// asking to delete it.
-			prompt = fmt.Sprintf("\nLink %s names Deployment %s.", deploymentLink, deploymentID) + prompt
-		}
-		if err := input.ConfirmOrAbort(prompt, input.AnsweredBy("--yes")); err != nil {
-			return err
-		}
+	prompt := dangerPrompt(cliDeploymentHardDeletePrompt)
+	if deploymentLink != "" {
+		// The run named a link: say which Deployment that is before
+		// asking to delete it.
+		prompt = fmt.Sprintf("\nLink %s names Deployment %s.", deploymentLink, deploymentID) + prompt
+	}
+	if err := confirm(prompt); err != nil {
+		return err
 	}
 	d, err := deployment.Delete(deploymentID, true, houstonClient)
 	if err != nil {
@@ -902,10 +898,8 @@ func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	if !skipPrompt {
-		if err := input.ConfirmOrAbort(dangerPrompt(cliDeploymentUnadoptPrompt), input.AnsweredBy("--yes")); err != nil {
-			return err
-		}
+	if err := confirm(dangerPrompt(cliDeploymentUnadoptPrompt)); err != nil {
+		return err
 	}
 	d, err := deployment.Unadopt(deploymentID, houstonClient)
 	if err != nil {
@@ -947,18 +941,18 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 
 // confirmDagDeploymentTypeChange asks before an update moves a deployment onto
 // or off dag_deploy. A no is input.ErrAborted, and nothing is changed. Any
-// other change needs no answer; --yes skips the question.
+// other change, including one that names no type, needs no answer.
 func confirmDagDeploymentTypeChange(current, next string) error {
 	var prompt string
 	switch {
 	case current != houston.DagOnlyDeploymentType && next == houston.DagOnlyDeploymentType:
 		prompt = UpdateDeploymentTypeToDagDeployPromptMsg
-	case current == houston.DagOnlyDeploymentType && next != houston.DagOnlyDeploymentType:
+	case current == houston.DagOnlyDeploymentType && next != "" && next != houston.DagOnlyDeploymentType:
 		prompt = UpdateDeploymentTypeFromDagDeployPromptMsg
 	default:
 		return nil
 	}
-	return input.ConfirmOrAbort(prompt, input.AnsweredBy("--yes"))
+	return confirm(prompt)
 }
 
 func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string, out io.Writer) error {
@@ -997,13 +991,6 @@ func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string,
 		dagOnlyDeployEnabled = appConfig.Flags.DagOnlyDeployment
 	}
 
-	// new dag deployment type or current dag deployment type is dag_deploy, confirm from user
-	if !skipPrompt {
-		if err := confirmDagDeploymentTypeChange(deploymentInfo.DagDeployment.Type, dagDeploymentType); err != nil {
-			return err
-		}
-	}
-
 	// we should validate only in case when this feature has been enabled
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
 		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, true)
@@ -1018,6 +1005,12 @@ func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string,
 		if err != nil {
 			return err
 		}
+	}
+
+	// Moving onto or off dag_deploy is confirmed with the person first, once
+	// what was asked for is known to be valid.
+	if err := confirmDagDeploymentTypeChange(deploymentInfo.DagDeployment.Type, dagDeploymentType); err != nil {
+		return err
 	}
 
 	d, err := deployment.Update(deploymentID, cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, appConfig)
