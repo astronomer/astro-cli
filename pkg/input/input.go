@@ -3,6 +3,7 @@ package input
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -53,6 +54,10 @@ func Text(promptText string, opts ...Option) (string, error) {
 	}
 	if err != nil && text == "" {
 		fmt.Fprintln(os.Stderr)
+		if !errors.Is(err, io.EOF) {
+			// A read that failed is not stdin ending: say what failed.
+			return "", fmt.Errorf("reading the answer to %s: %w", Quote(promptText), err)
+		}
 		return "", endedRequired(promptText, opts)
 	}
 	return strings.Trim(text, "\r\n"), nil
@@ -77,6 +82,9 @@ func Confirm(promptText string, opts ...Option) (bool, error) {
 		// Input that ended left the prompt's line open.
 		fmt.Fprintln(os.Stderr)
 		if text == "" {
+			if !errors.Is(err, io.EOF) {
+				return false, fmt.Errorf("reading the answer to %s: %w", Quote(promptText), err)
+			}
 			return false, endedRequired(promptText, opts)
 		}
 	}
@@ -86,7 +94,7 @@ func Confirm(promptText string, opts ...Option) (bool, error) {
 // endedRequired is the refusal for a question whose input ended with no
 // answer: nobody answered, so the answer has to come as the flag opts name.
 func endedRequired(promptText string, opts []Option) error {
-	e := &RequiredError{Prompt: promptText, Reason: "stdin ended before an answer"}
+	e := &RequiredError{Prompt: promptText, Reason: EndedReason}
 	for _, o := range opts {
 		o(e)
 	}
@@ -108,3 +116,7 @@ func Password(promptText string, opts ...Option) (string, error) {
 	}
 	return password, nil
 }
+
+// EndedReason is the reason a question gives when its input ended with no
+// answer, as opposed to a run that may not ask at all.
+const EndedReason = "stdin ended before an answer"

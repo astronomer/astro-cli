@@ -209,7 +209,7 @@ func (l *List) MayAsk() error {
 // endedRequired is the refusal for input that ended before any answer,
 // naming what Ask names.
 func (l *List) endedRequired() error {
-	e := &input.RequiredError{Prompt: prompt, Reason: "stdin ended before an answer"}
+	e := &input.RequiredError{Prompt: prompt, Reason: input.EndedReason}
 	for _, o := range l.Ask {
 		o(e)
 	}

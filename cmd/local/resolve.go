@@ -361,7 +361,7 @@ func (c *cli) announceInstance(i instances.Instance) {
 // "2", and reading the number first would pin whichever entry happened to sit
 // in that position instead. There is no default on Enter, because the safe
 // answer to "which Airflow should I act on" is never one this picked for you.
-// It asks on stderr, and is only ever reached on an interactive run.
+// It asks on stderr, and is only reached by a run that may ask.
 func (c *cli) promptForDeployment(choices []string) (string, error) {
 	ambiguous := &instances.AmbiguousError{Choices: choices}
 	l := picker.List{

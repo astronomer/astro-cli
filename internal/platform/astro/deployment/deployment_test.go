@@ -268,7 +268,7 @@ const (
 
 var mockV1Client *astrov1_mocks.ClientWithResponsesInterface
 
-// standInForATerminal makes mayAsk answer mayAsk, until the test
+// standInForATerminal makes mayAsk answer asks, until the test
 // ends: the tests pipe what a person would type.
 func standInForATerminal(t *testing.T, terminal bool) {
 	t.Helper()

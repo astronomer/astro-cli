@@ -49,8 +49,8 @@ var (
 	parseToken    = util.ParseAPIToken
 	CleanOutput   = false
 
-	// mayAsk reports whether someone is at the keyboard to pick a
-	// Deployment. A var so a test can stand in for a terminal.
+	// mayAsk reports whether this run may ask which Deployment to pick (input.CanAsk).
+	// A var so a test can answer either way.
 	mayAsk = input.CanAsk
 )
 
@@ -1561,7 +1561,7 @@ var (
 )
 
 // Delete deletes a Deployment, after the person types its name unless
-// forceDelete. A run with no terminal must name the Deployment: it is never
+// forceDelete. A run that cannot ask must name the Deployment: it is never
 // picked for it, whatever forceDelete says.
 func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Client astrov1.APIClient) (*Removal, error) {
 	if deploymentID == "" && deploymentName == "" && !mayAsk() {
