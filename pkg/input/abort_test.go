@@ -92,6 +92,8 @@ func (s *Suite) TestHintedAnswersReachEndedInputAndPasswordRefusals() {
 	s.Contains(err.Error(), "pass --name", "Confirm at the end of its input")
 
 	s.stdinHolding("")
+	defer SetTerminals(false, true)()
+	defer SetGuard(func() string { return Refusal(false, nil) })()
 	_, err = Password("Password: ", About("a name"))
 	s.True(IsRequired(err), "%v", err)
 	s.Contains(err.Error(), "pass --name", "Password on a stdin that is not a terminal")
@@ -100,6 +102,8 @@ func (s *Suite) TestHintedAnswersReachEndedInputAndPasswordRefusals() {
 // A password asked of a stdin that is not a terminal names the flag that
 // answers it, and reads nothing.
 func (s *Suite) TestPasswordOnAPipeNamesTheFlag() {
+	defer SetTerminals(false, true)()
+	defer SetGuard(func() string { return Refusal(false, nil) })()
 	s.stdinHolding("hunter2\n")
 	_, err := Password("Password: ", AnsweredBy("--password"))
 	s.True(IsRequired(err), "%v", err)

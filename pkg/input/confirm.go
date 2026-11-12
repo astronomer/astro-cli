@@ -19,10 +19,6 @@ type Confirmation struct {
 	// In is where the answer is read from, Out where the question is written.
 	In  io.Reader
 	Out io.Writer
-	// Terminal is whether In is a terminal: one echoes what is typed, a pipe
-	// does not, and it words a refusal ("input ended" or "stdin is not
-	// interactive").
-	Terminal bool
 	// Options name the flag that answers the question (AnsweredBy) and what is
 	// asked (About), for a run that may not ask, and for ended input.
 	Options []Option
@@ -31,15 +27,13 @@ type Confirmation struct {
 // Ask asks the question and returns nil for a yes (y or yes, in any case),
 // ErrAborted for any other answer, and ErrInterrupted at Ctrl-C.
 //
-// A run that may not ask (see Refusal) is refused with a *RequiredError before
-// anything is written or read. Otherwise the question is always written, on a
-// terminal or not: a stdin that is not one often still has a person behind it
-// (ssh or exec without a tty, mintty), or a tool that waits for the question
-// before it answers. Every way the read ends leaves the question's line whole:
-// Ctrl-C and input that ended close it before the error, and an answer from a
-// pipe, which nothing echoes, is written after the question as plain text
-// (Plain), so a log reads "...? [y/N] n". The answer is decided on that same
-// text, and input that is nothing but escapes is no answer, not a no.
+// A run that may not ask (see Refusal: no terminal on stdin or stderr, CI,
+// json, --non-interactive) is refused with a *RequiredError before anything is
+// written or read. Otherwise a person is at a terminal, which echoes what is
+// typed, so the question is written and the answer read from the line. Ctrl-C
+// and input that ended (Ctrl-D) close the question's line before the error. The
+// answer is decided on its Plain text, and input that is nothing but escapes is
+// no answer, not a no.
 //
 // Input that ended with no answer is not a no: nobody answered, so it is a
 // *RequiredError naming the flag that answers the question.
@@ -60,23 +54,16 @@ func (q *Confirmation) Ask() error {
 	// An empty line is an answer: a no. A read that failed is none, unless
 	// it brought text with it.
 	answered := err == nil || (errors.Is(err, io.EOF) && answer != "")
-	switch {
-	case answered && !q.Terminal:
-		// A terminal echoed what was typed; a pipe did not.
-		fmt.Fprintln(q.Out, answer)
-	case err != nil:
+	if err != nil {
 		// Input that ended left the line open: end it, so what follows
 		// starts on a fresh one.
 		fmt.Fprintln(q.Out)
 	}
 	if !answered {
-		switch {
-		case errors.Is(err, io.EOF):
+		if errors.Is(err, io.EOF) {
 			return q.ended()
-		case !q.Terminal:
-			return fmt.Errorf("reading the answer to %s: %w", Quote(q.Question), err)
 		}
-		return err
+		return fmt.Errorf("reading the answer to %s: %w", Quote(q.Question), err)
 	}
 	switch strings.ToLower(answer) {
 	case answerY, answerYes:
@@ -89,17 +76,13 @@ func (q *Confirmation) Ask() error {
 // ended is the refusal for input that ended with no answer.
 func (q *Confirmation) ended() error {
 	named := endedRequired(q.Question, q.Options).(*RequiredError) //nolint:forcetypeassert // endedRequired returns one
-	why := "stdin is not interactive"
-	if q.Terminal {
-		why = "input ended with no answer"
-	}
 	answer := "pass the answer as a flag"
 	if named.Flag != "" {
 		answer = "pass " + named.Flag
 	}
 	// The same structured refusal Text, Confirm and the pickers return (the
 	// question, the flag, the reason), in this confirmation's own words.
-	named.err = fmt.Errorf("confirmation needed but %s; %s to proceed", why, answer)
+	named.err = fmt.Errorf("confirmation needed but input ended with no answer; %s to proceed", answer)
 	return named
 }
 

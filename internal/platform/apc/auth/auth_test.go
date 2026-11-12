@@ -110,6 +110,10 @@ func (s *Suite) TestBasicAuth() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			if tt.name == "no password and no terminal" {
+				defer input.SetTerminals(false, true)()
+				defer input.SetGuard(func() string { return input.Refusal(false, nil) })()
+			}
 			got, err := basicAuth(tt.args.username, tt.args.password, &config.Context{}, houstonMock)
 			if !tt.errAssertion(s.T(), err) {
 				return

@@ -16,11 +16,19 @@ func TestRefusal(t *testing.T) {
 		name string
 		ci   string
 		env  map[string]string
-		json bool
-		args []string
-		want string // a substring of the reason; "" means the run may ask
+		// noStdin and noStderr: that stream is not a terminal.
+		noStdin, noStderr bool
+		json              bool
+		args              []string
+		want              string // a substring of the reason; "" means the run may ask
 	}{
-		{name: "nothing set may ask"},
+		{name: "nothing set, at a terminal, may ask"},
+		{name: "stdin a pipe", noStdin: true, want: "stdin is not a terminal"},
+		{name: "stderr not a terminal", noStderr: true, want: "stderr is not a terminal"},
+		{name: "stdin a pipe, --non-interactive=false still refuses", noStdin: true, args: []string{"--non-interactive=false"}, want: "stdin is not a terminal"},
+		{name: "stderr not a terminal, --non-interactive=false still refuses", noStderr: true, args: []string{"--non-interactive=false"}, want: "stderr is not a terminal"},
+		{name: "stdin a pipe under json is json", noStdin: true, json: true, want: "--output json"},
+		{name: "terminals, --non-interactive=false with CI asks", ci: "true", args: []string{"--non-interactive=false"}},
 		{name: "CI=true", ci: "true", want: "CI"},
 		{name: "CI=1", ci: "1", want: "CI"},
 		{name: "CI=TRUE", ci: "TRUE", want: "CI"},
@@ -51,6 +59,7 @@ func TestRefusal(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("CI", tt.ci)
+			defer SetTerminals(!tt.noStdin, !tt.noStderr)()
 			// Whatever CI system this test runs on must not decide it.
 			for _, k := range []string{"JENKINS_URL", "HUDSON_URL", "TF_BUILD"} {
 				t.Setenv(k, "")
@@ -71,7 +80,8 @@ func TestRefusal(t *testing.T) {
 		})
 	}
 
-	t.Run("a command with no such flag still reads CI", func(t *testing.T) {
+	t.Run("a command with no such flag still reads the terminals and CI", func(t *testing.T) {
+		defer SetTerminals(true, true)()
 		for _, k := range []string{"JENKINS_URL", "HUDSON_URL", "TF_BUILD"} {
 			t.Setenv(k, "")
 		}

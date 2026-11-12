@@ -291,20 +291,27 @@ func TestTheInteractionModeIsResolvedOnce(t *testing.T) {
 		ci     string
 		args   []string
 		refuse string // the reason the refusal gives; "" when the run asks
+		// noStdin and noStderr: that stream is not a terminal.
+		noStdin, noStderr bool
 	}{
-		{"nothing set asks", "", []string{"delete"}, ""},
-		{"CI=true", "true", []string{"delete"}, "with CI set it cannot"},
-		{"CI=1", "1", []string{"delete"}, "with CI set it cannot"},
-		{"CI=false asks", "false", []string{"delete"}, ""},
-		{"CI=0 asks", "0", []string{"delete"}, ""},
-		{"--non-interactive", "", []string{"delete", "--non-interactive"}, "with --non-interactive it cannot"},
-		{"--non-interactive before the command", "", []string{"--non-interactive", "delete"}, "with --non-interactive it cannot"},
-		{"--non-interactive=false with CI asks", "true", []string{"delete", "--non-interactive=false"}, ""},
-		{"-o json with --non-interactive=false refuses", "", []string{"delete", "-o", "json", "--non-interactive=false"}, "with --output json it cannot"},
-		{"-o json with CI=false refuses", "false", []string{"delete", "-o", "json"}, "with --output json it cannot"},
+		{"nothing set asks, at a terminal", "", []string{"delete"}, "", false, false},
+		{"stdin a pipe", "", []string{"delete"}, "stdin is not a terminal", true, false},
+		{"stderr not a terminal", "", []string{"delete"}, "stderr is not a terminal", false, true},
+		{"stdin a pipe, --non-interactive=false still refuses", "", []string{"delete", "--non-interactive=false"}, "stdin is not a terminal", true, false},
+		{"stderr not a terminal, CI=true and --non-interactive=false still refuses", "true", []string{"delete", "--non-interactive=false"}, "stderr is not a terminal", false, true},
+		{"CI=true", "true", []string{"delete"}, "with CI set it cannot", false, false},
+		{"CI=1", "1", []string{"delete"}, "with CI set it cannot", false, false},
+		{"CI=false asks", "false", []string{"delete"}, "", false, false},
+		{"CI=0 asks", "0", []string{"delete"}, "", false, false},
+		{"--non-interactive", "", []string{"delete", "--non-interactive"}, "with --non-interactive it cannot", false, false},
+		{"--non-interactive before the command", "", []string{"--non-interactive", "delete"}, "with --non-interactive it cannot", false, false},
+		{"--non-interactive=false with CI asks", "true", []string{"delete", "--non-interactive=false"}, "", false, false},
+		{"-o json with --non-interactive=false refuses", "", []string{"delete", "-o", "json", "--non-interactive=false"}, "with --output json it cannot", false, false},
+		{"-o json with CI=false refuses", "false", []string{"delete", "-o", "json"}, "with --output json it cannot", false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("CI", tc.ci)
+			defer input.SetTerminals(!tc.noStdin, !tc.noStderr)()
 			unread := stdinHolding(t, "y\n")
 			answered := ""
 			var r run

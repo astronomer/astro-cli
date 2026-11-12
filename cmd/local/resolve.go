@@ -384,13 +384,3 @@ func (c *cli) promptForDeployment(choices []string) (string, error) {
 	}
 	return choices[i], nil
 }
-
-// terminal reports whether stdin is a terminal. It words a refusal and tells a
-// command with a non-asking alternative whether someone is there to pick; it
-// never decides whether a question may be asked (input.CanAsk does).
-func (c *cli) terminal() bool {
-	if c.d.Terminal != nil {
-		return c.d.Terminal()
-	}
-	return false
-}

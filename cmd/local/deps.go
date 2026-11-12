@@ -30,7 +30,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
-	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
@@ -116,17 +115,10 @@ type Deps struct {
 	// Deployment by default (target = "apc"), on this context's domain.
 	APC *APCLinking
 
-	// Terminal reports whether stdin is a terminal. It does not decide whether
-	// a question is asked (input.CanAsk does, for the whole run): it words a
-	// confirmation that got no answer, and tells a bare `astro use` whether
-	// someone is there to pick. It is a seam so a test can stand in for a pty.
-	// nil means not a terminal.
-	Terminal func() bool
-
-	// OutputTerminal reports whether stdout is a terminal, for a command whose
-	// question and whose report both go to stdout: `astro use | grep prod` has a
-	// terminal on stdin and still wants the report, not a picker it cannot see.
-	// nil means not a terminal.
+	// OutputTerminal reports whether stdout is a terminal, for a bare `astro use`:
+	// with its stdin and stderr at a terminal it may ask, but `astro use | grep
+	// prod` still wants the report, not a picker whose answer goes nowhere. nil
+	// means not a terminal.
 	OutputTerminal func() bool
 
 	// JSONStyle lays out a json result. The zero value, cliout.StyleAuto, is
@@ -259,7 +251,6 @@ func NewDeps() Deps {
 		WorkspaceClients:   emenv.Clients,
 		Session:            astrosession.BearerFor,
 		Locator:            instancelocate.New,
-		Terminal:           input.StdinIsTerminal,
 		OutputTerminal:     stdoutIsTerminal,
 		AirflowDefault:     catalogDefault,
 		RuntimeCheck:       runtimecatalog.CheckRuntime,

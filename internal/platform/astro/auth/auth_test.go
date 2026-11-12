@@ -737,13 +737,20 @@ func TestAuthDeviceLogin(t *testing.T) {
 	})
 }
 
-// stubStdinIsTerminal answers the terminal check with one value, and puts the
-// real check back when the test ends.
-func stubStdinIsTerminal(t *testing.T, isTerminal bool) {
+// stubStdinIsTerminal says whether stdin is a terminal, and installs the guard
+// Execute would from it, so a login that finds none is refused as the rule
+// refuses it. Both are put back when the test ends, or by the function it
+// returns.
+func stubStdinIsTerminal(t *testing.T, isTerminal bool) (restore func()) {
 	t.Helper()
-	previous := stdinIsTerminal
-	t.Cleanup(func() { stdinIsTerminal = previous })
-	stdinIsTerminal = func() bool { return isTerminal }
+	restoreTerminals := input.SetTerminals(isTerminal, true)
+	restoreGuard := func() {}
+	if !isTerminal {
+		restoreGuard = input.SetGuard(func() string { return input.Refusal(false, nil) })
+	}
+	restore = func() { restoreGuard(); restoreTerminals() }
+	t.Cleanup(restore)
+	return restore
 }
 
 // stubStdin makes stdin hold text, and returns it so a test can read what the
@@ -1655,7 +1662,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		var out string
 		errOut := captureStderr(t, func() {
 			out = captureStdout(t, func() {
-				assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+				assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 			})
 		})
 
@@ -1684,7 +1691,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		mockV1Client := checkUserSessionMocks()
 
 		captureStdout(t, func() {
-			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+			assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 		})
 
 		assert.Equal(t, 0, *browserLogins)
@@ -1703,7 +1710,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		mockV1Client := checkUserSessionMocks()
 
 		captureStdout(t, func() {
-			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+			assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 		})
 
 		assert.Equal(t, 1, *browserLogins)
@@ -1722,7 +1729,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			saveLogin(t, domain, "", "", 0)
 			browserLogins := browserAuthenticator(t)
-			stubStdinIsTerminal(t, terminal)
+			restoreTerminals := stubStdinIsTerminal(t, terminal)
 			mockV1Client := checkUserSessionMocks()
 			if terminal {
 				// The Enter the prompt waits for.
@@ -1738,7 +1745,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 			var out string
 			errOut := captureStderr(t, func() {
 				out = captureStdout(t, func() {
-					assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+					assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 				})
 			})
 
@@ -1751,6 +1758,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 				assert.Contains(t, errOut, "Please visit the following link")
 			}
 			assert.Contains(t, errOut, "Logging in as")
+			restoreTerminals()
 		}
 	})
 
@@ -1761,7 +1769,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		mockV1Client := checkUserSessionMocks()
 
 		captureStdout(t, func() {
-			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+			assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 		})
 
 		assert.Equal(t, 1, *browserLogins)
@@ -1775,7 +1783,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		mockV1Client := checkUserSessionMocks()
 
 		captureStdout(t, func() {
-			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+			assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 		})
 
 		assert.Equal(t, 0, *browserLogins)
@@ -1822,7 +1830,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		mockV1Client := checkUserSessionMocks()
 
 		captureStdout(t, func() {
-			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+			assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 		})
 
 		assert.Equal(t, 1, *browserLogins)
@@ -1849,7 +1857,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 			mockV1Client := checkUserSessionMocks()
 
 			captureStdout(t, func() {
-				assert.NoError(t, Login(domain, tc.token, mockV1Client, io.Discard, false, tc.signup, tc.force))
+				assert.NoError(t, LoginCommand(domain, tc.token, mockV1Client, io.Discard, false, tc.signup, tc.force))
 			})
 
 			assert.Equal(t, tc.browserLogins, *browserLogins)
@@ -2170,7 +2178,7 @@ func TestWriteToContextKeepsTokenOnlyLoginOnItsOwnHost(t *testing.T) {
 // login link and waits for the browser's callback instead of being refused. A
 // login another command starts (Login) is still refused there.
 func TestExplicitLoginWorksWhenTheRunMayNotAsk(t *testing.T) {
-	for _, reason := range []string{"with CI set it cannot", "with --non-interactive it cannot", "with --output json it cannot"} {
+	for _, reason := range []string{"with CI set it cannot", "with --non-interactive it cannot", "with --output json it cannot", "stdin is not a terminal", "stderr is not a terminal"} {
 		t.Run(reason, func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			stubAuthConfig(t, testAuthConfig)

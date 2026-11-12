@@ -31,7 +31,6 @@ func pickDeps(t *testing.T, dir, stdin string, dep PickedDeployment, ws string) 
 	t.Helper()
 	d, out, errOut := linkDeps(t, dir)
 	run := &pickRun{out: out, errOut: errOut}
-	d.Terminal = func() bool { return true }
 	d.Stdin = strings.NewReader(stdin)
 	d.CurrentWorkspace = func() string { return "" }
 	d.PickDeployment = func(workspaceID string, linked map[string]string) (PickedDeployment, error) {
@@ -122,7 +121,6 @@ func TestLinkPickersNeverPromptARunThatCannotBeAsked(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dir, _ := linkTestProject(t, linkManifest)
 			d, run := pickDeps(t, dir, "1\n", PickedDeployment{ID: "clx9", Name: "x"}, "")
-			d.Terminal = func() bool { return tc.interactive }
 			err := execute(t, d, append([]string{"link"}, tc.args...)...)
 			require.Error(t, err)
 			if slices.Contains(tc.args, "json") {

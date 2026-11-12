@@ -3,9 +3,11 @@ package input
 import (
 	"os"
 	"strings"
+	"sync/atomic"
+	"testing"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/pflag"
-	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/pkg/telemetry"
 )
@@ -19,6 +21,11 @@ const (
 	reasonFlag = "with --non-interactive it cannot"
 	reasonCI   = "with CI set it cannot"
 
+	// A question needs a person at a terminal: stdin to answer on, stderr to
+	// see it on.
+	reasonStdin  = "stdin is not a terminal"
+	reasonStderr = "stderr is not a terminal"
+
 	// CI systems that do not set CI themselves, which telemetry already
 	// recognizes by name.
 	reasonJenkins = "in Jenkins (JENKINS_URL or HUDSON_URL set) it cannot"
@@ -30,31 +37,39 @@ const (
 // AddFlag registers the global --non-interactive flag on fs, the root's
 // persistent flags, so every command at every depth accepts it.
 func AddFlag(fs *pflag.FlagSet) {
-	fs.Bool(NonInteractiveFlag, false, "Never ask a question: a command that needs an answer fails and names the flag that gives it. Always on with CI set or --output json; --non-interactive=false asks even with CI set")
+	fs.Bool(NonInteractiveFlag, false, "Never ask a question: a command that needs an answer fails and names the flag that gives it. Always on with CI set, --output json, or stdin or stderr not a terminal; --non-interactive=false asks even with CI set, at a terminal")
 }
 
 // Refusal is the one place a run's interaction mode is decided. It returns why
 // this run may not ask a question, or "" when it may; the reason finishes the
 // sentence "this command needs to ask X; ..." in the refusal.
 //
-// A run is non-interactive when --output is json, when the CI environment
-// variable is set to a truthy value (anything but empty, "0" or "false", in
-// any case), when Jenkins (JENKINS_URL) or Azure Pipelines (TF_BUILD, truthy)
-// says so, which do not set CI, or when --non-interactive is passed. An explicit
-// --non-interactive=false asks again despite CI, so a person can debug a CI
-// setup locally, but never under json. Every other run may ask, whether or not
-// stdin is a terminal: the question goes to stderr and the answer is read from
-// stdin, where a person may be (ssh without -t, docker exec -i, mintty).
+// A run is non-interactive when --output is json; when stdin or stderr is not a
+// terminal, since a question needs a person at both, one to answer and one to
+// see it (so an answer is never read from a pipe: a script passes the flag);
+// when the CI environment variable is set to a truthy value (anything but
+// empty, "0" or "false", in any case); when Jenkins (JENKINS_URL) or Azure
+// Pipelines (TF_BUILD, truthy) says so, which do not set CI; or when
+// --non-interactive is passed. An explicit --non-interactive=false asks again
+// despite CI, so a person can debug a CI setup at a terminal, but never under
+// json and never without both terminals.
 //
 // flag is the parsed --non-interactive flag, or nil where the command has none.
 func Refusal(json bool, flag *pflag.Flag) string {
 	if json {
 		return reasonJSON
 	}
-	if flag != nil && flag.Changed {
-		if flag.Value.String() != falseValue {
-			return reasonFlag
-		}
+	asked := flag != nil && flag.Changed
+	if asked && flag.Value.String() != falseValue {
+		return reasonFlag
+	}
+	if !StdinIsTerminal() {
+		return reasonStdin
+	}
+	if !StderrIsTerminal() {
+		return reasonStderr
+	}
+	if asked {
 		return ""
 	}
 	switch {
@@ -82,8 +97,34 @@ func truthy(v string) bool {
 // missing answer. A run with no guard installed (a test, a library caller) may.
 func CanAsk() bool { return refusal() == "" }
 
-// StdinIsTerminal reports whether stdin is a terminal. It does not decide
-// whether to ask (CanAsk does); it is for wording ("input ended" at a terminal,
-// "stdin is not interactive" without one) and for a stdin that carries a
-// payload rather than an answer.
-func StdinIsTerminal() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
+// terminals is the answer a test gives for stdin and stderr, in place of the
+// real ones: nil means ask the real ones.
+var terminals atomic.Pointer[[2]bool]
+
+// StdinIsTerminal reports whether stdin is a terminal: the one answer to the
+// question, which Refusal asks and which a command that only needs to know
+// (not to decide whether to ask) may too. A Cygwin or MSYS pty (mintty) counts.
+func StdinIsTerminal() bool {
+	if t := terminals.Load(); t != nil {
+		return t[0]
+	}
+	if testing.Testing() {
+		return true
+	}
+	return isTerminal(os.Stdin)
+}
+
+// StderrIsTerminal is StdinIsTerminal for stderr, where a question is drawn.
+func StderrIsTerminal() bool {
+	if t := terminals.Load(); t != nil {
+		return t[1]
+	}
+	if testing.Testing() {
+		return true
+	}
+	return isTerminal(os.Stderr)
+}
+
+func isTerminal(f *os.File) bool {
+	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
+}

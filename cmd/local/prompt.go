@@ -28,7 +28,6 @@ func (c *cli) confirm(question string) error {
 		Choices:  " [y/N] ",
 		In:       c.d.Stdin,
 		Out:      c.d.Stderr,
-		Terminal: c.terminal(),
 		Options:  []input.Option{input.AnsweredBy("--yes")},
 	}).Ask()
 }

@@ -21,7 +21,6 @@ import (
 
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
-	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -52,7 +51,6 @@ var (
 	httpClient          = httputil.NewHTTPClient()
 	openURL             = browser.OpenURL
 	refreshAccessToken  = astroauth.RefreshToken
-	stdinIsTerminal     = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
 	exitOnInterrupt     = os.Exit
 	ErrorNoOrganization = errors.New("no organization found. Please contact your Astro Organization Owner to be invited to the organization")
 	errEmailNotFound    = errors.New("cannot retrieve email")
@@ -299,12 +297,11 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	stopWatching := quitOnInterrupt()
 	defer stopWatching()
 
-	// A run that may not ask (CI, --non-interactive) or has no terminal — a coding
-	// agent's shell — never answers the Press Enter gate below, so it takes the
-	// login-link path instead of blocking on stdin. The terminal check stays: the
-	// gate is a pause before opening a browser, not a question, and a stdin that
-	// is not a terminal must not be waited on for it.
-	if !shouldDisplayLoginLink && input.CanAsk() && stdinIsTerminal() {
+	// A run that may not ask (CI, --non-interactive, no terminal on stdin or
+	// stderr: a coding agent's shell, `astro login </dev/null`) never answers the
+	// Press Enter gate below, so it takes the login-link path: it prints the link
+	// and waits for the browser's callback instead of blocking on stdin.
+	if !shouldDisplayLoginLink && input.CanAsk() {
 		action := "log in"
 		if signup {
 			action = "create your Astro account"

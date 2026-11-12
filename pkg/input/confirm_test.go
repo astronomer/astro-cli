@@ -11,60 +11,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// askConfirmation drives a Confirmation with the given stdin and reports what
-// it returned and wrote, at a terminal or not.
-func askConfirmation(terminal bool, stdin string) (string, error) {
+// askConfirmation drives a Confirmation with the given stdin (what a person
+// types at a terminal) and reports what it returned and wrote.
+func askConfirmation(stdin string) (string, error) {
 	var out bytes.Buffer
 	err := (&Confirmation{
 		Question: "Wipe it?",
 		Choices:  " [y/N] ",
 		In:       strings.NewReader(stdin),
 		Out:      &out,
-		Terminal: terminal,
 		Options:  []Option{AnsweredBy("--yes")},
 	}).Ask()
 	return out.String(), err
 }
 
 // Every way a confirmation ends leaves its output with whole lines: the
-// question is always written first, a terminal or not; a terminal echoes the
-// answer itself while a piped answer, which nothing echoes, is written after
-// the question as plain text; input that ended has its line closed before the
-// refusal. This is the table astro local's confirmation was held to, now the
-// behavior of every confirmation.
+// question is written first, the terminal echoes the answer itself, and input
+// that ended (Ctrl-D) has its line closed before the refusal. Input that is
+// nothing but escapes is no answer, and the answer is decided on its Plain
+// text. A run with no terminal is refused before any of this
+// (TestConfirmationRefusedBeforeAnythingIsWritten).
 func TestConfirmationLeavesWholeLines(t *testing.T) {
 	const (
-		q                 = "Wipe it? [y/N] "
-		refusedAtTerminal = "confirmation needed but input ended with no answer; pass --yes to proceed"
-		refusedNoTerminal = "confirmation needed but stdin is not interactive; pass --yes to proceed"
+		q       = "Wipe it? [y/N] "
+		refused = "confirmation needed but input ended with no answer; pass --yes to proceed"
 	)
 	for name, tc := range map[string]struct {
-		terminal bool
-		stdin    string
-		out      string
-		refusal  string // the input_required refusal naming --yes
-		err      error  // otherwise; nil for a yes
+		stdin   string
+		out     string
+		refusal string // the input_required refusal naming --yes
+		err     error  // otherwise; nil for a yes
 	}{
-		"terminal, yes":                                {true, "y\n", q, "", nil},
-		"terminal, no":                                 {true, "n\n", q, "", ErrAborted},
-		"terminal, input ended":                        {true, "", q + "\n", refusedAtTerminal, nil},
-		"terminal, yes then ended":                     {true, "y", q + "\n", "", nil},
-		"piped, yes":                                   {false, "y\n", q + "y\n", "", nil},
-		"piped, no":                                    {false, "n\n", q + "n\n", "", ErrAborted},
-		"piped, yes with no newline":                   {false, "y", q + "y\n", "", nil},
-		"piped nothing":                                {false, "", q + "\n", refusedNoTerminal, nil},
-		"piped, an empty line (a no)":                  {false, "\n", q + "\n", "", ErrAborted},
-		"piped, escapes are not echoed":                {false, "n\x1b[2J\x1b]0;title\x07\x08\n", q + "n\n", "", ErrAborted},
-		"piped, a long answer on one row":              {false, "no  way\tthanks\r\n", q + "no way thanks\n", "", ErrAborted},
-		"terminal, only escapes and no newline":        {true, "\x1b[0m", q + "\n", refusedAtTerminal, nil},
-		"piped, only escapes and no newline":           {false, "\x1b[0m\u200b", q + "\n", refusedNoTerminal, nil},
-		"piped, a joiner keeps y-es from being yes":    {false, "y\u200des\n", q + "y\u200des\n", "", ErrAborted},
-		"piped, a styled yes is the yes the log shows": {false, "y\x1b[0m\x07\n", q + "y\n", "", nil},
-		"piped, YES in any case":                       {false, "YES\r\n", q + "YES\n", "", nil},
-		"piped, maybe is a no":                         {false, "maybe\n", q + "maybe\n", "", ErrAborted},
+		"yes":                           {"y\n", q, "", nil},
+		"no":                            {"n\n", q, "", ErrAborted},
+		"input ended":                   {"", q + "\n", refused, nil},
+		"yes then ended":                {"y", q + "\n", "", nil},
+		"an empty line (a no)":          {"\n", q, "", ErrAborted},
+		"only escapes and no newline":   {"\x1b[0m", q + "\n", refused, nil},
+		"only invisible and no newline": {"\x1b[0m\u200b", q + "\n", refused, nil},
+		"a joiner keeps y-es from yes":  {"y\u200des\n", q, "", ErrAborted},
+		"a styled yes is a yes":         {"y\x1b[0m\x07\n", q, "", nil},
+		"YES in any case":               {"YES\r\n", q, "", nil},
+		"maybe is a no":                 {"maybe\n", q, "", ErrAborted},
 	} {
 		t.Run(name, func(t *testing.T) {
-			out, err := askConfirmation(tc.terminal, tc.stdin)
+			out, err := askConfirmation(tc.stdin)
 			assert.Equal(t, tc.out, out)
 			switch {
 			case tc.refusal != "":
@@ -121,7 +112,7 @@ func (b blockingReader) Read([]byte) (int, error) {
 // Ctrl-C ends a question at once, with ErrInterrupted, and closes the
 // question's line first, a terminal on stdin or not.
 func TestConfirmationInterruptedEndsTheQuestionsLine(t *testing.T) {
-	for name, terminal := range map[string]bool{"terminal": true, "piped": false} {
+	for name := range map[string]bool{"terminal": true} {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -130,7 +121,7 @@ func TestConfirmationInterruptedEndsTheQuestionsLine(t *testing.T) {
 			t.Cleanup(func() { close(in.release) })
 
 			var out bytes.Buffer
-			err := (&Confirmation{Question: "Wipe it?", Choices: " [y/N] ", In: in, Out: &out, Terminal: terminal}).Ask()
+			err := (&Confirmation{Question: "Wipe it?", Choices: " [y/N] ", In: in, Out: &out}).Ask()
 			assert.ErrorIs(t, err, ErrInterrupted)
 			assert.Equal(t, "Wipe it? [y/N] \n", out.String())
 		})
@@ -152,10 +143,10 @@ func (p *partialThenFails) Read(b []byte) (int, error) {
 // A read that fails after some text is not a yes: only a line that ended at
 // the end of input counts as an unterminated answer.
 func TestConfirmationReadFailureWithPartialTextIsNotAYes(t *testing.T) {
-	for name, terminal := range map[string]bool{"terminal": true, "piped": false} {
+	for name := range map[string]bool{"terminal": true} {
 		t.Run(name, func(t *testing.T) {
 			var out bytes.Buffer
-			err := (&Confirmation{Question: "Wipe it?", In: &partialThenFails{}, Out: &out, Terminal: terminal}).Ask()
+			err := (&Confirmation{Question: "Wipe it?", In: &partialThenFails{}, Out: &out}).Ask()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "read failed")
 			assert.NotErrorIs(t, err, ErrAborted)
@@ -168,7 +159,7 @@ func TestConfirmationReadFailureWithPartialTextIsNotAYes(t *testing.T) {
 // return: the question, the flag and the reason are there to read, whatever
 // the message says.
 func TestConfirmationEndedIsAStructuredRequiredError(t *testing.T) {
-	_, err := askConfirmation(false, "")
+	_, err := askConfirmation("")
 	var req *RequiredError
 	require.ErrorAs(t, err, &req)
 	assert.Equal(t, "Wipe it?", req.Prompt)

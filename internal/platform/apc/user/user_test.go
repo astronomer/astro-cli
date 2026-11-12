@@ -10,7 +10,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houstonMocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
 	"github.com/astronomer/astro-cli/pkg/input"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // Houston's own words when public sign-ups are off, the default.
@@ -44,10 +43,11 @@ func (s *Suite) TestCreateSuccess() {
 // read from a stdin that is not a terminal: input_required naming --password,
 // and no user is created.
 func (s *Suite) TestCreatePrompted() {
-	defer testUtil.MockUserInput(s.T(), "someone@example.com\n")()
+	defer input.SetTerminals(false, true)()
+	defer input.SetGuard(func() string { return input.Refusal(false, nil) })()
 	houstonMock := new(houstonMocks.ClientInterface)
 
-	_, err := Create("", "", houstonMock)
+	_, err := Create("someone@example.com", "", houstonMock)
 	s.True(input.IsRequired(err), "%v", err)
 	s.Contains(err.Error(), "--password")
 	houstonMock.AssertNotCalled(s.T(), "CreateUser", mock.Anything)

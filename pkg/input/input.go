@@ -30,7 +30,6 @@ func ConfirmOrAbort(promptText string, opts ...Option) error {
 		Question: promptText,
 		In:       os.Stdin,
 		Out:      os.Stderr,
-		Terminal: StdinIsTerminal(),
 		Options:  opts,
 	}).Ask()
 }
@@ -103,23 +102,11 @@ func endedRequired(promptText string, opts []Option) error {
 
 // Password requests a users passord, does not print out what they entered, and
 // returns it. It returns a *RequiredError, and reads nothing, when this run may
-// not ask (see SetGuard), and when stdin is not a terminal: a password is
-// never read where it cannot be hidden.
+// not ask (see SetGuard), which includes a stdin that is not a terminal: a
+// password is never read where it cannot be hidden.
 func Password(promptText string, opts ...Option) (string, error) {
 	if err := MayAsk(promptText, opts...); err != nil {
 		return "", err
-	}
-	if !StdinIsTerminal() {
-		// A hidden answer needs a terminal to hide it on: read from anything
-		// else, it would be echoed by whatever is typing at the far end (ssh
-		// without -t, docker exec -i) or taken from a pipe a script did not
-		// mean as a password. So it is refused, naming the flag, not read, and
-		// not left to fail with a terminal error.
-		e := &RequiredError{Prompt: promptText, Reason: "stdin is not a terminal, so a hidden answer cannot be read"}
-		for _, o := range opts {
-			o(e)
-		}
-		return "", ApplyHint(e)
 	}
 	fmt.Fprint(os.Stderr, promptText)
 	password, err := HiddenValue(os.Stdin, os.Stderr)

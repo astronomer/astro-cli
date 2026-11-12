@@ -48,7 +48,6 @@ func apcDeps(t *testing.T, dir, current string, dep PickedDeployment) (Deps, *ap
 func TestLinkAddUnderAPCPicksAHoustonDeployment(t *testing.T) {
 	dir, path := linkTestProject(t, linkManifest)
 	d, run := apcDeps(t, dir, "ckws-current", PickedDeployment{ID: "ckdep-1", Name: "Orders Prod", WorkspaceID: "ckws-current"})
-	d.Terminal = func() bool { return true }
 	out := d.Stdout.(interface{ String() string })
 	require.NoError(t, execute(t, d, "link", "add"))
 	assert.Equal(t, []string{"ckws-current"}, run.workspaces)
@@ -80,7 +79,6 @@ func TestLinkAddUnderAPCLeavesOutLinkedDeployments(t *testing.T) {
 		"workspace = 'ckws-x'\ndeployment = 'ckdep-x'\n"
 	dir, _ := linkTestProject(t, body)
 	d, run := apcDeps(t, dir, "ckws-current", PickedDeployment{ID: "ckdep-2", Name: "new"})
-	d.Terminal = func() bool { return true }
 	require.NoError(t, execute(t, d, "link", "add"))
 	assert.Equal(t, map[string]string{"ckdep-old": "apc-old"}, run.linked)
 }

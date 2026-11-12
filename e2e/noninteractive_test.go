@@ -8,17 +8,17 @@ import (
 	"testing"
 )
 
-// A run with CI set never prompts, whatever stdin is: the question it would
-// have asked fails as input_required, naming the flag that answers it, and
-// nothing is written to stderr before the error, so a log shows no question
-// that nobody could answer. --non-interactive does the same without CI, and
-// --non-interactive=false asks despite CI. Every other run asks, on stderr,
-// even with no terminal on stdin, and a stdin that ends with no answer is
-// input_required too.
+// A question needs a person at a terminal. The harness runs the binary with
+// stdin from /dev/null and stderr a pipe, so every run here has no terminal: a
+// prompt is refused before it is written or read, as input_required naming the
+// flag that answers it, and an answer piped in is never read (`echo y | astro
+// local reset` used to be how a script answered). CI, --non-interactive and
+// json refuse the same way, and --non-interactive=false restores nothing
+// without a terminal.
 //
 // Tier 0, as TestAJSONRunNeverPrompts: `astro local reset` finds the project
 // first and its question is the first thing it would do.
-func TestCINeverPrompts(t *testing.T) {
+func TestNoTerminalNeverPrompts(t *testing.T) {
 	tier(t, 0)
 
 	p := newProject(t)
@@ -39,34 +39,20 @@ func TestCINeverPrompts(t *testing.T) {
 			t.Errorf("%s: want input_required naming --yes (%s)\n%s", name, why, r.output())
 		}
 	}
-	asked := func(name string, r *result) {
-		t.Helper()
-		if r.ExitCode != 1 {
-			t.Fatalf("%s: exit %d, want 1\n%s", name, r.ExitCode, r.output())
-		}
-		if !strings.Contains(r.Stderr, "[y/N]") {
-			t.Errorf("%s: the question was not written on stderr\n%s", name, r.output())
-		}
-		if !strings.Contains(r.Stderr, "stdin is not interactive") || !strings.Contains(r.Stderr, "pass --yes") {
-			t.Errorf("%s: want input_required naming --yes for the stdin that ended\n%s", name, r.output())
-		}
-	}
 
-	refused("CI=true", p.runWith(map[string]string{"CI": "true"}, "local", "reset"), "with CI set it cannot")
-	refused("CI=1", p.runWith(map[string]string{"CI": "1"}, "local", "reset"), "with CI set it cannot")
+	refused("stdin /dev/null", p.run("local", "reset"), "stdin is not a terminal")
+	refused("a piped yes", p.runPiped("y\n", "local", "reset"), "stdin is not a terminal")
+	refused("a piped no", p.runPiped("n\n", "local", "reset"), "stdin is not a terminal")
 	refused("--non-interactive", p.run("local", "reset", "--non-interactive"), "with --non-interactive it cannot")
-	refused("--non-interactive with CI=false", p.runWith(map[string]string{"CI": "false"}, "local", "reset", "--non-interactive"), "with --non-interactive it cannot")
+	refused("--non-interactive=false restores nothing without a terminal", p.run("local", "reset", "--non-interactive=false"), "stdin is not a terminal")
+	refused("--non-interactive=false and a piped yes", p.runPiped("y\n", "local", "reset", "--non-interactive=false"), "stdin is not a terminal")
+	refused("CI=true", p.runWith(map[string]string{"CI": "true"}, "local", "reset"), "stdin is not a terminal")
+	refused("JENKINS_URL", p.runWith(map[string]string{"JENKINS_URL": "https://ci.example.com/"}, "local", "reset"), "stdin is not a terminal")
+	refused("TF_BUILD=True", p.runWith(map[string]string{"TF_BUILD": "True"}, "local", "reset"), "stdin is not a terminal")
 
-	// CI systems that do not set CI themselves.
-	refused("JENKINS_URL", p.runWith(map[string]string{"JENKINS_URL": "https://ci.example.com/"}, "local", "reset"), "in Jenkins")
-	refused("TF_BUILD=True", p.runWith(map[string]string{"TF_BUILD": "True"}, "local", "reset"), "in Azure Pipelines")
-	asked("TF_BUILD=false", p.runWith(map[string]string{"TF_BUILD": "false"}, "local", "reset"))
-	asked("JENKINS_URL with --non-interactive=false", p.runWith(map[string]string{"JENKINS_URL": "https://ci.example.com/"}, "local", "reset", "--non-interactive=false"))
-
-	asked("CI unset", p.run("local", "reset"))
-	asked("CI=false", p.runWith(map[string]string{"CI": "false"}, "local", "reset"))
-	asked("CI=0", p.runWith(map[string]string{"CI": "0"}, "local", "reset"))
-	asked("--non-interactive=false with CI=true", p.runWith(map[string]string{"CI": "true"}, "local", "reset", "--non-interactive=false"))
+	// --yes is the answer a script gives, and is not refused.
+	// (Not run here: it would wipe the project's state; the refusals above are
+	// the point.)
 
 	// json is never interactive, even with --non-interactive=false.
 	r := p.runWith(map[string]string{"CI": "true"}, "local", "reset", "--non-interactive=false", "-o", "json")
