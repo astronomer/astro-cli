@@ -786,9 +786,15 @@ func (e *Engine) endGroup(ctx context.Context, rec localstate.Record) {
 	}
 	if e.groupAlive(rec) {
 		e.killGroup(pgid, syscall.SIGKILL)
-		time.Sleep(e.stopPoll)
+		for i := 0; i < killSettlePolls && e.groupAlive(rec); i++ {
+			time.Sleep(e.stopPoll)
+		}
 	}
 }
+
+// killSettlePolls bounds the wait for a SIGKILLed group to leave the process
+// table: half a second at the production poll interval.
+const killSettlePolls = 10
 
 // addRoute registers the project with the local proxy and returns the
 // hostname it was registered under, which is not always the one asked for:

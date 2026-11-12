@@ -13,7 +13,7 @@ const (
 	StandalonePIDFile     = "airflow.pid"
 	StandaloneLogFile     = "airflow.log"
 	StandaloneVersionFile = "airflow_version"
-	StopPollInterval      = 500 * time.Millisecond
+	StopPollInterval      = 50 * time.Millisecond
 	StopTimeout           = 10 * time.Second
 )
 

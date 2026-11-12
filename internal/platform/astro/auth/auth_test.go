@@ -2,6 +2,7 @@ package auth
 
 import (
 	"bytes"
+	stdcontext "context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -1312,6 +1313,28 @@ func TestLoginRefusedWhenTheRunMayNotAsk(t *testing.T) {
 	assert.False(t, input.IsRequired(err), "no flag answers a login, so it is not input_required")
 	assert.ErrorContains(t, err, "with --output json it cannot — run astro login first, or set ASTRO_API_TOKEN")
 	assert.Empty(t, string(printed), "nothing reaches stdout")
+}
+
+// A run interrupted before its login check needs a login starts none: no
+// browser, no Enter prompt, and the interrupt is the error.
+func TestLoginStartsNoneOnceInterrupted(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	stubAuthConfig(t, testAuthConfig)
+	stubRefresh(t, astroauth.TokenResponse{}, errMock)
+	ctx, cancel := stdcontext.WithCancel(stdcontext.Background())
+	cancel()
+	t.Cleanup(input.SetInterrupt(ctx))
+	previous := authenticator
+	t.Cleanup(func() { authenticator = previous })
+	authenticator = Authenticator{
+		callbackHandler: func() (string, error) {
+			t.Error("the browser login started")
+			return "", errMock
+		},
+	}
+
+	err := Login("astronomer.io", "", new(astrov1_mocks.ClientWithResponsesInterface), io.Discard, false, false, false)
+	assert.ErrorIs(t, err, input.ErrInterrupted)
 }
 
 func TestLogin(t *testing.T) {

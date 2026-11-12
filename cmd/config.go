@@ -53,43 +53,23 @@ func suggestSettings(name string) string {
 	return ""
 }
 
-// closestSettings are the names nearest to name by cobra's rule for "Did you
-// mean": within suggestionDistance edits, or name a prefix of them. Every
+// closestSettings are the names nearest to name by cliout.Closest: within
+// cliout.DefaultSuggestionDistance edits, a swap of neighbors counting as one,
+// or name a prefix of them. Every
 // name at the nearest distance, not one picked by sort order, since a partial
 // name such as "telemetry" is equally close to each setting under it. current
 // holds listed settings, with a renamed setting's 1.x name mapped to its
 // current one; removed holds the removed settings. Both sorted, and both
 // empty for an empty name, which is a prefix of everything.
 func closestSettings(name string) (current, removed []string) {
-	name = strings.ToLower(name)
-	if name == "" {
-		return nil, nil
-	}
-	distance := func(candidate string) int {
-		d := editDistance(name, candidate)
-		if strings.HasPrefix(candidate, name) && d > suggestionDistance {
-			d = suggestionDistance
-		}
-		return d
-	}
-	best := suggestionDistance + 1
-	var matches []string
-	consider := func(candidate string) {
-		switch d := distance(candidate); {
-		case d < best:
-			best, matches = d, []string{candidate}
-		case d == best:
-			matches = append(matches, candidate)
-		}
-	}
+	var candidates []string
 	for path, cfg := range config.CFGStrMap {
 		if cfg.Listed() {
-			consider(path)
+			candidates = append(candidates, path)
 		}
 	}
-	for _, old := range config.RemovedSettingNames() {
-		consider(old)
-	}
+	candidates = append(candidates, config.RemovedSettingNames()...)
+	matches := cliout.Closest(name, candidates, cliout.DefaultSuggestionDistance)
 	for _, match := range matches {
 		if renamed, ok := config.LegacySettingNames[match]; ok {
 			current = append(current, renamed)
@@ -102,29 +82,6 @@ func closestSettings(name string) (current, removed []string) {
 	slices.Sort(current)
 	slices.Sort(removed)
 	return slices.Compact(current), removed
-}
-
-// editDistance is the Levenshtein distance between a and b, by character
-// rather than byte, so an accented letter is one edit, not two.
-func editDistance(a, b string) int {
-	ra, rb := []rune(a), []rune(b)
-	prev := make([]int, len(rb)+1)
-	for j := range prev {
-		prev[j] = j
-	}
-	for i := 1; i <= len(ra); i++ {
-		cur := make([]int, len(rb)+1)
-		cur[0] = i
-		for j := 1; j <= len(rb); j++ {
-			cost := 1
-			if ra[i-1] == rb[j-1] {
-				cost = 0
-			}
-			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
-		}
-		prev = cur
-	}
-	return prev[len(rb)]
 }
 
 // refuseRemovedConfigKey fails a get or set of a 1.x setting v2 removed or

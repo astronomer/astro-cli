@@ -49,11 +49,13 @@ func newDeploymentSaRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage APC service accounts",
 		Long:    "Service accounts represent revocable tokens with access to the APC platform",
 	}
+	deleteCmd := newDeploymentSaDeleteCmd(out)
 	cmd.AddCommand(
 		newDeploymentSaCreateCmd(out),
 		newDeploymentSaListCmd(out),
-		newDeploymentSaDeleteCmd(out),
+		deleteCmd,
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	return cmd
 }
 
@@ -100,7 +102,7 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete <SERVICE_ACCOUNT_ID>",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete a service account in the APC platform",
 		Long:    "Delete a service account in the APC platform. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Example: deploymentSaDeleteExample,
@@ -117,12 +119,10 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 // serviceAccountDeleteQuestion is what a service-account delete asks before
-// it deletes id, and serviceAccountDeleteCanceled what it says when told no.
+// it deletes id.
 func serviceAccountDeleteQuestion(id string) string {
 	return fmt.Sprintf("\nAre you sure you want to delete service account %s? This cannot be undone.", id)
 }
-
-const serviceAccountDeleteCanceled = "Canceling service account deletion"
 
 func deploymentSaCreate(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
@@ -156,8 +156,7 @@ func deploymentSaDelete(cmd *cobra.Command, args []string, out io.Writer) error 
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	ok, err := confirmRemoval(out, serviceAccountDeleteQuestion(args[0]), serviceAccountDeleteCanceled)
-	if err != nil || !ok {
+	if err := confirmRemoval(serviceAccountDeleteQuestion(args[0])); err != nil {
 		return err
 	}
 	deleted, err := sa.DeleteUsingDeploymentUUID(args[0], deploymentID, houstonClient)

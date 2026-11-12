@@ -79,8 +79,7 @@ type BundleResult struct {
 // The API removes a bundle in the background (bundle list shows it with
 // deletion_is_pending until it is gone), so the action of a delete is
 // deletion_requested, not the deleted of a removal that is done when it
-// returns. canceled is a question answered no, which a run under --output
-// json never sees: there it is refused, and the run passes --yes.
+// returns. A question answered no publishes nothing: it is input.ErrAborted.
 type BundleRemoval struct {
 	ID              string `json:"id"`
 	Name            string `json:"name,omitempty"`
@@ -92,7 +91,6 @@ type BundleRemoval struct {
 // The actions a BundleRemoval publishes.
 const (
 	bundleDeletionRequested = "deletion_requested"
-	bundleDeletionCanceled  = "canceled"
 )
 
 func bundleToInfo(b *astrov1alpha1.DeploymentBundle) BundleInfo {
@@ -163,7 +161,7 @@ func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBund
 		return errDagBundleNonDagFlags
 	}
 
-	dep, err := GetDeployment(wsID, deploymentID, "", false, nil, astroV1Client)
+	dep, err := GetDeployment(wsID, deploymentID, "", ToChange, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -225,7 +223,7 @@ func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription strin
 		return errUpdateBundleNoOp
 	}
 
-	dep, err := GetDeployment(wsID, deploymentID, "", false, nil, astroV1Client)
+	dep, err := GetDeployment(wsID, deploymentID, "", ToChange, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -304,7 +302,7 @@ func nonEmpty(s string) *string {
 // listBundlesData fetches every bundle configured on a deployment, paging through
 // all results.
 func listBundlesData(wsID, deploymentID string, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) (*BundleList, error) {
-	dep, err := GetDeployment(wsID, deploymentID, "", false, nil, astroV1Client)
+	dep, err := GetDeployment(wsID, deploymentID, "", ToRead, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -445,14 +443,14 @@ func ListBundlesWithFormat(wsID, deploymentID string, r output.Emitter, astroV1C
 
 // DeleteBundle removes a bundle from a deployment, after asking unless force.
 // The bundle is identified by id, DAG bundle name, or non-DAG mount path. It
-// publishes what it did (BundleRemoval): the deletion it requested, or that the
-// question was declined.
+// publishes the deletion it requested (BundleRemoval); a declined question is
+// input.ErrAborted.
 func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID string, force bool, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 	if err := validateBundleSelector(bundleID, bundleName, bundleMountPath); err != nil {
 		return err
 	}
 
-	dep, err := GetDeployment(wsID, deploymentID, "", false, nil, astroV1Client)
+	dep, err := GetDeployment(wsID, deploymentID, "", ToChange, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -464,16 +462,8 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 	removal := BundleRemoval{ID: bundleID, Name: bundleName, NonDagMountPath: bundleMountPath, DeploymentID: dep.Id}
 
 	if !force {
-		confirmed, err := input.Confirm(fmt.Sprintf("Are you sure you want to delete bundle %s from deployment %s?", bundleID, dep.Id), input.AnsweredBy("--yes"))
-		if err != nil {
+		if err := input.ConfirmOrAbort(fmt.Sprintf("Are you sure you want to delete bundle %s from deployment %s?", bundleID, dep.Id), input.AnsweredBy("--yes")); err != nil {
 			return err
-		}
-		if !confirmed {
-			removal.Action = bundleDeletionCanceled
-			return r.Emit(removal, func(w io.Writer) error {
-				_, err := fmt.Fprintln(w, "Canceling bundle deletion")
-				return err
-			})
 		}
 	}
 

@@ -411,10 +411,11 @@ func (q *query) ensureUnpaused(ctx context.Context, client *airflowapi.Client, d
 func newRunsDeleteCmd(q *query) *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
-		Use:   "delete <DAG_ID> <RUN_ID>",
-		Short: "Delete a run and its task instances",
-		Long:  "Delete a run and everything Airflow recorded about it. This cannot be undone.",
-		Args:  cobra.ExactArgs(2),
+		Use:     "delete <DAG_ID> <RUN_ID>",
+		Aliases: []string{"rm"},
+		Short:   "Delete a run and its task instances",
+		Long:    "Delete a run and everything Airflow recorded about it. This cannot be undone.",
+		Args:    cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"Delete a run, after a confirmation prompt", "runs delete <DAG_ID> <RUN_ID>",
 			"Without the prompt", "runs delete <DAG_ID> <RUN_ID> --yes",

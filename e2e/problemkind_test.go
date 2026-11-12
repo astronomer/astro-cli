@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -82,17 +83,68 @@ func TestAUsageErrorExitsTwo(t *testing.T) {
 	}
 }
 
+// In text mode a failure is never followed by the usage block. A usage error
+// names the bad token, suggests the flag it was likely meant to be when one is
+// clearly close, and points at the failing command's help; a runtime failure
+// is the error alone. Through the binary, because what reaches stderr is
+// decided by the binary's own root.
+//
+// Tier 0: no login, so the cloud command fails in its pre-run, and the usage
+// errors fail while flags parse.
+func TestATextFailurePrintsNoUsageBlock(t *testing.T) {
+	tier(t, 0)
+
+	p := newProject(t)
+
+	for _, c := range []struct {
+		args   []string
+		code   int
+		stderr string
+	}{
+		{
+			[]string{"deployment", "list", "--bogus"},
+			2,
+			"Error: unknown flag: --bogus\nRun astro deployment list --help for usage.\n",
+		},
+		{
+			[]string{"deployment", "list", "--workspac", "x"},
+			2,
+			"Error: unknown flag: --workspac\nDid you mean --workspace?\nRun astro deployment list --help for usage.\n",
+		},
+		{
+			[]string{"--version"},
+			2,
+			"Error: unknown flag: --version\nRun astro --help for usage.\n",
+		},
+	} {
+		r := p.run(c.args...)
+		if r.ExitCode != c.code || r.Stderr != c.stderr {
+			t.Errorf("`astro %s`: want exit %d and stderr %q\n%s", strings.Join(c.args, " "), c.code, c.stderr, r.output())
+		}
+	}
+
+	r := p.run("deployment", "delete")
+	if r.ExitCode != 1 {
+		t.Errorf("exit %d, want 1\n%s", r.ExitCode, r.output())
+	}
+	if !strings.HasPrefix(r.Stderr, "Error: ") || strings.Contains(r.Stderr, "Usage:") || strings.Contains(r.Stderr, "--help") {
+		t.Errorf("a runtime failure should print the error alone\n%s", r.output())
+	}
+}
+
 // A command running with --output json never prompts: the question it would
 // have asked fails as input_required, naming the flag that answers it, and the
 // process exits 1 rather than waiting on stdin — through the binary, because
 // the guard is installed by the binary's own root.
 //
-// Tier 0: `astro local reset` asks before it looks for a project, so a bare
-// directory reaches the question.
+// Tier 0: `astro local reset` finds the project before it asks, so the
+// directory holds a manifest; nothing is started, and the question is the
+// first thing reset would do there.
 func TestAJSONRunNeverPrompts(t *testing.T) {
 	tier(t, 0)
 
 	p := newProject(t)
+	write(t, filepath.Join(p.Dir, "pyproject.toml"), "[project]\nname = 'demo'\n[tool.astro]\n")
 
 	r := p.run("local", "reset", "--output", "json")
 	if r.ExitCode != 1 {
@@ -108,5 +160,32 @@ func TestAJSONRunNeverPrompts(t *testing.T) {
 	}
 	if strings.Contains(r.Stderr, "[y/N]") {
 		t.Errorf("a json run asked its question\n%s", r.output())
+	}
+}
+
+// Reset finds the project before it asks to wipe it: in a directory with no
+// project it fails as no_project, as every local command does, and the
+// question never appears, in text mode with no terminal either.
+func TestResetWithNoProjectFailsBeforeAsking(t *testing.T) {
+	tier(t, 0)
+
+	p := newProject(t)
+
+	r := p.run("local", "reset", "--output", "json")
+	if r.ExitCode != 1 {
+		t.Fatalf("exit %d, want 1\n%s", r.ExitCode, r.output())
+	}
+	var emitted map[string]any
+	r.requireJSON(&emitted)
+	if emitted["kind"] != "no_project" {
+		t.Errorf("want kind no_project, got %v", emitted)
+	}
+
+	r = p.run("local", "reset")
+	if r.ExitCode != 1 {
+		t.Fatalf("exit %d, want 1\n%s", r.ExitCode, r.output())
+	}
+	if !strings.Contains(r.Stderr, "no Astro project found") || strings.Contains(r.Stderr, "[y/N]") {
+		t.Errorf("want the no-project error and no question\n%s", r.output())
 	}
 }

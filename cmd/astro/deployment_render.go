@@ -51,7 +51,7 @@ func emitDeployment(r cliout.Renderer, d *astrov1.Deployment, text func(io.Write
 }
 
 // emitUpdated publishes an update. One that sent nothing (the DAG deploy
-// setting was already as asked, or the question was declined) has already
+// setting was already as asked) has already
 // said so in text, and prints no table; in json it publishes the Deployment
 // as it is, which is what the run left.
 func emitUpdated(r cliout.Renderer, res *deployment.UpdateResult) error {
@@ -88,6 +88,18 @@ func emitRemoval(r cliout.Renderer, removal *deployment.Removal) error {
 // emitHibernation publishes the override hibernate or wake-up set, or, with
 // no override, its removal. In text, the lines they always printed: action is
 // the command's verb, "hibernate" or "wake up".
+// emitDeploymentUI publishes `deployment open`'s result. In text it says
+// whether the browser opened, and gives the URL to visit when it did not.
+func emitDeploymentUI(r cliout.Renderer, res *deployment.UIResult, opened bool) error {
+	return r.Emit(res, cliout.Text(func(b *bufio.Writer) {
+		if opened {
+			fmt.Fprintf(b, "Opened the Airflow UI for Deployment %s: %s\n", ansi.Bold(res.Name), res.URL)
+			return
+		}
+		fmt.Fprintf(b, "Unable to open the Airflow UI, please visit the following link: %s\n", res.URL)
+	}))
+}
+
 func emitHibernation(r cliout.Renderer, res *deployment.HibernationResult, action string) error {
 	return r.Emit(res, cliout.Text(func(b *bufio.Writer) {
 		switch {

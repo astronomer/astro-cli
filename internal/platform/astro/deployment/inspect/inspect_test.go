@@ -397,11 +397,14 @@ func TestInspect(t *testing.T) {
 		assert.Contains(t, out.String(), "a5")
 		mockV1Client.AssertExpectations(t)
 	})
+	// Nothing to inspect is a failure naming the workspace, not a note on
+	// stdout and exit 0.
 	t.Run("when no deployments in workspace", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 		err := printAs(workspaceID, "", "yaml", mockV1Client, out, "", false)
-		assert.NoError(t, err)
+		assert.EqualError(t, err, "no Deployments found in workspace "+workspaceID+": create one with astro deployment create")
+		assert.Empty(t, out.String())
 		mockV1Client.AssertExpectations(t)
 	})
 

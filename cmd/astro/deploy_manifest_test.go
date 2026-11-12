@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/userstate"
@@ -932,6 +933,63 @@ func TestDeployManifestNonInteractiveMustNameTheTarget(t *testing.T) {
 	assert.NotContains(t, out, "Building your project image")
 }
 
+// A deploy that names nothing, under an ASTRO_API_TOKEN scoped to one
+// Deployment, ships to that Deployment, as 1.x did in CI. The note naming it
+// is on stderr; stdout holds the result alone.
+func TestDeployManifestShipsToTheTokensDeployment(t *testing.T) {
+	const unlinkedProject = `[project]
+name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+workspace = "clw-ws"
+`
+	fake := &fakeCmdDeployer{}
+	setupManifestDeployWith(t, fake, unlinkedProject)
+	deployment.UseTokenDeployment(actionDeploymentID)
+	t.Cleanup(func() { deployment.UseTokenDeployment("") })
+
+	out, errOut, err := execDeployIO("", "--dags", "-o", "json")
+	require.NoError(t, err)
+	require.NotNil(t, fake.dagInput)
+	assert.Equal(t, actionDeploymentID, fake.dagInput.DeploymentID)
+	assert.Contains(t, errOut, "Using Deployment "+actionDeploymentID+", the one ASTRO_API_TOKEN is scoped to")
+	assert.NotContains(t, out, "ASTRO_API_TOKEN")
+	var got map[string]any
+	require.NoError(t, json.Unmarshal([]byte(out), &got), out)
+}
+
+// In a project that links Deployments, the token's Deployment is taken by
+// the link that points at it. One the project does not link is never shipped
+// to: the deploy refuses as one naming nothing does. A target named on the
+// command line wins.
+func TestDeployManifestTokensDeploymentInALinkedProject(t *testing.T) {
+	fake := &fakeCmdDeployer{}
+	setupManifestDeploy(t, fake)
+	t.Cleanup(func() { deployment.UseTokenDeployment("") })
+
+	deployment.UseTokenDeployment("clx-dev")
+	_, errOut, err := execDeployIO("", "--dags")
+	require.NoError(t, err)
+	assert.Equal(t, "clx-dev", fake.dagInput.DeploymentID)
+	assert.Contains(t, errOut, "Using Deployment dev (clx-dev), the one ASTRO_API_TOKEN is scoped to")
+
+	fake.dagInput = nil
+	_, errOut, err = execDeployIO("", "--dags", "--deployment", "prod")
+	require.NoError(t, err)
+	assert.Equal(t, "clx-dep", fake.dagInput.DeploymentID)
+	assert.NotContains(t, errOut, "ASTRO_API_TOKEN")
+
+	fake.dagInput = nil
+	deployment.UseTokenDeployment(actionDeploymentID)
+	_, errOut, err = execDeployIO("", "--dags")
+	require.Error(t, err)
+	assert.True(t, input.IsRequired(err), "%v", err)
+	assert.Contains(t, err.Error(), "a deploy must name the deployment it ships to")
+	assert.Nil(t, fake.dagInput)
+	assert.NotContains(t, errOut, "ASTRO_API_TOKEN")
+}
+
 // A pin is ambient state, and ambient state never decides a deploy — not even
 // the one the query commands would resolve to.
 func TestDeployManifestPinDoesNotDecideANonInteractiveDeploy(t *testing.T) {
@@ -1290,6 +1348,22 @@ func TestDeployManifestPickerRefusesAnotherHost(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--deployment <id>")
 	assert.Contains(t, err.Error(), "astro context switch astronomer.io")
+}
+
+// A workspace with no Deployment is an error naming astro deployment create:
+// a deploy never creates its target. The client fails on any call, a create
+// among them.
+func TestDeployManifestPickerNeverCreatesADeployment(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	orig := deployment.ListDeployments
+	t.Cleanup(func() { deployment.ListDeployments = orig })
+	deployment.ListDeployments = func(string, string, astrov1.APIClient) ([]astrov1.Deployment, error) { return nil, nil }
+
+	d := manifestDeployer{login: &deployLogin{current: true, client: new(astrov1_mocks.ClientWithResponsesInterface)}}
+	_, err := d.ResolveUnlinked("clw-ws")
+	var none *deployment.NoDeploymentsError
+	require.ErrorAs(t, err, &none)
+	assert.EqualError(t, err, "no Deployments found in workspace clw-ws: create one with astro deployment create")
 }
 
 // The prompt waits on the workspace's list, so a list that does not answer is

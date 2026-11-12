@@ -27,11 +27,13 @@ func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Deployment worker queues",
 		Long:    "Manage worker queues for an Astro Deployment.",
 	}
+	deleteCmd := newDeploymentWorkerQueueDeleteCmd(out)
 	cmd.AddCommand(
 		newDeploymentWorkerQueueCreateCmd(out),
 		newDeploymentWorkerQueueUpdateCmd(out),
-		newDeploymentWorkerQueueDeleteCmd(out),
+		deleteCmd,
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	cliout.AddOutputFlag(cmd, &deploymentWorkerQueueOutput)
 	addDeploymentWorkspaceFlag(cmd.PersistentFlags())
 	return cmd
@@ -94,7 +96,7 @@ func newDeploymentWorkerQueueUpdateCmd(out io.Writer) *cobra.Command {
 func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete a Deployment's worker queue",
 		Long:    "Delete a worker queue from a Deployment. Tasks currently running on the queue may be interrupted. The default queue cannot be deleted.",
 		Example: `  # Delete a worker queue
@@ -133,8 +135,7 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 	}
 
 	res, err := workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroV1Client, cliout.NotesTo(cmd, format, out))
-	if err != nil || res == nil {
-		// nil, nil is a declined update, which has said so.
+	if err != nil {
 		return err
 	}
 	return emitWorkerQueue(cliout.Renderer{Format: format, Out: out}, res, ws)
@@ -151,8 +152,7 @@ func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) 
 	}
 
 	res, err := workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroV1Client, cliout.NotesTo(cmd, format, out))
-	if err != nil || res == nil {
-		// nil, nil is a declined deletion, which has said so.
+	if err != nil {
 		return err
 	}
 	return emitWorkerQueue(cliout.Renderer{Format: format, Out: out}, res, ws)

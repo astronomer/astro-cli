@@ -343,6 +343,17 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	return res, nil
 }
 
+// askToCreateOrganization asks a login with no organization whether to create
+// one. A read error answers no, same as declining; a run that may not ask, or
+// one interrupted, is refused instead, since that is neither answer.
+func askToCreateOrganization(domain string, out io.Writer) (bool, error) {
+	create, err := input.Confirm(noOrganizationPrompt(domain, out), input.AnsweredBy("--signup to astro login"))
+	if input.Unanswered(err) {
+		return false, err
+	}
+	return create, nil
+}
+
 // noOrganizationPrompt asks whether to create an organization. A preview
 // environment is temporary and comes with data of its own, so there the prompt
 // also says how to reach that data and that a new organization is temporary too.
@@ -497,11 +508,8 @@ func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 		// preselects yes; it already declared the intent.
 		create := signup
 		if !create {
-			// A read error answers no, same as declining; a run that may not
-			// ask is refused instead, since that is neither answer.
 			var askErr error
-			create, askErr = input.Confirm(noOrganizationPrompt(c.Domain, out), input.AnsweredBy("--signup to astro login"))
-			if input.IsRequired(askErr) {
+			if create, askErr = askToCreateOrganization(c.Domain, out); askErr != nil {
 				return askErr
 			}
 		}
@@ -621,8 +629,12 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 	// neither, so it is refused before anything is printed.
 	if token == "" {
 		var refused *input.RequiredError
-		if errors.As(input.MayAsk("Log in to Astro"), &refused) {
+		switch err := input.MayAsk("Log in to Astro"); {
+		case errors.As(err, &refused):
 			return fmt.Errorf("%w; %s — run astro login first, or set ASTRO_API_TOKEN", ErrLoginNeeded, refused.Reason)
+		case errors.Is(err, input.ErrInterrupted):
+			// An interrupted run starts no login: it is ending.
+			return err
 		}
 	}
 

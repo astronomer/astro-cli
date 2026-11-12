@@ -112,15 +112,10 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 		return err
 	}
 	if !forceRotate {
-		ok, err := confirmTokenChange(
+		if err := confirmTokenChange(
 			"API Token rotation will invalidate the current token and cannot be undone.",
-			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
-		if err != nil {
+			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name))); err != nil {
 			return err
-		}
-		if !ok {
-			fmt.Fprintln(out, "Canceling token rotation")
-			return nil
 		}
 	}
 	rotated, err := organization.RotateToken(token, astroV1Client)
@@ -143,14 +138,9 @@ func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 		return err
 	}
 	if !forceDelete {
-		ok, err := confirmTokenChange("API token deletion cannot be undone.",
-			fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name)))
-		if err != nil {
+		if err := confirmTokenChange("API token deletion cannot be undone.",
+			fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name))); err != nil {
 			return err
-		}
-		if !ok {
-			fmt.Fprintln(out, "Canceling API Token deletion")
-			return nil
 		}
 	}
 	removal, err := organization.DeleteToken(token, astroV1Client)

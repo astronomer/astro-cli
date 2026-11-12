@@ -355,6 +355,10 @@ On Windows, add `--docker`.
 - `astro local logs -f` follows the logs.
 - `astro local stop` stops Airflow. It keeps running until you do.
 - `astro local shell` opens a shell inside the environment your dags run in.
+- `astro local run pytest` runs a command in that environment. With nothing
+  running it builds or updates the project's `.venv` first, as `uv run` does,
+  so it works in a fresh checkout or in CI. Its progress goes to stderr. Pass
+  `--no-sync` (or set `UV_NO_SYNC`) to use `.venv` as it is.
 - `astro deploy` ships the project to an Astro Deployment.
 
 For every key you can set in `pyproject.toml`, see the

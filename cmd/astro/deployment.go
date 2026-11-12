@@ -136,9 +136,10 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		Long:    "Create or manage Deployments running on Astro according to your Organization and Workspace permissions.",
 	}
 	cmd.PersistentPreRunE = followProjectPreRun(cmd)
+	deleteCmd := newDeploymentDeleteCmd(out)
 	cmd.AddCommand(
 		newDeploymentListCmd(out),
-		newDeploymentDeleteCmd(out),
+		deleteCmd,
 		newDeploymentCreateCmd(out),
 		newDeploymentLogsCmd(out),
 		newDeploymentUpdateCmd(out),
@@ -151,11 +152,13 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentBundleRootCmd(out),
 		newDeploymentHibernateCmd(out),
 		newDeploymentWakeUpCmd(out),
+		newDeploymentOpenCmd(out),
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	cmd.AddCommand(newRemovedDeploymentObjectCmds()...)
 	for _, c := range cmd.Commands() {
 		switch c.Name() {
-		case "inspect", "logs", "update", "delete", "hibernate", "wake-up":
+		case "inspect", "logs", "update", "delete", "hibernate", "wake-up", "open":
 			if c.Annotations == nil {
 				c.Annotations = map[string]string{}
 			}
@@ -585,7 +588,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [DEPLOYMENT_ID]",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete an Astro Deployment",
 		Long:    "Permanently delete a Deployment and all of its data including Dags, task logs, Airflow metadata, environment variables, connections, API tokens, and alerts. Running tasks are terminated without waiting. Cluster resources are deallocated asynchronously. This action cannot be undone.",
 		Example: `  # Delete a Deployment
@@ -753,6 +756,29 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "open [DEPLOYMENT_ID]",
+		Short: "Open a Deployment's Airflow UI in your browser",
+		Long:  "Open the Airflow UI of an Astro Deployment in your default browser. If the browser cannot be opened, the CLI prints the Airflow UI URL instead. Under --output json nothing is opened: the result carries the URL.",
+		Example: `  # Open a Deployment's Airflow UI
+  astro deployment open <DEPLOYMENT_ID>
+
+  # Open it by name
+  astro deployment open --deployment my-deployment
+
+  # Print its Airflow UI URL for a script
+  astro deployment open <DEPLOYMENT_ID> --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentOpen(cmd, args, out)
+		},
+	}
+	addDeploymentFlag(cmd.Flags(), "Deployment whose Airflow UI to open: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
+	addDeploymentWorkspaceFlag(cmd.Flags())
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
+	return cmd
+}
+
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// --all lists every workspace's, so it needs no workspace: an org-scoped
 	// token has none to find.
@@ -771,10 +797,6 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
-	// The Deployment lookup prints its notes to bare stdout; under json they
-	// are notes, not log records.
-	defer strayStdoutToStderr(deploymentLogsOutput)()
-
 	// Get release name from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
@@ -1011,8 +1033,7 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	removal, err := deployment.Delete(deploymentID, ws, deploymentName, forceDelete, astroV1Client)
-	if err != nil || removal == nil {
-		// nil, nil is a declined question, which has said so.
+	if err != nil {
 		return err
 	}
 	return emitRemoval(cliout.Renderer{Format: deploymentOutput, Out: out}, removal)
@@ -1066,6 +1087,29 @@ func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, 
 	return emitVariableModify(cliout.Renderer{Format: deploymentVariableOutput, Out: out}, res)
 }
 
+// openDeploymentUI opens a Deployment's Airflow UI; tests replace it.
+var openDeploymentUI = deployment.OpenInBrowser
+
+func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+	}
+	if len(args) > 0 {
+		deploymentID = args[0]
+	}
+	cmd.SilenceUsage = true
+
+	res, err := deployment.UI(ws, deploymentID, deploymentName, astroV1Client)
+	if err != nil {
+		return err
+	}
+	// A person is shown the UI in a browser; a run under json reads its url
+	// from the result instead.
+	opened := deploymentOutput == cliout.FormatText && openDeploymentUI(res.URL)
+	return emitDeploymentUI(cliout.Renderer{Format: deploymentOutput, Out: out}, res, opened)
+}
+
 func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Writer, isHibernating bool) error {
 	format := deploymentOutput
 	// The --wait prints its progress to bare stdout; under json that is a
@@ -1096,8 +1140,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 
 	if removeOverride {
 		res, err := deployment.DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName, forceOverride, astroV1Client)
-		if err != nil || res == nil {
-			// nil, nil is a declined question, which has said so.
+		if err != nil {
 			return err
 		}
 		return emitHibernation(r, res, action)
@@ -1109,7 +1152,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 	}
 
 	res, err := deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, astroV1Client)
-	if err != nil || res == nil {
+	if err != nil {
 		return err
 	}
 	// The override is set, and said so, before the wait for it starts.
@@ -1228,15 +1271,17 @@ func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
 		Long:    "Manage tokens in your Astro Deployment.",
 	}
 	cmd.SetOut(out)
+	deleteCmd := newDeploymentTokenDeleteCmd(out)
 	cmd.AddCommand(
 		newDeploymentTokenListCmd(out),
 		newDeploymentTokenCreateCmd(out),
 		newDeploymentTokenUpdateCmd(out),
 		newDeploymentTokenRotateCmd(out),
-		newDeploymentTokenDeleteCmd(out),
+		deleteCmd,
 		newWorkspaceTokenManageCmd(out),
 		newOrgTokenManageCmd(out),
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID(""))
 	cliout.AddOutputFlag(cmd, &deploymentTokenOutput)
 	return cmd
@@ -1334,7 +1379,7 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
 func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete a Deployment API token",
 		Long:    "Permanently revoke a Deployment API token. All access the token grants is immediately revoked.",
 		Example: `  # Delete a token
@@ -1494,9 +1539,10 @@ func updateWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out i
 
 func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "remove [ORG_TOKEN_ID]",
-		Short: "Remove an Organization API token's Deployment Role",
-		Long:  "Remove an Organization API token's Deployment Role. Name the token by its ID or with --org-token-name.",
+		Use:     "remove [ORG_TOKEN_ID]",
+		Aliases: []string{"rm"},
+		Short:   "Remove an Organization API token's Deployment Role",
+		Long:    "Remove an Organization API token's Deployment Role. Name the token by its ID or with --org-token-name.",
 		Example: `  # Remove an Organization token's role in a Deployment
   astro deployment token organization-token remove <ORG_TOKEN_ID> --deployment <DEPLOYMENT_ID>
 
@@ -1513,9 +1559,10 @@ func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 
 func newRemoveWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "remove [WORKSPACE_TOKEN_ID]",
-		Short: "Remove a Workspace API token's Deployment Role",
-		Long:  "Remove a Workspace API token's Deployment Role. Name the token by its ID or with --workspace-token-name.",
+		Use:     "remove [WORKSPACE_TOKEN_ID]",
+		Aliases: []string{"rm"},
+		Short:   "Remove a Workspace API token's Deployment Role",
+		Long:    "Remove a Workspace API token's Deployment Role. Name the token by its ID or with --workspace-token-name.",
 		Example: `  # Remove a Workspace token's role in a Deployment
   astro deployment token workspace-token remove <WORKSPACE_TOKEN_ID> --deployment <DEPLOYMENT_ID>
 

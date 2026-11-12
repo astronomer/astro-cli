@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -79,6 +80,54 @@ func TestUnknownCommandSuggestion(t *testing.T) {
 
 	root.DisableSuggestions = true
 	assert.Empty(t, findUnknownCommand(root, []string{"deploi"}).suggestion())
+}
+
+// Telemetry records the suggestion the refusal shows: by the root's settings,
+// which cliout.UnknownSubcommand reads, and without leaving a distance behind
+// on the command it looked under.
+func TestUnknownCommandSuggestionIsTheOneShown(t *testing.T) {
+	shown := func(root *cobra.Command, args ...string) string {
+		parent, _, err := root.Find(args[:len(args)-1])
+		require.NoError(t, err)
+		msg := cliout.UnknownSubcommand(parent, args[len(args)-1]).Error()
+		if _, after, ok := strings.Cut(msg, "Did you mean this?\n\t"); ok {
+			return strings.TrimSpace(after)
+		}
+		return ""
+	}
+	devOf := func(t *testing.T, root *cobra.Command) *cobra.Command {
+		t.Helper()
+		dev, _, err := root.Find([]string{"dev"})
+		require.NoError(t, err)
+		require.Equal(t, "dev", dev.Name())
+		return dev
+	}
+	// srtat is two edits from start: within cobra's default distance, past 1.
+	for name, c := range map[string]struct {
+		set  func(t *testing.T, root *cobra.Command)
+		want string
+	}{
+		"by default":                    {func(*testing.T, *cobra.Command) {}, "start"},
+		"the root disables suggestions": {func(_ *testing.T, root *cobra.Command) { root.DisableSuggestions = true }, ""},
+		"the root holds them to one edit": {
+			func(_ *testing.T, root *cobra.Command) { root.SuggestionsMinimumDistance = 1 }, "",
+		},
+		"the parent's own distance is unread": {
+			func(t *testing.T, root *cobra.Command) { devOf(t, root).SuggestionsMinimumDistance = 1 }, "start",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := newUnknownTestTree()
+			c.set(t, root)
+			dev := devOf(t, root)
+			own := dev.SuggestionsMinimumDistance
+
+			got := findUnknownCommand(root, []string{"dev", "srtat"}).suggestion()
+			assert.Equal(t, c.want, got)
+			assert.Equal(t, shown(root, "dev", "srtat"), got, "telemetry recorded another suggestion than the refusal shows")
+			assert.Equal(t, own, dev.SuggestionsMinimumDistance, "the lookup left a distance on the command")
+		})
+	}
 }
 
 // TestFindUnknownCommandLeavesCobrasOwnCommandsAlone guards the commands cobra
@@ -178,21 +227,21 @@ func TestUnknownFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, spelling := unknownFlag(parseError(t, tt.args...))
+			_, _, spelling := cliout.UnknownFlag(parseError(t, tt.args...))
 			assert.Equal(t, tt.want, spelling)
 		})
 	}
 
 	for _, err := range []error{nil, errors.New("something else")} {
-		name, isShorthand, spelling := unknownFlag(err)
+		name, isShorthand, spelling := cliout.UnknownFlag(err)
 		assert.Empty(t, name)
 		assert.False(t, isShorthand)
 		assert.Empty(t, spelling)
 	}
-	name, isShorthand, _ := unknownFlag(parseError(t, "-aZ"))
+	name, isShorthand, _ := cliout.UnknownFlag(parseError(t, "-aZ"))
 	assert.Equal(t, "Z", name)
 	assert.True(t, isShorthand)
-	name, isShorthand, _ = unknownFlag(parseError(t, "--api-token=sekret-123"))
+	name, isShorthand, _ = cliout.UnknownFlag(parseError(t, "--api-token=sekret-123"))
 	assert.Equal(t, "api-token", name)
 	assert.False(t, isShorthand)
 }
