@@ -2,17 +2,17 @@
 #
 # Tests the version resolution in godownloader.sh, the script behind
 # install.astronomer.io. Each case runs the whole installer under sh, bash and
-# dash with a stubbed curl that answers the GitHub API from fixtures below and
-# fails every download, so nothing is installed: the case reads the tag the
-# installer settled on from its "found version" log line, and the stub's
-# request log says how many API calls it took.
+# dash with a stubbed curl, or with no curl a stubbed wget, that answers the
+# GitHub API from fixtures below and fails every download, so nothing is
+# installed: the case reads the tag the installer settled on from its "found
+# version" log line, and the stub's request log says how many API calls it took.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 api=$work/api
-mkdir -p "$work/stub" "$api" "$work/tmp"
+mkdir -p "$work/stub" "$work/curl" "$work/wget" "$work/nohttp" "$api" "$work/tmp"
 
 # release TAG [CHECKSUMS] [PRERELEASE] writes the releases/tags answer for
 # TAG, with its checksums asset unless CHECKSUMS is "no" and GitHub's
@@ -115,17 +115,13 @@ v13.0.0-nightly.202610201230 release
 v13.0.0-nightly.2999999999 release
 EOF
 
-cat >"$work/stub/curl" <<'EOF'
+# serve URL answers as curl -s -w '%{http_code}' would: the body, then the
+# status. It serves api.github.com from $STUB_API and fails every other
+# request. A file $STUB_API/status-KEY makes the request for KEY answer with
+# that status; 403 is the API's rate limit.
+cat >"$work/serve" <<'EOF'
 #!/bin/sh
-# Serves api.github.com from $STUB_API and fails every other request. A file
-# $STUB_API/status-KEY makes the request for KEY answer with that status.
-url=
-for arg in "$@"; do
-  case "$arg" in
-    https://*) url=$arg ;;
-    "Authorization: Bearer "*) echo "$arg" >>"$STUB_API/auth-log" ;;
-  esac
-done
+url=$1
 case "$url" in
   https://api.github.com/*) ;;
   *)
@@ -178,6 +174,102 @@ case "$key" in
     ;;
 esac
 EOF
+cat >"$work/curl/curl" <<'EOF'
+#!/bin/sh
+url=
+for arg in "$@"; do
+  case "$arg" in
+    https://*) url=$arg ;;
+    "Authorization: Bearer "*) echo "$arg" >>"$STUB_API/auth-log" ;;
+  esac
+done
+exec "$STUB_SERVE" "$url"
+EOF
+# wget [-q] -S [--header H] -O FILE URL, as GNU wget, or as busybox wget or
+# wget2 when STUB_WGET says so, writing to stderr what each does. On an error
+# each exits non-zero without the body. GNU wget writes every header, as
+# "  HTTP/1.1 404 Not Found" and the rest; busybox only that status line;
+# wget2 every header, as ":status: 404" and the rest, and with -q nothing.
+cat >"$work/wget/wget" <<'EOF'
+#!/bin/sh
+url= out= quiet=
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -q) quiet=1 ;;
+    -O)
+      out=$2
+      shift
+      ;;
+    --header)
+      case "$2" in "Authorization: Bearer "*) echo "$2" >>"$STUB_API/auth-log" ;; esac
+      shift
+      ;;
+    https://*) url=$1 ;;
+  esac
+  shift
+done
+if [ "$STUB_WGET" = wget2 ] && [ -n "$quiet" ]; then
+  exec 2>/dev/null
+fi
+resp=$("$STUB_SERVE" "$url")
+code=$(printf '%s' "$resp" | tail -c 3)
+case "$code" in
+  200) reason=OK ;;
+  403) reason=Forbidden ;;
+  404) reason='Not Found' ;;
+  *) reason=Error ;;
+esac
+case "$STUB_WGET" in
+  busybox)
+    if [ "$code" = 000 ]; then
+      echo "wget: bad address 'api.github.com'" >&2
+      exit 1
+    fi
+    echo "Connecting to api.github.com (192.0.2.1:443)" >&2
+    echo "  HTTP/1.1 $code $reason" >&2
+    if [ "$code" != 200 ]; then
+      echo "wget: server returned error: HTTP/1.1 $code $reason" >&2
+      exit 1
+    fi
+    echo "  Content-Type: application/json; charset=utf-8" >&2
+    ;;
+  wget2)
+    if [ "$code" = 000 ]; then
+      echo "Failed to resolve 'api.github.com' (Name or service not known)" >&2
+      exit 4
+    fi
+    echo "[0] Downloading '$url' ..." >&2
+    echo "# got header 1024 bytes:" >&2
+    echo ":status: $code" >&2
+    echo "content-type: application/json; charset=utf-8" >&2
+    if [ "$code" = 403 ]; then echo "x-ratelimit-remaining: 0" >&2; fi
+    echo >&2
+    if [ "$code" != 200 ]; then
+      echo "HTTP ERROR response $code  [$url]" >&2
+      exit 8
+    fi
+    echo "HTTP response 200  [$url]" >&2
+    ;;
+  *)
+    echo "--2026-10-21 12:00:00--  $url" >&2
+    if [ "$code" = 000 ]; then
+      echo "Resolving api.github.com (api.github.com)... failed: Name or service not known." >&2
+      echo "wget: unable to resolve host address 'api.github.com'" >&2
+      exit 4
+    fi
+    echo "HTTP request sent, awaiting response... " >&2
+    echo "  HTTP/1.1 $code $reason" >&2
+    echo "  Content-Type: application/json; charset=utf-8" >&2
+    if [ "$code" = 403 ]; then echo "  x-ratelimit-remaining: 0" >&2; fi
+    if [ "$code" != 200 ]; then
+      echo "2026-10-21 12:00:00 ERROR $code: $reason." >&2
+      : >"$out"
+      exit 8
+    fi
+    ;;
+esac
+printf '%s' "${resp%???}" >"$out"
+EOF
 # linux/amd64 unless STUB_ARCH says otherwise, so a host that is darwin/arm64
 # does not refuse v0.6.
 cat >"$work/stub/uname" <<'EOF'
@@ -188,7 +280,19 @@ case "$1" in
   *) echo Linux ;;
 esac
 EOF
-chmod +x "$work/stub/curl" "$work/stub/uname"
+chmod +x "$work/serve" "$work/curl/curl" "$work/wget/wget" "$work/stub/uname"
+
+# The host's PATH without curl or wget, so a wget run cannot reach for either.
+IFS=: read -ra path_dirs <<<"$PATH"
+for dir in "${path_dirs[@]}"; do
+  for cmd in "$dir"/*; do
+    name=${cmd##*/}
+    case "$name" in curl | wget) continue ;; esac
+    if [ -x "$cmd" ] && [ ! -e "$work/nohttp/$name" ]; then
+      ln -s "$cmd" "$work/nohttp/$name"
+    fi
+  done
+done
 
 failures=0
 fail() {
@@ -203,11 +307,21 @@ if command -v dash >/dev/null; then
   shells+=(dash)
 fi
 
+# The HTTP client the installer finds: curl, or, with no curl on PATH, GNU
+# wget (wget), busybox wget (wget-busybox) or wget2 (wget2).
+transport=curl
+
 # resolve SHELL ARG runs the installer and prints the tag it resolved, or
 # nothing when it gave up before a download.
 resolve() {
+  local path=$work/curl:$work/stub:$PATH flavor=
+  case "$transport" in
+    wget) path=$work/wget:$work/stub:$work/nohttp ;;
+    wget-busybox) path=$work/wget:$work/stub:$work/nohttp flavor=busybox ;;
+    wget2) path=$work/wget:$work/stub:$work/nohttp flavor=wget2 ;;
+  esac
   rm -f "$api/requests"
-  PATH="$work/stub:$PATH" STUB_API="$api" TMPDIR="$work/tmp" \
+  PATH="$path" STUB_API="$api" STUB_SERVE="$work/serve" STUB_WGET="$flavor" TMPDIR="$work/tmp" \
     "$1" "$root/godownloader.sh" -b "$work/bin" "$2" 2>"$work/stderr" >/dev/null || true
   sed -n 's/.*found version: [^ ]* for \([^/]*\)\/.*/\1/p' "$work/stderr"
 }
@@ -223,13 +337,13 @@ check() {
     got=$(resolve "$shell" "$arg")
     n=$(requests)
     if [ "$got" != "$want" ]; then
-      fail "[$shell] '$arg': want '${want:-<failure>}', got '${got:-<failure>}'"
+      fail "[$shell $transport] '$arg': want '${want:-<failure>}', got '${got:-<failure>}'"
     elif [ -n "$calls" ] && [ "$n" != "$calls" ]; then
-      fail "[$shell] '$arg': want $calls API requests, made $n"
+      fail "[$shell $transport] '$arg': want $calls API requests, made $n"
     elif [ -n "$says" ] && ! grep -qF "$says" "$work/stderr"; then
-      fail "[$shell] '$arg': stderr does not say '$says'"
+      fail "[$shell $transport] '$arg': stderr does not say '$says'"
     else
-      echo "ok   [$shell] '$arg' -> ${got:-<failure>} ($n requests)"
+      echo "ok   [$shell $transport] '$arg' -> ${got:-<failure>} ($n requests)"
     fi
   done
 }
@@ -329,14 +443,50 @@ check '' v0.27.2-rc.1 1 'platform linux/arm64 is not supported for 0.27.2-rc.1'
 unset STUB_ARCH
 
 # GITHUB_TOKEN is sent on every API request.
-rm -f "$api/auth-log"
-GITHUB_TOKEN=secret resolve sh v1.46 >/dev/null
-if [ "$(sort -u "$api/auth-log" 2>/dev/null)" = "Authorization: Bearer secret" ] &&
-  [ "$(wc -l <"$api/auth-log" | tr -d ' ')" = "$(requests)" ]; then
-  echo "ok   GITHUB_TOKEN is sent"
-else
-  fail "GITHUB_TOKEN is not sent on every request"
-fi
+token_sent() {
+  rm -f "$api/auth-log"
+  GITHUB_TOKEN=secret resolve sh v1.46 >/dev/null
+  if [ "$(sort -u "$api/auth-log" 2>/dev/null)" = "Authorization: Bearer secret" ] &&
+    [ "$(wc -l <"$api/auth-log" | tr -d ' ')" = "$(requests)" ]; then
+    echo "ok   [$transport] GITHUB_TOKEN is sent"
+  else
+    fail "[$transport] GITHUB_TOKEN is not sent on every request"
+  fi
+}
+token_sent
+
+# Without curl the API is asked through wget: GNU, busybox or wget2. Their
+# answers differ only on an error: GNU wget and wget2 keep the headers and
+# busybox only the status line, so a 403 is the rate limit to two of them and
+# a guess to busybox.
+for transport in wget wget-busybox wget2; do
+  check v1.46.0 v1.46.0 1
+  check v1.46.9 v1.46 3
+  check v11.1.0-rc.1 v11 7
+  check '' v1.99.0 1
+  check '' v9 1 'no tag starts with v9.'
+  echo 403 >"$api/status-tags-v1.46.10"
+  if [ "$transport" = wget-busybox ]; then
+    check '' v1.46 2 'HTTP 403 for repos/astronomer/astro-cli/releases/tags/v1.46.10; if that is its rate limit, set GITHUB_TOKEN'
+  else
+    check '' v1.46 2 'rate limit exceeded; set GITHUB_TOKEN'
+  fi
+  rm "$api/status-tags-v1.46.10"
+  echo 502 >"$api/status-tags-v1.46.0"
+  check '' v1.46.0 1 'HTTP 502'
+  rm "$api/status-tags-v1.46.0"
+  # No answer, and wget's own reason comes along.
+  echo 000 >"$api/status-refs-v1.46."
+  case "$transport" in
+    wget) why="wget: unable to resolve host address 'api.github.com'" ;;
+    wget-busybox) why="wget: bad address 'api.github.com'" ;;
+    wget2) why="Failed to resolve 'api.github.com' (Name or service not known)" ;;
+  esac
+  check '' v1.46 1 "could not reach GitHub (api.github.com) for repos/astronomer/astro-cli/git/matching-refs/tags/v1.46. ($why); check"
+  rm "$api/status-refs-v1.46."
+  token_sent
+done
+transport=curl
 
 if [ -n "$(ls -A "$work/bin" 2>/dev/null)" ]; then
   fail "something was installed into $work/bin"
