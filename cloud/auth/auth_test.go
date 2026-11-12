@@ -342,6 +342,8 @@ func TestRequestToken(t *testing.T) {
 
 func TestAuthorizeCallbackHandler(t *testing.T) {
 	httpClient = httputil.NewHTTPClient()
+	// The handler redirects to the hosted success/denied pages; don't follow them from a unit test.
+	httpClient.HTTPClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	origServer, origTimeout, origListening := callbackServer, callbackTimeout, callbackListening
 	t.Cleanup(func() {
 		callbackServer, callbackTimeout, callbackListening = origServer, origTimeout, origListening
