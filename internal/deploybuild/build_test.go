@@ -184,19 +184,19 @@ func TestImageTag(t *testing.T) {
 }
 
 // TestImageTagIsAValidReference holds that whatever the directory is called,
-// the tag is a reference Docker accepts, and that a name that was already
-// valid keeps the label it had.
+// the tag is a reference Docker accepts, with the label the compose project
+// name (proxy.SanitizeLabel) gives the same directory.
 func TestImageTagIsAValidReference(t *testing.T) {
 	long := strings.Repeat("a", 200)
 	for name, want := range map[string]string{
 		"proj":         "proj",
-		"my_proj":      "my_proj",
-		"my__proj":     "my__proj",
+		"my_proj":      "my-proj",
+		"my__proj":     "my-proj",
 		"my-proj":      "my-proj",
-		"v1.2":         "v1.2",
-		"my.project":   "my.project",
+		"v1.2":         "v1-2",
+		"my.project":   "my-project",
 		"My Project":   "my-project",
-		"_my_project_": "my_project",
+		"_my_project_": "my-project",
 		"--weird--":    "weird",
 		"Foo!":         "foo",
 		"a___b":        "a-b",
@@ -207,7 +207,7 @@ func TestImageTagIsAValidReference(t *testing.T) {
 		"!!!":          "project",
 		"...":          "project",
 		"é":            "project",
-		long:           long[:maxImageLabelLen],
+		long:           long[:63],
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := filepath.Join(t.TempDir(), name)
