@@ -29,7 +29,7 @@ The first of these that names something wins:
 With nothing resolved:
 
 - a project with no links fails (`ErrNone`);
-- a project with several links and no default fails, telling you to pick with `-d`, `ASTRO_DEPLOYMENT` or `astro use`. A run that may ask (not in CI, with `--non-interactive`, or with `--output json`) asks once instead, and saves the answer as your selection.
+- a project with several links and no default fails, telling you to pick with `-d`, `ASTRO_DEPLOYMENT` or `astro use`. A run that is not in CI and passes neither `--non-interactive` nor `--output json` asks once instead, and saves the answer as your selection.
 
 Both errors add `For this machine: astro local af <family>`. Every run prints the target it resolved on stderr, as `→ name (kind where)`.
 
@@ -52,7 +52,7 @@ The selection is per user and per project, never committed: `state.json` in the 
 
 ## Deploy always asks
 
-`astro deploy` never resolves from ambient state. Shipping code is too consequential to decide from a selection, an exported variable or a marker in a file nobody looked at. The target is named on the command line, or a run that may ask is asked. Only `default = true` (or a project's only link) preselects the entry in that prompt. `ASTRO_DEPLOYMENT` and your selection play no part in it: they choose which Airflow the query commands read, and where code ships is the project's, so the CLI and Astro Desktop highlight the same entry. A run that cannot be asked (in CI, with `--non-interactive`, or with `--output json`) and names nothing fails. The one exception is a credential that can only reach one Deployment: under an `ASTRO_API_TOKEN` scoped to a single Deployment, a deploy that names nothing ships to that Deployment and says so on stderr. Details are in [deploy.md](deploy.md#3-selecting-the-deployment).
+`astro deploy` never resolves from ambient state. Shipping code is too consequential to decide from a selection, an exported variable or a marker in a file nobody looked at. The target is named on the command line, or a run that may ask is asked. Only `default = true` (or a project's only link) preselects the entry in that prompt. `ASTRO_DEPLOYMENT` and your selection play no part in it: they choose which Airflow the query commands read, and where code ships is the project's, so the CLI and Astro Desktop highlight the same entry. A run that cannot be asked (it is in CI, or passes `--non-interactive` or `--output json`) and names nothing fails. The one exception is a credential that can only reach one Deployment: under an `ASTRO_API_TOKEN` scoped to a single Deployment, a deploy that names nothing ships to that Deployment and says so on stderr. Details are in [deploy.md](deploy.md#3-selecting-the-deployment).
 
 ## Link kinds and authentication
 

@@ -1313,7 +1313,7 @@ func TestLoginRefusedWhenTheRunMayNotAsk(t *testing.T) {
 
 	assert.ErrorIs(t, err, ErrLoginNeeded)
 	assert.False(t, input.IsRequired(err), "no flag answers a login, so it is not input_required")
-	assert.ErrorContains(t, err, "with --output json it cannot — set ASTRO_API_TOKEN, or log in with astro login")
+	assert.ErrorContains(t, err, "with --output json it cannot — set ASTRO_API_TOKEN (astro login prints a link")
 	assert.NotContains(t, err.Error(), "run astro login first", "the refusal must not send the person to a command it also refuses")
 	assert.Empty(t, string(printed), "nothing reaches stdout")
 }

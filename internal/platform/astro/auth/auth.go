@@ -654,7 +654,7 @@ func login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 		var refused *input.RequiredError
 		switch err := input.MayAsk("Log in to Astro"); {
 		case errors.As(err, &refused):
-			return fmt.Errorf("%w; %s — set ASTRO_API_TOKEN, or log in with astro login, which prints a link to open when it cannot ask", ErrLoginNeeded, refused.Reason)
+			return fmt.Errorf("%w; %s — set ASTRO_API_TOKEN (astro login prints a link for a person to open, and waits for it)", ErrLoginNeeded, refused.Reason)
 		case errors.Is(err, input.ErrInterrupted):
 			// An interrupted run starts no login: it is ending.
 			return err

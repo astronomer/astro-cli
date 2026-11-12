@@ -168,7 +168,7 @@ func newLinkRemoveCmd(c *cli) *cobra.Command {
 		Use:     "remove [NAME]",
 		Aliases: []string{"rm"},
 		Short:   "Unlink a Deployment from this project",
-		Long:    "Unlink a Deployment from this project. With no NAME, it asks which one; in CI or with --non-interactive it fails instead.",
+		Long:    "Unlink a Deployment from this project. With no NAME, it asks which one; in CI, with --non-interactive or with --output json it fails instead.",
 		Example: "  astro link remove prod",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -190,7 +190,7 @@ func newLinkDefaultCmd(c *cli) *cobra.Command {
 		Use:   "default [NAME]",
 		Short: "Choose the Deployment commands use by default",
 		Long: "Choose the linked Deployment commands use when you don't name one. astro deploy still " +
-			"asks, with it preselected. With no NAME, it asks which one; in CI or with --non-interactive it fails instead.",
+			"asks, with it preselected. With no NAME, it asks which one; in CI, with --non-interactive or with --output json it fails instead.",
 		Example: "  astro link default prod\n" +
 			"  astro link default --unset",
 		Args: cobra.MaximumNArgs(1),
@@ -385,7 +385,7 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 		}
 	}
 	if name == "" {
-		return errors.New("add needs a NAME for the link. With no --deployment, it asks for a Deployment and names the link after it")
+		return errors.New("add needs a NAME for the link: pass one, or --deployment to name it after the Deployment. Where it may ask (not in CI, with --non-interactive or with --output json) it asks for a Deployment instead")
 	}
 	link.Name = name
 	if err := refuseExisting(m, name, in.replace); err != nil {

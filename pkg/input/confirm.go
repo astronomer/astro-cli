@@ -88,10 +88,7 @@ func (q *Confirmation) Ask() error {
 
 // ended is the refusal for input that ended with no answer.
 func (q *Confirmation) ended() error {
-	named := &RequiredError{Prompt: q.Question, Reason: EndedReason}
-	for _, o := range q.Options {
-		o(named)
-	}
+	named := endedRequired(q.Question, q.Options).(*RequiredError) //nolint:forcetypeassert // endedRequired returns one
 	why := "stdin is not interactive"
 	if q.Terminal {
 		why = "input ended with no answer"
