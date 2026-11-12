@@ -2187,6 +2187,12 @@ func TestExplicitLoginWorksWhenTheRunMayNotAsk(t *testing.T) {
 			t.Cleanup(input.SetGuard(func() string { return reason }))
 			previous := authenticator
 			t.Cleanup(func() { authenticator = previous })
+			// The link path never starts a browser: a run that cannot ask has
+			// nobody to open one for, and a test must never open a real one.
+			opened := 0
+			previousOpen := openURL
+			t.Cleanup(func() { openURL = previousOpen })
+			openURL = func(string) error { opened++; return nil }
 			reached := false
 			authenticator = Authenticator{
 				callbackHandler: func() (string, error) {
@@ -2199,6 +2205,7 @@ func TestExplicitLoginWorksWhenTheRunMayNotAsk(t *testing.T) {
 			printed := captureStderr(t, func() {
 				err = LoginCommand("astronomer.io", "", new(astrov1_mocks.ClientWithResponsesInterface), io.Discard, false, false, false)
 			})
+			assert.Zero(t, opened, "the browser was opened")
 			assert.ErrorIs(t, err, errMock, "the login reached the browser callback, not a refusal")
 			assert.NotErrorIs(t, err, ErrLoginNeeded)
 			assert.True(t, reached, "the callback was waited on")
@@ -2209,6 +2216,7 @@ func TestExplicitLoginWorksWhenTheRunMayNotAsk(t *testing.T) {
 			reached = false
 			err = LoginCommand("astronomer.io", "", new(astrov1_mocks.ClientWithResponsesInterface), io.Discard, true, false, true)
 			assert.ErrorIs(t, err, errMock)
+			assert.Zero(t, opened, "--login-link opened the browser")
 			assert.True(t, reached)
 
 			// The implicit login stays refused, and does not loop.

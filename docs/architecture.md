@@ -191,7 +191,7 @@ The rule for a new prompt is to resolve its context before it asks: find the pro
 | status | meaning |
 | --- | --- |
 | 0 | success |
-| 1 | the command failed, including `input_required`: a question it could not ask. Not 2, because a question can come after work has started, so the "nothing ran" that 2 promises would not hold. The same refusal in CI or with `--non-interactive` exits 1 too. A script that needs to tell it from other failures reads `kind` |
+| 1 | the command failed, including `input_required`: a question it could not ask. Not 2, because a question can come after work has started, so the "nothing ran" that 2 promises would not hold. The same refusal with no terminal, in CI or with `--non-interactive` exits 1 too. A script that needs to tell it from other failures reads `kind` |
 | 2 | usage error: an unknown flag or subcommand, a flag value the command does not accept (`--output yaml` included), the wrong number of arguments, a missing required flag, a group run with no subcommand under `--output json`, whether it has a RunE of its own (`cliout.GroupHelp`) or not (`cliout.Execute` answers it); in text mode it prints its help and exits 0, as before. Nothing ran |
 | 130 | interrupted (Ctrl-C or SIGTERM); the command unwound what it had started. The first Ctrl-C at a question ends it at once (`input.ErrInterrupted`) |
 | the command's own | `astro local check`: 1 when a check failed, 2 when it could not reach a verdict (no environment, no project). `astro af runs trigger-wait`, `astro af runs wait` and `astro af tasks wait` (and their `astro local af` forms): 1 when the run failed, or for `tasks wait` when the task cannot reach the state, 2 when the wait timed out. `astro local run`: the child's status |
@@ -205,7 +205,7 @@ The command-specific 2s predate the usage 2. A script that runs one of those com
 | kind | meaning |
 | --- | --- |
 | `usage` | the command was invoked wrongly; exit status 2 |
-| `input_required` | the command needed an answer it would have asked for, and this run could not ask: under `--output json`, with `CI` set or `--non-interactive`, or because stdin ended with no answer. The message names the flag that answers it, and the question unless it was just written above the error (a confirmation with nothing piped). Exit status 1 (see [Prompts](#prompts)) |
+| `input_required` | the command needed an answer it would have asked for, and this run could not ask: under `--output json`, with stdin or stderr not a terminal, with `CI` set or `--non-interactive`, or because stdin ended with no answer (Ctrl-D). The message names the flag that answers it, and the question, since a refused question is never written. Exit status 1 (see [Prompts](#prompts)) |
 | `aborted` | the command asked for confirmation and was answered no, so it did nothing it was asked to (`input.ErrAborted`, which a declined confirmation returns in `astro local`, the Astro commands, `astro context delete`, and the Astro Private Cloud workspace and service-account deletes: `Error: aborted`, and nothing on stdout). Exit status 1: declining is not success. Not 130, which is an interrupt. Under `--output json` no confirmation is asked, so it is a text-mode failure in practice |
 | `no_project` | no project here: no `pyproject.toml` with `[tool.astro]` |
 | `foreign_mode` | the project is running in the other mode |

@@ -320,10 +320,10 @@ func (c *cli) resolveDeployment(f deploymentFlags) (instances.Selection, error) 
 	return sel, nil
 }
 
-// mayPrompt reports whether this run may ask a question (input.CanAsk: not
-// under json, CI or --non-interactive), whether or not stdin is a terminal. A
-// run that does not pass the guard (a test calling a command directly) still
-// never asks under json.
+// mayPrompt reports whether this run may ask a question (input.CanAsk: stdin
+// and stderr are terminals, and not under json, CI or --non-interactive). A run
+// that does not pass the guard (a test calling a command directly) still never
+// asks under json.
 func (c *cli) mayPrompt() bool {
 	return input.CanAsk() && c.output != cliout.FormatJSON
 }

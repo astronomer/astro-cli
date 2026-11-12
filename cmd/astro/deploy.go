@@ -273,10 +273,11 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	// --workspace, or its 1.x spelling --workspace-id.
 	overrideWorkspace := manifestWorkspace
 
-	// A prompt has to be answered by someone, and json output has to stay a
-	// stream a program can parse — a question on stderr with the run blocked on
-	// stdin is not that. So json mode is non-interactive whatever stdin is, and
-	// must name its target like any other script.
+	// A prompt has to be answered by someone at a terminal, and json output has
+	// to stay a stream a program can parse — a question on stderr with the run
+	// blocked on stdin is not that. So json mode is non-interactive whatever the
+	// terminals are, as is a run with no terminal, CI or --non-interactive, and
+	// each must name its target like any other script.
 	interactive := format == cliout.FormatText && mayAsk()
 
 	errOut := cmd.ErrOrStderr()
@@ -460,8 +461,8 @@ func noteIgnoredDeploymentEnv(w io.Writer, m *manifest.Manifest, interactive boo
 }
 
 // mayAsk reports whether this run can be asked which deployment to ship to
-// (input.CanAsk: not under json, CI or --non-interactive, whether or not stdin
-// is a terminal). It is a var so a test can drive both answers.
+// (input.CanAsk: stdin and stderr are terminals, and not under json, CI or
+// --non-interactive). It is a var so a test can drive both answers.
 var mayAsk = input.CanAsk
 
 // deployJSON is the single object `astro deploy --output json` emits when a manifest
