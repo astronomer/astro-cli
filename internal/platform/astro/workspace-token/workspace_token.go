@@ -34,7 +34,6 @@ const (
 )
 
 var (
-	errNoWorkspace            = errors.New("no Workspace is selected: pass --workspace, or switch to one with astro workspace switch")
 	errWorkspaceTokenRoleSet  = errors.New("this Workspace API token already has that role on the Workspace")
 	ErrWorkspaceTokenNotFound = errors.New("no Workspace API token was found for the API token name you provided")
 	errOrgTokenInWorkspace    = errors.New("this Organization API token has already been added to the Workspace with that role")
@@ -68,9 +67,6 @@ func Target(workspaceID string) (wsID, organizationID string, err error) {
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
-	}
-	if workspaceID == "" {
-		return "", "", astrosession.NoWorkspace(errNoWorkspace)
 	}
 	return workspaceID, ctx.Organization, nil
 }
@@ -257,6 +253,9 @@ func DeleteToken(token astrov1.ApiToken, workspaceID string, client astrov1.APIC
 		return removal, nil
 	}
 	// Detach by removing the workspace role.
+	if workspaceID == "" {
+		return apitoken.WorkspaceRemoval{}, astrosession.NoWorkspace(nil)
+	}
 	if err := setWorkspaceRole(&token, workspaceID, "", organizationID, client); err != nil {
 		return apitoken.WorkspaceRemoval{}, err
 	}
@@ -286,7 +285,7 @@ func getWorkspaceTokens(workspaceID string, tokenTypes []TokenType, client astro
 		workspaceID = ctx.Workspace
 	}
 	if workspaceID == "" {
-		return nil, astrosession.NoWorkspace(errNoWorkspace)
+		return nil, astrosession.NoWorkspace(nil)
 	}
 	wsID := workspaceID
 	limit := tokenPaginationLim

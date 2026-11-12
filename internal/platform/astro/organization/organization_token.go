@@ -22,7 +22,6 @@ import (
 var (
 	ErrInvalidName               = errors.New("no name provided for the organization token. Retry with a valid name")
 	errOrganizationTokenNotFound = errors.New("organization token specified was not found")
-	errNoWorkspace               = errors.New("no Workspace is selected: pass --workspace, or switch to one with astro workspace switch")
 	errOrgTokenInWorkspace       = errors.New("this Organization API token has already been added to the Workspace with that role")
 	errOrgTokenRoleSet           = errors.New("this Organization API token already has that role on the Organization")
 	errWrongTokenTypeSelected    = errors.New("the token selected is not of the type you are trying to modify")
@@ -62,7 +61,7 @@ func AddOrgTokenToWorkspace(id, name, role, workspaceID string, pick apitoken.Pi
 		workspaceID = ctx.Workspace
 	}
 	if workspaceID == "" {
-		return apitoken.Token{}, astrosession.NoWorkspace(errNoWorkspace)
+		return apitoken.Token{}, astrosession.NoWorkspace(nil)
 	}
 	token, err := FindToken(id, name, ctx.Organization, pick, client)
 	if err != nil {

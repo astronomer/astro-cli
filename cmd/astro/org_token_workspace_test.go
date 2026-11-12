@@ -11,6 +11,8 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	"github.com/astronomer/astro-cli/internal/platform/astro/team"
+	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	workspacetoken "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -70,7 +72,11 @@ func TestAnOrganizationTokenDoesNotTakeTheSavedWorkspace(t *testing.T) {
 
 	// A command that reads the context for its workspace fails the same way,
 	// before it calls the API.
-	_, _, err = workspacetoken.Target("")
+	_, err = workspacetoken.ListTokens(nil, "", nil)
+	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
+	_, err = user.ListWorkspaceUsersData(nil, "")
+	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
+	_, err = team.ListWorkspaceTeamsData(nil, "")
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
 }
 
@@ -87,10 +93,6 @@ func TestAnOrganizationTokenStillTakesAWorkspaceFromTheFlagOrTheProject(t *testi
 	got, err = coalesceWorkspace()
 	require.NoError(t, err)
 	assert.Equal(t, "project-ws", got)
-
-	got, _, err = workspacetoken.Target("flag-ws")
-	require.NoError(t, err)
-	assert.Equal(t, "flag-ws", got)
 }
 
 // A Workspace token and a Deployment token carry the workspace in their claim.
@@ -121,6 +123,11 @@ func TestAnInteractiveLoginKeepsItsSavedWorkspace(t *testing.T) {
 // With no token and no saved workspace the error is the one that says how to
 // pick one, not the token's.
 func TestNoWorkspaceWithoutATokenKeepsItsMessage(t *testing.T) {
-	withWorkspaces(t, "", "")
-	assert.NotErrorIs(t, astrosession.NoWorkspace(errors.New("x")), astrosession.ErrOrgTokenNoWorkspace)
+	t.Setenv("ASTRO_API_TOKEN", "")
+	fallback := errors.New("how a saved login picks one")
+	assert.Equal(t, fallback, astrosession.NoWorkspace(fallback))
+	assert.Equal(t, astrosession.ErrNoWorkspace, astrosession.NoWorkspace(nil))
+
+	t.Setenv("ASTRO_API_TOKEN", "token")
+	assert.Equal(t, astrosession.ErrOrgTokenNoWorkspace, astrosession.NoWorkspace(fallback))
 }
