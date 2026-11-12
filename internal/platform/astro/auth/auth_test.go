@@ -5,6 +5,7 @@ import (
 	stdcontext "context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -376,41 +377,64 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 	// The test checks where it points without following it there.
 	client := httputil.NewHTTPClient()
 	client.HTTPClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	previous := httpClient
-	t.Cleanup(func() { httpClient = previous })
+	previousClient, previousServer, previousTimeout, previousListening := httpClient, callbackServer, callbackTimeout, callbackListening
+	t.Cleanup(func() {
+		httpClient, callbackServer, callbackTimeout, callbackListening = previousClient, previousServer, previousTimeout, previousListening
+	})
 	httpClient = client
-	t.Run("success", func(t *testing.T) {
-		callbackServer = "localhost:12345"
+
+	// bound is the address the last callback listener opened.
+	var bound string
+	// requirePortFree checks that a finished login released its port.
+	requirePortFree := func(t *testing.T) {
+		t.Helper()
+		again, err := net.Listen("tcp", bound)
+		if assert.NoError(t, err, "the callback listener outlived the login") {
+			again.Close()
+		}
+	}
+
+	// callbackAt binds an ephemeral port, so no other process can hold it, and
+	// requests the callback with the given query once the listener is open.
+	callbackAt := func(t *testing.T, query, wantLocation string) *sync.WaitGroup {
+		t.Helper()
+		callbackServer = "localhost:0"
 		var wg sync.WaitGroup
 		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			awaitCallbackServer(t, callbackServer)
+		callbackListening = func(addr net.Addr) {
+			bound = addr.String()
+			go func() {
+				defer wg.Done()
+				opts := &httputil.DoOptions{
+					Method: http.MethodGet,
+					Path:   fmt.Sprintf("http://%s/callback?%s", addr, query),
+				}
+				res, cbErr := client.Do(opts)
+				if assert.NoError(t, cbErr) {
+					defer res.Body.Close()
+					assert.Equal(t, http.StatusFound, res.StatusCode)
+					assert.Equal(t, wantLocation, res.Header.Get("Location"))
+				}
+			}()
+		}
+		return &wg
+	}
 
-			opts := &httputil.DoOptions{
-				Method: http.MethodGet,
-				Path:   "http://localhost:12345/callback?code=test",
-			}
-			res, cbErr := client.Do(opts)
-			if assert.NoError(t, cbErr) {
-				defer res.Body.Close()
-				assert.Equal(t, http.StatusFound, res.StatusCode)
-				assert.Equal(t, "https://auth.astronomer.io/device/success", res.Header.Get("Location"))
-			}
-		}()
+	t.Run("success", func(t *testing.T) {
+		wg := callbackAt(t, "code=test", "https://auth.astronomer.io/device/success")
 		code, err := authorizeCallback(io.Discard)
 		assert.Equal(t, "test", code)
 		assert.NoError(t, err)
 		wg.Wait()
+		requirePortFree(t)
 	})
 
 	t.Run("an address already taken returns an error", func(t *testing.T) {
 		held, err := net.Listen("tcp", "localhost:0")
 		assert.NoError(t, err)
 		defer held.Close()
-		previous := callbackServer
-		t.Cleanup(func() { callbackServer = previous })
 		callbackServer = held.Addr().String()
+		callbackListening = func(net.Addr) {}
 
 		code, err := authorizeCallback(io.Discard)
 		assert.Error(t, err)
@@ -420,50 +444,21 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		callbackServer = "localhost:12346"
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			awaitCallbackServer(t, callbackServer)
-			opts := &httputil.DoOptions{
-				Method: http.MethodGet,
-				Path:   "http://localhost:12346/callback?error=error&error_description=fatal_error",
-			}
-			res, cbErr := client.Do(opts)
-			if assert.NoError(t, cbErr) {
-				defer res.Body.Close()
-				assert.Equal(t, http.StatusFound, res.StatusCode)
-				assert.Equal(t, "https://auth.astronomer.io/device/denied", res.Header.Get("Location"))
-			}
-		}()
+		wg := callbackAt(t, "error=error&error_description=fatal_error", "https://auth.astronomer.io/device/denied")
 		_, err := authorizeCallback(io.Discard)
 		assert.Contains(t, err.Error(), "fatal_error")
 		wg.Wait()
+		requirePortFree(t)
 	})
 
 	t.Run("timeout", func(t *testing.T) {
-		callbackServer = "localhost:12347"
+		callbackServer = "localhost:0"
+		callbackListening = func(addr net.Addr) { bound = addr.String() }
 		callbackTimeout = 5 * time.Millisecond
 		_, err := authorizeCallback(io.Discard)
 		assert.Contains(t, err.Error(), "the operation has timed out")
+		requirePortFree(t)
 	})
-}
-
-// awaitCallbackServer waits for authorizeCallback, which runs in the
-// test's own goroutine, to open its listener. A fixed sleep would be both
-// slower and still a race.
-func awaitCallbackServer(t *testing.T, addr string) {
-	t.Helper()
-	for range 400 {
-		conn, err := net.Dial("tcp", addr)
-		if err == nil {
-			conn.Close()
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	t.Errorf("the login callback never opened %s", addr)
 }
 
 func TestShouldSignup(t *testing.T) {

@@ -89,6 +89,9 @@ var (
 	callbackTimeout = time.Second * 300
 	redirectURI     = "http://localhost:12345/callback"
 	callbackServer  = "localhost:12345"
+	// callbackListening is called with the bound address once the callback
+	// listener is open. Tests use it to learn the port of a localhost:0 bind.
+	callbackListening = func(net.Addr) {}
 )
 
 var authenticator = Authenticator{
@@ -205,11 +208,20 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("cannot open the login callback on %s: %w. Close any other astro login and try again", callbackServer, err)
 	}
+	callbackListening(listener.Addr())
 	go func() {
 		if err := s.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			// The caller selects on this channel, so it hears a server that
 			// stops early instead of waiting out the callback timeout.
 			callbackChannel <- CallbackMessage{err: fmt.Errorf("the login callback server stopped: %w", err)}
+		}
+	}()
+
+	// Every way out of the wait below, the error a browser reports included,
+	// must release the port, or the next login in this process can't bind it.
+	defer func() {
+		if err := s.Shutdown(http_context.Background()); err != nil {
+			ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
 		}
 	}()
 
@@ -223,16 +235,8 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 			}
 			authorizationCode = callbackMessage.authorizationCode
 		case <-time.After(callbackTimeout):
-			err := s.Shutdown(http_context.Background())
-			if err != nil {
-				ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
-			}
 			return "", errors.New("the operation has timed out")
 		}
-	}
-	err = s.Shutdown(http_context.Background())
-	if err != nil {
-		ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
 	}
 
 	// return code
