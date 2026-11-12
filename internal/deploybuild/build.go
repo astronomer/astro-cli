@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -121,13 +123,49 @@ func PrebuiltRuntime(image string, readLabel LabelReader) (string, error) {
 // ImageTag is the local tag the built deploy image carries. It appends a
 // hash of the full project path (same idea as localdocker's composeProjectName),
 // so two same-named projects in different directories never share a tag.
+//
+// The directory name goes through imageLabel, because a Docker repository name
+// is lowercase and a build with a tag that breaks that grammar fails.
 func ImageTag(projectDir string) string {
-	label := filepath.Base(projectDir)
-	if label == "" || label == "." || label == string(filepath.Separator) {
+	label := imageLabel(filepath.Base(projectDir))
+	if label == "" {
 		label = "project"
 	}
 	if id, err := localrt.ProjectID(projectDir); err == nil && len(id) >= 6 {
 		return "astro-deploy/" + label + "-" + id[:6]
 	}
 	return "astro-deploy/" + label
+}
+
+var (
+	// notRepoChar matches what a repository path component cannot hold at all.
+	notRepoChar = regexp.MustCompile(`[^a-z0-9._-]+`)
+	// separatorRun matches a run of separators. Docker allows a single '.',
+	// '_' or '__', or any number of '-', between alphanumerics; any other run
+	// is not a valid component.
+	separatorRun = regexp.MustCompile(`[._-]+`)
+)
+
+// maxImageLabelLen bounds the directory-derived part of the tag, well inside
+// the 255 characters Docker allows a whole repository name.
+const maxImageLabelLen = 100
+
+// imageLabel turns a directory name into one valid repository path component,
+// or "" when nothing usable is left. It differs from proxy.SanitizeLabel (a DNS
+// label, where '.' and '_' are not allowed) on purpose: a name that is already
+// valid, such as "my_proj" or "v1.2", must keep its tag so existing local
+// images and caches keep matching.
+func imageLabel(name string) string {
+	name = notRepoChar.ReplaceAllString(strings.ToLower(name), "-")
+	name = separatorRun.ReplaceAllStringFunc(name, func(run string) string {
+		if run == "." || run == "_" || run == "__" || strings.Trim(run, "-") == "" {
+			return run
+		}
+		return "-"
+	})
+	name = strings.Trim(name, "._-")
+	if len(name) > maxImageLabelLen {
+		name = strings.Trim(name[:maxImageLabelLen], "._-")
+	}
+	return name
 }
