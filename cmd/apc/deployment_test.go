@@ -10,6 +10,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -426,10 +427,10 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 		houstonClient = api
 
 		// mock os.Stdin
-		input := []byte("1")
+		answer := []byte("1")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -438,8 +439,9 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 		os.Stdin = r
 		defer testUtil.MockUserInput(s.T(), "n")()
 
-		_, err = execDeploymentCmd(cmdArgs...)
-		s.NoError(err)
+		output, err := execDeploymentCmd(cmdArgs...)
+		s.ErrorIs(err, input.ErrAborted)
+		s.Empty(output)
 		// Houston CreateDeployment API should not be called if user does not confirm the prompt
 		api.AssertNotCalled(s.T(), "CreateDeployment", mock.Anything)
 	})
@@ -461,10 +463,10 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 		houstonClient = api
 
 		// mock os.Stdin
-		input := []byte("1")
+		answer := []byte("1")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -572,10 +574,10 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		houstonClient = api
 
 		// mock os.Stdin
-		input := []byte("1")
+		answer := []byte("1")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -584,8 +586,9 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		os.Stdin = r
 		defer testUtil.MockUserInput(s.T(), "n")()
 
-		_, err = execDeploymentCmd(cmdArgs...)
-		s.NoError(err)
+		output, err := execDeploymentCmd(cmdArgs...)
+		s.ErrorIs(err, input.ErrAborted)
+		s.Empty(output)
 		api.AssertCalled(s.T(), "GetDeployment", mock.Anything)
 		// Houston UpdateDeployment API should not be called if user does not confirm the prompt
 		api.AssertNotCalled(s.T(), "UpdateDeployment", mock.Anything)
@@ -613,10 +616,10 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		houstonClient = api
 
 		// mock os.Stdin
-		input := []byte("1")
+		answer := []byte("1")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -679,10 +682,10 @@ func (s *Suite) TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy() {
 		houstonClient = api
 
 		// mock os.Stdin
-		input := []byte("1")
+		answer := []byte("1")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -691,8 +694,9 @@ func (s *Suite) TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy() {
 		os.Stdin = r
 		defer testUtil.MockUserInput(s.T(), "n")()
 
-		_, err = execDeploymentCmd(cmdArgs...)
-		s.NoError(err)
+		output, err := execDeploymentCmd(cmdArgs...)
+		s.ErrorIs(err, input.ErrAborted)
+		s.Empty(output)
 		api.AssertCalled(s.T(), "GetDeployment", mock.Anything)
 		// Houston UpdateDeployment API should not be called if user does not confirm the prompt
 		api.AssertNotCalled(s.T(), "UpdateDeployment", mock.Anything)
@@ -720,10 +724,10 @@ func (s *Suite) TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy() {
 		houstonClient = api
 
 		// mock os.Stdin
-		input := []byte("1")
+		answer := []byte("1")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
-		_, err = w.Write(input)
+		_, err = w.Write(answer)
 		s.NoError(err)
 		w.Close()
 		stdin := os.Stdin
@@ -972,10 +976,10 @@ func (s *Suite) TestDeploymentDelete() {
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 
 	// Delete now always prompts for confirmation; answer "y".
-	input := []byte("y")
+	answer := []byte("y")
 	r, w, err := os.Pipe()
 	s.Require().NoError(err)
-	_, err = w.Write(input)
+	_, err = w.Write(answer)
 	s.NoError(err)
 	w.Close()
 	stdin := os.Stdin
@@ -1111,8 +1115,8 @@ func (s *Suite) TestDeploymentUnadopt() {
 
 		houstonClient = api
 		output, err := execDeploymentCmd("unadopt", "--deployment-id", mockDeployment.ID)
-		s.NoError(err)
-		s.Contains(output, "was not executed and your Deployment was not unadopted")
+		s.ErrorIs(err, input.ErrAborted)
+		s.Empty(output)
 		api.AssertNotCalled(s.T(), "UnadoptDeployment", mock.Anything)
 	})
 
@@ -1181,20 +1185,12 @@ func (s *Suite) TestDeploymentDeleteHardResponseNo() {
 	api.On("GetAppConfig", mock.Anything).Return(appConfig, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	// mock os.Stdin
-	input := []byte("n")
-	r, w, err := os.Pipe()
-	s.Require().NoError(err)
-	_, err = w.Write(input)
-	s.NoError(err)
-	w.Close()
-	stdin := os.Stdin
-	// Restore stdin right after the test.
-	defer func() { os.Stdin = stdin }()
-	os.Stdin = r
+	defer testUtil.MockUserInput(s.T(), "n")()
 
 	houstonClient = api
-	_, err = execDeploymentCmd("delete", mockDeployment.ID)
-	s.NoError(err)
+	output, err := execDeploymentCmd("delete", mockDeployment.ID)
+	s.ErrorIs(err, input.ErrAborted)
+	s.Empty(output)
 }
 
 func (s *Suite) TestDeploymentDeleteHardResponseYes() {
@@ -1211,10 +1207,10 @@ func (s *Suite) TestDeploymentDeleteHardResponseYes() {
 	api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: true}).Return(mockDeployment, nil)
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	// mock os.Stdin
-	input := []byte("y")
+	answer := []byte("y")
 	r, w, err := os.Pipe()
 	s.Require().NoError(err)
-	_, err = w.Write(input)
+	_, err = w.Write(answer)
 	s.NoError(err)
 	w.Close()
 	stdin := os.Stdin

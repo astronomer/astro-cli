@@ -49,6 +49,14 @@ func newAPCClient() *mocks.ClientInterface {
 // runAPC builds the APC tree on a file standing in for stdout, and runs args.
 func runAPC(t *testing.T, api houston.ClientInterface, answers string, args ...string) apcRun {
 	t.Helper()
+	return runAPCGated(t, api, false, answers, args...)
+}
+
+// runAPCGated is runAPC that, when gated, also takes out the commands the
+// platform's version cannot serve, as the root does (VersionMatchCmds), so a
+// command added in a later version is refused on an earlier one.
+func runAPCGated(t *testing.T, api houston.ClientInterface, gated bool, answers string, args ...string) apcRun {
+	t.Helper()
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	houstonVersion = "1.0.0"
 	// These flags are registered only when Houston's feature flags allow
@@ -73,6 +81,9 @@ func runAPC(t *testing.T, api houston.ClientInterface, answers string, args ...s
 	root := &cobra.Command{Use: "astro", SilenceErrors: true}
 	LoadPlatform(api) // as the root does for a line that runs one of these commands
 	root.AddCommand(AddCmds(api, stdout)...)
+	if gated {
+		VersionMatchCmds(root, []string{"astro"})
+	}
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	ctx := context.Background()

@@ -706,13 +706,8 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 
 	// If it's a dag_deploy type, validate from the user first
 	if !skipPrompt && dagDeploymentType == houston.DagOnlyDeploymentType {
-		y, err := input.Confirm(CreateDeploymentWithTypeDagDeployPromptMsg, input.AnsweredBy("--yes"))
-		if err != nil {
+		if err := input.ConfirmOrAbort(CreateDeploymentWithTypeDagDeployPromptMsg, input.AnsweredBy("--yes")); err != nil {
 			return err
-		}
-		if !y {
-			fmt.Println("canceling deployment create..")
-			return nil
 		}
 	}
 
@@ -784,13 +779,8 @@ func deploymentHibernate(cmd *cobra.Command, hibernate bool, out io.Writer) erro
 		if hibernateRemove {
 			question = "\nAre you sure you want to remove the hibernation override on this Deployment?"
 		}
-		ok, err := input.Confirm(question, input.AnsweredBy("--yes"))
-		if err != nil {
+		if err := input.ConfirmOrAbort(question, input.AnsweredBy("--yes")); err != nil {
 			return err
-		}
-		if !ok {
-			fmt.Fprintln(out, "Exit: This command was not executed and your Deployment was not changed.")
-			return nil
 		}
 	}
 
@@ -858,13 +848,8 @@ func deploymentDelete(cmd *cobra.Command, out io.Writer) error {
 			// asking to delete it.
 			prompt = fmt.Sprintf("\nLink %s names Deployment %s.", deploymentLink, deploymentID) + prompt
 		}
-		i, err := input.Confirm(prompt, input.AnsweredBy("--yes"))
-		if err != nil {
+		if err := input.ConfirmOrAbort(prompt, input.AnsweredBy("--yes")); err != nil {
 			return err
-		}
-		if !i {
-			fmt.Println("Exit: This command was not executed and your Deployment was not deleted.")
-			return nil
 		}
 	}
 	d, err := deployment.Delete(deploymentID, true, houstonClient)
@@ -918,13 +903,8 @@ func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 
 	if !skipPrompt {
-		i, err := input.Confirm(dangerPrompt(cliDeploymentUnadoptPrompt), input.AnsweredBy("--yes"))
-		if err != nil {
+		if err := input.ConfirmOrAbort(dangerPrompt(cliDeploymentUnadoptPrompt), input.AnsweredBy("--yes")); err != nil {
 			return err
-		}
-		if !i {
-			fmt.Fprintln(out, "Exit: This command was not executed and your Deployment was not unadopted.")
-			return nil
 		}
 	}
 	d, err := deployment.Unadopt(deploymentID, houstonClient)
@@ -966,9 +946,9 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 }
 
 // confirmDagDeploymentTypeChange asks before an update moves a deployment onto
-// or off dag_deploy, and reports whether to go on. Any other change needs no
-// answer; --yes skips the question.
-func confirmDagDeploymentTypeChange(current, next string) (bool, error) {
+// or off dag_deploy. A no is input.ErrAborted, and nothing is changed. Any
+// other change needs no answer; --yes skips the question.
+func confirmDagDeploymentTypeChange(current, next string) error {
 	var prompt string
 	switch {
 	case current != houston.DagOnlyDeploymentType && next == houston.DagOnlyDeploymentType:
@@ -976,9 +956,9 @@ func confirmDagDeploymentTypeChange(current, next string) (bool, error) {
 	case current == houston.DagOnlyDeploymentType && next != houston.DagOnlyDeploymentType:
 		prompt = UpdateDeploymentTypeFromDagDeployPromptMsg
 	default:
-		return true, nil
+		return nil
 	}
-	return input.Confirm(prompt, input.AnsweredBy("--yes"))
+	return input.ConfirmOrAbort(prompt, input.AnsweredBy("--yes"))
 }
 
 func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string, out io.Writer) error {
@@ -1019,13 +999,8 @@ func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string,
 
 	// new dag deployment type or current dag deployment type is dag_deploy, confirm from user
 	if !skipPrompt {
-		proceed, err := confirmDagDeploymentTypeChange(deploymentInfo.DagDeployment.Type, dagDeploymentType)
-		if err != nil {
+		if err := confirmDagDeploymentTypeChange(deploymentInfo.DagDeployment.Type, dagDeploymentType); err != nil {
 			return err
-		}
-		if !proceed {
-			fmt.Println("canceling deployment update..")
-			return nil
 		}
 	}
 
