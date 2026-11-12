@@ -87,8 +87,10 @@ var signupVerificationPattern = regexp.MustCompile(`(?i)verif\w*\s+(your\s+)?ema
 var (
 	callbackChannel = make(chan CallbackMessage, 1)
 	callbackTimeout = time.Second * 300
-	redirectURI     = "http://localhost:12345/callback"
-	callbackServer  = "localhost:12345"
+	// callbackShutdownTimeout bounds how long a finished login waits for the callback server to drain.
+	callbackShutdownTimeout = 5 * time.Second
+	redirectURI             = "http://localhost:12345/callback"
+	callbackServer          = "localhost:12345"
 	// callbackListening is called with the bound address once the callback
 	// listener is open. Tests use it to learn the port of a localhost:0 bind.
 	callbackListening = func(net.Addr) {}
@@ -220,7 +222,11 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 	// Every way out of the wait below, the error a browser reports included,
 	// must release the port, or the next login in this process can't bind it.
 	defer func() {
-		if err := s.Shutdown(http_context.Background()); err != nil {
+		// A stuck connection must not keep a finished login from returning.
+		ctx, cancel := http_context.WithTimeout(http_context.Background(), callbackShutdownTimeout)
+		defer cancel()
+		if err := s.Shutdown(ctx); err != nil {
+			s.Close() //nolint:errcheck // already reporting the shutdown failure
 			ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
 		}
 	}()

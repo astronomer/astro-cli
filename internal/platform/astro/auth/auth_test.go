@@ -388,10 +388,14 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 	// requirePortFree checks that a finished login released its port.
 	requirePortFree := func(t *testing.T) {
 		t.Helper()
+		if !assert.NotEmpty(t, bound, "the callback listener never opened") {
+			return
+		}
 		again, err := net.Listen("tcp", bound)
 		if assert.NoError(t, err, "the callback listener outlived the login") {
 			again.Close()
 		}
+		bound = ""
 	}
 
 	// callbackAt binds an ephemeral port, so no other process can hold it, and
@@ -446,7 +450,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		wg := callbackAt(t, "error=error&error_description=fatal_error", "https://auth.astronomer.io/device/denied")
 		_, err := authorizeCallback(io.Discard)
-		assert.Contains(t, err.Error(), "fatal_error")
+		assert.ErrorContains(t, err, "fatal_error")
 		wg.Wait()
 		requirePortFree(t)
 	})
