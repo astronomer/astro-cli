@@ -158,7 +158,6 @@ func (s *Suite) TestIsCloudDomain() {
 		"pr12345.astronomer-dev.io",
 		"pr123456.astronomer-dev.io",
 		"localhost",
-		"localhost123",
 	}
 	s.Run("returns true for valid domains", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -178,6 +177,14 @@ func (s *Suite) TestIsCloudDomain() {
 		for _, domain := range NotCloudList {
 			actual := IsCloudDomain(domain)
 			s.False(actual, domain)
+		}
+	})
+	// The localhost case is localhost itself: a host that merely contains the
+	// word is someone else's, and a cloud login there would send it a token.
+	s.Run("returns false for hosts that only contain localhost", func() {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		for _, domain := range []string{"localhost123", "localhost.attacker.example", "evil-localhost.io", "localhost.me"} {
+			s.False(IsCloudDomain(domain), domain)
 		}
 	})
 }

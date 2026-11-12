@@ -55,5 +55,16 @@ func (c *Context) GetPublicRESTAPIURL(version string) string {
 		return CFG.LocalCore.GetString() + "/" + version
 	}
 
-	return domainutil.GetURLToEndpoint(CFG.CloudAPIProtocol.GetString(), domainutil.FormatDomain(c.Domain), version)
+	return domainutil.GetURLToEndpoint(apiProtocol(), domainutil.FormatDomain(c.Domain), version)
+}
+
+// apiProtocol is the scheme the API URLs are built with: cloud.api.protocol
+// when it is http or https, https otherwise. The value is spliced in front of
+// "://" and the host, so anything else (a full URL, say) would move every
+// request, token and all, to another host.
+func apiProtocol() string {
+	if p := CFG.CloudAPIProtocol.GetString(); p == "http" {
+		return p
+	}
+	return "https"
 }
