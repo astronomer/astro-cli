@@ -781,7 +781,7 @@ func TestAgentsMdHoldsOnlyStableFacts(t *testing.T) {
 		"`apache-airflow` requirement in `[project] dependencies`",
 		"`[tool.astro] runtime`",
 		"`dags/`", "`include/`", "`plugins/`", "`tests/`", "`.venv/`",
-		"`astro local run pytest`",
+		"`uv run pytest`",
 		"`uv add <package>`",
 		"`astro --help`",
 		"`astro local --help`",
