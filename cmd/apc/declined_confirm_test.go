@@ -487,7 +487,7 @@ func TestUpdateSendsWhatItReadOnce(t *testing.T) {
 	// consumed.
 	t.Run("-o json without --yes reads nothing", func(t *testing.T) {
 		key := oneShot(t, "KEY\n")
-		run, sent := update(t, "y\n", "--ssh-key", filepath.Join(t.TempDir(), "missing"), "--known-hosts", key, "-o", "json")
+		run, sent := update(t, "y\n", "--ssh-key", key, "--known-hosts", filepath.Join(t.TempDir(), "missing"), "-o", "json")
 
 		assert.Equal(t, 1, run.code)
 		var got struct {
@@ -502,4 +502,29 @@ func TestUpdateSendsWhatItReadOnce(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "KEY\n", string(b), "the pipe was not consumed")
 	})
+}
+
+// With no question to ask (the Deployment is not on dag_deploy), the files the
+// flags name are still read, once, and sent.
+func TestUpdateWithoutAQuestionSendsTheFilesItRead(t *testing.T) {
+	for _, current := range []string{houston.ImageDeploymentType, houston.VolumeDeploymentType} {
+		t.Run("from "+current, func(t *testing.T) {
+			var sent map[string]interface{}
+			api := apcAt("2.1.0")
+			api.On("GetDeployment", "dep-1").Return(&houston.Deployment{ID: "dep-1", DagDeployment: houston.DagDeploymentConfig{Type: current}}, nil)
+			api.On("UpdateDeployment", mock.Anything).Run(func(args mock.Arguments) {
+				sent, _ = args.Get(0).(map[string]interface{})
+			}).Return(&certifiedDep, nil)
+
+			run := runAPCGated(t, api, true, "", "deployment", "update", "dep-1", "--dag-deployment-type", "git_sync",
+				"--git-repository-url", "git@example.com:o/r.git", "--ssh-key", oneShot(t, "KEY\n"), "--known-hosts", oneShot(t, "example.com ssh-rsa AAAA\n"))
+
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+			assert.False(t, run.stdinRead, "no question was asked")
+			dag, ok := sent["dagDeployment"].(map[string]interface{})
+			require.True(t, ok, "%v", sent)
+			assert.Equal(t, "KEY\n", dag["sshKey"])
+			assert.Equal(t, "example.com ssh-rsa AAAA", dag["knownHosts"])
+		})
+	}
 }
