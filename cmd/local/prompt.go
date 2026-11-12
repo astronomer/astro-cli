@@ -44,10 +44,11 @@ func (c *cli) confirm(question string) error {
 	if errors.Is(err, input.ErrInterrupted) {
 		return err // ReadLine ended the line
 	}
-	answered := err == nil || strings.TrimSpace(line) != "" // an empty line is an answer: a no
 	// The answer is decided on the text a log shows, so the line written
-	// below never reads as a yes for a run that went on to abort.
+	// below never reads as a yes for a run that went on to abort, and input
+	// that was nothing but escapes is no answer, not a no.
 	answer := input.Plain(line)
+	answered := err == nil || answer != "" // an empty line is an answer: a no
 	switch {
 	case answered && !tty:
 		// A terminal echoed what was typed; a pipe did not.

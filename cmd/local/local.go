@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -1380,7 +1381,10 @@ func (c *cli) runReset(ctx context.Context, yes bool) error {
 	if c.d.HomeErr != nil {
 		return c.d.HomeErr
 	}
-	if err := c.confirmUnless(yes, fmt.Sprintf("Wipe the local Airflow state (database, logs, environment) of %s?", dir)); err != nil {
+	// The path is cleaned where the question is built: a directory can be
+	// named with escape sequences, and the question reaches the terminal as
+	// written.
+	if err := c.confirmUnless(yes, fmt.Sprintf("Wipe the local Airflow state (database, logs, environment) of %s?", input.Plain(dir))); err != nil {
 		return err
 	}
 	// Runtime.Reset rather than Stop with Clean: stop goes through Attach,

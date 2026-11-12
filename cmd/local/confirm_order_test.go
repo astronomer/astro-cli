@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -29,26 +32,33 @@ func confirmLines(t *testing.T, interactive bool, stdin string) (string, error) 
 // nothing echoes, is written after the question as plain text; and input
 // that ended has its line ended before the error.
 func TestConfirmLeavesWholeLines(t *testing.T) {
-	const q = "Wipe it? [y/N] "
+	const (
+		q                 = "Wipe it? [y/N] "
+		refusedAtTerminal = "confirmation needed but input ended with no answer; pass --yes to proceed"
+		refusedNoTerminal = "confirmation needed but stdin is not interactive; pass --yes to proceed"
+	)
 	for name, tc := range map[string]struct {
 		interactive bool
 		stdin       string
 		stderr      string
-		refused     bool  // the input_required refusal naming --yes
-		err         error // otherwise; nil for a yes
+		refusal     string // the input_required refusal naming --yes
+		err         error  // otherwise; nil for a yes
 	}{
-		"terminal, yes":                                {true, "y\n", q, false, nil},
-		"terminal, no":                                 {true, "n\n", q, false, input.ErrAborted},
-		"terminal, input ended":                        {true, "", q + "\n", true, nil},
-		"terminal, yes then ended":                     {true, "y", q + "\n", false, nil},
-		"piped, yes":                                   {false, "y\n", q + "y\n", false, nil},
-		"piped, no":                                    {false, "n\n", q + "n\n", false, input.ErrAborted},
-		"piped, yes with no newline":                   {false, "y", q + "y\n", false, nil},
-		"piped nothing":                                {false, "", q + "\n", true, nil},
-		"piped, an empty line (a no)":                  {false, "\n", q + "\n", false, input.ErrAborted},
-		"piped, escapes are not echoed":                {false, "n\x1b[2J\x1b]0;title\x07\x08\n", q + "n\n", false, input.ErrAborted},
-		"piped, a long answer on one row":              {false, "no  way\tthanks\r\n", q + "no way thanks\n", false, input.ErrAborted},
-		"piped, a styled yes is the yes the log shows": {false, "y\x1b[0m\x07\n", q + "y\n", false, nil},
+		"terminal, yes":                                {true, "y\n", q, "", nil},
+		"terminal, no":                                 {true, "n\n", q, "", input.ErrAborted},
+		"terminal, input ended":                        {true, "", q + "\n", refusedAtTerminal, nil},
+		"terminal, yes then ended":                     {true, "y", q + "\n", "", nil},
+		"piped, yes":                                   {false, "y\n", q + "y\n", "", nil},
+		"piped, no":                                    {false, "n\n", q + "n\n", "", input.ErrAborted},
+		"piped, yes with no newline":                   {false, "y", q + "y\n", "", nil},
+		"piped nothing":                                {false, "", q + "\n", refusedNoTerminal, nil},
+		"piped, an empty line (a no)":                  {false, "\n", q + "\n", "", input.ErrAborted},
+		"piped, escapes are not echoed":                {false, "n\x1b[2J\x1b]0;title\x07\x08\n", q + "n\n", "", input.ErrAborted},
+		"piped, a long answer on one row":              {false, "no  way\tthanks\r\n", q + "no way thanks\n", "", input.ErrAborted},
+		"terminal, only escapes and no newline":        {true, "\x1b[0m", q + "\n", refusedAtTerminal, nil},
+		"piped, only escapes and no newline":           {false, "\x1b[0m\u200b", q + "\n", refusedNoTerminal, nil},
+		"piped, a joiner keeps y-es from being yes":    {false, "y\u200des\n", q + "y\u200des\n", "", input.ErrAborted},
+		"piped, a styled yes is the yes the log shows": {false, "y\x1b[0m\x07\n", q + "y\n", "", nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			stderr, err := confirmLines(t, tc.interactive, tc.stdin)
@@ -56,9 +66,9 @@ func TestConfirmLeavesWholeLines(t *testing.T) {
 				t.Errorf("stderr = %q, want %q", stderr, tc.stderr)
 			}
 			switch {
-			case tc.refused:
-				if !input.IsRequired(err) || !strings.Contains(err.Error(), "pass --yes") {
-					t.Errorf("err = %v, want the refusal naming --yes", err)
+			case tc.refusal != "":
+				if !input.IsRequired(err) || err.Error() != tc.refusal {
+					t.Errorf("err = %v, want the refusal %q", err, tc.refusal)
 				}
 			case tc.err == nil && err != nil:
 				t.Errorf("err = %v, want a yes", err)
@@ -161,6 +171,21 @@ func TestResetWithNoHomeFailsBeforeAsking(t *testing.T) {
 	if rt.called != "" {
 		t.Error("reset reached the runtime")
 	}
+
+	// A missing home is a failure, not a question this run could not ask, so
+	// under --output json it is the home error and not input_required.
+	d, rt, out := resetDeps(t)
+	d.HomeErr = errors.New("no home directory")
+	err = execute(t, d, "local", "reset", "-o", "json")
+	if err == nil || ProblemKinds.Of(err) == cliout.KindInputRequired {
+		t.Fatalf("err = %v (kind %q), want the home error, not input_required", err, ProblemKinds.Of(err))
+	}
+	if strings.Contains(out.String(), "input_required") || !strings.Contains(out.String(), "no home directory") {
+		t.Errorf("json = %q, want the home error", out.String())
+	}
+	if rt.called != "" {
+		t.Error("reset reached the runtime")
+	}
 }
 
 // With no terminal and no answer, reset still asks, ends the question's line,
@@ -209,5 +234,39 @@ func TestResetQuestionNamesTheProject(t *testing.T) {
 				t.Errorf("reset ran on %q, want %q", rt.called, dir)
 			}
 		})
+	}
+}
+
+// A project directory can be named with an escape sequence. The question
+// names the path, so the path is cleaned where the question is built: nothing
+// reaches the terminal that moves the cursor or retitles the window. The
+// wipe itself still runs on the real path.
+func TestResetQuestionCleansTheProjectPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a Windows file name cannot hold an escape")
+	}
+	d, rt, _ := resetDeps(t)
+	name := "proj\x1b]0;pwned\x07\x1b[2J" // an OSC window title, then a clear screen
+	dir := t.TempDir() + string(filepath.Separator) + name
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(validManifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	d.Stdin = strings.NewReader("y\n")
+	if err := execute(t, d, "local", "reset"); err != nil {
+		t.Fatalf("reset answered yes: %v", err)
+	}
+	stderr := stderrOf(d)
+	if strings.ContainsAny(stderr, "\x1b\x07") {
+		t.Errorf("an escape from the directory name reached the terminal: %q", stderr)
+	}
+	if want := "/proj? [y/N] "; !strings.Contains(stderr, want) {
+		t.Errorf("stderr = %q, want the question to end the path with %q", stderr, want)
+	}
+	if rt.called != dir {
+		t.Errorf("reset ran on %q, want the real path %q", rt.called, dir)
 	}
 }
