@@ -426,17 +426,6 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1"}
 		houstonClient = api
 
-		// mock os.Stdin
-		answer := []byte("1")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(answer)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
 		defer testUtil.MockUserInput(s.T(), "n")()
 
 		output, err := execDeploymentCmd(cmdArgs...)
@@ -462,20 +451,9 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1"}
 		houstonClient = api
 
-		// mock os.Stdin
-		answer := []byte("1")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(answer)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
 		defer testUtil.MockUserInput(s.T(), "y")()
 
-		_, err = execDeploymentCmd(cmdArgs...)
+		_, err := execDeploymentCmd(cmdArgs...)
 		s.NoError(err)
 		// Houston CreateDeployment API should be called if user confirms the prompt
 		api.AssertCalled(s.T(), "CreateDeployment", mock.Anything)
@@ -573,17 +551,6 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}
 		houstonClient = api
 
-		// mock os.Stdin
-		answer := []byte("1")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(answer)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
 		defer testUtil.MockUserInput(s.T(), "n")()
 
 		output, err := execDeploymentCmd(cmdArgs...)
@@ -615,20 +582,9 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}
 		houstonClient = api
 
-		// mock os.Stdin
-		answer := []byte("1")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(answer)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
 		defer testUtil.MockUserInput(s.T(), "y")()
 
-		_, err = execDeploymentCmd(cmdArgs...)
+		_, err := execDeploymentCmd(cmdArgs...)
 		s.NoError(err)
 		api.AssertCalled(s.T(), "GetDeployment", mock.Anything)
 		// Houston UpdateDeployment API should be called if user confirms the prompt
@@ -681,17 +637,6 @@ func (s *Suite) TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy() {
 		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=image"}
 		houstonClient = api
 
-		// mock os.Stdin
-		answer := []byte("1")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(answer)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
 		defer testUtil.MockUserInput(s.T(), "n")()
 
 		output, err := execDeploymentCmd(cmdArgs...)
@@ -723,20 +668,9 @@ func (s *Suite) TestDeploymentUpdateFromTypeDagDeployToNonDagDeploy() {
 		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=image"}
 		houstonClient = api
 
-		// mock os.Stdin
-		answer := []byte("1")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(answer)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
 		defer testUtil.MockUserInput(s.T(), "y")()
 
-		_, err = execDeploymentCmd(cmdArgs...)
+		_, err := execDeploymentCmd(cmdArgs...)
 		s.NoError(err)
 		api.AssertCalled(s.T(), "GetDeployment", mock.Anything)
 		// Houston UpdateDeployment API should be called if user does not confirm the prompt

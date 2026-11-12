@@ -239,7 +239,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, SkipUserPromptMsgForCreateDeployment)
+	addYesFlag(cmd, SkipUserPromptMsgForCreateDeployment)
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, runtimeEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
@@ -319,7 +319,7 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	addDeploymentArgFlag(cmd)
-	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Delete without asking for confirmation")
+	addYesFlag(cmd, "Delete without asking for confirmation")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -387,7 +387,7 @@ func addHibernationFlags(cmd *cobra.Command, period, doing string) {
 	cmd.Flags().StringVarP(&hibernateUntil, "until", "u", "", "End the "+period+" at this date and time, in RFC 3339. Example value: 2026-01-01T00:00:00Z")
 	cmd.Flags().StringVarP(&hibernateForDuration, "for", "d", "", "End the "+period+" after this long. Example value: 1h30m")
 	cmd.Flags().BoolVarP(&hibernateRemove, "remove-override", "r", false, "Remove any existing override and resume the regular hibernation schedule")
-	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Don't ask for confirmation before "+doing+" the Deployment")
+	addYesFlag(cmd, "Don't ask for confirmation before "+doing+" the Deployment")
 	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 }
@@ -432,7 +432,7 @@ func newDeploymentUnadoptCmd(out io.Writer) *cobra.Command {
 	}
 	addDeploymentFlag(cmd.Flags(), "Adopted Deployment to release: a link name from the project's manifest, or a Deployment id", true, "d")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Release the Deployment without asking for confirmation")
+	addYesFlag(cmd, "Release the Deployment without asking for confirmation")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -486,7 +486,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	}
 	addDeploymentArgFlag(cmd)
 
-	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, SkipUserPromptMsgForUpdateDeployment)
+	addYesFlag(cmd, SkipUserPromptMsgForUpdateDeployment)
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
@@ -703,18 +703,19 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		createTriggererReplicas = -1
 	}
 
-	// we should validate only in case when this feature has been enabled
-	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
-		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, false)
-		if err != nil {
+	// If it's a dag_deploy type, validate from the user first. That type is
+	// one validateDagDeploymentArgs always accepts, so nothing below can
+	// refuse the line after a yes.
+	if dagDeploymentType == houston.DagOnlyDeploymentType {
+		if err := confirm(CreateDeploymentWithTypeDagDeployPromptMsg); err != nil {
 			return err
 		}
 	}
 
-	// A dag_deploy type is confirmed with the person first, once what was
-	// asked for is known to be valid.
-	if dagDeploymentType == houston.DagOnlyDeploymentType {
-		if err := confirm(CreateDeploymentWithTypeDagDeployPromptMsg); err != nil {
+	// we should validate only in case when this feature has been enabled
+	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
+		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, false)
+		if err != nil {
 			return err
 		}
 	}
@@ -740,7 +741,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		Mode:              deploymentMode,
 		Namespace:         createNamespace,
 	}
-	d, err := deployment.Create(req, houstonClient, cliout.NotesTo(cmd, r.Format, out), appConfig)
+	d, err := deployment.Create(req, houstonClient, appConfig)
 	if err != nil {
 		return err
 	}
@@ -1007,6 +1008,12 @@ func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string,
 		}
 	}
 
+	// The files and the repository the flags name are read before the
+	// question too: a line that cannot be sent asks nothing.
+	if err := deployment.CheckDagDeploymentArgs(dagDeploymentType, sshKey, knowHosts, gitRepoURL); err != nil {
+		return err
+	}
+
 	// Moving onto or off dag_deploy is confirmed with the person first, once
 	// what was asked for is known to be valid.
 	if err := confirmDagDeploymentTypeChange(deploymentInfo.DagDeployment.Type, dagDeploymentType); err != nil {
@@ -1031,7 +1038,7 @@ func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
 	if cancel {
 		change, err = deployment.AirflowUpgradeCancel(deploymentID, houstonClient)
 	} else {
-		change, err = deployment.AirflowUpgrade(deploymentID, desiredAirflowVersion, houstonClient, cliout.NotesTo(cmd, r.Format, out))
+		change, err = deployment.AirflowUpgrade(deploymentID, desiredAirflowVersion, houstonClient)
 	}
 	if err != nil {
 		return err
@@ -1050,7 +1057,7 @@ func deploymentRuntimeUpgrade(cmd *cobra.Command, out io.Writer) error {
 	if cancel {
 		change, err = deployment.RuntimeUpgradeCancel(deploymentID, houstonClient)
 	} else {
-		change, err = deployment.RuntimeUpgrade(deploymentID, desiredRuntimeVersion, houstonClient, cliout.NotesTo(cmd, r.Format, out))
+		change, err = deployment.RuntimeUpgrade(deploymentID, desiredRuntimeVersion, houstonClient)
 	}
 	if err != nil {
 		return err

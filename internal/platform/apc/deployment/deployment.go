@@ -86,9 +86,9 @@ func addTriggererReplicasArg(vars map[string]interface{}, appConfig *houston.App
 }
 
 // Create creates an Airflow Deployment and returns it as Houston reported it.
-// out is where the namespace picker draws its choices, when the platform asks
-// for a namespace.
-func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io.Writer, appConfig *houston.AppConfig) (*houston.Deployment, error) {
+// When the platform asks for a namespace, the picker is drawn on stderr, as
+// every question is.
+func Create(req *CreateDeploymentRequest, client houston.ClientInterface, appConfig *houston.AppConfig) (*houston.Deployment, error) {
 	vars := map[string]interface{}{"label": req.Label, "workspaceId": req.WS, "executor": req.Executor, "cloudRole": req.CloudRole}
 
 	if req.ClusterID != "" {
@@ -110,7 +110,7 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 		}
 		vars["namespace"] = namespace
 	case appConfig.Flags.ManualNamespaceNames:
-		namespace, err := getDeploymentSelectionNamespaces(client, out, req.ClusterID, req.Namespace)
+		namespace, err := getDeploymentSelectionNamespaces(client, req.ClusterID, req.Namespace)
 		if err != nil {
 			return nil, err
 		}
@@ -169,8 +169,8 @@ func (e errNamespaceNotAvailable) Error() string {
 
 // getDeploymentSelectionNamespaces is the namespace for a new Deployment, from
 // the ones the platform offers: given (--namespace) when it is one of them,
-// or the one picked from a list drawn on out.
-func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Writer, clusterID, given string) (string, error) {
+// or the one picked from a list drawn on stderr.
+func getDeploymentSelectionNamespaces(client houston.ClientInterface, clusterID, given string) (string, error) {
 	logger.Debug("checking namespaces available for platform")
 
 	names, err := houston.Call(client.GetAvailableNamespaces)(map[string]interface{}{"clusterID": clusterID})
@@ -206,7 +206,7 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 	for _, namespace := range names {
 		list.AddRow(false, namespace.Name)
 	}
-	i, err := list.Pick(out, os.Stdin)
+	i, err := list.Pick(os.Stderr, os.Stdin)
 	if err != nil {
 		return "", err
 	}
@@ -306,8 +306,8 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 }
 
 // AirflowUpgrade starts upgrading a Deployment's Airflow. With no desired
-// version it asks for one, drawing the choices on out.
-func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInterface, out io.Writer) (*VersionChange, error) {
+// version it asks for one, drawing the choices on stderr.
+func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInterface) (*VersionChange, error) {
 	deployment, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return nil, err
@@ -318,7 +318,7 @@ func AirflowUpgrade(id, desiredAirflowVersion string, client houston.ClientInter
 	}
 
 	if desiredAirflowVersion == "" {
-		selectedVersion, err := getAirflowVersionSelection(deployment.AirflowVersion, client, out)
+		selectedVersion, err := getAirflowVersionSelection(deployment.AirflowVersion, client)
 		if err != nil {
 			return nil, err
 		}
@@ -380,8 +380,8 @@ func AirflowUpgradeCancel(id string, client houston.ClientInterface) (*VersionCh
 }
 
 // RuntimeUpgrade starts upgrading a Deployment to a newer Runtime version.
-// With no desired version it asks for one, drawing the choices on out.
-func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInterface, out io.Writer) (*VersionChange, error) {
+// With no desired version it asks for one, drawing the choices on stderr.
+func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInterface) (*VersionChange, error) {
 	deployment, err := houston.Call(client.GetDeployment)(id)
 	if err != nil {
 		return nil, err
@@ -392,7 +392,7 @@ func RuntimeUpgrade(id, desiredRuntimeVersion string, client houston.ClientInter
 	}
 
 	if desiredRuntimeVersion == "" {
-		selectedVersion, err := getRuntimeVersionSelection(deployment.RuntimeVersion, deployment.RuntimeAirflowVersion, deployment.ClusterID, client, out)
+		selectedVersion, err := getRuntimeVersionSelection(deployment.RuntimeVersion, deployment.RuntimeAirflowVersion, deployment.ClusterID, client)
 		if err != nil {
 			return nil, err
 		}
@@ -531,7 +531,7 @@ func RuntimeMigrateCancel(id string, client houston.ClientInterface) (*VersionCh
 	}, nil
 }
 
-func getAirflowVersionSelection(airflowVersion string, client houston.ClientInterface, out io.Writer) (string, error) {
+func getAirflowVersionSelection(airflowVersion string, client houston.ClientInterface) (string, error) {
 	currentAirflowVersion, err := semver.NewVersion(airflowVersion)
 	if err != nil {
 		return "", err
@@ -559,14 +559,14 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 		}
 	}
 
-	i, err := list.Pick(out, os.Stdin)
+	i, err := list.Pick(os.Stderr, os.Stdin)
 	if err != nil {
 		return "", err
 	}
 	return filteredVersions[i], nil
 }
 
-func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string, client houston.ClientInterface, out io.Writer) (string, error) {
+func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string, client houston.ClientInterface) (string, error) {
 	currentRuntimeVersion, err := semver.NewVersion(normalizeRuntimeVersion(runtimeVersion))
 	if err != nil {
 		return "", err
@@ -607,7 +607,7 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string
 		}
 	}
 
-	i, err := list.Pick(out, os.Stdin)
+	i, err := list.Pick(os.Stderr, os.Stdin)
 	if err != nil {
 		return "", err
 	}
@@ -689,6 +689,15 @@ func meetsRuntimeUpgradeReqs(runtimeVersion, desiredRuntimeVersion string) error
 	}
 
 	return nil
+}
+
+// CheckDagDeploymentArgs reads what an update's dag deployment flags name (the
+// SSH key and known hosts files, the repository URL) and returns the error
+// the update would return for them, without sending anything. A command calls
+// it before it asks a question that only a request that can be sent should
+// ask.
+func CheckDagDeploymentArgs(dagDeploymentType, sshKey, knownHosts, gitRepoURL string) error {
+	return addDagDeploymentArgs(map[string]interface{}{}, dagDeploymentType, "", sshKey, knownHosts, gitRepoURL, "", "", "", 0)
 }
 
 // addDagDeploymentArgs adds dag deployment argument to houston request map

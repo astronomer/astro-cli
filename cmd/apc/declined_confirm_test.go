@@ -1,6 +1,7 @@
 package apc
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,7 +20,7 @@ func apcAt(version string) *mocks.ClientInterface {
 	api := new(mocks.ClientInterface)
 	api.On("GetPlatformVersion", mock.Anything).Return(version, nil).Maybe()
 	api.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Version: version, Flags: houston.FeatureFlags{
-		AstroRuntimeEnabled: true, TriggererEnabled: true, DagOnlyDeployment: true,
+		AstroRuntimeEnabled: true, TriggererEnabled: true, DagOnlyDeployment: true, GitSyncEnabled: true,
 	}}, nil).Maybe()
 	return api
 }
@@ -335,6 +336,20 @@ func TestDagDeployQuestionFollowsValidation(t *testing.T) {
 		assert.NotContains(t, run.stderr, "experimental feature")
 		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
 	})
+	t.Run("update to git_sync with an ssh key that is not there", func(t *testing.T) {
+		api := apcAt("2.1.0")
+		api.On("GetDeployment", "dep-1").Return(&houston.Deployment{ID: "dep-1", DagDeployment: houston.DagDeploymentConfig{Type: houston.DagOnlyDeploymentType}}, nil)
+
+		run := runAPCGated(t, api, true, "y\n", "deployment", "update", "dep-1", "--dag-deployment-type", "git_sync",
+			"--git-repository-url", "git@example.com:o/r.git", "--ssh-key", filepath.Join(t.TempDir(), "missing"))
+
+		assert.Equal(t, 1, run.code)
+		require.Error(t, run.err)
+		assert.NotErrorIs(t, run.err, input.ErrAborted)
+		assert.False(t, run.stdinRead, "asked before the key was read")
+		assert.NotContains(t, run.stderr, "erase all of the currently deployed Dags")
+		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
+	})
 	t.Run("update to volume with no mount", func(t *testing.T) {
 		api := apcAt("2.1.0")
 		api.On("GetDeployment", "dep-1").Return(&houston.Deployment{ID: "dep-1", DagDeployment: houston.DagDeploymentConfig{Type: houston.DagOnlyDeploymentType}}, nil)
@@ -346,5 +361,41 @@ func TestDagDeployQuestionFollowsValidation(t *testing.T) {
 		assert.NotErrorIs(t, run.err, input.ErrAborted)
 		assert.False(t, run.stdinRead)
 		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
+	})
+}
+
+// A picker is a question: it is drawn on stderr, so a command whose stdout is
+// redirected to a file captures no table and no prompt.
+func TestPickersAreNotDrawnOnStdout(t *testing.T) {
+	t.Run("create asks for a namespace", func(t *testing.T) {
+		api := new(mocks.ClientInterface)
+		api.On("GetPlatformVersion", mock.Anything).Return("2.1.0", nil).Maybe()
+		api.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Version: "2.1.0", Flags: houston.FeatureFlags{
+			AstroRuntimeEnabled: true, TriggererEnabled: true, ManualNamespaceNames: true,
+		}}, nil).Maybe()
+		api.On("GetAvailableNamespaces", mock.Anything).Return([]houston.Namespace{{Name: "ns-a"}, {Name: "ns-b"}}, nil)
+		api.On("CreateDeployment", mock.MatchedBy(func(v map[string]interface{}) bool { return v["namespace"] == "ns-b" })).Return(&runtimeDep, nil)
+
+		run := runAPCGated(t, api, true, "2\n", "deployment", "create", "--cluster-id", "cl-1", "--name", "alpha")
+
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		assert.Contains(t, run.stderr, "AVAILABLE KUBERNETES NAMESPACES")
+		assert.NotContains(t, run.stdout, "AVAILABLE KUBERNETES NAMESPACES")
+		assert.NotContains(t, run.stdout, "ns-a")
+		assert.NotContains(t, run.stdout, "> ")
+		api.AssertCalled(t, "CreateDeployment", mock.Anything)
+	})
+	t.Run("airflow upgrade asks for a version", func(t *testing.T) {
+		api := apcAt("2.1.0")
+		api.On("GetDeployment", "dep-1").Return(&houston.Deployment{ID: "dep-1", AirflowVersion: "1.10.7"}, nil)
+		api.On("GetDeploymentConfig", mock.Anything).Return(&houston.DeploymentConfig{AirflowVersions: []string{"1.10.7", "1.10.10", "1.10.12"}}, nil)
+		api.On("UpdateDeploymentAirflow", mock.Anything).Return(&houston.Deployment{ID: "dep-1", AirflowVersion: "1.10.7", DesiredAirflowVersion: "1.10.12"}, nil)
+
+		run := runAPCGated(t, api, true, "2\n", "deployment", "airflow", "upgrade", "--deployment", "dep-1")
+
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		assert.Contains(t, run.stderr, "AIRFLOW VERSION")
+		assert.NotContains(t, run.stdout, "AIRFLOW VERSION")
+		assert.NotContains(t, run.stdout, "Astronomer-Certified-1.10.10")
 	})
 }
