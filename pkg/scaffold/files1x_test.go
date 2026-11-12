@@ -563,6 +563,52 @@ func TestPinOnlyDockerfileRecordsItsRuntime(t *testing.T) {
 	}
 }
 
+// The Python a pin-only Dockerfile's -python-X.Y flavor names is recorded only
+// when its pin is the one the manifest took. A pin that lost to --airflow-version
+// or to an existing requirement is a different Airflow, and its Python must not
+// become requires-python, just as its runtime is not recorded.
+func TestPinOnlyDockerfilePythonIsRecordedOnlyWhenItsPinWon(t *testing.T) {
+	const dockerfile = "FROM astrocrpublic.azurecr.io/runtime:3.3-8-python-3.11\n"
+	for _, tc := range []struct {
+		name    string
+		files   map[string]string
+		opts    Options
+		wantPy  string
+		wantRun string
+	}{
+		{name: "the Dockerfile's pin won", files: map[string]string{fileDockerfile: dockerfile}, wantPy: "==3.11.*", wantRun: "3.3-8"},
+		{
+			name: "--airflow-version named another", files: map[string]string{fileDockerfile: dockerfile},
+			opts: Options{AirflowVersion: "3.2"},
+		},
+		{
+			name: "an existing requirement named another",
+			files: map[string]string{
+				fileDockerfile: dockerfile,
+				manifest.Marker: "[project]\nname = 'p'\nversion = '0.1.0'\nrequires-python = '>=3.10'\n" +
+					"dependencies = ['apache-airflow==3.2.*']\n",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTree(t, dir, tc.files)
+			_, err := Run(dir, tc.opts)
+			require.NoError(t, err)
+			data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+			require.NoError(t, err)
+			m, err := manifest.Parse(data)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantRun, m.Astro.Runtime)
+			if tc.wantPy != "" {
+				assert.Equal(t, tc.wantPy, m.Project.RequiresPython)
+			} else {
+				assert.NotContains(t, string(data), "3.11", "the losing Dockerfile's Python is not recorded")
+			}
+		})
+	}
+}
+
 // A deletion is planned, not performed, so a preview can show it.
 func TestPlanDoesNotDeleteAnything(t *testing.T) {
 	dir := t.TempDir()
@@ -1090,6 +1136,22 @@ func TestRunPipSpecs(t *testing.T) {
 	}
 }
 
+// A spec is printed as one POSIX shell word, so a marker's double quotes paste
+// as written rather than being read by the shell. (A spec with a $ or a
+// backtick is never reported: runPipSpecs skips it as a variable.)
+func TestPipInstallNotesQuoteTheSpecForAShell(t *testing.T) {
+	for _, tc := range []struct{ spec, want string }{
+		{`pkg; python_version<"3.12"`, `uv add 'pkg; python_version<"3.12"'`},
+		{`pkg==1.0; sys_platform=="linux"`, `uv add 'pkg==1.0; sys_platform=="linux"'`},
+	} {
+		t.Run(tc.spec, func(t *testing.T) {
+			notes := pipInstallNotes([]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-12\nRUN pip install " + ShellQuote(tc.spec) + "\n"))
+			require.Len(t, notes, 1, "notes: %q", notes)
+			assert.True(t, strings.HasSuffix(notes[0], tc.want), "got %q, want suffix %q", notes[0], tc.want)
+		})
+	}
+}
+
 func TestKeptDockerfilePipInstallsAreReported(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(
@@ -1101,7 +1163,7 @@ func TestKeptDockerfilePipInstallsAreReported(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, res.Notes, "Dockerfile: a pip step installs "+
 		"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3. For standalone mode too, run: "+
-		"uv add \"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3\"")
+		"uv add 'example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3'")
 	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.NotContains(t, strings.Join(m.Project.Dependencies, "\n"), "example-lib", "the note reports; it does not add")

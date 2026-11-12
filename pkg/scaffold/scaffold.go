@@ -652,15 +652,21 @@ func declaresDockerfile(from1x *project1x) bool {
 	return len(from1x.dockerfileBody) > 0 && !from1x.dockerfilePinOnly && !from1x.dockerfileForeign
 }
 
-// buildPython is the Python this project's image runs when its Dockerfile is
-// the build and the base's tag names one, or "". A Dockerfile that is only a
-// pin gives nothing here: the image is then generated from the runtime series
-// and runs that runtime's default Python.
-func (from1x *project1x) buildPython() string {
-	if !declaresDockerfile(from1x) && !from1x.pinRecorded {
-		return ""
+// buildPython is the Python this project's image runs when it is stated, or "".
+// pinned is the Airflow version the manifest ends up pinning.
+//
+// A declared Dockerfile is the build, so its base's Python is the image's. A
+// pin-only Dockerfile's -python-X.Y flavor is recorded too (pinRecorded), but
+// only when its pin is the one the manifest took, as setRuntimeDeclaration does
+// for the runtime: a pin that lost to --airflow-version or an existing
+// requirement is a different Airflow, and its Python says nothing about the
+// image that one runs. A pin-only Dockerfile that gives nothing here leaves
+// the image generated from the runtime series, on that runtime's default Python.
+func (from1x *project1x) buildPython(pinned string) string {
+	if declaresDockerfile(from1x) || (from1x.pinRecorded && pinned == from1x.airflow) {
+		return from1x.basePython
 	}
-	return from1x.basePython
+	return ""
 }
 
 // set1xDeclarations writes what the 1.x files declare beyond the dependency
@@ -717,16 +723,17 @@ func setDockerfileDeclaration(ed tomledit.Editor, from1x *project1x) error {
 	return ed.Set([]string{"tool", "astro", manifestKeyDockerfile}, fileDockerfile)
 }
 
-// setRuntimeDeclaration records the Airflow 2 build a pin-only Dockerfile was
-// FROM as [tool.astro] runtime, so the image a deploy generates is the one the
-// 1.x project built rather than the newest Airflow 2. Only when the manifest's
-// pin is the one that tag gave: a pin from --airflow-version or an existing
-// requirement won, and the Dockerfile stays behind as the record of what it
-// was (dockerfileIsSpent).
+// setRuntimeDeclaration records the Astro Runtime version a pin-only Dockerfile
+// was FROM as [tool.astro] runtime, so the image a deploy generates is the
+// build the 1.x project used: for Airflow 2 rather than the newest Airflow 2,
+// and for Airflow 3 rather than the newest release of its series. Only when the
+// manifest's pin is the one that tag gave: a pin from --airflow-version or an
+// existing requirement won, and the Dockerfile stays behind as the record of
+// what it was (dockerfileIsSpent). The Python flavor of that tag is recorded
+// under the same condition, as requires-python (buildPython).
 //
-// This is the one runtime line a conversion writes. An Airflow 3 tag needs
-// none, its series being the pin, and a declared Dockerfile picks its own
-// base.
+// This is the one runtime line a conversion writes. A declared Dockerfile
+// picks its own base, so it records none.
 func setRuntimeDeclaration(ed tomledit.Editor, from1x *project1x, pinned string) error {
 	if from1x.runtime == "" || pinned != from1x.airflow {
 		return nil
@@ -827,7 +834,7 @@ func (p airflowPick) defaulted() bool { return p.source != "" }
 // the newest it finds: a floor resolves for interpreters the image never runs,
 // can fail on one of them, and can start standalone on another.
 func (p airflowPick) pythonBound(from1x *project1x) string {
-	if python := from1x.buildPython(); python != "" {
+	if python := from1x.buildPython(p.version); python != "" {
 		return "==" + python + ".*"
 	}
 	if p.requiresPython != "" {
@@ -1226,7 +1233,7 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	checks := []struct{ file, note string }{
 		{"docker-compose.yml", "not read — astro local start replaces it"},
 		{"docker-compose.yaml", "not read — astro local start replaces it"},
-		{"docker-compose.override.yml", "applies to astro local start --docker only"},
+		{composeOverrideFile, composeOverrideNote},
 		{"docker-compose.override.yaml", "not read — Docker mode merges docker-compose.override.yml, so rename it to use it there"},
 	}
 	for _, c := range checks {
@@ -1262,7 +1269,14 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 }
 
 // infoNotes are notes that need nothing done, which Info carries instead.
-var infoNotes = []string{"docker-compose.override.yml: applies to astro local start --docker only"}
+// Built from the constants leftovers() builds the same note from, so the two
+// cannot drift apart and move it back under "Left to do".
+var infoNotes = []string{composeOverrideFile + ": " + composeOverrideNote}
+
+const (
+	composeOverrideFile = "docker-compose.override.yml"
+	composeOverrideNote = "applies to astro local start --docker only"
+)
 
 // instancesNotes are a note per deployment link .astro/config.yaml's
 // `instances:` list holds, each the command that links it (LinkNotePrefix). A

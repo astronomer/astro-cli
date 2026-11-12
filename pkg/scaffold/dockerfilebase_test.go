@@ -291,6 +291,9 @@ func TestInitDeclaresABuildArgumentBaseAsUnknown(t *testing.T) {
 			assert.Contains(t, buildArg[0], "dockerfile under [tool.astro] in pyproject.toml")
 			assert.Contains(t, buildArg[0], "cannot confirm it is an Astro Runtime image")
 			assert.Contains(t, buildArg[0], "fails when the containers start")
+			assert.Contains(t, buildArg[0], "its base installs requirements.txt, so it stays too",
+				"the lists a declared build keeps are said here, not in a second note")
+			assert.NotContains(t, joined, "kept as this project's build", "one note about the file, not two")
 			assert.Contains(t, joined, "is the default, not this project's version")
 			for _, label := range append(res.Created, res.Updated...) {
 				assert.NotContains(t, label, "from the Dockerfile")

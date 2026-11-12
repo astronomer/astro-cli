@@ -105,9 +105,9 @@ func adopt(dir string, data []byte, opts *Options, from1x *project1x, res *Resul
 	// absent key and one this run just wrote look the same.
 	// A kept Dockerfile's Python is the sharper test of a stated bound, and
 	// the note below makes it.
-	pin.loosePython = from1x.buildPython() == "" && statedPythonTooLoose(ed, version)
+	pin.loosePython = from1x.buildPython(version) == "" && statedPythonTooLoose(ed, version)
 	bound := pick.pythonBound(from1x)
-	pin.migrationNotes = append(pin.migrationNotes, statedPythonNotTheImagesNote(ed, from1x.buildPython(), bound)...)
+	pin.migrationNotes = append(pin.migrationNotes, statedPythonNotTheImagesNote(ed, from1x.buildPython(version), bound)...)
 	requiresPythonLabel, err := ensureProjectKeys(ed, bound)
 	if err != nil {
 		return nil, nil, pin, err

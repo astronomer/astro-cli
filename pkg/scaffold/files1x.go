@@ -271,6 +271,9 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 	from1x.dockerfilePinOnly = dockerfileIsPinOnly(data)
 	var notes []string
 	var keptWhy string
+	// The build-argument note already says the file is declared as the build,
+	// so a second, generic "kept as this project's build" would repeat it.
+	var buildArgNoted bool
 	if airflowrt.IsUnresolvedRef(ref) {
 		// Unknown, so declared unless pin-only. The version is still read when the build
 		// argument leaves the image's name and its tag literal, as in
@@ -279,7 +282,8 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 		// (`${BASE:-runtime:3.1-12}` splits to the tag "3.1-12}"), nothing is,
 		// and the pin defaults with the defaulted-pin note.
 		from1x.statedVersion = true
-		notes = []string{buildArgDockerfileNote(ref, from1x.dockerfilePinOnly)}
+		notes = []string{buildArgDockerfileNote(ref, from1x.dockerfilePinOnly, from1x.present)}
+		buildArgNoted = true
 		if !strings.ContainsAny(tag, "${}") && strings.Contains(image, runtimeImageHint) {
 			version, _, versionNotes := airflowFromDockerfile(image, tag, nil)
 			from1x.airflow = version
@@ -329,7 +333,7 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 	// kept too (planRetirements spares a file a note names), and their
 	// contents are in pyproject.toml as well, for standalone mode. That is two
 	// package lists, so it is said.
-	if !from1x.dockerfilePinOnly {
+	if !from1x.dockerfilePinOnly && !buildArgNoted {
 		from1x.notes = append(from1x.notes, keptDockerfileNote(keptWhy, from1x.present))
 	}
 }
@@ -343,6 +347,17 @@ func keptDockerfileNote(why string, present []string) string {
 		note += ", because " + why
 	}
 	note += ". It builds as written and doesn't install from uv.lock yet"
+	if clause := keptListsClause(present); clause != "" {
+		note += ": " + clause
+	}
+	return note
+}
+
+// keptListsClause says which of requirements.txt and packages.txt stay beside
+// a declared Dockerfile because its base installs them, or "" when neither is
+// there. planRetirements spares them because the Dockerfile is declared, not
+// because of this text; it is for the reader, who is told there are two copies.
+func keptListsClause(present []string) string {
 	var lists []string
 	for _, l := range []string{"requirements.txt", "packages.txt"} {
 		if slices.Contains(present, l) {
@@ -351,26 +366,32 @@ func keptDockerfileNote(why string, present []string) string {
 	}
 	switch len(lists) {
 	case 1:
-		note += ": its base installs " + lists[0] + ", so it stays too, and it is in pyproject.toml as well, for standalone mode"
+		return "its base installs " + lists[0] + ", so it stays too, and it is in pyproject.toml as well, for standalone mode"
 	case 2:
-		note += ": its base installs " + strings.Join(lists, " and ") + ", so they stay too, and they are in pyproject.toml as well, for standalone mode"
+		return "its base installs " + strings.Join(lists, " and ") + ", so they stay too, and they are in pyproject.toml as well, for standalone mode"
 	}
-	return note
+	return ""
 }
 
 // buildArgDockerfileNote tells the user a Dockerfile's final FROM, ref, is
 // built from a build argument, so its base was not judged. pinOnly is a file
 // that says nothing else: astro passes no --build-arg, so it cannot be built as
-// it stands, and it is kept and not declared.
-func buildArgDockerfileNote(ref string, pinOnly bool) string {
+// it stands, and it is kept and not declared. present is the 1.x files found,
+// for a declared file's lists (keptListsClause), which the generic kept note
+// would otherwise have carried.
+func buildArgDockerfileNote(ref string, pinOnly bool, present []string) string {
 	note := "Dockerfile: its final FROM is " + ref + ", which comes from a build argument this run does not " +
 		"expand, so astro cannot confirm it is an Astro Runtime image. "
 	if pinOnly {
 		return note + "It names nothing else, so it was kept and not declared as this project's build; to use it " +
 			"as the build, replace the build argument in FROM with a literal Astro Runtime image"
 	}
-	return note + "It was declared as this project's build (dockerfile under [tool.astro] in " + manifest.Marker +
+	note += "It was declared as this project's build (dockerfile under [tool.astro] in " + manifest.Marker +
 		"); make sure its base is one, because a base that is not fails when the containers start"
+	if clause := keptListsClause(present); clause != "" {
+		note += ". If it is, " + clause
+	}
+	return note
 }
 
 // foreignDockerfileNote tells the user a Dockerfile was found and not made the
@@ -793,7 +814,7 @@ func airflowFromDockerfile(image, tag string, err error) (version string, stated
 func pipInstallNotes(data []byte) []string {
 	var notes []string
 	for _, spec := range runPipSpecs(data) {
-		notes = append(notes, "Dockerfile: a pip step installs "+spec+". For standalone mode too, run: uv add \""+spec+"\"")
+		notes = append(notes, "Dockerfile: a pip step installs "+spec+". For standalone mode too, run: uv add "+ShellQuote(spec))
 	}
 	return notes
 }
