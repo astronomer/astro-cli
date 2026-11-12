@@ -277,8 +277,8 @@ func (s *Suite) TestIsAstronomerRegistry() {
 // one, or text that mentions one, is not it.
 func (s *Suite) TestIsAstronomerRegistryHost() {
 	for registry, want := range map[string]bool{
-		"images.astronomer.cloud":                  true,
-		"images.astronomer-dev.cloud":              true,
+		astronomerRegistries[0]:                    true,
+		astronomerRegistries[1]:                    true,
 		"images.astronomer-stage.cloud/":           true,
 		"Images.Astronomer.Cloud":                  true,
 		"images.astronomer.cloud.attacker.example": false,
