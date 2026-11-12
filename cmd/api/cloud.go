@@ -22,6 +22,7 @@ import (
 // CloudOptions holds all options for the cloud api command.
 type CloudOptions struct {
 	RequestOptions
+	Labs            bool
 	SpecURL         string // hidden flag: alternative OpenAPI spec URL
 	SpecTokenEnvVar string // hidden flag: env var name containing auth token for spec fetch
 }
@@ -92,7 +93,10 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   astro api cloud /organizations/{organizationId} -i
 
   # Verbose mode showing full request/response
-  astro api cloud /organizations/{organizationId} --verbose`,
+  astro api cloud /organizations/{organizationId} --verbose
+
+  # Use the Labs API, which adds experimental endpoints
+  astro api cloud ls --labs`,
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			opts.RequestMethodPassed = cmd.Flags().Changed("method")
@@ -127,12 +131,14 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 
 	// Other flags
 	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Output a curl command instead of executing the request")
+	cmd.PersistentFlags().BoolVar(&opts.Labs, "labs", false, "Use the Labs API, which adds experimental endpoints to the Cloud API")
 	cmd.PersistentFlags().StringVar(&opts.SpecURL, "spec-url", "", "OpenAPI spec URL or file path (overrides default Cloud API spec)")
 	cmd.PersistentFlags().StringVar(&opts.SpecTokenEnvVar, "spec-token-env-var", "", "Environment variable containing auth token for fetching the spec")
 	//nolint:errcheck // error deliberately ignored in this shell code
 	cmd.PersistentFlags().MarkHidden("spec-url")
 	//nolint:errcheck // error deliberately ignored in this shell code
 	cmd.PersistentFlags().MarkHidden("spec-token-env-var")
+	cmd.MarkFlagsMutuallyExclusive("labs", "spec-url")
 
 	// Add list and describe subcommands (cloud-specific to support lazy cache init)
 	cmd.AddCommand(NewCloudListCmd(out, opts))
@@ -212,7 +218,7 @@ func runCloud(opts *CloudOptions) error {
 
 	// Build the full URL using the domain-derived base URL
 	var baseURL string
-	if opts.SpecURL != "" {
+	if opts.SpecURL != "" || opts.Labs {
 		if err := opts.specCache.Load(false); err != nil {
 			return fmt.Errorf("loading spec: %w", err)
 		}
@@ -417,13 +423,19 @@ func initCloudSpecCache(opts *CloudOptions, ctx *config.Context) error {
 		return nil
 	}
 
-	domain := domainutil.FormatDomain(ctx.Domain)
-	specURL := ctx.GetPublicRESTAPIURL("spec/v1.0")
+	specPath := "spec/v1.0"
+	if opts.Labs {
+		specPath = "spec/labs/v1"
+	}
+	specURL := ctx.GetPublicRESTAPIURL(specPath)
 	if specURL == "" {
 		return fmt.Errorf("could not determine API spec URL for domain %q. Check your login context", ctx.Domain)
 	}
-	cachePath := filepath.Join(config.HomeConfigPath, openapi.CloudCacheFileNameForDomain(domain))
-	opts.specCache = openapi.NewCacheWithOptions(specURL, cachePath)
+	cacheFile := openapi.CloudCacheFileNameForDomain(domainutil.FormatDomain(ctx.Domain))
+	if opts.Labs {
+		cacheFile = openapi.SpecCacheFileName(specURL)
+	}
+	opts.specCache = openapi.NewCacheWithOptions(specURL, filepath.Join(config.HomeConfigPath, cacheFile))
 	return nil
 }
 
