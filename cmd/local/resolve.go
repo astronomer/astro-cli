@@ -320,11 +320,12 @@ func (c *cli) resolveDeployment(f deploymentFlags) (instances.Selection, error) 
 	return sel, nil
 }
 
-// mayPrompt reports whether this run may ask a question: someone has to be
-// there to answer, and json output has to stay a stream a program can parse —
-// a prompt on stderr with the run blocked on stdin is not that.
+// mayPrompt reports whether this run may ask a question (input.CanAsk: stdin
+// and stderr are terminals, and not under json, CI or --non-interactive). A run
+// that does not pass the guard (a test calling a command directly) still never
+// asks under json.
 func (c *cli) mayPrompt() bool {
-	return c.interactive() && c.output != cliout.FormatJSON
+	return input.CanAsk() && c.output != cliout.FormatJSON
 }
 
 // pickAndPin asks which deployment to use and writes the answer to the pin, so
@@ -360,7 +361,7 @@ func (c *cli) announceInstance(i instances.Instance) {
 // "2", and reading the number first would pin whichever entry happened to sit
 // in that position instead. There is no default on Enter, because the safe
 // answer to "which Airflow should I act on" is never one this picked for you.
-// It asks on stderr, and is only ever reached on an interactive run.
+// It asks on stderr, and is only reached by a run that may ask.
 func (c *cli) promptForDeployment(choices []string) (string, error) {
 	ambiguous := &instances.AmbiguousError{Choices: choices}
 	l := picker.List{
@@ -382,14 +383,4 @@ func (c *cli) promptForDeployment(choices []string) (string, error) {
 		return "", err
 	}
 	return choices[i], nil
-}
-
-// interactive reports whether this run can ask a question: someone has to be at
-// a terminal to answer it. A piped or redirected stdin is a script, and a
-// script must decide with -d, ASTRO_DEPLOYMENT, or a pin rather than be asked.
-func (c *cli) interactive() bool {
-	if c.d.Interactive != nil {
-		return c.d.Interactive()
-	}
-	return false
 }

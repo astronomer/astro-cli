@@ -21,6 +21,7 @@ import (
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 var (
@@ -120,6 +121,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// setup below: apcCmd.NeedsPlatform reads the root's persistent flags to
 	// find which command a line runs.
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
+	input.AddFlag(rootCmd.PersistentFlags())
 
 	rootCmd.AddCommand(
 		newLoginCommand(astroV1Client, o.out),
@@ -187,7 +189,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// The root's out, os.Stdout in production, so a test of the assembled
 	// root reads what a core command publishes where it reads the rest.
 	coreDeps.Stdout = o.out
-	wireLinkPickers(&coreDeps, o.platform, astroV1Client, houstonClient, o.out)
+	wireLinkPickers(&coreDeps, o.platform, astroV1Client, houstonClient, os.Stderr)
 	// A single positional argument is Otto's first message in an interactive
 	// session.
 	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}, ottoMembership(astroV1Client)) }

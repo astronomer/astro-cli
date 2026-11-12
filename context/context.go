@@ -217,8 +217,10 @@ func IsCloudDomain(domain string) bool {
 		return true
 	}
 
-	// Case when user is connected to localhost && internal.localhost.platform (1.x: local.platform) is set to cloud in astro config
-	if strings.Contains(domain, "localhost") && config.CFG.LocalPlatform.GetString() == config.CloudPlatform {
+	// Case when user is connected to localhost && internal.localhost.platform (1.x: local.platform) is set to cloud in astro config.
+	// Only localhost itself: a domain that merely contains the word (localhost.example.com) is
+	// someone else's host, and a cloud login there would hand it an Astro token.
+	if domain == domainutil.LocalDomain && config.CFG.LocalPlatform.GetString() == config.CloudPlatform {
 		return true
 	}
 

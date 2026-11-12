@@ -273,6 +273,24 @@ func (s *Suite) TestIsAstronomerRegistry() {
 	}
 }
 
+// Only the registry host itself takes an Astro token: a host that contains
+// one, or text that mentions one, is not it.
+func (s *Suite) TestIsAstronomerRegistryHost() {
+	for registry, want := range map[string]bool{
+		astronomerRegistries[0]:                    true,
+		astronomerRegistries[1]:                    true,
+		"images.astronomer-stage.cloud/":           true,
+		"Images.Astronomer.Cloud":                  true,
+		"images.astronomer.cloud.attacker.example": false,
+		"evil.example/images.astronomer.cloud":     false,
+		"FROM images.astronomer.cloud/base:1":      false,
+		"quay.io":                                  false,
+		"":                                         false,
+	} {
+		s.Equal(want, IsAstronomerRegistryHost(registry), registry)
+	}
+}
+
 func (s *Suite) TestIsCUID() {
 	tests := []struct {
 		name   string

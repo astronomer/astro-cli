@@ -426,3 +426,33 @@ func TestGitIgnoresThePerMachineFiles(t *testing.T) {
 		})
 	}
 }
+
+func TestIgnoresRootFile(t *testing.T) {
+	for _, tc := range []struct {
+		gitignore string
+		want      bool
+	}{
+		{"uv.lock\n", true},
+		{"/uv.lock\n", true},
+		{"**/uv.lock\n", true},
+		{"*.lock\n", true},
+		{"uv.lock\n!/uv.lock\n", false},
+		{"bi/scripts/**/uv.lock\n", false},
+		{"uv.lock/\n", false},
+		{"# uv.lock\n", false},
+		{"", false},
+	} {
+		assert.Equal(t, tc.want, ignoresRootFile(tc.gitignore, "uv.lock"), "%q", tc.gitignore)
+	}
+}
+
+func TestPlanIgnoreRulesStopsIgnoringTheLock(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(".env\n# stray locks\nuv.lock\n"), 0o600))
+	c, err := planIgnoreRules(dir)
+	require.NoError(t, err)
+	require.NotNil(t, c)
+	assert.Contains(t, string(c.Content), "# uv.lock pins what every image of this project installs, so it is committed.\n!/uv.lock\n")
+	assert.Contains(t, c.Labels, ".gitignore (stopped ignoring uv.lock, which pins what every image installs: commit it)")
+	assert.False(t, ignoresRootFile(string(c.Content), "uv.lock"))
+}

@@ -744,7 +744,7 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	ws, err := workspace.SwitchTo(workspaceNameOrID, astroV1Client, cliout.NotesTo(cmd, workspaceLifecycleOutput, out))
+	ws, err := workspace.SwitchTo(workspaceNameOrID, astroV1Client, os.Stderr)
 	if err != nil {
 		return err
 	}
@@ -776,7 +776,7 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 			return workspace.ErrWrongEnforceInput
 		}
 	}
-	res, err := workspace.Update(id, workspaceName, workspaceDescription, enforce, cliout.NotesTo(cmd, workspaceLifecycleOutput, out), astroV1Client)
+	res, err := workspace.Update(id, workspaceName, workspaceDescription, enforce, os.Stderr, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -791,7 +791,7 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	removal, err := workspace.Delete(id, workspaceDeleteYes, cliout.NotesTo(cmd, workspaceLifecycleOutput, out), astroV1Client)
+	removal, err := workspace.Delete(id, workspaceDeleteYes, os.Stderr, astroV1Client)
 	if err != nil {
 		return err
 	}

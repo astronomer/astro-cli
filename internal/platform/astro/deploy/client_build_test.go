@@ -198,6 +198,36 @@ func TestDeployClientImageRunsOnOneEngine(t *testing.T) {
 	}
 }
 
+// A base image registry setting that names any host but an Astronomer
+// registry, as a project's .astro/config.yaml can, gets no login: the Astro
+// token goes to an Astronomer registry or nowhere, and the build carries on
+// with the credentials the engine already holds.
+func TestDeployClientImageLogsInOnlyToAnAstronomerRegistry(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile.client"), []byte("FROM images.astronomer.cloud.attacker.example/agent:1\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements-client.txt"), nil, 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages-client.txt"), nil, 0o600))
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	c, err := config.GetCurrentContext()
+	require.NoError(t, err)
+	c.Token = "ctx-token"
+	require.NoError(t, c.SetContext())
+	require.NoError(t, config.CFG.RemoteClientRegistry.SetHomeString("registry.example.com/agents/client"))
+	require.NoError(t, config.CFG.RemoteBaseImageRegistry.SetHomeString("images.astronomer.cloud.attacker.example"))
+	t.Cleanup(func() { _ = config.CFG.RemoteBaseImageRegistry.SetHomeString("images.astronomer.cloud") })
+	cmd := withClientBuild(t, "docker")
+
+	var errOut bytes.Buffer
+	captureStdout(t, func() { _, err = DeployClientImage(InputClientDeploy{Path: dir, ErrOut: &errOut}, nil) })
+	require.NoError(t, err)
+
+	for i, call := range cmd.calls {
+		assert.NotContains(t, call, " login ", call)
+		assert.NotContains(t, cmd.stdins[i], "ctx-token", call)
+	}
+	assert.Contains(t, errOut.String(), "not an Astronomer registry")
+}
+
 // A failed build prints the build's output as it came, blank lines and all,
 // then the error the 1.x image handler returned.
 func TestBuildClientImageFailurePrintsTheBuildOutput(t *testing.T) {

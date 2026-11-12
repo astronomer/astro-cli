@@ -159,6 +159,19 @@ func DetectAgent() string {
 	return detectAIAgent()
 }
 
+// IsCISystemSet reports whether any environment variable that names the CI
+// system called name (a name from ciEnvVars, such as "jenkins") is set and not
+// empty. Unlike DetectCISystem it is not decided by the order of the list, so a
+// caller that acts on one provider is not fooled by another also being set.
+func IsCISystemSet(name string) bool {
+	for _, m := range ciEnvVars {
+		if m.name == name && os.Getenv(m.envVar) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // DetectCISystem returns the name of the detected CI system (e.g. "github-actions"), or "" if none.
 func DetectCISystem() string {
 	for _, m := range ciEnvVars {

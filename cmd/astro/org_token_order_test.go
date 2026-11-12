@@ -105,11 +105,9 @@ func TestMissingWorkspaceIsSaidBeforeAQuestionThatCannotBeAsked(t *testing.T) {
 	runWithToken(t, "apiTokenId:token-id", "organizationId:env-org")
 	resetTokenCommandFlags(t)
 	astroV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
-	t.Cleanup(input.SetGuard(func() string { return "this run cannot ask" }))
-
 	cmd := &cobra.Command{}
 	var out bytes.Buffer
-	for name, run := range map[string]func() error{
+	commands := map[string]func() error{
 		"workspace team remove":     func() error { return removeWorkspaceTeam(cmd, nil, &out) },
 		"workspace team add":        func() error { return addWorkspaceTeam(cmd, nil, &out) },
 		"workspace team update":     func() error { return updateWorkspaceTeam(cmd, nil, &out) },
@@ -122,10 +120,21 @@ func TestMissingWorkspaceIsSaidBeforeAQuestionThatCannotBeAsked(t *testing.T) {
 		"workspace token add":       func() error { return addOrgTokenToWorkspace(cmd, nil, &out) },
 		"organization-token add":    func() error { return addOrgTokenWorkspaceRole(cmd, nil, &out) },
 		"organization-token update": func() error { return updateOrgTokenWorkspaceRole(cmd, nil, &out) },
-	} {
-		err := run()
-		require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace, name)
-		assert.False(t, input.IsRequired(err), "%s fails on its question, not on the Workspace", name)
+	}
+	// A run that cannot ask because it has no terminal (as under CI or piped),
+	// and one the guard refuses, as --output json does.
+	modes := map[string]func() func(){
+		"no terminal": func() func() { return input.SetTerminals(false, true) },
+		"guard":       func() func() { return input.SetGuard(func() string { return "this run cannot ask" }) },
+	}
+	for mode, set := range modes {
+		restore := set()
+		for name, run := range commands {
+			err := run()
+			require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace, mode+": "+name)
+			assert.False(t, input.IsRequired(err), "%s (%s) fails on its question, not on the Workspace", name, mode)
+		}
+		restore()
 	}
 }
 

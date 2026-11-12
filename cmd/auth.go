@@ -19,6 +19,7 @@ import (
 	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -32,7 +33,7 @@ var (
 	forceLogin             bool
 	loginInVault           bool
 
-	cloudLogin  = astroAuth.Login
+	cloudLogin  = astroAuth.LoginCommand
 	cloudLogout = astroAuth.Logout
 	apcLogin    = apcAuth.Login
 	apcLogout   = apcAuth.Logout
@@ -80,7 +81,10 @@ func signupForDomain(domain string) bool {
 	case signin, token != "": // a token login opens no browser, so it keeps its old behavior
 		return false
 	default:
-		return astroAuth.ShouldSignup(domain)
+		// A first run is a guess that this is a new account, which opens the sign-up
+		// screen and preselects creating an organization. A run that may not ask
+		// cannot confirm the guess, so only --signup says so there.
+		return input.CanAsk() && astroAuth.ShouldSignup(domain)
 	}
 }
 

@@ -784,7 +784,7 @@ func selectTeamMember(teamMembers []astrov1.TeamMember) (astrov1.TeamMember, err
 	list := picker.List{
 		Title:   "\nPlease select the team member you would like to remove from the team:",
 		Header:  []string{"FULLNAME", "EMAIL", "ID"},
-		Ask:     []input.Option{input.About("a team member")},
+		Ask:     []input.Option{input.About("a team member"), input.AnsweredBy("--user-id")},
 		Invalid: ErrInvalidTeamMemberKey,
 	}
 	for i := range teamMembers {

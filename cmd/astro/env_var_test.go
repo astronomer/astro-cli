@@ -140,9 +140,6 @@ func TestEnvVarDeleteRequiresYes(t *testing.T) {
 func TestEnvVarDeleteDeclinedFailsAborted(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	defer resetEnvFlags()
-	orig := stdinIsTerminal
-	stdinIsTerminal = func() bool { return true }
-	t.Cleanup(func() { stdinIsTerminal = orig })
 	defer testUtil.MockUserInput(t, "n\n")()
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)

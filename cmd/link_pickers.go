@@ -35,7 +35,9 @@ var (
 // wireLinkPickers wires the link pickers for the current context's platform.
 // Under Astro they list Astro Deployments and workspaces through the Astro
 // login. Under Astro Private Cloud, `astro link add` links that platform's
-// Deployments instead (withAPCLinking), and the Astro pickers stay nil.
+// Deployments instead (withAPCLinking), and the Astro pickers stay nil. out is
+// where the pickers draw: stderr in production, as every question is asked
+// there, so stdout holds a command's result only.
 func wireLinkPickers(d *local.Deps, platform string, client astrov1.APIClient, houstonClient houston.ClientInterface, out io.Writer) {
 	if platform != cloudPlatform {
 		withAPCLinking(d, houstonClient)

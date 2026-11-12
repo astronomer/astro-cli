@@ -298,7 +298,7 @@ func bundleWait(cmd *cobra.Command, login *deployLogin, deploymentID string, wai
 // (deploymentNamed). Without one, the workspace's Deployments are offered
 // (workspace, else the login's): only to a run that can be asked, and only on
 // the current context's host, as astro deploy offers them. A run that cannot
-// be asked, under --output json or without a terminal, is refused as astro
+// be asked (--output json, CI, --non-interactive), is refused as astro
 // deploy's is, with kind input_required. read is the Deployment when it was
 // picked, so the deploy need not read it again.
 func bundleTarget(ctx context.Context, name, workspace string, format cliout.Format) (id string, read *astrov1.Deployment, login deployLogin, err error) {
@@ -341,7 +341,7 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 		deployment.NoteTokenDeployment(os.Stderr, id)
 		return id, nil, login, nil
 	}
-	if format != cliout.FormatText || !stdinIsTerminal() {
+	if format != cliout.FormatText || !mayAsk() {
 		return "", nil, login, input.Required(errBundleNoTarget)
 	}
 	if !login.current {

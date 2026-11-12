@@ -54,3 +54,59 @@ func (s *Suite) TestConfirmOrAbort() {
 		s.Contains(got.Error(), "pass --yes")
 	})
 }
+
+// A Text question whose input ends with nothing is nobody answering: a
+// *RequiredError naming the flag, not an empty answer. Text typed before the
+// end is still the answer.
+func (s *Suite) TestTextEnded() {
+	s.stdinHolding("")
+	_, err := Text("Name: ", AnsweredBy("--name"))
+	s.True(IsRequired(err), "%v", err)
+	s.Contains(err.Error(), "pass --name")
+
+	s.stdinHolding("prod")
+	got, err := Text("Name: ", AnsweredBy("--name"))
+	s.NoError(err)
+	s.Equal("prod", got)
+
+	s.stdinHolding("\n")
+	got, err = Text("Name: ", AnsweredBy("--name"))
+	s.NoError(err)
+	s.Empty(got, "an empty line is an answer")
+}
+
+// A hinted answer is named by every refusal about its question: ended input
+// at Text and Confirm, and a password that cannot be read from a pipe.
+func (s *Suite) TestHintedAnswersReachEndedInputAndPasswordRefusals() {
+	s.T().Cleanup(ClearHints)
+	HintAnswer("a name", "--name")
+
+	s.stdinHolding("")
+	_, err := Text("Name: ", About("a name"))
+	s.True(IsRequired(err), "%v", err)
+	s.Contains(err.Error(), "pass --name", "Text at the end of its input")
+
+	s.stdinHolding("")
+	_, err = Confirm("Sure?", About("a name"))
+	s.True(IsRequired(err), "%v", err)
+	s.Contains(err.Error(), "pass --name", "Confirm at the end of its input")
+
+	s.stdinHolding("")
+	defer SetTerminals(false, true)()
+	_, err = Password("Password: ", About("a name"))
+	s.True(IsRequired(err), "%v", err)
+	s.Contains(err.Error(), "pass --name", "Password on a stdin that is not a terminal")
+}
+
+// A password asked of a stdin that is not a terminal names the flag that
+// answers it, and reads nothing.
+func (s *Suite) TestPasswordOnAPipeNamesTheFlag() {
+	defer SetTerminals(false, true)()
+	s.stdinHolding("hunter2\n")
+	_, err := Password("Password: ", AnsweredBy("--password"))
+	s.True(IsRequired(err), "%v", err)
+	s.Contains(err.Error(), "pass --password")
+	left, readErr := io.ReadAll(os.Stdin)
+	s.Require().NoError(readErr)
+	s.Equal("hunter2\n", string(left), "the pipe was not read")
+}

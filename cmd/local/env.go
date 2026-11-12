@@ -1479,7 +1479,14 @@ func (c *cli) readSetValue(cmd *cobra.Command, in *setInput, fields *connFields,
 		if err != nil {
 			return "", fmt.Errorf("reading stdin: %w", err)
 		}
-		return strings.TrimRight(string(b), "\r\n"), nil
+		v := strings.TrimRight(string(b), "\r\n")
+		if v == "" {
+			// A stdin with nothing on it (/dev/null, a closed pipe, an empty
+			// pipe) is no value, not the empty string: writing it would
+			// silently blank the variable. Setting one to empty is --value "".
+			return "", errors.New("no value supplied: pass --value, or pipe one on stdin")
+		}
+		return v, nil
 	}
 	prompt := fmt.Sprintf("Value for %s %s: ", localenv.Noun(kind), name)
 	if err := input.MayAsk(prompt, input.AnsweredBy("--value or --stdin")); err != nil {
