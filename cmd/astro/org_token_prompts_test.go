@@ -31,7 +31,12 @@ func captureStderr(t *testing.T, fn func()) string {
 	require.NoError(t, err)
 	prevErr, prevIn := os.Stderr, os.Stdin
 	os.Stderr, os.Stdin = errFile, in
-	defer func() { os.Stderr, os.Stdin = prevErr, prevIn }()
+	// Closed before the temp dir is removed: Windows cannot delete an open file.
+	defer func() {
+		os.Stderr, os.Stdin = prevErr, prevIn
+		_ = errFile.Close()
+		_ = in.Close()
+	}()
 	fn()
 	require.NoError(t, errFile.Sync())
 	out, err := os.ReadFile(errFile.Name())
