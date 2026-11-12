@@ -12,6 +12,7 @@ import (
 	"fmt"
 
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
@@ -21,6 +22,7 @@ import (
 var (
 	ErrInvalidName               = errors.New("no name provided for the organization token. Retry with a valid name")
 	errOrganizationTokenNotFound = errors.New("organization token specified was not found")
+	errNoWorkspace               = errors.New("no Workspace is selected: pass --workspace, or switch to one with astro workspace switch")
 	errOrgTokenInWorkspace       = errors.New("this Organization API token has already been added to the Workspace with that role")
 	errOrgTokenRoleSet           = errors.New("this Organization API token already has that role on the Organization")
 	errWrongTokenTypeSelected    = errors.New("the token selected is not of the type you are trying to modify")
@@ -58,6 +60,9 @@ func AddOrgTokenToWorkspace(id, name, role, workspaceID string, pick apitoken.Pi
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
+	}
+	if workspaceID == "" {
+		return apitoken.Token{}, astrosession.NoWorkspace(errNoWorkspace)
 	}
 	token, err := FindToken(id, name, ctx.Organization, pick, client)
 	if err != nil {

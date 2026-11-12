@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/apirequest"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/openapi"
@@ -357,6 +358,10 @@ func fillPlaceholders(path string, ctx *config.Context) (string, error) {
 			return ctx.Organization
 		case "workspaceid":
 			if ctx.Workspace == "" {
+				if astrosession.HasAPIToken() {
+					errs = append(errs, "workspaceId not set: the API token in ASTRO_API_TOKEN is an Organization token, which selects no Workspace, so write the id in the path")
+					return match
+				}
 				errs = append(errs, "workspaceId not set in context (run 'astro workspace switch')")
 				return match
 			}

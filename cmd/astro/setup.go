@@ -593,10 +593,11 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 		return false, err
 	}
 
-	if wsID == "" {
-		wsID = c.Workspace
-	}
-
+	// A token with no workspaceId claim, an Organization token, selects no
+	// workspace, and the run has none unless a flag or the project's link names
+	// one. The workspace the interactive login last used is a selection nobody
+	// made in this run, so it is not inherited (the empty value below hides it,
+	// for this process only).
 	useEnvironmentSelection(&c, orgID, orgProduct, wsID)
 	// A Deployment-scoped token can act on one Deployment, so a run that names
 	// none acts on it. For this process only, like the selection above, and

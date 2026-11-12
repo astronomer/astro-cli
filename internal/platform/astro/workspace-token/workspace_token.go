@@ -13,6 +13,7 @@ import (
 	"slices"
 
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
@@ -33,6 +34,7 @@ const (
 )
 
 var (
+	errNoWorkspace            = errors.New("no Workspace is selected: pass --workspace, or switch to one with astro workspace switch")
 	errWorkspaceTokenRoleSet  = errors.New("this Workspace API token already has that role on the Workspace")
 	ErrWorkspaceTokenNotFound = errors.New("no Workspace API token was found for the API token name you provided")
 	errOrgTokenInWorkspace    = errors.New("this Organization API token has already been added to the Workspace with that role")
@@ -66,6 +68,9 @@ func Target(workspaceID string) (wsID, organizationID string, err error) {
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
+	}
+	if workspaceID == "" {
+		return "", "", astrosession.NoWorkspace(errNoWorkspace)
 	}
 	return workspaceID, ctx.Organization, nil
 }
@@ -279,6 +284,9 @@ func getWorkspaceTokens(workspaceID string, tokenTypes []TokenType, client astro
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
+	}
+	if workspaceID == "" {
+		return nil, astrosession.NoWorkspace(errNoWorkspace)
 	}
 	wsID := workspaceID
 	limit := tokenPaginationLim

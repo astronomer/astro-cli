@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
@@ -880,6 +881,9 @@ func coalesceWorkspace() (string, error) {
 	}
 
 	wsCfg, err := workspace.GetCurrentWorkspace()
+	if errors.Is(err, astrosession.ErrOrgTokenNoWorkspace) {
+		return "", err
+	}
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get current Workspace")
 	}
