@@ -16,7 +16,7 @@ func addYesFlag(cmd *cobra.Command, usage string) {
 // easily changed back (a removal, a hibernation, a move onto dag_deploy),
 // unless --yes answered it already. A declined question is input.ErrAborted,
 // as it is on Astro. A run that may not ask (under --output json) is refused,
-// naming --yes, before the question is printed, stdin is read, or anything is changed (a command that looks something up in Houston first, as hibernate and delete do, has done that read by then).
+// naming --yes, before the question is printed, stdin is read, or anything is changed. A command that looks something up in Houston first, as hibernate and delete do, has done that read by then.
 func confirm(question string) error {
 	return confirmAfter(question, nil)
 }

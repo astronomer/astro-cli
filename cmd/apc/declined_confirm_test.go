@@ -233,7 +233,7 @@ func TestDeploymentConfirmationsSkippedByYes(t *testing.T) {
 }
 
 // Under --output json nothing is asked: the question is refused as
-// input_required naming --yes, before anything is read, and the error is the
+// input_required naming --yes, before the question is printed or stdin is read, and the error is the
 // only thing on stdout.
 func TestDeploymentConfirmationsRefusedUnderJSON(t *testing.T) {
 	for _, c := range apcConfirmCases() {

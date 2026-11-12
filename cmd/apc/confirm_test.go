@@ -14,7 +14,7 @@ import (
 
 // The commands that delete something for good ask first, as Astro's do: a
 // yes deletes, --yes skips the question, --output json without --yes is
-// refused before anything is read or sent, and a no changes nothing and fails
+// refused before the question is printed or stdin is read, and a no changes nothing and fails
 // aborted, exit 1, with nothing on stdout.
 func TestRemovalsAskFirst(t *testing.T) {
 	for _, c := range []struct {
