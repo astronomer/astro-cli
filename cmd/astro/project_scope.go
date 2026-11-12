@@ -27,6 +27,12 @@ const deploymentArgAnnotation = "astro.deployment-arg"
 // to before the context's. followProject sets it; coalesceWorkspace reads it.
 var projectWorkspaceID string
 
+// projectFollowed is whether the running command reads the project for its
+// workspace at all: only the commands under astro env and astro deployment do.
+// It decides whether an error about a missing workspace may name the project
+// link as a way to supply one.
+var projectFollowed bool
+
 // projectPick is what a project decided for a command the user left open.
 type projectPick struct {
 	// workspace is the default workspace, "" when the project picks none.
@@ -79,7 +85,7 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 // deploymentFlag.resolve), or as a Deployment-id argument is replaced in
 // place by the link's Deployment id.
 func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
-	projectWorkspaceID = ""
+	projectWorkspaceID, projectFollowed = "", true
 	m, err := projectManifest(config.WorkingPath)
 	if err != nil || m == nil {
 		return projectPick{}, err

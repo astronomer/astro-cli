@@ -161,14 +161,32 @@ var ErrNoWorkspace = errors.New("no Workspace is selected: pass --workspace, or 
 // ASTRO_API_TOKEN and given none. A token supplies its Workspace itself (a
 // Workspace or Deployment token) or has none (an Organization token), and a
 // run with a token never takes the one the person's saved login last used.
-var ErrOrgTokenNoWorkspace = errors.New("no Workspace is selected: the API token in ASTRO_API_TOKEN selects none (an Organization token does not), so pass --workspace, or run in a project linked to one")
+var ErrOrgTokenNoWorkspace = errors.New("no Workspace is selected: the API token in ASTRO_API_TOKEN selects none (an Organization token does not)")
 
-// NoWorkspace is the error for a command that needs a Workspace and finds
-// none: ErrOrgTokenNoWorkspace under an API token, else fallback, which says
-// how a saved login picks one (ErrNoWorkspace when fallback is nil).
+// The ways a command can be given a Workspace differ, so the advice that
+// follows ErrOrgTokenNoWorkspace does too: a flag only, or a flag or the
+// project's link.
+const (
+	HintFlag          = "so pass --workspace"
+	HintFlagOrProject = "so pass --workspace, or run in a project linked to one"
+	// HintCurrent is for a command that acts on the current Workspace alone,
+	// which a run with an API token does not have.
+	HintCurrent = "so use a Workspace API token, or log in with astro login"
+)
+
+// NoWorkspace is the error for a command that needs a Workspace, takes it from
+// --workspace alone, and finds none: ErrOrgTokenNoWorkspace under an API
+// token, else fallback, which says how a saved login picks one (ErrNoWorkspace
+// when fallback is nil).
 func NoWorkspace(fallback error) error {
+	return NoWorkspaceHint(fallback, HintFlag)
+}
+
+// NoWorkspaceHint is NoWorkspace with the advice that suits the command: one
+// of the Hint constants, or its own.
+func NoWorkspaceHint(fallback error, hint string) error {
 	if HasAPIToken() {
-		return ErrOrgTokenNoWorkspace
+		return fmt.Errorf("%w, %s", ErrOrgTokenNoWorkspace, hint)
 	}
 	if fallback == nil {
 		return ErrNoWorkspace

@@ -798,7 +798,7 @@ func unlinkedTarget(req Request, d Deployer) (Target, error) {
 	if workspaceID == "" {
 		err := errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
 		if req.platform() == manifest.KindAstro {
-			err = astrosession.NoWorkspace(err)
+			err = astrosession.NoWorkspaceHint(err, astrosession.HintFlagOrProject)
 		}
 		return Target{}, err
 	}

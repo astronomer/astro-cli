@@ -129,5 +129,5 @@ func TestNoWorkspaceWithoutATokenKeepsItsMessage(t *testing.T) {
 	assert.Equal(t, astrosession.ErrNoWorkspace, astrosession.NoWorkspace(nil))
 
 	t.Setenv("ASTRO_API_TOKEN", "token")
-	assert.Equal(t, astrosession.ErrOrgTokenNoWorkspace, astrosession.NoWorkspace(fallback))
+	assert.ErrorIs(t, astrosession.NoWorkspace(fallback), astrosession.ErrOrgTokenNoWorkspace)
 }

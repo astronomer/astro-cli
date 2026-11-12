@@ -34,6 +34,10 @@ type DeploymentNameError struct {
 
 func (e *DeploymentNameError) Error() string {
 	switch {
+	case e.Workspace == "" && astrosession.HasAPIToken():
+		// A run with an API token never takes a saved login's workspace, so
+		// 'astro workspace switch' is no way to give it one.
+		return fmt.Sprintf("%q is not a Deployment id, and the API token in ASTRO_API_TOKEN selects no workspace to find a Deployment of that name in: pass -d with the Deployment id, or run in a project that links its workspace", e.Name)
 	case e.Workspace == "":
 		return fmt.Sprintf("%q is not a Deployment id, and there is no workspace to find a Deployment of that name in: pass -d with the Deployment id, or run 'astro workspace switch'", e.Name)
 	case len(e.IDs) == 0:

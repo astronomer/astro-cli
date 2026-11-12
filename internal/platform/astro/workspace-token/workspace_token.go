@@ -58,9 +58,13 @@ func workspaceRoleReader(workspaceID string) func(*astrov1.ApiToken) string {
 	return func(t *astrov1.ApiToken) string { return workspaceRoleOf(t, workspaceID) }
 }
 
-// Target resolves the Workspace a command means, "" being the current one, and
-// the Organization it is in.
-func Target(workspaceID string) (wsID, organizationID string, err error) {
+// Scope resolves the Workspace a command means, "" being the current one, and
+// the Organization it is in. The Workspace may come back empty: a run with an
+// API token has no current one, and an Organization token selects none. A
+// command that acts on a Workspace uses Target, which refuses that; Scope is
+// for the ones that may not need it (rotating a token, deleting a Workspace
+// token, both given by ID).
+func Scope(workspaceID string) (wsID, organizationID string, err error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return "", "", err
@@ -69,6 +73,19 @@ func Target(workspaceID string) (wsID, organizationID string, err error) {
 		workspaceID = ctx.Workspace
 	}
 	return workspaceID, ctx.Organization, nil
+}
+
+// Target is Scope for a command that acts on the Workspace: it fails, before
+// the command asks or calls the API, when there is none.
+func Target(workspaceID string) (wsID, organizationID string, err error) {
+	wsID, organizationID, err = Scope(workspaceID)
+	if err != nil {
+		return "", "", err
+	}
+	if wsID == "" {
+		return "", "", astrosession.NoWorkspace(nil)
+	}
+	return wsID, organizationID, nil
 }
 
 // ListTokens lists tokens with a role in the Workspace ("" is the current
@@ -213,7 +230,7 @@ func updateNameAndDescription(token *astrov1.ApiToken, newName, description, org
 // RotateToken rotates the secret of token, which FindToken found, and returns
 // it with the new secret and its role on workspaceID.
 func RotateToken(token astrov1.ApiToken, workspaceID string, client astrov1.APIClient) (apitoken.Token, error) { //nolint:gocritic // ApiToken is what FindToken returns
-	workspaceID, organizationID, err := Target(workspaceID)
+	workspaceID, organizationID, err := Scope(workspaceID)
 	if err != nil {
 		return apitoken.Token{}, err
 	}
@@ -236,7 +253,7 @@ func RotateToken(token astrov1.ApiToken, workspaceID string, client astrov1.APIC
 // Organization token with a role on the Workspace) removes its Workspace role,
 // leaving the token itself.
 func DeleteToken(token astrov1.ApiToken, workspaceID string, client astrov1.APIClient) (apitoken.WorkspaceRemoval, error) { //nolint:gocritic // ApiToken is what FindToken returns
-	workspaceID, organizationID, err := Target(workspaceID)
+	workspaceID, organizationID, err := Scope(workspaceID)
 	if err != nil {
 		return apitoken.WorkspaceRemoval{}, err
 	}
@@ -277,15 +294,9 @@ func setWorkspaceRole(token *astrov1.ApiToken, workspaceID, role, organizationID
 // getWorkspaceTokens lists tokens with a role in the given workspace, then filters client-side
 // by token scope if tokenTypes is not empty.
 func getWorkspaceTokens(workspaceID string, tokenTypes []TokenType, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
-	ctx, err := context.GetCurrentContext()
+	workspaceID, organizationID, err := Target(workspaceID)
 	if err != nil {
 		return nil, err
-	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
-	}
-	if workspaceID == "" {
-		return nil, astrosession.NoWorkspace(nil)
 	}
 	wsID := workspaceID
 	limit := tokenPaginationLim
@@ -297,7 +308,7 @@ func getWorkspaceTokens(workspaceID string, tokenTypes []TokenType, client astro
 			Offset:      &offset,
 			Limit:       &limit,
 		}
-		resp, err := client.ListApiTokensWithResponse(httpContext.Background(), ctx.Organization, params)
+		resp, err := client.ListApiTokensWithResponse(httpContext.Background(), organizationID, params)
 		if err != nil {
 			return nil, err
 		}

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	workspacetoken "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
@@ -57,6 +58,9 @@ func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}
+	if err := requireWorkspace(workspaceID); err != nil {
+		return err
+	}
 	if tokenName == "" {
 		// no role was provided so ask the user for it
 		answer, err := input.Text("Enter a name for the new Workspace API token: ", input.AnsweredBy("--name"))
@@ -90,6 +94,9 @@ func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}
+	if err := requireWorkspace(workspaceID); err != nil {
+		return err
+	}
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
 	res, err := workspacetoken.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID,
@@ -106,7 +113,7 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
-	ws, org, err := workspacetoken.Target(workspaceID)
+	ws, org, err := workspacetoken.Scope(workspaceID)
 	if err != nil {
 		return err
 	}
@@ -137,7 +144,7 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
-	ws, org, err := workspacetoken.Target(workspaceID)
+	ws, org, err := workspacetoken.Scope(workspaceID)
 	if err != nil {
 		return err
 	}
@@ -147,6 +154,11 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 		return err
 	}
 	isWS := string(token.Scope) == string(workspacetoken.TokenTypeWORKSPACE)
+	// Taking an Organization token off a Workspace needs the Workspace, and the
+	// question below is not asked on the way to saying it has none.
+	if !isWS && ws == "" {
+		return astrosession.NoWorkspace(nil)
+	}
 	if !forceDelete {
 		warning, question := "", fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Workspace?", ansi.Bold(token.Name))
 		if isWS {
@@ -173,6 +185,9 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 // rather than asking for its name.
 func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
+		return err
+	}
+	if err := requireWorkspace(workspaceID); err != nil {
 		return err
 	}
 	tokenArg(args, &orgTokenID)
@@ -215,6 +230,9 @@ func upsertOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}
+	if err := requireWorkspace(workspaceID); err != nil {
+		return err
+	}
 	tokenArg(args, &orgTokenID)
 	if tokenRole == "" {
 		// no role was provided so ask the user for it
@@ -239,6 +257,9 @@ func upsertOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 
 func removeOrganizationTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
+		return err
+	}
+	if err := requireWorkspace(workspaceID); err != nil {
 		return err
 	}
 	tokenArg(args, &orgTokenID)
