@@ -321,8 +321,8 @@ var (
 // (TestV1PredecessorsFollowTheDevMapping keeps the two in step). Left out:
 //
 //   - astro dev run, which parsed no flags of its own in 1.x;
-//   - astro dev pytest, whose replacement is uv run pytest, not an astro
-//     command;
+//   - astro dev pytest, whose replacement is astro local run, which takes
+//     pytest as an argument rather than naming a command of its own;
 //   - astro dev object export and import, whose flags picked what to move
 //     between airflow_settings.yaml and a running Airflow, which no flag of
 //     astro local env does: the astro dev stub's guidance is the answer there.

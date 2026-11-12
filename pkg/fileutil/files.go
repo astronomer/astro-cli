@@ -447,8 +447,8 @@ func UploadFile(args *UploadFileArguments) error {
 			}
 			continue
 		}
-		defer response.Body.Close()          //nolint:gocritic // intentional in this shell code
 		data, _ := io.ReadAll(response.Body) //nolint:errcheck // error deliberately ignored in this shell code
+		response.Body.Close()
 		responseStatusCode := response.StatusCode
 
 		// Return success for 2xx status code

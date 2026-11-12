@@ -1431,3 +1431,66 @@ func TestIsValidCloudProvider(t *testing.T) {
 		assert.False(t, actual)
 	})
 }
+
+func TestDeploymentOpen(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	prevOpen := openDeploymentUI
+	t.Cleanup(func() { openDeploymentUI = prevOpen })
+
+	t.Run("returns an error when the Deployment name is not found", func(t *testing.T) {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		astroV1Client = mockV1Client
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+
+		// 1.x's spelling, which v2 takes as an alias of --deployment.
+		_, err := execDeploymentCmd("open", "--deployment-name", "missing")
+		assert.ErrorContains(t, err, `no Deployment named "missing"`)
+		mockV1Client.AssertExpectations(t)
+	})
+
+	for _, tc := range []struct {
+		name   string
+		opens  bool
+		output string
+	}{
+		{name: "opens the Airflow UI", opens: true, output: "Opened the Airflow UI for Deployment"},
+		{name: "prints the link when the browser cannot be opened", opens: false, output: "Unable to open the Airflow UI, please visit the following link: https://test-url"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var opened string
+			openDeploymentUI = func(url string) bool {
+				opened = url
+				return tc.opens
+			}
+			mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+			astroV1Client = mockV1Client
+			mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+			mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+
+			out, err := execDeploymentCmd("open", "test-id-1")
+			require.NoError(t, err)
+			assert.Equal(t, "https://test-url", opened)
+			assert.Contains(t, out, tc.output)
+			mockV1Client.AssertExpectations(t)
+		})
+	}
+
+	t.Run("under --output json, publishes the URL and opens nothing", func(t *testing.T) {
+		openDeploymentUI = func(string) bool {
+			t.Error("opened a browser under --output json")
+			return true
+		}
+		t.Cleanup(func() { deploymentOutput = cliout.FormatText })
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		astroV1Client = mockV1Client
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+
+		out, err := execDeploymentCmd("open", "test-id-1", "--output", "json")
+		require.NoError(t, err)
+		var res deployment.UIResult
+		require.NoError(t, json.Unmarshal([]byte(out), &res), out)
+		assert.Equal(t, deployment.UIResult{DeploymentID: "test-id-1", Name: "test-deployment-label", URL: "https://test-url"}, res)
+		mockV1Client.AssertExpectations(t)
+	})
+}

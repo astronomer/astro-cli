@@ -92,6 +92,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "remove <EMAIL>",
+		Aliases: []string{"rm"},
 		Short:   "Remove a user from a Deployment",
 		Long:    "Remove a user from a Deployment",
 		Args:    cobra.ExactArgs(1),

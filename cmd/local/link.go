@@ -166,6 +166,7 @@ func newLinkAddCmd(c *cli) *cobra.Command {
 func newLinkRemoveCmd(c *cli) *cobra.Command {
 	return &cobra.Command{
 		Use:     "remove [NAME]",
+		Aliases: []string{"rm"},
 		Short:   "Unlink a Deployment from this project",
 		Long:    "Unlink a Deployment from this project. In a terminal, with no NAME, it asks which one.",
 		Example: "  astro link remove prod",

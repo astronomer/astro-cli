@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -84,7 +85,8 @@ func PlatformVersion() string {
 // It answers by finding the command in a probe tree built from these commands
 // alone, the way cobra will find it in the real one. The probe has a stand-in
 // for cobra's help command, so `help <command>` asks about the command named,
-// wherever on the line it stands.
+// wherever on the line it stands. A removed command's stub (`astro deployment
+// de`) only says what replaced it, so it needs no platform either.
 func NeedsPlatform(words []string, rootFlags *pflag.FlagSet) bool {
 	probe := &cobra.Command{Use: "astro"}
 	probe.PersistentFlags().AddFlagSet(rootFlags)
@@ -95,7 +97,7 @@ func NeedsPlatform(words []string, rootFlags *pflag.FlagSet) bool {
 	if err == nil && found == help {
 		found, _, err = probe.Find(rest)
 	}
-	return err == nil && found != probe && found != help
+	return err == nil && found != probe && found != help && !cliout.IsRemovedCommand(found)
 }
 
 // SetUpLogs set the log output and the log level

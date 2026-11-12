@@ -73,6 +73,17 @@ func TestGetSpecPathForVersion(t *testing.T) {
 			version:  "3.1.7",
 			wantPath: "airflow-core/src/airflow/api_fastapi/core_api/openapi/v2-rest-api-generated.yaml",
 		},
+		// PEP 440 pre-releases match on their release segment
+		{
+			name:     "Airflow 3.4.0 dev build",
+			version:  "3.4.0.dev26657",
+			wantPath: "airflow-core/src/airflow/api_fastapi/core_api/openapi/v2-rest-api-generated.yaml",
+		},
+		{
+			name:     "Airflow 3.0.3 release candidate",
+			version:  "3.0.3rc1",
+			wantPath: "airflow-core/src/airflow/api_fastapi/core_api/openapi/v2-rest-api-generated.yaml",
+		},
 		// Future versions (should use latest range)
 		{
 			name:     "Future version 3.5.0",
@@ -141,6 +152,16 @@ func TestBuildAirflowSpecURL(t *testing.T) {
 			name:    "Airflow 3.1.7 with build metadata",
 			version: "3.1.7+astro.1",
 			wantURL: "https://raw.githubusercontent.com/apache/airflow/refs/tags/3.1.7/airflow-core/src/airflow/api_fastapi/core_api/openapi/v2-rest-api-generated.yaml",
+		},
+		{
+			name:    "Airflow release candidate uses its tag",
+			version: "3.1.0rc1",
+			wantURL: "https://raw.githubusercontent.com/apache/airflow/refs/tags/3.1.0rc1/airflow-core/src/airflow/api_fastapi/core_api/openapi/v2-rest-api-generated.yaml",
+		},
+		{
+			name:    "Airflow dev build uses its release branch",
+			version: "3.4.0.dev26657+astro.1",
+			wantURL: "https://raw.githubusercontent.com/apache/airflow/refs/heads/v3-4-test/airflow-core/src/airflow/api_fastapi/core_api/openapi/v2-rest-api-generated.yaml",
 		},
 		{
 			name:    "Invalid version",

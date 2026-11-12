@@ -1,6 +1,9 @@
 package cliout
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/spf13/cobra"
 )
 
@@ -51,6 +54,66 @@ func RemovedCommand(use string, aliases []string, short string, run func(cmd *co
 	}
 	AddOutputFlag(cmd, new(Format))
 	return cmd
+}
+
+// RemovedAlias builds the stub for a 1.x alias v2 took away from cmd, to be
+// added as cmd's sibling: `astro deployment de` once `de` no longer spells
+// `astro deployment delete`. A dropped alias is a removed spelling like any
+// removed command, so a 1.x script using it fails naming cmd rather than
+// being told only that the word is unknown, and never runs cmd.
+//
+// The stub's Short names cmd by its whole path, as its error does, which is
+// known only once the tree is built. Execute sets it then, in the walk it
+// already makes over the tree (nameRemovedAlias); until then it says only
+// "Removed in v2".
+func RemovedAlias(alias string, cmd *cobra.Command) *cobra.Command {
+	stub := RemovedCommand(alias, nil, "Removed in v2", func(stub *cobra.Command, _ []string) error {
+		return Usage(fmt.Errorf("%s was removed in Astro CLI v2: %s is no longer short for %s. Use %s.",
+			stub.CommandPath(), alias, cmd.Name(), useInstead(cmd)))
+	})
+	stub.Annotations[RemovedAliasOfAnnotation] = cmd.Name()
+	return stub
+}
+
+// RemovedAliasOfAnnotation names, on a RemovedAlias stub, the sibling command
+// the alias used to spell.
+const RemovedAliasOfAnnotation = "removedAliasOf"
+
+// RemovedAliasTarget returns the command a RemovedAlias stub's alias used to
+// spell, its sibling, or nil when stub is not one.
+func RemovedAliasTarget(stub *cobra.Command) *cobra.Command {
+	name := stub.Annotations[RemovedAliasOfAnnotation]
+	if name == "" || !stub.HasParent() {
+		return nil
+	}
+	for _, sibling := range stub.Parent().Commands() {
+		if sibling.Name() == name && sibling != stub {
+			return sibling
+		}
+	}
+	return nil
+}
+
+// nameRemovedAlias sets the Short of c, when it is a RemovedAlias stub, to
+// name its command by the whole path. Execute calls it on every command of the
+// built tree.
+func nameRemovedAlias(c *cobra.Command) {
+	if target := RemovedAliasTarget(c); target != nil {
+		c.Short = "Removed in v2 — use " + useInstead(target)
+	}
+}
+
+// useInstead names cmd by its path, and its aliases after it:
+// "astro deployment delete, or its alias rm".
+func useInstead(cmd *cobra.Command) string {
+	switch len(cmd.Aliases) {
+	case 0:
+		return cmd.CommandPath()
+	case 1:
+		return cmd.CommandPath() + ", or its alias " + cmd.Aliases[0]
+	default:
+		return cmd.CommandPath() + ", or one of its aliases " + strings.Join(cmd.Aliases, ", ")
+	}
 }
 
 // IsRemovedCommand reports whether cmd is a removed command's stub.
