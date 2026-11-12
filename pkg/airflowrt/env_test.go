@@ -83,12 +83,30 @@ func TestBuildEnv_WithEnvFile(t *testing.T) {
 }
 
 func TestHasProxyConfigured(t *testing.T) {
+	// Keep the result independent of the machine running the test: clear the
+	// inherited proxy variables and stub the macOS system proxy lookup.
+	for _, key := range proxyEnvKeys {
+		t.Setenv(key, "")
+	}
+	orig := HasSystemProxy
+	t.Cleanup(func() { HasSystemProxy = orig })
+	HasSystemProxy = func() bool { return false }
+
 	// No proxy set
 	assert.False(t, HasProxyConfigured(map[string]string{}))
 
 	// Proxy in overrides
 	assert.True(t, HasProxyConfigured(map[string]string{"HTTP_PROXY": "http://proxy:8080"}))
 	assert.True(t, HasProxyConfigured(map[string]string{"https_proxy": "http://proxy:8080"}))
+
+	// Proxy in the inherited environment
+	t.Setenv("HTTPS_PROXY", "http://proxy:8080")
+	assert.True(t, HasProxyConfigured(map[string]string{}))
+	t.Setenv("HTTPS_PROXY", "")
+
+	// System proxy alone
+	HasSystemProxy = func() bool { return true }
+	assert.True(t, HasProxyConfigured(map[string]string{}))
 }
 
 func envToMap(env []string) map[string]string {
