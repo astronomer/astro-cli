@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	workspacetoken "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
@@ -37,9 +38,9 @@ func tokenWith(t *testing.T, permissions ...string) string {
 // workspace for one test, as the pre-runs do.
 func withWorkspaces(t *testing.T, flag, project string) {
 	t.Helper()
-	prevFlag, prevProject := workspaceID, projectWorkspaceID
-	workspaceID, projectWorkspaceID = flag, project
-	t.Cleanup(func() { workspaceID, projectWorkspaceID = prevFlag, prevProject })
+	prevFlag, prevProject, prevFollowed := workspaceID, projectWorkspaceID, projectFollowed
+	workspaceID, projectWorkspaceID, projectFollowed = flag, project, false
+	t.Cleanup(func() { workspaceID, projectWorkspaceID, projectFollowed = prevFlag, prevProject, prevFollowed })
 }
 
 // runWithToken sets up a saved login whose workspace is saved-ws, runs the
@@ -51,6 +52,7 @@ func runWithToken(t *testing.T, permissions ...string) string {
 	realTokenParser(t)
 	noLoginFlow(t)
 	fakeIDP(t)
+	t.Cleanup(func() { deployment.UseTokenDeployment("") })
 	t.Setenv("ASTRO_API_TOKEN", tokenWith(t, permissions...))
 	require.NoError(t, EnsureLogin(orgsClient(nil)))
 	c, err := config.GetCurrentContext()

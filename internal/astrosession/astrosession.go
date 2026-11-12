@@ -169,6 +169,9 @@ var ErrOrgTokenNoWorkspace = errors.New("no Workspace is selected: the API token
 const (
 	HintFlag          = "so pass --workspace"
 	HintFlagOrProject = "so pass --workspace, or run in a project linked to one"
+	// HintFlagOrTokenID is for a command that finds a token in the Workspace,
+	// unless the token is given by ID.
+	HintFlagOrTokenID = "so pass --workspace or the token's ID, or run in a project linked to one" //nolint:gosec // advice, not a credential
 	// HintCurrent is for a command that acts on the current Workspace alone,
 	// which a run with an API token does not have.
 	HintCurrent = "so use a Workspace API token"
