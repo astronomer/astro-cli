@@ -372,7 +372,7 @@ func TestAPCDeployRefusesWhatItCannotDeploy(t *testing.T) {
 		{"a 1.x project", make1xProject, []string{"deploy", "dep-id"}, []string{"Astro CLI 1.x layout", "Convert it with astro init, or deploy it with Astro CLI 1.x"}, "no_project"},
 		{"--image-name from a 1.x project", make1xProject, []string{"deploy", "dep-id", "--image-name", "img:1"}, []string{"Astro CLI 1.x layout"}, "no_project"},
 		{"--dags from a 1.x project", make1xProject, []string{"deploy", "dep-id", "--dags"}, []string{"Astro CLI 1.x layout", "Astro CLI v2 deploys only pyproject.toml projects"}, "no_project"},
-		{"a pyproject.toml project's deploy that names no Deployment", initProject, []string{"deploy"}, []string{"this project links no deployment and this run cannot be asked", "--deployment"}, "input_required"},
+		{"a pyproject.toml project's deploy that names no Deployment", initProject, []string{"deploy", "--non-interactive"}, []string{"this project links no deployment and this run cannot be asked", "--deployment"}, "input_required"},
 		{"an apc link on another installation", func(t *testing.T, p *project) {
 			initProject(t, p)
 			addAPCLink(t, p, "elsewhere", "astro.other.example")

@@ -79,7 +79,7 @@ func TestPickHighlightsTheCurrentRow(t *testing.T) {
 // Anything but one of the row numbers, spelled exactly, picks nothing and
 // fails with the caller's own error.
 func TestPickRefusesAnythingButARowNumber(t *testing.T) {
-	for _, answer := range []string{"", "\n", "0\n", "4\n", "-1\n", "prod\n", " 1\n", "1 \n", "01\n", "+1\n", "1.0\n", "0x1\n"} {
+	for _, answer := range []string{"\n", "0\n", "4\n", "-1\n", "prod\n", " 1\n", "1 \n", "01\n", "+1\n", "1.0\n", "0x1\n"} {
 		_, err := things().Pick(&bytes.Buffer{}, strings.NewReader(answer))
 		assert.ErrorIs(t, err, errInvalidThing, "answer %q", answer)
 	}
@@ -131,7 +131,8 @@ func TestPickDefaultOnEnter(t *testing.T) {
 	l = things()
 	l.Default = 2
 	_, err = l.Pick(&bytes.Buffer{}, strings.NewReader(""))
-	require.ErrorIs(t, err, errInvalidThing, "ended input is not Enter")
+	require.NotErrorIs(t, err, errInvalidThing, "ended input is not Enter")
+	assert.True(t, input.IsRequired(err), "it is input_required: %v", err)
 
 	_, err = things().Pick(&bytes.Buffer{}, strings.NewReader("\n"))
 	assert.ErrorIs(t, err, errInvalidThing, "with no Default, Enter picks nothing")
@@ -386,4 +387,21 @@ func TestPickThenConfirmFromOnePipe(t *testing.T) {
 	ok, err := input.Confirm("Delete it?")
 	require.NoError(t, err)
 	assert.True(t, ok, "the confirmation lost the answer the picker read ahead")
+}
+
+// A stdin that ends before any answer (a closed pipe, /dev/null) is nobody
+// answering: input_required naming the flag that answers, never "invalid
+// selection". A wrong answer and then the end is still an invalid one.
+func TestPickEndedInputIsInputRequiredNamingTheFlag(t *testing.T) {
+	var out bytes.Buffer
+	_, err := things().Pick(&out, strings.NewReader(""))
+	require.Error(t, err)
+	assert.True(t, input.IsRequired(err), "%v", err)
+	assert.NotErrorIs(t, err, errInvalidThing)
+	assert.Contains(t, err.Error(), "--thing")
+	assert.Contains(t, err.Error(), "a thing")
+	assert.Contains(t, out.String(), "Which thing?", "the question was asked")
+
+	_, err = things().Pick(&bytes.Buffer{}, strings.NewReader("9\n"))
+	assert.ErrorIs(t, err, errInvalidThing, "a wrong answer then the end is invalid")
 }

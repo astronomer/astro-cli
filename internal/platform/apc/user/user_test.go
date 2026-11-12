@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houstonMocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // Houston's own words when public sign-ups are off, the default.
@@ -38,9 +39,10 @@ func (s *Suite) TestCreateSuccess() {
 	houstonMock.AssertExpectations(s.T())
 }
 
-// With neither given and nothing on stdin, the prompts read empty answers,
-// as they always have.
+// With neither given and nothing but empty lines on stdin, the prompts read
+// empty answers, as they always have.
 func (s *Suite) TestCreatePrompted() {
+	defer testUtil.MockUserInput(s.T(), "\n\n\n")()
 	houstonMock := new(houstonMocks.ClientInterface)
 	houstonMock.On("CreateUser", mock.Anything).Return(created("pending"), nil)
 

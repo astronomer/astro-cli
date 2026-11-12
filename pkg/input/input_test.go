@@ -81,11 +81,15 @@ func (s *Suite) TestConfirm() {
 			errAssertion: assert.NoError,
 		},
 		{
-			name:         "no input",
-			inputString:  "",
-			args:         args{promptText: "enter y or n"},
-			want:         false,
-			errAssertion: assert.NoError,
+			// Nobody answering is not a no: it is a question this run could
+			// not get answered.
+			name:        "no input",
+			inputString: "",
+			args:        args{promptText: "enter y or n"},
+			want:        false,
+			errAssertion: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.True(t, IsRequired(err), "%v", err)
+			},
 		},
 	}
 	for _, tt := range tests {

@@ -426,6 +426,10 @@ func mkdir(t *testing.T, parts ...string) string {
 var leaky = []string{
 	"ASTRO_", "AIRFLOW_", "XDG_", "UV_",
 	"HOME", "USERPROFILE", "NO_COLOR", "VIRTUAL_ENV",
+	// Whether a run may ask is decided by CI (input.Refusal), so a runner that
+	// sets it would turn every case that expects a question into a refusal. A
+	// case about CI sets it itself, through extra.
+	"CI",
 }
 
 // env is the whole environment a command runs with: the ambient one, minus

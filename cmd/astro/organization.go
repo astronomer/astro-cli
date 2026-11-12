@@ -262,7 +262,7 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationNameOrID = args[0]
 	}
 
-	asks := cliout.NotesTo(cmd, format, out)
+	asks := os.Stderr
 	switched, err := orgSwitch(organizationNameOrID, astroV1Client, asks)
 	if err != nil {
 		return err

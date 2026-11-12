@@ -49,9 +49,9 @@ func TestDeployImageNameToALink(t *testing.T) {
 // default preselected, as a build's does.
 func TestDeployImageNameAsksWithTheDefaultPreselected(t *testing.T) {
 	linkedProject(t)
-	prev := stdinIsTerminal
-	stdinIsTerminal = func() bool { return true }
-	t.Cleanup(func() { stdinIsTerminal = prev })
+	prev := mayAsk
+	mayAsk = func() bool { return true }
+	t.Cleanup(func() { mayAsk = prev })
 	seen := deployMocks(t, deployPushed, nil)
 	api := newAPCClient()
 	api.On("ListDeployments", houston.ListDeploymentsRequest{WorkspaceID: deployWorkspace}).Return([]houston.Deployment{{ID: "dep-prod", Label: "Prod"}}, nil)

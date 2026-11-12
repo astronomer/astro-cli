@@ -299,9 +299,12 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	stopWatching := quitOnInterrupt()
 	defer stopWatching()
 
-	// A run without a terminal — a coding agent's shell, CI — never answers the
-	// prompt below, so it takes the login-link path instead of blocking on stdin.
-	if !shouldDisplayLoginLink && stdinIsTerminal() {
+	// A run that may not ask (CI, --non-interactive) or has no terminal — a coding
+	// agent's shell — never answers the Press Enter gate below, so it takes the
+	// login-link path instead of blocking on stdin. The terminal check stays: the
+	// gate is a pause before opening a browser, not a question, and a stdin that
+	// is not a terminal must not be waited on for it.
+	if !shouldDisplayLoginLink && input.CanAsk() && stdinIsTerminal() {
 		action := "log in"
 		if signup {
 			action = "create your Astro account"

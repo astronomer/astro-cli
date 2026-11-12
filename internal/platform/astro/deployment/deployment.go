@@ -15,7 +15,6 @@ import (
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
-	"golang.org/x/term"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
@@ -50,9 +49,9 @@ var (
 	parseToken    = util.ParseAPIToken
 	CleanOutput   = false
 
-	// stdinIsTerminal reports whether someone is at the keyboard to pick a
+	// mayAsk reports whether someone is at the keyboard to pick a
 	// Deployment. A var so a test can stand in for a terminal.
-	stdinIsTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
+	mayAsk = input.CanAsk
 )
 
 const (
@@ -1554,10 +1553,7 @@ func updateResourceQuotaMemory(resourceQuotaMemory string, deployment *astrov1.D
 var (
 	// errDeleteNeedsTarget is a delete with no Deployment named and nobody to
 	// pick one. --yes answers the confirmation, never which Deployment.
-	errDeleteNeedsTarget = errors.New("astro deployment delete needs the Deployment to delete, and there is no terminal to pick it from: pass --deployment, or the Deployment id as the argument. --yes skips the confirmation and never chooses the Deployment")
-	// errDeleteNeedsConfirmation is a delete without --yes and nobody to
-	// type the confirmation.
-	errDeleteNeedsConfirmation = errors.New("astro deployment delete asks for the Deployment's name to confirm, and there is no terminal to type it at: pass --yes")
+	errDeleteNeedsTarget = errors.New("astro deployment delete needs the Deployment to delete, and this run cannot ask which one: pass --deployment, or the Deployment id as the argument. --yes skips the confirmation and never chooses the Deployment")
 	// errDeleteNotConfirmed is a confirmation answered with anything but the
 	// Deployment's name: declined, as every declined confirmation is
 	// (input.ErrAborted), saying why.
@@ -1568,7 +1564,7 @@ var (
 // forceDelete. A run with no terminal must name the Deployment: it is never
 // picked for it, whatever forceDelete says.
 func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Client astrov1.APIClient) (*Removal, error) {
-	if deploymentID == "" && deploymentName == "" && !stdinIsTerminal() {
+	if deploymentID == "" && deploymentName == "" && !mayAsk() {
 		return nil, input.Required(errDeleteNeedsTarget)
 	}
 
@@ -1587,11 +1583,6 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 			input.About("the Deployment's name, to confirm the delete"), input.AnsweredBy("--yes"))
 		if err != nil {
 			return nil, err
-		}
-		// Nothing typed with no terminal is nobody there to type it: say
-		// what answers the question, not that the answer was wrong.
-		if typed == "" && !stdinIsTerminal() {
-			return nil, input.Required(errDeleteNeedsConfirmation)
 		}
 		if typed != currentDeployment.Name {
 			return nil, fmt.Errorf("%w (\"%s\"): the Deployment was not deleted", errDeleteNotConfirmed, currentDeployment.Name)
@@ -2204,7 +2195,7 @@ func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, fil
 		}
 		// 1.x took it here for every command. A change waits for someone to
 		// pick it, and a run with nobody to ask is told to name it.
-		if !stdinIsTerminal() {
+		if !mayAsk() {
 			return astrov1.Deployment{}, input.Required(fmt.Errorf("%s (%s) is the only Deployment in workspace %s this command can act on, but a command that changes a Deployment does not choose one by itself: pass --deployment", deployments[0].Name, deployments[0].Id, ws))
 		}
 	}

@@ -48,7 +48,7 @@ func apcDeps(t *testing.T, dir, current string, dep PickedDeployment) (Deps, *ap
 func TestLinkAddUnderAPCPicksAHoustonDeployment(t *testing.T) {
 	dir, path := linkTestProject(t, linkManifest)
 	d, run := apcDeps(t, dir, "ckws-current", PickedDeployment{ID: "ckdep-1", Name: "Orders Prod", WorkspaceID: "ckws-current"})
-	d.Interactive = func() bool { return true }
+	d.Terminal = func() bool { return true }
 	out := d.Stdout.(interface{ String() string })
 	require.NoError(t, execute(t, d, "link", "add"))
 	assert.Equal(t, []string{"ckws-current"}, run.workspaces)
@@ -80,7 +80,7 @@ func TestLinkAddUnderAPCLeavesOutLinkedDeployments(t *testing.T) {
 		"workspace = 'ckws-x'\ndeployment = 'ckdep-x'\n"
 	dir, _ := linkTestProject(t, body)
 	d, run := apcDeps(t, dir, "ckws-current", PickedDeployment{ID: "ckdep-2", Name: "new"})
-	d.Interactive = func() bool { return true }
+	d.Terminal = func() bool { return true }
 	require.NoError(t, execute(t, d, "link", "add"))
 	assert.Equal(t, map[string]string{"ckdep-old": "apc-old"}, run.linked)
 }
@@ -187,7 +187,7 @@ func TestLinkAddUnderAPCNamesTheMissingDeploymentFirst(t *testing.T) {
 		t.Error("the workspace was read for a link with no Deployment")
 		return "", nil
 	}
-	err := execute(t, d, "link", "add", "prod-apc")
+	err := execute(t, d, "link", "add", "prod-apc", "--non-interactive")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "needs a deployment")
 	assert.Equal(t, linkManifest, readManifest(t, dir))
@@ -229,7 +229,7 @@ func TestAPCLinksAreListed(t *testing.T) {
 	dir, _ := linkTestProject(t, linkManifest+apc)
 	d, run := pickDeps(t, dir, "\n", PickedDeployment{}, "")
 	require.Error(t, execute(t, d, "link", "remove"))
-	assertPickerTable(t, run.out.String(), "Select a link to remove", `2\s+prod-apc\s+apc\s+ckdep-1 on astro.corp.example`)
+	assertPickerTable(t, run.errOut.String(), "Select a link to remove", `2\s+prod-apc\s+apc\s+ckdep-1 on astro.corp.example`)
 
 	dir = instanceProject(t, apc)
 	d, out, _ := instanceDeps(t, dir)

@@ -331,12 +331,12 @@ func TestBareUseAtATerminalPicksAndPins(t *testing.T) {
 	dir := instanceProject(t, twoLinkManifest)
 	pick := func(answer string) (string, error) {
 		t.Helper()
-		d, out, _ := instanceDeps(t, dir)
-		d.Interactive = func() bool { return true }
+		d, out, errOut := instanceDeps(t, dir)
+		d.Terminal = func() bool { return true }
 		d.OutputTerminal = func() bool { return true }
 		d.Stdin = strings.NewReader(answer)
 		err := execute(t, d, "use")
-		return out.String(), err
+		return out.String() + errOut.String(), err
 	}
 	pin := func() string {
 		t.Helper()
@@ -391,7 +391,7 @@ func TestBareUseReportsWhenThePickerCannotHelp(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dir := instanceProject(t, tc.links)
 			d, out, _ := instanceDeps(t, dir)
-			d.Interactive = func() bool { return true }
+			d.Terminal = func() bool { return true }
 			d.OutputTerminal = func() bool { return tc.stdoutTTY }
 			d.Stdin = strings.NewReader("2\n")
 			if err := execute(t, d, "use"); err != nil {
@@ -441,14 +441,14 @@ func lineWith(out, name, mark string) bool {
 func TestBareUseMarksAnEnvChosenRow(t *testing.T) {
 	dir := instanceProject(t, twoLinkManifest)
 	t.Setenv(instances.EnvVar, "prod")
-	d, out, _ := instanceDeps(t, dir)
-	d.Interactive = func() bool { return true }
+	d, out, errOut := instanceDeps(t, dir)
+	d.Terminal = func() bool { return true }
 	d.OutputTerminal = func() bool { return true }
 	d.Stdin = strings.NewReader("2\n")
 	if err := execute(t, d, "use"); err != nil {
 		t.Fatal(err)
 	}
-	if !lineWith(out.String(), "prod", "from "+instances.EnvVar) {
+	if !lineWith(errOut.String(), "prod", "from "+instances.EnvVar) {
 		t.Errorf("prod not marked as env-chosen:\n%s", out)
 	}
 }
@@ -469,14 +469,14 @@ func TestBareUseKeepsTheDefaultMarkOnAnEnvChosenDefault(t *testing.T) {
 		t.Errorf("listing: dev should read %q:\n%s", both, out)
 	}
 
-	d, out, _ = instanceDeps(t, dir)
-	d.Interactive = func() bool { return true }
+	d, out, errOut := instanceDeps(t, dir)
+	d.Terminal = func() bool { return true }
 	d.OutputTerminal = func() bool { return true }
 	d.Stdin = strings.NewReader("2\n")
 	if err := execute(t, d, "use"); err != nil {
 		t.Fatal(err)
 	}
-	if !lineWith(out.String(), "dev", both) {
+	if !lineWith(errOut.String(), "dev", both) {
 		t.Errorf("picker: dev should read %q:\n%s", both, out)
 	}
 }
@@ -485,7 +485,7 @@ func TestBareUseKeepsTheDefaultMarkOnAnEnvChosenDefault(t *testing.T) {
 func TestBareUseWithJSONAtATerminalReports(t *testing.T) {
 	dir := instanceProject(t, twoLinkManifest)
 	d, out, _ := instanceDeps(t, dir)
-	d.Interactive = func() bool { return true }
+	d.Terminal = func() bool { return true }
 	d.OutputTerminal = func() bool { return true }
 	d.Stdin = strings.NewReader("2\n")
 	if err := execute(t, d, "use", "--output", "json"); err != nil {

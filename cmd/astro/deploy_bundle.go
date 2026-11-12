@@ -341,7 +341,7 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 		deployment.NoteTokenDeployment(os.Stderr, id)
 		return id, nil, login, nil
 	}
-	if format != cliout.FormatText || !stdinIsTerminal() {
+	if format != cliout.FormatText || !mayAsk() {
 		return "", nil, login, input.Required(errBundleNoTarget)
 	}
 	if !login.current {

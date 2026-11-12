@@ -22,6 +22,10 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	origArgs := os.Args
 	os.Args = []string{"astro"}
+	// A run with CI set asks nothing (input.Refusal), and a CI runner sets it: the
+	// cases that expect a prompt must not depend on where they run. Those about
+	// CI set it themselves.
+	os.Unsetenv("CI") //nolint:usetesting // for the whole package run
 	watching := emitWatch().Arm()
 	code := m.Run()
 	os.Args = origArgs

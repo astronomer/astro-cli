@@ -54,3 +54,23 @@ func (s *Suite) TestConfirmOrAbort() {
 		s.Contains(got.Error(), "pass --yes")
 	})
 }
+
+// A Text question whose input ends with nothing is nobody answering: a
+// *RequiredError naming the flag, not an empty answer. Text typed before the
+// end is still the answer.
+func (s *Suite) TestTextEnded() {
+	s.stdinHolding("")
+	_, err := Text("Name: ", AnsweredBy("--name"))
+	s.True(IsRequired(err), "%v", err)
+	s.Contains(err.Error(), "pass --name")
+
+	s.stdinHolding("prod")
+	got, err := Text("Name: ", AnsweredBy("--name"))
+	s.NoError(err)
+	s.Equal("prod", got)
+
+	s.stdinHolding("\n")
+	got, err = Text("Name: ", AnsweredBy("--name"))
+	s.NoError(err)
+	s.Empty(got, "an empty line is an answer")
+}

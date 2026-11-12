@@ -89,8 +89,11 @@ type List struct {
 	// Ended, when set, is the error for input that ends (Ctrl-D, a closed
 	// stdin) before an answer picks a row: with nothing typed, or with a
 	// last answer cut short that picks nothing. Input that has ended cannot
-	// be asked again, so it is returned at once. When nil, ended input fails
-	// like any answer that picks nothing.
+	// be asked again, so it is returned at once. When nil, input that ended
+	// before any answer at all (a closed stdin, /dev/null) is a
+	// *input.RequiredError naming what Ask names, never an invalid selection:
+	// nobody answered. Input that ends after a wrong answer fails like any
+	// answer that picks nothing.
 	Ended error
 
 	rows    [][]string
@@ -154,6 +157,7 @@ func (l *List) Choose(out io.Writer, in io.Reader) (Choice, error) {
 	}
 	r := input.Reader(in)
 	var last string // the last answer given, for InvalidAnswer to name
+	var asked bool  // whether any answer was given at all
 	for attempt := 1; ; attempt++ {
 		// A failed read ends the input: whatever it returned is the last
 		// answer there will be.
@@ -169,7 +173,7 @@ func (l *List) Choose(out io.Writer, in io.Reader) (Choice, error) {
 		// Input that ended with nothing on its line is no answer at all.
 		answered := answer != "" || !ended
 		if answered {
-			last = answer
+			last, asked = answer, true
 			// Every wrong answer is told so, the last included: one that
 			// ends quietly would otherwise end with no word.
 			io.WriteString(out, retry) //nolint:errcheck // a failed write to the terminal still reads the answer
@@ -180,6 +184,12 @@ func (l *List) Choose(out io.Writer, in io.Reader) (Choice, error) {
 			}
 			if ended && l.Ended != nil {
 				return Choice{}, l.Ended
+			}
+			if ended && !asked {
+				// Nobody answered: not an invalid selection, but a question
+				// this run could not get answered, so the answer has to come
+				// as the flag Ask names.
+				return Choice{}, l.endedRequired()
 			}
 			break
 		}
@@ -194,6 +204,16 @@ func (l *List) Choose(out io.Writer, in io.Reader) (Choice, error) {
 // nothing, and refuses with the error Choose would.
 func (l *List) MayAsk() error {
 	return input.MayAsk(prompt, l.Ask...)
+}
+
+// endedRequired is the refusal for input that ended before any answer,
+// naming what Ask names.
+func (l *List) endedRequired() error {
+	e := &input.RequiredError{Prompt: prompt, Reason: "stdin ended before an answer"}
+	for _, o := range l.Ask {
+		o(e)
+	}
+	return e
 }
 
 // ErrNoChoices is what a List with nothing to choose from fails with, unless

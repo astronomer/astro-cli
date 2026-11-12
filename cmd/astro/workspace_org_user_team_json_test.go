@@ -279,7 +279,9 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 		},
 		{name: "update an IdP team confirmed", root: newOrganizationCmd, client: with(teams, updatesTeam("team-idp", &idp)), answers: "y\n", args: []string{"organization", "team", "update", "team-idp", "--description", "d"}, check: says("This is an IDP-managed team. Are you sure you want to continue the operation? (y/n)", "Astro Team Okta Ops was successfully updated")},
 		{name: "update an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "update", "team-idp", "--description", "d"}, check: func(t *testing.T, out string) {
-			assert.Equal(t, "This is an IDP-managed team. Are you sure you want to continue the operation? (y/n) ", out)
+			// The answer from a pipe, which nothing echoes, is written after the
+			// question, so a log reads whole lines.
+			assert.Equal(t, "This is an IDP-managed team. Are you sure you want to continue the operation? (y/n) n\n", out)
 		}, wantErr: "aborted"},
 		{name: "update an IdP team --yes", root: newOrganizationCmd, client: with(teams, updatesTeam("team-idp", &idp)), args: []string{"organization", "team", "update", "team-idp", "--description", "d", "--yes"}, check: says("Astro Team Okta Ops was successfully updated")},
 		{

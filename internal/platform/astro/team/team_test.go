@@ -931,6 +931,7 @@ func (s *Suite) TestCreate() {
 	s.Run("error path no name passed in and user doesn't type one in when prompted", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
+		defer testUtil.MockUserInput(s.T(), "\n")()
 		_, err := CreateTeam("", *team1.Description, "ORGANIZATION_MEMBER", mockClient)
 		s.EqualError(err, "you must give your Team a name")
 	})

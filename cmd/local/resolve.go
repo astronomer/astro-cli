@@ -320,11 +320,12 @@ func (c *cli) resolveDeployment(f deploymentFlags) (instances.Selection, error) 
 	return sel, nil
 }
 
-// mayPrompt reports whether this run may ask a question: someone has to be
-// there to answer, and json output has to stay a stream a program can parse —
-// a prompt on stderr with the run blocked on stdin is not that.
+// mayPrompt reports whether this run may ask a question (input.CanAsk: not
+// under json, CI or --non-interactive), whether or not stdin is a terminal. A
+// run that does not pass the guard (a test calling a command directly) still
+// never asks under json.
 func (c *cli) mayPrompt() bool {
-	return c.interactive() && c.output != cliout.FormatJSON
+	return input.CanAsk() && c.output != cliout.FormatJSON
 }
 
 // pickAndPin asks which deployment to use and writes the answer to the pin, so
@@ -384,12 +385,12 @@ func (c *cli) promptForDeployment(choices []string) (string, error) {
 	return choices[i], nil
 }
 
-// interactive reports whether this run can ask a question: someone has to be at
-// a terminal to answer it. A piped or redirected stdin is a script, and a
-// script must decide with -d, ASTRO_DEPLOYMENT, or a pin rather than be asked.
-func (c *cli) interactive() bool {
-	if c.d.Interactive != nil {
-		return c.d.Interactive()
+// terminal reports whether stdin is a terminal. It words a refusal and tells a
+// command with a non-asking alternative whether someone is there to pick; it
+// never decides whether a question may be asked (input.CanAsk does).
+func (c *cli) terminal() bool {
+	if c.d.Terminal != nil {
+		return c.d.Terminal()
 	}
 	return false
 }

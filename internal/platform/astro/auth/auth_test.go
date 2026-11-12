@@ -962,8 +962,11 @@ func TestCheckUserSession(t *testing.T) {
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrganizationsResponseEmpty, nil).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
+		// A stdin with no answer is nobody answering the offer to create an
+		// organization: input_required, naming the flag that answers it.
 		err := CheckUserSession(&ctx, mockV1Client, buf)
-		assert.Contains(t, err.Error(), "Please contact your Astro Organization Owner to be invited to the organization")
+		assert.True(t, input.IsRequired(err), "%v", err)
+		assert.Contains(t, err.Error(), "--signup")
 		mockV1Client.AssertExpectations(t)
 	})
 

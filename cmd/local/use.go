@@ -52,7 +52,7 @@ func newUseCmd(c *cli) *cobra.Command {
 				return c.runUseUnset()
 			case len(args) == 1:
 				return c.runUse(args[0])
-			case c.mayPrompt() && c.d.OutputTerminal != nil && c.d.OutputTerminal():
+			case c.mayPrompt() && c.terminal() && c.d.OutputTerminal != nil && c.d.OutputTerminal():
 				return c.runUsePick()
 			default:
 				return c.runUseShow()

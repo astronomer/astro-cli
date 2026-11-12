@@ -706,6 +706,8 @@ func (s *Suite) TestCheckClusterDomain() {
 }
 
 func (s *Suite) TestGetAuthTokenSuccess() {
+	// The oAuth token prompt is answered with an empty line.
+	defer testUtil.MockUserInput(s.T(), "\n")()
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("software")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)

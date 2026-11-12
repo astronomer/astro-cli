@@ -37,7 +37,7 @@ func TestAJSONConfirmationIsNeverAsked(t *testing.T) {
 	d, out, errOut := queryDeps(t)
 	answer := strings.NewReader("y\n")
 	d.Stdin = answer
-	d.Interactive = func() bool { return true }
+	d.Terminal = func() bool { return true }
 	err := execute(t, d, afName, "runs", "delete", "orders_etl", "run_1", "--url", stub.URL, "-o", "json")
 
 	msg := requireInputRequired(t, out.String(), err)
@@ -79,7 +79,7 @@ func TestAJSONPickerIsNeverDrawn(t *testing.T) {
 	d, out, _ := instanceDeps(t, dir)
 	answer := strings.NewReader("1\n")
 	d.Stdin = answer
-	d.Interactive = func() bool { return true }
+	d.Terminal = func() bool { return true }
 	d.OutputTerminal = func() bool { return true }
 
 	err := execute(t, d, "link", "remove", "-o", "json")
@@ -99,7 +99,7 @@ func TestAJSONAmbiguousDeploymentIsInputRequired(t *testing.T) {
 	dir := instanceProject(t, ambiguousManifest)
 	d, out, errOut := instanceDeps(t, dir)
 	d.Stdin = strings.NewReader("2\n")
-	d.Interactive = func() bool { return true }
+	d.Terminal = func() bool { return true }
 
 	err := execute(t, d, afName, "dags", "list", "-o", "json")
 

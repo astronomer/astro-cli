@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/cmd/cliout"
@@ -29,13 +28,6 @@ var (
 	noPrompt bool
 
 	cloudSwitch = astroAuth.Switch
-
-	// contextPickerMayPrompt reports whether a bare `astro context switch` can
-	// ask which context to use: someone at a terminal to answer, and a stdout
-	// they will see the picker on, so a redirected run fails rather than blocks.
-	contextPickerMayPrompt = func() bool {
-		return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
-	}
 )
 
 func newContextCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
@@ -122,7 +114,7 @@ func newContextSwitchCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 func switchContext(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, r cliout.Renderer) error {
 	cmd.SilenceUsage = true
 	if len(args) == 0 {
-		domain, err := pickContext(cmd.InOrStdin(), r.Out)
+		domain, err := pickContext(cmd.InOrStdin(), cmd.ErrOrStderr())
 		if err != nil {
 			return err
 		}
@@ -175,9 +167,6 @@ var errInvalidContextSelection = errors.New("invalid context selected")
 // variable in this shell outranks the saved context, and it is what makes the
 // CLI look as though it flips between hosts.
 func pickContext(in io.Reader, out io.Writer) (string, error) {
-	if !contextPickerMayPrompt() {
-		return "", input.Required(errors.New("name the context to switch to: astro context switch <domain>"))
-	}
 	contexts, err := config.ListContexts()
 	if err != nil {
 		return "", err

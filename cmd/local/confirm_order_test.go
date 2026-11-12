@@ -20,7 +20,7 @@ func confirmLines(t *testing.T, interactive bool, stdin string) (string, error) 
 	t.Helper()
 	d, _ := testDeps(t)
 	d.Stdin = strings.NewReader(stdin)
-	d.Interactive = func() bool { return interactive }
+	d.Terminal = func() bool { return interactive }
 	c := &cli{d: d}
 	err := c.confirm("Wipe it?")
 	return stderrOf(d), err
@@ -107,7 +107,7 @@ func TestConfirmInterruptedEndsTheQuestionsLine(t *testing.T) {
 			d, _ := testDeps(t)
 			d.Stdin = stdin
 			d.Stderr = &bytes.Buffer{}
-			d.Interactive = func() bool { return interactive }
+			d.Terminal = func() bool { return interactive }
 			err := (&cli{d: d}).confirm("Wipe it?")
 			if !errors.Is(err, input.ErrInterrupted) {
 				t.Fatalf("err = %v, want ErrInterrupted", err)
@@ -218,7 +218,7 @@ func TestResetQuestionNamesTheProject(t *testing.T) {
 			d, rt, _ := resetDeps(t)
 			dir, _ := d.WorkingDir()
 			d.Stdin = strings.NewReader("y\n")
-			d.Interactive = func() bool { return interactive }
+			d.Terminal = func() bool { return interactive }
 			if err := execute(t, d, "local", "reset"); err != nil {
 				t.Fatalf("reset answered yes: %v", err)
 			}
@@ -315,7 +315,7 @@ func TestConfirmReadFailureWithPartialTextIsNotAYes(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d, _ := testDeps(t)
 			d.Stdin = &partialThenFails{}
-			d.Interactive = func() bool { return interactive }
+			d.Terminal = func() bool { return interactive }
 			err := (&cli{d: d}).confirm("Wipe it?")
 			if err == nil || !strings.Contains(err.Error(), "read failed") {
 				t.Fatalf("err = %v, want the read failure, not a yes", err)

@@ -14,7 +14,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
@@ -29,6 +28,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -277,7 +277,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	// stream a program can parse — a question on stderr with the run blocked on
 	// stdin is not that. So json mode is non-interactive whatever stdin is, and
 	// must name its target like any other script.
-	interactive := format == cliout.FormatText && stdinIsTerminal()
+	interactive := format == cliout.FormatText && mayAsk()
 
 	errOut := cmd.ErrOrStderr()
 	// Every warning the deploy gives goes to stderr, led by a yellow
@@ -459,10 +459,10 @@ func noteIgnoredDeploymentEnv(w io.Writer, m *manifest.Manifest, interactive boo
 	}
 }
 
-// stdinIsTerminal reports whether this run can be asked which deployment to
-// ship to. It is a var rather than the call itself so a test can drive the
-// prompt without a pty.
-var stdinIsTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
+// mayAsk reports whether this run can be asked which deployment to ship to
+// (input.CanAsk: not under json, CI or --non-interactive, whether or not stdin
+// is a terminal). It is a var so a test can drive both answers.
+var mayAsk = input.CanAsk
 
 // deployJSON is the single object `astro deploy --output json` emits when a manifest
 // deploy finishes. Fields that do not apply to a deploy kind are omitted: a

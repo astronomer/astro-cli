@@ -70,25 +70,12 @@ func readSetValue(cmd *cobra.Command, flagName, flagValue, prompt string) (strin
 	return v, nil
 }
 
-// errAbortedDelete is a delete asked where nobody could answer. One answered
-// no is input.ErrAborted.
-var errAbortedDelete = errors.New("aborted: pass --yes (or confirm interactively) to delete")
-
-// confirmTTY asks prompt at an interactive prompt: nil for a yes (y or yes,
-// in any case), input.ErrAborted for any other answer. On a non-TTY it reads
-// nothing and returns errAbortedDelete, marked as a question this run could
-// not ask; callers must require an explicit --yes flag for non-interactive
-// use. A run that may not ask at all (--output json) returns that refusal,
-// naming --yes, rather than an answer.
+// confirmTTY asks prompt: nil for a yes (y or yes, in any case),
+// input.ErrAborted for any other answer. A run that may not ask (--output json,
+// CI, --non-interactive), and input that ends with no answer, return a
+// question this run could not ask, naming --yes, rather than an answer.
 func confirmTTY(prompt string) error {
-	yes := input.AnsweredBy("--yes")
-	if err := input.MayAsk(prompt, yes); err != nil {
-		return err
-	}
-	if !stdinIsTerminal() {
-		return input.Required(errAbortedDelete)
-	}
-	return input.ConfirmOrAbort(prompt, yes)
+	return input.ConfirmOrAbort(prompt, input.AnsweredBy("--yes"))
 }
 
 // hasPipedStdin reports whether stdin appears to be a pipe rather than a TTY.

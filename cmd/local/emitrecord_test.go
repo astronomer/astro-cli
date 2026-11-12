@@ -63,6 +63,9 @@ func emitWatch() cliouttest.Watch {
 // afterwards. A single test cannot: the point is what every OTHER test
 // emitted.
 func TestMain(m *testing.M) {
+	// A run with CI set asks nothing (input.Refusal), and a CI runner sets it:
+	// the cases that expect a prompt must not depend on where they run.
+	os.Unsetenv("CI") //nolint:usetesting // for the whole package run
 	watching := emitWatch().Arm()
 	os.Exit(watching.Finish(m.Run()))
 }

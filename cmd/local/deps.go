@@ -30,6 +30,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/proxy"
@@ -115,11 +116,12 @@ type Deps struct {
 	// Deployment by default (target = "apc"), on this context's domain.
 	APC *APCLinking
 
-	// Interactive reports whether this run may ask the user a question. It is a
-	// seam rather than a stdin type-assertion so a test can drive the prompt
-	// path without a pty. nil means non-interactive, which is the safe default:
-	// a run that cannot be asked is never blocked waiting for an answer.
-	Interactive func() bool
+	// Terminal reports whether stdin is a terminal. It does not decide whether
+	// a question is asked (input.CanAsk does, for the whole run): it words a
+	// confirmation that got no answer, and tells a bare `astro use` whether
+	// someone is there to pick. It is a seam so a test can stand in for a pty.
+	// nil means not a terminal.
+	Terminal func() bool
 
 	// OutputTerminal reports whether stdout is a terminal, for a command whose
 	// question and whose report both go to stdout: `astro use | grep prod` has a
@@ -257,7 +259,7 @@ func NewDeps() Deps {
 		WorkspaceClients:   emenv.Clients,
 		Session:            astrosession.BearerFor,
 		Locator:            instancelocate.New,
-		Interactive:        stdinIsTerminal,
+		Terminal:           input.StdinIsTerminal,
 		OutputTerminal:     stdoutIsTerminal,
 		AirflowDefault:     catalogDefault,
 		RuntimeCheck:       runtimecatalog.CheckRuntime,
@@ -283,11 +285,6 @@ func NewDeps() Deps {
 		d.Watch = rt.WatchProject
 	}
 	return d
-}
-
-// stdinIsTerminal is the production answer to "can this run ask a question".
-func stdinIsTerminal() bool {
-	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
 // stdoutIsTerminal is the production answer to "will the user see what this

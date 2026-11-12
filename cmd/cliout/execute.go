@@ -82,7 +82,7 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	root.SilenceErrors, root.SilenceUsage = true, true
 	defer func() { root.SilenceErrors, root.SilenceUsage = quietErrors, quietUsage }()
 
-	defer input.SetGuard(refuseUnderJSON(root, args))()
+	defer input.SetGuard(refuseToAsk(root, args))()
 	// The run's first Ctrl-C cancels ctx; a question waiting for a line ends
 	// at once on it, rather than after a second Ctrl-C or an Enter.
 	defer input.SetInterrupt(ctx)()
@@ -147,28 +147,27 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	return err
 }
 
-// refuseUnderJSON is the prompt guard for one run: a command whose --output is
-// json asks nothing (pkg/input.SetGuard). A question on a terminal with the
-// run blocked on stdin is not a result a program can parse, and an agent or a
-// script driving the CLI has nobody at the keyboard to answer it — it hangs.
-// The answer has to come with the invocation instead, and the refusal says
-// which flag carries it.
+// refuseToAsk is the prompt guard for one run, and the one place its
+// interaction mode is resolved (input.Refusal): a run asks nothing under
+// --output json, with CI set, or with --non-interactive (pkg/input.SetGuard).
+// A question with the run blocked on stdin is not a result a program can
+// parse, and an agent, a script or a CI job driving the CLI has nobody to
+// answer it — it hangs. The answer has to come with the invocation instead, and
+// the refusal says which flag carries it.
 //
 // The command is found the way cobra will find it, before it runs, and its
-// flag read only when a question comes up: by then cobra has parsed it, so
-// the guard answers from the value the command itself sees, with no reading
-// of raw arguments.
-func refuseUnderJSON(root *cobra.Command, args []string) func() string {
+// flags read only when a question comes up: by then cobra has parsed them, so
+// the guard answers from the values the command itself sees, with no reading
+// of raw arguments. A line that resolves to no command still gets the guard,
+// for the environment's part of the rule.
+func refuseToAsk(root *cobra.Command, args []string) func() string {
 	cmd := findTarget(root, args)
-	if cmd == nil {
-		return nil
-	}
 	return func() string {
-		f := cmd.Flag("output")
-		if f == nil || f.Value.String() != string(FormatJSON) {
-			return ""
+		if cmd == nil {
+			return input.Refusal(false, nil)
 		}
-		return "with --output json it cannot"
+		f := cmd.Flag("output")
+		return input.Refusal(f != nil && f.Value.String() == string(FormatJSON), cmd.Flag(input.NonInteractiveFlag))
 	}
 }
 

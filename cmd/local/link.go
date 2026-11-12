@@ -275,7 +275,11 @@ func (c *cli) pickLink(title, none, current, mark, missing string) (string, erro
 	if none != "" {
 		list.AddRow(false, row("none", "", none)...)
 	}
-	i, err := list.Pick(c.d.Stdout, c.d.Stdin)
+	i, err := list.Pick(c.d.Stderr, c.d.Stdin)
+	if input.IsRequired(err) {
+		// Nobody answered: say how to name the link, in this command's words.
+		return "", input.Required(errors.New(missing))
+	}
 	switch {
 	case err != nil:
 		return "", err

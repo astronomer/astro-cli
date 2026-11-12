@@ -32,6 +32,10 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	origArgs := os.Args
 	os.Args = []string{"astro"}
+	// A run with CI set asks nothing (input.Refusal), and a CI runner sets it: the
+	// cases that expect a prompt must not depend on where they run. Those about
+	// CI set it themselves.
+	os.Unsetenv("CI")                            //nolint:usetesting // for the whole package run
 	os.Setenv(utils.RenameHintsDisabledEnv, "1") //nolint:usetesting // for the whole package run
 
 	// A login reads its auth config from api.<domain>, which no unit test may

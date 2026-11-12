@@ -25,31 +25,13 @@ var ErrAborted = errors.New("aborted")
 // under --output json. It is the confirmation a command that changes
 // something asks, so a decline is one failure everywhere.
 func ConfirmOrAbort(promptText string, opts ...Option) error {
-	if err := MayAsk(promptText, opts...); err != nil {
-		return err
-	}
-	fmt.Fprintf(os.Stderr, "%s (y/n) ", promptText)
-	line, err := ReadLine(stdin(), os.Stderr)
-	if errors.Is(err, ErrInterrupted) {
-		return err
-	}
-	answer := strings.ToLower(strings.TrimSpace(line))
-	if err != nil {
-		// Input that ended left the prompt's line open: end it, so what
-		// follows starts on a fresh one.
-		fmt.Fprintln(os.Stderr)
-	}
-	if err != nil && answer == "" {
-		e := &RequiredError{Prompt: promptText, Reason: "stdin ended before an answer"}
-		for _, o := range opts {
-			o(e)
-		}
-		return e
-	}
-	if answer == "y" || answer == "yes" {
-		return nil
-	}
-	return ErrAborted
+	return (&Confirmation{
+		Question: promptText,
+		In:       os.Stdin,
+		Out:      os.Stderr,
+		Terminal: StdinIsTerminal(),
+		Options:  opts,
+	}).Ask()
 }
 
 // Text requests a user for input text and returns it. It returns a
@@ -62,11 +44,16 @@ func Text(promptText string, opts ...Option) (string, error) {
 	if promptText != "" {
 		fmt.Fprint(os.Stderr, promptText)
 	}
-	// A read that ends is the answer so far, as it always was; an
-	// interrupt is not an answer.
+	// A read that ends is the answer so far, as it always was, unless it ends
+	// with nothing: that is nobody answering, refused naming the flag like a
+	// question this run could not ask. An interrupt is not an answer either.
 	text, err := ReadLine(reader, os.Stderr)
 	if errors.Is(err, ErrInterrupted) {
 		return "", err
+	}
+	if err != nil && text == "" {
+		fmt.Fprintln(os.Stderr)
+		return "", endedRequired(promptText, opts)
 	}
 	return strings.Trim(text, "\r\n"), nil
 }
@@ -89,8 +76,21 @@ func Confirm(promptText string, opts ...Option) (bool, error) {
 	if err != nil {
 		// Input that ended left the prompt's line open.
 		fmt.Fprintln(os.Stderr)
+		if text == "" {
+			return false, endedRequired(promptText, opts)
+		}
 	}
 	return strings.Trim(text, "\r\n") == "y", nil
+}
+
+// endedRequired is the refusal for a question whose input ended with no
+// answer: nobody answered, so the answer has to come as the flag opts name.
+func endedRequired(promptText string, opts []Option) error {
+	e := &RequiredError{Prompt: promptText, Reason: "stdin ended before an answer"}
+	for _, o := range opts {
+		o(e)
+	}
+	return e
 }
 
 // Password requests a users passord, does not print out what they entered, and
