@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -85,10 +86,11 @@ var orgNameForbidden = regexp.MustCompile(`[^a-zA-Z0-9-]+`)
 var signupVerificationPattern = regexp.MustCompile(`(?i)verif\w*\s+(your\s+)?email`)
 
 var (
-	callbackChannel = make(chan CallbackMessage, 1)
 	callbackTimeout = time.Second * 300
 	// callbackShutdownTimeout bounds how long a finished login waits for the callback server to drain.
-	callbackShutdownTimeout = 5 * time.Second
+	// By then the browser has its redirect, so what is left is an idle connection, such as a
+	// browser's preconnect, and a short wait is enough.
+	callbackShutdownTimeout = time.Second
 	redirectURI             = "http://localhost:12345/callback"
 	callbackServer          = "localhost:12345"
 	// callbackListening is called with the bound address once the callback
@@ -189,21 +191,38 @@ func authorizeCallbackHandlerTo(errOut io.Writer) AuthorizeCallbackHandler {
 	return func() (string, error) { return authorizeCallback(errOut) }
 }
 
-func authorizeCallback(errOut io.Writer) (string, error) {
+// callbackMux serves the login callback. The first result goes to results and
+// later ones (a refresh, a retry) are dropped, so a repeated hit never blocks
+// the handler and still gets the normal redirect page.
+func callbackMux(results chan<- CallbackMessage) *http.ServeMux {
+	send := func(msg CallbackMessage) {
+		select {
+		case results <- msg:
+		default:
+		}
+	}
 	m := http.NewServeMux()
-	s := http.Server{Handler: m, ReadHeaderTimeout: 0}
 	m.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 		if errorCode, ok := req.URL.Query()["error"]; ok {
-			callbackChannel <- CallbackMessage{err: authorizeError(errorCode, req.URL.Query()["error_description"])}
+			send(CallbackMessage{err: authorizeError(errorCode, req.URL.Query()["error_description"])})
 			resp := &http.Request{}
 			http.Redirect(w, resp, "https://auth.astronomer.io/device/denied", http.StatusFound)
 		} else {
-			callbackChannel <- CallbackMessage{authorizationCode: req.URL.Query().Get("code")}
+			send(CallbackMessage{authorizationCode: req.URL.Query().Get("code")})
 			resp := &http.Request{}
 			http.Redirect(w, resp, "https://auth.astronomer.io/device/success", http.StatusFound)
 		}
 	})
+	return m
+}
+
+func authorizeCallback(errOut io.Writer) (string, error) {
+	// One channel per login, so a result left over from an earlier attempt
+	// can't answer this one.
+	results := make(chan CallbackMessage, 1)
+	fresh := &freshConns{conns: map[net.Conn]struct{}{}}
+	s := http.Server{Handler: callbackMux(results), ReadHeaderTimeout: 0, ConnState: fresh.track}
 	// Bind before serving, so an address already taken reaches the caller as an
 	// error rather than ending the process from inside the goroutine below.
 	listener, err := net.Listen("tcp", callbackServer)
@@ -215,19 +234,30 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 		if err := s.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			// The caller selects on this channel, so it hears a server that
 			// stops early instead of waiting out the callback timeout.
-			callbackChannel <- CallbackMessage{err: fmt.Errorf("the login callback server stopped: %w", err)}
+			select {
+			case results <- CallbackMessage{err: fmt.Errorf("the login callback server stopped: %w", err)}:
+			default:
+			}
 		}
 	}()
 
 	// Every way out of the wait below, the error a browser reports included,
 	// must release the port, or the next login in this process can't bind it.
 	defer func() {
+		// Shutdown counts a connection that has sent nothing yet, such as a
+		// browser's preconnect, as busy for several seconds. The login is over,
+		// so drop those rather than wait on them.
+		fresh.closeAll()
 		// A stuck connection must not keep a finished login from returning.
 		ctx, cancel := http_context.WithTimeout(http_context.Background(), callbackShutdownTimeout)
 		defer cancel()
 		if err := s.Shutdown(ctx); err != nil {
-			s.Close() //nolint:errcheck // already reporting the shutdown failure
-			ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
+			// Only an idle connection can still be holding Shutdown here, and
+			// closing it is the normal way to finish, not something to report.
+			closeErr := s.Close()
+			if closeErr != nil || !errors.Is(err, http_context.DeadlineExceeded) {
+				ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", shutdownFailure(err, closeErr)))
+			}
 		}
 	}()
 
@@ -235,7 +265,7 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 	authorizationCode := ""
 	for authorizationCode == "" {
 		select {
-		case callbackMessage := <-callbackChannel:
+		case callbackMessage := <-results:
 			if callbackMessage.err != nil {
 				return "", callbackMessage.err
 			}
@@ -247,6 +277,41 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 
 	// return code
 	return authorizationCode, nil
+}
+
+// freshConns tracks the connections that have been accepted but have not yet
+// started a request.
+type freshConns struct {
+	mu    sync.Mutex
+	conns map[net.Conn]struct{}
+}
+
+func (f *freshConns) track(c net.Conn, state http.ConnState) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if state == http.StateNew {
+		f.conns[c] = struct{}{}
+		return
+	}
+	delete(f.conns, c)
+}
+
+func (f *freshConns) closeAll() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for c := range f.conns {
+		c.Close() //nolint:errcheck // the connection never sent a request
+		delete(f.conns, c)
+	}
+}
+
+// shutdownFailure describes a callback server that would not shut down, and
+// would not close either when closeErr is set.
+func shutdownFailure(shutdownErr, closeErr error) error {
+	if closeErr == nil {
+		return shutdownErr
+	}
+	return fmt.Errorf("%w; closing it failed too: %v", shutdownErr, closeErr)
 }
 
 // quitOnInterrupt ends the process on ^C or SIGTERM while a login waits on the

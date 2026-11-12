@@ -9,10 +9,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -372,7 +372,7 @@ func TestAuthorizeError(t *testing.T) {
 	})
 }
 
-func TestAuthorizeCallbackHandler(t *testing.T) {
+func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests share the listener helpers
 	// The callback answers the browser with a redirect to auth.astronomer.io.
 	// The test checks where it points without following it there.
 	client := httputil.NewHTTPClient()
@@ -400,15 +400,23 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 
 	// callbackAt binds an ephemeral port, so no other process can hold it, and
 	// requests the callback with the given query once the listener is open.
-	callbackAt := func(t *testing.T, query, wantLocation string) *sync.WaitGroup {
+	// With preconnect it first opens an idle connection, as a browser may.
+	// The returned func waits for the request to finish.
+	callbackAt := func(t *testing.T, query, wantLocation string, preconnect bool) (wait func()) {
 		t.Helper()
 		callbackServer = "localhost:0"
-		var wg sync.WaitGroup
-		wg.Add(1)
+		done := make(chan struct{})
 		callbackListening = func(addr net.Addr) {
 			bound = addr.String()
 			go func() {
-				defer wg.Done()
+				defer close(done)
+				if preconnect {
+					idle, err := net.Dial("tcp", bound)
+					if assert.NoError(t, err) {
+						// Held open past the login, as a browser's preconnect is.
+						t.Cleanup(func() { idle.Close() })
+					}
+				}
 				opts := &httputil.DoOptions{
 					Method: http.MethodGet,
 					Path:   fmt.Sprintf("http://%s/callback?%s", addr, query),
@@ -421,15 +429,25 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 				}
 			}()
 		}
-		return &wg
+		return func() {
+			t.Helper()
+			if bound == "" {
+				return // the listener never opened; requirePortFree reports it
+			}
+			select {
+			case <-done:
+			case <-time.After(10 * time.Second):
+				t.Error("the callback request never finished")
+			}
+		}
 	}
 
 	t.Run("success", func(t *testing.T) {
-		wg := callbackAt(t, "code=test", "https://auth.astronomer.io/device/success")
+		wait := callbackAt(t, "code=test", "https://auth.astronomer.io/device/success", false)
 		code, err := authorizeCallback(io.Discard)
 		assert.Equal(t, "test", code)
 		assert.NoError(t, err)
-		wg.Wait()
+		wait()
 		requirePortFree(t)
 	})
 
@@ -441,17 +459,18 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 		callbackListening = func(net.Addr) {}
 
 		code, err := authorizeCallback(io.Discard)
-		assert.Error(t, err)
 		assert.Empty(t, code)
-		assert.Contains(t, err.Error(), "cannot open the login callback on "+held.Addr().String())
-		assert.Contains(t, err.Error(), "Close any other astro login")
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "cannot open the login callback on "+held.Addr().String())
+			assert.Contains(t, err.Error(), "Close any other astro login")
+		}
 	})
 
 	t.Run("error", func(t *testing.T) {
-		wg := callbackAt(t, "error=error&error_description=fatal_error", "https://auth.astronomer.io/device/denied")
+		wait := callbackAt(t, "error=error&error_description=fatal_error", "https://auth.astronomer.io/device/denied", false)
 		_, err := authorizeCallback(io.Discard)
 		assert.ErrorContains(t, err, "fatal_error")
-		wg.Wait()
+		wait()
 		requirePortFree(t)
 	})
 
@@ -459,10 +478,68 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 		callbackServer = "localhost:0"
 		callbackListening = func(addr net.Addr) { bound = addr.String() }
 		callbackTimeout = 5 * time.Millisecond
+		defer func() { callbackTimeout = previousTimeout }()
 		_, err := authorizeCallback(io.Discard)
-		assert.Contains(t, err.Error(), "the operation has timed out")
+		assert.ErrorContains(t, err, "the operation has timed out")
 		requirePortFree(t)
 	})
+
+	// A browser may open an idle connection to the callback before it sends the
+	// request. It must neither slow the login down nor print a warning.
+	for _, tc := range []struct{ name, query, location, wantErr string }{
+		{"success", "code=test", "https://auth.astronomer.io/device/success", ""},
+		{"error", "error=error&error_description=fatal_error", "https://auth.astronomer.io/device/denied", "fatal_error"},
+	} {
+		t.Run("an idle connection does not hold up a login that ends in "+tc.name, func(t *testing.T) {
+			wait := callbackAt(t, tc.query, tc.location, true)
+			var out bytes.Buffer
+			start := time.Now()
+			code, err := authorizeCallback(&out)
+			elapsed := time.Since(start)
+			if tc.wantErr == "" {
+				assert.Equal(t, "test", code)
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.wantErr)
+			}
+			wait()
+			assert.Less(t, elapsed, callbackShutdownTimeout/2, "the login waited on the idle connection")
+			assert.Empty(t, out.String())
+			requirePortFree(t)
+		})
+	}
+
+	t.Run("a login does not see the result of an earlier one", func(t *testing.T) {
+		for _, code := range []string{"first", "second"} {
+			wait := callbackAt(t, "code="+code, "https://auth.astronomer.io/device/success", false)
+			got, err := authorizeCallback(io.Discard)
+			assert.NoError(t, err)
+			assert.Equal(t, code, got)
+			wait()
+			requirePortFree(t)
+		}
+	})
+}
+
+func TestCallbackMuxKeepsTheFirstResult(t *testing.T) {
+	results := make(chan CallbackMessage, 1)
+	mux := callbackMux(results)
+	for _, target := range []string{"/callback?code=first", "/callback?code=second", "/callback?error=denied", "/callback?code=third"} {
+		done := make(chan *httptest.ResponseRecorder, 1)
+		go func() {
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, http.NoBody))
+			done <- rec
+		}()
+		select {
+		case rec := <-done:
+			assert.Equal(t, http.StatusFound, rec.Code, target)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("the callback handler blocked on %s", target)
+		}
+	}
+	assert.Equal(t, "first", (<-results).authorizationCode)
+	assert.Empty(t, results)
 }
 
 func TestShouldSignup(t *testing.T) {
