@@ -35,6 +35,17 @@ builds:
       - arm64
       - amd64
     ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
+    # Sign each binary with Astronomer's Developer ID Application certificate and notarize
+    # it with Apple, before anything is archived or published, so Gatekeeper and
+    # endpoint-security tools that trust by Team ID accept each release without
+    # per-version allowlisting. Uses Apple's codesign and notarytool (the release job runs
+    # on macOS) so the signature records the Team ID. Does nothing without a signing
+    # identity (forks, local snapshots); the release workflow requires one for official
+    # releases.
+    hooks:
+      post:
+        - cmd: scripts/release/sign-macos-binary.sh "{{ .Path }}"
+          output: true
   - id: linux-build
     main: main.go
     binary: astro
@@ -58,6 +69,15 @@ builds:
       - amd64
       - arm64
     ldflags: -s -w -X github.com/astronomer/astro-cli/version.CurrVersion={{ .Version }}
+    # Sign each .exe with Authenticode through Azure Artifact Signing (publisher
+    # "Astronomer, Inc."), timestamped, before anything is archived or published, so
+    # SmartScreen and endpoint tools that trust by publisher accept each release. Does
+    # nothing when signing isn't set up (forks, local snapshots); the release workflow
+    # requires it for official releases.
+    hooks:
+      post:
+        - cmd: scripts/release/sign-windows-binary.sh "{{ .Path }}"
+          output: true
 brews:
   - name: astro
     repository:
