@@ -35,11 +35,13 @@ func newWorkspaceSaRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage APC workspace service accounts",
 		Long:    "Service accounts represent revocable tokens with access to the APC platform",
 	}
+	deleteCmd := newWorkspaceSaDeleteCmd(out)
 	cmd.AddCommand(
 		newWorkspaceSaCreateCmd(out),
 		newWorkspaceSaListCmd(out),
-		newWorkspaceSaDeleteCmd(out),
+		deleteCmd,
 	)
+	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 
 	return cmd
 }
@@ -86,7 +88,7 @@ func newWorkspaceSaListCmd(out io.Writer) *cobra.Command {
 func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete <SERVICE_ACCOUNT_ID>",
-		Aliases: []string{"de"},
+		Aliases: []string{"rm"},
 		Short:   "Delete a service account in the APC platform",
 		Long:    "Delete a service account in the APC platform. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Args:    cobra.ExactArgs(1),
@@ -152,8 +154,7 @@ func workspaceSaDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	ok, err := confirmRemoval(out, serviceAccountDeleteQuestion(args[0]), serviceAccountDeleteCanceled)
-	if err != nil || !ok {
+	if err := confirmRemoval(serviceAccountDeleteQuestion(args[0])); err != nil {
 		return err
 	}
 	deleted, err := sa.DeleteUsingWorkspaceUUID(args[0], ws, houstonClient)

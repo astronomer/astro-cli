@@ -34,7 +34,8 @@ type DeploymentList struct {
 
 // UpdateResult is what Update did. Deployment is the Deployment as the update
 // left it when Updated, and as it was otherwise: when it already had the DAG
-// deploy setting asked for, or the question before the update was declined.
+// deploy setting asked for. A declined question is input.ErrAborted, with no
+// result.
 type UpdateResult struct {
 	Deployment astrov1.Deployment
 	Updated    bool
@@ -62,6 +63,14 @@ type HibernationResult struct {
 	DeploymentID string               `json:"deployment_id"`
 	Name         string               `json:"name"`
 	Override     *HibernationOverride `json:"hibernation_override"`
+}
+
+// UIResult is `astro deployment open`'s result: the Deployment and the URL of
+// its Airflow UI.
+type UIResult struct {
+	DeploymentID string `json:"deployment_id"`
+	Name         string `json:"name"`
+	URL          string `json:"url"`
 }
 
 // HibernationOverride is an override of a Deployment's hibernation schedule,

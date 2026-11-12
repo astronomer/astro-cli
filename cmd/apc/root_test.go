@@ -135,6 +135,10 @@ func (s *AddCmdSuite) TestNeedsPlatform() {
 		// The removal stubs say what replaced them without the platform.
 		{[]string{"dev", "start"}, false},
 		{[]string{"run", "my_dag", "-o", "json"}, false},
+		{[]string{"deployment", "de", "dep-id"}, false},
+		{[]string{"de", "de", "dep-id", "--force"}, false},
+		{[]string{"workspace", "service-account", "de", "sa-id"}, false},
+		{[]string{"de", "rm", "dep-id"}, true},
 		{[]string{"deployment"}, true},
 		{[]string{"deployment", "create", "--help"}, true},
 		{[]string{"de", "ls"}, true},

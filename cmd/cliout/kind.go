@@ -40,6 +40,12 @@ const KindUsage ProblemKind = "usage"
 // Also cliout's own, because pkg/input is what recognizes one.
 const KindInputRequired ProblemKind = "input_required"
 
+// KindAborted: the command asked for confirmation and was answered no, so it
+// stopped without doing what it was asked (input.ErrAborted). Exit status 1:
+// declining is not success. Not 130, which is an interrupt. Also cliout's
+// own, because pkg/input is what names one, and every tree asks.
+const KindAborted ProblemKind = "aborted"
+
 // KindRule names one failure: Match recognizes it, Kind is what it publishes.
 //
 // A predicate rather than a bare sentinel, because not every failure worth a
@@ -79,6 +85,9 @@ func (k Kinds) Of(err error) ProblemKind {
 	}
 	if input.IsRequired(err) {
 		return KindInputRequired
+	}
+	if errors.Is(err, input.ErrAborted) {
+		return KindAborted
 	}
 	for _, r := range k {
 		if r.Match(err) {

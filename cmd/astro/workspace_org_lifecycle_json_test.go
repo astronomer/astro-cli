@@ -215,11 +215,11 @@ func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
 			check: plain(says(deleteProdQuestion, "Astro Workspace Production was successfully deleted\n")),
 		},
 		// Declined, nothing is deleted (the client mocks no delete) and the
-		// run exits 0, as a declined Deployment or token delete does.
+		// run fails aborted, exit 1, with nothing on stdout.
 		{
 			name: "workspace delete, declined", root: ws, client: workspacesMock(both), answers: "n\n",
 			args:  []string{"workspace", "delete", "ws-prod"},
-			check: then(plain(says(deleteProdQuestion, "Canceling Workspace deletion\n")), lacks("successfully deleted")),
+			check: then(plain(says(deleteProdQuestion)), lacks("successfully deleted")), wantErr: "aborted",
 		},
 		{
 			name: "workspace delete --yes", root: ws, client: workspacesMock(both, deletesWorkspace("ws-prod")),
@@ -242,7 +242,7 @@ func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
 		{
 			name: "workspace delete through the picker, declined", root: ws, client: workspacesMock(both), answers: "2\nn\n",
 			args:  []string{"workspace", "delete"},
-			check: then(pickRows, says("Canceling Workspace deletion\n"), lacks("successfully deleted")),
+			check: then(pickRows, lacks("successfully deleted")), wantErr: "aborted", picksOnStdout: true,
 		},
 		// The only Workspace is found, not named, and still asked about.
 		{
@@ -254,7 +254,7 @@ func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
 		{
 			name: "workspace delete of the only Workspace, declined", root: ws, client: workspacesMock([]astrov1.Workspace{prod}), answers: "n\n",
 			args:  []string{"workspace", "delete"},
-			check: plain(says(deleteProdQuestion, "Only one Workspace was found.", "Canceling Workspace deletion\n")),
+			check: plain(says(deleteProdQuestion, "Only one Workspace was found.")), wantErr: "aborted", picksOnStdout: true,
 		},
 		{name: "workspace delete of an unknown id", root: ws, client: workspacesMock(both), args: []string{"workspace", "delete", "ws-nope"}, check: says(""), wantErr: "no workspace was found for the ID you provided"},
 		{name: "workspace switch by name", root: ws, client: workspacesMock(both), args: []string{"workspace", "switch", "Production"}, check: listsContext("ws-prod")},

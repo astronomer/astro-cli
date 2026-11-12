@@ -38,10 +38,36 @@ func Usage(err error) error {
 	if err == nil {
 		return nil
 	}
-	return &usageError{err}
+	return &usageError{err: err}
 }
 
-type usageError struct{ err error }
+// misinvoked marks err as a usage error found before the command ran: a flag
+// that does not parse, the wrong number of arguments, a word that names no
+// subcommand. Execute points at the command's help for these whatever the
+// command's SilenceUsage says, since its help is where the right invocation
+// is. A usage error a command returns once it runs is a judgement about its
+// input (a Deployment name several Deployments share), and a command that
+// silenced its usage first says its help would not settle it.
+//
+// An error already marked Usage gets its mark replaced rather than a second
+// one around it, so what it wraps is still one Unwrap away.
+func misinvoked(err error) error {
+	if err == nil {
+		return nil
+	}
+	if u, ok := err.(*usageError); ok { //nolint:errorlint // only a mark on the outside is replaced; a wrapped one stays where it is
+		if u.beforeRun {
+			return u
+		}
+		err = u.err
+	}
+	return &usageError{err: err, beforeRun: true}
+}
+
+type usageError struct {
+	err       error
+	beforeRun bool
+}
 
 func (e *usageError) Error() string { return e.err.Error() }
 func (e *usageError) Unwrap() error { return e.err }
@@ -57,6 +83,29 @@ var cobraUsagePrefixes = []string{
 	"required flag(s) ",
 	"if any flags in the group ",
 	"at least one of the flags in the group ",
+}
+
+// isMisinvoked reports whether err is a usage error found before the command
+// ran (misinvoked), including the ones cobra returns untyped, all of which it
+// finds before then. An error a command marked Usage itself is judged by its
+// mark alone, whatever its wording: astro local's refusal of a 1.x verb reads
+// "unknown command ..." too, and comes from its run.
+func isMisinvoked(err error) bool {
+	var u *usageError
+	if errors.As(err, &u) {
+		return u.beforeRun
+	}
+	return hasCobraUsagePrefix(err)
+}
+
+func hasCobraUsagePrefix(err error) bool {
+	msg := err.Error()
+	for _, p := range cobraUsagePrefixes {
+		if strings.HasPrefix(msg, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // usageMarker is an error a package that cannot import cliout (one under
@@ -77,13 +126,7 @@ func IsUsage(err error) bool {
 	if errors.As(err, &m) && m.IsUsageError() {
 		return true
 	}
-	msg := err.Error()
-	for _, p := range cobraUsagePrefixes {
-		if strings.HasPrefix(msg, p) {
-			return true
-		}
-	}
-	return false
+	return hasCobraUsagePrefix(err)
 }
 
 // ErrorObject is the object a failed command writes in json mode. Named

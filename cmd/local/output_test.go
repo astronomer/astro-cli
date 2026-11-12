@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -379,7 +380,7 @@ func TestWarnStandaloneOmissionsExactText(t *testing.T) {
 		if err := json.Unmarshal([]byte(lines[i]), &e); err != nil {
 			t.Fatalf("line %d is not JSON: %v: %q", i, err, lines[i])
 		}
-		if (e != event{Event: "warning", Text: want}) {
+		if !reflect.DeepEqual(e, event{Event: "warning", Text: want}) {
 			t.Errorf("line %d: got %+v, want a warning with text %q", i, e, want)
 		}
 	}

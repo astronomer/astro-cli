@@ -19,6 +19,7 @@ require (
 )
 
 require (
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sys v0.47.0
 	gopkg.in/yaml.v3 v3.0.1

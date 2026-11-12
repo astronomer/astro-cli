@@ -116,6 +116,12 @@ type UV struct {
 	// ExcludeNewer is [tool.uv] exclude-newer as written: a date, a time or
 	// a duration such as "1 week". Empty when the project sets none.
 	ExcludeNewer string
+	// Raw is the whole [tool.uv] table as decoded, nil when there is none.
+	// The fields above are the ones astro reads; Raw is for a caller that has
+	// to notice a change to any of uv's settings, including the many astro
+	// does not interpret (override-dependencies, index-url, prerelease...).
+	// Read-only: it is the decoder's map, not a copy.
+	Raw map[string]any
 }
 
 // IndexPages are the per-package pages, the PEP 503 layout
@@ -788,6 +794,7 @@ func uvTable(t map[string]any) UV {
 	out := UV{
 		ConstraintDependencies: stringList(t["constraint-dependencies"]),
 		Environments:           stringList(t["environments"]),
+		Raw:                    t,
 	}
 	if v, ok := t["exclude-newer"]; ok && v != nil {
 		// A string as uv documents it, or a TOML date written bare.

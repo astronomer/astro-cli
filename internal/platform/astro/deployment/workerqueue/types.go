@@ -1,10 +1,7 @@
 package workerqueue
 
 import (
-	"fmt"
-
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
-	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 )
 
 // actionDeleted is a delete's Result action. A create's is "created" and an
@@ -35,12 +32,6 @@ type Queue struct {
 	MinWorkerCount    int    `json:"min_worker_count"`
 	MaxWorkerCount    int    `json:"max_worker_count"`
 	WorkerConcurrency int    `json:"worker_concurrency"`
-}
-
-// errNoDeployment is the failure of a queue change in a Workspace with no
-// Deployment to make it on. It used to be a note, with exit 0.
-func errNoDeployment(ws string) error {
-	return fmt.Errorf("%s %s", deployment.NoDeploymentInWSMsg, ws)
 }
 
 // nodePoolInstanceType is the instance type of the node pool with id, or ""

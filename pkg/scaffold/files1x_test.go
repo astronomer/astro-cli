@@ -519,6 +519,96 @@ func TestPlanRetiresOnlyAPinOnlyDockerfile(t *testing.T) {
 	}
 }
 
+// A Dockerfile that only names a runtime is retired with what its tag said
+// recorded: the runtime version and the Python of a -python-X.Y flavor. One
+// whose tag pyproject.toml cannot hold is kept as the build, as written,
+// with the reason.
+func TestPinOnlyDockerfileRecordsItsRuntime(t *testing.T) {
+	t.Run("recorded", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
+			[]byte("FROM astrocrpublic.azurecr.io/runtime:3.3-8-python-3.13\n"), 0o600))
+		_, err := Run(dir, Options{})
+		require.NoError(t, err)
+		assert.NoFileExists(t, filepath.Join(dir, "Dockerfile"))
+		m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+		require.NoError(t, err)
+		assert.Equal(t, "3.3-8", m.Astro.Runtime)
+		assert.Equal(t, "==3.13.*", m.Project.RequiresPython)
+		assert.Empty(t, m.Astro.Dockerfile)
+	})
+	for _, tc := range []struct{ name, from, why string }{
+		{"a mirror", "registry.corp.example/runtime:3.3-8", "is not Astronomer's repository for Airflow 3"},
+		{"a slim flavor", "quay.io/astronomer/astro-runtime:12.6.0-slim", "flavor, which pyproject.toml has no way to pick"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			body := "FROM " + tc.from + "\n"
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(body), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("pandas==2.1.0\n"), 0o600))
+			res, err := Run(dir, Options{})
+			require.NoError(t, err)
+			got, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+			require.NoError(t, err)
+			assert.Equal(t, body, string(got), "kept exactly as written")
+			assert.FileExists(t, filepath.Join(dir, "requirements.txt"), "its base still installs it")
+			m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+			require.NoError(t, err)
+			assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
+			joined := strings.Join(res.Notes, "\n")
+			assert.Contains(t, joined, "Dockerfile: kept as this project's build, because")
+			assert.Contains(t, joined, tc.why)
+			assert.Contains(t, joined, "doesn't install from uv.lock yet")
+		})
+	}
+}
+
+// The Python a pin-only Dockerfile's -python-X.Y flavor names is recorded only
+// when its pin is the one the manifest took. A pin that lost to --airflow-version
+// or to an existing requirement is a different Airflow, and its Python must not
+// become requires-python, just as its runtime is not recorded.
+func TestPinOnlyDockerfilePythonIsRecordedOnlyWhenItsPinWon(t *testing.T) {
+	const dockerfile = "FROM astrocrpublic.azurecr.io/runtime:3.3-8-python-3.11\n"
+	for _, tc := range []struct {
+		name    string
+		files   map[string]string
+		opts    Options
+		wantPy  string
+		wantRun string
+	}{
+		{name: "the Dockerfile's pin won", files: map[string]string{fileDockerfile: dockerfile}, wantPy: "==3.11.*", wantRun: "3.3-8"},
+		{
+			name: "--airflow-version named another", files: map[string]string{fileDockerfile: dockerfile},
+			opts: Options{AirflowVersion: "3.2"},
+		},
+		{
+			name: "an existing requirement named another",
+			files: map[string]string{
+				fileDockerfile: dockerfile,
+				manifest.Marker: "[project]\nname = 'p'\nversion = '0.1.0'\nrequires-python = '>=3.10'\n" +
+					"dependencies = ['apache-airflow==3.2.*']\n",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTree(t, dir, tc.files)
+			_, err := Run(dir, tc.opts)
+			require.NoError(t, err)
+			data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+			require.NoError(t, err)
+			m, err := manifest.Parse(data)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantRun, m.Astro.Runtime)
+			if tc.wantPy != "" {
+				assert.Equal(t, tc.wantPy, m.Project.RequiresPython)
+			} else {
+				assert.NotContains(t, string(data), "3.11", "the losing Dockerfile's Python is not recorded")
+			}
+		})
+	}
+}
+
 // A deletion is planned, not performed, so a preview can show it.
 func TestPlanDoesNotDeleteAnything(t *testing.T) {
 	dir := t.TempDir()
@@ -597,7 +687,7 @@ func TestAdoptMergesRequirementsWithoutTouchingExistingPins(t *testing.T) {
 
 	assert.Equal(t, manifest.DistName("python-dateutil"), manifest.DistName("Python_DateUtil==2.8.2"),
 		"the normalization the dedup relies on")
-	assert.Contains(t, strings.Join(res.Updated, "\n"), "migrated 1 from requirements.txt")
+	assert.Contains(t, strings.Join(res.Updated, "\n"), "moved in 1 package from requirements.txt")
 }
 
 // packages.txt is carried into a manifest that has another tool's packages key,
@@ -703,12 +793,9 @@ func TestAirflowExtrasAreReportedWhenDropped(t *testing.T) {
 	}
 }
 
-// A Dockerfile that does more than name a base image is still reported, even
-// when its tag parses cleanly.
-//
-// Removing the unconditional "Dockerfile: not read" entry from leftovers —
-// correct, since the tag IS read now — meant a Dockerfile with real build steps
-// went unmentioned entirely, which is a worse answer than the one it replaced.
+// A Dockerfile that does more than name a base image is reported as kept and
+// built as written, even when its tag parses cleanly: pyproject.toml does not
+// describe its steps, and its image does not install from uv.lock.
 func TestDockerfileBuildStepsAreReported(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(
@@ -721,17 +808,19 @@ func TestDockerfileBuildStepsAreReported(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "3.1", res.AirflowVersion, "the tag is still read")
 	joined := strings.Join(res.Notes, "\n")
-	assert.Contains(t, joined, "RUN, COPY, ENV")
-	// The instructions are named; their arguments are the user's own.
+	assert.Contains(t, joined, "Dockerfile: kept as this project's build. It builds as written and doesn't install from uv.lock yet")
+	// The steps' arguments are the user's own.
 	assert.NotContains(t, joined, "unixodbc-dev")
 
-	// A Dockerfile that only names a base image has nothing to report.
+	// A Dockerfile that only names a base image is retired, with nothing to
+	// report.
 	plain := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(plain, "Dockerfile"),
 		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"), 0o600))
 	res, err = Run(plain, Options{})
 	require.NoError(t, err)
-	assert.NotContains(t, strings.Join(res.Notes, "\n"), "instructions were not read")
+	assert.NotContains(t, strings.Join(res.Notes, "\n"), "kept as this project's build")
+	assert.NoFileExists(t, filepath.Join(plain, "Dockerfile"))
 }
 
 // A secret the Dockerfile mounts gets a note with the build-secrets entry to
@@ -745,8 +834,8 @@ func TestDockerfileSecretMountsAreReported(t *testing.T) {
 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
-	assert.Contains(t, res.Notes, `Dockerfile: line 2 mounts build secret "netrc". To build without --build-secret each time, `+
-		`add 'id=netrc,env=<VAR>' to build-secrets under [tool.astro], where <VAR> is the environment variable that holds it`)
+	assert.Contains(t, res.Notes, "Dockerfile: line 2 mounts the build secret netrc. To pass it on every build, "+
+		"add build-secrets = ['id=netrc,env=NETRC'] to the Astro settings in pyproject.toml")
 	pyproject, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	assert.NotContains(t, string(pyproject), "build-secrets")
@@ -768,8 +857,8 @@ func TestGreenfieldReportsWhatItMigrated(t *testing.T) {
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 	joined := strings.Join(res.Created, "\n")
-	assert.Contains(t, joined, "migrated 2 from requirements.txt")
-	assert.Contains(t, joined, "migrated packages.txt")
+	assert.Contains(t, joined, "moved in 2 packages from requirements.txt")
+	assert.Contains(t, joined, "moved in the apt packages from packages.txt")
 	assert.Contains(t, joined, "read Airflow 3.1 from the Dockerfile")
 }
 
@@ -1047,6 +1136,22 @@ func TestRunPipSpecs(t *testing.T) {
 	}
 }
 
+// A spec is printed as one POSIX shell word, so a marker's double quotes paste
+// as written rather than being read by the shell. (A spec with a $ or a
+// backtick is never reported: runPipSpecs skips it as a variable.)
+func TestPipInstallNotesQuoteTheSpecForAShell(t *testing.T) {
+	for _, tc := range []struct{ spec, want string }{
+		{`pkg; python_version<"3.12"`, `uv add 'pkg; python_version<"3.12"'`},
+		{`pkg==1.0; sys_platform=="linux"`, `uv add 'pkg==1.0; sys_platform=="linux"'`},
+	} {
+		t.Run(tc.spec, func(t *testing.T) {
+			notes := pipInstallNotes([]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-12\nRUN pip install " + ShellQuote(tc.spec) + "\n"))
+			require.Len(t, notes, 1, "notes: %q", notes)
+			assert.True(t, strings.HasSuffix(notes[0], tc.want), "got %q, want suffix %q", notes[0], tc.want)
+		})
+	}
+}
+
 func TestKeptDockerfilePipInstallsAreReported(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(
@@ -1056,9 +1161,9 @@ func TestKeptDockerfilePipInstallsAreReported(t *testing.T) {
 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
-	assert.Contains(t, res.Notes, "Dockerfile: its RUN steps install "+
-		"\"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3\". "+
-		"Standalone mode and astro local check do not have it unless you add it to [project] dependencies")
+	assert.Contains(t, res.Notes, "Dockerfile: a pip step installs "+
+		"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3. For standalone mode too, run: "+
+		"uv add 'example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3'")
 	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.NotContains(t, strings.Join(m.Project.Dependencies, "\n"), "example-lib", "the note reports; it does not add")

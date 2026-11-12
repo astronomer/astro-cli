@@ -1,5 +1,6 @@
 # Every visible flag on every visible, runnable command of Astro CLI 1.x
-# (main at 7aa23cdc), its own and those it inherits, the root's (--verbosity)
+# (main at 7aa23cdc, and since then 1.48's deployment open and api cloud
+# --labs), its own and those it inherits, the root's (--verbosity)
 # and --help left out. One line per flag: the trees that had it, the command
 # path without "astro", the flag, its shorthand, and bool when it took no
 # value (string otherwise). The trees are 1.x's Astro tree for a non-hosted
@@ -66,6 +67,7 @@ astro,astro-hosted,apc	api cloud	header	H	string
 astro,astro-hosted,apc	api cloud	include	i	bool
 astro,astro-hosted,apc	api cloud	input		string
 astro,astro-hosted,apc	api cloud	jq	q	string
+astro,astro-hosted,apc	api cloud	labs		bool
 astro,astro-hosted,apc	api cloud	method	X	string
 astro,astro-hosted,apc	api cloud	no-color		bool
 astro,astro-hosted,apc	api cloud	paginate		bool
@@ -76,11 +78,13 @@ astro,astro-hosted,apc	api cloud	slurp		bool
 astro,astro-hosted,apc	api cloud	template	t	string
 astro,astro-hosted,apc	api cloud	verbose		bool
 astro,astro-hosted,apc	api cloud describe	json		bool
+astro,astro-hosted,apc	api cloud describe	labs		bool
 astro,astro-hosted,apc	api cloud describe	method	X	string
 astro,astro-hosted,apc	api cloud describe	no-color		bool
 astro,astro-hosted,apc	api cloud describe	refresh		bool
 astro,astro-hosted,apc	api cloud describe	verbose	v	bool
 astro,astro-hosted,apc	api cloud ls	json		bool
+astro,astro-hosted,apc	api cloud ls	labs		bool
 astro,astro-hosted,apc	api cloud ls	no-color		bool
 astro,astro-hosted,apc	api cloud ls	refresh		bool
 astro,astro-hosted,apc	api cloud ls	verbose	v	bool
@@ -324,6 +328,8 @@ apc	deployment logs workers	follow	f	bool
 apc	deployment logs workers	search	s	string
 apc	deployment logs workers	since	t	string
 apc	deployment logs workers	workspace-id		string
+astro,astro-hosted	deployment open	deployment-name	n	string
+astro,astro-hosted	deployment open	workspace-id		string
 astro,astro-hosted	deployment pool copy	source-id	s	string
 astro,astro-hosted	deployment pool copy	source-name	n	string
 astro,astro-hosted	deployment pool copy	target-id	t	string

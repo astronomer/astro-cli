@@ -166,6 +166,7 @@ func newLinkAddCmd(c *cli) *cobra.Command {
 func newLinkRemoveCmd(c *cli) *cobra.Command {
 	return &cobra.Command{
 		Use:     "remove [NAME]",
+		Aliases: []string{"rm"},
 		Short:   "Unlink a Deployment from this project",
 		Long:    "Unlink a Deployment from this project. In a terminal, with no NAME, it asks which one.",
 		Example: "  astro link remove prod",
@@ -223,12 +224,14 @@ func newLinkDefaultCmd(c *cli) *cobra.Command {
 // is current. An answer that is not a row number is refused, as the Deployment
 // picker refuses one.
 func (c *cli) pickLink(title, none, current, mark, missing string) (string, error) {
-	if !c.mayPrompt() {
-		return "", input.Required(errors.New(missing))
-	}
+	// The project is found before deciding whether to ask, so a directory with
+	// no project fails as no_project rather than being asked for a NAME.
 	_, _, m, err := c.linkProject()
 	if err != nil {
 		return "", err
+	}
+	if !c.mayPrompt() {
+		return "", input.Required(errors.New(missing))
 	}
 	names := make([]string, 0, len(m.Astro.Deployments))
 	for name := range m.Astro.Deployments {

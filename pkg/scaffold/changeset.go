@@ -158,6 +158,7 @@ func (cs *Changeset) result() *Result {
 	res.Deleted = append([]string(nil), cs.Deleted...)
 	res.Notes = append([]string(nil), cs.Notes...)
 	res.Advisories = append([]string(nil), cs.Advisories...)
+	res.Info = append([]string(nil), cs.Info...)
 	return &res
 }
 

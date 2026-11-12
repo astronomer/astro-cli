@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/distribution/reference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -180,4 +181,43 @@ func TestImageTag(t *testing.T) {
 
 	// A path with no usable base name falls back to a stable label.
 	assert.True(t, strings.HasPrefix(ImageTag("/"), "astro-deploy/project"), "got %q", ImageTag("/"))
+}
+
+// TestImageTagIsAValidReference holds that whatever the directory is called,
+// the tag is a reference Docker accepts, with the label the compose project
+// name (proxy.SanitizeLabel) gives the same directory.
+func TestImageTagIsAValidReference(t *testing.T) {
+	long := strings.Repeat("a", 200)
+	for name, want := range map[string]string{
+		"proj":         "proj",
+		"my_proj":      "my-proj",
+		"my__proj":     "my-proj",
+		"my-proj":      "my-proj",
+		"v1.2":         "v1-2",
+		"my.project":   "my-project",
+		"My Project":   "my-project",
+		"_my_project_": "my-project",
+		"--weird--":    "weird",
+		"Foo!":         "foo",
+		"a___b":        "a-b",
+		"a..b":         "a-b",
+		"a._b":         "a-b",
+		"a  b":         "a-b",
+		"héllo":        "h-llo",
+		"!!!":          "project",
+		"...":          "project",
+		"é":            "project",
+		long:           long[:63],
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), name)
+			require.NoError(t, os.MkdirAll(dir, 0o755))
+			tag := ImageTag(dir)
+			assert.True(t, strings.HasPrefix(tag, "astro-deploy/"+want+"-"), "got %q, want label %q", tag, want)
+			assert.Len(t, strings.TrimPrefix(tag, "astro-deploy/"+want+"-"), 6, "got %q", tag)
+			ref, err := reference.ParseNormalizedNamed(tag)
+			require.NoError(t, err, "tag %q", tag)
+			assert.Equal(t, "docker.io/"+tag, ref.Name(), "tag %q must be a plain repository name", tag)
+		})
+	}
 }

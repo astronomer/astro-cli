@@ -373,7 +373,9 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 					assert.Zero(t, *preRuns, "a pre-run started before the refusal")
 					if !asJSON {
 						assert.Empty(t, stdout)
-						assert.Contains(t, stderr, "Error: "+want)
+						// The message, and a pointer to help with no guess at
+						// a flag: the message already names what replaced it.
+						assert.Equal(t, "Error: "+want+"\nRun "+target.CommandPath()+" --help for usage.\n", stderr)
 						return
 					}
 					assert.Empty(t, stderr)
@@ -762,12 +764,12 @@ func TestEveryV1CommandCompletesPastItsRemovedFlags(t *testing.T) {
 // command the mapping sends to an astro command is in it, but for the ones
 // its comment leaves out.
 func TestV1PredecessorsFollowTheDevMapping(t *testing.T) {
-	leftOut := map[string]bool{"run": true, "object export": true, "object": true}
+	leftOut := map[string]bool{"run": true, "pytest": true, "object export": true, "object": true}
 	replacedBy := map[string]string{}
 	for _, m := range scaffold.DevReplacements() {
 		words, ok := strings.CutPrefix(m.Replacement, "astro ")
 		if !ok {
-			continue // uv run pytest
+			continue // anything outside this tree
 		}
 		path := strings.Join(slices.DeleteFunc(strings.Fields(words), func(w string) bool { return strings.HasPrefix(w, "-") }), " ")
 		replacedBy["dev "+m.Command] = path

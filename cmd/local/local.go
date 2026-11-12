@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -47,7 +48,10 @@ const (
 	replaceInit    = "astro init"
 
 	flagWithWorkspace = "with-workspace"
+	flagNoSync        = "no-sync"
 )
+
+const noSyncHelp = "With nothing running, use the project's virtualenv as it is instead of building or updating it first (also set by UV_NO_SYNC)"
 
 const withWorkspaceHelp = "With Airflow stopped, fetch the values declared source = \"workspace\" from the Environment Manager, as a start does (needs network and astro login)"
 
@@ -169,6 +173,7 @@ func newStartCmd(c *cli) *cobra.Command {
 		docker          bool
 		stopWithSession bool
 		allowMissing    bool
+		watch           bool
 		buildSecrets    []string
 	}
 	cmd := &cobra.Command{
@@ -180,9 +185,18 @@ func newStartCmd(c *cli) *cobra.Command {
 		// with nothing wrong.
 		Long: "Start local Airflow for this project.\n\n" +
 			"A start waits up to five minutes for Airflow to answer. Set " +
-			"ASTRO_LOCAL_HEALTH_TIMEOUT to a Go duration (10m, 90s) to change that.",
+			"ASTRO_LOCAL_HEALTH_TIMEOUT to a Go duration (10m, 90s) to change that.\n\n" +
+			"With --watch, start stays in the foreground and keeps Airflow in step " +
+			"with edits to pyproject.toml and .env: a package added to the " +
+			"dependencies is installed into the running Airflow, and any other " +
+			"change Airflow only reads at start (a re-pinned package, the Airflow " +
+			"version, [tool.uv], the env) restarts it. A save that leaves " +
+			"pyproject.toml unreadable is reported and Airflow keeps running. " +
+			"Ctrl-C stops Airflow and exits.",
 		Example: "  # Start Airflow for this project\n" +
 			"  astro local start\n\n" +
+			"  # Keep it in step with edits to pyproject.toml and .env\n" +
+			"  astro local start --watch\n\n" +
 			"  # In Docker rather than the default standalone mode\n" +
 			"  astro local start --docker\n\n" +
 			"  # On a port of your choosing\n" +
@@ -195,32 +209,162 @@ func newStartCmd(c *cli) *cobra.Command {
 			if opts.docker {
 				mode = localrt.ModeDocker
 			}
-			return c.runStart(cmd.Context(), plan.Options{
-				Mode:            mode,
-				RequestedPort:   opts.port,
-				StopWithSession: opts.stopWithSession,
+			built, err := c.startProject(cmd.Context(), plan.Options{
+				Mode:          mode,
+				RequestedPort: opts.port,
+				// A watch ends with this process, and so does what it
+				// started: tied to the session, Airflow stops even if the
+				// process dies without reaching its own stop.
+				StopWithSession: opts.stopWithSession || opts.watch,
 				AllowMissing:    opts.allowMissing,
 			}, opts.buildSecrets)
+			if err != nil || !opts.watch {
+				return err
+			}
+			return c.runWatch(cmd.Context(), built, opts.allowMissing, opts.buildSecrets)
 		},
+	}
+	// Refused before anything starts, rather than after a start it would
+	// then have to undo.
+	cmd.PreRunE = func(*cobra.Command, []string) error {
+		if opts.watch && c.d.Watch == nil {
+			return errWatchUnavailable
+		}
+		return nil
 	}
 	cmd.Flags().IntVar(&opts.port, "port", 0, "Preferred API server port (0 lets the runtime pick)")
 	cmd.Flags().BoolVar(&opts.docker, "docker", false, "Run Airflow in Docker instead of the default standalone mode")
 	cmd.Flags().BoolVar(&opts.stopWithSession, "stop-with-session", false, "Stop Airflow when this process exits instead of leaving it running")
 	cmd.Flags().BoolVar(&opts.allowMissing, "allow-missing", false, "Start even if required environment values have no source, warning about each")
+	cmd.Flags().BoolVar(&opts.watch, "watch", false, "Stay in the foreground, apply edits to pyproject.toml and .env to the running Airflow, and stop it on Ctrl-C")
 	addBuildSecretFlag(cmd, &opts.buildSecrets)
 	return cmd
 }
 
-func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag []string) error {
+// errWatchUnavailable is --watch on a Deps with no Watch.
+var errWatchUnavailable = errors.New("--watch is not available here")
+
+// runWatch keeps a project that --watch just started in step with its edits
+// until the command is interrupted, then stops it.
+//
+// A change that needs a restart goes through restartProject, the same rebuild
+// of the plan and the same warnings `astro local restart` gives. It keeps the
+// session tie, mode and port the start set, even when Airflow went down
+// under the watch and the restart is a fresh start.
+func (c *cli) runWatch(ctx context.Context, built *plan.Built, allowMissing bool, buildSecretFlag []string) error {
+	if c.d.Watch == nil {
+		return errWatchUnavailable
+	}
+	r := c.renderer()
+	var port int
+	if st, err := c.readStatus(); err == nil {
+		port = st.Port
+	}
+	if r.Format == cliout.FormatText {
+		fmt.Fprintf(c.d.Stderr, "Watching %s and %s for changes. Press Ctrl-C to stop Airflow and exit.\n", manifest.Marker, ".env")
+	}
+	err := c.d.Watch(ctx, localrt.WatchOptions{
+		ProjectPath: built.Project.Dir,
+		Mode:        built.Plan.Mode,
+		Manifest:    built.Manifest,
+		Restart: func(ctx context.Context, _ localrt.Change) (*manifest.Manifest, error) {
+			started, err := c.restartProject(ctx, restartOptions{
+				allowMissing:    allowMissing,
+				buildSecrets:    buildSecretFlag,
+				stopWithSession: true,
+				port:            port,
+				mode:            built.Plan.Mode,
+			})
+			if started == nil {
+				return nil, err
+			}
+			// What the start was built from, after the restart's own
+			// rewrite of the Astronomer build pin, not before it.
+			return started.Manifest, err
+		},
+		OnEvent:   func(e localrt.WatchEvent) { reportWatch(r, e) },
+		Callbacks: c.callbacks(r),
+	})
+	// Interrupted, or the watch never began: stop what --watch started. The
+	// session tie would stop it once this process exits; stopping here says
+	// so and waits for it. Not under ctx, which the interrupt has ended.
+	if serr := c.runStop(context.WithoutCancel(ctx), localrt.StopOptions{}); err == nil {
+		err = serr
+	}
+	return err
+}
+
+// reportWatch renders one thing a watch did. In json each is a "watch" event
+// carrying the localrt kind, files, requirements and reason codes; in text,
+// a line for each a person needs to see.
+func reportWatch(r cliout.Renderer, w localrt.WatchEvent) {
+	e := event{
+		Event:   "watch",
+		Watch:   string(w.Kind),
+		Files:   w.Files,
+		Install: w.Change.Install,
+		Removed: w.Change.Removed,
+		Reasons: w.Change.Reasons,
+	}
+	if w.Err != nil {
+		e.Error = w.Err.Error()
+	}
+	text := watchText(w)
+	//nolint:errcheck // a write failure surfaces on the command's own output
+	r.EmitEvent(e, func(out io.Writer) error {
+		if text == "" {
+			return nil
+		}
+		_, werr := fmt.Fprintln(out, text)
+		return werr
+	})
+}
+
+// watchText is the terminal line for a watch event, "" for one a person need
+// not see: a save that changed nothing, and the end of a restart, which
+// prints the new status itself.
+func watchText(w localrt.WatchEvent) string {
+	files := strings.Join(w.Files, " and ")
+	switch w.Kind {
+	case localrt.WatchUnreadable:
+		return fmt.Sprintf("%s does not load, so Airflow keeps running as it was: %v", manifest.Marker, w.Err)
+	case localrt.WatchUnchanged:
+		if len(w.Change.Removed) == 0 {
+			return ""
+		}
+		return "no longer declared, and still installed until the next restart: " + strings.Join(w.Change.Removed, ", ")
+	case localrt.WatchInstalling:
+		return fmt.Sprintf("%s changed: installing %s", files, strings.Join(w.Change.Install, ", "))
+	case localrt.WatchInstalled:
+		return "installed " + strings.Join(w.Change.Install, ", ")
+	case localrt.WatchInstallFailed:
+		return fmt.Sprintf("the install failed, so Airflow keeps running as it was: %v", w.Err)
+	case localrt.WatchRestarting:
+		reasons := make([]string, len(w.Change.Reasons))
+		for i, why := range w.Change.Reasons {
+			reasons[i] = why.String()
+		}
+		return fmt.Sprintf("%s changed: restarting, because %s", files, strings.Join(reasons, "; "))
+	case localrt.WatchRestarted:
+		return ""
+	case localrt.WatchRestartFailed:
+		return fmt.Sprintf("the restart failed: %v. Save again once it is fixed", w.Err)
+	}
+	return string(w.Kind)
+}
+
+// startProject starts the project in the working directory and returns what
+// it built the start from.
+func (c *cli) startProject(ctx context.Context, opts plan.Options, buildSecretFlag []string) (*plan.Built, error) {
 	// Without a home for the proxy routes nothing can start: say so before
 	// the refresh, the catalog, the plan and the secret checks.
 	if c.d.HomeErr != nil {
-		return c.d.HomeErr
+		return nil, c.d.HomeErr
 	}
 	r := c.renderer()
 	wd, err := c.d.WorkingDir()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Turn on Environment Manager resolution for workspace-source env values.
 	opts.WorkspaceProvider = c.workspaceProvider()
@@ -231,33 +375,33 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	}
 	built, err := plan.Build(wd, opts)
 	if err != nil {
-		return c.reportBuildError(r, err)
+		return nil, c.reportBuildError(r, err)
 	}
 	warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
 	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
-		return err
+		return nil, err
 	}
 	missingSecrets, err := warnMissingBuildSecrets(r, built.Plan)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	warnEnvValues(r, built.EnvWarnings)
 	warnWorkspaceUnread(r, built.WorkspaceNote)
 	warnWithout(r, "started", built.StartedWithout)
 	warnLocalFilesInImage(r, built.Plan)
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
-		return err
+		return nil, err
 	}
 	af, err := c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
-		return adviseStart(missingSecrets.Explain(err))
+		return nil, adviseStart(missingSecrets.Explain(err))
 	}
 	st, err := af.Status()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// A busy explicit --port falls back to another port rather than failing;
 	// say so on stderr so the user knows the URL moved and stdout stays clean
@@ -267,12 +411,12 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	}
 	c.noteSchedulesOff(r, built.Plan, st.Mode)
 	if err := plan.PersistPort(built.Project.Dir, st.Port); err != nil {
-		return err
+		return nil, err
 	}
 	c.applyPools(ctx, r, st, built.Pools)
 	// The status ends the event stream the start wrote, so it is a line of
 	// it: NDJSON on a terminal too.
-	return r.EmitEvent(st, func(w io.Writer) error {
+	return built, r.EmitEvent(st, func(w io.Writer) error {
 		return renderStatus(w, st, c.d.ProxyDir)
 	})
 }
@@ -371,7 +515,7 @@ func warnManifest(r cliout.Renderer, warnings []manifest.Problem) {
 // Which omissions there are, and in what order, is Plan.StandaloneOmissions'
 // answer, shared with Astro Desktop. Only the wording is decided here.
 //
-// Both callers reach it: runStart and runRestart. `astro local restart` has no
+// Both callers reach it: startProject and restartProject. `astro local restart` has no
 // --docker flag of its own, so the messages name Docker mode as the thing to run
 // in rather than a flag to add to the command in hand.
 func warnStandaloneOmissions(r cliout.Renderer, p localrt.Plan) {
@@ -599,19 +743,51 @@ func newRestartCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSecretFlag []string) error {
+	_, err := c.restartProject(ctx, restartOptions{force: force, allowMissing: allowMissing, buildSecrets: buildSecretFlag})
+	return err
+}
+
+// restartOptions are restartProject's inputs.
+type restartOptions struct {
+	force, allowMissing bool
+	buildSecrets        []string
+	// stopWithSession ties the new start to this process whatever the record
+	// says, and port is the port to ask for when no record names one. A
+	// --watch sets both, so a restart after Airflow went down still stops
+	// with the watch and keeps its URL.
+	stopWithSession bool
+	port            int
+	// mode is the mode to start in when no record names one, so a docker
+	// project whose record went with its Airflow restarts in docker.
+	mode localrt.Mode
+}
+
+// restartProject is runRestart, returning what it built the new start from.
+func (c *cli) restartProject(ctx context.Context, o restartOptions) (*plan.Built, error) {
+	allowMissing, buildSecretFlag, force := o.allowMissing, o.buildSecrets, o.force
 	r := c.renderer()
 	wd, err := c.d.WorkingDir()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	st, err := c.readStatus()
 	if err != nil {
-		return err
+		return nil, err
+	}
+	port := st.Port
+	if port == 0 {
+		port = o.port
 	}
 	if st.State != localrt.StateRunning {
 		// Nothing is running, so there is nothing to stop: restart falls back
 		// to a plain start, in the mode a leftover record names, if any.
-		return c.runStart(ctx, plan.Options{Mode: st.Mode, AllowMissing: allowMissing}, buildSecretFlag)
+		mode := st.Mode
+		if mode == "" {
+			mode = o.mode
+		}
+		fallback := plan.Options{Mode: mode, AllowMissing: allowMissing, StopWithSession: o.stopWithSession, RequestedPort: port}
+		started, err := c.startProject(ctx, fallback, buildSecretFlag)
+		return started, err
 	}
 	// Rebuild the plan from the manifest and env as they are now, so a
 	// restart picks up edits — but keep the running mode, port, and session
@@ -621,8 +797,8 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	}
 	built, err := plan.Build(wd, plan.Options{
 		Mode:             st.Mode,
-		RequestedPort:    st.Port,
-		StopWithSession:  st.StopWithSession,
+		RequestedPort:    port,
+		StopWithSession:  st.StopWithSession || o.stopWithSession,
 		AllowMissing:     allowMissing,
 		BuildSecretFlags: buildSecretFlag,
 		PythonCatalog:    c.pythonCatalog(ctx),
@@ -630,22 +806,22 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 		WorkspaceProvider: c.workspaceProvider(),
 	})
 	if err != nil {
-		return c.reportBuildError(r, err)
+		return nil, c.reportBuildError(r, err)
 	}
 	af, err := c.attach()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
 	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
-		return err
+		return nil, err
 	}
 	missingSecrets, err := warnMissingBuildSecrets(r, built.Plan)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	warnEnvValues(r, built.EnvWarnings)
 	warnWorkspaceUnread(r, built.WorkspaceNote)
@@ -653,27 +829,27 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	warnLocalFilesInImage(r, built.Plan)
 	// Before the stop, like the build: a refusal leaves Airflow running.
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
-		return err
+		return nil, err
 	}
 	if err := af.Stop(ctx, localrt.StopOptions{Force: force}); err != nil {
-		return err
+		return nil, err
 	}
 	af, err = c.d.Runtime.Start(ctx, built.Plan, c.callbacks(r))
 	if err != nil {
-		return adviseStart(missingSecrets.Explain(err))
+		return nil, adviseStart(missingSecrets.Explain(err))
 	}
 	st, err = af.Status()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	c.noteSchedulesOff(r, built.Plan, st.Mode)
 	if err := plan.PersistPort(built.Project.Dir, st.Port); err != nil {
-		return err
+		return nil, err
 	}
 	c.applyPools(ctx, r, st, built.Pools)
 	// The status ends the event stream the start wrote, so it is a line of
 	// it: NDJSON on a terminal too.
-	return r.EmitEvent(st, func(w io.Writer) error {
+	return built, r.EmitEvent(st, func(w io.Writer) error {
 		return renderStatus(w, st, c.d.ProxyDir)
 	})
 }
@@ -970,23 +1146,32 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 }
 
 func newRunCmd(c *cli) *cobra.Command {
-	var withWorkspace bool
+	var withWorkspace, noSync bool
 	cmd := &cobra.Command{
 		Use:   nameRun + " <COMMAND> [ARGS...]",
 		Short: "Run a command inside this project's Airflow environment",
+		Long: "Run a command inside this project's Airflow environment.\n\n" +
+			"With Airflow running, the command attaches to it and shares its port and metadata database. " +
+			"With nothing running, a standalone project first builds or updates its virtualenv from pyproject.toml, " +
+			"as uv run does, so the command works in a fresh checkout or in CI. The first build can take a few minutes. " +
+			"Its progress goes to stderr; stdout stays the command's own. " +
+			"Pass --" + flagNoSync + " (or set UV_NO_SYNC) to use the virtualenv as it is.",
 		Example: "  # Run the tests in the project's environment\n" +
 			"  astro local run pytest\n\n" +
 			"  # Run an Airflow CLI command\n" +
-			"  astro local run airflow dags list",
+			"  astro local run airflow dags list\n\n" +
+			"  # Use the existing virtualenv without updating it\n" +
+			"  astro local run --" + flagNoSync + " pytest",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return c.runExec(cmd.Context(), args, withWorkspace)
+			return c.runExec(cmd.Context(), args, withWorkspace, noSync)
 		},
 	}
 	// Everything after the first positional belongs to the wrapped
 	// command, not to us.
 	cmd.Flags().SetInterspersed(false)
 	cmd.Flags().BoolVar(&withWorkspace, flagWithWorkspace, false, withWorkspaceHelp)
+	cmd.Flags().BoolVar(&noSync, flagNoSync, false, noSyncHelp)
 	return cmd
 }
 
@@ -994,13 +1179,15 @@ func newRunCmd(c *cli) *cobra.Command {
 // is attached, so a command shares its port and metadata DB. With nothing
 // running, a standalone project's command runs in its venv under the
 // environment a start would give it, so `astro local run pytest` needs no
-// Airflow. Docker mode runs commands inside its containers, which have to be
-// up.
+// Airflow. That venv is built or brought up to date first, as `uv run` does,
+// unless noSync (or UV_NO_SYNC) says to use it as it is; a running Airflow is
+// never synced, because that would rebuild the venv under it. Docker mode runs
+// commands inside its containers, which have to be up.
 //
 // A stopped run stays offline unless withWorkspace asks for the values only
 // the Environment Manager holds. Then it resolves them as a start does, and a
 // value it cannot fetch fails the run the way it fails a start.
-func (c *cli) environment(withWorkspace bool) (localrt.Airflow, error) {
+func (c *cli) environment(ctx context.Context, withWorkspace, noSync bool) (localrt.Airflow, error) {
 	dir, err := c.projectPath()
 	if err != nil {
 		return nil, err
@@ -1050,7 +1237,24 @@ func (c *cli) environment(withWorkspace bool) (localrt.Airflow, error) {
 	warnWorkspaceUnread(stderr, built.WorkspaceNote)
 	warnWithout(stderr, "running", local)
 	warnWorkspaceSkipped(stderr, workspace)
-	return c.d.Runtime.Stopped(built.Plan)
+	// A docker plan has no venv to build; Stopped refuses it as before.
+	skipped := noSync || uvNoSyncSet()
+	if !skipped && built.Plan.Mode != localrt.ModeDocker {
+		if err := c.syncEnvironment(ctx, built.Plan); err != nil {
+			// Airflow may have come up since the status was read, and a sync
+			// refuses to rebuild the venv under it. Attach, as the running
+			// path does.
+			if now, serr := c.d.Runtime.ReadStatus(dir); serr == nil && now.State == localrt.StateRunning {
+				return c.d.Runtime.Attach(dir)
+			}
+			return nil, err
+		}
+	}
+	af, err := c.d.Runtime.Stopped(built.Plan)
+	if skipped && errors.Is(err, localrt.ErrNotRunning) {
+		err = fmt.Errorf("%w; drop --%s and unset UV_NO_SYNC to let this command build it", err, flagNoSync)
+	}
+	return af, err
 }
 
 // warnWorkspaceSkipped reports, in one line, the required values an offline
@@ -1084,8 +1288,8 @@ func (e notRunning) Error() string { return string(e) }
 
 func (e notRunning) Is(target error) bool { return target == localrt.ErrNotRunning }
 
-func (c *cli) runExec(ctx context.Context, argv []string, withWorkspace bool) error {
-	af, err := c.environment(withWorkspace)
+func (c *cli) runExec(ctx context.Context, argv []string, withWorkspace, noSync bool) error {
+	af, err := c.environment(ctx, withWorkspace, noSync)
 	if err != nil {
 		return err
 	}
@@ -1100,7 +1304,7 @@ func (c *cli) runExec(ctx context.Context, argv []string, withWorkspace bool) er
 }
 
 func newShellCmd(c *cli) *cobra.Command {
-	var withWorkspace bool
+	var withWorkspace, noSync bool
 	cmd := &cobra.Command{
 		Use:   "shell",
 		Short: "Open a shell inside this project's Airflow environment",
@@ -1108,16 +1312,17 @@ func newShellCmd(c *cli) *cobra.Command {
 			"  astro local shell",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return c.runShell(cmd.Context(), withWorkspace)
+			return c.runShell(cmd.Context(), withWorkspace, noSync)
 		},
 	}
 	cmd.Flags().String("shell", "", "Shell to launch instead of your login shell (not built yet)")
 	cmd.Flags().BoolVar(&withWorkspace, flagWithWorkspace, false, withWorkspaceHelp)
+	cmd.Flags().BoolVar(&noSync, flagNoSync, false, noSyncHelp)
 	return cmd
 }
 
-func (c *cli) runShell(ctx context.Context, withWorkspace bool) error {
-	af, err := c.environment(withWorkspace)
+func (c *cli) runShell(ctx context.Context, withWorkspace, noSync bool) error {
+	af, err := c.environment(ctx, withWorkspace, noSync)
 	if err != nil {
 		return err
 	}
@@ -1197,11 +1402,21 @@ func newResetCmd(c *cli) *cobra.Command {
 
 func (c *cli) runReset(ctx context.Context, yes bool) error {
 	r := c.renderer()
-	if err := c.confirmUnless(yes, "Wipe this project's local Airflow state?"); err != nil {
-		return err
-	}
+	// Everything that can fail without consent fails first: a directory with
+	// no project, or a run with no home for the state reset would wipe, is
+	// refused before it is asked to wipe anything, and the question names the
+	// project it would wipe.
 	dir, err := c.projectPath()
 	if err != nil {
+		return err
+	}
+	if c.d.HomeErr != nil {
+		return c.d.HomeErr
+	}
+	// The path is cleaned where the question is built: a directory can be
+	// named with escape sequences, and the question reaches the terminal as
+	// written.
+	if err := c.confirmUnless(yes, fmt.Sprintf("Wipe the local Airflow state (database, logs, environment) of %s?", input.Clean(dir))); err != nil {
 		return err
 	}
 	// Runtime.Reset rather than Stop with Clean: stop goes through Attach,

@@ -280,7 +280,7 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 		{name: "update an IdP team confirmed", root: newOrganizationCmd, client: with(teams, updatesTeam("team-idp", &idp)), answers: "y\n", args: []string{"organization", "team", "update", "team-idp", "--description", "d"}, check: says("This is an IDP-managed team. Are you sure you want to continue the operation? (y/n)", "Astro Team Okta Ops was successfully updated")},
 		{name: "update an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "update", "team-idp", "--description", "d"}, check: func(t *testing.T, out string) {
 			assert.Equal(t, "This is an IDP-managed team. Are you sure you want to continue the operation? (y/n) ", out)
-		}},
+		}, wantErr: "aborted"},
 		{name: "update an IdP team --yes", root: newOrganizationCmd, client: with(teams, updatesTeam("team-idp", &idp)), args: []string{"organization", "team", "update", "team-idp", "--description", "d", "--yes"}, check: says("Astro Team Okta Ops was successfully updated")},
 		{
 			// Refused before anything is sent:
@@ -292,9 +292,9 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 		},
 		{name: "delete", root: newOrganizationCmd, client: with(teams, deletesTeam("team-eng")), args: []string{"organization", "team", "delete", "team-eng", "--yes"}, check: says("Astro Team Engineering was successfully deleted")},
 		{name: "delete through the picker", root: newOrganizationCmd, client: with(teams, deletesTeam("team-eng")), answers: "1\n", args: []string{"organization", "team", "delete", "--yes"}, check: says("Please select a team:", "> Astro Team Engineering was successfully deleted")},
-		{name: "delete declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "delete", "team-eng"}, check: says("Are you sure you want to delete the Engineering team? This cannot be undone. (y/n)")},
+		{name: "delete declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "delete", "team-eng"}, check: says("Are you sure you want to delete the Engineering team? This cannot be undone. (y/n)"), wantErr: "aborted"},
 		{name: "delete an IdP team --yes", root: newOrganizationCmd, client: with(teams, deletesTeam("team-idp")), args: []string{"organization", "team", "delete", "team-idp", "--yes"}, check: says("Astro Team Okta Ops was successfully deleted")},
-		{name: "delete an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "delete", "team-idp"}, check: says("This is an IDP-managed team.", "Are you sure you want to delete the Okta Ops team? This cannot be undone. (y/n)")},
+		{name: "delete an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "delete", "team-idp"}, check: says("This is an IDP-managed team.", "Are you sure you want to delete the Okta Ops team? This cannot be undone. (y/n)"), wantErr: "aborted"},
 		{name: "delete with no teams", root: newOrganizationCmd, client: with(noTeams), args: []string{"organization", "team", "delete"}, check: empty, wantErr: "no teams found in your organization"},
 		// The user is named by email, and the line ends with the team's name.
 		{name: "user add", root: newOrganizationCmd, client: with(teams, addsMember("team-eng")), args: []string{"organization", "team", "user", "add", "--team-id", "team-eng", "--user-id", "user-bob"}, check: func(t *testing.T, out string) {
@@ -310,7 +310,7 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 			args:  []string{"organization", "team", "user", "add", "--user-id", "user-bob"},
 			check: says("Please select a team:", "> Astro User bob@example.com was successfully added to team Engineering\n"),
 		},
-		{name: "user add to an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "user", "add", "--team-id", "team-idp", "--user-id", "user-bob"}, check: says("Are you sure you want to continue the operation? (y/n)")},
+		{name: "user add to an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "user", "add", "--team-id", "team-idp", "--user-id", "user-bob"}, check: says("Are you sure you want to continue the operation? (y/n)"), wantErr: "aborted"},
 		{name: "user remove", root: newOrganizationCmd, client: with(teams, removesMember("team-eng", "user-ada")), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-ada"}, check: func(t *testing.T, out string) {
 			assert.Equal(t, "Astro User ada@example.com was successfully removed from team Engineering\n", out)
 		}},
@@ -323,6 +323,7 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 			},
 		},
 		// The client mocks no removal, so going on would panic.
+		{name: "user remove from an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "user", "remove", "--team-id", "team-idp", "--user-id", "user-ada"}, check: says("Are you sure you want to continue the operation? (y/n)"), wantErr: "aborted"},
 		{name: "user remove of a non-member", root: newOrganizationCmd, client: with(teams), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-bob"}, check: empty, wantErr: "user user-bob is not a member of team Engineering"},
 		{name: "user remove from a team with no members", root: newOrganizationCmd, client: with(noMembers), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-ada"}, check: empty, wantErr: "no team members found in team"},
 		{name: "user list", root: newOrganizationCmd, client: with(teams), args: []string{"organization", "team", "user", "list", "--team-id", "team-eng"}, check: listsRows("ID", adaMemberRow)},

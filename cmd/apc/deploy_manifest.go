@@ -153,7 +153,8 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 	recap.Flush()
 	if err != nil {
 		if errors.Is(err, manifestdeploy.ErrAborted) {
-			// Asked, and declined: the exit code says so.
+			// Asked, and no deployment picked: the picker has said why,
+			// and the exit code says the rest.
 			cmd.SilenceErrors = true
 		}
 		return err

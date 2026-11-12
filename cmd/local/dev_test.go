@@ -40,6 +40,10 @@ func (fakeRuntime) Stopped(localrt.Plan) (localrt.Airflow, error) {
 	return nil, localrt.ErrNotImplemented
 }
 
+func (fakeRuntime) Sync(context.Context, localrt.Plan, localrt.Callbacks) error {
+	return localrt.ErrNotImplemented
+}
+
 func testDeps(t *testing.T) (d Deps, stdout *bytes.Buffer) {
 	t.Helper()
 	stdout = &bytes.Buffer{}
@@ -207,7 +211,7 @@ func TestDevStubLeadsWithTheConversionInA1xProject(t *testing.T) {
 	d.WorkingDir = func() (string, error) { return project1xWithToolsPyproject(t), nil }
 
 	err := execute(t, d, "dev", "pytest")
-	if err == nil || !strings.Contains(err.Error(), "Convert with astro init, then use uv run pytest") {
+	if err == nil || !strings.Contains(err.Error(), "Convert with astro init, then use astro local run pytest") {
 		t.Errorf("a 1.x project should be told to convert before using the replacement: %v", err)
 	}
 
@@ -236,8 +240,8 @@ func TestDevStubJSONNamesTheConversion(t *testing.T) {
 		if err := json.Unmarshal(out.Bytes(), &payload); err != nil {
 			t.Fatalf("stdout is not one JSON object: %v\n%s", err, out.String())
 		}
-		if payload.Replacement != "uv run pytest" {
-			t.Errorf("replacement = %q, want uv run pytest", payload.Replacement)
+		if payload.Replacement != "astro local run pytest" {
+			t.Errorf("replacement = %q, want astro local run pytest", payload.Replacement)
 		}
 		return payload.Convert, payload.Is1xProject
 	}

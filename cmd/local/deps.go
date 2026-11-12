@@ -46,6 +46,10 @@ type Deps struct {
 
 	// Runtime is the pkg/localrt surface the commands call.
 	Runtime Runtime
+	// Watch is localrt's WatchProject, behind `astro local start --watch`.
+	// A field rather than a Runtime method, so the runtime fakes need not
+	// grow one. nil makes --watch refuse.
+	Watch func(ctx context.Context, o localrt.WatchOptions) error
 	// ProxyDir is where the proxy routes and the daemon's record live
 	// (proxydaemon.Dir), resolved once per run. Empty when there is no home
 	// directory: HomeErr then says why, and Runtime is a stand-in returning it.
@@ -217,6 +221,10 @@ type Runtime interface {
 	// venv while no Airflow runs on it, under the environment a start of p
 	// would give Airflow. It backs `astro local run` and `shell` offline.
 	Stopped(p localrt.Plan) (localrt.Airflow, error)
+	// Sync builds or updates a standalone project's venv without starting
+	// Airflow, as a start's first step does. `astro local run` and `shell` call
+	// it before Stopped, and only when nothing is running.
+	Sync(ctx context.Context, p localrt.Plan, cb localrt.Callbacks) error
 	// LogSource returns a handle for reading a project's logs. Unlike Attach
 	// it also serves a stopped standalone project, whose log file outlives its
 	// record; the handle's Logs reads that file.
@@ -270,7 +278,9 @@ func NewDeps() Deps {
 		d.Runtime = homelessRuntime{err: err}
 	} else {
 		d.ProxyDir = dir
-		d.Runtime = newRuntime(dir)
+		rt := newRuntime(dir)
+		d.Runtime = rt
+		d.Watch = rt.WatchProject
 	}
 	return d
 }
@@ -307,9 +317,6 @@ func markSkipPreRun(cmd *cobra.Command) {
 		markSkipPreRun(sub)
 	}
 }
-
-// errAborted reports a confirmation answered "no".
-var errAborted = errors.New("aborted")
 
 // proxyDaemon adapts internal/proxydaemon's daemon lifecycle to the engines'
 // localrt.ProxyDaemon seam, for the routes under dir. The engines see only the
@@ -375,7 +382,10 @@ func (r homelessRuntime) Start(context.Context, localrt.Plan, localrt.Callbacks)
 }
 func (r homelessRuntime) Attach(string) (localrt.Airflow, error)        { return nil, r.err }
 func (r homelessRuntime) Stopped(localrt.Plan) (localrt.Airflow, error) { return nil, r.err }
-func (r homelessRuntime) LogSource(string) (localrt.Airflow, error)     { return nil, r.err }
+func (r homelessRuntime) Sync(context.Context, localrt.Plan, localrt.Callbacks) error {
+	return r.err
+}
+func (r homelessRuntime) LogSource(string) (localrt.Airflow, error) { return nil, r.err }
 func (r homelessRuntime) ReadStatus(string) (localrt.Status, error) {
 	return localrt.Status{}, r.err
 }

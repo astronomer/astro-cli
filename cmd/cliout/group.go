@@ -32,38 +32,35 @@ func GroupHelp(cmd *cobra.Command, args []string) error {
 	if !isJSON(cmd) {
 		return cmd.Help()
 	}
-	return Usage(needsSubcommand(cmd))
+	return misinvoked(needsSubcommand(cmd))
 }
 
 // UnknownSubcommand is the usage error for arg, which names none of cmd's
 // subcommands, with the suggestions cobra's own refusal would carry.
 func UnknownSubcommand(cmd *cobra.Command, arg string) error {
 	msg := fmt.Sprintf("unknown command %q for %q", arg, cmd.CommandPath())
-	if suggestions := suggestionsFor(cmd, arg); len(suggestions) > 0 {
+	if suggestions := SubcommandSuggestions(cmd, arg); len(suggestions) > 0 {
 		msg += "\n\nDid you mean this?\n"
 		for _, s := range suggestions {
 			msg += "\t" + s + "\n"
 		}
 	}
-	return Usage(errors.New(msg))
+	return misinvoked(errors.New(msg))
 }
 
-// suggestionsFor is what cobra's own refusal of an unknown command would
-// suggest for arg among cmd's subcommands. Cobra refuses from the root, so it
-// reads the root's settings: nothing when the root (or here, any command on
-// the way to cmd) disables suggestions, and otherwise the subcommands within
-// the root's SuggestionsMinimumDistance, 2 when that is unset. SuggestionsFor
-// reads the distance off the command it is called on, so cmd carries the
-// root's for the call and gets its own back after.
-func suggestionsFor(cmd *cobra.Command, arg string) []string {
-	for c := cmd; c != nil; c = c.Parent() {
-		if c.DisableSuggestions {
-			return nil
-		}
-	}
-	distance := cmd.Root().SuggestionsMinimumDistance
-	if distance <= 0 {
-		distance = defaultSuggestionDistance
+// SubcommandSuggestions is what cobra's own refusal of an unknown command
+// would suggest for arg among cmd's subcommands, by cobra's own matcher
+// (plain Levenshtein or a prefix; unlike suggestFlag's, a transposition is
+// two edits). Cobra refuses from the root, so it reads the root's settings
+// (suggestionDistance): nothing when the root, or here any command on the
+// way to cmd, disables suggestions. It is what a refusal shows and what
+// telemetry records for it, so the two agree. SuggestionsFor reads the
+// distance off the command it is called on, so cmd carries the root's for
+// the call and gets its own back after.
+func SubcommandSuggestions(cmd *cobra.Command, arg string) []string {
+	distance, ok := suggestionDistance(cmd)
+	if !ok {
+		return nil
 	}
 	own := cmd.SuggestionsMinimumDistance
 	defer func() { cmd.SuggestionsMinimumDistance = own }()
@@ -71,9 +68,27 @@ func suggestionsFor(cmd *cobra.Command, arg string) []string {
 	return cmd.SuggestionsFor(arg)
 }
 
-// defaultSuggestionDistance is cobra's, which findSuggestions applies when the
-// root sets none.
-const defaultSuggestionDistance = 2
+// suggestionDistance is how far a suggestion for something typed on cmd may
+// be, by the settings cobra's own refusal reads: not at all (ok false) when
+// cmd or a command on the way up disables suggestions, else the root's
+// SuggestionsMinimumDistance, DefaultSuggestionDistance when that is unset.
+// Subcommand and flag suggestions both read it, so they agree.
+func suggestionDistance(cmd *cobra.Command) (distance int, ok bool) {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.DisableSuggestions {
+			return 0, false
+		}
+	}
+	distance = cmd.Root().SuggestionsMinimumDistance
+	if distance <= 0 {
+		distance = DefaultSuggestionDistance
+	}
+	return distance, true
+}
+
+// DefaultSuggestionDistance is cobra's distance for "Did you mean", which
+// findSuggestions applies when the root sets none.
+const DefaultSuggestionDistance = 2
 
 // isJSON reports whether cmd's parsed --output is json.
 func isJSON(cmd *cobra.Command) bool {
@@ -119,7 +134,7 @@ func bareGroups(root, target *cobra.Command) (refused func(ran *cobra.Command) e
 		case len(extra) > 0:
 			err = UnknownSubcommand(c, extra[0])
 		case isJSON(c):
-			err = Usage(needsSubcommand(c))
+			err = misinvoked(needsSubcommand(c))
 		default:
 			help(c, args)
 			return
