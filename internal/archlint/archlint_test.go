@@ -41,6 +41,7 @@ var coreBelowCmd = []string{
 	"internal/deploy",
 	"internal/deploybuild",
 	"internal/envresolve",
+	"internal/httpsocket",
 	"internal/imageinstall",
 	"internal/localenv",
 	"internal/pack",

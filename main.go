@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -13,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd"
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/httpsocket"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
@@ -23,6 +25,13 @@ import (
 
 func main() {
 	pauseGCForStartup()
+	// Before anything builds a request: every client that names no transport
+	// reads http.DefaultTransport, which this replaces when
+	// ASTRO_HTTP_UNIX_SOCKET is set.
+	if err := httpsocket.Install(os.Getenv); err != nil {
+		fmt.Fprintln(os.Stderr, ansi.ErrorLabel(os.Stderr), err)
+		os.Exit(1)
+	}
 	// TODO: Remove this when version logic is implemented
 	fs := afero.NewOsFs()
 	config.InitConfig(fs)
