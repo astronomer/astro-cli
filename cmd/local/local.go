@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -1401,11 +1402,21 @@ func newResetCmd(c *cli) *cobra.Command {
 
 func (c *cli) runReset(ctx context.Context, yes bool) error {
 	r := c.renderer()
-	if err := c.confirmUnless(yes, "Wipe this project's local Airflow state?"); err != nil {
-		return err
-	}
+	// Everything that can fail without consent fails first: a directory with
+	// no project, or a run with no home for the state reset would wipe, is
+	// refused before it is asked to wipe anything, and the question names the
+	// project it would wipe.
 	dir, err := c.projectPath()
 	if err != nil {
+		return err
+	}
+	if c.d.HomeErr != nil {
+		return c.d.HomeErr
+	}
+	// The path is cleaned where the question is built: a directory can be
+	// named with escape sequences, and the question reaches the terminal as
+	// written.
+	if err := c.confirmUnless(yes, fmt.Sprintf("Wipe the local Airflow state (database, logs, environment) of %s?", input.Clean(dir))); err != nil {
 		return err
 	}
 	// Runtime.Reset rather than Stop with Clean: stop goes through Attach,
