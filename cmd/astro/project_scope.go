@@ -30,7 +30,8 @@ var projectWorkspaceID string
 // projectFollowed is whether the running command reads the project for its
 // workspace at all: only the commands under astro env and astro deployment do.
 // It decides whether an error about a missing workspace may name the project
-// link as a way to supply one.
+// link as a way to supply one. followProject sets it on every run of those
+// commands; a process runs one command, so it is never reset (tests do).
 var projectFollowed bool
 
 // projectPick is what a project decided for a command the user left open.

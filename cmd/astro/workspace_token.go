@@ -94,9 +94,6 @@ func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}
-	if err := requireWorkspace(workspaceID); err != nil {
-		return err
-	}
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
 	res, err := workspacetoken.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID,
@@ -257,9 +254,6 @@ func upsertOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 
 func removeOrganizationTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
-		return err
-	}
-	if err := requireWorkspace(workspaceID); err != nil {
 		return err
 	}
 	tokenArg(args, &orgTokenID)

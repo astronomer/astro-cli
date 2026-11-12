@@ -6,6 +6,7 @@ package astro
 // helpers the three token families share (api_token_render.go).
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -134,6 +136,13 @@ func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, ki
 			orgTokenID = strings.ToLower(args[0])
 		}
 	}
+	// An add reads the Workspace its token is found in, so a run with none
+	// fails before it asks for a role.
+	if kind == tokenKindWorkspace && operation == tokenRoleAdd {
+		if _, err := workspaceTokenWorkspace(); err != nil {
+			return err
+		}
+	}
 	if tokenRole == "" {
 		prompt := "Enter a role for the API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): "
 		if operation == tokenRoleUpdate {
@@ -189,6 +198,9 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 // Organization token's, can still name one.
 func workspaceTokenWorkspace() (string, error) {
 	ws, err := coalesceWorkspace()
+	if errors.Is(err, astrosession.ErrOrgTokenNoWorkspace) && workspaceTokenID == "" {
+		return "", astrosession.NoWorkspaceHint(nil, "so pass --workspace or the token's ID, or run in a project linked to one")
+	}
 	if err != nil && workspaceTokenID == "" {
 		return "", fmt.Errorf("failed to find a valid workspace to find the Workspace token in; pass --workspace, or the token's ID: %w", err)
 	}
