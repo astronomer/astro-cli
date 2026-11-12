@@ -15,7 +15,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
-	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 const (
@@ -240,7 +239,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, SkipUserPromptMsgForCreateDeployment)
+	addYesFlag(cmd, SkipUserPromptMsgForCreateDeployment)
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, runtimeEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
@@ -320,7 +319,7 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	addDeploymentArgFlag(cmd)
-	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Delete without asking for confirmation")
+	addYesFlag(cmd, "Delete without asking for confirmation")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -388,7 +387,7 @@ func addHibernationFlags(cmd *cobra.Command, period, doing string) {
 	cmd.Flags().StringVarP(&hibernateUntil, "until", "u", "", "End the "+period+" at this date and time, in RFC 3339. Example value: 2026-01-01T00:00:00Z")
 	cmd.Flags().StringVarP(&hibernateForDuration, "for", "d", "", "End the "+period+" after this long. Example value: 1h30m")
 	cmd.Flags().BoolVarP(&hibernateRemove, "remove-override", "r", false, "Remove any existing override and resume the regular hibernation schedule")
-	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Don't ask for confirmation before "+doing+" the Deployment")
+	addYesFlag(cmd, "Don't ask for confirmation before "+doing+" the Deployment")
 	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 }
@@ -433,7 +432,7 @@ func newDeploymentUnadoptCmd(out io.Writer) *cobra.Command {
 	}
 	addDeploymentFlag(cmd.Flags(), "Adopted Deployment to release: a link name from the project's manifest, or a Deployment id", true, "d")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Release the Deployment without asking for confirmation")
+	addYesFlag(cmd, "Release the Deployment without asking for confirmation")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -487,7 +486,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	}
 	addDeploymentArgFlag(cmd)
 
-	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, SkipUserPromptMsgForUpdateDeployment)
+	addYesFlag(cmd, SkipUserPromptMsgForUpdateDeployment)
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
@@ -704,15 +703,10 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		createTriggererReplicas = -1
 	}
 
-	// If it's a dag_deploy type, validate from the user first
-	if !skipPrompt && dagDeploymentType == houston.DagOnlyDeploymentType {
-		y, err := input.Confirm(CreateDeploymentWithTypeDagDeployPromptMsg, input.AnsweredBy("--yes"))
-		if err != nil {
+	// If it's a dag_deploy type, confirm it with the person first.
+	if dagDeploymentType == houston.DagOnlyDeploymentType {
+		if err := confirm(CreateDeploymentWithTypeDagDeployPromptMsg); err != nil {
 			return err
-		}
-		if !y {
-			fmt.Println("canceling deployment create..")
-			return nil
 		}
 	}
 
@@ -745,7 +739,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		Mode:              deploymentMode,
 		Namespace:         createNamespace,
 	}
-	d, err := deployment.Create(req, houstonClient, cliout.NotesTo(cmd, r.Format, out), appConfig)
+	d, err := deployment.Create(req, houstonClient, appConfig)
 	if err != nil {
 		return err
 	}
@@ -779,19 +773,12 @@ func deploymentHibernate(cmd *cobra.Command, hibernate bool, out io.Writer) erro
 	if hibernate {
 		verb = "hibernate"
 	}
-	if !skipPrompt {
-		question := fmt.Sprintf("\nAre you sure you want to %s this Deployment?", verb)
-		if hibernateRemove {
-			question = "\nAre you sure you want to remove the hibernation override on this Deployment?"
-		}
-		ok, err := input.Confirm(question, input.AnsweredBy("--yes"))
-		if err != nil {
-			return err
-		}
-		if !ok {
-			fmt.Fprintln(out, "Exit: This command was not executed and your Deployment was not changed.")
-			return nil
-		}
+	question := fmt.Sprintf("\nAre you sure you want to %s this Deployment?", verb)
+	if hibernateRemove {
+		question = "\nAre you sure you want to remove the hibernation override on this Deployment?"
+	}
+	if err := confirm(question); err != nil {
+		return err
 	}
 
 	var d *houston.Deployment
@@ -851,21 +838,14 @@ func deploymentDelete(cmd *cobra.Command, out io.Writer) error {
 	// Deletions are always hard deletes now (PLX-575): all data associated with
 	// the Deployment, including the database, is permanently removed. Confirm
 	// before proceeding, unless --yes already did.
-	if !skipPrompt {
-		prompt := dangerPrompt(cliDeploymentHardDeletePrompt)
-		if deploymentLink != "" {
-			// The run named a link: say which Deployment that is before
-			// asking to delete it.
-			prompt = fmt.Sprintf("\nLink %s names Deployment %s.", deploymentLink, deploymentID) + prompt
-		}
-		i, err := input.Confirm(prompt, input.AnsweredBy("--yes"))
-		if err != nil {
-			return err
-		}
-		if !i {
-			fmt.Println("Exit: This command was not executed and your Deployment was not deleted.")
-			return nil
-		}
+	prompt := dangerPrompt(cliDeploymentHardDeletePrompt)
+	if deploymentLink != "" {
+		// The run named a link: say which Deployment that is before
+		// asking to delete it.
+		prompt = fmt.Sprintf("\nLink %s names Deployment %s.", deploymentLink, deploymentID) + prompt
+	}
+	if err := confirm(prompt); err != nil {
+		return err
 	}
 	d, err := deployment.Delete(deploymentID, true, houstonClient)
 	if err != nil {
@@ -917,15 +897,8 @@ func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	if !skipPrompt {
-		i, err := input.Confirm(dangerPrompt(cliDeploymentUnadoptPrompt), input.AnsweredBy("--yes"))
-		if err != nil {
-			return err
-		}
-		if !i {
-			fmt.Fprintln(out, "Exit: This command was not executed and your Deployment was not unadopted.")
-			return nil
-		}
+	if err := confirm(dangerPrompt(cliDeploymentUnadoptPrompt)); err != nil {
+		return err
 	}
 	d, err := deployment.Unadopt(deploymentID, houstonClient)
 	if err != nil {
@@ -965,20 +938,17 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	return emitDeploymentList(r, ds)
 }
 
-// confirmDagDeploymentTypeChange asks before an update moves a deployment onto
-// or off dag_deploy, and reports whether to go on. Any other change needs no
-// answer; --yes skips the question.
-func confirmDagDeploymentTypeChange(current, next string) (bool, error) {
-	var prompt string
+// dagDeploymentQuestion is what an update asks before it moves a deployment
+// onto or off dag_deploy, and "" for any other change, including one that
+// names no type.
+func dagDeploymentQuestion(current, next string) string {
 	switch {
 	case current != houston.DagOnlyDeploymentType && next == houston.DagOnlyDeploymentType:
-		prompt = UpdateDeploymentTypeToDagDeployPromptMsg
-	case current == houston.DagOnlyDeploymentType && next != houston.DagOnlyDeploymentType:
-		prompt = UpdateDeploymentTypeFromDagDeployPromptMsg
-	default:
-		return true, nil
+		return UpdateDeploymentTypeToDagDeployPromptMsg
+	case current == houston.DagOnlyDeploymentType && next != "" && next != houston.DagOnlyDeploymentType:
+		return UpdateDeploymentTypeFromDagDeployPromptMsg
 	}
-	return input.Confirm(prompt, input.AnsweredBy("--yes"))
+	return ""
 }
 
 func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string, out io.Writer) error {
@@ -1017,18 +987,6 @@ func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string,
 		dagOnlyDeployEnabled = appConfig.Flags.DagOnlyDeployment
 	}
 
-	// new dag deployment type or current dag deployment type is dag_deploy, confirm from user
-	if !skipPrompt {
-		proceed, err := confirmDagDeploymentTypeChange(deploymentInfo.DagDeployment.Type, dagDeploymentType)
-		if err != nil {
-			return err
-		}
-		if !proceed {
-			fmt.Println("canceling deployment update..")
-			return nil
-		}
-	}
-
 	// we should validate only in case when this feature has been enabled
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
 		err = validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL, true)
@@ -1045,7 +1003,26 @@ func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string,
 		}
 	}
 
-	d, err := deployment.Update(deploymentID, cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, appConfig)
+	// The settings the flags name (the SSH key and known hosts files, the
+	// repository) are read once, here, and what is read is what is sent. A
+	// move onto or off dag_deploy is confirmed first, once what was asked for
+	// is known to be valid, and a run that may not ask is refused before any
+	// file is read.
+	var dagConfig map[string]interface{}
+	build := func() (err error) {
+		dagConfig, err = deployment.BuildDagDeploymentConfig(dagDeploymentType, nfsLocation, sshKey, knowHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, gitSyncInterval)
+		return err
+	}
+	if question := dagDeploymentQuestion(deploymentInfo.DagDeployment.Type, dagDeploymentType); question != "" {
+		err = confirmAfter(question, build)
+	} else {
+		err = build()
+	}
+	if err != nil {
+		return err
+	}
+
+	d, err := deployment.Update(deploymentID, cloudRole, argsMap, dagConfig, executorType, updateTriggererReplicas, houstonClient, appConfig)
 	if err != nil {
 		return err
 	}
@@ -1063,7 +1040,7 @@ func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
 	if cancel {
 		change, err = deployment.AirflowUpgradeCancel(deploymentID, houstonClient)
 	} else {
-		change, err = deployment.AirflowUpgrade(deploymentID, desiredAirflowVersion, houstonClient, cliout.NotesTo(cmd, r.Format, out))
+		change, err = deployment.AirflowUpgrade(deploymentID, desiredAirflowVersion, houstonClient)
 	}
 	if err != nil {
 		return err
@@ -1082,7 +1059,7 @@ func deploymentRuntimeUpgrade(cmd *cobra.Command, out io.Writer) error {
 	if cancel {
 		change, err = deployment.RuntimeUpgradeCancel(deploymentID, houstonClient)
 	} else {
-		change, err = deployment.RuntimeUpgrade(deploymentID, desiredRuntimeVersion, houstonClient, cliout.NotesTo(cmd, r.Format, out))
+		change, err = deployment.RuntimeUpgrade(deploymentID, desiredRuntimeVersion, houstonClient)
 	}
 	if err != nil {
 		return err
