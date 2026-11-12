@@ -661,7 +661,7 @@ To add a dependency, run `uv add <package>`. It keeps the pins, and a running st
 Standalone mode installs what the project declares. Docker mode and a deployment run the runtime image, which also has what it preinstalls: pandas, psycopg2, kubernetes and a few providers among them. A Dag that imports one of those without declaring it works in Docker mode and on a deployment, and fails in standalone with `ModuleNotFoundError`. Declare what your Dags import. `astro local check` says so when the missing module is, by name, a package the image ships, at the image's version, which a deployment then installs as it already runs:
 
 ```
-hint: Astro Runtime 3.3-11 ships pandas 2.3.3, but this project doesn't list it: uv add 'pandas==2.3.3'
+hint: Astro Runtime 3.3-11 ships pandas 2.3.3, but this project doesn't list it: uv add pandas==2.3.3
 ```
 
 It matches the missing module's top-level name exactly against the image's package names, reads the image's package list from `https://cdn.astronomer.io/runtime-freeze/` (`ASTRO_RUNTIME_FREEZE_URL` for a mirror) only when a Dag is missing a module, and gives no hint for a module whose package has another name (`yaml` is PyYAML's, `airflow.providers.celery` is a provider's) or when the list cannot be read. `--target astro` gives the same hints. To run exactly what a deployment runs, start in Docker mode.

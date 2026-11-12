@@ -100,7 +100,7 @@ func (c *cli) withRuntimeHints(ctx context.Context, project string, m *manifest.
 		}
 		name, version, _ := strings.Cut(pin, "==")
 		f.Hint = "Astro Runtime " + build + " ships " + name + " " + version +
-			", but this project doesn't list it: uv add '" + pin + "'"
+			", but this project doesn't list it: uv add " + scaffold.ShellQuote(pin)
 	}
 	res.Findings = findings
 	return res
