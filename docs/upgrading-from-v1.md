@@ -98,7 +98,7 @@ Everything below fails with an error naming the replacement, instead of an "unkn
 | `astro dev bash` | `astro local shell` |
 | `astro dev run` | `astro local run` |
 | `astro dev parse` | `astro local check` |
-| `astro dev pytest` | `uv run pytest` |
+| `astro dev pytest` | `astro local run pytest` |
 | `astro dev build` | `astro package` |
 | `astro dev kill` | `astro local reset --yes` |
 | `astro dev object export` | `astro local env list` |
