@@ -45,7 +45,15 @@ A name more than one source holds goes to the highest in the chain. To keep a gl
 
 **Declarations are requirements.** A declared name no source supplies refuses `astro local start` (`--allow-missing` starts without it). Types, enums and `conn_type` are validated and reported as warnings. `astro local env list` shows each undeclared value the project gets, and `astro local check` warns about the local ones, since they will not follow the project to a Deployment or a teammate's clone: a line per value with its source and the two commands `astro local env list` offers for it, one that declares it if the project needs it and one that deletes it if not.
 
-**Vault and workspace values stay off disk.** In Docker mode they are passed to the containers through the environment of the compose process, never written into the compose file the CLI generates and never put on a command line. Plain `.env` values are written into that file, as docker-compose would read them anyway. As with any container, `docker inspect` can show a running container's environment.
+**Vault and workspace values stay out of sight.** They are never written into the compose file the CLI generates, never stored in Airflow's metadata database, and never put on a command line. In Docker mode they are not set as container environment either, so `docker inspect`, the environment panels of Docker Desktop, OrbStack and similar tools, and engine diagnostic bundles don't show them: the CLI hands them to Compose as a secret, Compose copies it into each Airflow container as a file, and each container reads it into its environment before running, as do `astro local run` and `astro local shell` against the running project. In standalone mode they are passed as ordinary process environment.
+
+This keeps values from being seen by accident; it does not hide them from someone with access to your machine. The running Airflow processes hold them in their environment, which the same user and root can read. In Docker mode the secret file stays in each container until `astro local stop` removes the containers, which is also what lets Airflow come back with its values when the container engine restarts. `astro local run` against a Docker-mode project that is not running starts a one-off container and passes the values to it as container environment, which `docker inspect` shows until that container exits.
+
+A `command:` that a project's `docker-compose.override.yml` sets for an Airflow service replaces the step that loads the values, so that service starts without them; `astro local start` warns when it sees one.
+
+This needs Docker Compose v2.6.1 or later, which Docker Desktop, OrbStack and `podman compose` with `docker-compose` installed all provide. When `podman compose` runs podman-compose instead (no `docker-compose` installed), which cannot pass secrets this way, `astro local start` passes the values as container environment and says so; installing `docker-compose` avoids that.
+
+Plain `.env` values are written into the compose file, as docker-compose would read them anyway.
 
 ## Which projects a global reaches: links
 

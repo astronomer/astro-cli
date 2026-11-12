@@ -253,9 +253,9 @@ func TestRunInImageBringsTheEngineUpBeforeRunning(t *testing.T) {
 
 	var order []string
 	e.ensureEngine = func(rt.Callbacks, string) error { order = append(order, "ensureEngine"); return nil }
-	e.composeAvail = func(context.Context, engineConn) error {
+	e.composeAvail = func(context.Context, engineConn) (composeInfo, error) {
 		order = append(order, "composeAvail")
-		return nil
+		return composeInfo{}, nil
 	}
 
 	require.NoError(t, e.RunInImage(context.Background(), project, rt.ImageRun{
@@ -287,7 +287,7 @@ func TestRunInImageStopsWithoutTheComposePlugin(t *testing.T) {
 	withComposeFile(t, project)
 
 	missing := errors.New("compose v2 is not installed")
-	e.composeAvail = func(context.Context, engineConn) error { return missing }
+	e.composeAvail = func(context.Context, engineConn) (composeInfo, error) { return composeInfo{}, missing }
 
 	require.ErrorIs(t, e.RunInImage(context.Background(), project, rt.ImageRun{
 		Argv: []string{"python"},
@@ -339,10 +339,27 @@ func TestRunInImageAcceptsADockerRecord(t *testing.T) {
 	assert.Len(t, cmd.calls, 1)
 }
 
+// The file declares the secret handoff whenever the last start had secret
+// values, and compose refuses to create any container from it while the
+// secret's variable is unset, so a run sets it, to an empty payload, every
+// time.
+func TestRunInImageAlwaysSetsTheSecretPayloadVariable(t *testing.T) {
+	cmd := &fakeCmd{}
+	e := testEngine(t, cmd)
+	project := t.TempDir()
+	withComposeFile(t, project)
+
+	require.NoError(t, e.RunInImage(context.Background(), project, rt.ImageRun{Argv: []string{"python"}}))
+
+	env, ok := cmd.envFor("run --rm")
+	require.True(t, ok)
+	assert.Contains(t, env, secretEnvPayloadVar+"={}")
+}
+
 // The caller's environment reaches the compose PROCESS, not only the container.
 //
-// The compose file declares every PassthroughEnv and SecretEnv key without a
-// value, the command line names every caller key the same way, and compose
+// The compose file declares every PassthroughEnv key without a value, the
+// command line names every caller key the same way, and compose
 // resolves all of them from its own environment; a key it cannot resolve is
 // dropped from the container silently. The engine connection still
 // goes last, so a caller-supplied DOCKER_HOST cannot retarget the invocation.
