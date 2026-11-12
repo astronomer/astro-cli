@@ -6,8 +6,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
-// addYesFlag registers --yes/-y on a command that asks before it removes
-// something, as the Astro commands that remove things do.
+// addYesFlag registers --yes/-y on a command that asks before it changes
+// something that is not easily changed back, as the Astro commands that do.
 func addYesFlag(cmd *cobra.Command, usage string) {
 	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, usage)
 }
@@ -16,10 +16,25 @@ func addYesFlag(cmd *cobra.Command, usage string) {
 // easily changed back (a removal, a hibernation, a move onto dag_deploy),
 // unless --yes answered it already. A declined question is input.ErrAborted,
 // as it is on Astro. A run that may not ask (under --output json) is refused,
-// naming --yes, before anything is read.
+// naming --yes, before the question is printed or stdin is read.
 func confirm(question string) error {
+	return confirmAfter(question, func() error { return nil })
+}
+
+// confirmAfter is confirm for a command that has work to do before it asks,
+// which it does only once the run is known to be able to ask (or to have
+// been answered by --yes), and runs exactly once on every path: prepare
+// reads what the question is about, and what it read is what the command
+// sends. A run that is refused, or whose prepare fails, asks nothing.
+func confirmAfter(question string, prepare func() error) error {
 	if skipPrompt {
-		return nil
+		return prepare()
+	}
+	if err := input.MayAsk(question, input.AnsweredBy("--yes")); err != nil {
+		return err
+	}
+	if err := prepare(); err != nil {
+		return err
 	}
 	return input.ConfirmOrAbort(question, input.AnsweredBy("--yes"))
 }

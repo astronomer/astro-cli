@@ -664,7 +664,7 @@ func (s *Suite) TestUpdate() {
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		for _, dagDeploymentType := range []string{"", houston.ImageDeploymentType} {
-			got, err := Update(mockDeployment.ID, role, map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType, "", "", "", "", "", "", "", "", 1, 0, api, mockAppConfig)
+			got, err := Update(mockDeployment.ID, role, map[string]string{"executor": houston.CeleryExecutorType}, dagConfig(s, dagDeploymentType), "", 0, api, mockAppConfig)
 			s.NoError(err)
 			s.Equal(mockDeployment, got)
 			api.AssertExpectations(s.T())
@@ -678,7 +678,7 @@ func (s *Suite) TestUpdate() {
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		for _, dagDeploymentType := range []string{"", houston.ImageDeploymentType} {
-			got, err := Update(mockDeployment.ID, role, map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType, "", "", "", "", "", "", "", "", 1, 1, api, mockAppConfig)
+			got, err := Update(mockDeployment.ID, role, map[string]string{"executor": houston.CeleryExecutorType}, dagConfig(s, dagDeploymentType), "", 1, api, mockAppConfig)
 			s.NoError(err)
 			s.Equal(mockDeployment, got)
 			api.AssertExpectations(s.T())
@@ -692,7 +692,7 @@ func (s *Suite) TestUpdate() {
 		deploymentConfig := make(map[string]string)
 		deploymentConfig["executor"] = houston.CeleryExecutorType
 
-		_, err := Update(mockDeployment.ID, role, deploymentConfig, "", "", "", "", "", "", "", "", "", 1, 0, api, mockAppConfig)
+		_, err := Update(mockDeployment.ID, role, deploymentConfig, dagConfig(s, ""), "", 0, api, mockAppConfig)
 
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
@@ -1564,4 +1564,11 @@ func captureStderr(t *testing.T, f func()) string {
 	os.Stderr = previous
 	w.Close()
 	return <-done
+}
+
+// dagConfig is the dag deployment settings of a request that names only a type.
+func dagConfig(s *Suite, dagDeploymentType string) map[string]interface{} {
+	config, err := BuildDagDeploymentConfig(dagDeploymentType, "", "", "", "", "", "", "", 1)
+	s.Require().NoError(err)
+	return config
 }

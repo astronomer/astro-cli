@@ -280,7 +280,9 @@ func List(ws string, all bool, client houston.ClientInterface, clusterID string)
 }
 
 // Update an airflow deployment, and return it as Houston reported it.
-func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knownHosts, executor string, gitSyncInterval, triggererReplicas int, client houston.ClientInterface, appConfig *houston.AppConfig) (*houston.Deployment, error) {
+// dagDeployment is its dag deployment settings, as BuildDagDeploymentConfig
+// built them.
+func Update(id, cloudRole string, args map[string]string, dagDeployment map[string]interface{}, executor string, triggererReplicas int, client houston.ClientInterface, appConfig *houston.AppConfig) (*houston.Deployment, error) {
 	vars := map[string]interface{}{"deploymentId": id, "payload": args, "cloudRole": cloudRole}
 
 	// sync with commander only when we have cloudRole
@@ -292,11 +294,7 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 		vars["executor"] = executor
 	}
 
-	// adds dag deployment args to the vars map
-	err := addDagDeploymentArgs(vars, dagDeploymentType, nfsLocation, sshKey, knownHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, gitSyncInterval)
-	if err != nil {
-		return nil, err
-	}
+	vars["dagDeployment"] = dagDeployment
 
 	if appConfig.Flags.TriggererEnabled && triggererReplicas != -1 {
 		vars["triggererReplicas"] = triggererReplicas
@@ -691,17 +689,22 @@ func meetsRuntimeUpgradeReqs(runtimeVersion, desiredRuntimeVersion string) error
 	return nil
 }
 
-// CheckDagDeploymentArgs reads what an update's dag deployment flags name (the
-// SSH key and known hosts files, the repository URL) and returns the error
-// the update would return for them, without sending anything. A command calls
-// it before it asks a question that only a request that can be sent should
-// ask.
-func CheckDagDeploymentArgs(dagDeploymentType, sshKey, knownHosts, gitRepoURL string) error {
-	return addDagDeploymentArgs(map[string]interface{}{}, dagDeploymentType, "", sshKey, knownHosts, gitRepoURL, "", "", "", 0)
-}
-
 // addDagDeploymentArgs adds dag deployment argument to houston request map
 func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLocation, sshKey, knownHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir string, gitSyncInterval int) error {
+	config, err := BuildDagDeploymentConfig(dagDeploymentType, nfsLocation, sshKey, knownHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, gitSyncInterval)
+	if err != nil {
+		return err
+	}
+	vars["dagDeployment"] = config
+	return nil
+}
+
+// BuildDagDeploymentConfig is the dag deployment settings of a request: it
+// reads the SSH key and known hosts files the flags name, and parses the
+// repository URL, each once. Update takes the result, so a command that
+// builds it before it asks a question sends what it checked, and a file that
+// can be read only once (a pipe) is read once.
+func BuildDagDeploymentConfig(dagDeploymentType, nfsLocation, sshKey, knownHosts, gitRepoURL, gitRevision, gitBranchName, gitDAGDir string, gitSyncInterval int) (map[string]interface{}, error) {
 	dagDeploymentConfig := map[string]interface{}{}
 	if dagDeploymentType != "" {
 		dagDeploymentConfig["type"] = dagDeploymentType
@@ -715,18 +718,18 @@ func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLoc
 		if sshKey != "" {
 			sshPubKey, err := readSSHKeyFile(sshKey)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			dagDeploymentConfig["sshKey"] = sshPubKey
 
 			if knownHosts != "" {
 				repoHost, err := getURLHost(gitRepoURL)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				knownHostsVal, err := readKnownHostsFile(knownHosts, repoHost)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				dagDeploymentConfig["knownHosts"] = knownHostsVal
 			}
@@ -745,8 +748,7 @@ func addDagDeploymentArgs(vars map[string]interface{}, dagDeploymentType, nfsLoc
 		}
 		dagDeploymentConfig["syncInterval"] = gitSyncInterval
 	}
-	vars["dagDeployment"] = dagDeploymentConfig
-	return nil
+	return dagDeploymentConfig, nil
 }
 
 func readSSHKeyFile(sshFilePath string) (string, error) {

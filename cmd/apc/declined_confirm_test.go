@@ -1,7 +1,10 @@
 package apc
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -397,5 +400,96 @@ func TestPickersAreNotDrawnOnStdout(t *testing.T) {
 		assert.Contains(t, run.stderr, "AIRFLOW VERSION")
 		assert.NotContains(t, run.stdout, "AIRFLOW VERSION")
 		assert.NotContains(t, run.stdout, "Astronomer-Certified-1.10.10")
+	})
+	t.Run("runtime upgrade asks for a version", func(t *testing.T) {
+		api := apcAt("2.1.0")
+		api.On("GetDeployment", "dep-1").Return(&houston.Deployment{ID: "dep-1", RuntimeVersion: "12.1.0", RuntimeAirflowVersion: "2.10.5"}, nil)
+		api.On("GetRuntimeReleases", mock.Anything).Return(houston.RuntimeReleases{
+			{Version: "12.1.1", AirflowVersion: "2.10.5"},
+			{Version: "12.2.0", AirflowVersion: "2.10.5"},
+		}, nil)
+		api.On("UpdateDeploymentRuntime", mock.Anything).Return(&houston.Deployment{ID: "dep-1", RuntimeVersion: "12.1.0"}, nil)
+
+		run := runAPCGated(t, api, true, "2\n", "deployment", "runtime", "upgrade", "--deployment", "dep-1")
+
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		assert.Contains(t, run.stderr, "RUNTIME VERSION")
+		assert.NotContains(t, run.stdout, "RUNTIME VERSION")
+		assert.NotContains(t, run.stdout, "Runtime-12.2.0")
+	})
+}
+
+// oneShot returns a path that gives content once: a pipe, as a process
+// substitution (--ssh-key <(cat key)) is. A second read of it gets nothing.
+func oneShot(t *testing.T, content string) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("no /dev/fd on windows")
+	}
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	_, err = w.WriteString(content)
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+	t.Cleanup(func() { r.Close() })
+	return fmt.Sprintf("/dev/fd/%d", r.Fd())
+}
+
+// What the update reads from --ssh-key and --known-hosts is what it sends:
+// each is read once, however the run goes, so a file that gives its content
+// once (a pipe) reaches Houston whole after the question is answered.
+func TestUpdateSendsWhatItReadOnce(t *testing.T) {
+	update := func(t *testing.T, answers string, extra ...string) (apcRun, map[string]interface{}) {
+		t.Helper()
+		var sent map[string]interface{}
+		api := apcAt("2.1.0")
+		api.On("GetDeployment", "dep-1").Return(&houston.Deployment{ID: "dep-1", DagDeployment: houston.DagDeploymentConfig{Type: houston.DagOnlyDeploymentType}}, nil)
+		api.On("UpdateDeployment", mock.Anything).Run(func(args mock.Arguments) {
+			sent, _ = args.Get(0).(map[string]interface{})
+		}).Return(&certifiedDep, nil).Maybe()
+		args := append([]string{"deployment", "update", "dep-1", "--dag-deployment-type", "git_sync", "--git-repository-url", "git@example.com:o/r.git"}, extra...)
+		return runAPCGated(t, api, true, answers, args...), sent
+	}
+
+	for _, c := range []struct {
+		name    string
+		answers string
+		yes     []string
+	}{
+		{"after a yes", "y\n", nil},
+		{"with --yes", "", []string{"--yes"}},
+	} {
+		t.Run("a key and known hosts from pipes "+c.name, func(t *testing.T) {
+			key := oneShot(t, "KEY\n")
+			hosts := oneShot(t, "example.com ssh-rsa AAAA\n")
+			run, sent := update(t, c.answers, append([]string{"--ssh-key", key, "--known-hosts", hosts}, c.yes...)...)
+
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+			dag, ok := sent["dagDeployment"].(map[string]interface{})
+			require.True(t, ok, "%v", sent)
+			assert.Equal(t, "KEY\n", dag["sshKey"])
+			assert.Equal(t, "example.com ssh-rsa AAAA", dag["knownHosts"])
+		})
+	}
+
+	// Under --output json nothing is asked: the run is refused before any
+	// file is read, so a bad path is not what it reports and a pipe is not
+	// consumed.
+	t.Run("-o json without --yes reads nothing", func(t *testing.T) {
+		key := oneShot(t, "KEY\n")
+		run, sent := update(t, "y\n", "--ssh-key", filepath.Join(t.TempDir(), "missing"), "--known-hosts", key, "-o", "json")
+
+		assert.Equal(t, 1, run.code)
+		var got struct {
+			Error string `json:"error"`
+			Kind  string `json:"kind"`
+		}
+		decodeOne(t, run.stdout, &got)
+		assert.Equal(t, string(cliout.KindInputRequired), got.Kind)
+		assert.Contains(t, got.Error, "--yes")
+		assert.Nil(t, sent)
+		b, err := os.ReadFile(key)
+		require.NoError(t, err)
+		assert.Equal(t, "KEY\n", string(b), "the pipe was not consumed")
 	})
 }
