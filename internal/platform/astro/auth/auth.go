@@ -196,6 +196,11 @@ func authorizeCallbackHandlerTo(errOut io.Writer) AuthorizeCallbackHandler {
 // the handler and still gets the normal redirect page.
 func callbackMux(results chan<- CallbackMessage) *http.ServeMux {
 	send := func(msg CallbackMessage) {
+		// A hit with neither a code nor an error (a prefetch, a probe) is not
+		// a result, and must not take the slot the real one needs.
+		if msg.err == nil && msg.authorizationCode == "" {
+			return
+		}
 		select {
 		case results <- msg:
 		default:
@@ -223,6 +228,10 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 	results := make(chan CallbackMessage, 1)
 	fresh := &freshConns{conns: map[net.Conn]struct{}{}}
 	s := http.Server{Handler: callbackMux(results), ReadHeaderTimeout: 0, ConnState: fresh.track}
+	// Shutdown counts a connection that has sent nothing yet, such as a
+	// browser's preconnect, as busy for several seconds. Drop those once the
+	// listener is closed (so no new one can slip in) rather than wait on them.
+	s.RegisterOnShutdown(fresh.closeAll)
 	// Bind before serving, so an address already taken reaches the caller as an
 	// error rather than ending the process from inside the goroutine below.
 	listener, err := net.Listen("tcp", callbackServer)
@@ -244,10 +253,6 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 	// Every way out of the wait below, the error a browser reports included,
 	// must release the port, or the next login in this process can't bind it.
 	defer func() {
-		// Shutdown counts a connection that has sent nothing yet, such as a
-		// browser's preconnect, as busy for several seconds. The login is over,
-		// so drop those rather than wait on them.
-		fresh.closeAll()
 		// A stuck connection must not keep a finished login from returning.
 		ctx, cancel := http_context.WithTimeout(http_context.Background(), callbackShutdownTimeout)
 		defer cancel()
