@@ -74,3 +74,11 @@ func (s *Suite) TestTextEnded() {
 	s.NoError(err)
 	s.Empty(got, "an empty line is an answer")
 }
+
+// A password asked of a stdin that ends names the flag that answers it.
+func (s *Suite) TestPasswordEndedNamesTheFlag() {
+	s.stdinHolding("")
+	_, err := Password("Password: ", AnsweredBy("--password"))
+	s.True(IsRequired(err), "%v", err)
+	s.Contains(err.Error(), "pass --password")
+}

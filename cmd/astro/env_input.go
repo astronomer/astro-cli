@@ -70,11 +70,11 @@ func readSetValue(cmd *cobra.Command, flagName, flagValue, prompt string) (strin
 	return v, nil
 }
 
-// confirmTTY asks prompt: nil for a yes (y or yes, in any case),
+// confirmDelete asks prompt: nil for a yes (y or yes, in any case),
 // input.ErrAborted for any other answer. A run that may not ask (--output json,
 // CI, --non-interactive), and input that ends with no answer, return a
 // question this run could not ask, naming --yes, rather than an answer.
-func confirmTTY(prompt string) error {
+func confirmDelete(prompt string) error {
 	return input.ConfirmOrAbort(prompt, input.AnsweredBy("--yes"))
 }
 
@@ -214,7 +214,7 @@ func runEnvDelete(cmd *cobra.Command, out io.Writer, noun, idOrKey string, del f
 	cmd.SilenceUsage = true
 
 	if !envYes {
-		if err := confirmTTY(fmt.Sprintf("Delete %s %q?", noun, idOrKey)); err != nil {
+		if err := confirmDelete(fmt.Sprintf("Delete %s %q?", noun, idOrKey)); err != nil {
 			return err
 		}
 	}

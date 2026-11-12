@@ -190,7 +190,7 @@ func SelectUser(users []astrov1.User, roleEntity, scopeID string) (astrov1.User,
 	list := picker.List{
 		Title:   "\nPlease select the user:",
 		Header:  []string{"FULLNAME", "EMAIL", "ID", roleColumn, "CREATE DATE"},
-		Ask:     []input.Option{input.About("a user"), input.AnsweredBy("the email address as an argument, or --user-id")},
+		Ask:     []input.Option{input.About("a user")},
 		Invalid: ErrInvalidUserKey,
 	}
 	for i := range users {

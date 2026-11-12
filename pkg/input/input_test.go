@@ -128,12 +128,26 @@ func (s *Suite) TestPassword() {
 		want         string
 		errAssertion assert.ErrorAssertionFunc
 	}{
+		// A stdin that is not a terminal has no echo to turn off: the line is
+		// the answer.
 		{
-			name:         "unsupported error",
-			inputString:  "",
+			name:         "a piped line",
+			inputString:  "hunter2\n",
 			args:         args{"enter pass"},
-			want:         "",
-			errAssertion: assert.Error,
+			want:         "hunter2",
+			errAssertion: assert.NoError,
+		},
+		// Input that ends with nothing is nobody answering: input_required
+		// naming the flag, not the terminal error of taking a pipe for a
+		// terminal.
+		{
+			name:        "ended input",
+			inputString: "",
+			args:        args{"enter pass"},
+			want:        "",
+			errAssertion: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.True(t, IsRequired(err), "%v", err) && assert.NotContains(t, err.Error(), "ioctl")
+			},
 		},
 	}
 	for _, tt := range tests {

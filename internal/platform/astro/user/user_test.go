@@ -11,9 +11,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -904,4 +906,17 @@ func TestDeleteDeploymentUser(t *testing.T) {
 	// parity with prior tests even though individual error paths are not exercised here.
 	_ = ListWorkspaceUsersResponseError
 	_ = ListDeploymentUsersResponseError
+}
+
+// The picker is shared by commands that take the user as an email argument and
+// by one that takes a flag, so at the end of its input it names neither: the
+// command's own refusal does, before it gets here. It must not name an option
+// that most of its commands do not have.
+func TestSelectUserEndedInputNamesNoOption(t *testing.T) {
+	defer testUtil.MockUserInput(t, "")()
+	_, err := SelectUser([]astrov1.User{{Id: "u1", Username: "a@example.com"}}, "organization", "")
+	require.Error(t, err)
+	assert.True(t, input.IsRequired(err), "%v", err)
+	assert.NotContains(t, err.Error(), "--user-id")
+	assert.Contains(t, err.Error(), "pass the answer as a flag")
 }

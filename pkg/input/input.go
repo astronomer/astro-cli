@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 // Every prompt here is written to stderr: stdout carries a command's results
@@ -103,10 +105,14 @@ func endedRequired(promptText string, opts []Option) error {
 
 // Password requests a users passord, does not print out what they entered, and
 // returns it. It returns a *RequiredError, and reads nothing, when this run may
-// not ask (see SetGuard).
+// not ask (see SetGuard). When stdin is not a terminal the answer is the line
+// read from it, since there is no echo to turn off.
 func Password(promptText string, opts ...Option) (string, error) {
 	if err := MayAsk(promptText, opts...); err != nil {
 		return "", err
+	}
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		return passwordFromPipe(promptText, opts)
 	}
 	fmt.Fprint(os.Stderr, promptText)
 	password, err := HiddenValue(os.Stdin, os.Stderr)
@@ -115,6 +121,27 @@ func Password(promptText string, opts ...Option) (string, error) {
 		return "", err
 	}
 	return password, nil
+}
+
+// passwordFromPipe answers a Password question from a stdin that is not a
+// terminal (ssh without -t, docker exec -i, a pipe): there is no echo to turn
+// off, so the line is read as it is, like any other answer. Input that ends
+// with nothing is *RequiredError naming the flag, as for any question, not the
+// raw terminal error that taking a pipe for a terminal gives.
+func passwordFromPipe(promptText string, opts []Option) (string, error) {
+	fmt.Fprint(os.Stderr, promptText)
+	text, err := ReadLine(stdin(), os.Stderr)
+	if errors.Is(err, ErrInterrupted) {
+		return "", err
+	}
+	fmt.Fprint(os.Stderr, "\n")
+	if err != nil && text == "" {
+		if !errors.Is(err, io.EOF) {
+			return "", fmt.Errorf("reading the answer to %s: %w", Quote(promptText), err)
+		}
+		return "", endedRequired(promptText, opts)
+	}
+	return strings.Trim(text, "\r\n"), nil
 }
 
 // EndedReason is the reason a question gives when its input ended with no

@@ -399,7 +399,7 @@ func selectTeam(teams []astrov1.Team) (astrov1.Team, error) {
 	list := picker.List{
 		Title:   "\nPlease select a team:",
 		Header:  []string{"TEAMNAME", "ID"},
-		Ask:     []input.Option{input.About("a team"), input.AnsweredBy("the team ID as an argument, or --team-id")},
+		Ask:     []input.Option{input.About("a team")},
 		Invalid: ErrInvalidTeamKey,
 	}
 	for i := range teams {

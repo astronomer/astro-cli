@@ -828,7 +828,7 @@ var SelectDeployment = func(deployments []houston.Deployment, message string) (h
 	list := picker.List{
 		Title:   message,
 		Header:  []string{"DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID"},
-		Ask:     []input.Option{input.About("a deployment"), input.AnsweredBy("the deployment ID as an argument")},
+		Ask:     []input.Option{input.About("a deployment")},
 		Invalid: ErrInvalidDeploymentKey,
 	}
 	for i := range deployments {

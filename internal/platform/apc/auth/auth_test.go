@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houstonMocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -104,6 +105,9 @@ func (s *Suite) TestBasicAuth() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			// The password prompt reads its line from a stdin that is not a
+			// terminal: an empty one here.
+			defer testUtil.MockUserInput(s.T(), "\n")()
 			got, err := basicAuth(tt.args.username, tt.args.password, &config.Context{}, houstonMock)
 			if !tt.errAssertion(s.T(), err) {
 				return
@@ -776,4 +780,12 @@ func (s *Suite) TestGetAuthTokenFailure() {
 		return
 	}
 	houstonMock.AssertExpectations(s.T())
+}
+
+// A password asked of a stdin that ends is input_required, not the terminal
+// error of taking a pipe for a terminal, and no authentication is attempted.
+func (s *Suite) TestBasicAuthEndedStdinIsInputRequired() {
+	defer testUtil.MockUserInput(s.T(), "")()
+	_, err := basicAuth("test", "", &config.Context{}, new(houstonMocks.ClientInterface))
+	s.True(input.IsRequired(err), "%v", err)
 }
