@@ -122,10 +122,10 @@ func composerRequirements(deps []string) string {
 // quoted for the shell, as every printed command is.
 func composerNextSteps(outDir string, hasPlugins bool) []string {
 	steps := []string{
-		fmt.Sprintf("gcloud composer environments storage dags import --environment=<env> --location=<region> %s", scaffold.ShellQuote("--source="+outDir+"/dags")),
+		fmt.Sprintf("gcloud composer environments storage dags import --environment=<env> --location=<region> --source=%s", scaffold.ShellQuote(outDir+"/dags")),
 	}
 	if hasPlugins {
-		steps = append(steps, fmt.Sprintf("gcloud composer environments storage plugins import --environment=<env> --location=<region> %s", scaffold.ShellQuote("--source="+outDir+"/plugins")))
+		steps = append(steps, fmt.Sprintf("gcloud composer environments storage plugins import --environment=<env> --location=<region> --source=%s", scaffold.ShellQuote(outDir+"/plugins")))
 	}
 	steps = append(steps, fmt.Sprintf("gcloud composer environments update <env> --location=<region> --update-pypi-packages-from-file %s", scaffold.ShellQuote(outDir+"/"+composerDepsFile)))
 	return steps
