@@ -1237,12 +1237,23 @@ func (c *cli) environment(ctx context.Context, withWorkspace, noSync bool) (loca
 	warnWithout(stderr, "running", local)
 	warnWorkspaceSkipped(stderr, workspace)
 	// A docker plan has no venv to build; Stopped refuses it as before.
-	if !noSync && !uvNoSyncSet() && built.Plan.Mode != localrt.ModeDocker {
+	skipped := noSync || uvNoSyncSet()
+	if !skipped && built.Plan.Mode != localrt.ModeDocker {
 		if err := c.syncEnvironment(ctx, built.Plan); err != nil {
+			// Airflow may have come up since the status was read, and a sync
+			// refuses to rebuild the venv under it. Attach, as the running
+			// path does.
+			if now, serr := c.d.Runtime.ReadStatus(dir); serr == nil && now.State == localrt.StateRunning {
+				return c.d.Runtime.Attach(dir)
+			}
 			return nil, err
 		}
 	}
-	return c.d.Runtime.Stopped(built.Plan)
+	af, err := c.d.Runtime.Stopped(built.Plan)
+	if skipped && errors.Is(err, localrt.ErrNotRunning) {
+		err = fmt.Errorf("%w; drop --%s and unset UV_NO_SYNC to let this command build it", err, flagNoSync)
+	}
+	return af, err
 }
 
 // warnWorkspaceSkipped reports, in one line, the required values an offline
