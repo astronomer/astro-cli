@@ -10,11 +10,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
+	workspacetoken "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/picker"
 )
@@ -937,15 +937,8 @@ func selectWorkspaceRole() (string, error) {
 // --workspace (flagWorkspace) or else the current context's has none, so it can
 // run ahead of a prompt: a question is never asked on the way to an error.
 func requireWorkspace(flagWorkspace string) error {
-	if flagWorkspace != "" {
-		return nil
-	}
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-	if c.Workspace == "" {
-		return astrosession.NoWorkspace(nil)
-	}
-	return nil
+	// The one resolver the commands themselves use, so the check and the later
+	// call cannot disagree.
+	_, _, err := workspacetoken.Target(flagWorkspace)
+	return err
 }

@@ -171,7 +171,7 @@ const (
 	HintFlagOrProject = "so pass --workspace, or run in a project linked to one"
 	// HintCurrent is for a command that acts on the current Workspace alone,
 	// which a run with an API token does not have.
-	HintCurrent = "so use a Workspace API token, or log in with astro login"
+	HintCurrent = "so use a Workspace API token"
 )
 
 // NoWorkspace is the error for a command that needs a Workspace, takes it from

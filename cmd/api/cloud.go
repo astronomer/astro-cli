@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -359,9 +358,11 @@ func fillPlaceholders(path string, ctx *config.Context) (string, error) {
 			return ctx.Organization
 		case "workspaceid":
 			if ctx.Workspace == "" {
-				errs = append(errs, astrosession.NoWorkspaceHint(
-					errors.New("workspaceId not set in context (run 'astro workspace switch')"),
-					"so write the id in the path").Error())
+				if astrosession.HasAPIToken() {
+					errs = append(errs, fmt.Sprintf("%s, so write the id in the path", astrosession.ErrOrgTokenNoWorkspace))
+					return match
+				}
+				errs = append(errs, "workspaceId not set in context (run 'astro workspace switch')")
 				return match
 			}
 			return ctx.Workspace
