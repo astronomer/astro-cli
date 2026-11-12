@@ -454,6 +454,20 @@ func TestMWAANextStepsNameTheDeclaredBucket(t *testing.T) {
 	}
 }
 
+// The upload command runs as printed: a bucket carrying shell syntax stays one
+// quoted argument, and a tree path with a space is quoted too.
+func TestMWAANextStepsQuoteTheBucketAndPath(t *testing.T) {
+	m, err := manifest.Parse([]byte("[project]\nname = 'demo'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n\n[tool.astro.targets.mwaa]\nbucket = \"x; touch pwned #\"\n"))
+	require.NoError(t, err)
+	req := newProject(t)
+	req.OutDir = filepath.Join(t.TempDir(), "my artifact")
+	req.Manifest.Astro.Targets = m.Astro.Targets
+	res, err := NewMWAATarget().Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	require.NotEmpty(t, res.NextSteps)
+	assert.Equal(t, "aws s3 sync '"+req.OutDir+"/' 's3://x; touch pwned #/'", res.NextSteps[0])
+}
+
 // --- Composer ----------------------------------------------------------------
 
 // A core-only project packages without its Airflow requirement, for both
@@ -524,6 +538,19 @@ func TestComposerNextStepsSplitBucketAndEnv(t *testing.T) {
 	assert.Contains(t, joined, "gcloud composer environments storage dags import")
 	assert.Contains(t, joined, "--update-pypi-packages-from-file")
 	assert.Contains(t, joined, composerDepsFile)
+}
+
+// The printed commands run as printed: each path argument is quoted when the
+// output directory holds a space.
+func TestComposerNextStepsQuoteThePaths(t *testing.T) {
+	req := newProject(t, withPlugin("my_plugin.py", "plugin = 1\n"))
+	req.OutDir = filepath.Join(t.TempDir(), "my artifact")
+	res, err := NewComposerTarget().Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	require.Len(t, res.NextSteps, 3)
+	assert.True(t, strings.HasSuffix(res.NextSteps[0], " '--source="+req.OutDir+"/dags'"), res.NextSteps[0])
+	assert.True(t, strings.HasSuffix(res.NextSteps[1], " '--source="+req.OutDir+"/plugins'"), res.NextSteps[1])
+	assert.True(t, strings.HasSuffix(res.NextSteps[2], " '"+req.OutDir+"/"+composerDepsFile+"'"), res.NextSteps[2])
 }
 
 // --- env checklist -----------------------------------------------------------

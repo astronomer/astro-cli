@@ -9,6 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/platformversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // MWAATarget builds the artifact Amazon MWAA consumes: a directory laid out as
@@ -124,26 +125,34 @@ func mwaaRequirements(airflowPin string, deps []string) (content, warning string
 // is set; nothing else reads it.
 const mwaaBucketKey = "bucket"
 
+// mwaaBucketPlaceholder stands in for the bucket when the manifest names none.
+// It prints bare, unlike a declared bucket, since the user replaces it anyway.
+const mwaaBucketPlaceholder = "s3://<your-mwaa-bucket>/"
+
 // mwaaBucket is the bucket from [tool.astro.targets.mwaa], as the s3:// URL the
 // sync command takes, or a placeholder when the manifest names none. It takes
 // the bucket with or without its s3:// scheme, since the docs write it with
 // one and the console shows it without.
 func mwaaBucket(m *manifest.Manifest) string {
-	const placeholder = "s3://<your-mwaa-bucket>/"
 	name, _ := m.Astro.Targets[TargetMWAA][mwaaBucketKey].(string)
 	name = strings.Trim(strings.TrimPrefix(strings.TrimSpace(name), "s3://"), "/")
 	if name == "" {
-		return placeholder
+		return mwaaBucketPlaceholder
 	}
 	return "s3://" + name + "/"
 }
 
 // mwaaNextSteps is the upload hand-off: sync the tree to the environment's S3
 // bucket, then point the environment at the new requirements.txt (and
-// plugins.zip) object version, which MWAA tracks by S3 version id.
+// plugins.zip) object version, which MWAA tracks by S3 version id. The tree
+// path and a declared bucket are quoted for the shell, as every printed command
+// is: the bucket comes from the manifest, and a path may hold a space.
 func mwaaNextSteps(outDir string, hasPlugins bool, bucket string) []string {
+	if bucket != mwaaBucketPlaceholder {
+		bucket = scaffold.ShellQuote(bucket)
+	}
 	steps := []string{
-		fmt.Sprintf("aws s3 sync %s/ %s", outDir, bucket),
+		fmt.Sprintf("aws s3 sync %s %s", scaffold.ShellQuote(outDir+"/"), bucket),
 		"Point the environment at the new requirements.txt object version (MWAA console, or aws mwaa update-environment --requirements-s3-object-version <ver>).",
 	}
 	if hasPlugins {
