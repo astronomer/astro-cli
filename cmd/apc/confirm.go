@@ -18,23 +18,29 @@ func addYesFlag(cmd *cobra.Command, usage string) {
 // as it is on Astro. A run that may not ask (under --output json) is refused,
 // naming --yes, before the question is printed or stdin is read.
 func confirm(question string) error {
-	return confirmAfter(question, func() error { return nil })
+	return confirmAfter(question, nil)
 }
 
 // confirmAfter is confirm for a command that has work to do before it asks,
 // which it does only once the run is known to be able to ask (or to have
 // been answered by --yes), and runs exactly once on every path: prepare
 // reads what the question is about, and what it read is what the command
-// sends. A run that is refused, or whose prepare fails, asks nothing.
+// sends. A run that is refused, or whose prepare fails, asks nothing. A nil
+// prepare is no work.
 func confirmAfter(question string, prepare func() error) error {
 	if skipPrompt {
+		if prepare == nil {
+			return nil
+		}
 		return prepare()
 	}
-	if err := input.MayAsk(question, input.AnsweredBy("--yes")); err != nil {
-		return err
-	}
-	if err := prepare(); err != nil {
-		return err
+	if prepare != nil {
+		if err := input.MayAsk(question, input.AnsweredBy("--yes")); err != nil {
+			return err
+		}
+		if err := prepare(); err != nil {
+			return err
+		}
 	}
 	return input.ConfirmOrAbort(question, input.AnsweredBy("--yes"))
 }

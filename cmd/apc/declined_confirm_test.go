@@ -448,7 +448,8 @@ func TestUpdateSendsWhatItReadOnce(t *testing.T) {
 			sent, _ = args.Get(0).(map[string]interface{})
 		}).Return(&certifiedDep, nil).Maybe()
 		args := append([]string{"deployment", "update", "dep-1", "--dag-deployment-type", "git_sync", "--git-repository-url", "git@example.com:o/r.git"}, extra...)
-		return runAPCGated(t, api, true, answers, args...), sent
+		run := runAPCGated(t, api, true, answers, args...)
+		return run, sent
 	}
 
 	for _, c := range []struct {
@@ -471,6 +472,15 @@ func TestUpdateSendsWhatItReadOnce(t *testing.T) {
 			assert.Equal(t, "example.com ssh-rsa AAAA", dag["knownHosts"])
 		})
 	}
+
+	// A no after the files were read sends nothing.
+	t.Run("a no sends nothing", func(t *testing.T) {
+		run, sent := update(t, "n\n", "--ssh-key", oneShot(t, "KEY\n"))
+
+		assert.Equal(t, 1, run.code)
+		require.ErrorIs(t, run.err, input.ErrAborted)
+		assert.Nil(t, sent)
+	})
 
 	// Under --output json nothing is asked: the run is refused before any
 	// file is read, so a bad path is not what it reports and a pipe is not

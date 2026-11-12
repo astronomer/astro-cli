@@ -294,6 +294,9 @@ func Update(id, cloudRole string, args map[string]string, dagDeployment map[stri
 		vars["executor"] = executor
 	}
 
+	if dagDeployment == nil {
+		dagDeployment = map[string]interface{}{}
+	}
 	vars["dagDeployment"] = dagDeployment
 
 	if appConfig.Flags.TriggererEnabled && triggererReplicas != -1 {
