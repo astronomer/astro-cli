@@ -529,7 +529,7 @@ func TestUpdateWithoutAQuestionSendsTheFilesItRead(t *testing.T) {
 	}
 }
 
-// A run that cannot ask (no terminal, CI) is refused as
+// A run that cannot ask (no terminal, CI, --non-interactive) is refused as
 // input_required naming --yes before any file the flags name is read, and
 // --yes answers it.
 func TestUpdateCannotAskReadsNothing(t *testing.T) {
@@ -561,6 +561,10 @@ func TestUpdateCannotAskReadsNothing(t *testing.T) {
 	t.Run("no terminal", func(t *testing.T) {
 		defer input.SetTerminals(false, true)()
 		run, key, sent := setup(t)
+		refused(t, run, key, sent)
+	})
+	t.Run("--non-interactive", func(t *testing.T) {
+		run, key, sent := setup(t, "--non-interactive")
 		refused(t, run, key, sent)
 	})
 	t.Run("CI", func(t *testing.T) {

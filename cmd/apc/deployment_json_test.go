@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -79,7 +80,8 @@ func runAPCGated(t *testing.T, api houston.ClientInterface, gated bool, answers 
 	t.Cleanup(func() { os.Stdout, os.Stderr, os.Stdin = prevOut, prevErr, prevIn })
 
 	root := &cobra.Command{Use: "astro", SilenceErrors: true}
-	LoadPlatform(api) // as the root does for a line that runs one of these commands
+	input.AddFlag(root.PersistentFlags()) // the root's --non-interactive
+	LoadPlatform(api)                     // as the root does for a line that runs one of these commands
 	root.AddCommand(AddCmds(api, stdout)...)
 	if gated {
 		VersionMatchCmds(root, []string{"astro"})

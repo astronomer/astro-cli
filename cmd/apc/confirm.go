@@ -15,18 +15,20 @@ func addYesFlag(cmd *cobra.Command, usage string) {
 // confirm asks question before a command changes something that is not
 // easily changed back (a removal, a hibernation, a move onto dag_deploy),
 // unless --yes answered it already. A declined question is input.ErrAborted,
-// as it is on Astro. A run that may not ask (under --output json) is refused,
-// naming --yes, before the question is printed, stdin is read, or anything is changed. A command that looks something up in Houston first, as hibernate and delete do, has done that read by then.
+// as it is on Astro. A run that cannot ask (see input.Refusal) is refused,
+// naming --yes, before the question is printed or stdin is read. A command
+// that read from Houston first, as hibernate and delete do, has done so by
+// then, but it has changed nothing.
 func confirm(question string) error {
 	return confirmAfter(question, nil)
 }
 
 // confirmAfter is confirm for a command that has work to do before it asks,
 // which it does only once the run is known to be able to ask (or to have
-// been answered by --yes), and runs exactly once on every path: prepare
-// reads what the question is about, and what it read is what the command
-// sends. A run that is refused, or whose prepare fails, asks nothing. A nil
-// prepare is no work.
+// been answered by --yes). prepare reads what the question is about, and
+// what it read is what the command sends; it runs at most once, and not at
+// all when the run is refused. A run that is refused, or whose prepare
+// fails, asks nothing. A nil prepare is no work.
 func confirmAfter(question string, prepare func() error) error {
 	if skipPrompt {
 		if prepare == nil {
