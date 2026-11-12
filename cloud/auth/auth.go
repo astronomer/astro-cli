@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -49,6 +50,9 @@ var (
 	callbackTimeout = time.Second * 300
 	redirectURI     = "http://localhost:12345/callback"
 	callbackServer  = "localhost:12345"
+	// callbackListening is called with the bound address once the callback server accepts connections.
+	// Tests use it to learn the port when callbackServer asks for an ephemeral one (localhost:0).
+	callbackListening = func(net.Addr) {}
 )
 
 var authenticator = Authenticator{
@@ -143,8 +147,13 @@ func authorizeCallbackHandler() (string, error) {
 			http.Redirect(w, resp, "https://auth.astronomer.io/device/success", http.StatusFound)
 		}
 	})
+	ln, err := net.Listen("tcp", s.Addr)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	callbackListening(ln.Addr())
 	go func() {
-		if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := s.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatal(err)
 		}
 	}()
@@ -166,7 +175,7 @@ func authorizeCallbackHandler() (string, error) {
 			return "", errors.New("the operation has timed out")
 		}
 	}
-	err := s.Shutdown(http_context.Background())
+	err = s.Shutdown(http_context.Background())
 	if err != nil {
 		fmt.Printf("error: %s", err)
 	}

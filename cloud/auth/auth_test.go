@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"testing"
@@ -340,40 +342,46 @@ func TestRequestToken(t *testing.T) {
 
 func TestAuthorizeCallbackHandler(t *testing.T) {
 	httpClient = httputil.NewHTTPClient()
-	t.Run("success", func(t *testing.T) {
-		callbackServer = "localhost:12345"
-		go func() {
-			time.Sleep(2 * time.Second) // time to spinup the server in authorizeCallbackHandler
+	origServer, origTimeout, origListening := callbackServer, callbackTimeout, callbackListening
+	t.Cleanup(func() {
+		callbackServer, callbackTimeout, callbackListening = origServer, origTimeout, origListening
+	})
 
-			opts := &httputil.DoOptions{
-				Method: http.MethodGet,
-				Path:   "http://localhost:12345/callback?code=test",
-			}
-			_, err = httpClient.Do(opts) //nolint
-			assert.NoError(t, err)
-		}()
+	// hitCallback binds an ephemeral port and requests the given query on the callback once it is listening.
+	hitCallback := func(t *testing.T, query string) {
+		t.Helper()
+		callbackServer = "localhost:0"
+		done := make(chan struct{})
+		t.Cleanup(func() { <-done })
+		callbackListening = func(addr net.Addr) {
+			go func() {
+				defer close(done)
+				opts := &httputil.DoOptions{
+					Method: http.MethodGet,
+					Path:   fmt.Sprintf("http://%s/callback?%s", addr, query),
+				}
+				_, err := httpClient.Do(opts) //nolint
+				assert.NoError(t, err)
+			}()
+		}
+	}
+
+	t.Run("success", func(t *testing.T) {
+		hitCallback(t, "code=test")
 		code, err := authorizeCallbackHandler()
 		assert.Equal(t, "test", code)
 		assert.NoError(t, err)
 	})
 
 	t.Run("error", func(t *testing.T) {
-		callbackServer = "localhost:12346"
-		go func() {
-			time.Sleep(2 * time.Second) // time to spinup the server in authorizeCallbackHandler
-			opts := &httputil.DoOptions{
-				Method: http.MethodGet,
-				Path:   "http://localhost:12346/callback?error=error&error_description=fatal_error",
-			}
-			_, err = httpClient.Do(opts) //nolint
-			assert.NoError(t, err)
-		}()
+		hitCallback(t, "error=error&error_description=fatal_error")
 		_, err := authorizeCallbackHandler()
 		assert.Contains(t, err.Error(), "fatal_error")
 	})
 
 	t.Run("timeout", func(t *testing.T) {
-		callbackServer = "localhost:12347"
+		callbackServer = "localhost:0"
+		callbackListening = func(net.Addr) {}
 		callbackTimeout = 5 * time.Millisecond
 		_, err := authorizeCallbackHandler()
 		assert.Contains(t, err.Error(), "the operation has timed out")
