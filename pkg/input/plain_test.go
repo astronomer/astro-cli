@@ -40,6 +40,16 @@ func (s *Suite) TestPlain() {
 			"yes",
 		},
 		{
+			"the word joiner and the other invisible operators are stripped",
+			"y\u2060e\u2061s\u206Fx\uFFF9",
+			"yesx",
+		},
+		{
+			"a device control string is stripped with its payload",
+			"x\x1bPqsixel-payload\x1b\\y\x1b_app\x1b\\z",
+			"xyz",
+		},
+		{
 			"escapes and control characters are stripped, spaces collapse",
 			"n\x1b[2J\x1b]0;title\x07\x08  o\t\r\n",
 			"n o",
@@ -48,4 +58,14 @@ func (s *Suite) TestPlain() {
 	for _, tc := range cases {
 		s.Run(tc.name, func() { s.Equal(tc.want, Plain(tc.in)) })
 	}
+}
+
+// Clean makes a name safe to print and changes nothing else: two names that
+// differ only in their spacing stay different.
+func (s *Suite) TestClean() {
+	s.Equal("/p/my  proj", Clean("/p/my  proj"))
+	s.NotEqual(Clean("/p/my  proj"), Clean("/p/my proj"))
+	s.Equal(" a b ", Clean(" a b "))
+	s.Equal("/p/proj", Clean("/p/pr\x1b]0;title\x07oj\n\t\u202E"))
+	s.Equal("C:\\Users\\me\\proj", Clean("C:\\Users\\me\\proj"))
 }

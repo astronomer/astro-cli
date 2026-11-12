@@ -1384,7 +1384,7 @@ func (c *cli) runReset(ctx context.Context, yes bool) error {
 	// The path is cleaned where the question is built: a directory can be
 	// named with escape sequences, and the question reaches the terminal as
 	// written.
-	if err := c.confirmUnless(yes, fmt.Sprintf("Wipe the local Airflow state (database, logs, environment) of %s?", input.Plain(dir))); err != nil {
+	if err := c.confirmUnless(yes, fmt.Sprintf("Wipe the local Airflow state (database, logs, environment) of %s?", input.Clean(dir))); err != nil {
 		return err
 	}
 	// Runtime.Reset rather than Stop with Clean: stop goes through Attach,

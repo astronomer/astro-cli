@@ -48,7 +48,7 @@ func (c *cli) confirm(question string) error {
 	// below never reads as a yes for a run that went on to abort, and input
 	// that was nothing but escapes is no answer, not a no.
 	answer := input.Plain(line)
-	answered := err == nil || answer != "" // an empty line is an answer: a no
+	answered := err == nil || (errors.Is(err, io.EOF) && answer != "") // an empty line is an answer: a no; a read that failed is none
 	switch {
 	case answered && !tty:
 		// A terminal echoed what was typed; a pipe did not.

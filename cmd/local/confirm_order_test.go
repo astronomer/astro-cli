@@ -246,7 +246,7 @@ func TestResetQuestionCleansTheProjectPath(t *testing.T) {
 		t.Skip("a Windows file name cannot hold an escape")
 	}
 	d, rt, _ := resetDeps(t)
-	name := "proj\x1b]0;pwned\x07\x1b[2J" // an OSC window title, then a clear screen
+	name := "proj\x1b]0;pwned\x07\x1b[2J\x1bPpayload\x1b\\" // a window title, a clear screen, a device control string
 	dir := t.TempDir() + string(filepath.Separator) + name
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		t.Fatal(err)
@@ -268,5 +268,61 @@ func TestResetQuestionCleansTheProjectPath(t *testing.T) {
 	}
 	if rt.called != dir {
 		t.Errorf("reset ran on %q, want the real path %q", rt.called, dir)
+	}
+}
+
+// Two sibling projects whose names differ only in their spacing are named
+// apart in the question, so a person is never asked about one while the wipe
+// runs on the other.
+func TestResetQuestionKeepsThePathsSpacing(t *testing.T) {
+	d, rt, _ := resetDeps(t)
+	dir := t.TempDir() + string(filepath.Separator) + "my  proj"
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(validManifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.WorkingDir = func() (string, error) { return dir, nil }
+	d.Stdin = strings.NewReader("y\n")
+	if err := execute(t, d, "local", "reset"); err != nil {
+		t.Fatalf("reset answered yes: %v", err)
+	}
+	if want := "of " + dir + "? [y/N] "; !strings.Contains(stderrOf(d), want) {
+		t.Errorf("stderr = %q, want the path as it is, in %q", stderrOf(d), want)
+	}
+	if rt.called != dir {
+		t.Errorf("reset ran on %q, want %q", rt.called, dir)
+	}
+}
+
+// partialThenFails is a stdin whose read returns part of a line and then
+// fails, as a broken pipe or a console that went away does.
+type partialThenFails struct{ done bool }
+
+func (p *partialThenFails) Read(b []byte) (int, error) {
+	if p.done {
+		return 0, errors.New("read failed")
+	}
+	p.done = true
+	return copy(b, "y"), nil
+}
+
+// A read that fails after some text is not a yes: only a line that ended at
+// the end of input counts as an unterminated answer.
+func TestConfirmReadFailureWithPartialTextIsNotAYes(t *testing.T) {
+	for name, interactive := range map[string]bool{"terminal": true, "piped": false} {
+		t.Run(name, func(t *testing.T) {
+			d, _ := testDeps(t)
+			d.Stdin = &partialThenFails{}
+			d.Interactive = func() bool { return interactive }
+			err := (&cli{d: d}).confirm("Wipe it?")
+			if err == nil || !strings.Contains(err.Error(), "read failed") {
+				t.Fatalf("err = %v, want the read failure, not a yes", err)
+			}
+			if errors.Is(err, input.ErrAborted) || input.IsRequired(err) {
+				t.Errorf("err = %v, want the read error as it came", err)
+			}
+		})
 	}
 }
