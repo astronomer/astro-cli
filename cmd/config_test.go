@@ -56,7 +56,7 @@ func (s *CmdSuite) TestConfigGetCommandFailure() {
 
 	_, err = executeCommand("config", "get", "upgrade_message")
 	s.Error(err)
-	s.Contains(err.Error(), "You are attempting to get a project config outside of a project directory")
+	s.Contains(err.Error(), "CLI settings are global")
 	// The suggested command has to be runnable. It used to interpolate the
 	// argument placeholder alongside the real argument.
 	s.Contains(err.Error(), "astro config get upgrade_message -g")
@@ -67,7 +67,7 @@ func (s *CmdSuite) TestConfigSetOutsideProjectSuggestsTheValueToo() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.useWorkingPath(s.T().TempDir())
 	_, err := executeCommand("config", "set", "show_warnings", "false")
-	s.ErrorContains(err, "outside of a project directory")
+	s.ErrorContains(err, "CLI settings are global")
 	s.ErrorContains(err, "astro config set show_warnings false -g")
 }
 
@@ -99,13 +99,17 @@ func (s *CmdSuite) TestConfigSuggestionQuotesAValueWithSpaces() {
 	s.ErrorContains(err, "astro config set internal.astro.localhost.core_url 'http://my host' -g")
 }
 
-func (s *CmdSuite) TestConfigIn1xProjectWithPyprojectKeepsProjectScope() {
+// A converted project that still has its 1.x .astro/config.yaml has no
+// project scope either: the file is not read, and the answer is the
+// manifest project's.
+func (s *CmdSuite) TestConfigInAConvertedProjectStillHolding1xConfigIsGlobalOnly() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.useManifestProject()
 	s.Require().NoError(os.Mkdir(filepath.Join(config.WorkingPath, config.ConfigDir), 0o755))
 	s.Require().NoError(os.WriteFile(filepath.Join(config.WorkingPath, config.ConfigDir, config.ConfigFileNameWithExt), nil, 0o600))
 	_, err := executeCommand("config", "get", "apc.page_size")
-	s.NoError(err)
+	s.ErrorContains(err, "pyproject.toml under [tool.astro]")
+	s.ErrorContains(err, "astro config get apc.page_size -g")
 }
 
 // initConfigFiles loads config from an in-memory home config and, when
@@ -141,17 +145,15 @@ func (s *CmdSuite) TestConfigListShowsValueAndScope() {
 	s.NotRegexp(`(?m)^\s*page_size\s`, out, "nor a 1.x name")
 }
 
-func (s *CmdSuite) TestConfigListReadsA1xProjectUnlessGlobal() {
+// list shows the global values in a 1.x project too: no setting is read from
+// its .astro/config.yaml, so none is listed from there.
+func (s *CmdSuite) TestConfigListIgnoresA1xProjectConfig() {
 	s.initConfigFiles("page_size: 50\n", "page_size: 70\n")
 
 	buf := new(bytes.Buffer)
 	s.NoError(configList(textTo(buf)))
-	s.Regexp(`(?m)^\s*apc\.page_size\s+70\s+project\s*$`, buf.String())
-
-	globalFlag = true
-	buf.Reset()
-	s.NoError(configList(textTo(buf)))
 	s.Regexp(`(?m)^\s*apc\.page_size\s+50\s+global\s*$`, buf.String())
+	s.NotContains(buf.String(), "project")
 }
 
 // A bare `astro config set` panicked: ensureGlobalFlag runs as a

@@ -22,42 +22,22 @@ func (s *Suite) TestLegacy1xValueFromTheHomeConfig() {
 			"dev:\n  build_secrets: id=mysecret,src=secret.txt\n"), 0o600))
 	initHome(fs)
 
-	value, file, _ := Legacy1xValue("", "webserver.port")
+	value, file, _ := Legacy1xValue("webserver.port")
 	s.Equal("8099", value, "a port the user chose")
 	s.Equal(homeFile, file)
-	value, _, _ = Legacy1xValue("", "api-server.port")
+	value, _, _ = Legacy1xValue("api-server.port")
 	s.Empty(value, "1.x's default port is no choice")
-	value, _, replacement := Legacy1xValue("no-config-here", "dev.build_secrets")
-	s.Equal("id=mysecret,src=secret.txt", value, "a project with no .astro/config.yaml reads the home config")
+	value, _, replacement := Legacy1xValue("dev.build_secrets")
+	s.Equal("id=mysecret,src=secret.txt", value, "a value the user chose")
 	s.Equal(removedSettings["dev.build_secrets"].replacement, replacement, "the advice astro config refuses it with")
-	value, _, _ = Legacy1xValue("", "proxy.port")
+	value, _, _ = Legacy1xValue("proxy.port")
 	s.Empty(value, "unset")
 	s.NotContains(CFGStrMap, "webserver.port", "reading it does not register it")
-}
-
-// 1.x's `astro config set` without -g wrote the project's .astro/config.yaml,
-// which it read over the home config, at any value.
-func (s *Suite) TestLegacy1xValueFromTheProjectConfig() {
-	fs := afero.NewMemMapFs()
-	const home = "home"
-	s.withAstroHome(home)
-	s.NoError(afero.WriteFile(fs, filepath.Join(home, ConfigDir, ConfigFileNameWithExt), []byte(
-		"config_version: 2\nwebserver:\n  port: 8099\napi-server:\n  port: 9090\n"), 0o600))
-	projectFile := filepath.Join("proj", ConfigDir, ConfigFileNameWithExt)
-	s.NoError(afero.WriteFile(fs, projectFile, []byte(
-		"webserver:\n  port: 8100\napi-server:\n  port: 8080\n"), 0o600))
-	initHome(fs)
-
-	value, file, _ := Legacy1xValue("proj", "webserver.port")
-	s.Equal("8100", value)
-	s.Equal(projectFile, file, "the note names the file the value came from")
-	value, _, _ = Legacy1xValue("proj", "api-server.port")
-	s.Empty(value, "the project's default overrides the home value, as in 1.x")
 }
 
 func (s *Suite) TestLegacy1xValueWithNoHomeConfig() {
 	s.withAstroHome("empty-home")
 	initHome(afero.NewMemMapFs())
-	value, _, _ := Legacy1xValue("", "webserver.port")
+	value, _, _ := Legacy1xValue("webserver.port")
 	s.Empty(value)
 }

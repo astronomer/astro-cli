@@ -64,14 +64,6 @@ func (s *Suite) TestLegacySettingNames() {
 		s.Equal(30, CFG.PageSize.GetInt())
 	})
 
-	s.Run("a 1.x project config read by its path takes the 1.x name", func() {
-		s.startWithHomeConfig("config_version: 2\n")
-		dir := s.T().TempDir()
-		s.Require().NoError(afero.WriteFile(configFs, dir+"/.astro/config.yaml", []byte("remote:\n    client_registry: quay.io/acme/client\n"), 0o600))
-
-		s.Equal("quay.io/acme/client", CFG.RemoteClientRegistry.GetStringFor(dir))
-	})
-
 	s.Run("the cleanup removes a default written under the 1.x name", func() {
 		fs := s.startWithHomeConfig("show_warnings: \"true\"\ncloud:\n    api:\n        port: \"443\"\nauto_select: \"true\"\n")
 

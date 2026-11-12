@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -727,11 +728,10 @@ func TestInitKeepsStdoutParseableWhenThe1xConfigWillNot(t *testing.T) {
 	if res.Name == "" {
 		t.Error("a project still needs a name when its 1.x config will not parse")
 	}
-	// And the warning is not lost, it is on the stream prose belongs on — and
-	// names the file it is about, rather than the home directory, which is
-	// where it used to send people looking.
-	if !strings.Contains(r.Stderr, "project config") {
-		t.Errorf("the parse failure should be reported on stderr, naming the project's config:\n%s", r.output())
+	// And the failure is not lost: the conversion, the one reader of the file,
+	// reports it as a note naming the file it is about.
+	if !slices.ContainsFunc(res.Notes, func(n string) bool { return strings.HasPrefix(n, ".astro/config.yaml: could not be read") }) {
+		t.Errorf("the parse failure should be a note naming .astro/config.yaml, got %q", res.Notes)
 	}
 }
 
