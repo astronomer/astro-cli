@@ -28,14 +28,15 @@ type ProblemKind string
 // fail any other way.
 const KindUsage ProblemKind = "usage"
 
-// KindInputRequired: the command needed an answer it would have asked for at
-// a terminal, and this run could not ask — under --output json no command
-// prompts (Execute's guard), and some refuse without a terminal too. The
-// message names what was asked and, where the command knows it, the flag that
+// KindInputRequired: the command needed an answer it would have asked for, and
+// this run could not ask — under --output json, with stdin or stderr
+// not a terminal, with CI set or with --non-interactive no command prompts
+// (Execute's guard), and stdin that ends with no answer (Ctrl-D) is the same
+// failure. The message names what was asked and, where the command knows it, the flag that
 // answers it. Exit status 1, like any failure: the question can come after
 // the command has started work (a v1 DAG deploy asks about an empty dags/
 // after creating its deploy record), so "nothing ran" (usage's 2) is not a
-// promise it can keep, and the same refusal without a terminal has always
+// promise it can keep, and the same refusal in CI has always
 // exited 1.
 // Also cliout's own, because pkg/input is what recognizes one.
 const KindInputRequired ProblemKind = "input_required"

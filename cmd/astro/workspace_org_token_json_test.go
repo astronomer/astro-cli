@@ -122,10 +122,6 @@ type tokenCase struct {
 	args    []string
 	check   func(t *testing.T, stdout string)
 	wantErr string
-	// picksOnStdout is a run whose picker, or its note about the only
-	// choice, is drawn on the command's stdout ahead of the question, as
-	// the Workspace picker is in text mode: a decline adds nothing to it.
-	picksOnStdout bool
 }
 
 func runTokenCases(t *testing.T, cases []tokenCase) {
@@ -137,7 +133,7 @@ func runTokenCases(t *testing.T, cases []tokenCase) {
 				require.Error(t, r.err)
 				assert.Equal(t, tc.wantErr, r.err.Error())
 				assert.Equal(t, cliout.ExitFailure, r.code)
-				if errors.Is(r.err, input.ErrAborted) && !tc.picksOnStdout {
+				if errors.Is(r.err, input.ErrAborted) {
 					assert.Empty(t, r.stdout, "a decline is not a result")
 				}
 			} else {

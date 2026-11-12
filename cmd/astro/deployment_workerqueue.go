@@ -2,6 +2,7 @@ package astro
 
 import (
 	"io"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -134,7 +135,7 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 		minWorkerCount = -1
 	}
 
-	res, err := workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroV1Client, cliout.NotesTo(cmd, format, out))
+	res, err := workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroV1Client, os.Stderr)
 	if err != nil {
 		return err
 	}
@@ -151,7 +152,7 @@ func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) 
 		return err
 	}
 
-	res, err := workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroV1Client, cliout.NotesTo(cmd, format, out))
+	res, err := workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroV1Client, os.Stderr)
 	if err != nil {
 		return err
 	}

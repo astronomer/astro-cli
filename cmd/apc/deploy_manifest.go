@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
@@ -34,7 +32,7 @@ import (
 var (
 	DeployManifestImage = deploy.DeployManifestImage
 
-	stdinIsTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
+	mayAsk = input.CanAsk
 )
 
 // deployManifest deploys the pyproject.toml project the working directory is
@@ -98,7 +96,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		warnings = append(warnings, msg)
 		recap.Warn(msg)
 	}
-	interactive := deployOutput == cliout.FormatText && stdinIsTerminal()
+	interactive := deployOutput == cliout.FormatText && mayAsk()
 	engine := utils.OnceEngine(func() (string, []string, error) { return containercfg.Engine(config.WorkingPath) })
 	if runtimeVersionForImageName != "" && !imagePresentOnRemote {
 		// Astro CLI 1.x took it here and read nothing of it, so it is still

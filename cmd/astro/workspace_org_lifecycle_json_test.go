@@ -236,25 +236,25 @@ func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
 		{
 			name: "workspace delete through the picker, confirmed", root: ws, client: workspacesMock(both, deletesWorkspace(curWorkspaceID)), answers: "2\ny\n",
 			args: []string{"workspace", "delete"},
-			// The question is on stderr, which the terminal view reads first.
-			check: then(pickRows, plain(says("\nAre you sure you want to delete the Development Workspace ("+curWorkspaceID+")? This cannot be undone. (y/n) ", "Please select the workspace you would like to delete:", "> ", "Astro Workspace Development was successfully deleted\n"))),
+			// The menu and then the question, both on stderr, in the order asked.
+			check: then(pickRows, plain(says("Please select the workspace you would like to delete:", "> ", "\nAre you sure you want to delete the Development Workspace ("+curWorkspaceID+")? This cannot be undone. (y/n) ", "Astro Workspace Development was successfully deleted\n"))),
 		},
 		{
 			name: "workspace delete through the picker, declined", root: ws, client: workspacesMock(both), answers: "2\nn\n",
 			args:  []string{"workspace", "delete"},
-			check: then(pickRows, lacks("successfully deleted")), wantErr: "aborted", picksOnStdout: true,
+			check: then(pickRows, lacks("successfully deleted")), wantErr: "aborted",
 		},
 		// The only Workspace is found, not named, and still asked about.
 		{
 			name: "workspace delete of the only Workspace", root: ws, client: workspacesMock([]astrov1.Workspace{prod}, deletesWorkspace("ws-prod")), answers: "y\n",
 			args: []string{"workspace", "delete"},
-			check: plain(says(deleteProdQuestion, "Only one Workspace was found. Using the following Workspace by default: \n",
+			check: plain(says("Only one Workspace was found. Using the following Workspace by default: \n", deleteProdQuestion,
 				"Astro Workspace Production was successfully deleted\n")),
 		},
 		{
 			name: "workspace delete of the only Workspace, declined", root: ws, client: workspacesMock([]astrov1.Workspace{prod}), answers: "n\n",
 			args:  []string{"workspace", "delete"},
-			check: plain(says(deleteProdQuestion, "Only one Workspace was found.")), wantErr: "aborted", picksOnStdout: true,
+			check: plain(says("Only one Workspace was found.", deleteProdQuestion)), wantErr: "aborted",
 		},
 		{name: "workspace delete of an unknown id", root: ws, client: workspacesMock(both), args: []string{"workspace", "delete", "ws-nope"}, check: says(""), wantErr: "no workspace was found for the ID you provided"},
 		{name: "workspace switch by name", root: ws, client: workspacesMock(both), args: []string{"workspace", "switch", "Production"}, check: listsContext("ws-prod")},
@@ -398,7 +398,7 @@ func TestWorkspaceOnlyOneNoteGoesToStderrUnderJSON(t *testing.T) {
 			r := execAstroCmd(t, run.client(t), "", newWorkspaceCmd, run.args...)
 			require.NoError(t, r.err)
 			jsonIs(run.want)(t, r.stdout)
-			assert.Contains(t, r.stderr, "Only one Workspace was found. Using the following Workspace by default:")
+			assert.Contains(t, r.asked, "Only one Workspace was found. Using the following Workspace by default:")
 		})
 	}
 }

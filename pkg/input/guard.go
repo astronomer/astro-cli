@@ -39,7 +39,9 @@ func SetGuard(refuse func() string) (restore func()) {
 func refusal() string {
 	g := guard.Load()
 	if g == nil {
-		return ""
+		// No command to read flags from (a library caller, a test): the
+		// terminals alone decide.
+		return terminalRefusal()
 	}
 	return (*g)()
 }
@@ -78,7 +80,7 @@ func MayAsk(prompt string, opts ...Option) error {
 	for _, o := range opts {
 		o(e)
 	}
-	return e
+	return ApplyHint(e)
 }
 
 // RequiredError is a question this run needed answered and could not ask. The

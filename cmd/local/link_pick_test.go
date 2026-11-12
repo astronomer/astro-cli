@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // pickRun is what a picker case reads back: the output streams, and what the
@@ -30,7 +31,6 @@ func pickDeps(t *testing.T, dir, stdin string, dep PickedDeployment, ws string) 
 	t.Helper()
 	d, out, errOut := linkDeps(t, dir)
 	run := &pickRun{out: out, errOut: errOut}
-	d.Interactive = func() bool { return true }
 	d.Stdin = strings.NewReader(stdin)
 	d.CurrentWorkspace = func() string { return "" }
 	d.PickDeployment = func(workspaceID string, linked map[string]string) (PickedDeployment, error) {
@@ -100,7 +100,7 @@ func TestLinkAddPicksTheWorkspaceToListFrom(t *testing.T) {
 	assert.Equal(t, []string{"ws_Z"}, run.deploymentWorkspaces)
 }
 
-// A run that cannot be asked never prompts: no terminal, or json output. It
+// A run that cannot be asked never prompts: --non-interactive, or json output. It
 // names the missing argument instead, and writes nothing.
 func TestLinkPickersNeverPromptARunThatCannotBeAsked(t *testing.T) {
 	for name, tc := range map[string]struct {
@@ -108,20 +108,19 @@ func TestLinkPickersNeverPromptARunThatCannotBeAsked(t *testing.T) {
 		args        []string
 		want        string
 	}{
-		"add, no terminal":       {false, []string{"add"}, "add needs a NAME"},
-		"add, json":              {true, []string{"add", "--output", "json"}, "add needs a NAME"},
-		"add named, json":        {true, []string{"add", "prod", "--output", "json"}, "needs a deployment"},
-		"remove, no terminal":    {false, []string{"remove"}, "astro link remove NAME"},
-		"remove, json":           {true, []string{"remove", "--output", "json"}, "astro link remove NAME"},
-		"default, no terminal":   {false, []string{"default"}, "--unset to clear it"},
-		"default, json":          {true, []string{"default", "--output", "json"}, "--unset to clear it"},
-		"add url with no NAME":   {true, []string{"add", "--url", "https://a.example.com", "--auth", "none"}, "add needs a NAME"},
-		"add, --deployment only": {true, []string{"add", "--deployment", "clx1"}, "add needs a NAME"},
+		"add, non-interactive":     {false, []string{"add", "--non-interactive"}, "add needs a NAME"},
+		"add, json":                {true, []string{"add", "--output", "json"}, "add needs a NAME"},
+		"add named, json":          {true, []string{"add", "prod", "--output", "json"}, "needs a deployment"},
+		"remove, non-interactive":  {false, []string{"remove", "--non-interactive"}, "astro link remove NAME"},
+		"remove, json":             {true, []string{"remove", "--output", "json"}, "astro link remove NAME"},
+		"default, non-interactive": {false, []string{"default", "--non-interactive"}, "--unset to clear it"},
+		"default, json":            {true, []string{"default", "--output", "json"}, "--unset to clear it"},
+		"add url with no NAME":     {true, []string{"add", "--url", "https://a.example.com", "--auth", "none"}, "add needs a NAME"},
+		"add, --deployment only":   {true, []string{"add", "--deployment", "clx1"}, "add needs a NAME"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir, _ := linkTestProject(t, linkManifest)
 			d, run := pickDeps(t, dir, "1\n", PickedDeployment{ID: "clx9", Name: "x"}, "")
-			d.Interactive = func() bool { return tc.interactive }
 			err := execute(t, d, append([]string{"link"}, tc.args...)...)
 			require.Error(t, err)
 			if slices.Contains(tc.args, "json") {
@@ -197,7 +196,7 @@ func TestLinkRemovePicksALink(t *testing.T) {
 	dir, path := linkTestProject(t, linkManifest)
 	d, run := pickDeps(t, dir, "2\n", PickedDeployment{}, "")
 	require.NoError(t, execute(t, d, "link", "remove"))
-	assertPickerTable(t, run.out.String(), "Select a link to remove", `1\s+dev\s+astro\s+dep-dev`, `2\s+stage\s+astro\s+dep-stage`)
+	assertPickerTable(t, run.errOut.String(), "Select a link to remove", `1\s+dev\s+astro\s+dep-dev`, `2\s+stage\s+astro\s+dep-stage`)
 	assert.Contains(t, run.out.String(), "removed link stage from ")
 	m := loadManifest(t, path)
 	assert.NotContains(t, m.Astro.Deployments, "stage")
@@ -205,12 +204,25 @@ func TestLinkRemovePicksALink(t *testing.T) {
 
 	// An answer that is no row number removes nothing, as the Deployment
 	// picker refuses one.
-	for _, answer := range []string{"", "9\n", "dev\n", " 1\n"} {
+	for _, answer := range []string{"9\n", "dev\n", " 1\n"} {
 		d, _ = pickDeps(t, dir, answer, PickedDeployment{}, "")
 		err := execute(t, d, "link", "remove")
 		require.ErrorIs(t, err, errInvalidLinkSelection, "answer %q", answer)
 		assert.Contains(t, loadManifest(t, path).Astro.Deployments, "dev")
 	}
+
+	// A stdin that ends with no answer is not an invalid one: it is
+	// input_required, naming how to say which link. The picker is drawn on
+	// stderr, never stdout.
+	d, run = pickDeps(t, dir, "", PickedDeployment{}, "")
+	err := execute(t, d, "link", "remove")
+	require.Error(t, err)
+	assert.True(t, input.IsRequired(err), "%v", err)
+	assert.NotErrorIs(t, err, errInvalidLinkSelection)
+	assert.Contains(t, err.Error(), "astro link remove NAME")
+	assert.Empty(t, run.out.String(), "a picker wrote to stdout")
+	assert.Contains(t, run.errOut.String(), "Select a link to remove")
+	assert.Contains(t, loadManifest(t, path).Astro.Deployments, "dev")
 }
 
 // With no NAME, default asks which link, and offers none to clear it.
@@ -220,9 +232,9 @@ func TestLinkDefaultPicksALinkOrNone(t *testing.T) {
 	require.NoError(t, execute(t, d, "link", "default"))
 	// The current default is marked as `astro use` and the deploy prompt mark
 	// it: one word, never the manifest's `default = true`.
-	assertPickerTable(t, run.out.String(), "Select the default link", `1\s+dev\s+astro\s+dep-dev\s+default`, `2\s+stage\s+astro`, `3\s+none\s+clear the default`)
-	assert.NotRegexp(t, `stage\s+astro\s+dep-stage\s+default`, run.out.String())
-	assert.NotContains(t, run.out.String(), "default = true")
+	assertPickerTable(t, run.errOut.String(), "Select the default link", `1\s+dev\s+astro\s+dep-dev\s+default`, `2\s+stage\s+astro`, `3\s+none\s+clear the default`)
+	assert.NotRegexp(t, `stage\s+astro\s+dep-stage\s+default`, run.errOut.String())
+	assert.NotContains(t, run.errOut.String(), "default = true")
 	assert.Contains(t, run.out.String(), "set link stage as the default in ")
 	m := loadManifest(t, path)
 	assert.True(t, m.Astro.Deployments["stage"].Default)
@@ -245,7 +257,7 @@ func TestLinkPickerShowsEachKind(t *testing.T) {
 	dir, _ := linkTestProject(t, body)
 	d, run := pickDeps(t, dir, "\n", PickedDeployment{}, "")
 	require.Error(t, execute(t, d, "link", "remove"))
-	assertPickerTable(t, run.out.String(), "Select a link to remove",
+	assertPickerTable(t, run.errOut.String(), "Select a link to remove",
 		`1\s+aws\s+mwaa\s+orders-prod`, `3\s+oss\s+endpoint\s+https://airflow.example.com`)
 }
 

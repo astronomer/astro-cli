@@ -118,10 +118,12 @@ open the browser. To log in again anyway, run `astro login --force`.
 
 Some shells do not give the CLI a terminal, for example a coding agent's
 shell. There, `astro login` cannot open the browser. It prints a link instead.
-Open the link and sign in there.
+Open the link and sign in there. The same holds when `CI` is set or you pass `--non-interactive`: `astro login`
+is not refused there, it prints the link and waits.
 
-If the CLI has no saved account for the domain, it opens the sign-up screen.
-Create your account there. If you already have an account, log in from the same
+If the CLI has no saved account for the domain, it opens the sign-up screen
+(in a shell with no terminal or in CI it opens the sign-in screen; pass
+`--signup` to open sign-up there). Create your account there. If you already have an account, log in from the same
 page, or run `astro login --signin` to open the sign-in screen directly.
 
 After you sign up, Astro sends you a verification email, so the command stops

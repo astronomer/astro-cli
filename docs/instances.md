@@ -29,7 +29,7 @@ The first of these that names something wins:
 With nothing resolved:
 
 - a project with no links fails (`ErrNone`);
-- a project with several links and no default fails, telling you to pick with `-d`, `ASTRO_DEPLOYMENT` or `astro use`. An interactive run without `--output json` asks once instead, and saves the answer as your selection.
+- a project with several links and no default fails, telling you to pick with `-d`, `ASTRO_DEPLOYMENT` or `astro use`. A run at a terminal that is not in CI and passes neither `--non-interactive` nor `--output json` asks once instead, and saves the answer as your selection.
 
 Both errors add `For this machine: astro local af <family>`. Every run prints the target it resolved on stderr, as `→ name (kind where)`.
 
@@ -46,13 +46,13 @@ Inside a project, a name that matches neither a link nor a Deployment is most li
 
 ## `astro use`
 
-`astro use NAME` makes a link your selection for this project. It checks the name against the manifest's links, and warns when `ASTRO_DEPLOYMENT` is set and will override it. `astro use --unset` clears it. Bare `astro use` opens a picker at a terminal (with an option to clear the selection). Off a terminal, or with `--output json`, it reports the link commands act on now (`current`, the name) and what made it so (`from`: `env`, `selection` or `default`), then each link as a row: `name`, `kind`, `where`, `url`, `auth_method`, and two booleans, `current` (this row is the one) and `default` (this row is the project's default link). Both mark rows in the words the `astro link` pickers and the deploy prompt use: `default` on the project's default link, `from ASTRO_DEPLOYMENT` on a row the variable made current, and `default, from ASTRO_DEPLOYMENT` when both fall on one row. Your own selection carries no label; the highlight (or `*`) says it.
+`astro use NAME` makes a link your selection for this project. It checks the name against the manifest's links, and warns when `ASTRO_DEPLOYMENT` is set and will override it. `astro use --unset` clears it. Bare `astro use` opens a picker when stdin and stdout are terminals and the run may ask (with an option to clear the selection). Otherwise, or with `--output json`, it reports the link commands act on now (`current`, the name) and what made it so (`from`: `env`, `selection` or `default`), then each link as a row: `name`, `kind`, `where`, `url`, `auth_method`, and two booleans, `current` (this row is the one) and `default` (this row is the project's default link). Both mark rows in the words the `astro link` pickers and the deploy prompt use: `default` on the project's default link, `from ASTRO_DEPLOYMENT` on a row the variable made current, and `default, from ASTRO_DEPLOYMENT` when both fall on one row. Your own selection carries no label; the highlight (or `*`) says it.
 
 The selection is per user and per project, never committed: `state.json` in the project's cache directory (`$XDG_CACHE_HOME/astro/projects/<project id>/`, else `~/.cache/astro/…`), mode `0600`. The field is `instance`; `deployment` is also read and written, for compatibility with pre-release builds.
 
 ## Deploy always asks
 
-`astro deploy` never resolves from ambient state. Shipping code is too consequential to decide from a selection, an exported variable or a marker in a file nobody looked at. The target is named on the command line, or an interactive run asks. Only `default = true` (or a project's only link) preselects the entry in that prompt. `ASTRO_DEPLOYMENT` and your selection play no part in it: they choose which Airflow the query commands read, and where code ships is the project's, so the CLI and Astro Desktop highlight the same entry. A run that cannot be asked and names nothing fails. The one exception is a credential that can only reach one Deployment: under an `ASTRO_API_TOKEN` scoped to a single Deployment, a deploy that names nothing ships to that Deployment and says so on stderr. Details are in [deploy.md](deploy.md#3-selecting-the-deployment).
+`astro deploy` never resolves from ambient state. Shipping code is too consequential to decide from a selection, an exported variable or a marker in a file nobody looked at. The target is named on the command line, or a run that may ask is asked. Only `default = true` (or a project's only link) preselects the entry in that prompt. `ASTRO_DEPLOYMENT` and your selection play no part in it: they choose which Airflow the query commands read, and where code ships is the project's, so the CLI and Astro Desktop highlight the same entry. A run that cannot be asked (no terminal, CI, `--non-interactive` or `--output json`) and names nothing fails. The one exception is a credential that can only reach one Deployment: under an `ASTRO_API_TOKEN` scoped to a single Deployment, a deploy that names nothing ships to that Deployment and says so on stderr. Details are in [deploy.md](deploy.md#3-selecting-the-deployment).
 
 ## Link kinds and authentication
 

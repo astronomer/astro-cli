@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -23,6 +24,7 @@ func promptTree(answered *string) *cobra.Command {
 	var force bool
 	root := &cobra.Command{Use: "astro"}
 	AddOutputFlag(root, &output)
+	input.AddFlag(root.PersistentFlags())
 	del := &cobra.Command{
 		Use: "delete",
 		RunE: func(*cobra.Command, []string) error {
@@ -230,4 +232,120 @@ func TestAbortedKind(t *testing.T) {
 	assert.Equal(t, KindAborted, testKinds.Of(errors.Join(errBoom, input.ErrAborted)), "it wins over a table's row")
 	assert.Equal(t, ExitFailure, ExitCode(context.Background(), declined))
 	assert.Equal(t, KindInputRequired, testKinds.Of(input.Required(fmt.Errorf("asked: %w", input.ErrAborted))))
+}
+
+// What answers a shared picker is per command and per run: a hint one Execute
+// run set is gone in the next, in the same process.
+func TestHintsDoNotOutliveTheRun(t *testing.T) {
+	t.Cleanup(input.ClearHints)
+	hinted := &cobra.Command{
+		Use: "hint",
+		RunE: func(*cobra.Command, []string) error {
+			input.HintAnswer("a thing", "--thing")
+			assert.Equal(t, "--thing", input.ApplyHint(&input.RequiredError{About: "a thing"}).Flag)
+			return nil
+		},
+	}
+	var seen string
+	plain := &cobra.Command{
+		Use: "plain",
+		RunE: func(*cobra.Command, []string) error {
+			seen = input.ApplyHint(&input.RequiredError{About: "a thing"}).Flag
+			return nil
+		},
+	}
+	root := &cobra.Command{Use: "astro"}
+	root.AddCommand(hinted, plain)
+
+	require.NoError(t, execTree(context.Background(), root, "hint").err)
+	assert.Empty(t, input.ApplyHint(&input.RequiredError{About: "a thing"}).Flag, "cleared when the run ended")
+
+	input.HintAnswer("a thing", "--leaked")
+	require.NoError(t, execTree(context.Background(), root, "plain").err)
+	assert.Empty(t, seen, "cleared when the next run began")
+}
+
+// writtenToStderr is what f wrote to the process's stderr, where the pkg/input
+// prompts write their questions.
+func writtenToStderr(t *testing.T, f func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	saved := os.Stderr
+	os.Stderr = w
+	defer func() { os.Stderr = saved }()
+	f()
+	require.NoError(t, w.Close())
+	b, err := io.ReadAll(r)
+	require.NoError(t, err)
+	return string(b)
+}
+
+// The run's interaction mode is resolved once, by Execute: json, a truthy CI
+// or --non-interactive refuse every question before it is written or read,
+// naming the flag that answers it; --non-interactive=false asks despite CI,
+// but never under json; any other run asks.
+func TestTheInteractionModeIsResolvedOnce(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		ci     string
+		args   []string
+		refuse string // the reason the refusal gives; "" when the run asks
+		// noStdin and noStderr: that stream is not a terminal.
+		noStdin, noStderr bool
+	}{
+		{"nothing set asks, at a terminal", "", []string{"delete"}, "", false, false},
+		{"stdin a pipe", "", []string{"delete"}, "stdin is not a terminal", true, false},
+		{"stderr not a terminal", "", []string{"delete"}, "stderr is not a terminal", false, true},
+		{"stdin a pipe, --non-interactive=false still refuses", "", []string{"delete", "--non-interactive=false"}, "stdin is not a terminal", true, false},
+		{"stderr not a terminal, CI=true and --non-interactive=false still refuses", "true", []string{"delete", "--non-interactive=false"}, "stderr is not a terminal", false, true},
+		{"CI=true", "true", []string{"delete"}, "with CI set it cannot", false, false},
+		{"CI=1", "1", []string{"delete"}, "with CI set it cannot", false, false},
+		{"CI=false asks", "false", []string{"delete"}, "", false, false},
+		{"CI=0 asks", "0", []string{"delete"}, "", false, false},
+		{"--non-interactive", "", []string{"delete", "--non-interactive"}, "with --non-interactive it cannot", false, false},
+		{"--non-interactive before the command", "", []string{"--non-interactive", "delete"}, "with --non-interactive it cannot", false, false},
+		{"--non-interactive=false with CI asks", "true", []string{"delete", "--non-interactive=false"}, "", false, false},
+		{"-o json with --non-interactive=false refuses", "", []string{"delete", "-o", "json", "--non-interactive=false"}, "with --output json it cannot", false, false},
+		{"-o json with CI=false refuses", "false", []string{"delete", "-o", "json"}, "with --output json it cannot", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("CI", tc.ci)
+			defer input.SetTerminals(!tc.noStdin, !tc.noStderr)()
+			unread := stdinHolding(t, "y\n")
+			answered := ""
+			var r run
+			asked := writtenToStderr(t, func() {
+				r = execTree(context.Background(), promptTree(&answered), tc.args...)
+			})
+
+			if tc.refuse == "" {
+				require.NoError(t, r.err)
+				assert.Equal(t, "true", answered)
+				assert.Contains(t, asked, "Delete prod? (y/n) ")
+				return
+			}
+			require.Error(t, r.err)
+			assert.True(t, input.IsRequired(r.err), "%v", r.err)
+			assert.Equal(t, KindInputRequired, testKinds.Of(r.err))
+			assert.Contains(t, r.err.Error(), tc.refuse)
+			assert.Contains(t, r.err.Error(), "pass --force")
+			assert.Empty(t, asked, "the question was written")
+			assert.Empty(t, answered)
+			assert.True(t, unread(), "the answer was read")
+		})
+	}
+}
+
+// A command line that resolves to no command is still guarded by the
+// environment's part of the rule, so nothing that runs under it can ask in CI.
+func TestTheGuardAppliesWhenNoCommandResolves(t *testing.T) {
+	answered := ""
+	root := promptTree(&answered)
+	require.Nil(t, findTarget(root, []string{"nonesuch"}), "the line resolves to no command")
+
+	t.Setenv("CI", "true")
+	assert.Equal(t, "with CI set it cannot", refuseToAsk(root, []string{"nonesuch"})())
+	t.Setenv("CI", "")
+	assert.Empty(t, refuseToAsk(root, []string{"nonesuch"})())
 }

@@ -21,7 +21,6 @@ import (
 
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
-	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -52,7 +51,6 @@ var (
 	httpClient          = httputil.NewHTTPClient()
 	openURL             = browser.OpenURL
 	refreshAccessToken  = astroauth.RefreshToken
-	stdinIsTerminal     = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
 	exitOnInterrupt     = os.Exit
 	ErrorNoOrganization = errors.New("no organization found. Please contact your Astro Organization Owner to be invited to the organization")
 	errEmailNotFound    = errors.New("cannot retrieve email")
@@ -299,9 +297,11 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	stopWatching := quitOnInterrupt()
 	defer stopWatching()
 
-	// A run without a terminal — a coding agent's shell, CI — never answers the
-	// prompt below, so it takes the login-link path instead of blocking on stdin.
-	if !shouldDisplayLoginLink && stdinIsTerminal() {
+	// A run that may not ask (CI, --non-interactive, no terminal on stdin or
+	// stderr: a coding agent's shell, `astro login </dev/null`) never answers the
+	// Press Enter gate below, so it takes the login-link path: it prints the link
+	// and waits for the browser's callback instead of blocking on stdin.
+	if !shouldDisplayLoginLink && input.CanAsk() {
 		action := "log in"
 		if signup {
 			action = "create your Astro account"
@@ -348,6 +348,12 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 // one interrupted, is refused instead, since that is neither answer.
 func askToCreateOrganization(domain string, out io.Writer) (bool, error) {
 	create, err := input.Confirm(noOrganizationPrompt(domain, out), input.AnsweredBy("--signup to astro login"))
+	if input.IsRequired(err) {
+		// Nobody could answer. The answer is not a flag of this login: the
+		// account needs an organization, which it gets in the Astro UI or from
+		// an invitation.
+		return false, input.Required(errors.New("this login has no organization, and this run cannot ask whether to create one. Create or join an Organization in the Astro UI, or ask an Organization Owner to invite you, then log in again"))
+	}
 	if input.Unanswered(err) {
 		return false, err
 	}
@@ -609,6 +615,19 @@ func shouldSignup(getContext func(domain string) (config.Context, error), domain
 // signup or a token asks for a new login, it first tries the login already
 // saved for domain and opens the browser only when that login no longer works.
 func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
+	return login(domain, token, astroV1Client, out, shouldDisplayLoginLink, signup, force, false)
+}
+
+// LoginCommand is Login for a person who ran astro login (or astro auth
+// login): it works in a run that may not ask (CI, --non-interactive), where it
+// prints the login link and waits for the browser's callback, since running the
+// command is the consent to log in. Login is for a login another command starts
+// because it found none, and that one is refused in such a run.
+func LoginCommand(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
+	return login(domain, token, astroV1Client, out, shouldDisplayLoginLink, signup, force, true)
+}
+
+func login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force, explicit bool) error {
 	domain = domainutil.FormatDomain(domain)
 	authConfig, err := FetchDomainAuthConfig(domain)
 	if err != nil {
@@ -624,14 +643,15 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 		}
 	}
 
-	// A browser login asks on stderr and then waits: on Enter at a terminal,
-	// on the browser's callback otherwise. A run that may not ask can do
-	// neither, so it is refused before anything is printed.
-	if token == "" {
+	// A browser login another command starts asks on stderr and then waits: on
+	// Enter at a terminal, on the browser's callback otherwise. A run that may
+	// not ask is refused before anything is printed. An explicit astro login is
+	// not asked anything: it prints the link and waits for the callback.
+	if token == "" && !explicit {
 		var refused *input.RequiredError
 		switch err := input.MayAsk("Log in to Astro"); {
 		case errors.As(err, &refused):
-			return fmt.Errorf("%w; %s — run astro login first, or set ASTRO_API_TOKEN", ErrLoginNeeded, refused.Reason)
+			return fmt.Errorf("%w; %s — set ASTRO_API_TOKEN (astro login prints a link for a person to open, and waits for it)", ErrLoginNeeded, refused.Reason)
 		case errors.Is(err, input.ErrInterrupted):
 			// An interrupted run starts no login: it is ending.
 			return err

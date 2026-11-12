@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houstonMocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // Houston's own words when public sign-ups are off, the default.
@@ -38,15 +39,18 @@ func (s *Suite) TestCreateSuccess() {
 	houstonMock.AssertExpectations(s.T())
 }
 
-// With neither given and nothing on stdin, the prompts read empty answers,
-// as they always have.
+// With no password given, the prompt asks for a hidden answer, which is never
+// read from a stdin that is not a terminal: input_required naming --password,
+// and no user is created.
 func (s *Suite) TestCreatePrompted() {
+	defer input.SetTerminals(false, true)()
+	defer input.SetGuard(func() string { return input.Refusal(false, nil) })()
 	houstonMock := new(houstonMocks.ClientInterface)
-	houstonMock.On("CreateUser", mock.Anything).Return(created("pending"), nil)
 
-	got, err := Create("", "", houstonMock)
-	s.NoError(err)
-	s.Equal("pending", got.Status)
+	_, err := Create("someone@example.com", "", houstonMock)
+	s.True(input.IsRequired(err), "%v", err)
+	s.Contains(err.Error(), "--password")
+	houstonMock.AssertNotCalled(s.T(), "CreateUser", mock.Anything)
 }
 
 // The failure is Houston's, as it gave it. It used to be "user creation is
