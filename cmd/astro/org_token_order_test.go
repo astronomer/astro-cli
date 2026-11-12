@@ -128,13 +128,14 @@ func TestMissingWorkspaceIsSaidBeforeAQuestionThatCannotBeAsked(t *testing.T) {
 		"guard":       func() func() { return input.SetGuard(func() string { return "this run cannot ask" }) },
 	}
 	for mode, set := range modes {
-		restore := set()
-		for name, run := range commands {
-			err := run()
-			require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace, mode+": "+name)
-			assert.False(t, input.IsRequired(err), "%s (%s) fails on its question, not on the Workspace", name, mode)
-		}
-		restore()
+		t.Run(mode, func(t *testing.T) {
+			t.Cleanup(set())
+			for name, run := range commands {
+				err := run()
+				require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace, name)
+				assert.False(t, input.IsRequired(err), "%s fails on its question, not on the Workspace", name)
+			}
+		})
 	}
 }
 

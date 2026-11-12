@@ -177,6 +177,15 @@ func Workspace(domain string) string {
 		}
 		return ctx.Workspace
 	}
+	// An API token is the login on any host (astrosession.BearerFor), and names
+	// a workspace only on the host of the current context, where checkAPIToken
+	// recorded it. The workspace another host's saved login last used is not
+	// one this run chose.
+	if astrosession.HasAPIToken() {
+		if current, err := config.GetCurrentDomain(); err != nil || !strings.EqualFold(strings.ReplaceAll(current, "_", "."), strings.ReplaceAll(domain, "_", ".")) {
+			return ""
+		}
+	}
 	c := config.Context{Domain: domain}
 	ctx, err := c.GetContext()
 	if err != nil {

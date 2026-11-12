@@ -187,6 +187,7 @@ func TestFillPlaceholders(t *testing.T) {
 	})
 
 	t.Run("error when workspaceId missing", func(t *testing.T) {
+		t.Setenv("ASTRO_API_TOKEN", "") // a token run gets another message
 		emptyCtx := &config.Context{}
 		_, err := fillPlaceholders("/workspaces/{workspaceId}", emptyCtx)
 		require.Error(t, err)

@@ -154,7 +154,13 @@ func UpdateToken(id, name, newName, description, role, workspaceID string, pick 
 			return apitoken.Update{}, err
 		}
 	}
-	workspaceID, organizationID, err := Target(workspaceID)
+	// A rename by ID reads no Workspace; a role change does, and a lookup by
+	// name (FindToken) asks for one itself.
+	resolve := Scope
+	if role != "" {
+		resolve = Target
+	}
+	workspaceID, organizationID, err := resolve(workspaceID)
 	if err != nil {
 		return apitoken.Update{}, err
 	}

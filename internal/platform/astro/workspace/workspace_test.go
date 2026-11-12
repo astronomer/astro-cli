@@ -346,6 +346,7 @@ func (s *Suite) TestSwitch() {
 }
 
 func (s *Suite) TestGetCurrentWorkspace() {
+	s.T().Setenv("ASTRO_API_TOKEN", "") // a token run gets another message
 	resp, err := GetCurrentWorkspace()
 	s.NoError(err)
 	s.Equal(resp, "ck05r3bor07h40d02y2hw4n4v")

@@ -64,7 +64,7 @@ func envScope() (env.Scope, error) {
 	if envWorkspaceID == "" && envDeploymentID == "" {
 		ws, err := coalesceWorkspace()
 		if err != nil {
-			return env.Scope{}, fmt.Errorf("%w (and falling back to workspace context: %s)", env.ErrScopeNotSpecified, err.Error())
+			return env.Scope{}, fmt.Errorf("%w (and falling back to workspace context: %w)", env.ErrScopeNotSpecified, err)
 		}
 		return env.Scope{WorkspaceID: ws}, nil
 	}
