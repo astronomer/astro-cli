@@ -703,9 +703,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		createTriggererReplicas = -1
 	}
 
-	// If it's a dag_deploy type, validate from the user first. That type is
-	// one validateDagDeploymentArgs always accepts, so nothing below can
-	// refuse the line after a yes.
+	// If it's a dag_deploy type, confirm it with the person first.
 	if dagDeploymentType == houston.DagOnlyDeploymentType {
 		if err := confirm(CreateDeploymentWithTypeDagDeployPromptMsg); err != nil {
 			return err
@@ -942,8 +940,9 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 
 // confirmDagDeploymentTypeChange asks before an update moves a deployment onto
 // or off dag_deploy. A no is input.ErrAborted, and nothing is changed. Any
-// other change, including one that names no type, needs no answer.
-func confirmDagDeploymentTypeChange(current, next string) error {
+// other change, including one that names no type, needs no answer. precheck
+// runs before the question, and only when one is to be asked.
+func confirmDagDeploymentTypeChange(current, next string, precheck func() error) error {
 	var prompt string
 	switch {
 	case current != houston.DagOnlyDeploymentType && next == houston.DagOnlyDeploymentType:
@@ -952,6 +951,12 @@ func confirmDagDeploymentTypeChange(current, next string) error {
 		prompt = UpdateDeploymentTypeFromDagDeployPromptMsg
 	default:
 		return nil
+	}
+	if skipPrompt {
+		return nil
+	}
+	if err := precheck(); err != nil {
+		return err
 	}
 	return confirm(prompt)
 }
@@ -1008,15 +1013,14 @@ func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string,
 		}
 	}
 
-	// The files and the repository the flags name are read before the
-	// question too: a line that cannot be sent asks nothing.
-	if err := deployment.CheckDagDeploymentArgs(dagDeploymentType, sshKey, knowHosts, gitRepoURL); err != nil {
-		return err
-	}
-
 	// Moving onto or off dag_deploy is confirmed with the person first, once
-	// what was asked for is known to be valid.
-	if err := confirmDagDeploymentTypeChange(deploymentInfo.DagDeployment.Type, dagDeploymentType); err != nil {
+	// what was asked for is known to be valid. When a question is going to be
+	// asked, the files and the repository the flags name are read first too,
+	// so a line that cannot be sent asks nothing; a run that asks nothing
+	// reads them once, in the update.
+	if err := confirmDagDeploymentTypeChange(deploymentInfo.DagDeployment.Type, dagDeploymentType, func() error {
+		return deployment.CheckDagDeploymentArgs(dagDeploymentType, sshKey, knowHosts, gitRepoURL)
+	}); err != nil {
 		return err
 	}
 
