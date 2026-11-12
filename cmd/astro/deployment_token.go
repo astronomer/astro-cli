@@ -6,6 +6,7 @@ package astro
 // helpers the three token families share (api_token_render.go).
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -134,6 +136,15 @@ func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, ki
 			orgTokenID = strings.ToLower(args[0])
 		}
 	}
+	// An add reads the Workspace its token is found in, so a run with none
+	// fails before it asks for a role.
+	ws := ""
+	if kind == tokenKindWorkspace && operation == tokenRoleAdd {
+		var err error
+		if ws, err = workspaceTokenWorkspace(); err != nil {
+			return err
+		}
+	}
 	if tokenRole == "" {
 		prompt := "Enter a role for the API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): "
 		if operation == tokenRoleUpdate {
@@ -146,14 +157,14 @@ func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, ki
 		tokenRole = answer
 	}
 	cmd.SilenceUsage = true
-	return runDeploymentTokenUpsert(deploymentTokenOutput, out, kind, operation)
+	return runDeploymentTokenUpsert(deploymentTokenOutput, out, kind, operation, ws)
 }
 
 // runDeploymentTokenUpsert adds or updates the Deployment role of a Workspace
 // or Organization token. An add picks among the Workspace's or the
 // Organization's tokens, with that family's picker; an update among the
 // Deployment's.
-func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operation string) error {
+func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operation, ws string) error {
 	var (
 		token apitoken.Token
 		err   error
@@ -161,12 +172,9 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 	if kind == tokenKindWorkspace {
 		// An update finds the token among the Deployment's, so only an add
 		// reads a workspace.
-		pick, ws := deploymentTokenPicker("--workspace-token-name"), ""
+		pick := deploymentTokenPicker("--workspace-token-name")
 		if operation == tokenRoleAdd {
 			pick = workspaceTokenPicker("--workspace-token-name", "Please select the Workspace API token you would like to add to the Deployment:")
-			if ws, err = workspaceTokenWorkspace(); err != nil {
-				return err
-			}
 		}
 		token, err = deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, tokenRole, ws, deploymentID, operation, pick, astroV1Client)
 	} else {
@@ -189,6 +197,9 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 // Organization token's, can still name one.
 func workspaceTokenWorkspace() (string, error) {
 	ws, err := coalesceWorkspace()
+	if errors.Is(err, astrosession.ErrOrgTokenNoWorkspace) && workspaceTokenID == "" {
+		return "", astrosession.NoWorkspaceHint(nil, astrosession.HintFlagOrTokenID)
+	}
 	if err != nil && workspaceTokenID == "" {
 		return "", fmt.Errorf("failed to find a valid workspace to find the Workspace token in; pass --workspace, or the token's ID: %w", err)
 	}

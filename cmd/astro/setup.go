@@ -593,10 +593,11 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 		return false, err
 	}
 
-	if wsID == "" {
-		wsID = c.Workspace
-	}
-
+	// A token with no workspaceId claim, an Organization token, selects no
+	// workspace, and the run has none unless a flag or the project's link names
+	// one. The workspace the interactive login last used is a selection nobody
+	// made in this run, so it is not inherited (the empty value below hides it,
+	// for this process only).
 	useEnvironmentSelection(&c, orgID, orgProduct, wsID)
 	// A Deployment-scoped token can act on one Deployment, so a run that names
 	// none acts on it. For this process only, like the selection above, and
@@ -654,9 +655,6 @@ func useEnvironmentLogin(domain string, current bool, token string, expiresAt ti
 	return c.GetContext()
 }
 
-// useEnvironmentSelection records the organization and workspace the
-// environment's credential is for, for this process only, as the credential
-// itself is.
 // environmentOrganization looks up the organization the credentials in the
 // environment belong to, and its product. The product cannot be skipped: it is
 // what tells a hosted organization from a hybrid one (organization.IsOrgHosted),
@@ -677,6 +675,9 @@ func environmentOrganization(astroV1Client astrov1.APIClient) (orgID, orgProduct
 	return orgs[0].Id, string(*orgs[0].Product), nil
 }
 
+// useEnvironmentSelection records the organization and workspace the
+// environment's credential is for, for this process only, as the credential
+// itself is. An empty wsID is recorded as empty, which hides the saved one.
 func useEnvironmentSelection(c *config.Context, orgID, orgProduct, wsID string) {
 	if err := c.SetEnvironmentContextKey("workspace", wsID); err != nil {
 		fmt.Fprintln(os.Stderr, "no workspace set")

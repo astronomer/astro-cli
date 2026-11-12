@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -47,7 +48,7 @@ func GetCurrentWorkspace() (string, error) {
 	}
 
 	if c.Workspace == "" {
-		return "", errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+		return "", astrosession.NoWorkspace(errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID"))
 	}
 
 	return c.Workspace, nil

@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
@@ -303,6 +304,9 @@ func AddWorkspaceUser(email, role, workspaceID string, client astrov1.APIClient)
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
 	}
+	if workspaceID == "" {
+		return UserInfo{}, astrosession.NoWorkspace(nil)
+	}
 	users, err := GetOrgUsers(client)
 	if err != nil {
 		return UserInfo{}, err
@@ -324,6 +328,9 @@ func UpdateWorkspaceUserRole(email, role, workspaceID string, client astrov1.API
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
+	}
+	if workspaceID == "" {
+		return UserInfo{}, astrosession.NoWorkspace(nil)
 	}
 	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
 	if err != nil {
@@ -397,6 +404,9 @@ func GetWorkspaceUsers(client astrov1.APIClient, workspaceID string, _ int) ([]a
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
 	}
+	if workspaceID == "" {
+		return nil, astrosession.NoWorkspace(nil)
+	}
 	wsID := workspaceID
 	return listUsers(client, &wsID, nil)
 }
@@ -411,6 +421,9 @@ func RemoveWorkspaceUser(email, workspaceID string, client astrov1.APIClient) (W
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
+	}
+	if workspaceID == "" {
+		return WorkspaceRemoval{}, astrosession.NoWorkspace(nil)
 	}
 	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
 	if err != nil {
@@ -634,6 +647,9 @@ func ListWorkspaceUsersData(client astrov1.APIClient, workspaceID string) (*User
 			return nil, err
 		}
 		workspaceID = ctx.Workspace
+		if workspaceID == "" {
+			return nil, astrosession.NoWorkspace(nil)
+		}
 	}
 	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
 	if err != nil {

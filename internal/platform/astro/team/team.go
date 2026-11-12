@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -196,6 +197,9 @@ func UpdateWorkspaceTeamRole(id, role, workspaceID string, client astrov1.APICli
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
 	}
+	if workspaceID == "" {
+		return TeamInfo{}, astrosession.NoWorkspace(nil)
+	}
 
 	var team astrov1.Team
 	if id == "" {
@@ -361,6 +365,9 @@ func RemoveWorkspaceTeam(id, workspaceID string, client astrov1.APIClient) (Work
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
 	}
+	if workspaceID == "" {
+		return WorkspaceRemoval{}, astrosession.NoWorkspace(nil)
+	}
 
 	var team astrov1.Team
 	if id == "" {
@@ -452,6 +459,9 @@ func GetWorkspaceTeams(client astrov1.APIClient, workspaceID string, _ int) ([]a
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
 	}
+	if workspaceID == "" {
+		return nil, astrosession.NoWorkspace(nil)
+	}
 	wsID := workspaceID
 	return listTeams(client, &wsID, nil)
 }
@@ -470,6 +480,9 @@ func AddWorkspaceTeam(id, role, workspaceID string, client astrov1.APIClient) (T
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
+	}
+	if workspaceID == "" {
+		return TeamInfo{}, astrosession.NoWorkspace(nil)
 	}
 	var team astrov1.Team
 	if id == "" {
@@ -1030,6 +1043,9 @@ func ListWorkspaceTeamsData(client astrov1.APIClient, workspaceID string) (*Team
 			return nil, err
 		}
 		workspaceID = ctx.Workspace
+		if workspaceID == "" {
+			return nil, astrosession.NoWorkspace(nil)
+		}
 	}
 	teams, err := GetWorkspaceTeams(client, workspaceID, teamPaginationLimit)
 	if err != nil {

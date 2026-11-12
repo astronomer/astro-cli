@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -795,7 +796,11 @@ func namedTarget(req Request, name string, links map[string]manifest.Link) (Targ
 func unlinkedTarget(req Request, d Deployer) (Target, error) {
 	workspaceID := listWorkspace(req)
 	if workspaceID == "" {
-		return Target{}, errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
+		err := errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
+		if req.platform() == manifest.KindAstro {
+			err = astrosession.NoWorkspaceHint(err, astrosession.HintFlagOrProject)
+		}
+		return Target{}, err
 	}
 	if !req.Interactive {
 		if req.Manifest == nil {

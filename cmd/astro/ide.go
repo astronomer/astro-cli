@@ -9,6 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/ide"
 )
 
@@ -171,7 +172,9 @@ func validateWorkspaceAndOrgID(ctx *config.Context) (orgID, wsID string, err err
 
 	wsID = ctx.Workspace
 	if wsID == "" {
-		return "", "", errors.New("no workspace ID provided and no workspace set in context. Please set context or provide workspace ID")
+		return "", "", astrosession.NoWorkspaceHint(
+			errors.New("no workspace ID provided and no workspace set in context. Please set context or provide workspace ID"),
+			astrosession.HintCurrent)
 	}
 
 	return orgID, wsID, nil
