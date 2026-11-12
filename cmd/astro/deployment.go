@@ -152,12 +152,13 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentBundleRootCmd(out),
 		newDeploymentHibernateCmd(out),
 		newDeploymentWakeUpCmd(out),
+		newDeploymentOpenCmd(out),
 	)
 	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	cmd.AddCommand(newRemovedDeploymentObjectCmds()...)
 	for _, c := range cmd.Commands() {
 		switch c.Name() {
-		case "inspect", "logs", "update", "delete", "hibernate", "wake-up":
+		case "inspect", "logs", "update", "delete", "hibernate", "wake-up", "open":
 			if c.Annotations == nil {
 				c.Annotations = map[string]string{}
 			}
@@ -755,6 +756,29 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "open [DEPLOYMENT_ID]",
+		Short: "Open a Deployment's Airflow UI in your browser",
+		Long:  "Open the Airflow UI of an Astro Deployment in your default browser. If the browser cannot be opened, the CLI prints the Airflow UI URL instead. Under --output json nothing is opened: the result carries the URL.",
+		Example: `  # Open a Deployment's Airflow UI
+  astro deployment open <DEPLOYMENT_ID>
+
+  # Open it by name
+  astro deployment open --deployment my-deployment
+
+  # Print its Airflow UI URL for a script
+  astro deployment open <DEPLOYMENT_ID> --output json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentOpen(cmd, args, out)
+		},
+	}
+	addDeploymentFlag(cmd.Flags(), "Deployment whose Airflow UI to open: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
+	addDeploymentWorkspaceFlag(cmd.Flags())
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
+	return cmd
+}
+
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// --all lists every workspace's, so it needs no workspace: an org-scoped
 	// token has none to find.
@@ -1061,6 +1085,29 @@ func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, 
 		return err
 	}
 	return emitVariableModify(cliout.Renderer{Format: deploymentVariableOutput, Out: out}, res)
+}
+
+// openDeploymentUI opens a Deployment's Airflow UI; tests replace it.
+var openDeploymentUI = deployment.OpenInBrowser
+
+func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
+	ws, err := coalesceWorkspace()
+	if err != nil {
+		return errors.Wrap(err, "failed to find a valid workspace")
+	}
+	if len(args) > 0 {
+		deploymentID = args[0]
+	}
+	cmd.SilenceUsage = true
+
+	res, err := deployment.UI(ws, deploymentID, deploymentName, astroV1Client)
+	if err != nil {
+		return err
+	}
+	// A person is shown the UI in a browser; a run under json reads its url
+	// from the result instead.
+	opened := deploymentOutput == cliout.FormatText && openDeploymentUI(res.URL)
+	return emitDeploymentUI(cliout.Renderer{Format: deploymentOutput, Out: out}, res, opened)
 }
 
 func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Writer, isHibernating bool) error {
