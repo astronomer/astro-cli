@@ -213,7 +213,7 @@ func (l *List) endedRequired() error {
 	for _, o := range l.Ask {
 		o(e)
 	}
-	return e
+	return input.ApplyHint(e)
 }
 
 // ErrNoChoices is what a List with nothing to choose from fails with, unless

@@ -96,18 +96,18 @@ func (s *Suite) TestBasicAuth() {
 			want:         mockToken,
 			errAssertion: assert.NoError,
 		},
+		// No password and no terminal to ask at (a go test's stdin is a pipe):
+		// refused as a question this run could not ask.
 		{
-			name:         "successfully authenticated without password",
-			args:         args{username: "test"},
-			want:         mockToken,
-			errAssertion: assert.NoError,
+			name: "no password and no terminal",
+			args: args{username: "test"},
+			errAssertion: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.True(t, input.IsRequired(err), "%v", err)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			// The password prompt reads its line from a stdin that is not a
-			// terminal: an empty one here.
-			defer testUtil.MockUserInput(s.T(), "\n")()
 			got, err := basicAuth(tt.args.username, tt.args.password, &config.Context{}, houstonMock)
 			if !tt.errAssertion(s.T(), err) {
 				return
@@ -780,12 +780,4 @@ func (s *Suite) TestGetAuthTokenFailure() {
 		return
 	}
 	houstonMock.AssertExpectations(s.T())
-}
-
-// A password asked of a stdin that ends is input_required, not the terminal
-// error of taking a pipe for a terminal, and no authentication is attempted.
-func (s *Suite) TestBasicAuthEndedStdinIsInputRequired() {
-	defer testUtil.MockUserInput(s.T(), "")()
-	_, err := basicAuth("test", "", &config.Context{}, new(houstonMocks.ClientInterface))
-	s.True(input.IsRequired(err), "%v", err)
 }

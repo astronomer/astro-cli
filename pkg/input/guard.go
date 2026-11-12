@@ -78,7 +78,7 @@ func MayAsk(prompt string, opts ...Option) error {
 	for _, o := range opts {
 		o(e)
 	}
-	return e
+	return ApplyHint(e)
 }
 
 // RequiredError is a question this run needed answered and could not ask. The

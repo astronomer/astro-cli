@@ -909,14 +909,29 @@ func TestDeleteDeploymentUser(t *testing.T) {
 }
 
 // The picker is shared by commands that take the user as an email argument and
-// by one that takes a flag, so at the end of its input it names neither: the
-// command's own refusal does, before it gets here. It must not name an option
-// that most of its commands do not have.
-func TestSelectUserEndedInputNamesNoOption(t *testing.T) {
-	defer testUtil.MockUserInput(t, "")()
-	_, err := SelectUser([]astrov1.User{{Id: "u1", Username: "a@example.com"}}, "organization", "")
-	require.Error(t, err)
-	assert.True(t, input.IsRequired(err), "%v", err)
-	assert.NotContains(t, err.Error(), "--user-id")
-	assert.Contains(t, err.Error(), "pass the answer as a flag")
+// by one that takes a flag, so it names no option of its own: the command says
+// what answers it (input.HintAnswer), and the refusal at the end of its input
+// names that, never an option the command lacks.
+func TestSelectUserEndedInputNamesWhatTheCommandSaid(t *testing.T) {
+	users := []astrov1.User{{Id: "u1", Username: "a@example.com"}}
+
+	t.Cleanup(input.ClearHints)
+	func() {
+		defer testUtil.MockUserInput(t, "")()
+		_, err := SelectUser(users, "organization", "")
+		require.Error(t, err)
+		assert.True(t, input.IsRequired(err), "%v", err)
+		assert.NotContains(t, err.Error(), "--user-id")
+		assert.Contains(t, err.Error(), "pass the answer as a flag", "nothing said what answers it")
+	}()
+
+	for _, answer := range []string{"the user's email as an argument", "--user-id"} {
+		input.HintAnswer("a user", answer)
+		func() {
+			defer testUtil.MockUserInput(t, "")()
+			_, err := SelectUser(users, "organization", "")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "pass "+answer)
+		}()
+	}
 }

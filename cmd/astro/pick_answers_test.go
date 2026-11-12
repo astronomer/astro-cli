@@ -6,8 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/pkg/input"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // A team or user picker refused for want of a way to ask names the option its
@@ -37,4 +40,31 @@ func TestTeamAndUserPickersNameTheOptionTheirCommandHas(t *testing.T) {
 			assert.NotContains(t, r.err.Error(), tc.notWant)
 		})
 	}
+}
+
+// At the end of its input (not in CI), the shared picker names what the
+// command that opened it said answers it: an email argument for a workspace
+// user command, flags for the organization team user commands.
+func TestEndedPickersNameTheOptionTheirCommandSaid(t *testing.T) {
+	t.Cleanup(input.ClearHints)
+	users := []astrov1.User{{Id: "u1", Username: "a@example.com"}}
+
+	require.NoError(t, mayPick("a user", userEmailAnswer))
+	func() {
+		defer testUtil.MockUserInput(t, "")()
+		_, err := user.SelectUser(users, "workspace", "ws")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "pass "+userEmailAnswer)
+		assert.NotContains(t, err.Error(), "--user-id")
+	}()
+
+	input.ClearHints()
+	require.NoError(t, mayPickTeamAndUser("a user"))
+	func() {
+		defer testUtil.MockUserInput(t, "")()
+		_, err := user.SelectUser(users, "organization", "")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "pass "+userIDFlag)
+		assert.NotContains(t, err.Error(), "as an argument")
+	}()
 }

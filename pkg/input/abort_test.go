@@ -75,10 +75,14 @@ func (s *Suite) TestTextEnded() {
 	s.Empty(got, "an empty line is an answer")
 }
 
-// A password asked of a stdin that ends names the flag that answers it.
-func (s *Suite) TestPasswordEndedNamesTheFlag() {
-	s.stdinHolding("")
+// A password asked of a stdin that is not a terminal names the flag that
+// answers it, and reads nothing.
+func (s *Suite) TestPasswordOnAPipeNamesTheFlag() {
+	s.stdinHolding("hunter2\n")
 	_, err := Password("Password: ", AnsweredBy("--password"))
 	s.True(IsRequired(err), "%v", err)
 	s.Contains(err.Error(), "pass --password")
+	left, readErr := io.ReadAll(os.Stdin)
+	s.Require().NoError(readErr)
+	s.Equal("hunter2\n", string(left), "the pipe was not read")
 }

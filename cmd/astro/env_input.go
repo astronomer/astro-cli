@@ -70,14 +70,6 @@ func readSetValue(cmd *cobra.Command, flagName, flagValue, prompt string) (strin
 	return v, nil
 }
 
-// confirmDelete asks prompt: nil for a yes (y or yes, in any case),
-// input.ErrAborted for any other answer. A run that may not ask (--output json,
-// CI, --non-interactive), and input that ends with no answer, return a
-// question this run could not ask, naming --yes, rather than an answer.
-func confirmDelete(prompt string) error {
-	return input.ConfirmOrAbort(prompt, input.AnsweredBy("--yes"))
-}
-
 // hasPipedStdin reports whether stdin appears to be a pipe rather than a TTY.
 // Used by opt-in secret prompts to distinguish "user piped a value" from
 // "user is at an interactive shell with no flag set".
@@ -214,7 +206,7 @@ func runEnvDelete(cmd *cobra.Command, out io.Writer, noun, idOrKey string, del f
 	cmd.SilenceUsage = true
 
 	if !envYes {
-		if err := confirmDelete(fmt.Sprintf("Delete %s %q?", noun, idOrKey)); err != nil {
+		if err := input.ConfirmOrAbort(fmt.Sprintf("Delete %s %q?", noun, idOrKey), input.AnsweredBy("--yes")); err != nil {
 			return err
 		}
 	}

@@ -128,25 +128,26 @@ func (s *Suite) TestPassword() {
 		want         string
 		errAssertion assert.ErrorAssertionFunc
 	}{
-		// A stdin that is not a terminal has no echo to turn off: the line is
-		// the answer.
+		// A hidden answer is never read from a stdin that is not a terminal,
+		// piped or ended: it would be echoed by whatever types at the far end,
+		// or taken from a pipe not meant as a password. It is input_required,
+		// not the terminal error of taking a pipe for a terminal.
 		{
-			name:         "a piped line",
-			inputString:  "hunter2\n",
-			args:         args{"enter pass"},
-			want:         "hunter2",
-			errAssertion: assert.NoError,
-		},
-		// Input that ends with nothing is nobody answering: input_required
-		// naming the flag, not the terminal error of taking a pipe for a
-		// terminal.
-		{
-			name:        "ended input",
-			inputString: "",
+			name:        "a pipe is refused, not read",
+			inputString: "hunter2\n",
 			args:        args{"enter pass"},
 			want:        "",
 			errAssertion: func(t assert.TestingT, err error, _ ...interface{}) bool {
 				return assert.True(t, IsRequired(err), "%v", err) && assert.NotContains(t, err.Error(), "ioctl")
+			},
+		},
+		{
+			name:        "ended input is refused too",
+			inputString: "",
+			args:        args{"enter pass"},
+			want:        "",
+			errAssertion: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.True(t, IsRequired(err), "%v", err)
 			},
 		},
 	}
