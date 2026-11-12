@@ -162,16 +162,34 @@ func Filter[T any](ss []T, test func(T) bool) (ret []T) {
 	return
 }
 
-// IsAstronomerRegistry checks if a given registry domain is one of the valid Astronomer registries
-func IsAstronomerRegistry(registry string) bool {
-	validRegistries := []string{
-		"images.astronomer.cloud",
-		"images.astronomer-dev.cloud",
-		"images.astronomer-stage.cloud",
-	}
+// astronomerRegistries are the registries that accept an Astro token.
+var astronomerRegistries = []string{
+	"images.astronomer.cloud",
+	"images.astronomer-dev.cloud",
+	"images.astronomer-stage.cloud",
+}
 
-	for _, validRegistry := range validRegistries {
+// IsAstronomerRegistry reports whether text (a Dockerfile, an image
+// reference) mentions one of the Astronomer registries anywhere. It is a hint
+// that a build pulls from one, not a check of where a credential may go; that
+// is IsAstronomerRegistryHost.
+func IsAstronomerRegistry(registry string) bool {
+	for _, validRegistry := range astronomerRegistries {
 		if strings.Contains(registry, validRegistry) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsAstronomerRegistryHost reports whether registry is exactly one of the
+// Astronomer registries (case aside, a trailing slash allowed), the only hosts
+// an Astro token is sent to on a registry login.
+// images.astronomer.cloud.example.com is someone else's host.
+func IsAstronomerRegistryHost(registry string) bool {
+	host := strings.TrimSuffix(strings.TrimSpace(registry), "/")
+	for _, validRegistry := range astronomerRegistries {
+		if strings.EqualFold(host, validRegistry) {
 			return true
 		}
 	}
