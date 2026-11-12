@@ -721,6 +721,7 @@ func TestRunExecsInScheduler(t *testing.T) {
 	cmd := &fakeCmd{}
 	e := testEngine(t, cmd)
 	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
 	af, name := startProject(t, e, p)
 	cmd.output = func(call string) ([]byte, error) {
 		if strings.Contains(call, workingDirLabel) {
@@ -729,9 +730,9 @@ func TestRunExecsInScheduler(t *testing.T) {
 		return nil, nil
 	}
 
-	// Through the loader, optional: an exec inherits only the container's
-	// configuration, which holds no secret values, and a project started with
-	// none has no file for the loader to read.
+	// A project started with the handoff: through the loader, optional, since
+	// an exec inherits only the container's configuration, which holds no
+	// secret values.
 	loader := strings.Join(withSecretEnv(false, nil), " ")
 	require.NoError(t, af.Run(context.Background(), []string{"airflow", "version"}, rt.Stdio{}))
 	assert.Equal(t, "docker compose -p "+name+" exec scheduler "+loader+" airflow version", cmd.calls[len(cmd.calls)-1])
@@ -1020,18 +1021,74 @@ func TestStartLabelsEachHandoffWithANewRevision(t *testing.T) {
 	assert.NotEqual(t, first, rev())
 }
 
-// A payload past what one environment variable can carry fails the start
-// before anything is created, with a message that names the limit rather than
-// an exec error on Linux hosts only.
-func TestStartRefusesSecretValuesPastTheLimit(t *testing.T) {
-	cmd := &fakeCmd{output: noProjects}
-	e := testEngine(t, cmd)
-	p := testPlan(t)
-	p.SecretEnv = map[string]string{"BIG": strings.Repeat("x", secretEnvMaxBytes)}
+// A payload past what one environment variable can carry on the host fails the
+// start before anything is created, with a message that names the limit
+// rather than a launch error. Windows holds far less in one variable than
+// Linux does, so a payload one host takes, the other refuses.
+func TestStartRefusesSecretValuesPastTheHostsLimit(t *testing.T) {
+	orig := hostGOOS
+	t.Cleanup(func() { hostGOOS = orig })
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		hostGOOS = goos
+		limit := secretEnvMaxBytes(goos)
 
-	_, err := e.Start(context.Background(), p, rt.Callbacks{})
-	require.ErrorContains(t, err, "more than the")
-	assert.False(t, hasCall(cmd.calls, " up "), "nothing may be created: %v", cmd.calls)
+		cmd := &fakeCmd{output: noProjects}
+		e := testEngine(t, cmd)
+		p := testPlan(t)
+		p.SecretEnv = map[string]string{"BIG": strings.Repeat("x", limit)}
+		_, err := e.Start(context.Background(), p, rt.Callbacks{})
+		require.ErrorContains(t, err, "more than the "+strconv.Itoa(limit), goos)
+		assert.False(t, hasCall(cmd.calls, " up "), "%s: nothing may be created: %v", goos, cmd.calls)
+
+		cmd = &fakeCmd{output: noProjects}
+		e = testEngine(t, cmd)
+		p = testPlan(t)
+		p.SecretEnv = map[string]string{"FITS": strings.Repeat("x", limit-64)}
+		_, err = e.Start(context.Background(), p, rt.Callbacks{})
+		require.NoError(t, err, "%s: a payload under the limit must start", goos)
+	}
+	assert.Less(t, secretEnvMaxBytes("windows"), 32767, "Windows holds at most 32,767 characters in one variable")
+	assert.Less(t, secretEnvMaxBytes("linux"), 128<<10, "Linux refuses one environment string past 128 KiB")
+}
+
+// An exec into a project started without secret values runs the command as
+// it is, with no python3 in front of it: that project has no reason to depend
+// on one.
+func TestRunWithoutTheHandoffRunsTheCommandAsIs(t *testing.T) {
+	cmd := &fakeCmd{}
+	e := testEngine(t, cmd)
+	af, name := startProject(t, e, testPlan(t))
+	cmd.output = func(call string) ([]byte, error) {
+		if strings.Contains(call, workingDirLabel) {
+			return []byte(name + "\n"), nil
+		}
+		return nil, nil
+	}
+
+	require.NoError(t, af.Run(context.Background(), []string{"airflow", "version"}, rt.Stdio{}))
+	assert.Equal(t, "docker compose -p "+name+" exec scheduler airflow version", cmd.calls[len(cmd.calls)-1])
+	require.NoError(t, af.Shell(context.Background(), rt.Stdio{}))
+	assert.Equal(t, "docker compose -p "+name+" exec scheduler /bin/bash", cmd.calls[len(cmd.calls)-1])
+}
+
+// Nor does a project whose compose could not take the secret, which got the
+// values as environment instead: an exec inherits those already.
+func TestRunAfterTheEnvFallbackRunsTheCommandAsIs(t *testing.T) {
+	cmd := &fakeCmd{}
+	e := testEngine(t, cmd)
+	e.composeAvail = func(context.Context, engineConn) (composeInfo, error) { return composeInfo{envSecrets: false}, nil }
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+	af, name := startProject(t, e, p)
+	cmd.output = func(call string) ([]byte, error) {
+		if strings.Contains(call, workingDirLabel) {
+			return []byte(name + "\n"), nil
+		}
+		return nil, nil
+	}
+
+	require.NoError(t, af.Run(context.Background(), []string{"airflow", "version"}, rt.Stdio{}))
+	assert.Equal(t, "docker compose -p "+name+" exec scheduler airflow version", cmd.calls[len(cmd.calls)-1])
 }
 
 // An override that replaces a service's command drops the loader with it, and

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"text/template"
@@ -426,12 +427,30 @@ const secretEnvLoader = "import json,os,sys;" +
 	"os.execvp(a[0],a)"
 
 // secretEnvMaxBytes caps the payload. It travels as one environment variable
-// on the compose process, and Linux refuses to exec a process carrying a
-// single environment string past 128 KiB (MAX_ARG_STRLEN), name included. The
-// cap sits under that with room for the name, so a payload too large fails
-// with a message naming the limit, on every host, rather than as an exec
-// error on Linux only.
-const secretEnvMaxBytes = 120 << 10
+// on the compose process, and each host bounds a single variable: Linux
+// refuses to exec a process carrying one environment string past 128 KiB
+// (MAX_ARG_STRLEN), name included, and Windows holds at most 32,767
+// characters in one variable. The cap sits under the host's limit with room
+// for the name, so a payload too large fails with a message naming the limit
+// rather than as a launch error. Bytes, not characters: a UTF-8 payload never
+// takes more UTF-16 units on Windows than it has bytes, so a byte cap is the
+// safe side of a character limit.
+func secretEnvMaxBytes(goos string) int {
+	if goos == goosWindows {
+		return secretEnvMaxBytesWindows
+	}
+	return secretEnvMaxBytesUnix
+}
+
+const (
+	goosWindows              = "windows"
+	secretEnvMaxBytesWindows = 30 << 10
+	secretEnvMaxBytesUnix    = 120 << 10
+)
+
+// hostGOOS is the platform the compose process runs on, which decides
+// secretEnvMaxBytes. A var so a test can stand in another host.
+var hostGOOS = runtime.GOOS
 
 // secretEnvRevBytes is how much randomness a start's handoff revision carries:
 // enough that two starts never share one.
@@ -498,6 +517,23 @@ func overrideReplacedCommands(projectPath string, names []string) []string {
 		}
 	}
 	return out
+}
+
+// composeFileDeclaresSecretEnv reports whether a generated compose file
+// declares the secret handoff. A file that cannot be read or parsed says no.
+func composeFileDeclaresSecretEnv(path string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var spec struct {
+		Secrets map[string]any `yaml:"secrets"`
+	}
+	if yaml.Unmarshal(b, &spec) != nil {
+		return false
+	}
+	_, ok := spec.Secrets[secretEnvName]
+	return ok
 }
 
 // withSecretEnv runs argv through secretEnvLoader.

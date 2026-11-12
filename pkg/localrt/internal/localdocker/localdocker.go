@@ -461,12 +461,12 @@ func (e *Engine) planHandoff(compose composeInfo, p rt.Plan, env []envVar, proje
 		}
 		h.upEnv = secretEnviron(values)
 		if cb.OnLine != nil {
-			cb.OnLine(rt.LogLine{Component: "system", Time: e.now(), Text: "this container engine's compose cannot pass secret values as a compose secret, so they reach the containers as environment, where `docker inspect` shows them; installing Docker Compose (docker-compose) avoids that"})
+			cb.OnLine(rt.LogLine{Component: "system", Time: e.now(), Text: "this container engine's compose cannot pass secret values as a compose secret, so they reach the containers as environment, where docker inspect shows them; installing Docker Compose (docker-compose) avoids that"})
 		}
 		return h, nil
 	}
-	if len(payload) > secretEnvMaxBytes {
-		return h, fmt.Errorf("this project's secret values come to %d bytes, more than the %d a local start can hand to Airflow (or a process environment can hold)", len(payload), secretEnvMaxBytes)
+	if limit := secretEnvMaxBytes(hostGOOS); len(payload) > limit {
+		return h, fmt.Errorf("this project's secret values come to %d bytes, more than the %d a local start can hand to Airflow on this platform (one environment variable carries them to compose)", len(payload), limit)
 	}
 	rev := make([]byte, secretEnvRevBytes)
 	if _, err := rand.Read(rev); err != nil {
@@ -1112,12 +1112,30 @@ func (a *airflow) exec(ctx context.Context, argv []string, s rt.Stdio) error {
 	if name == "" {
 		return errContainersDown
 	}
-	// Through the loader, so a command run here sees the secret values the
-	// services do: they are not in the container's configuration, which is all
-	// an exec inherits. Optional, because a project started with none has no
-	// file to read.
-	args := append([]string{"compose", "-p", name, "exec", execService}, withSecretEnv(false, argv)...)
+	// Through the loader when the project was started with the secret handoff,
+	// so a command run here sees the secret values the services do: they are
+	// not in the container's configuration, which is all an exec inherits.
+	// Only then: the loader needs python3 in the image, and a project with no
+	// secret values (or one whose compose fell back to environment) has no
+	// reason to depend on it. Optional all the same, so a file gone missing
+	// costs the values, not the command.
+	if a.startedWithSecretEnv() {
+		argv = withSecretEnv(false, argv)
+	}
+	args := append([]string{"compose", "-p", name, "exec", execService}, argv...)
 	return a.eng.cmd.Run(ctx, conn.env, s, conn.bin, args...)
+}
+
+// startedWithSecretEnv reports whether the running project was started with
+// the secret handoff, from the compose file that start wrote: the file is what
+// the containers were created from, so it says what they hold. A file that
+// cannot be read says no.
+func (a *airflow) startedWithSecretEnv() bool {
+	path := a.composeFilePath()
+	if path == "" {
+		return false
+	}
+	return composeFileDeclaresSecretEnv(path)
 }
 
 // composeFilePath returns the generated compose file's location, or "" when
