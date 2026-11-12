@@ -692,6 +692,32 @@ func TestSetupClientDependencyFiles(t *testing.T) {
 				strings.Contains(errorMsg, "failed to copy packages-client.txt"),
 			"error should mention one of the missing client files, got: %s", errorMsg)
 	})
+
+	// A requirements.txt or packages.txt the project symlinks elsewhere (a
+	// monorepo's shared file) is replaced in the build context, never written
+	// through: the file it points at keeps its content.
+	t.Run("replaces a symlinked regular file instead of writing through it", func(t *testing.T) {
+		buildDir := t.TempDir()
+		shared := filepath.Join(t.TempDir(), "shared-requirements.txt")
+		require.NoError(t, os.WriteFile(shared, []byte("shared==1.0\n"), 0o644))
+		if err := os.Symlink(shared, filepath.Join(buildDir, "requirements.txt")); err != nil {
+			t.Skipf("cannot create a symlink here: %v", err)
+		}
+		require.NoError(t, os.WriteFile(filepath.Join(buildDir, "requirements-client.txt"), []byte("numpy==1.21.0"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(buildDir, "packages-client.txt"), []byte("curl"), 0o644))
+
+		require.NoError(t, setupClientDependencyFiles(buildDir))
+
+		got, err := os.ReadFile(shared)
+		require.NoError(t, err)
+		assert.Equal(t, "shared==1.0\n", string(got), "the symlink's target was overwritten")
+		info, err := os.Lstat(filepath.Join(buildDir, "requirements.txt"))
+		require.NoError(t, err)
+		assert.True(t, info.Mode().IsRegular(), "requirements.txt is a regular file in the build context")
+		got, err = os.ReadFile(filepath.Join(buildDir, "requirements.txt"))
+		require.NoError(t, err)
+		assert.Equal(t, "numpy==1.21.0", string(got))
+	})
 }
 
 func TestExtractRuntimeVersionFromImage(t *testing.T) {

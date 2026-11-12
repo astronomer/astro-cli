@@ -285,6 +285,14 @@ func setupClientDependencyFiles(buildDir string) error {
 		clientPath := filepath.Join(buildDir, clientFile)
 		regularPath := filepath.Join(buildDir, regularFile)
 
+		// The project's own requirements.txt or packages.txt was copied here
+		// as it is, symlink included, and CopyFile writes through a symlink.
+		// Remove it first so the write lands in the build context, not on
+		// the file a symlink points at (a monorepo's shared requirements.txt,
+		// say), which the client deps would otherwise overwrite.
+		if err := os.Remove(regularPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to replace %s in build context: %w", regularFile, err)
+		}
 		// Copy client file content to the regular file location (requires client file to exist)
 		if err := fileutil.CopyFile(clientPath, regularPath); err != nil {
 			return fmt.Errorf("failed to copy %s to %s in build context: %w", clientFile, regularFile, err)
