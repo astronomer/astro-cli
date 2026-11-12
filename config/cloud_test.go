@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"strings"
 
 	"github.com/spf13/afero"
 )
@@ -73,4 +74,25 @@ func (s *Suite) TestPrintCurrentCloudContext() {
 	err := PrintCurrentCloudContext(buf)
 	s.NoError(err)
 	s.Contains(buf.String(), "localhost")
+}
+
+// cloud.api.protocol is a scheme and nothing more: a value carrying a host
+// falls back to https rather than sending the API calls, and the token on
+// them, somewhere else.
+func (s *Suite) TestContextAPIProtocolIsOnlyAScheme() {
+	initTestConfig()
+	defer CFG.CloudAPIProtocol.SetHomeString("https") //nolint:errcheck
+	c := Context{Domain: "astronomer.io"}
+	for value, want := range map[string]string{
+		"https":                   "https://api.astronomer.io/v1alpha1",
+		"http":                    "http://api.astronomer.io/v1alpha1",
+		"HTTP\t":                  "http://api.astronomer.io/v1alpha1",
+		"https://evil.example/x?": "https://api.astronomer.io/v1alpha1",
+		"":                        "https://api.astronomer.io/v1alpha1",
+	} {
+		s.NoError(CFG.CloudAPIProtocol.SetHomeString(value))
+		s.Equal(want, c.GetPublicRESTAPIURL("v1alpha1"), value)
+		scheme, _, _ := strings.Cut(want, "://")
+		s.True(strings.HasPrefix(c.GetSoftwareAPIURL(), scheme+"://houston.astronomer.io:"), value)
+	}
 }
