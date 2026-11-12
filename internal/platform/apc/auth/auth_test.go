@@ -102,7 +102,9 @@ func (s *Suite) TestBasicAuth() {
 			name: "no password and no terminal",
 			args: args{username: "test"},
 			errAssertion: func(t assert.TestingT, err error, _ ...interface{}) bool {
-				return assert.True(t, input.IsRequired(err), "%v", err)
+				return assert.True(t, input.IsRequired(err), "%v", err) &&
+					assert.Contains(t, err.Error(), "astro login") &&
+					assert.NotContains(t, err.Error(), "as a flag", "no flag takes this password")
 			},
 		},
 	}

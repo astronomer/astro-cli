@@ -75,6 +75,28 @@ func (s *Suite) TestTextEnded() {
 	s.Empty(got, "an empty line is an answer")
 }
 
+// A hinted answer is named by every refusal about its question: ended input
+// at Text and Confirm, and a password that cannot be read from a pipe.
+func (s *Suite) TestHintedAnswersReachEndedInputAndPasswordRefusals() {
+	s.T().Cleanup(ClearHints)
+	HintAnswer("a name", "--name")
+
+	s.stdinHolding("")
+	_, err := Text("Name: ", About("a name"))
+	s.True(IsRequired(err), "%v", err)
+	s.Contains(err.Error(), "pass --name", "Text at the end of its input")
+
+	s.stdinHolding("")
+	_, err = Confirm("Sure?", About("a name"))
+	s.True(IsRequired(err), "%v", err)
+	s.Contains(err.Error(), "pass --name", "Confirm at the end of its input")
+
+	s.stdinHolding("")
+	_, err = Password("Password: ", About("a name"))
+	s.True(IsRequired(err), "%v", err)
+	s.Contains(err.Error(), "pass --name", "Password on a stdin that is not a terminal")
+}
+
 // A password asked of a stdin that is not a terminal names the flag that
 // answers it, and reads nothing.
 func (s *Suite) TestPasswordOnAPipeNamesTheFlag() {

@@ -234,6 +234,37 @@ func TestAbortedKind(t *testing.T) {
 	assert.Equal(t, KindInputRequired, testKinds.Of(input.Required(fmt.Errorf("asked: %w", input.ErrAborted))))
 }
 
+// What answers a shared picker is per command and per run: a hint one Execute
+// run set is gone in the next, in the same process.
+func TestHintsDoNotOutliveTheRun(t *testing.T) {
+	t.Cleanup(input.ClearHints)
+	hinted := &cobra.Command{
+		Use: "hint",
+		RunE: func(*cobra.Command, []string) error {
+			input.HintAnswer("a thing", "--thing")
+			assert.Equal(t, "--thing", input.ApplyHint(&input.RequiredError{About: "a thing"}).Flag)
+			return nil
+		},
+	}
+	var seen string
+	plain := &cobra.Command{
+		Use: "plain",
+		RunE: func(*cobra.Command, []string) error {
+			seen = input.ApplyHint(&input.RequiredError{About: "a thing"}).Flag
+			return nil
+		},
+	}
+	root := &cobra.Command{Use: "astro"}
+	root.AddCommand(hinted, plain)
+
+	require.NoError(t, execTree(context.Background(), root, "hint").err)
+	assert.Empty(t, input.ApplyHint(&input.RequiredError{About: "a thing"}).Flag, "cleared when the run ended")
+
+	input.HintAnswer("a thing", "--leaked")
+	require.NoError(t, execTree(context.Background(), root, "plain").err)
+	assert.Empty(t, seen, "cleared when the next run began")
+}
+
 // writtenToStderr is what f wrote to the process's stderr, where the pkg/input
 // prompts write their questions.
 func writtenToStderr(t *testing.T, f func()) string {
