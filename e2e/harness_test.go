@@ -429,7 +429,7 @@ var leaky = []string{
 	// Whether a run may ask is decided by CI (input.Refusal), so a runner that
 	// sets it would turn every case that expects a question into a refusal. A
 	// case about CI sets it itself, through extra.
-	"CI",
+	"CI", "JENKINS_URL", "HUDSON_URL", "TF_BUILD",
 }
 
 // env is the whole environment a command runs with: the ambient one, minus

@@ -298,3 +298,16 @@ func TestTheInteractionModeIsResolvedOnce(t *testing.T) {
 		})
 	}
 }
+
+// A command line that resolves to no command is still guarded by the
+// environment's part of the rule, so nothing that runs under it can ask in CI.
+func TestTheGuardAppliesWhenNoCommandResolves(t *testing.T) {
+	answered := ""
+	root := promptTree(&answered)
+	require.Nil(t, findTarget(root, []string{"nonesuch"}), "the line resolves to no command")
+
+	t.Setenv("CI", "true")
+	assert.Equal(t, "with CI set it cannot", refuseToAsk(root, []string{"nonesuch"})())
+	t.Setenv("CI", "")
+	assert.Empty(t, refuseToAsk(root, []string{"nonesuch"})())
+}

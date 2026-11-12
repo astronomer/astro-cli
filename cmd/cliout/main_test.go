@@ -10,5 +10,8 @@ import (
 // where CI is set. The cases about CI set it themselves.
 func TestMain(m *testing.M) {
 	os.Unsetenv("CI") //nolint:usetesting // for the whole package run
+	for _, k := range []string{"JENKINS_URL", "HUDSON_URL", "TF_BUILD"} {
+		os.Unsetenv(k) //nolint:usetesting // other CI systems decide it too
+	}
 	os.Exit(m.Run())
 }

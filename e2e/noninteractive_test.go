@@ -57,6 +57,12 @@ func TestCINeverPrompts(t *testing.T) {
 	refused("--non-interactive", p.run("local", "reset", "--non-interactive"), "with --non-interactive it cannot")
 	refused("--non-interactive with CI=false", p.runWith(map[string]string{"CI": "false"}, "local", "reset", "--non-interactive"), "with --non-interactive it cannot")
 
+	// CI systems that do not set CI themselves.
+	refused("JENKINS_URL", p.runWith(map[string]string{"JENKINS_URL": "https://ci.example.com/"}, "local", "reset"), "in Jenkins")
+	refused("TF_BUILD=True", p.runWith(map[string]string{"TF_BUILD": "True"}, "local", "reset"), "in Azure Pipelines")
+	asked("TF_BUILD=false", p.runWith(map[string]string{"TF_BUILD": "false"}, "local", "reset"))
+	asked("JENKINS_URL with --non-interactive=false", p.runWith(map[string]string{"JENKINS_URL": "https://ci.example.com/"}, "local", "reset", "--non-interactive=false"))
+
 	asked("CI unset", p.run("local", "reset"))
 	asked("CI=false", p.runWith(map[string]string{"CI": "false"}, "local", "reset"))
 	asked("CI=0", p.runWith(map[string]string{"CI": "0"}, "local", "reset"))

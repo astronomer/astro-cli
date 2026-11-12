@@ -110,7 +110,7 @@ func newLinkAddCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [NAME] [-- COMMAND...]",
 		Short: "Link a Deployment to this project",
-		Long: "Link a Deployment to this project as NAME. In a terminal, with no --deployment, it asks " +
+		Long: "Link a Deployment to this project as NAME. With no --deployment, it asks " +
 			"which Astro Deployment to link and, with no NAME, names the link after it: lowercased, with " +
 			"each run of spaces and punctuation turned into one dash.\n\n" +
 			"Under an Astro Private Cloud context it links that platform's Deployments instead, on the " +
@@ -168,7 +168,7 @@ func newLinkRemoveCmd(c *cli) *cobra.Command {
 		Use:     "remove [NAME]",
 		Aliases: []string{"rm"},
 		Short:   "Unlink a Deployment from this project",
-		Long:    "Unlink a Deployment from this project. In a terminal, with no NAME, it asks which one.",
+		Long:    "Unlink a Deployment from this project. With no NAME, it asks which one; in CI or with --non-interactive it fails instead.",
 		Example: "  astro link remove prod",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -190,7 +190,7 @@ func newLinkDefaultCmd(c *cli) *cobra.Command {
 		Use:   "default [NAME]",
 		Short: "Choose the Deployment commands use by default",
 		Long: "Choose the linked Deployment commands use when you don't name one. astro deploy still " +
-			"asks, with it preselected. In a terminal, with no NAME, it asks which one.",
+			"asks, with it preselected. With no NAME, it asks which one; in CI or with --non-interactive it fails instead.",
 		Example: "  astro link default prod\n" +
 			"  astro link default --unset",
 		Args: cobra.MaximumNArgs(1),
@@ -385,7 +385,7 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 		}
 	}
 	if name == "" {
-		return errors.New("add needs a NAME for the link. In a terminal, with no --deployment, it asks for a Deployment and names the link after it")
+		return errors.New("add needs a NAME for the link. With no --deployment, it asks for a Deployment and names the link after it")
 	}
 	link.Name = name
 	if err := refuseExisting(m, name, in.replace); err != nil {

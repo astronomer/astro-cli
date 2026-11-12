@@ -6,6 +6,8 @@ import (
 
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
+
+	"github.com/astronomer/astro-cli/pkg/telemetry"
 )
 
 // NonInteractiveFlag is the name of the global flag that turns prompts off.
@@ -16,6 +18,11 @@ const (
 	reasonJSON = "with --output json it cannot"
 	reasonFlag = "with --non-interactive it cannot"
 	reasonCI   = "with CI set it cannot"
+
+	// CI systems that do not set CI themselves, which telemetry already
+	// recognizes by name.
+	reasonJenkins = "in Jenkins (JENKINS_URL or HUDSON_URL set) it cannot"
+	reasonAzure   = "in Azure Pipelines (TF_BUILD set) it cannot"
 
 	falseValue = "false"
 )
@@ -32,7 +39,8 @@ func AddFlag(fs *pflag.FlagSet) {
 //
 // A run is non-interactive when --output is json, when the CI environment
 // variable is set to a truthy value (anything but empty, "0" or "false", in
-// any case), or when --non-interactive is passed. An explicit
+// any case), when Jenkins (JENKINS_URL) or Azure Pipelines (TF_BUILD, truthy)
+// says so, which do not set CI, or when --non-interactive is passed. An explicit
 // --non-interactive=false asks again despite CI, so a person can debug a CI
 // setup locally, but never under json. Every other run may ask, whether or not
 // stdin is a terminal: the question goes to stderr and the answer is read from
@@ -49,8 +57,13 @@ func Refusal(json bool, flag *pflag.Flag) string {
 		}
 		return ""
 	}
-	if truthy(os.Getenv("CI")) {
+	switch {
+	case truthy(os.Getenv("CI")):
 		return reasonCI
+	case telemetry.IsCISystemSet("jenkins"):
+		return reasonJenkins
+	case telemetry.IsCISystemSet("azure-devops") && truthy(os.Getenv("TF_BUILD")):
+		return reasonAzure
 	}
 	return ""
 }

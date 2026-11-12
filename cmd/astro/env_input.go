@@ -203,7 +203,7 @@ func setFromFileEntry(warn io.Writer, r cliout.Renderer, scope env.Scope, k, val
 }
 
 // runEnvDelete deletes the noun idOrKey names, once confirmed: --yes, or a
-// yes at a terminal. Under --output json it asks nothing, failing as
+// yes to the question. Under --output json it asks nothing, failing as
 // input_required naming --yes.
 func runEnvDelete(cmd *cobra.Command, out io.Writer, noun, idOrKey string, del func(string, env.Scope, astrov1.APIClient) (*astrov1.EnvironmentObject, error)) error {
 	scope, err := envScope()

@@ -32,7 +32,7 @@ var (
 	forceLogin             bool
 	loginInVault           bool
 
-	cloudLogin  = astroAuth.Login
+	cloudLogin  = astroAuth.LoginCommand
 	cloudLogout = astroAuth.Logout
 	apcLogin    = apcAuth.Login
 	apcLogout   = apcAuth.Logout

@@ -966,7 +966,7 @@ func TestCheckUserSession(t *testing.T) {
 		// organization: input_required, naming the flag that answers it.
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.True(t, input.IsRequired(err), "%v", err)
-		assert.Contains(t, err.Error(), "--signup")
+		assert.Contains(t, err.Error(), "Create or join an Organization")
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -1252,10 +1252,9 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 		assert.NotContains(t, buf.String(), "Creating your organization")
 		mockV1Client.AssertExpectations(t)
 	})
-
-	// The question can come from the login inside any command, and only
-	// `astro login` has --signup, so the refusal names the command too.
-	t.Run("a run that may not ask is refused, naming astro login", func(t *testing.T) {
+	// The question can come from the login inside any command, and only a
+	// person can answer it: a run that cannot ask says what resolves it.
+	t.Run("a run that may not ask is refused, saying what resolves it", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		t.Cleanup(input.SetGuard(func() string { return "with --output json it cannot" }))
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
@@ -1265,7 +1264,7 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 		ctx := config.Context{Domain: "test-domain"}
 		err := checkUserSession(&ctx, mockV1Client, new(bytes.Buffer), false)
 		assert.True(t, input.IsRequired(err), "err: %v", err)
-		assert.ErrorContains(t, err, "pass --signup to astro login")
+		assert.ErrorContains(t, err, "Create or join an Organization in the Astro UI")
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -1314,7 +1313,8 @@ func TestLoginRefusedWhenTheRunMayNotAsk(t *testing.T) {
 
 	assert.ErrorIs(t, err, ErrLoginNeeded)
 	assert.False(t, input.IsRequired(err), "no flag answers a login, so it is not input_required")
-	assert.ErrorContains(t, err, "with --output json it cannot — run astro login first, or set ASTRO_API_TOKEN")
+	assert.ErrorContains(t, err, "with --output json it cannot — set ASTRO_API_TOKEN, or log in with astro login")
+	assert.NotContains(t, err.Error(), "run astro login first", "the refusal must not send the person to a command it also refuses")
 	assert.Empty(t, string(printed), "nothing reaches stdout")
 }
 
@@ -2163,4 +2163,63 @@ func TestWriteToContextKeepsTokenOnlyLoginOnItsOwnHost(t *testing.T) {
 	assert.Equal(t, "Bearer pasted", own.Token)
 	assert.Empty(t, own.RefreshToken)
 	assert.Equal(t, "user@astronomer.test", own.UserEmail)
+}
+
+// An explicit astro login works in a run that may not ask (CI,
+// --non-interactive): running the command is the consent, so it prints the
+// login link and waits for the browser's callback instead of being refused. A
+// login another command starts (Login) is still refused there.
+func TestExplicitLoginWorksWhenTheRunMayNotAsk(t *testing.T) {
+	for _, reason := range []string{"with CI set it cannot", "with --non-interactive it cannot", "with --output json it cannot"} {
+		t.Run(reason, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			stubAuthConfig(t, testAuthConfig)
+			stubRefresh(t, astroauth.TokenResponse{}, errMock)
+			stubStdinIsTerminal(t, true)
+			t.Cleanup(input.SetGuard(func() string { return reason }))
+			previous := authenticator
+			t.Cleanup(func() { authenticator = previous })
+			reached := false
+			authenticator = Authenticator{
+				callbackHandler: func() (string, error) {
+					reached = true
+					return "", errMock
+				},
+			}
+
+			var err error
+			printed := captureStderr(t, func() {
+				err = LoginCommand("astronomer.io", "", new(astrov1_mocks.ClientWithResponsesInterface), io.Discard, false, false, false)
+			})
+			assert.ErrorIs(t, err, errMock, "the login reached the browser callback, not a refusal")
+			assert.NotErrorIs(t, err, ErrLoginNeeded)
+			assert.True(t, reached, "the callback was waited on")
+			assert.Contains(t, printed, "Please visit the following link", "the link is printed")
+			assert.NotContains(t, printed, "Press Enter", "no pause for Enter in a run that may not ask")
+
+			// --login-link is not refused either.
+			reached = false
+			err = LoginCommand("astronomer.io", "", new(astrov1_mocks.ClientWithResponsesInterface), io.Discard, true, false, true)
+			assert.ErrorIs(t, err, errMock)
+			assert.True(t, reached)
+
+			// The implicit login stays refused, and does not loop.
+			reached = false
+			err = Login("astronomer.io", "", new(astrov1_mocks.ClientWithResponsesInterface), io.Discard, false, false, false)
+			assert.ErrorIs(t, err, ErrLoginNeeded)
+			assert.False(t, reached, "an implicit login started a browser login")
+			assert.NotContains(t, err.Error(), "run astro login first")
+			assert.Contains(t, err.Error(), "ASTRO_API_TOKEN")
+		})
+	}
+}
+
+// A login with no organization, in a run that could not ask whether to create
+// one, says what resolves it, not a flag that restarts the login.
+func TestNoOrganizationRefusalNamesWhatResolvesIt(t *testing.T) {
+	t.Cleanup(input.SetGuard(func() string { return "with CI set it cannot" }))
+	_, err := askToCreateOrganization("astronomer.io", io.Discard)
+	assert.True(t, input.IsRequired(err), "%v", err)
+	assert.ErrorContains(t, err, "Create or join an Organization in the Astro UI")
+	assert.NotContains(t, err.Error(), "--signup")
 }

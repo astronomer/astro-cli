@@ -164,6 +164,18 @@ func TestConfirmationReadFailureWithPartialTextIsNotAYes(t *testing.T) {
 	}
 }
 
+// Ended input is the same structured refusal as Text, Confirm and a picker
+// return: the question, the flag and the reason are there to read, whatever
+// the message says.
+func TestConfirmationEndedIsAStructuredRequiredError(t *testing.T) {
+	_, err := askConfirmation(false, "")
+	var req *RequiredError
+	require.ErrorAs(t, err, &req)
+	assert.Equal(t, "Wipe it?", req.Prompt)
+	assert.Equal(t, "--yes", req.Flag)
+	assert.Equal(t, EndedReason, req.Reason)
+}
+
 // A question that names no flag still refuses ended input, saying to pass the
 // answer as a flag.
 func TestConfirmationEndedWithNoFlagNamed(t *testing.T) {

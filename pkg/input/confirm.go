@@ -88,9 +88,9 @@ func (q *Confirmation) Ask() error {
 
 // ended is the refusal for input that ended with no answer.
 func (q *Confirmation) ended() error {
-	var named RequiredError
+	named := &RequiredError{Prompt: q.Question, Reason: EndedReason}
 	for _, o := range q.Options {
-		o(&named)
+		o(named)
 	}
 	why := "stdin is not interactive"
 	if q.Terminal {
@@ -100,7 +100,10 @@ func (q *Confirmation) ended() error {
 	if named.Flag != "" {
 		answer = "pass " + named.Flag
 	}
-	return Required(fmt.Errorf("confirmation needed but %s; %s to proceed", why, answer))
+	// The same structured refusal Text, Confirm and the pickers return (the
+	// question, the flag, the reason), in this confirmation's own words.
+	named.err = fmt.Errorf("confirmation needed but %s; %s to proceed", why, answer)
+	return named
 }
 
 // The answers that are a yes, in any case.

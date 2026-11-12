@@ -26,6 +26,9 @@ func TestMain(m *testing.M) {
 	// cases that expect a prompt must not depend on where they run. Those about
 	// CI set it themselves.
 	os.Unsetenv("CI") //nolint:usetesting // for the whole package run
+	for _, k := range []string{"JENKINS_URL", "HUDSON_URL", "TF_BUILD"} {
+		os.Unsetenv(k) //nolint:usetesting // other CI systems decide it too
+	}
 	watching := emitWatch().Arm()
 	code := m.Run()
 	os.Args = origArgs
