@@ -379,7 +379,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 	client.HTTPClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	previousClient, previousServer, previousTimeout, previousListening, previousShutdown := httpClient, callbackServer, callbackTimeout, callbackListening, callbackShutdownTimeout
 	t.Cleanup(func() {
-		httpClient, callbackServer, callbackTimeout, callbackListening = previousClient, previousServer, previousTimeout, previousListening
+		httpClient, callbackServer, callbackTimeout, callbackListening, callbackShutdownTimeout = previousClient, previousServer, previousTimeout, previousListening, previousShutdown
 	})
 	httpClient = client
 
@@ -478,7 +478,6 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 		callbackServer = "localhost:0"
 		callbackListening = func(addr net.Addr) { bound = addr.String() }
 		callbackTimeout = 5 * time.Millisecond
-		defer func() { callbackTimeout = previousTimeout }()
 		_, err := authorizeCallback(io.Discard)
 		assert.ErrorContains(t, err, "the operation has timed out")
 		requirePortFree(t)
@@ -494,7 +493,6 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 			// A generous bound, so a login that waits on the idle connection
 			// is told apart from a slow machine.
 			callbackShutdownTimeout = 5 * time.Second
-			defer func() { callbackShutdownTimeout = previousShutdown }()
 			wait := callbackAt(t, tc.query, tc.location, true)
 			var out bytes.Buffer
 			start := time.Now()
@@ -528,11 +526,15 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 func TestCallbackMuxKeepsTheFirstResult(t *testing.T) {
 	results := make(chan CallbackMessage, 1)
 	mux := callbackMux(results)
-	// A hit with no code and no error leaves the slot free for the real result.
-	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/callback", http.NoBody))
-	assert.Equal(t, http.StatusFound, rec.Code)
-	assert.Empty(t, results)
+	// A hit with no code and no error leaves the slot free for the real result,
+	// and is not told the login succeeded.
+	for _, target := range []string{"/callback", "/callback?code="} {
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, http.NoBody))
+		assert.Equal(t, http.StatusBadRequest, rec.Code, target)
+		assert.Empty(t, rec.Header().Get("Location"), target)
+		assert.Empty(t, results, target)
+	}
 
 	for _, target := range []string{"/callback?code=first", "/callback?code=second", "/callback?error=denied", "/callback?code=third"} {
 		done := make(chan *httptest.ResponseRecorder, 1)

@@ -193,14 +193,12 @@ func authorizeCallbackHandlerTo(errOut io.Writer) AuthorizeCallbackHandler {
 
 // callbackMux serves the login callback. The first result goes to results and
 // later ones (a refresh, a retry) are dropped, so a repeated hit never blocks
-// the handler and still gets the normal redirect page.
+// the handler and still gets the normal redirect page. A hit that carries
+// neither a code nor an error (a prefetch, a probe, a manual visit) is not a
+// result: it must not take the slot the real one needs, and it must not be
+// told the login succeeded.
 func callbackMux(results chan<- CallbackMessage) *http.ServeMux {
 	send := func(msg CallbackMessage) {
-		// A hit with neither a code nor an error (a prefetch, a probe) is not
-		// a result, and must not take the slot the real one needs.
-		if msg.err == nil && msg.authorizationCode == "" {
-			return
-		}
 		select {
 		case results <- msg:
 		default:
@@ -209,6 +207,10 @@ func callbackMux(results chan<- CallbackMessage) *http.ServeMux {
 	m := http.NewServeMux()
 	m.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
+		if _, hasError := req.URL.Query()["error"]; !hasError && req.URL.Query().Get("code") == "" {
+			http.Error(w, "No authorization code was received. Return to the terminal and sign in again.", http.StatusBadRequest)
+			return
+		}
 		if errorCode, ok := req.URL.Query()["error"]; ok {
 			send(CallbackMessage{err: authorizeError(errorCode, req.URL.Query()["error_description"])})
 			resp := &http.Request{}
@@ -257,8 +259,11 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 		ctx, cancel := http_context.WithTimeout(http_context.Background(), callbackShutdownTimeout)
 		defer cancel()
 		if err := s.Shutdown(ctx); err != nil {
-			// Only an idle connection can still be holding Shutdown here, and
-			// closing it is the normal way to finish, not something to report.
+			// Hitting the bound means something is still open after the result
+			// was chosen: an idle connection, a handler stalled past the bound
+			// or a slow header read. Force-closing it is the normal way to
+			// finish, and the login has already succeeded, so say nothing
+			// unless the close fails too.
 			closeErr := s.Close()
 			if closeErr != nil || !errors.Is(err, http_context.DeadlineExceeded) {
 				ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", shutdownFailure(err, closeErr)))
@@ -266,22 +271,16 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 		}
 	}()
 
-	// Wait for code on channel, or timeout
-	authorizationCode := ""
-	for authorizationCode == "" {
-		select {
-		case callbackMessage := <-results:
-			if callbackMessage.err != nil {
-				return "", callbackMessage.err
-			}
-			authorizationCode = callbackMessage.authorizationCode
-		case <-time.After(callbackTimeout):
-			return "", errors.New("the operation has timed out")
+	// Wait for the result, or time out
+	select {
+	case callbackMessage := <-results:
+		if callbackMessage.err != nil {
+			return "", callbackMessage.err
 		}
+		return callbackMessage.authorizationCode, nil
+	case <-time.After(callbackTimeout):
+		return "", errors.New("the operation has timed out")
 	}
-
-	// return code
-	return authorizationCode, nil
 }
 
 // freshConns tracks the connections that have been accepted but have not yet
