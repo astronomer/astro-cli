@@ -104,6 +104,45 @@ func BuildImage(ctx context.Context, in *Image) (image, runtimeVersion string, e
 	return built, version, nil
 }
 
+// rebuildFromBase is how a refused prebuilt image is built again on the
+// project's install base.
+const rebuildFromBase = "Rebuild it with: astro package --base && docker build ."
+
+// CheckInstallBase refuses a prebuilt image (--image-name) built on an
+// install base that is not the project's as it stands: one labeled for
+// another project, or whose install digest the project, resolved again over
+// the same runtime image, no longer produces (uv.lock or pyproject.toml
+// changed since the base was built). An image without the install base's
+// labels, or a project that cannot be resolved again (no uv), is let
+// through, as before. m is the project's manifest build, its ProjectDir ""
+// for an image deployed from outside a project; resolve is the deploy's
+// imageinstall.Fill.
+func CheckInstallBase(ctx context.Context, image string, readLabel LabelReader, m *imagebuild.ManifestBuild, resolve func(context.Context, *imagebuild.Request) error) error {
+	if m == nil || m.ProjectDir == "" {
+		return nil
+	}
+	project, err := readLabel(image, airflowrt.InstallBaseProjectLabel)
+	if err != nil || project == "" {
+		return nil
+	}
+	if project != m.Name {
+		return fmt.Errorf("this image was built on an install base for a different project. %s", rebuildFromBase)
+	}
+	digest, _ := readLabel(image, airflowrt.InstallBaseDigestLabel) //nolint:errcheck // an unreadable label checks nothing
+	from, _ := readLabel(image, airflowrt.InstallBaseFromLabel)     //nolint:errcheck // as above
+	if digest == "" || from == "" || resolve == nil {
+		return nil
+	}
+	req := imagebuild.Request{BaseImage: from, ManifestDir: m.ProjectDir, Dependencies: m.Dependencies, FindLinks: m.FindLinks, Packages: m.Packages}
+	if err := resolve(ctx, &req); err != nil || req.Install == nil {
+		return nil
+	}
+	if req.InstallDigest() != digest {
+		return fmt.Errorf("this image was built on an install base that no longer matches uv.lock. %s", rebuildFromBase)
+	}
+	return nil
+}
+
 // PrebuiltRuntime reads the runtime version off a prebuilt local image
 // (--image-name). A registry image name says nothing about its base, so the
 // label is read off the local image: an inspect that fails is the "not found

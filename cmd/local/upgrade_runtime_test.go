@@ -302,6 +302,27 @@ func TestUpgradeRuntimeWithNoBuildRefusesADeclaredDockerfile(t *testing.T) {
 	assert.Zero(t, rd.locks)
 }
 
+// A Dockerfile built on the install base takes its runtime version from the
+// manifest, as a generated build does, so both a bare and a named upgrade go
+// ahead and leave the Dockerfile alone.
+func TestUpgradeRuntimeTakesADockerfileOnTheInstallBase(t *testing.T) {
+	src := buildManifest + "dockerfile = 'Dockerfile'\n"
+	dockerfile := "FROM localhost/astro-base\nCOPY --chown=astro:0 . .\n"
+
+	rd := newRefreshDeps(t, src)
+	dfPath := filepath.Join(filepath.Dir(rd.path), "Dockerfile")
+	require.NoError(t, os.WriteFile(dfPath, []byte(dockerfile), 0o600))
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime"))
+	assert.Equal(t, dockerfile, readText(t, dfPath))
+
+	rd = newRefreshDeps(t, src)
+	dfPath = filepath.Join(filepath.Dir(rd.path), "Dockerfile")
+	require.NoError(t, os.WriteFile(dfPath, []byte(dockerfile), 0o600))
+	require.NoError(t, execute(t, rd.d, "local", "upgrade", "runtime", "3.3-10"))
+	assert.Contains(t, readText(t, rd.path), "runtime = '3.3-10'")
+	assert.Equal(t, dockerfile, readText(t, dfPath))
+}
+
 // A floating project's bare upgrade holds requires-python to the runtime
 // version it gets, as a named runtime version does, and says which Python that
 // runtime version runs.

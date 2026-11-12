@@ -250,10 +250,16 @@ func refuseImageOnly(in *ManifestImage, t *manifestTarget) error {
 // manifest, OnBuild called first.
 func manifestDeployImage(ctx context.Context, in *ManifestImage, req *imagebuild.Request, engine imagebuild.Engine, progress io.Writer) (localImage, runtimeVersion string, err error) {
 	if in.ImageName != "" {
-		runtimeVersion, err = deploybuild.PrebuiltRuntime(in.ImageName, func(image, label string) (string, error) {
+		readLabel := func(image, label string) (string, error) {
 			return engine.Label(ctx, image, label)
-		})
-		return in.ImageName, runtimeVersion, err
+		}
+		if runtimeVersion, err = deploybuild.PrebuiltRuntime(in.ImageName, readLabel); err != nil {
+			return "", "", err
+		}
+		if err := deploybuild.CheckInstallBase(ctx, in.ImageName, readLabel, &in.Build, in.resolveInstall); err != nil {
+			return "", "", err
+		}
+		return in.ImageName, runtimeVersion, nil
 	}
 	if in.OnBuild != nil {
 		in.OnBuild()
@@ -590,20 +596,24 @@ func buildManifestImage(ctx context.Context, in *ManifestImage, req *imagebuild.
 		req.Labels = append(req.Labels, labelRevisionDescription+in.Description)
 	}
 	return deploybuild.BuildImage(ctx, &deploybuild.Image{
-		Request:    *req,
-		ProjectDir: in.Build.ProjectDir,
-		Dockerfile: in.Build.Dockerfile,
-		Commander:  engine.Cmd,
-		Now:        manifestBuildNow,
-		Progress:   progress,
-		ReadLabel:  readLabel,
-		ResolveInstall: func(ctx context.Context, req *imagebuild.Request) error {
-			if in.ResolveInstall == nil {
-				return nil
-			}
-			return in.ResolveInstall(ctx, req, in.Warn)
-		},
+		Request:        *req,
+		ProjectDir:     in.Build.ProjectDir,
+		Dockerfile:     in.Build.Dockerfile,
+		Commander:      engine.Cmd,
+		Now:            manifestBuildNow,
+		Progress:       progress,
+		ReadLabel:      readLabel,
+		ResolveInstall: in.resolveInstall,
 	})
+}
+
+// resolveInstall is ResolveInstall with the deploy's warnings, and nothing
+// without one.
+func (in *ManifestImage) resolveInstall(ctx context.Context, req *imagebuild.Request) error {
+	if in.ResolveInstall == nil {
+		return nil
+	}
+	return in.ResolveInstall(ctx, req, in.Warn)
 }
 
 // checkDagsInImage holds a deploy to an image Deployment, whose DAGs are the

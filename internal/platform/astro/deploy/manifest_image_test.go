@@ -80,7 +80,9 @@ func (f *fakeImageCmd) Run(_ context.Context, env []string, stdio localrt.Stdio,
 		}
 		f.stdins[len(f.calls)-1] = string(in)
 	}
-	if len(args) > 3 && args[0] == "image" && args[1] == "inspect" && strings.Contains(args[3], ".Config.Labels") && f.label != nil && stdio.Out != nil {
+	// The install base's labels are not modeled: an image without them, as a
+	// real engine reads an absent label.
+	if len(args) > 3 && args[0] == "image" && args[1] == "inspect" && strings.Contains(args[3], ".Config.Labels") && !strings.Contains(args[3], "install-base") && f.label != nil && stdio.Out != nil {
 		fmt.Fprintln(stdio.Out, f.label(args[len(args)-1]))
 	}
 	if len(args) > 3 && args[0] == "image" && args[1] == "inspect" && strings.Contains(args[3], ".Config.Env") && stdio.Out != nil {

@@ -425,26 +425,33 @@ func buildOrAdoptImage(ctx context.Context, in *ManifestImageDeployInput, req *i
 		if err != nil {
 			return "", "", err
 		}
+		if err := deploybuild.CheckInstallBase(ctx, in.ImageName, readLabel, &in.Build, in.resolveInstall); err != nil {
+			return "", "", err
+		}
 		return in.ImageName, version, nil
 	}
 	req.Secrets = in.BuildSecrets
 	req.Bin = engine.Bin
 	req.Env = engine.Env
 	return deploybuild.BuildImage(ctx, &deploybuild.Image{
-		Request:    *req,
-		ProjectDir: in.Build.ProjectDir,
-		Dockerfile: in.Build.Dockerfile,
-		Commander:  engine.Cmd,
-		Now:        buildNow,
-		Progress:   in.Progress,
-		ReadLabel:  readLabel,
-		ResolveInstall: func(ctx context.Context, req *imagebuild.Request) error {
-			if in.ResolveInstall == nil {
-				return nil
-			}
-			return in.ResolveInstall(ctx, req, in.Warn)
-		},
+		Request:        *req,
+		ProjectDir:     in.Build.ProjectDir,
+		Dockerfile:     in.Build.Dockerfile,
+		Commander:      engine.Cmd,
+		Now:            buildNow,
+		Progress:       in.Progress,
+		ReadLabel:      readLabel,
+		ResolveInstall: in.resolveInstall,
 	})
+}
+
+// resolveInstall is ResolveInstall with the deploy's warnings, and nothing
+// without one.
+func (in *ManifestImageDeployInput) resolveInstall(ctx context.Context, req *imagebuild.Request) error {
+	if in.ResolveInstall == nil {
+		return nil
+	}
+	return in.ResolveInstall(ctx, req, in.Warn)
 }
 
 // offeredRuntimes fetches the runtime releases the organization's

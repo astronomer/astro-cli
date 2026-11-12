@@ -44,7 +44,7 @@ func PlanRuntime(imageName string, req *imagebuild.Request, build *imagebuild.Ma
 		return Plan{raise: func(minimum string) string {
 			return fmt.Sprintf("rebuild %s FROM Astro Runtime %s or newer", imageName, minimum)
 		}}
-	case req.FromDeclaredDockerfile():
+	case req.FromDeclaredDockerfile() && !req.UsesInstallBase():
 		v := airflowrt.ReadDeclaredBase(req.Dockerfile).RuntimeVersion()
 		dockerfile := build.Dockerfile
 		p := Plan{raise: func(minimum string) string {

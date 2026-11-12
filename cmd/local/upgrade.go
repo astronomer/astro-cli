@@ -281,7 +281,7 @@ func (c *cli) runUpgradeRuntime(ctx context.Context, build, python string) error
 // Dockerfile picks the image is refused.
 func pickBareRuntime(dir, python string, catalog *runtimeversions.Catalog, res *runtimeUpgrade) (build string, keep bool, err error) {
 	m := repairManifest(dir)
-	if m.Astro.Dockerfile != "" {
+	if scaffold.OwnsBase(dir, m) {
 		return "", false, fmt.Errorf("setting the runtime version: %w", scaffold.DockerfilePicksRuntime(m.Astro.Dockerfile))
 	}
 	current := m.Astro.Runtime

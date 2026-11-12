@@ -20,7 +20,7 @@ import (
 // line on stderr in text, and a warning event in json, never on stdout as if
 // it were the command's output.
 func TestEmitWarningIsAWarningOnStderr(t *testing.T) {
-	const msg = "the image will carry 5,510 files that .gitignore ignores and .dockerignore does not, in .claude/. If they do not belong in the image, add them to .dockerignore"
+	const msg = "5,510 files that .gitignore ignores and .dockerignore does not go into the image, in .claude/. If they don't belong there, add them to .dockerignore"
 	var out, stderr bytes.Buffer
 	emitWarning(cliout.Renderer{Format: cliout.FormatText, Out: &out, Err: &stderr}, event{Event: "warning", Text: msg})
 	if got, want := stderr.String(), "Warning: "+msg+"\n"; got != want {
@@ -265,6 +265,31 @@ func packageWithFake(t *testing.T, target fakePackageTarget, args ...string) (st
 	d.PackageAstro = target
 	err := execute(t, d, append([]string{"package", "astro"}, args...)...)
 	return out.String(), err
+}
+
+// --base prints the install base's tag alone on stdout, for
+// $(astro package --base); the build's output and warnings go to stderr.
+func TestPackageBasePrintsOnlyTheTag(t *testing.T) {
+	d, out := testDeps(t)
+	writeManifest(t, &d, t.TempDir())
+	d.PackageAstro = fakePackageTarget{res: pack.Result{Target: pack.TargetAstro, Kind: pack.KindBase, Image: "localhost/demo-base"}}
+	if err := execute(t, d, "package", "--base"); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); got != "localhost/demo-base\n" {
+		t.Errorf("stdout = %q, want the tag alone", got)
+	}
+	requireInOrder(t, stderrOf(d), "[build] step 1/9", "Warning: found before the build")
+
+	for _, args := range [][]string{{"--base", "--context-dir", "x"}, {"--base", "--save", "x.tar"}, {"--base", "--tag", "x"}} {
+		d, _ := testDeps(t)
+		writeManifest(t, &d, t.TempDir())
+		d.PackageAstro = fakePackageTarget{}
+		err := execute(t, d, append([]string{"package"}, args...)...)
+		if err == nil || !strings.Contains(err.Error(), "--base builds only the install base") {
+			t.Errorf("%v: err = %v", args, err)
+		}
+	}
 }
 
 // In text, each warning a package finds prints once, after the

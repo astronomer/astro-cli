@@ -3,6 +3,7 @@ package scaffold
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -32,6 +33,20 @@ func dockerfilePath(dir string, m *manifest.Manifest) string {
 		return ""
 	}
 	return filepath.Join(dir, filepath.FromSlash(m.Astro.Dockerfile))
+}
+
+// ownsBase reports a declared Dockerfile whose FROM line picks the image the
+// project builds: any declared one but a Dockerfile built on the install base
+// (airflowrt.UsesInstallBase), whose runtime is [tool.astro] runtime and the
+// requirement's, as a generated build's is. One that cannot be read counts as
+// picking its own, as it did before the install base existed.
+func ownsBase(dir string, m *manifest.Manifest) bool {
+	path := dockerfilePath(dir, m)
+	if path == "" {
+		return false
+	}
+	data, err := os.ReadFile(path)
+	return err != nil || !airflowrt.UsesInstallBase(data)
 }
 
 // CheckDockerfileAirflow refuses a declared Dockerfile whose FROM line names an
@@ -143,7 +158,7 @@ func MatchAirflowToDockerfile(dir string, wrap func(run func() error) error, opt
 			return nil
 		}
 		var err error
-		change, err = setAirflowVersion(before, ed, versionForTag(tag, base.RuntimeVersion(), opts), opts)
+		change, err = setAirflowVersion(dir, before, ed, versionForTag(tag, base.RuntimeVersion(), opts), opts)
 		return err
 	})
 	if err != nil {

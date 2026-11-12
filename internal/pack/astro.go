@@ -114,6 +114,32 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 	return warnings, nil
 }
 
+// tagFinal names the built image finalTag and, with latest (the default
+// scheme; a caller that pins its own --tag owns its naming), also
+// astro-package/<name>:latest, then drops the working tag.
+//
+// The working tag goes only after every Tag succeeded: rmi of an image's last
+// name removes the image and can prune its dangling parent layers (podman;
+// docker without BuildKit), so a failed tag leaves the working tag and the
+// image in place instead. With another name on the image, rmi drops only the
+// name. Best effort; an orphaned tag is harmless. Compared rather than
+// assumed, so a builder that returns another reference never has that
+// reference untagged.
+func tagFinal(ctx context.Context, engine imagebuild.Engine, built, workingTag, finalTag string, latest bool, name string) error {
+	if err := engine.Tag(ctx, built, finalTag); err != nil {
+		return err
+	}
+	if latest {
+		if err := engine.Tag(ctx, built, fmt.Sprintf("astro-package/%s:latest", name)); err != nil {
+			return err
+		}
+	}
+	if built == workingTag {
+		engine.Untag(ctx, workingTag) //nolint:errcheck // best-effort cleanup; a leftover tag changes nothing
+	}
+	return nil
+}
+
 func runtimeCatalog(ctx context.Context, req Request) func() *runtimeversions.Catalog {
 	if req.RuntimeCatalog == nil {
 		return nil
@@ -231,6 +257,13 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		defer os.RemoveAll(workDir) //nolint:errcheck // scratch dir; a leftover temp dir is harmless
 	}
 
+	if req.BaseOnly {
+		breq.WorkDir, breq.Platform, breq.Secrets, breq.Bin, breq.Env = workDir, req.Platform, req.BuildSecrets, engine.Bin, engine.Env
+		breq.InstallBaseOnly = true
+		base, err := t.builder.BuildLocal(ctx, breq, cb)
+		return Result{Target: TargetAstro, Kind: KindBase, Image: base, Warnings: warnings}, missingSecrets.Explain(err)
+	}
+
 	// Build into a source-hash working tag, which BuildLocal always returns:
 	// with nothing to install it still builds the generated Dockerfile over the
 	// runtime's -base image, its install steps installing nothing.
@@ -284,26 +317,8 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	if finalTag == "" {
 		finalTag = fmt.Sprintf("astro-package/%s:%s-%s", name, tagSafe(runtimeVersion), hash)
 	}
-	if err := engine.Tag(ctx, built, finalTag); err != nil {
+	if err := tagFinal(ctx, engine, built, workingTag, finalTag, req.Tag == "", name); err != nil {
 		return Result{}, err
-	}
-	// The moving :latest tag is part of the default scheme; a caller that pins
-	// its own --tag owns its naming, so skip it there.
-	if req.Tag == "" {
-		if err := engine.Tag(ctx, built, fmt.Sprintf("astro-package/%s:latest", name)); err != nil {
-			return Result{}, err
-		}
-	}
-	// Drop the working tag now that the final names point at the image, so
-	// package leaves a clean set of tags. Only here, after every Tag succeeded:
-	// rmi of an image's last name removes the image and can prune its dangling
-	// parent layers (podman; docker without BuildKit), so a failed tag leaves
-	// the working tag and the image in place instead. With another name on the
-	// image, rmi drops only the name. Best effort; an orphaned tag is harmless.
-	// Compared rather than assumed, so a builder that returns another reference
-	// never has that reference untagged.
-	if built == workingTag {
-		engine.Untag(ctx, workingTag) //nolint:errcheck // best-effort cleanup; a leftover tag changes nothing
 	}
 
 	res := Result{
@@ -524,7 +539,17 @@ func contentHash(base, platform, recipe string, breq imagebuild.Request, df decl
 		}
 		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
 	}
-	if projectFiles := breq.ProjectFiles; projectFiles != "" {
+	projectFiles := breq.ProjectFiles
+	// A Dockerfile built on the install base installs what a generated build
+	// does, and builds over the project, which its own steps COPY: so its
+	// address covers the install (as a generated recipe's does) and the
+	// project's files, beside its own bytes.
+	if breq.UsesInstallBase() {
+		writeField("install-base", fmt.Sprintf("%x", sha256.Sum256([]byte(imagebuild.GeneratedDockerfile(breq.BaseImage, true)))))
+		writeField("install-lists", breq.Lists().Digest())
+		projectFiles = breq.Context
+	}
+	if projectFiles != "" {
 		digest, err := imagebuild.ProjectFilesDigest(projectFiles)
 		if err != nil {
 			return "", err
