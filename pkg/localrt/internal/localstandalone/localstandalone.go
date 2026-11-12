@@ -609,7 +609,7 @@ func (e *Engine) Stopped(p rt.Plan) (rt.Airflow, error) {
 	}
 	if _, err := os.Stat(filepath.Join(projectPath, ".venv", "bin", "python")); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("%w, and it has no environment yet: astro local start builds one, or astro local start --docker runs it in Docker", localstate.ErrNotRunning)
+			return nil, fmt.Errorf("%w, and it has no environment yet: astro local start builds one (as does astro local run without --no-sync), or astro local start --docker runs it in Docker", localstate.ErrNotRunning)
 		}
 		return nil, err
 	}

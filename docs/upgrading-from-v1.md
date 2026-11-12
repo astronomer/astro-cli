@@ -96,7 +96,7 @@ Everything below fails with an error naming the replacement, instead of an "unkn
 | `astro dev ps` | `astro local status` |
 | `astro dev logs` | `astro local logs` |
 | `astro dev bash` | `astro local shell` |
-| `astro dev run` | `astro local run` |
+| `astro dev run` | `astro local run` (with nothing running it syncs `.venv` first; `--no-sync` skips that) |
 | `astro dev parse` | `astro local check` |
 | `astro dev pytest` | `astro local run pytest` |
 | `astro dev build` | `astro package` |

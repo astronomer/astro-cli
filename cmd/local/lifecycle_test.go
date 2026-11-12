@@ -56,7 +56,26 @@ type stoppedRuntime struct {
 	calls *stoppedCalls
 }
 
-type stoppedCalls struct{ stopped, started localrt.Plan }
+type stoppedCalls struct {
+	stopped, started localrt.Plan
+	// synced holds the plan of each Sync; order records Sync and Stopped as
+	// they happen, so a test can see the sync came first.
+	synced []localrt.Plan
+	order  []string
+	// syncLines are written through the sync's OnLine; syncErr is what it
+	// returns.
+	syncLines []string
+	syncErr   error
+}
+
+func (r stoppedRuntime) Sync(_ context.Context, p localrt.Plan, cb localrt.Callbacks) error {
+	r.calls.synced = append(r.calls.synced, p)
+	r.calls.order = append(r.calls.order, "sync")
+	for _, l := range r.calls.syncLines {
+		cb.OnLine(localrt.LogLine{Component: "uv", Text: l})
+	}
+	return r.calls.syncErr
+}
 
 func (r stoppedRuntime) ReadStatus(dir string) (localrt.Status, error) {
 	return localrt.Status{ProjectPath: dir, State: localrt.StateStopped, Mode: r.mode}, nil
@@ -66,6 +85,7 @@ func (r stoppedRuntime) Attach(string) (localrt.Airflow, error) { return nil, lo
 
 func (r stoppedRuntime) Stopped(p localrt.Plan) (localrt.Airflow, error) {
 	r.calls.stopped = p
+	r.calls.order = append(r.calls.order, "stopped")
 	return runAirflow{}, nil
 }
 
@@ -83,6 +103,15 @@ func stoppedProject(t *testing.T, mode localrt.Mode) (d Deps, stdout *bytes.Buff
 		t.Fatal(err)
 	}
 	d.WorkingDir = func() (string, error) { return project, nil }
+	// A venv that already exists, so a sync reads as an update and stays
+	// quiet; the first-build tests remove it.
+	venvBin := filepath.Join(project, ".venv", "bin")
+	if err := os.MkdirAll(venvBin, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(venvBin, "python"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	calls = &stoppedCalls{}
 	d.Runtime = stoppedRuntime{mode: mode, calls: calls}
 	return d, stdout, calls
