@@ -24,9 +24,6 @@ var (
 	successCtxDeleteMsg  = "Successfully deleted context: %s"
 )
 
-// localhostDomain is the context domain of a locally running Astro.
-const localhostDomain = "localhost"
-
 var tab = printutil.Table{
 	Padding:      []int{44},
 	Header:       []string{"NAME"},
@@ -198,7 +195,7 @@ func IsCloudDomain(domain string) bool {
 	// Case when user is connected to localhost && local.platform is set to cloud in astro config.
 	// Only localhost itself: a domain that merely contains the word (localhost.example.com) is
 	// someone else's host, and a cloud login there would hand it an Astro token.
-	if domain == localhostDomain && config.CFG.LocalPlatform.GetString() == config.CloudPlatform {
+	if domain == domainutil.LocalDomain && config.CFG.LocalPlatform.GetString() == config.CloudPlatform {
 		return true
 	}
 

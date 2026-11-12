@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"strings"
 
 	"github.com/spf13/afero"
 )
@@ -85,11 +86,13 @@ func (s *Suite) TestContextAPIProtocolIsOnlyAScheme() {
 	for value, want := range map[string]string{
 		"https":                   "https://api.astronomer.io/v1alpha1",
 		"http":                    "http://api.astronomer.io/v1alpha1",
+		"HTTP\t":                  "http://api.astronomer.io/v1alpha1",
 		"https://evil.example/x?": "https://api.astronomer.io/v1alpha1",
 		"":                        "https://api.astronomer.io/v1alpha1",
 	} {
 		s.NoError(CFG.CloudAPIProtocol.SetHomeString(value))
 		s.Equal(want, c.GetPublicRESTAPIURL("v1alpha1"), value)
-		s.Contains(c.GetSoftwareAPIURL(), "://houston.astronomer.io:", value)
+		scheme, _, _ := strings.Cut(want, "://")
+		s.True(strings.HasPrefix(c.GetSoftwareAPIURL(), scheme+"://houston.astronomer.io:"), value)
 	}
 }

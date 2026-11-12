@@ -2,6 +2,7 @@ package config
 
 import (
 	"io"
+	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -59,12 +60,12 @@ func (c *Context) GetPublicRESTAPIURL(version string) string {
 }
 
 // apiProtocol is the scheme the API URLs are built with: cloud.api.protocol
-// when it is http or https, https otherwise. The value is spliced in front of
+// when it is http or https (in any case, spaces trimmed), https otherwise. The value is spliced in front of
 // "://" and the host, so anything else (a full URL, say) would move every
 // request, token and all, to another host.
 func apiProtocol() string {
-	if p := CFG.CloudAPIProtocol.GetString(); p == "http" {
-		return p
+	if strings.EqualFold(strings.TrimSpace(CFG.CloudAPIProtocol.GetString()), "http") {
+		return "http"
 	}
 	return "https"
 }
