@@ -282,6 +282,9 @@ type project struct {
 	// to its built-in series, and a case that needs a real catalog serves one
 	// or names the live one.
 	catalogURL string
+	// stdin is what commands read on stdin, when a case pipes something in;
+	// empty is /dev/null.
+	stdin string
 }
 
 // unreachableCatalog refuses connections at once, so a lookup fails fast rather
@@ -426,6 +429,10 @@ func mkdir(t *testing.T, parts ...string) string {
 var leaky = []string{
 	"ASTRO_", "AIRFLOW_", "XDG_", "UV_",
 	"HOME", "USERPROFILE", "NO_COLOR", "VIRTUAL_ENV",
+	// Whether a run may ask is decided by CI (input.Refusal), so a runner that
+	// sets it would turn every case that expects a question into a refusal. A
+	// case about CI sets it itself, through extra.
+	"CI", "JENKINS_URL", "HUDSON_URL", "TF_BUILD",
 }
 
 // env is the whole environment a command runs with: the ambient one, minus
@@ -556,6 +563,14 @@ func (p *project) run(args ...string) *result {
 	return p.runWith(nil, args...)
 }
 
+// runPiped is run with stdin piped from stdin, as `echo y | astro ...` does.
+func (p *project) runPiped(stdin string, args ...string) *result {
+	p.t.Helper()
+	p.stdin = stdin
+	defer func() { p.stdin = "" }()
+	return p.run(args...)
+}
+
 // runSlow is run with the bound a command that drives a real Airflow needs.
 //
 // Tier 2 only. `astro local start` installs what the project is missing,
@@ -585,6 +600,9 @@ func (p *project) runBounded(bound time.Duration, extra map[string]string, args 
 	cmd.Env = p.env(extra)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	if p.stdin != "" {
+		cmd.Stdin = strings.NewReader(p.stdin)
+	}
 	// A command that outlives its bound fails its test with where it hung,
 	// not only that it did: its stderr ends with every goroutine's stack.
 	dumpStacksOnTimeout(cmd)

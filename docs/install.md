@@ -118,10 +118,12 @@ open the browser. To log in again anyway, run `astro login --force`.
 
 Some shells do not give the CLI a terminal, for example a coding agent's
 shell. There, `astro login` cannot open the browser. It prints a link instead.
-Open the link and sign in there.
+Open the link and sign in there. The same holds when `CI` is set or you pass `--non-interactive`: `astro login`
+is not refused there, it prints the link and waits.
 
-If the CLI has no saved account for the domain, it opens the sign-up screen.
-Create your account there. If you already have an account, log in from the same
+If the CLI has no saved account for the domain, it opens the sign-up screen
+(in a shell with no terminal or in CI it opens the sign-in screen; pass
+`--signup` to open sign-up there). Create your account there. If you already have an account, log in from the same
 page, or run `astro login --signin` to open the sign-in screen directly.
 
 After you sign up, Astro sends you a verification email, so the command stops
@@ -241,10 +243,12 @@ the first of:
    tag like `runtime:3.3-2` names Airflow 3.3. An older tag like
    `astro-runtime:9.1.0` is a *runtime* version that does not name the
    Airflow minor, so `init` pins `apache-airflow==2.*`. When the Dockerfile
-   is only that `FROM`, `init` also writes the build as `[tool.astro] runtime
-   = '9.1.0'`, so a deploy builds on the runtime the project ran rather than
-   the newest Airflow 2; for a floating tag (`astro-runtime:9`), a flavor, or
-   a Dockerfile that does more, it says so under Left to do instead;
+   is only that `FROM`, `init` also writes the runtime version as
+   `[tool.astro] runtime = '9.1.0'`, so a deploy builds on the runtime the
+   project ran rather than the newest Airflow 2, and the Python of a
+   `-python-X.Y` flavor as `requires-python`; for a floating tag
+   (`astro-runtime:9`) it says so under Left to do instead, and a mirror or
+   a `-slim` flavor keeps the Dockerfile as the project's build;
 4. an `apache-airflow==` pin in `requirements.txt`;
 5. the newest supported series from the runtime catalog.
 
@@ -275,20 +279,22 @@ writes leave Intel macOS out.
 
 ### A kept Dockerfile
 
-A kept Dockerfile stays the project's build: Docker mode, `astro deploy` and
-`astro package` build from it, and its `RUN`, `ENV` and other instructions
-still run there. Left to do names what the manifest therefore does not
+A kept Dockerfile stays the project's build, as written: Docker mode,
+`astro deploy` and `astro package` build from it, its `RUN`, `ENV` and other
+instructions still run there, and its base still installs `requirements.txt`
+and `packages.txt`, which stay beside it. The image does not install from
+`uv.lock` yet. Left to do names what the manifest therefore does not
 describe:
 
-- Python packages a `RUN pip install` or `uv pip install` step installs.
-  Standalone mode and `astro local check` read only `pyproject.toml`, so add
-  them to `[project] dependencies` too.
+- Python packages a `RUN pip install` or `uv pip install` step installs, each
+  with the `uv add` command that gives standalone mode and
+  `astro local check` the same package.
 - Each `RUN --mount=type=secret` step, with the
   [`build-secrets`](manifest-reference.md#build-secrets) entry to add.
-- Instructions it did not read (`ENV` and the rest). Standalone mode never
-  sees an `ENV` line, so a value a Dag reads needs a home there too: declare
-  it in `[tool.astro.env]`, with the value as its default, or set it with
-  `astro local env variable set`.
+
+Standalone mode never sees an `ENV` line either, so a value a Dag reads needs
+a home there too: declare it in `[tool.astro.env]`, with the value as its
+default, or set it with `astro local env variable set`.
 
 If a `RUN` line does something you cannot place, ask the person what it was
 for. Don't guess.

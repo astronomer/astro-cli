@@ -575,7 +575,8 @@ func (s *Suite) TestGetWorkspaceSelectionPaged() {
 
 	s.Run("closed stdin ends at once", func() {
 		got, out := ask(3, "")
-		s.ErrorIs(got.err, errInvalidWorkspaceKey)
+		s.True(input.IsRequired(got.err), "%v", got.err)
+		s.NotErrorIs(got.err, errInvalidWorkspaceKey)
 		s.NotContains(out, told)
 	})
 

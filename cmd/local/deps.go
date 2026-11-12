@@ -115,16 +115,10 @@ type Deps struct {
 	// Deployment by default (target = "apc"), on this context's domain.
 	APC *APCLinking
 
-	// Interactive reports whether this run may ask the user a question. It is a
-	// seam rather than a stdin type-assertion so a test can drive the prompt
-	// path without a pty. nil means non-interactive, which is the safe default:
-	// a run that cannot be asked is never blocked waiting for an answer.
-	Interactive func() bool
-
-	// OutputTerminal reports whether stdout is a terminal, for a command whose
-	// question and whose report both go to stdout: `astro use | grep prod` has a
-	// terminal on stdin and still wants the report, not a picker it cannot see.
-	// nil means not a terminal.
+	// OutputTerminal reports whether stdout is a terminal, for a bare `astro use`:
+	// with its stdin and stderr at a terminal it may ask, but `astro use | grep
+	// prod` still wants the report, not a picker whose answer goes nowhere. nil
+	// means not a terminal.
 	OutputTerminal func() bool
 
 	// JSONStyle lays out a json result. The zero value, cliout.StyleAuto, is
@@ -257,7 +251,6 @@ func NewDeps() Deps {
 		WorkspaceClients:   emenv.Clients,
 		Session:            astrosession.BearerFor,
 		Locator:            instancelocate.New,
-		Interactive:        stdinIsTerminal,
 		OutputTerminal:     stdoutIsTerminal,
 		AirflowDefault:     catalogDefault,
 		RuntimeCheck:       runtimecatalog.CheckRuntime,
@@ -283,11 +276,6 @@ func NewDeps() Deps {
 		d.Watch = rt.WatchProject
 	}
 	return d
-}
-
-// stdinIsTerminal is the production answer to "can this run ask a question".
-func stdinIsTerminal() bool {
-	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
 // stdoutIsTerminal is the production answer to "will the user see what this

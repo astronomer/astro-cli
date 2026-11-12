@@ -295,6 +295,7 @@ func TestDeployBundleTarget(t *testing.T) {
 			assert.Contains(t, got.Error, "pass --deployment with a Deployment id, a Deployment name, or a link name")
 		})
 		t.Run(name+": none named, without a terminal", func(t *testing.T) {
+			nonInteractiveDeploy(t)
 			bundle := dbtProject(t)
 			noBundleTransport(t)
 			r := execBundleRun(t, nil, "", with(bundle)...)

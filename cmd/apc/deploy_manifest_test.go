@@ -177,9 +177,9 @@ func TestDeployManifestNeverPicks(t *testing.T) {
 // of those links it.
 func TestDeployManifestAsks(t *testing.T) {
 	dir := linkedProject(t)
-	prev := stdinIsTerminal
-	stdinIsTerminal = func() bool { return true }
-	t.Cleanup(func() { stdinIsTerminal = prev })
+	prev := mayAsk
+	mayAsk = func() bool { return true }
+	t.Cleanup(func() { mayAsk = prev })
 	asked := manifestDeploys(t, builtAndPushed)
 	api := newAPCClient()
 	api.On("ListDeployments", houston.ListDeploymentsRequest{WorkspaceID: "ck05r3bor07h40d02y2hw4n4v"}).Return([]houston.Deployment{
@@ -377,9 +377,9 @@ func TestDeployManifestRefusesDagsWithImage(t *testing.T) {
 // asking is a terminal for one test: the deploy may ask.
 func asking(t *testing.T) {
 	t.Helper()
-	prev := stdinIsTerminal
-	stdinIsTerminal = func() bool { return true }
-	t.Cleanup(func() { stdinIsTerminal = prev })
+	prev := mayAsk
+	mayAsk = func() bool { return true }
+	t.Cleanup(func() { mayAsk = prev })
 }
 
 // promptAPI is a Houston whose workspace lists dep-old and dep-new, which no

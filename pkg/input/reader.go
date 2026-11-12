@@ -11,13 +11,13 @@ import (
 // answers through, and the file it buffers.
 //
 // A bufio.Reader reads ahead: given a pipe, its first read takes everything
-// that is there, not just the line it returns. So two questions that each
-// wrapped stdin in a reader of their own lost answers between them: a picker
-// took "2\ny\n" from a pipe, used the "2", and the confirmation after it read
-// a stdin with nothing left, which is a no. A terminal hands over one line
-// per read, so only piped answers ever showed it. Every question reading the
-// same file reads through the same reader, and so sees what the one before
-// it left buffered.
+// that is there, not just the line it returns. A run never reads an answer from
+// a pipe (a prompt is refused unless stdin is a terminal, which hands over one
+// line per read), so this serves tests that simulate a person typing several
+// answers through one pipe: two questions that each wrapped stdin in a reader
+// of their own lost answers between them. Every question reading the same file
+// reads through the same reader, and so sees what the one before it left
+// buffered.
 var shared struct {
 	sync.Mutex
 	src *os.File

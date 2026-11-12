@@ -8,6 +8,7 @@ import (
 
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/platformversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // composerDepsFile is the requirements file the Composer environment update
@@ -117,14 +118,15 @@ func composerRequirements(deps []string) string {
 // composerNextSteps is the two-part hand-off: DAGs (and plugins) to the bucket
 // through the Composer storage commands, and PyPI dependencies to the
 // environment through an update. The storage commands take an environment and
-// location, so the user never needs the bucket name.
+// location, so the user never needs the bucket name. Each path argument is
+// quoted for the shell, as every printed command is.
 func composerNextSteps(outDir string, hasPlugins bool) []string {
 	steps := []string{
-		fmt.Sprintf("gcloud composer environments storage dags import --environment=<env> --location=<region> --source=%s/dags", outDir),
+		fmt.Sprintf("gcloud composer environments storage dags import --environment=<env> --location=<region> --source=%s", scaffold.ShellQuote(outDir+"/dags")),
 	}
 	if hasPlugins {
-		steps = append(steps, fmt.Sprintf("gcloud composer environments storage plugins import --environment=<env> --location=<region> --source=%s/plugins", outDir))
+		steps = append(steps, fmt.Sprintf("gcloud composer environments storage plugins import --environment=<env> --location=<region> --source=%s", scaffold.ShellQuote(outDir+"/plugins")))
 	}
-	steps = append(steps, fmt.Sprintf("gcloud composer environments update <env> --location=<region> --update-pypi-packages-from-file %s/%s", outDir, composerDepsFile))
+	steps = append(steps, fmt.Sprintf("gcloud composer environments update <env> --location=<region> --update-pypi-packages-from-file %s", scaffold.ShellQuote(outDir+"/"+composerDepsFile)))
 	return steps
 }

@@ -285,6 +285,14 @@ func setupClientDependencyFiles(buildDir string) error {
 		clientPath := filepath.Join(buildDir, clientFile)
 		regularPath := filepath.Join(buildDir, regularFile)
 
+		// The project's own requirements.txt or packages.txt was copied here
+		// as it is, symlink included, and CopyFile writes through a symlink.
+		// Remove it first so the write lands in the build context, not on
+		// the file a symlink points at (a monorepo's shared requirements.txt,
+		// say), which the client deps would otherwise overwrite.
+		if err := os.Remove(regularPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to replace %s in build context: %w", regularFile, err)
+		}
 		// Copy client file content to the regular file location (requires client file to exist)
 		if err := fileutil.CopyFile(clientPath, regularPath); err != nil {
 			return fmt.Errorf("failed to copy %s to %s in build context: %w", clientFile, regularFile, err)
@@ -379,17 +387,24 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		// This is needed because Dockerfile.client uses base images from a private registry
 
 		// Skip registry login if the base image registry is not from astronomer, check the content of the Dockerfile.client file
+		errOut := deployInput.ErrOut
+		if errOut == nil {
+			errOut = ansi.Messages
+		}
 		dockerfileClientContent, err := fileutil.ReadFileToString(filepath.Join(deployInput.Path, "Dockerfile.client"))
-		if util.IsAstronomerRegistry(dockerfileClientContent) || err != nil {
-			// login to the registry
+		needsLogin := util.IsAstronomerRegistry(dockerfileClientContent) || err != nil
+		baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
+		switch {
+		case !needsLogin:
+		case !util.IsAstronomerRegistryHost(baseImageRegistry):
+			// The login sends the Astro token, so it goes to an Astronomer
+			// registry or nowhere: the setting can come from a project's
+			// .astro/config.yaml, and any other host would just collect it.
+			ansi.Warn(errOut, fmt.Sprintf("the base image registry %q is not an Astronomer registry, so astro does not log in to it with your Astro token; the build pulls with the credentials the container engine already has", baseImageRegistry))
+		default:
 			if err != nil {
-				errOut := deployInput.ErrOut
-				if errOut == nil {
-					errOut = ansi.Messages
-				}
 				ansi.Warn(errOut, "could not read Dockerfile.client, so astro assumes its base image is on images.astronomer.cloud and logs in to that registry")
 			}
-			baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
 			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)
 			err := loginBaseImageRegistry(ctx, engine, baseImageRegistry, c.Token)
 			if err != nil {

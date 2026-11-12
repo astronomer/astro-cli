@@ -70,27 +70,6 @@ func readSetValue(cmd *cobra.Command, flagName, flagValue, prompt string) (strin
 	return v, nil
 }
 
-// errAbortedDelete is a delete asked where nobody could answer. One answered
-// no is input.ErrAborted.
-var errAbortedDelete = errors.New("aborted: pass --yes (or confirm interactively) to delete")
-
-// confirmTTY asks prompt at an interactive prompt: nil for a yes (y or yes,
-// in any case), input.ErrAborted for any other answer. On a non-TTY it reads
-// nothing and returns errAbortedDelete, marked as a question this run could
-// not ask; callers must require an explicit --yes flag for non-interactive
-// use. A run that may not ask at all (--output json) returns that refusal,
-// naming --yes, rather than an answer.
-func confirmTTY(prompt string) error {
-	yes := input.AnsweredBy("--yes")
-	if err := input.MayAsk(prompt, yes); err != nil {
-		return err
-	}
-	if !stdinIsTerminal() {
-		return input.Required(errAbortedDelete)
-	}
-	return input.ConfirmOrAbort(prompt, yes)
-}
-
 // hasPipedStdin reports whether stdin appears to be a pipe rather than a TTY.
 // Used by opt-in secret prompts to distinguish "user piped a value" from
 // "user is at an interactive shell with no flag set".
@@ -216,7 +195,7 @@ func setFromFileEntry(warn io.Writer, r cliout.Renderer, scope env.Scope, k, val
 }
 
 // runEnvDelete deletes the noun idOrKey names, once confirmed: --yes, or a
-// yes at a terminal. Under --output json it asks nothing, failing as
+// yes to the question. Under --output json it asks nothing, failing as
 // input_required naming --yes.
 func runEnvDelete(cmd *cobra.Command, out io.Writer, noun, idOrKey string, del func(string, env.Scope, astrov1.APIClient) (*astrov1.EnvironmentObject, error)) error {
 	scope, err := envScope()
@@ -227,7 +206,7 @@ func runEnvDelete(cmd *cobra.Command, out io.Writer, noun, idOrKey string, del f
 	cmd.SilenceUsage = true
 
 	if !envYes {
-		if err := confirmTTY(fmt.Sprintf("Delete %s %q?", noun, idOrKey)); err != nil {
+		if err := input.ConfirmOrAbort(fmt.Sprintf("Delete %s %q?", noun, idOrKey), input.AnsweredBy("--yes")); err != nil {
 			return err
 		}
 	}

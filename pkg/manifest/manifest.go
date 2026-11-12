@@ -80,6 +80,10 @@ func (m *Manifest) RemovedAirflowKey() string {
 	return m.repair.removedKey
 }
 
+// AstronomerIndexName is the name of the [[tool.uv.index]] entry `astro init`
+// writes for Astronomer's builds of Airflow.
+const AstronomerIndexName = "astronomer"
+
 // UV is the [tool.uv] table, the fields astro reads. uv applies them to the
 // project's own environment itself; astro reads them for the scratch
 // environments it builds outside the project, which uv cannot see the project
@@ -94,6 +98,11 @@ type UV struct {
 	// Sources maps a package to the [[tool.uv.index]] URL its
 	// [tool.uv.sources] entry names, for the entries that name an index.
 	Sources map[string]string
+	// AstronomerIndex is the URL of the [[tool.uv.index]] entry named
+	// AstronomerIndexName, the one `astro init` writes for Astronomer's
+	// builds, whether it is the project's default or explicit. Empty when
+	// there is none.
+	AstronomerIndex string
 	// DirectURLs maps a package to the PEP 508 URL its [tool.uv.sources]
 	// entry stands for, for the entries that name a git repository or a URL.
 	DirectURLs map[string]string
@@ -115,18 +124,21 @@ type UV struct {
 	Raw map[string]any
 }
 
-// IndexPages are the per-package pages of the indexes Sources names, the
-// PEP 503 layout <index>/<package>/, for an install that happens outside the
-// project, where uv cannot read [tool.uv.sources]: a page lists one package's
-// files, so passing it as find-links scopes the index to that package the way
-// the source does.
+// IndexPages are the per-package pages, the PEP 503 layout
+// <index>/<package>/, of the indexes Sources names, and of Astronomer's index
+// (AstronomerIndex) for each Astronomer build the constraints pin (AstroPin)
+// that no source routes: a project with Astronomer's index as its default
+// needs no source for them. They are for an install that happens outside the
+// project, where uv cannot read [tool.uv.sources] or [[tool.uv.index]]: a page
+// lists one package's files, so passing it as find-links scopes the index to
+// that package the way the project's settings do.
 //
 //nolint:gocritic // a value receiver, as Astro Desktop calls it: UV outgrew the hugeParam limit after this shipped
 func (u UV) IndexPages() []string {
 	return u.indexPages(func(string) bool { return true })
 }
 
-// IndexPagesFor is IndexPages for the sources of deps alone: the page of each
+// IndexPagesFor is IndexPages for the packages of deps alone: the page of each
 // package a requirement in deps names, matched by distribution name
 // (DistName). An install that never asks for a package has no use for its
 // index, and reading the page anyway makes the install reach that index: a
@@ -143,12 +155,43 @@ func (u UV) IndexPagesFor(deps []string) []string {
 	return u.indexPages(func(pkg string) bool { return wanted[DistName(pkg)] })
 }
 
-// indexPages are the pages of the sources whose package keep accepts.
+// indexPages are the pages of the sources whose package keep accepts, and of
+// Astronomer's index for the Astronomer builds the constraints pin that no
+// source routes. Only the index named AstronomerIndexName carries them: a
+// default index of the project's own (a mirror) may not.
 //
 //nolint:gocritic // a value receiver, as its callers have
 func (u UV) indexPages(keep func(pkg string) bool) []string {
-	pkgs := make([]string, 0, len(u.Sources))
-	for pkg := range u.Sources {
+	// where is keyed by DistName; spelled keeps a source's own spelling, which
+	// its page is asked for as written.
+	where := make(map[string]string, len(u.Sources))
+	spelled := make(map[string]string, len(u.Sources))
+	for pkg, index := range u.Sources {
+		// uv reads a source's key as a package name, so apache_airflow and
+		// Apache-Airflow are the one package the pins name.
+		where[DistName(pkg)] = index
+		spelled[DistName(pkg)] = pkg
+	}
+	if u.AstronomerIndex != "" {
+		for _, c := range u.ConstraintDependencies {
+			if !AstroPin(c) {
+				continue
+			}
+			// Airflow 3's build of apache-airflow requires the same build of
+			// core, which the pins leave to it; only Airflow 3 has a Task SDK.
+			pkgs := []string{DistName(c)}
+			if pkgs[0] == taskSDKDist {
+				pkgs = append(pkgs, airflowCoreDist)
+			}
+			for _, pkg := range pkgs {
+				if where[pkg] == "" {
+					where[pkg] = u.AstronomerIndex
+				}
+			}
+		}
+	}
+	pkgs := make([]string, 0, len(where))
+	for pkg := range where {
 		if keep(pkg) {
 			pkgs = append(pkgs, pkg)
 		}
@@ -156,7 +199,11 @@ func (u UV) indexPages(keep func(pkg string) bool) []string {
 	sort.Strings(pkgs)
 	pages := make([]string, 0, len(pkgs))
 	for _, pkg := range pkgs {
-		pages = append(pages, strings.TrimSuffix(u.Sources[pkg], "/")+"/"+pkg+"/")
+		name := pkg
+		if s := spelled[pkg]; s != "" {
+			name = s
+		}
+		pages = append(pages, strings.TrimSuffix(where[pkg], "/")+"/"+name+"/")
 	}
 	return pages
 }
@@ -771,6 +818,9 @@ func uvTable(t map[string]any) UV {
 		address, _ := index["url"].(string)
 		if name != "" && address != "" {
 			urls[name] = address
+		}
+		if name == AstronomerIndexName && address != "" {
+			out.AstronomerIndex = address
 		}
 	}
 	sources, _ := t["sources"].(map[string]any)

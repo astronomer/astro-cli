@@ -268,13 +268,13 @@ const (
 
 var mockV1Client *astrov1_mocks.ClientWithResponsesInterface
 
-// standInForATerminal makes stdinIsTerminal answer terminal, until the test
+// standInForATerminal makes mayAsk answer asks, until the test
 // ends: the tests pipe what a person would type.
 func standInForATerminal(t *testing.T, terminal bool) {
 	t.Helper()
-	previous := stdinIsTerminal
-	stdinIsTerminal = func() bool { return terminal }
-	t.Cleanup(func() { stdinIsTerminal = previous })
+	previous := mayAsk
+	mayAsk = func() bool { return terminal }
+	t.Cleanup(func() { mayAsk = previous })
 }
 
 func (s *Suite) SetupTest() {
@@ -627,13 +627,52 @@ func (s *Suite) TestGetDeploymentAutoSelectsOnlyToRead() {
 		s.Contains(err.Error(), "pass --deployment")
 	})
 
+	// Several Deployments and no target: in CI the picker is refused up front
+	// (nothing drawn, nothing read), and at a stdin that ends with no answer it
+	// is asked and fails the same way. Both name --deployment, and neither is
+	// the vague "invalid Deployment selected".
+	two := astrov1.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		JSON200: &astrov1.DeploymentsPaginated{Deployments: []astrov1.Deployment{
+			{Id: "test-id-1", Name: "one"}, {Id: "test-id-2", Name: "two"},
+		}},
+	}
+	s.Run("several Deployments in CI is input_required naming --deployment, and draws nothing", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&two, nil).Once()
+		s.T().Cleanup(input.SetGuard(func() string { return "with CI set it cannot" }))
+		defer testUtil.MockUserInput(s.T(), "1\n")()
+
+		var err error
+		stderr := capture(s.T(), &os.Stderr, func() {
+			_, err = GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
+		})
+		s.Require().Error(err)
+		s.True(input.IsRequired(err), "%v", err)
+		s.NotErrorIs(err, ErrInvalidDeploymentKey)
+		s.Contains(err.Error(), "pass --deployment")
+		s.Empty(stderr, "nothing was drawn")
+	})
+
+	s.Run("several Deployments with stdin at its end is input_required naming --deployment", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&two, nil).Once()
+		defer testUtil.MockUserInput(s.T(), "")()
+
+		_, err := GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
+		s.Require().Error(err)
+		s.True(input.IsRequired(err), "%v", err)
+		s.NotErrorIs(err, ErrInvalidDeploymentKey)
+		s.Contains(err.Error(), "pass --deployment")
+	})
+
 	s.Run("a change with a terminal asks", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&one, nil).Once()
 
-		// Nothing typed is no pick.
+		// Nothing typed is no pick: not an invalid one, but nobody answering,
+		// which names the flag.
 		defer testUtil.MockUserInput(s.T(), "")()
 		_, err := GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
-		s.ErrorIs(err, ErrInvalidDeploymentKey)
+		s.True(input.IsRequired(err), "%v", err)
+		s.Contains(err.Error(), "pass --deployment")
 	})
 
 	s.Run("a change with a terminal takes what is picked", func() {
@@ -757,7 +796,7 @@ func (s *Suite) TestGetDeploymentFromADeploymentToken() {
 
 		defer testUtil.MockUserInput(s.T(), "")() // nothing typed: no pick
 		got, err := GetDeployment(ws, "", "", ToPick, nil, mockV1Client)
-		s.ErrorIs(err, ErrInvalidDeploymentKey, "asked, not taken: %v", got.Id)
+		s.True(input.IsRequired(err), "asked, not taken: %v %v", got.Id, err)
 	})
 
 	s.Run("a delete with --yes and no terminal still needs its target", func() {
@@ -2658,7 +2697,7 @@ func (s *Suite) TestDelete() {
 		removal, err := Delete("test-id-1", ws, "", false, mockV1Client)
 		s.Nil(removal)
 		s.True(input.IsRequired(err), "%v", err)
-		s.ErrorIs(err, errDeleteNeedsConfirmation)
+		s.Contains(err.Error(), "pass --yes")
 		mockV1Client.AssertExpectations(s.T())
 	})
 

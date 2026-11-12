@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -59,10 +60,6 @@ func (s *CmdSuite) TestContextSwitchPicker() {
 		return nil
 	}
 
-	previousMayPrompt := contextPickerMayPrompt
-	s.T().Cleanup(func() { contextPickerMayPrompt = previousMayPrompt })
-	contextPickerMayPrompt = func() bool { return true }
-
 	const green, reset = "\033[1;32m", "\033[0m"
 
 	// Two saved contexts, astronomer.io current: astronomer-dev.io is row 1
@@ -73,7 +70,8 @@ func (s *CmdSuite) TestContextSwitchPicker() {
 		s.Require().NoError(dev.SetContext())
 		got = ""
 	}
-	// run returns what the picker drew on stdout and what went to stderr.
+	// run returns what the picker drew and what else went to stderr: both are
+	// stderr, since stdout carries a result only.
 	run := func(stdin string) (picker, stderr string, err error) {
 		cmd := &cobra.Command{}
 		cmd.SetIn(strings.NewReader(stdin))
@@ -81,7 +79,8 @@ func (s *CmdSuite) TestContextSwitchPicker() {
 		cmd.SetErr(errOut)
 		out := new(bytes.Buffer)
 		err = switchContext(cmd, nil, nil, textTo(out))
-		return out.String(), errOut.String(), err
+		s.Empty(out.String(), "stdout carries a result only, never the picker")
+		return errOut.String(), errOut.String(), err
 	}
 	// rowOf is the line of the picker's table that holds domain.
 	rowOf := func(picker, domain string) string {
@@ -147,13 +146,22 @@ func (s *CmdSuite) TestContextSwitchPicker() {
 		}
 	})
 
-	s.Run("away from a terminal it asks for the domain instead of prompting", func() {
+	s.Run("a run that may not ask is told to name the domain, and draws nothing", func() {
 		setup()
-		contextPickerMayPrompt = func() bool { return false }
-		s.T().Cleanup(func() { contextPickerMayPrompt = func() bool { return true } })
+		s.T().Cleanup(input.SetGuard(func() string { return "with CI set it cannot" }))
 		picker, _, err := run("1\n")
-		s.ErrorContains(err, "astro context switch <domain>")
+		s.True(input.IsRequired(err), "%v", err)
+		s.ErrorContains(err, "the domain as an argument")
 		s.Empty(picker)
+		s.Empty(got)
+	})
+
+	s.Run("stdin that ends with no answer is input_required, not an invalid selection", func() {
+		setup()
+		_, _, err := run("")
+		s.True(input.IsRequired(err), "%v", err)
+		s.NotErrorIs(err, errInvalidContextSelection)
+		s.ErrorContains(err, "the domain as an argument")
 		s.Empty(got)
 	})
 

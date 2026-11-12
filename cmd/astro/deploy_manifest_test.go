@@ -267,9 +267,18 @@ func execDeployIO(answers string, args ...string) (out, errOut string, err error
 // terminal would.
 func interactiveDeploy(t *testing.T) {
 	t.Helper()
-	orig := stdinIsTerminal
-	stdinIsTerminal = func() bool { return true }
-	t.Cleanup(func() { stdinIsTerminal = orig })
+	orig := mayAsk
+	mayAsk = func() bool { return true }
+	t.Cleanup(func() { mayAsk = orig })
+}
+
+// nonInteractiveDeploy is a run that may not ask (CI, --non-interactive), until
+// the test ends.
+func nonInteractiveDeploy(t *testing.T) {
+	t.Helper()
+	orig := mayAsk
+	mayAsk = func() bool { return false }
+	t.Cleanup(func() { mayAsk = orig })
 }
 
 func TestDeployManifestJSONImageAndDag(t *testing.T) {
@@ -923,6 +932,7 @@ func TestDeployManifestRefusedBeforeTheBuildSaysNothingAboutBuilding(t *testing.
 }
 
 func TestDeployManifestNonInteractiveMustNameTheTarget(t *testing.T) {
+	nonInteractiveDeploy(t)
 	setupManifestDeploy(t, &fakeCmdDeployer{})
 
 	out, err := execDeployCapture()
@@ -964,6 +974,7 @@ workspace = "clw-ws"
 // to: the deploy refuses as one naming nothing does. A target named on the
 // command line wins.
 func TestDeployManifestTokensDeploymentInALinkedProject(t *testing.T) {
+	nonInteractiveDeploy(t)
 	fake := &fakeCmdDeployer{}
 	setupManifestDeploy(t, fake)
 	t.Cleanup(func() { deployment.UseTokenDeployment("") })
@@ -993,6 +1004,7 @@ func TestDeployManifestTokensDeploymentInALinkedProject(t *testing.T) {
 // A pin is ambient state, and ambient state never decides a deploy — not even
 // the one the query commands would resolve to.
 func TestDeployManifestPinDoesNotDecideANonInteractiveDeploy(t *testing.T) {
+	nonInteractiveDeploy(t)
 	setupManifestDeploy(t, &fakeCmdDeployer{})
 	t.Setenv(instances.EnvVar, "prod")
 
@@ -1029,6 +1041,7 @@ func decodeOneJSON(t *testing.T, out string) map[string]any {
 }
 
 func TestDeployRoutesManifestProject(t *testing.T) {
+	nonInteractiveDeploy(t)
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	resetDeployFlagVars()
 
@@ -1039,8 +1052,8 @@ func TestDeployRoutesManifestProject(t *testing.T) {
 	config.WorkingPath = dir
 	t.Cleanup(func() { config.WorkingPath = orig })
 
-	// The manifest names no deployment and the run is non-interactive (go test
-	// has no TTY), so the manifest path stops at selection asking for --deployment —
+	// The manifest names no deployment and the run is non-interactive (the
+	// test says so), so the manifest path stops at selection asking for --deployment —
 	// before any build or transport work. That message is unique to the manifest path,
 	// so it proves routing did not fall through to the 1.x path.
 	err := execDeployCmd()
@@ -1056,6 +1069,7 @@ func TestDeployRoutesManifestProject(t *testing.T) {
 func TestDeployAcceptsForceAndPromptOnAManifestProject(t *testing.T) {
 	for _, flag := range []string{"--force", "-f", "--prompt", "-p"} {
 		t.Run(flag, func(t *testing.T) {
+			nonInteractiveDeploy(t)
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			resetDeployFlagVars()
 
@@ -1126,6 +1140,7 @@ func TestDeployManifestBuildSecretRefusals(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			nonInteractiveDeploy(t)
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			resetDeployFlagVars()
 			if tc.env != "" {

@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houstonMocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -95,15 +96,24 @@ func (s *Suite) TestBasicAuth() {
 			want:         mockToken,
 			errAssertion: assert.NoError,
 		},
+		// No password and no terminal to ask at (a go test's stdin is a pipe):
+		// refused as a question this run could not ask.
 		{
-			name:         "successfully authenticated without password",
-			args:         args{username: "test"},
-			want:         mockToken,
-			errAssertion: assert.NoError,
+			name: "no password and no terminal",
+			args: args{username: "test"},
+			errAssertion: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.True(t, input.IsRequired(err), "%v", err) &&
+					assert.Contains(t, err.Error(), "astro login") &&
+					assert.NotContains(t, err.Error(), "as a flag", "no flag takes this password")
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			if tt.name == "no password and no terminal" {
+				defer input.SetTerminals(false, true)()
+				defer input.SetGuard(func() string { return input.Refusal(false, nil) })()
+			}
 			got, err := basicAuth(tt.args.username, tt.args.password, &config.Context{}, houstonMock)
 			if !tt.errAssertion(s.T(), err) {
 				return
@@ -706,6 +716,8 @@ func (s *Suite) TestCheckClusterDomain() {
 }
 
 func (s *Suite) TestGetAuthTokenSuccess() {
+	// The oAuth token prompt is answered with an empty line.
+	defer testUtil.MockUserInput(s.T(), "\n")()
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("software")
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)

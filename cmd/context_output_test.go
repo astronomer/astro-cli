@@ -91,8 +91,6 @@ func (s *CmdSuite) TestContextSwitchOutput() {
 		fmt.Fprintf(out, "Logged in to %s\n", domain)
 		return context.Switch(domain)
 	}
-	previousMayPrompt := contextPickerMayPrompt
-	s.T().Cleanup(func() { contextPickerMayPrompt = previousMayPrompt })
 
 	s.Run("json publishes the APC context now current", func() {
 		s.savedContexts()
@@ -131,20 +129,15 @@ func (s *CmdSuite) TestContextSwitchOutput() {
 	})
 
 	s.Run("json with no domain refuses to pick, naming the argument", func() {
-		for _, terminal := range []bool{true, false} {
+		{
 			s.savedContexts()
-			contextPickerMayPrompt = func() bool { return terminal }
 			stdout, stderr, err := runContextCmd("switch", "-o", "json")
 			s.Error(err)
 			s.Empty(stderr)
 			failure := decodeOne[cliout.ErrorObject](s, stdout)
-			s.Equal(cliout.KindInputRequired, failure.Kind, "terminal=%v", terminal)
+			s.Equal(cliout.KindInputRequired, failure.Kind)
 			s.Equal(1, failure.Code)
-			if terminal {
-				s.Contains(failure.Error, "the domain as an argument")
-			} else {
-				s.Contains(failure.Error, "astro context switch <domain>")
-			}
+			s.Contains(failure.Error, "the domain as an argument")
 			domain, err := config.GetCurrentDomain()
 			s.NoError(err)
 			s.Equal("astronomer.io", domain, "nothing switched")

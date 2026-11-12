@@ -528,3 +528,52 @@ func TestUpdateWithoutAQuestionSendsTheFilesItRead(t *testing.T) {
 		})
 	}
 }
+
+// A run that cannot ask (no terminal, CI) is refused as
+// input_required naming --yes before any file the flags name is read, and
+// --yes answers it.
+func TestUpdateCannotAskReadsNothing(t *testing.T) {
+	setup := func(t *testing.T, extra ...string) (apcRun, string, map[string]interface{}) {
+		t.Helper()
+		var sent map[string]interface{}
+		api := apcAt("2.1.0")
+		api.On("GetDeployment", "dep-1").Return(&houston.Deployment{ID: "dep-1", DagDeployment: houston.DagDeploymentConfig{Type: houston.DagOnlyDeploymentType}}, nil)
+		api.On("UpdateDeployment", mock.Anything).Run(func(args mock.Arguments) {
+			sent, _ = args.Get(0).(map[string]interface{})
+		}).Return(&certifiedDep, nil).Maybe()
+		key := oneShot(t, "KEY\n")
+		args := append([]string{"deployment", "update", "dep-1", "--dag-deployment-type", "git_sync", "--git-repository-url", "git@example.com:o/r.git", "--ssh-key", key}, extra...)
+		run := runAPCGated(t, api, true, "y\n", args...)
+		return run, key, sent
+	}
+	refused := func(t *testing.T, run apcRun, key string, sent map[string]interface{}) {
+		t.Helper()
+		assert.Equal(t, 1, run.code)
+		require.True(t, input.IsRequired(run.err), "%v", run.err)
+		assert.Contains(t, run.err.Error(), "--yes")
+		assert.False(t, run.stdinRead)
+		assert.Nil(t, sent)
+		b, err := os.ReadFile(key)
+		require.NoError(t, err)
+		assert.Equal(t, "KEY\n", string(b), "the key was not read")
+	}
+
+	t.Run("no terminal", func(t *testing.T) {
+		defer input.SetTerminals(false, true)()
+		run, key, sent := setup(t)
+		refused(t, run, key, sent)
+	})
+	t.Run("CI", func(t *testing.T) {
+		t.Setenv("CI", "true")
+		run, key, sent := setup(t)
+		refused(t, run, key, sent)
+	})
+	t.Run("--yes answers it, with the key read once", func(t *testing.T) {
+		defer input.SetTerminals(false, true)()
+		run, _, sent := setup(t, "--yes")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		dag, ok := sent["dagDeployment"].(map[string]interface{})
+		require.True(t, ok, "%v", sent)
+		assert.Equal(t, "KEY\n", dag["sshKey"])
+	})
+}

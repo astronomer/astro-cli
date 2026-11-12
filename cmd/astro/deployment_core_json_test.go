@@ -602,16 +602,22 @@ func TestDeploymentCoreNothingToActOnFails(t *testing.T) {
 		args []string
 		want string
 		code int
+		// ci is a run that may not ask: a delete naming none is refused, naming
+		// --deployment, rather than asking which Deployment to delete.
+		ci bool
 	}{
-		{"delete, naming none", []string{"delete", "--yes"}, "pass --deployment", cliout.ExitFailure},
-		{"delete, naming one", []string{"delete", coreDeploymentID, "--yes"}, "the Deployment specified was not found in this workspace", cliout.ExitFailure},
-		{"hibernate, naming none", []string{"hibernate", "--yes"}, noneHere, cliout.ExitFailure},
-		{"wake-up, naming one by name", []string{"wake-up", "--deployment-name", "etl-dev", "--yes"}, `no Deployment named "etl-dev" in workspace ws-empty`, cliout.ExitUsage},
-		{"--remove-override, naming none", []string{"wake-up", "--remove-override", "--yes"}, noneHere, cliout.ExitFailure},
+		{"delete, naming none", []string{"delete", "--yes"}, "pass --deployment", cliout.ExitFailure, true},
+		{"delete, naming one", []string{"delete", coreDeploymentID, "--yes"}, "the Deployment specified was not found in this workspace", cliout.ExitFailure, false},
+		{"hibernate, naming none", []string{"hibernate", "--yes"}, noneHere, cliout.ExitFailure, false},
+		{"wake-up, naming one by name", []string{"wake-up", "--deployment-name", "etl-dev", "--yes"}, `no Deployment named "etl-dev" in workspace ws-empty`, cliout.ExitUsage, false},
+		{"--remove-override, naming none", []string{"wake-up", "--remove-override", "--yes"}, noneHere, cliout.ExitFailure, false},
 	}
 	for _, tc := range cases {
 		for _, format := range []string{"text", "json"} {
 			t.Run(tc.name+" "+format, func(t *testing.T) {
+				if tc.ci {
+					t.Setenv("CI", "true")
+				}
 				r := execDeploymentRun(t, coreMock(t), "", append(tc.args, "--workspace-id", "ws-empty", "-o", format)...)
 				assert.Equal(t, tc.code, r.code)
 				require.Error(t, r.err)
