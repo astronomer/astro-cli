@@ -263,12 +263,12 @@ func TestSecretEnvIsDeclaredButNotRecorded(t *testing.T) {
 		t.Error("a non-secret value must still be written; only SecretEnv is withheld")
 	}
 
-	declared := passEnv(nil, secretEnv, env)
-	if len(declared) != 1 || declared[0] != secret {
-		t.Fatalf("passEnv = %v, want %s declared so compose has an entry to resolve", declared, secret)
+	declared := secretDecls(secretEnv, env)
+	if len(declared) != 1 || declared[0] != (secretDecl{Name: secret, Ref: secretRef(secret)}) {
+		t.Fatalf("secretDecls = %v, want %s declared as a reference so compose has an entry to resolve", declared, secret)
 	}
-	if got := secretEnviron(secretEnv); len(got) != 1 || got[0] != secret+"=postgres://user:pw@host/db" {
-		t.Fatalf("secretEnviron = %v, want the value handed to the compose process instead", got)
+	if got := secretEnviron(secretEnv); len(got) != 1 || got[0] != secretRef(secret)+"=postgres://user:pw@host/db" {
+		t.Fatalf("secretEnviron = %v, want the value handed to the compose process under its alias", got)
 	}
 }
 
@@ -297,7 +297,7 @@ func TestAirflowEnvRunsDAGsOnlyWhenTriggered(t *testing.T) {
 		secret := map[string]string{schedule: "True"}
 		env = airflowEnv("proj", 8080, major, nil, secret)
 		assert.Empty(t, value(env, schedule), "a secret value must replace the default, not lose to it")
-		assert.Contains(t, passEnv(nil, secret, env), schedule)
+		assert.Equal(t, []secretDecl{{Name: schedule, Ref: secretRef(schedule)}}, secretDecls(secret, env))
 	}
 }
 
@@ -314,29 +314,65 @@ func TestSecretEnvWinsOverEnv(t *testing.T) {
 			t.Fatalf("%s was written as %s; a key in both maps must be treated as secret", key, e.Value)
 		}
 	}
-	if got := passEnv(nil, map[string]string{key: "from-secret"}, env); len(got) != 1 || got[0] != key {
-		t.Fatalf("passEnv = %v, want %s declared", got, key)
+	if got := secretDecls(map[string]string{key: "from-secret"}, env); len(got) != 1 || got[0].Name != key {
+		t.Fatalf("secretDecls = %v, want %s declared", got, key)
 	}
 }
 
-// PassthroughEnv and SecretEnv both render as a valueless entry, so a key in both
-// lists must not be declared twice — duplicate keys in a YAML mapping are invalid.
+// A key in both PassthroughEnv and SecretEnv must not be declared twice —
+// duplicate keys in a YAML mapping are invalid — and the secret's reference
+// wins: its value is not in the CLI's environment for a valueless entry to find.
 func TestPassEnvDoesNotDuplicateAcrossBothSources(t *testing.T) {
-	got := passEnv([]string{"SHARED"}, map[string]string{"SHARED": "v"}, nil)
+	secret := map[string]string{"SHARED": "v"}
+	assert.Empty(t, passEnv([]string{"SHARED"}, secret, nil))
 	// Identity, not just count: a result of length one holding the wrong key
 	// satisfies a length check while declaring a variable nobody asked for.
-	assert.Equal(t, []string{"SHARED"}, got)
+	assert.Equal(t, []secretDecl{{Name: "SHARED", Ref: secretRef("SHARED")}}, secretDecls(secret, nil))
 }
 
-// The values have to reach the compose process, since that is what resolves the
-// declarations at container-creation time.
+// The values have to reach the compose process, since that is what interpolates
+// the references at container-creation time, under their aliases and never as
+// themselves.
 func TestSecretEnvironRendersSortedKeyValues(t *testing.T) {
 	got := secretEnviron(map[string]string{"B_KEY": "2", "A_KEY": "1"})
-	want := []string{"A_KEY=1", "B_KEY=2"}
+	want := []string{secretRef("A_KEY") + "=1", secretRef("B_KEY") + "=2"}
 	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
 		t.Fatalf("secretEnviron = %v, want %v", got, want)
 	}
 	if secretEnviron(nil) != nil {
 		t.Error("no secrets means no extra environment, not an empty entry")
 	}
+}
+
+// An alias maps back to the key it was made from, whatever characters the key
+// holds, and nothing else passes for one.
+func TestSecretRefRoundTrips(t *testing.T) {
+	for _, key := range []string{"AIRFLOW_CONN_DB", "docker_host", "weird.key-name"} {
+		ref := secretRef(key)
+		assert.Regexp(t, `^[A-Z_][A-Za-z0-9_]*$`, ref, "an alias must be a valid variable name")
+		got, ok := secretKey(ref)
+		assert.True(t, ok, ref)
+		assert.Equal(t, key, got)
+	}
+	for _, notOne := range []string{"DOCKER_HOST", secretRefPrefix + "zz", ""} {
+		_, ok := secretKey(notOne)
+		assert.False(t, ok, notOne)
+	}
+}
+
+// A secret renders as a reference to its alias, never as its value.
+func TestGenerateComposeRendersSecretsAsReferences(t *testing.T) {
+	in := goldenInput()
+	in.SecretEnv = []secretDecl{{Name: "DOCKER_HOST", Ref: secretRef("DOCKER_HOST")}}
+	got, err := generateCompose(in)
+	require.NoError(t, err)
+	var doc struct {
+		Services map[string]struct {
+			Environment map[string]*string `yaml:"environment"`
+		} `yaml:"services"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(got), &doc))
+	val := doc.Services["scheduler"].Environment["DOCKER_HOST"]
+	require.NotNil(t, val)
+	assert.Equal(t, "${"+secretRef("DOCKER_HOST")+"-}", *val)
 }
