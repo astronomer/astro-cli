@@ -153,16 +153,6 @@ func APIToken() (string, bool) {
 	return token, Credential(token) != ""
 }
 
-// ErrNoWorkspace is a command that needs a Workspace, run on a saved login
-// whose current Workspace is none and given none.
-var ErrNoWorkspace = errors.New("no Workspace is selected: pass --workspace, or switch to one with astro workspace switch")
-
-// ErrOrgTokenNoWorkspace is a command that needs a Workspace, run with an
-// ASTRO_API_TOKEN and given none. A token supplies its Workspace itself (a
-// Workspace or Deployment token) or has none (an Organization token), and a
-// run with a token never takes the one the person's saved login last used.
-var ErrOrgTokenNoWorkspace = errors.New("no Workspace is selected: the API token in ASTRO_API_TOKEN selects none (an Organization token does not)")
-
 // The ways a command can be given a Workspace differ, so the advice that
 // follows ErrOrgTokenNoWorkspace does too: a flag only, or a flag or the
 // project's link.
