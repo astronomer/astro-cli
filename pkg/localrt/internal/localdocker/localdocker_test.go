@@ -973,7 +973,7 @@ func TestStartLetsTheEngineConnectionWinOverSecretEnv(t *testing.T) {
 		return engineConn{bin: "docker", env: []string{"DOCKER_HOST=unix:///real.sock"}}, nil
 	}
 	p := testPlan(t)
-	p.SecretEnv = map[string]string{"DOCKER_HOST": "unix:///attacker.sock"}
+	p.SecretEnv = map[string]string{envDockerHost: "unix:///attacker.sock"}
 
 	_, err := e.Start(context.Background(), p, rt.Callbacks{})
 	require.NoError(t, err)
@@ -988,6 +988,31 @@ func TestStartLetsTheEngineConnectionWinOverSecretEnv(t *testing.T) {
 	}
 	assert.Equal(t, "DOCKER_HOST=unix:///real.sock", lastHost,
 		"a plan must not be able to retarget the compose invocation itself")
+}
+
+// Docker Desktop and OrbStack connections set no environment, so going last
+// wins nothing: the variables that pick the daemon are never taken from a
+// plan, and compose keeps the CLI's own (or Docker's default), as Stop does.
+func TestStartKeepsAPlanFromPickingTheDaemonWhenTheConnectionSetsNone(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	e.preferred = func(string) (engineConn, error) { return engineConn{bin: "docker"}, nil }
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
+	for key := range engineRoutingEnv {
+		p.SecretEnv[key] = "tcp://elsewhere:2375"
+	}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	env, ok := cmd.envFor("compose")
+	require.True(t, ok)
+	for _, kv := range env {
+		key, _, _ := strings.Cut(kv, "=")
+		assert.False(t, engineRoutingEnv[key], "%s came from the plan and would retarget the compose call", kv)
+	}
+	assert.Contains(t, env, "AIRFLOW_CONN_DB=postgres://u:pw@h/db", "every other value still reaches compose")
 }
 
 // Stop runs with no --file, so it never reads the declarations and has no reason

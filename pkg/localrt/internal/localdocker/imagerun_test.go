@@ -361,7 +361,7 @@ func TestRunInImageGivesTheCallersEnvToComposeItself(t *testing.T) {
 		Argv: []string{"python"},
 		Env: map[string]string{
 			"AIRFLOW_VAR_TOKEN": "s3cret",
-			"DOCKER_HOST":       "unix:///attacker.sock",
+			envDockerHost:       "unix:///attacker.sock",
 		},
 	}))
 

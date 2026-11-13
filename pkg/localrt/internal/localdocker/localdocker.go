@@ -1133,12 +1133,41 @@ func (l composeLine) argv(args ...string) []string {
 // the engine connection reaches the container with the connection's value
 // instead of its own; a compose command talking to the wrong daemon is
 // unrecoverable from the UI.
+//
+// Going last only wins a collision the connection takes part in, though, and
+// Docker Desktop and OrbStack connections set nothing: the daemon is whatever
+// the CLI's own environment and Docker's context say. So the variables that
+// pick the daemon are never taken from extraEnv at all. Compose keeps the
+// CLI's own value, or Docker's default, as Stop and Down do, and the container
+// gets that value for the key, as it does when the connection sets one.
 func (l composeLine) env() []string {
 	out := make([]string, 0, len(l.extraEnv)+len(l.conn.env))
-	out = append(out, l.extraEnv...)
+	for _, kv := range l.extraEnv {
+		key, _, _ := strings.Cut(kv, "=")
+		if !engineRoutingEnv[key] {
+			out = append(out, kv)
+		}
+	}
 	out = append(out, l.conn.env...)
 	return out
 }
+
+// engineRoutingEnv are the variables the docker and podman CLIs, and compose
+// under them, read to pick the daemon they talk to and how. A project's
+// Airflow env can carry one for its own reasons (DOCKER_HOST for a
+// DockerOperator DAG), and must not retarget the compose call that starts it.
+var engineRoutingEnv = map[string]bool{
+	envDockerHost:          true,
+	"DOCKER_CONTEXT":       true,
+	"DOCKER_CONFIG":        true,
+	"DOCKER_TLS_VERIFY":    true,
+	"DOCKER_CERT_PATH":     true,
+	"CONTAINER_HOST":       true,
+	"CONTAINER_CONNECTION": true,
+}
+
+// envDockerHost is the variable that points the docker CLI at a daemon.
+const envDockerHost = "DOCKER_HOST"
 
 // runCompose runs one compose command, forwarding its output line by line
 // to cb.OnLine (component "compose") so frontends can render engine
