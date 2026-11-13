@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 )
@@ -39,7 +38,6 @@ func TestMain(m *testing.M) {
 	for _, k := range []string{"JENKINS_URL", "HUDSON_URL", "TF_BUILD"} {
 		os.Unsetenv(k) //nolint:usetesting // other CI systems decide it too
 	}
-	os.Setenv(utils.RenameHintsDisabledEnv, "1") //nolint:usetesting // for the whole package run
 
 	// A login reads its auth config from api.<domain>, which no unit test may
 	// reach. The identity provider it names is under .test, which never

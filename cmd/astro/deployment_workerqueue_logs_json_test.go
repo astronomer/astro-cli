@@ -263,7 +263,7 @@ func TestDeploymentWorkerQueueJSON(t *testing.T) {
 			var got wqResultJSON
 			decodeOne(t, r.stdout, &got)
 			assert.Equal(t, tc.want, got)
-			assert.Empty(t, r.stderr)
+			assert.Empty(t, withoutDeprecations(r.stderr))
 			m.AssertExpectations(t)
 		})
 	}

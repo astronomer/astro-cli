@@ -201,7 +201,7 @@ func TestWorkspaceTextIsUnchanged(t *testing.T) {
 			got := runWorkspaceTree(t, api, "", true, tc.args...)
 			require.Equal(t, 0, got.code, "stderr:\n%s", got.stderr)
 			assert.Equal(t, tc.want, got.stdout)
-			assert.Empty(t, got.stderr)
+			assert.Empty(t, withoutDeprecations(got.stderr))
 			api.AssertExpectations(t)
 		})
 	}
@@ -222,7 +222,7 @@ func TestWorkspaceListJSON(t *testing.T) {
 		assert.Equal(t, []bool{false, true, false}, []bool{list.Workspaces[0].IsCurrent, list.Workspaces[1].IsCurrent, list.Workspaces[2].IsCurrent})
 		assert.Equal(t, "desc b", *list.Workspaces[0].Description)
 		assert.Equal(t, "2020-01-02T03:04:05.000Z", *list.Workspaces[0].CreatedAt)
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 	})
 	t.Run("what Houston gave no value for is null, not empty", func(t *testing.T) {
 		api := wsClient()
@@ -252,7 +252,7 @@ func TestWorkspaceListJSON(t *testing.T) {
 		decodeWorkspaceOutput(t, got.stdout, &e)
 		assert.Equal(t, "boom", e.Error)
 		assert.Equal(t, 1, e.Code)
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 	})
 }
 
@@ -271,7 +271,7 @@ func TestWorkspaceCreateAndUpdateJSON(t *testing.T) {
 		assert.Equal(t, "d", *w.Description)
 		assert.Equal(t, created.CreatedAt, *w.CreatedAt)
 		assert.False(t, w.IsCurrent, "creating does not switch")
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 	})
 	t.Run("update returns the workspace as it now is", func(t *testing.T) {
 		api := wsClient()
@@ -310,7 +310,7 @@ func TestWorkspaceDeleteJSON(t *testing.T) {
 		assert.Equal(t, wsOther.ID, r.WorkspaceID)
 		assert.Equal(t, "second", *r.Label)
 		assert.Equal(t, "deleted", r.Action)
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 	})
 	t.Run("a workspace with Deployments is refused, exit 1", func(t *testing.T) {
 		api := wsClient()
@@ -338,7 +338,7 @@ func TestWorkspaceSwitchJSON(t *testing.T) {
 		assert.Equal(t, "second", w.Label)
 		assert.True(t, w.IsCurrent)
 		assert.Equal(t, wsOther.ID, currentContextWorkspace(t))
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 	})
 	t.Run("an ID Houston does not know is a failure, and switches nothing", func(t *testing.T) {
 		api := wsClient()
@@ -422,7 +422,7 @@ func TestWorkspaceJSONReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 			decodeWorkspaceOutput(t, got.stdout, &v)
 			assert.Contains(t, got.stdout, wsOther.ID)
 			assert.Empty(t, got.processStdout, "the result left by the process's stdout, not the tree's out")
-			assert.Empty(t, got.stderr)
+			assert.Empty(t, withoutDeprecations(got.stderr))
 		})
 	}
 }
@@ -488,7 +488,7 @@ func TestWorkspaceSwitchPageSizeNote(t *testing.T) {
 		got := runWorkspaceTree(t, api, "", true, "workspace", "switch", "--paginated", "--page-size", "500", "-o", "json")
 		assert.Equal(t, 1, got.code)
 		assert.Contains(t, got.stdout, "input_required")
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 		assert.Empty(t, logs.String(), "no note before the refusal")
 	})
 }

@@ -44,6 +44,7 @@ func AddAlias(fs *pflag.FlagSet, old, preferred string) *pflag.Flag {
 	f := fs.Lookup(old)
 	f.Hidden = true
 	f.Annotations = map[string][]string{aliasAnnotation: {preferred}}
+	cliout.DeprecateFlag(f, "use --"+preferred)
 	return f
 }
 

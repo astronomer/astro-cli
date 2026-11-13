@@ -181,7 +181,7 @@ func TestDeploymentVariableListJSON(t *testing.T) {
 		decodeOne(t, run.stdout, &got)
 		assert.Equal(t, twoVariablesJSON(), got.Variables)
 		assert.NotContains(t, run.stdout, "do-not-print")
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 		m.AssertExpectations(t)
 	})
 
@@ -231,7 +231,7 @@ func TestDeploymentVariableListJSON(t *testing.T) {
 		var got variableListJSON
 		decodeOne(t, run.stdout, &got)
 		assert.Empty(t, got.Variables)
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 		m.AssertExpectations(t)
 	})
 
@@ -249,7 +249,7 @@ func TestDeploymentVariableListJSON(t *testing.T) {
 		decodeOne(t, run.stdout, &got)
 		assert.Equal(t, "usage", got.Kind)
 		assert.Contains(t, got.Error, `the Deployment id test-id-1 and the name "test-2" name different Deployments`)
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 		m.AssertExpectations(t)
 	})
 }
@@ -269,7 +269,7 @@ func TestDeploymentVariableListTextUnchanged(t *testing.T) {
 	requireRow(t, run.stdout, "1", "test-key-1", "test-value-1", "false")
 	requireRow(t, run.stdout, "2", "SECRET_KEY", maskedSecret, "true")
 	assert.NotContains(t, run.stdout, "do-not-print")
-	assert.Empty(t, run.stderr)
+	assert.Empty(t, withoutDeprecations(run.stderr))
 	m.AssertExpectations(t)
 }
 
@@ -314,7 +314,7 @@ func TestDeploymentVariableCreateJSON(t *testing.T) {
 			{Kind: "invalid", Input: "=nokey", Reason: "blank key or value"},
 		}, got.Outcomes, "one outcome per input, in the order given")
 		assert.Equal(t, twoVariablesJSON(), got.Variables)
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 		m.AssertExpectations(t)
 	})
 
@@ -330,7 +330,7 @@ func TestDeploymentVariableCreateJSON(t *testing.T) {
 		decodeOne(t, run.stdout, &got)
 		assert.Equal(t, []outcomeJSON{{Kind: "created", Key: "NEW"}}, got.Outcomes)
 		assert.Equal(t, twoVariablesJSON(), got.Variables)
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 		m.AssertExpectations(t)
 	})
 
@@ -416,7 +416,7 @@ func TestDeploymentVariableUpdateJSON(t *testing.T) {
 		{Kind: "invalid", Key: "B", Input: "B=", Reason: "blank key or value"},
 	}, got.Outcomes, "one outcome per input, in the order given")
 	assert.Equal(t, twoVariablesJSON(), got.Variables)
-	assert.Empty(t, run.stderr)
+	assert.Empty(t, withoutDeprecations(run.stderr))
 	m.AssertExpectations(t)
 }
 

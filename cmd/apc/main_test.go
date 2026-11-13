@@ -4,8 +4,6 @@ import (
 	"flag"
 	"os"
 	"testing"
-
-	"github.com/astronomer/astro-cli/cmd/utils"
 )
 
 // TestMain pins os.Args to a single non-test argument for the whole package run.
@@ -35,7 +33,6 @@ func TestMain(m *testing.M) {
 	for _, k := range []string{"JENKINS_URL", "HUDSON_URL", "TF_BUILD"} {
 		os.Unsetenv(k) //nolint:usetesting // other CI systems decide it too
 	}
-	os.Setenv(utils.RenameHintsDisabledEnv, "1") //nolint:usetesting // for the whole package run
 
 	watching := emitWatch().Arm()
 	code := m.Run()

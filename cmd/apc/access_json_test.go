@@ -45,7 +45,7 @@ func TestServiceAccountJSON(t *testing.T) {
 					ID: "sa-1", Label: sp("ci"), Category: sp("default"), Active: true,
 					CreatedAt: sp("2026-10-01T00:00:00.000Z"), APIKey: sp(apiKey),
 				}, got, "last_used_at is null: the account has never been used")
-				assert.Empty(t, run.stderr)
+				assert.Empty(t, withoutDeprecations(run.stderr))
 			})
 		}
 	})
@@ -60,7 +60,7 @@ func TestServiceAccountJSON(t *testing.T) {
 		var got accessError
 		decodeAccess(t, run.stdout, &got)
 		assert.Equal(t, errMockHouston.Error(), got.Error)
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 	})
 
 	// Houston returns the key whole for ten minutes after the create; a list
@@ -488,7 +488,7 @@ func TestWorkspaceAndDeploymentTeamJSON(t *testing.T) {
 		var ws workspaceTeamRemovalJSON
 		decodeAccess(t, run.stdout, &ws)
 		assert.Equal(t, workspaceTeamRemovalJSON{ID: "team-1", WorkspaceID: accessWorkspaceID, Action: "removed", MembershipVerified: true}, ws)
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 	})
 
 	// Houston removes nothing for a team with no binding in the Workspace

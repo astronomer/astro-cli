@@ -133,6 +133,14 @@ func newComponentLogsCmd(out io.Writer, use string, aliases []string, component 
 		Long:    "1.x's spelling of astro deployment logs --" + use + ", kept for scripts written for Astro CLI 1.x",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// The subcommand is a spelling 1.x had, as typed (its alias, too):
+			// astro deployment logs --scheduler is what to type now.
+			typed := cmd.CalledAs()
+			if typed == "" {
+				typed = cmd.Name()
+			}
+			logs := cmd.Parent().CommandPath()
+			cliout.WarnDeprecated(cmd.ErrOrStderr(), cmd, logs+" "+typed, "use "+logs+" --"+logComponentFlag(component))
 			return showLogs(cmd, []string{component}, out)
 		},
 	}

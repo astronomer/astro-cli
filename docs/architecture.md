@@ -283,6 +283,27 @@ No other flag has a short option, visible or hidden. A flag keeps its letter onl
 
 `TestShortOptionsFollowTheTable` holds every flag in every tree to the table, and fails on a new flag that takes a letter. `TestTableLettersReachEveryFlagThatCanTakeThem` fails on a command that has one of the table's flags without its letter, unless 1.x gave the letter to another flag there or `lettersWithheld` says why. `TestNoShortOptionIsReadAsAnother1xFlag` fails on a letter that 1.x gave a different flag on the same command, and `TestEveryV1FlagStillWorksOrSaysWhatReplacedIt` fails on a 1.x letter that is neither the same flag's nor refused. `TestShortOptionsTableIsDocumented` keeps this table and the code's the same.
 
+### Deprecated spellings
+
+A spelling that still works but that v2 means to drop says so, once per run, through one helper: `cliout.WarnDeprecated` in [`cmd/cliout/deprecated.go`](../cmd/cliout/deprecated.go). The line is on stderr, led by the usual yellow `Warning:`, and names what was typed and what to type instead:
+
+```
+Warning: --deployment-id is deprecated: use --deployment
+```
+
+- **Once per run per distinct spelling.** Two different old flags give two lines, the same one typed twice gives one. The run's root remembers what it has said, and `cliout.Execute` clears that as a run starts, so a second run in one process says it again.
+- **Stderr only.** Under `--output json` stdout is still exactly one document, the result or the error object, as with every other warning (progress, warnings and notes go to stderr, see [Adding `--output` to a command](#adding---output-to-a-command)). The JSON is unchanged and has no `warnings` key for it.
+- **No suppression, no effect on the exit code.** Nothing turns the line off: the `ASTRO_RENAME_HINTS_DISABLED` variable that hid the old, longer hint is gone. A run that works exits 0 with the line, and one that fails exits as it would have.
+- **Removed spellings do not warn.** They fail with their removal message (see [Removed 1.x commands and flags](#removed-1x-commands-and-flags)) before anything is used. A spelling that is simply supported, such as `ls` for `list`, is not deprecated and says nothing; no kept command alias is deprecated. A 1.x flag a command accepts and ignores (`--workspace-id` on `astro deployment team`, `astro deploy --force`) is no spelling of anything and has no replacement to name, so it says nothing either.
+
+What is deprecated:
+
+- **The hidden 1.x flag aliases.** `utils.AddAlias` (`--deployment-id`, `--deployment-name`, `--workspace-id`, `--label`, `--search`) marks the alias with `cliout.DeprecateFlag`, which records what to type instead (`use --deployment`) and hides the flag. `utils.ApplyPreferredFlags`, which every Astro and APC command runs once its flags are parsed, hands the alias's value to the flag it stands for and then warns of each alias the run gave (`cliout.WarnDeprecatedFlags`). The same step queues the renamed-flags telemetry event, which is what tells us when an alias can go. An alias given as `""` still means the default, as in 1.x, and is deprecated all the same.
+- **A flag deprecated in v2** takes the same mark (`astro local env … set --secret`), and the command that reads it calls `cliout.WarnDeprecatedFlags` with its own stderr.
+- **A kept 1.x subcommand**: APC's hidden `astro deployment logs scheduler`, `webserver` and `workers` still run, and warn, naming the spelling typed (an alias such as `sch` too) and `astro deployment logs --scheduler`.
+
+`TestEveryDeprecatedAliasWarnsOncePerRun` in `cmd` walks every command of every tree for the aliases it takes, types each twice, and checks that each warns exactly once, that nothing reaches stdout, and that `--output json` leaves stdout one document. `TestEveryDeprecatedFlagIsAnAliasOrHasItsOwnTest` fails on a deprecated flag that is neither an alias nor listed with its own test, and `TestOnlyKept1xSubcommandsAreDeprecatedCommands` on a command that uses cobra's own `Deprecated` or a kept subcommand nobody listed.
+
 ## Help
 
 Every `--help` page is drawn by one renderer, [`cmd/help.go`](../cmd/help.go), which the root installs with `SetHelpFunc` and `SetUsageFunc` and every command inherits. It wraps prose and flag descriptions to the terminal (at most 100 columns, 80 when piped), lists each command with its aliases, and puts examples after the flags they use. It shows the current context only on commands that run the platform pre-run, so not on the offline core tree. A command does not set a template of its own: the inherited func would ignore it. A section a command needs belongs in the renderer instead, as flag groups do. Annotate a flag with `group` to list it under `<Group> Flags:`, and set `flag-groups` on the command to order those sections (`astro deploy` does both).

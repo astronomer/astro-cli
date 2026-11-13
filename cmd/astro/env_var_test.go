@@ -34,7 +34,9 @@ func execEnvCmd(args ...string) (string, error) {
 	cmd.SetArgs(args)
 	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
-	return buf.String(), err
+	// The tests spell flags as 1.x did where that is what they test, and say
+	// nothing of the deprecation warning that costs.
+	return withoutDeprecations(buf.String()), err
 }
 
 // expectAbsent mocks the key lookup `set` makes before it decides whether to
