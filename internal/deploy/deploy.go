@@ -51,7 +51,7 @@ type Request struct {
 	// (astrosession.Resolve): a token's claim or the saved login's.
 	ContextWorkspace string
 	// NoWorkspace is what a deploy that needs a workspace and finds none says,
-	// "" being ErrNoWorkspace. On Astro it is the resolver's: what a run with
+	// nil being ErrNoWorkspace. It is read only when none was found. On Astro it is the resolver's: what a run with
 	// an API token, or a saved login, has to do to supply one.
 	NoWorkspace error
 	// DagsOnly is --dags: ship only the dags/ directory, no image, no Docker.

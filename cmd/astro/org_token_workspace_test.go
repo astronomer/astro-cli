@@ -152,6 +152,7 @@ func TestNoWorkspaceWithoutATokenKeepsItsMessage(t *testing.T) {
 	require.ErrorIs(t, err, workspace.ErrCurrentNotSet)
 	assert.NotErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
 
-	_, err = requiredWorkspace(cmd, "", 0)
-	require.ErrorIs(t, err, workspace.ErrCurrentNotSet)
+	// A command that takes its Workspace from --workspace alone says so.
+	_, err = requiredWorkspace(cmd, "")
+	require.ErrorIs(t, err, astrosession.ErrNoWorkspace)
 }

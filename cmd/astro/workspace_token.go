@@ -57,7 +57,7 @@ func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}
-	ws, err := requiredWorkspace(cmd, workspaceID, 0)
+	ws, err := requiredWorkspace(cmd, workspaceID)
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) er
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}
-	ws, err := requiredWorkspace(cmd, workspaceID, 0)
+	ws, err := requiredWorkspace(cmd, workspaceID)
 	if err != nil {
 		return err
 	}
@@ -232,7 +232,7 @@ func upsertOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}
-	ws, err := requiredWorkspace(cmd, workspaceID, 0)
+	ws, err := requiredWorkspace(cmd, workspaceID)
 	if err != nil {
 		return err
 	}
