@@ -2,6 +2,7 @@ package localdocker
 
 import (
 	_ "embed"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -97,7 +98,12 @@ type composeInput struct {
 	// how a value satisfied only by the caller's shell reaches the
 	// containers without ever being written into the compose file.
 	PassEnv []string
-	Mounts  []mount
+	// SecretEnv is the plan's SecretEnv keys, each rendered as a reference to
+	// its alias (secretRef) rather than as a value: the value reaches compose
+	// under the alias only, so it is never written to disk and never becomes
+	// one of compose's own variables.
+	SecretEnv []secretDecl
+	Mounts    []mount
 	// DBCommand is the one-shot database service's argv, and Services the
 	// components that wait on it.
 	DBCommand []string
@@ -300,62 +306,124 @@ func quoteYAML(s string) string {
 }
 
 // passEnv returns the keys the compose file declares with no value: the plan's
-// PassthroughEnv, which the runtime's own environment satisfies, plus every
-// SecretEnv key, whose value the engine hands to the compose process instead.
+// PassthroughEnv, which the runtime's own environment satisfies. They render
+// as `KEY:`, which compose resolves from its own environment and omits when
+// unset; the values are the CLI's own, already in that environment.
 //
-// Both end up as the same YAML — `KEY:` — because compose resolves a valueless
-// entry from its own environment and omits the variable entirely when unset.
+// A SecretEnv key is not one of these. Its value is not in the CLI's
+// environment, so it travels to compose under an alias and is declared as a
+// reference to it (secretDecls), which also wins a key in both lists.
 //
 // A stop or a down needs none of these values, and not for the reason it first
 // looks: those commands are run with no --file at all. Down resolves the project
 // from container labels, so the declarations are never even read. The valueless
 // form would also be harmless if they were, which is the belt to that braces.
 func passEnv(names []string, secretEnv map[string]string, env []envVar) []string {
-	held := make(map[string]bool, len(env))
+	held := make(map[string]bool, len(env)+len(secretEnv))
 	for _, e := range env {
 		held[e.Name] = true
 	}
+	for n := range secretEnv {
+		held[n] = true
+	}
 	var out []string
-	// held doubles as the emitted set: a key already carrying a value on disk is
-	// skipped for the same reason a key already declared is — a duplicate YAML key
-	// is invalid either way.
-	add := func(n string) {
+	// held doubles as the emitted set: a key already carrying a value on disk, or
+	// declared as a secret, is skipped for the same reason a key already declared
+	// is — a duplicate YAML key is invalid either way.
+	for _, n := range names {
 		if held[n] {
-			return
+			continue
 		}
 		held[n] = true
 		out = append(out, n)
-	}
-	for _, n := range names {
-		add(n)
-	}
-	for n := range secretEnv {
-		add(n)
 	}
 	sort.Strings(out)
 	return out
 }
 
-// secretEnviron renders SecretEnv as KEY=VALUE for a child process environment,
-// sorted so the result is deterministic. The compose child reads these to
-// resolve valueless entries: the ones passEnv declared, and RunInImage's bare
-// -e KEY flags. The values belong in an environment only, never on a command
-// line, where any local user can read them through ps.
+// secretDecl is one SecretEnv key as the compose file declares it: the key,
+// and the alias whose value compose interpolates into it.
+type secretDecl struct {
+	Name, Ref string
+}
+
+// secretRefPrefix starts every alias a SecretEnv value travels under.
+const secretRefPrefix = "ASTRO_SECRET_"
+
+// secretRef is the variable a SecretEnv key's value travels to compose under.
+//
+// Never the key itself. Compose and the docker or podman CLI under it read
+// their own settings from the same environment they resolve declarations from,
+// so a project value named DOCKER_HOST (a DockerOperator DAG's), DOCKER_CONTEXT,
+// COMPOSE_PROFILES, HOME or PATH, handed over as itself, would retarget or
+// reconfigure the very command starting Airflow. Under the alias it is only
+// ever interpolated into the container's environment. The key is hex-encoded
+// so any key makes a valid variable name, and so RunInImage can map an alias
+// in the file back to its key (secretKey).
+func secretRef(key string) string {
+	return secretRefPrefix + hex.EncodeToString([]byte(key))
+}
+
+// secretKey is the key secretRef made ref from, and whether ref is one.
+func secretKey(ref string) (string, bool) {
+	enc, ok := strings.CutPrefix(ref, secretRefPrefix)
+	if !ok {
+		return "", false
+	}
+	key, err := hex.DecodeString(enc)
+	if err != nil {
+		return "", false
+	}
+	return string(key), true
+}
+
+// secretDecls are the SecretEnv keys the compose file declares, sorted, less
+// any env already holds: a SecretEnv key colliding with a baseline setting is
+// not applied (see airflowEnv), and a duplicate YAML key is invalid.
+func secretDecls(secretEnv map[string]string, env []envVar) []secretDecl {
+	held := make(map[string]bool, len(env))
+	for _, e := range env {
+		held[e.Name] = true
+	}
+	var out []secretDecl
+	for k := range secretEnv {
+		if held[k] || !secretKeyOK(k) {
+			continue
+		}
+		out = append(out, secretDecl{Name: k, Ref: secretRef(k)})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// secretKeyOK reports whether a key can travel at all. An empty key makes the
+// file itself invalid, and one holding "=" cannot be an environment variable
+// in the container. Neither is worth a half-delivery.
+func secretKeyOK(k string) bool {
+	return k != "" && !strings.Contains(k, "=")
+}
+
+// secretInterpolation is what the compose file holds for a SecretEnv key: a
+// reference to its alias, single-quoted so YAML takes it as a string, with an
+// empty default so a run that lacks the alias gets no warning on every line.
+func secretInterpolation(ref string) string {
+	return "'${" + ref + "-}'"
+}
+
+// secretEnviron renders SecretEnv as ALIAS=VALUE for the compose process
+// environment, sorted so the result is deterministic: the values the file's
+// references interpolate. The values belong in an environment only, never on a
+// command line, where any local user can read them through ps.
 func secretEnviron(secretEnv map[string]string) []string {
 	if len(secretEnv) == 0 {
 		return nil
 	}
 	out := make([]string, 0, len(secretEnv))
 	for k, v := range secretEnv {
-		// A key that cannot survive KEY=VALUE is dropped rather than rendered.
-		// "A=B" would reach the OS as key "A" holding "B=<value>", while the
-		// compose file declared "A=B" — so the variable would be declared, never
-		// resolved, and Airflow would start silently missing it. An empty key
-		// makes the file itself invalid. Neither is worth a half-delivery.
-		if k == "" || strings.Contains(k, "=") {
+		if !secretKeyOK(k) {
 			continue
 		}
-		out = append(out, k+"="+v)
+		out = append(out, secretRef(k)+"="+v)
 	}
 	sort.Strings(out)
 	return out
@@ -386,7 +454,7 @@ func composeFiles(generated, projectPath string) []string {
 // generateCompose renders the compose file for a plan with all ports and
 // the image already resolved.
 func generateCompose(in composeInput) (string, error) {
-	tmpl, err := template.New("compose").Funcs(template.FuncMap{"quote": quoteYAML}).Parse(composeTemplate)
+	tmpl, err := template.New("compose").Funcs(template.FuncMap{"quote": quoteYAML, "secretRef": secretInterpolation}).Parse(composeTemplate)
 	if err != nil {
 		return "", fmt.Errorf("parsing compose template: %w", err)
 	}

@@ -959,60 +959,68 @@ func TestStartHandsSecretValuesToTheComposeUp(t *testing.T) {
 
 	env, ok := cmd.envFor("compose")
 	require.True(t, ok, "no compose call was recorded")
-	assert.Contains(t, env, "AIRFLOW_CONN_DB=postgres://u:pw@h/db",
-		"the up must carry the values for the declarations the file makes, or the variable is declared and never resolved")
+	assert.Contains(t, env, secretRef("AIRFLOW_CONN_DB")+"=postgres://u:pw@h/db",
+		"the up must carry the values the file's references interpolate, or the variable is declared and never resolved")
+	assert.NotContains(t, env, "AIRFLOW_CONN_DB=postgres://u:pw@h/db",
+		"a value travels to compose under its alias only")
+	file := generatedCompose(t, p.ProjectPath)
+	assert.Contains(t, file, "'AIRFLOW_CONN_DB': "+secretInterpolation(secretRef("AIRFLOW_CONN_DB")))
+	assert.NotContains(t, file, "pw@h", "a secret value never reaches the file")
 }
 
-// The engine connection has to win a collision, because os/exec keeps the last
-// duplicate and a compose command talking to the wrong daemon is unrecoverable
-// from a UI — where a secret that loses simply does not reach the container.
-func TestStartLetsTheEngineConnectionWinOverSecretEnv(t *testing.T) {
-	cmd := &fakeCmd{output: noProjects}
-	e := testEngine(t, cmd)
-	e.preferred = func(string) (engineConn, error) {
-		return engineConn{bin: "docker", env: []string{"DOCKER_HOST=unix:///real.sock"}}, nil
+// A project value can be named anything, including the variables compose and
+// the docker CLI read for themselves. None of them reaches the compose process
+// under its own name, so none can retarget or reconfigure the up. Docker
+// Desktop and OrbStack connections set no env at all, the case where going
+// last protected nothing. Each still reaches the container, through its
+// reference: DOCKER_HOST for a DockerOperator DAG keeps the project's value.
+func TestStartKeepsPlanValuesOutOfComposesOwnSettings(t *testing.T) {
+	controlled := []string{
+		"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_CONFIG", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH",
+		"CONTAINER_HOST", "CONTAINER_CONNECTION", "COMPOSE_PROFILES", "COMPOSE_PROJECT_NAME",
+		"COMPOSE_FILE", "HOME", "PATH", "docker_host",
 	}
-	p := testPlan(t)
-	p.SecretEnv = map[string]string{envDockerHost: "unix:///attacker.sock"}
+	for _, conn := range []engineConn{
+		{bin: "docker"},
+		{bin: "docker", env: []string{"DOCKER_HOST=unix:///real.sock"}},
+	} {
+		cmd := &fakeCmd{output: noProjects}
+		e := testEngine(t, cmd)
+		e.preferred = func(string) (engineConn, error) { return conn, nil }
+		p := testPlan(t)
+		p.SecretEnv = map[string]string{}
+		for _, key := range controlled {
+			p.SecretEnv[key] = "from-the-plan"
+		}
 
-	_, err := e.Start(context.Background(), p, rt.Callbacks{})
-	require.NoError(t, err)
+		_, err := e.Start(context.Background(), p, rt.Callbacks{})
+		require.NoError(t, err)
 
-	env, ok := cmd.envFor("compose")
-	require.True(t, ok)
-	var lastHost string
-	for _, kv := range env {
-		if strings.HasPrefix(kv, "DOCKER_HOST=") {
-			lastHost = kv // os/exec resolves duplicates to the last one
+		env, ok := cmd.envFor("compose")
+		require.True(t, ok)
+		for _, kv := range env {
+			assert.NotContains(t, kv, "from-the-plan=", kv)
+			key, value, _ := strings.Cut(kv, "=")
+			if value == "from-the-plan" {
+				assert.True(t, strings.HasPrefix(key, secretRefPrefix), "%s reached compose under its own name", kv)
+			}
+		}
+		file := generatedCompose(t, p.ProjectPath)
+		for _, key := range controlled {
+			assert.Contains(t, env, secretRef(key)+"=from-the-plan", key)
+			assert.Contains(t, file, secretInterpolation(secretRef(key)), "%s still reaches the container", key)
 		}
 	}
-	assert.Equal(t, "DOCKER_HOST=unix:///real.sock", lastHost,
-		"a plan must not be able to retarget the compose invocation itself")
 }
 
-// Docker Desktop and OrbStack connections set no environment, so going last
-// wins nothing: the variables that pick the daemon are never taken from a
-// plan, and compose keeps the CLI's own (or Docker's default), as Stop does.
-func TestStartKeepsAPlanFromPickingTheDaemonWhenTheConnectionSetsNone(t *testing.T) {
-	cmd := &fakeCmd{output: noProjects}
-	e := testEngine(t, cmd)
-	e.preferred = func(string) (engineConn, error) { return engineConn{bin: "docker"}, nil }
-	p := testPlan(t)
-	p.SecretEnv = map[string]string{"AIRFLOW_CONN_DB": "postgres://u:pw@h/db"}
-	for key := range engineRoutingEnv {
-		p.SecretEnv[key] = "tcp://elsewhere:2375"
-	}
-
-	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+// generatedCompose is the compose file Start wrote for a project.
+func generatedCompose(t *testing.T, projectPath string) string {
+	t.Helper()
+	dir, err := rt.StateDir(projectPath)
 	require.NoError(t, err)
-
-	env, ok := cmd.envFor("compose")
-	require.True(t, ok)
-	for _, kv := range env {
-		key, _, _ := strings.Cut(kv, "=")
-		assert.False(t, engineRoutingEnv[key], "%s came from the plan and would retarget the compose call", kv)
-	}
-	assert.Contains(t, env, "AIRFLOW_CONN_DB=postgres://u:pw@h/db", "every other value still reaches compose")
+	data, err := os.ReadFile(filepath.Join(dir, composeFileName))
+	require.NoError(t, err)
+	return string(data)
 }
 
 // Stop runs with no --file, so it never reads the declarations and has no reason

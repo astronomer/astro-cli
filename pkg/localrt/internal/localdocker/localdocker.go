@@ -347,6 +347,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		PostgresPort: pgPort,
 		Env:          env,
 		PassEnv:      passEnv(p.PassthroughEnv, p.SecretEnv, env),
+		SecretEnv:    secretDecls(p.SecretEnv, env),
 		Mounts:       projectMounts(projectPath),
 		DBCommand:    dbCommand(major),
 		Services:     airflowServices(major),
@@ -1092,8 +1093,8 @@ type composeLine struct {
 	name       string
 	projectDir string
 	// extraEnv is added to the compose process environment on top of the engine
-	// connection's own. It carries SecretEnv values, which the file declares
-	// without recording (see passEnv) and RunInImage names with bare -e flags.
+	// connection's own. It carries SecretEnv values under their secretRef
+	// aliases, which the file's references interpolate (see secretDecls).
 	extraEnv []string
 }
 
@@ -1123,51 +1124,18 @@ func (l composeLine) argv(args ...string) []string {
 // into spare capacity would leak one project's secrets into the next command
 // that reused it.
 //
-// The connection goes LAST, and that ordering is load-bearing. os/exec keeps
-// the last duplicate of a key, so anything in extraEnv that collides with
-// DOCKER_HOST, CONTAINER_HOST or DOCKER_CONFIG would otherwise retarget this
-// very compose invocation — a project's Airflow env is caller-supplied and can
-// name anything, so a plan carrying DOCKER_HOST for a DockerOperator DAG would
-// silently point the start at a different daemon while Stop, which uses
-// conn.env untouched, still looked at the right one. A secret that loses to
-// the engine connection reaches the container with the connection's value
-// instead of its own; a compose command talking to the wrong daemon is
-// unrecoverable from the UI.
-//
-// Going last only wins a collision the connection takes part in, though, and
-// Docker Desktop and OrbStack connections set nothing: the daemon is whatever
-// the CLI's own environment and Docker's context say. So the variables that
-// pick the daemon are never taken from extraEnv at all. Compose keeps the
-// CLI's own value, or Docker's default, as Stop and Down do, and the container
-// gets that value for the key, as it does when the connection sets one.
+// extraEnv carries project values only under their secretRef aliases, never
+// as themselves, so nothing in it can be one of compose's own settings: a
+// project's DOCKER_HOST (a DockerOperator DAG's), DOCKER_CONTEXT or
+// COMPOSE_PROFILES reaches the container through the file's reference and
+// cannot retarget or reconfigure this invocation. The connection still goes
+// last, so it decides any variable both name.
 func (l composeLine) env() []string {
 	out := make([]string, 0, len(l.extraEnv)+len(l.conn.env))
-	for _, kv := range l.extraEnv {
-		key, _, _ := strings.Cut(kv, "=")
-		if !engineRoutingEnv[key] {
-			out = append(out, kv)
-		}
-	}
+	out = append(out, l.extraEnv...)
 	out = append(out, l.conn.env...)
 	return out
 }
-
-// engineRoutingEnv are the variables the docker and podman CLIs, and compose
-// under them, read to pick the daemon they talk to and how. A project's
-// Airflow env can carry one for its own reasons (DOCKER_HOST for a
-// DockerOperator DAG), and must not retarget the compose call that starts it.
-var engineRoutingEnv = map[string]bool{
-	envDockerHost:          true,
-	"DOCKER_CONTEXT":       true,
-	"DOCKER_CONFIG":        true,
-	"DOCKER_TLS_VERIFY":    true,
-	"DOCKER_CERT_PATH":     true,
-	"CONTAINER_HOST":       true,
-	"CONTAINER_CONNECTION": true,
-}
-
-// envDockerHost is the variable that points the docker CLI at a daemon.
-const envDockerHost = "DOCKER_HOST"
 
 // runCompose runs one compose command, forwarding its output line by line
 // to cb.OnLine (component "compose") so frontends can render engine
