@@ -956,8 +956,7 @@ workspace = "clw-ws"
 `
 	fake := &fakeCmdDeployer{}
 	setupManifestDeployWith(t, fake, unlinkedProject)
-	deployment.UseTokenDeployment(actionDeploymentID)
-	t.Cleanup(func() { deployment.UseTokenDeployment("") })
+	testUtil.UseAPIToken(t, "deploymentId:"+actionDeploymentID)
 
 	out, errOut, err := execDeployIO("", "--dags", "-o", "json")
 	require.NoError(t, err)
@@ -977,9 +976,8 @@ func TestDeployManifestTokensDeploymentInALinkedProject(t *testing.T) {
 	nonInteractiveDeploy(t)
 	fake := &fakeCmdDeployer{}
 	setupManifestDeploy(t, fake)
-	t.Cleanup(func() { deployment.UseTokenDeployment("") })
 
-	deployment.UseTokenDeployment("clx-dev")
+	testUtil.UseAPIToken(t, "deploymentId:"+"clx-dev")
 	_, errOut, err := execDeployIO("", "--dags")
 	require.NoError(t, err)
 	assert.Equal(t, "clx-dev", fake.dagInput.DeploymentID)
@@ -992,7 +990,7 @@ func TestDeployManifestTokensDeploymentInALinkedProject(t *testing.T) {
 	assert.NotContains(t, errOut, "ASTRO_API_TOKEN")
 
 	fake.dagInput = nil
-	deployment.UseTokenDeployment(actionDeploymentID)
+	testUtil.UseAPIToken(t, "deploymentId:"+actionDeploymentID)
 	_, errOut, err = execDeployIO("", "--dags")
 	require.Error(t, err)
 	assert.True(t, input.IsRequired(err), "%v", err)

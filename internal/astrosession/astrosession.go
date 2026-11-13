@@ -153,40 +153,6 @@ func APIToken() (string, bool) {
 	return token, Credential(token) != ""
 }
 
-// The ways a command can be given a Workspace differ, so the advice that
-// follows ErrOrgTokenNoWorkspace does too: a flag only, or a flag or the
-// project's link.
-const (
-	HintFlag          = "so pass --workspace"
-	HintFlagOrProject = "so pass --workspace, or run in a project linked to one"
-	// HintFlagOrTokenID is for a command that finds a token in the Workspace,
-	// unless the token is given by ID.
-	HintFlagOrTokenID = "so pass --workspace or the token's ID, or run in a project linked to one" //nolint:gosec // advice, not a credential
-	// HintCurrent is for a command that acts on the current Workspace alone,
-	// which a run with an API token does not have.
-	HintCurrent = "so use a Workspace API token"
-)
-
-// NoWorkspace is the error for a command that needs a Workspace, takes it from
-// --workspace alone, and finds none: ErrOrgTokenNoWorkspace under an API
-// token, else fallback, which says how a saved login picks one (ErrNoWorkspace
-// when fallback is nil).
-func NoWorkspace(fallback error) error {
-	return NoWorkspaceHint(fallback, HintFlag)
-}
-
-// NoWorkspaceHint is NoWorkspace with the advice that suits the command: one
-// of the Hint constants, or its own.
-func NoWorkspaceHint(fallback error, hint string) error {
-	if HasAPIToken() {
-		return fmt.Errorf("%w, %s", ErrOrgTokenNoWorkspace, hint)
-	}
-	if fallback == nil {
-		return ErrNoWorkspace
-	}
-	return fallback
-}
-
 // HasAPIToken reports whether ASTRO_API_TOKEN holds a credential (see
 // APIToken), for a reader that only asks whether CI supplied one.
 func HasAPIToken() bool {

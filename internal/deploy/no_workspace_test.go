@@ -4,14 +4,19 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // A deploy under an API token with no workspace to list from may be given one
 // by --workspace or by the project's link, and says so.
 func TestUnlinkedTargetWithNoWorkspaceUnderATokenNamesTheProject(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Setenv("ASTRO_API_TOKEN", "token")
-	_, err := unlinkedTarget(Request{}, nil)
+	// The resolver words the error, for what an Astro deploy accepts.
+	run := astrosession.Resolve(astrosession.Request{Accepts: astrosession.ByFlag | astrosession.ByProject, NoSaved: ErrNoWorkspace})
+	_, err := unlinkedTarget(Request{NoWorkspace: run.Missing()}, nil)
 	if err == nil || !strings.Contains(err.Error(), "--workspace, or run in a project") {
 		t.Errorf("err = %v", err)
 	}

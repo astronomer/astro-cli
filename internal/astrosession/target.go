@@ -97,7 +97,7 @@ const (
 	// hintFlagOrID is for a command that finds a token in the Workspace,
 	// unless the token is given by ID.
 	hintFlagOrID = "so pass --workspace or the token's ID, or run in a project linked to one" //nolint:gosec // advice, not a credential
-	hintPath = "so write the id in the path"
+	hintPath     = "so write the id in the path"
 	// hintCurrent is for a command that acts on the current Workspace alone,
 	// which a run with an API token does not have.
 	hintCurrent = "so use a Workspace API token"

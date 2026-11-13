@@ -711,8 +711,7 @@ func capture(t *testing.T, stream **os.File, f func()) string {
 // until the test ends.
 func withTokenDeployment(t *testing.T, id string) {
 	t.Helper()
-	UseTokenDeployment(id)
-	t.Cleanup(func() { UseTokenDeployment("") })
+	testUtil.UseAPIToken(t, "deploymentId:"+id)
 }
 
 // Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, a change
