@@ -91,7 +91,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   # Get a specific Dag by path
   astro api airflow -d prod /dags/example_dag
 
-  # Use operation ID (path params supplied via -p)
+  # Use operation ID (path params supplied via --path-param)
   astro api airflow -d prod get_dag --path-param dag_id=example_dag
 
   # Pause a Dag via operation ID

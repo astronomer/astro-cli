@@ -11,7 +11,7 @@ package utils
 // --workspace and the others takes the letter too, except where Astro CLI 1.x
 // gave the letter to a different flag on that command (astro deploy's -d was
 // --dags and its -w was --wait), so that an old script is refused instead of
-// read as something else. ShortOptionExceptions lists those.
+// read as something else (TestTableLettersReachEveryFlagThatCanTakeThem).
 var ShortOptions = map[string]string{
 	"o": "output",
 	"y": "yes",

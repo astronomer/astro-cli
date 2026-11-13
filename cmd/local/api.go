@@ -53,8 +53,8 @@ func newAPICmd(c *cli) *cobra.Command {
 			"Airflow 3 and /api/v1/dags on Airflow 2 — the generation is detected, not assumed. A query string " +
 			"typed onto the path is sent as one. --root (or --raw) addresses the server below the version prefix, " +
 			"for the few paths Airflow serves unversioned.\n\n" +
-			"-F/--field adds a typed field: true, false and null are themselves, a number is a number, and @file " +
-			"reads a file (@- reads stdin). --raw-field adds a field that is always a string (af spells it -f, which is --follow elsewhere in this tree). key[sub]=v nests " +
+			"--field adds a typed field: true, false and null are themselves, a number is a number, and @file " +
+			"reads a file (@- reads stdin). --raw-field adds a field that is always a string (af spells it -f, which is --follow in this tree). key[sub]=v nests " +
 			"an object and key[]=v builds an array. Fields go in the query string on a GET, or when --body or --input carries " +
 			"the payload, and become the JSON body otherwise. The method stays GET unless --method says otherwise.\n\n" +
 			"The body is printed whatever the status, and a non-2xx status also fails the command, so a script can " +
