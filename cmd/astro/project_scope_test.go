@@ -55,7 +55,7 @@ func inProject(t *testing.T, pyproject string) {
 	t.Setenv("ASTRO_DOMAIN", "")
 	t.Cleanup(func() {
 		config.WorkingPath = orig
-		projectWorkspaceID, workspaceID, deploymentID, deploymentName = "", "", "", ""
+		workspaceID, deploymentID, deploymentName = "", "", ""
 		forceDelete = false
 		resetEnvFlags()
 	})
@@ -400,8 +400,8 @@ func TestDeploymentCreateDefaultsToTheProjectWorkspace(t *testing.T) {
 	group := &cobra.Command{Use: "deployment"}
 	group.PersistentPreRunE = followProjectPreRun(group)
 	var ws string
-	create := &cobra.Command{Use: "create", RunE: func(*cobra.Command, []string) (err error) {
-		ws, err = coalesceWorkspace()
+	create := &cobra.Command{Use: "create", RunE: func(cmd *cobra.Command, _ []string) (err error) {
+		ws, err = coalesceWorkspace(cmd)
 		return err
 	}}
 	create.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "")

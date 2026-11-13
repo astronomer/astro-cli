@@ -39,19 +39,17 @@ var workspaceTableConfig = output.BuildTableConfig(
 	output.WithPadding([]int{44, 50}),
 )
 
+// ErrCurrentNotSet is what a saved login with no current Workspace says.
+var ErrCurrentNotSet = errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+
 // GetCurrentWorkspace gets the current workspace set in context config
 // Returns a string representing the current workspace and an error if it doesn't exist
 func GetCurrentWorkspace() (string, error) {
-	c, err := config.GetCurrentContext()
-	if err != nil {
+	t := astrosession.Resolve(astrosession.Request{Accepts: astrosession.ByFlag, NoSaved: ErrCurrentNotSet, LoginError: true})
+	if err := t.Require(); err != nil {
 		return "", err
 	}
-
-	if c.Workspace == "" {
-		return "", astrosession.NoWorkspace(errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID"))
-	}
-
-	return c.Workspace, nil
+	return t.Workspace, nil
 }
 
 // ListData returns workspace list data for structured output

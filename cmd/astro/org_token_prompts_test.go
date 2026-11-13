@@ -99,15 +99,12 @@ func TestTheMissingWorkspaceAdviceNamesOnlyWhatTheCommandTakes(t *testing.T) {
 	withWorkspaces(t, "", "")
 	runWithToken(t, "apiTokenId:token-id", "organizationId:env-org")
 
-	projectFollowed = false
-	_, err := coalesceWorkspace()
+	_, err := coalesceWorkspace(&cobra.Command{})
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
 	assert.Contains(t, err.Error(), "pass --workspace")
 	assert.NotContains(t, err.Error(), "project")
 
-	projectFollowed = true
-	t.Cleanup(func() { projectFollowed = false })
-	_, err = coalesceWorkspace()
+	_, err = coalesceWorkspace(followingProject(""))
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
 	assert.Contains(t, err.Error(), "--workspace, or run in a project")
 }
@@ -123,8 +120,8 @@ func TestWorkspaceTokenCommandsUnderAnOrganizationToken(t *testing.T) {
 	_, err = workspacetoken.UpdateToken("id", "", "new", "", "WORKSPACE_MEMBER", "", nil, nil)
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
 
-	ws, org, err := workspacetoken.Scope("")
+	target, org, err := workspacetoken.Scope("")
 	require.NoError(t, err)
-	assert.Empty(t, ws)
+	assert.False(t, target.Found())
 	assert.Equal(t, "env-org", org)
 }

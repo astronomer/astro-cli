@@ -434,15 +434,16 @@ func lookupDeployment(override, orgID, ref string, project *manifest.Astro, ctx 
 		}
 		return dep, nil
 	}
-	ws, wsOrg := ctx.Workspace, ctx.Organization
-	if project.Workspace != "" {
+	run := astrosession.Resolve(astrosession.Request{Login: ctx, Project: project.Workspace})
+	ws, wsOrg := run.Workspace, ctx.Organization
+	if run.WorkspaceSource == astrosession.SourceProject {
 		// The project's workspace is on the project's host. Listed through a
 		// context on another host it would be asked of an Astro that does not
 		// have it.
 		if host := project.LoginDomain(); host != "" && host != manifest.NormalizeDomain(ctx.Domain) {
 			return astrov1.Deployment{}, fmt.Errorf("%q is not a Deployment id, and the project's workspace %s, where its name is looked up, is on %s, not the current context's %s: run 'astro context switch %s', or pass -d with the Deployment id", ref, project.Workspace, host, ctx.Domain, host)
 		}
-		ws, wsOrg = project.Workspace, project.WorkspaceOrganization(ctx.Organization)
+		wsOrg = project.WorkspaceOrganization(ctx.Organization)
 	}
 	if ws == "" {
 		return astrov1.Deployment{}, &instancelocate.DeploymentNameError{Name: ref}

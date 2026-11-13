@@ -57,11 +57,9 @@ func AddOrgTokenToWorkspace(id, name, role, workspaceID string, pick apitoken.Pi
 	if err != nil {
 		return apitoken.Token{}, err
 	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
-	}
-	if workspaceID == "" {
-		return apitoken.Token{}, astrosession.NoWorkspace(nil)
+	workspaceID, err = astrosession.RequireWorkspace(workspaceID)
+	if err != nil {
+		return apitoken.Token{}, err
 	}
 	token, err := FindToken(id, name, ctx.Organization, pick, client)
 	if err != nil {

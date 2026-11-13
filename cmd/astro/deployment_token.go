@@ -141,7 +141,7 @@ func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, ki
 	ws := ""
 	if kind == tokenKindWorkspace && operation == tokenRoleAdd {
 		var err error
-		if ws, err = workspaceTokenWorkspace(); err != nil {
+		if ws, err = workspaceTokenWorkspace(cmd); err != nil {
 			return err
 		}
 	}
@@ -195,12 +195,12 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 // current one (coalesceWorkspace). A token given by id is read wherever it
 // is, so then none is needed, and a login with no workspace, such as an
 // Organization token's, can still name one.
-func workspaceTokenWorkspace() (string, error) {
-	ws, err := coalesceWorkspace()
-	if errors.Is(err, astrosession.ErrOrgTokenNoWorkspace) && workspaceTokenID == "" {
-		return "", astrosession.NoWorkspaceHint(nil, astrosession.HintFlagOrTokenID)
-	}
+func workspaceTokenWorkspace(cmd *cobra.Command) (string, error) {
+	ws, err := coalesceWorkspaceOr(cmd, astrosession.ByID)
 	if err != nil && workspaceTokenID == "" {
+		if errors.Is(err, astrosession.ErrOrgTokenNoWorkspace) {
+			return "", err
+		}
 		return "", fmt.Errorf("failed to find a valid workspace to find the Workspace token in; pass --workspace, or the token's ID: %w", err)
 	}
 	return ws, nil
@@ -208,14 +208,14 @@ func workspaceTokenWorkspace() (string, error) {
 
 // runDeploymentTokenRemove removes the Deployment role of a Workspace or
 // Organization token.
-func runDeploymentTokenRemove(format cliout.Format, out io.Writer, kind string) error {
+func runDeploymentTokenRemove(cmd *cobra.Command, format cliout.Format, out io.Writer, kind string) error {
 	var (
 		removal apitoken.DeploymentRemoval
 		err     error
 	)
 	if kind == tokenKindWorkspace {
 		pick := workspaceTokenPicker("--workspace-token-name", "Please select the Workspace API token you would like to remove from the Deployment:")
-		ws, wsErr := workspaceTokenWorkspace()
+		ws, wsErr := workspaceTokenWorkspace(cmd)
 		if wsErr != nil {
 			return wsErr
 		}

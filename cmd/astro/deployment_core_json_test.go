@@ -15,6 +15,7 @@ import (
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/input"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // What `astro deployment create`, `update`, `delete`, `hibernate` and
@@ -417,8 +418,7 @@ func TestDeploymentCoreJSON(t *testing.T) {
 	// Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, the
 	// update is to that Deployment, said on stderr; stdout is the result.
 	t.Run("an update naming nothing takes the token's Deployment", func(t *testing.T) {
-		deployment.UseTokenDeployment(coreDeploymentID)
-		t.Cleanup(func() { deployment.UseTokenDeployment("") })
+		testUtil.UseAPIToken(t, "deploymentId:"+coreDeploymentID)
 		updated := coreDeployment()
 		updated.Name = "etl-prod-2"
 		m := new(astrov1_mocks.ClientWithResponsesInterface)

@@ -19,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -48,8 +47,13 @@ type Request struct {
 	// WorkspaceID is the --workspace override, "" if unset.
 	WorkspaceID string
 	// ContextWorkspace is the workspace of the login the deploy runs under,
-	// the fallback.
+	// the fallback. On Astro it is the run's resolved Workspace
+	// (astrosession.Resolve): a token's claim or the saved login's.
 	ContextWorkspace string
+	// NoWorkspace is what a deploy that needs a workspace and finds none says,
+	// nil being ErrNoWorkspace. It is read only when none was found. On Astro it is the resolver's: what a run with
+	// an API token, or a saved login, has to do to supply one.
+	NoWorkspace error
 	// DagsOnly is --dags: ship only the dags/ directory, no image, no Docker.
 	DagsOnly bool
 	// Image is --image: an image-only deploy, leaving the running dags in place.
@@ -791,16 +795,18 @@ func namedTarget(req Request, name string, links map[string]manifest.Link) (Targ
 	}, nil
 }
 
+// ErrNoWorkspace is a deploy with no Workspace to pick a Deployment in.
+var ErrNoWorkspace = errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
+
 // unlinkedTarget runs the workspace-level pick/create flow, for a project whose
 // manifest declares no deployment links at all, and links what it picks.
 func unlinkedTarget(req Request, d Deployer) (Target, error) {
 	workspaceID := listWorkspace(req)
 	if workspaceID == "" {
-		err := errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
-		if req.platform() == manifest.KindAstro {
-			err = astrosession.NoWorkspaceHint(err, astrosession.HintFlagOrProject)
+		if req.NoWorkspace != nil {
+			return Target{}, req.NoWorkspace
 		}
-		return Target{}, err
+		return Target{}, ErrNoWorkspace
 	}
 	if !req.Interactive {
 		if req.Manifest == nil {
