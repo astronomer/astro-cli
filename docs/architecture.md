@@ -103,6 +103,18 @@ A dependency's own `replace` lines are never honoured, so a consumer of a module
 - Tests match the package they are in. testify and plain `testing` both exist; don't rewrite either style, and don't mix them within a package.
 - Windows handling uses build tags only when code won't compile cross-OS, and a `runtime.GOOS` switch when picking a value.
 
+## Which Astro Workspace a run acts on
+
+`astrosession.Resolve` (`internal/astrosession/target.go`) decides it, once, for every Astro command; nothing else reads the saved context for a Workspace or checks one for emptiness. The first source that names one wins:
+
+1. the flag: `--workspace` (`--deployment` for a Deployment);
+2. the project link, `[tool.astro]` in `pyproject.toml`, for the command families that follow the project: `astro env` and `astro deployment` (`followProjectPreRun` records it on the command's context, `withProjectFollow`; `workspaceTarget` in `cmd/astro` reads it);
+3. the claims of the run's API token: a Workspace or Deployment token names its Workspace, a Deployment token its Deployment (`astrosession.TokenDeployment` reads it from the token). An Organization token names neither;
+4. the Workspace the saved interactive login last used. Never under `ASTRO_API_TOKEN`, and never another host's saved login for a token run (`Request.Domain`);
+5. the legacy `ASTRONOMER_KEY_*` rule: the Workspace of the organization's first Deployment, which setup records for such a run.
+
+A `Target` records the source of each answer. A run that found none gets its error from `Target.Missing`, worded by what the command accepts (`Request.Accepts`: `ByFlag`, `ByProject`, `ByID`, `ByPath`), so the advice never offers a way the command would not take. A command that asks a question or calls the API calls `Require` first. A Deployment given by ID is identified by it and needs no Workspace (`deploymentWorkspace` in `cmd/astro`): under an Organization token it is fetched by ID, and the command works in the Workspace it is in. A name or a pick still needs one.
+
 ## Output
 
 The output contract covers the whole CLI, and lives in [`cmd/cliout`](../cmd/cliout): the `--output` flag, `Renderer.Emit` and its stream twin `Renderer.EmitEvent` (the single door every payload leaves by, so a test can watch what a command publishes), and `cliout.Execute`, which runs the root and reports every failure. Formats are `text` (the default) and `json`; a command offers another only for a special use.
