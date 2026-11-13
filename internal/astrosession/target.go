@@ -3,7 +3,6 @@ package astrosession
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/astronomer/astro-cli/config"
@@ -22,15 +21,12 @@ import (
 //     Workspace, a Deployment token also its Deployment. An Organization
 //     token names neither;
 //  4. the saved context: the Workspace an interactive login last used. Never
-//     under ASTRO_API_TOKEN, and never another host's;
-//  5. the legacy ASTRONOMER_KEY_* rule: the Workspace of the organization's
-//     first Deployment, which setup records for such a run.
+//     under ASTRO_API_TOKEN, and never another host's.
 //
-// A run with ASTRO_API_TOKEN or ASTRONOMER_KEY_* has its own overlay on the
-// current context (cmd/astro/setup.go records the claim or the first
-// Deployment's Workspace there, for the process only), so the context read in
-// steps 3 to 5 is that overlay and the saved login's Workspace is out of
-// reach: the source names which of the three it is.
+// A run with ASTRO_API_TOKEN has its own overlay on the current context
+// (cmd/astro/setup.go records the token's claim there, for the process
+// only), so the context read in steps 3 and 4 is that overlay and the saved
+// login's Workspace is out of reach: the source names which of the two it is.
 //
 // A Target records where the answer came from, and, when there is none, what
 // would supply one, so the "no Workspace" error and its advice are formed
@@ -50,9 +46,6 @@ const (
 	SourceToken
 	// SourceContext is the Workspace a saved interactive login last used.
 	SourceContext
-	// SourceLegacyKey is the Workspace of the first Deployment of the
-	// organization an ASTRONOMER_KEY_ID run belongs to.
-	SourceLegacyKey
 )
 
 // Accepts is what a command lets a person name a Workspace with, besides the
@@ -229,8 +222,6 @@ func fromLogin(login *config.Context, domain string, token, onCurrent bool) (str
 		return "", SourceNone, nil
 	case token:
 		return ws, SourceToken, nil
-	case os.Getenv("ASTRONOMER_KEY_ID") != "":
-		return ws, SourceLegacyKey, nil
 	}
 	return ws, SourceContext, nil
 }

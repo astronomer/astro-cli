@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/config"
@@ -67,6 +68,7 @@ var cloudKinds = cliout.Kinds{
 			errors.Is(err, astrosession.ErrLoggedOut) ||
 			errors.Is(err, astroAuth.ErrLoginNeeded) ||
 			errors.Is(err, errNoAuthToken) ||
+			errors.Is(err, astroCmd.ErrLegacyAPIKeys) ||
 			httputil.HasStatus(err, http.StatusUnauthorized)
 	}},
 	{Kind: KindForbidden, Match: status(http.StatusForbidden)},

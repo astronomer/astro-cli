@@ -588,14 +588,12 @@ func (s *Suite) TestGetDeployment() {
 	}
 }
 
-// Named nothing, with an API token, deployment.auto_select, or ASTRONOMER_KEY_*
+// Named nothing, with an API token or deployment.auto_select
 // set and one Deployment in the workspace: a read takes it, saying so on
 // stderr; a change never does. With a terminal it asks, and with none it
 // fails, naming the flag.
 func (s *Suite) TestGetDeploymentAutoSelectsOnlyToRead() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	s.T().Setenv("ASTRONOMER_KEY_ID", "")
-	s.T().Setenv("ASTRONOMER_KEY_SECRET", "")
 	s.T().Setenv("ASTRO_API_TOKEN", "ci-token")
 	one := astrov1.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
@@ -1938,8 +1936,6 @@ func (s *Suite) TestCanCiCdDeploy() {
 // token, so it asks (and, with nothing to read, fails).
 func (s *Suite) TestSelectDeploymentReadsTheAPITokenByTheOneRule() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	s.T().Setenv("ASTRONOMER_KEY_ID", "")
-	s.T().Setenv("ASTRONOMER_KEY_SECRET", "")
 	only := []astrov1.Deployment{{Id: "dep-1", Name: "only"}}
 	for env, asks := range map[string]bool{"Bearer ": true, "Bearer Bearer": true, "ci-token": false, "Bearer ci-token": false} {
 		s.Run(env, func() {

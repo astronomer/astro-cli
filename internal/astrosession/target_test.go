@@ -18,17 +18,14 @@ const (
 	orgToken    runKind = "organization token"
 	wsToken     runKind = "workspace token"
 	depToken    runKind = "deployment token"
-	legacyKey   runKind = "legacy key"
 )
 
 // useRun sets up a run of kind on astronomer.io: the saved context, as the
 // run sees it. A token run sees the claim its setup overlaid on the context
-// (none for an Organization token), never the saved login's Workspace; a
-// legacy key run sees the first Deployment's Workspace.
+// (none for an Organization token), never the saved login's Workspace.
 func useRun(t *testing.T, kind runKind, saved string) {
 	t.Helper()
 	t.Setenv(EnvAPIToken, "")
-	t.Setenv("ASTRONOMER_KEY_ID", "")
 	ctxWorkspace := saved
 	switch kind {
 	case interactive:
@@ -42,9 +39,6 @@ func useRun(t *testing.T, kind runKind, saved string) {
 	case depToken:
 		testUtil.UseAPIToken(t, "organizationId:org", "workspaceId:ws-claim", "deploymentId:dep-claim")
 		ctxWorkspace = "ws-claim"
-	case legacyKey:
-		t.Setenv("ASTRONOMER_KEY_ID", "key")
-		ctxWorkspace = "ws-first"
 	}
 	writeConfig(t, fmt.Sprintf(`context: astronomer.io
 contexts:
@@ -75,7 +69,6 @@ func TestResolveWorkspacePrecedence(t *testing.T) {
 		{"saved login alone", interactive, "", "", saved, SourceContext},
 		{"workspace token alone", wsToken, "", "", "ws-claim", SourceToken},
 		{"deployment token alone", depToken, "", "", "ws-claim", SourceToken},
-		{"legacy key alone", legacyKey, "", "", "ws-first", SourceLegacyKey},
 		{"organization token alone selects none", orgToken, "", "", "", SourceNone},
 
 		// each pair, the higher of the two winning
@@ -86,8 +79,6 @@ func TestResolveWorkspacePrecedence(t *testing.T) {
 		{"project over workspace token", wsToken, "", "ws-project", "ws-project", SourceProject},
 		{"flag over deployment token", depToken, "ws-flag", "", "ws-flag", SourceFlag},
 		{"project over deployment token", depToken, "", "ws-project", "ws-project", SourceProject},
-		{"flag over legacy key", legacyKey, "ws-flag", "", "ws-flag", SourceFlag},
-		{"project over legacy key", legacyKey, "", "ws-project", "ws-project", SourceProject},
 		{"flag supplies an organization token's", orgToken, "ws-flag", "", "ws-flag", SourceFlag},
 		{"project supplies an organization token's", orgToken, "", "ws-project", "ws-project", SourceProject},
 
@@ -168,7 +159,6 @@ func TestResolveDeployment(t *testing.T) {
 		{"flag over deployment token", depToken, "dep-flag", "", "dep-flag", SourceFlag},
 		{"workspace token names none", wsToken, "", "", "", SourceNone},
 		{"organization token names none", orgToken, "", "", "", SourceNone},
-		{"legacy key names none", legacyKey, "", "", "", SourceNone},
 		{"deployment token on its own host", depToken, "", "astronomer.io", "dep-claim", SourceToken},
 		{"deployment token is no Deployment of another host", depToken, "", "astronomer-stage.io", "", SourceNone},
 		{"flag on another host", depToken, "dep-flag", "astronomer-stage.io", "dep-flag", SourceFlag},

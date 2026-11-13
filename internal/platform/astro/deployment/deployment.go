@@ -153,7 +153,7 @@ func CanCiCdDeploy(bearerToken string) bool {
 		return false
 	}
 
-	// Only API Tokens and API Keys have permissions
+	// Only API Tokens have permissions
 	if len(claims.Permissions) > 0 {
 		return true
 	}
@@ -2108,7 +2108,7 @@ func (e *TargetsDisagreeError) IsUsageError() bool { return true }
 // Deployment without asking: authenticated by an API token, or with
 // deployment.auto_select on.
 func mayAutoSelect() bool {
-	return astrosession.HasAPIToken() || os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != "" || config.CFG.AutoSelect.GetBool()
+	return astrosession.HasAPIToken() || config.CFG.AutoSelect.GetBool()
 }
 
 // GetDeployment is the Deployment in workspace ws that deploymentID or

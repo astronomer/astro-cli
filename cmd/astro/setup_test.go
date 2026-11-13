@@ -1,8 +1,6 @@
 package astro
 
 import (
-	"bytes"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -240,129 +238,6 @@ func TestSetup(t *testing.T) {
 
 		err = Setup(cmd, mockV1Client)
 		assert.NoError(t, err)
-	})
-
-	t.Run("use API key", func(t *testing.T) {
-		mockOrgsResponse := astrov1.ListOrganizationsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrov1.OrganizationsPaginated{
-				Organizations: []astrov1.Organization{
-					{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
-				},
-			},
-		}
-		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("domain", "astronomer.io")
-		assert.NoError(t, err)
-
-		cmd := &cobra.Command{Use: "deploy"}
-		cmd, err = cmd.ExecuteC()
-		assert.NoError(t, err)
-
-		rootCmd := &cobra.Command{Use: "astro"}
-		rootCmd.AddCommand(cmd)
-
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
-			return nil
-		}
-
-		t.Setenv("ASTRONOMER_KEY_ID", "key")
-		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
-
-		origFetch := fetchDomainAuthConfig
-		fetchDomainAuthConfig = func(domain string) (auth.Config, error) {
-			return auth.Config{DomainURL: "https://auth." + domain + "/"}, nil
-		}
-		defer func() { fetchDomainAuthConfig = origFetch }()
-
-		mockResp := TokenResponse{
-			AccessToken: "test-token",
-			IDToken:     "test-id",
-		}
-		jsonResponse, err := json.Marshal(mockResp)
-		assert.NoError(t, err)
-
-		client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		err = Setup(cmd, mockV1Client)
-		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
-	})
-}
-
-func TestCheckAPIKeys(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
-	t.Run("test context switch", func(t *testing.T) {
-		mockOrgsResponse := astrov1.ListOrganizationsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrov1.OrganizationsPaginated{
-				Organizations: []astrov1.Organization{
-					{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
-				},
-			},
-		}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("domain", "astronomer.io")
-		assert.NoError(t, err)
-
-		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
-			return nil
-		}
-
-		// Stub auth config fetch so the test doesn't hit the network.
-		origFetch := fetchDomainAuthConfig
-		fetchDomainAuthConfig = func(domain string) (auth.Config, error) {
-			return auth.Config{DomainURL: "https://auth." + domain + "/"}, nil
-		}
-		defer func() { fetchDomainAuthConfig = origFetch }()
-
-		t.Setenv("ASTRONOMER_KEY_ID", "key")
-		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
-
-		mockResp := TokenResponse{
-			AccessToken: "test-token",
-			IDToken:     "test-id",
-		}
-		jsonResponse, err := json.Marshal(mockResp)
-		assert.NoError(t, err)
-
-		client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-
-		// Switch context
-		domain := "astronomer-dev.io"
-		err = context.Switch(domain)
-		assert.NoError(t, err)
-
-		// run CheckAPIKeys
-		_, err = checkAPIKeys(mockV1Client, false)
-		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
 	})
 }
 

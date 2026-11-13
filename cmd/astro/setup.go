@@ -15,13 +15,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
-	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -33,19 +31,17 @@ var (
 	fetchDomainAuthConfig = auth.FetchDomainAuthConfig
 	defaultDomain         = "astronomer.io"
 	client                = httputil.NewHTTPClient()
-	isDeploymentFile      = false
 	parseAPIToken         = util.ParseAPIToken
 	errNotAPIToken        = errors.New("the API token given does not appear to be an Astro API Token")
 	errExpiredAPIToken    = errors.New("the API token given has expired")
 	// ErrAPITokenOrganization is returned when the organization of an accepted
-	// API token, or of API keys, can't be looked up, which leaves the context
+	// API token can't be looked up, which leaves the context
 	// without one.
 	ErrAPITokenOrganization = errors.New("cannot look up the organization of the Astro credentials in the environment")
 )
 
 const (
-	topLvlCmd     = "astro"
-	deploymentCmd = "deployment"
+	topLvlCmd = "astro"
 )
 
 type TokenResponse struct {
@@ -102,19 +98,13 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 		return nil
 	}
 
-	// if deployment inspect, create, or update commands are used
-	deploymentCmds := []string{"inspect", "create", "update"}
-	if util.Contains(deploymentCmds, cmd.CalledAs()) && cmd.Parent().Use == deploymentCmd {
-		isDeploymentFile = true
-	}
-
 	// `astro auth token` prints a token for scripts and for Otto, which runs it
 	// with no terminal. It renews the login it prints itself (FreshLogin) and
 	// must never start the login flow, which would wait for a browser nobody
 	// is watching. Credentials in the environment still apply.
 	if isAuthTokenCmd(cmd) {
 		// Quietly: the command's output is the token alone.
-		_, err := ensureEnvCredentials(true, astroV1Client)
+		_, err := ensureEnvCredentials(astroV1Client)
 		// An API token is saved before its organization is looked up, and
 		// printing it needs no organization, so a lookup that failed for want
 		// of the API (a rate limit, an outage) does not stop this command as it
@@ -127,7 +117,7 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 		return err
 	}
 
-	return ensureLogin(isDeploymentFile, astroV1Client)
+	return ensureLogin(astroV1Client)
 }
 
 // NoLoginAnnotation, set to "true" on a command or on a group, says that it
@@ -151,31 +141,49 @@ func isAuthTokenCmd(cmd *cobra.Command) bool {
 }
 
 // EnsureLogin runs the login check Setup gives every cloud command before it
-// calls the API: an API token, then API keys, then the current login, whose
+// calls the API: an API token, then the current login, whose
 // access token is refreshed when it is about to expire (and, with no login at
 // all, the login flow). A command that skips the root's pre-run, as the core tree
 // does, calls this before its own API calls.
 func EnsureLogin(astroV1Client astrov1.APIClient) error {
-	return ensureLogin(false, astroV1Client)
+	return ensureLogin(astroV1Client)
 }
 
 // ensureLogin is Setup's auth half, shared with EnsureLogin.
-func ensureLogin(deploymentFile bool, astroV1Client astrov1.APIClient) error {
-	used, err := ensureEnvCredentials(deploymentFile, astroV1Client)
+func ensureLogin(astroV1Client astrov1.APIClient) error {
+	used, err := ensureEnvCredentials(astroV1Client)
 	if err != nil || used {
 		return err
 	}
 	return checkToken(astroV1Client, os.Stderr)
 }
 
-// ensureEnvCredentials sets up an API token or API keys from the environment,
-// reporting whether one was found. They come before any saved login.
-func ensureEnvCredentials(deploymentFile bool, astroV1Client astrov1.APIClient) (bool, error) {
+// ensureEnvCredentials sets up an API token from the environment, reporting
+// whether one was found. It comes before any saved login. With no token, a
+// Deployment API key in the environment fails here, before any request or
+// prompt, rather than being skipped for a saved login the key's owner never
+// meant to use.
+func ensureEnvCredentials(astroV1Client astrov1.APIClient) (bool, error) {
 	apiToken, err := checkAPIToken(astroV1Client)
 	if err != nil || apiToken {
+		// A token wins over the keys and says nothing of them: a CI job
+		// that moves from keys to a token may keep both set for a while.
 		return apiToken, err
 	}
-	return checkAPIKeys(astroV1Client, deploymentFile)
+	if hasLegacyAPIKeys() {
+		return false, ErrLegacyAPIKeys
+	}
+	return false, nil
+}
+
+// ErrLegacyAPIKeys is the failure of a run that needs an Astro login when the
+// environment holds Deployment API keys and no API token. The keys stopped
+// authenticating on June 1st, 2024.
+var ErrLegacyAPIKeys = errors.New("ASTRONOMER_KEY_ID and ASTRONOMER_KEY_SECRET (Deployment API keys) are no longer supported: set ASTRO_API_TOKEN to a Deployment API token instead")
+
+// hasLegacyAPIKeys reports whether either Deployment API key variable is set.
+func hasLegacyAPIKeys() bool {
+	return os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != ""
 }
 
 // FreshLogin returns the context for domain, or the current context when
@@ -278,13 +286,13 @@ func tokenIssuedAt(token string) (time.Time, bool) {
 
 var (
 	errNoRefreshToken          = errors.New("this login cannot be renewed because it has no refresh token, run 'astro login' to log in again")
-	errForceWithEnvCredentials = errors.New("--force renews a saved login, and the token here comes from the environment (ASTRO_API_TOKEN or an API key), which cannot be renewed")
+	errForceWithEnvCredentials = errors.New("--force renews a saved login, and the token here comes from the environment (ASTRO_API_TOKEN), which cannot be renewed")
 )
 
 // envCredentials reports whether the environment supplies the credentials
 // Setup uses before any saved login.
 func envCredentials() bool {
-	return astrosession.HasAPIToken() || (os.Getenv("ASTRONOMER_KEY_ID") != "" && os.Getenv("ASTRONOMER_KEY_SECRET") != "")
+	return astrosession.HasAPIToken()
 }
 
 func renewLogin(c *config.Context) error {
@@ -456,85 +464,6 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 	}
 
 	return tokenRes, nil
-}
-
-func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool, error) {
-	// check os variables
-	astronomerKeyID := os.Getenv("ASTRONOMER_KEY_ID")
-	astronomerKeySecret := os.Getenv("ASTRONOMER_KEY_SECRET")
-	if astronomerKeyID == "" || astronomerKeySecret == "" {
-		return false, nil
-	}
-	if !isDeploymentFile {
-		fmt.Fprintln(os.Stderr, "Using an Astro API key")
-		fmt.Fprintln(os.Stderr)
-		cliout.Warn(os.Stderr, "Starting June 1st, 2024, Deployment API Keys will stop working. To ensure uninterrupted access to our services, we strongly recommend transitioning to Deployment API tokens. See https://www.astronomer.io/docs/astro/deployment-api-tokens")
-	}
-
-	domain, current := environmentDomain()
-	authConfig, err := fetchDomainAuthConfig(domain)
-	if err != nil {
-		return false, err
-	}
-
-	// setup request
-	addr := authConfig.DomainURL + "oauth/token"
-	data := url.Values{
-		"client_id":     {astronomerKeyID},
-		"client_secret": {astronomerKeySecret},
-		"audience":      {"astronomer-ee"},
-		"grant_type":    {"client_credentials"},
-	}
-
-	doOptions := &httputil.DoOptions{
-		Data:    []byte(data.Encode()),
-		Context: http_context.Background(),
-		Headers: map[string]string{"Content-Type": "application/x-www-form-urlencoded"},
-		Path:    addr,
-		Method:  http.MethodPost,
-	}
-
-	// execute request
-	res, err := client.Do(doOptions)
-	if err != nil {
-		logger.Fatal(err)
-		return false, fmt.Errorf("cannot getaccess token with API keys: %w", err)
-	}
-	defer res.Body.Close()
-
-	// decode response
-	var tokenRes TokenResponse
-
-	err = json.NewDecoder(res.Body).Decode(&tokenRes)
-	if err != nil {
-		return false, fmt.Errorf("cannot decode response: %w", err)
-	}
-
-	if tokenRes.Error != nil {
-		return false, errors.New(tokenRes.ErrorDescription)
-	}
-
-	c, err := useEnvironmentLogin(domain, current, "Bearer "+tokenRes.AccessToken, time.Now().Add(time.Duration(tokenRes.ExpiresIn)*time.Second))
-	if err != nil {
-		return false, err
-	}
-	orgID, orgProduct, err := environmentOrganization(astroV1Client)
-	if err != nil {
-		return false, err
-	}
-
-	// get workspace ID
-	deployments, err := deployment.ListDeployments("", orgID, astroV1Client)
-	if err != nil {
-		return false, fmt.Errorf("%w: %w", ErrAPITokenOrganization, errors.Wrap(err, organization.AstronomerConnectionErrMsg))
-	}
-	if len(deployments) == 0 {
-		return false, fmt.Errorf("%w: the API keys' organization has no Deployment to take a workspace from", ErrAPITokenOrganization)
-	}
-	workspaceID = deployments[0].WorkspaceId
-
-	useEnvironmentSelection(&c, orgID, orgProduct, workspaceID)
-	return true, nil
 }
 
 func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {

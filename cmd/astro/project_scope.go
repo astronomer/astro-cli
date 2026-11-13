@@ -186,12 +186,12 @@ func projectManifest(dir string) (*manifest.Manifest, error) {
 	return m, err
 }
 
-// credentialFromEnv reports an API token or key in the environment. Setup
+// credentialFromEnv reports an API token in the environment. Setup
 // uses one, for that process only, as the login of the domain it runs on and
 // makes that domain current, so the command stays on the host the environment
 // names rather than move the user's current context.
 func credentialFromEnv() bool {
-	return astrosession.HasAPIToken() || os.Getenv("ASTRONOMER_KEY_ID") != ""
+	return astrosession.HasAPIToken()
 }
 
 // projectDeployment reads ref as a Deployment link name, then as a Deployment
