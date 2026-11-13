@@ -125,7 +125,12 @@ func TestRunInImagePassesEnvironmentDeterministically(t *testing.T) {
 
 	require.Len(t, cmd.calls, 1)
 	call := cmd.calls[0]
-	assert.Contains(t, call, "compose.run-", "the caller's keys are declared by a run-only override")
+	// The run's override is the LAST --file, after the project's own override:
+	// compose merges in order, so that is what makes the caller's value win a
+	// key either file also sets.
+	override := strings.LastIndex(call, imageRunOverrideName)
+	require.Positive(t, override, "the caller's keys are declared by a run-only override")
+	assert.NotContains(t, call[override:], "--file", "the run's override must be the last file")
 	assert.NotContains(t, call, " -e ", "no key is named on the command line")
 	assert.NotContains(t, call, "BAD", "a key holding = would never resolve")
 
@@ -136,9 +141,8 @@ func TestRunInImagePassesEnvironmentDeterministically(t *testing.T) {
 
 	dir, err := rt.StateDir(project)
 	require.NoError(t, err)
-	leftovers, err := filepath.Glob(filepath.Join(dir, "compose.run-*.yaml"))
-	require.NoError(t, err)
-	assert.Empty(t, leftovers, "the run's override is removed when the run ends")
+	_, statErr := os.Stat(filepath.Join(dir, imageRunOverrideName))
+	assert.True(t, os.IsNotExist(statErr), "the run's override is removed when the run ends")
 }
 
 // The override declares each caller key on the run's service as a reference

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -999,8 +1000,9 @@ func TestStartKeepsPlanValuesOutOfComposesOwnSettings(t *testing.T) {
 		env, ok := cmd.envFor("compose")
 		require.True(t, ok)
 		for _, kv := range env {
-			assert.NotContains(t, kv, "from-the-plan=", kv)
 			key, value, _ := strings.Cut(kv, "=")
+			assert.False(t, slices.Contains(controlled, key) && value == "from-the-plan",
+				"%s reached compose under its own name", kv)
 			if value == "from-the-plan" {
 				assert.True(t, strings.HasPrefix(key, secretRefPrefix), "%s reached compose under its own name", kv)
 			}
@@ -1011,6 +1013,30 @@ func TestStartKeepsPlanValuesOutOfComposesOwnSettings(t *testing.T) {
 			assert.Contains(t, file, secretInterpolation(secretRef(key)), "%s still reaches the container", key)
 		}
 	}
+}
+
+// A secret colliding with a setting the engine owns is not applied (see
+// airflowEnv), so the file references nothing for it, and its value is not
+// handed to compose either: it would sit in that environment for no reader.
+func TestStartHandsComposeOnlyTheSecretsTheFileReferences(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	p := testPlan(t)
+	p.SecretEnv = map[string]string{
+		"AIRFLOW__CORE__EXECUTOR": "from-the-plan",
+		"AIRFLOW_CONN_DB":         "postgres://u:pw@h/db",
+	}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	env, ok := cmd.envFor("compose")
+	require.True(t, ok)
+	assert.Contains(t, env, secretRef("AIRFLOW_CONN_DB")+"=postgres://u:pw@h/db")
+	for _, kv := range env {
+		assert.False(t, strings.HasPrefix(kv, secretRef("AIRFLOW__CORE__EXECUTOR")+"="), "an unapplied secret reached compose")
+	}
+	assert.NotContains(t, generatedCompose(t, p.ProjectPath), secretRef("AIRFLOW__CORE__EXECUTOR"))
 }
 
 // generatedCompose is the compose file Start wrote for a project.

@@ -396,6 +396,17 @@ func secretDecls(secretEnv map[string]string, env []envVar) []secretDecl {
 	return out
 }
 
+// declaredSecrets is the part of secretEnv the file declares: the values an up
+// hands compose. A key secretDecls skipped is referenced nowhere, and its
+// value has no reason to sit in compose's environment.
+func declaredSecrets(secretEnv map[string]string, decls []secretDecl) map[string]string {
+	out := make(map[string]string, len(decls))
+	for _, d := range decls {
+		out[d.Name] = secretEnv[d.Name]
+	}
+	return out
+}
+
 // secretKeyOK reports whether a key can travel at all. An empty key makes the
 // file itself invalid, and one holding "=" cannot be an environment variable
 // in the container. Neither is worth a half-delivery.

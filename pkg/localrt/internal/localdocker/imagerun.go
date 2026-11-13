@@ -195,6 +195,10 @@ func imageRunValues(composePath string, env map[string]string) (map[string]strin
 // in env on the service a run uses, as a reference to its alias, and returns
 // its path, or "" when env names nothing to declare. It holds key names only:
 // the values are interpolated from the compose process's environment.
+//
+// One fixed name rather than a temp file: RunInImage holds the project lock,
+// so no two runs share it at once, and a file a killed run left behind is
+// overwritten by the next one instead of accumulating.
 func writeImageRunOverride(dir string, env map[string]string) (string, error) {
 	keys := make([]string, 0, len(env))
 	for k := range env {
@@ -211,17 +215,16 @@ func writeImageRunOverride(dir string, env map[string]string) (string, error) {
 	for _, k := range keys {
 		b.WriteString("      " + quoteYAML(k) + ": " + secretInterpolation(secretRef(k)) + "\n")
 	}
-	f, err := os.CreateTemp(dir, "compose.run-*.yaml")
-	if err != nil {
+	path := filepath.Join(dir, imageRunOverrideName)
+	if err := os.WriteFile(path, []byte(b.String()), imageRunOverridePerm); err != nil {
 		return "", fmt.Errorf("writing the run's compose override: %w", err)
 	}
-	_, werr := f.WriteString(b.String())
-	if cerr := f.Close(); werr == nil {
-		werr = cerr
-	}
-	if werr != nil {
-		os.Remove(f.Name()) //nolint:errcheck // best-effort cleanup; the write error is what we return
-		return "", fmt.Errorf("writing the run's compose override: %w", werr)
-	}
-	return f.Name(), nil
+	return path, nil
 }
+
+// imageRunOverrideName is the run-only compose override in the state dir, and
+// imageRunOverridePerm its mode: the CLI user's alone, like the state dir.
+const (
+	imageRunOverrideName = "compose.run.yaml"
+	imageRunOverridePerm = 0o600
+)

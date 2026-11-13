@@ -336,6 +336,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	}
 
 	env := airflowEnv(name, webPort, major, p.Env, p.SecretEnv)
+	secrets := secretDecls(p.SecretEnv, env)
 	composePath, err := e.writeComposeFile(stateDir, composeInput{
 		ProjectName: name,
 		Image:       image,
@@ -347,7 +348,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		PostgresPort: pgPort,
 		Env:          env,
 		PassEnv:      passEnv(p.PassthroughEnv, p.SecretEnv, env),
-		SecretEnv:    secretDecls(p.SecretEnv, env),
+		SecretEnv:    secrets,
 		Mounts:       projectMounts(projectPath),
 		DBCommand:    dbCommand(major),
 		Services:     airflowServices(major),
@@ -388,7 +389,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		files:      composeFiles(composePath, projectPath),
 		name:       name,
 		projectDir: projectPath,
-		extraEnv:   secretEnviron(p.SecretEnv),
+		extraEnv:   secretEnviron(declaredSecrets(p.SecretEnv, secrets)),
 	}
 	if err := e.bringUp(ctx, &up, mayCleanUp, cb); err != nil {
 		return nil, err
