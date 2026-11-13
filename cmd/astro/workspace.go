@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
@@ -951,4 +952,37 @@ func selectWorkspaceRole() (string, error) {
 		return "", err
 	}
 	return validWorkspaceRoles[i], nil
+}
+
+// argOrID is the Deployment id a command was given: its argument, else
+// --deployment-id (or whatever --deployment resolved to).
+func argOrID(args []string) string {
+	if len(args) > 0 {
+		return args[0]
+	}
+	return deploymentID
+}
+
+// deploymentWorkspace is the Workspace a command that acts on one Deployment
+// looks it up in. A Deployment given by id is identified by it, so a run that
+// has no Workspace (an Organization token selects none) goes on without one:
+// the Deployment is fetched by id, and its own Workspace is the one the rest of
+// the command works in. Given a Workspace the id is looked for in it, as it
+// always was, with no extra call. A name, or a pick, still needs a Workspace,
+// and fails here as before, ahead of any question or API call. A failure to
+// find the Workspace is worded with msg ("" for none); a failure to fetch the
+// Deployment is not a failure to find a Workspace, and is not.
+func deploymentWorkspace(cmd *cobra.Command, id, msg string) (string, error) {
+	if id != "" && workspaceTarget(cmd, workspaceID, 0).NoSource() {
+		d, err := deployment.GetDeploymentByID("", id, astroV1Client)
+		if err != nil {
+			return "", fmt.Errorf("fetching Deployment %s: %w", id, err)
+		}
+		return d.WorkspaceId, nil
+	}
+	ws, err := coalesceWorkspace(cmd)
+	if err != nil && msg != "" {
+		return "", errors.Wrap(err, msg)
+	}
+	return ws, err
 }

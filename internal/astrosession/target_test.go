@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -261,5 +262,77 @@ func TestSourceNamesItself(t *testing.T) {
 		if s.String() != want {
 			t.Errorf("%d is %q, want %q", s, s.String(), want)
 		}
+	}
+}
+
+// A caller handed a login reads its selection, as the run's own.
+func TestResolveReadsTheLoginItIsHanded(t *testing.T) {
+	useRun(t, interactive, "ws-saved")
+	handed := &config.Context{Workspace: "ws-handed"}
+	got := Resolve(Request{Login: handed})
+	if got.Workspace != "ws-handed" || got.WorkspaceSource != SourceContext {
+		t.Fatalf("got %q from %v", got.Workspace, got.WorkspaceSource)
+	}
+	if got := Resolve(Request{Login: handed, Workspace: "ws-flag"}); got.Workspace != "ws-flag" {
+		t.Fatalf("the flag lost to the login: %q", got.Workspace)
+	}
+	useRun(t, orgToken, "ws-saved")
+	if got := Resolve(Request{Login: &config.Context{}}); got.Found() || !errors.Is(got.Require(), ErrOrgTokenNoWorkspace) {
+		t.Fatalf("an Organization token's empty login found %q", got.Workspace)
+	}
+}
+
+// A login that cannot be read is that error, never a claim that no Workspace
+// is selected, and it is not a Workspace an ID can do without.
+func TestResolveWithNoLoginAtAll(t *testing.T) {
+	t.Setenv(EnvAPIToken, "")
+	testUtil.InitTestConfig(testUtil.Initial)
+	got := Resolve(Request{})
+	if got.Found() || got.NoSource() {
+		t.Fatalf("found %q, NoSource %v", got.Workspace, got.NoSource())
+	}
+	if err := got.Require(); err == nil || errors.Is(err, ErrNoWorkspace) {
+		t.Fatalf("err = %v, want the login's own", err)
+	}
+	if got := Resolve(Request{Workspace: "ws-flag"}); !got.Found() {
+		t.Fatal("a flag needs no login")
+	}
+}
+
+func TestNoSourceIsAMissingWorkspaceNotAFoundOne(t *testing.T) {
+	for _, tt := range []struct {
+		kind runKind
+		want bool
+	}{{orgToken, true}, {wsToken, false}, {interactive, false}} {
+		useRun(t, tt.kind, "ws-saved")
+		if got := Resolve(Request{}).NoSource(); got != tt.want {
+			t.Errorf("%s: NoSource() = %v, want %v", tt.kind, got, tt.want)
+		}
+	}
+	useRun(t, interactive, "")
+	if !Resolve(Request{}).NoSource() {
+		t.Error("a saved login with no Workspace is no source")
+	}
+}
+
+func TestRequireWorkspaceTakesTheFlagOrTheRunsOwn(t *testing.T) {
+	useRun(t, orgToken, "")
+	if ws, err := RequireWorkspace("ws-flag"); err != nil || ws != "ws-flag" {
+		t.Fatalf("got %q, %v", ws, err)
+	}
+	if _, err := RequireWorkspace(""); !errors.Is(err, ErrOrgTokenNoWorkspace) || !strings.HasSuffix(err.Error(), ", so pass --workspace") {
+		t.Fatalf("err = %v", err)
+	}
+	useRun(t, wsToken, "")
+	if ws, err := RequireWorkspace(""); err != nil || ws != "ws-claim" {
+		t.Fatalf("got %q, %v", ws, err)
+	}
+}
+
+func TestMissingWorkspaceAdviceForAPathNamesThePath(t *testing.T) {
+	useRun(t, orgToken, "")
+	err := Resolve(Request{Accepts: ByPath}).Require()
+	if !errors.Is(err, ErrOrgTokenNoWorkspace) || !strings.HasSuffix(err.Error(), ", so write the id in the path") {
+		t.Fatalf("err = %v", err)
 	}
 }

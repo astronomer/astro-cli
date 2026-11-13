@@ -247,6 +247,11 @@ func sameDomain(a, b string) bool {
 // Found reports whether a source named a Workspace.
 func (t Target) Found() bool { return t.Workspace != "" }
 
+// NoSource reports that no source named a Workspace, as opposed to the login
+// being unreadable: a command addressed by an ID, which identifies its target
+// with no Workspace to look in, goes on without one only for the first.
+func (t Target) NoSource() bool { return !t.Found() && t.readErr == nil }
+
 // Require is nil when the run has a Workspace, else the error for its absence
 // (Missing). A command that asks a question or calls the API calls it first,
 // so nothing is asked on the way to this error.

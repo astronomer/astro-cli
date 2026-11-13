@@ -3,7 +3,6 @@ package astro
 import (
 	"io"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
@@ -57,9 +56,9 @@ func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
   astro deployment bundle create --deployment <id> --name my-dags -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := coalesceWorkspace(cmd)
+			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
+				return err
 			}
 			cmd.SilenceUsage = true
 			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), astroV1Client, astroV1Alpha1Client)
@@ -83,9 +82,9 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
   astro deployment bundle list --deployment <id> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := coalesceWorkspace(cmd)
+			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
+				return err
 			}
 			cmd.SilenceUsage = true
 			return deployment.ListBundlesWithFormat(ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
@@ -114,9 +113,9 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := coalesceWorkspace(cmd)
+			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
+				return err
 			}
 			cmd.SilenceUsage = true
 			var bundleID string
@@ -153,9 +152,9 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := coalesceWorkspace(cmd)
+			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
+				return err
 			}
 			cmd.SilenceUsage = true
 			var bundleID string
