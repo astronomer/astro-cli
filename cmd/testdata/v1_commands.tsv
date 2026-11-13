@@ -4,27 +4,43 @@
 # non-hosted organization (astro) and a hosted one (astro-hosted), and its
 # APC tree (apc).
 #
+# It also lists every alias 1.x gave a command, since otherwise only the name
+# is checked and v2 could drop an alias unnoticed. For each visible command
+# and each of its aliases there is a path that spells the command by that
+# alias at its own position and every group above it by name (deployment ls,
+# not de ls). So a command with two aliases has two such paths, and an alias a
+# group gave itself (deployment, de, deployments) is a path of its own
+# (de, deployments). An alias of a group is not repeated under each command
+# below it: cobra resolves one word at a time, so the group's own path covers
+# it. The paths were walked off 1.x's cobra trees, with APC built as for the
+# newest platform so that no version gate hides a command. A command
+# every tree had at the root (api, context, dev) lists its aliases in all three.
+#
 # It records 1.x, so nothing in v2 changes it, with one exception: a 1.x
-# alias v2 dropped is listed as a path of its own, since otherwise only the
-# name is checked. Today that is 1.x's de on every delete (deployment de),
-# which v2 gave up because de is also deployment's own alias; each reaches a
-# stub that names the command it spelled. Only the tests read it
-# (removed_commands_test.go): every path here is a command v2 still has, or
-# reaches a hidden stub that says what replaced it.
+# alias v2 dropped stays listed, and what it reaches is a stub. Today that is
+# 1.x's de on every delete (deployment de), which v2 gave up because de is
+# also deployment's own alias; each reaches a stub that names the command it
+# spelled. Only the tests read it (removed_commands_test.go): every path here
+# is a command v2 still has, at that spelling, or reaches a hidden stub that
+# says what replaced it.
 astro,astro-hosted,apc	api
 astro,astro-hosted,apc	api airflow
 astro,astro-hosted,apc	api airflow describe
+astro,astro-hosted,apc	api airflow list
 astro,astro-hosted,apc	api airflow ls
 astro,astro-hosted,apc	api cloud
 astro,astro-hosted,apc	api cloud describe
+astro,astro-hosted,apc	api cloud list
 astro,astro-hosted,apc	api cloud ls
 astro,astro-hosted,apc	api registry
 astro,astro-hosted,apc	api registry describe
+astro,astro-hosted,apc	api registry list
 astro,astro-hosted,apc	api registry ls
 astro,astro-hosted,apc	auth
 astro,astro-hosted,apc	auth login
 astro,astro-hosted,apc	auth logout
 astro,astro-hosted,apc	auth token
+astro,astro-hosted,apc	c
 astro,astro-hosted,apc	config
 astro,astro-hosted,apc	config get
 astro,astro-hosted,apc	config set
@@ -32,97 +48,163 @@ astro,astro-hosted,apc	context
 astro,astro-hosted,apc	context de
 astro,astro-hosted,apc	context delete
 astro,astro-hosted,apc	context list
+astro,astro-hosted,apc	context ls
+astro,astro-hosted,apc	context sw
 astro,astro-hosted,apc	context switch
+astro,astro-hosted,apc	d
 astro,astro-hosted	dbt
 astro,astro-hosted	dbt cleanup
 astro,astro-hosted	dbt delete
 astro,astro-hosted	dbt deploy
+astro,astro-hosted,apc	de
 astro,astro-hosted,apc	deploy
 astro,astro-hosted,apc	deployment
+apc	deployment ai
 apc	deployment airflow
+apc	deployment airflow up
 apc	deployment airflow upgrade
 astro,astro-hosted	deployment airflow-variable
 astro,astro-hosted	deployment airflow-variable copy
+astro,astro-hosted	deployment airflow-variable cp
+astro,astro-hosted	deployment airflow-variable cr
 astro,astro-hosted	deployment airflow-variable create
+astro,astro-hosted	deployment airflow-variable li
 astro,astro-hosted	deployment airflow-variable list
+astro,astro-hosted	deployment airflow-variable up
 astro,astro-hosted	deployment airflow-variable update
 astro,astro-hosted	deployment bundle
 astro,astro-hosted	deployment bundle create
 astro,astro-hosted	deployment bundle delete
 astro,astro-hosted	deployment bundle list
+astro,astro-hosted	deployment bundle ls
+astro,astro-hosted	deployment bundle rm
 astro,astro-hosted	deployment bundle update
+astro,astro-hosted	deployment bundles
+astro,astro-hosted	deployment con
 astro,astro-hosted	deployment connection
 astro,astro-hosted	deployment connection copy
+astro,astro-hosted	deployment connection cp
+astro,astro-hosted	deployment connection cr
 astro,astro-hosted	deployment connection create
+astro,astro-hosted	deployment connection li
 astro,astro-hosted	deployment connection list
+astro,astro-hosted	deployment connection up
 astro,astro-hosted	deployment connection update
+astro,astro-hosted	deployment connections
+astro,astro-hosted,apc	deployment cr
 astro,astro-hosted,apc	deployment create
 astro,astro-hosted,apc	deployment de
 astro,astro-hosted,apc	deployment delete
+astro,astro-hosted	deployment hb
 astro,astro-hosted	deployment hibernate
+astro,astro-hosted	deployment in
 astro,astro-hosted	deployment inspect
+astro,astro-hosted,apc	deployment l
 astro,astro-hosted,apc	deployment list
+apc	deployment log
 astro,astro-hosted,apc	deployment logs
+apc	deployment logs s
+apc	deployment logs sch
 apc	deployment logs scheduler
+apc	deployment logs w
+apc	deployment logs web
 apc	deployment logs webserver
+apc	deployment logs worker
 apc	deployment logs workers
+apc	deployment logs wrk
+astro,astro-hosted,apc	deployment ls
+astro,astro-hosted	deployment pl
 astro,astro-hosted	deployment pool
 astro,astro-hosted	deployment pool copy
+astro,astro-hosted	deployment pool cp
+astro,astro-hosted	deployment pool cr
 astro,astro-hosted	deployment pool create
+astro,astro-hosted	deployment pool li
 astro,astro-hosted	deployment pool list
+astro,astro-hosted	deployment pool up
 astro,astro-hosted	deployment pool update
+astro,astro-hosted	deployment pools
+apc	deployment sa
 apc	deployment service-account
+apc	deployment service-account cr
 apc	deployment service-account create
 apc	deployment service-account de
 apc	deployment service-account delete
 apc	deployment service-account list
+apc	deployment service-account ls
+astro,astro-hosted,apc	deployment te
 astro,astro-hosted,apc	deployment team
 astro,astro-hosted,apc	deployment team add
 astro,astro-hosted,apc	deployment team list
+astro,astro-hosted,apc	deployment team ls
 astro,astro-hosted,apc	deployment team remove
+astro,astro-hosted	deployment team rm
+astro,astro-hosted	deployment team up
 astro,astro-hosted,apc	deployment team update
+astro,astro-hosted,apc	deployment teams
+astro,astro-hosted	deployment to
 astro,astro-hosted	deployment token
+astro,astro-hosted	deployment token cr
 astro,astro-hosted	deployment token create
 astro,astro-hosted	deployment token de
 astro,astro-hosted	deployment token delete
 astro,astro-hosted	deployment token list
+astro,astro-hosted	deployment token ls
 astro,astro-hosted	deployment token organization-token
 astro,astro-hosted	deployment token organization-token add
 astro,astro-hosted	deployment token organization-token list
 astro,astro-hosted	deployment token organization-token remove
 astro,astro-hosted	deployment token organization-token update
+astro,astro-hosted	deployment token ro
 astro,astro-hosted	deployment token rotate
+astro,astro-hosted	deployment token up
 astro,astro-hosted	deployment token update
 astro,astro-hosted	deployment token workspace-token
 astro,astro-hosted	deployment token workspace-token add
 astro,astro-hosted	deployment token workspace-token list
 astro,astro-hosted	deployment token workspace-token remove
 astro,astro-hosted	deployment token workspace-token update
+astro,astro-hosted,apc	deployment up
 astro,astro-hosted,apc	deployment update
+astro,astro-hosted,apc	deployment us
 astro,astro-hosted,apc	deployment user
 astro,astro-hosted,apc	deployment user add
 astro,astro-hosted,apc	deployment user list
+astro,astro-hosted	deployment user ls
 astro,astro-hosted,apc	deployment user remove
+astro,astro-hosted	deployment user rm
+astro,astro-hosted	deployment user up
 astro,astro-hosted,apc	deployment user update
+astro,astro-hosted,apc	deployment users
+astro,astro-hosted	deployment var
 astro,astro-hosted	deployment variable
 astro,astro-hosted	deployment variable create
 astro,astro-hosted	deployment variable list
 astro,astro-hosted	deployment variable update
+astro,astro-hosted	deployment variables
 astro,astro-hosted	deployment wake-up
 astro,astro-hosted	deployment worker-queue
+astro,astro-hosted	deployment worker-queue cr
 astro,astro-hosted	deployment worker-queue create
 astro,astro-hosted	deployment worker-queue de
 astro,astro-hosted	deployment worker-queue delete
+astro,astro-hosted	deployment worker-queue up
 astro,astro-hosted	deployment worker-queue update
+astro,astro-hosted	deployment worker-queues
+astro,astro-hosted	deployment wq
+astro,astro-hosted	deployment wu
+astro,astro-hosted,apc	deployments
 astro,astro-hosted,apc	dev
 astro,astro-hosted,apc	dev bash
 astro,astro-hosted,apc	dev build
 astro,astro-hosted,apc	dev init
 astro,astro-hosted,apc	dev kill
 astro,astro-hosted,apc	dev logs
+astro,astro-hosted,apc	dev obj
 astro,astro-hosted,apc	dev object
 astro,astro-hosted,apc	dev object export
 astro,astro-hosted,apc	dev object import
+astro,astro-hosted,apc	dev objects
 astro,astro-hosted,apc	dev parse
 astro,astro-hosted,apc	dev proxy
 astro,astro-hosted,apc	dev proxy status
@@ -135,117 +217,203 @@ astro,astro-hosted,apc	dev start
 astro,astro-hosted,apc	dev stop
 astro,astro-hosted,apc	dev upgrade-test
 astro,astro-hosted	env
+astro,astro-hosted	env airflow-var
 astro,astro-hosted	env airflow-variable
+astro,astro-hosted	env airflow-variable cr
 astro,astro-hosted	env airflow-variable create
 astro,astro-hosted	env airflow-variable delete
 astro,astro-hosted	env airflow-variable get
 astro,astro-hosted	env airflow-variable list
+astro,astro-hosted	env airflow-variable ls
+astro,astro-hosted	env airflow-variable rm
+astro,astro-hosted	env airflow-variable up
 astro,astro-hosted	env airflow-variable update
+astro,astro-hosted	env airflow-variables
+astro,astro-hosted	env airflow-vars
+astro,astro-hosted	env conn
 astro,astro-hosted	env connection
+astro,astro-hosted	env connection cr
 astro,astro-hosted	env connection create
 astro,astro-hosted	env connection delete
 astro,astro-hosted	env connection get
 astro,astro-hosted	env connection list
+astro,astro-hosted	env connection ls
+astro,astro-hosted	env connection rm
+astro,astro-hosted	env connection up
 astro,astro-hosted	env connection update
+astro,astro-hosted	env connections
+astro,astro-hosted	env metrics
 astro,astro-hosted	env metrics-export
+astro,astro-hosted	env metrics-export cr
 astro,astro-hosted	env metrics-export create
 astro,astro-hosted	env metrics-export delete
 astro,astro-hosted	env metrics-export get
 astro,astro-hosted	env metrics-export list
+astro,astro-hosted	env metrics-export ls
+astro,astro-hosted	env metrics-export rm
+astro,astro-hosted	env metrics-export up
 astro,astro-hosted	env metrics-export update
+astro,astro-hosted	env metrics-exports
+astro,astro-hosted	env var
 astro,astro-hosted	env variable
+astro,astro-hosted	env variable cr
 astro,astro-hosted	env variable create
 astro,astro-hosted	env variable delete
 astro,astro-hosted	env variable export
 astro,astro-hosted	env variable get
 astro,astro-hosted	env variable link
+astro,astro-hosted	env variable link cr
 astro,astro-hosted	env variable link create
 astro,astro-hosted	env variable link delete
 astro,astro-hosted	env variable link list
+astro,astro-hosted	env variable link ls
+astro,astro-hosted	env variable link rm
+astro,astro-hosted	env variable links
 astro,astro-hosted	env variable list
+astro,astro-hosted	env variable ls
+astro,astro-hosted	env variable rm
+astro,astro-hosted	env variable up
 astro,astro-hosted	env variable update
+astro,astro-hosted	env variables
+astro,astro-hosted	env vars
+astro,astro-hosted	environment
 astro,astro-hosted	ide
 astro,astro-hosted	ide project
+astro,astro-hosted	ide project e
 astro,astro-hosted	ide project export
+astro,astro-hosted	ide project i
 astro,astro-hosted	ide project import
 astro,astro-hosted	ide project list
+astro,astro-hosted	ide project ls
 astro,astro-hosted,apc	login
 astro,astro-hosted,apc	logout
+astro,astro-hosted	org
 astro,astro-hosted	organization
+astro,astro-hosted	organization al
 astro,astro-hosted	organization audit-logs
+astro,astro-hosted	organization audit-logs e
 astro,astro-hosted	organization audit-logs export
 astro,astro-hosted	organization list
+astro,astro-hosted	organization ls
+astro,astro-hosted	organization ro
 astro,astro-hosted	organization role
 astro,astro-hosted	organization role list
+astro,astro-hosted	organization role ls
+astro,astro-hosted	organization roles
+astro,astro-hosted	organization sw
 astro,astro-hosted	organization switch
+astro,astro-hosted	organization te
 astro,astro-hosted	organization team
+astro,astro-hosted	organization team cr
 astro,astro-hosted	organization team create
 astro,astro-hosted	organization team de
 astro,astro-hosted	organization team delete
 astro,astro-hosted	organization team list
+astro,astro-hosted	organization team ls
+astro,astro-hosted	organization team up
 astro,astro-hosted	organization team update
+astro,astro-hosted	organization team us
 astro,astro-hosted	organization team user
 astro,astro-hosted	organization team user add
 astro,astro-hosted	organization team user list
 astro,astro-hosted	organization team user remove
+astro,astro-hosted	organization team users
+astro,astro-hosted	organization teams
+astro,astro-hosted	organization to
 astro,astro-hosted	organization token
+astro,astro-hosted	organization token cr
 astro,astro-hosted	organization token create
 astro,astro-hosted	organization token de
 astro,astro-hosted	organization token delete
 astro,astro-hosted	organization token list
+astro,astro-hosted	organization token ls
+astro,astro-hosted	organization token ro
 astro,astro-hosted	organization token roles
 astro,astro-hosted	organization token rotate
+astro,astro-hosted	organization token up
 astro,astro-hosted	organization token update
+astro,astro-hosted	organization us
 astro,astro-hosted	organization user
+astro,astro-hosted	organization user inv
 astro,astro-hosted	organization user invite
 astro,astro-hosted	organization user list
+astro,astro-hosted	organization user ls
+astro,astro-hosted	organization user up
 astro,astro-hosted	organization user update
+astro,astro-hosted	organization users
 astro,astro-hosted,apc	otto
 astro,astro-hosted	remote
 astro,astro-hosted	remote deploy
 astro,astro-hosted,apc	run
 apc	team
+apc	team g
 apc	team get
+apc	team l
 apc	team list
+apc	team u
 apc	team update
 astro,astro-hosted,apc	telemetry
 astro,astro-hosted,apc	telemetry disable
 astro,astro-hosted,apc	telemetry enable
 apc	user
+apc	user cr
 apc	user create
 astro,astro-hosted,apc	version
+astro,astro-hosted,apc	wo
 astro,astro-hosted,apc	workspace
+astro,astro-hosted,apc	workspace cr
 astro,astro-hosted,apc	workspace create
 astro,astro-hosted,apc	workspace de
 astro,astro-hosted,apc	workspace delete
 astro,astro-hosted,apc	workspace list
+astro,astro-hosted,apc	workspace ls
+apc	workspace sa
 apc	workspace service-account
+apc	workspace service-account cr
 apc	workspace service-account create
 apc	workspace service-account de
 apc	workspace service-account delete
 apc	workspace service-account list
+apc	workspace service-account ls
+astro,astro-hosted,apc	workspace sw
 astro,astro-hosted,apc	workspace switch
+astro,astro-hosted,apc	workspace te
 astro,astro-hosted,apc	workspace team
 astro,astro-hosted,apc	workspace team add
 astro,astro-hosted,apc	workspace team list
+astro,astro-hosted,apc	workspace team ls
 astro,astro-hosted,apc	workspace team remove
+astro,astro-hosted,apc	workspace team rm
+astro,astro-hosted	workspace team up
 astro,astro-hosted,apc	workspace team update
+astro,astro-hosted,apc	workspace teams
+astro,astro-hosted	workspace to
 astro,astro-hosted	workspace token
 astro,astro-hosted	workspace token add
+astro,astro-hosted	workspace token cr
 astro,astro-hosted	workspace token create
 astro,astro-hosted	workspace token de
 astro,astro-hosted	workspace token delete
 astro,astro-hosted	workspace token list
+astro,astro-hosted	workspace token ls
 astro,astro-hosted	workspace token organization-token
 astro,astro-hosted	workspace token organization-token add
 astro,astro-hosted	workspace token organization-token list
 astro,astro-hosted	workspace token organization-token remove
 astro,astro-hosted	workspace token organization-token update
+astro,astro-hosted	workspace token ro
 astro,astro-hosted	workspace token rotate
+astro,astro-hosted	workspace token up
 astro,astro-hosted	workspace token update
+astro,astro-hosted,apc	workspace up
 astro,astro-hosted,apc	workspace update
+astro,astro-hosted,apc	workspace us
 astro,astro-hosted,apc	workspace user
 astro,astro-hosted,apc	workspace user add
 astro,astro-hosted,apc	workspace user list
+astro,astro-hosted,apc	workspace user ls
 astro,astro-hosted,apc	workspace user remove
+astro,astro-hosted,apc	workspace user rm
+astro,astro-hosted	workspace user up
 astro,astro-hosted,apc	workspace user update
+astro,astro-hosted,apc	workspace users
