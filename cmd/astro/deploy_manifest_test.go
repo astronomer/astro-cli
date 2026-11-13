@@ -1410,3 +1410,26 @@ func TestDeployManifestNamedIsNotAsked(t *testing.T) {
 		assert.Contains(t, out, "to prod (deployment clx-dep).", "%v", args)
 	}
 }
+
+// A deploy under an Organization token that selects no Workspace, in a project
+// that names none and links nothing, says what a deploy takes to be given one:
+// the flag or the project, and that the token selects none.
+func TestDeployWithAnOrganizationTokenAndNoWorkspaceSaysWhatToPass(t *testing.T) {
+	const bareProject = `[project]
+name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+`
+	setupManifestDeployWith(t, &fakeCmdDeployer{}, bareProject)
+	interactiveDeploy(t)
+	testUtil.UseAPIToken(t, "organizationId:org")
+	c, err := config.GetCurrentContext()
+	require.NoError(t, err)
+	c.Workspace = ""
+	require.NoError(t, c.SetContext())
+
+	_, _, err = execDeployIO("")
+	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
+	assert.ErrorContains(t, err, "so pass --workspace, or run in a project linked to one")
+}

@@ -300,7 +300,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	// Deployment and no Workspace of the token's. The flag and the project's
 	// own Workspace are weighed in the deploy (internal/deploy), which knows
 	// which link it reads.
-	run := astrosession.Resolve(astrosession.Request{Domain: login.context.Domain, Accepts: astrosession.ByFlag | astrosession.ByProject, NoSaved: manifestdeploy.ErrNoWorkspace})
+	run := astrosession.Resolve(astrosession.Request{Login: login.selection(), Domain: login.context.Domain, WantDeployment: true, Accepts: astrosession.ByFlag | astrosession.ByProject, NoSaved: manifestdeploy.ErrNoWorkspace})
 	tokenID := ""
 	if run.DeploymentSource == astrosession.SourceToken {
 		tokenID = run.Deployment
@@ -626,6 +626,17 @@ type deployLogin struct {
 	// current reports the login is the current context's, which the
 	// workspace-level deployment picker assumes.
 	current bool
+}
+
+// selection is the login whose Workspace the run's selection is read from,
+// when it is the current context's, which the caller has already resolved;
+// another host's is left to the resolver, which will not hand a token run that
+// host's saved Workspace.
+func (l *deployLogin) selection() *config.Context {
+	if l.current {
+		return &l.context
+	}
+	return nil
 }
 
 // loginForDeploy picks the login a manifest deploy runs under from domain, the

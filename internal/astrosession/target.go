@@ -72,6 +72,9 @@ const (
 	// ByPath is writing the Workspace's id where the command takes a path (the
 	// astro api commands' placeholders).
 	ByPath
+	// ByDeployment is -d with the Deployment's ID, for a Deployment name that
+	// has no Workspace to be found in.
+	ByDeployment
 )
 
 // The advice that follows ErrOrgTokenNoWorkspace, by what the command takes.
@@ -82,6 +85,7 @@ const (
 	// unless the token is given by ID.
 	hintFlagOrID = "so pass --workspace or the token's ID, or run in a project linked to one"
 	hintPath     = "so write the id in the path"
+	hintDeployID = "so pass -d with the Deployment id, or run in a project that links its workspace"
 	// hintCurrent is for a command that acts on the current Workspace alone,
 	// which a run with an API token does not have.
 	hintCurrent = "so use a Workspace API token"
@@ -91,6 +95,8 @@ func (a Accepts) hint() string {
 	switch {
 	case a&ByPath != 0:
 		return hintPath
+	case a&ByDeployment != 0:
+		return hintDeployID
 	case a&ByID != 0:
 		return hintFlagOrID
 	case a&ByProject != 0:
@@ -120,6 +126,10 @@ type Request struct {
 	Project string
 	// Deployment is --deployment's id, "" when not given.
 	Deployment string
+	// WantDeployment asks for the Deployment too: Target.Deployment is the
+	// flag's, else a Deployment token's. A caller that wants only the
+	// Workspace does not pay for reading the token.
+	WantDeployment bool
 	// Accepts is what the command takes, for the advice.
 	Accepts Accepts
 	// Login is the login whose selection is read, for a caller handed one;
@@ -181,7 +191,7 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 	switch {
 	case r.Deployment != "":
 		t.Deployment, t.DeploymentSource = r.Deployment, SourceFlag
-	case onCurrent:
+	case onCurrent && r.WantDeployment:
 		if id := TokenDeployment(); id != "" {
 			t.Deployment, t.DeploymentSource = id, SourceToken
 		}

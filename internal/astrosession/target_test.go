@@ -176,7 +176,7 @@ func TestResolveDeployment(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			useRun(t, tt.kind, "ws-saved")
-			got := Resolve(Request{Deployment: tt.flag, Domain: tt.domain})
+			got := Resolve(Request{Deployment: tt.flag, WantDeployment: true, Domain: tt.domain})
 			if got.Deployment != tt.want || got.DeploymentSource != tt.source {
 				t.Fatalf("got %q from %v, want %q from %v", got.Deployment, got.DeploymentSource, tt.want, tt.source)
 			}
@@ -312,6 +312,25 @@ func TestMissingWorkspaceAdviceForAPathNamesThePath(t *testing.T) {
 	useRun(t, orgToken, "")
 	err := Resolve(Request{Accepts: ByPath}).Require()
 	if !errors.Is(err, ErrOrgTokenNoWorkspace) || !strings.HasSuffix(err.Error(), ", so write the id in the path") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+// A caller that asks for no Deployment gets none from a token, whatever it names.
+func TestResolveReadsTheTokenForADeploymentOnlyWhenAsked(t *testing.T) {
+	useRun(t, depToken, "ws-saved")
+	if got := Resolve(Request{}); got.Deployment != "" || got.DeploymentSource != SourceNone {
+		t.Fatalf("got %q from %v without asking", got.Deployment, got.DeploymentSource)
+	}
+	if got := Resolve(Request{WantDeployment: true}); got.Deployment != "dep-claim" {
+		t.Fatalf("got %q when asked", got.Deployment)
+	}
+}
+
+func TestMissingWorkspaceAdviceForADeploymentNameNamesTheID(t *testing.T) {
+	useRun(t, orgToken, "")
+	err := Resolve(Request{Accepts: ByDeployment}).Require()
+	if !errors.Is(err, ErrOrgTokenNoWorkspace) || !strings.HasSuffix(err.Error(), ", so pass -d with the Deployment id, or run in a project that links its workspace") {
 		t.Fatalf("err = %v", err)
 	}
 }

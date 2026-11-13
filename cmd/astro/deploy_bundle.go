@@ -326,7 +326,7 @@ func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Form
 		if m != nil {
 			projectWorkspace = m.Astro.Workspace
 		}
-		ws := astrosession.Resolve(astrosession.Request{Workspace: workspace, Project: projectWorkspace, Domain: login.context.Domain}).Workspace
+		ws := astrosession.Resolve(astrosession.Request{Workspace: workspace, Project: projectWorkspace, Login: login.selection(), Domain: login.context.Domain}).Workspace
 		dep, err := deploymentNamed(name, ws, &login)
 		if err != nil {
 			return "", nil, login, err
@@ -337,7 +337,7 @@ func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Form
 	// A Deployment-scoped ASTRO_API_TOKEN names the one Deployment it can act
 	// on, as astro deploy reads it. The token is the current context's login,
 	// so it names nothing for a project on another host.
-	if run := astrosession.Resolve(astrosession.Request{Domain: login.context.Domain}); run.DeploymentSource == astrosession.SourceToken {
+	if run := astrosession.Resolve(astrosession.Request{Login: login.selection(), Domain: login.context.Domain, WantDeployment: true}); run.DeploymentSource == astrosession.SourceToken {
 		deployment.NoteTokenDeployment(os.Stderr, run.Deployment)
 		return run.Deployment, nil, login, nil
 	}

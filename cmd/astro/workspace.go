@@ -933,7 +933,11 @@ func coalesceWorkspace(cmd *cobra.Command) (string, error) {
 // coalesceWorkspaceOr is coalesceWorkspace for a command that also takes
 // something in place of a Workspace (extra), which its advice then names.
 func coalesceWorkspaceOr(cmd *cobra.Command, extra astrosession.Accepts) (string, error) {
-	ws, err := requiredFrom(workspaceTarget(cmd, workspaceID, extra, workspace.ErrCurrentNotSet))
+	return coalesceFrom(workspaceTarget(cmd, workspaceID, extra, workspace.ErrCurrentNotSet))
+}
+
+func coalesceFrom(t astrosession.Target) (string, error) { //nolint:gocritic // a small value type
+	ws, err := requiredFrom(t)
 	if errors.Is(err, astrosession.ErrOrgTokenNoWorkspace) {
 		return "", err
 	}
@@ -970,13 +974,13 @@ func argOrID(args []string) string {
 
 // deploymentWorkspace is the Workspace a command that acts on one Deployment
 // looks it up in. A Deployment given by id is identified by it, so a run that
-// has no Workspace (an Organization token selects none) goes on without one:
-// the Deployment is fetched by id, and its own Workspace is the one the rest of
-// the command works in. Given a Workspace the id is looked for in it, as it
-// always was, with no extra call. A name, or a pick, still needs a Workspace,
-// and fails here as before, ahead of any question or API call. A failure to
-// find the Workspace is worded with msg ("" for none); a failure to fetch the
-// Deployment is not a failure to find a Workspace, and is not.
+// has no Workspace goes on without one: an Organization token selects none, and
+// a saved login may have none current. The Deployment is fetched by id, and its
+// own Workspace is the one the rest of the command works in. Given a Workspace
+// the id is looked for in it, as it always was, with no extra call. A name, or a
+// pick, still needs a Workspace, and fails here as before, ahead of any
+// question or API call. A failure to find the Workspace is worded with msg
+// ("" for none).
 func deploymentWorkspace(cmd *cobra.Command, id, msg string) (string, error) {
 	t := workspaceTarget(cmd, workspaceID, 0, workspace.ErrCurrentNotSet)
 	// Only an id identifies a Deployment with no Workspace; a name that is not
@@ -984,20 +988,13 @@ func deploymentWorkspace(cmd *cobra.Command, id, msg string) (string, error) {
 	if !t.Found() && util.IsCUID(id) {
 		d, err := deployment.GetDeploymentByID("", id, astroV1Client)
 		if err != nil {
-			return "", fmt.Errorf("fetching Deployment %s: %w", id, err)
+			return "", fmt.Errorf("no Workspace is selected, so Deployment %s was fetched by its id, which failed (pass --workspace to look it up in a Workspace instead): %w", id, err)
 		}
 		return d.WorkspaceId, nil
 	}
-	ws, err := requiredFrom(t)
-	if errors.Is(err, astrosession.ErrOrgTokenNoWorkspace) {
-		return "", err
+	ws, err := coalesceFrom(t)
+	if err != nil && msg != "" {
+		return "", errors.Wrap(err, msg)
 	}
-	if err != nil {
-		err = errors.Wrap(err, "failed to get current Workspace")
-		if msg != "" {
-			err = errors.Wrap(err, msg)
-		}
-		return "", err
-	}
-	return ws, nil
+	return ws, err
 }

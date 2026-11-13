@@ -103,7 +103,7 @@ func TestDeploymentByIDThatDoesNotExistFailsBeforeAnyChange(t *testing.T) {
 
 	_, err := execDeploymentCmd("delete", "clmissingdeployment000001", "--yes")
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "fetching Deployment clmissingdeployment000001")
+	assert.ErrorContains(t, err, "Deployment clmissingdeployment000001 was fetched by its id")
 	mc.AssertNotCalled(t, "DeleteDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)
 	mc.AssertNotCalled(t, "ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything)
 }
