@@ -56,7 +56,7 @@ func newInitCmd(c *cli) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.AirflowVersion, "airflow-version", "",
 		"Airflow version to pin in the manifest (default: the pin already in the manifest, else the newest supported Airflow series)")
-	cmd.Flags().StringVar(&opts.Name, "name", "", "Project name (default: the directory name)")
+	cmd.Flags().StringVarP(&opts.Name, "name", "n", "", "Project name (default: the directory name)")
 	return cmd
 }
 

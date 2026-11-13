@@ -85,18 +85,18 @@ func NewDeployCmd() *cobra.Command {
 	// read by nothing, because astronomer/deploy-action passes it on every
 	// deploy (TestDeployManifestDeployActionInvocations); hidden, as there is
 	// nothing for anyone to choose.
-	cmd.Flags().BoolP("force", "f", false, utils.OneXNoOpUsage)
+	cmd.Flags().Bool("force", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("force") //nolint:errcheck // the flag is defined just above
 	// --prompt asked 1.x to offer the Deployment list even with one named. A
 	// deploy here asks whenever none is named, so it is accepted, hidden and
 	// read by nothing, as a pyproject.toml project's deploy always took it.
-	cmd.Flags().BoolP("prompt", "p", false, utils.OneXNoOpUsage)
+	cmd.Flags().Bool("prompt", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
-	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a prebuilt local image to deploy instead of building one. Outside a pyproject.toml project it deploys the image alone")
-	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only Dags to your Astro Deployment")
+	cmd.Flags().StringVar(&imageName, imageNameFlag, "", "Name of a prebuilt local image to deploy instead of building one. Outside a pyproject.toml project it deploys the image alone")
+	cmd.Flags().BoolVar(&dags, "dags", false, "Push only Dags to your Astro Deployment")
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
-	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment; with Dag Deploy enabled, its Dags are not affected")
-	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
+	cmd.Flags().BoolVar(&image, "image", false, "Push only an image to your Astro Deployment; with Dag Deploy enabled, its Dags are not affected")
+	cmd.Flags().BoolVar(&waitForDeploy, "wait", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	// No -d shorthand: on this command -d has meant --dags since v1, and moving
 	// it would turn `astro deploy -d` from a DAG-only deploy into a target
@@ -105,7 +105,7 @@ func NewDeployCmd() *cobra.Command {
 	utils.RefuseEmpty(cmd.Flags().Lookup("deployment"))
 	addWorkspaceFlag(cmd.Flags(), &manifestWorkspace, "", "Workspace for the deploy, overriding the context", oneXWorkspaceID)
 	cmd.Flags().StringVarP(&deployOutput, "output", "o", string(cliout.FormatText), "Output format: text or json")
-	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
+	cmd.Flags().StringVar(&deployDescription, "description", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
 
 	annotateDeployFlag(cmd, "image", deployGroupImage)

@@ -57,8 +57,9 @@ Use "astro api registry ls" to discover all available endpoints and operation ID
   astro api registry ls
 
   # Query by operation ID with path parameters
-  astro api registry getProviderModulesLatest -p providerId=amazon
-  astro api registry getProviderModulesByVersion -p providerId=amazon -p version=9.22.0
+  astro api registry getProviderModulesLatest --path-param providerId=amazon
+  astro api registry getProviderModulesByVersion --path-param providerId=amazon \
+    --path-param version=9.22.0
 
   # Query by path
   astro api registry /providers.json
@@ -102,18 +103,18 @@ Use "astro api registry ls" to discover all available endpoints and operation ID
 	cmd.PersistentFlags().StringVar(&opts.RegistryURL, "registry-url", "", "Override the registry base URL (env: ASTRO_REGISTRY_URL)")
 
 	// Request flags
-	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "The HTTP method for the request")
-	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a typed parameter in key=value format")
-	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in key=value format")
-	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in key:value format")
+	cmd.Flags().StringVar(&opts.RequestMethod, "method", "GET", "The HTTP method for the request")
+	cmd.Flags().StringArrayVar(&opts.MagicFields, "field", nil, "Add a typed parameter in key=value format")
+	cmd.Flags().StringArrayVar(&opts.RawFields, "raw-field", nil, "Add a string parameter in key=value format")
+	cmd.Flags().StringArrayVar(&opts.RequestHeaders, "header", nil, "Add a HTTP request header in key:value format")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request (use \"-\" for stdin)")
-	cmd.Flags().StringArrayVarP(&opts.PathParams, "path-param", "p", nil, "Path parameter in key=value format (for use with operation IDs)")
+	cmd.Flags().StringArrayVar(&opts.PathParams, "path-param", nil, "Path parameter in key=value format (for use with operation IDs)")
 
 	// Output flags
-	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
+	cmd.Flags().BoolVar(&opts.ShowResponseHeaders, "include", false, "Include HTTP response status line and headers in the output")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
-	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template")
-	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
+	cmd.Flags().StringVar(&opts.Template, "template", "", "Format JSON output using a Go template")
+	cmd.Flags().StringVar(&opts.FilterOutput, "jq", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
 
 	// Other flags
@@ -159,7 +160,7 @@ func runRegistry(opts *RegistryOptions) error {
 
 	// Check for any remaining unfilled path parameters
 	if missing := findMissingPathParams(requestPath); len(missing) > 0 {
-		return fmt.Errorf("missing path parameter(s): %s. Use -p/--path-param to provide them (e.g., -p %s=value)",
+		return fmt.Errorf("missing path parameter(s): %s. Use --path-param to provide them (e.g., --path-param %s=value)",
 			strings.Join(missing, ", "), missing[0])
 	}
 
@@ -252,7 +253,7 @@ You can optionally provide a filter to search for specific endpoints. The filter
 		},
 	}
 
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show additional details like summaries and tags")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
 	cliout.AddOutputFlag(cmd, &format)
 
@@ -296,9 +297,9 @@ The endpoint can be specified as a path or as an operation ID.`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET)")
+	cmd.Flags().StringVar(&method, "method", "", "HTTP method (GET)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show spec URL and additional details")
 	cliout.AddOutputFlag(cmd, &format)
 
 	return cmd

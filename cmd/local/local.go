@@ -943,7 +943,7 @@ func newListCmd(c *cli) *cobra.Command {
 			return c.runList(opts.all, opts.clean)
 		},
 	}
-	cmd.Flags().BoolVar(&opts.all, "all", false, "Include stale records whose Airflow is no longer running")
+	cmd.Flags().BoolVarP(&opts.all, "all", "a", false, "Include stale records whose Airflow is no longer running")
 	cmd.Flags().BoolVar(&opts.clean, "clean", false, "Remove stale records whose process or compose project is gone")
 	return cmd
 }
@@ -1108,7 +1108,7 @@ func newLogsCmd(c *cli) *cobra.Command {
 		Example: "  # Show every log line so far\n" +
 			"  astro local logs\n\n" +
 			"  # Follow the scheduler's log, starting from its last 100 lines\n" +
-			"  astro local logs --component scheduler --tail 100 -f",
+			"  astro local logs --component scheduler --tail 100 --follow",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runLogs(cmd.Context(), opts.follow, opts.tail, opts.components)

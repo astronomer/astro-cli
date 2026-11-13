@@ -99,7 +99,7 @@ func newDagsListCmd(q *query) *cobra.Command {
 		Example: afExample(q.t,
 			"List the Dags", "dags list",
 			"Only the paused ones, as JSON", "dags list --paused -o json",
-			"Only the Dags tagged etl", "dags list -t etl",
+			"Only the Dags tagged etl", "dags list --tags etl",
 		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			o := airflowapi.ListDAGsOptions{
@@ -132,7 +132,7 @@ func newDagsListCmd(q *query) *cobra.Command {
 		},
 	}
 	addListFlags(cmd, &list, "")
-	cmd.Flags().StringSliceVarP(&opts.tags, "tags", "t", nil, "Keep only Dags carrying one of these tags (repeatable)")
+	cmd.Flags().StringSliceVar(&opts.tags, "tags", nil, "Keep only Dags carrying one of these tags (repeatable)")
 	cmd.Flags().StringVar(&opts.pattern, "dag-id-pattern", "", "Keep only Dags whose id contains this")
 	cmd.Flags().BoolVar(&opts.paused, "paused", false, "Keep only paused Dags")
 	cmd.Flags().BoolVar(&opts.notPaused, "not-paused", false, "Keep only Dags that are not paused")

@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 )
 
@@ -68,7 +69,10 @@ const (
 	// 1.x kept --build-secrets, hidden and deprecated, as an alias of the
 	// repeatable --build-secret that replaced it.
 	errBuildSecretsRemoved = "use --build-secret, once for each secret" //nolint:gosec // message text naming a flag, not a credential
-	errAPCDeployNoCache    = "astro deploy " + buildsOnTheEngineCache
+	// -w stays refused on astro deploy for good: it means --workspace
+	// everywhere else.
+	errWaitShorthandRemoved = "use --wait"
+	errAPCDeployNoCache     = "astro deploy " + buildsOnTheEngineCache
 	// buildsOnTheEngineCache is what a command that builds an image says of
 	// --no-cache, after its own name.
 	buildsOnTheEngineCache = "builds on the container engine's cache, which a changed dependency or file invalidates. " +
@@ -142,6 +146,12 @@ type removedFlag struct {
 	// and took away. v1_flags.tsv has no row for it there, so it is
 	// consulted without one, for the long name alone.
 	v2Only bool
+	// shorthand, when set, makes the entry answer for the letter alone: a
+	// shorthand that no command of under has, whatever Astro CLI 1.x had on
+	// it, told name's replacement. It is for a letter v2 withholds for as
+	// long as it lives, so that a script's old meaning of it is never read as
+	// another flag's (astro deploy -w, which was --wait). It is always v2Only.
+	shorthand string
 }
 
 // reasonFunc builds a removedFlag's reason.
@@ -234,6 +244,11 @@ var removedFlags = []removedFlag{
 	{name: "non-dags-local-path", under: []string{"deploy"}, reason: says(errDeployNonDagsLocalPathRemoved)},
 	{name: "non-dags-bundle-type", under: []string{"deploy"}, reason: says(errDeployNonDagsBundleTypeRemoved)},
 	{name: "build-secrets", needs: has("build-secret"), reason: says(errBuildSecretsRemoved)},
+	// -w was --wait on astro deploy, so -w is not --workspace there or on
+	// its subcommand astro deploy bundle (which has no 1.x spelling to find
+	// it by): an old astro deploy -w <ID> fails loudly, for as long as v2
+	// lives, instead of naming a Workspace.
+	{name: "wait", shorthand: "w", under: []string{"deploy"}, needs: has("wait"), v2Only: true, reason: says(errWaitShorthandRemoved)},
 	// The flags 1.x kept hidden and deprecated.
 	{name: "enforce-cicd", needs: has("cicd-enforcement"), reason: says(errEnforceCICDRemoved)},
 	{name: "cluster-type", under: []string{"deployment create"}, needs: has("type"), reason: says(errClusterTypeRemoved)},
@@ -415,6 +430,11 @@ func removedFlagError(cmd *cobra.Command, err error) error {
 	if spelling == "" {
 		return nil
 	}
+	if isShorthand {
+		if f := findRemovedShorthand(cmd, typed); f != nil {
+			return cliout.Usage(&removedFlagErr{f.message(cmd, spelling)})
+		}
+	}
 	v1 := v1FlagOn(cmd, typed, isShorthand)
 	if v1 == nil {
 		// A command 1.x did not have: only an entry made for it applies.
@@ -425,8 +445,8 @@ func removedFlagError(cmd *cobra.Command, err error) error {
 	}
 	// The flag is still there, without the letter 1.x gave it (astro init
 	// -n, astro local start -p).
-	if isShorthand && cmd.Flag(v1.name) != nil {
-		return cliout.Usage(&removedFlagErr{shorthandRemoved(spelling, v1.name)})
+	if flag := cmd.Flag(v1.name); isShorthand && flag != nil {
+		return cliout.Usage(&removedFlagErr{shorthandRemoved(spelling, flag)})
 	}
 	f := findRemovedFlag(cmd, v1.name)
 	if f == nil {
@@ -436,9 +456,30 @@ func removedFlagError(cmd *cobra.Command, err error) error {
 }
 
 // shorthandRemoved is what a run is told for a shorthand 1.x had, of a flag
-// the command still has under its long name alone.
-func shorthandRemoved(spelling, name string) string {
+// the command still has under its long name alone. A hidden alias (1.x's
+// --deployment-name, whose -n is --name's now) is told the flag it is
+// another spelling of, which is the one to type.
+func shorthandRemoved(spelling string, flag *pflag.Flag) string {
+	name := flag.Name
+	if preferred := utils.AliasOf(flag); preferred != "" {
+		name = preferred
+	}
 	return removedMessage(spelling, "use --"+name)
+}
+
+// findRemovedShorthand returns the entry for the shorthand letter that applies
+// on cmd, or nil when none does.
+func findRemovedShorthand(cmd *cobra.Command, letter string) *removedFlag {
+	for i := range removedFlags {
+		f := &removedFlags[i]
+		if f.shorthand != letter || !slices.ContainsFunc(f.under, func(path string) bool { return isUnder(cmd, path) }) {
+			continue
+		}
+		if f.needs == nil || f.needs(cmd) {
+			return f
+		}
+	}
+	return nil
 }
 
 // findRemovedFlag returns the entry for the flag called name that applies on
@@ -458,7 +499,7 @@ func findRemovedFlagIn(cmd *cobra.Command, name string, v2Only bool) *removedFla
 	}
 	for i := range removedFlags {
 		f := &removedFlags[i]
-		if f.name != name || f.v2Only != v2Only {
+		if f.name != name || f.v2Only != v2Only || f.shorthand != "" {
 			continue
 		}
 		if len(f.under) > 0 && !slices.ContainsFunc(f.under, func(path string) bool { return isUnder(cmd, path) }) {
@@ -738,6 +779,13 @@ func acceptForCompletion(root *cobra.Command, args []string) {
 			addHiddenFlag(cmd, f)
 		case f.shorthand != "" && cmd.Flag(f.name) != nil:
 			addHiddenShorthand(cmd, f)
+		}
+	}
+	// The letters v2 withholds for good, which no inventory row names on a
+	// command 1.x did not have (astro deploy bundle -w).
+	for i := range removedFlags {
+		if f := &removedFlags[i]; f.shorthand != "" && findRemovedShorthand(cmd, f.shorthand) == f {
+			addHiddenShorthand(cmd, &v1Flag{name: f.name, shorthand: f.shorthand, isBool: true})
 		}
 	}
 }

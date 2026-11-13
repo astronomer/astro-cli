@@ -66,52 +66,48 @@ func reach(t *testing.T, args ...string) (reached, error) {
 }
 
 // The commands that name their Deployment with --deployment alone, as the
-// command line that reaches each, and the shorthand 1.x gave --deployment-id
-// there, which the hidden alias keeps.
+// command line that reaches each. Each gives it -d, which 1.x's -d
+// --deployment-id named as well.
 var deploymentFlagCommands = []struct {
-	args      []string
-	shorthand string
+	args []string
 }{
-	{[]string{"deployment", "unadopt"}, "d"},
-	{[]string{"deployment", "airflow", "upgrade"}, "d"},
-	{[]string{"deployment", "runtime", "upgrade"}, "d"},
-	{[]string{"deployment", "runtime", "migrate"}, "d"},
-	{[]string{"deployment", "service-account", "create", "--label", "l"}, "d"},
-	{[]string{"deployment", "service-account", "list"}, "d"},
-	{[]string{"deployment", "service-account", "delete", "sa-id"}, "d"},
-	{[]string{"deployment", "user", "list"}, ""},
-	{[]string{"deployment", "user", "add", "--email", "a@example.com"}, ""},
-	{[]string{"deployment", "user", "remove", "a@example.com"}, ""},
-	{[]string{"deployment", "user", "update", "a@example.com"}, ""},
-	{[]string{"deployment", "team", "list"}, ""},
-	{[]string{"deployment", "team", "add", "--team-id", "team-id"}, ""},
-	{[]string{"deployment", "team", "remove", "team-id"}, ""},
-	{[]string{"deployment", "team", "update", "team-id"}, ""},
+	{[]string{"deployment", "unadopt"}},
+	{[]string{"deployment", "airflow", "upgrade"}},
+	{[]string{"deployment", "runtime", "upgrade"}},
+	{[]string{"deployment", "runtime", "migrate"}},
+	{[]string{"deployment", "service-account", "create", "--label", "l"}},
+	{[]string{"deployment", "service-account", "list"}},
+	{[]string{"deployment", "service-account", "delete", "sa-id"}},
+	{[]string{"deployment", "user", "list"}},
+	{[]string{"deployment", "user", "add", "--email", "a@example.com"}},
+	{[]string{"deployment", "user", "remove", "a@example.com"}},
+	{[]string{"deployment", "user", "update", "a@example.com"}},
+	{[]string{"deployment", "team", "list"}},
+	{[]string{"deployment", "team", "add", "--team-id", "team-id"}},
+	{[]string{"deployment", "team", "remove", "team-id"}},
+	{[]string{"deployment", "team", "update", "team-id"}},
 }
 
 func with(args []string, more ...string) []string {
 	return append(append([]string{}, args...), more...)
 }
 
-// --deployment, 1.x's --deployment-id and the shorthand 1.x gave it all name
-// the Deployment the command acts on. The shorthand is the alias's, as in
-// 1.x; --deployment has none.
+// --deployment, -d and 1.x's --deployment-id all name the Deployment the
+// command acts on. The letter is --deployment's, as the table has it; the
+// alias has none.
 func TestDeploymentSpellingsReachTheSameDeployment(t *testing.T) {
 	for _, c := range deploymentFlagCommands {
 		label := strings.Join(c.args, " ")
 		cmd := findAPC(t, c.args...)
 		if f := cmd.Flag("deployment"); assert.NotNil(t, f, label) {
-			assert.Empty(t, f.Shorthand, label)
+			assert.Equal(t, "d", f.Shorthand, label)
 			assert.False(t, f.Hidden, label)
 		}
 		if f := cmd.Flag("deployment-id"); assert.NotNil(t, f, label) {
-			assert.Equal(t, c.shorthand, f.Shorthand, label)
+			assert.Empty(t, f.Shorthand, label)
 			assert.True(t, f.Hidden, label)
 		}
-		spellings := [][]string{{"--deployment", "dep-id"}, {"--deployment-id", "dep-id"}, {"--deployment=dep-id", "--deployment-id=dep-id"}}
-		if c.shorthand != "" {
-			spellings = append(spellings, []string{"-" + c.shorthand, "dep-id"})
-		}
+		spellings := [][]string{{"--deployment", "dep-id"}, {"--deployment-id", "dep-id"}, {"--deployment=dep-id", "--deployment-id=dep-id"}, {"-d", "dep-id"}}
 		for _, s := range spellings {
 			got, err := reach(t, with(c.args, s...)...)
 			if assert.NoError(t, err, "%s %v", label, s) {
@@ -144,8 +140,8 @@ func TestDeploymentSpellingsMustAgree(t *testing.T) {
 }
 
 // --deployment given as "" is a mistake, refused. 1.x's --deployment-id
-// given as "", or its shorthand, means what it did in 1.x, where it met the
-// required check and named no Deployment.
+// given as "" means what it did in 1.x, where it met the required check and
+// named no Deployment.
 func TestDeploymentEmptyValues(t *testing.T) {
 	for _, c := range deploymentFlagCommands {
 		label := strings.Join(c.args, " ")
@@ -157,11 +153,6 @@ func TestDeploymentEmptyValues(t *testing.T) {
 		got, err := reach(t, with(c.args, "--deployment-id", "")...)
 		assert.NoError(t, err, label)
 		assert.Empty(t, got.deployment, label)
-		if c.shorthand != "" {
-			got, err = reach(t, with(c.args, "-"+c.shorthand, "")...)
-			assert.NoError(t, err, label)
-			assert.Empty(t, got.deployment, label)
-		}
 	}
 }
 
@@ -179,42 +170,42 @@ func TestTeamIDIsRequired(t *testing.T) {
 }
 
 // The commands that act in a workspace, as the command line that reaches
-// each, and the shorthand 1.x gave --workspace-id there, which the hidden
-// alias keeps.
+// each, and the letter --workspace has there: -w, except on astro deploy,
+// where 1.x's -w was --wait.
 var workspaceFlagCommands = []struct {
 	args      []string
 	shorthand string
 }{
-	{[]string{"deployment", "create", "--label", "l", "--cluster-id", "c"}, ""},
-	{[]string{"deployment", "list"}, ""},
-	{[]string{"deployment", "adopt", "--cluster-id", "c", "--cr-name", "n", "--namespace", "ns"}, ""},
+	{[]string{"deployment", "create", "--label", "l", "--cluster-id", "c"}, "w"},
+	{[]string{"deployment", "list"}, "w"},
+	{[]string{"deployment", "adopt", "--cluster-id", "c", "--cr-name", "n", "--namespace", "ns"}, "w"},
 	{[]string{"workspace", "user", "add", "--email", "a@example.com"}, "w"},
 	{[]string{"workspace", "user", "update", "a@example.com"}, "w"},
 	{[]string{"workspace", "user", "remove", "a@example.com"}, "w"},
 	{[]string{"workspace", "user", "list"}, "w"},
-	{[]string{"workspace", "team", "add", "--team-id", "team-id"}, ""},
-	{[]string{"workspace", "team", "update", "team-id"}, ""},
-	{[]string{"workspace", "team", "remove", "team-id"}, ""},
-	{[]string{"workspace", "team", "list"}, ""},
+	{[]string{"workspace", "team", "add", "--team-id", "team-id"}, "w"},
+	{[]string{"workspace", "team", "update", "team-id"}, "w"},
+	{[]string{"workspace", "team", "remove", "team-id"}, "w"},
+	{[]string{"workspace", "team", "list"}, "w"},
 	{[]string{"workspace", "service-account", "create", "--label", "l"}, "w"},
 	{[]string{"workspace", "service-account", "list"}, "w"},
 	{[]string{"workspace", "service-account", "delete", "sa-id"}, "w"},
 	{[]string{"deploy"}, ""},
 }
 
-// --workspace, 1.x's --workspace-id and the shorthand 1.x gave it name the
-// workspace; given together they must agree. --workspace given as "" is
-// refused, and --workspace-id or its shorthand given as "" means the
-// context's workspace, as in 1.x. --workspace has no shorthand.
+// --workspace, its letter and 1.x's --workspace-id name the workspace; given
+// together they must agree. --workspace given as "" is refused, and
+// --workspace-id given as "" means the context's workspace, as in 1.x. The
+// alias has no letter.
 func TestWorkspaceSpellings(t *testing.T) {
 	for _, c := range workspaceFlagCommands {
 		label := strings.Join(c.args, " ")
 		cmd := findAPC(t, c.args...)
 		if f := cmd.Flag("workspace"); assert.NotNil(t, f, label) {
-			assert.Empty(t, f.Shorthand, label)
+			assert.Equal(t, c.shorthand, f.Shorthand, label)
 		}
 		if f := cmd.Flag("workspace-id"); assert.NotNil(t, f, label) {
-			assert.Equal(t, c.shorthand, f.Shorthand, label)
+			assert.Empty(t, f.Shorthand, label)
 			assert.True(t, f.Hidden, label)
 		}
 		spellings := [][]string{{"--workspace", "ws-id"}, {"--workspace-id", "ws-id"}, {"--workspace=ws-id", "--workspace-id=ws-id"}}
@@ -242,11 +233,6 @@ func TestWorkspaceSpellings(t *testing.T) {
 		got, err := reach(t, with(c.args, "--workspace-id", "")...)
 		assert.NoError(t, err, label)
 		assert.Empty(t, got.workspace, label)
-		if c.shorthand != "" {
-			got, err = reach(t, with(c.args, "-"+c.shorthand, "")...)
-			assert.NoError(t, err, label)
-			assert.Empty(t, got.workspace, label)
-		}
 	}
 }
 
@@ -317,11 +303,9 @@ func TestDeploymentFlagTakesALinkName(t *testing.T) {
 		if assert.NoError(t, err, label) {
 			assert.Equal(t, "stage", got.deployment, "%s: --deployment-id is an id, as in 1.x", label)
 		}
-		if c.shorthand != "" {
-			got, err = reach(t, with(c.args, "-"+c.shorthand, "stage")...)
-			if assert.NoError(t, err, label) {
-				assert.Equal(t, "stage", got.deployment, "%s: -%s is --deployment-id, an id, as in 1.x", label, c.shorthand)
-			}
+		got, err = reach(t, with(c.args, "-d", "stage")...)
+		if assert.NoError(t, err, label) {
+			assert.Equal(t, "dep-stage", got.deployment, "%s: -d is --deployment, which reads a link's name", label)
 		}
 		got, err = reach(t, with(c.args, "--deployment", "dep-other")...)
 		if assert.NoError(t, err, label) {
@@ -382,7 +366,7 @@ func TestDeploymentFlagReportsAManifestThatDoesNotLoad(t *testing.T) {
 		_, err := reach(t, with(args, "--deployment", "prod")...)
 		assert.Error(t, err, label)
 	}
-	got, err := reach(t, "deployment", "service-account", "list", "-d", "prod")
+	got, err := reach(t, "deployment", "service-account", "list", "--deployment-id", "prod")
 	require.NoError(t, err)
 	assert.Equal(t, "prod", got.deployment)
 	got, err = reach(t, "deployment", "logs", "webserver", "prod")
@@ -418,31 +402,31 @@ func findAPC(t *testing.T, args ...string) *cobra.Command {
 	return cmd
 }
 
-// -r is --role on the commands that take a role and had no shorthand for it,
-// and -d is adopt's --description.
-func TestRoleAndDescriptionShorthands(t *testing.T) {
-	got, err := reach(t, "deployment", "user", "add", "--deployment", "d", "--email", "a@example.com", "-r", "DEPLOYMENT_EDITOR")
+// --role and adopt's --description are long flags only: a short option is one
+// of the table's, or none.
+func TestRoleAndDescriptionHaveNoShorthands(t *testing.T) {
+	got, err := reach(t, "deployment", "user", "add", "--deployment", "d", "--email", "a@example.com", "--role", "DEPLOYMENT_EDITOR")
 	require.NoError(t, err)
 	assert.Equal(t, "DEPLOYMENT_EDITOR", got.userRole)
-	got, err = reach(t, "deployment", "user", "update", "a@example.com", "--deployment", "d", "-r", "DEPLOYMENT_ADMIN")
+	got, err = reach(t, "deployment", "user", "update", "a@example.com", "--deployment", "d", "--role", "DEPLOYMENT_ADMIN")
 	require.NoError(t, err)
 	assert.Equal(t, "DEPLOYMENT_ADMIN", got.userRole)
-	got, err = reach(t, "deployment", "team", "add", "--deployment", "d", "--team-id", "t", "-r", "DEPLOYMENT_EDITOR")
+	got, err = reach(t, "deployment", "team", "add", "--deployment", "d", "--team-id", "t", "--role", "DEPLOYMENT_EDITOR")
 	require.NoError(t, err)
 	assert.Equal(t, "DEPLOYMENT_EDITOR", got.deploymentRole)
-	got, err = reach(t, "deployment", "team", "update", "t", "--deployment", "d", "-r", "DEPLOYMENT_ADMIN")
+	got, err = reach(t, "deployment", "team", "update", "t", "--deployment", "d", "--role", "DEPLOYMENT_ADMIN")
 	require.NoError(t, err)
 	assert.Equal(t, "DEPLOYMENT_ADMIN", got.deploymentRole)
-	got, err = reach(t, "workspace", "team", "add", "--team-id", "t", "-r", "WORKSPACE_EDITOR")
+	got, err = reach(t, "workspace", "team", "add", "--team-id", "t", "--role", "WORKSPACE_EDITOR")
 	require.NoError(t, err)
 	assert.Equal(t, "WORKSPACE_EDITOR", got.workspaceRole)
-	got, err = reach(t, "workspace", "team", "update", "t", "-r", "WORKSPACE_ADMIN")
+	got, err = reach(t, "workspace", "team", "update", "t", "--role", "WORKSPACE_ADMIN")
 	require.NoError(t, err)
 	assert.Equal(t, "WORKSPACE_ADMIN", got.workspaceRole)
-	got, err = reach(t, "workspace", "user", "update", "a@example.com", "-r", "WORKSPACE_ADMIN")
+	got, err = reach(t, "workspace", "user", "update", "a@example.com", "--role", "WORKSPACE_ADMIN")
 	require.NoError(t, err)
 	assert.Equal(t, "WORKSPACE_ADMIN", got.workspaceRole)
-	got, err = reach(t, "deployment", "adopt", "--cluster-id", "c", "--cr-name", "n", "--namespace", "ns", "-d", "adopted")
+	got, err = reach(t, "deployment", "adopt", "--cluster-id", "c", "--cr-name", "n", "--namespace", "ns", "--description", "adopted")
 	require.NoError(t, err)
 	assert.Equal(t, "adopted", got.adoptDescription)
 }

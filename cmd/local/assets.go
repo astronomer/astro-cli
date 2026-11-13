@@ -137,7 +137,7 @@ func newAssetsEventsCmd(q *query) *cobra.Command {
 	// the question behind an event listing is nearly always "what just changed".
 	addListFlags(cmd, &list, "-timestamp")
 	cmd.Flags().StringVar(&source.dagID, "dag-id", "", "Only events produced by this Dag")
-	cmd.Flags().StringVarP(&source.runID, "run-id", "r", "", "Only events produced by this run")
+	cmd.Flags().StringVar(&source.runID, "run-id", "", "Only events produced by this run")
 	cmd.Flags().StringVar(&source.taskID, "task-id", "", "Only events produced by this task")
 	return cmd
 }

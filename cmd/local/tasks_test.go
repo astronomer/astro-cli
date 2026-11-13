@@ -139,7 +139,7 @@ func TestTasksLogsAlwaysFetchTheWholeLog(t *testing.T) {
 
 	mapped := newAirflowStub(t)
 	mapped.route(http.MethodGet, logPath, `{"content":"one expansion"}`)
-	if _, _, err := runQuery(t, mapped, "tasks", "logs", "orders_etl", "run_1", "load", "-m", "0"); err != nil {
+	if _, _, err := runQuery(t, mapped, "tasks", "logs", "orders_etl", "run_1", "load", "--map-index", "0"); err != nil {
 		t.Fatalf("tasks logs -m 0: %v", err)
 	}
 	if got := mapped.request(http.MethodGet, logPath).Query; !strings.Contains(got, "map_index=0") {

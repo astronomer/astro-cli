@@ -100,10 +100,10 @@ type waitFlags struct {
 }
 
 func (f *waitFlags) register(cmd *cobra.Command) {
-	// -t is --tags across this tree (TestShorthandsMeanOneThingEachAcrossTheCoreTree),
-	// so --timeout has no shorthand here.
+	// --timeout has no shorthand: a short option is one of the table's
+	// (utils.ShortOptions).
 	cmd.Flags().StringVar(&f.timeout, "timeout", defaultWaitTimeout, "How long to wait before giving up, in seconds or as a duration")
-	cmd.Flags().StringVarP(&f.poll, "poll-interval", "p", defaultPollInterval, "How often to check, in seconds or as a duration")
+	cmd.Flags().StringVar(&f.poll, "poll-interval", defaultPollInterval, "How often to check, in seconds or as a duration")
 }
 
 func (f *waitFlags) options() (waitOptions, error) {
@@ -354,7 +354,7 @@ func (q *query) renderFailedTasks(w io.Writer, dagID, runID string, failed []tas
 		}
 		command := "tasks logs " + dagID + " " + runID + " " + row.TaskID + " --try " + strconv.Itoa(max(row.TryNumber, 1))
 		if row.MapIndex >= 0 {
-			command += " -m " + strconv.Itoa(row.MapIndex)
+			command += " --map-index " + strconv.Itoa(row.MapIndex)
 		}
 		_, err := fmt.Fprintf(w, "\nread why %s failed with %s\n", row.TaskID, q.t.suggest(command))
 		return err

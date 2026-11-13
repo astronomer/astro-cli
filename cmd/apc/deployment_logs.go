@@ -145,12 +145,12 @@ func newComponentLogsCmd(out io.Writer, use string, aliases []string, component 
 // addLogsFlags registers the flags every logs command takes, with oneX 1.x's
 // --search as --keyword's hidden alias.
 func addLogsFlags(cmd *cobra.Command, oneX bool) {
-	cmd.Flags().StringVarP(&search, "keyword", "k", "", "Show only the log lines that contain this keyword")
+	cmd.Flags().StringVar(&search, "keyword", "", "Show only the log lines that contain this keyword")
 	if oneX {
-		utils.AddAlias(cmd.Flags(), "search", "s", "keyword")
+		utils.AddAlias(cmd.Flags(), "search", "keyword")
 	}
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Stream the logs as they come, of one component")
-	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only logs from the moment it starts")
+	cmd.Flags().DurationVar(&since, "since", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only logs from the moment it starts")
 	cliout.AddOutputFlag(cmd, &logsOutput)
 }
 

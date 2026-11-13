@@ -262,7 +262,7 @@ func TestIsolationKeepsWritesOutOfTheRealHome(t *testing.T) {
 	tier(t, 0)
 
 	p := newProject(t)
-	p.run("config", "set", "-g", "upgrade_message", "false").requireSuccess()
+	p.run("config", "set", "--global", "upgrade_message", "false").requireSuccess()
 
 	if _, err := os.Stat(filepath.Join(p.home, ".astro")); err != nil {
 		t.Errorf("no .astro under the test's ASTRO_HOME, so that write went somewhere else: %v", err)

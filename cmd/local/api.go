@@ -30,8 +30,10 @@ import (
 // engine started this Airflow, so the CLI already knows how to talk to it.
 //
 // What goes after the endpoint is the standalone af's `af api`, flag for flag,
-// because that is what the skills and every af user already type: -F and -f
-// fields, -H headers, -i, `ls --filter`, `spec`. The parsing and rendering
+// because that is what the skills and every af user already type: --field and
+// --raw-field fields, --header, --include, `ls --filter`, `spec`. Without af's
+// short options, which would give one letter two meanings (utils.ShortOptions
+// holds the whole table). The parsing and rendering
 // are apirequest's, the same code `astro api airflow` runs, so the two raw-API
 // commands cannot drift apart on what a flag means.
 //
@@ -54,9 +56,9 @@ func newAPICmd(c *cli) *cobra.Command {
 			"-F/--field adds a typed field: true, false and null are themselves, a number is a number, and @file " +
 			"reads a file (@- reads stdin). --raw-field adds a field that is always a string (af spells it -f, which is --follow elsewhere in this tree). key[sub]=v nests " +
 			"an object and key[]=v builds an array. Fields go in the query string on a GET, or when --body or --input carries " +
-			"the payload, and become the JSON body otherwise. The method stays GET unless -X says otherwise.\n\n" +
+			"the payload, and become the JSON body otherwise. The method stays GET unless --method says otherwise.\n\n" +
 			"The body is printed whatever the status, and a non-2xx status also fails the command, so a script can " +
-			"branch on the exit code without parsing anything. -i puts the status line and headers in front of it; " +
+			"branch on the exit code without parsing anything. --include puts the status line and headers in front of it; " +
 			"with --output json it prints one {status_code, headers, body} object instead. Otherwise the output is " +
 			"Airflow's own, and --output governs how a failure is reported.\n\n" +
 			"The ls command lists the endpoints this Airflow serves and spec prints its OpenAPI document, both read from " +
@@ -65,15 +67,15 @@ func newAPICmd(c *cli) *cobra.Command {
 		Example: "  # Every Dag, as Airflow itself reports them\n" +
 			"  astro local api /dags\n\n" +
 			"  # Typed fields become the query string on a GET\n" +
-			"  astro local api dags -F limit=10 -F only_active=true\n\n" +
+			"  astro local api dags --field limit=10 --field only_active=true\n\n" +
 			"  # Create a variable: fields become the body on a POST\n" +
-			"  astro local api variables -X POST -F key=my_var --raw-field value=8080\n\n" +
+			"  astro local api variables --method POST --field key=my_var --raw-field value=8080\n\n" +
 			"  # Trigger a run with a whole body\n" +
-			"  astro local api /dags/etl/dagRuns -X POST --body '{\"logical_date\": null}'\n\n" +
+			"  astro local api /dags/etl/dagRuns --method POST --body '{\"logical_date\": null}'\n\n" +
 			"  # The same, with the body in a file\n" +
-			"  astro local api /dags/etl/dagRuns -X POST --input run.json\n\n" +
+			"  astro local api /dags/etl/dagRuns --method POST --input run.json\n\n" +
 			"  # The status line and headers too\n" +
-			"  astro local api dags -i\n\n" +
+			"  astro local api dags --include\n\n" +
 			"  # A path below the version prefix\n" +
 			"  astro local api --root /health\n\n" +
 			"  # Which endpoints mention variables, and the whole spec\n" +
@@ -84,18 +86,19 @@ func newAPICmd(c *cli) *cobra.Command {
 			return c.runAPI(cmd.Context(), args[0], opts)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.method, "method", "X", http.MethodGet, "HTTP method")
+	cmd.Flags().StringVar(&opts.method, "method", http.MethodGet, "HTTP method")
 	cmd.Flags().StringVar(&opts.body, "body", "", "JSON request body, or - to read it from stdin")
 	cmd.Flags().StringVar(&opts.input, "input", "", "File holding the JSON request body, or - to read it from stdin")
 	cmd.MarkFlagsMutuallyExclusive("body", "input")
 	cmd.Flags().BoolVar(&opts.root, "root", false, "Address the server root, below the API version prefix (af spells it --raw)")
-	cmd.Flags().StringArrayVarP(&opts.fields, "field", "F", nil, "Add a typed field in key=value format: numbers, true, false, null, @file")
-	// No -f: across the core tree -f is --follow (`astro local logs -f`), and one
-	// shorthand means one thing there (TestShorthandsMeanOneThingEachAcrossTheCoreTree).
-	// af's `-f key=value` is spelled out as --raw-field here.
+	cmd.Flags().StringArrayVar(&opts.fields, "field", nil, "Add a typed field in key=value format: numbers, true, false, null, @file")
+	// No short options: a letter is one of the table's (utils.ShortOptions), and
+	// -f is --follow (`astro local logs -f`). af's `-f key=value` is spelled out
+	// as --raw-field here, and its -F, -H, -i and -X as --field, --header,
+	// --include and --method.
 	cmd.Flags().StringArrayVar(&opts.rawFields, "raw-field", nil, "Add a string field in key=value format")
-	cmd.Flags().StringArrayVarP(&opts.headers, "header", "H", nil, "Add a request header in key:value format")
-	cmd.Flags().BoolVarP(&opts.include, "include", "i", false, "Include the response status line and headers in the output")
+	cmd.Flags().StringArrayVar(&opts.headers, "header", nil, "Add a request header in key:value format")
+	cmd.Flags().BoolVar(&opts.include, "include", false, "Include the response status line and headers in the output")
 	// af's spelling of --root, taken as a synonym rather than a second flag so
 	// the two can never disagree.
 	cmd.Flags().SetNormalizeFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
@@ -276,7 +279,7 @@ func newAPIListCmd(c *cli) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&filterFlag, "filter", "", "Only list endpoints matching this, the same as the positional filter")
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show each endpoint's operation id, summary, tags and path parameters")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show each endpoint's operation id, summary, tags and path parameters")
 	return cmd
 }
 

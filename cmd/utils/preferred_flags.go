@@ -32,13 +32,15 @@ func refusesEmpty(f *pflag.Flag) bool {
 	return ok
 }
 
-// AddAlias registers --old (and the shorthand 1.x gave it) on fs, hidden, as
-// another spelling of --preferred, which the caller has already put on fs.
-// The alias holds nothing a command reads: ApplyAliases hands what it was
-// given to --preferred, and the command reads --preferred alone, whichever
-// spelling was typed. It returns the alias.
-func AddAlias(fs *pflag.FlagSet, old, shorthand, preferred string) *pflag.Flag {
-	fs.StringP(old, shorthand, "", "Another spelling of --"+preferred+", kept for scripts written for Astro CLI 1.x")
+// AddAlias registers --old on fs, hidden, as another spelling of --preferred,
+// which the caller has already put on fs. It takes no shorthand, whatever 1.x
+// gave it: a letter means one thing (ShortOptions), and the one 1.x gave the
+// alias is refused by name instead (removedFlagError). The alias holds
+// nothing a command reads: ApplyAliases hands what it was given to
+// --preferred, and the command reads --preferred alone, whichever spelling
+// was typed. It returns the alias.
+func AddAlias(fs *pflag.FlagSet, old, preferred string) *pflag.Flag {
+	fs.String(old, "", "Another spelling of --"+preferred+", kept for scripts written for Astro CLI 1.x")
 	f := fs.Lookup(old)
 	f.Hidden = true
 	f.Annotations = map[string][]string{aliasAnnotation: {preferred}}
@@ -48,6 +50,11 @@ func AddAlias(fs *pflag.FlagSet, old, shorthand, preferred string) *pflag.Flag {
 // IsAlias reports whether f is a spelling AddAlias registered.
 func IsAlias(f *pflag.Flag) bool {
 	return aliasOf(f) != ""
+}
+
+// AliasOf is the flag f is another spelling of, or "" when it is none.
+func AliasOf(f *pflag.Flag) string {
+	return aliasOf(f)
 }
 
 func aliasOf(f *pflag.Flag) string {
@@ -183,15 +190,15 @@ func RefuseDisagreeingArg(args []string, what, name, value string, same ...strin
 }
 
 // AddWorkspaceFlag registers --workspace on fs, read into to, with the
-// shorthand given ("" for none), refusing "" (RefuseEmpty). With oneX, 1.x's
-// --workspace-id is its hidden alias, with the shorthand 1.x gave it there
-// (oneXShorthand, "" for none). It returns --workspace.
-func AddWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string, oneX bool, oneXShorthand string) *pflag.Flag {
+// shorthand given ("w", or "" on a command that withholds it), refusing ""
+// (RefuseEmpty). With oneX, 1.x's --workspace-id is its hidden alias. It
+// returns --workspace.
+func AddWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string, oneX bool) *pflag.Flag {
 	fs.StringVarP(to, "workspace", shorthand, "", usage)
 	f := fs.Lookup("workspace")
 	RefuseEmpty(f)
 	if oneX {
-		AddAlias(fs, "workspace-id", oneXShorthand, "workspace")
+		AddAlias(fs, "workspace-id", "workspace")
 	}
 	return f
 }
@@ -199,11 +206,11 @@ func AddWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string, on
 // OneXNoOpUsage is the help of a 1.x flag a command accepts and ignores.
 const OneXNoOpUsage = "Has no effect; accepted so scripts written for Astro CLI 1.x keep working"
 
-// AddOneXNoOp registers 1.x's --name on fs, a flag that took a value, with
-// the shorthand 1.x gave it ("" for none), for a command that 1.x gave it to
-// and that never read it: hidden and read by nothing, so a 1.x script
-// passing it keeps working.
-func AddOneXNoOp(fs *pflag.FlagSet, name, shorthand string) {
-	fs.StringP(name, shorthand, "", OneXNoOpUsage)
+// AddOneXNoOp registers 1.x's --name on fs, a flag that took a value, for a
+// command that 1.x gave it to and that never read it: hidden and read by
+// nothing, so a 1.x script passing it keeps working. It takes no shorthand,
+// whatever 1.x gave it.
+func AddOneXNoOp(fs *pflag.FlagSet, name string) {
+	fs.String(name, "", OneXNoOpUsage)
 	fs.MarkHidden(name) //nolint:errcheck // the flag is defined just above
 }

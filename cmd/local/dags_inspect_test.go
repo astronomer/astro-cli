@@ -23,7 +23,7 @@ func TestDagsErrorsListsImportErrorsOnBothGenerations(t *testing.T) {
 			stub := tc.stub(t)
 			stub.route(http.MethodGet, tc.prefix+"/importErrors", importErrorsBody)
 
-			out, _, err := runQuery(t, stub, "dags", "errors", "-o", "json", "-l", "5")
+			out, _, err := runQuery(t, stub, "dags", "errors", "-o", "json", "--limit", "5")
 			if err != nil {
 				t.Fatalf("dags errors: %v", err)
 			}

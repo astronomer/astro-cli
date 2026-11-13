@@ -23,7 +23,7 @@ func TestLocalAPITypedFieldsGoInTheQueryOnAGet(t *testing.T) {
 	stub.route(http.MethodGet, "/api/v2/dags", `{"dags":[],"total_entries":0}`)
 
 	if _, _, err := runLocalQuery(t, stub, "local", "api", "dags",
-		"-F", "limit=10", "-F", "only_active=true", "-F", "ratio=1.5", "-F", "cursor=null", "--raw-field", "tags=10"); err != nil {
+		"--field", "limit=10", "--field", "only_active=true", "--field", "ratio=1.5", "--field", "cursor=null", "--raw-field", "tags=10"); err != nil {
 		t.Fatalf("local api: %v", err)
 	}
 	req := stub.request(http.MethodGet, "/api/v2/dags")
@@ -51,9 +51,9 @@ func TestLocalAPITypedFieldsAreTheBodyOnAPost(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err := runLocalQuery(t, stub, "local", "api", "variables", "-X", "POST",
-		"-F", "key=port", "--raw-field", "value=8080", "-F", "weight=1.5", "-F", "slots=8",
-		"-F", "is_encrypted=false", "-F", "overwrite=true", "-F", "note=null", "-F", "description=@"+file); err != nil {
+	if _, _, err := runLocalQuery(t, stub, "local", "api", "variables", "--method", "POST",
+		"--field", "key=port", "--raw-field", "value=8080", "--field", "weight=1.5", "--field", "slots=8",
+		"--field", "is_encrypted=false", "--field", "overwrite=true", "--field", "note=null", "--field", "description=@"+file); err != nil {
 		t.Fatalf("local api: %v", err)
 	}
 	var body map[string]any
@@ -76,7 +76,7 @@ func TestLocalAPITypedFieldsAreTheBodyOnAPost(t *testing.T) {
 // A field that does not parse fails before anything is sent.
 func TestLocalAPIRefusesAFieldWithNoValue(t *testing.T) {
 	stub := newAirflowStub(t)
-	_, _, err := runLocalQuery(t, stub, "local", "api", "variables", "-X", "POST", "-F", "key")
+	_, _, err := runLocalQuery(t, stub, "local", "api", "variables", "--method", "POST", "--field", "key")
 	if err == nil || !strings.Contains(err.Error(), "parsing fields") {
 		t.Fatalf("err = %v, want the field refused", err)
 	}
@@ -91,8 +91,8 @@ func TestLocalAPIFieldsBesideABodyGoInTheQuery(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodPost, "/api/v2/backfills", `{}`)
 
-	if _, _, err := runLocalQuery(t, stub, "local", "api", "backfills", "-X", "POST",
-		"--body", `{"dag_id":"etl"}`, "-F", "dry_run=true"); err != nil {
+	if _, _, err := runLocalQuery(t, stub, "local", "api", "backfills", "--method", "POST",
+		"--body", `{"dag_id":"etl"}`, "--field", "dry_run=true"); err != nil {
 		t.Fatalf("local api: %v", err)
 	}
 	req := stub.request(http.MethodPost, "/api/v2/backfills")
@@ -111,7 +111,7 @@ func TestLocalAPISendsHeaders(t *testing.T) {
 	stub.route(http.MethodGet, "/api/v2/dags", `{"dags":[]}`)
 
 	if _, _, err := runLocalQuery(t, stub, "local", "api", "/dags",
-		"-H", "X-Trace: abc123", "-H", "Authorization: Bearer mine"); err != nil {
+		"--header", "X-Trace: abc123", "--header", "Authorization: Bearer mine"); err != nil {
 		t.Fatalf("local api: %v", err)
 	}
 	req := stub.request(http.MethodGet, "/api/v2/dags")
@@ -125,7 +125,7 @@ func TestLocalAPISendsHeaders(t *testing.T) {
 
 func TestLocalAPIRefusesAHeaderWithNoColon(t *testing.T) {
 	stub := newAirflowStub(t)
-	_, _, err := runLocalQuery(t, stub, "local", "api", "/dags", "-H", "X-Trace abc")
+	_, _, err := runLocalQuery(t, stub, "local", "api", "/dags", "--header", "X-Trace abc")
 	if err == nil || !strings.Contains(err.Error(), "invalid header format") {
 		t.Fatalf("err = %v, want the header refused", err)
 	}
@@ -137,7 +137,7 @@ func TestLocalAPIIncludePrintsTheStatusAndHeaders(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodGet, "/api/v2/dags", `{"dags":[]}`)
 
-	out, _, err := runLocalQuery(t, stub, "local", "api", "dags", "-i")
+	out, _, err := runLocalQuery(t, stub, "local", "api", "dags", "--include")
 	if err != nil {
 		t.Fatalf("local api -i: %v", err)
 	}
@@ -161,9 +161,9 @@ func TestLocalAPIIncludeInJSONModeIsOneObject(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodGet, "/api/v2/dags", `{"dags":[],"total_entries":0}`)
 
-	out, _, err := runLocalQuery(t, stub, "local", "api", "dags", "-i", "-o", "json")
+	out, _, err := runLocalQuery(t, stub, "local", "api", "dags", "--include", "-o", "json")
 	if err != nil {
-		t.Fatalf("local api -i -o json: %v", err)
+		t.Fatalf("local api --include -o json: %v", err)
 	}
 	got := decodeJSON(t, out)
 	if got["status_code"] != float64(200) {
@@ -184,7 +184,7 @@ func TestLocalAPIIncludeStillFailsOnANon2xx(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.routeStatus(http.MethodGet, "/api/v2/dags/missing", http.StatusNotFound, `{"detail":"DAG not found"}`)
 
-	out, _, err := runLocalQuery(t, stub, "local", "api", "dags/missing", "-i")
+	out, _, err := runLocalQuery(t, stub, "local", "api", "dags/missing", "--include")
 	if err == nil || !strings.Contains(err.Error(), "404") {
 		t.Fatalf("err = %v, want the 404", err)
 	}

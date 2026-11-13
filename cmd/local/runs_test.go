@@ -57,7 +57,7 @@ func TestRunsListFiltersByStateAndDAG(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns", twoRunsAF3)
 
-	if _, _, err := runQuery(t, stub, "runs", "list", "--dag-id", "orders_etl", "-s", "failed", "-s", "running", "-l", "5"); err != nil {
+	if _, _, err := runQuery(t, stub, "runs", "list", "--dag-id", "orders_etl", "--state", "failed", "--state", "running", "--limit", "5"); err != nil {
 		t.Fatalf("runs list: %v", err)
 	}
 	query := stub.request(http.MethodGet, "/api/v2/dags/orders_etl/dagRuns").Query

@@ -435,9 +435,9 @@ var connFieldFlagNames = []string{"type", "host", "login", "password", "schema",
 // addConnFieldFlags registers the per-field flags on a connection's `set`.
 //
 // The long names are the cloud sibling's, so the same invocation describes the
-// same connection in both trees. The single-letter forms are not: cloud has
-// -t/-l/-p free, but here -p next to --project reads as the scope flag, and a
-// shorthand that invites the wrong guess is worse than no shorthand.
+// same connection in both trees. The single-letter forms are not carried: a
+// short option is one of the table's (utils.ShortOptions), and -p next to
+// --project would read as the scope flag.
 func addConnFieldFlags(cmd *cobra.Command, f *connFields) {
 	cmd.Flags().StringVar(&f.connType, "type", "", "Connection type (e.g. postgres, http)")
 	cmd.Flags().StringVar(&f.host, "host", "", "Connection host")
@@ -585,7 +585,7 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			return c.runEnvList(scope, all, only)
 		},
 	}
-	cmd.Flags().BoolVar(&all, "all", false, "Also include every known project's .env, and vault globals not linked to this project")
+	cmd.Flags().BoolVarP(&all, "all", "a", false, "Also include every known project's .env, and vault globals not linked to this project")
 	return cmd
 }
 

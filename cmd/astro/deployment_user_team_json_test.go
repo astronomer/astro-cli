@@ -112,7 +112,7 @@ func deploymentUserTeamTextCases() []tokenCase {
 		// name, as the workspace team commands once did.
 		{name: "team add", root: dep, client: with(all, setsTeamRoles("team-eng")), args: []string{"deployment", "team", "add", "team-eng", "--role", "custom-role", d}, check: exactly("The team team-eng was successfully added to the deployment with the role custom-role\n")},
 		{name: "team add with the default role", root: dep, client: with(all, setsTeamRoles("team-idp")), args: []string{"deployment", "team", "add", "team-idp", d}, check: exactly("The team team-idp was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n")},
-		{name: "team add with -w", root: dep, client: with(all, setsTeamRoles("team-idp")), args: []string{"deployment", "team", "add", "team-idp", "-w", tokDeploymentID}, check: exactly("The team team-idp was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n")},
+		{name: "team add with --deployment-id", root: dep, client: with(all, setsTeamRoles("team-idp")), args: []string{"deployment", "team", "add", "team-idp", "--deployment-id", tokDeploymentID}, check: exactly("The team team-idp was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n")},
 		{
 			name: "team add through the picker", root: dep, client: with(all, setsTeamRoles("team-idp")), answers: "2\n",
 			args: []string{"deployment", "team", "add", d},

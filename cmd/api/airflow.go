@@ -69,9 +69,9 @@ The API generation is detected from the instance itself, so /dags reaches /api/v
 
 The default HTTP request method is GET normally and POST if any parameters were added. Override the method with --method. When using an operation ID, the method is auto-detected from the API spec.
 
-Pass one or more -f/--raw-field values in key=value format to add static string parameters to the request payload. To add non-string or placeholder-determined values, see -F/--field below.
+Pass one or more --raw-field values in key=value format to add static string parameters to the request payload. To add non-string or placeholder-determined values, see --field below.
 
-The -F/--field flag has magic type conversion based on the format of the value:
+The --field flag has magic type conversion based on the format of the value:
   - literal values true, false, null, and integer numbers get converted to
     appropriate JSON types;
   - if the value starts with @, the rest of the value is interpreted as a
@@ -92,10 +92,10 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   astro api airflow -d prod /dags/example_dag
 
   # Use operation ID (path params supplied via -p)
-  astro api airflow -d prod get_dag -p dag_id=example_dag
+  astro api airflow -d prod get_dag --path-param dag_id=example_dag
 
   # Pause a Dag via operation ID
-  astro api airflow -d prod patch_dag -p dag_id=example_dag -F is_paused=true
+  astro api airflow -d prod patch_dag --path-param dag_id=example_dag --field is_paused=true
 
   # Use jq filter on response
   astro api airflow -d prod /dags --jq '.dags[].dag_id'
@@ -136,30 +136,30 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, else an Astro Deployment id or name")
 	utils.RefuseEmpty(cmd.PersistentFlags().Lookup("deployment"))
 	cmd.PersistentFlags().StringVar(&opts.URL, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
-	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override organization ID for deployment lookup")
+	cmd.PersistentFlags().StringVar(&opts.OrganizationID, "organization-id", "", "Override organization ID for deployment lookup")
 	// 1.x declared --workspace-id (-W) and never read it: -d is looked up in
 	// the project's or the context's workspace. It stays, hidden and read by
 	// nothing, so a 1.x script passing it keeps working.
-	utils.AddOneXNoOp(cmd.PersistentFlags(), "workspace-id", "W")
-	cmd.PersistentFlags().StringVarP(&opts.Username, "username", "u", airflowrt.Airflow2AdminUser, "Username for Airflow API authentication (--url only)")
+	utils.AddOneXNoOp(cmd.PersistentFlags(), "workspace-id")
+	cmd.PersistentFlags().StringVar(&opts.Username, "username", airflowrt.Airflow2AdminUser, "Username for Airflow API authentication (--url only)")
 	cmd.PersistentFlags().StringVar(&opts.Password, "password", airflowrt.Airflow2AdminPassword, "Password for Airflow API authentication (--url only)")
 	cmd.PersistentFlags().StringVar(&opts.AirflowVersion, "airflow-version", "", "Override Airflow version for API spec (auto-detected by default)")
 
 	// Request flags
-	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "The HTTP method for the request")
-	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a typed parameter in key=value format")
-	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in key=value format")
-	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in key:value format")
+	cmd.Flags().StringVar(&opts.RequestMethod, "method", "GET", "The HTTP method for the request")
+	cmd.Flags().StringArrayVar(&opts.MagicFields, "field", nil, "Add a typed parameter in key=value format")
+	cmd.Flags().StringArrayVar(&opts.RawFields, "raw-field", nil, "Add a string parameter in key=value format")
+	cmd.Flags().StringArrayVar(&opts.RequestHeaders, "header", nil, "Add a HTTP request header in key:value format")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request (use \"-\" for stdin)")
-	cmd.Flags().StringArrayVarP(&opts.PathParams, "path-param", "p", nil, "Path parameter in key=value format (for use with operation IDs)")
+	cmd.Flags().StringArrayVar(&opts.PathParams, "path-param", nil, "Path parameter in key=value format (for use with operation IDs)")
 
 	// Output flags
-	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
+	cmd.Flags().BoolVar(&opts.ShowResponseHeaders, "include", false, "Include HTTP response status line and headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().BoolVar(&opts.Slurp, "slurp", false, "Use with --paginate to return an array of all pages")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
-	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template")
-	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
+	cmd.Flags().StringVar(&opts.Template, "template", "", "Format JSON output using a Go template")
+	cmd.Flags().StringVar(&opts.FilterOutput, "jq", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
 
 	// Other flags
@@ -228,7 +228,7 @@ func runAirflow(opts *AirflowOptions) error {
 
 	// Check for any remaining unfilled path parameters
 	if missing := findMissingPathParams(requestPath); len(missing) > 0 {
-		return fmt.Errorf("missing path parameter(s): %s. Use -p/--path-param to provide them (e.g., -p %s=value)",
+		return fmt.Errorf("missing path parameter(s): %s. Use --path-param to provide them (e.g., --path-param %s=value)",
 			strings.Join(missing, ", "), missing[0])
 	}
 
@@ -505,7 +505,7 @@ You can optionally provide a filter to search for specific endpoints, as an argu
 	}
 
 	cmd.Flags().StringVar(&filterFlag, "filter", "", "Only list endpoints matching this, the same as the positional filter")
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show additional details like summaries and tags")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
 	cliout.AddOutputFlag(cmd, &format)
 
@@ -572,7 +572,7 @@ The endpoint can be specified as a path or as an operation ID.`,
   astro api airflow describe /dags/{dag_id}
 
   # Describe a POST endpoint specifically
-  astro api airflow describe /dags/{dag_id} -X POST
+  astro api airflow describe /dags/{dag_id} --method POST
 
   # Describe by operation ID
   astro api airflow describe get_dag`,
@@ -597,9 +597,9 @@ The endpoint can be specified as a path or as an operation ID.`,
 		},
 	}
 
-	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
+	cmd.Flags().StringVar(&method, "method", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show spec URL and additional details")
 	cliout.AddOutputFlag(cmd, &format)
 
 	return cmd

@@ -35,7 +35,7 @@ func (s *Suite) TestLegacy1xValueFromTheHomeConfig() {
 	s.NotContains(CFGStrMap, "webserver.port", "reading it does not register it")
 }
 
-// 1.x's `astro config set` without -g wrote the project's .astro/config.yaml,
+// 1.x's `astro config set` without --global wrote the project's .astro/config.yaml,
 // which it read over the home config, at any value.
 func (s *Suite) TestLegacy1xValueFromTheProjectConfig() {
 	fs := afero.NewMemMapFs()

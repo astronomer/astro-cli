@@ -43,25 +43,25 @@ func TestRenamedFlagsSayWhatTheyAreCalledNow(t *testing.T) {
 			astroTree,
 			[]string{"deployment", "list", "--workspace-id", "ws"},
 			&renamedFlagEvent{"astro deployment list", []string{"--workspace-id"}, []string{"--workspace"}},
-			[]string{"Flag --workspace-id has been renamed to --workspace. The old spelling will be removed in a future release."},
+			[]string{"Flag --workspace-id has been renamed to --workspace (-w). The old spelling will be removed in a future release."},
 		},
 		{
 			astroTree,
-			[]string{"deployment", "inspect", "-n", "dep"},
+			[]string{"deployment", "inspect", "--deployment-name", "dep"},
 			&renamedFlagEvent{"astro deployment inspect", []string{"--deployment-name"}, []string{"--deployment"}},
-			[]string{"Flag --deployment-name (-n) has been renamed to --deployment. --deployment takes Deployment names, ids and link names. The old spelling"},
+			[]string{"Flag --deployment-name has been renamed to --deployment (-d). --deployment takes Deployment names, ids and link names. The old spelling"},
 		},
 		{
 			apcTree,
-			[]string{"deployment", "service-account", "list", "-d", "dep-id"},
+			[]string{"deployment", "service-account", "list", "--deployment-id", "dep-id"},
 			&renamedFlagEvent{"astro deployment service-account list", []string{"--deployment-id"}, []string{"--deployment"}},
-			[]string{"Flag --deployment-id (-d) has been renamed to --deployment. --deployment takes Deployment ids and link names, so check that the value names the same Deployment before switching."},
+			[]string{"Flag --deployment-id has been renamed to --deployment (-d). --deployment takes Deployment ids and link names, so check that the value names the same Deployment before switching."},
 		},
 		{
 			apcTree,
-			[]string{"workspace", "create", "-l", "etl"},
+			[]string{"workspace", "create", "--label", "etl"},
 			&renamedFlagEvent{"astro workspace create", []string{"--label"}, []string{"--name"}},
-			[]string{"Flag --label (-l) has been renamed to --name (-n)."},
+			[]string{"Flag --label has been renamed to --name (-n)."},
 		},
 		{
 			astroTree,
@@ -72,9 +72,9 @@ func TestRenamedFlagsSayWhatTheyAreCalledNow(t *testing.T) {
 				[]string{"--deployment", "--deployment", "--workspace"},
 			},
 			[]string{
-				"Flags --deployment-id (-d) and --deployment-name are replaced by --deployment, which takes one value. " +
+				"Flags --deployment-id and --deployment-name are replaced by --deployment (-d), which takes one value. " +
 					"--deployment takes Deployment names, ids and link names, so check that the value names the same Deployment before switching.",
-				"Flag --workspace-id has been renamed to --workspace.",
+				"Flag --workspace-id has been renamed to --workspace (-w).",
 			},
 		},
 		// "" still means the default through the alias, and --workspace

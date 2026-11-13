@@ -210,7 +210,7 @@ func newTasksInstanceCmd(q *query) *cobra.Command {
 			return q.runTasksInstance(cmd.Context(), args[0], args[1], args[2], mapIndex)
 		},
 	}
-	cmd.Flags().IntVarP(&mapIndex, "map-index", "m", -1, "Which expansion of a mapped task to show (-1 for an unmapped task)")
+	cmd.Flags().IntVar(&mapIndex, "map-index", -1, "Which expansion of a mapped task to show (-1 for an unmapped task)")
 	return cmd
 }
 
@@ -325,7 +325,7 @@ func newTasksLogsCmd(q *query) *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&opts.try, "try", 1, "Which attempt to read, counting from 1")
-	cmd.Flags().IntVarP(&opts.mapIndex, "map-index", "m", -1, "Which expansion of a mapped task to read (-1 for an unmapped task)")
+	cmd.Flags().IntVar(&opts.mapIndex, "map-index", -1, "Which expansion of a mapped task to read (-1 for an unmapped task)")
 	return cmd
 }
 

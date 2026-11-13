@@ -108,12 +108,12 @@ func TestAirflowWorkspaceIDIsAHiddenNoOp(t *testing.T) {
 		}
 		return cmd.Args(cmd, cmd.Flags().Args())
 	}
-	for _, args := range [][]string{{"--workspace-id", "ws"}, {"-W", "ws"}, {"--workspace-id", ""}} {
+	for _, args := range [][]string{{"--workspace-id", "ws"}, {"--workspace-id", ""}} {
 		require.NoError(t, apply(args...), args)
 	}
 	f := NewAirflowCmd(new(bytes.Buffer)).PersistentFlags().Lookup("workspace-id")
 	assert.True(t, f.Hidden)
-	assert.Equal(t, "W", f.Shorthand)
+	assert.Empty(t, f.Shorthand, "a letter is one of the table's or none")
 	assert.Equal(t, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working", f.Usage)
 	require.EqualError(t, apply("--workspace", "ws"), "unknown flag: --workspace")
 	for _, args := range [][]string{{"--deployment", ""}, {"-d", ""}} {

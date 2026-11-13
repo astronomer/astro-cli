@@ -205,7 +205,7 @@ func initHome(fs afero.Fs) {
 	// setters guard on ConfigFileUsed() which SetConfigFile
 	// above has already set, and saveConfig creates the parent directory
 	// before it writes the file — so the first `astro login` or `astro
-	// config set -g` still writes it.
+	// config set --global` still writes it.
 	switch err := readConfigFile(viperHome, fs); {
 	case err == nil:
 		delete(unreadableConfigs, HomeConfigFile)

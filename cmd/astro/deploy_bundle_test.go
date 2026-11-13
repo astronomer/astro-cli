@@ -123,7 +123,7 @@ func TestDeployBundleTypes(t *testing.T) {
 		project := dbtProject(t)
 		config.WorkingPath = project
 		captured := fakeDeployBundle(t)
-		r := execBundleRun(t, nil, "", "--deployment", bundleTestID, "-m", "/usr/local/airflow/dbt/custom")
+		r := execBundleRun(t, nil, "", "--deployment", bundleTestID, "--mount-path", "/usr/local/airflow/dbt/custom")
 		require.NoError(t, r.err, r.stderr)
 		assert.Equal(t, project, (*captured).BundlePath)
 		assert.Equal(t, "/usr/local/airflow/dbt/custom", (*captured).MountPath)

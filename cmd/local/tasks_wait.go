@@ -59,7 +59,7 @@ func newTasksWaitCmd(q *query) *cobra.Command {
 			return q.runTasksWait(cmd.Context(), args[0], args[1], target, wait)
 		},
 	}
-	cmd.Flags().IntVarP(&opts.mapIndex, "map-index", "m", -1, "Which expansion of a mapped task to wait on (-1 for an unmapped task)")
+	cmd.Flags().IntVar(&opts.mapIndex, "map-index", -1, "Which expansion of a mapped task to wait on (-1 for an unmapped task)")
 	cmd.Flags().StringVar(&opts.until, "until", defaultWaitState, "The state to wait for")
 	timing.register(cmd)
 	return cmd
