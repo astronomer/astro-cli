@@ -43,7 +43,7 @@ func TestRootPersistentPreRunESetupErrors(t *testing.T) {
 	t.Run("Deployment API keys in the environment stop the command", func(t *testing.T) {
 		t.Setenv("ASTRO_API_TOKEN", "")
 		t.Setenv("ASTRONOMER_KEY_ID", "id")
-		t.Setenv("ASTRONOMER_KEY_SECRET", "")
+		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
 		astroSetup = origSetup
 		root := &cobra.Command{Use: "astro"}
 		leaf := &cobra.Command{Use: "list"}

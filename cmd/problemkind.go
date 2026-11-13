@@ -25,8 +25,8 @@ import (
 const (
 	// KindUnauthenticated: there is no usable login — none was ever made, the
 	// API refused the token (401), one was needed and this run may not
-	// start a browser login (--output json), or the environment holds only
-	// Deployment API keys, which no longer log in (set ASTRO_API_TOKEN).
+	// start a browser login (--output json), or the environment holds both
+	// Deployment API key variables and no token, which no longer log in (set ASTRO_API_TOKEN).
 	// Log in and try again.
 	KindUnauthenticated cliout.ProblemKind = "unauthenticated"
 	// KindForbidden: the login is good but does not carry the permission this

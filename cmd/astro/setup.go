@@ -9,12 +9,14 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/astrosession"
@@ -159,31 +161,58 @@ func ensureLogin(astroV1Client astrov1.APIClient) error {
 }
 
 // ensureEnvCredentials sets up an API token from the environment, reporting
-// whether one was found. It comes before any saved login. With no token, a
-// Deployment API key in the environment fails here, before any request or
-// prompt, rather than being skipped for a saved login the key's owner never
-// meant to use.
+// whether one was found. It comes before any saved login. With no token and
+// both Deployment API key variables set, it fails here, before any request or
+// prompt, as 1.x would have used the keys. A lone variable was ignored by 1.x
+// and is here too, with a warning.
 func ensureEnvCredentials(astroV1Client astrov1.APIClient) (bool, error) {
 	apiToken, err := checkAPIToken(astroV1Client)
-	if err != nil || apiToken {
-		// A token wins over the keys and says nothing of them: a CI job
-		// that moves from keys to a token may keep both set for a while.
-		return apiToken, err
+	if err != nil {
+		return false, err
 	}
-	if hasLegacyAPIKeys() {
+	set := legacyKeysSet()
+	if apiToken {
+		// A token wins over the keys: a CI job that moves from keys to a
+		// token may keep both set for a while.
+		warnLegacyKeys(set)
+		return true, nil
+	}
+	if len(set) == 2 {
 		return false, ErrLegacyAPIKeys
 	}
+	warnLegacyKeys(set)
 	return false, nil
 }
 
 // ErrLegacyAPIKeys is the failure of a run that needs an Astro login when the
-// environment holds Deployment API keys and no API token. The keys stopped
+// environment holds both Deployment API key variables and no API token. The keys stopped
 // authenticating on June 1st, 2024.
 var ErrLegacyAPIKeys = errors.New("ASTRONOMER_KEY_ID and ASTRONOMER_KEY_SECRET (Deployment API keys) are no longer supported: set ASTRO_API_TOKEN to a Deployment API token instead")
 
-// hasLegacyAPIKeys reports whether either Deployment API key variable is set.
-func hasLegacyAPIKeys() bool {
-	return os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != ""
+// legacyKeysSet returns the Deployment API key variables that are set.
+func legacyKeysSet() []string {
+	var set []string
+	for _, name := range []string{legacyKeyIDVar, legacyKeySecretVar} {
+		if os.Getenv(name) != "" {
+			set = append(set, name)
+		}
+	}
+	return set
+}
+
+var legacyKeysWarned atomic.Bool
+
+// warnLegacyKeys says once per run, on stderr, that the variables in set are
+// not used.
+func warnLegacyKeys(set []string) {
+	if len(set) == 0 || !legacyKeysWarned.CompareAndSwap(false, true) {
+		return
+	}
+	verb := "is"
+	if len(set) > 1 {
+		verb = "are"
+	}
+	cliout.Warn(os.Stderr, fmt.Sprintf("%s %s set but no longer used (Deployment API keys are not supported); unset %s", strings.Join(set, " and "), verb, map[bool]string{true: "them", false: "it"}[len(set) > 1]))
 }
 
 // FreshLogin returns the context for domain, or the current context when
@@ -596,3 +625,9 @@ func useEnvironmentSelection(c *config.Context, orgID, orgProduct, wsID string) 
 		fmt.Fprintln(os.Stderr, "no organization context set")
 	}
 }
+
+// The Deployment API key variables, no longer used.
+const (
+	legacyKeyIDVar     = "ASTRONOMER_KEY_ID"
+	legacyKeySecretVar = "ASTRONOMER_KEY_SECRET"
+)
