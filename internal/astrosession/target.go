@@ -55,22 +55,6 @@ const (
 	SourceLegacyKey
 )
 
-func (s Source) String() string {
-	switch s {
-	case SourceFlag:
-		return "flag"
-	case SourceProject:
-		return "project"
-	case SourceToken:
-		return "token"
-	case SourceContext:
-		return "context"
-	case SourceLegacyKey:
-		return "legacy key"
-	}
-	return "none"
-}
-
 // Accepts is what a command lets a person name a Workspace with, besides the
 // token's claim and the saved login. It words the advice a missing Workspace
 // gets, so it never offers a way the command would not take.
@@ -96,7 +80,7 @@ const (
 	hintFlagOrProject = "so pass --workspace, or run in a project linked to one"
 	// hintFlagOrID is for a command that finds a token in the Workspace,
 	// unless the token is given by ID.
-	hintFlagOrID = "so pass --workspace or the token's ID, or run in a project linked to one" //nolint:gosec // advice, not a credential
+	hintFlagOrID = "so pass --workspace or the token's ID, or run in a project linked to one"
 	hintPath     = "so write the id in the path"
 	// hintCurrent is for a command that acts on the current Workspace alone,
 	// which a run with an API token does not have.
@@ -166,14 +150,12 @@ type Target struct {
 
 	accepts Accepts
 	noSaved error
-	// readErr is why the login could not be read, when it could not.
-	readErr error
 	token   bool
 }
 
 // Resolve decides the run's Workspace and Deployment. It reads the current
 // context and ASTRO_API_TOKEN, and never prompts or calls the API.
-func Resolve(r Request) Target {
+func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 	t := Target{accepts: r.Accepts, noSaved: r.NoSaved, token: HasAPIToken()}
 	onCurrent := r.Domain == "" || sameDomain(r.Domain, currentDomain())
 
@@ -183,7 +165,7 @@ func Resolve(r Request) Target {
 	case r.Project != "":
 		t.Workspace, t.WorkspaceSource = r.Project, SourceProject
 	default:
-		t.Workspace, t.WorkspaceSource, t.readErr = fromLogin(r.Login, r.Domain, t.token, onCurrent)
+		t.Workspace, t.WorkspaceSource = fromLogin(r.Login, r.Domain, t.token, onCurrent)
 	}
 
 	switch {
@@ -198,8 +180,8 @@ func Resolve(r Request) Target {
 }
 
 // fromLogin is the Workspace of the login the run is on, and which kind of
-// source that is. The error is a login that could not be read at all.
-func fromLogin(login *config.Context, domain string, token, onCurrent bool) (string, Source, error) {
+// source that is. A login that cannot be read names no Workspace.
+func fromLogin(login *config.Context, domain string, token, onCurrent bool) (string, Source) {
 	var ws string
 	switch {
 	case login != nil:
@@ -208,28 +190,28 @@ func fromLogin(login *config.Context, domain string, token, onCurrent bool) (str
 		// An API token's selection is overlaid on the current context.
 		ctx, err := config.GetCurrentContext()
 		if err != nil {
-			return "", SourceNone, err
+			return "", SourceNone
 		}
 		ws = ctx.Workspace
 	case token:
 		// Another host's saved Workspace is not one this run chose.
-		return "", SourceNone, nil
+		return "", SourceNone
 	default:
 		ctx, err := (&config.Context{Domain: domain}).GetContext()
 		if err != nil {
-			return "", SourceNone, nil
+			return "", SourceNone
 		}
 		ws = ctx.Workspace
 	}
 	switch {
 	case ws == "":
-		return "", SourceNone, nil
+		return "", SourceNone
 	case token:
-		return ws, SourceToken, nil
+		return ws, SourceToken
 	case os.Getenv("ASTRONOMER_KEY_ID") != "":
-		return ws, SourceLegacyKey, nil
+		return ws, SourceLegacyKey
 	}
-	return ws, SourceContext, nil
+	return ws, SourceContext
 }
 
 func currentDomain() string {
@@ -245,17 +227,14 @@ func sameDomain(a, b string) bool {
 }
 
 // Found reports whether a source named a Workspace.
-func (t Target) Found() bool { return t.Workspace != "" }
-
-// NoSource reports that no source named a Workspace, as opposed to the login
-// being unreadable: a command addressed by an ID, which identifies its target
-// with no Workspace to look in, goes on without one only for the first.
-func (t Target) NoSource() bool { return !t.Found() && t.readErr == nil }
+func (t Target) Found() bool { //nolint:gocritic // a small value type
+	return t.Workspace != ""
+}
 
 // Require is nil when the run has a Workspace, else the error for its absence
 // (Missing). A command that asks a question or calls the API calls it first,
 // so nothing is asked on the way to this error.
-func (t Target) Require() error {
+func (t Target) Require() error { //nolint:gocritic // a small value type
 	if t.Found() {
 		return nil
 	}
@@ -264,12 +243,8 @@ func (t Target) Require() error {
 
 // Missing is the error for a run with no Workspace: under an API token,
 // ErrOrgTokenNoWorkspace with the advice the command's flags and project
-// support, else what a saved login without one says. A login that could not be
-// read is that error.
-func (t Target) Missing() error {
-	if t.readErr != nil {
-		return t.readErr
-	}
+// support, else what a saved login without one says.
+func (t Target) Missing() error { //nolint:gocritic // a small value type
 	if t.token {
 		return fmt.Errorf("%w, %s", ErrOrgTokenNoWorkspace, t.accepts.hint())
 	}

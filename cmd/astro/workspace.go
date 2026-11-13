@@ -973,7 +973,7 @@ func argOrID(args []string) string {
 // find the Workspace is worded with msg ("" for none); a failure to fetch the
 // Deployment is not a failure to find a Workspace, and is not.
 func deploymentWorkspace(cmd *cobra.Command, id, msg string) (string, error) {
-	if id != "" && workspaceTarget(cmd, workspaceID, 0).NoSource() {
+	if id != "" && !workspaceTarget(cmd, workspaceID, 0).Found() {
 		d, err := deployment.GetDeploymentByID("", id, astroV1Client)
 		if err != nil {
 			return "", fmt.Errorf("fetching Deployment %s: %w", id, err)

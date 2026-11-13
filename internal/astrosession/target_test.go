@@ -31,6 +31,8 @@ func useRun(t *testing.T, kind runKind, saved string) {
 	t.Setenv("ASTRONOMER_KEY_ID", "")
 	ctxWorkspace := saved
 	switch kind {
+	case interactive:
+		// the saved login's own Workspace
 	case orgToken:
 		testUtil.UseAPIToken(t, "organizationId:org")
 		ctxWorkspace = ""
@@ -257,14 +259,6 @@ func TestMissingWorkspaceIsWordedByWhatTheCommandAccepts(t *testing.T) {
 	}
 }
 
-func TestSourceNamesItself(t *testing.T) {
-	for s, want := range map[Source]string{SourceNone: "none", SourceFlag: "flag", SourceProject: "project", SourceToken: "token", SourceContext: "context", SourceLegacyKey: "legacy key"} {
-		if s.String() != want {
-			t.Errorf("%d is %q, want %q", s, s.String(), want)
-		}
-	}
-}
-
 // A caller handed a login reads its selection, as the run's own.
 func TestResolveReadsTheLoginItIsHanded(t *testing.T) {
 	useRun(t, interactive, "ws-saved")
@@ -282,36 +276,16 @@ func TestResolveReadsTheLoginItIsHanded(t *testing.T) {
 	}
 }
 
-// A login that cannot be read is that error, never a claim that no Workspace
-// is selected, and it is not a Workspace an ID can do without.
+// With no login at all there is no Workspace, and a flag needs none.
 func TestResolveWithNoLoginAtAll(t *testing.T) {
 	t.Setenv(EnvAPIToken, "")
 	testUtil.InitTestConfig(testUtil.Initial)
 	got := Resolve(Request{})
-	if got.Found() || got.NoSource() {
-		t.Fatalf("found %q, NoSource %v", got.Workspace, got.NoSource())
-	}
-	if err := got.Require(); err == nil || errors.Is(err, ErrNoWorkspace) {
-		t.Fatalf("err = %v, want the login's own", err)
+	if got.Found() || !errors.Is(got.Require(), ErrNoWorkspace) {
+		t.Fatalf("found %q, err %v", got.Workspace, got.Require())
 	}
 	if got := Resolve(Request{Workspace: "ws-flag"}); !got.Found() {
 		t.Fatal("a flag needs no login")
-	}
-}
-
-func TestNoSourceIsAMissingWorkspaceNotAFoundOne(t *testing.T) {
-	for _, tt := range []struct {
-		kind runKind
-		want bool
-	}{{orgToken, true}, {wsToken, false}, {interactive, false}} {
-		useRun(t, tt.kind, "ws-saved")
-		if got := Resolve(Request{}).NoSource(); got != tt.want {
-			t.Errorf("%s: NoSource() = %v, want %v", tt.kind, got, tt.want)
-		}
-	}
-	useRun(t, interactive, "")
-	if !Resolve(Request{}).NoSource() {
-		t.Error("a saved login with no Workspace is no source")
 	}
 }
 
