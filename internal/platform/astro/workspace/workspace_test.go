@@ -28,8 +28,27 @@ var (
 		Id:          "workspace-id",
 	}
 
+	workspace2 = astrov1.Workspace{
+		Name:        "test-workspace-2",
+		Description: &description,
+		Id:          "workspace-id-2",
+	}
+
 	workspaces = []astrov1.Workspace{
 		workspace1,
+	}
+
+	// Package-level fixtures are read-only: a test that needs two Workspaces
+	// uses this, never reassigns ListWorkspacesResponseOK (which leaked into
+	// the next run under -count).
+	listTwoWorkspacesOK = astrov1.ListWorkspacesResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.WorkspacesPaginated{
+			Limit:      10,
+			Offset:     0,
+			TotalCount: 2,
+			Workspaces: []astrov1.Workspace{workspace1, workspace2},
+		},
 	}
 
 	ListWorkspacesResponseOK = astrov1.ListWorkspacesResponse{
@@ -218,31 +237,8 @@ func (s *Suite) TestGetWorkspaceSelection() {
 func (s *Suite) TestSwitch() {
 	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	workspace2 := astrov1.Workspace{
-		Name:        "test-workspace-2",
-		Description: &description,
-		Id:          "workspace-id-2",
-	}
-
-	workspaces = []astrov1.Workspace{
-		workspace1,
-		workspace2,
-	}
-
-	ListWorkspacesResponseOK = astrov1.ListWorkspacesResponse{
-		HTTPResponse: &http.Response{
-			StatusCode: 200,
-		},
-		JSON200: &astrov1.WorkspacesPaginated{
-			Limit:      10,
-			Offset:     0,
-			TotalCount: 2,
-			Workspaces: workspaces,
-		},
-	}
-
 	s.Run("success", func() {
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listTwoWorkspacesOK, nil).Once()
 
 		buf := new(bytes.Buffer)
 		err := switchAndPrint("workspace-id-2", mockV1Client, buf)
@@ -292,7 +288,7 @@ func (s *Suite) TestSwitch() {
 	})
 
 	s.Run("success with selection", func() {
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listTwoWorkspacesOK, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("1")
@@ -314,7 +310,7 @@ func (s *Suite) TestSwitch() {
 	})
 
 	s.Run("failure with invalid selection", func() {
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listTwoWorkspacesOK, nil).Once()
 
 		// mock os.Stdin
 		input := []byte("0")
@@ -605,32 +601,10 @@ func (s *Suite) TestUpdate() {
 	})
 
 	s.Run("ask to select the workspace if more than 1 exists", func() {
-		workspace2 := astrov1.Workspace{
-			Name:        "test-workspace-2",
-			Description: &description,
-			Id:          "workspace-id-2",
-		}
-
-		workspaces = []astrov1.Workspace{
-			workspace1,
-			workspace2,
-		}
-
-		ListWorkspacesResponseOK = astrov1.ListWorkspacesResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrov1.WorkspacesPaginated{
-				Limit:      2,
-				Offset:     0,
-				TotalCount: 2,
-				Workspaces: workspaces,
-			},
-		}
 		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseOK, nil).Once()
-		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listTwoWorkspacesOK, nil).Once()
 		res, err := Update("workspace-id", "update-workspace-test", "updated workspace", "ON", out, mockClient)
 		s.NoError(err)
 		s.Equal("test-workspace", res.PreviousName)
@@ -639,7 +613,7 @@ func (s *Suite) TestUpdate() {
 	s.Run("a picker that cannot ask says so, naming what answers it", func() {
 		defer pkginput.SetGuard(func() string { return "with --output json it cannot" })()
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listTwoWorkspacesOK, nil).Once()
 		out := new(bytes.Buffer)
 		_, err := Update("", "", "", "", out, mockClient)
 		s.True(pkginput.IsRequired(err), "refused, not %v", err)
@@ -651,7 +625,7 @@ func (s *Suite) TestUpdate() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listTwoWorkspacesOK, nil).Once()
 		_, err := Update("workspace-id", "", "", "", out, mockClient)
 		s.EqualError(err, "network error")
 	})
@@ -660,7 +634,7 @@ func (s *Suite) TestUpdate() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseError, nil).Once()
-		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listTwoWorkspacesOK, nil).Once()
 		_, err := Update("workspace-id", "", "", "", out, mockClient)
 		s.EqualError(err, "failed to update workspace")
 	})
@@ -680,7 +654,7 @@ func (s *Suite) TestUpdate() {
 		out := new(bytes.Buffer)
 
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listTwoWorkspacesOK, nil).Once()
 		// mock os.Stdin
 		expectedInput := []byte("1")
 		r, w, err := os.Pipe()
