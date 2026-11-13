@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -85,10 +86,16 @@ var orgNameForbidden = regexp.MustCompile(`[^a-zA-Z0-9-]+`)
 var signupVerificationPattern = regexp.MustCompile(`(?i)verif\w*\s+(your\s+)?email`)
 
 var (
-	callbackChannel = make(chan CallbackMessage, 1)
 	callbackTimeout = time.Second * 300
-	redirectURI     = "http://localhost:12345/callback"
-	callbackServer  = "localhost:12345"
+	// callbackShutdownTimeout bounds how long a finished login waits for the callback server to drain.
+	// By then the browser has its redirect, so what is left is an idle connection, such as a
+	// browser's preconnect, and a short wait is enough.
+	callbackShutdownTimeout = time.Second
+	redirectURI             = "http://localhost:12345/callback"
+	callbackServer          = "localhost:12345"
+	// callbackListening is called with the bound address once the callback
+	// listener is open. Tests use it to learn the port of a localhost:0 bind.
+	callbackListening = func(net.Addr) {}
 )
 
 var authenticator = Authenticator{
@@ -184,59 +191,131 @@ func authorizeCallbackHandlerTo(errOut io.Writer) AuthorizeCallbackHandler {
 	return func() (string, error) { return authorizeCallback(errOut) }
 }
 
-func authorizeCallback(errOut io.Writer) (string, error) {
+// callbackMux serves the login callback. The first result goes to results and
+// later ones (a refresh, a retry) are dropped, so a repeated hit never blocks
+// the handler and still gets the normal redirect page. A hit that carries
+// neither a code nor an error (a prefetch, a probe, a manual visit) is not a
+// result: it must not take the slot the real one needs, and it must not be
+// told the login succeeded.
+func callbackMux(results chan<- CallbackMessage) *http.ServeMux {
+	send := func(msg CallbackMessage) {
+		select {
+		case results <- msg:
+		default:
+		}
+	}
 	m := http.NewServeMux()
-	s := http.Server{Handler: m, ReadHeaderTimeout: 0}
 	m.HandleFunc("/callback", func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
+		if _, hasError := req.URL.Query()["error"]; !hasError && req.URL.Query().Get("code") == "" {
+			http.Error(w, "No authorization code was received. Return to the terminal and sign in again.", http.StatusBadRequest)
+			return
+		}
 		if errorCode, ok := req.URL.Query()["error"]; ok {
-			callbackChannel <- CallbackMessage{err: authorizeError(errorCode, req.URL.Query()["error_description"])}
+			send(CallbackMessage{err: authorizeError(errorCode, req.URL.Query()["error_description"])})
 			resp := &http.Request{}
 			http.Redirect(w, resp, "https://auth.astronomer.io/device/denied", http.StatusFound)
 		} else {
-			callbackChannel <- CallbackMessage{authorizationCode: req.URL.Query().Get("code")}
+			send(CallbackMessage{authorizationCode: req.URL.Query().Get("code")})
 			resp := &http.Request{}
 			http.Redirect(w, resp, "https://auth.astronomer.io/device/success", http.StatusFound)
 		}
 	})
+	return m
+}
+
+func authorizeCallback(errOut io.Writer) (string, error) {
+	// One channel per login, so a result left over from an earlier attempt
+	// can't answer this one.
+	results := make(chan CallbackMessage, 1)
+	fresh := &freshConns{conns: map[net.Conn]struct{}{}}
+	s := http.Server{Handler: callbackMux(results), ReadHeaderTimeout: 0, ConnState: fresh.track}
+	// Shutdown counts a connection that has sent nothing yet, such as a
+	// browser's preconnect, as busy for several seconds. Drop those once the
+	// listener is closed (so no new one can slip in) rather than wait on them.
+	s.RegisterOnShutdown(fresh.closeAll)
 	// Bind before serving, so an address already taken reaches the caller as an
 	// error rather than ending the process from inside the goroutine below.
 	listener, err := net.Listen("tcp", callbackServer)
 	if err != nil {
 		return "", fmt.Errorf("cannot open the login callback on %s: %w. Close any other astro login and try again", callbackServer, err)
 	}
+	callbackListening(listener.Addr())
 	go func() {
 		if err := s.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			// The caller selects on this channel, so it hears a server that
 			// stops early instead of waiting out the callback timeout.
-			callbackChannel <- CallbackMessage{err: fmt.Errorf("the login callback server stopped: %w", err)}
+			select {
+			case results <- CallbackMessage{err: fmt.Errorf("the login callback server stopped: %w", err)}:
+			default:
+			}
 		}
 	}()
 
-	// Wait for code on channel, or timeout
-	authorizationCode := ""
-	for authorizationCode == "" {
-		select {
-		case callbackMessage := <-callbackChannel:
-			if callbackMessage.err != nil {
-				return "", callbackMessage.err
+	// Every way out of the wait below, the error a browser reports included,
+	// must release the port, or the next login in this process can't bind it.
+	defer func() {
+		// A stuck connection must not keep a finished login from returning.
+		ctx, cancel := http_context.WithTimeout(http_context.Background(), callbackShutdownTimeout)
+		defer cancel()
+		if err := s.Shutdown(ctx); err != nil {
+			// Hitting the bound means something is still open after the result
+			// was chosen: an idle connection, a handler stalled past the bound
+			// or a slow header read. Force-closing it is the normal way to
+			// finish, and the login has already succeeded, so say nothing
+			// unless the close fails too.
+			closeErr := s.Close()
+			if closeErr != nil || !errors.Is(err, http_context.DeadlineExceeded) {
+				ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", shutdownFailure(err, closeErr)))
 			}
-			authorizationCode = callbackMessage.authorizationCode
-		case <-time.After(callbackTimeout):
-			err := s.Shutdown(http_context.Background())
-			if err != nil {
-				ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
-			}
-			return "", errors.New("the operation has timed out")
 		}
-	}
-	err = s.Shutdown(http_context.Background())
-	if err != nil {
-		ansi.Warn(errOut, fmt.Sprintf("could not shut down the login callback server: %s", err))
-	}
+	}()
 
-	// return code
-	return authorizationCode, nil
+	// Wait for the result, or time out
+	select {
+	case callbackMessage := <-results:
+		if callbackMessage.err != nil {
+			return "", callbackMessage.err
+		}
+		return callbackMessage.authorizationCode, nil
+	case <-time.After(callbackTimeout):
+		return "", errors.New("the operation has timed out")
+	}
+}
+
+// freshConns tracks the connections that have been accepted but have not yet
+// started a request.
+type freshConns struct {
+	mu    sync.Mutex
+	conns map[net.Conn]struct{}
+}
+
+func (f *freshConns) track(c net.Conn, state http.ConnState) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if state == http.StateNew {
+		f.conns[c] = struct{}{}
+		return
+	}
+	delete(f.conns, c)
+}
+
+func (f *freshConns) closeAll() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for c := range f.conns {
+		c.Close() //nolint:errcheck // the connection never sent a request
+		delete(f.conns, c)
+	}
+}
+
+// shutdownFailure describes a callback server that would not shut down, and
+// would not close either when closeErr is set.
+func shutdownFailure(shutdownErr, closeErr error) error {
+	if closeErr == nil {
+		return shutdownErr
+	}
+	return fmt.Errorf("%w; closing it failed too: %v", shutdownErr, closeErr)
 }
 
 // quitOnInterrupt ends the process on ^C or SIGTERM while a login waits on the
