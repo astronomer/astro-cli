@@ -23,16 +23,36 @@ import (
 // id, so a link name in that place resolves the way a --deployment id does.
 const deploymentArgAnnotation = "astro.deployment-arg"
 
-// projectWorkspaceID is the workspace a command inside a project falls back
-// to before the context's. followProject sets it; coalesceWorkspace reads it.
-var projectWorkspaceID string
+// projectFollow is what followProjectPreRun records on the context of a
+// command that follows the project: the command reads the project for its
+// workspace, whether or not it found one. Only the commands under astro env
+// and astro deployment do. It is how the run's workspace resolver (see
+// workspaceTarget) knows to take the project's workspace before the token's or
+// the context's, and to name the project among the ways to supply one.
+type projectFollow struct {
+	// workspace is the project's workspace, "" when the project names none.
+	workspace string
+}
 
-// projectFollowed is whether the running command reads the project for its
-// workspace at all: only the commands under astro env and astro deployment do.
-// It decides whether an error about a missing workspace may name the project
-// link as a way to supply one. followProject sets it on every run of those
-// commands; a process runs one command, so it is never reset (tests do).
-var projectFollowed bool
+type projectFollowKey struct{}
+
+// withProjectFollow is ctx recording that the command follows the project.
+func withProjectFollow(ctx context.Context, f projectFollow) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, projectFollowKey{}, f)
+}
+
+// projectFollowOf is what cmd's pre-run recorded, and whether cmd follows the
+// project at all.
+func projectFollowOf(cmd *cobra.Command) (projectFollow, bool) {
+	if cmd == nil || cmd.Context() == nil {
+		return projectFollow{}, false
+	}
+	f, ok := cmd.Context().Value(projectFollowKey{}).(projectFollow)
+	return f, ok
+}
 
 // projectPick is what a project decided for a command the user left open.
 type projectPick struct {
@@ -69,7 +89,7 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 				return err
 			}
 		}
-		projectWorkspaceID = pick.workspace
+		cmd.SetContext(withProjectFollow(cmd.Context(), projectFollow{workspace: pick.workspace}))
 		if err := parentPreRun(group, cmd, args); err != nil {
 			return err
 		}
@@ -86,7 +106,6 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 // deploymentFlag.resolve), or as a Deployment-id argument is replaced in
 // place by the link's Deployment id.
 func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
-	projectWorkspaceID, projectFollowed = "", true
 	m, err := projectManifest(config.WorkingPath)
 	if err != nil || m == nil {
 		return projectPick{}, err

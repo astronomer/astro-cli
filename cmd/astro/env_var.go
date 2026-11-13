@@ -173,7 +173,7 @@ func newEnvVarDeleteCmd(out io.Writer) *cobra.Command {
 // runEnvVarList is `variable list`, and `variable export`, whose text is the
 // dotenv file and whose json is the list's: the same variables, as data.
 func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
 }
 
 func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -214,7 +214,7 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 }
 
 func runEnvVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func runEnvVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}

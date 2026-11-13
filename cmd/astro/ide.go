@@ -170,12 +170,14 @@ func validateWorkspaceAndOrgID(ctx *config.Context) (orgID, wsID string, err err
 		return "", "", errors.New("no organization ID provided and no organization set in context. Please set context or provide organization ID")
 	}
 
-	wsID = ctx.Workspace
-	if wsID == "" {
-		return "", "", astrosession.NoWorkspaceHint(
-			errors.New("no workspace ID provided and no workspace set in context. Please set context or provide workspace ID"),
-			astrosession.HintCurrent)
+	t := astrosession.Resolve(astrosession.Request{
+		Login:   ctx,
+		NoSaved: errors.New("no workspace ID provided and no workspace set in context. Please set context or provide workspace ID"),
+	})
+	if err := t.Require(); err != nil {
+		return "", "", err
 	}
+	wsID = t.Workspace
 
 	return orgID, wsID, nil
 }

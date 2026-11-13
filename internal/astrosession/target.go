@@ -85,6 +85,9 @@ const (
 	// ByID is the id of the token or Deployment the command acts on, which
 	// identifies it with no Workspace to look in.
 	ByID
+	// ByPath is writing the Workspace's id where the command takes a path (the
+	// astro api commands' placeholders).
+	ByPath
 )
 
 // The advice that follows ErrOrgTokenNoWorkspace, by what the command takes.
@@ -94,6 +97,7 @@ const (
 	// hintFlagOrID is for a command that finds a token in the Workspace,
 	// unless the token is given by ID.
 	hintFlagOrID = "so pass --workspace or the token's ID, or run in a project linked to one" //nolint:gosec // advice, not a credential
+	hintPath = "so write the id in the path"
 	// hintCurrent is for a command that acts on the current Workspace alone,
 	// which a run with an API token does not have.
 	hintCurrent = "so use a Workspace API token"
@@ -101,6 +105,8 @@ const (
 
 func (a Accepts) hint() string {
 	switch {
+	case a&ByPath != 0:
+		return hintPath
 	case a&ByID != 0:
 		return hintFlagOrID
 	case a&ByProject != 0:
@@ -132,6 +138,10 @@ type Request struct {
 	Deployment string
 	// Accepts is what the command takes, for the advice.
 	Accepts Accepts
+	// Login is the login whose selection is read, for a caller handed one;
+	// nil is the current context. It is read as the run's own (a token's
+	// claim, or a saved login's Workspace), whatever Domain says.
+	Login *config.Context
 	// Domain is the host the command runs on, "" for the current context's.
 	// An API token's claim is the run's selection on the current host only,
 	// and a saved login's Workspace on another host is another login's.
@@ -173,7 +183,7 @@ func Resolve(r Request) Target {
 	case r.Project != "":
 		t.Workspace, t.WorkspaceSource = r.Project, SourceProject
 	default:
-		t.Workspace, t.WorkspaceSource, t.readErr = fromLogin(r.Domain, t.token, onCurrent)
+		t.Workspace, t.WorkspaceSource, t.readErr = fromLogin(r.Login, r.Domain, t.token, onCurrent)
 	}
 
 	switch {
@@ -189,9 +199,11 @@ func Resolve(r Request) Target {
 
 // fromLogin is the Workspace of the login the run is on, and which kind of
 // source that is. The error is a login that could not be read at all.
-func fromLogin(domain string, token, onCurrent bool) (string, Source, error) {
+func fromLogin(login *config.Context, domain string, token, onCurrent bool) (string, Source, error) {
 	var ws string
 	switch {
+	case login != nil:
+		ws = login.Workspace
 	case domain == "" || (token && onCurrent):
 		// An API token's selection is overlaid on the current context.
 		ctx, err := config.GetCurrentContext()
@@ -288,4 +300,16 @@ func TokenDeployment() string {
 		id = v
 	}
 	return id
+}
+
+// RequireWorkspace is the Workspace of a command that takes it from
+// --workspace (flag, "" when not given) or else the run's own selection, and
+// has no project link or other way to name one: the Workspace, or the error
+// for there being none.
+func RequireWorkspace(flag string) (string, error) {
+	t := Resolve(Request{Workspace: flag, Accepts: ByFlag})
+	if err := t.Require(); err != nil {
+		return "", err
+	}
+	return t.Workspace, nil
 }

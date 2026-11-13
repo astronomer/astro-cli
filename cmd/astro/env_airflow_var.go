@@ -133,7 +133,7 @@ func newEnvAirflowVarDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 }
 
 func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -174,7 +174,7 @@ func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvAirflowVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}

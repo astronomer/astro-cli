@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -165,7 +166,7 @@ func TestCoalesceWorkspace(t *testing.T) {
 		setCurrentWorkspace(t, "")
 		workspaceID = "explicit-workspace-id"
 
-		ws, err := coalesceWorkspace()
+		ws, err := coalesceWorkspace(&cobra.Command{})
 		assert.NoError(t, err)
 		assert.Equal(t, "explicit-workspace-id", ws)
 	})
@@ -175,7 +176,7 @@ func TestCoalesceWorkspace(t *testing.T) {
 		setCurrentWorkspace(t, "context-workspace-id")
 		workspaceID = "explicit-workspace-id"
 
-		ws, err := coalesceWorkspace()
+		ws, err := coalesceWorkspace(&cobra.Command{})
 		assert.NoError(t, err)
 		assert.Equal(t, "explicit-workspace-id", ws)
 	})
@@ -185,7 +186,7 @@ func TestCoalesceWorkspace(t *testing.T) {
 		setCurrentWorkspace(t, "context-workspace-id")
 		workspaceID = ""
 
-		ws, err := coalesceWorkspace()
+		ws, err := coalesceWorkspace(&cobra.Command{})
 		assert.NoError(t, err)
 		assert.Equal(t, "context-workspace-id", ws)
 	})
@@ -195,7 +196,7 @@ func TestCoalesceWorkspace(t *testing.T) {
 		setCurrentWorkspace(t, "")
 		workspaceID = ""
 
-		_, err := coalesceWorkspace()
+		_, err := coalesceWorkspace(&cobra.Command{})
 		assert.Error(t, err)
 	})
 }

@@ -156,7 +156,7 @@ func connFlags(cmd *cobra.Command) {
 }
 
 func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 // has done the same since the tree was written. It is what --no-create is
 // for, and this is the first release where every noun has that flag.
 func runEnvConnSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}

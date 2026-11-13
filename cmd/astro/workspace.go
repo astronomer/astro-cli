@@ -14,7 +14,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
-	workspacetoken "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/picker"
 )
@@ -608,7 +607,8 @@ func listWorkspaceTeam(cmd *cobra.Command, out io.Writer) error {
 }
 
 func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
-	if err := requireWorkspace(workspaceID); err != nil {
+	ws, err := requiredWorkspace(cmd, workspaceID, 0)
+	if err != nil {
 		return err
 	}
 	var id string
@@ -623,7 +623,7 @@ func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 			return err
 		}
 	}
-	r, err := team.RemoveWorkspaceTeam(id, workspaceID, astroV1Client)
+	r, err := team.RemoveWorkspaceTeam(id, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -653,7 +653,8 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 }
 
 func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
-	if err := requireWorkspace(workspaceID); err != nil {
+	ws, err := requiredWorkspace(cmd, workspaceID, 0)
+	if err != nil {
 		return err
 	}
 	var id string
@@ -668,7 +669,7 @@ func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 			return err
 		}
 	}
-	t, err := team.AddWorkspaceTeam(id, addWorkspaceRole, workspaceID, astroV1Client)
+	t, err := team.AddWorkspaceTeam(id, addWorkspaceRole, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -705,7 +706,8 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	if len(args) > 0 {
 		id = args[0]
 	}
-	if err := requireWorkspace(workspaceID); err != nil {
+	ws, err := requiredWorkspace(cmd, workspaceID, 0)
+	if err != nil {
 		return err
 	}
 	if updateWorkspaceRole == "" {
@@ -723,7 +725,7 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 			return err
 		}
 	}
-	t, err := team.UpdateWorkspaceTeamRole(id, updateWorkspaceRole, workspaceID, astroV1Client)
+	t, err := team.UpdateWorkspaceTeamRole(id, updateWorkspaceRole, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -799,7 +801,8 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 }
 
 func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
-	if err := requireWorkspace(workspaceID); err != nil {
+	ws, err := requiredWorkspace(cmd, workspaceID, 0)
+	if err != nil {
 		return err
 	}
 	var email string
@@ -816,7 +819,7 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 			return err
 		}
 	}
-	u, err := user.AddWorkspaceUser(email, addWorkspaceRole, workspaceID, astroV1Client)
+	u, err := user.AddWorkspaceUser(email, addWorkspaceRole, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -836,7 +839,8 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 		// make sure the email is lowercase
 		email = strings.ToLower(args[0])
 	}
-	if err := requireWorkspace(workspaceID); err != nil {
+	ws, err := requiredWorkspace(cmd, workspaceID, 0)
+	if err != nil {
 		return err
 	}
 
@@ -855,7 +859,7 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 			return err
 		}
 	}
-	u, err := user.UpdateWorkspaceUserRole(email, updateWorkspaceRole, workspaceID, astroV1Client)
+	u, err := user.UpdateWorkspaceUserRole(email, updateWorkspaceRole, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -863,7 +867,8 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 }
 
 func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
-	if err := requireWorkspace(workspaceID); err != nil {
+	ws, err := requiredWorkspace(cmd, workspaceID, 0)
+	if err != nil {
 		return err
 	}
 	var email string
@@ -880,41 +885,56 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 			return err
 		}
 	}
-	r, err := user.RemoveWorkspaceUser(email, workspaceID, astroV1Client)
+	r, err := user.RemoveWorkspaceUser(email, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
 	return renderLines(workspaceUserOutput, out, &r, fmt.Sprintf("The user %s was successfully removed from the workspace", r.Email))
 }
 
-func coalesceWorkspace() (string, error) {
-	// An explicit --workspace flag is authoritative and must win before we
-	// require a current-workspace context. Org-scoped API tokens leave that
-	// context empty (no workspaceId claim), so consulting it first would error
-	// out even when the caller supplied a valid workspace explicitly.
-	if wsFlag := workspaceID; wsFlag != "" {
-		return wsFlag, nil
+// workspaceTarget is the run's Workspace for cmd, from the one resolver
+// (astrosession.Resolve): flag (--workspace, "" when the command has none or
+// it was not given), the project when cmd follows it, the token's claim, the
+// saved login. extra is what else the command accepts in place of a Workspace
+// (astrosession.ByID), for the advice a missing one gets.
+func workspaceTarget(cmd *cobra.Command, flag string, extra astrosession.Accepts) astrosession.Target {
+	req := astrosession.Request{Workspace: flag, Accepts: astrosession.ByFlag | extra, NoSaved: workspace.ErrCurrentNotSet}
+	if f, ok := projectFollowOf(cmd); ok {
+		req.Project = f.workspace
+		req.Accepts |= astrosession.ByProject
 	}
-	if projectWorkspaceID != "" {
-		return projectWorkspaceID, nil
-	}
+	return astrosession.Resolve(req)
+}
 
-	wsCfg, err := workspace.GetCurrentWorkspace()
+// requiredWorkspace is workspaceTarget's Workspace, or the error for its
+// absence, so a command that asks a question or calls the API takes its
+// Workspace first and nothing is asked on the way to the error.
+func requiredWorkspace(cmd *cobra.Command, flag string, extra astrosession.Accepts) (string, error) {
+	t := workspaceTarget(cmd, flag, extra)
+	if err := t.Require(); err != nil {
+		return "", err
+	}
+	return t.Workspace, nil
+}
+
+// coalesceWorkspace is the Workspace the astro env and astro deployment
+// commands act on: --workspace, else the project's, else the token's, else the
+// saved login's.
+func coalesceWorkspace(cmd *cobra.Command) (string, error) {
+	return coalesceWorkspaceOr(cmd, 0)
+}
+
+// coalesceWorkspaceOr is coalesceWorkspace for a command that also takes
+// something in place of a Workspace (extra), which its advice then names.
+func coalesceWorkspaceOr(cmd *cobra.Command, extra astrosession.Accepts) (string, error) {
+	ws, err := requiredWorkspace(cmd, workspaceID, extra)
 	if errors.Is(err, astrosession.ErrOrgTokenNoWorkspace) {
-		if projectFollowed {
-			return "", astrosession.NoWorkspaceHint(nil, astrosession.HintFlagOrProject)
-		}
 		return "", err
 	}
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get current Workspace")
 	}
-
-	if wsCfg != "" {
-		return wsCfg, nil
-	}
-
-	return "", errors.New("no valid Workspace source found")
+	return ws, nil
 }
 
 func selectWorkspaceRole() (string, error) {
@@ -931,14 +951,4 @@ func selectWorkspaceRole() (string, error) {
 		return "", err
 	}
 	return validWorkspaceRoles[i], nil
-}
-
-// requireWorkspace fails when a command that takes its Workspace from
-// --workspace (flagWorkspace) or else the current context's has none, so it can
-// run ahead of a prompt: a question is never asked on the way to an error.
-func requireWorkspace(flagWorkspace string) error {
-	// The one resolver the commands themselves use, so the check and the later
-	// call cannot disagree.
-	_, _, err := workspacetoken.Target(flagWorkspace)
-	return err
 }

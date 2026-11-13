@@ -194,11 +194,9 @@ func UpdateWorkspaceTeamRole(id, role, workspaceID string, client astrov1.APICli
 	if err != nil {
 		return TeamInfo{}, err
 	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
-	}
-	if workspaceID == "" {
-		return TeamInfo{}, astrosession.NoWorkspace(nil)
+	workspaceID, err = astrosession.RequireWorkspace(workspaceID)
+	if err != nil {
+		return TeamInfo{}, err
 	}
 
 	var team astrov1.Team
@@ -362,11 +360,9 @@ func RemoveWorkspaceTeam(id, workspaceID string, client astrov1.APIClient) (Work
 	if err != nil {
 		return WorkspaceRemoval{}, err
 	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
-	}
-	if workspaceID == "" {
-		return WorkspaceRemoval{}, astrosession.NoWorkspace(nil)
+	workspaceID, err = astrosession.RequireWorkspace(workspaceID)
+	if err != nil {
+		return WorkspaceRemoval{}, err
 	}
 
 	var team astrov1.Team
@@ -452,15 +448,9 @@ func listTeams(client astrov1.APIClient, workspaceID, deploymentID *string) ([]a
 }
 
 func GetWorkspaceTeams(client astrov1.APIClient, workspaceID string, _ int) ([]astrov1.Team, error) {
-	ctx, err := context.GetCurrentContext()
+	workspaceID, err := astrosession.RequireWorkspace(workspaceID)
 	if err != nil {
 		return nil, err
-	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
-	}
-	if workspaceID == "" {
-		return nil, astrosession.NoWorkspace(nil)
 	}
 	wsID := workspaceID
 	return listTeams(client, &wsID, nil)
@@ -478,11 +468,9 @@ func AddWorkspaceTeam(id, role, workspaceID string, client astrov1.APIClient) (T
 	if err != nil {
 		return TeamInfo{}, err
 	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
-	}
-	if workspaceID == "" {
-		return TeamInfo{}, astrosession.NoWorkspace(nil)
+	workspaceID, err = astrosession.RequireWorkspace(workspaceID)
+	if err != nil {
+		return TeamInfo{}, err
 	}
 	var team astrov1.Team
 	if id == "" {
@@ -1037,15 +1025,9 @@ func ListDeploymentTeamsWithFormat(client astrov1.APIClient, deploymentID string
 func ListWorkspaceTeamsData(client astrov1.APIClient, workspaceID string) (*TeamList, error) {
 	// The roles shown are the ones on the Workspace listed, which is the
 	// current one when workspaceID is "".
-	if workspaceID == "" {
-		ctx, err := context.GetCurrentContext()
-		if err != nil {
-			return nil, err
-		}
-		workspaceID = ctx.Workspace
-		if workspaceID == "" {
-			return nil, astrosession.NoWorkspace(nil)
-		}
+	workspaceID, err := astrosession.RequireWorkspace(workspaceID)
+	if err != nil {
+		return nil, err
 	}
 	teams, err := GetWorkspaceTeams(client, workspaceID, teamPaginationLimit)
 	if err != nil {

@@ -190,6 +190,7 @@ func TestTokenDeploymentNeedsExactlyOneDeploymentPermission(t *testing.T) {
 		{"one", []string{"workspaceId:ws", "deploymentId:dep"}, "dep"},
 		{"none", []string{"workspaceId:ws"}, ""},
 		{"several", []string{"deploymentId:a", "deploymentId:b"}, ""},
+		{"the same twice", []string{"deploymentId:a", "deploymentId:a"}, ""},
 		{"empty id", []string{"deploymentId:"}, ""},
 		{"a permission with no colon is skipped", []string{"admin", "deploymentId:dep"}, "dep"},
 	}

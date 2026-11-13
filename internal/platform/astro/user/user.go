@@ -301,11 +301,9 @@ func AddWorkspaceUser(email, role, workspaceID string, client astrov1.APIClient)
 	if err != nil {
 		return UserInfo{}, err
 	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
-	}
-	if workspaceID == "" {
-		return UserInfo{}, astrosession.NoWorkspace(nil)
+	workspaceID, err = astrosession.RequireWorkspace(workspaceID)
+	if err != nil {
+		return UserInfo{}, err
 	}
 	users, err := GetOrgUsers(client)
 	if err != nil {
@@ -326,11 +324,9 @@ func UpdateWorkspaceUserRole(email, role, workspaceID string, client astrov1.API
 	if err != nil {
 		return UserInfo{}, err
 	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
-	}
-	if workspaceID == "" {
-		return UserInfo{}, astrosession.NoWorkspace(nil)
+	workspaceID, err = astrosession.RequireWorkspace(workspaceID)
+	if err != nil {
+		return UserInfo{}, err
 	}
 	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
 	if err != nil {
@@ -397,15 +393,9 @@ func IsOrganizationRoleValid(role string) error {
 
 // GetWorkspaceUsers returns users with a role in the given workspace.
 func GetWorkspaceUsers(client astrov1.APIClient, workspaceID string, _ int) ([]astrov1.User, error) {
-	ctx, err := context.GetCurrentContext()
+	workspaceID, err := astrosession.RequireWorkspace(workspaceID)
 	if err != nil {
 		return nil, err
-	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
-	}
-	if workspaceID == "" {
-		return nil, astrosession.NoWorkspace(nil)
 	}
 	wsID := workspaceID
 	return listUsers(client, &wsID, nil)
@@ -419,11 +409,9 @@ func RemoveWorkspaceUser(email, workspaceID string, client astrov1.APIClient) (W
 	if err != nil {
 		return WorkspaceRemoval{}, err
 	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
-	}
-	if workspaceID == "" {
-		return WorkspaceRemoval{}, astrosession.NoWorkspace(nil)
+	workspaceID, err = astrosession.RequireWorkspace(workspaceID)
+	if err != nil {
+		return WorkspaceRemoval{}, err
 	}
 	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
 	if err != nil {
@@ -641,15 +629,9 @@ func ListDeploymentUsersWithFormat(client astrov1.APIClient, deploymentID string
 func ListWorkspaceUsersData(client astrov1.APIClient, workspaceID string) (*UserList, error) {
 	// The roles shown are the ones on the Workspace listed, which is the
 	// current one when workspaceID is "".
-	if workspaceID == "" {
-		ctx, err := context.GetCurrentContext()
-		if err != nil {
-			return nil, err
-		}
-		workspaceID = ctx.Workspace
-		if workspaceID == "" {
-			return nil, astrosession.NoWorkspace(nil)
-		}
+	workspaceID, err := astrosession.RequireWorkspace(workspaceID)
+	if err != nil {
+		return nil, err
 	}
 	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
 	if err != nil {

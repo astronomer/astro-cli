@@ -59,8 +59,9 @@ func ListProjects(client astrov1alpha1.APIClient) ([]astrov1alpha1.AstroIdeProje
 	if err != nil {
 		return []astrov1alpha1.AstroIdeProject{}, err
 	}
-	if ctx.Workspace == "" {
-		return []astrov1alpha1.AstroIdeProject{}, astrosession.NoWorkspaceHint(errNoWorkspace, astrosession.HintCurrent)
+	run := astrosession.Resolve(astrosession.Request{Login: &ctx, NoSaved: errNoWorkspace})
+	if err := run.Require(); err != nil {
+		return []astrov1alpha1.AstroIdeProject{}, err
 	}
 
 	sorts := []astrov1alpha1.ListAstroIdeProjectsParamsSorts{"name:asc"}
@@ -70,7 +71,7 @@ func ListProjects(client astrov1alpha1.APIClient) ([]astrov1alpha1.AstroIdeProje
 		Sorts: &sorts,
 	}
 
-	resp, err := client.ListAstroIdeProjectsWithResponse(httpContext.Background(), ctx.Organization, ctx.Workspace, workspaceListParams)
+	resp, err := client.ListAstroIdeProjectsWithResponse(httpContext.Background(), ctx.Organization, run.Workspace, workspaceListParams)
 	if err != nil {
 		return []astrov1alpha1.AstroIdeProject{}, err
 	}
