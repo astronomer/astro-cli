@@ -1282,7 +1282,7 @@ func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
 		newOrgTokenManageCmd(out),
 	)
 	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
-	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID, withhold: true}, oneXDeploymentID)
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID)
 	cliout.AddOutputFlag(cmd, &deploymentTokenOutput)
 	return cmd
 }
@@ -1325,6 +1325,9 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The role for the "+
 		"token. Possible values are DEPLOYMENT_ADMIN or a custom role name")
 	cmd.Flags().IntVar(&tokenExpiration, "expiration", 0, "Days until the token expires, from 1 to 3650 (default: it never expires)")
+	// 1.x gave -d to --description on create and update, so --deployment takes no -d
+	// here: it shadows the group's, which has one, and a script's -d is refused.
+	addDeploymentFlag(cmd.Flags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID, withhold: true}, oneXDeploymentID)
 	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }
@@ -1349,6 +1352,9 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&tokenDescription, "description", "", "Updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVar(&deploymentTokenUpdateRole, "role", "", "The new role for the "+
 		"token. Possible values are DEPLOYMENT_ADMIN or a custom role name. Without it, the token keeps its role")
+	// 1.x gave -d to --description on create and update, so --deployment takes no -d
+	// here: it shadows the group's, which has one, and a script's -d is refused.
+	addDeploymentFlag(cmd.Flags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID, withhold: true}, oneXDeploymentID)
 	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }

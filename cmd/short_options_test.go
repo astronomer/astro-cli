@@ -190,7 +190,14 @@ func reached(cmd *cobra.Command, f *pflag.Flag) []*cobra.Command {
 	cmds := []*cobra.Command{cmd}
 	if cmd.PersistentFlags().Lookup(f.Name) != nil {
 		cmds = cmds[:0]
-		walkCmd(cmd, func(c *cobra.Command) { cmds = append(cmds, c) })
+		walkCmd(cmd, func(c *cobra.Command) {
+			// A command that declares a flag of its own by the name shadows
+			// the persistent one, and has its own letter to answer for.
+			c.InheritedFlags()
+			if own := c.Flags().Lookup(f.Name); own == f || own == nil {
+				cmds = append(cmds, c)
+			}
+		})
 	}
 	return cmds
 }

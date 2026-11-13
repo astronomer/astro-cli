@@ -72,7 +72,9 @@ const (
 	// -w stays refused on astro deploy for good: it means --workspace
 	// everywhere else.
 	errWaitShorthandRemoved = "use --wait"
-	errAPCDeployNoCache     = "astro deploy " + buildsOnTheEngineCache
+	// -n was APC's --nfs-location, and is no spelling of --name there.
+	errNFSLocationShorthandRemoved = "use --nfs-location for the NFS volume to mount, or --name for the Deployment's name"
+	errAPCDeployNoCache            = "astro deploy " + buildsOnTheEngineCache
 	// buildsOnTheEngineCache is what a command that builds an image says of
 	// --no-cache, after its own name.
 	buildsOnTheEngineCache = "builds on the container engine's cache, which a changed dependency or file invalidates. " +
@@ -249,6 +251,10 @@ var removedFlags = []removedFlag{
 	// it by): an old astro deploy -w <ID> fails loudly, for as long as v2
 	// lives, instead of naming a Workspace.
 	{name: "wait", shorthand: "w", under: []string{"deploy"}, needs: has("wait"), v2Only: true, reason: says(errWaitShorthandRemoved)},
+	// APC's -n was --nfs-location, which 1.x registered only where the platform
+	// mounts NFS, so no inventory row could say so for every platform. --name
+	// takes no letter on these two commands, so it is never read as a name.
+	{name: "nfs-location", shorthand: "n", under: []string{"deployment create", "deployment update"}, needs: has("nfs-location"), v2Only: true, reason: says(errNFSLocationShorthandRemoved)},
 	// The flags 1.x kept hidden and deprecated.
 	{name: "enforce-cicd", needs: has("cicd-enforcement"), reason: says(errEnforceCICDRemoved)},
 	{name: "cluster-type", under: []string{"deployment create"}, needs: has("type"), reason: says(errClusterTypeRemoved)},

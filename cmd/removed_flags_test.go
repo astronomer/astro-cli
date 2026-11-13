@@ -531,6 +531,17 @@ func TestRemovedFlagsLeaveOtherCommandsAlone(t *testing.T) {
 		{astroTree, []string{"deploy", "-w"}, "-w was removed in Astro CLI v2: use --wait"},
 		{astroTree, []string{"deploy", "bundle", "-w"}, "-w was removed in Astro CLI v2: use --wait"},
 		{astroTree, []string{"deployment", "hibernate", "-n", "x"}, "-n was removed in Astro CLI v2: use --deployment"},
+		// APC's -n was --nfs-location, a flag 1.x registered only where the
+		// platform mounts NFS, and --name takes no letter there: a script that
+		// mounts a volume is refused, never renamed.
+		{apcTree, []string{"deployment", "update", "dep-id", "--dag-deployment-type=volume", "-n", "nas01:/export/dags"}, "-n was removed in Astro CLI v2: use --nfs-location for the NFS volume to mount, or --name for the Deployment's name"},
+		{apcTree, []string{"deployment", "create", "--label", "prod", "-n", "10.0.0.5:/dags"}, "-n was removed in Astro CLI v2: use --nfs-location for the NFS volume to mount, or --name for the Deployment's name"},
+		{apcTree, []string{"deployment", "hibernate", "dep-id", "-d", "2h"}, "-d was removed in Astro CLI v2: use --for"},
+		{apcTree, []string{"deployment", "update", "dep-id", "-t", "volume"}, "-t was removed in Astro CLI v2: use --dag-deployment-type"},
+		{astroTree, []string{"deployment", "token", "create", "-d", "x"}, "-d was removed in Astro CLI v2: use --description"},
+		{astroTree, []string{"deployment", "token", "update", "-d", "x"}, "-d was removed in Astro CLI v2: use --description"},
+		{astroTree, []string{"deployment", "token", "list", "-d", "cl123"}, errRan.Error()},
+		{astroTree, []string{"deployment", "token", "rotate", "-d", "cl123"}, errRan.Error()},
 		// The letters that moved to the table's flags work.
 		{astroTree, []string{"init", "-n", "my-project"}, errRan.Error()},
 		{astroTree, []string{"deploy", "bundle", "-d", "x"}, errRan.Error()},
@@ -1010,7 +1021,7 @@ func (c *v1FlagChecker) check(cmd *cobra.Command, args []string, f *v1Flag, labe
 	// With nothing holding it, it says what replaced the flag, or, for a flag
 	// the command still has, the long name to use.
 	if flag := cmd.Flag(f.name); flag != nil {
-		assertShorthandNamesTheFlag(c.t, c.root, c.preRuns, args, f, flag, label)
+		assertShorthandNamesTheFlag(c.t, c.root, cmd, c.preRuns, args, f, flag, label)
 		return
 	}
 	c.reached[assertSaysWhatReplacedIt(c.t, c.root, c.preRuns, cmd, args, f, "-"+f.shorthand, "-"+f.shorthand, label)] = true
@@ -1019,7 +1030,7 @@ func (c *v1FlagChecker) check(cmd *cobra.Command, args []string, f *v1Flag, labe
 // assertShorthandNamesTheFlag runs args with the shorthand 1.x gave f, which
 // the command reached by args still has under its long name alone, and checks
 // it is refused naming that long name.
-func assertShorthandNamesTheFlag(t *testing.T, root *cobra.Command, preRuns *int, args []string, f *v1Flag, flag *pflag.Flag, label string) {
+func assertShorthandNamesTheFlag(t *testing.T, root, cmd *cobra.Command, preRuns *int, args []string, f *v1Flag, flag *pflag.Flag, label string) {
 	t.Helper()
 	arg := "-" + f.shorthand
 	root.SetArgs(append(slices.Clone(args), arg))
@@ -1034,7 +1045,12 @@ func assertShorthandNamesTheFlag(t *testing.T, root *cobra.Command, preRuns *int
 	if preferred := utils.AliasOf(flag); preferred != "" {
 		name = preferred
 	}
-	assert.Equal(t, arg+" was removed in Astro CLI v2: use --"+name, err.Error(), label)
+	want := arg + " was removed in Astro CLI v2: use --" + name
+	// A letter v2 withholds for good has an entry of its own (removedFlags).
+	if entry := findRemovedShorthand(cmd, f.shorthand); entry != nil {
+		want = entry.message(cmd, arg)
+	}
+	assert.Equal(t, want, err.Error(), label)
 	assert.True(t, cliout.IsUsage(err), "%s: not a usage error", label)
 	assert.Equal(t, before, *preRuns, "%s: a pre-run started", label)
 }

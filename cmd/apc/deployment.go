@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -276,9 +275,9 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().StringVar(&runtimeVersion, "runtime-version", "", "Add desired Astronomer Runtime version: e.g: 4.2.2 or 5.0.0")
 	}
 
-	// -n, as on Astro: 1.x's -n here was --nfs-location, which now has no
-	// shorthand, and deploymentName refuses a 1.x line passing the mount.
-	addDeploymentNameFlag(cmd, &deploymentCreateName, "Name of your deployment", true)
+	// No -n: 1.x's -n here was --nfs-location, so a 1.x line passing the mount
+	// with it is refused (removedFlags), not read as the Deployment's name.
+	addDeploymentNameFlag(cmd, &deploymentCreateName, "Name of your deployment", "")
 	cmd.Flags().StringVar(&executor, "executor", celeryExecutorArg, "The executor used in your Airflow deployment, one of: local, celery, or kubernetes (or Astro's LocalExecutor, CeleryExecutor, KubernetesExecutor)")
 	cmd.Flags().StringVar(&airflowVersion, "airflow-version", "", "Add desired Airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVar(&releaseName, "release-name", "", "Set custom release-name if possible")
@@ -383,7 +382,7 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 // addHibernationFlags gives hibernate or wake-up its flags: period names
 // what --until and --for end, and doing what --yes skips the question for.
 func addHibernationFlags(cmd *cobra.Command, period, doing string) {
-	addDeploymentArgFlag(cmd)
+	addDeploymentArgFlagWithoutLetter(cmd) // 1.x gave -d to --for here
 	cmd.Flags().StringVar(&hibernateUntil, "until", "", "End the "+period+" at this date and time, in RFC 3339. Example value: 2026-01-01T00:00:00Z")
 	cmd.Flags().StringVar(&hibernateForDuration, "for", "", "End the "+period+" after this long. Example value: 1h30m")
 	cmd.Flags().BoolVar(&hibernateRemove, "remove-override", false, "Remove any existing override and resume the regular hibernation schedule")
@@ -408,7 +407,7 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 	// required: a 1.x line names none, and refuseOneXAdoptName says why.
 	cmd.Flags().StringVar(&adoptCRName, "cr-name", "", "Name (metadata.name) of the existing Airflow custom resource (CR)")
 	cmd.Flags().StringVar(&adoptNamespace, "namespace", "", "Kubernetes namespace of the existing Airflow custom resource (CR)")
-	addDeploymentNameFlag(cmd, &adoptDeploymentName, "Name of the adopted Deployment (default: the --cr-name value)", false)
+	addDeploymentNameFlag(cmd, &adoptDeploymentName, "Name of the adopted Deployment (default: the --cr-name value)", "n")
 	cmd.Flags().StringVar(&adoptDescription, "description", "", "Description for the adopted Deployment")
 	cmd.Flags().BoolVar(&adoptUseApcLogging, "use-apc-logging", false, "Route the adopted Deployment's logs through APC logging")
 	cmd.Flags().BoolVar(&adoptUseApcRegistry, "use-apc-registry", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
@@ -519,7 +518,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 
 	cmd.Flags().StringVar(&deploymentUpdateDescription, "description", "", "Set description to update in deployment")
 	// -n, as on Astro: see create.
-	addDeploymentNameFlag(cmd, &deploymentUpdateName, "The new name for the deployment", true)
+	addDeploymentNameFlag(cmd, &deploymentUpdateName, "The new name for the deployment", "")
 	cmd.Flags().StringVar(&cloudRole, "cloud-role", "", "Set cloud role to annotate service accounts in deployment")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -621,40 +620,12 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// nfsShaped matches an NFS location as --nfs-location takes it, <host>:/<path>,
-// with or without the nfs:// the CLI adds, the host an IPv4 address, an IPv6
-// one in brackets or a dotted host name. That is narrower than every NFS
-// location, so that a Deployment name such as etl:/daily, which 1.x's --label
-// took, is not one: a host name with no dot, or a URL's ://, is a name.
-var nfsShaped = regexp.MustCompile(`^(nfs://)?(\[[0-9A-Fa-f:.]+\]|[0-9]{1,3}(\.[0-9]{1,3}){3}|[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+):/([^/]|$)`)
-
-// deploymentName is --name on the deployment commands that name one. With
-// refuseNFS, on create and update, it refuses an NFS location: -n was 1.x's
-// --nfs-location there and is --name in v2, so a 1.x line passing the mount
-// with -n would otherwise name the Deployment after it. It refuses as the
-// line is parsed, ahead of the check that --name and 1.x's --label agree, so
-// the refusal is the one that says where the mount goes now.
-type deploymentName struct {
-	to        *string
-	refuseNFS bool
-}
-
-func (n deploymentName) String() string { return *n.to }
-func (n deploymentName) Type() string   { return "string" }
-func (n deploymentName) Set(v string) error {
-	if n.refuseNFS && nfsShaped.MatchString(v) {
-		return errors.New("it is an NFS location: the NFS volume to mount is --nfs-location, and --name (-n) is the Deployment's name in v2")
-	}
-	*n.to = v
-	return nil
-}
-
-// addDeploymentNameFlag registers the Deployment's name on cmd as --name, -n,
-// read into to, with 1.x's --label, -l, as its hidden alias. refuseNFS says
-// whether 1.x's -n there was --nfs-location (deploymentName).
-func addDeploymentNameFlag(cmd *cobra.Command, to *string, usage string, refuseNFS bool) {
+// addDeploymentNameFlag registers the Deployment's name on cmd as --name, with
+// the shorthand given ("n", or "" on create and update, where 1.x's -n was
+// --nfs-location), read into to, and 1.x's --label as its hidden alias.
+func addDeploymentNameFlag(cmd *cobra.Command, to *string, usage, shorthand string) {
 	*to = ""
-	cmd.Flags().VarP(deploymentName{to: to, refuseNFS: refuseNFS}, "name", "n", usage)
+	cmd.Flags().StringVarP(to, "name", shorthand, "", usage)
 	utils.AddAlias(cmd.Flags(), "label", "name")
 }
 

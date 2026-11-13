@@ -259,15 +259,15 @@ Both commands follow the CLI's output rules: text by default, `--output json` fr
 astro deploy [LINK-NAME | DEPLOYMENT-ID] [flags]
   --deployment <name|id>  the link name or Deployment id to deploy to
   --workspace <id>        the workspace (overrides the link's and the context's)
-  -d, --dags              deploy only dags/ (no image build, no Docker)
+  --dags                  deploy only dags/ (no image build, no Docker)
   --image                 deploy only the image, leave DAGs untouched
-  -i, --image-name <ref>  deploy a prebuilt local image; skips the build
+  --image-name <ref>      deploy a prebuilt local image; skips the build
   --no-dags-base-dir      put DAG files at the bundle root rather than under dags/
   --description <text>    description recorded on the deploy
   --build-secret <spec>   a build secret, repeatable (not with --dags or --image-name)
-  -w, --wait              wait for the Deployment to report healthy
+  --wait                  wait for the Deployment to report healthy
   --wait-time <dur>       how long --wait waits (default 5m)
-  --output text|json
+  -o, --output text|json
 
 astro package [TARGET] [flags]    # astro (default), mwaa, composer, oss
   --save <file>           also write the artifact to one file (.tar for astro, .zip for a tree)
