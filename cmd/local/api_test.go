@@ -60,7 +60,7 @@ func TestLocalAPISendsAMethodAndABody(t *testing.T) {
 	stub.route(http.MethodPost, "/api/v2/dags/etl/dagRuns", `{"dag_run_id":"manual__1"}`)
 
 	if _, _, err := runLocalQuery(t, stub, "local", "api", "/dags/etl/dagRuns",
-		"--method", "POST", "--body", `{"logical_date":null}`); err != nil {
+		"-X", "POST", "--body", `{"logical_date":null}`); err != nil {
 		t.Fatalf("local api: %v", err)
 	}
 	if got := stub.request(http.MethodPost, "/api/v2/dags/etl/dagRuns").Body; !strings.Contains(got, "logical_date") {
@@ -108,7 +108,7 @@ func TestLocalAPIReadsABodyFromStdin(t *testing.T) {
 	d.WorkingDir = func() (string, error) { return dir, nil }
 	d.Stdin = strings.NewReader(`{"conf":{"from":"stdin"}}`)
 
-	if err := execute(t, d, "local", "api", "/dags/etl/dagRuns", "--method", "POST", "--body", "-"); err != nil {
+	if err := execute(t, d, "local", "api", "/dags/etl/dagRuns", "-X", "POST", "--body", "-"); err != nil {
 		t.Fatalf("local api: %v", err)
 	}
 	if got := stub.request(http.MethodPost, "/api/v2/dags/etl/dagRuns").Body; !strings.Contains(got, "stdin") {
@@ -126,7 +126,7 @@ func TestLocalAPIReadsABodyFromAnInputFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err := runLocalQuery(t, stub, "local", "api", "/dags/etl/dagRuns", "--method", "POST", "--input", file); err != nil {
+	if _, _, err := runLocalQuery(t, stub, "local", "api", "/dags/etl/dagRuns", "-X", "POST", "--input", file); err != nil {
 		t.Fatalf("local api --input: %v", err)
 	}
 	if got := stub.request(http.MethodPost, "/api/v2/dags/etl/dagRuns").Body; !strings.Contains(got, "file") {

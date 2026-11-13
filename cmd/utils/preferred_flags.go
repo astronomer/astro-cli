@@ -212,6 +212,12 @@ const OneXNoOpUsage = "Has no effect; accepted so scripts written for Astro CLI 
 // nothing, so a 1.x script passing it keeps working. It takes no shorthand,
 // whatever 1.x gave it.
 func AddOneXNoOp(fs *pflag.FlagSet, name string) {
-	fs.String(name, "", OneXNoOpUsage)
+	AddOneXNoOpP(fs, name, "")
+}
+
+// AddOneXNoOpP is AddOneXNoOp with the shorthand 1.x gave the flag, for the
+// passthrough commands, which keep every letter they had (PassthroughShortOptions).
+func AddOneXNoOpP(fs *pflag.FlagSet, name, shorthand string) {
+	fs.StringP(name, shorthand, "", OneXNoOpUsage)
 	fs.MarkHidden(name) //nolint:errcheck // the flag is defined just above
 }

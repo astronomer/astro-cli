@@ -51,13 +51,13 @@ The argument can be either:
   - A path of an Astro Cloud API endpoint (e.g., /organizations/{organizationId})
   - An operation ID from the API spec (e.g., GetDeployment, ListOrganizations)
 
-Placeholder values {organizationId} and {workspaceId} will be replaced with values from the current context. Other path parameters can be provided using the --path-param flag.
+Placeholder values {organizationId} and {workspaceId} will be replaced with values from the current context. Other path parameters can be provided using the -p/--path-param flag.
 
 The default HTTP request method is GET normally and POST if any parameters were added. Override the method with --method. When using an operation ID, the method is auto-detected from the API spec.
 
-Pass one or more --raw-field values in key=value format to add static string parameters to the request payload. To add non-string or placeholder-determined values, see --field below.
+Pass one or more -f/--raw-field values in key=value format to add static string parameters to the request payload. To add non-string or placeholder-determined values, see -F/--field below.
 
-The --field flag has magic type conversion based on the format of the value:
+The -F/--field flag has magic type conversion based on the format of the value:
   - literal values true, false, null, and integer numbers get converted to
     appropriate JSON types;
   - if the value starts with @, the rest of the value is interpreted as a
@@ -71,7 +71,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   astro api cloud /organizations/{organizationId}
 
   # Use operation ID with path parameters
-  astro api cloud GetDeployment --path-param deploymentId=abc123
+  astro api cloud GetDeployment -p deploymentId=abc123
 
   # Use operation ID (organizationId auto-injected from context)
   astro api cloud ListDeployments
@@ -80,9 +80,9 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   astro api cloud /organizations/{organizationId}/deployments --jq '.[].name'
 
   # Create a resource with typed fields
-  astro api cloud --method POST /organizations/{organizationId}/workspaces \
-    --field name=my-workspace \
-    --field description="My new workspace"
+  astro api cloud -X POST /organizations/{organizationId}/workspaces \
+    -F name=my-workspace \
+    -F description="My new workspace"
 
   # Use Go template for output
   astro api cloud /organizations/{organizationId}/deployments \
@@ -92,7 +92,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   astro api cloud /organizations/{organizationId}/deployments --generate
 
   # Include response headers
-  astro api cloud /organizations/{organizationId} --include
+  astro api cloud /organizations/{organizationId} -i
 
   # Verbose mode showing full request/response
   astro api cloud /organizations/{organizationId} --verbose
@@ -115,20 +115,20 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 	}
 
 	// Request flags
-	cmd.Flags().StringVar(&opts.RequestMethod, "method", "GET", "The HTTP method for the request")
-	cmd.Flags().StringArrayVar(&opts.MagicFields, "field", nil, "Add a typed parameter in key=value format")
-	cmd.Flags().StringArrayVar(&opts.RawFields, "raw-field", nil, "Add a string parameter in key=value format")
-	cmd.Flags().StringArrayVar(&opts.RequestHeaders, "header", nil, "Add a HTTP request header in key:value format")
+	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "The HTTP method for the request")
+	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a typed parameter in key=value format")
+	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in key=value format")
+	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in key:value format")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request (use \"-\" for stdin)")
-	cmd.Flags().StringArrayVar(&opts.PathParams, "path-param", nil, "Path parameter in key=value format (for use with operation IDs)")
+	cmd.Flags().StringArrayVarP(&opts.PathParams, "path-param", "p", nil, "Path parameter in key=value format (for use with operation IDs)")
 
 	// Output flags
-	cmd.Flags().BoolVar(&opts.ShowResponseHeaders, "include", false, "Include HTTP response status line and headers in the output")
+	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().BoolVar(&opts.Slurp, "slurp", false, "Use with --paginate to return an array of all pages")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
-	cmd.Flags().StringVar(&opts.Template, "template", "", "Format JSON output using a Go template")
-	cmd.Flags().StringVar(&opts.FilterOutput, "jq", "", "Query to select values from the response using jq syntax")
+	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template")
+	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
 
 	// Other flags
@@ -203,7 +203,7 @@ func runCloud(opts *CloudOptions) error {
 
 	// Check for any remaining unfilled path parameters
 	if missing := findMissingPathParams(requestPath); len(missing) > 0 {
-		return fmt.Errorf("missing path parameter(s): %s. Use --path-param to provide them (e.g., --path-param %s=value)",
+		return fmt.Errorf("missing path parameter(s): %s. Use -p/--path-param to provide them (e.g., -p %s=value)",
 			strings.Join(missing, ", "), missing[0])
 	}
 
@@ -503,7 +503,7 @@ You can optionally provide a filter to search for specific endpoints. The filter
 		},
 	}
 
-	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show additional details like summaries and tags")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
 	cliout.AddOutputFlag(cmd, &format)
 
@@ -531,7 +531,7 @@ The endpoint can be specified as a path or as an operation ID.`,
   astro api cloud describe /organizations/{organizationId}/deployments
 
   # Describe a POST endpoint specifically
-  astro api cloud describe /organizations/{organizationId}/deployments --method POST
+  astro api cloud describe /organizations/{organizationId}/deployments -X POST
 
   # Describe by operation ID
   astro api cloud describe CreateDeployment`,
@@ -563,9 +563,9 @@ The endpoint can be specified as a path or as an operation ID.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&method, "method", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
+	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
-	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show spec URL and additional details")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
 	cliout.AddOutputFlag(cmd, &format)
 
 	return cmd

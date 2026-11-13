@@ -213,7 +213,7 @@ func TestDeploymentNameInAProjectLeadsWithTheLinks(t *testing.T) {
 // The flags reach the lookup through the command: -W and --workspace-id are
 // accepted and change nothing.
 func TestAirflowCmdIgnoresTheWorkspaceIDFlag(t *testing.T) {
-	for _, flags := range [][]string{nil, {"--workspace-id", "ws-other"}} {
+	for _, flags := range [][]string{nil, {"-W", "ws-other"}, {"--workspace-id", "ws-other"}} {
 		writeAPIProject(t, "")
 		listed := astroLookups(t,
 			astroDeployment("dep-context", "etl-prod", "test-org", contextWS),

@@ -181,7 +181,7 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 
 The `astro dev` flags are refused this way on the command that replaced each `astro dev` command (`astro init`, `astro local start` and the rest, `astro package`, and the `astro start`, `stop` and `logs` shorthands), which is where a 1.x script that only renames the command passes them. `astro dev run`, `pytest` and `object` have no such row: their replacements take none of their flags, and the `astro dev` stub names what replaces each.
 
-Some 1.x flags still work but are hidden from help in favor of a new spelling. On the `astro deployment` subcommands and `astro env`, `--deployment-name` and `--deployment-id`, whichever the command has, give way to `--deployment`. `--workspace-id` gives way to `--workspace` on those commands and the other commands that have both, `astro deploy` among them. A run that passes a hidden spelling that gives way to a new one, here or on Astro Private Cloud (below), prints one line on stderr for each, such as `--deployment-id is deprecated: use --deployment` (see [Deprecation warnings](#deprecation-warnings)), as the hidden ones will be removed in a future release; stdout, and `-o json` output, are unchanged. The `astro deployment team`, `user` and `token` commands other than `token workspace-token add` and `remove`, and on Astro Private Cloud every `astro deployment` command 1.x had other than `create`, `list` and `adopt`, act on a Deployment by its id alone: 1.x read nothing from the `--workspace-id` it gave them, and they still accept it, hidden, and read nothing from it. A hidden spelling given as an empty value still means the default, as in 1.x, so `--workspace-id "$WS"` with `WS` unset keeps working. The new spellings refuse an empty value as a usage error, and so does `-d` on `astro api airflow`, which is `--deployment` there now. `astro api airflow` still accepts 1.x's `--workspace-id`, hidden, and reads nothing from it, as 1.x read nothing from it (its `-W` is refused, like every short option outside [the table](#short-options)): a name given to `-d` is looked up in the project's workspace, else the context's.
+Some 1.x flags still work but are hidden from help in favor of a new spelling. On the `astro deployment` subcommands and `astro env`, `--deployment-name` and `--deployment-id`, whichever the command has, give way to `--deployment`. `--workspace-id` gives way to `--workspace` on those commands and the other commands that have both, `astro deploy` among them. A run that passes a hidden spelling that gives way to a new one, here or on Astro Private Cloud (below), prints one line on stderr for each, such as `--deployment-id is deprecated: use --deployment` (see [Deprecation warnings](#deprecation-warnings)), as the hidden ones will be removed in a future release; stdout, and `-o json` output, are unchanged. The `astro deployment team`, `user` and `token` commands other than `token workspace-token add` and `remove`, and on Astro Private Cloud every `astro deployment` command 1.x had other than `create`, `list` and `adopt`, act on a Deployment by its id alone: 1.x read nothing from the `--workspace-id` it gave them, and they still accept it, hidden, and read nothing from it. A hidden spelling given as an empty value still means the default, as in 1.x, so `--workspace-id "$WS"` with `WS` unset keeps working. The new spellings refuse an empty value as a usage error, and so does `-d` on `astro api airflow`, which is `--deployment` there now. `astro api airflow` still accepts 1.x's `--workspace-id`, hidden, and reads nothing from it, as 1.x read nothing from it (with its `-W`, as `astro api` keeps every letter it had): a name given to `-d` is looked up in the project's workspace, else the context's.
 
 On Astro Private Cloud the same spellings give way. The hidden spellings take no short option, as on Astro: `-d` and `-w` are `--deployment` and `--workspace` there, the flags 1.x's `-d` and `-w` named too, and a letter 1.x gave another spelling is refused with the long flag to type (see [Short options](#short-options)). The one 1.x shorthand that changes meaning is `-n` on `astro deployment create` and `update`, which is `--name` now (see [Behavior](#behavior)).
 
@@ -216,7 +216,7 @@ A short option means one thing in v2, on every command: the letters in this tabl
 | `-h` | `--help` |
 | `-w` | `--workspace` |
 
-A command that has one of these flags has its letter, and `-d`, `-n` and `-w` now work on commands where 1.x had `--deployment-id`, `--name` or `--workspace-id` without them or under other spellings. Every other short option is gone, and the flag it belonged to keeps its long name, so a script that typed one fails with `-t was removed in Astro CLI v2: use --name` (or whatever the flag is called now) and no longer needs changing beyond spelling the flag out. The ones you are most likely to have typed:
+A command that has one of these flags has its letter, and `-d`, `-n` and `-w` now work on commands where 1.x had `--deployment-id`, `--name` or `--workspace-id` without them or under other spellings. `astro api`, `astro af` and `astro local api` are the exception: they mirror gh api and the standalone af CLI, and keep every short option they had (`-X`, `-H`, `-F`, `-f`, `-i`, `-q`, `-p` and the rest), so a script that calls them needs no change. Every other short option is gone, and the flag it belonged to keeps its long name, so a script that typed one fails with `-t was removed in Astro CLI v2: use --name` (or whatever the flag is called now) and no longer needs changing beyond spelling the flag out. The ones you are most likely to have typed:
 
 | 1.x | v2 |
 | --- | --- |
@@ -224,16 +224,14 @@ A command that has one of these flags has its letter, and `-d`, `-n` and `-w` no
 | `-c` | `--cancel`, `--category`, `--clean-output`, `--cloud-role`, `--cluster-id`, `--log-count` |
 | `-d` | `--dags`, `--description`, `--domain`, `--for` |
 | `-e` | `--email`, `--enforce-cicd`, `--error`, `--executor`, `--expiration` |
-| `-f` | `--force` (`--yes` where it asks), `--raw-field` |
-| `-F`, `-H`, `-X`, `-q` on `astro api` | `--field`, `--header`, `--method`, `--jq` |
+| `-f` | `--force` (`--yes` where it asks) |
 | `-g` | `--global` |
-| `-i` | `--image-name`, `--include`, `--include-default-roles`, `--info`, `--wait` |
+| `-i` | `--image-name`, `--include-default-roles`, `--info`, `--wait` |
 | `-k` | `--key`, `--keyword` |
 | `-l` | `--load`, `--login-link`; APC's `--label` (`--name` now) |
 | `-m` | `--development-mode` |
 | `-n` | `--new-name`, `--org-token-name`, `--organization-name`, `--workspace-token-name`; `--deployment-name` (`--deployment` now) |
 | `-o` | `--oauth` (APC `astro login`), `--output-file` (`--output` is `-o` now) |
-| `-O`, `-W` | `--organization-id`, `--workspace-id` |
 | `-p` | `--cloud-provider`, `--paginated`, `--password`, `--project-id`, `--prompt` |
 | `-r` | `--release-name`, `--remove-override`, `--role`, `--scheduler-replicas` |
 | `-s` | `--page-size`, `--save`, `--scheduler-au`, `--secret`, `--session-id`; APC's `--search` (`--keyword` now) |

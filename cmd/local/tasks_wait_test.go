@@ -119,7 +119,7 @@ func TestTasksWaitEndsWhenTheTaskSettlesElsewhere(t *testing.T) {
 // that finishes without it ends the wait.
 func TestTasksWaitWaitsThroughAMissingInstanceAndStopsWhenTheRunEnds(t *testing.T) {
 	stub := taskWaitStub(t, "running", "success")
-	out, _, err := runQuery(t, stub, "tasks", "wait", "orders_etl", "manual__1", "review", "--map-index", "5", "--until", "awaiting_input",
+	out, _, err := runQuery(t, stub, "tasks", "wait", "orders_etl", "manual__1", "review", "-m", "5", "--until", "awaiting_input",
 		"--poll-interval", "5ms", "--timeout", "1h")
 	if code := exitCode(t, err); code != exitRunFailed {
 		t.Fatalf("exit = %d, want %d", code, exitRunFailed)

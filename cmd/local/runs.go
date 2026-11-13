@@ -90,7 +90,7 @@ func newRunsListCmd(q *query) *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		Example: afExample(q.t,
 			"The latest runs of every Dag", "runs list",
-			"The failed runs of one Dag", "runs list <DAG_ID> --state failed",
+			"The failed runs of one Dag", "runs list <DAG_ID> -s failed",
 			"Runs that started on or after a time", "runs list --start-date-gte 2026-01-01T00:00:00Z",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -118,7 +118,7 @@ func newRunsListCmd(q *query) *cobra.Command {
 	// always "what just happened", and Airflow's own default order is not that.
 	addListFlags(cmd, &list, "-start_date")
 	cmd.Flags().StringVar(&opts.dagID, "dag-id", "", "Only runs of this Dag, the same as naming it as the argument (default: every Dag)")
-	cmd.Flags().StringSliceVar(&opts.states, "state", nil, "Only runs in these states, such as running or failed (repeatable)")
+	cmd.Flags().StringSliceVarP(&opts.states, "state", "s", nil, "Only runs in these states, such as running or failed (repeatable)")
 	cmd.Flags().StringVar(&opts.startDateGTE, "start-date-gte", "", "Only runs that started at or after this RFC 3339 time")
 	cmd.Flags().StringVar(&opts.startDateLTE, "start-date-lte", "", "Only runs that started at or before this RFC 3339 time")
 	return cmd
@@ -289,7 +289,7 @@ type triggerFlags struct {
 }
 
 func (f *triggerFlags) register(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&f.conf, "conf", "", "Run configuration as a JSON object")
+	cmd.Flags().StringVarP(&f.conf, "conf", "c", "", "Run configuration as a JSON object")
 	cmd.Flags().StringVar(&f.runID, "run-id", "", "Name the run instead of letting Airflow generate one")
 	cmd.Flags().StringVar(&f.logicalDate, "logical-date", "", "The run's logical date, as RFC 3339")
 	cmd.Flags().StringVar(&f.note, "note", "", "A note to attach to the run")

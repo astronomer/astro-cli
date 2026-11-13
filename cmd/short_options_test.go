@@ -73,13 +73,28 @@ func forEveryDeclaredFlag(t *testing.T, fn func(tree string, cmd *cobra.Command,
 // A short option means one thing everywhere. Every flag with one, visible or
 // hidden, in every tree, is in utils.ShortOptions under its own long name; a
 // new flag that takes a letter nobody listed fails here, as does one that
-// takes a listed letter for another meaning.
+// takes a listed letter for another meaning. The API passthrough commands
+// (utils.PassthroughPaths) are held to their family's table instead, with the
+// main table behind it for the letters the family does not have, so a new
+// command under astro api, astro af or astro local api takes the exemption by
+// its path and is held to it.
 func TestShortOptionsFollowTheTable(t *testing.T) {
 	problems := map[string]bool{}
 	letters := map[string]bool{}
 	forEveryDeclaredFlag(t, func(tree string, cmd *cobra.Command, f *pflag.Flag) {
 		if f.Shorthand == "" {
 			return
+		}
+		family, exempt := passthroughOptions(pathBelowRoot(cmd))
+		if exempt {
+			if _, own := family[f.Shorthand]; own {
+				letters[familyKey(family)+f.Shorthand] = true
+				if family[f.Shorthand] == f.Name {
+					return
+				}
+				problems[fmt.Sprintf("[%s] %s: --%s has -%s, which is --%s in its passthrough table", tree, cmd.CommandPath(), f.Name, f.Shorthand, family[f.Shorthand])] = true
+				return
+			}
 		}
 		letters[f.Shorthand] = true
 		if utils.ShortOptions[f.Shorthand] == f.Name {
@@ -96,6 +111,40 @@ func TestShortOptionsFollowTheTable(t *testing.T) {
 	}
 	for letter, long := range utils.ShortOptions {
 		assert.True(t, letters[letter], "-%s (--%s) is in the table but no flag in any tree takes it", letter, long)
+	}
+	for _, family := range []map[string]string{utils.APIShortOptions, utils.AfShortOptions} {
+		for letter, long := range family {
+			assert.True(t, letters[familyKey(family)+letter], "-%s (--%s) is in a passthrough table but no command of its family takes it", letter, long)
+		}
+	}
+}
+
+// familyKey names a passthrough table, by what only it holds.
+func familyKey(family map[string]string) string {
+	if _, ok := family["q"]; ok {
+		return "api:"
+	}
+	return "af:"
+}
+
+// Every exempt path is a command of a tree, so a rename cannot leave the
+// exemption standing on nothing, and every exempt command is in a family.
+func TestPassthroughPathsNameRealCommands(t *testing.T) {
+	testUtil.SetupOSArgsForGinkgo()
+	seen := map[string]bool{}
+	for _, tree := range rootsUnderTest(t) {
+		walkCmd(tree.root, func(cmd *cobra.Command) {
+			if _, ok := passthroughOptions(pathBelowRoot(cmd)); ok {
+				for path := range utils.PassthroughPaths {
+					if pathBelowRoot(cmd) == path {
+						seen[path] = true
+					}
+				}
+			}
+		})
+	}
+	for path := range utils.PassthroughPaths {
+		assert.True(t, seen[path], "astro %s is exempt but no tree has it", path)
 	}
 }
 
@@ -232,4 +281,16 @@ func TestShortOptionsTableIsDocumented(t *testing.T) {
 		}
 	}
 	assert.Equal(t, utils.ShortOptions, got, "the short-option table in docs/architecture.md and utils.ShortOptions differ")
+}
+
+// passthroughOptions is the family the command at path (below the root, as
+// "api airflow ls") is in, and whether it is exempt at all: its path, or one
+// above it, is in utils.PassthroughPaths.
+func passthroughOptions(path string) (map[string]string, bool) {
+	for prefix, letters := range utils.PassthroughPaths {
+		if path == prefix || strings.HasPrefix(path, prefix+" ") {
+			return letters, true
+		}
+	}
+	return nil, false
 }

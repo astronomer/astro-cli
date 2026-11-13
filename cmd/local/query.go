@@ -283,7 +283,7 @@ type listFlags struct {
 // sort a reader wants without asking — most recent first, where the endpoint
 // has a time to sort on — and "" leaves the order to Airflow.
 func addListFlags(cmd *cobra.Command, f *listFlags, defaultOrder string) {
-	cmd.Flags().IntVar(&f.limit, "limit", airflowapi.DefaultLimit, "Maximum rows to return")
+	cmd.Flags().IntVarP(&f.limit, "limit", "l", airflowapi.DefaultLimit, "Maximum rows to return")
 	cmd.Flags().IntVar(&f.offset, "offset", 0, "Row to start the page at")
 	cmd.Flags().StringVar(&f.orderBy, "order-by", defaultOrder, "Sort field; prefix with - for descending")
 }

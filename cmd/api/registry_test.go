@@ -185,7 +185,7 @@ func TestRegistryCmd_Execute_IncludeHeaders(t *testing.T) {
 
 	var out bytes.Buffer
 	cmd := NewRegistryCmd(&out)
-	cmd.SetArgs([]string{"/providers.json", "--registry-url", srv.URL, "--include"})
+	cmd.SetArgs([]string{"/providers.json", "--registry-url", srv.URL, "-i"})
 
 	err := cmd.Execute()
 	require.NoError(t, err)
@@ -259,7 +259,7 @@ func TestRegistryCmd_Execute_CustomHeaders(t *testing.T) {
 
 	var out bytes.Buffer
 	cmd := NewRegistryCmd(&out)
-	cmd.SetArgs([]string{"/providers.json", "--registry-url", srv.URL, "--header", "X-Foo:bar"})
+	cmd.SetArgs([]string{"/providers.json", "--registry-url", srv.URL, "-H", "X-Foo:bar"})
 
 	err := cmd.Execute()
 	require.NoError(t, err)
@@ -336,7 +336,7 @@ func TestRegistryCmd_Execute_OperationID(t *testing.T) {
 	t.Run("operation ID with path params", func(t *testing.T) {
 		var out bytes.Buffer
 		cmd := NewRegistryCmd(&out)
-		cmd.SetArgs([]string{"getProviderModulesLatest", "--path-param", "providerId=amazon", "--registry-url", srv.URL})
+		cmd.SetArgs([]string{"getProviderModulesLatest", "-p", "providerId=amazon", "--registry-url", srv.URL})
 
 		err := cmd.Execute()
 		require.NoError(t, err)
