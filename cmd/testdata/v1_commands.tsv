@@ -13,7 +13,8 @@
 # (de, deployments). An alias of a group is not repeated under each command
 # below it: cobra resolves one word at a time, so the group's own path covers
 # it. The paths were walked off 1.x's cobra trees, with APC built as for the
-# newest platform so that no version gate hides a command.
+# newest platform so that no version gate hides a command. A command
+# every tree had at the root (api, context, dev) lists its aliases in all three.
 #
 # It records 1.x, so nothing in v2 changes it, with one exception: a 1.x
 # alias v2 dropped stays listed, and what it reaches is a stub. Today that is
@@ -25,21 +26,21 @@
 astro,astro-hosted,apc	api
 astro,astro-hosted,apc	api airflow
 astro,astro-hosted,apc	api airflow describe
-astro,astro-hosted	api airflow list
+astro,astro-hosted,apc	api airflow list
 astro,astro-hosted,apc	api airflow ls
 astro,astro-hosted,apc	api cloud
 astro,astro-hosted,apc	api cloud describe
-astro,astro-hosted	api cloud list
+astro,astro-hosted,apc	api cloud list
 astro,astro-hosted,apc	api cloud ls
 astro,astro-hosted,apc	api registry
 astro,astro-hosted,apc	api registry describe
-astro,astro-hosted	api registry list
+astro,astro-hosted,apc	api registry list
 astro,astro-hosted,apc	api registry ls
 astro,astro-hosted,apc	auth
 astro,astro-hosted,apc	auth login
 astro,astro-hosted,apc	auth logout
 astro,astro-hosted,apc	auth token
-astro,astro-hosted	c
+astro,astro-hosted,apc	c
 astro,astro-hosted,apc	config
 astro,astro-hosted,apc	config get
 astro,astro-hosted,apc	config set
@@ -47,10 +48,10 @@ astro,astro-hosted,apc	context
 astro,astro-hosted,apc	context de
 astro,astro-hosted,apc	context delete
 astro,astro-hosted,apc	context list
-astro,astro-hosted	context ls
-astro,astro-hosted	context sw
+astro,astro-hosted,apc	context ls
+astro,astro-hosted,apc	context sw
 astro,astro-hosted,apc	context switch
-astro,astro-hosted	d
+astro,astro-hosted,apc	d
 astro,astro-hosted	dbt
 astro,astro-hosted	dbt cleanup
 astro,astro-hosted	dbt delete
@@ -199,11 +200,11 @@ astro,astro-hosted,apc	dev build
 astro,astro-hosted,apc	dev init
 astro,astro-hosted,apc	dev kill
 astro,astro-hosted,apc	dev logs
-astro,astro-hosted	dev obj
+astro,astro-hosted,apc	dev obj
 astro,astro-hosted,apc	dev object
 astro,astro-hosted,apc	dev object export
 astro,astro-hosted,apc	dev object import
-astro,astro-hosted	dev objects
+astro,astro-hosted,apc	dev objects
 astro,astro-hosted,apc	dev parse
 astro,astro-hosted,apc	dev proxy
 astro,astro-hosted,apc	dev proxy status

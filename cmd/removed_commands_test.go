@@ -179,7 +179,9 @@ func assertStubSaysWhatReplacedIt(t *testing.T, root *cobra.Command, out *bytes.
 	assert.Contains(t, obj["error"], "was removed in Astro CLI v2", label+" -o json")
 	assert.Equal(t, float64(cliout.ExitUsage), obj["code"], label+" -o json")
 	assert.Equal(t, string(cliout.KindUsage), obj["kind"], label+" -o json")
-	if top, _, err := root.Find(args[:1]); err != nil || top.Name() != "dev" {
+	top, _, err := root.Find(args[:1])
+	require.NoError(t, err, label)
+	if top.Name() != "dev" {
 		// `astro dev` publishes the mapping from every 1.x dev command to
 		// its replacement besides (cmd/local/testdata/schema/dev-removed.json).
 		assert.Len(t, obj, 3, "%s -o json: not the error object: %s", label, stdout)
