@@ -147,42 +147,25 @@ func TarDir(source, target, baseDir string) error {
 }
 
 // createTarFile creates the tarball writeTar writes; a test fails its Close.
-var createTarFile = func(name string) (io.WriteCloser, error) { return CreateFresh(name, archiveFileMode) }
+var createTarFile = func(name string) (io.WriteCloser, error) { return createFresh(name) }
 
-// CreateFresh creates name as a new file with perm for output the CLI names
-// itself, replacing whatever is there. os.Create would write through a
-// symlink at name - a dags.tar a project holds as a link, say - and truncate
-// the file it points at, outside the project. Removing the entry first
-// unlinks a symlink rather than its target, and O_EXCL fails on one put back
-// in between instead of following it. A directory at name is left alone, and
-// fails the create as os.Create fails on one.
-//
-// A path the user typed is theirs to point anywhere, a symlink included, and
-// is written as os.Create writes it; this is for the paths the CLI picks.
-func CreateFresh(name string, perm os.FileMode) (*os.File, error) {
+// createFresh creates name as a new file for an archive the CLI writes,
+// replacing whatever is there. os.Create would write through a symlink at
+// name - a dags.tar a project holds as a link, say - and truncate the file it
+// points at, outside the project. Removing the entry first unlinks a symlink
+// rather than its target, and O_EXCL fails on one put back in between instead
+// of following it. A directory at name is left alone, and fails the create as
+// os.Create fails on one.
+func createFresh(name string) (*os.File, error) {
 	if info, err := os.Lstat(name); err == nil && !info.IsDir() {
 		if err := os.Remove(name); err != nil {
 			return nil, err
 		}
 	}
-	return os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
+	return os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, archiveFileMode)
 }
 
-// WriteFresh is os.WriteFile through CreateFresh: data written to name as a
-// new file with perm, never through a symlink at name.
-func WriteFresh(name string, data []byte, perm os.FileMode) error {
-	f, err := CreateFresh(name, perm)
-	if err != nil {
-		return err
-	}
-	if _, err := f.Write(data); err != nil {
-		f.Close()
-		return err
-	}
-	return f.Close()
-}
-
-// archiveFileMode is the mode archives are created with, os.Create's: the
+// archiveFileMode is the mode createFresh creates with, os.Create's: the
 // user's umask decides the rest.
 const archiveFileMode = 0o666
 
@@ -527,7 +510,7 @@ func GzipFile(srcFilePath, destFilePath string) error {
 	}
 	defer srcFile.Close()
 
-	destFile, err := CreateFresh(destFilePath, archiveFileMode)
+	destFile, err := createFresh(destFilePath)
 	if err != nil {
 		return err
 	}
