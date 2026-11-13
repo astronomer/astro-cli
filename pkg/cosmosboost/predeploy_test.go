@@ -129,7 +129,7 @@ func TestPreDeployNonexistentPath(t *testing.T) {
 }
 
 // TestEnsureCleanRemovesStaleArtifacts covers the sequence the deploy hooks
-// run: EnsureClean first, then (opt-in) BestEffortPreDeploy — so an artifact
+// run: EnsureClean first, then BestEffortPreDeploy — so an artifact
 // from an earlier deploy, even one whose project no longer exists, cannot
 // survive into the payload.
 func TestEnsureCleanRemovesStaleArtifacts(t *testing.T) {
