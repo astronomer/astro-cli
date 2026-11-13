@@ -127,7 +127,7 @@ func TestChooseNameTakesWhatTheProjectCallsItself(t *testing.T) {
 // would offer it to planRetirements, which retires a file once everything it
 // said reached the manifest — and the name would be everything, as far as that
 // code could tell.
-func TestReadingThe1xNameDoesNotRetireTheConfig(t *testing.T) {
+func TestReadingThe1xNameThenRetiresTheConfig(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
 	require.NoError(t, os.WriteFile(
@@ -139,13 +139,14 @@ func TestReadingThe1xNameDoesNotRetireTheConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "orders-pipeline", from1x.projectName)
 	assert.NotContains(t, from1x.present, config1xRelPath,
-		"the config is not a retirement candidate, so it must not be recorded as present")
+		"the config is decided by config1xRetirable, not matched against the notes, so it is not recorded as present")
 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 	assert.Equal(t, "orders-pipeline", res.Name)
 	_, statErr := os.Stat(filepath.Join(dir, filepath.FromSlash(config1xRelPath)))
-	assert.NoError(t, statErr, "the config holds 1.x CLI configuration this run does not replace, so it stays")
+	assert.ErrorIs(t, statErr, os.ErrNotExist, "the name is in [project] name, so nothing in the file is left to keep")
+	assert.Contains(t, res.Advisories, config1xDeletedAdvisory, "and the run says what that means for Astro CLI 1.x")
 }
 
 // A malformed config costs the name, not the conversion.

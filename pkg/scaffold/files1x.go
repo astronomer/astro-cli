@@ -109,9 +109,15 @@ type project1x struct {
 	// projectName is the name .astro/config.yaml states, before any
 	// sanitizing. Empty when the file is absent, says nothing, or will not
 	// parse.
-	//
-	// The file itself is not retired, so this is read from a file that stays.
 	projectName string
+	// config1xPresent and config1xUnreadable say whether .astro/config.yaml is
+	// there, and whether it failed to parse; config1xRetirable reads both.
+	config1xPresent, config1xUnreadable bool
+	// cliSettings are the CLI settings the same file sets (yamlSettings), each
+	// reported by a note, since v2 reads none of them from a project.
+	cliSettings []setting1x
+	// setting1x is Options.Setting1x, which settingNotes asks about each.
+	setting1x func(key, value string) (SettingReplacement, bool)
 	// deployment is `project.deployment` from the same file: the target
 	// `astro deploy --save` remembers, or empty when nothing saved one. The key
 	// is a single string and always has been, so there is at most one.
@@ -169,6 +175,8 @@ type config1x struct {
 type config1xFacts struct {
 	name, deployment, workspace string
 	instances                   []instance1x
+	settings                    []setting1x
+	present, unreadable         bool
 }
 
 // yamlString is the value of a loosely-decoded scalar string, and "" for every
@@ -212,17 +220,17 @@ func read1xProject(dir string) (*project1x, error) {
 		from1x.present = append(from1x.present, "packages.txt")
 	}
 
-	// The project's own name, which is the one thing in .astro/config.yaml a
-	// project keeps, and the Deployment id that decides whether this file
-	// gets a note at all. Not added to present: the file holds 1.x CLI
-	// configuration this conversion neither reads nor replaces, so it is not a
-	// candidate for retirement, and recording it there would offer it for
-	// deletion.
+	// The project's own name, its saved deploy target and links, and the CLI
+	// settings beside them. Not added to present: whether the file goes is
+	// decided by config1xRetirable, from what it held, rather than by the
+	// notes planRetirements matches file names against, since every setting
+	// in it is reported in a note that names it.
 	cfg, note, err := read1xConfig(dir)
 	if err != nil {
 		return nil, err
 	}
 	from1x.projectName, from1x.deployment, from1x.workspace, from1x.instances = cfg.name, cfg.deployment, cfg.workspace, cfg.instances
+	from1x.cliSettings, from1x.config1xPresent, from1x.config1xUnreadable = cfg.settings, cfg.present, cfg.unreadable
 	if note != "" {
 		from1x.notes = append(from1x.notes, note)
 	}
@@ -467,14 +475,21 @@ func read1xConfig(dir string) (facts config1xFacts, note string, err error) {
 	}
 	var cfg config1x
 	if uerr := yaml.Unmarshal(data, &cfg); uerr != nil {
-		return config1xFacts{}, config1xRelPath +
+		return config1xFacts{present: true, unreadable: true}, config1xRelPath +
 			": could not be read, so the project is named after its directory. " + uerr.Error(), nil
 	}
+	// The same bytes again, untyped, for the settings: they parsed above, so
+	// this cannot fail on syntax, and a document that is not a mapping (a bare
+	// list) sets nothing.
+	var doc map[string]any
+	_ = yaml.Unmarshal(data, &doc) //nolint:errcheck // parsed above; a non-mapping document sets no settings
 	return config1xFacts{
 		name:       strings.TrimSpace(cfg.Project.Name),
 		deployment: yamlString(cfg.Project.Deployment),
 		workspace:  yamlString(cfg.Project.Workspace),
 		instances:  yamlInstances(cfg.Instances),
+		settings:   yamlSettings(doc),
+		present:    true,
 	}, "", nil
 }
 

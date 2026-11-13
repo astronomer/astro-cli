@@ -190,6 +190,22 @@ func TestNoNoteForAProjectThatNeverRanUnder1x(t *testing.T) {
 	require.Len(t, calls, 1, "without a 1.x config there is nothing to look for, got %v", calls)
 }
 
+// astro init deletes .astro/config.yaml when it converts a project, carrying
+// project.name into [project] name. The note still finds the 1.x database by
+// that name, and no longer says 1.x can start it: without the file, 1.x does
+// not see a project there.
+func TestTheNoteFindsAConvertedProjectByItsManifestName(t *testing.T) {
+	projectPath := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(projectPath, "pyproject.toml"), []byte(
+		"[project]\nname = 'proj'\nrequires-python = '>=3.12'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n"), 0o600))
+	legacy := legacyMetadataVolume(projectPath, "proj")
+	_, lines := noteRun(t, projectPath, &engineState{docker: []string{legacy}})
+
+	require.Len(t, lines, 1)
+	assert.Contains(t, lines[0], legacy)
+	assert.NotContains(t, lines[0], "Astro CLI 1.x can still start it")
+}
+
 func TestNoNoteWhenThe1xProjectHasNoVolume(t *testing.T) {
 	projectPath, _ := legacyProject(t, "project:\n  name: proj\n")
 	_, lines := noteRun(t, projectPath, &engineState{})

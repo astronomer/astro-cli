@@ -43,35 +43,6 @@ func (s *Suite) TestSaveRefusesAConfigItCouldNotRead() {
 	s.Contains(string(after), "SECRET")
 }
 
-// The same for the project config, which has the same shape and the same
-// consequence.
-//
-// Its file is where a converted project's Deployment mappings live — the ones
-// the conversion's own leftover note tells somebody to go and read — and
-// `astro deploy` and `astro config set -p` both write it.
-func (s *Suite) TestSaveRefusesAProjectConfigItCouldNotRead() {
-	fs := afero.NewMemMapFs()
-	file := filepath.Join(WorkingPath, ConfigDir, ConfigFileNameWithExt)
-	const original = "project:\n  deployment: prod-1\nbroken: [unclosed\n"
-	s.NoError(afero.WriteFile(fs, file, []byte(original), 0o600))
-
-	// This records the config package's own directory as unreadable, and the
-	// key is not one withAstroHome clears. Left behind, it would make any
-	// later test that writes a project config fail with the refusal instead
-	// of whatever it was actually checking.
-	s.T().Cleanup(func() { delete(unreadableConfigs, file) })
-
-	initProject(fs)
-
-	s.True(unreadableConfigs[file], "a project config that would not parse should be recorded")
-	err := saveConfig(viperProject, file)
-	s.Error(err, "writing a project config this process could not read destroys it")
-
-	after, readErr := afero.ReadFile(fs, file)
-	s.NoError(readErr)
-	s.Equal(original, string(after), "the project's own config must survive")
-}
-
 // A config that reads cleanly is still writable, including after an earlier
 // run in the same process recorded a failure for it.
 func (s *Suite) TestSaveAllowsAConfigItCouldRead() {

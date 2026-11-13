@@ -3,6 +3,7 @@ package scaffold
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -13,7 +14,8 @@ import (
 )
 
 // convertWithConfig writes body as .astro/config.yaml beside a pin-only
-// Dockerfile, converts, and returns every note naming that file.
+// Dockerfile, converts, and returns every note naming that file. config1xKept
+// says whether the run left the file.
 //
 // Every note, not the last one that matched. A malformed config emits its own
 // note about the same file, so a helper that overwrites would let that one
@@ -29,15 +31,22 @@ func convertWithConfig(t *testing.T, body string) (res *Result, about []string) 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 
-	_, statErr := os.Stat(filepath.Join(dir, filepath.FromSlash(config1xRelPath)))
-	require.NoError(t, statErr, "the config is never retired, whatever it names")
-
 	for _, n := range res.Notes {
 		if strings.Contains(n, "config.yaml") {
 			about = append(about, n)
 		}
 	}
 	return res, about
+}
+
+// config1xKept reports whether a conversion of dir left .astro/config.yaml,
+// checking the disk and the report agree.
+func config1xKept(t *testing.T, res *Result) bool {
+	t.Helper()
+	_, statErr := os.Stat(filepath.Join(res.Dir, filepath.FromSlash(config1xRelPath)))
+	deleted := slices.ContainsFunc(res.Deleted, func(d string) bool { return strings.HasPrefix(d, config1xRelPath+" (") })
+	require.Equal(t, statErr == nil, !deleted, "the disk and the report agree: deleted=%v", res.Deleted)
+	return statErr == nil
 }
 
 // The .astro/config.yaml note is about project.deployment, so it is reported on
@@ -52,13 +61,15 @@ func TestConfigNoteFollowsTheDeploymentNotTheFile(t *testing.T) {
 		res, about := convertWithConfig(t, "project:\n  name: orders\n")
 		assert.Empty(t, about,
 			"a config that names no deploy target has nothing to hand over, got: %v", res.Notes)
+		assert.False(t, config1xKept(t, res), "its name is in [project] name, so the file goes")
 	})
 
 	t.Run("a saved deploy target is reported, and named", func(t *testing.T) {
-		_, about := convertWithConfig(t, "project:\n  name: orders\n  deployment: cm1orders\n")
+		res, about := convertWithConfig(t, "project:\n  name: orders\n  deployment: cm1orders\n")
 		require.Len(t, about, 1)
 		assert.Contains(t, about[0], "cm1orders",
 			"the note names the target, so nobody has to reopen the file to find it")
+		assert.False(t, config1xKept(t, res), "the note prints the target whole, so the file goes")
 	})
 
 	t.Run("a workspace beside it is carried into the note", func(t *testing.T) {
@@ -94,8 +105,9 @@ func TestAMalformedDeployTargetDoesNotCostTheName(t *testing.T) {
 // put an unindented orphan line under "Left to do:" and a multi-line string
 // into that array.
 func TestAnUnprintableDeployTargetIsReportedWithoutItsValue(t *testing.T) {
-	_, about := convertWithConfig(t, "project:\n  name: orders\n  deployment: \"cm1\\nsecond line\"\n")
+	res, about := convertWithConfig(t, "project:\n  name: orders\n  deployment: \"cm1\\nsecond line\"\n")
 	require.Len(t, about, 1)
+	assert.True(t, config1xKept(t, res), "the note could not print the target, so the file is still its only record")
 	assert.NotContains(t, about[0], "second line", "the value is not printed")
 	assert.NotContains(t, about[0], "\n", "a note is one line")
 	assert.Contains(t, about[0], "project.deployment", "and the key is still named, so it can be found")

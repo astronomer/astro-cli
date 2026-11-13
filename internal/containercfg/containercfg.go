@@ -11,13 +11,14 @@ import (
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 )
 
-// Binary returns container.binary for the project at projectPath: the
-// project's .astro/config.yaml when it sets one (a 1.x project; a project
-// with a pyproject.toml has no such file), the global config otherwise. "" means unset, which
-// pkg/container takes as auto-detect. An empty projectPath asks for the global
-// value.
-func Binary(projectPath string) string {
-	return config.CFG.DockerCommand.GetStringFor(projectPath)
+// Binary returns container.binary from the global config, "" when unset,
+// which pkg/container takes as auto-detect. It takes the project path because
+// that is the seam's shape (localrt.Config.ContainerBinary and the engine
+// funcs below are per project), but no project chooses the binary: which
+// container engine runs is this machine's setting, and a project's
+// .astro/config.yaml is never read for it.
+func Binary(_ string) string {
+	return config.CFG.DockerCommand.GetString()
 }
 
 // Engine resolves the container CLI for the project at projectPath — the

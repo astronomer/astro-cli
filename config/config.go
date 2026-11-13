@@ -32,13 +32,7 @@ const (
 	// .astro/config.yaml will not parse emitted a line of prose and then the
 	// object, which no consumer can read.
 	//
-	// There is a message per file rather than one shared. Both project sites
-	// used to report the home-dir wording, so a malformed project config was
-	// announced as a problem with a file in the user's home directory — which
-	// is somewhere they would look, and not where the file is.
-	configCreateProjectErrorMsg = "Error creating project config %s: %s\n"
-	configReadHomeErrorMsg      = "Error reading config %s: %s\n"
-	configReadProjectErrorMsg   = "Error reading project config %s: %s\n"
+	configReadHomeErrorMsg = "Error reading config %s: %s\n"
 	// configUnwritableMsg is the refusal a write gets against a file this
 	// process could not read. viper's parse errors carry a line number and no
 	// filename, so both of these say which file.
@@ -141,8 +135,6 @@ var (
 
 	// viperHome is the viper object in the users home directory
 	viperHome *viper.Viper
-	// viperProject is the viper object in a project directory
-	viperProject *viper.Viper
 	// configFs is the filesystem the viper objects above are bound to.
 	//
 	// viper has no exported accessor for its own fs, and saveConfig needs one
@@ -159,7 +151,6 @@ var (
 func InitConfig(fs afero.Fs) {
 	forgetEnvironmentLogin()
 	initHome(fs)
-	initProject(fs)
 	registerValidators()
 }
 
@@ -220,52 +211,14 @@ func initHome(fs afero.Fs) {
 	}
 }
 
-// Init viper for config file in project directory
-// If project config does not exist, just exit
-func initProject(fs afero.Fs) {
-	// Set up viper object for project config
-	viperProject = viper.New()
-	viperProject.SetFs(fs)
-	configFs = fs
-	viperProject.SetConfigName(ConfigFileName)
-	viperProject.SetConfigType(ConfigFileType)
-
-	// Construct the path to the config file
-	workingConfigPath := filepath.Join(WorkingPath, ConfigDir)
-
-	workingConfigFile := filepath.Join(workingConfigPath, ConfigFileNameWithExt)
-
-	// If path is empty or config file does not exist, just return
-	workingConfigExists, _ := fileutil.Exists(workingConfigFile, fs) //nolint:errcheck // treated as absent on error
-	if workingConfigPath == "" || workingConfigPath == HomeConfigPath || !workingConfigExists {
-		// A file that is gone is no longer a file a write could destroy, so
-		// it does not keep its place on the unreadable list. Without this a
-		// project config that failed to parse and was then deleted — by hand,
-		// or by a conversion — stayed unwritable for the life of the process.
-		delete(unreadableConfigs, workingConfigFile)
-		return
-	}
-
-	// Add the path we discovered
-	viperProject.SetConfigFile(workingConfigFile)
-
-	// Read in project config. As with the home config, a file that vanished
-	// between the check above and this read is absent rather than corrupt.
-	switch readErr := readConfigFile(viperProject, fs); {
-	case readErr == nil, errors.Is(readErr, iofs.ErrNotExist):
-		delete(unreadableConfigs, workingConfigFile)
-	default:
-		unreadableConfigs[workingConfigFile] = true
-		fmt.Fprintf(os.Stderr, configReadProjectErrorMsg, workingConfigFile, readErr)
-	}
-}
-
 // configExists returns a boolean indicating if the config is backed by a file
 func configExists(v *viper.Viper) bool {
 	return v.ConfigFileUsed() != ""
 }
 
-// IsProjectDir returns a boolean depending on if path is a valid project dir
+// IsProjectDir reports whether path is a project in the Astro CLI 1.x layout,
+// the way 1.x decides it: a .astro/config.yaml there. v2 reads no settings
+// from that file; this only lets a command name the layout it was run in.
 func IsProjectDir(path string) (bool, error) {
 	configPath := filepath.Join(path, ConfigDir)
 	configFile := filepath.Join(configPath, ConfigFileNameWithExt)

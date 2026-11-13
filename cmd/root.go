@@ -194,6 +194,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// session.
 	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}, ottoMembership(astroV1Client)) }
 	coreDeps.Legacy1xSetting = config.Legacy1xValue
+	coreDeps.ProjectSetting1x = config.ProjectSetting1x
 	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 
 	groupCommands(rootCmd)

@@ -154,30 +154,6 @@ func TestThe1xWarningIsAJSONEvent(t *testing.T) {
 	}
 }
 
-// The seam is asked about the project being started, which is where a 1.x
-// project's own .astro/config.yaml is.
-func TestThe1xSettingIsReadForTheProject(t *testing.T) {
-	d, _ := testDeps(t)
-	var plans []localrt.Plan
-	d.Runtime = planRecorder{plans: &plans}
-	wiringProject(t, &d, "", "")
-	want, _ := d.WorkingDir()
-	var asked []string
-	d.Legacy1xSetting = func(dir, _ string) (string, string, string) {
-		asked = append(asked, dir)
-		return "", "", ""
-	}
-	_ = execute(t, d, "local", "start")
-	if len(asked) == 0 {
-		t.Fatal("the seam was never asked")
-	}
-	for _, dir := range asked {
-		if dir != want {
-			t.Errorf("asked about %q, want the project %q", dir, want)
-		}
-	}
-}
-
 // Without the seam, as in a build that does not wire it, a start is not told.
 func TestStartWithoutLegacySettingsReaderSaysNothing(t *testing.T) {
 	stdout, stderr := runWithLegacySettings(t, legacyCase{args: []string{"local", "start"}})
@@ -213,7 +189,7 @@ func runWithLegacySettings(t *testing.T, tc legacyCase) (stdout, stderr string) 
 		}
 	}
 	if tc.settings != nil {
-		d.Legacy1xSetting = func(_, key string) (string, string, string) {
+		d.Legacy1xSetting = func(key string) (string, string, string) {
 			return tc.settings[key], legacyConfigFile, fakeReplacement
 		}
 	}
