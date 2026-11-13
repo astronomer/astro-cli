@@ -149,35 +149,40 @@ func TestRunInImagePassesEnvironmentDeterministically(t *testing.T) {
 // to its alias, sorted, and holds no value.
 func TestWriteImageRunOverrideDeclaresReferencesOnly(t *testing.T) {
 	dir := t.TempDir()
-	path, err := writeImageRunOverride(dir, map[string]string{"ZED": "s3cret", "DOCKER_HOST": "tcp://x:2375", "BAD=KEY": "v"})
+	path, err := writeImageRunOverride(dir,
+		map[string]string{"ZED": "s3cret", "DOCKER_HOST": "tcp://x:2375", "BAD=KEY": "v"},
+		[]string{"ZED", "FROM_START"})
 	require.NoError(t, err)
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
+	// FROM_START is a secret the generated file declares that this run was not
+	// handed: valueless, so it resolves as it did before it was a reference.
 	assert.Equal(t, "services:\n  "+execService+":\n    environment:\n"+
 		"      'DOCKER_HOST': "+secretInterpolation(secretRef("DOCKER_HOST"))+"\n"+
+		"      'FROM_START':\n"+
 		"      'ZED': "+secretInterpolation(secretRef("ZED"))+"\n", string(data))
 
-	none, err := writeImageRunOverride(dir, nil)
+	none, err := writeImageRunOverride(dir, nil, nil)
 	require.NoError(t, err)
 	assert.Empty(t, none, "nothing to declare writes nothing")
 }
 
-// A secret the compose file declares from the last start, and the caller does
-// not pass, takes the CLI's own value for it, as the valueless entry it
-// replaced did; the caller's value wins one it does pass.
-func TestRunInImageResolvesTheFilesReferencesAsBefore(t *testing.T) {
+// A secret the compose file declares from the last start that the caller does
+// not pass is not handed to compose at all: the run's override declares it
+// valueless, so compose resolves it from the CLI's own environment under its
+// own name, as before it was a reference, and leaves it unset when that holds
+// none. Only the caller's values travel, under their aliases.
+func TestRunInImageHandsComposeOnlyTheCallersValues(t *testing.T) {
 	cmd := &fakeCmd{}
 	e := testEngine(t, cmd)
 	project := t.TempDir()
 	path := withComposeFile(t, project)
 	file := "x-common-env: &common-env\n" +
-		"  FROM_SHELL: " + secretInterpolation(secretRef("FROM_SHELL")) + "\n" +
+		"  FROM_START: " + secretInterpolation(secretRef("FROM_START")) + "\n" +
 		"  FROM_CALLER: " + secretInterpolation(secretRef("FROM_CALLER")) + "\n" +
-		"  NOWHERE: " + secretInterpolation(secretRef("NOWHERE")) + "\n" +
 		"services: {}\n"
 	require.NoError(t, os.WriteFile(path, []byte(file), 0o600))
-	t.Setenv("FROM_SHELL", "shell-value")
-	t.Setenv("FROM_CALLER", "loses")
+	t.Setenv("FROM_START", "shell-value")
 
 	require.NoError(t, e.RunInImage(context.Background(), project, rt.ImageRun{
 		Argv: []string{"python"},
@@ -186,11 +191,8 @@ func TestRunInImageResolvesTheFilesReferencesAsBefore(t *testing.T) {
 
 	env, ok := cmd.envFor("run --rm")
 	require.True(t, ok)
-	assert.Contains(t, env, secretRef("FROM_SHELL")+"=shell-value")
-	assert.Contains(t, env, secretRef("FROM_CALLER")+"=caller-value")
-	for _, kv := range env {
-		assert.False(t, strings.HasPrefix(kv, secretRef("NOWHERE")+"="), "a key nothing holds gets no value")
-	}
+	assert.Equal(t, []string{secretRef("FROM_CALLER") + "=caller-value"}, env,
+		"only the caller's values travel, under their aliases")
 }
 
 // Values never appear on the command line, where any local user can read them
