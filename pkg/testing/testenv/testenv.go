@@ -16,6 +16,9 @@ var behaviorEnv = []string{
 	"ASTRONOMER_KEY_SECRET",
 	"ASTRO_DOMAIN",
 	"ASTRO_ORGANIZATION",
+	"ASTRO_DEPLOYMENT",
+	"ASTRO_REGISTRY_URL",
+	"ASTRO_LOCAL_HEALTH_TIMEOUT",
 	// Where the CLI keeps its state.
 	"ASTRO_HOME",
 	// Whether the run is non-interactive, or reports as a CI system.
