@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -525,6 +526,35 @@ func (s *Suite) TestExportAuditLogs() {
 		info, err := os.Stat(export.OutputFile)
 		s.NoError(err)
 		s.Equal(int(info.Size()), export.Bytes)
+		mockV1Client.AssertExpectations(s.T())
+	})
+	// The name the CLI makes up is written as a new file: a symlink already
+	// sitting at it (a project's, in the working directory) is replaced, and
+	// the file it points at keeps its content.
+	s.Run("default name replaces a symlink instead of writing through it", func() {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
+		asOf := time.Date(2025, 12, 31, 12, 0, 0, 0, time.Local)
+		defer func(orig func() time.Time) { auditLogsClock = orig }(auditLogsClock)
+		auditLogsClock = func() time.Time { return asOf }
+		mockV1Client.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
+		outside := filepath.Join(s.T().TempDir(), "precious")
+		s.Require().NoError(os.WriteFile(outside, []byte("keep me"), 0o600))
+		name := "org1-logs-2-days-20251231.ndjson.gz"
+		if err := os.Symlink(outside, name); err != nil {
+			s.T().Skipf("cannot create a symlink here: %v", err)
+		}
+		defer os.Remove(name)
+
+		export, err := ExportAuditLogs(mockV1Client, "org1", "", 2)
+		s.Require().NoError(err)
+		s.Equal(name, export.OutputFile)
+		got, err := os.ReadFile(outside)
+		s.Require().NoError(err)
+		s.Equal("keep me", string(got), "the symlink's target was overwritten")
+		info, err := os.Lstat(name)
+		s.Require().NoError(err)
+		s.True(info.Mode().IsRegular(), "the export is a file of its own, not a link")
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("exported file is valid gzip of the raw NDJSON body", func() {
