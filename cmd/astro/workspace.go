@@ -899,7 +899,7 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 // saved login. extra is what else the command accepts in place of a Workspace
 // (astrosession.ByID), for the advice a missing one gets.
 func workspaceTarget(cmd *cobra.Command, flag string, extra astrosession.Accepts) astrosession.Target {
-	req := astrosession.Request{Workspace: flag, Accepts: astrosession.ByFlag | extra, NoSaved: workspace.ErrCurrentNotSet}
+	req := astrosession.Request{Workspace: flag, Accepts: astrosession.ByFlag | extra, NoSaved: workspace.ErrCurrentNotSet, LoginError: true}
 	if f, ok := projectFollowOf(cmd); ok {
 		req.Project = f.workspace
 		req.Accepts |= astrosession.ByProject

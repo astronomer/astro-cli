@@ -287,6 +287,11 @@ func TestResolveWithNoLoginAtAll(t *testing.T) {
 	if got := Resolve(Request{Workspace: "ws-flag"}); !got.Found() {
 		t.Fatal("a flag needs no login")
 	}
+	// A command that has always said the login is unreadable still does.
+	err := Resolve(Request{LoginError: true}).Require()
+	if err == nil || errors.Is(err, ErrNoWorkspace) {
+		t.Fatalf("err = %v, want the login's own", err)
+	}
 }
 
 func TestRequireWorkspaceTakesTheFlagOrTheRunsOwn(t *testing.T) {

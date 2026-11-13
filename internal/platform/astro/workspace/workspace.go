@@ -45,7 +45,7 @@ var ErrCurrentNotSet = errors.New("current workspace context not set, you can sw
 // GetCurrentWorkspace gets the current workspace set in context config
 // Returns a string representing the current workspace and an error if it doesn't exist
 func GetCurrentWorkspace() (string, error) {
-	t := astrosession.Resolve(astrosession.Request{Accepts: astrosession.ByFlag, NoSaved: ErrCurrentNotSet})
+	t := astrosession.Resolve(astrosession.Request{Accepts: astrosession.ByFlag, NoSaved: ErrCurrentNotSet, LoginError: true})
 	if err := t.Require(); err != nil {
 		return "", err
 	}

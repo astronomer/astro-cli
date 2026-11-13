@@ -130,6 +130,10 @@ type Request struct {
 	// An API token's claim is the run's selection on the current host only,
 	// and a saved login's Workspace on another host is another login's.
 	Domain string
+	// LoginError makes a login that cannot be read (none at all) the error of a
+	// missing Workspace, rather than the "no Workspace" one, for a command that
+	// has always said so.
+	LoginError bool
 	// NoSaved is what a saved login with no current Workspace says, for a
 	// command with its own words for it. ErrNoWorkspace when nil.
 	NoSaved error
@@ -150,6 +154,8 @@ type Target struct {
 
 	accepts Accepts
 	noSaved error
+	// readErr is why the login could not be read, when the request asked.
+	readErr error
 	token   bool
 }
 
@@ -165,7 +171,11 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 	case r.Project != "":
 		t.Workspace, t.WorkspaceSource = r.Project, SourceProject
 	default:
-		t.Workspace, t.WorkspaceSource = fromLogin(r.Login, r.Domain, t.token, onCurrent)
+		var err error
+		t.Workspace, t.WorkspaceSource, err = fromLogin(r.Login, r.Domain, t.token, onCurrent)
+		if r.LoginError {
+			t.readErr = err
+		}
 	}
 
 	switch {
@@ -180,8 +190,9 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 }
 
 // fromLogin is the Workspace of the login the run is on, and which kind of
-// source that is. A login that cannot be read names no Workspace.
-func fromLogin(login *config.Context, domain string, token, onCurrent bool) (string, Source) {
+// source that is. The error is a login that cannot be read at all, which names
+// no Workspace.
+func fromLogin(login *config.Context, domain string, token, onCurrent bool) (string, Source, error) {
 	var ws string
 	switch {
 	case login != nil:
@@ -190,28 +201,28 @@ func fromLogin(login *config.Context, domain string, token, onCurrent bool) (str
 		// An API token's selection is overlaid on the current context.
 		ctx, err := config.GetCurrentContext()
 		if err != nil {
-			return "", SourceNone
+			return "", SourceNone, err
 		}
 		ws = ctx.Workspace
 	case token:
 		// Another host's saved Workspace is not one this run chose.
-		return "", SourceNone
+		return "", SourceNone, nil
 	default:
 		ctx, err := (&config.Context{Domain: domain}).GetContext()
 		if err != nil {
-			return "", SourceNone
+			return "", SourceNone, nil
 		}
 		ws = ctx.Workspace
 	}
 	switch {
 	case ws == "":
-		return "", SourceNone
+		return "", SourceNone, nil
 	case token:
-		return ws, SourceToken
+		return ws, SourceToken, nil
 	case os.Getenv("ASTRONOMER_KEY_ID") != "":
-		return ws, SourceLegacyKey
+		return ws, SourceLegacyKey, nil
 	}
-	return ws, SourceContext
+	return ws, SourceContext, nil
 }
 
 func currentDomain() string {
@@ -245,6 +256,9 @@ func (t Target) Require() error { //nolint:gocritic // a small value type
 // ErrOrgTokenNoWorkspace with the advice the command's flags and project
 // support, else what a saved login without one says.
 func (t Target) Missing() error { //nolint:gocritic // a small value type
+	if t.readErr != nil {
+		return t.readErr
+	}
 	if t.token {
 		return fmt.Errorf("%w, %s", ErrOrgTokenNoWorkspace, t.accepts.hint())
 	}
@@ -287,7 +301,7 @@ func TokenDeployment() string {
 // has no project link or other way to name one: the Workspace, or the error
 // for there being none.
 func RequireWorkspace(flag string) (string, error) {
-	t := Resolve(Request{Workspace: flag, Accepts: ByFlag})
+	t := Resolve(Request{Workspace: flag, Accepts: ByFlag, LoginError: true})
 	if err := t.Require(); err != nil {
 		return "", err
 	}
