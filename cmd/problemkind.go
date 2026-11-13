@@ -24,8 +24,10 @@ import (
 // same vocabulary (see cliout.ProblemKind), and are composed with them below.
 const (
 	// KindUnauthenticated: there is no usable login — none was ever made, the
-	// API refused the token (401), or one was needed and this run may not
-	// start a browser login (--output json). Log in and try again.
+	// API refused the token (401), one was needed and this run may not
+	// start a browser login (--output json), or the environment holds only
+	// Deployment API keys, which no longer log in (set ASTRO_API_TOKEN).
+	// Log in and try again.
 	KindUnauthenticated cliout.ProblemKind = "unauthenticated"
 	// KindForbidden: the login is good but does not carry the permission this
 	// needs (403).
