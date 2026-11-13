@@ -43,8 +43,17 @@ func legacyChoice(v *viper.Viper, key string) string {
 // set for every project with `astro config set -g`; removed is what replaces
 // a setting v2 removed, in the words `astro config` refuses it with. ok is
 // false for a key that needs no note: no setting this CLI knows, the login
-// contexts, or a value the setting shipped with.
+// contexts, a removed setting at a value it shipped with, or a setting at the
+// value this machine already uses, so dropping the file changes nothing.
+//
+// The comparison is with the value in effect, not the default: 1.x read a
+// project's value over the global one, so a project that set the default
+// over a global value that differs did change something, and deleting the
+// file changes it back.
+//
+// Keys are matched in lower case, as viper read them.
 func ProjectSetting1x(key, value string) (global, removed string, ok bool) {
+	key = strings.ToLower(key)
 	if s, isRemoved := removedSettings[key]; isRemoved {
 		if slices.Contains(s.defaults, value) {
 			return "", "", false
@@ -56,7 +65,7 @@ func ProjectSetting1x(key, value string) (global, removed string, ok bool) {
 		name = current
 	}
 	c, known := CFGStrMap[name]
-	if !known || name == contextsKey || name == CFG.Context.Path || value == c.Default {
+	if !known || name == contextsKey || name == CFG.Context.Path || value == c.GetHomeString() {
 		return "", "", false
 	}
 	return name, "", true

@@ -45,6 +45,8 @@ func (s *Suite) TestLegacy1xValueWithNoHomeConfig() {
 // What astro init says about each setting a converted 1.x project's file held:
 // its v2 name to set globally, what replaces a removed one, or nothing.
 func (s *Suite) TestProjectSetting1x() {
+	s.restoreConfigGlobals()
+	initTestConfig()
 	global, removed, ok := ProjectSetting1x("remote.client_registry", "quay.io/acme/client")
 	s.True(ok)
 	s.Equal("deploy.remote_execution.client_registry", global, "a 1.x name is set under its v2 one")
@@ -67,4 +69,17 @@ func (s *Suite) TestProjectSetting1x() {
 	s.False(ok)
 	_, _, ok = ProjectSetting1x(contextsKey, "x")
 	s.False(ok, "logins are never a project's")
+
+	// 1.x read the project's value over the global one, so the default set in
+	// a project over a global value that differs is a change worth naming.
+	s.Require().NoError(CFG.UpgradeMessage.SetHomeString("false"))
+	global, _, ok = ProjectSetting1x("upgrade_message", CFG.UpgradeMessage.Default)
+	s.True(ok, "the project's default shadowed the global false")
+	s.Equal("upgrade_message", global)
+	_, _, ok = ProjectSetting1x("upgrade_message", "false")
+	s.False(ok, "the value this machine already uses")
+
+	global, _, ok = ProjectSetting1x("Container.Binary", "podman")
+	s.True(ok, "keys match in any case, as viper read them")
+	s.Equal("container.binary", global)
 }

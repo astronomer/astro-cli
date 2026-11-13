@@ -92,7 +92,7 @@ type Options struct {
 	// .astro/config.yaml sets to value. The conversion deletes that file, and
 	// reports each setting in it with a note built from the answer. ok false
 	// is a key that needs no note: one the caller does not know as a setting,
-	// or a value the setting shipped with. nil reports every key the file
+	// or a value that changes nothing on this machine. nil reports every key the file
 	// sets, without a replacement.
 	Setting1x func(key, value string) (r SettingReplacement, ok bool)
 }
