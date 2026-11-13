@@ -16,6 +16,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
@@ -638,8 +639,7 @@ func TestSetupReadsTheAPITokenByTheOneRule(t *testing.T) {
 	errStop := errors.New("stop after the parse")
 	for env, parsed := range map[string]string{"Bearer ": "", "Bearer Bearer": "", "token": "token", "Bearer token": "token", "Bearer Bearer token": "token"} {
 		t.Setenv("ASTRO_API_TOKEN", env)
-		assert.Equal(t, parsed != "", envCredentials(), "ASTRO_API_TOKEN=%q", env)
-		assert.Equal(t, parsed != "", credentialFromEnv(), "ASTRO_API_TOKEN=%q", env)
+		assert.Equal(t, parsed != "", astrosession.HasAPIToken(), "ASTRO_API_TOKEN=%q", env)
 
 		var got string
 		parseAPIToken = func(token string) (*util.CustomClaims, error) {

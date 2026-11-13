@@ -32,7 +32,6 @@ var (
 	authLogin             = auth.Login
 	fetchDomainAuthConfig = auth.FetchDomainAuthConfig
 	defaultDomain         = "astronomer.io"
-	client                = httputil.NewHTTPClient()
 	parseAPIToken         = util.ParseAPIToken
 	errNotAPIToken        = errors.New("the API token given does not appear to be an Astro API Token")
 	errExpiredAPIToken    = errors.New("the API token given has expired")
@@ -184,10 +183,16 @@ func ensureEnvCredentials(astroV1Client astrov1.APIClient) (bool, error) {
 	return false, nil
 }
 
+// The Deployment API key variables, no longer used.
+const (
+	legacyKeyIDVar     = "ASTRONOMER_KEY_ID"
+	legacyKeySecretVar = "ASTRONOMER_KEY_SECRET"
+)
+
 // ErrLegacyAPIKeys is the failure of a run that needs an Astro login when the
 // environment holds both Deployment API key variables and no API token. The keys stopped
 // authenticating on June 1st, 2024.
-var ErrLegacyAPIKeys = errors.New("ASTRONOMER_KEY_ID and ASTRONOMER_KEY_SECRET (Deployment API keys) are no longer supported: set ASTRO_API_TOKEN to a Deployment API token instead")
+var ErrLegacyAPIKeys = fmt.Errorf("%s and %s (Deployment API keys) are no longer supported: set ASTRO_API_TOKEN to a Deployment API token instead", legacyKeyIDVar, legacyKeySecretVar)
 
 // legacyKeysSet returns the Deployment API key variables that are set.
 func legacyKeysSet() []string {
@@ -208,11 +213,11 @@ func warnLegacyKeys(set []string) {
 	if len(set) == 0 || !legacyKeysWarned.CompareAndSwap(false, true) {
 		return
 	}
-	verb := "is"
+	verb, pronoun := "is", "it"
 	if len(set) > 1 {
-		verb = "are"
+		verb, pronoun = "are", "them"
 	}
-	cliout.Warn(os.Stderr, fmt.Sprintf("%s %s set but no longer used (Deployment API keys are not supported); unset %s", strings.Join(set, " and "), verb, map[bool]string{true: "them", false: "it"}[len(set) > 1]))
+	cliout.Warn(os.Stderr, fmt.Sprintf("%s %s set but no longer used (Deployment API keys are not supported); unset %s", strings.Join(set, " and "), verb, pronoun))
 }
 
 // FreshLogin returns the context for domain, or the current context when
@@ -229,7 +234,7 @@ func warnLegacyKeys(set []string) {
 // subagents each run this) renew it once: the others wait, re-read the login,
 // and return the renewal (see renewedMeanwhile).
 func FreshLogin(domain string, force bool) (config.Context, error) {
-	if force && envCredentials() {
+	if force && astrosession.HasAPIToken() {
 		return config.Context{}, errForceWithEnvCredentials
 	}
 	c, err := loginContext(domain)
@@ -317,12 +322,6 @@ var (
 	errNoRefreshToken          = errors.New("this login cannot be renewed because it has no refresh token, run 'astro login' to log in again")
 	errForceWithEnvCredentials = errors.New("--force renews a saved login, and the token here comes from the environment (ASTRO_API_TOKEN), which cannot be renewed")
 )
-
-// envCredentials reports whether the environment supplies the credentials
-// Setup uses before any saved login.
-func envCredentials() bool {
-	return astrosession.HasAPIToken()
-}
 
 func renewLogin(c *config.Context) error {
 	authConfig, err := fetchDomainAuthConfig(c.Domain)
@@ -625,9 +624,3 @@ func useEnvironmentSelection(c *config.Context, orgID, orgProduct, wsID string) 
 		fmt.Fprintln(os.Stderr, "no organization context set")
 	}
 }
-
-// The Deployment API key variables, no longer used.
-const (
-	legacyKeyIDVar     = "ASTRONOMER_KEY_ID"
-	legacyKeySecretVar = "ASTRONOMER_KEY_SECRET"
-)

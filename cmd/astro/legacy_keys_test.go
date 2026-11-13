@@ -2,7 +2,6 @@ package astro
 
 import (
 	"io"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -24,16 +23,12 @@ const legacyKeysMessage = "ASTRONOMER_KEY_ID and ASTRONOMER_KEY_SECRET (Deployme
 // and returns the Astro API client mock that must see no call.
 func noNetwork(t *testing.T) *astrov1_mocks.ClientWithResponsesInterface {
 	t.Helper()
-	prevFetch, prevClient, prevLogin := fetchDomainAuthConfig, client, authLogin
-	t.Cleanup(func() { fetchDomainAuthConfig, client, authLogin = prevFetch, prevClient, prevLogin })
+	prevFetch, prevLogin := fetchDomainAuthConfig, authLogin
+	t.Cleanup(func() { fetchDomainAuthConfig, authLogin = prevFetch, prevLogin })
 	fetchDomainAuthConfig = func(string) (auth.Config, error) {
 		t.Error("the auth config was fetched")
 		return auth.Config{}, nil
 	}
-	client = testUtil.NewTestClient(func(r *http.Request) *http.Response {
-		t.Errorf("a request went out: %s %s", r.Method, r.URL)
-		return &http.Response{StatusCode: http.StatusInternalServerError, Body: http.NoBody, Header: make(http.Header)}
-	})
 	noLoginFlow(t)
 	return new(astrov1_mocks.ClientWithResponsesInterface)
 }
@@ -51,35 +46,29 @@ func cloudLeaf() *cobra.Command {
 // API token, refuse before any request or prompt, in both entry points a
 // command's login check goes through.
 func TestDeploymentAPIKeysAreRefusedBeforeAnyRequest(t *testing.T) {
-	for name, env := range map[string]map[string]string{
-		"both": {"ASTRONOMER_KEY_ID": "id", "ASTRONOMER_KEY_SECRET": "secret"},
+	for entry, run := range map[string]func(*astrov1_mocks.ClientWithResponsesInterface) error{
+		"Setup":       func(mc *astrov1_mocks.ClientWithResponsesInterface) error { return Setup(cloudLeaf(), mc) },
+		"EnsureLogin": func(mc *astrov1_mocks.ClientWithResponsesInterface) error { return EnsureLogin(mc) },
 	} {
-		for entry, run := range map[string]func(*astrov1_mocks.ClientWithResponsesInterface) error{
-			"Setup":       func(mc *astrov1_mocks.ClientWithResponsesInterface) error { return Setup(cloudLeaf(), mc) },
-			"EnsureLogin": func(mc *astrov1_mocks.ClientWithResponsesInterface) error { return EnsureLogin(mc) },
-		} {
-			t.Run(name+" "+entry, func(t *testing.T) {
-				testUtil.InitTestConfig(testUtil.CloudPlatform)
-				t.Setenv("ASTRO_API_TOKEN", "")
-				t.Setenv("ASTRONOMER_KEY_ID", "")
-				t.Setenv("ASTRONOMER_KEY_SECRET", "")
-				for k, v := range env {
-					t.Setenv(k, v)
-				}
-				mc := noNetwork(t)
+		t.Run(entry, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			t.Setenv("ASTRO_API_TOKEN", "")
+			t.Setenv("ASTRONOMER_KEY_ID", "id")
+			t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
+			mc := noNetwork(t)
 
-				err := run(mc)
+			err := run(mc)
 
-				require.ErrorIs(t, err, ErrLegacyAPIKeys)
-				assert.Equal(t, legacyKeysMessage, err.Error())
-				assert.Empty(t, mc.Calls, "the Astro API was called")
-			})
-		}
+			require.ErrorIs(t, err, ErrLegacyAPIKeys)
+			assert.Equal(t, legacyKeysMessage, err.Error())
+			assert.Empty(t, mc.Calls, "the Astro API was called")
+		})
 	}
 }
 
-// An API token wins over the keys, as it always did: the keys are not read,
-// not exchanged and not mentioned, and the token is the run's login.
+// An API token wins over the keys, as it always did: the keys are not read or
+// exchanged, the run says once that they are unused, and the token is the run's
+// login.
 func TestAnAPITokenWinsOverDeploymentAPIKeys(t *testing.T) {
 	home := savedLogin(t, false)
 	realTokenParser(t)
