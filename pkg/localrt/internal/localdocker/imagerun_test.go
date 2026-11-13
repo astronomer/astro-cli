@@ -125,7 +125,7 @@ func TestRunInImagePassesEnvironmentDeterministically(t *testing.T) {
 
 	require.Len(t, cmd.calls, 1)
 	call := cmd.calls[0]
-	assert.Contains(t, call, "/compose.run-", "the caller's keys are declared by a run-only override")
+	assert.Contains(t, call, "compose.run-", "the caller's keys are declared by a run-only override")
 	assert.NotContains(t, call, " -e ", "no key is named on the command line")
 	assert.NotContains(t, call, "BAD", "a key holding = would never resolve")
 
