@@ -104,8 +104,9 @@ func TestRunInImageRequiresACommand(t *testing.T) {
 	assert.Empty(t, cmd.calls)
 }
 
-// Extra environment is named to compose, in a deterministic order, and a key
-// that cannot survive KEY=VALUE is dropped rather than declared-but-unresolved.
+// Extra environment reaches compose under its aliases, declared to the
+// container by a run-only override the run cleans up, and a key that cannot
+// survive KEY=VALUE is dropped rather than declared-but-unresolved.
 func TestRunInImagePassesEnvironmentDeterministically(t *testing.T) {
 	cmd := &fakeCmd{}
 	e := testEngine(t, cmd)
@@ -124,22 +125,79 @@ func TestRunInImagePassesEnvironmentDeterministically(t *testing.T) {
 
 	require.Len(t, cmd.calls, 1)
 	call := cmd.calls[0]
-	assert.Contains(t, call, "-e AIRFLOW_HOME -e ZED "+execService,
-		"each key should be named bare, in order, so the command line is reproducible")
+	// The run's override is the LAST --file, after the project's own override:
+	// compose merges in order, so that is what makes the caller's value win a
+	// key either file also sets.
+	override := strings.LastIndex(call, imageRunOverrideName)
+	require.Positive(t, override, "the caller's keys are declared by a run-only override")
+	assert.NotContains(t, call[override:], "--file", "the run's override must be the last file")
+	assert.NotContains(t, call, " -e ", "no key is named on the command line")
 	assert.NotContains(t, call, "BAD", "a key holding = would never resolve")
 
 	env, ok := cmd.envFor("run --rm")
 	require.True(t, ok, "the run command's environment was not recorded")
-	assert.Contains(t, env, "AIRFLOW_HOME=/tmp/scratch")
-	assert.Contains(t, env, "ZED=last")
-	for _, kv := range env {
-		assert.False(t, strings.HasPrefix(kv, "BAD"), "a key holding = would never resolve")
-	}
+	assert.Equal(t, []string{secretRef("AIRFLOW_HOME") + "=/tmp/scratch", secretRef("ZED") + "=last"}, env,
+		"each value travels under its alias, in order, and nothing else does")
+
+	dir, err := rt.StateDir(project)
+	require.NoError(t, err)
+	_, statErr := os.Stat(filepath.Join(dir, imageRunOverrideName))
+	assert.True(t, os.IsNotExist(statErr), "the run's override is removed when the run ends")
+}
+
+// The override declares each caller key on the run's service as a reference
+// to its alias, sorted, and holds no value.
+func TestWriteImageRunOverrideDeclaresReferencesOnly(t *testing.T) {
+	dir := t.TempDir()
+	path, err := writeImageRunOverride(dir,
+		map[string]string{"ZED": "s3cret", "DOCKER_HOST": "tcp://x:2375", "BAD=KEY": "v"},
+		[]string{"ZED", "FROM_START"})
+	require.NoError(t, err)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	// FROM_START is a secret the generated file declares that this run was not
+	// handed: valueless, so it resolves as it did before it was a reference.
+	assert.Equal(t, "services:\n  "+execService+":\n    environment:\n"+
+		"      'DOCKER_HOST': "+secretInterpolation(secretRef("DOCKER_HOST"))+"\n"+
+		"      'FROM_START':\n"+
+		"      'ZED': "+secretInterpolation(secretRef("ZED"))+"\n", string(data))
+
+	none, err := writeImageRunOverride(dir, nil, nil)
+	require.NoError(t, err)
+	assert.Empty(t, none, "nothing to declare writes nothing")
+}
+
+// A secret the compose file declares from the last start that the caller does
+// not pass is not handed to compose at all: the run's override declares it
+// valueless, so compose resolves it from the CLI's own environment under its
+// own name, as before it was a reference, and leaves it unset when that holds
+// none. Only the caller's values travel, under their aliases.
+func TestRunInImageHandsComposeOnlyTheCallersValues(t *testing.T) {
+	cmd := &fakeCmd{}
+	e := testEngine(t, cmd)
+	project := t.TempDir()
+	path := withComposeFile(t, project)
+	file := "x-common-env: &common-env\n" +
+		"  FROM_START: " + secretInterpolation(secretRef("FROM_START")) + "\n" +
+		"  FROM_CALLER: " + secretInterpolation(secretRef("FROM_CALLER")) + "\n" +
+		"services: {}\n"
+	require.NoError(t, os.WriteFile(path, []byte(file), 0o600))
+	t.Setenv("FROM_START", "shell-value")
+
+	require.NoError(t, e.RunInImage(context.Background(), project, rt.ImageRun{
+		Argv: []string{"python"},
+		Env:  map[string]string{"FROM_CALLER": "caller-value"},
+	}))
+
+	env, ok := cmd.envFor("run --rm")
+	require.True(t, ok)
+	assert.Equal(t, []string{secretRef("FROM_CALLER") + "=caller-value"}, env,
+		"only the caller's values travel, under their aliases")
 }
 
 // Values never appear on the command line, where any local user can read them
 // through ps. They reach the container only through the compose process's
-// environment, which compose resolves each bare -e KEY from.
+// environment, under the aliases the run's override references.
 func TestRunInImageKeepsValuesOffTheCommandLine(t *testing.T) {
 	cmd := &fakeCmd{}
 	e := testEngine(t, cmd)
@@ -165,9 +223,8 @@ func TestRunInImageKeepsValuesOffTheCommandLine(t *testing.T) {
 		// says how long the leaked value was, which is enough to find it.
 		assert.Truef(t, !strings.Contains(call, v),
 			"the value of %s (%d bytes) is on the command line", k, len(v))
-		assert.Truef(t, strings.Contains(call, "-e "+k+" "), "%s should be named to compose", k)
-		assert.Truef(t, slices.Contains(env, k+"="+v),
-			"the value of %s should be in the compose process environment", k)
+		assert.Truef(t, slices.Contains(env, secretRef(k)+"="+v),
+			"the value of %s should be in the compose process environment, under its alias", k)
 	}
 }
 
@@ -339,15 +396,11 @@ func TestRunInImageAcceptsADockerRecord(t *testing.T) {
 	assert.Len(t, cmd.calls, 1)
 }
 
-// The caller's environment reaches the compose PROCESS, not only the container.
-//
-// The compose file declares every PassthroughEnv and SecretEnv key without a
-// value, the command line names every caller key the same way, and compose
-// resolves all of them from its own environment; a key it cannot resolve is
-// dropped from the container silently. The engine connection still
-// goes last, so a caller-supplied DOCKER_HOST cannot retarget the invocation.
-// The same resolution means the container gets the connection's DOCKER_HOST,
-// not the caller's, exactly as the running Airflow does after a start.
+// The caller's environment reaches the compose PROCESS under aliases only, so a
+// caller-supplied DOCKER_HOST cannot retarget the invocation, whether or not
+// the connection names one: the only DOCKER_HOST compose sees is the
+// connection's. The container still gets the caller's value, through the
+// override's reference, as the running Airflow does after a start.
 func TestRunInImageGivesTheCallersEnvToComposeItself(t *testing.T) {
 	cmd := &fakeCmd{}
 	e := testEngine(t, cmd)
@@ -367,22 +420,19 @@ func TestRunInImageGivesTheCallersEnvToComposeItself(t *testing.T) {
 
 	env, ok := cmd.envFor("run --rm")
 	require.True(t, ok, "the run command's environment was not recorded")
-	assert.Contains(t, env, "AIRFLOW_VAR_TOKEN=s3cret",
-		"a value compose cannot resolve is dropped from the container silently")
-	// os/exec keeps the last duplicate, so the connection must win.
-	last := ""
+	assert.Contains(t, env, secretRef("AIRFLOW_VAR_TOKEN")+"=s3cret")
+	assert.Contains(t, env, secretRef("DOCKER_HOST")+"=unix:///attacker.sock",
+		"the caller's DOCKER_HOST travels under its alias, for the container")
+	var hosts []string
 	for _, kv := range env {
 		if strings.HasPrefix(kv, "DOCKER_HOST=") {
-			last = kv
+			hosts = append(hosts, kv)
 		}
 	}
-	assert.Equal(t, "DOCKER_HOST=unix:///real.sock", last,
-		"a caller-supplied DOCKER_HOST must not retarget the invocation")
+	assert.Equal(t, []string{"DOCKER_HOST=unix:///real.sock"}, hosts,
+		"the only DOCKER_HOST compose itself sees is the connection's")
 	require.Len(t, cmd.calls, 1)
-	assert.Contains(t, cmd.calls[0], "-e DOCKER_HOST ",
-		"the key is named bare, so compose resolves it to the connection's value")
-	assert.NotContains(t, cmd.calls[0], "attacker.sock",
-		"a value on the command line would outrank compose's own environment")
+	assert.NotContains(t, cmd.calls[0], "attacker.sock", "no value is on the command line")
 }
 
 // A compose file that stat cannot resolve for some other reason is not reported

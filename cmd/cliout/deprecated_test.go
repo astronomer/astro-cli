@@ -11,16 +11,15 @@ import (
 )
 
 func TestWarnDeprecatedSaysEachSpellingOncePerRun(t *testing.T) {
-	root := &cobra.Command{Use: "astro"}
-	leaf := &cobra.Command{Use: "leaf"}
-	root.AddCommand(leaf)
+	ResetWarnOnce()
+	t.Cleanup(ResetWarnOnce)
 	var w bytes.Buffer
 
-	WarnDeprecated(&w, leaf, "--deployment-id", "use --deployment")
-	WarnDeprecated(&w, leaf, "--deployment-id", "use --deployment")
-	WarnDeprecated(&w, root, "--deployment-id", "use --deployment")
-	WarnDeprecated(&w, leaf, "--workspace-id", "use --workspace")
-	WarnDeprecated(&w, leaf, "astro deployment logs scheduler", "use astro deployment logs --scheduler")
+	WarnDeprecated(&w, "--deployment-id", "use --deployment")
+	WarnDeprecated(&w, "--deployment-id", "use --deployment")
+	WarnDeprecated(&w, "--deployment-id", "use --deployment")
+	WarnDeprecated(&w, "--workspace-id", "use --workspace")
+	WarnDeprecated(&w, "astro deployment logs scheduler", "use astro deployment logs --scheduler")
 
 	assert.Equal(t, "Warning: --deployment-id is deprecated: use --deployment\n"+
 		"Warning: --workspace-id is deprecated: use --workspace\n"+
@@ -28,6 +27,8 @@ func TestWarnDeprecatedSaysEachSpellingOncePerRun(t *testing.T) {
 }
 
 func TestWarnDeprecatedFlagsWarnsOfTheFlagsTheRunGave(t *testing.T) {
+	ResetWarnOnce()
+	t.Cleanup(ResetWarnOnce)
 	cmd := &cobra.Command{Use: "list"}
 	cmd.Flags().String("workspace", "", "")
 	cmd.Flags().String("workspace-id", "", "")
@@ -51,8 +52,10 @@ func TestExecuteClearsWhatTheLastRunSaid(t *testing.T) {
 	root := &cobra.Command{Use: "astro"}
 	var w bytes.Buffer
 	leaf := &cobra.Command{Use: "leaf", RunE: func(cmd *cobra.Command, _ []string) error {
-		WarnDeprecated(&w, cmd, "--old", "use --new")
-		WarnDeprecated(&w, cmd, "--old", "use --new")
+		WarnDeprecated(&w, "--old", "use --new")
+		WarnDeprecated(&w, "--old", "use --new")
+		WarnOnce(&w, "other", "something else, once")
+		WarnOnce(&w, "other", "something else, once")
 		return nil
 	}}
 	root.AddCommand(leaf)
@@ -60,4 +63,5 @@ func TestExecuteClearsWhatTheLastRunSaid(t *testing.T) {
 		require.NoError(t, Execute(t.Context(), root, []string{"leaf"}, &bytes.Buffer{}, nil))
 	}
 	assert.Equal(t, 2, strings.Count(w.String(), "--old is deprecated: use --new"), w.String())
+	assert.Equal(t, 2, strings.Count(w.String(), "something else, once"), w.String())
 }

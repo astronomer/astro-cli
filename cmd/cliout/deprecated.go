@@ -2,8 +2,7 @@ package cliout
 
 import (
 	"io"
-	"slices"
-	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -31,10 +30,6 @@ import (
 // what to type instead as its value.
 const deprecatedAnnotation = "astro.deprecated-use"
 
-// warnedAnnotation holds, on a run's root, the spellings it has warned of, one
-// to a line. Execute clears it as a run starts.
-const warnedAnnotation = "astro.deprecation-warned"
-
 // DeprecateFlag marks f as a deprecated spelling, with use as what to type
 // instead ("use --deployment"), and hides it from help. WarnDeprecatedFlags
 // warns of it when a run gives it.
@@ -59,19 +54,36 @@ func DeprecatedUse(f *pflag.Flag) (string, bool) {
 // stream, os.Stderr in the binary), that spelling (as typed: "--secret",
 // "astro deployment logs scheduler") is deprecated and that use is what to
 // type instead, once for each spelling in a run. use reads after the colon:
-// "use --deployment". cmd is any command of the run's tree: the run's root
-// remembers what it has said.
-func WarnDeprecated(w io.Writer, cmd *cobra.Command, spelling, use string) {
-	root := cmd.Root()
-	warned := root.Annotations[warnedAnnotation]
-	if slices.Contains(strings.Split(warned, "\n"), spelling) {
-		return
+// "use --deployment".
+func WarnDeprecated(w io.Writer, spelling, use string) {
+	WarnOnce(w, spelling, spelling+" is deprecated: "+use)
+}
+
+var (
+	onceMu     sync.Mutex
+	onceWarned = map[string]bool{}
+)
+
+// WarnOnce prints msg as a warning to w, once per run for each key. It is what
+// WarnDeprecated is made of, for a warning that is no deprecated spelling but
+// is as much the run's, not the process's, such as an environment variable
+// that is set and no longer used. Execute starts each run with nothing said.
+func WarnOnce(w io.Writer, key, msg string) {
+	onceMu.Lock()
+	seen := onceWarned[key]
+	onceWarned[key] = true
+	onceMu.Unlock()
+	if !seen {
+		Warn(w, msg)
 	}
-	if root.Annotations == nil {
-		root.Annotations = map[string]string{}
-	}
-	root.Annotations[warnedAnnotation] = warned + spelling + "\n"
-	Warn(w, spelling+" is deprecated: "+use)
+}
+
+// ResetWarnOnce forgets what the run has warned of. Execute does it as a run
+// starts; a test that does not run through Execute does it for itself.
+func ResetWarnOnce() {
+	onceMu.Lock()
+	clear(onceWarned)
+	onceMu.Unlock()
 }
 
 // WarnDeprecatedFlags warns, through WarnDeprecated, of each deprecated flag
@@ -79,12 +91,7 @@ func WarnDeprecated(w io.Writer, cmd *cobra.Command, spelling, use string) {
 func WarnDeprecatedFlags(w io.Writer, cmd *cobra.Command) {
 	cmd.Flags().Visit(func(f *pflag.Flag) {
 		if use, ok := DeprecatedUse(f); ok {
-			WarnDeprecated(w, cmd, "--"+f.Name, use)
+			WarnDeprecated(w, "--"+f.Name, use)
 		}
 	})
-}
-
-// resetDeprecations forgets what root has warned of, as a new run starts.
-func resetDeprecations(root *cobra.Command) {
-	delete(root.Annotations, warnedAnnotation)
 }

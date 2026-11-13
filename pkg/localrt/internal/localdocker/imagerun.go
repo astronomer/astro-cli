@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/internal/localstate"
@@ -92,19 +94,33 @@ func (e *Engine) RunInImage(ctx context.Context, projectPath string, req rt.Imag
 		return err
 	}
 	// The caller's values travel in the compose process's environment and
-	// nowhere else. They are typically decrypted connections and variables, and
-	// a command line is readable by every local user through ps.
-	environ := secretEnviron(req.Env)
+	// nowhere else, under their secretRef aliases. They are typically decrypted
+	// connections and variables: a command line is readable by every local user
+	// through ps, and under its own name a value like DOCKER_HOST would retarget
+	// this compose call instead of reaching the container.
+	fileKeys, err := composeSecretKeys(path)
+	if err != nil {
+		return err
+	}
+	files := composeFiles(path, projectPath)
+	// The caller's keys reach the container through a run-only override that
+	// declares each as a reference to its alias. Env is not limited to keys the
+	// generated file declares, and one it does not declare would otherwise
+	// never reach the container. The override also covers the file's own
+	// secret keys the caller did not pass (see writeImageRunOverride). It holds
+	// names, never values.
+	if override, err := writeImageRunOverride(filepath.Dir(path), req.Env, fileKeys); err != nil {
+		return err
+	} else if override != "" {
+		defer os.Remove(override) //nolint:errcheck // best-effort cleanup of a file holding no values
+		files = append(files, override)
+	}
 	line := composeLine{
 		conn:       conn,
-		files:      composeFiles(path, projectPath),
+		files:      files,
 		name:       name,
 		projectDir: projectPath,
-		// Compose resolves two kinds of valueless entry from this: the
-		// PassthroughEnv and SecretEnv keys the file declares, and the bare
-		// -e KEY flags below. A key it cannot resolve is dropped from the
-		// container silently.
-		extraEnv: environ,
+		extraEnv:   secretEnviron(req.Env),
 	}
 
 	// --pull never: the image was built locally and never pushed, so a pull can
@@ -124,18 +140,9 @@ func (e *Engine) RunInImage(ctx context.Context, projectPath string, req rt.Imag
 	// and prints to stdout while it waits. Overriding it also discards the
 	// service's own command, so the arguments below are the whole command line
 	// and a program with no arguments runs as itself.
-	//
-	// -e names each key with no value, so compose takes the value from its own
-	// environment. The flag is still needed: Env is not limited to keys the
-	// file declares, and one it does not declare would otherwise never reach
-	// the container.
 	args := []string{
 		"run", "--rm", "--no-deps", "-T", "--pull", "never",
 		"--entrypoint", req.Argv[0],
-	}
-	for _, kv := range environ {
-		key, _, _ := strings.Cut(kv, "=")
-		args = append(args, "-e", key)
 	}
 	args = append(args, execService)
 	args = append(args, req.Argv[1:]...)
@@ -153,3 +160,77 @@ func (e *Engine) composeFileFor(projectPath string) (string, error) {
 	}
 	return filepath.Join(dir, composeFileName), nil
 }
+
+// secretRefPattern finds the aliases a generated compose file references.
+var secretRefPattern = regexp.MustCompile(secretRefPrefix + `[0-9a-f]+`)
+
+// composeSecretKeys are the SecretEnv keys a generated compose file declares,
+// read back from the aliases it references.
+func composeSecretKeys(composePath string) ([]string, error) {
+	data, err := os.ReadFile(composePath)
+	if err != nil {
+		return nil, fmt.Errorf("reading the project's compose file: %w", err)
+	}
+	var keys []string
+	for _, ref := range secretRefPattern.FindAllString(string(data), -1) {
+		if key, ok := secretKey(ref); ok {
+			keys = append(keys, key)
+		}
+	}
+	return keys, nil
+}
+
+// writeImageRunOverride writes, in dir, a compose override for the service a
+// run uses and returns its path, or "" when there is nothing to declare. It
+// holds key names only, never values:
+//
+//   - each key in env, as a reference to its alias, whose value the run hands
+//     compose;
+//   - each key in fileKeys that env does not hold, as a valueless `KEY:`.
+//     That replaces the generated file's reference to an alias this run has no
+//     value for, and resolves the key the way it resolved before it was a
+//     reference: from the CLI's own environment under its own name, and left
+//     unset when that holds none rather than set to an empty string.
+//
+// One fixed name rather than a temp file: RunInImage holds the project lock,
+// so no two runs share it at once, and a file a killed run left behind is
+// overwritten by the next one instead of accumulating.
+func writeImageRunOverride(dir string, env map[string]string, fileKeys []string) (string, error) {
+	decl := map[string]string{}
+	for _, k := range fileKeys {
+		if _, passed := env[k]; !passed && secretKeyOK(k) {
+			decl[k] = ""
+		}
+	}
+	for k := range env {
+		if secretKeyOK(k) {
+			decl[k] = " " + secretInterpolation(secretRef(k))
+		}
+	}
+	if len(decl) == 0 {
+		return "", nil
+	}
+	keys := make([]string, 0, len(decl))
+	for k := range decl {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	b.WriteString("services:\n  " + execService + ":\n    environment:\n")
+	for _, k := range keys {
+		b.WriteString("      " + quoteYAML(k) + ":" + decl[k] + "\n")
+	}
+	path := filepath.Join(dir, imageRunOverrideName)
+	if err := os.WriteFile(path, []byte(b.String()), imageRunOverridePerm); err != nil {
+		os.Remove(path) //nolint:errcheck // best-effort cleanup of a partial file; the write error is what we return
+		return "", fmt.Errorf("writing the run's compose override: %w", err)
+	}
+	return path, nil
+}
+
+// imageRunOverrideName is the run-only compose override in the state dir, and
+// imageRunOverridePerm its mode: the CLI user's alone, like the state dir.
+const (
+	imageRunOverrideName = "compose.run.yaml"
+	imageRunOverridePerm = 0o600
+)

@@ -140,7 +140,7 @@ func newComponentLogsCmd(out io.Writer, use string, aliases []string, component 
 				typed = cmd.Name()
 			}
 			logs := cmd.Parent().CommandPath()
-			cliout.WarnDeprecated(cmd.ErrOrStderr(), cmd, logs+" "+typed, "use "+logs+" --"+logComponentFlag(component))
+			cliout.WarnDeprecated(cmd.ErrOrStderr(), logs+" "+typed, "use "+logs+" --"+logComponentFlag(component))
 			return showLogs(cmd, []string{component}, out)
 		},
 	}

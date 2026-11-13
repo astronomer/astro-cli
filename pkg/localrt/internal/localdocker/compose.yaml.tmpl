@@ -5,6 +5,9 @@ x-common-env: &common-env
 {{- range .PassEnv}}
   {{quote .}}:
 {{- end}}
+{{- range .SecretEnv}}
+  {{quote .Name}}: {{secretRef .Ref}}
+{{- end}}
 
 networks:
   airflow:
