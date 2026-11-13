@@ -80,7 +80,7 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 		if err != nil {
 			return err
 		}
-		switched := pick.domain != "" && pick.domain != manifest.NormalizeDomain(before.Domain) && !credentialFromEnv()
+		switched := pick.domain != "" && pick.domain != manifest.NormalizeDomain(before.Domain) && !astrosession.HasAPIToken()
 		if switched {
 			if _, err := astrosession.BearerFor(cmd.Context(), pick.domain); err != nil {
 				return err
@@ -184,14 +184,6 @@ func projectManifest(dir string) (*manifest.Manifest, error) {
 		return nil, nil
 	}
 	return m, err
-}
-
-// credentialFromEnv reports an API token or key in the environment. Setup
-// uses one, for that process only, as the login of the domain it runs on and
-// makes that domain current, so the command stays on the host the environment
-// names rather than move the user's current context.
-func credentialFromEnv() bool {
-	return astrosession.HasAPIToken() || os.Getenv("ASTRONOMER_KEY_ID") != ""
 }
 
 // projectDeployment reads ref as a Deployment link name, then as a Deployment

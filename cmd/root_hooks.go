@@ -78,7 +78,7 @@ func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobr
 				}
 				// Carrying on without the organization would send its requests to
 				// an empty one, and fail with an error that hides this one.
-				if errors.Is(err, astroCmd.ErrAPITokenOrganization) {
+				if errors.Is(err, astroCmd.ErrAPITokenOrganization) || errors.Is(err, astroCmd.ErrLegacyAPIKeys) {
 					return err
 				}
 				apcCmd.InitDebugLogs = append(apcCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())

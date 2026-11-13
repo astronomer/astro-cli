@@ -110,8 +110,7 @@ A dependency's own `replace` lines are never honoured, so a consumer of a module
 1. the flag: `--workspace` (`--deployment` for a Deployment);
 2. the project link, `[tool.astro]` in `pyproject.toml`, for the command families that follow the project: `astro env` and `astro deployment` (`followProjectPreRun` records it on the command's context, `withProjectFollow`; `workspaceTarget` in `cmd/astro` reads it);
 3. the claims of the run's API token: a Workspace or Deployment token names its Workspace, a Deployment token its Deployment (`astrosession.TokenDeployment` reads it from the token). An Organization token names neither;
-4. the Workspace the saved interactive login last used. Never under `ASTRO_API_TOKEN`, and never another host's saved login for a token run (`Request.Domain`);
-5. the legacy `ASTRONOMER_KEY_*` rule: the Workspace of the organization's first Deployment, which setup records for such a run.
+4. the Workspace the saved interactive login last used. Never under `ASTRO_API_TOKEN`, and never another host's saved login for a token run (`Request.Domain`).
 
 A `Target` records the source of each answer. A run that found none gets its error from `Target.Missing`, worded by what the command accepts (`Request.Accepts`: `ByFlag`, `ByProject`, `ByID`, `ByPath`), so the advice never offers a way the command would not take. A command that asks a question or calls the API calls `Require` first. A Deployment given by ID is identified by it and needs no Workspace (`deploymentWorkspace` in `cmd/astro`): when none is found, which is an Organization token's run and also a saved login whose current Workspace is empty, it is fetched by ID, and the command works in the Workspace it is in. That costs a round trip: the fetch by ID, the list of the Deployment's Workspace, and the library's own fetch again. A name, a pick, and a value that is not an ID still need a Workspace. `Resolve` reads a token's Deployment only for a caller that sets `WantDeployment`.
 
@@ -229,7 +228,7 @@ The command-specific 2s predate the usage 2. A script that runs one of those com
 | `database_newer_than_airflow` | the metadata database was migrated by a newer Airflow (Docker mode) |
 | `not_running` | nothing is running for this project |
 | `deployment_hibernating`, `deployment_deploying`, `deployment_unhealthy`, `airflow_unavailable` | an Astro Deployment's Airflow did not answer (see [instances.md](instances.md#when-a-deployments-airflow-does-not-answer)); `deployment_hibernating` is also `astro deploy` refused because the Deployment is hibernating (see [deploy.md](deploy.md#1-image-deploys) and [Dags-only deploys](deploy.md#2-dags-only-deploys)); `deployment_deploying` and `airflow_unavailable` mean try again |
-| `unauthenticated` | no usable Astro login: none was made, the API refused the token (401), or one was needed and a run under `--output json` may not start a browser login |
+| `unauthenticated` | no usable Astro login: none was made, the API refused the token (401), one was needed and a run under `--output json` may not start a browser login, or the environment holds both of the retired `ASTRONOMER_KEY_ID` and `ASTRONOMER_KEY_SECRET` and no API token (the message names `ASTRO_API_TOKEN`) |
 | `forbidden` | the login lacks the permission this needs (403) |
 | `not_found` | the Astro API has no such object (404) |
 | `conflict` | the Astro API refused because of the object's current state, such as one that already exists (409) |
