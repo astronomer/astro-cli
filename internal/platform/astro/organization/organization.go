@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/picker"
@@ -271,7 +272,11 @@ func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, 
 	// One reading of the clock, so the date in the file's name and the day
 	// its logs start from cannot straddle a midnight.
 	asOf := auditLogsClock()
-	if filePath == "" {
+	// A name the CLI made up is written as a new file, never through a symlink
+	// already sitting at it in the working directory (a project's, say);
+	// --output-file is the user's to point anywhere, and is written as given.
+	defaultName := filePath == ""
+	if defaultName {
 		orgName = strings.ReplaceAll(strings.ToLower(orgName), " ", "")
 
 		date := "-" + asOf.Format("20060102")
@@ -302,7 +307,11 @@ func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, 
 	}
 
 	filePerms := 0o644
-	err = os.WriteFile(filePath, body, os.FileMode(filePerms))
+	if defaultName {
+		err = fileutil.WriteFresh(filePath, body, os.FileMode(filePerms))
+	} else {
+		err = os.WriteFile(filePath, body, os.FileMode(filePerms))
+	}
 	if err != nil {
 		return nil, err
 	}
