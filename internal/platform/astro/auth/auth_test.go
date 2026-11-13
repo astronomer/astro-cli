@@ -385,6 +385,20 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 
 	// bound is the address the last callback listener opened.
 	var bound string
+	// setup gives a subtest its own explicit callback settings, restored when
+	// it ends, so no subtest depends on what an earlier one left behind.
+	setup := func(t *testing.T) {
+		t.Helper()
+		server, timeout, listening, shutdown := callbackServer, callbackTimeout, callbackListening, callbackShutdownTimeout
+		t.Cleanup(func() {
+			callbackServer, callbackTimeout, callbackListening, callbackShutdownTimeout = server, timeout, listening, shutdown
+		})
+		bound = ""
+		callbackServer = "localhost:0"
+		callbackTimeout = 10 * time.Second
+		callbackListening = func(net.Addr) {}
+		callbackShutdownTimeout = time.Second
+	}
 	// requirePortFree checks that a finished login released its port.
 	requirePortFree := func(t *testing.T) {
 		t.Helper()
@@ -404,7 +418,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 	// The returned func waits for the request to finish.
 	callbackAt := func(t *testing.T, query, wantLocation string, preconnect bool) (wait func()) {
 		t.Helper()
-		callbackServer = "localhost:0"
+		setup(t)
 		done := make(chan struct{})
 		callbackListening = func(addr net.Addr) {
 			bound = addr.String()
@@ -455,8 +469,8 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 		held, err := net.Listen("tcp", "localhost:0")
 		assert.NoError(t, err)
 		defer held.Close()
+		setup(t)
 		callbackServer = held.Addr().String()
-		callbackListening = func(net.Addr) {}
 
 		code, err := authorizeCallback(io.Discard)
 		assert.Empty(t, code)
@@ -475,7 +489,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 	})
 
 	t.Run("timeout", func(t *testing.T) {
-		callbackServer = "localhost:0"
+		setup(t)
 		callbackListening = func(addr net.Addr) { bound = addr.String() }
 		callbackTimeout = 5 * time.Millisecond
 		_, err := authorizeCallback(io.Discard)
@@ -492,8 +506,8 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 		t.Run("an idle connection does not hold up a login that ends in "+tc.name, func(t *testing.T) {
 			// A generous bound, so a login that waits on the idle connection
 			// is told apart from a slow machine.
-			callbackShutdownTimeout = 5 * time.Second
 			wait := callbackAt(t, tc.query, tc.location, true)
+			callbackShutdownTimeout = 5 * time.Second
 			var out bytes.Buffer
 			start := time.Now()
 			code, err := authorizeCallback(&out)
