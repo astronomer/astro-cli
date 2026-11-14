@@ -357,7 +357,7 @@ func stringField(m map[string]interface{}, field string) string {
 	return s
 }
 
-// Credentials from the environment (ASTRO_API_TOKEN, API keys) belong to the
+// Credentials from the environment (ASTRO_API_TOKEN) belong to the
 // process that was given them. UseEnvironmentLogin hands one to the context a
 // command runs on, and SetEnvironmentContextKey the organization and workspace
 // it is for: every read of that context in this process returns them, with no

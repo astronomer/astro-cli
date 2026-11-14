@@ -39,4 +39,17 @@ func TestRootPersistentPreRunESetupErrors(t *testing.T) {
 	t.Run("other setup errors are only logged", func(t *testing.T) {
 		assert.NoError(t, run(errors.New("the API token given does not appear to be an Astro API Token")))
 	})
+
+	t.Run("Deployment API keys in the environment stop the command", func(t *testing.T) {
+		t.Setenv("ASTRO_API_TOKEN", "")
+		t.Setenv("ASTRONOMER_KEY_ID", "id")
+		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
+		astroSetup = origSetup
+		root := &cobra.Command{Use: "astro"}
+		leaf := &cobra.Command{Use: "list"}
+		root.AddCommand(leaf)
+		err := CreateRootPersistentPreRunE(nil)(leaf, nil)
+		require.ErrorIs(t, err, astroCmd.ErrLegacyAPIKeys)
+		assert.Equal(t, KindUnauthenticated, problemKinds.Of(err))
+	})
 }
