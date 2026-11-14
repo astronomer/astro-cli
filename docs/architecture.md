@@ -101,6 +101,7 @@ A dependency's own `replace` lines are never honoured, so a consumer of a module
 ### Code conventions
 
 - Tests match the package they are in. testify and plain `testing` both exist; don't rewrite either style, and don't mix them within a package.
+- Tests do not read the shell they run in. A test package's `TestMain` calls `testenv.Clear()` ([`pkg/testing/testenv`](../pkg/testing/testenv/testenv.go)), which unsets the variables that change what the CLI does (`ASTRO_API_TOKEN`, `ASTRO_HOME`, `ASTRO_DOMAIN`, `ASTRONOMER_KEY_ID` and `_SECRET`, `CI` and the other CI markers, ...), so a developer's exported token or a CI runner's `CI=true` fails nothing. A test that needs one sets it with `t.Setenv` (`testUtil.UseAPIToken` for a token); a new package whose code reads one of these gets a `TestMain`, and a new variable the CLI reads is added to the list in `testenv`. Package-level fixtures are read-only: a test that needs a different one builds its own rather than reassigning the shared one, which would leak into the next run under `-count`.
 - Windows handling uses build tags only when code won't compile cross-OS, and a `runtime.GOOS` switch when picking a value.
 
 ## Which Astro Workspace a run acts on

@@ -220,6 +220,17 @@ type Suite struct {
 	suite.Suite
 }
 
+// pristineDeployment is deploymentResponse's Deployment as declared. The tests
+// reassign its fields (Executor, Type, WorkerQueues), so each starts from this
+// again rather than from whatever the previous run left.
+var pristineDeployment = *deploymentResponse.JSON200
+
+func (*Suite) SetupTest() {
+	*deploymentResponse.JSON200 = pristineDeployment
+}
+
+var _ suite.SetupTestSuite = (*Suite)(nil)
+
 func (s *Suite) SetupSubTest() {
 	// Reset the shared mock between subtests so expectations don't leak across boundaries.
 	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
