@@ -336,7 +336,7 @@ func (s *Suite) TestSwitch() {
 	})
 
 	s.Run("successful switch with name and set default product", func() {
-		mockOKResponse = astrov1.ListOrganizationsResponse{
+		oneOrgResponse := astrov1.ListOrganizationsResponse{
 			HTTPResponse: &http.Response{
 				StatusCode: 200,
 			},
@@ -350,7 +350,7 @@ func (s *Suite) TestSwitch() {
 			},
 		}
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
-		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&oneOrgResponse, nil).Once()
 		CheckUserSession = func(c *config.Context, astroV1Client astrov1.APIClient, out io.Writer) error {
 			return nil
 		}
