@@ -87,13 +87,13 @@ func newDeployBundleCmd() *cobra.Command {
   astro deploy bundle --delete --deployment <DEPLOYMENT_ID>`,
 	}
 	f := cmd.Flags()
-	f.StringVarP(&o.mountPath, "mount-path", "m", "", "Path the bundle is mounted at in Airflow, for reference by Dags. Default: the type's, "+astrodeploy.DbtDefaultMountPathPrefix+"<project name> for a dbt project")
+	f.StringVar(&o.mountPath, "mount-path", "", "Path the bundle is mounted at in Airflow, for reference by Dags. Default: the type's, "+astrodeploy.DbtDefaultMountPathPrefix+"<project name> for a dbt project")
 	f.StringVar(&o.bundleType, "type", "", "Type of the bundle: "+types+", or any other label, which has no defaults. Default: detected from PATH, else none")
-	f.StringVar(&o.deployment, "deployment", "", "Deployment to deploy to: a link name from the project here, a Deployment id, or a Deployment name")
+	f.StringVarP(&o.deployment, "deployment", "d", "", "Deployment to deploy to: a link name from the project here, a Deployment id, or a Deployment name")
 	f.StringVar(&o.workspace, "workspace", "", "Workspace a Deployment name is looked up in, and whose Deployments are offered when no --deployment is given")
 	f.StringVar(&o.description, "description", "", "Description to store on the deploy")
-	f.BoolVarP(&o.wait, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
-	f.DurationVarP(&o.waitTime, "wait-time", "t", deployWaitTime, "Time to wait for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
+	f.BoolVar(&o.wait, "wait", false, "Wait for the Deployment to become healthy before ending the command")
+	f.DurationVar(&o.waitTime, "wait-time", deployWaitTime, "Time to wait for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	f.BoolVar(&o.delete, "delete", false, "Remove the bundle mounted at --mount-path (by default the one PATH's type would mount at) instead of deploying")
 	cliout.AddOutputFlag(cmd, &o.output)
 	return cmd

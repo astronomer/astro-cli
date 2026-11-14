@@ -58,7 +58,7 @@ func (s *Suite) TestNewGetTeamUsersCmd() {
 	api.On("GetTeamUsers", mock.Anything).Return(users, nil)
 	houstonClient = api
 
-	output, err := execTeamCmd("get", "-u", "test-id")
+	output, err := execTeamCmd("get", "--users", "test-id")
 	s.NoError(err)
 	s.Contains(output, "USERNAME            ID          \n email@email.com     test-id")
 	api.AssertExpectations(s.T())
@@ -106,7 +106,7 @@ func (s *Suite) TestListTeam() {
 		houstonClient = api
 		defer testUtil.MockUserInput(s.T(), "q")()
 
-		output, err := execTeamCmd("list", "-p", "-s=30")
+		output, err := execTeamCmd("list", "--paginated", "--page-size=30")
 		s.NoError(err)
 		s.Contains(output, "test-id")
 		api.AssertExpectations(s.T())
@@ -118,7 +118,7 @@ func (s *Suite) TestListTeam() {
 		houstonClient = api
 		defer testUtil.MockUserInput(s.T(), "q")()
 
-		output, err := execTeamCmd("list", "-p", "-s=-2")
+		output, err := execTeamCmd("list", "--paginated", "--page-size=-2")
 		s.NoError(err)
 		s.Contains(output, "test-id")
 		api.AssertExpectations(s.T())

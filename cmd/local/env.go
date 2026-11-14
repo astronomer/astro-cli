@@ -32,8 +32,9 @@ import (
 const (
 	plainSetHelp    = "Store the value unencrypted: in the project's .env, or for a global, in the vault without encryption"
 	plainNarrowHelp = "In a project, act on the plain .env only, not the vault"
-	// legacySecretUsage is the deprecation notice cobra prints for --secret.
-	legacySecretUsage = "values are stored in the encrypted vault by default; use --plain to opt out (--secret=false still means --plain)"
+	// legacyStoreFlagUse is what the deprecation warning says to type instead of
+	// --secret (cliout.WarnDeprecated).
+	legacyStoreFlagUse = "use --plain to opt out of the encrypted vault, which is the default (--secret=false still means --plain)"
 )
 
 // scopeFlags carries the shared --project/--global choice and the store
@@ -63,17 +64,18 @@ type scopeFlags struct {
 func addStoreFlags(cmd *cobra.Command, scope *scopeFlags, plainHelp string) {
 	cmd.Flags().BoolVar(&scope.plain, "plain", false, plainHelp)
 	cmd.Flags().BoolVar(&scope.legacySecret, "secret", false, "Deprecated: the vault is the default")
-	_ = cmd.Flags().MarkDeprecated("secret", legacySecretUsage) //nolint:errcheck // the flag was just registered
+	cliout.DeprecateFlag(cmd.Flags().Lookup("secret"), legacyStoreFlagUse)
 }
 
 // readStoreFlags folds the deprecated --secret into --plain. --secret is the
 // default and changes nothing; --secret=false, which used to mean a plain
 // file, still does, so a script written for it keeps its meaning. --plain with
 // --secret asks for both stores at once and is refused.
-func readStoreFlags(cmd *cobra.Command, scope *scopeFlags) error {
+func readStoreFlags(cmd *cobra.Command, stderr io.Writer, scope *scopeFlags) error {
 	if !cmd.Flags().Changed("secret") {
 		return nil
 	}
+	cliout.WarnDeprecatedFlags(stderr, cmd)
 	if scope.legacySecret && scope.plain {
 		return errors.New("--plain and --secret cannot be used together: the vault is the default, and --plain opts out of it")
 	}
@@ -384,7 +386,7 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Example: example,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := readStoreFlags(cmd, scope); err != nil {
+			if err := readStoreFlags(cmd, c.d.Stderr, scope); err != nil {
 				return err
 			}
 			// The route is decided before the value is read, so a save the
@@ -435,9 +437,9 @@ var connFieldFlagNames = []string{"type", "host", "login", "password", "schema",
 // addConnFieldFlags registers the per-field flags on a connection's `set`.
 //
 // The long names are the cloud sibling's, so the same invocation describes the
-// same connection in both trees. The single-letter forms are not: cloud has
-// -t/-l/-p free, but here -p next to --project reads as the scope flag, and a
-// shorthand that invites the wrong guess is worse than no shorthand.
+// same connection in both trees. The single-letter forms are not carried: a
+// short option is one of the table's (utils.ShortOptions), and -p next to
+// --project would read as the scope flag.
 func addConnFieldFlags(cmd *cobra.Command, f *connFields) {
 	cmd.Flags().StringVar(&f.connType, "type", "", "Connection type (e.g. postgres, http)")
 	cmd.Flags().StringVar(&f.host, "host", "", "Connection host")
@@ -510,7 +512,7 @@ func newEnvGetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			"  astro local env " + localenv.Noun(k.kind) + " get " + exampleName(k.kind) + " --global",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := readStoreFlags(cmd, scope); err != nil {
+			if err := readStoreFlags(cmd, c.d.Stderr, scope); err != nil {
 				return err
 			}
 			return c.runEnvGet(scope, k.kind, args[0])
@@ -539,7 +541,7 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			"  astro local env " + localenv.Noun(k.kind) + " delete " + exampleName(k.kind) + " --undeclare",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := readStoreFlags(cmd, scope); err != nil {
+			if err := readStoreFlags(cmd, c.d.Stderr, scope); err != nil {
 				return err
 			}
 			return c.runEnvDelete(scope, k.kind, args[0], undeclare)
@@ -585,7 +587,7 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			return c.runEnvList(scope, all, only)
 		},
 	}
-	cmd.Flags().BoolVar(&all, "all", false, "Also include every known project's .env, and vault globals not linked to this project")
+	cmd.Flags().BoolVarP(&all, "all", "a", false, "Also include every known project's .env, and vault globals not linked to this project")
 	return cmd
 }
 

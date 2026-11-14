@@ -49,8 +49,8 @@ const (
 // subroot. Used by every `astro env <type>` subroot so the scope semantics
 // are uniform across types.
 func addScopePersistentFlags(cmd *cobra.Command) {
-	addWorkspaceFlag(cmd.PersistentFlags(), &envWorkspaceID, "", envWorkspaceUsage, oneXWorkspaceID)
-	addDeploymentFlag(cmd.PersistentFlags(), envDeploymentUsage, deploymentTargets{id: &envDeploymentID, scope: true}, oneXDeploymentID(""))
+	addWorkspaceFlag(cmd.PersistentFlags(), &envWorkspaceID, "w", envWorkspaceUsage, oneXWorkspaceID)
+	addDeploymentFlag(cmd.PersistentFlags(), envDeploymentUsage, deploymentTargets{id: &envDeploymentID, scope: true}, oneXDeploymentID)
 	cmd.PersistentFlags().BoolVar(&envIncludeSecrets, "include-secrets", false, "Show secret values (org policy must allow it)")
 	cmd.PersistentFlags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 }
@@ -165,7 +165,7 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 	//
 	// 1.x had no env list, so it takes only the v2 spellings: no hidden
 	// --workspace-id or --deployment-id for a 1.x script to have used.
-	addWorkspaceFlag(cmd.Flags(), &envWorkspaceID, "", envWorkspaceUsage)
+	addWorkspaceFlag(cmd.Flags(), &envWorkspaceID, "w", envWorkspaceUsage)
 	addDeploymentFlag(cmd.Flags(), envDeploymentUsage, deploymentTargets{id: &envDeploymentID, scope: true})
 	cmd.Flags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 	return cmd

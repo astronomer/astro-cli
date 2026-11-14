@@ -320,12 +320,6 @@ func TestEveryOneXSpellingReachesWhatTheV2SpellingDoes(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, want, got, "--%s", u.alias)
 
-			if u.shorthand != "" {
-				short, err := resolveSpellings(t, u, "-"+u.shorthand, v)
-				require.NoError(t, err)
-				assert.Equal(t, want, short, "-%s", u.shorthand)
-			}
-
 			got, err = resolveSpellings(t, u, "--"+u.preferred, v, "--"+u.alias, v)
 			require.NoError(t, err)
 			assert.Equal(t, want, got, "both spellings, agreeing")
@@ -372,29 +366,13 @@ func TestAnEmptyDeploymentOrWorkspaceIsRefused(t *testing.T) {
 	}
 }
 
-// The shorthands 1.x gave its spellings are still there, on the hidden
-// aliases, so a 1.x script's -d and -n keep working.
-func TestTheOneXShorthandsAreKept(t *testing.T) {
-	short := map[string]string{}
+// The hidden aliases take no shorthand, whatever 1.x gave them: a letter is
+// one of the table's flags or none, so a 1.x script's -d is --deployment's,
+// and its -n and -w, which meant other things here, are refused by name at the
+// root (TestEveryV1FlagStillWorksOrSaysWhatReplacedIt).
+func TestTheOneXAliasesTakeNoShorthand(t *testing.T) {
 	for _, u := range aliasUses(t) {
-		if u.shorthand != "" {
-			short[u.tree+" "+strings.Join(u.path, " ")+" -"+u.shorthand] = u.alias
-		}
-	}
-	for cmd, alias := range map[string]string{
-		"deployment variable list -d":       "deployment-id",
-		"deployment variable list -n":       "deployment-name",
-		"deployment variable create -d":     "deployment-id",
-		"deployment variable update -n":     "deployment-name",
-		"deployment worker-queue create -d": "deployment-id",
-		"deployment logs -n":                "deployment-name",
-		"deployment delete -n":              "deployment-name",
-		"deployment inspect -n":             "deployment-name",
-		"deployment hibernate -n":           "deployment-name",
-		"deployment wake-up -n":             "deployment-name",
-		"deployment team add -w":            "deployment-id",
-	} {
-		assert.Equal(t, alias, short[cmd], cmd)
+		assert.Empty(t, u.shorthand, "%s %s: --%s", u.tree, strings.Join(u.path, " "), u.alias)
 	}
 }
 
@@ -409,11 +387,11 @@ func TestADeploymentAliasKeepsItsKind(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, resolvedSpellings{id: "test-id-1"}, r, "a non-CUID id is still an id")
 
-	r, err = resolveSpellings(t, list, "-n", unlinkedDep)
+	r, err = resolveSpellings(t, list, "--deployment-name", unlinkedDep)
 	require.NoError(t, err)
 	assert.Equal(t, resolvedSpellings{name: unlinkedDep}, r, "a CUID-shaped name is still a name")
 
-	r, err = resolveSpellings(t, list, "-d", unlinkedDep, "-n", "my-dep")
+	r, err = resolveSpellings(t, list, "--deployment-id", unlinkedDep, "--deployment-name", "my-dep")
 	require.NoError(t, err)
 	assert.Equal(t, resolvedSpellings{id: unlinkedDep, name: "my-dep"}, r, "both, as 1.x took them")
 

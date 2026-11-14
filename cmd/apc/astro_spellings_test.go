@@ -21,7 +21,7 @@ func TestWorkspaceNameFlag(t *testing.T) {
 		return mock.MatchedBy(func(r houston.CreateWorkspaceRequest) bool { return r.Label == label })
 	}
 	for _, args := range [][]string{
-		{"--name", "alpha"}, {"-n", "alpha"}, {"--label", "alpha"}, {"-l", "alpha"}, {"--name", "alpha", "--label", "alpha"},
+		{"--name", "alpha"}, {"-n", "alpha"}, {"--label", "alpha"}, {"--name", "alpha", "--label", "alpha"},
 	} {
 		t.Run("create "+args[0], func(t *testing.T) {
 			api := newAPCClient()
@@ -69,34 +69,14 @@ func TestWorkspaceNameFlag(t *testing.T) {
 	}
 }
 
-// What --name refuses as an NFS location, and what it takes as a name.
-func TestNFSShapedName(t *testing.T) {
-	for v, nfs := range map[string]bool{
-		"10.0.0.5:/dags":         true,
-		"nfs://10.0.0.5:/dags":   true,
-		"nfs.corp:/airflow/dags": true,
-		"[fd00::5]:/dags":        true,
-		"10.0.0.5:/":             true,
-		"prod":                   false,
-		"Team A: prod":           false,
-		"etl:/daily":             false,
-		"filer-01:/dags":         false,
-		"https://wiki/team-a":    false,
-		"10.0.0.5:dags":          false,
-		"a/b:/c":                 false,
-		"":                       false,
-	} {
-		assert.Equal(t, nfs, nfsShaped.MatchString(v), v)
-	}
-}
-
-// deployment create, update and adopt take the Deployment's name as --name
-// and -n, as Astro's do, with 1.x's --label and -l as its alias. 1.x's -n on
-// create and update was --nfs-location, which keeps its long spelling, and
-// 1.x's --name on adopt was the custom resource's, which is --cr-name.
+// deployment create, update and adopt take the Deployment's name as --name,
+// with 1.x's --label as its alias, and adopt as -n too. 1.x's -n on create and
+// update was --nfs-location, so those two take no -n (the root refuses it by
+// name, see removedFlags), and 1.x's --name on adopt was the custom
+// resource's, which is --cr-name.
 func TestDeploymentNameFlag(t *testing.T) {
 	for _, args := range [][]string{
-		{"--name", "alpha"}, {"-n", "alpha"}, {"--label", "alpha"}, {"-l", "alpha"}, {"--name", "alpha", "--label", "alpha"},
+		{"--name", "alpha"}, {"--label", "alpha"}, {"--name", "alpha", "--label", "alpha"},
 	} {
 		t.Run("create "+args[0], func(t *testing.T) {
 			api := newAPCClient()
@@ -127,39 +107,8 @@ func TestDeploymentNameFlag(t *testing.T) {
 		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
 	})
 
-	// 1.x's -n was the NFS mount. A 1.x line passing it is refused, not
-	// taken as the Deployment's name.
-	t.Run("an NFS location given as the name is refused, naming --nfs-location", func(t *testing.T) {
-		for _, args := range [][]string{
-			{"deployment", "update", "dep-ac", "-n", "10.0.0.5:/dags"},
-			{"deployment", "update", "dep-ac", "-n", "nfs://10.0.0.5:/dags"},
-			{"deployment", "create", "--cluster-id", "cl-1", "--name", "nfs.corp:/airflow/dags"},
-		} {
-			api := newAPCClient()
-			api.On("GetDeployment", "dep-ac").Return(&certifiedDep, nil).Maybe()
-			run := runAPC(t, api, "", args...)
-			assert.Equal(t, 2, run.code, "%v", args)
-			require.Error(t, run.err, "%v", args)
-			assert.Contains(t, run.err.Error(), "it is an NFS location: the NFS volume to mount is --nfs-location, and --name (-n) is the Deployment's name in v2", "%v", args)
-			api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
-			api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
-		}
-	})
-
-	// Given through 1.x's --label, it is refused as given: a usage error
-	// naming the spelling typed.
-	t.Run("an NFS location given as -l is a usage error naming -l's --label", func(t *testing.T) {
-		api := newAPCClient()
-		run := runAPC(t, api, "", "deployment", "create", "--cluster-id", "cl-1", "-l", "10.0.0.5:/dags")
-		assert.Equal(t, 2, run.code)
-		require.Error(t, run.err)
-		assert.Contains(t, run.err.Error(), `--label: invalid argument "10.0.0.5:/dags" for "-n, --name" flag: it is an NFS location`)
-		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
-	})
-
-	// 1.x's --label took any name, so --name does: only what is shaped as an
-	// NFS location is refused.
-	t.Run("a name with :/ in it that is no NFS location is taken", func(t *testing.T) {
+	// 1.x's --label took any name, so --name does, whatever it looks like.
+	t.Run("a name with :/ in it is a name", func(t *testing.T) {
 		api := newAPCClient()
 		api.On("GetDeployment", "dep-ac").Return(&certifiedDep, nil)
 		api.On("UpdateDeployment", mock.MatchedBy(func(v map[string]interface{}) bool {
@@ -171,21 +120,18 @@ func TestDeploymentNameFlag(t *testing.T) {
 		api.AssertExpectations(t)
 	})
 
-	// 1.x's create needed -l, so this is how a 1.x line passing the mount
-	// looks: the refusal is the one naming --nfs-location, not --name and
-	// --label disagreeing, which would say to keep the mount as the name.
-	t.Run("a 1.x line passing the mount as -n beside -l is refused, naming --nfs-location", func(t *testing.T) {
+	// 1.x's -n was the NFS mount, and --name takes no letter on these two, so a
+	// 1.x line passing the mount with it never names the Deployment.
+	t.Run("create and update take no -n", func(t *testing.T) {
 		for _, args := range [][]string{
-			{"deployment", "create", "--cluster-id", "cl-1", "-l", "prod", "-n", "10.0.0.5:/dags"},
-			{"deployment", "create", "--cluster-id", "cl-1", "-n", "10.0.0.5:/dags", "-l", "prod"},
-			{"deployment", "update", "dep-ac", "-l", "prod", "-n", "[fd00::5]:/dags"},
+			{"deployment", "create", "--cluster-id", "cl-1", "--label", "prod", "-n", "nas01:/export/dags"},
+			{"deployment", "update", "dep-ac", "--executor", "local", "-n", "nas01:/export/dags"},
 		} {
 			api := newAPCClient()
+			api.On("GetDeployment", "dep-ac").Return(&certifiedDep, nil).Maybe()
 			run := runAPC(t, api, "", args...)
-			assert.Equal(t, 2, run.code, "%v", args)
 			require.Error(t, run.err, "%v", args)
-			assert.Contains(t, run.err.Error(), "the NFS volume to mount is --nfs-location", "%v", args)
-			assert.NotContains(t, run.err.Error(), "disagree", "%v", args)
+			assert.Contains(t, run.err.Error(), "unknown shorthand flag: 'n'", "%v", args)
 			api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
 			api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
 		}
@@ -220,7 +166,7 @@ func TestDeploymentNameFlag(t *testing.T) {
 		return api
 	}
 	adopt := []string{"deployment", "adopt", "--cluster-id", "cl-1", "--namespace", "ns", "--cr-name", "cr"}
-	for _, args := range [][]string{{"--name", "shown"}, {"-n", "shown"}, {"--label", "shown"}, {"-l", "shown"}} {
+	for _, args := range [][]string{{"--name", "shown"}, {"-n", "shown"}, {"--label", "shown"}} {
 		t.Run("adopt "+args[0]+" names the Deployment, --cr-name the custom resource", func(t *testing.T) {
 			api := adopts("shown")
 			run := runAPC(t, api, "", append(append([]string{}, adopt...), args...)...)
@@ -242,7 +188,7 @@ func TestDeploymentNameFlag(t *testing.T) {
 		for _, args := range [][]string{
 			{"--name", "cr"},
 			{"--name", "cr", "--label", "shown"},
-			{"-l", "shown", "--name", "cr"},
+			{"--label", "shown", "--name", "cr"},
 		} {
 			api := newAPCClient()
 			run := runAPC(t, api, "", append([]string{"deployment", "adopt", "--cluster-id", "cl-1", "--namespace", "ns"}, args...)...)
@@ -257,7 +203,7 @@ func TestDeploymentNameFlag(t *testing.T) {
 	// No --name typed, so nothing to say about what it means now: the error is
 	// the one naming the flag missing, --label alone given or not.
 	t.Run("adopt naming no custom resource and no --name is the required-flag error", func(t *testing.T) {
-		for _, args := range [][]string{{}, {"-l", "shown"}} {
+		for _, args := range [][]string{{}} {
 			run := runAPC(t, newAPCClient(), "", append([]string{"deployment", "adopt", "--cluster-id", "cl-1", "--namespace", "ns"}, args...)...)
 			require.Error(t, run.err, "%v", args)
 			assert.Contains(t, run.err.Error(), `required flag(s) "cr-name" not set`, "%v", args)
@@ -268,7 +214,12 @@ func TestDeploymentNameFlag(t *testing.T) {
 		t.Run(sub+" help shows --name only", func(t *testing.T) {
 			run := runAPC(t, newAPCClient(), "", "deployment", sub, "--help")
 			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-			assert.Contains(t, run.stdout, "-n, --name")
+			if sub == "adopt" {
+				assert.Contains(t, run.stdout, "-n, --name")
+			} else {
+				assert.Contains(t, run.stdout, "--name")
+				assert.NotContains(t, run.stdout, "-n, --name", "1.x's -n here was --nfs-location")
+			}
 			assert.NotContains(t, run.stdout, "--label")
 		})
 	}
@@ -293,9 +244,8 @@ func TestServiceAccountNameFlag(t *testing.T) {
 			{"--name", "ci"},
 			{"-n", "ci"},
 			{"--label", "ci"},
-			{"-l", "ci"},
 			{"--name", "ci", "--label", "ci"},
-			{"-n", "ci", "-l", "ci"},
+			{"-n", "ci", "--label", "ci"},
 		} {
 			t.Run(c.scope+" "+strings.Join(given, " "), func(t *testing.T) {
 				api := newAPCClient()
@@ -305,7 +255,7 @@ func TestServiceAccountNameFlag(t *testing.T) {
 				api.AssertExpectations(t)
 			})
 		}
-		for _, given := range [][]string{{"--name", "ci", "--label", "other"}, {"-n", "ci", "-l", "other"}} {
+		for _, given := range [][]string{{"--name", "ci", "--label", "other"}, {"-n", "ci", "--label", "other"}} {
 			t.Run(c.scope+": "+strings.Join(given, " ")+" disagreeing is refused", func(t *testing.T) {
 				api := newAPCClient()
 				run := runAPC(t, api, "", append(append([]string{}, c.args...), given...)...)
@@ -317,7 +267,7 @@ func TestServiceAccountNameFlag(t *testing.T) {
 		}
 		// An unset variable is no name: refused, not an account named "" with
 		// a live API key, whichever spelling handed it on.
-		for _, given := range [][]string{{"--name", ""}, {"--label", ""}, {"-l", ""}} {
+		for _, given := range [][]string{{"--name", ""}, {"--label", ""}} {
 			t.Run(c.scope+": "+strings.Join(given, " ")+`"" is refused`, func(t *testing.T) {
 				api := newAPCClient()
 				run := runAPC(t, api, "", append(append([]string{}, c.args...), given...)...)
@@ -346,7 +296,7 @@ func TestDeploymentLogsKeywordFlag(t *testing.T) {
 		return mock.MatchedBy(func(r houston.ListDeploymentLogsRequest) bool { return r.Search == term })
 	}
 	for _, args := range [][]string{
-		{"--keyword", "boom"}, {"-k", "boom"}, {"--search", "boom"}, {"-s", "boom"}, {"--keyword", "boom", "--search", "boom"},
+		{"--keyword", "boom"}, {"--search", "boom"}, {"--keyword", "boom", "--search", "boom"},
 	} {
 		t.Run(args[0], func(t *testing.T) {
 			api := newAPCClient()

@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -205,19 +204,17 @@ func legacyKeysSet() []string {
 	return set
 }
 
-var legacyKeysWarned atomic.Bool
-
 // warnLegacyKeys says once per run, on stderr, that the variables in set are
 // not used.
 func warnLegacyKeys(set []string) {
-	if len(set) == 0 || !legacyKeysWarned.CompareAndSwap(false, true) {
+	if len(set) == 0 {
 		return
 	}
 	verb, pronoun := "is", "it"
 	if len(set) > 1 {
 		verb, pronoun = "are", "them"
 	}
-	cliout.Warn(os.Stderr, fmt.Sprintf("%s %s set but no longer used (Deployment API keys are not supported); unset %s", strings.Join(set, " and "), verb, pronoun))
+	cliout.WarnOnce(os.Stderr, "legacy-api-keys", fmt.Sprintf("%s %s set but no longer used (Deployment API keys are not supported); unset %s", strings.Join(set, " and "), verb, pronoun))
 }
 
 // FreshLogin returns the context for domain, or the current context when

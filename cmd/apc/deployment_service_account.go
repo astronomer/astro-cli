@@ -70,12 +70,12 @@ func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command {
 			return deploymentSaCreate(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
-	cmd.Flags().StringVarP(&deploymentSACreateCategory, "category", "c", "default", "Category of the service account")
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, "d", true)
+	cmd.Flags().StringVar(&deploymentSACreateCategory, "category", "default", "Category of the service account")
 	// --name, as an Astro API token's; 1.x's --label, -l, is its alias.
 	cmd.Flags().StringVarP(&deploymentSACreateName, "name", "n", "", "Name of the service account")
-	utils.AddAlias(cmd.Flags(), "label", "l", "name")
-	cmd.Flags().StringVarP(&deploymentSACreateRole, "role", "r", houston.DeploymentViewerRole, "Role of the service account to create, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
+	utils.AddAlias(cmd.Flags(), "label", "name")
+	cmd.Flags().StringVar(&deploymentSACreateRole, "role", houston.DeploymentViewerRole, "Role of the service account to create, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
 	_ = cmd.MarkFlagRequired("name")       //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
@@ -93,7 +93,7 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 			return deploymentSaList(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, "d", true)
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
@@ -111,7 +111,7 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 			return deploymentSaDelete(cmd, args, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, "d", true)
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addYesFlag(cmd, "Don't ask for confirmation before deleting the service account")
 	addAccessOutputFlag(cmd)

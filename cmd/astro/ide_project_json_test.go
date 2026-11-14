@@ -104,26 +104,26 @@ func ideTextCases() []ideCase {
 		{name: "list refused by the API", projects: both, more: []ideMockOpt{failsList(403)}, args: []string{"project", "list"}, check: says(""), wantErr: "no IDE for you"},
 		// The success line of an import has always said "exported".
 		{
-			name: "import by id", projects: both, more: []ideMockOpt{opensSession(ro)}, args: []string{"project", "import", "-p", "proj-etl"},
+			name: "import by id", projects: both, more: []ideMockOpt{opensSession(ro)}, args: []string{"project", "import", "--project-id", "proj-etl"},
 			check: says("Successfully exported project from ETL\n"), after: imported,
 		},
 		{
-			name: "import from a session", projects: both, args: []string{"project", "import", "-p", "proj-etl", "-s", "sess-x"},
+			name: "import from a session", projects: both, args: []string{"project", "import", "--project-id", "proj-etl", "--session-id", "sess-x"},
 			check: says("Successfully exported project from ETL\n"), after: imported,
 		},
 		{
 			name: "import into a directory that is not empty, confirmed", projects: both, more: []ideMockOpt{opensSession(ro)},
-			files: map[string]string{"README.md": "hi\n"}, answers: "y\n", args: []string{"project", "import", "-p", "proj-etl"},
+			files: map[string]string{"README.md": "hi\n"}, answers: "y\n", args: []string{"project", "import", "--project-id", "proj-etl"},
 			check: says("Current directory is not empty. Do you want to import the project here? ", " (y/n) ", "Successfully exported project from ETL\n"), after: imported,
 		},
 		{
 			name: "import into a directory that is not empty, declined", projects: both,
-			files: map[string]string{"README.md": "hi\n"}, answers: "n\n", args: []string{"project", "import", "-p", "proj-etl"},
+			files: map[string]string{"README.md": "hi\n"}, answers: "n\n", args: []string{"project", "import", "--project-id", "proj-etl"},
 			check: then(says("Current directory is not empty.", " (y/n) "), lacks("Successfully")), wantErr: "aborted", after: importedNothing,
 		},
 		{
 			name: "import into a directory that is not empty --yes", projects: both, more: []ideMockOpt{opensSession(ro)},
-			files: map[string]string{"README.md": "hi\n"}, args: []string{"project", "import", "-p", "proj-etl", "--yes"},
+			files: map[string]string{"README.md": "hi\n"}, args: []string{"project", "import", "--project-id", "proj-etl", "--yes"},
 			check: then(says("Successfully exported project from ETL\n"), lacks("Current directory is not empty")), after: imported,
 		},
 		{
@@ -142,21 +142,21 @@ func ideTextCases() []ideCase {
 		{name: "import with no projects", args: []string{"project", "import"}, check: says(""), wantErr: "no Astro IDE projects found in workspace", after: importedNothing},
 		{
 			name: "export by id", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload}, files: exportSource,
-			args: []string{"project", "export", "-p", "proj-etl"}, check: says("Successfully exported project to ETL\n"),
+			args: []string{"project", "export", "--project-id", "proj-etl"}, check: says("Successfully exported project to ETL\n"),
 		},
 		// A project that cannot be read back afterwards is named by its ID.
 		{
 			name: "export to a project that cannot be read back", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload, cannotRead("proj-gone")}, files: exportSource,
-			args: []string{"project", "export", "-p", "proj-gone"}, check: says("Successfully exported project to proj-gone\n"),
+			args: []string{"project", "export", "--project-id", "proj-gone"}, check: says("Successfully exported project to proj-gone\n"),
 		},
 		{
 			name: "export to a locked project", projects: []astrov1alpha1.AstroIdeProject{lockedETL(), ml}, more: []ideMockOpt{opensSession(ro)}, files: exportSource,
-			args: []string{"project", "export", "-p", "proj-etl"}, check: says(""),
+			args: []string{"project", "export", "--project-id", "proj-etl"}, check: says(""),
 			wantErr: "project is locked by user Ada Lovelace and last edited at January 2, 2026 at 3:04 PM. Use --force flag to overwrite the existing project lock",
 		},
 		{
 			name: "export to a locked project --force", projects: []astrov1alpha1.AstroIdeProject{lockedETL(), ml}, more: []ideMockOpt{opensSession(ro), acceptsUpload}, files: exportSource,
-			args: []string{"project", "export", "-p", "proj-etl", "--force"}, check: says("Successfully exported project to ETL\n"),
+			args: []string{"project", "export", "--project-id", "proj-etl", "--force"}, check: says("Successfully exported project to ETL\n"),
 		},
 		{
 			name: "export to a project picked", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload}, files: exportSource,
@@ -184,7 +184,7 @@ func ideTextCases() []ideCase {
 			wantErr: "failed to create project: the API did not return the project",
 		},
 		{
-			name: "import, the export failing", projects: both, more: []ideMockOpt{opensSession(ro), failsDownload}, args: []string{"project", "import", "-p", "proj-etl"},
+			name: "import, the export failing", projects: both, more: []ideMockOpt{opensSession(ro), failsDownload}, args: []string{"project", "import", "--project-id", "proj-etl"},
 			check: says(""), wantErr: "export broke", after: importedNothing,
 		},
 		{
@@ -303,17 +303,17 @@ func TestIDEProjectJSON(t *testing.T) {
 			},
 		},
 		{
-			ideCase: ideCase{name: "import by id", projects: both, more: []ideMockOpt{opensSession(ro)}, args: []string{"project", "import", "-p", "proj-etl"}, after: imported},
+			ideCase: ideCase{name: "import by id", projects: both, more: []ideMockOpt{opensSession(ro)}, args: []string{"project", "import", "--project-id", "proj-etl"}, after: imported},
 			check:   movedJSON(importedETL),
 		},
 		{
-			ideCase: ideCase{name: "import from a session", projects: both, args: []string{"project", "import", "-p", "proj-etl", "-s", "sess-x"}, after: imported},
+			ideCase: ideCase{name: "import from a session", projects: both, args: []string{"project", "import", "--project-id", "proj-etl", "--session-id", "sess-x"}, after: imported},
 			check:   movedJSON(map[string]any{"project_id": "proj-etl", "project_name": "ETL", "session_id": "sess-x", "files": float64(2), "bytes": float64(20), "action": "imported"}),
 		},
 		{
 			ideCase: ideCase{
 				name: "import into a directory that is not empty --yes", projects: both, more: []ideMockOpt{opensSession(ro)},
-				files: map[string]string{"README.md": "hi\n"}, args: []string{"project", "import", "-p", "proj-etl", "--yes"}, after: imported,
+				files: map[string]string{"README.md": "hi\n"}, args: []string{"project", "import", "--project-id", "proj-etl", "--yes"}, after: imported,
 			},
 			check: movedJSON(importedETL),
 		},
@@ -325,21 +325,21 @@ func TestIDEProjectJSON(t *testing.T) {
 			stderr:  []string{"Only one Project was found.", "Project ID: ", "proj-etl"},
 		},
 		{
-			ideCase: ideCase{name: "export by id", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload}, files: exportSource, args: []string{"project", "export", "-p", "proj-etl"}},
+			ideCase: ideCase{name: "export by id", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload}, files: exportSource, args: []string{"project", "export", "--project-id", "proj-etl"}},
 			check:   movedJSON(exportedETL),
 		},
 		// The URL is published instead of opened.
 		{
-			ideCase: ideCase{name: "export to a project with a URL", projects: []astrov1alpha1.AstroIdeProject{etl, mlURL}, more: []ideMockOpt{opensSession(rw), acceptsUpload}, files: exportSource, args: []string{"project", "export", "-p", "proj-ml"}},
+			ideCase: ideCase{name: "export to a project with a URL", projects: []astrov1alpha1.AstroIdeProject{etl, mlURL}, more: []ideMockOpt{opensSession(rw), acceptsUpload}, files: exportSource, args: []string{"project", "export", "--project-id", "proj-ml"}},
 			check:   movedJSON(map[string]any{"project_id": "proj-ml", "project_name": "ML", "project_created": false, "url": url, "files": float64(2), "bytes": float64(10), "action": "exported"}),
 		},
 		// With no name to give, the result gives none.
 		{
-			ideCase: ideCase{name: "export to a project that cannot be read back", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload, cannotRead("proj-gone")}, files: exportSource, args: []string{"project", "export", "-p", "proj-gone"}},
+			ideCase: ideCase{name: "export to a project that cannot be read back", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload, cannotRead("proj-gone")}, files: exportSource, args: []string{"project", "export", "--project-id", "proj-gone"}},
 			check:   movedJSON(map[string]any{"project_id": "proj-gone", "project_created": false, "files": float64(2), "bytes": float64(10), "action": "exported"}),
 		},
 		{
-			ideCase: ideCase{name: "export to a locked project --force", projects: []astrov1alpha1.AstroIdeProject{lockedETL(), ml}, more: []ideMockOpt{opensSession(ro), acceptsUpload}, files: exportSource, args: []string{"project", "export", "-p", "proj-etl", "--force"}},
+			ideCase: ideCase{name: "export to a locked project --force", projects: []astrov1alpha1.AstroIdeProject{lockedETL(), ml}, more: []ideMockOpt{opensSession(ro), acceptsUpload}, files: exportSource, args: []string{"project", "export", "--project-id", "proj-etl", "--force"}},
 			check:   movedJSON(exportedETL),
 		},
 	}
@@ -370,7 +370,7 @@ func TestIDEProjectJSONFailures(t *testing.T) {
 		{name: "import with no projects", args: []string{"project", "import"}, wantErr: "no Astro IDE projects found in workspace", after: importedNothing},
 		{
 			name: "export to a locked project", projects: []astrov1alpha1.AstroIdeProject{lockedETL(), ml}, more: []ideMockOpt{opensSession(ro)}, files: exportSource,
-			args: []string{"project", "export", "-p", "proj-etl"}, wantErr: "project is locked by user Ada Lovelace",
+			args: []string{"project", "export", "--project-id", "proj-etl"}, wantErr: "project is locked by user Ada Lovelace",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -400,7 +400,7 @@ func TestIDEProjectJSONNeverAsks(t *testing.T) {
 		answered string
 	}{
 		{ideCase{name: "import naming no project", projects: both, args: []string{"project", "import"}}, "pass --project-id"},
-		{ideCase{name: "import into a directory that is not empty", projects: both, files: notEmpty, args: []string{"project", "import", "-p", "proj-etl"}}, "pass --yes"},
+		{ideCase{name: "import into a directory that is not empty", projects: both, files: notEmpty, args: []string{"project", "import", "--project-id", "proj-etl"}}, "pass --yes"},
 		{ideCase{name: "export naming no project", projects: both, files: exportSource, args: []string{"project", "export"}}, "pass --project-id"},
 		{ideCase{name: "export --force naming no project", projects: both, files: exportSource, args: []string{"project", "export", "--force"}}, "pass --project-id"},
 	} {
@@ -424,7 +424,7 @@ func TestIDEProjectJSONNeverAsks(t *testing.T) {
 // writes into.
 func TestIDEProjectImportConfirmationNamesTheDirectory(t *testing.T) {
 	etl, ml := ideProjects()
-	tc := ideCase{projects: []astrov1alpha1.AstroIdeProject{etl, ml}, files: map[string]string{"README.md": "hi\n"}, answers: "n\n", args: []string{"project", "import", "-p", "proj-etl"}}
+	tc := ideCase{projects: []astrov1alpha1.AstroIdeProject{etl, ml}, files: map[string]string{"README.md": "hi\n"}, answers: "n\n", args: []string{"project", "import", "--project-id", "proj-etl"}}
 	r, dir := tc.run(t)
 	require.Error(t, r.err)
 	cwd, err := os.Getwd()
@@ -439,8 +439,8 @@ func TestIDEProjectImportConfirmationNamesTheDirectory(t *testing.T) {
 func TestIDEProjectRefusesAnUnknownFormat(t *testing.T) {
 	for _, args := range [][]string{
 		{"project", "list", "-o", "yaml"},
-		{"project", "import", "-p", "proj-etl", "-o", "yaml"},
-		{"project", "export", "-p", "proj-etl", "-o", "yaml"},
+		{"project", "import", "--project-id", "proj-etl", "-o", "yaml"},
+		{"project", "export", "--project-id", "proj-etl", "-o", "yaml"},
 	} {
 		t.Run(args[1], func(t *testing.T) {
 			m := ideMock(t, nil)

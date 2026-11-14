@@ -537,15 +537,15 @@ func TestDeploymentLogs(t *testing.T) {
 	astroV1Client = mockV1Client
 	astroV1Client = mockV1Client
 
-	cmdArgs := []string{"logs", "test-id-1", "-w"}
+	cmdArgs := []string{"logs", "test-id-1", "--warn"}
 	_, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "-e"}
+	cmdArgs = []string{"logs", "test-id-1", "--error"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "-i"}
+	cmdArgs = []string{"logs", "test-id-1", "--info"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	mockV1Client.AssertExpectations(t)
@@ -562,15 +562,15 @@ func TestDeploymentLogsMultipleComponents(t *testing.T) {
 	astroV1Client = mockV1Client
 	astroV1Client = mockV1Client
 
-	cmdArgs := []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "-w"}
+	cmdArgs := []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "--warn"}
 	_, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "-e"}
+	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "--error"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "-i"}
+	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "--info"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	mockV1Client.AssertExpectations(t)
@@ -979,7 +979,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		ctx.Workspace = ""
 		require.NoError(t, ctx.SetContext())
 		defer testUtil.InitTestConfig(testUtil.LocalPlatform)
-		resp, err := execDeploymentCmd("update", "-n", "doesnotexist")
+		resp, err := execDeploymentCmd("update", "--deployment-name", "doesnotexist")
 		assert.ErrorContains(t, err, "failed to find a valid Workspace")
 		assert.Contains(t, resp, "Usage:\n")
 	})
@@ -1362,7 +1362,7 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			assert.NoError(t, err)
 			defer testUtil.InitTestConfig(testUtil.LocalPlatform)
 			expectedOut := "Usage:\n"
-			cmdArgs := []string{tt.command, "-n", "doesnotexist"}
+			cmdArgs := []string{tt.command, "--deployment-name", "doesnotexist"}
 			resp, err := execDeploymentCmd(cmdArgs...)
 			assert.ErrorContains(t, err, "failed to find a valid workspace")
 			assert.Contains(t, resp, expectedOut)

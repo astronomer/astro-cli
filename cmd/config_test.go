@@ -35,19 +35,19 @@ func (s *CmdSuite) TestConfigRootCommand() {
 
 func (s *CmdSuite) TestConfigGetCommandSuccess() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, err := executeCommand("config", "get", "show_warnings", "-g")
+	_, err := executeCommand("config", "get", "show_warnings", "--global")
 	s.NoError(err)
 }
 
 func (s *CmdSuite) TestConfigGetCommandFailure() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, err := executeCommand("config", "get", "-g", "test")
+	_, err := executeCommand("config", "get", "--global", "test")
 	s.ErrorIs(err, errInvalidConfigPath)
 	s.True(cliout.IsUsage(err), "an unknown setting is a usage error, as an unknown flag is")
 	s.EqualError(err, `unknown setting: "test". Run astro config list to see every setting.`)
 
-	// Outside a project and without -g, an unknown name is still an unknown
-	// name, not advice to retry with -g, which would only fail again.
+	// Outside a project and without --global, an unknown name is still an unknown
+	// name, not advice to retry with --global, which would only fail again.
 	s.useWorkingPath(s.T().TempDir())
 	_, err = executeCommand("config", "get", "test")
 	s.ErrorIs(err, errInvalidConfigPath)
@@ -59,7 +59,7 @@ func (s *CmdSuite) TestConfigGetCommandFailure() {
 	s.Contains(err.Error(), "You are attempting to get a project config outside of a project directory")
 	// The suggested command has to be runnable. It used to interpolate the
 	// argument placeholder alongside the real argument.
-	s.Contains(err.Error(), "astro config get upgrade_message -g")
+	s.Contains(err.Error(), "astro config get upgrade_message --global")
 	s.NotContains(err.Error(), "[setting-name]")
 }
 
@@ -68,7 +68,7 @@ func (s *CmdSuite) TestConfigSetOutsideProjectSuggestsTheValueToo() {
 	s.useWorkingPath(s.T().TempDir())
 	_, err := executeCommand("config", "set", "show_warnings", "false")
 	s.ErrorContains(err, "outside of a project directory")
-	s.ErrorContains(err, "astro config set show_warnings false -g")
+	s.ErrorContains(err, "astro config set show_warnings false --global")
 }
 
 func (s *CmdSuite) TestConfigInAManifestProjectPointsAtGlobalAndPyproject() {
@@ -79,15 +79,15 @@ func (s *CmdSuite) TestConfigInAManifestProjectPointsAtGlobalAndPyproject() {
 	s.Error(err)
 	s.NotContains(err.Error(), "outside of a project directory")
 	s.Contains(err.Error(), "pyproject.toml under [tool.astro]")
-	s.Contains(err.Error(), "astro config set show_warnings false -g")
+	s.Contains(err.Error(), "astro config set show_warnings false --global")
 	s.Equal("true", config.CFG.ShowWarnings.GetHomeString())
 
 	_, err = executeCommand("config", "get", "deploy.git_metadata")
 	s.Error(err)
 	s.Contains(err.Error(), "pyproject.toml under [tool.astro]")
-	s.Contains(err.Error(), "astro config get deploy.git_metadata -g")
+	s.Contains(err.Error(), "astro config get deploy.git_metadata --global")
 
-	_, err = executeCommand("config", "set", "show_warnings", "false", "-g")
+	_, err = executeCommand("config", "set", "show_warnings", "false", "--global")
 	s.NoError(err)
 	s.Equal("false", config.CFG.ShowWarnings.GetHomeString())
 }
@@ -96,7 +96,7 @@ func (s *CmdSuite) TestConfigSuggestionQuotesAValueWithSpaces() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.useManifestProject()
 	_, err := executeCommand("config", "set", "internal.astro.localhost.core_url", "http://my host")
-	s.ErrorContains(err, "astro config set internal.astro.localhost.core_url 'http://my host' -g")
+	s.ErrorContains(err, "astro config set internal.astro.localhost.core_url 'http://my host' --global")
 }
 
 func (s *CmdSuite) TestConfigIn1xProjectWithPyprojectKeepsProjectScope() {
@@ -166,15 +166,15 @@ func (s *CmdSuite) TestConfigSetWithNoArgumentsReportsArity() {
 
 func (s *CmdSuite) TestConfigSetCommandFailure() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, err := executeCommand("config", "set", "test", "testing", "-g")
+	_, err := executeCommand("config", "set", "test", "testing", "--global")
 	s.Error(err)
 
-	_, err = executeCommand("config", "set", "test", "-g")
+	_, err = executeCommand("config", "set", "test", "--global")
 	s.ErrorIs(err, errInvalidSetArgs)
 	s.True(cliout.IsUsage(err), "the wrong number of arguments is a usage error, exit 2")
 }
 
-// Outside a project and without -g, the group's pre-run would refuse the
+// Outside a project and without --global, the group's pre-run would refuse the
 // scope before configSet saw the count, as a plain error exiting 1. The count
 // is checked first, as Args, so a wrong one is a usage error wherever it is.
 func (s *CmdSuite) TestConfigSetWithOneArgumentOutsideAProjectIsAUsageError() {
@@ -191,7 +191,7 @@ func (s *CmdSuite) TestConfigSetWithOneArgumentOutsideAProjectIsAUsageError() {
 
 func (s *CmdSuite) TestConfigSetCommandSuccess() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, err := executeCommand("config", "set", "-g", "apc.page_size", "30")
+	_, err := executeCommand("config", "set", "--global", "apc.page_size", "30")
 	s.NoError(err)
 }
 
@@ -228,7 +228,7 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 				case "outside a project":
 					s.useWorkingPath(s.T().TempDir())
 				case "global":
-					args = append(args, "-g")
+					args = append(args, "--global")
 				case "manifest project":
 					s.useManifestProject()
 				}
@@ -274,9 +274,9 @@ func (s *CmdSuite) TestConfigSetNeverWritesARemovedKey() {
 func (s *CmdSuite) TestConfigSetWritesOnlyTheChangeAndKeeps1xSettings() {
 	fs := s.initConfigFiles("postgres:\n  user: me\nwebserver:\n  port: \"8081\"\ncontext: localhost\n", "")
 
-	_, err := executeCommand("config", "set", "show_warnings", "false", "-g")
+	_, err := executeCommand("config", "set", "show_warnings", "false", "--global")
 	s.Require().NoError(err)
-	_, err = executeCommand("config", "set", "apc.page_size", "30", "-g")
+	_, err = executeCommand("config", "set", "apc.page_size", "30", "--global")
 	s.Require().NoError(err)
 
 	got, err := afero.ReadFile(fs, config.HomeConfigFile)
@@ -306,22 +306,22 @@ func (s *CmdSuite) TestConfigUnknownSettingSuggestsTheClosest() {
 		args []string
 		want string
 	}{
-		{"a typo", []string{"config", "set", "apc.page_sise", "30", "-g"}, " Did you mean apc.page_size? "},
-		{"a typo", []string{"config", "get", "deploy.git_metdata", "-g"}, " Did you mean deploy.git_metadata? "},
-		{"an accented letter is one edit", []string{"config", "get", "apc.page_sizé", "-g"}, " Did you mean apc.page_size? "},
-		{"swapped neighbors are one edit", []string{"config", "get", "telemetry.enalbed", "-g"}, " Did you mean telemetry.enabled? "},
+		{"a typo", []string{"config", "set", "apc.page_sise", "30", "--global"}, " Did you mean apc.page_size? "},
+		{"a typo", []string{"config", "get", "deploy.git_metdata", "--global"}, " Did you mean deploy.git_metadata? "},
+		{"an accented letter is one edit", []string{"config", "get", "apc.page_sizé", "--global"}, " Did you mean apc.page_size? "},
+		{"swapped neighbors are one edit", []string{"config", "get", "telemetry.enalbed", "--global"}, " Did you mean telemetry.enabled? "},
 		{
 			"every setting under a partial name",
-			[]string{"config", "get", "telemetry", "-g"},
+			[]string{"config", "get", "telemetry", "--global"},
 			" Did you mean one of: telemetry.anonymous_id, telemetry.enabled, telemetry.notice_shown? ",
 		},
-		{"a typo of a renamed 1.x name suggests the current one", []string{"config", "get", "page_sise", "-g"}, " Did you mean apc.page_size? "},
+		{"a typo of a renamed 1.x name suggests the current one", []string{"config", "get", "page_sise", "--global"}, " Did you mean apc.page_size? "},
 		{
 			"a typo of a removed 1.x name says it was removed",
-			[]string{"config", "set", "webserver.prot", "8081", "-g"},
+			[]string{"config", "set", "webserver.prot", "8081", "--global"},
 			"Did you mean webserver.port? It was removed in Astro CLI v2: nothing reads it. Pick the local Airflow port",
 		},
-		{"outside a project without -g", []string{"config", "get", "apc.page_sise"}, " Did you mean apc.page_size? "},
+		{"outside a project without --global", []string{"config", "get", "apc.page_sise"}, " Did you mean apc.page_size? "},
 	} {
 		s.Run(tc.name+": "+strings.Join(tc.args, " "), func() {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -338,14 +338,14 @@ func (s *CmdSuite) TestConfigUnknownSettingSuggestsTheClosest() {
 	// empty name, which is a prefix of all of them.
 	s.Run("never contexts", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		_, err := executeCommand("config", "set", "contxts", "x", "-g")
+		_, err := executeCommand("config", "set", "contxts", "x", "--global")
 		s.ErrorIs(err, errInvalidConfigPath)
 		s.NotContains(err.Error(), "contexts")
 	})
 	for _, args := range [][]string{
-		{"config", "set", "internal.astro.localhost.core", "x", "-g"},
-		{"config", "get", "", "-g"},
-		{"config", "get", "xyzzy", "-g"},
+		{"config", "set", "internal.astro.localhost.core", "x", "--global"},
+		{"config", "get", "", "--global"},
+		{"config", "get", "xyzzy", "--global"},
 	} {
 		s.Run("no suggestion: "+strings.Join(args, " "), func() {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)

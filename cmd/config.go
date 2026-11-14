@@ -98,19 +98,19 @@ func refuseRemovedConfigKey(key string) error {
 var (
 	globalFlag       bool
 	configGetExample = `  # Get a global setting
-  astro config get upgrade_message -g
+  astro config get upgrade_message --global
 
   # Get a setting from a 1.x project's .astro/config.yaml
   astro config get deploy.git_metadata`
 	configSetExample = `  # Turn off the upgrade notice on this machine
-  astro config set upgrade_message false -g
+  astro config set upgrade_message false --global
 
   # Set a setting in a 1.x project's .astro/config.yaml
   astro config set deploy.git_metadata false`
 )
 
 // configOutput is the -o of `astro config get`, `set` and `list`, registered
-// once on the group as -g is.
+// once on the group as --global is.
 var configOutput cliout.Format
 
 // configSetting is one setting as `astro config get`, `set` and `list`
@@ -141,11 +141,11 @@ func newConfigRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "config",
 		Short:             "Manage CLI settings for this machine",
-		Long:              "Manage CLI settings, stored globally with -g or in a 1.x project's .astro/config.yaml. Run astro config list to see every setting, or see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for what each one does",
+		Long:              "Manage CLI settings, stored globally with --global or in a 1.x project's .astro/config.yaml. Run astro config list to see every setting, or see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for what each one does",
 		PersistentPreRunE: ensureGlobalFlag,
 		Annotations:       map[string]string{astroCmd.NoLoginAnnotation: "true"},
 	}
-	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "View or modify global config")
+	cmd.PersistentFlags().BoolVar(&globalFlag, "global", false, "View or modify global config")
 	cliout.AddOutputFlag(cmd, &configOutput)
 	cmd.AddCommand(
 		newConfigGetCmd(out),
@@ -191,7 +191,7 @@ func newConfigListCmd(out io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List CLI settings",
-		Long:  "List every CLI setting with its value and where the value comes from: project (a 1.x project's .astro/config.yaml), global, or default. With -g, list the global values only",
+		Long:  "List every CLI setting with its value and where the value comes from: project (a 1.x project's .astro/config.yaml), global, or default. With --global, list the global values only",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return configList(cliout.Renderer{Format: configOutput, Out: out})
@@ -200,7 +200,7 @@ func newConfigListCmd(out io.Writer) *cobra.Command {
   astro config list
 
   # List the global values only
-  astro config list -g`,
+  astro config list --global`,
 	}
 }
 
@@ -213,14 +213,14 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	}
 	// A removed key is refused by set and get alike. Ahead of the scope
 	// checks, so the answer is the same in and out of a project and with or
-	// without -g.
+	// without --global.
 	if cmd.Name() == "set" || cmd.Name() == "get" {
 		if err := refuseRemovedConfigKey(args[0]); err != nil {
 			cmd.SilenceUsage = true
 			return err
 		}
 		// An unknown name too, for the same reason: the scope checks below
-		// would otherwise answer it with advice to run it with -g, which
+		// would otherwise answer it with advice to run it with --global, which
 		// then fails.
 		if _, ok := config.CFGStrMap[args[0]]; !ok {
 			cmd.SilenceUsage = true
@@ -235,12 +235,12 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	}
 	// cmd.Name(), not cmd.Use: Use carries the argument placeholder, so the
 	// suggested command read "astro config set [setting-name] project.name
-	// -g", which nobody can run.
+	// --global", which nobody can run.
 	quoted := make([]string, len(args))
 	for i, a := range args {
 		quoted[i] = scaffold.ShellQuote(a)
 	}
-	c := "astro config " + cmd.Name() + " " + strings.Join(quoted, " ") + " -g"
+	c := "astro config " + cmd.Name() + " " + strings.Join(quoted, " ") + " --global"
 	cmd.SilenceUsage = true
 	if project.HasManifest(config.WorkingPath) {
 		return fmt.Errorf(configUseWithManifestMsg, args[0], cmd.Name(), c)
@@ -249,7 +249,7 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 }
 
 // configGet publishes one setting from the scope asked for, as its text has
-// always shown it: with -g the global value (the built-in default when the
+// always shown it: with --global the global value (the built-in default when the
 // home config does not set it), and otherwise the 1.x project's own, which is
 // "" when the project does not set it. It never falls back from one to the
 // other; set says whether that scope sets the key. `config list` is where the
@@ -306,7 +306,7 @@ func configSet(cmd *cobra.Command, args []string) error {
 	}))
 }
 
-// configList publishes every setting but the unlisted ones, by key: with -g
+// configList publishes every setting but the unlisted ones, by key: with --global
 // the global values, and otherwise each value from where commands run here
 // read it, with the scope it comes from; set is false for a default. In
 // text, the table it always printed.

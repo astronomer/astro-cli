@@ -29,9 +29,9 @@ func recordRenamedFlags(t *testing.T) *[]renamedFlagEvent {
 	return got
 }
 
-// A 1.x spelling v2 keeps as a hidden alias says on stderr what the flag is
-// called now, by the shorthand too, and is recorded, all of a run's in one
-// event, so a script gets updated and we can see when the alias can go.
+// A 1.x spelling v2 keeps as a hidden alias says on stderr, in one line, that
+// it is deprecated and what to type instead, and is recorded, all of a run's
+// in one event, so a script gets updated and we can see when the alias can go.
 func TestRenamedFlagsSayWhatTheyAreCalledNow(t *testing.T) {
 	for _, tc := range []struct {
 		tree  treeConfig
@@ -43,25 +43,25 @@ func TestRenamedFlagsSayWhatTheyAreCalledNow(t *testing.T) {
 			astroTree,
 			[]string{"deployment", "list", "--workspace-id", "ws"},
 			&renamedFlagEvent{"astro deployment list", []string{"--workspace-id"}, []string{"--workspace"}},
-			[]string{"Flag --workspace-id has been renamed to --workspace. The old spelling will be removed in a future release."},
+			[]string{"--workspace-id is deprecated: use --workspace"},
 		},
 		{
 			astroTree,
-			[]string{"deployment", "inspect", "-n", "dep"},
+			[]string{"deployment", "inspect", "--deployment-name", "dep"},
 			&renamedFlagEvent{"astro deployment inspect", []string{"--deployment-name"}, []string{"--deployment"}},
-			[]string{"Flag --deployment-name (-n) has been renamed to --deployment. --deployment takes Deployment names, ids and link names. The old spelling"},
+			[]string{"--deployment-name is deprecated: use --deployment"},
 		},
 		{
 			apcTree,
-			[]string{"deployment", "service-account", "list", "-d", "dep-id"},
+			[]string{"deployment", "service-account", "list", "--deployment-id", "dep-id"},
 			&renamedFlagEvent{"astro deployment service-account list", []string{"--deployment-id"}, []string{"--deployment"}},
-			[]string{"Flag --deployment-id (-d) has been renamed to --deployment. --deployment takes Deployment ids and link names, so check that the value names the same Deployment before switching."},
+			[]string{"--deployment-id is deprecated: use --deployment"},
 		},
 		{
 			apcTree,
-			[]string{"workspace", "create", "-l", "etl"},
+			[]string{"workspace", "create", "--label", "etl"},
 			&renamedFlagEvent{"astro workspace create", []string{"--label"}, []string{"--name"}},
-			[]string{"Flag --label (-l) has been renamed to --name (-n)."},
+			[]string{"--label is deprecated: use --name"},
 		},
 		{
 			astroTree,
@@ -72,18 +72,18 @@ func TestRenamedFlagsSayWhatTheyAreCalledNow(t *testing.T) {
 				[]string{"--deployment", "--deployment", "--workspace"},
 			},
 			[]string{
-				"Flags --deployment-id (-d) and --deployment-name are replaced by --deployment, which takes one value. " +
-					"--deployment takes Deployment names, ids and link names, so check that the value names the same Deployment before switching.",
-				"Flag --workspace-id has been renamed to --workspace.",
+				"--deployment-id is deprecated: use --deployment",
+				"--deployment-name is deprecated: use --deployment",
+				"--workspace-id is deprecated: use --workspace",
 			},
 		},
-		// "" still means the default through the alias, and --workspace
-		// refuses it: recorded, but no hint to switch.
+		// "" still means the default through the alias, as in 1.x, and the
+		// spelling is deprecated all the same.
 		{
 			astroTree,
 			[]string{"deployment", "list", "--workspace-id", ""},
 			&renamedFlagEvent{"astro deployment list", []string{"--workspace-id"}, []string{"--workspace"}},
-			nil,
+			[]string{"--workspace-id is deprecated: use --workspace"},
 		},
 		{astroTree, []string{"deployment", "list", "--workspace", "ws"}, nil, nil},
 	} {
@@ -98,13 +98,16 @@ func TestRenamedFlagsSayWhatTheyAreCalledNow(t *testing.T) {
 			} else {
 				assert.Equal(t, []renamedFlagEvent{*tc.want}, *got)
 			}
-			for _, h := range tc.hints {
-				assert.Contains(t, stderr, h)
+			// Each warning is one line, led by a plain "Warning:" here, where
+			// stderr is no terminal and so gets no color, and the run's own
+			// failure follows.
+			var warnings []string
+			for line := range strings.Lines(stderr) {
+				if strings.HasPrefix(line, "Warning: ") {
+					warnings = append(warnings, strings.TrimSuffix(strings.TrimPrefix(line, "Warning: "), "\n"))
+				}
 			}
-			// Each hint is its own line, led by a plain "Warning:" here, where
-			// stderr is no terminal and so gets no color.
-			assert.Equal(t, len(tc.hints), strings.Count(stderr, "Warning: Flag"), stderr)
-			assert.Equal(t, len(tc.hints), strings.Count(stderr, "will be removed in a future release"), stderr)
+			assert.Equal(t, tc.hints, warnings, stderr)
 		})
 	}
 }
@@ -116,18 +119,18 @@ func TestARefusedRunNotesNoRenamedFlags(t *testing.T) {
 	root, _ := disarmedTree(t, astroTree)
 	_, stderr, err := executeRoot(root, "deployment", "list", "--workspace", "a", "--workspace-id", "b")
 	require.ErrorContains(t, err, "disagree")
-	assert.NotContains(t, stderr, "has been renamed")
+	assert.NotContains(t, stderr, "is deprecated")
 	assert.Empty(t, *got)
 }
 
-// ASTRO_RENAME_HINTS_DISABLED hides the hint, for a script that must still
-// run on 1.x, where the new spelling does not exist, but not the event.
-func TestRenameHintsCanBeHidden(t *testing.T) {
-	t.Setenv(utils.RenameHintsDisabledEnv, "1")
+// Nothing turns the warning off: the variable that used to hide it does
+// nothing now, and the event goes as before.
+func TestNothingHidesTheDeprecationWarning(t *testing.T) {
+	t.Setenv("ASTRO_RENAME_HINTS_DISABLED", "1")
 	got := recordRenamedFlags(t)
 	root, _ := disarmedTree(t, astroTree)
 	_, stderr, err := executeRoot(root, "deployment", "list", "--workspace-id", "ws")
 	require.ErrorIs(t, err, errRan)
-	assert.NotContains(t, stderr, "has been renamed")
+	assert.Contains(t, stderr, "--workspace-id is deprecated: use --workspace")
 	assert.Equal(t, []renamedFlagEvent{{"astro deployment list", []string{"--workspace-id"}, []string{"--workspace"}}}, *got)
 }

@@ -58,7 +58,7 @@ func (s *Suite) Test_validateRegistryEndpoint() {
 }
 
 // ClientRegistry checks a saved value as a new one is checked, and its error
-// names the config that holds it and the command that fixes it there: -g for
+// names the config that holds it and the command that fixes it there: --global for
 // the global one, which `astro config set` without it does not write.
 func (s *Suite) TestClientRegistry() {
 	s.restoreConfigGlobals()
@@ -86,13 +86,13 @@ func (s *Suite) TestClientRegistry() {
 		s.Equal("quay.io/acme/my-image", got)
 	})
 
-	s.Run("a tagged global value says to fix it with -g", func() {
+	s.Run("a tagged global value says to fix it with --global", func() {
 		noProject()
 		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString("quay.io/acme/my-image:1.0"))
 		_, err := ClientRegistry()
 		s.ErrorContains(err, "deploy.remote_execution.client_registry in your global config is not a usable registry endpoint")
 		s.ErrorContains(err, "must not include an image tag")
-		s.ErrorContains(err, "astro config set -g deploy.remote_execution.client_registry")
+		s.ErrorContains(err, "astro config set --global deploy.remote_execution.client_registry")
 	})
 
 	s.Run("a tagged project value says to fix it in the project", func() {
@@ -101,7 +101,7 @@ func (s *Suite) TestClientRegistry() {
 		_, err := ClientRegistry()
 		s.ErrorContains(err, "deploy.remote_execution.client_registry in this project's config")
 		s.ErrorContains(err, "'astro config set deploy.remote_execution.client_registry")
-		s.NotContains(err.Error(), "config set -g", "a project's value is fixed in the project, not the global config")
+		s.NotContains(err.Error(), "config set --global", "a project's value is fixed in the project, not the global config")
 	})
 
 	// A value 1.x saved under its own name is read, reported under that
@@ -114,15 +114,15 @@ func (s *Suite) TestClientRegistry() {
 		_, err := ClientRegistry()
 		s.ErrorContains(err, "remote.client_registry in your global config is not a usable registry endpoint")
 		s.NotContains(err.Error(), "deploy.remote_execution.client_registry in")
-		s.ErrorContains(err, "astro config set -g deploy.remote_execution.client_registry")
+		s.ErrorContains(err, "astro config set --global deploy.remote_execution.client_registry")
 	})
 
-	// An unset registry is set where it is read: globally, with -g, unless
+	// An unset registry is set where it is read: globally, with --global, unless
 	// the project sets the key, even to "", which shadows the global value.
 	s.Run("the fix for an unset value", func() {
 		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString(""))
 		noProject()
-		s.Equal("astro config set -g deploy.remote_execution.client_registry <registry>/<repository>", ClientRegistryFix())
+		s.Equal("astro config set --global deploy.remote_execution.client_registry <registry>/<repository>", ClientRegistryFix())
 		withProject("")
 		s.Equal("astro config set deploy.remote_execution.client_registry <registry>/<repository>", ClientRegistryFix())
 	})

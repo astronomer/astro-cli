@@ -92,15 +92,10 @@ func TestRemoteDeployCommandFlags(t *testing.T) {
 		assert.Equal(t, "test-image:latest", imageNameValue)
 	})
 
-	t.Run("command accepts short flag for image name", func(t *testing.T) {
+	t.Run("command takes no short flag for image name", func(t *testing.T) {
 		cmd := newRemoteDeployCmd()
 
-		err := cmd.ParseFlags([]string{"-i", "short-flag-image:tag"})
-		assert.NoError(t, err)
-
-		imageNameValue, err := cmd.Flags().GetString("image-name")
-		assert.NoError(t, err)
-		assert.Equal(t, "short-flag-image:tag", imageNameValue)
+		assert.Error(t, cmd.ParseFlags([]string{"-i", "short-flag-image:tag"}))
 	})
 
 	t.Run("command accepts build-secret flag", func(t *testing.T) {
@@ -180,7 +175,7 @@ func TestRemoteDeployFlags(t *testing.T) {
 		assert.NotNil(t, imageNameFlag)
 		assert.Equal(t, "string", imageNameFlag.Value.Type())
 		assert.Equal(t, "", imageNameFlag.DefValue)
-		assert.Equal(t, "i", imageNameFlag.Shorthand)
+		assert.Empty(t, imageNameFlag.Shorthand)
 	})
 
 	t.Run("build-secret flag configuration", func(t *testing.T) {

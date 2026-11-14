@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
@@ -119,7 +120,7 @@ func captureKeyWarnings(t *testing.T) func() string {
 	require.NoError(t, err)
 	prev := os.Stderr
 	os.Stderr = w
-	legacyKeysWarned.Store(false)
+	cliout.ResetWarnOnce()
 	var once sync.Once
 	var out string
 	read := func() string {
@@ -135,7 +136,7 @@ func captureKeyWarnings(t *testing.T) func() string {
 	}
 	t.Cleanup(func() {
 		read()
-		legacyKeysWarned.Store(false)
+		cliout.ResetWarnOnce()
 	})
 	return read
 }

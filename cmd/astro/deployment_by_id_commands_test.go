@@ -256,7 +256,7 @@ func TestDeploymentCommandsKeepTheirNoWorkspacePrefix(t *testing.T) {
 		prefix string
 	}{
 		"delete":        {[]string{"delete", "--deployment-name", "etl", "--yes"}, "failed to find a valid Workspace: "},
-		"logs":          {[]string{"logs", "--deployment-name", "etl", "-w"}, "failed to find a valid Workspace: "},
+		"logs":          {[]string{"logs", "--deployment-name", "etl", "--warn"}, "failed to find a valid Workspace: "},
 		"update":        {[]string{"update", "--deployment-name", "etl", "--yes"}, "failed to find a valid Workspace: "},
 		"variable list": {[]string{"variable", "list", "--deployment-name", "etl"}, "failed to find a valid workspace: "},
 		"open":          {[]string{"open", "--deployment-name", "etl"}, "failed to find a valid workspace: "},

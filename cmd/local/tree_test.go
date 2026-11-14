@@ -308,11 +308,13 @@ func TestQueryFamiliesShareTheSelectorFlags(t *testing.T) {
 }
 
 // One shorthand means one thing across the core tree — the commands AddCmds
-// returns, not the shell surface those mount alongside, which has its own older
-// spellings (see TestDashDMeansDeploymentOutsideTheAllowlist in package cmd). `af`
-// reused -t for tags, task ids, and try numbers in commands that sit next to
-// each other; carrying that over would make -t unreadable, and -o would shadow
-// --output outright. Nothing enforces this in cobra, so it is enforced here.
+// returns, not the shell surface those mount alongside. TestShortOptionsFollowTheTable
+// in package cmd holds every tree to utils.ShortOptions; this holds the core
+// tree to one meaning per letter without the table, so a letter that drifts
+// here fails in this package first. `af` reused -t for tags, task ids, and try
+// numbers in commands that sit next to each other; carrying that over would
+// make -t unreadable, and -o would shadow --output outright. Nothing enforces
+// this in cobra, so it is enforced here.
 func TestShorthandsMeanOneThingEachAcrossTheCoreTree(t *testing.T) {
 	d, _ := testDeps(t)
 	// meaning maps a shorthand to the flag name that claimed it, and where.

@@ -103,7 +103,7 @@ Every command takes `--output json`. The nouns and their aliases:
 
 **Input.** A value is never a bare argument, which would land in shell history and `ps`. With `--stdin`, or when stdin is not a terminal, it is read from stdin; otherwise a no-echo prompt asks for it. `--value <v>` is the scripting escape hatch and is documented as leaking into history. A `NAME=value` form is not accepted. This applies to every set, secret or not.
 
-**Connections.** `connection set <id>` takes a whole connection, as a URI (`postgres://user:pass@host:5432/db`) or the connection JSON, or field by field with the cloud sibling's flags: `--type`, `--host`, `--login`, `--password`, `--schema`, `--port`, `--extra` (no short forms, since `-p` beside `--project` would read as the scope). Both shapes are encoded through the shared `airflowenv` codec into identical records.
+**Connections.** `connection set <id>` takes a whole connection, as a URI (`postgres://user:pass@host:5432/db`) or the connection JSON, or field by field with the cloud sibling's flags: `--type`, `--host`, `--login`, `--password`, `--schema`, `--port`, `--extra` (no short forms: a short option is one of [the table's](architecture.md#short-options), and `-p` beside `--project` would read as the scope). Both shapes are encoded through the shared `airflowenv` codec into identical records.
 
 ### `get`
 

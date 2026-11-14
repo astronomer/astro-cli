@@ -509,7 +509,7 @@ func runJSONCases(t *testing.T, cases []tokenCase) {
 			require.NoError(t, r.err)
 			assert.Equal(t, 0, r.code)
 			tc.check(t, r.stdout)
-			assert.Empty(t, r.stderr)
+			assert.Empty(t, withoutDeprecations(r.stderr))
 		})
 	}
 }
@@ -568,7 +568,7 @@ func TestWorkspaceOrganizationUserTeamJSONNeverAsks(t *testing.T) {
 			assert.Equal(t, string(cliout.KindInputRequired), got.Kind)
 			assert.Equal(t, cliout.ExitFailure, got.Code, "the code it reports is the one it exits with")
 			assert.Contains(t, got.Error, tc.answered)
-			assert.Empty(t, r.stderr)
+			assert.Empty(t, withoutDeprecations(r.stderr))
 		})
 	}
 }
@@ -621,7 +621,7 @@ func assertOnlyTheError(t *testing.T, format string, r tokenRun, msg string) {
 	var got errorJSON
 	decodeOne(t, r.stdout, &got)
 	assert.Contains(t, got.Error, msg)
-	assert.Empty(t, r.stderr)
+	assert.Empty(t, withoutDeprecations(r.stderr))
 }
 
 // workspace team update and remove act on the Workspace --workspace (or

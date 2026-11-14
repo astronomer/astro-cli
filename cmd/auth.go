@@ -221,9 +221,9 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
   astro auth login <BASEDOMAIN> --token-login <TOKEN>`,
 	}
 
-	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
-	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token, with no browser or prompt: for Astro and APC, such as in CI/CD")
-	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for APC login")
+	cmd.Flags().BoolVar(&shouldDisplayLoginLink, "login-link", false, "Get login link to login on a separate device for cloud CLI login")
+	cmd.Flags().StringVar(&token, "token-login", "", "Login with a token, with no browser or prompt: for Astro and APC, such as in CI/CD")
+	cmd.Flags().BoolVar(&oAuth, "oauth", false, "Do not prompt for local auth for APC login")
 	cmd.Flags().BoolVar(&signup, "signup", false, "Create a new Astro account instead of signing in to an existing one")
 	cmd.Flags().BoolVar(&signin, "signin", false, "Sign in to an existing Astro account instead of creating one")
 	cmd.Flags().BoolVar(&forceLogin, "force", false, "Log in through the browser even when a saved login still works, and ask for the password again")
@@ -275,7 +275,7 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
   # The token with its domain and expiry, for a script
   astro auth token -o json`,
 	}
-	cmd.Flags().StringVarP(&tokenDomain, "domain", "d", "", "Print the token for a specific context domain instead of the current context")
+	cmd.Flags().StringVar(&tokenDomain, "domain", "", "Print the token for a specific context domain instead of the current context")
 	cmd.Flags().BoolVar(&forceRenew, "force", false, "Renew the token from the saved login even if it has not expired yet")
 	cliout.AddOutputFlag(cmd, &output)
 	return cmd
