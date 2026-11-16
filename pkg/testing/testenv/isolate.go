@@ -207,11 +207,16 @@ func mockKeyring() { secrets.MockKeyringForTests() }
 
 // inherit is Isolate for a helper process.
 func inherit() {
-	for _, name := range []string{"HOME", "ASTRO_HOME"} {
-		if dir := os.Getenv(name); !within(dir, os.TempDir()) {
-			dief("a helper process runs with %s=%q, which is not in the temporary directory %s; "+
-				"it must work in the home its parent made, never a real one", name, dir, os.TempDir())
-		}
+	// The marker is the parent's temporary root, and HOME is inside it. A stale
+	// or invented marker (exported from a shell, say) fails here, loudly, rather
+	// than switching the isolation off for the binary.
+	root := os.Getenv(inheritedEnv)
+	if home := os.Getenv("HOME"); !within(home, root) {
+		dief("a helper process runs with HOME=%q, which is not inside %s=%q: its parent's home. "+
+			"A helper works in the home its parent made, never a real one; unset %s if it is stale", home, inheritedEnv, root, inheritedEnv)
+	}
+	if dir := os.Getenv("ASTRO_HOME"); !inTestArea(dir) {
+		dief("a helper process runs with ASTRO_HOME=%q, which is not in the test home %q or the temporary directory %s", dir, root, os.TempDir())
 	}
 	mockKeyring()
 	for _, f := range afterIsolate {
@@ -226,10 +231,17 @@ func inherit() {
 // real ~/.astro.
 func RequireTemp(paths ...string) {
 	for _, p := range paths {
-		if !within(p, os.TempDir()) {
-			dief("the path %q is not inside the temporary directory %s, so this helper would write outside the test home", p, os.TempDir())
+		if !inTestArea(p) {
+			dief("the path %q is not inside the test home or the temporary directory %s, so this helper would write outside it", p, os.TempDir())
 		}
 	}
+}
+
+// inTestArea reports whether path is in the test binary's home or in the
+// temporary directory (where a test's own t.TempDir is). The home is checked
+// against the root Isolate recorded, so a TMPDIR changed since does not matter.
+func inTestArea(path string) bool {
+	return within(path, os.TempDir()) || (os.Getenv(inheritedEnv) != "" && within(path, os.Getenv(inheritedEnv)))
 }
 
 // within reports whether path is dir or below it, after symlinks (macOS keeps

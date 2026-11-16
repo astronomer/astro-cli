@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -45,9 +46,14 @@ const (
 
 // behaviorVars are the variables, besides every ASTRO_ and ASTRONOMER_ one, that
 // change what the CLI does and that a shell or a CI runner may export.
+// internal/archlint fails when this list lacks one of testenv's.
 var behaviorVars = []string{
-	"CI", "JENKINS_URL", "HUDSON_URL", "TF_BUILD", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI",
-	"UV_EXCLUDE_NEWER", "UV_NO_SYNC", "NO_COLOR", "CLICOLOR",
+	"CI", "JENKINS_URL", "HUDSON_URL", "TF_BUILD", "GITHUB_ACTIONS", "DEPLOY_ACTION", "DEPLOY_ACTION_VERSION",
+	"UV_EXCLUDE_NEWER", "UV_NO_SYNC",
+	"GITLAB_CI", "CIRCLECI", "BITBUCKET_BUILD_NUMBER", "CODEBUILD_BUILD_ID", "TEAMCITY_VERSION", "BUILDKITE",
+	"CF_BUILD_ID", "TRAVIS", "OTTO", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CURSOR_TRACE_ID", "CURSOR_AGENT",
+	"AIDER_MODEL", "CONTINUE_GLOBAL_DIR", "CORTEX_SESSION_ID", "GEMINI_CLI", "OPENCODE", "CODEX_API_KEY",
+	"COPILOT_CLI", "COPILOT_AGENT", "AI_AGENT", "OTTO_CHANNEL", "NO_COLOR", "CLICOLOR",
 }
 
 func isolateHome(kr ...keyringHooks) (finish func(code int) int) {
@@ -72,6 +78,7 @@ func isolateHome(kr ...keyringHooks) (finish func(code int) int) {
 	watch := watchRealConfig()
 	clearBehaviorEnv()
 	python := prepareUVDir()
+	pinGoEnv()
 
 	root, err := os.MkdirTemp("", "astro-test-")
 	if err != nil {
@@ -140,9 +147,33 @@ func ciSet() bool {
 // requireInherited is what a helper process checks: it works in the home its
 // parent made, and never a real one.
 func requireInherited() {
-	for _, name := range []string{"HOME", "ASTRO_HOME"} {
-		if dir := os.Getenv(name); !within(dir, os.TempDir()) {
-			exitf("a helper process runs with %s=%q, outside the temporary directory %s", name, dir, os.TempDir())
+	// The marker is the parent's temporary root and HOME is inside it. A stale or
+	// invented marker fails here, loudly, rather than switching isolation off.
+	root := os.Getenv(inheritedHome)
+	if home := os.Getenv("HOME"); !within(home, root) {
+		exitf("a helper process runs with HOME=%q, not inside %s=%q, its parent's home; unset it if it is stale", home, inheritedHome, root)
+	}
+	if dir := os.Getenv("ASTRO_HOME"); !within(dir, root) && !within(dir, os.TempDir()) {
+		exitf("a helper process runs with ASTRO_HOME=%q, outside its parent's home %q and the temporary directory %s", dir, root, os.TempDir())
+	}
+}
+
+// pinGoEnv fixes where the go command keeps its own state to what `go env` says
+// before HOME moves, so a test that runs it finds the module cache and the
+// settings saved with `go env -w`. A variable already set is left alone.
+func pinGoEnv() {
+	names := []string{"GOCACHE", "GOMODCACHE", "GOPATH", "GOENV"}
+	out, err := exec.Command("go", append([]string{"env"}, names...)...).Output() //nolint:noctx // fixed arguments, before any test
+	if err != nil {
+		return
+	}
+	values := strings.Split(strings.TrimRight(string(out), "\r\n"), "\n")
+	if len(values) != len(names) {
+		return
+	}
+	for i, name := range names {
+		if v := strings.TrimRight(values[i], "\r"); v != "" && os.Getenv(name) == "" {
+			os.Setenv(name, v) //nolint:usetesting // for the whole package run
 		}
 	}
 }

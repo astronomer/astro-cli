@@ -55,8 +55,6 @@ var homeFree = []string{
 	"pkg/envschema",
 	"pkg/fsatomic",
 	"pkg/platformversions",
-	"pkg/runtimeversions",
-	"pkg/telemetry",
 }
 
 // homeReads is what makes code able to reach a home or the keychain.
@@ -258,6 +256,46 @@ func TestModuleIsolationCopiesMatchTheTemplate(t *testing.T) {
 			if !strings.HasPrefix(first, "package ") || body != templateBody {
 				t.Errorf("%s differs from internal/archlint/testdata/hermetic_template.go.txt: change the template and copy it over every module test package, not one copy", filepath.ToSlash(file))
 			}
+		}
+	}
+}
+
+// The template unsets every variable testenv does (those it does not unset by
+// prefix), so a variable added to testenv.behaviorEnv reaches the modules too.
+func TestTemplateClearsWhatTestenvClears(t *testing.T) {
+	root := repoRoot(t)
+	template, err := os.ReadFile(filepath.Join(root, "internal", "archlint", "testdata", "hermetic_template.go.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, "pkg", "testing", "testenv", "testenv.go"), nil, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	ast.Inspect(f, func(n ast.Node) bool {
+		spec, ok := n.(*ast.ValueSpec)
+		if !ok || len(spec.Names) != 1 || spec.Names[0].Name != "behaviorEnv" || len(spec.Values) != 1 {
+			return true
+		}
+		if lit, ok := spec.Values[0].(*ast.CompositeLit); ok {
+			for _, e := range lit.Elts {
+				if s, ok := e.(*ast.BasicLit); ok {
+					names = append(names, strings.Trim(s.Value, `"`))
+				}
+			}
+		}
+		return false
+	})
+	if len(names) < 10 {
+		t.Fatalf("read %d names from testenv.behaviorEnv; this test no longer finds it", len(names))
+	}
+	for _, name := range names {
+		if strings.HasPrefix(name, "ASTRO_") || strings.HasPrefix(name, "ASTRONOMER_") {
+			continue // the template unsets these by prefix
+		}
+		if !strings.Contains(string(template), `"`+name+`"`) {
+			t.Errorf("testenv unsets %s and internal/archlint/testdata/hermetic_template.go.txt does not: add it to behaviorVars, and copy the template over every module test package", name)
 		}
 	}
 }
