@@ -70,7 +70,7 @@ func TestDeploymentCommandsAddressedByIDNeedNoWorkspaceUnderAnOrganizationToken(
 			want: "test-key-1",
 		},
 		"logs": {
-			args: []string{"logs", byID, "-w"},
+			args: []string{"logs", byID, "--warn"},
 			setup: func(mc *astrov1_mocks.ClientWithResponsesInterface) {
 				mc.On("GetDeploymentLogsWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockGetDeploymentLogsResponse, nil).Once()
 			},
@@ -118,8 +118,8 @@ func TestDeploymentByNameOrPickerStillNeedsAWorkspaceUnderAnOrganizationToken(t 
 		"delete picker":                 {"delete", "--yes"},
 		"variable list by name":         {"variable", "list", "--deployment-name", "etl"},
 		"variable list picker":          {"variable", "list"},
-		"logs by name":                  {"logs", "--deployment-name", "etl", "-w"},
-		"logs picker":                   {"logs", "-w"},
+		"logs by name":                  {"logs", "--deployment-name", "etl", "--warn"},
+		"logs picker":                   {"logs", "--warn"},
 		"hibernate by name":             {"hibernate", "--deployment-name", "etl", "--yes"},
 		"hibernate picker":              {"hibernate", "--yes"},
 		"update by name":                {"update", "--deployment-name", "etl", "--yes"},

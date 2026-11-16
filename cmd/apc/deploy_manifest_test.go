@@ -312,7 +312,7 @@ func requireInOrder(t *testing.T, out string, parts ...string) {
 func TestDeployManifestTakesForceAndPrompt(t *testing.T) {
 	linkedProject(t)
 	asked := manifestDeploys(t, builtAndPushed)
-	run := runAPC(t, newAPCClient(), "", "deploy", "prod", "--force", "-p", "-o", "json")
+	run := runAPC(t, newAPCClient(), "", "deploy", "prod", "--force", "--prompt", "-o", "json")
 	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 	require.Len(t, *asked, 1)
 	assert.Equal(t, "dep-prod", (*asked)[0].DeploymentID)

@@ -1,11 +1,8 @@
 package config
 
 import (
-	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/spf13/viper"
 )
 
 // ValidatorFunc is a function that validates a configuration value
@@ -82,51 +79,15 @@ func (c cfg) SetHomeString(value string) error {
 	return nil
 }
 
-// SetProjectString sets a string value in project config
-func (c cfg) SetProjectString(value string) error {
-	if !configExists(viperProject) {
-		return nil
-	}
-	c.set(viperProject, c.typed(value))
-	err := saveConfig(viperProject, viperProject.ConfigFileUsed())
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// GetString will return the requested config, check working dir and fallback to home
+// GetString returns the setting's value: the home config's, or its default
+// when the home config does not set it. No setting is read from a project's
+// files: what a project decides is in its pyproject.toml.
 func (c cfg) GetString() string {
-	if key := c.projectKey(); key != "" {
-		return viperProject.GetString(key)
-	}
 	return c.GetHomeString()
 }
 
-// GetStringFor is GetString for the project at projectDir rather than the
-// working directory: that project's .astro/config.yaml when it sets the value,
-// the home config otherwise. A command that acts on a project it was handed a
-// path to (astro local, Astro Desktop's mirror of it) resolves the project's
-// own setting even when run from somewhere else.
-func (c cfg) GetStringFor(projectDir string) string {
-	if projectDir != "" {
-		v := viper.New()
-		v.SetFs(configFs)
-		v.SetConfigFile(filepath.Join(projectDir, ConfigDir, ConfigFileNameWithExt))
-		if err := readConfigFile(v, configFs); err == nil {
-			if key := c.keyIn(v); key != "" {
-				return v.GetString(key)
-			}
-		}
-	}
-	return c.GetHomeString()
-}
-
-// GetBool will return the requested config, check working dir and fallback to home
+// GetBool is GetString as a bool.
 func (c cfg) GetBool() bool {
-	if key := c.projectKey(); key != "" {
-		return viperProject.GetBool(key)
-	}
 	if key := c.keyIn(viperHome); key != "" {
 		return viperHome.GetBool(key)
 	}
@@ -134,11 +95,8 @@ func (c cfg) GetBool() bool {
 	return b
 }
 
-// GetInt will return the integer value of requested config, check working dir and fallback to home
+// GetInt is GetString as an int.
 func (c cfg) GetInt() int {
-	if key := c.projectKey(); key != "" {
-		return viperProject.GetInt(key)
-	}
 	if key := c.keyIn(viperHome); key != "" {
 		return viperHome.GetInt(key)
 	}
@@ -168,15 +126,6 @@ func (c cfg) typed(value string) any {
 	return value
 }
 
-// GetProjectString will return a project config
-func (c cfg) GetProjectString() string {
-	key := c.keyIn(viperProject)
-	if key == "" {
-		return ""
-	}
-	return viperProject.GetString(key)
-}
-
 // GetHomeString will return config from home string, its default when the
 // home config does not set it, or "" before InitConfig has read one, so a
 // caller like GetCurrentDomain reports no context (its ErrGetHomeString)
@@ -190,15 +139,6 @@ func (c cfg) GetHomeString() string {
 		return c.Default
 	}
 	return viperHome.GetString(key)
-}
-
-// Scope names where GetString finds this setting: "project", "global", or
-// "default" when no config file sets it.
-func (c cfg) Scope() string {
-	if c.projectKey() != "" {
-		return "project"
-	}
-	return c.HomeScope()
 }
 
 // HomeScope names where GetHomeString finds this setting: "global", or

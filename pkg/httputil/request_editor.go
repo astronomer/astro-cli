@@ -7,11 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/version"
@@ -110,4 +113,49 @@ func NewRequestEditorFn(getTokenAndURL func() (token, baseURL string, err error)
 		req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.Current()))
 		return nil
 	}
+}
+
+// IsTransportError reports whether err is a request that failed in transit in
+// a way a retry can fix: the host refused or reset the connection or could not
+// be reached, its name did not resolve, the connection ended early, or the
+// request timed out. An HTTP status, whatever it is, is an answer, and is a
+// StatusError instead. A failure a retry will not fix is not one: a canceled
+// request (the run ended), a certificate or TLS failure, a URL that is
+// malformed or names an unsupported scheme.
+func IsTransportError(err error) bool {
+	if err == nil || errors.Is(err, httpContext.Canceled) {
+		return false
+	}
+	for _, errno := range []error{
+		syscall.ECONNREFUSED, syscall.ECONNRESET, syscall.ECONNABORTED, syscall.EPIPE,
+		syscall.EHOSTUNREACH, syscall.ENETUNREACH,
+	} {
+		if errors.Is(err, errno) {
+			return true
+		}
+	}
+	var (
+		dnsErr *net.DNSError
+		opErr  *net.OpError
+		urlErr *url.Error
+		netErr net.Error
+	)
+	switch {
+	case errors.As(err, &dnsErr):
+		return true
+	case errors.As(err, &opErr) && (opErr.Op == "dial" || opErr.Op == "read" || opErr.Op == "write"):
+		// What a connection that could not be made or broke is on every
+		// platform: Windows reports a refusal as its own socket error, which
+		// is none of the errno values above. A TLS alert is Op "remote error".
+		return true
+	case errors.Is(err, httpContext.DeadlineExceeded):
+		return true
+	case errors.As(err, &urlErr) && (errors.Is(urlErr.Err, io.EOF) || errors.Is(urlErr.Err, io.ErrUnexpectedEOF)):
+		// The client's request ended early. The same EOF from decoding a body
+		// the server did send is not one.
+		return true
+	case errors.As(err, &netErr):
+		return netErr.Timeout()
+	}
+	return false
 }

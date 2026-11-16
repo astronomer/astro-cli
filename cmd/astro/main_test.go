@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/pkg/testing/testenv"
@@ -25,20 +24,15 @@ import (
 //
 // It also watches what the commands publish through cliout.Renderer.Emit, and
 // fails a passing run that published a shape no golden pins (schema_test.go).
-//
-// Many cases run 1.x command lines to pin what they print, so the rename hint
-// a 1.x spelling prints on stderr is hidden here; cmd's renamed_flags_test.go
-// is where the hint is tested.
 func TestMain(m *testing.M) {
 	flag.Parse()
 	origArgs := os.Args
 	os.Args = []string{"astro"}
-	// A helper process (TestForcedRenewalHelper) works in the ASTRO_HOME its
+	// A helper process (TestForcedRenewalHelper, TestCheckTokenHelper) works in the ASTRO_HOME its
 	// parent test hands it through the environment.
-	if os.Getenv(renewHelperEnv) == "" {
+	if os.Getenv(renewHelperEnv) == "" && os.Getenv(checkTokenHelperEnv) == "" {
 		testenv.Clear()
 	}
-	os.Setenv(utils.RenameHintsDisabledEnv, "1") //nolint:usetesting // for the whole package run
 
 	// A login reads its auth config from api.<domain>, which no unit test may
 	// reach. The identity provider it names is under .test, which never

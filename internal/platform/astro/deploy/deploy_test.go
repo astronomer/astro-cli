@@ -231,7 +231,7 @@ func TestDeployClientImage(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a usable registry endpoint")
 		assert.Contains(t, err.Error(), "must not include an image tag")
-		assert.Contains(t, err.Error(), "astro config set -g deploy.remote_execution.client_registry")
+		assert.Contains(t, err.Error(), "astro config set --global deploy.remote_execution.client_registry")
 		assert.False(t, hasImageCall(cmd.calls, " build "), "nothing is built: %v", cmd.calls)
 	})
 
@@ -245,7 +245,7 @@ func TestDeployClientImage(t *testing.T) {
 		// Outside a project the advice is the global command; config's own
 		// tests pin its wording.
 		assert.Contains(t, err.Error(), "'"+config.ClientRegistryFix()+"'")
-		assert.Contains(t, err.Error(), "config set -g")
+		assert.Contains(t, err.Error(), "config set --global")
 		assert.Empty(t, cmd.calls, "no login, no build")
 	})
 

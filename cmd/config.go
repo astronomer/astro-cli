@@ -19,9 +19,15 @@ import (
 )
 
 const (
-	configSetSuccessMsg           = "Setting %s to %s successfully\n"
-	configUseOutsideProjectDirMsg = "You are attempting to %s a project config outside of a project directory\n To %s a global config try\n%s\n"
-	configUseWithManifestMsg      = "This project keeps its settings in pyproject.toml under [tool.astro], so it has no per-project CLI settings such as %s. CLI settings are global: one value for every project on this machine.\nTo %s the global value, run:\n  %s\n"
+	configSetSuccessMsg = "Setting %s to %s successfully\n"
+	// The refusals of a get or set without --global. CLI settings are global, so --global
+	// is the only scope there is; it stays required because Astro CLI 1.x's
+	// `astro config set` without it wrote the project's .astro/config.yaml,
+	// and the same command must not now change every project on the machine
+	// without saying so.
+	configUseWithoutGlobalMsg = "CLI settings are global: one value for every project on this machine.\nTo %s the global value, run:\n  %s\n"
+	configUseWithManifestMsg  = "This project keeps its settings in pyproject.toml under [tool.astro], so it has no per-project CLI settings such as %s. " + configUseWithoutGlobalMsg
+	configUseIn1xProjectMsg   = "Astro CLI v2 reads no settings from a project's .astro/config.yaml, such as %s. Convert the project with astro init, or use Astro CLI 1.x for that file. " + configUseWithoutGlobalMsg
 )
 
 // unknownSetting fails a get or set of a name that is no setting the way an
@@ -97,27 +103,20 @@ func refuseRemovedConfigKey(key string) error {
 
 var (
 	globalFlag       bool
-	configGetExample = `  # Get a global setting
-  astro config get upgrade_message -g
-
-  # Get a setting from a 1.x project's .astro/config.yaml
-  astro config get deploy.git_metadata`
+	configGetExample = `  # Get a setting
+  astro config get upgrade_message --global`
 	configSetExample = `  # Turn off the upgrade notice on this machine
-  astro config set upgrade_message false -g
-
-  # Set a setting in a 1.x project's .astro/config.yaml
-  astro config set deploy.git_metadata false`
+  astro config set upgrade_message false --global`
 )
 
 // configOutput is the -o of `astro config get`, `set` and `list`, registered
-// once on the group as -g is.
+// once on the group as --global is.
 var configOutput cliout.Format
 
 // configSetting is one setting as `astro config get`, `set` and `list`
 // publish it: its key, its value, the scope the value was read from or
-// written to, and whether a config file sets it there. The scopes are project
-// (a 1.x project's .astro/config.yaml), global, and, in a list, default for a
-// value no config file sets.
+// written to, and whether the global config sets it. The scopes are global
+// and, in a list, default for a value the global config does not set.
 type configSetting struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
@@ -133,19 +132,15 @@ type configSettings struct {
 	Settings []configSetting `json:"settings"`
 }
 
-// projectScope is the scope a setting read from, or written to, a 1.x
-// project's .astro/config.yaml has.
-const projectScope = "project"
-
 func newConfigRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "config",
 		Short:             "Manage CLI settings for this machine",
-		Long:              "Manage CLI settings, stored globally with -g or in a 1.x project's .astro/config.yaml. Run astro config list to see every setting, or see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for what each one does",
+		Long:              "Manage CLI settings, stored globally: one value for every project on this machine. get and set take --global. A project's own settings are in its pyproject.toml. Run astro config list to see every setting, or see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for what each one does",
 		PersistentPreRunE: ensureGlobalFlag,
 		Annotations:       map[string]string{astroCmd.NoLoginAnnotation: "true"},
 	}
-	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "View or modify global config")
+	cmd.PersistentFlags().BoolVar(&globalFlag, "global", false, "View or modify global config")
 	cliout.AddOutputFlag(cmd, &configOutput)
 	cmd.AddCommand(
 		newConfigGetCmd(out),
@@ -191,16 +186,13 @@ func newConfigListCmd(out io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List CLI settings",
-		Long:  "List every CLI setting with its value and where the value comes from: project (a 1.x project's .astro/config.yaml), global, or default. With -g, list the global values only",
+		Long:  "List every CLI setting with its value and where the value comes from: global, or default when the global config does not set it. --global changes nothing",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return configList(cliout.Renderer{Format: configOutput, Out: out})
 		},
 		Example: `  # List every setting, with where its value comes from
-  astro config list
-
-  # List the global values only
-  astro config list -g`,
+  astro config list`,
 	}
 }
 
@@ -213,14 +205,14 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	}
 	// A removed key is refused by set and get alike. Ahead of the scope
 	// checks, so the answer is the same in and out of a project and with or
-	// without -g.
+	// without --global.
 	if cmd.Name() == "set" || cmd.Name() == "get" {
 		if err := refuseRemovedConfigKey(args[0]); err != nil {
 			cmd.SilenceUsage = true
 			return err
 		}
 		// An unknown name too, for the same reason: the scope checks below
-		// would otherwise answer it with advice to run it with -g, which
+		// would otherwise answer it with advice to run it with --global, which
 		// then fails.
 		if _, ok := config.CFGStrMap[args[0]]; !ok {
 			cmd.SilenceUsage = true
@@ -230,30 +222,35 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	if globalFlag {
 		return nil
 	}
-	if isProjectDir, _ := config.IsProjectDir(config.WorkingPath); isProjectDir { //nolint:errcheck // treated as absent on error
-		return nil
-	}
 	// cmd.Name(), not cmd.Use: Use carries the argument placeholder, so the
 	// suggested command read "astro config set [setting-name] project.name
-	// -g", which nobody can run.
+	// --global", which nobody can run.
 	quoted := make([]string, len(args))
 	for i, a := range args {
 		quoted[i] = scaffold.ShellQuote(a)
 	}
-	c := "astro config " + cmd.Name() + " " + strings.Join(quoted, " ") + " -g"
+	c := "astro config " + cmd.Name() + " " + strings.Join(quoted, " ") + " --global"
 	cmd.SilenceUsage = true
-	if project.HasManifest(config.WorkingPath) {
+	switch {
+	case project.HasManifest(config.WorkingPath):
 		return fmt.Errorf(configUseWithManifestMsg, args[0], cmd.Name(), c)
+	case is1xProject():
+		return fmt.Errorf(configUseIn1xProjectMsg, args[0], cmd.Name(), c)
+	default:
+		return fmt.Errorf(configUseWithoutGlobalMsg, cmd.Name(), c)
 	}
-	return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Name(), cmd.Name(), c)
 }
 
-// configGet publishes one setting from the scope asked for, as its text has
-// always shown it: with -g the global value (the built-in default when the
-// home config does not set it), and otherwise the 1.x project's own, which is
-// "" when the project does not set it. It never falls back from one to the
-// other; set says whether that scope sets the key. `config list` is where the
-// value in effect, and the scope it comes from, are published.
+// is1xProject reports whether the working directory is a project in the
+// Astro CLI 1.x layout, whose .astro/config.yaml a 1.x `astro config set`
+// without --global would have written.
+func is1xProject() bool {
+	is, _ := config.IsProjectDir(config.WorkingPath) //nolint:errcheck // treated as absent on error
+	return is
+}
+
+// configGet publishes one setting's global value, the built-in default when
+// the home config does not set it; set says whether it does.
 func configGet(cmd *cobra.Command, args []string) error {
 	// Cobra has checked the argument count, so what can fail from here is
 	// the name or the value, which the usage text does not help with.
@@ -263,10 +260,7 @@ func configGet(cmd *cobra.Command, args []string) error {
 		return unknownSetting(args[0])
 	}
 
-	setting := configSetting{Key: cfg.Path, Value: cfg.GetProjectString(), Scope: projectScope, Set: cfg.Scope() == projectScope}
-	if globalFlag {
-		setting = configSetting{Key: cfg.Path, Value: cfg.GetHomeString(), Scope: globalScope, Set: cfg.HomeScope() == globalScope}
-	}
+	setting := configSetting{Key: cfg.Path, Value: cfg.GetHomeString(), Scope: globalScope, Set: cfg.HomeScope() == globalScope}
 	return cliout.Renderer{Format: configOutput, Out: cmd.OutOrStdout()}.Emit(&setting, cliout.Text(func(b *bufio.Writer) {
 		fmt.Fprintf(b, "%s: %s\n", setting.Key, setting.Value)
 	}))
@@ -289,15 +283,8 @@ func configSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid value for %s: %w", cfg.Path, err)
 	}
 
-	setting := configSetting{Key: cfg.Path, Value: args[1], Scope: projectScope, Set: true}
-	var err error
-	if globalFlag {
-		setting.Scope = globalScope
-		err = cfg.SetHomeString(args[1])
-	} else {
-		err = cfg.SetProjectString(args[1])
-	}
-	if err != nil {
+	setting := configSetting{Key: cfg.Path, Value: args[1], Scope: globalScope, Set: true}
+	if err := cfg.SetHomeString(args[1]); err != nil {
 		return err
 	}
 
@@ -306,10 +293,9 @@ func configSet(cmd *cobra.Command, args []string) error {
 	}))
 }
 
-// configList publishes every setting but the unlisted ones, by key: with -g
-// the global values, and otherwise each value from where commands run here
-// read it, with the scope it comes from; set is false for a default. In
-// text, the table it always printed.
+// configList publishes every setting but the unlisted ones, by key, with the
+// scope its value comes from; set is false for a default. In text, the table
+// it always printed.
 func configList(r cliout.Renderer) error {
 	list := configSettings{Settings: []configSetting{}}
 	for _, key := range slices.Sorted(maps.Keys(config.CFGStrMap)) {
@@ -317,10 +303,7 @@ func configList(r cliout.Renderer) error {
 		if !cfg.Listed() {
 			continue
 		}
-		setting := configSetting{Key: key, Value: cfg.GetString(), Scope: cfg.Scope()}
-		if globalFlag {
-			setting = configSetting{Key: key, Value: cfg.GetHomeString(), Scope: cfg.HomeScope()}
-		}
+		setting := configSetting{Key: key, Value: cfg.GetHomeString(), Scope: cfg.HomeScope()}
 		setting.Set = setting.Scope != "default"
 		list.Settings = append(list.Settings, setting)
 	}

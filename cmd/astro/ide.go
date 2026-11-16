@@ -79,8 +79,8 @@ func newIDEImportProjectCmd(out io.Writer) *cobra.Command {
   # Import a project from a specific Astro IDE session
   astro ide project import --project-id <PROJECT_ID> --session-id <SESSION_ID>`,
 	}
-	cmd.Flags().StringVarP(&ideProjectID, "project-id", "p", "", "Project ID to import")
-	cmd.Flags().StringVarP(&ideSessionID, "session-id", "s", "", "Session ID to import")
+	cmd.Flags().StringVar(&ideProjectID, "project-id", "", "Project ID to import")
+	cmd.Flags().StringVar(&ideSessionID, "session-id", "", "Session ID to import")
 	cmd.Flags().BoolVarP(&ideImportYes, "yes", "y", false, "Import into the current directory without asking when it is not empty")
 	return cmd
 }
@@ -103,8 +103,8 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
   # Export it even though the Astro IDE project is locked
   astro ide project export --project-id <PROJECT_ID> --force`,
 	}
-	cmd.Flags().StringVarP(&ideProjectID, "project-id", "p", "", "Project ID to export")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force export to overwrite project lock")
+	cmd.Flags().StringVar(&ideProjectID, "project-id", "", "Project ID to export")
+	cmd.Flags().BoolVar(&force, "force", false, "Force export to overwrite project lock")
 	return cmd
 }
 

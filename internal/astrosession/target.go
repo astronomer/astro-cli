@@ -201,7 +201,13 @@ func fromLogin(login *config.Context, domain string, token, onCurrent bool) (str
 	case login != nil:
 		ws = login.Workspace
 	case domain == "" || (token && onCurrent):
-		// An API token's selection is overlaid on the current context.
+		// An API token's selection is overlaid on the current context, by the
+		// setup that accepted the token. Without that overlay the context's
+		// Workspace is the saved login's, which a token run never takes, and
+		// it must not be labeled the token's.
+		if token && !config.HoldsEnvironmentLogin() {
+			return "", SourceNone, nil
+		}
 		ctx, err := config.GetCurrentContext()
 		if err != nil {
 			return "", SourceNone, err

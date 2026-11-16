@@ -90,7 +90,7 @@ func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 		api := newAPCClient()
 		api.On("ListDeploymentLogs", mock.Anything).Return([]houston.DeploymentLog{{CreatedAt: "t", Log: "a line"}}, nil)
 
-		stdout, stderr, err := execUnboundRoot(t, api, "deployment", "logs", "scheduler", "dep-ac", "-o", "json")
+		stdout, stderr, err := execUnboundRoot(t, api, "deployment", "logs", "dep-ac", "--scheduler", "-o", "json")
 		require.NoError(t, err, "stderr:\n%s", stderr)
 		assert.Equal(t, []logEntryJSON{{Component: "scheduler", Timestamp: "t", Message: "a line"}}, decodeLines[logEntryJSON](t, stdout))
 		assert.Empty(t, stderr)

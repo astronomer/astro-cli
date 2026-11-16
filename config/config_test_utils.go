@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
@@ -47,4 +48,28 @@ func CountLoginResolutions() (count func() int, restore func()) {
 	prev := loginResolved
 	loginResolved = func() { n.Add(1) }
 	return func() int { return int(n.Load()) }, func() { loginResolved = prev }
+}
+
+// UseEnvironmentLoginForTesting applies token to the current context as the
+// setup that accepts ASTRO_API_TOKEN does: it is the context's login for the
+// process, and workspace (empty for none) its selection, whatever the saved
+// context holds. It reports false, and changes nothing, when there is no
+// current context to apply it to. restore forgets it.
+func UseEnvironmentLoginForTesting(token, workspace string) (restore func(), ok bool) {
+	d, err := GetCurrentDomain()
+	if err != nil {
+		return func() {}, false
+	}
+	c := Context{Domain: d}
+	if !c.ContextExists() {
+		return func() {}, false
+	}
+	if err := c.UseEnvironmentLogin(token, time.Now().Add(time.Hour)); err != nil {
+		return func() {}, false
+	}
+	if err := c.SetEnvironmentContextKey("workspace", workspace); err != nil {
+		forgetEnvironmentLogin()
+		return func() {}, false
+	}
+	return forgetEnvironmentLogin, true
 }

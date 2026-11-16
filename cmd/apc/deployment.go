@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -183,18 +182,18 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	for _, c := range cmd.Commands() {
 		switch c.Name() {
 		case "create":
-			addWorkspaceFlag(c.Flags(), "Workspace to create the Deployment in (default: the current context's)", "")
+			addWorkspaceFlag(c.Flags(), "Workspace to create the Deployment in (default: the current context's)", "w")
 		case "list":
-			addWorkspaceFlag(c.Flags(), "Workspace whose Deployments to list (default: the current context's)", "")
+			addWorkspaceFlag(c.Flags(), "Workspace whose Deployments to list (default: the current context's)", "w")
 		case "adopt":
 			adopt = c
-			addWorkspaceFlag(c.Flags(), "Workspace to adopt the Deployment into (default: the current context's)", "")
+			addWorkspaceFlag(c.Flags(), "Workspace to adopt the Deployment into (default: the current context's)", "w")
 		case "update", "delete", "unadopt", "logs", "service-account", "user", "team", "airflow", "runtime":
 			fs := c.Flags()
 			if c.HasSubCommands() {
 				fs = c.PersistentFlags()
 			}
-			utils.AddOneXNoOp(fs, "workspace-id", "")
+			utils.AddOneXNoOp(fs, "workspace-id")
 		}
 	}
 
@@ -252,7 +251,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 	// let's hide under feature flag
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
-		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", deploymentTypeCmdMessage)
+		cmd.Flags().StringVar(&dagDeploymentType, "dag-deployment-type", "", deploymentTypeCmdMessage)
 	}
 
 	if nfsMountDAGDeploymentEnabled {
@@ -269,29 +268,29 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	if triggererEnabled {
-		cmd.Flags().IntVarP(&createTriggererReplicas, "triggerer-replicas", "", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
+		cmd.Flags().IntVar(&createTriggererReplicas, "triggerer-replicas", 0, "Number of replicas to use for triggerer airflow component, valid 0-2")
 	}
 
 	if runtimeEnabled {
-		cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "", "", "Add desired Astronomer Runtime version: e.g: 4.2.2 or 5.0.0")
+		cmd.Flags().StringVar(&runtimeVersion, "runtime-version", "", "Add desired Astronomer Runtime version: e.g: 4.2.2 or 5.0.0")
 	}
 
-	// -n, as on Astro: 1.x's -n here was --nfs-location, which now has no
-	// shorthand, and deploymentName refuses a 1.x line passing the mount.
-	addDeploymentNameFlag(cmd, &deploymentCreateName, "Name of your deployment", true)
-	cmd.Flags().StringVarP(&executor, "executor", "e", celeryExecutorArg, "The executor used in your Airflow deployment, one of: local, celery, or kubernetes (or Astro's LocalExecutor, CeleryExecutor, KubernetesExecutor)")
-	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired Airflow version parameter: e.g: 1.10.5 or 1.10.7")
-	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
-	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
+	// No -n: 1.x's -n here was --nfs-location, so a 1.x line passing the mount
+	// with it is refused (removedFlags), not read as the Deployment's name.
+	addDeploymentNameFlag(cmd, &deploymentCreateName, "Name of your deployment", "")
+	cmd.Flags().StringVar(&executor, "executor", celeryExecutorArg, "The executor used in your Airflow deployment, one of: local, celery, or kubernetes (or Astro's LocalExecutor, CeleryExecutor, KubernetesExecutor)")
+	cmd.Flags().StringVar(&airflowVersion, "airflow-version", "", "Add desired Airflow version parameter: e.g: 1.10.5 or 1.10.7")
+	cmd.Flags().StringVar(&releaseName, "release-name", "", "Set custom release-name if possible")
+	cmd.Flags().StringVar(&cloudRole, "cloud-role", "", "Set cloud role to annotate service accounts in deployment")
 	cmd.Flags().StringVar(&createNamespace, "namespace", "", "Kubernetes namespace for the Deployment, where the platform asks for one: one of the namespaces it offers, or a name of your own (lower-case letters, digits and '-', at most 63) where it takes one")
 
 	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
-		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Set cluster ID to create deployment in ")
+		cmd.Flags().StringVar(&clusterID, "cluster-id", "", "Set cluster ID to create deployment in ")
 		_ = cmd.MarkFlagRequired("cluster-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	}
 
 	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "2.1.0"}) {
-		cmd.Flags().StringVarP(&deploymentMode, "mode", "", "", "Deployment mode, one of: helm (default), operator")
+		cmd.Flags().StringVar(&deploymentMode, "mode", "", "Deployment mode, one of: helm (default), operator")
 		cmd.Example += createExampleOperatorMode
 	}
 	_ = cmd.MarkFlagRequired("name") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
@@ -383,10 +382,10 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 // addHibernationFlags gives hibernate or wake-up its flags: period names
 // what --until and --for end, and doing what --yes skips the question for.
 func addHibernationFlags(cmd *cobra.Command, period, doing string) {
-	addDeploymentArgFlag(cmd)
-	cmd.Flags().StringVarP(&hibernateUntil, "until", "u", "", "End the "+period+" at this date and time, in RFC 3339. Example value: 2026-01-01T00:00:00Z")
-	cmd.Flags().StringVarP(&hibernateForDuration, "for", "d", "", "End the "+period+" after this long. Example value: 1h30m")
-	cmd.Flags().BoolVarP(&hibernateRemove, "remove-override", "r", false, "Remove any existing override and resume the regular hibernation schedule")
+	addDeploymentArgFlagWithoutLetter(cmd) // 1.x gave -d to --for here
+	cmd.Flags().StringVar(&hibernateUntil, "until", "", "End the "+period+" at this date and time, in RFC 3339. Example value: 2026-01-01T00:00:00Z")
+	cmd.Flags().StringVar(&hibernateForDuration, "for", "", "End the "+period+" after this long. Example value: 1h30m")
+	cmd.Flags().BoolVar(&hibernateRemove, "remove-override", false, "Remove any existing override and resume the regular hibernation schedule")
 	addYesFlag(cmd, "Don't ask for confirmation before "+doing+" the Deployment")
 	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
@@ -402,17 +401,17 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 			return deploymentAdopt(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "ID of the cluster the Airflow custom resource is running on")
+	cmd.Flags().StringVar(&clusterID, "cluster-id", "", "ID of the cluster the Airflow custom resource is running on")
 	// --name is the Deployment's, as on create, with 1.x's --label its alias.
 	// 1.x's --name was the custom resource's, which is --cr-name now, and
 	// required: a 1.x line names none, and refuseOneXAdoptName says why.
 	cmd.Flags().StringVar(&adoptCRName, "cr-name", "", "Name (metadata.name) of the existing Airflow custom resource (CR)")
-	cmd.Flags().StringVarP(&adoptNamespace, "namespace", "", "", "Kubernetes namespace of the existing Airflow custom resource (CR)")
-	addDeploymentNameFlag(cmd, &adoptDeploymentName, "Name of the adopted Deployment (default: the --cr-name value)", false)
-	cmd.Flags().StringVarP(&adoptDescription, "description", "d", "", "Description for the adopted Deployment")
-	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through APC logging")
-	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
-	cmd.Flags().BoolVarP(&adoptAcceptIncompatibilities, "accept-incompatibilities", "", true, "Adopt even if the custom resource has fields with no APC representation")
+	cmd.Flags().StringVar(&adoptNamespace, "namespace", "", "Kubernetes namespace of the existing Airflow custom resource (CR)")
+	addDeploymentNameFlag(cmd, &adoptDeploymentName, "Name of the adopted Deployment (default: the --cr-name value)", "n")
+	cmd.Flags().StringVar(&adoptDescription, "description", "", "Description for the adopted Deployment")
+	cmd.Flags().BoolVar(&adoptUseApcLogging, "use-apc-logging", false, "Route the adopted Deployment's logs through APC logging")
+	cmd.Flags().BoolVar(&adoptUseApcRegistry, "use-apc-registry", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
+	cmd.Flags().BoolVar(&adoptAcceptIncompatibilities, "accept-incompatibilities", true, "Adopt even if the custom resource has fields with no APC representation")
 	_ = cmd.MarkFlagRequired("cluster-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	_ = cmd.MarkFlagRequired("cr-name")    //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	_ = cmd.MarkFlagRequired("namespace")  //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
@@ -430,7 +429,7 @@ func newDeploymentUnadoptCmd(out io.Writer) *cobra.Command {
 			return deploymentUnadopt(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "Adopted Deployment to release: a link name from the project's manifest, or a Deployment id", true, "d")
+	addDeploymentFlag(cmd.Flags(), "Adopted Deployment to release: a link name from the project's manifest, or a Deployment id", "d", true)
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addYesFlag(cmd, "Release the Deployment without asking for confirmation")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
@@ -454,7 +453,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show Deployments across all Workspaces")
 	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
-		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Show Deployments from the specified cluster")
+		cmd.Flags().StringVar(&clusterID, "cluster-id", "", "Show Deployments from the specified cluster")
 	}
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -484,7 +483,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 			return deploymentUpdate(cmd, dagDeploymentType, nfsLocation, out)
 		},
 	}
-	addDeploymentArgFlag(cmd)
+	addDeploymentArgFlagWithoutLetter(cmd) // 1.x gave -d to --description here
 
 	addYesFlag(cmd, SkipUserPromptMsgForUpdateDeployment)
 
@@ -496,11 +495,11 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 		dagOnlyDeployEnabled = appConfig.Flags.DagOnlyDeployment
 	}
 
-	cmd.Flags().StringVarP(&executorUpdate, "executor", "e", "", "Add executor parameter: local, celery, or kubernetes (or Astro's LocalExecutor, CeleryExecutor, KubernetesExecutor)")
+	cmd.Flags().StringVar(&executorUpdate, "executor", "", "Add executor parameter: local, celery, or kubernetes (or Astro's LocalExecutor, CeleryExecutor, KubernetesExecutor)")
 
 	// let's hide under feature flag
 	if nfsMountDAGDeploymentEnabled || gitSyncDAGDeploymentEnabled || dagOnlyDeployEnabled {
-		cmd.Flags().StringVarP(&dagDeploymentType, "dag-deployment-type", "t", "", deploymentTypeCmdMessage)
+		cmd.Flags().StringVar(&dagDeploymentType, "dag-deployment-type", "", deploymentTypeCmdMessage)
 	}
 
 	if nfsMountDAGDeploymentEnabled {
@@ -509,7 +508,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	}
 
 	if triggererEnabled {
-		cmd.Flags().IntVarP(&updateTriggererReplicas, "triggerer-replicas", "", -1, "Number of replicas to use for triggerer Airflow component, valid 0-2")
+		cmd.Flags().IntVar(&updateTriggererReplicas, "triggerer-replicas", -1, "Number of replicas to use for triggerer Airflow component, valid 0-2")
 	}
 
 	//noline:dupl
@@ -517,10 +516,10 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 		addGitSyncDeploymentFlags(cmd)
 	}
 
-	cmd.Flags().StringVarP(&deploymentUpdateDescription, "description", "d", "", "Set description to update in deployment")
+	cmd.Flags().StringVar(&deploymentUpdateDescription, "description", "", "Set description to update in deployment")
 	// -n, as on Astro: see create.
-	addDeploymentNameFlag(cmd, &deploymentUpdateName, "The new name for the deployment", true)
-	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
+	addDeploymentNameFlag(cmd, &deploymentUpdateName, "The new name for the deployment", "")
+	cmd.Flags().StringVar(&cloudRole, "cloud-role", "", "Set cloud role to annotate service accounts in deployment")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -528,13 +527,13 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 func addGitSyncDeploymentFlags(cmd *cobra.Command) {
 	const defaultSyncInterval = 60
 
-	cmd.Flags().StringVarP(&gitRevision, "git-revision", "v", "", "Git revision (tag or hash) to check out")
-	cmd.Flags().StringVarP(&gitRepoURL, "git-repository-url", "u", "", "The repository URL of the git repo")
-	cmd.Flags().StringVarP(&gitBranchName, "git-branch-name", "b", "", "The Branch name of the git repo we will be syncing from")
-	cmd.Flags().StringVarP(&gitDAGDir, "dag-directory-path", "p", "", "The directory where dags are stored in repo")
-	cmd.Flags().IntVarP(&gitSyncInterval, "sync-interval", "s", defaultSyncInterval, "The interval in seconds in which git-sync will be polling git for updates")
-	cmd.Flags().StringVarP(&sshKey, "ssh-key", "", "", "Path to the ssh public key file to use to clone your git repo")
-	cmd.Flags().StringVarP(&knowHosts, "known-hosts", "", "", "Path to the known hosts file to use to clone your git repo")
+	cmd.Flags().StringVar(&gitRevision, "git-revision", "", "Git revision (tag or hash) to check out")
+	cmd.Flags().StringVar(&gitRepoURL, "git-repository-url", "", "The repository URL of the git repo")
+	cmd.Flags().StringVar(&gitBranchName, "git-branch-name", "", "The Branch name of the git repo we will be syncing from")
+	cmd.Flags().StringVar(&gitDAGDir, "dag-directory-path", "", "The directory where dags are stored in repo")
+	cmd.Flags().IntVar(&gitSyncInterval, "sync-interval", defaultSyncInterval, "The interval in seconds in which git-sync will be polling git for updates")
+	cmd.Flags().StringVar(&sshKey, "ssh-key", "", "Path to the ssh public key file to use to clone your git repo")
+	cmd.Flags().StringVar(&knowHosts, "known-hosts", "", "Path to the known hosts file to use to clone your git repo")
 }
 
 func newDeploymentAirflowRootCmd(out io.Writer) *cobra.Command {
@@ -562,9 +561,9 @@ func newDeploymentAirflowUpgradeCmd(out io.Writer) *cobra.Command {
 			return deploymentAirflowUpgrade(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", true, "d")
-	cmd.Flags().StringVarP(&desiredAirflowVersion, "desired-airflow-version", "v", "", "Desired Airflow version to upgrade to")
-	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial airflow upgrade step")
+	addDeploymentFlag(cmd.Flags(), "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", "d", true)
+	cmd.Flags().StringVar(&desiredAirflowVersion, "desired-airflow-version", "", "Desired Airflow version to upgrade to")
+	cmd.Flags().BoolVar(&cancel, "cancel", false, "Abort the initial airflow upgrade step")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -595,9 +594,9 @@ func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command { //nolint:dup
 			return deploymentRuntimeUpgrade(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", true, "d")
-	cmd.Flags().StringVarP(&desiredRuntimeVersion, "desired-runtime-version", "v", "", "Desired Runtime version you wish to upgrade your deployment to")
-	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime upgrade step")
+	addDeploymentFlag(cmd.Flags(), "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", "d", true)
+	cmd.Flags().StringVar(&desiredRuntimeVersion, "desired-runtime-version", "", "Desired Runtime version you wish to upgrade your deployment to")
+	cmd.Flags().BoolVar(&cancel, "cancel", false, "Abort the initial runtime upgrade step")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -614,48 +613,20 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 			return deploymentRuntimeMigrate(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "Deployment to migrate: a link name from the project's manifest, or a Deployment id", true, "d")
-	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime migrate step")
+	addDeploymentFlag(cmd.Flags(), "Deployment to migrate: a link name from the project's manifest, or a Deployment id", "d", true)
+	cmd.Flags().BoolVar(&cancel, "cancel", false, "Abort the initial runtime migrate step")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
-// nfsShaped matches an NFS location as --nfs-location takes it, <host>:/<path>,
-// with or without the nfs:// the CLI adds, the host an IPv4 address, an IPv6
-// one in brackets or a dotted host name. That is narrower than every NFS
-// location, so that a Deployment name such as etl:/daily, which 1.x's --label
-// took, is not one: a host name with no dot, or a URL's ://, is a name.
-var nfsShaped = regexp.MustCompile(`^(nfs://)?(\[[0-9A-Fa-f:.]+\]|[0-9]{1,3}(\.[0-9]{1,3}){3}|[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+):/([^/]|$)`)
-
-// deploymentName is --name on the deployment commands that name one. With
-// refuseNFS, on create and update, it refuses an NFS location: -n was 1.x's
-// --nfs-location there and is --name in v2, so a 1.x line passing the mount
-// with -n would otherwise name the Deployment after it. It refuses as the
-// line is parsed, ahead of the check that --name and 1.x's --label agree, so
-// the refusal is the one that says where the mount goes now.
-type deploymentName struct {
-	to        *string
-	refuseNFS bool
-}
-
-func (n deploymentName) String() string { return *n.to }
-func (n deploymentName) Type() string   { return "string" }
-func (n deploymentName) Set(v string) error {
-	if n.refuseNFS && nfsShaped.MatchString(v) {
-		return errors.New("it is an NFS location: the NFS volume to mount is --nfs-location, and --name (-n) is the Deployment's name in v2")
-	}
-	*n.to = v
-	return nil
-}
-
-// addDeploymentNameFlag registers the Deployment's name on cmd as --name, -n,
-// read into to, with 1.x's --label, -l, as its hidden alias. refuseNFS says
-// whether 1.x's -n there was --nfs-location (deploymentName).
-func addDeploymentNameFlag(cmd *cobra.Command, to *string, usage string, refuseNFS bool) {
+// addDeploymentNameFlag registers the Deployment's name on cmd as --name, with
+// the shorthand given ("n", or "" on create and update, where 1.x's -n was
+// --nfs-location), read into to, and 1.x's --label as its hidden alias.
+func addDeploymentNameFlag(cmd *cobra.Command, to *string, usage, shorthand string) {
 	*to = ""
-	cmd.Flags().VarP(deploymentName{to: to, refuseNFS: refuseNFS}, "name", "n", usage)
-	utils.AddAlias(cmd.Flags(), "label", "l", "name")
+	cmd.Flags().StringVarP(to, "name", shorthand, "", usage)
+	utils.AddAlias(cmd.Flags(), "label", "name")
 }
 
 func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
