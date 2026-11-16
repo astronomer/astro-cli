@@ -437,7 +437,7 @@ func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.Proje
 // deploy with no project (an --image-name deploy from outside one).
 func deploySettings(m *manifest.Manifest) manifest.Deploy {
 	if m == nil {
-		return manifest.Deploy{GitMetadata: true}
+		return manifest.DefaultDeploy()
 	}
 	return m.Astro.Deploy
 }

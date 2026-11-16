@@ -307,7 +307,7 @@ Whether a deploy that uploads the project's Dags generates Cosmos Boost files fo
 
 ### `sha-as-tag`
 
-Whether a deploy to Astro Private Cloud pushes its image by digest, and points the Deployment at it so, rather than by tag. `false` unless set `true`. Astro CLI 1.x kept this as `sha_as_tag`.
+Whether a deploy to Astro Private Cloud pushes its image by digest, and points the Deployment at it so, rather than by tag. `false` unless set `true`. `astro deploy --sha-as-tag` does the same for one run, which is the way for an `--image-name` deploy from outside a project. Astro CLI 1.x kept this as `sha_as_tag`.
 
 ## `[tool.astro.deployments.<name>]`
 

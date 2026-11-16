@@ -393,12 +393,8 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	if res.Git.Uncommitted {
 		recap.Note("the project has uncommitted changes, so this deploy records no git commit")
 	}
-	// A prebuilt image records no commit whatever the settings say, so it
-	// gets no note about them.
-	if inProject && imageName == "" && m != nil {
-		if note := gitMetadataOffNote(config.WorkingPath, m.Astro.Deploy.GitMetadata); note != "" {
-			recap.Note(note)
-		}
+	if note := projectGitMetadataOffNote(m, imageName); note != "" {
+		recap.Note(note)
 	}
 	if !inProject {
 		w := imageAloneWarning(&res, imageName)
@@ -774,6 +770,16 @@ func gitMetadataOffNote(dir string, wanted bool) string {
 		return ""
 	}
 	return gitMetadataOffText
+}
+
+// projectGitMetadataOffNote is gitMetadataOffNote for a project deploy: none
+// with no project (m nil), and none for a prebuilt image (imageName), which
+// records no commit whatever the settings say.
+func projectGitMetadataOffNote(m *manifest.Manifest, imageName string) string {
+	if m == nil || imageName != "" {
+		return ""
+	}
+	return gitMetadataOffNote(config.WorkingPath, m.Astro.Deploy.GitMetadata)
 }
 
 // gitMetadataOffText says why a deploy recorded no commit, in the words of

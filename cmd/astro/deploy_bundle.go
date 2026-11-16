@@ -169,12 +169,14 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	if !login.current {
 		in.Login = &login.context
 	}
-	if note := gitMetadataOffNote(path, o.gitMetadata); note != "" {
-		cliout.Note(cmd.ErrOrStderr(), note)
-	}
 	res, err := DeployBundle(in)
 	if err != nil {
 		return err
+	}
+	// After the deploy, as a project deploy's recap gives it: a deploy that
+	// failed recorded nothing either way.
+	if note := gitMetadataOffNote(path, o.gitMetadata); note != "" {
+		cliout.Note(cmd.ErrOrStderr(), note)
 	}
 	bundlePath, err := filepath.Abs(path)
 	if err != nil {

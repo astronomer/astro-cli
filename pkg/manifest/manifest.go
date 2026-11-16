@@ -1383,10 +1383,17 @@ func (p *parser) workspace(key string, kind LinkKind, raw any, fallback string) 
 	return ws
 }
 
+// DefaultDeploy is [tool.astro.deploy] when the project sets none of it: a
+// deploy records its commit, and nothing else is on. A deploy with no project
+// behaves as this. The zero Deploy is not it, since GitMetadata defaults on.
+func DefaultDeploy() Deploy {
+	return Deploy{GitMetadata: true}
+}
+
 // deploy decodes [tool.astro.deploy], applying each setting's default.
 func (p *parser) deploy(v any) Deploy {
 	const key = astroRoot + ".deploy"
-	d := Deploy{GitMetadata: true}
+	d := DefaultDeploy()
 	table := p.table(key, v)
 	if table == nil {
 		return d

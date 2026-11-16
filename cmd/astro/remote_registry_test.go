@@ -51,6 +51,10 @@ environment = 'orders'
 			clientTarget{registry: "other.example.com/x", source: "--registry", deploymentID: "dep-prod"},
 		},
 		{
+			"a linked Deployment named by its id takes its link's", "", "dep-prod",
+			clientTarget{registry: "123.dkr.ecr.us-east-1.amazonaws.com/acme-prod", source: "pyproject.toml [tool.astro.deployments.prod] client-registry", deploymentID: "dep-prod"},
+		},
+		{
 			"a Deployment id that is no link is passed as it is", "", "clnotalink",
 			clientTarget{registry: "quay.io/acme/client", source: projectClientRegistry, deploymentID: "clnotalink"},
 		},

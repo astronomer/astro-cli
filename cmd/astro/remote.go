@@ -155,6 +155,7 @@ type clientTarget struct {
 func resolveClientTarget(m *manifest.Manifest, registry, deployment string) (clientTarget, error) {
 	t := clientTarget{registry: registry, source: "--registry", deploymentID: deployment}
 	var link *manifest.Link
+	linkName := deployment
 	if m != nil && deployment != "" {
 		if l, ok := m.Astro.Deployments[deployment]; ok {
 			if l.Kind() != manifest.KindAstro {
@@ -162,9 +163,12 @@ func resolveClientTarget(m *manifest.Manifest, registry, deployment string) (cli
 			}
 			link = &l
 			t.deploymentID = l.Deployment
+		} else if linked, l, ok := astroLinkTo(m, deployment); ok {
+			// A Deployment id the project links: its agents pull from that
+			// link's registry, however the run named it.
+			link, linkName = &l, linked
 		}
 	}
-	linkName := deployment
 	if m != nil && deployment == "" {
 		if defName, l, ok := manifest.DefaultLink(m.Astro.Deployments); ok && l.Kind() == manifest.KindAstro {
 			link, linkName = &l, defName
@@ -189,4 +193,17 @@ func resolveClientTarget(m *manifest.Manifest, registry, deployment string) (cli
 		return clientTarget{}, errors.New("no client registry: set client-registry under [tool.astro.deploy] in pyproject.toml to the repository the project's remote agents pull the client image from, so every checkout pushes there, or pass --registry for this run")
 	}
 	return t, nil
+}
+
+// astroLinkTo is the project's astro link to the Deployment id, if one links
+// it. Map order is not stable, so of two links to one Deployment the
+// lowest-named wins.
+func astroLinkTo(m *manifest.Manifest, id string) (name string, link manifest.Link, ok bool) {
+	for n := range m.Astro.Deployments {
+		l := m.Astro.Deployments[n]
+		if l.Kind() == manifest.KindAstro && l.Deployment == id && (!ok || n < name) {
+			name, link, ok = n, l, true
+		}
+	}
+	return name, link, ok
 }
