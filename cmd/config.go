@@ -278,11 +278,6 @@ func configSet(cmd *cobra.Command, args []string) error {
 		return unknownSetting(args[0])
 	}
 
-	// Validate the value using the registered validator (if any)
-	if err := cfg.Validate(args[1]); err != nil {
-		return fmt.Errorf("invalid value for %s: %w", cfg.Path, err)
-	}
-
 	setting := configSetting{Key: cfg.Path, Value: args[1], Scope: globalScope, Set: true}
 	if err := cfg.SetHomeString(args[1]); err != nil {
 		return err

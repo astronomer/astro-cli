@@ -499,6 +499,7 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	if a := from1x.deployLinkAdvisory(); a != "" {
 		cs.Advisories = append(cs.Advisories, a)
 	}
+	cs.Advisories = append(cs.Advisories, from1x.deploySettingsAdvisories()...)
 	if slices.ContainsFunc(cs.Changes, func(c Change) bool { return c.Kind == Delete && c.Path == config1xRelPath }) {
 		cs.Advisories = append(cs.Advisories, config1xDeletedAdvisory)
 	}
@@ -704,6 +705,9 @@ func set1xDeclarations(ed tomledit.Editor, from1x *project1x, pinned string) err
 		return err
 	}
 	if err := setDeployLink(ed, from1x); err != nil {
+		return err
+	}
+	if err := setDeploySettings(ed, from1x); err != nil {
 		return err
 	}
 	return setPools(ed, from1x.settings.pools.byName)

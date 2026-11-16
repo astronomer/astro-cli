@@ -3,8 +3,12 @@ package scaffold
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 )
 
 // A 1.x project's .astro/config.yaml holds two kinds of thing: facts about the
@@ -77,9 +81,10 @@ func yamlSettings(doc map[string]any) []setting1x {
 // parses line by line. A value is never printed for a key that names a
 // credential.
 func (from1x *project1x) settingNotes() []string {
+	_, handled := from1x.carriedDeploySettings()
 	var notes []string
 	for _, s := range from1x.cliSettings {
-		if !plainSettingKey(s.key) {
+		if !plainSettingKey(s.key) || handled[s.key] {
 			continue
 		}
 		var fate SettingReplacement
@@ -178,4 +183,93 @@ func credentialKey(key string) bool {
 		}
 	}
 	return false
+}
+
+// deployClientRegistry is [tool.astro.deploy] client-registry, the one deploy
+// setting that is a string rather than a boolean.
+const deployClientRegistry = "client-registry"
+
+// deploySettings1x maps each 1.x CLI setting a project decides to the
+// [tool.astro.deploy] key that holds it now, under every name 1.x wrote it.
+// These are carried rather than named: every checkout of the project, a
+// teammate's or a CI runner's, read them from the committed file, and the
+// manifest is where they are committed now.
+var deploySettings1x = map[string]string{
+	"deploy.git_metadata":                     "git-metadata",
+	"cosmos_boost.pre_deploy":                 "cosmos-boost",
+	"deploy.cosmos_boost":                     "cosmos-boost",
+	"sha_as_tag":                              "sha-as-tag",
+	"apc.sha_as_tag":                          "sha-as-tag",
+	"remote.client_registry":                  deployClientRegistry,
+	"deploy.remote_execution.client_registry": deployClientRegistry,
+}
+
+// carried1x is one 1.x deploy setting the conversion writes into
+// [tool.astro.deploy].
+type carried1x struct {
+	from, key string
+	value     any
+}
+
+// carriedDeploySettings are the deploy settings .astro/config.yaml set to
+// something other than the default, as the [tool.astro.deploy] values that
+// keep them. handled holds every key, by the name the file spells it, that
+// needs no note: carried, or at the default, where the manifest needs no
+// line either. A value that is not a boolean, or a registry that does not
+// print on one line, is neither, and keeps its note.
+//
+// The first spelling of a key wins, in the file's sorted order, if a file
+// holds both a 1.x name and the current one.
+func (from1x *project1x) carriedDeploySettings() (carried []carried1x, handled map[string]bool) {
+	handled = map[string]bool{}
+	seen := map[string]bool{}
+	for _, s := range from1x.cliSettings {
+		key, ok := deploySettings1x[strings.ToLower(s.key)]
+		if !ok || seen[key] {
+			continue
+		}
+		var value any
+		switch key {
+		case deployClientRegistry:
+			if !plainSettingValue(s.value) {
+				continue
+			}
+			value = strings.TrimSpace(s.value)
+		default:
+			b, err := strconv.ParseBool(s.value)
+			if err != nil {
+				continue
+			}
+			seen[key], handled[s.key] = true, true
+			if b == (key == "git-metadata") {
+				continue // the default
+			}
+			value = b
+		}
+		seen[key], handled[s.key] = true, true
+		carried = append(carried, carried1x{from: s.key, key: key, value: value})
+	}
+	return carried, handled
+}
+
+// setDeploySettings writes the carried deploy settings into
+// [tool.astro.deploy].
+func setDeploySettings(ed tomledit.Editor, from1x *project1x) error {
+	carried, _ := from1x.carriedDeploySettings()
+	for _, c := range carried {
+		if err := ed.Set([]string{"tool", "astro", "deploy", c.key}, c.value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// deploySettingsAdvisories say what setDeploySettings carried, one line each.
+func (from1x *project1x) deploySettingsAdvisories() []string {
+	carried, _ := from1x.carriedDeploySettings()
+	out := make([]string, 0, len(carried))
+	for _, c := range carried {
+		out = append(out, config1xRelPath+": carried "+c.from+" into [tool.astro.deploy] "+c.key+" in "+manifest.Marker)
+	}
+	return out
 }

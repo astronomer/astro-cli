@@ -26,6 +26,12 @@ type ManifestDagDeployInput struct {
 	NoDagsBaseDir bool
 	Wait          bool
 	WaitTime      time.Duration
+	// GitMetadata is [tool.astro.deploy] git-metadata: whether the deploy
+	// records the commit it ships.
+	GitMetadata bool
+	// CosmosBoost is [tool.astro.deploy] cosmos-boost: whether the Dags
+	// upload carries Cosmos Boost files for its dbt projects.
+	CosmosBoost bool
 	// Progress takes the Wait progress; nil is stderr.
 	Progress io.Writer
 }
@@ -47,11 +53,12 @@ type ManifestDeployGit struct {
 }
 
 // readManifestDeployGit reads the git metadata a manifest deploy records, under Astro CLI 1.x's
-// rules: none when deploy.git_metadata is off, and none when the tree has
-// uncommitted changes, since HEAD would not describe the files deployed. The
-// commit message comes back as the description fallback.
-func readManifestDeployGit(projectDir string) (info ManifestDeployGit, commitMessage string) {
-	if !config.CFG.DeployGitMetadata.GetBool() {
+// rules: none when the project's [tool.astro.deploy] git-metadata is off
+// (enabled), and none when the tree has uncommitted changes, since HEAD would
+// not describe the files deployed. The commit message comes back as the
+// description fallback.
+func readManifestDeployGit(projectDir string, enabled bool) (info ManifestDeployGit, commitMessage string) {
+	if !enabled {
 		return ManifestDeployGit{}, ""
 	}
 	if git.HasUncommittedChanges(projectDir) {
@@ -100,7 +107,7 @@ func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClie
 		return ManifestDagDeployResult{}, fmt.Errorf(enableDagDeployMsg, in.DeploymentID)
 	}
 
-	gitInfo, commitMessage := readManifestDeployGit(in.ProjectDir)
+	gitInfo, commitMessage := readManifestDeployGit(in.ProjectDir, in.GitMetadata)
 	description := descriptionOrCommitMessage(in.Description, commitMessage)
 	created, err := createDeploy(dep.OrganizationId, dep.Id, astrov1.CreateDeployRequest{
 		Description: &description,
@@ -111,7 +118,7 @@ func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClie
 		return ManifestDagDeployResult{}, explainHibernating(err, &dep)
 	}
 
-	tarballVersion, err := uploadDeployDags(&c, in.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
+	tarballVersion, err := uploadDeployDags(&c, in.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir, in.CosmosBoost)
 	if err != nil {
 		return ManifestDagDeployResult{}, err
 	}

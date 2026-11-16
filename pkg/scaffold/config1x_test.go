@@ -8,12 +8,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // fakeSettings stands in for the CLI's answer: container.binary is a setting,
-// remote.client_registry its 1.x name for deploy.remote_execution.client_registry,
 // webserver.port a setting v2 removed, and a value equal to "default" one the
-// setting shipped with.
+// setting shipped with. The deploy settings never reach it: the conversion
+// carries them into [tool.astro.deploy].
 func fakeSettings(key, value string) (SettingReplacement, bool) {
 	if value == "default" {
 		return SettingReplacement{}, false
@@ -21,8 +23,6 @@ func fakeSettings(key, value string) (SettingReplacement, bool) {
 	switch key {
 	case "container.binary", "cloud.api.token":
 		return SettingReplacement{Global: key}, true
-	case "remote.client_registry":
-		return SettingReplacement{Global: "deploy.remote_execution.client_registry"}, true
 	case "webserver.port":
 		return SettingReplacement{Removed: "Pick the local Airflow port with astro local start --port <port>."}, true
 	}
@@ -65,9 +65,8 @@ func TestEachSettingIn1xConfigIsNamedAndTheFileGoes(t *testing.T) {
 
 	assert.Equal(t, []string{config1xRelPath + ": container.binary is a CLI setting, which Astro CLI v2 keeps per machine rather than per project. " +
 		"To keep it on this machine, run: astro config set -g container.binary podman"}, notesAbout(res, "container.binary"))
-	assert.Equal(t, []string{config1xRelPath + ": remote.client_registry is a CLI setting, which Astro CLI v2 keeps per machine rather than per project. " +
-		"To keep it on this machine, run: astro config set -g deploy.remote_execution.client_registry quay.io/acme/client"},
-		notesAbout(res, "remote.client_registry"), "named as the file spells it, set under its v2 name")
+	assert.Empty(t, notesAbout(res, "remote.client_registry"), "a deploy setting is carried, not named")
+	assert.Contains(t, res.Advisories, config1xRelPath+": carried remote.client_registry into [tool.astro.deploy] client-registry in pyproject.toml")
 	assert.Equal(t, []string{config1xRelPath + ": webserver.port is an Astro CLI 1.x setting v2 does not have. " +
 		"Pick the local Airflow port with astro local start --port <port>."}, notesAbout(res, "webserver.port"))
 	assert.Empty(t, notesAbout(res, "show_warnings"), "a shipped default needs no word")
@@ -136,4 +135,32 @@ func TestALinkTheNoteCannotPrintKeepsTheFile(t *testing.T) {
 	res = convert1x(t, "project:\n  name: orders\ninstances:\n  - name: \"prod west\"\n    deployment_id: cm1prod\n", nil)
 	_, err = os.Stat(filepath.Join(res.Dir, filepath.FromSlash(config1xRelPath)))
 	assert.NoError(t, err, "the note stands <name> in for the name, so the file is its only record")
+}
+
+// The deploy settings a 1.x project's file held are what every checkout of it
+// read, so they are carried into [tool.astro.deploy], under their 1.x names
+// as much as the current ones. A setting at its default needs no line.
+func TestDeploySettingsAreCarriedIntoTheManifest(t *testing.T) {
+	res := convert1x(t, "project:\n  name: orders\n"+
+		"remote:\n  client_registry: quay.io/acme/client\n"+
+		"sha_as_tag: true\n"+
+		"cosmos_boost:\n  pre_deploy: \"true\"\n"+
+		"deploy:\n  git_metadata: false\n", fakeSettings)
+
+	m, err := manifest.Load(filepath.Join(res.Dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.Equal(t, manifest.Deploy{ClientRegistry: "quay.io/acme/client", CosmosBoost: true, ShaAsTag: true}, m.Astro.Deploy)
+	for _, from := range []string{"remote.client_registry", "sha_as_tag", "cosmos_boost.pre_deploy", "deploy.git_metadata"} {
+		assert.Empty(t, notesAbout(res, from), from)
+	}
+	_, err = os.Stat(filepath.Join(res.Dir, filepath.FromSlash(config1xRelPath)))
+	assert.ErrorIs(t, err, os.ErrNotExist, "everything in it was carried")
+}
+
+func TestADeploySettingAtItsDefaultWritesNothing(t *testing.T) {
+	res := convert1x(t, "project:\n  name: orders\ndeploy:\n  git_metadata: true\nsha_as_tag: false\n", fakeSettings)
+	data, err := os.ReadFile(filepath.Join(res.Dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "[tool.astro.deploy]")
+	assert.Empty(t, res.Notes)
 }

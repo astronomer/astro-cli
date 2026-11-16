@@ -5,9 +5,6 @@ import (
 	"strings"
 )
 
-// ValidatorFunc is a function that validates a configuration value
-type ValidatorFunc func(value string) error
-
 // cfg defines settings a single configuration setting can have
 type cfg struct {
 	Path string
@@ -18,8 +15,7 @@ type cfg struct {
 	// Legacy are the names the setting had before v2 renamed it, which
 	// Astro CLI 1.x still reads and writes. `astro config` refuses them
 	// (removed.go); a file that sets one still sets the setting (compat1x.go).
-	Legacy    []string
-	validator ValidatorFunc
+	Legacy []string
 }
 
 // cfgs houses all configurations for an astro project
@@ -41,15 +37,11 @@ type cfgs struct {
 	PageSize                cfg
 	UpgradeMessage          cfg
 	AutoSelect              cfg
-	ShaAsTag                cfg
-	RemoteClientRegistry    cfg
 	RemoteBaseImageRegistry cfg
-	DeployGitMetadata       cfg
 	TelemetryEnabled        cfg
 	TelemetryAnonymousID    cfg
 	TelemetryNoticeShown    cfg
 	OttoAutoUpdate          cfg
-	CosmosBoostPreDeploy    cfg
 }
 
 // Creates a new cfg struct
@@ -156,17 +148,4 @@ func (c cfg) HomeScope() string {
 // Astronomer's own development, which get and set still take.
 func (c cfg) Listed() bool {
 	return c.Path != contextsKey && !strings.HasPrefix(c.Path, "internal.")
-}
-
-// RegisterValidator registers a validation function for this config
-func (c *cfg) RegisterValidator(fn ValidatorFunc) {
-	c.validator = fn
-}
-
-// Validate validates a value using the registered validator
-func (c cfg) Validate(value string) error {
-	if c.validator != nil {
-		return c.validator(value)
-	}
-	return nil
 }

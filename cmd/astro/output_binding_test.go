@@ -120,7 +120,7 @@ func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 		config.WorkingPath = dir
 		t.Cleanup(func() { config.WorkingPath = prev })
 
-		stdout, stderr, err := execUnboundRoot(t, nil, "remote", "deploy", "-o", "json")
+		stdout, stderr, err := execUnboundRoot(t, nil, "remote", "deploy", "--registry", "registry.example.com/agents/client", "-o", "json")
 		require.NoError(t, err, "stderr:\n%s", stderr)
 		var got remoteDeployJSON
 		decodeOne(t, stdout, &got)

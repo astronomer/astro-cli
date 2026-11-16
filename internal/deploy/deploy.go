@@ -222,6 +222,12 @@ type DagDeploy struct {
 	NoDagsBaseDir bool
 	Wait          bool
 	WaitTime      time.Duration
+	// GitMetadata is [tool.astro.deploy] git-metadata: whether the deploy
+	// records the commit it ships.
+	GitMetadata bool
+	// CosmosBoost is [tool.astro.deploy] cosmos-boost: whether the Dags
+	// upload carries Cosmos Boost files for its dbt projects.
+	CosmosBoost bool
 }
 
 // DagResult is what the transport reports after a dags-only deploy.
@@ -240,6 +246,15 @@ type DagResult struct {
 type ImageDeploy struct {
 	DeploymentID string
 	WorkspaceID  string
+	// ShaAsTag is [tool.astro.deploy] sha-as-tag: an Astro Private Cloud
+	// deploy pushes the image by digest rather than by tag.
+	ShaAsTag bool
+	// GitMetadata is [tool.astro.deploy] git-metadata: whether the deploy
+	// records the commit it ships.
+	GitMetadata bool
+	// CosmosBoost is [tool.astro.deploy] cosmos-boost: whether the Dags
+	// upload carries Cosmos Boost files for its dbt projects.
+	CosmosBoost bool
 	// Build is the project's root (Build.ProjectDir) and the manifest's
 	// image-deciding fields, as imagebuild.ManifestBuildOf reads them.
 	Build imagebuild.ManifestBuild
@@ -418,6 +433,15 @@ func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.Proje
 	})
 }
 
+// deploySettings is the project's [tool.astro.deploy], or its defaults for a
+// deploy with no project (an --image-name deploy from outside one).
+func deploySettings(m *manifest.Manifest) manifest.Deploy {
+	if m == nil {
+		return manifest.Deploy{GitMetadata: true}
+	}
+	return m.Astro.Deploy
+}
+
 // runDagsOnly ships just the dags/ directory through the transport.
 func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 	dag, err := d.DeployDags(&DagDeploy{
@@ -428,6 +452,8 @@ func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 		NoDagsBaseDir: req.NoDagsBaseDir,
 		Wait:          req.Wait,
 		WaitTime:      req.WaitTime,
+		GitMetadata:   deploySettings(req.Manifest).GitMetadata,
+		CosmosBoost:   deploySettings(req.Manifest).CosmosBoost,
 	})
 	if err != nil {
 		return Result{}, err
@@ -463,6 +489,9 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 		DeploymentID:    target.DeploymentID,
 		WorkspaceID:     target.WorkspaceID,
 		Build:           imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest),
+		GitMetadata:     deploySettings(req.Manifest).GitMetadata,
+		CosmosBoost:     deploySettings(req.Manifest).CosmosBoost,
+		ShaAsTag:        deploySettings(req.Manifest).ShaAsTag,
 		BuildSecrets:    req.BuildSecrets,
 		ImageName:       req.ImageName,
 		ImageInRegistry: req.ImageInRegistry,

@@ -18,10 +18,19 @@ type removedSetting struct {
 // setting the cleanup knows to be stale is also one `astro config` refuses
 // by name.
 var removedSettings = map[string]removedSetting{
-	"airflow.expose_port": {"astro local has no setting for the interfaces local Airflow listens on.", []string{"false"}},
-	"api-server.port":     {portRemoved, []string{"8080"}},
-	"beta.remote_cmd":     {"It was a beta flag, and nothing is gated on it any more.", []string{"false"}},
-	"cloud.api.token":     {"Log in with astro login, or set ASTRO_API_TOKEN to use an API token.", nil},
+	// The deploy settings a project decides, which [tool.astro.deploy] holds
+	// now: every teammate and CI job reads the committed value.
+	"deploy.git_metadata":                     {gitMetadataMoved, []string{"true"}},
+	"deploy.cosmos_boost":                     {cosmosBoostMoved, []string{"false"}},
+	"cosmos_boost.pre_deploy":                 {cosmosBoostMoved, []string{"false"}},
+	"apc.sha_as_tag":                          {shaAsTagMoved, []string{"false"}},
+	"sha_as_tag":                              {shaAsTagMoved, []string{"false"}},
+	"deploy.remote_execution.client_registry": {clientRegistryMoved, nil},
+	"remote.client_registry":                  {clientRegistryMoved, nil},
+	"airflow.expose_port":                     {"astro local has no setting for the interfaces local Airflow listens on.", []string{"false"}},
+	"api-server.port":                         {portRemoved, []string{"8080"}},
+	"beta.remote_cmd":                         {"It was a beta flag, and nothing is gated on it any more.", []string{"false"}},
+	"cloud.api.token":                         {"Log in with astro login, or set ASTRO_API_TOKEN to use an API token.", nil},
 	"dev.build_secrets": {"Pass --build-secret to astro local start, or declare build-secrets under [tool.astro] in pyproject.toml " +
 		"for a project that builds its own Dockerfile.", nil},
 	"dev.mode": {"Local Airflow runs in standalone mode by default; start it in Docker with astro local start --docker. " +
@@ -50,6 +59,10 @@ var removedSettings = map[string]removedSetting{
 }
 
 const (
+	gitMetadataMoved    = "A project's deploys record their commit unless git-metadata = false under [tool.astro.deploy] in its pyproject.toml. A bundle deploy records it always."
+	cosmosBoostMoved    = "A project's deploys generate Cosmos Boost files with cosmos-boost = true under [tool.astro.deploy] in its pyproject.toml; astro deploy bundle takes --cosmos-boost."
+	shaAsTagMoved       = "A project's Astro Private Cloud deploys push by digest with sha-as-tag = true under [tool.astro.deploy] in its pyproject.toml."
+	clientRegistryMoved = "astro remote deploy pushes to client-registry under [tool.astro.deploy] in the project's pyproject.toml (a link can set its own), or to --registry."
 	// portRemoved replaces 1.x's webserver.port and api-server.port.
 	portRemoved = "Pick the local Airflow port with astro local start --port <port>; without it a free port is chosen."
 	// postgresRemoved replaces every 1.x postgres.* setting: the metadata

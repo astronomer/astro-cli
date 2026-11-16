@@ -278,6 +278,32 @@ The default target every deployment link inherits when the link sets none. A tar
 target = 'astro'
 ```
 
+## `[tool.astro.deploy]`
+
+How the project's deploys behave, whoever runs them. These live in the project, not in `astro config`, because they are the project's to decide: a teammate and a CI job that check the project out deploy it the same way. Every key is optional.
+
+```toml
+[tool.astro.deploy]
+client-registry = 'quay.io/acme/client'
+git-metadata = false
+```
+
+### `client-registry`
+
+The image repository `astro remote deploy` pushes the Remote Execution client image to: `registry[:port]/repository`, with no tag, since the deploy adds its own. It is the repository the project's remote agents pull from, configured on their side. A link can set its own (see [`client-registry` on a link](#client-registry-1)), and `astro remote deploy --registry` overrides both for one run, which is also the only way to name one outside a project. `astro remote deploy` checks the value is a repository it can push to and names this key when it is not. Astro CLI 1.x kept this as `remote.client_registry`; `astro init` carries it here.
+
+### `git-metadata`
+
+Whether a deploy records the commit it ships: its SHA, branch and, for a GitHub remote, its URL, with the commit message as the description when the deploy is given none. `true` unless set `false`. A project with uncommitted changes records none either way. Astro CLI 1.x kept this as `deploy.git_metadata`.
+
+### `cosmos-boost`
+
+Whether a deploy that uploads the project's Dags generates Cosmos Boost files for the dbt projects among them into the upload, so Cosmos skips parsing them at runtime. `false` unless set `true`. The files go into the upload only, never into the project. `astro deploy bundle`, which deploys a directory outside any project, takes `--cosmos-boost` instead. Astro CLI 1.x kept this as `cosmos_boost.pre_deploy`.
+
+### `sha-as-tag`
+
+Whether a deploy to Astro Private Cloud pushes its image by digest, and points the Deployment at it so, rather than by tag. `false` unless set `true`. Astro CLI 1.x kept this as `sha_as_tag`.
+
 ## `[tool.astro.deployments.<name>]`
 
 One table per Airflow the project talks to, keyed by a name you choose (`dev`, `prod`, and so on). This is the committed inventory: a teammate who clones the repo has the same list you do, with nothing to pass around. `astro deploy` ships to one of these links, and the commands that query an Airflow read the same table.
@@ -345,6 +371,10 @@ Every field that carries a credential is a `*-env` name: it names the environmen
 `exec`'s `command` is an array — the program and its arguments, as you would type them apart: `command = ['acme-airflow-token', '--profile', 'prod']`. The CLI runs the program directly and never through a shell, so a single string is an error rather than a quoting puzzle.
 
 Anything else is an error: an unknown method, a field the method does not take, a missing credential field, half a credential pair, both credential pairs at once.
+
+### `client-registry`
+
+On an Astro link only: the repository `astro remote deploy --deployment <name>` pushes the client image to, for a Deployment whose remote agents pull from somewhere other than the project's [`client-registry`](#client-registry). Unset, the link takes the project's. An error on any other kind of link, which has no remote agents.
 
 ### `default`
 

@@ -757,6 +757,8 @@ func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdepl
 		NoDagsBaseDir: in.NoDagsBaseDir,
 		Wait:          in.Wait,
 		WaitTime:      in.WaitTime,
+		GitMetadata:   in.GitMetadata,
+		CosmosBoost:   in.CosmosBoost,
 		Progress:      d.errOut,
 	}, d.login.client)
 	if err != nil {
@@ -807,6 +809,8 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		NoDagsBaseDir:  in.NoDagsBaseDir,
 		Wait:           in.Wait,
 		WaitTime:       in.WaitTime,
+		GitMetadata:    in.GitMetadata,
+		CosmosBoost:    in.CosmosBoost,
 		Progress:       d.errOut,
 		ResolveInstall: imageinstall.Fill,
 	}, d.login.client)
