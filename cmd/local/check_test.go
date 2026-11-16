@@ -100,8 +100,9 @@ func (p stubTargetParser) ParseWith(context.Context, string, checks.ParseInput) 
 // a project the check can report on.
 const validManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\", \"pandas\"]\n[tool.astro]\n"
 
-// brokenManifest fails manifest.Load on a [tool.astro] packages that is not a list. Named
-// beside its valid counterpart so a change to Load's strictness is one edit.
+// brokenManifest fails manifest.Load on a [tool.astro] packages that is not
+// a list. Named beside its valid counterpart so a change to Load's strictness
+// is one edit.
 const brokenManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\npackages = 'curl'\n"
 
 func TestTargetComposerPassesCleanly(t *testing.T) {
@@ -326,6 +327,37 @@ func TestCheckStrictTurnsWarningIntoFailure(t *testing.T) {
 	var exit *cliout.ExitError
 	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
 		t.Fatalf("strict slow parse must fail with code 1, got %v", err)
+	}
+}
+
+// A key pyproject.toml carries that this build does not know is a check
+// finding: a warning, which --strict fails on, so CI that gates on the check
+// still hears about it. A near-miss of a known key is refused when the
+// manifest loads, which the check reports like any manifest problem.
+func TestCheckReportsAnUnknownManifestKey(t *testing.T) {
+	withKey := func(t *testing.T) (Deps, *bytes.Buffer) {
+		t.Helper()
+		d, out := checkDeps(t)
+		dir, _ := d.WorkingDir()
+		if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(validManifest+"palette = 'blue'\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		d.Checks = stubParser{}
+		return d, out
+	}
+	d, out := withKey(t)
+	if err := execute(t, d, "local", "check"); err != nil {
+		t.Fatalf("an unknown key is a warning, exit zero: %v", err)
+	}
+	if row, ok := lineContaining(out.String(), "manifest_warning"); !ok || !strings.Contains(row, "tool.astro.palette") {
+		t.Errorf("want a manifest_warning row naming the key, got %q", out.String())
+	}
+
+	d2, _ := withKey(t)
+	err := execute(t, d2, "local", "check", "--strict")
+	var exit *cliout.ExitError
+	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
+		t.Fatalf("--strict must fail on it, got %v", err)
 	}
 }
 

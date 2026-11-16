@@ -204,6 +204,12 @@ type Deps struct {
 	// it, because the read touches config/, which this tree never imports.
 	// nil reads as nothing set.
 	Legacy1xSetting func(projectDir, key string) (value, file, replacement string)
+
+	// ManifestWarningsShown is set when the root prints every loaded
+	// manifest's warnings itself (manifest.SetWarningHandler), so a start's
+	// text output does not repeat them. Its json warning events are emitted
+	// either way.
+	ManifestWarningsShown bool
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an

@@ -106,7 +106,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 		}
 		return err
 	}
-	res = withEnvFindings(res, envFindings(envRep))
+	res = withEnvFindings(res, append(manifestFindings(m), envFindings(envRep)...))
 	res = c.withRuntimeHints(ctx, project, m, res)
 
 	// Best effort: the check is about the DAGs, and a listing that cannot be
@@ -157,7 +157,7 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 		// target runs under; mwaa and composer set theirs on the platform,
 		// from the ENV_SETUP.md checklist `astro package` writes.
 		if t == checks.TargetAstro && rep.OpError == "" {
-			res := withEnvFindings(checks.Result{Findings: rep.Findings, DagCount: rep.DagCount, Errors: rep.Errors, Warnings: rep.Warnings}, envFindings(envRep))
+			res := withEnvFindings(checks.Result{Findings: rep.Findings, DagCount: rep.DagCount, Errors: rep.Errors, Warnings: rep.Warnings}, append(manifestFindings(m), envFindings(envRep)...))
 			res = c.withRuntimeHints(ctx, project, m, res)
 			rep.Findings, rep.Errors, rep.Warnings = res.Findings, res.Errors, res.Warnings
 		}

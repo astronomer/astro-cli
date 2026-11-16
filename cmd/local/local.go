@@ -377,7 +377,7 @@ func (c *cli) startProject(ctx context.Context, opts plan.Options, buildSecretFl
 	if err != nil {
 		return nil, c.reportBuildError(r, err)
 	}
-	warnManifest(r, built.ManifestWarnings)
+	c.warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
 	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)
@@ -496,7 +496,10 @@ func warnLocalFilesInImage(r cliout.Renderer, p localrt.Plan) {
 // [tool.astro.targets.<name>] key nothing reads, most likely a misspelling of
 // one that is. The key and reason ride as their own fields, as an env warning's
 // do, so a json consumer need not parse the prose.
-func warnManifest(r cliout.Renderer, warnings []manifest.Problem) {
+func (c *cli) warnManifest(r cliout.Renderer, warnings []manifest.Problem) {
+	if r.Format == cliout.FormatText && c.d.ManifestWarningsShown {
+		return
+	}
 	for _, w := range warnings {
 		emitWarning(r, event{
 			Event:  "warning",
@@ -812,7 +815,7 @@ func (c *cli) restartProject(ctx context.Context, o restartOptions) (*plan.Built
 	if err != nil {
 		return nil, err
 	}
-	warnManifest(r, built.ManifestWarnings)
+	c.warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
 	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)

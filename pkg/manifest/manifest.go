@@ -15,7 +15,7 @@
 //     section's keys, and it warns (Manifest.Warnings) rather than refuses.
 //
 // [tool.astro] is decoded by hand rather than through struct tags, because it
-// is authored config: an unknown key, a value of the wrong shape and a
+// is authored config: a misspelled key, a value of the wrong shape and a
 // contradictory link are all things its author should be told about, each
 // addressed by its dotted TOML key, and all of them at once.
 //
@@ -695,6 +695,30 @@ const Marker = "pyproject.toml"
 // errors.Is(err, fs.ErrNotExist)); other failure shapes are
 // ErrNoAstroSection, ParseError, and ValidationError.
 func Load(path string) (*Manifest, error) {
+	m, err := load(path)
+	if err == nil && len(m.Warnings) > 0 {
+		if h := warningHandler; h != nil {
+			h(path, m.Warnings)
+		}
+	}
+	return m, err
+}
+
+// warningHandler is SetWarningHandler's fn.
+var warningHandler func(path string, warnings []Problem)
+
+// SetWarningHandler has Load hand fn the warnings of every manifest it loads,
+// with the file's path, so a program shows them wherever it loads a project
+// rather than at each call site. A warning is a key this build does not know,
+// which a misspelling and a newer reader's key both are: a caller that
+// dropped them would deploy or run without a word about what it ignored. nil,
+// the default, hands them to no one; Manifest.Warnings holds them either way.
+// It is meant to be set once, at startup, before any Load.
+func SetWarningHandler(fn func(path string, warnings []Problem)) {
+	warningHandler = fn
+}
+
+func load(path string) (*Manifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -857,10 +881,10 @@ func stringList(v any) []string {
 // astroRoot prefixes every key under the section this package owns.
 const astroRoot = "tool.astro"
 
-// The keys each table defines. Anything else is a problem: this is authored
-// config, and a key that decodes to nothing — a misspelled `default` on the
-// link meant to be the default — would otherwise send a deploy somewhere else
-// in silence.
+// The keys each table defines. A key that is a near-miss of one of them is a
+// problem, and any other key a warning (unknownKeys): a misspelled `default`
+// on the link meant to be the default would otherwise send a deploy somewhere
+// else in silence, while a key a newer reader defines must not stop this one.
 var (
 	astroKeys = []string{"airflow", "build-secrets", "deployments", "dockerfile", "domain", "env", "organization", "packages", "pools", "runtime", "target", "targets", "workspace"}
 	linkKeys  = []string{"auth", "default", "deployment", "domain", "environment", "target", "url", "workspace"}
@@ -1074,10 +1098,9 @@ var reservedTargets = []string{"astro", "oss", "apc"}
 // targets decodes [tool.astro.targets], one plain-data section per backend.
 //
 // An unknown key in a section with a reader, or a section named for no
-// target, is a warning rather than a problem. The rest of [tool.astro] refuses
-// an unknown key, but these sections were documented as untyped and open, and
-// a manifest that loaded yesterday must not stop loading over a key that
-// never did anything. The warning is enough to catch the misspelling.
+// target, is a warning rather than a problem, as an unknown key is everywhere
+// in [tool.astro] (unknownKeys). These sections are open by design, so not
+// even a near-miss of a known key is refused here.
 func (p *parser) targets(v any) map[string]map[string]any {
 	const key = astroRoot + ".targets"
 	table := p.table(key, v)
@@ -1314,21 +1337,31 @@ func (p *parser) workspace(key string, kind LinkKind, raw any, fallback string) 
 	return ws
 }
 
-// unknownKeys warns about every key the table does not define, and the load
-// goes on without it.
+// unknownKeys reports every key the table does not define: a problem when it
+// is a near-miss of a key the table does define (nearMiss), and a warning,
+// with the load going on without it, otherwise.
 //
-// A warning and not a problem, so a project stays readable by an older build
-// of this package. The file is committed and shared: a teammate on a newer
-// CLI, or a newer Astro Desktop, can write a key this build has never heard
-// of, and refusing the whole manifest over it would stop every older reader
-// from starting, deploying or opening the project at all. The warning still
-// names the key, so a misspelling (`defaults = true` on a link) is said out
-// loud rather than silently ignored.
+// A near-miss is a typo. `defalt = true` on a link, or `client_registry`
+// for client-registry, decodes to nothing, so the setting the author meant
+// silently does not apply; it is refused, naming the key it was meant to be.
+//
+// Any other unknown key is a warning, so a project stays readable by an older
+// build of this package. The file is committed and shared: a teammate on a
+// newer CLI, or a newer Astro Desktop, can write a key this build has never
+// heard of, and refusing the whole manifest over it would stop every older
+// reader from starting, deploying or opening the project at all. That holds
+// only while no new key is a near-miss of an older one in its table, which
+// TestNoKeyIsANearMissOfAnother keeps true.
 func (p *parser) unknownKeys(key string, table map[string]any, known []string) {
 	for name := range table {
-		if !slices.Contains(known, name) {
-			p.warn(CodeUnknownKey, key+"."+name, "unknown key, ignored: check its spelling, or whether a newer Astro CLI writes it")
+		if slices.Contains(known, name) {
+			continue
 		}
+		if meant := nearMiss(name, known); meant != "" {
+			p.add(CodeUnknownKey, key+"."+name, "not a key: did you mean "+meant+"?")
+			continue
+		}
+		p.warn(CodeUnknownKey, key+"."+name, "unknown key, ignored: check its spelling, or whether a newer Astro CLI writes it")
 	}
 }
 

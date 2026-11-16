@@ -85,7 +85,12 @@ The runtime image already is Airflow, so a generated image leaves both distribut
 
 ## `[tool.astro]`
 
-The section that makes a Python project an Astro project. Its absence is how the CLI tells an Astro project from a plain one. Every key it holds is listed below. A key that is not (a typo, a setting from another tool, or a key a newer Astro CLI or Astro Desktop writes) is a warning: the manifest still loads without it, and `astro local start` and `restart` print the key, so a misspelling is said rather than quietly ignored. It is a warning rather than an error so a project stays readable when a teammate on a newer CLI adds a key this one does not know. The same holds for a link's keys and a pool's. `[tool.astro.env]` is the exception: an unknown key there is an error, see below.
+The section that makes a Python project an Astro project. Its absence is how the CLI tells an Astro project from a plain one. Every key it holds is listed below. A key that is not is one of two things:
+
+- **A near-miss of a key the table holds is an error**, naming the key it was meant to be: the same key in another case or with `_` for `-` (`build_secrets`), or one a letter or two away (`defalt` on a link, `workspce`). A misspelled setting would otherwise not apply, in silence.
+- **Any other key is a warning.** The manifest loads without it, and every command that reads the project prints the key on stderr, once; `astro local check` lists it as a `manifest_warning` finding, which `--strict` fails on. It is a warning rather than an error so a project stays readable when a teammate on a newer Astro CLI or Astro Desktop adds a key this one does not know. No two keys in a table are near-misses of each other, so a newer key is never mistaken for a typo of an older one.
+
+The same holds for a link's keys and a pool's. `[tool.astro.env]` and a link's `auth` table are the exceptions: an unknown key there is an error, since a misspelling there decides where a secret goes or how a request proves itself.
 
 There is no `airflow` key: the requirement is the one statement of the version, so nothing can run one Airflow in Docker mode and another in standalone. A manifest with an `airflow` line is refused until it is deleted, and the error quotes the requirement that decides the version:
 
@@ -296,7 +301,7 @@ There are five kinds of link, and the kind follows from what the link sets:
 
 A link names coordinates (`deployment` or `environment`) or a `url`, never both.
 
-Pick any name you like, with two rules: it cannot be empty, and it cannot be `local`, which always means the Airflow running on your own machine. Keys the table does not define are warnings rather than silence: misspell `default` on the link you meant to be the default and `astro local start` says so, though the link loads without it.
+Pick any name you like, with two rules: it cannot be empty, and it cannot be `local`, which always means the Airflow running on your own machine. A key the table does not define follows the rule above: misspell `default` on the link you meant to be the default (`defalt`, `defaults`) and the manifest is refused, naming `default`, rather than another link quietly staying the default.
 
 ### `deployment`
 
@@ -528,7 +533,7 @@ it cannot look enforced when it is not.
 
 A declaration may be both `optional` and defaulted. The default already satisfies the run gate, so `optional` changes nothing there — but it still says the value is not one a person has to supply, which is what a UI listing the environment needs in order to mark it.
 
-Unknown keys are an error, as they are everywhere in this section. That is why a typo'd `sensitiv` cannot quietly ship a secret to the wrong place.
+Unknown keys are an error in this section, unlike in the rest of `[tool.astro]`. That is why a typo'd `sensitiv` cannot quietly ship a secret to the wrong place.
 
 Plain env vars live directly under `[tool.astro.env]`. Connections and Airflow variables use their own sub-sections, which pick the `AIRFLOW_CONN_` / `AIRFLOW_VAR_` encoding — a connection `warehouse` resolves as `AIRFLOW_CONN_WAREHOUSE`, a variable `batch_size` as `AIRFLOW_VAR_BATCH_SIZE`.
 
@@ -609,7 +614,7 @@ project = 'acme-data'                  # the GCP project holding the environment
 location = 'us-central1'               # its region
 ```
 
-Any other key in those two sections, or a section named for no target, is a warning: the manifest still loads, and `astro local start` and `restart` print the key, since a misspelled `region` reads the same as no region at all. It is a warning, as an unknown key is elsewhere in `[tool.astro]` but `[tool.astro.env]`.
+Any other key in those two sections, or a section named for no target, is a warning: the manifest still loads, and `astro local start` and `restart` print the key, since a misspelled `region` reads the same as no region at all. These sections are open by design, so here even a near-miss of a known key is a warning, not an error.
 
 `astro` and `oss` are targets too, but nothing reads their sections yet. They are reserved: carried through as they are and never warned about, until a reader gives them a shape.
 

@@ -22,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 var (
@@ -194,6 +195,11 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// session.
 	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}, ottoMembership(astroV1Client)) }
 	coreDeps.Legacy1xSetting = config.Legacy1xValue
+	// Every manifest any command loads reports the keys it does not know, on
+	// stderr, once per run (manifestWarningPrinter); a start's own warning
+	// events then need not repeat them in text.
+	manifest.SetWarningHandler(manifestWarningPrinter(os.Stderr))
+	coreDeps.ManifestWarningsShown = true
 	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 
 	groupCommands(rootCmd)
