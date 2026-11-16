@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -110,4 +112,14 @@ func NewRequestEditorFn(getTokenAndURL func() (token, baseURL string, err error)
 		req.Header.Add("User-Agent", fmt.Sprintf("astro-cli/%s", version.Current()))
 		return nil
 	}
+}
+
+// IsTransportError reports whether err is a request that never got an answer:
+// the host could not be reached or resolved, the connection broke, or the
+// request timed out. An HTTP status, whatever it is, is an answer, and is a
+// StatusError instead.
+func IsTransportError(err error) bool {
+	var urlErr *url.Error
+	var netErr net.Error
+	return errors.As(err, &urlErr) || errors.As(err, &netErr) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, httpContext.DeadlineExceeded)
 }

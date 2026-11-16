@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -54,8 +53,21 @@ func readVerbosity(_ *cobra.Command, args []string) error {
 
 // CreateRootPersistentPreRunE takes clients as arguments and returns a cobra
 // pre-run hook that sets up the context and checks for the latest version.
+//
+// The hook fails closed. An error from Astro's setup stops the command: a run
+// that carried on without a login it could not set up would use the saved one
+// (or none) and fail late, after doing work, or worse, act as someone the
+// person did not mean. Setup decides what is soft, with typed errors: the
+// version check below and a token renewal that failed while the access token
+// still works never reach here as errors.
+//
+// Shell completion skips all of it. It runs on every TAB, and must not log in,
+// refresh a token, call an API or draw a prompt.
 func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		if astroCmd.IsCompletion(cmd) {
+			return nil
+		}
 		// Check for latest version
 		if config.CFG.UpgradeMessage.GetBool() {
 			// create http client with 3 second timeout, setting an aggressive timeout since its not mandatory to get a response in each command execution
@@ -68,20 +80,9 @@ func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobr
 			}
 		}
 		if context.IsCloudContext() {
-			err := astroSetup(cmd, astroV1Client)
-			if err != nil {
-				if strings.Contains(err.Error(), "token is invalid or malformed") {
-					return errors.New("API Token is invalid or malformed")
-				}
-				if strings.Contains(err.Error(), "the API token given has expired") {
-					return errors.New("API Token is expired")
-				}
-				// Carrying on without the organization would send its requests to
-				// an empty one, and fail with an error that hides this one.
-				if errors.Is(err, astroCmd.ErrAPITokenOrganization) || errors.Is(err, astroCmd.ErrLegacyAPIKeys) {
-					return err
-				}
-				apcCmd.InitDebugLogs = append(apcCmd.InitDebugLogs, "Error during cmd setup: "+err.Error())
+			if err := astroSetup(cmd, astroV1Client); err != nil {
+				apcCmd.PrintDebugLogs()
+				return err
 			}
 		}
 		apcCmd.PrintDebugLogs()

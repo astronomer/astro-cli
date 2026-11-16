@@ -522,7 +522,7 @@ func TestCheckAPIToken(t *testing.T) {
 
 		// run checkAPIToken
 		_, err = checkAPIToken(mockV1Client)
-		assert.ErrorIs(t, err, errNotAPIToken)
+		assert.ErrorIs(t, err, ErrNotAPIToken)
 	})
 
 	t.Run("expired token", func(t *testing.T) {
@@ -562,7 +562,7 @@ func TestCheckAPIToken(t *testing.T) {
 
 		// run checkAPIToken
 		_, err = checkAPIToken(mockV1Client)
-		assert.ErrorIs(t, err, errExpiredAPIToken)
+		assert.ErrorIs(t, err, ErrAPITokenExpired)
 	})
 
 	t.Run("non-expiry token", func(t *testing.T) {
