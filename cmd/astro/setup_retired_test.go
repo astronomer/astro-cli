@@ -22,7 +22,8 @@ func resetRetiredRenewal(t *testing.T) {
 	t.Helper()
 	reset := func() {
 		retiredMu.Lock()
-		retired = false
+		retiredTokens = map[string]bool{}
+		warnedUnsaved = false
 		retiredMu.Unlock()
 	}
 	reset()
@@ -56,6 +57,16 @@ func TestUnsavedRenewalWarnsOnceAndStopsRetrying(t *testing.T) {
 	assert.Equal(t, before, readFile(t, path), "nothing was written")
 	assert.ErrorIs(t, renewLogin(&c), errRenewalRetired, "nor does any other renewal in this run")
 	assert.ErrorIs(t, RefreshLogin(), errRenewalRetired)
+}
+
+// Only the refresh token that was spent is blocked: a login that has since been
+// replaced renews as usual.
+func TestRetiredRenewalBlocksOnlyTheSpentToken(t *testing.T) {
+	resetRetiredRenewal(t)
+	assert.True(t, retireRenewal("spent"), "the first is the one to warn about")
+	assert.False(t, retireRenewal("spent-too"))
+	assert.True(t, renewalRetired("spent"))
+	assert.False(t, renewalRetired("new-login"))
 }
 
 // A provider that is failing or limiting, with a body that is not a token

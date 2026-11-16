@@ -223,7 +223,9 @@ func TrackCommand(cmd *cobra.Command) {
 //
 // Like TrackRemovedCommand it sends only on a machine that has already shown
 // the first-run notice: a setup failure on a first run must not write the
-// config or print the notice on its way out.
+// config or print the notice on its way out. So the events undercount, as
+// TrackRemovedCommand's do: a fresh machine, and a CI runner that starts fresh
+// each time, send none.
 func TrackSetupFailure(cmd *cobra.Command, kind string) {
 	if GetCommandPath(cmd) == "" || cmd.Hidden || !noticeShown() || !canTrack(cmd) {
 		return

@@ -248,8 +248,11 @@ func (c *Context) SetSharedLogin(token, refreshToken string, expiresIn int64, us
 	}
 	expiresAt := time.Now().Add(time.Duration(expiresIn) * time.Second)
 	for _, key := range append([]string{cKey}, contextKeysSharingLogin(cKey)...) {
-		putLoginField(key, tokenField, token)
-		putLoginField(key, refreshTokenField, refreshToken)
+		// One vault write for the pair, so a failure between two can never
+		// leave the new access token beside the old refresh token.
+		fields := saveContextLogin(key, secrets.Login{Token: token, RefreshToken: refreshToken})
+		putContextField(key, tokenField, fields.Token)
+		putContextField(key, refreshTokenField, fields.RefreshToken)
 		putContextField(key, "expiresin", expiresAt)
 		putContextField(key, "user_email", userEmail)
 	}

@@ -118,8 +118,9 @@ func NewRequestEditorFn(getTokenAndURL func() (token, baseURL string, err error)
 // IsTransportError reports whether err is a request that failed in transit in
 // a way a retry can fix: the host refused or reset the connection or could not
 // be reached, its name did not resolve, the connection ended early, or the
-// request timed out. An HTTP status, whatever it is, is an answer, and is a
-// StatusError instead. A failure a retry will not fix is not one: a canceled
+// request timed out, or a server that answered 5xx or 429 and so said only
+// that it could not take the request now (TransientStatusError). Any other HTTP
+// status is an answer, and is a StatusError instead. A failure a retry will not fix is not one: a canceled
 // request (the run ended), a certificate or TLS failure, a URL that is
 // malformed or names an unsupported scheme.
 func IsTransportError(err error) bool {
