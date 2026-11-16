@@ -86,11 +86,23 @@ func runDeploymentTokenRotate(format cliout.Format, out io.Writer) error {
 	return renderTokenSecret(format, out, &rotated, "Deployment", "rotated", token.Name, cleanTokenOutput)
 }
 
+// offeredDeploymentTokens is the scopes a delete or a remove looks among: the
+// ones it can act on when it was named no token and has to ask, so the picker
+// offers no row it would refuse, and none (every scope) when the token is
+// named, so a wrong-scope one is refused with what to use instead.
+func offeredDeploymentTokens(scopes ...deployment.DeploymentTokenType) []deployment.DeploymentTokenType {
+	if tokenID == "" && name == "" {
+		return scopes
+	}
+	return nil
+}
+
 func runDeploymentTokenDelete(cmd *cobra.Command, format cliout.Format, out io.Writer) error {
-	// Found among every token with a role on the Deployment, so that a token
-	// of a broader scope is refused with what to use instead, not reported as
-	// missing.
-	token, err := deployment.FindToken(tokenID, name, deploymentID, nil, tokenPicker(), astroV1Client)
+	// A token named is found among every token with a role on the Deployment,
+	// so that one of a broader scope is refused with what to use instead, not
+	// reported as missing; a token picked is offered only among the ones this
+	// can delete.
+	token, err := deployment.FindToken(tokenID, name, deploymentID, offeredDeploymentTokens(deployment.DeploymentTokenTypeDEPLOYMENT), tokenPicker(), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -115,7 +127,8 @@ func runDeploymentTokenDelete(cmd *cobra.Command, format cliout.Format, out io.W
 // Organization token, away. The Deployment's own tokens have no role to take,
 // and are refused with delete.
 func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out io.Writer) error {
-	token, err := deployment.FindToken(tokenID, name, deploymentID, nil, tokenPicker(), astroV1Client)
+	token, err := deployment.FindToken(tokenID, name, deploymentID,
+		offeredDeploymentTokens(deployment.DeploymentTokenTypeWORKSPACE, deployment.DeploymentTokenTypeORGANIZATION), tokenPicker(), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -152,6 +165,10 @@ func runDeploymentTokenAdd(cmd *cobra.Command, args []string, out io.Writer) err
 	ws, wsErr := "", error(nil)
 	if id == "" {
 		ws, wsErr = workspaceTokenWorkspace(cmd, id)
+		// A Workspace the run named itself is not quietly left out.
+		if wsErr != nil && workspaceID != "" {
+			return wsErr
+		}
 	}
 	if tokenRole == "" {
 		answer, err := input.Text("Enter a role for the API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ", input.AnsweredBy("--role"))
@@ -165,7 +182,7 @@ func runDeploymentTokenAdd(cmd *cobra.Command, args []string, out io.Writer) err
 	token, err := deployment.AddToken(id, name, tokenRole, ws, deploymentID, nil, pick, astroV1Client)
 	if err != nil {
 		if wsErr != nil && errors.Is(err, deployment.ErrTokenNotFound) {
-			return fmt.Errorf("%w; there was no Workspace to look for a Workspace token in (%w): pass --workspace, or the token's ID", err, wsErr)
+			return fmt.Errorf("%w; no Workspace token was looked for: %w", err, wsErr)
 		}
 		return err
 	}

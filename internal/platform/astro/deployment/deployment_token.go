@@ -37,6 +37,7 @@ var (
 	errDeploymentTokenRoleSet     = errors.New("this Deployment API token already has that role on the Deployment")
 	errWrongTokenTypeSelected     = errors.New("the token selected is not of the type you are trying to modify")
 	errDeploymentScopedAdd        = errors.New("this is a Deployment API token, which has its role on its own Deployment already: update changes it")
+	errRoleRequired               = errors.New("a role is required: DEPLOYMENT_ADMIN or a custom role name")
 	errNotDeploymentScoped        = errors.New("only a Deployment API token is deleted from a Deployment")
 	errDeploymentScoped           = errors.New("a Deployment API token is not removed from its own Deployment, only deleted")
 	// ErrTokenNotFound: no token has the ID or name given, among the ones the
@@ -277,6 +278,9 @@ func RemoveToken(token astrov1.ApiToken, deploymentID string, client astrov1.API
 // on; none means both. A Deployment token already has its role: UpdateToken
 // changes it.
 func AddToken(id, name, role, workspaceID, deploymentID string, scopes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
+	if role == "" {
+		return apitoken.Token{}, apitoken.Usage(errRoleRequired)
+	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.Token{}, err

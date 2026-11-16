@@ -1338,13 +1338,17 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
-		Short:   "Update a Deployment API token",
-		Long:    "Update a Deployment API token's name, description, or role. Identify the token by its ID (positional argument) or current name (--name). Only what you pass changes: without --role the token keeps its role, and a --role the token already holds is refused before anything changes.",
-		Example: `  # Rename a token
+		Short:   "Update a Deployment, Workspace or Organization API token in a Deployment",
+		Long:    "Update an API token that has a role on a Deployment. A Deployment token can change its name, description and role. A Workspace or Organization token can change only its role on this Deployment: its name and description are changed where the token lives. Identify the token by its ID (positional argument) or current name (--name). Only what you pass changes: without --role the token keeps its role, and a --role the token already holds is refused before anything changes.",
+		Example: `  # Rename a Deployment token
   astro deployment token update <TOKEN_ID> --deployment <DEPLOYMENT_ID> --new-name my-new-token-name
 
   # Change a token's role
-  astro deployment token update <TOKEN_ID> --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
+  astro deployment token update <TOKEN_ID> --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN
+
+  # Change the role a Workspace or Organization token has on the Deployment
+  astro deployment token update --name my-ws-token --deployment <DEPLOYMENT_ID> \
+    --role DEPLOYMENT_MEMBER`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateDeploymentToken(cmd, args, out)
 		},

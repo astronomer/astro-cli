@@ -17,7 +17,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -217,16 +216,6 @@ func refuseDeleteOfBroader(deleteCmd *cobra.Command, token *astrov1.ApiToken, ow
 func refuseRemoveOfOwn(removeCmd *cobra.Command, token *astrov1.ApiToken, own string) error {
 	return cliout.Usage(fmt.Errorf("%s is this %s's own API token. %s takes a broader token's role off the %s; use %s delete to delete it",
 		token.Name, own, removeCmd.CommandPath(), own, groupPath(removeCmd)))
-}
-
-// addTokenNameFlag registers --name (-n) on cmd, read into name, with oneX,
-// the spelling 1.x had for it on that command ("" when it had none), as its
-// hidden alias.
-func addTokenNameFlag(cmd *cobra.Command, usage, oneX string) {
-	cmd.Flags().StringVarP(&name, "name", "n", "", usage)
-	if oneX != "" {
-		utils.AddAlias(cmd.Flags(), oneX, "name")
-	}
 }
 
 // deprecatedTokenGroup hides group, an old subgroup of a token command whose

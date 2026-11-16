@@ -179,13 +179,16 @@ func newEnvLinkRootCmd(out io.Writer, n *linkNoun) *cobra.Command {
 	return cmd
 }
 
+// deprecatedLinkVerb is what a link group's remove was called before.
+const deprecatedLinkVerb = "delete"
+
 // deprecatedLinkDelete turns cmd, a fresh build of a link group's remove
 // command, into `delete`, the spelling the verb had before it was called
 // remove: hidden, still unlinking, and saying once per run that the spelling is
 // deprecated. Its flags are cmd's, bound to the same values, so the two take
 // the same arguments.
 func deprecatedLinkDelete(cmd *cobra.Command) *cobra.Command {
-	cmd.Use, cmd.Aliases = "delete", nil
+	cmd.Use, cmd.Aliases = deprecatedLinkVerb, nil
 	return cliout.DeprecateCommand(cmd, func(c *cobra.Command) string {
 		return c.Parent().CommandPath() + " remove"
 	})

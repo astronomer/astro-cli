@@ -346,6 +346,13 @@ func TestAddTokenWorksOutTheScope(t *testing.T) {
 		assert.Equal(t, "ORGANIZATION", got.Scope)
 	})
 
+	t.Run("a blank role is refused before anything is looked up", func(t *testing.T) {
+		m := addClient(t, nil, nil, ws)
+		_, err := AddToken("w1", "", "", "", deploymentID, nil, noPicking(t), m)
+		require.ErrorIs(t, err, errRoleRequired)
+		assert.True(t, usageMarked(err))
+	})
+
 	t.Run("a Deployment token is refused as a usage error, and nothing is sent", func(t *testing.T) {
 		m := addClient(t, nil, nil, own)
 		_, err := AddToken("d1", "", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)

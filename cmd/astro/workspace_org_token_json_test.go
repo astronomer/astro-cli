@@ -177,9 +177,9 @@ func secretShown(kind, verb, name string) func(t *testing.T, out string) {
 // else (`TOKEN=$(astro workspace token create ... --clean-output)`).
 func onlyTheSecret(t *testing.T, out string) { assert.Equal(t, tokSecret+"\n", out) }
 
-// withNumber is row with the picker's number.
-func withNumber(n string, row map[string]string) map[string]string {
-	out := map[string]string{"#": n}
+// firstRow is row as the picker numbers the first of its choices.
+func firstRow(row map[string]string) map[string]string {
+	out := map[string]string{"#": "1"}
 	for k, v := range row {
 		out[k] = v
 	}
@@ -248,7 +248,7 @@ func TestWorkspaceTokenText(t *testing.T) {
 			args: []string{"workspace", "token", "update", "--description", "d"},
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out, "Please select the API token you would like to update:", "> Astro Workspace API token ws-token was successfully updated")
-				assert.Equal(t, []map[string]string{withNumber("1", wsTokRow)}, tableRows(t, out, "#"))
+				assert.Equal(t, []map[string]string{firstRow(wsTokRow)}, tableRows(t, out, "#"))
 			},
 		},
 		{
@@ -315,7 +315,7 @@ func TestWorkspaceTokenText(t *testing.T) {
 			args: []string{"workspace", "token", "delete", "--yes"},
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out, "Please select the API token you would like to delete from the Workspace:", "> Astro Workspace API token ws-token was successfully deleted")
-				assert.Equal(t, []map[string]string{withNumber("1", wsTokRow), withNumber("2", orgTokRow)}, tableRows(t, out, "#"))
+				assert.Equal(t, []map[string]string{firstRow(wsTokRow)}, tableRows(t, out, "#"), "the picker offers only the Workspace's own tokens, the ones delete takes")
 			},
 		},
 		{
@@ -390,7 +390,7 @@ func TestWorkspaceTokenText(t *testing.T) {
 			args: []string{"workspace", "token", "organization-token", "update", "--role", "WORKSPACE_OWNER"},
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out, "Please select the Organization API token whose Workspace role you would like to update:", "> Astro Organization API token org-token was successfully added/updated to the Workspace")
-				assert.Equal(t, []map[string]string{withNumber("1", orgTokRow)}, tableRows(t, out, "#"))
+				assert.Equal(t, []map[string]string{firstRow(orgTokRow)}, tableRows(t, out, "#"))
 			},
 		},
 		{name: "organization-token remove", root: newWorkspaceCmd, client: fakeTokens(both, setsRoles("tok-org")), args: []string{"workspace", "token", "organization-token", "remove", "tok-org"}, check: says("Astro Organization API token org-token was successfully removed from the Workspace")},
@@ -426,7 +426,7 @@ func TestDeploymentTokenPicksWithTheOtherFamiliesTables(t *testing.T) {
 	d := "--deployment=" + tokDeploymentID
 	// The deployment family names no Workspace here. The tokens offered are
 	// the current Workspace's, and so are the roles shown with them.
-	wsPicked := withNumber("1", wsTokRow)
+	wsPicked := firstRow(wsTokRow)
 
 	runTokenCases(t, []tokenCase{
 		{

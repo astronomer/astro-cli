@@ -218,6 +218,46 @@ func TestDeploymentTokenAddUpdateRemoveWorkOutTheScope(t *testing.T) {
 	})
 }
 
+// A delete or a remove that has to ask offers only the tokens it can act on,
+// so no row of its picker is one it would refuse; a token it is told by name
+// or ID is found among all of them, and refused with what to use instead.
+func TestDeleteAndRemovePickersOfferOnlyWhatTheyCanActOn(t *testing.T) {
+	dep, ws, org := jsonTokenFixtures()
+	wsTok, orgTok := wsOrgTokenFixtures()
+
+	// Workspace: delete offers the Workspace's own, remove the Organization's.
+	r := execAstroCmd(t, fakeTokens([]astrov1.ApiToken{wsTok, orgTok}, deletesToken("tok-ws"))(t), "1\n", newWorkspaceCmd, "workspace", "token", "delete", "--yes")
+	require.NoError(t, r.err)
+	assert.Equal(t, []string{"tok-ws"}, pickedIDs(t, r.asked))
+	r = execAstroCmd(t, fakeTokens([]astrov1.ApiToken{wsTok, orgTok}, setsRoles("tok-org"))(t), "1\n", newWorkspaceCmd, "workspace", "token", "remove", "--yes")
+	require.NoError(t, r.err)
+	assert.Equal(t, []string{"tok-org"}, pickedIDs(t, r.asked))
+
+	// Deployment: delete offers the Deployment's own, remove the Workspace's
+	// and the Organization's.
+	d := "--deployment=" + tokDeploymentID
+	m := tokenMock(t, dep, ws, org)
+	m.On("DeleteApiTokenWithResponse", mock.Anything, mock.Anything, "tok-dep").Return(&astrov1.DeleteApiTokenResponse{HTTPResponse: ok200()}, nil)
+	r = execTokenCmd(t, m, "1\n", "token", "delete", d, "--yes")
+	require.NoError(t, r.err)
+	assert.Equal(t, []string{"tok-dep"}, pickedIDs(t, r.asked))
+	m = tokenMock(t, dep, ws, org)
+	m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
+	r = execTokenCmd(t, m, "1\n", "token", "remove", d, "--yes")
+	require.NoError(t, r.err)
+	assert.Equal(t, []string{"tok-ws", "tok-org"}, pickedIDs(t, r.asked))
+}
+
+// pickedIDs is the ID column of the picker table in what a run asked.
+func pickedIDs(t *testing.T, asked string) []string {
+	t.Helper()
+	var ids []string
+	for _, row := range tableRows(t, asked, "#") {
+		ids = append(ids, row["ID"])
+	}
+	return ids
+}
+
 // `link remove` is what `link delete` was: the old spelling still unlinks, and
 // says once per run to type remove, while remove and its alias rm say nothing.
 func TestEnvLinkDeleteStillUnlinksAndWarns(t *testing.T) {

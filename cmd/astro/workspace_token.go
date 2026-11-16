@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	workspacetoken "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -22,6 +23,27 @@ import (
 // workspaceTokenOutput is the --output of the whole `workspace token` family,
 // registered once on its group.
 var workspaceTokenOutput cliout.Format
+
+// offeredWorkspaceTokens is the scopes a delete or a remove looks among: the
+// one it can act on when it was named no token and has to ask, so the picker
+// offers no row it would refuse, and none (every scope) when the token is
+// named, so a wrong-scope one is refused with what to use instead.
+func offeredWorkspaceTokens(scope workspacetoken.TokenType) []workspacetoken.TokenType {
+	if tokenID == "" && name == "" {
+		return []workspacetoken.TokenType{scope}
+	}
+	return nil
+}
+
+// addTokenNameFlag registers --name (-n) on cmd, read into name, with oneX,
+// the spelling 1.x had for it on that command ("" when it had none), as its
+// hidden alias.
+func addTokenNameFlag(cmd *cobra.Command, usage, oneX string) {
+	cmd.Flags().StringVarP(&name, "name", "n", "", usage)
+	if oneX != "" {
+		utils.AddAlias(cmd.Flags(), oneX, "name")
+	}
+}
 
 // tokenArg lowercases a token ID given as the command's argument into id.
 func tokenArg(args []string, id *string) {
@@ -150,11 +172,12 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 		return err
 	}
 	ws := target.Workspace
-	// Found among every token with a role in the Workspace, so that a token of
-	// a broader scope is refused with what to use instead, not reported as
-	// missing.
+	// A token named is found among every token with a role in the Workspace,
+	// so that one of a broader scope is refused with what to use instead, not
+	// reported as missing; a token picked is offered only among the ones this
+	// can delete.
 	pick := workspaceTokenPicker("Please select the API token you would like to delete from the Workspace:")
-	token, err := workspacetoken.FindToken(tokenID, name, ws, org, nil, pick, astroV1Client)
+	token, err := workspacetoken.FindToken(tokenID, name, ws, org, offeredWorkspaceTokens(workspacetoken.TokenTypeWORKSPACE), pick, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -189,7 +212,7 @@ func removeWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 	ws := target.Workspace
 	pick := workspaceTokenPicker("Please select the Organization API token you would like to remove from the Workspace:")
-	token, err := workspacetoken.FindToken(tokenID, name, ws, org, nil, pick, astroV1Client)
+	token, err := workspacetoken.FindToken(tokenID, name, ws, org, offeredWorkspaceTokens(workspacetoken.TokenTypeORGANIZATION), pick, astroV1Client)
 	if err != nil {
 		return err
 	}
