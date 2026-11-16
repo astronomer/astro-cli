@@ -198,9 +198,6 @@ func mintToken(t *testing.T, claims *util.CustomClaims) string {
 }
 
 func TestSetupFailsClosedOnTheAPIToken(t *testing.T) {
-	prevParse := parseAPIToken
-	t.Cleanup(func() { parseAPIToken = prevParse })
-	parseAPIToken = util.ParseAPIToken
 	setupCmd := func() *cobra.Command {
 		root := &cobra.Command{Use: "astro"}
 		leaf := &cobra.Command{Use: "list"}

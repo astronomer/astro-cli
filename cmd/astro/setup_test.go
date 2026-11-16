@@ -172,10 +172,6 @@ func TestSetup(t *testing.T) {
 				ID:        "test-id",
 			},
 		}
-		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
-			return &mockClaims, nil
-		}
-
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("domain", "astronomer.io")
@@ -188,7 +184,7 @@ func TestSetup(t *testing.T) {
 		rootCmd := &cobra.Command{Use: "astro"}
 		rootCmd.AddCommand(cmd)
 
-		t.Setenv("ASTRO_API_TOKEN", "token")
+		t.Setenv("ASTRO_API_TOKEN", mintToken(t, &mockClaims))
 
 		err = Setup(cmd, mockV1Client)
 		assert.NoError(t, err)
@@ -196,10 +192,6 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("using a bad API token will throw error", func(t *testing.T) {
-		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
-			return nil, errors.New("bad token")
-		}
-
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		err = c.SetContextKey("domain", "astronomer.io")
@@ -394,13 +386,9 @@ func TestCheckAPIToken(t *testing.T) {
 			return nil
 		}
 
-		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
-			return &mockClaims, nil
-		}
-
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
-		t.Setenv("ASTRO_API_TOKEN", "token")
+		t.Setenv("ASTRO_API_TOKEN", mintToken(t, &mockClaims))
 
 		// Switch context
 		domain := "astronomer-dev.io"
@@ -413,12 +401,9 @@ func TestCheckAPIToken(t *testing.T) {
 	})
 
 	t.Run("an organization that can't be looked up is an error", func(t *testing.T) {
-		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
-			return &mockClaims, nil
-		}
 		rateLimited := astrov1.ListOrganizationsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusTooManyRequests}}
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&rateLimited, nil).Once()
-		t.Setenv("ASTRO_API_TOKEN", "token")
+		t.Setenv("ASTRO_API_TOKEN", mintToken(t, &mockClaims))
 		require.NoError(t, context.Switch("astronomer-dev.io"))
 
 		_, err := checkAPIToken(mockV1Client)
@@ -427,10 +412,7 @@ func TestCheckAPIToken(t *testing.T) {
 	})
 
 	t.Run("an organization list it can't use is an error, not a panic", func(t *testing.T) {
-		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
-			return &mockClaims, nil
-		}
-		t.Setenv("ASTRO_API_TOKEN", "token")
+		t.Setenv("ASTRO_API_TOKEN", mintToken(t, &mockClaims))
 		require.NoError(t, context.Switch("astronomer-dev.io"))
 		for name, orgs := range map[string][]astrov1.Organization{
 			"none":       {},
@@ -451,10 +433,6 @@ func TestCheckAPIToken(t *testing.T) {
 			return nil
 		}
 
-		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
-			return nil, errors.New("Failed to parse token")
-		}
-
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
 		t.Setenv("ASTRO_API_TOKEN", "token")
@@ -473,13 +451,9 @@ func TestCheckAPIToken(t *testing.T) {
 			return nil
 		}
 
-		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
-			return &mockClaims, nil
-		}
-
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
-		t.Setenv("ASTRO_API_TOKEN", "token")
+		t.Setenv("ASTRO_API_TOKEN", mintToken(t, &mockClaims))
 		err := config.ResetCurrentContext()
 		assert.NoError(t, err)
 
@@ -507,13 +481,9 @@ func TestCheckAPIToken(t *testing.T) {
 			return nil
 		}
 
-		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
-			return &mockClaims, nil
-		}
-
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
-		t.Setenv("ASTRO_API_TOKEN", "token")
+		t.Setenv("ASTRO_API_TOKEN", mintToken(t, &mockClaims))
 
 		// Switch context
 		domain := "astronomer-dev.io"
@@ -547,13 +517,9 @@ func TestCheckAPIToken(t *testing.T) {
 			return nil
 		}
 
-		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
-			return &mockClaims, nil
-		}
-
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
-		t.Setenv("ASTRO_API_TOKEN", "token")
+		t.Setenv("ASTRO_API_TOKEN", mintToken(t, &mockClaims))
 
 		// Switch context
 		domain := "astronomer-dev.io"
@@ -586,13 +552,9 @@ func TestCheckAPIToken(t *testing.T) {
 			return nil
 		}
 
-		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
-			return &mockClaims, nil
-		}
-
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 
-		t.Setenv("ASTRO_API_TOKEN", "token")
+		t.Setenv("ASTRO_API_TOKEN", mintToken(t, &mockClaims))
 
 		// Switch context
 		domain := "astronomer-dev.io"
@@ -634,25 +596,21 @@ func TestSetupReadsTheAPITokenByTheOneRule(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Setenv("ASTRONOMER_KEY_ID", "")
 	t.Setenv("ASTRONOMER_KEY_SECRET", "")
-	origParse := parseAPIToken
-	t.Cleanup(func() { parseAPIToken = origParse })
-	errStop := errors.New("stop after the parse")
-	for env, parsed := range map[string]string{"Bearer ": "", "Bearer Bearer": "", "token": "token", "Bearer token": "token", "Bearer Bearer token": "token"} {
+	real := mintToken(t, &util.CustomClaims{
+		Permissions:      []string{"organizationId:env-org"},
+		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour))},
+	})
+	for env, parsed := range map[string]string{"Bearer ": "", "Bearer Bearer": "", real: real, "Bearer " + real: real, "Bearer Bearer " + real: real} {
 		t.Setenv("ASTRO_API_TOKEN", env)
 		assert.Equal(t, parsed != "", astrosession.HasAPIToken(), "ASTRO_API_TOKEN=%q", env)
 
-		var got string
-		parseAPIToken = func(token string) (*util.CustomClaims, error) {
-			got = token
-			return nil, errStop
+		ok, err := checkAPIToken(orgsClient(nil))
+		assert.Equal(t, parsed != "", ok, "ASTRO_API_TOKEN=%q", env)
+		assert.NoError(t, err, "ASTRO_API_TOKEN=%q", env)
+		if parsed != "" {
+			c, err := config.GetCurrentContext()
+			require.NoError(t, err)
+			assert.Equal(t, "Bearer "+parsed, c.Token, "ASTRO_API_TOKEN=%q: what was applied", env)
 		}
-		ok, err := checkAPIToken(new(astrov1_mocks.ClientWithResponsesInterface))
-		assert.False(t, ok, "ASTRO_API_TOKEN=%q", env)
-		if parsed == "" {
-			assert.NoError(t, err, "ASTRO_API_TOKEN=%q", env)
-		} else {
-			assert.ErrorIs(t, err, errStop, "ASTRO_API_TOKEN=%q", env)
-		}
-		assert.Equal(t, parsed, got, "ASTRO_API_TOKEN=%q: what was parsed", env)
 	}
 }

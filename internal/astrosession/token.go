@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -34,6 +35,13 @@ var (
 	ErrAPITokenMalformed error = &invalidTokenError{"API Token is invalid or malformed"}
 )
 
+// malformedTokenError is ErrAPITokenMalformed with the parser's reason, which
+// a test or a debug reader can reach but the message leaves out.
+type malformedTokenError struct{ cause error }
+
+func (e *malformedTokenError) Error() string   { return ErrAPITokenMalformed.Error() }
+func (e *malformedTokenError) Unwrap() []error { return []error{ErrAPITokenMalformed, e.cause} }
+
 // invalidTokenError carries its own sentence and matches ErrInvalidToken.
 type invalidTokenError struct{ msg string }
 
@@ -59,6 +67,8 @@ type Identity struct {
 	// Deployment is the Deployment the token is scoped to: its one
 	// deploymentId claim, empty for none or for several.
 	Deployment string
+	// ExpiresAt is the token's expiry, the zero time for a token with none.
+	ExpiresAt time.Time
 }
 
 // TokenIdentity reads ASTRO_API_TOKEN. ok is false, with no error, when the
@@ -74,15 +84,22 @@ func TokenIdentity() (id Identity, ok bool, err error) {
 	credential := Credential(stored)
 	claims, err := util.ParseAPIToken(credential)
 	if err != nil || claims == nil {
-		return Identity{}, true, ErrAPITokenMalformed
+		if err == nil {
+			err = errors.New("the token has no claims")
+		}
+		return Identity{}, true, &malformedTokenError{cause: err}
 	}
 	if len(claims.Permissions) == 0 {
 		return Identity{}, true, ErrNotAPIToken
 	}
-	if claims.ExpiresAt != nil && claims.ExpiresAt.Before(time.Now()) {
-		return Identity{}, true, ErrAPITokenExpired
-	}
 	id = Identity{Credential: credential}
+	if claims.ExpiresAt != nil {
+		if claims.ExpiresAt.Before(time.Now()) {
+			logger.Debugf("The given API Token %s has expired", claims.APITokenID)
+			return Identity{}, true, ErrAPITokenExpired
+		}
+		id.ExpiresAt = claims.ExpiresAt.Time
+	}
 	deployments := 0
 	for _, permission := range claims.Permissions {
 		kind, v, found := strings.Cut(permission, ":")

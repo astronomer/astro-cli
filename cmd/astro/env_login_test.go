@@ -164,13 +164,6 @@ func signedAPIToken(t *testing.T, name string, expiresAt *jwt.NumericDate) strin
 	return token
 }
 
-func realTokenParser(t *testing.T) {
-	t.Helper()
-	previous := parseAPIToken
-	t.Cleanup(func() { parseAPIToken = previous })
-	parseAPIToken = util.ParseAPIToken
-}
-
 func orgsClient(err error) *astrov1_mocks.ClientWithResponsesInterface {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	if err != nil {
@@ -234,7 +227,6 @@ func TestABadEnvironmentTokenLeavesTheSavedLoginUntouched(t *testing.T) {
 		} {
 			t.Run(name+map[bool]string{true: " in the vault", false: " in the config"}[vault], func(t *testing.T) {
 				home := savedLogin(t, vault)
-				realTokenParser(t)
 				noLoginFlow(t)
 				t.Setenv("ASTRO_API_TOKEN", tc.token(t))
 				before := snapshot(t, home)
@@ -260,7 +252,6 @@ func TestAGoodEnvironmentTokenIsUsedButNotSaved(t *testing.T) {
 	for _, vault := range []bool{true, false} {
 		t.Run(map[bool]string{true: "vault", false: "config"}[vault], func(t *testing.T) {
 			home := savedLogin(t, vault)
-			realTokenParser(t)
 			noLoginFlow(t)
 			calls := fakeIDP(t)
 			token := apiToken(t, "env-good")
@@ -290,7 +281,6 @@ func TestWritingBackTheContextDoesNotSaveTheEnvironmentToken(t *testing.T) {
 	for _, vault := range []bool{true, false} {
 		t.Run(map[bool]string{true: "vault", false: "config"}[vault], func(t *testing.T) {
 			home := savedLogin(t, vault)
-			realTokenParser(t)
 			noLoginFlow(t)
 			t.Setenv("ASTRO_API_TOKEN", apiToken(t, "env-writeback"))
 			if err := EnsureLogin(orgsClient(nil)); err != nil {
@@ -330,7 +320,6 @@ func TestWritingBackTheContextDoesNotSaveTheEnvironmentToken(t *testing.T) {
 // so nothing takes it for a stale login to renew.
 func TestAnEnvironmentTokenWithNoExpiryReadsAsLive(t *testing.T) {
 	savedLogin(t, true)
-	realTokenParser(t)
 	noLoginFlow(t)
 	t.Setenv("ASTRO_API_TOKEN", signedAPIToken(t, "env-no-expiry", nil))
 	if err := EnsureLogin(orgsClient(nil)); err != nil {

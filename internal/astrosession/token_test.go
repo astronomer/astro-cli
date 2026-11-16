@@ -21,12 +21,17 @@ func TestTokenIdentityReadsTheClaims(t *testing.T) {
 		{"several deployments are none", []string{"organizationId:org", "deploymentId:a", "deploymentId:b"}, Identity{Organization: "org"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			token := testUtil.MintAPIToken(t, time.Now().Add(time.Hour), tt.permissions...)
+			expiry := time.Now().Add(time.Hour).Truncate(time.Second)
+			token := testUtil.MintAPIToken(t, expiry, tt.permissions...)
 			t.Setenv(EnvAPIToken, "Bearer "+token)
 			got, ok, err := TokenIdentity()
 			if err != nil || !ok {
 				t.Fatalf("ok, err = %v, %v", ok, err)
 			}
+			if !got.ExpiresAt.Equal(expiry) {
+				t.Errorf("expiry %v, want %v", got.ExpiresAt, expiry)
+			}
+			got.ExpiresAt = time.Time{}
 			tt.want.Credential = token
 			if got != tt.want {
 				t.Errorf("got %+v, want %+v", got, tt.want)
