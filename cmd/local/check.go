@@ -570,9 +570,9 @@ func findingDetail(f checks.Finding) string {
 		// so there is no file or dag_id to point at and the LOCATION column
 		// stays empty.
 		return f.Message
-	case checks.KindEnvMissing, checks.KindEnvInvalid:
-		// The declaration is the LOCATION; the message is what is wrong with
-		// its value.
+	case checks.KindEnvMissing, checks.KindEnvInvalid, checks.KindManifestWarning:
+		// The declaration, or the manifest key, is the LOCATION; the message
+		// is what is wrong with it.
 		return f.Message
 	default:
 		return f.Message
