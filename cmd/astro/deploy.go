@@ -747,6 +747,24 @@ func (d manifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeploy.De
 	return manifestdeploy.Deployment{ID: dep.Id, Name: dep.Name, WorkspaceID: dep.WorkspaceId}, nil
 }
 
+// gitMetadataAllowed reports whether a deploy records the commit it ships:
+// the project's [tool.astro.deploy] git-metadata (or a bundle's
+// --git-metadata) asks for it, and this machine's deploy.git_metadata has not
+// turned it off. The global setting is an off switch only, so a project
+// committed with git-metadata = true never starts sending commit data from a
+// machine whose owner turned it off; when that happens the deploy says so on
+// errOut, in the words of the uncommitted-changes note.
+func gitMetadataAllowed(errOut io.Writer, wanted bool) bool {
+	if !wanted {
+		return false
+	}
+	if config.CFG.DeployGitMetadata.GetBool() {
+		return true
+	}
+	cliout.Note(errOut, "deploy.git_metadata is false in your global config, so this deploy records no git commit")
+	return false
+}
+
 // DeployDags ships the project's dags/ through the dags-only transport.
 func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
 	res, err := astrodeploy.DeployManifestDags(astrodeploy.ManifestDagDeployInput{
@@ -757,7 +775,7 @@ func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdepl
 		NoDagsBaseDir: in.NoDagsBaseDir,
 		Wait:          in.Wait,
 		WaitTime:      in.WaitTime,
-		GitMetadata:   in.GitMetadata,
+		GitMetadata:   gitMetadataAllowed(d.errOut, in.GitMetadata),
 		CosmosBoost:   in.CosmosBoost,
 		Progress:      d.errOut,
 	}, d.login.client)
@@ -809,7 +827,7 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		NoDagsBaseDir:  in.NoDagsBaseDir,
 		Wait:           in.Wait,
 		WaitTime:       in.WaitTime,
-		GitMetadata:    in.GitMetadata,
+		GitMetadata:    in.ImageName == "" && gitMetadataAllowed(d.errOut, in.GitMetadata),
 		CosmosBoost:    in.CosmosBoost,
 		Progress:       d.errOut,
 		ResolveInstall: imageinstall.Fill,

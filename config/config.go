@@ -92,7 +92,11 @@ var (
 		OttoAutoUpdate:       newCfg("otto.auto_update", "true"),
 
 		// Astro: picking a Deployment, and deploying to it.
-		AutoSelect:              newCfg("deployment.auto_select", "false", "auto_select"),
+		AutoSelect: newCfg("deployment.auto_select", "false", "auto_select"),
+		// This machine's off switch for the commit a deploy records: false
+		// turns it off for every deploy from here, whatever a project's
+		// [tool.astro.deploy] git-metadata says. It never turns it on.
+		DeployGitMetadata:       newCfg("deploy.git_metadata", "true"),
 		RemoteBaseImageRegistry: newCfg("deploy.remote_execution.base_image_registry", "images.astronomer.cloud", "remote.base_image_registry"),
 
 		// Astro Private Cloud.

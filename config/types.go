@@ -37,6 +37,7 @@ type cfgs struct {
 	PageSize                cfg
 	UpgradeMessage          cfg
 	AutoSelect              cfg
+	DeployGitMetadata       cfg
 	RemoteBaseImageRegistry cfg
 	TelemetryEnabled        cfg
 	TelemetryAnonymousID    cfg

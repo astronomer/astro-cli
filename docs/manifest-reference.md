@@ -299,7 +299,7 @@ The image repository `astro remote deploy` pushes the Remote Execution client im
 
 ### `git-metadata`
 
-Whether a deploy records the commit it ships: its SHA, branch and, for a GitHub remote, its URL, with the commit message as the description when the deploy is given none. `true` unless set `false`. A project with uncommitted changes records none either way. Astro CLI 1.x kept this as `deploy.git_metadata`.
+Whether a deploy records the commit it ships: its SHA, branch and, for a GitHub remote, its URL, with the commit message as the description when the deploy is given none. `true` unless set `false`. A project with uncommitted changes records none either way. A machine can also turn it off for every project with `astro config set -g deploy.git_metadata false`: that wins over `git-metadata = true`, and the deploy says why it recorded no commit. The global setting only turns it off, so a committed project can never start sending commit data from a machine whose owner turned it off. Astro CLI 1.x kept the project's choice in its `.astro/config.yaml` as `deploy.git_metadata`; `astro init` carries it here.
 
 ### `cosmos-boost`
 

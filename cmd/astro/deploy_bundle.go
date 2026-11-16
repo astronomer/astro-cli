@@ -164,7 +164,7 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 		AstroV1Client: login.client,
 		ErrOut:        cmd.ErrOrStderr(),
 		CosmosBoost:   o.cosmosBoost,
-		NoGitMetadata: !o.gitMetadata,
+		NoGitMetadata: !gitMetadataAllowed(cmd.ErrOrStderr(), o.gitMetadata),
 	}
 	if !login.current {
 		in.Login = &login.context
