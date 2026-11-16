@@ -244,7 +244,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	// pushed, unless the DAGs are inside the image.
 	var tarballVersion string
 	if dags.upload {
-		tarballVersion, err = uploadDeployDags(&c, in.Build.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir, in.CosmosBoost)
+		tarballVersion, err = uploadDeployDags(&c, in.Build.ProjectDir, in.DeploymentID, &dep, created, dagsUpload{NoDagsBaseDir: in.NoDagsBaseDir, CosmosBoost: in.CosmosBoost})
 		if err != nil {
 			return ManifestImageDeployResult{}, err
 		}
@@ -380,7 +380,7 @@ func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request, pod
 // created deploy's upload URL and returns the tarball version. Both manifest paths use
 // it: the dags-only deploy and a "both" image deploy, which ships the tarball to
 // fit the image just pushed.
-func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *astrov1.Deployment, created *astrov1.Deploy, noDagsBaseDir, cosmosBoost bool) (string, error) {
+func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *astrov1.Deployment, created *astrov1.Deploy, opts dagsUpload) (string, error) {
 	uploadURL := ""
 	if created.DagsUploadUrl != nil {
 		uploadURL = *created.DagsUploadUrl
@@ -393,8 +393,8 @@ func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *a
 		deploymentType = *dep.Type
 	}
 	dagsPath := filepath.Join(projectDir, "dags")
-	monitoringDag := includeMonitoringDag(c.OrganizationProduct == string(astrov1.OrganizationProductHOSTED), deploymentType)
-	tarballVersion, err := uploadDags(dagsPath, uploadURL, dep.AstroRuntimeVersion, monitoringDag, noDagsBaseDir, cosmosBoost)
+	opts.MonitoringDag = includeMonitoringDag(c.OrganizationProduct == string(astrov1.OrganizationProductHOSTED), deploymentType)
+	tarballVersion, err := uploadDags(dagsPath, uploadURL, dep.AstroRuntimeVersion, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), dagDeployDisabled) {
 			return "", fmt.Errorf(enableDagDeployMsg, deploymentID)
