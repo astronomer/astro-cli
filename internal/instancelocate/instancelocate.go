@@ -114,11 +114,26 @@ func New(domain string) instances.Locator {
 // deploymentsOn is the v1 client for domain's control plane. Its token is left
 // empty because astroDeployment puts the session's bearer on every request.
 func deploymentsOn(domain string) Deployments {
+	if domain == "" && astrosession.HasAPIToken() {
+		// A token run needs no login on the machine, so it may have no current
+		// context to name its host: the environment's, else the default, as the
+		// platform tree's setup chooses it.
+		domain = tokenHost()
+	}
 	if domain == "" {
 		return astrov1.NewV1Client(httputil.NewHTTPClient())
 	}
 	c := config.Context{Domain: domain}
 	return astrov1.NewV1ClientForLogin(httputil.NewHTTPClient(), "", c.GetPublicRESTAPIURL("v1"))
+}
+
+// tokenHost is the host an ASTRO_API_TOKEN is used on when a project names
+// none: the current context's, which ASTRO_DOMAIN overrides, else Astro's.
+func tokenHost() string {
+	if d, err := config.GetCurrentDomain(); err == nil {
+		return d
+	}
+	return "astronomer.io"
 }
 
 // GoogleChain is implemented by a locator that resolves Application Default
@@ -185,7 +200,20 @@ func (l *locator) BaseURL(ctx context.Context, i instances.Instance) (string, er
 // Reaching an astro link there needs a Deployment lookup, and the lookup needs
 // an org, so the message says which half is missing rather than reporting the
 // whole machine as logged out.
+//
+// With ASTRO_API_TOKEN set the organization is the token's own claim, on either
+// path, and the saved login is never read: a token's credential with the saved
+// login's organization is an identity nobody chose.
 func Organization(domain string) (string, error) {
+	if id, ok, err := astrosession.TokenIdentity(); ok || err != nil {
+		if err != nil {
+			return "", err
+		}
+		if id.Organization == "" {
+			return "", astrosession.ErrTokenNoOrganization
+		}
+		return id.Organization, nil
+	}
 	if domain == "" {
 		ctx, err := config.GetCurrentContext()
 		if err != nil {

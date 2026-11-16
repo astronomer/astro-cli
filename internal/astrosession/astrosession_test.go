@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 
@@ -108,9 +109,10 @@ func TestBearerForReadsTheDomainsLoginNotTheCurrentContext(t *testing.T) {
 
 func TestBearerForPrefersTheAPIToken(t *testing.T) {
 	prodLogin(t, "Bearer prod", "")
-	t.Setenv(EnvAPIToken, "ci-token")
+	ci := testUtil.MintAPIToken(t, time.Time{}, "organizationId:org")
+	t.Setenv(EnvAPIToken, ci)
 	token, err := BearerFor(context.Background(), "astronomer.io")
-	if err != nil || token != "ci-token" {
+	if err != nil || token != ci {
 		t.Fatalf("token, err = %q, %v; want %s", token, err, EnvAPIToken)
 	}
 }
@@ -133,10 +135,11 @@ func TestBearerIgnoresAnAPITokenWithNoCredential(t *testing.T) {
 		}
 	}
 	// A real token, with its scheme or without, is one, and wins.
-	for _, v := range []string{"ci-token", "Bearer ci-token"} {
+	ci := testUtil.MintAPIToken(t, time.Time{}, "organizationId:org")
+	for _, v := range []string{ci, "Bearer " + ci} {
 		t.Setenv(EnvAPIToken, v)
-		if token, err := Bearer(context.Background()); err != nil || token != v {
-			t.Errorf("%s=%q: token, err = %q, %v; want the variable", EnvAPIToken, v, token, err)
+		if token, err := Bearer(context.Background()); err != nil || token != ci {
+			t.Errorf("%s=%q: token, err = %q, %v; want the variable's credential", EnvAPIToken, v, token, err)
 		}
 		if !HasAPIToken() {
 			t.Errorf("%s=%q: HasAPIToken() = false", EnvAPIToken, v)

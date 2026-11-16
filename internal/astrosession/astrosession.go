@@ -95,13 +95,16 @@ func Credential(stored string) string {
 // method, context and all, though nothing about reading the local config
 // blocks.
 //
-// ASTRO_API_TOKEN wins when it is set. That is how CI supplies an identity with
-// no login on the machine at all, and reading it here rather than only where a
-// bearer is wanted is what lets a CI run reach an Astro Deployment it has to
-// look up first, not just one whose URL it already holds.
+// ASTRO_API_TOKEN wins when it is set, and then is the only identity: the
+// saved login is never read, and a token that is malformed, expired or has no
+// permissions is the run's error (see TokenIdentity), not a reason to use it.
+// That is how CI supplies an identity with no login on the machine at all, and
+// reading it here rather than only where a bearer is wanted is what lets a CI
+// run reach an Astro Deployment it has to look up first, not just one whose URL
+// it already holds. The credential comes back without a scheme.
 func Bearer(context.Context) (string, error) {
-	if token, ok := APIToken(); ok {
-		return token, nil
+	if id, ok, err := TokenIdentity(); ok || err != nil {
+		return id.Credential, err
 	}
 	ctx, err := config.GetCurrentContext()
 	if err != nil {
@@ -127,8 +130,8 @@ func BearerFor(ctx context.Context, domain string) (string, error) {
 	if domain == "" {
 		return Bearer(ctx)
 	}
-	if token, ok := APIToken(); ok {
-		return token, nil
+	if id, ok, err := TokenIdentity(); ok || err != nil {
+		return id.Credential, err
 	}
 	login, err := Login(domain)
 	switch {
@@ -194,7 +197,17 @@ var refreshLogin = func(domain, refreshToken string) (*astroauth.TokenResponse, 
 // A login with no refresh token is returned as it is, and so is one that has
 // been logged out of: `astro logout` clears the token but keeps the refresh
 // token, and refreshing it would log the user back in.
+//
+// With ASTRO_API_TOKEN set the result is the token's own login, and nothing is
+// read from the saved one: the token as the credential, the organization and
+// Workspace its claims name, and no refresh (a token has none).
 func Login(domain string) (config.Context, error) {
+	if id, ok, err := TokenIdentity(); ok || err != nil {
+		if err != nil {
+			return config.Context{Domain: domain}, err
+		}
+		return config.Context{Domain: domain, Token: "Bearer " + id.Credential, Organization: id.Organization, Workspace: id.Workspace}, nil
+	}
 	c := config.Context{Domain: domain}
 	ctx, err := c.GetContext()
 	if err != nil || ctx.RefreshToken == "" || Credential(ctx.Token) == "" {
