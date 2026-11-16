@@ -157,6 +157,22 @@ func TestDeploySettingsAreCarriedIntoTheManifest(t *testing.T) {
 	assert.ErrorIs(t, err, os.ErrNotExist, "everything in it was carried")
 }
 
+// A file holding a setting under both names gets the value Astro CLI 1.x
+// used, which is the 1.x name's: 1.x read nothing else, so the v2 spelling,
+// which an earlier v2 wrote beside it, never applied there.
+func TestTheSpelling1xReadDecidesADeploySetting(t *testing.T) {
+	res := convert1x(t, "project:\n  name: orders\n"+
+		"cosmos_boost:\n  pre_deploy: false\n"+
+		"deploy:\n  cosmos_boost: true\n"+
+		"apc:\n  sha_as_tag: false\n"+
+		"sha_as_tag: true\n", fakeSettings)
+
+	m, err := manifest.Load(filepath.Join(res.Dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.Equal(t, manifest.Deploy{GitMetadata: true, ShaAsTag: true}, m.Astro.Deploy)
+	assert.Empty(t, res.Notes, "the shadowed spelling needs no note")
+}
+
 func TestADeploySettingAtItsDefaultWritesNothing(t *testing.T) {
 	res := convert1x(t, "project:\n  name: orders\ndeploy:\n  git_metadata: true\nsha_as_tag: false\n", fakeSettings)
 	data, err := os.ReadFile(filepath.Join(res.Dir, manifest.Marker))

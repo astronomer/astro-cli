@@ -59,7 +59,7 @@ var removedSettings = map[string]removedSetting{
 }
 
 const (
-	gitMetadataMoved    = "A project's deploys record their commit unless git-metadata = false under [tool.astro.deploy] in its pyproject.toml. A bundle deploy records it always."
+	gitMetadataMoved    = "A project's deploys record their commit unless git-metadata = false under [tool.astro.deploy] in its pyproject.toml. astro deploy bundle takes --git-metadata=false."
 	cosmosBoostMoved    = "A project's deploys generate Cosmos Boost files with cosmos-boost = true under [tool.astro.deploy] in its pyproject.toml; astro deploy bundle takes --cosmos-boost."
 	shaAsTagMoved       = "A project's Astro Private Cloud deploys push by digest with sha-as-tag = true under [tool.astro.deploy] in its pyproject.toml."
 	clientRegistryMoved = "astro remote deploy pushes to client-registry under [tool.astro.deploy] in the project's pyproject.toml (a link can set its own), or to --registry."

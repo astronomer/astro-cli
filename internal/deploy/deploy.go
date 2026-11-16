@@ -444,6 +444,7 @@ func deploySettings(m *manifest.Manifest) manifest.Deploy {
 
 // runDagsOnly ships just the dags/ directory through the transport.
 func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
+	settings := deploySettings(req.Manifest)
 	dag, err := d.DeployDags(&DagDeploy{
 		DeploymentID:  target.DeploymentID,
 		WorkspaceID:   target.WorkspaceID,
@@ -452,8 +453,8 @@ func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 		NoDagsBaseDir: req.NoDagsBaseDir,
 		Wait:          req.Wait,
 		WaitTime:      req.WaitTime,
-		GitMetadata:   deploySettings(req.Manifest).GitMetadata,
-		CosmosBoost:   deploySettings(req.Manifest).CosmosBoost,
+		GitMetadata:   settings.GitMetadata,
+		CosmosBoost:   settings.CosmosBoost,
 	})
 	if err != nil {
 		return Result{}, err
@@ -485,13 +486,14 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 	// every project that generates its image. imagebuild passes a generated build
 	// only the netrc secret, and checkImageSource has warned about the rest.
 	includeDags := !req.Image && !req.ImageAlone
+	settings := deploySettings(req.Manifest)
 	img, err := d.DeployImage(&ImageDeploy{
 		DeploymentID:    target.DeploymentID,
 		WorkspaceID:     target.WorkspaceID,
 		Build:           imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest),
-		GitMetadata:     deploySettings(req.Manifest).GitMetadata,
-		CosmosBoost:     deploySettings(req.Manifest).CosmosBoost,
-		ShaAsTag:        deploySettings(req.Manifest).ShaAsTag,
+		GitMetadata:     settings.GitMetadata,
+		CosmosBoost:     settings.CosmosBoost,
+		ShaAsTag:        settings.ShaAsTag,
 		BuildSecrets:    req.BuildSecrets,
 		ImageName:       req.ImageName,
 		ImageInRegistry: req.ImageInRegistry,

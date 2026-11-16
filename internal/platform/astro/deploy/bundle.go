@@ -39,6 +39,10 @@ type DeployBundleInput struct {
 	// CosmosBoost is --cosmos-boost: generate Cosmos Boost files for a dbt
 	// bundle into the upload.
 	CosmosBoost bool
+	// NoGitMetadata is --git-metadata=false: record no commit. A bundle is
+	// outside any project, so the flag is its one switch; by default it
+	// records the commit it ships, as a project does.
+	NoGitMetadata bool
 }
 
 // BundleGit is the commit a bundle deploy recorded, when the bundle sits in a
@@ -90,8 +94,12 @@ func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
 	}
 
 	// A bundle is outside any project, so no [tool.astro.deploy] git-metadata
-	// reaches it: it records the commit it ships, as a project does by default.
-	deployGit, commitMessage := retrieveLocalGitMetadata(input.BundlePath)
+	// reaches it: it records the commit it ships unless --git-metadata=false.
+	var deployGit *astrov1.CreateDeployGitRequest
+	var commitMessage string
+	if !input.NoGitMetadata {
+		deployGit, commitMessage = retrieveLocalGitMetadata(input.BundlePath)
+	}
 
 	// if no description was provided, use the commit message from the local Git checkout
 	if input.Description == "" {

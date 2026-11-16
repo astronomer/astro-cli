@@ -66,6 +66,23 @@ environment = 'orders'
 	assert.ErrorContains(t, err, "only an Astro Deployment runs remote agents")
 }
 
+// With no --deployment, the project's default link gives its registry, but
+// not its Deployment: a run that named none is not checked against one.
+func TestResolveClientTargetTakesTheDefaultLinksRegistry(t *testing.T) {
+	m := registryManifest(t, `
+[tool.astro.deployments.prod]
+deployment = 'dep-prod'
+default = true
+client-registry = 'quay.io/acme/prod'
+
+[tool.astro.deployments.dev]
+deployment = 'dep-dev'
+`)
+	got, err := resolveClientTarget(m, "", "")
+	require.NoError(t, err)
+	assert.Equal(t, clientTarget{registry: "quay.io/acme/prod", source: "pyproject.toml [tool.astro.deployments.prod] client-registry"}, got)
+}
+
 func TestResolveClientTargetWithNone(t *testing.T) {
 	_, err := resolveClientTarget(nil, "", "")
 	assert.ErrorContains(t, err, "pass --registry <registry>/<repository>")

@@ -118,6 +118,8 @@ type project1x struct {
 	cliSettings []setting1x
 	// setting1x is Options.Setting1x, which settingNotes asks about each.
 	setting1x func(key, value string) (SettingReplacement, bool)
+	// deployDecided caches carriedDeploySettings.
+	deployDecided *deploySettingsDecided
 	// deployment is `project.deployment` from the same file: the target
 	// `astro deploy --save` remembers, or empty when nothing saved one. The key
 	// is a single string and always has been, so there is at most one.

@@ -215,6 +215,39 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataGenericProvider() {
 	s.mockV1Client.AssertExpectations(s.T())
 }
 
+// --git-metadata=false: a bundle in a git checkout records no commit.
+func (s *BundleSuite) TestBundleDeploy_GitMetadataOff() {
+	gitPath := s.createTestGitRepository(false)
+	defer os.RemoveAll(gitPath)
+
+	input := &DeployBundleInput{
+		BundlePath:    gitPath,
+		AstroV1Client: s.mockV1Client,
+		NoGitMetadata: true,
+	}
+
+	mockGetDeployment(s.mockV1Client, true, false)
+
+	// Expect deploy request WITHOUT git metadata
+	expectedDeploy := &astrov1.CreateDeployRequest{
+		Type:            astrov1.CreateDeployRequestTypeBUNDLE,
+		BundleType:      &input.BundleType,
+		BundleMountPath: &input.MountPath,
+		Description:     &input.Description,
+	}
+	mockCreateDeploy(s.mockV1Client, "http://bundle-upload-url", expectedDeploy)
+	mockUpdateDeploy(s.mockV1Client, "version-id")
+
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	_, err := DeployBundle(input)
+	assert.NoError(s.T(), err)
+
+	s.mockV1Client.AssertExpectations(s.T())
+}
+
 func (s *BundleSuite) TestBundleDeploy_GitHasUncommittedChanges() {
 	gitPath := s.createTestGitRepository(true)
 	defer os.RemoveAll(gitPath)

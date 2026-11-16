@@ -211,21 +211,49 @@ type carried1x struct {
 	value     any
 }
 
+// deploySettingsDecided is carriedDeploySettings' answer, worked out once per
+// conversion: the notes, the manifest edit and the advisories all read it, so
+// they cannot disagree about what was carried.
+type deploySettingsDecided struct {
+	carried []carried1x
+	handled map[string]bool
+}
+
 // carriedDeploySettings are the deploy settings .astro/config.yaml set to
 // something other than the default, as the [tool.astro.deploy] values that
 // keep them. handled holds every key, by the name the file spells it, that
-// needs no note: carried, or at the default, where the manifest needs no
-// line either. A value that is not a boolean, or a registry that does not
-// print on one line, is neither, and keeps its note.
+// needs no note: carried, at the default (where the manifest needs no line
+// either), or shadowed by the spelling 1.x read instead. A value that is not
+// a boolean, or a registry that does not print on one line, is none of these,
+// and keeps its note.
 //
-// The first spelling of a key wins, in the file's sorted order, if a file
-// holds both a 1.x name and the current one.
+// Where a file holds a setting under both its 1.x name and its v2 one, the
+// 1.x name decides, as it did for Astro CLI 1.x, which read only that name.
 func (from1x *project1x) carriedDeploySettings() (carried []carried1x, handled map[string]bool) {
+	if d := from1x.deployDecided; d != nil {
+		return d.carried, d.handled
+	}
 	handled = map[string]bool{}
-	seen := map[string]bool{}
+	byKey := map[string]setting1x{}
 	for _, s := range from1x.cliSettings {
-		key, ok := deploySettings1x[strings.ToLower(s.key)]
-		if !ok || seen[key] {
+		name := strings.ToLower(s.key)
+		key, ok := deploySettings1x[name]
+		if !ok {
+			continue
+		}
+		if prev, seen := byKey[key]; seen {
+			// Keep the spelling 1.x read; the other is shadowed.
+			if deploySettingIs1xName(strings.ToLower(prev.key)) || !deploySettingIs1xName(name) {
+				handled[s.key] = true
+				continue
+			}
+			handled[prev.key] = true
+		}
+		byKey[key] = s
+	}
+	for _, s := range from1x.cliSettings {
+		key := deploySettings1x[strings.ToLower(s.key)]
+		if key == "" || byKey[key].key != s.key {
 			continue
 		}
 		var value any
@@ -240,16 +268,28 @@ func (from1x *project1x) carriedDeploySettings() (carried []carried1x, handled m
 			if err != nil {
 				continue
 			}
-			seen[key], handled[s.key] = true, true
 			if b == (key == "git-metadata") {
+				handled[s.key] = true
 				continue // the default
 			}
 			value = b
 		}
-		seen[key], handled[s.key] = true, true
+		handled[s.key] = true
 		carried = append(carried, carried1x{from: s.key, key: key, value: value})
 	}
+	from1x.deployDecided = &deploySettingsDecided{carried: carried, handled: handled}
 	return carried, handled
+}
+
+// deploySettingIs1xName reports a spelling Astro CLI 1.x read: every name in
+// deploySettings1x but the v2 ones, which 1.x never wrote.
+func deploySettingIs1xName(name string) bool {
+	switch name {
+	case "deploy.cosmos_boost", "apc.sha_as_tag", "deploy.remote_execution.client_registry":
+		return false
+	}
+	_, ok := deploySettings1x[name]
+	return ok
 }
 
 // setDeploySettings writes the carried deploy settings into

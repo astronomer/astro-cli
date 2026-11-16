@@ -147,7 +147,11 @@ type clientTarget struct {
 // value came from, for an error about it.
 //
 // --deployment may name a link of the project, as the deploys' does; the
-// runtime check then reads the link's Deployment.
+// runtime check then reads the link's Deployment. With no --deployment, the
+// project's default link (manifest.DefaultLink) gives its client-registry, as
+// it is the link the project's other commands fall through to, but not its
+// Deployment: a run that named none has never been checked against one, and
+// checking would call the API where it did not before.
 func resolveClientTarget(m *manifest.Manifest, registry, deployment string) (clientTarget, error) {
 	t := clientTarget{registry: registry, source: "--registry", deploymentID: deployment}
 	var link *manifest.Link
@@ -160,6 +164,12 @@ func resolveClientTarget(m *manifest.Manifest, registry, deployment string) (cli
 			t.deploymentID = l.Deployment
 		}
 	}
+	linkName := deployment
+	if m != nil && deployment == "" {
+		if defName, l, ok := manifest.DefaultLink(m.Astro.Deployments); ok && l.Kind() == manifest.KindAstro {
+			link, linkName = &l, defName
+		}
+	}
 	if t.registry != "" {
 		return t, nil
 	}
@@ -170,7 +180,7 @@ func resolveClientTarget(m *manifest.Manifest, registry, deployment string) (cli
 		t.registry = link.ClientRegistry
 		t.source = projectClientRegistry
 		if link.ClientRegistry != m.Astro.Deploy.ClientRegistry {
-			t.source = "pyproject.toml [tool.astro.deployments." + deployment + "] client-registry"
+			t.source = "pyproject.toml [tool.astro.deployments." + linkName + "] client-registry"
 		}
 	case m.Astro.Deploy.ClientRegistry != "":
 		t.registry = m.Astro.Deploy.ClientRegistry
