@@ -107,6 +107,9 @@ func newFakeAstro(t *testing.T) fakeAstro {
 // developer machine has.
 func useFakeAstro(t *testing.T, f fakeAstro) {
 	t.Helper()
+	// Nothing here may reach the machine's keychain through the vault.
+	keyring.MockInit()
+	t.Cleanup(keyring.MockInit)
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	testUtil.UseLocalCoreURL(t, f.URL)
 	t.Setenv("ASTRO_DOMAIN", "localhost")

@@ -15,6 +15,7 @@ import (
 // An unusable ASTRO_API_TOKEN is its own outage, named, and the saved login is
 // not read in its place: no request is made.
 func TestUnusableAPITokenIsAnOutageNotTheSavedLogin(t *testing.T) {
+	testUtil.MockKeyring(t)
 	mc := mockClient(okResp(envVarObj("X", "saved-login-value", false)))
 	p := loggedInProvider(t, mc, true) // a saved login on localhost
 	t.Setenv(astrosession.EnvAPIToken, testUtil.MintAPIToken(t, time.Now().Add(-time.Hour), "organizationId:org"))
@@ -31,6 +32,7 @@ func TestUnusableAPITokenIsAnOutageNotTheSavedLogin(t *testing.T) {
 func TestReadUnderATokenUsesTheTokensLogin(t *testing.T) {
 	token := testUtil.MintAPIToken(t, time.Now().Add(time.Hour), "organizationId:org-claim")
 	mc := mockClient(okResp(envVarObj("X", "v", false)))
+	testUtil.MockKeyring(t)
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Setenv(astrosession.EnvAPIToken, token)
 	var got Login

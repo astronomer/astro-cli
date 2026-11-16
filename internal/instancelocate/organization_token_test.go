@@ -12,6 +12,7 @@ import (
 // Under ASTRO_API_TOKEN the organization is the token's own claim, on either
 // path, and never the saved login's.
 func TestOrganizationUnderATokenIsTheClaim(t *testing.T) {
+	testUtil.MockKeyring(t)
 	testUtil.InitTestConfig(testUtil.LocalPlatform) // a saved login in test-org-id
 	t.Setenv(astrosession.EnvAPIToken, testUtil.MintAPIToken(t, time.Now().Add(time.Hour), "organizationId:org-claim"))
 	for _, domain := range []string{"", "localhost", "astronomer.io"} {

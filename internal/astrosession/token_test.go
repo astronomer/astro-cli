@@ -48,6 +48,7 @@ func TestTokenIdentityWithNoTokenIsNoTokenRun(t *testing.T) {
 // reader of the session, as setup fails the platform tree, and the saved login
 // is not read instead.
 func TestUnusableTokensFailEveryReaderOfTheSession(t *testing.T) {
+	testUtil.MockKeyring(t)
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	for _, tt := range []struct {
 		name  string
@@ -76,6 +77,7 @@ func TestUnusableTokensFailEveryReaderOfTheSession(t *testing.T) {
 // Login under a token is the token's own: its credential, and the
 // organization and Workspace its claims name, whatever the saved login holds.
 func TestLoginUnderATokenIsTheTokensOwn(t *testing.T) {
+	testUtil.MockKeyring(t)
 	testUtil.InitTestConfig(testUtil.CloudPlatform) // a saved login with its own token, organization and Workspace
 	token := testUtil.MintAPIToken(t, time.Now().Add(time.Hour), "organizationId:org-claim", "workspaceId:ws-claim")
 	t.Setenv(EnvAPIToken, token)
@@ -91,6 +93,7 @@ func TestLoginUnderATokenIsTheTokensOwn(t *testing.T) {
 // Without any overlay on the context, and with no saved login at all, a token's
 // claim is still the run's Workspace.
 func TestResolveReadsTheClaimsWithNoContextAtAll(t *testing.T) {
+	testUtil.MockKeyring(t)
 	testUtil.InitTestConfig(testUtil.Initial)
 	t.Setenv(EnvAPIToken, testUtil.MintAPIToken(t, time.Now().Add(time.Hour), "organizationId:org", "workspaceId:ws-claim"))
 	got := Resolve(Request{LoginError: true})
@@ -102,6 +105,7 @@ func TestResolveReadsTheClaimsWithNoContextAtAll(t *testing.T) {
 // With the saved login's Workspace on the context and nothing applied, an
 // Organization token still has none.
 func TestResolveUnderAnOrganizationTokenIgnoresTheSavedWorkspace(t *testing.T) {
+	testUtil.MockKeyring(t)
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Setenv(EnvAPIToken, testUtil.MintAPIToken(t, time.Now().Add(time.Hour), "organizationId:org"))
 	for _, domain := range []string{"", "astronomer.io"} {
