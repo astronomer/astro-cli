@@ -19,8 +19,10 @@ func driveIsolate(t *testing.T, g guards) func(code int) int {
 func driveIsolateWith(t *testing.T, g guards, o Options) func(code int) int {
 	t.Helper()
 	saved := os.Environ()
-	hooks := afterIsolate
+	hooks, root := afterIsolate, tempRoot
 	t.Cleanup(func() {
+		os.RemoveAll(os.Getenv(inheritedEnv)) // the home this drive made, whether or not finish ran
+		tempRoot = root
 		os.Clearenv()
 		for _, kv := range saved {
 			k, v, _ := strings.Cut(kv, "=")
@@ -81,6 +83,8 @@ func TestFinishFailsOnAnOSKeychainRefusal(t *testing.T) {
 // it in a hook, which runs after HOME has moved.
 func TestAfterIsolateHooksSeeTheTemporaryHome(t *testing.T) {
 	var sawHome string
+	orig := afterIsolate
+	t.Cleanup(func() { afterIsolate = orig })
 	afterIsolate = append(afterIsolate, func() { sawHome = os.Getenv("HOME") })
 	driveIsolate(t, guards{watch: newStateWatch(t.TempDir()), refusals: none})
 	if sawHome == "" || sawHome != os.Getenv("HOME") {

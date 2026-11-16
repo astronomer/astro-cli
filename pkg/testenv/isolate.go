@@ -200,6 +200,18 @@ func isolate(g guards, o Options) func(code int) int {
 			dief("unsetting %s: %v", k, err)
 		}
 	}
+	// The list above is the variables known to matter; every other ASTRO_ and
+	// ASTRONOMER_ one is the CLI's too (ASTRO_UV_BIN, ASTRO_AIRFLOW_INDEX_URL, ...),
+	// and a shell may export it. The ASTRO_TEST_ ones are the tests' own.
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		upper := strings.ToUpper(name)
+		if (strings.HasPrefix(upper, "ASTRO_") || strings.HasPrefix(upper, "ASTRONOMER_")) && !strings.HasPrefix(upper, "ASTRO_TEST_") {
+			if err := os.Unsetenv(name); err != nil { //nolint:usetesting // for the whole package run
+				dief("unsetting %s: %v", name, err)
+			}
+		}
+	}
 	// Before anything is made, so a refusal leaves nothing behind.
 	uvDir, err := prepareUVDir()
 	if err != nil {
@@ -253,6 +265,9 @@ func inherit(o Options) {
 	// or invented marker (exported from a shell, say) fails here, loudly, rather
 	// than switching the isolation off for the binary.
 	root := os.Getenv(inheritedEnv)
+	if !within(root, os.TempDir()) {
+		dief("%s=%q is not a directory in the temporary directory %s, so it is not a home a test binary made; unset it", inheritedEnv, root, os.TempDir())
+	}
 	if home := os.Getenv("HOME"); !within(home, root) {
 		dief("a helper process runs with HOME=%q, which is not inside %s=%q: its parent's home. "+
 			"A helper works in the home its parent made, never a real one; unset %s if it is stale", home, inheritedEnv, root, inheritedEnv)
