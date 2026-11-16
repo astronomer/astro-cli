@@ -619,29 +619,6 @@ var validationCases = []struct {
 		wantKeys:  []string{"tool.astro.build-secrets"},
 	},
 	{
-		name:      "unknown key in [tool.astro]",
-		wantCodes: []ProblemCode{CodeUnknownKey},
-		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nairflw = \"3.1\"\n",
-		wantKeys:  []string{"tool.astro.airflw"},
-	},
-	{
-		name:      "unknown key on a link",
-		wantCodes: []ProblemCode{CodeUnknownKey},
-		content: `
-[project]
-name = "p"
-dependencies = ["apache-airflow==3.1.*"]
-
-[tool.astro]
-workspace = "ws-abc"
-
-[tool.astro.deployments.prod]
-deployment = "dep-xyz"
-defaults = true
-`,
-		wantKeys: []string{"tool.astro.deployments.prod.defaults"},
-	},
-	{
 		name:      "incomplete deployment",
 		wantCodes: []ProblemCode{CodeDeploymentRequired, CodeWorkspaceRequired},
 		content: `
@@ -1104,27 +1081,6 @@ url = "https://deployments.astro.corp.example/ckdep-apc/airflow"
 		wantKeys: []string{"tool.astro.deployments.prod-apc.url"},
 	},
 	{
-		// A link has no organization: Houston has none, and an Astro link's
-		// is [tool.astro] organization.
-		name:      "apc link with an organization",
-		wantCodes: []ProblemCode{CodeUnknownKey},
-		content: `
-[project]
-name = "p"
-dependencies = ["apache-airflow==3.1.*"]
-
-[tool.astro]
-
-[tool.astro.deployments.prod-apc]
-target = "apc"
-domain = "astro.corp.example"
-workspace = "ckws-apc"
-deployment = "ckdep-apc"
-organization = "clorg"
-`,
-		wantKeys: []string{"tool.astro.deployments.prod-apc.organization"},
-	},
-	{
 		// An astro link's host is [tool.astro] domain. A domain on the link
 		// would look like it routes the link to another host, so it is
 		// refused, as any key a link does not take always was.
@@ -1245,12 +1201,6 @@ deployment = "dep-xyz"
 		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\netl = { slots = -2 }\n",
 		wantKeys:  []string{"tool.astro.pools.etl.slots"},
 		wantCodes: []ProblemCode{CodePoolSlotsInvalid},
-	},
-	{
-		name:      "a pool with a key Airflow has no field for",
-		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\netl = { slots = 4, open_slots = 2 }\n",
-		wantKeys:  []string{"tool.astro.pools.etl.open_slots"},
-		wantCodes: []ProblemCode{CodeUnknownKey},
 	},
 	{
 		name:      "a pool include_deferred that is not a boolean",

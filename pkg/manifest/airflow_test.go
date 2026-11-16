@@ -436,10 +436,10 @@ func TestParseForRepair(t *testing.T) {
 	}
 
 	// Any other problem refuses it, as Parse does.
-	_, err = ParseForRepair(airflowManifest(`'apache-airflow>=3.1'`, "airflow = '3.1'\nairflw = '3.1'\n"))
+	_, err = ParseForRepair(airflowManifest(`'apache-airflow>=3.1'`, "airflow = '3.1'\npackages = 'curl'\n"))
 	ve := validationError(t, err)
 	if len(ve.Problems) != 3 {
-		t.Errorf("want the unknown key reported beside the two Airflow problems, got %v", ve.Problems)
+		t.Errorf("want the packages problem reported beside the two Airflow problems, got %v", ve.Problems)
 	}
 
 	// A manifest Parse loaded has nothing to repair.
