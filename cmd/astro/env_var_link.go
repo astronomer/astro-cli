@@ -33,7 +33,7 @@ const envVarLinkExamples = `
 
   # list links, and remove one
   astro env variable link list --variable-key DATABASE_URL --workspace <ws>
-  astro env variable link delete --variable-key DATABASE_URL --workspace <ws> --deployment <dep>`
+  astro env variable link remove --variable-key DATABASE_URL --workspace <ws> --deployment <dep>`
 
 func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -51,7 +51,8 @@ func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newEnvVarLinkSetCmd(out),
 		newRemovedLinkCreateCmd(),
-		newEnvVarLinkDeleteCmd(out),
+		newEnvVarLinkRemoveCmd(out),
+		deprecatedLinkDelete(newEnvVarLinkRemoveCmd(out)),
 		newEnvVarLinkListCmd(out),
 	)
 	return cmd
@@ -125,19 +126,19 @@ func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newEnvVarLinkDeleteCmd(out io.Writer) *cobra.Command {
+func newEnvVarLinkRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete",
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a link or exclude",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runEnvVarLinkDelete(cmd, out)
+			return runEnvVarLinkRemove(cmd, out)
 		},
 		Example: `  # Unlink a workspace variable from a Deployment
-  astro env variable link delete --variable-key DATABASE_URL --deployment <DEPLOYMENT_ID>
+  astro env variable link remove --variable-key DATABASE_URL --deployment <DEPLOYMENT_ID>
 
   # Remove an exclude, so an auto-linked variable reaches the Deployment again
-  astro env variable link delete --variable-key LOG_LEVEL --deployment <DEPLOYMENT_ID> --exclude`,
+  astro env variable link remove --variable-key LOG_LEVEL --deployment <DEPLOYMENT_ID> --exclude`,
 	}
 	addLinkVariableFlags(cmd)
 	addDeploymentFlag(cmd.Flags(), "Deployment to unlink: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &envLinkDeploymentID}, oneXDeploymentID)
@@ -196,7 +197,7 @@ func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 	return linkChanged(cmd, r, report, line)
 }
 
-func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
+func runEnvVarLinkRemove(cmd *cobra.Command, out io.Writer) error {
 	scope, err := envScope(cmd)
 	if err != nil {
 		return err

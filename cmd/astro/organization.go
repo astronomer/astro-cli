@@ -791,8 +791,8 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rotate [TOKEN_ID]",
 		Aliases: []string{"ro"},
-		Short:   "Rotate a Organization API token",
-		Long:    "Rotate a Organization API token. You can only rotate Organization API tokens. You cannot rotate Workspace API tokens with this command",
+		Short:   "Rotate an Organization API token",
+		Long:    "Rotate an Organization API token. You can only rotate Organization API tokens. You cannot rotate Workspace API tokens with this command",
 		Example: `
   # Rotate a token by its ID
   astro organization token rotate <TOKEN_ID>
@@ -815,7 +815,7 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
 		Aliases: []string{"rm"},
-		Short:   "Delete a Organization API token or remove an Organization API token from a Organization",
+		Short:   "Delete an Organization API token",
 		Long:    "Permanently revoke an Organization API token. All access the token grants — including any Workspace and Deployment roles — is immediately revoked.",
 		Example: `
   # Delete a token by its ID
@@ -829,7 +829,7 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting or removing the API token")
+	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting the API token")
 
 	return cmd
 }

@@ -143,7 +143,7 @@ func TestWorkspaceTokenAddAndRemovePickInTheWorkspaceTheyArePointedAt(t *testing
 		return mc
 	}
 	for _, verb := range [][]string{{"add", "--role", "DEPLOYMENT_ADMIN"}, {"remove"}} {
-		args := append([]string{"token", "workspace-token", verb[0], "--workspace-token-name", wsTok.Name, "--deployment", otherDep}, verb[1:]...)
+		args := append([]string{"token", "workspace-token", verb[0], "--name", wsTok.Name, "--deployment", otherDep}, verb[1:]...)
 		t.Run(verb[0]+" in a project", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			inProject(t, testProjectManifest)
@@ -182,7 +182,7 @@ func TestWorkspaceTokenAddAndRemovePickInTheWorkspaceTheyArePointedAt(t *testing
 		tokenID, orgTokenID, workspaceTokenID = "", "", ""
 		astroV1Client = new(astrov1_mocks.ClientWithResponsesInterface) // asked nothing
 		for _, verb := range [][]string{{"add", "--role", "DEPLOYMENT_ADMIN"}, {"remove"}} {
-			args := append([]string{"token", "workspace-token", verb[0], "--workspace-token-name", wsTok.Name, "--deployment", otherDep}, verb[1:]...)
+			args := append([]string{"token", "workspace-token", verb[0], "--name", wsTok.Name, "--deployment", otherDep}, verb[1:]...)
 			_, err := execDeploymentCmd(args...)
 			require.Error(t, err, verb[0])
 			assert.Contains(t, err.Error(), "failed to find a valid workspace to find the Workspace token in; pass --workspace, or the token's ID: ", verb[0])

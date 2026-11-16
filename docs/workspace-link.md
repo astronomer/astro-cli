@@ -196,8 +196,9 @@ a command reads its workspace and Deployment in this order:
 1. **`--workspace` wins.** Given, it is the workspace. A link name in the
    same command still picks the link's Deployment and host. The
    `deployment team`, `user` and `token` commands, which act on a Deployment
-   by its id alone, take no `--workspace`; `deployment token workspace-token
-   add` and `remove`, which find a Workspace token, do. The 1.x
+   by its id alone, take no `--workspace`; `deployment token add`, which
+   looks for a Workspace token given by name in a Workspace, and the hidden
+   `deployment token workspace-token add` and `remove`, do. The 1.x
    `--workspace-id` those commands had is accepted and does nothing, as in
    1.x: the project's workspace and host still apply.
 2. **A link name is a Deployment.** `--deployment` and the Deployment-id

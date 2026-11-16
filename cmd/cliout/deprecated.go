@@ -95,3 +95,35 @@ func WarnDeprecatedFlags(w io.Writer, cmd *cobra.Command) {
 		}
 	})
 }
+
+// DeprecatedCommandAnnotation marks, with "true", a command that is a
+// deprecated spelling (DeprecateCommand), for the tests that hold each one to
+// its table.
+const DeprecatedCommandAnnotation = "astro.deprecated-command"
+
+// DeprecateCommand marks cmd as a command v2 renamed or folded into another,
+// kept for the scripts that type it: it is hidden from help, still runs as
+// it did, and says once per run (WarnDeprecated) that the spelling is
+// deprecated, naming what to type instead. replacement reads the command
+// path to use from cmd as it was typed (cmd.Parent().CommandPath()+" remove"),
+// since the tree around it is known only once it is built. It returns cmd.
+//
+// The warning is given with the arguments check, which runs for a command
+// that is typed whatever happens next, as a hidden flag alias's does, and
+// not in the run, so a test that replaces every run still sees it.
+func DeprecateCommand(cmd *cobra.Command, replacement func(cmd *cobra.Command) string) *cobra.Command {
+	cmd.Hidden = true
+	if cmd.Annotations == nil {
+		cmd.Annotations = map[string]string{}
+	}
+	cmd.Annotations[DeprecatedCommandAnnotation] = "true"
+	check := cmd.Args
+	if check == nil {
+		check = cobra.ArbitraryArgs
+	}
+	cmd.Args = func(c *cobra.Command, args []string) error {
+		WarnDeprecated(c.ErrOrStderr(), c.CommandPath(), "use "+replacement(c))
+		return check(c, args)
+	}
+	return cmd
+}

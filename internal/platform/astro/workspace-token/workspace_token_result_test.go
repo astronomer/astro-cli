@@ -1,6 +1,7 @@
 package workspacetoken
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -50,6 +51,10 @@ func resultClient(t *testing.T, tokens ...astrov1.ApiToken) *astrov1_mocks.Clien
 func rolesOK() *astrov1.UpdateApiTokenRolesResponse {
 	return &astrov1.UpdateApiTokenRolesResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, JSON200: &astrov1.SubjectRoles{}}
 }
+
+// ownTokens is the scope an update acted on before it took tokens of a
+// broader scope: the Workspace's own. The tests of that behavior keep it.
+var ownTokens = []TokenType{TokenTypeWORKSPACE}
 
 func noPicking(t *testing.T) apitoken.Picker {
 	return func(string, []apitoken.Token) (int, error) {
@@ -128,7 +133,7 @@ func TestUpdateTokenResult(t *testing.T) {
 		}, nil)
 		m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "t1", mock.Anything).Return(rolesOK(), nil)
 
-		got, err := UpdateToken("t1", "", "uno", "", "WORKSPACE_OWNER", "", noPicking(t), m)
+		got, err := UpdateToken("t1", "", "uno", "", "WORKSPACE_OWNER", "", ownTokens, noPicking(t), m)
 		require.NoError(t, err)
 		assert.Equal(t, "one", got.PreviousName, "the text names the token as it was")
 		assert.Equal(t, "uno", got.Token.Name)
@@ -142,7 +147,7 @@ func TestUpdateTokenResult(t *testing.T) {
 			HTTPResponse: &http.Response{StatusCode: http.StatusOK}, JSON200: &after,
 		}, nil)
 
-		got, err := UpdateToken("t1", "", "uno", "", "", "", noPicking(t), m)
+		got, err := UpdateToken("t1", "", "uno", "", "", "", ownTokens, noPicking(t), m)
 		require.NoError(t, err)
 		assert.Equal(t, "WORKSPACE_MEMBER", got.Token.Role)
 		m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -158,14 +163,14 @@ func TestUpdateTokenRefusesBeforeChanging(t *testing.T) {
 
 	t.Run("a role that is not a Workspace role", func(t *testing.T) {
 		m := astrov1_mocks.NewClientWithResponsesInterface(t)
-		_, err := UpdateToken("", "", "uno", "", "NOT_A_ROLE", "", noPicking(t), m)
+		_, err := UpdateToken("", "", "uno", "", "NOT_A_ROLE", "", ownTokens, noPicking(t), m)
 		require.Error(t, err)
 		m.AssertExpectations(t)
 	})
 
 	t.Run("a role it already holds", func(t *testing.T) {
 		m := resultClient(t, before)
-		_, err := UpdateToken("t1", "", "uno", "", "WORKSPACE_MEMBER", "", noPicking(t), m)
+		_, err := UpdateToken("t1", "", "uno", "", "WORKSPACE_MEMBER", "", ownTokens, noPicking(t), m)
 		assert.EqualError(t, err, "this Workspace API token already has that role on the Workspace")
 	})
 
@@ -174,7 +179,7 @@ func TestUpdateTokenRefusesBeforeChanging(t *testing.T) {
 		m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "t1", mock.Anything).Return(&astrov1.UpdateApiTokenRolesResponse{
 			HTTPResponse: &http.Response{StatusCode: http.StatusBadRequest}, Body: []byte(`{"message":"no such role"}`),
 		}, nil)
-		_, err := UpdateToken("t1", "", "uno", "", "WORKSPACE_OWNER", "", noPicking(t), m)
+		_, err := UpdateToken("t1", "", "uno", "", "WORKSPACE_OWNER", "", ownTokens, noPicking(t), m)
 		require.Error(t, err)
 		m.AssertNotCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
@@ -208,16 +213,80 @@ func TestDeleteTokenResult(t *testing.T) {
 		assert.Equal(t, apitoken.WorkspaceRemoval{ID: "t1", Name: "one", Scope: "WORKSPACE", WorkspaceID: workspaceID, Action: apitoken.Deleted}, got)
 	})
 
+	t.Run("an Organization token is not deleted, and nothing is sent", func(t *testing.T) {
+		tok := resultToken("t2", "two", astrov1.ApiTokenScopeORGANIZATION, "WORKSPACE_OWNER")
+		m := resultClient(t, tok)
+		_, err := DeleteToken(tok, "", m)
+		require.ErrorIs(t, err, errNotWorkspaceScoped)
+		m.AssertNotCalled(t, "DeleteApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything)
+		m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+}
+
+func TestRemoveTokenResult(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
 	t.Run("an Organization token loses its Workspace role, and keeps its others", func(t *testing.T) {
 		tok := resultToken("t2", "two", astrov1.ApiTokenScopeORGANIZATION, "WORKSPACE_OWNER")
 		m := resultClient(t, tok)
 		m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "t2", mock.MatchedBy(func(r astrov1.UpdateApiTokenRolesRequest) bool {
 			return len(r.Roles) == 1 && r.Roles[0].EntityType == astrov1.ApiTokenRoleEntityTypeORGANIZATION
 		})).Return(rolesOK(), nil)
-		got, err := DeleteToken(tok, "", m)
+		got, err := RemoveToken(tok, "", m)
 		require.NoError(t, err)
 		assert.Equal(t, apitoken.WorkspaceRemoval{ID: "t2", Name: "two", Scope: "ORGANIZATION", WorkspaceID: workspaceID, Action: apitoken.Removed}, got)
 	})
+
+	t.Run("a Workspace token is not removed from its own Workspace, and nothing is sent", func(t *testing.T) {
+		tok := resultToken("t1", "one", astrov1.ApiTokenScopeWORKSPACE, "WORKSPACE_MEMBER")
+		m := resultClient(t, tok)
+		_, err := RemoveToken(tok, "", m)
+		require.ErrorIs(t, err, errWorkspaceScoped)
+		m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+}
+
+func TestUpdateTokenOfAnOrganizationToken(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	org := resultToken("t2", "two", astrov1.ApiTokenScopeORGANIZATION, "WORKSPACE_MEMBER")
+
+	t.Run("changes its role in the Workspace and nothing else", func(t *testing.T) {
+		m := resultClient(t, org)
+		m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "t2", mock.Anything).Return(rolesOK(), nil)
+		got, err := UpdateToken("t2", "", "", "", "WORKSPACE_OWNER", "", nil, noPicking(t), m)
+		require.NoError(t, err)
+		assert.Equal(t, "WORKSPACE_OWNER", got.Token.Role)
+		assert.Equal(t, "ORGANIZATION", got.Token.Scope)
+		m.AssertNotCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("is not renamed from a Workspace, and nothing is sent", func(t *testing.T) {
+		m := resultClient(t, org)
+		_, err := UpdateToken("t2", "", "uno", "", "WORKSPACE_OWNER", "", nil, noPicking(t), m)
+		require.ErrorIs(t, err, ErrOrgTokenNotRenamed)
+		assert.True(t, usageMarked(err), "a rename of an Organization token from a Workspace is a usage error")
+		m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		m.AssertNotCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("refuses a role it already holds", func(t *testing.T) {
+		m := resultClient(t, org)
+		_, err := UpdateToken("t2", "", "", "", "WORKSPACE_MEMBER", "", nil, noPicking(t), m)
+		require.ErrorIs(t, err, errOrgTokenInWorkspace)
+	})
+
+	t.Run("is not reached by a command that acts on the Workspace's own tokens", func(t *testing.T) {
+		m := resultClient(t, org)
+		_, err := UpdateToken("t2", "", "", "", "WORKSPACE_OWNER", "", ownTokens, noPicking(t), m)
+		require.ErrorIs(t, err, errWrongTokenTypeSelected)
+	})
+}
+
+// usageMarked reports whether err is marked as a usage error the way cliout
+// recognizes one from a package that cannot import it.
+func usageMarked(err error) bool {
+	var m interface{ IsUsageError() bool }
+	return errors.As(err, &m) && m.IsUsageError()
 }
 
 func TestOrgTokenWorkspaceRoleResult(t *testing.T) {

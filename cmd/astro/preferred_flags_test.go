@@ -229,8 +229,14 @@ var aliasTrees = map[string]func() *cobra.Command{
 // aliasValue is a value of the kind each 1.x spelling took, and aliasOther a
 // second one, for a disagreement.
 var (
-	aliasValue = map[string]string{"deployment-id": unlinkedDep, "deployment-name": "my-dep", "workspace-id": projectWS}
-	aliasOther = map[string]string{"deployment-id": otherDep, "deployment-name": "other-dep", "workspace-id": "clotherworkspace000000001"}
+	aliasValue = map[string]string{
+		"deployment-id": unlinkedDep, "deployment-name": "my-dep", "workspace-id": projectWS,
+		"org-token-name": "my-org-token", "workspace-token-name": "my-ws-token",
+	}
+	aliasOther = map[string]string{
+		"deployment-id": otherDep, "deployment-name": "other-dep", "workspace-id": "clotherworkspace000000001",
+		"org-token-name": "other-org-token", "workspace-token-name": "other-ws-token",
+	}
 )
 
 // aliasUse is one 1.x spelling on one command.
@@ -269,9 +275,10 @@ func aliasUses(t *testing.T) []aliasUse {
 }
 
 // resolvedSpellings is what a command reads once its spellings are applied:
-// its Deployment id and name, an id standing for its argument, and its
-// workspace.
-type resolvedSpellings struct{ id, name, arg, workspace string }
+// its Deployment id and name, an id standing for its argument, its workspace,
+// and, on a token command that takes its token by --name (whose 1.x spellings
+// were --org-token-name and --workspace-token-name), that name.
+type resolvedSpellings struct{ id, name, arg, workspace, tokenName string }
 
 func resolveSpellings(t *testing.T, u *aliasUse, args ...string) (resolvedSpellings, error) {
 	t.Helper()
@@ -297,6 +304,9 @@ func resolveSpellings(t *testing.T, u *aliasUse, args ...string) (resolvedSpelli
 	}
 	if w := cmd.Flags().Lookup("workspace"); w != nil {
 		r.workspace = w.Value.String()
+	}
+	if u.preferred == "name" {
+		r.tokenName = cmd.Flags().Lookup("name").Value.String()
 	}
 	return r, nil
 }
@@ -345,10 +355,15 @@ func TestAnEmptyDeploymentOrWorkspaceIsRefused(t *testing.T) {
 	for i := range uses {
 		u := &uses[i]
 		where := u.tree + " " + strings.Join(u.path, " ")
-		_, err := resolveSpellings(t, u, "--"+u.preferred, "")
-		if assert.Error(t, err, "%s --%s \"\"", where, u.preferred) {
-			assert.True(t, cliout.IsUsage(err), "%v", err)
-			assert.EqualError(t, err, "--"+u.preferred+" cannot be empty")
+		// A token's --name given as "" is no name, as it always was: the
+		// token is picked, or asked for. Only a flag that names a
+		// Deployment or a workspace refuses it.
+		if u.preferred != "name" {
+			_, err := resolveSpellings(t, u, "--"+u.preferred, "")
+			if assert.Error(t, err, "%s --%s \"\"", where, u.preferred) {
+				assert.True(t, cliout.IsUsage(err), "%v", err)
+				assert.EqualError(t, err, "--"+u.preferred+" cannot be empty")
+			}
 		}
 		if u.alias == "" {
 			continue

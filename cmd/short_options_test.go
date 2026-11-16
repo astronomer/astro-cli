@@ -180,6 +180,10 @@ func sameMeaning(v1 string, f *pflag.Flag) bool {
 		return v1 == "deployment-id" || v1 == "deployment-name"
 	case "workspace":
 		return v1 == "workspace-id"
+	case "name":
+		// The token commands named the token they add, update or remove
+		// after its kind; --name is that one flag now, with -n as before.
+		return v1 == "org-token-name" || v1 == "workspace-token-name"
 	}
 	return false
 }

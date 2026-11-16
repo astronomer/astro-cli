@@ -81,10 +81,10 @@ func TestAnOrganizationTokenIsRefusedBeforeAnyQuestion(t *testing.T) {
 		"organization-token add":    func() error { return addOrgTokenWorkspaceRole(cmd, nil, &out) },
 		"organization-token update": func() error { return updateOrgTokenWorkspaceRole(cmd, nil, &out) },
 		"organization-token remove": func() error { return removeOrganizationTokenWorkspaceRole(cmd, nil, &out) },
-		"workspace token delete of an Organization token by ID": func() error {
+		"workspace token remove of an Organization token by ID": func() error {
 			tokenID = "token-id"
 			defer func() { tokenID = "" }()
-			return deleteWorkspaceToken(cmd, nil, &out)
+			return removeWorkspaceToken(cmd, nil, &out)
 		},
 	} {
 		var err error
@@ -117,7 +117,7 @@ func TestWorkspaceTokenCommandsUnderAnOrganizationToken(t *testing.T) {
 
 	_, err := workspacetoken.CreateToken("x", "", "WORKSPACE_MEMBER", "", 0, nil)
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
-	_, err = workspacetoken.UpdateToken("id", "", "new", "", "WORKSPACE_MEMBER", "", nil, nil)
+	_, err = workspacetoken.UpdateToken("id", "", "new", "", "WORKSPACE_MEMBER", "", nil, nil, nil)
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
 
 	target, org, err := workspacetoken.Scope("")
