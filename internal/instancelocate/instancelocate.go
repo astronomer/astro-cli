@@ -39,6 +39,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	pkglocate "github.com/astronomer/astro-cli/pkg/instancelocate"
 	"github.com/astronomer/astro-cli/pkg/instances"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // Deployments is the two control-plane calls this package makes: reading a
@@ -133,7 +134,7 @@ func tokenHost() string {
 	if d, err := config.GetCurrentDomain(); err == nil {
 		return d
 	}
-	return "astronomer.io"
+	return manifest.DefaultWorkspaceDomain
 }
 
 // GoogleChain is implemented by a locator that resolves Application Default

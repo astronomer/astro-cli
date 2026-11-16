@@ -596,11 +596,11 @@ func TestSetupReadsTheAPITokenByTheOneRule(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Setenv("ASTRONOMER_KEY_ID", "")
 	t.Setenv("ASTRONOMER_KEY_SECRET", "")
-	real := mintToken(t, &util.CustomClaims{
+	valid := mintToken(t, &util.CustomClaims{
 		Permissions:      []string{"organizationId:env-org"},
 		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour))},
 	})
-	for env, parsed := range map[string]string{"Bearer ": "", "Bearer Bearer": "", real: real, "Bearer " + real: real, "Bearer Bearer " + real: real} {
+	for env, parsed := range map[string]string{"Bearer ": "", "Bearer Bearer": "", valid: valid, "Bearer " + valid: valid, "Bearer Bearer " + valid: valid} {
 		t.Setenv("ASTRO_API_TOKEN", env)
 		assert.Equal(t, parsed != "", astrosession.HasAPIToken(), "ASTRO_API_TOKEN=%q", env)
 
