@@ -352,12 +352,33 @@ func TestCheckReportsAnUnknownManifestKey(t *testing.T) {
 	if row, ok := lineContaining(out.String(), "manifest_warning"); !ok || !strings.Contains(row, "tool.astro.palette") {
 		t.Errorf("want a manifest_warning row naming the key, got %q", out.String())
 	}
+	if loc := findingLocation(checks.Finding{Kind: checks.KindManifestWarning, Key: "tool.astro.palette"}); loc != "tool.astro.palette" {
+		t.Errorf("the location is the key alone, got %q", loc)
+	}
 
 	d2, _ := withKey(t)
 	err := execute(t, d2, "local", "check", "--strict")
 	var exit *cliout.ExitError
 	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
 		t.Fatalf("--strict must fail on it, got %v", err)
+	}
+}
+
+// The manifest is the project's, whatever platform the check is for, so a
+// --target check reports its unknown keys too and --strict fails on them.
+func TestATargetCheckReportsAnUnknownManifestKey(t *testing.T) {
+	d, out := targetDeps(t)
+	dir, _ := d.WorkingDir()
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(validManifest+"palette = 'blue'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := execute(t, d, "local", "check", "--target", "mwaa", "--strict")
+	var exit *cliout.ExitError
+	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
+		t.Fatalf("--strict must fail on it, got %v", err)
+	}
+	if !strings.Contains(out.String(), "tool.astro.palette") {
+		t.Errorf("want the key in the report, got %q", out.String())
 	}
 }
 

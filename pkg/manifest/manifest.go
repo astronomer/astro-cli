@@ -39,6 +39,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
@@ -697,15 +698,16 @@ const Marker = "pyproject.toml"
 func Load(path string) (*Manifest, error) {
 	m, err := load(path)
 	if err == nil && len(m.Warnings) > 0 {
-		if h := warningHandler; h != nil {
-			h(path, m.Warnings)
+		if h := warningHandler.Load(); h != nil {
+			(*h)(path, m.Warnings)
 		}
 	}
 	return m, err
 }
 
-// warningHandler is SetWarningHandler's fn.
-var warningHandler func(path string, warnings []Problem)
+// warningHandler is SetWarningHandler's fn. Atomic, so a Load on one
+// goroutine never races a Set on another.
+var warningHandler atomic.Pointer[func(path string, warnings []Problem)]
 
 // SetWarningHandler has Load hand fn the warnings of every manifest it loads,
 // with the file's path, so a program shows them wherever it loads a project
@@ -715,7 +717,11 @@ var warningHandler func(path string, warnings []Problem)
 // the default, hands them to no one; Manifest.Warnings holds them either way.
 // It is meant to be set once, at startup, before any Load.
 func SetWarningHandler(fn func(path string, warnings []Problem)) {
-	warningHandler = fn
+	if fn == nil {
+		warningHandler.Store(nil)
+		return
+	}
+	warningHandler.Store(&fn)
 }
 
 func load(path string) (*Manifest, error) {
@@ -1341,7 +1347,8 @@ func (p *parser) workspace(key string, kind LinkKind, raw any, fallback string) 
 // is a near-miss of a key the table does define (nearMiss), and a warning,
 // with the load going on without it, otherwise.
 //
-// A near-miss is a typo. `defalt = true` on a link, or `client_registry`
+// A near-miss is a typo (nearMiss says how near). `defalt = true` on a link,
+// or `client_registry`
 // for client-registry, decodes to nothing, so the setting the author meant
 // silently does not apply; it is refused, naming the key it was meant to be.
 //
