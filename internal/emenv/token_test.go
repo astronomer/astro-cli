@@ -9,6 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -43,4 +44,44 @@ func TestReadUnderATokenUsesTheTokensLogin(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "Bearer "+token, got.Token)
 	require.Equal(t, "org-claim", mc.Calls[0].Arguments.String(1))
+}
+
+// The Workspace a run reads is the manifest's, else a Workspace or Deployment
+// token's own, and never the saved login's: an Organization token, or no token,
+// names none.
+func TestWorkspaceIDIsTheManifestsThenTheTokens(t *testing.T) {
+	linked := &manifest.Astro{Workspace: "manifest-ws"}
+	unlinked := &manifest.Astro{}
+	org := testUtil.MintAPIToken(t, time.Now().Add(time.Hour), "organizationId:org")
+	ws := testUtil.MintAPIToken(t, time.Now().Add(time.Hour), "organizationId:org", "workspaceId:token-ws")
+	dep := testUtil.MintAPIToken(t, time.Now().Add(time.Hour), "organizationId:org", "workspaceId:token-ws", "deploymentId:dep")
+	expired := testUtil.MintAPIToken(t, time.Now().Add(-time.Hour), "organizationId:org", "workspaceId:token-ws")
+	for _, tt := range []struct {
+		name, token string
+		astro       *manifest.Astro
+		want        string
+	}{
+		{"no token, linked", "", linked, "manifest-ws"},
+		{"no token, unlinked", "", unlinked, ""},
+		{"organization token, linked", org, linked, "manifest-ws"},
+		{"organization token, unlinked", org, unlinked, ""},
+		{"workspace token, linked", ws, linked, "manifest-ws"},
+		{"workspace token, unlinked", ws, unlinked, "token-ws"},
+		{"deployment token, unlinked", dep, unlinked, "token-ws"},
+		{"unusable token, unlinked", expired, unlinked, ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(astrosession.EnvAPIToken, tt.token)
+			require.Equal(t, tt.want, WorkspaceID(tt.astro))
+			require.Equal(t, tt.want, WorkspaceOf(tt.astro).ID)
+		})
+	}
+}
+
+// An unusable token with no Workspace to read is named, not blamed on the
+// manifest.
+func TestNewProviderWithAnUnusableTokenNamesTheToken(t *testing.T) {
+	t.Setenv(astrosession.EnvAPIToken, testUtil.MintAPIToken(t, time.Now().Add(-time.Hour), "organizationId:org"))
+	p := NewProvider(WorkspaceOf(&manifest.Astro{}), nil, false)
+	require.Equal(t, "API Token is expired", p.(envresolve.Diagnoser).Diagnose("X"))
 }

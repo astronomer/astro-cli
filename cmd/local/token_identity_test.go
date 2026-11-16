@@ -333,6 +333,81 @@ func TestLocalEnvListWorkspaceSourceUnderATokenUsesOnlyTheToken(t *testing.T) {
 	}
 }
 
+// noWorkspaceEnvProject is workspaceEnvProject's manifest with no `workspace`
+// key, so the only Workspace a read could use is the token's own.
+func noWorkspaceEnvProject(t *testing.T) string {
+	t.Helper()
+	dir := workspaceEnvProject(t)
+	body := strings.Replace(workspaceEnvManifest, "workspace = 'cmws'\ndomain = 'localhost'\n", "", 1)
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// A manifest that links no Workspace has the token's own under a Workspace or
+// Deployment token, and the token's alone: never the saved login's.
+func TestLocalEnvListTakesTheTokensWorkspaceWhenTheManifestNamesNone(t *testing.T) {
+	for _, kind := range []tokenKind{wsToken, depToken} {
+		t.Run(kind.name, func(t *testing.T) {
+			f := newFakeAstro(t)
+			useFakeAstro(t, f)
+			token := useToken(t, kind)
+			d := productionDeps(t, noWorkspaceEnvProject(t))
+			stdout := d.Stdout.(interface{ String() string })
+			if err := execute(t, d, "local", "env", "list", "--all", "--output", "json"); err != nil {
+				t.Fatal(err)
+			}
+			everyRequestUnder(t, f, token)
+			if !strings.Contains(stdout.String(), "workspace ("+tokenWS+")") {
+				t.Errorf("the name did not resolve from the token's workspace:\n%s", stdout.String())
+			}
+			for _, req := range f.requests() {
+				if !strings.Contains(req.Query, "workspaceId="+tokenWS) {
+					t.Errorf("%s %s?%s did not ask for the token's workspace", req.Method, req.Path, req.Query)
+				}
+			}
+		})
+	}
+}
+
+// An Organization token names no Workspace, so with none in the manifest the
+// read is refused naming the manifest key, and nothing is sent, under the
+// token or the saved login.
+func TestLocalEnvListUnderAnOrganizationTokenWithNoManifestWorkspaceReadsNothing(t *testing.T) {
+	f := newFakeAstro(t)
+	useFakeAstro(t, f)
+	useToken(t, orgToken)
+	d := productionDeps(t, noWorkspaceEnvProject(t))
+	stdout := d.Stdout.(interface{ String() string })
+	if err := execute(t, d, "local", "env", "list", "--all", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	if reqs := f.requests(); len(reqs) != 0 {
+		t.Errorf("%d requests were made, want none: %+v", len(reqs), reqs)
+	}
+	if !strings.Contains(stdout.String(), "no workspace key") {
+		t.Errorf("the listing does not name the missing manifest key:\n%s", stdout.String())
+	}
+}
+
+// local env get resolves the same way: the token's Workspace when the
+// manifest names none.
+func TestLocalEnvGetTakesTheTokensWorkspaceWhenTheManifestNamesNone(t *testing.T) {
+	f := newFakeAstro(t)
+	useFakeAstro(t, f)
+	token := useToken(t, wsToken)
+	d := productionDeps(t, noWorkspaceEnvProject(t))
+	stdout := d.Stdout.(interface{ String() string })
+	if err := execute(t, d, "local", "env", "variable", "get", "DATA_WAREHOUSE_URI"); err != nil {
+		t.Fatal(err)
+	}
+	everyRequestUnder(t, f, token)
+	if !strings.Contains(stdout.String(), "postgres://cloud") {
+		t.Errorf("get did not resolve from the token's workspace:\n%s", stdout.String())
+	}
+}
+
 // Without a token nothing changes: the saved login's token and organization
 // are what go out.
 func TestWithoutATokenTheSavedLoginIsStillUsed(t *testing.T) {

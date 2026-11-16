@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -368,6 +369,7 @@ func (c *cli) startProject(ctx context.Context, opts plan.Options, buildSecretFl
 	}
 	// Turn on Environment Manager resolution for workspace-source env values.
 	opts.WorkspaceProvider = c.workspaceProvider()
+	opts.WorkspaceID = emenv.WorkspaceID
 	opts.BuildSecretFlags = buildSecretFlag
 	opts.PythonCatalog = c.pythonCatalog(ctx)
 	if opts.Mode != localrt.ModeDocker {
@@ -1214,6 +1216,7 @@ func (c *cli) environment(ctx context.Context, withWorkspace, noSync bool) (loca
 	opts := plan.Options{AllowMissing: true}
 	if withWorkspace {
 		opts.WorkspaceProvider = c.workspaceProvider()
+		opts.WorkspaceID = emenv.WorkspaceID
 	}
 	built, err := plan.Build(dir, opts)
 	if err != nil {
