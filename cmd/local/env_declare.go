@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/envschema"
@@ -315,7 +316,7 @@ func (c *cli) deleteRemainder(res *envResult, dir string) {
 		res.SetHint = localenv.SetHint(res.Kind, key)
 		res.UndeclareHint = localenv.UndeclareHint(res.Kind, key)
 		if m != nil {
-			res.Workspace = m.Astro.Workspace
+			res.Workspace = emenv.WorkspaceID(&m.Astro)
 		}
 	case envschema.RemainderUndeclared:
 	}
@@ -451,7 +452,7 @@ func declarationResult(dir string, kind localenv.Kind, name string) (envDeclarat
 // name is simply missing, and a local value still satisfies it.
 func (c *cli) noteNoWorkspace(dir, name string) {
 	m, err := manifest.Load(filepath.Join(dir, project.Marker))
-	if err != nil || m.Astro.Workspace != "" {
+	if err != nil || emenv.WorkspaceID(&m.Astro) != "" {
 		return
 	}
 	cliout.Note(c.d.Stderr, fmt.Sprintf("[tool.astro] sets no workspace, so %s resolves only from local values until one is linked in Astro Desktop", name))

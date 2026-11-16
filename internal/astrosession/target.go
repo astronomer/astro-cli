@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // This file is the one place that decides which Astro Workspace (and, for a
@@ -23,10 +22,11 @@ import (
 //  4. the saved context: the Workspace an interactive login last used. Never
 //     under ASTRO_API_TOKEN, and never another host's.
 //
-// A run with ASTRO_API_TOKEN has its own overlay on the current context
-// (cmd/astro/setup.go records the token's claim there, for the process
-// only), so the context read in steps 3 and 4 is that overlay and the saved
-// login's Workspace is out of reach: the source names which of the two it is.
+// A run with ASTRO_API_TOKEN reads step 3 from the token itself (see
+// TokenIdentity), in the platform tree and in the core tree alike, and never
+// reads the context for it: the saved login's Workspace is out of reach
+// whether or not the root's setup overlaid the token on the context (it does
+// not, in the core tree). Step 4 is only for a run with no token.
 //
 // A Target records where the answer came from, and, when there is none, what
 // would supply one, so the "no Workspace" error and its advice are formed
@@ -198,16 +198,15 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 func fromLogin(login *config.Context, domain string, token, onCurrent bool) (string, Source, error) {
 	var ws string
 	switch {
+	case token && (login != nil || domain == "" || onCurrent):
+		// An API token's claim is the run's selection on the current host,
+		// read from the token itself. No context is read, so the saved login's
+		// Workspace is out of reach whether or not setup overlaid the token on
+		// it, and a machine with no login at all still has a selection.
+		ws = claimsOf().Workspace
 	case login != nil:
 		ws = login.Workspace
-	case domain == "" || (token && onCurrent):
-		// An API token's selection is overlaid on the current context, by the
-		// setup that accepted the token. Without that overlay the context's
-		// Workspace is the saved login's, which a token run never takes, and
-		// it must not be labeled the token's.
-		if token && !config.HoldsEnvironmentLogin() {
-			return "", SourceNone, nil
-		}
+	case domain == "":
 		ctx, err := config.GetCurrentContext()
 		if err != nil {
 			return "", SourceNone, err
@@ -267,6 +266,11 @@ func (t Target) Missing() error { //nolint:gocritic // a small value type
 		return t.readErr
 	}
 	if t.token {
+		// An unusable token names nothing because it is unusable, not because
+		// it is an Organization token: say so.
+		if _, _, err := TokenIdentity(); err != nil {
+			return err
+		}
 		return fmt.Errorf("%w, %s", ErrOrgTokenNoWorkspace, t.accepts.hint())
 	}
 	if t.noSaved != nil {
@@ -281,26 +285,7 @@ func (t Target) Missing() error { //nolint:gocritic // a small value type
 // one Deployment. It is read from the token each time it is asked, so no run
 // state stands in for it.
 func TokenDeployment() string {
-	stored, ok := APIToken()
-	if !ok {
-		return ""
-	}
-	claims, err := util.ParseAPIToken(Credential(stored))
-	if err != nil || claims == nil {
-		return ""
-	}
-	id := ""
-	for _, permission := range claims.Permissions {
-		v, ok := strings.CutPrefix(permission, "deploymentId:")
-		if !ok {
-			continue
-		}
-		if id != "" || v == "" {
-			return ""
-		}
-		id = v
-	}
-	return id
+	return claimsOf().Deployment
 }
 
 // RequireWorkspace is the Workspace of a command that takes it from

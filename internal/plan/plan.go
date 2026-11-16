@@ -51,6 +51,9 @@ type Options struct {
 	// directly would make every plan build import a platform, which the layer
 	// rules forbid below cmd/ (docs/architecture.md).
 	WorkspaceProvider func(astro *manifest.Astro, reveal bool) envresolve.Provider
+	// WorkspaceID is the Workspace the provider reads for a manifest, when it
+	// is not only the manifest's (a token run's own). Nil means the manifest's.
+	WorkspaceID func(astro *manifest.Astro) string
 	// AllowMissing starts even when a required value has no source, instead
 	// of returning *MissingEnvError: `--allow-missing`, and Astro Desktop's
 	// Start anyway. The missing values come back on Built.StartedWithout for
@@ -507,9 +510,13 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 		delete(inj, k)
 	}
 	var wsNote string
-	if in.WorkspaceProvider != nil && m.Astro.Workspace != "" {
+	workspaceID := m.Astro.Workspace
+	if opts.WorkspaceID != nil {
+		workspaceID = opts.WorkspaceID(&m.Astro)
+	}
+	if in.WorkspaceProvider != nil && workspaceID != "" {
 		shellWon = append(shellWon, workspaceUndeclared(in.WorkspaceProvider, schema, src, inj, secretInj)...)
-		wsNote = workspaceNote(in.WorkspaceProvider, m.Astro.Workspace)
+		wsNote = workspaceNote(in.WorkspaceProvider, workspaceID)
 	}
 	return resolvedEnv{
 		env:            inj,

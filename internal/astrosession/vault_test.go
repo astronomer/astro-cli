@@ -5,12 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/zalando/go-keyring"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/secrets"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // vaultLogin stores a login for astronomer.io in a vault of the test's own,
@@ -69,7 +71,8 @@ func TestBearerReadsALoginFromTheVault(t *testing.T) {
 // in the config.
 func TestTheAPITokenVariableStillWinsOverAVaultLogin(t *testing.T) {
 	vaultLogin(t)
-	t.Setenv(EnvAPIToken, "env-api-token")
+	envToken := testUtil.MintAPIToken(t, time.Time{}, "organizationId:org")
+	t.Setenv(EnvAPIToken, envToken)
 	for name, get := range map[string]func() (string, error){
 		"Bearer":    func() (string, error) { return Bearer(context.Background()) },
 		"BearerFor": func() (string, error) { return BearerFor(context.Background(), "astronomer.io") },
@@ -78,7 +81,7 @@ func TestTheAPITokenVariableStillWinsOverAVaultLogin(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		if token != "env-api-token" {
+		if token != envToken {
 			t.Errorf("%s: token is not the variable's (len %d)", name, len(token))
 		}
 	}

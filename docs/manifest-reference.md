@@ -361,7 +361,7 @@ The table is optional on every kind but the endpoint one, where there is no safe
 
 | `method` | Where the credential comes from | Fields |
 | -- | -- | -- |
-| `astro` | `ASTRO_API_TOKEN`, else your `astro login` session for [`domain`](#domain) (the current one if the project names no domain) | none |
+| `astro` | `ASTRO_API_TOKEN` (and then never your saved login), else your `astro login` session for [`domain`](#domain) (the current one if the project names no domain) | none |
 | `aws` | the AWS credential chain (env, profile, SSO, instance role) | none |
 | `google` | Application Default Credentials | none |
 | `basic` | a username and password | `username-env`, `password-env` |

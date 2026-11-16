@@ -65,7 +65,6 @@ func followingProject(project string) *cobra.Command {
 func runWithToken(t *testing.T, permissions ...string) string {
 	t.Helper()
 	savedLogin(t, false)
-	realTokenParser(t)
 	noLoginFlow(t)
 	fakeIDP(t)
 	t.Setenv("ASTRO_API_TOKEN", tokenWith(t, permissions...))

@@ -71,6 +71,8 @@ var cloudKinds = cliout.Kinds{
 	{Kind: KindUnauthenticated, Match: func(err error) bool {
 		return errors.Is(err, config.ErrGetHomeString) ||
 			errors.Is(err, astrosession.ErrLoggedOut) ||
+			errors.Is(err, astrosession.ErrInvalidToken) ||
+			errors.Is(err, astrosession.ErrTokenNoOrganization) ||
 			errors.Is(err, astroAuth.ErrLoginNeeded) ||
 			errors.Is(err, errNoAuthToken) ||
 			errors.Is(err, astroCmd.ErrLegacyAPIKeys) ||

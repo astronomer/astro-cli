@@ -3,6 +3,7 @@ package deploy
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -13,7 +14,7 @@ import (
 // by --workspace or by the project's link, and says so.
 func TestUnlinkedTargetWithNoWorkspaceUnderATokenNamesTheProject(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	t.Setenv("ASTRO_API_TOKEN", "token")
+	t.Setenv("ASTRO_API_TOKEN", testUtil.MintAPIToken(t, time.Time{}, "organizationId:org"))
 	// The resolver words the error, for what an Astro deploy accepts.
 	run := astrosession.Resolve(astrosession.Request{Accepts: astrosession.ByFlag | astrosession.ByProject, NoSaved: ErrNoWorkspace})
 	_, err := unlinkedTarget(Request{NoWorkspace: run.Missing()}, nil)
