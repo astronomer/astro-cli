@@ -316,7 +316,7 @@ func CompareVersions(ctx context.Context, client *http.Client, cachePath string)
 	if latestSemver != nil && currentSemver.LessThan(latestSemver) {
 		fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nPlease see https://www.astronomer.io/docs/astro/cli/upgrade-cli for information on how to update the Astro CLI\n\n", latestSemver)
 		fmt.Fprint(os.Stderr, ansi.ForStderr().Cyan("\nTo learn more about what's new in this version, please see https://www.astronomer.io/docs/astro/cli/release-notes\n\n"))
-		fmt.Fprintf(os.Stderr, "If you don't want to see this message again run 'astro config set -g upgrade_message false' or pass '2>/dev/null' to print this text to stderr\n\n")
+		fmt.Fprintf(os.Stderr, "If you don't want to see this message again run 'astro config set --global upgrade_message false' or pass '2>/dev/null' to print this text to stderr\n\n")
 	}
 
 	return nil
