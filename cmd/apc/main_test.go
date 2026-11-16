@@ -24,10 +24,10 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	origArgs := os.Args
 	os.Args = []string{"astro"}
-	testenv.Clear()
+	finish := testenv.Isolate()
 
 	watching := emitWatch().Arm()
 	code := m.Run()
 	os.Args = origArgs
-	os.Exit(watching.Finish(code))
+	os.Exit(finish(watching.Finish(code)))
 }

@@ -160,6 +160,7 @@ func TestAnEnvironmentLoginDoesNotReadTheVault(t *testing.T) {
 	}
 	// A new process, whose keyring does not answer.
 	keyring.MockInitWithError(errors.New("keyring locked"))
+	t.Cleanup(keyring.MockInit) // leave no error-injecting mock behind
 	fresh, err := secrets.NewLogins(filepath.Join(os.Getenv("ASTRO_HOME"), "secrets"))
 	if err != nil {
 		t.Fatal(err)

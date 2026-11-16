@@ -59,7 +59,8 @@ func TestMain(m *testing.M) {
 		time.Sleep(time.Minute)
 		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	finish := isolateHome()
+	os.Exit(finish(m.Run()))
 }
 
 func readLog(d *Daemon) string {

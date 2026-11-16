@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -122,7 +123,27 @@ func checkNoHomeConfig(t *testing.T, p *project) {
 			t.Errorf("a core command created config/ state at %s (stat: %v)", path, err)
 		}
 	}
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
-		t.Errorf("a core command created %s (stat: %v)", dir, err)
+	// The directory holds what the harness put there (stampKeyringUnavailable:
+	// secrets/login-keyring-unavailable) and nothing else.
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if os.IsNotExist(err) {
+			return nil // nothing was created
+		}
+		if err != nil {
+			return err
+		}
+		rel, relErr := filepath.Rel(dir, path)
+		if relErr != nil {
+			return relErr
+		}
+		switch filepath.ToSlash(rel) {
+		case ".", "secrets", "secrets/" + keyringStampName:
+			return nil
+		}
+		t.Errorf("a core command created %s", path)
+		return nil
+	})
+	if err != nil {
+		t.Errorf("reading %s: %v", dir, err)
 	}
 }

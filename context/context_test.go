@@ -137,7 +137,7 @@ func (s *Suite) TestDelete() {
 // one object on stdout.
 func (s *Suite) TestDeleteThatCannotSave() {
 	fs := afero.NewMemMapFs()
-	s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFile, testUtil.NewTestConfig(testUtil.LocalPlatform), 0o600))
+	s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFileForTesting(), testUtil.NewTestConfig(testUtil.LocalPlatform), 0o600))
 	config.InitConfig(afero.NewReadOnlyFs(fs))
 	s.T().Cleanup(func() { testUtil.InitTestConfig(testUtil.LocalPlatform) })
 

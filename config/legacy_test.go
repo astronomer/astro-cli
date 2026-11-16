@@ -57,7 +57,7 @@ func (s *Suite) TestLegacySettingNames() {
 		// What 1.x's own set would do: change the top-level page_size, carry
 		// the rest, apc.page_size included.
 		s.Require().Contains(string(data), "\npage_size: 70\n")
-		s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, []byte(strings.Replace(string(data), "\npage_size: 70\n", "\npage_size: 30\n", 1)), 0o600))
+		s.Require().NoError(afero.WriteFile(fs, HomeConfigFileForTesting(), []byte(strings.Replace(string(data), "\npage_size: 70\n", "\npage_size: 30\n", 1)), 0o600))
 
 		InitConfig(fs)
 

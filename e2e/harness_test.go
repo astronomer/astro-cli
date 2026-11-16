@@ -85,12 +85,13 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
+	finish := guardRealConfig()
 	code, err := runSuite(m)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "e2e:", err)
 		os.Exit(1)
 	}
-	os.Exit(code)
+	os.Exit(finish(code))
 }
 
 // runSuite exists so the build's temp directory can be cleaned up with a defer,
@@ -349,6 +350,7 @@ func newNamedProject(t *testing.T, name string) *project {
 		cache: mkdir(t, base, "cache"),
 	}
 	p.shareUVCache()
+	stampKeyringUnavailable(t, p.home)
 	return p
 }
 

@@ -48,7 +48,7 @@ contexts:
     organization: test-org
     workspace: test-ws
 `)
-	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777))
 	config.InitConfig(fs)
 	config.CFG.CloudAPIProtocol.SetHomeString("https")
 }

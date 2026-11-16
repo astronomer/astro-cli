@@ -115,7 +115,7 @@ func (s *CmdSuite) initConfigFiles(home, project string) afero.Fs {
 	fs := afero.NewMemMapFs()
 	projectDir := filepath.Join(s.T().TempDir(), "proj")
 	s.useWorkingPath(projectDir)
-	s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFile, []byte(home), 0o600))
+	s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFileForTesting(), []byte(home), 0o600))
 	if project != "" {
 		s.Require().NoError(afero.WriteFile(fs, filepath.Join(projectDir, config.ConfigDir, config.ConfigFileNameWithExt), []byte(project), 0o600))
 	}

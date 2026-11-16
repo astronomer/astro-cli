@@ -29,6 +29,20 @@ func CreateTempProject() (dir string, cleanup func(), err error) {
 	}, nil
 }
 
+// HomeConfigFileForTesting is the path InitConfig will read the home config
+// from, which HomeConfigFile is not until something has called InitConfig:
+// the variable starts as the real home's, worked out when the package loads,
+// before a test binary's TestMain has moved HOME and ASTRO_HOME. A test that
+// writes its fixture into an in-memory filesystem and then calls InitConfig
+// writes it here, so it is found whichever test ran first.
+func HomeConfigFileForTesting() string {
+	home := os.Getenv("ASTRO_HOME")
+	if home == "" {
+		home = HomePath
+	}
+	return filepath.Join(home, ConfigDir, ConfigFileNameWithExt)
+}
+
 // UseLoginsForTesting keeps logins in l for the rest of a test, in place of
 // the shared vault, which is off in test binaries. It returns a func that
 // restores the previous vault.

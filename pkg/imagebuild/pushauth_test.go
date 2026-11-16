@@ -23,6 +23,7 @@ import (
 // TestMain points DOCKER_CONFIG at an empty directory for the whole package,
 // so no test reads, or could write, the developer's own docker config.
 func TestMain(m *testing.M) {
+	finish := isolateHome()
 	dir, err := os.MkdirTemp("", "imagebuild-docker-config-*")
 	if err != nil {
 		panic(err)
@@ -36,7 +37,7 @@ func TestMain(m *testing.M) {
 	tempDir = func() string { return authRoot }
 	code := m.Run()
 	os.RemoveAll(dir)
-	os.Exit(code)
+	os.Exit(finish(code))
 }
 
 // credEngine is a Commander that reads a push's credential the way the

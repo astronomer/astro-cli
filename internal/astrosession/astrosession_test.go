@@ -52,7 +52,7 @@ func TestBearerTreatsASchemeWithNoTokenAsLoggedOut(t *testing.T) {
 func writeConfig(t *testing.T, yaml string) {
 	t.Helper()
 	fs := afero.NewMemMapFs()
-	if err := afero.WriteFile(fs, config.HomeConfigFile, []byte(yaml), 0o600); err != nil {
+	if err := afero.WriteFile(fs, config.HomeConfigFileForTesting(), []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	config.InitConfig(fs)
