@@ -69,7 +69,7 @@ func newFakeAstro(t *testing.T) fakeAstro {
 	deployment := func(ws string) map[string]any {
 		return map[string]any{"id": etlDepID, "name": "etl", "workspaceId": ws, "webServerAirflowApiUrl": stub.URL}
 	}
-	stub.routeFunc(http.MethodGet, "/v1/organizations/"+tokenOrg+"/deployments", func(q url.Values) string {
+	stub.routeGetFunc("/v1/organizations/"+tokenOrg+"/deployments", func(q url.Values) string {
 		var out []map[string]any
 		for _, ws := range q["workspaceIds"] {
 			out = append(out, deployment(ws))
@@ -85,7 +85,7 @@ func newFakeAstro(t *testing.T) fakeAstro {
 		t.Fatal(err)
 	}
 	stub.route(http.MethodGet, "/v1/organizations/"+tokenOrg+"/deployments/"+etlDepID, string(body))
-	stub.routeFunc(http.MethodGet, "/v1/organizations/"+tokenOrg+"/environment-objects", func(q url.Values) string {
+	stub.routeGetFunc("/v1/organizations/"+tokenOrg+"/environment-objects", func(q url.Values) string {
 		var objects []map[string]any
 		if q.Get("objectType") == "ENVIRONMENT_VARIABLE" {
 			objects = append(objects, map[string]any{
@@ -187,9 +187,27 @@ func unlinkedProject(t *testing.T) string {
 	return dir
 }
 
+// routeGetFunc answers GET path with a body built from the request's query.
+func (s *airflowStub) routeGetFunc(path string, respond func(url.Values) string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.routes[http.MethodGet+" "+path] = stubRoute{status: http.StatusOK, respond: respond}
+}
+
+// requestsToPath is every GET of path, in order.
+func (s *airflowStub) requestsToPath(path string) []stubRequest {
+	var out []stubRequest
+	for _, req := range s.requests() {
+		if req.Method == http.MethodGet && req.Path == path {
+			out = append(out, req)
+		}
+	}
+	return out
+}
+
 func listedWorkspaces(f fakeAstro) []string {
 	var out []string
-	for _, req := range f.requestsTo(http.MethodGet, "/v1/organizations/"+tokenOrg+"/deployments") {
+	for _, req := range f.requestsToPath("/v1/organizations/" + tokenOrg + "/deployments") {
 		q, _ := url.ParseQuery(req.Query)
 		out = append(out, q["workspaceIds"]...)
 	}
@@ -318,7 +336,7 @@ func TestWithoutATokenTheSavedLoginIsStillUsed(t *testing.T) {
 	f := newFakeAstro(t)
 	useFakeAstro(t, f)
 	// The fake serves the token's organization only; serve the saved one too.
-	f.routeFunc(http.MethodGet, "/v1/organizations/"+savedOrg+"/environment-objects", func(q url.Values) string {
+	f.routeGetFunc("/v1/organizations/"+savedOrg+"/environment-objects", func(q url.Values) string {
 		return `{"environmentObjects":[],"totalCount":0,"limit":1000,"offset":0}`
 	})
 	f.route(http.MethodGet, "/v1/organizations/"+savedOrg+"/deployments/"+etlDepID, fmt.Sprintf(`{"id":%q,"name":"etl","workspaceId":%q,"webServerAirflowApiUrl":%q}`, etlDepID, linkedWS, f.URL))
