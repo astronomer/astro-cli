@@ -31,11 +31,11 @@ func resetTokenCommandFlags(t *testing.T) {
 		workspaceTokenOutput = prevOutput
 		updateWorkspaceRole, addWorkspaceRole, tokenRole, tokenID, orgTokenID, workspaceTokenID = "", "", "", "", "", ""
 		deploymentID, tokenName, orgTokenName = "", "", ""
-		forceDelete, forceRotate = false, false
+		forceDelete, forceRotate, cleanTokenOutput = false, false, false
 	})
 	updateWorkspaceRole, addWorkspaceRole, tokenRole, tokenID, orgTokenID, workspaceTokenID = "", "", "", "", "", ""
 	deploymentID, tokenName, orgTokenName = "", "", ""
-	forceDelete, forceRotate = false, false
+	forceDelete, forceRotate, cleanTokenOutput = false, false, false
 	workspaceTokenOutput = cliout.FormatText
 }
 
