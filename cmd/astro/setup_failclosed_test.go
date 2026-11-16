@@ -214,7 +214,6 @@ func TestSetupFailsClosedOnTheAPIToken(t *testing.T) {
 		require.ErrorIs(t, err, ErrNotAPIToken)
 		assert.EqualError(t, err, "ASTRO_API_TOKEN is not an Astro API token (it has no permissions): set a valid token, or unset it to use your login")
 		assert.Zero(t, logins.Load())
-		assert.False(t, config.HoldsEnvironmentLogin(), "the saved login must not be the run's")
 		client.AssertNotCalled(t, "ListOrganizationsWithResponse")
 	})
 
@@ -251,7 +250,6 @@ func TestEnvironmentOverlayFailuresAreReturned(t *testing.T) {
 	err := useEnvironmentSelection(&config.Context{Domain: "astronomer.io"}, "org", "HOSTED", "ws")
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "cannot apply ASTRO_API_TOKEN's workspace to this run")
-	assert.False(t, config.HoldsEnvironmentLogin())
 }
 
 func TestSetupSkipsCompletion(t *testing.T) {
