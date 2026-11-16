@@ -104,11 +104,9 @@ func InitTestConfig(platform string) {
 	// fake filesystem
 	fs := afero.NewMemMapFs()
 	configYaml := NewTestConfig(platform)
-	// InitConfig points HomeConfigFile at $ASTRO_HOME/.astro/config.yaml, which
-	// is not where an earlier test, or the package's init, left it. Initialize
-	// once on the empty filesystem to learn the path, then write there.
-	config.InitConfig(fs)
-	err := afero.WriteFile(fs, config.HomeConfigFile, configYaml, perm)
+	// Where InitConfig will look, which HomeConfigFile is not for a test that
+	// runs before any other reached InitConfig.
+	err := afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, perm)
 	config.InitConfig(fs)
 	if err != nil {
 		panic(err)

@@ -233,6 +233,35 @@ func TestEveryModuleTestPackageIsolatesItsRun(t *testing.T) {
 	}
 }
 
+// Every module test package's isolateHome is the template, unchanged but for the
+// package clause, so a fix to the isolation reaches all of them. e2e has its own
+// (it does not move HOME, see guardRealConfig) and is not one of them.
+func TestModuleIsolationCopiesMatchTheTemplate(t *testing.T) {
+	root := repoRoot(t)
+	raw, err := os.ReadFile(filepath.Join(root, "internal", "archlint", "testdata", "hermetic_template.go.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, templateBody, _ := strings.Cut(string(raw), "\n")
+	for _, mod := range modules(t, root) {
+		if mod == "e2e" || slices.Contains(homeFree, mod) {
+			continue
+		}
+		for _, pkg := range testPackages(t, filepath.Join(root, filepath.FromSlash(mod))) {
+			file := filepath.Join(root, filepath.FromSlash(mod), filepath.FromSlash(pkg.dir), "hermetic_test.go")
+			got, err := os.ReadFile(file)
+			if err != nil {
+				t.Errorf("%s/%s has no hermetic_test.go: copy internal/archlint/testdata/hermetic_template.go.txt there, changing only the package clause (%v)", mod, pkg.dir, err)
+				continue
+			}
+			first, body, _ := strings.Cut(string(got), "\n")
+			if !strings.HasPrefix(first, "package ") || body != templateBody {
+				t.Errorf("%s differs from internal/archlint/testdata/hermetic_template.go.txt: change the template and copy it over every module test package, not one copy", filepath.ToSlash(file))
+			}
+		}
+	}
+}
+
 // The modules exempt from isolation have to stay unable to reach a home.
 func TestHomeFreeModulesReachNoHome(t *testing.T) {
 	root := repoRoot(t)

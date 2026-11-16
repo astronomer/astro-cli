@@ -3,9 +3,9 @@ package testenv
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -20,6 +20,10 @@ import (
 // home its parent made, and never makes or clears one of its own.
 const inheritedEnv = "ASTRO_TEST_ISOLATED_HOME"
 
+// strictEnv makes a change to the developer's real config fail the package
+// instead of warning. CI makes it strict without it.
+const strictEnv = "ASTRO_TEST_STRICT_REALCONFIG"
+
 // Isolate makes the test binary hermetic, and returns the function that ends
 // the run. It is the first call in a package's TestMain, once per binary:
 //
@@ -28,7 +32,7 @@ const inheritedEnv = "ASTRO_TEST_ISOLATED_HOME"
 //		os.Exit(finish(m.Run()))
 //	}
 //
-// It does four things.
+// It does five things.
 //
 //   - Unsets every variable in behaviorEnv, so the tests run the same under a
 //     shell that exports ASTRO_API_TOKEN and on a CI runner. A test that needs
@@ -38,18 +42,25 @@ const inheritedEnv = "ASTRO_TEST_ISOLATED_HOME"
 //     XDG_CONFIG_HOME, XDG_CACHE_HOME and XDG_DATA_HOME (and USERPROFILE,
 //     APPDATA and LOCALAPPDATA on Windows) into it. finish removes it.
 //     ASTRO_HOME is the same directory as HOME, as it is when the variable is
-//     unset.
+//     unset. Packages that worked out a path from the real home when they were
+//     loaded (config does) register an AfterIsolate hook that works it out
+//     again, so nothing starts out pointing at the real one.
 //   - Makes the default keyring an in-memory one (secrets.MockKeyringForTests,
 //     which is keyring.MockInit and the record pkg/secrets' guard needs, which
-//     refuses the OS keychain in a test binary otherwise). A test that wants an error-injecting mock calls
-//     keyring.MockInitWithError and restores keyring.MockInit in t.Cleanup.
+//     refuses the OS keychain in a test binary otherwise).
 //   - Points uv's managed Pythons at a directory shared by every test binary
 //     (see uvPythonDir), so tests that install one download it once, and never
 //     into ~/.local.
+//   - Pins where the go command keeps its own state to what `go env` says
+//     before HOME moves.
 //
-// finish(code) removes the directory and returns code, unless the run changed
-// the real ~/.astro/config.yaml or created its lock file. It then says so on
-// stderr and returns 1, so a package whose tests passed still fails.
+// finish(code) removes the directory and returns code, with two exceptions
+// that return 1 so a package whose tests passed still fails. The OS keychain
+// was asked for and refused: a caller may have fallen back on the error, so a
+// passing test proves nothing. And the real ~/.astro/config.yaml or its lock
+// file changed, when CI is set or ASTRO_TEST_STRICT_REALCONFIG=1: on a
+// developer's machine that change can be a real `astro login` in another
+// terminal, so without either it is a warning on stderr.
 //
 // A helper process (see inheritedEnv) keeps its parent's home: it checks that
 // HOME and ASTRO_HOME are in the temporary directory, exits 2 if they are not,
@@ -62,7 +73,12 @@ func Isolate() (finish func(code int) int) {
 		inherit()
 		return func(code int) int { return code }
 	}
-	return isolate(realStateWatch())
+	// Both are read here, before isolate unsets CI with the rest.
+	return isolate(guards{
+		watch:    realStateWatch(),
+		strict:   truthy(os.Getenv("CI")) || os.Getenv(strictEnv) == "1",
+		refusals: secrets.OSKeyringRefusals,
+	})
 }
 
 // Main is the whole TestMain of a package with nothing to add to it:
@@ -77,20 +93,78 @@ func Main(m *testing.M) {
 	os.Exit(finish(m.Run()))
 }
 
-// isolate is Isolate with the real-state watch given, so a test can point it
-// at a decoy instead of the developer's home.
-func isolate(watch *stateWatch) func(code int) int {
+// afterIsolate are the hooks AfterIsolate registered.
+var afterIsolate []func()
+
+// AfterIsolate registers f to run once Isolate has moved HOME and the rest, for
+// a package that worked a path out from the real home when it was loaded. It is
+// called from an init function, before TestMain, and only in a test binary.
+func AfterIsolate(f func()) { afterIsolate = append(afterIsolate, f) }
+
+// truthy reports whether an environment value says yes, as CI systems spell it.
+func truthy(v string) bool {
+	switch strings.ToLower(v) {
+	case "", "0", "false", "no":
+		return false
+	}
+	return true
+}
+
+// guards are what finish judges the run against.
+type guards struct {
+	// watch is the developer's real config, and strict whether a change to it
+	// fails the package or only warns.
+	watch  *stateWatch
+	strict bool
+	// refusals is how many times the OS keychain was asked for and refused.
+	refusals func() int
+}
+
+// verdict is the exit code for a run whose tests returned code, and what to say
+// about it on stderr.
+func (g guards) verdict(code int) (exit int, msg string) {
+	if n := g.refusals(); n > 0 {
+		return 1, fmt.Sprintf("\ntestenv: FAIL: this package's tests asked the OS keychain %d time(s) and were refused, even though they passed "+
+			"(a caller may have fallen back on the error). See docs/architecture.md, \"Tests never touch the machine\".\n", n)
+	}
+	changed := g.watch.changed()
+	if len(changed) == 0 {
+		return code, ""
+	}
+	list := strings.Join(changed, "\n  ")
+	if g.strict {
+		return 1, fmt.Sprintf("\ntestenv: FAIL: this package's tests touched the real machine, even though they passed:\n  %s\n"+
+			"A test reached the developer's own ~/.astro instead of the temporary home. "+
+			"See docs/architecture.md, \"Tests never touch the machine\".\n", list)
+	}
+	return code, fmt.Sprintf("\ntestenv: WARNING: the developer's real config changed during this run:\n  %s\n"+
+		"A test may have reached the real ~/.astro instead of the temporary home, or something else on this machine "+
+		"(an astro login in another terminal) changed it. It fails the package when CI is set or %s=1.\n", list, strictEnv)
+}
+
+// tempRoot is the temporary home, for dief to remove.
+var tempRoot string
+
+// isolate is Isolate with the guards given, so a test can point them at a
+// decoy instead of the developer's home.
+func isolate(g guards) func(code int) int {
 	for _, k := range behaviorEnv {
 		if err := os.Unsetenv(k); err != nil { //nolint:usetesting // for the whole package run
 			dief("unsetting %s: %v", k, err)
 		}
 	}
+	// Before anything is made, so a refusal leaves nothing behind.
+	uvDir, err := prepareUVDir()
+	if err != nil {
+		dief("the shared uv directory is not usable: %v; remove it", err)
+	}
+	pinToolchain()
 
 	root, err := os.MkdirTemp("", "astro-test-")
 	if err != nil {
 		dief("making the test home: %v", err)
 	}
-	pinToolchain()
+	tempRoot = root
 	home := filepath.Join(root, "home")
 	for name, dir := range map[string]string{
 		"HOME":            home,
@@ -101,39 +175,29 @@ func isolate(watch *stateWatch) func(code int) int {
 	} {
 		setDir(name, dir)
 	}
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == goosWindows {
 		setDir("USERPROFILE", home)
 		setDir("APPDATA", filepath.Join(root, "appdata"))
 		setDir("LOCALAPPDATA", filepath.Join(root, "localappdata"))
 	}
-	uvDir := uvPythonDir()
-	setDir("UV_PYTHON_INSTALL_DIR", uvDir)
-	// A directory someone else made first, or left open, would have uv run
-	// interpreters its maker can replace.
-	if info, err := os.Stat(uvDir); err != nil || !info.IsDir() || (runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
-		dief("the shared uv directory %s is not a private directory (stat: %v); remove it", uvDir, err)
-	}
+	setenv("UV_PYTHON_INSTALL_DIR", uvDir)
 	// go-homedir caches the first home it resolves, which is the real one when
-	// anything asked before TestMain ran (a package-level var in config does).
+	// anything asked before TestMain ran.
 	homedir.Reset()
 	setenv(inheritedEnv, root)
 
 	mockKeyring()
+	for _, f := range afterIsolate {
+		f()
+	}
 
 	return func(code int) int {
 		if err := os.RemoveAll(root); err != nil {
 			fmt.Fprintf(os.Stderr, "testenv: removing %s: %v\n", root, err)
 		}
-		if n := secrets.OSKeyringRefusals(); n > 0 {
-			fmt.Fprintf(os.Stderr, "\ntestenv: FAIL: this package's tests asked the OS keychain %d time(s) and were refused, even though they passed "+
-				"(a caller may have fallen back on the error). See docs/architecture.md, \"Tests never touch the machine\".\n", n)
-			return 1
-		}
-		if changed := watch.changed(); len(changed) > 0 {
-			fmt.Fprintf(os.Stderr, "\ntestenv: FAIL: this package's tests touched the real machine, even though they passed:\n  %s\n"+
-				"A test reached the developer's own ~/.astro instead of the temporary home. "+
-				"See docs/architecture.md, \"Tests never touch the machine\".\n", strings.Join(changed, "\n  "))
-			return 1
+		code, msg := g.verdict(code)
+		if msg != "" {
+			fmt.Fprint(os.Stderr, msg)
 		}
 		return code
 	}
@@ -150,6 +214,9 @@ func inherit() {
 		}
 	}
 	mockKeyring()
+	for _, f := range afterIsolate {
+		f()
+	}
 }
 
 // RequireTemp exits the process, as a helper must, unless every path is inside
@@ -166,12 +233,17 @@ func RequireTemp(paths ...string) {
 }
 
 // within reports whether path is dir or below it, after symlinks (macOS keeps
-// its temporary directory behind /var -> /private/var).
+// its temporary directory behind /var -> /private/var), ignoring case where
+// the file system does (Windows).
 func within(path, dir string) bool {
 	if path == "" || dir == "" {
 		return false
 	}
-	rel, err := filepath.Rel(resolve(dir), resolve(path))
+	a, b := resolve(dir), resolve(path)
+	if runtime.GOOS == goosWindows {
+		a, b = strings.ToLower(a), strings.ToLower(b)
+	}
+	rel, err := filepath.Rel(a, b)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
@@ -207,56 +279,37 @@ func setDir(k, dir string) {
 	setenv(k, dir)
 }
 
+// dief reports a setup failure and exits, taking the temporary home with it.
 func dief(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "testenv: "+format+"\n", args...)
+	if tempRoot != "" {
+		os.RemoveAll(tempRoot) //nolint:errcheck // exiting
+	}
 	os.Exit(2)
 }
 
-// pinToolchain fixes where the go command keeps its own state to where it is
-// now, before HOME moves. A test that runs `go list` (internal/archlint does)
-// would otherwise find an empty module cache and build cache under the
-// temporary home. GOENV is pinned so the settings `go env -w` saved still
-// apply. None of it is the CLI's: they are caches of the Go toolchain, which a
-// test run fills as `go test` itself does.
+// pinToolchain fixes where the go command keeps its own state to what `go env`
+// says now, before HOME moves, so settings saved with `go env -w` still apply.
+// A test that runs `go list` (internal/archlint does) would otherwise find an
+// empty module cache and build cache under the temporary home. A variable that
+// is already set is left alone. None of it is the CLI's: they are caches of the
+// Go toolchain, which a test run fills as `go test` itself does. Without a go
+// command on the PATH there is nothing to pin.
 func pinToolchain() {
-	pin := func(k, v string) {
-		if os.Getenv(k) == "" {
-			setenv(k, v)
+	names := []string{"GOCACHE", "GOMODCACHE", "GOPATH", "GOENV"}
+	out, err := exec.Command("go", append([]string{"env"}, names...)...).Output() //nolint:gosec,noctx // fixed arguments; a few ms before any test
+	if err != nil {
+		return
+	}
+	values := strings.Split(strings.TrimRight(string(out), "\r\n"), "\n")
+	if len(values) != len(names) {
+		return
+	}
+	for i, name := range names {
+		if v := strings.TrimRight(values[i], "\r"); v != "" && os.Getenv(name) == "" {
+			setenv(name, v)
 		}
 	}
-	gopath := os.Getenv("GOPATH")
-	if home, err := os.UserHomeDir(); err == nil && gopath == "" {
-		gopath = filepath.Join(home, "go")
-	}
-	if gopath != "" {
-		pin("GOPATH", gopath)
-		first, _, _ := strings.Cut(gopath, string(os.PathListSeparator))
-		pin("GOMODCACHE", filepath.Join(first, "pkg", "mod"))
-	}
-	if cache, err := os.UserCacheDir(); err == nil {
-		pin("GOCACHE", filepath.Join(cache, "go-build"))
-	}
-	if conf, err := os.UserConfigDir(); err == nil {
-		pin("GOENV", filepath.Join(conf, "go", "env"))
-	}
-}
-
-// uvPythonDir is where the test binaries share uv's managed Pythons: a
-// directory per user under the OS temporary directory, which is neither the
-// developer's home nor any test's.
-//
-// uv downloads a managed interpreter (tens of MB) into UV_PYTHON_INSTALL_DIR,
-// by default ~/.local/share/uv/python, and the tests under cmd/local ask for
-// one. With HOME in a directory each binary removes, they would download it in
-// every package on every run; pointing at the developer's real directory would
-// write into their home, which no test may. This is a plain directory uv owns
-// and locks, so concurrent test binaries are safe, and it lasts until the OS
-// clears its temporary directory. The user id is in the name, and the mode is
-// 0700, so that on a shared /tmp one user's cache is not another's. uv's
-// download cache needs no such setting: the CLI pins UV_CACHE_DIR to its own
-// directory under the (isolated) cache home.
-func uvPythonDir() string {
-	return filepath.Join(os.TempDir(), "astro-test-uv-"+strconv.Itoa(os.Getuid()), "python")
 }
 
 // stateWatch remembers what the developer's real ~/.astro/config.yaml and its

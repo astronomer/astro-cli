@@ -5,10 +5,41 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"testing"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/secrets"
+	"github.com/astronomer/astro-cli/pkg/testing/testenv"
 )
+
+// A test binary's TestMain moves HOME and ASTRO_HOME into a temporary directory
+// (testenv.Isolate), but HomePath, HomeConfigPath and HomeConfigFile were worked
+// out from the real home when this package loaded, and initHome is the only
+// thing that would recompute them. Until a test reached InitConfig, anything
+// reading them (the API registry, the root hooks, otto, the login store, the
+// OpenAPI cache) would use the developer's own ~/.astro. So the isolation tells
+// this package to work them out again. testing.Testing keeps it out of the
+// shipped binary, which imports testenv only for this.
+func init() {
+	if testing.Testing() {
+		testenv.AfterIsolate(resolveHomeForTesting)
+	}
+}
+
+// resolveHomeForTesting recomputes the home paths from the isolated HOME and
+// ASTRO_HOME, by the rule initHome uses, and stops the run if any of them is
+// not in the temporary directory.
+func resolveHomeForTesting() {
+	HomePath, _ = fileutil.GetHomeDir() //nolint:errcheck // as at package load
+	home := os.Getenv("ASTRO_HOME")
+	if home == "" {
+		home = HomePath
+	}
+	HomeConfigPath = filepath.Join(home, ConfigDir)
+	HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
+	testenv.RequireTemp(HomePath, HomeConfigPath, HomeConfigFile)
+}
 
 func CreateTempProject() (dir string, cleanup func(), err error) {
 	projectDir, err := os.MkdirTemp("", "")

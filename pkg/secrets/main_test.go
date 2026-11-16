@@ -9,9 +9,8 @@ import (
 // package run (isolateHome), and makes the default keyring an in-memory one, so
 // no test touches the developer's machine. Most tests here pass a fake keyringAPI
 // of their own; this is for any that reach the default one, which refuseInTests
-// would otherwise fail.
+// would otherwise fail, and the run fails on any refusal.
 func TestMain(m *testing.M) {
-	finish := isolateHome()
-	MockKeyringForTests()
+	finish := isolateHome(keyringHooks{Mock: MockKeyringForTests, Refusals: OSKeyringRefusals})
 	os.Exit(finish(m.Run()))
 }
