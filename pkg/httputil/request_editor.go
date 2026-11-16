@@ -134,13 +134,24 @@ func IsTransportError(err error) bool {
 			return true
 		}
 	}
+	for _, errno := range windowsTransportErrnos {
+		if errors.Is(err, errno) {
+			return true
+		}
+	}
 	var (
-		dnsErr *net.DNSError
-		opErr  *net.OpError
-		urlErr *url.Error
-		netErr net.Error
+		transientErr *TransientStatusError
+		sysErr       *os.SyscallError
+		dnsErr       *net.DNSError
+		opErr        *net.OpError
+		urlErr       *url.Error
+		netErr       net.Error
 	)
 	switch {
+	case errors.As(err, &transientErr):
+		return true
+	case errors.As(err, &sysErr) && windowsSocketCalls[sysErr.Syscall]:
+		return true
 	case errors.As(err, &dnsErr):
 		return true
 	case errors.As(err, &opErr) && (opErr.Op == "dial" || opErr.Op == "read" || opErr.Op == "write"):
@@ -158,4 +169,56 @@ func IsTransportError(err error) bool {
 		return netErr.Timeout()
 	}
 	return false
+}
+
+// The Winsock errors for a connection that was refused, reset, aborted, timed
+// out or could not be routed. They are numbers, not syscall.E* names: on
+// Windows those names are Go's own invented values, which no Winsock call
+// returns, and the numbers are harmless elsewhere.
+const (
+	wsaENETDOWN     syscall.Errno = 10050
+	wsaENETUNREACH  syscall.Errno = 10051
+	wsaENETRESET    syscall.Errno = 10052
+	wsaECONNABORTED syscall.Errno = 10053
+	wsaECONNRESET   syscall.Errno = 10054
+	wsaENOTCONN     syscall.Errno = 10057
+	wsaESHUTDOWN    syscall.Errno = 10058
+	wsaETIMEDOUT    syscall.Errno = 10060
+	wsaECONNREFUSED syscall.Errno = 10061
+	wsaEHOSTDOWN    syscall.Errno = 10064
+	wsaEHOSTUNREACH syscall.Errno = 10065
+)
+
+// windowsTransportErrnos are the Winsock errors IsTransportError recognizes.
+var windowsTransportErrnos = []error{
+	wsaENETDOWN,
+	wsaENETUNREACH,
+	wsaENETRESET,
+	wsaECONNABORTED,
+	wsaECONNRESET,
+	wsaENOTCONN,
+	wsaESHUTDOWN,
+	wsaETIMEDOUT,
+	wsaECONNREFUSED,
+	wsaEHOSTDOWN,
+	wsaEHOSTUNREACH,
+}
+
+// windowsSocketCalls are the Windows socket calls whose failure, wrapped in an
+// os.SyscallError, is a connection that failed.
+var windowsSocketCalls = map[string]bool{
+	"connectex": true, "wsarecv": true, "wsasend": true, "wsarecvfrom": true, "wsasendto": true,
+}
+
+// TransientStatusError is a server answer that says nothing about the request
+// itself, only that the server could not take it now: 5xx, or 429. A caller
+// with no body to read a verdict from (a proxy's HTML page) returns it, so
+// that IsTransportError reads it as a failure a retry can fix.
+type TransientStatusError struct{ StatusCode int }
+
+// NewTransientStatusError returns the error for a 5xx or 429 answer.
+func NewTransientStatusError(status int) error { return &TransientStatusError{StatusCode: status} }
+
+func (e *TransientStatusError) Error() string {
+	return fmt.Sprintf("the server answered %d %s", e.StatusCode, http.StatusText(e.StatusCode))
 }

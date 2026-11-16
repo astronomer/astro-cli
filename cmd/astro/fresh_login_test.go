@@ -40,6 +40,7 @@ func vaultLogins(t *testing.T, expiresin time.Time) string {
 	// re-initializes. Put the path back.
 	prevPath, prevFile := config.HomeConfigPath, config.HomeConfigFile
 	t.Cleanup(func() { config.HomeConfigPath, config.HomeConfigFile = prevPath, prevFile })
+	resetRetiredRenewal(t)
 	t.Setenv("ASTRO_DOMAIN", "")
 	t.Setenv("ASTRO_API_TOKEN", "")
 	keyring.MockInit()

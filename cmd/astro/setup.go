@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -363,6 +364,9 @@ var (
 )
 
 func renewLogin(c *config.Context) error {
+	if renewalRetired() {
+		return errRenewalRetired
+	}
 	authConfig, err := fetchDomainAuthConfig(c.Domain)
 	if err != nil {
 		return err
@@ -377,7 +381,11 @@ func renewLogin(c *config.Context) error {
 	// The login only: saveRenewedToken also rewrites the workspace from
 	// LastUsedWorkspace, which would undo a workspace switch every time a
 	// tool fetches a token in the background.
-	return saveRenewedLogin(c, &res)
+	if err := saveRenewedLogin(c, &res); err != nil {
+		retireRenewal()
+		return err
+	}
+	return nil
 }
 
 func loginContext(domain string) (config.Context, error) {
@@ -404,15 +412,37 @@ func RefreshLogin() error {
 	if c.RefreshToken == "" {
 		return errors.New("the current login has no refresh token")
 	}
-	authConfig, err := fetchDomainAuthConfig(c.Domain)
+	// Serialized like every other renewal: a 401 reaches several processes at
+	// once, and a refresh token the provider rotates fails all but the first.
+	unlock := config.LockLoginRenewal()
+	defer unlock()
+	config.ReloadHome()
+	fresh, err := context.GetCurrentContext()
 	if err != nil {
 		return err
 	}
-	res, err := refresh(c.RefreshToken, authConfig)
+	if fresh.Token != c.Token && fresh.Token != "" && fresh.Token != "Bearer " {
+		return nil // another process renewed it while this one waited
+	}
+	if fresh.RefreshToken == "" {
+		return errors.New("the current login has no refresh token")
+	}
+	if renewalRetired() {
+		return errRenewalRetired
+	}
+	authConfig, err := fetchDomainAuthConfig(fresh.Domain)
 	if err != nil {
 		return err
 	}
-	return saveRenewedToken(&c, &res)
+	res, err := refresh(fresh.RefreshToken, authConfig)
+	if err != nil {
+		return err
+	}
+	if err := saveRenewedToken(&fresh, &res); err != nil {
+		retireRenewal()
+		return err
+	}
+	return nil
 }
 
 // checkToken makes sure the current context holds a login the command can
@@ -440,10 +470,15 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 	if !renewed.expired {
 		// Inside the refresh margin but not past it the token still works, and a
 		// provider that is down, or a config that will not save, is no reason to
-		// fail a command that can run on it. If the provider did answer and the
-		// answer could not be saved, it may have retired the old refresh token:
-		// the next run, with this token expired, will ask for a login.
-		logger.Debugf("could not renew the Astro login, which has not expired yet; continuing on the current access token (renewed at the provider but not saved: %t): %v", renewed.unsaved, err)
+		// fail a command that can run on it.
+		if renewed.unsaved {
+			// The provider answered and may have retired the old refresh token,
+			// and the answer could not be kept: say so once, since a later run
+			// that finds this token expired will ask for a login.
+			cliout.Warn(out, fmt.Sprintf("your Astro login was renewed but could not be saved to %s (%v). This command continues on the current access token; run 'astro login' if later commands ask you to log in again.", config.HomeConfigFile, err))
+		} else {
+			logger.Debugf("could not renew the Astro login, which has not expired yet; continuing on the current access token: %v", err)
+		}
 		return nil
 	}
 	if renewed.rejected {
@@ -471,7 +506,37 @@ type renewal struct {
 	// provider that could not be reached says nothing about the token.
 	rejected bool
 	// unsaved: the provider renewed the login and the config would not take it.
+	// It is true once per run, for the call that found out (see retireRenewal).
 	unsaved bool
+}
+
+// softLockAttempts bounds how long a renewal that nothing depends on waits for
+// another process's: a login whose access token still works runs on it.
+const softLockAttempts = 1
+
+var (
+	retiredMu sync.Mutex
+	retired   bool
+	// errRenewalRetired is a renewal this run already did at the provider and
+	// could not save. The refresh token it spent may be retired, so the run
+	// does not present it again.
+	errRenewalRetired = errors.New("the login was renewed but could not be saved, so its refresh token is not used again in this run")
+)
+
+// retireRenewal records that a renewal reached the provider and was not saved,
+// and reports whether this is the first time in the run.
+func retireRenewal() bool {
+	retiredMu.Lock()
+	defer retiredMu.Unlock()
+	first := !retired
+	retired = true
+	return first
+}
+
+func renewalRetired() bool {
+	retiredMu.Lock()
+	defer retiredMu.Unlock()
+	return retired
 }
 
 // renewCurrentLogin renews the current context's access token from its refresh
@@ -482,7 +547,20 @@ type renewal struct {
 // login is renewed, by this process or another.
 func renewCurrentLogin(c *config.Context) (renewal, error) {
 	before, _ := c.GetExpiresIn() //nolint:errcheck // a missing expiry reads as expired, which renews
-	unlock := config.LockLoginRenewal()
+	if renewalRetired() {
+		return renewal{expired: isExpired(before, 0)}, errRenewalRetired
+	}
+	var unlock func()
+	if isExpired(before, 0) {
+		unlock = config.LockLoginRenewal()
+	} else {
+		// The token still works: do not wait out another process's renewal.
+		var contended bool
+		unlock, contended = config.LockLoginRenewalFor(softLockAttempts)
+		if contended {
+			return renewal{}, errors.New("another process is renewing the login")
+		}
+	}
 	defer unlock()
 	config.ReloadHome()
 	fresh, err := context.GetCurrentContext()
@@ -510,7 +588,7 @@ func renewCurrentLogin(c *config.Context) (renewal, error) {
 		return state, err
 	}
 	if err := saveRenewedToken(c, &res); err != nil {
-		state.unsaved = true
+		state.unsaved = retireRenewal()
 		return state, err
 	}
 	return state, nil
@@ -554,16 +632,7 @@ func saveRenewedLogin(c *config.Context, res *TokenResponse) error {
 	if refreshToken == "" {
 		refreshToken = c.RefreshToken
 	}
-	if err := c.SetSharedContextKey("token", "Bearer "+res.AccessToken); err != nil {
-		return err
-	}
-	if err := c.SetSharedContextKey("refreshtoken", refreshToken); err != nil {
-		return err
-	}
-	if err := c.SetSharedExpiresIn(res.ExpiresIn); err != nil {
-		return err
-	}
-	return c.SetSharedContextKey("user_email", c.UserEmail)
+	return c.SetSharedLogin("Bearer "+res.AccessToken, refreshToken, res.ExpiresIn, c.UserEmail)
 }
 
 // isExpired is true if now() + a threshold is after the given date
@@ -598,6 +667,13 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: %w", err)
 	}
 	defer res.Body.Close()
+
+	// A server that is failing or limiting says nothing about the token (its
+	// body is often a proxy's HTML): a transport-style failure, so no one is
+	// offered a browser login for it.
+	if res.StatusCode >= http.StatusInternalServerError || res.StatusCode == http.StatusTooManyRequests {
+		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: %w", httputil.NewTransientStatusError(res.StatusCode))
+	}
 
 	var tokenRes TokenResponse
 

@@ -106,13 +106,14 @@ func TestCheckTokenHelper(t *testing.T) {
 		t.Error("the login flow must not start")
 		return nil
 	}
-	config.InitConfig(afero.NewOsFs())
+	// The checks come before InitConfig, which would read the config they
+	// are there to protect: a helper that lost its ASTRO_HOME would renew,
+	// and save over, the developer's own login.
 	testenv.RequireTemp(config.HomeConfigFile)
-	// Never touch a config that is not the parent's: a helper that lost its
-	// ASTRO_HOME would renew, and save over, the developer's own login.
 	if home := os.Getenv("ASTRO_HOME"); home == "" || !strings.HasPrefix(config.HomeConfigFile, home) {
 		t.Fatalf("the helper's config is %s, not under ASTRO_HOME=%q", config.HomeConfigFile, home)
 	}
+	config.InitConfig(afero.NewOsFs())
 	// Say the config is loaded, then wait for the parent to say both are.
 	if err := os.WriteFile(filepath.Join(filepath.Dir(start), fmt.Sprintf("ready-%d", os.Getpid())), nil, 0o600); err != nil {
 		t.Fatal(err)

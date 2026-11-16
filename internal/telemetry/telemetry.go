@@ -220,8 +220,12 @@ func TrackCommand(cmd *cobra.Command) {
 // event carries, and nothing else: no message, which can name a file or a
 // domain, and no credential. It goes out anonymously, since the failure is
 // often the credential itself.
+//
+// Like TrackRemovedCommand it sends only on a machine that has already shown
+// the first-run notice: a setup failure on a first run must not write the
+// config or print the notice on its way out.
 func TrackSetupFailure(cmd *cobra.Command, kind string) {
-	if GetCommandPath(cmd) == "" || cmd.Hidden || !canTrack(cmd) {
+	if GetCommandPath(cmd) == "" || cmd.Hidden || !noticeShown() || !canTrack(cmd) {
 		return
 	}
 	properties := buildCommandProperties(cmd)
