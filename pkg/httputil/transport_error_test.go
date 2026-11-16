@@ -23,6 +23,7 @@ func TestIsTransportError(t *testing.T) {
 
 	// An answer, whatever it says, is not a failure to get one.
 	assert.False(t, IsTransportError(NormalizeAPIError(&http.Response{StatusCode: http.StatusServiceUnavailable}, nil)))
+	assert.False(t, IsTransportError(&url.Error{Op: "Get", URL: "http://api.invalid/", Err: context.Canceled}), "an interrupted request is the run ending")
 	assert.False(t, IsTransportError(errors.New("boom")))
 	assert.False(t, IsTransportError(nil))
 }

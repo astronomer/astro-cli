@@ -307,7 +307,7 @@ func FreshLogin(domain string, force bool) (config.Context, error) {
 		return fresh, nil
 	}
 	if err := renewLogin(&fresh); err != nil {
-		return fresh, fmt.Errorf("could not renew your Astro login, run 'astro login' to log in again: %w", err)
+		return fresh, renewalFailed(err)
 	}
 	return loginContext(domain)
 }
@@ -430,11 +430,13 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 		return nil
 	}
 	authConfig, err := fetchDomainAuthConfig(c.Domain)
-	if err == nil {
-		err = c.SetAuthTenant(authConfig.DomainURL, authConfig.ClientID)
-	}
 	if err != nil {
 		return renewalOutcome(expireTime, err)
+	}
+	if err := c.SetAuthTenant(authConfig.DomainURL, authConfig.ClientID); err != nil {
+		// A write that failed is not a provider that did not answer: the config
+		// cannot hold the renewal, so say so now rather than at expiry.
+		return renewalFailed(err)
 	}
 	res, err := refresh(c.RefreshToken, authConfig)
 	if err != nil {
@@ -453,14 +455,20 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 		}
 		return renewalOutcome(expireTime, err)
 	}
-	return renewalOutcome(expireTime, saveRenewedToken(&c, &res))
+	if err := saveRenewedToken(&c, &res); err != nil {
+		// The refresh worked, so the provider may have retired the old refresh
+		// token: a renewal that was not saved is lost, not postponed.
+		return renewalFailed(err)
+	}
+	return nil
 }
 
 // renewalOutcome decides what a renewal that failed with err means for a
 // login whose access token expires at expireTime. Inside the refresh margin but
-// not past it the token still works, and an identity provider that is down or a
-// config that will not save is no reason to fail a command that can run on it:
-// that is the one failure here that is logged and not returned.
+// not past it the token still works, and an identity provider that is down is
+// no reason to fail a command that can run on it: that is the one failure here
+// that is logged and not returned. A renewal that could not be saved is always
+// returned.
 func renewalOutcome(expireTime time.Time, err error) error {
 	if err == nil {
 		return nil
@@ -614,6 +622,12 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 		}
 	}
 
+	// Record the claims' selection before the lookup, so a lookup that fails
+	// softly (astro auth token) leaves the applied token with its own selection
+	// and not the saved login's.
+	if err := useEnvironmentSelection(&config.Context{Domain: domain}, orgID, "", wsID); err != nil {
+		return false, err
+	}
 	_, orgProduct, err := environmentOrganization(astroV1Client)
 	if err != nil {
 		return false, err

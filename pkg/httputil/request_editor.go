@@ -119,6 +119,9 @@ func NewRequestEditorFn(getTokenAndURL func() (token, baseURL string, err error)
 // request timed out. An HTTP status, whatever it is, is an answer, and is a
 // StatusError instead.
 func IsTransportError(err error) bool {
+	if errors.Is(err, httpContext.Canceled) {
+		return false // an interrupted request got no answer because the run ended
+	}
 	var urlErr *url.Error
 	var netErr net.Error
 	return errors.As(err, &urlErr) || errors.As(err, &netErr) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, httpContext.DeadlineExceeded)
