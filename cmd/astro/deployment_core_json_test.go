@@ -391,7 +391,7 @@ func TestDeploymentCoreJSON(t *testing.T) {
 		assert.Equal(t, "workspace-id", got.Deployment.Metadata.WorkspaceID)
 		assert.Equal(t, "etl-prod", got.Deployment.Configuration.Name)
 		assert.Equal(t, "test-workspace", got.Deployment.Configuration.WorkspaceName)
-		assert.Equal(t, "Current Workspace: test-workspace\n\n", r.stderr, "the note, on stderr")
+		assert.Equal(t, "Current Workspace: test-workspace\n\n", withoutDeprecations(r.stderr), "the note, on stderr")
 		m.AssertExpectations(t)
 	})
 
@@ -583,7 +583,7 @@ func TestDeploymentCoreJSONNeverAsks(t *testing.T) {
 			assert.Equal(t, string(cliout.KindInputRequired), got.Kind)
 			assert.Equal(t, cliout.ExitFailure, got.Code, "the code it reports is the one it exits with")
 			assert.Contains(t, got.Error, tc.answered)
-			assert.Empty(t, r.stderr)
+			assert.Empty(t, withoutDeprecations(r.stderr))
 		})
 	}
 }

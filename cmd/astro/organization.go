@@ -164,10 +164,10 @@ func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 	cliout.OnBadFormat(cmd, func(_ string, refused error) error {
 		return fmt.Errorf("%w; -o is the output format, and --output-file takes the path", refused)
 	})
-	cmd.Flags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for")
+	cmd.Flags().StringVar(&orgName, "organization-name", "", "Name of the Organization to manage audit logs for")
 	// No shorthand: -o is --output, as on every other command.
 	cmd.Flags().StringVar(&auditLogsOutputFilePath, "output-file", "", "Path to a file for storing exported audit logs. Defaults to a file in the current directory named for the Organization, the days and the date")
-	cmd.Flags().IntVarP(&auditLogsEarliestParam, "include", "i", auditLogsEarliestParamDefaultValue,
+	cmd.Flags().IntVar(&auditLogsEarliestParam, "include", auditLogsEarliestParamDefaultValue,
 		"Number of days in the past to start exporting logs from, from 1 to 90")
 	return cmd
 }
@@ -206,7 +206,7 @@ func newOrganizationUserInviteCmd(out io.Writer) *cobra.Command {
 			return userInvite(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&role, "role", "r", "ORGANIZATION_MEMBER", "The role for the "+
+	cmd.Flags().StringVar(&role, "role", "ORGANIZATION_MEMBER", "The role for the "+
 		"user. Possible values are "+allowedOrganizationRoleNamesProse)
 	return cmd
 }
@@ -240,7 +240,7 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 			return userUpdate(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&updateRole, "role", "r", "", "The new role for the "+
+	cmd.Flags().StringVar(&updateRole, "role", "", "The new role for the "+
 		"user. Possible values are "+allowedOrganizationRoleNamesProse)
 	return cmd
 }
@@ -433,8 +433,8 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().
-		StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
-	cmd.Flags().StringVarP(&updateOrganizationRole, "role", "r", "", "The new role for the "+
+		StringVar(&teamDescription, "description", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
+	cmd.Flags().StringVar(&updateOrganizationRole, "role", "", "The new role for the "+
 		"team. Possible values are "+allowedOrganizationRoleNamesProse)
 	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation on an IDP-managed team")
 	return cmd
@@ -474,8 +474,8 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire team within quotes \"\" ")
-	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team in quotes \"\"")
-	cmd.Flags().StringVarP(&teamOrgRole, "role", "r", "", "The role for the new team. Possible values are "+allowedOrganizationRoleNamesProse)
+	cmd.Flags().StringVar(&teamDescription, "description", "", "Description of the Team. If the description contains a space, specify the entire team in quotes \"\"")
+	cmd.Flags().StringVar(&teamOrgRole, "role", "", "The role for the new team. Possible values are "+allowedOrganizationRoleNamesProse)
 
 	return cmd
 }
@@ -575,8 +575,8 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 			return removeTeamUser(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's unique identifier \"\" ")
-	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's unique identifier \"\"")
+	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's unique identifier \"\" ")
+	cmd.Flags().StringVar(&userID, "user-id", "", "The User's unique identifier \"\"")
 	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation on an IDP-managed team")
 	return cmd
 }
@@ -621,8 +621,8 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 			return addTeamUser(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's unique identifier \"\" ")
-	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's unique identifier \"\"")
+	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's unique identifier \"\" ")
+	cmd.Flags().StringVar(&userID, "user-id", "", "The User's unique identifier \"\"")
 	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation on an IDP-managed team")
 	return cmd
 }
@@ -655,7 +655,7 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
 			return listUsersCmd(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's id \"\" ")
+	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's id \"\" ")
 	return cmd
 }
 
@@ -755,10 +755,10 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
-	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
-	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Expiration of the token in days, from 1 to 3650. Without it, the token does not expire")
+	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	cmd.Flags().StringVar(&tokenDescription, "description", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
+	cmd.Flags().StringVar(&tokenRole, "role", "", "The role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
+	cmd.Flags().IntVar(&tokenExpiration, "expiration", 0, "Expiration of the token in days, from 1 to 3650. Without it, the token does not expire")
 	return cmd
 }
 
@@ -779,10 +779,10 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 			return updateOrganizationToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&name, "name", "t", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the token. Possible values are "+allowedOrganizationRoleNamesProse+". Without it, the token keeps its role")
+	cmd.Flags().StringVar(&name, "name", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&tokenName, "new-name", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&tokenDescription, "description", "", "Updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
+	cmd.Flags().StringVar(&tokenRole, "role", "", "The new role for the token. Possible values are "+allowedOrganizationRoleNamesProse+". Without it, the token keeps its role")
 	return cmd
 }
 
@@ -804,8 +804,8 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
 			return rotateOrganizationToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
-	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceRotate, "yes", "y", false, "Don't ask for confirmation before rotating the Organization API token")
 
 	return cmd
@@ -828,7 +828,7 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 			return deleteOrganizationToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting or removing the API token")
 
 	return cmd
@@ -885,7 +885,7 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 			return listRoles(cmd, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&shouldIncludeDefaultRoles, "include-default-roles", "i", false, "Should include default roles in response")
+	cmd.Flags().BoolVar(&shouldIncludeDefaultRoles, "include-default-roles", false, "Should include default roles in response")
 
 	return cmd
 }

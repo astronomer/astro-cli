@@ -120,7 +120,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// Defined ahead of the commands rather than with the rest of the root's
 	// setup below: apcCmd.NeedsPlatform reads the root's persistent flags to
 	// find which command a line runs.
-	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
+	rootCmd.PersistentFlags().StringVar(&verboseLevel, "verbosity", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	input.AddFlag(rootCmd.PersistentFlags())
 
 	rootCmd.AddCommand(

@@ -92,7 +92,7 @@ func ClientRegistryFix() string {
 // clientRegistryScope names the config the client registry is read from and
 // the command that changes it there: the project's when it sets the key,
 // even to "", since that shadows the global one; else the global one, which
-// takes -g from anywhere: without it, `astro config set` writes the project's
+// takes --global from anywhere: without it, `astro config set` writes the project's
 // config inside a project and refuses outside one. The command names the
 // current key, which wins over the 1.x one it was read from.
 func clientRegistryScope() (where, fix string) {
@@ -100,7 +100,7 @@ func clientRegistryScope() (where, fix string) {
 	if c.projectKey() != "" {
 		return "this project's config", "astro config set " + c.Path + " <registry>/<repository>"
 	}
-	return "your global config", "astro config set -g " + c.Path + " <registry>/<repository>"
+	return "your global config", "astro config set --global " + c.Path + " <registry>/<repository>"
 }
 
 // clientRegistryKey is the name the config holding the client registry sets

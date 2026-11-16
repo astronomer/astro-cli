@@ -13,7 +13,8 @@ import (
 // --deployment and --workspace are the spellings help shows, and the ones
 // commands read. On a command 1.x had, the ones they replace, --deployment-id,
 // --deployment-name and --workspace-id, keep working as they always have,
-// hidden, with the shorthands 1.x gave them: the command opts in to them
+// hidden, without the shorthands 1.x gave them, which a letter meaning one
+// thing (utils.ShortOptions) leaves to -d and -w: the command opts in to them
 // (oneXSpelling), and they are aliases that applyPreferredFlags hands to
 // --deployment or --workspace, which nothing else reads.
 
@@ -25,6 +26,11 @@ import (
 type deploymentTargets struct {
 	id, name *string
 	scope    bool
+	// withhold leaves -d off --deployment, on a command where Astro CLI 1.x
+	// gave -d to another flag (hibernate's and wake-up's --for, update's and
+	// token's --description): a script that typed it is refused by name
+	// instead of read as naming a Deployment.
+	withhold bool
 }
 
 // workspaceChoiceAnnotation marks a flag that chooses the workspace a command
@@ -53,26 +59,20 @@ func workspaceChosen(fs *pflag.FlagSet) bool {
 }
 
 // oneXSpelling is a 1.x flag a command that 1.x had keeps as a hidden alias of
-// its v2 spelling, with the shorthand 1.x gave it ("" for none). A command
-// opts in to each one; a command 1.x did not have takes none.
+// its v2 spelling. A command opts in to each one; a command 1.x did not have
+// takes none. The alias has no shorthand, whatever 1.x gave it.
 type oneXSpelling struct {
-	name, shorthand string
+	name string
 }
 
-// oneXWorkspaceID is 1.x's --workspace-id, which had no shorthand.
+// oneXWorkspaceID is 1.x's --workspace-id.
 var oneXWorkspaceID = oneXSpelling{name: "workspace-id"}
 
-// oneXDeploymentID is 1.x's --deployment-id, with the shorthand it had on
-// the command.
-func oneXDeploymentID(shorthand string) oneXSpelling {
-	return oneXSpelling{name: "deployment-id", shorthand: shorthand}
-}
+// oneXDeploymentID is 1.x's --deployment-id.
+var oneXDeploymentID = oneXSpelling{name: "deployment-id"}
 
-// oneXDeploymentName is 1.x's --deployment-name, with the shorthand it had on
-// the command.
-func oneXDeploymentName(shorthand string) oneXSpelling {
-	return oneXSpelling{name: "deployment-name", shorthand: shorthand}
-}
+// oneXDeploymentName is 1.x's --deployment-name.
+var oneXDeploymentName = oneXSpelling{name: "deployment-name"}
 
 // deploymentFlag is the value of --deployment. It splits what it was given
 // into the command's id or name once the flags are parsed (resolve), and
@@ -98,10 +98,16 @@ func (d *deploymentFlag) Type() string       { return "string" }
 
 // addDeploymentFlag registers --deployment on fs, splitting into to's id and
 // name, and the 1.x spellings oneX names as hidden aliases: --deployment-id
-// for a command with an id, --deployment-name for one with a name.
+// for a command with an id, --deployment-name for one with a name. It gives
+// --deployment its -d; a command that 1.x gave -d to another flag registers
+// its own (astro deploy).
 func addDeploymentFlag(fs *pflag.FlagSet, usage string, to deploymentTargets, oneX ...oneXSpelling) {
 	d := &deploymentFlag{deploymentTargets: to}
-	fs.Var(d, "deployment", usage)
+	shorthand := "d"
+	if to.withhold {
+		shorthand = ""
+	}
+	fs.VarP(d, "deployment", shorthand, usage)
 	d.self = fs.Lookup("deployment")
 	utils.RefuseEmpty(d.self)
 	if to.id != nil {
@@ -113,26 +119,27 @@ func addDeploymentFlag(fs *pflag.FlagSet, usage string, to deploymentTargets, on
 	for _, o := range oneX {
 		switch {
 		case o.name == "deployment-id" && to.id != nil:
-			d.idAlias = utils.AddAlias(fs, o.name, o.shorthand, "deployment")
+			d.idAlias = utils.AddAlias(fs, o.name, "deployment")
 		case o.name == "deployment-name" && to.name != nil:
-			d.nameAlias = utils.AddAlias(fs, o.name, o.shorthand, "deployment")
+			d.nameAlias = utils.AddAlias(fs, o.name, "deployment")
 		default:
 			panic(fmt.Sprintf("addDeploymentFlag: --%s is no 1.x spelling of what this --deployment takes", o.name))
 		}
 	}
 }
 
-// addWorkspaceFlag registers --workspace on fs, read into to, and the 1.x
+// addWorkspaceFlag registers --workspace on fs, read into to, with its -w
+// (shorthand is "w", or "" on a command that withholds it), and the 1.x
 // spelling oneX names (oneXWorkspaceID) as a hidden alias.
 func addWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string, oneX ...oneXSpelling) {
-	alias, aliasShorthand := false, ""
+	alias := false
 	for _, o := range oneX {
 		if o.name != oneXWorkspaceID.name {
 			panic(fmt.Sprintf("addWorkspaceFlag: --%s is no 1.x spelling of --workspace", o.name))
 		}
-		alias, aliasShorthand = true, o.shorthand
+		alias = true
 	}
-	markWorkspaceChoice(utils.AddWorkspaceFlag(fs, to, shorthand, usage, alias, aliasShorthand))
+	markWorkspaceChoice(utils.AddWorkspaceFlag(fs, to, shorthand, usage, alias))
 }
 
 // addOneXWorkspaceIDNoOp registers 1.x's --workspace-id on fs for a command
@@ -142,7 +149,7 @@ func addWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string, on
 // workspace, so a project's workspace and host apply as they would without
 // it.
 func addOneXWorkspaceIDNoOp(fs *pflag.FlagSet) {
-	utils.AddOneXNoOp(fs, oneXWorkspaceID.name, oneXWorkspaceID.shorthand)
+	utils.AddOneXNoOp(fs, oneXWorkspaceID.name)
 }
 
 // deploymentWorkspaceUsage is --workspace on a deployment command that looks
@@ -152,6 +159,12 @@ const deploymentWorkspaceUsage = "Workspace the Deployment is in (default: the p
 // addDeploymentWorkspaceFlag registers --workspace, and 1.x's --workspace-id
 // as its alias, on a deployment command that reads it.
 func addDeploymentWorkspaceFlag(fs *pflag.FlagSet) {
+	addWorkspaceFlag(fs, &workspaceID, "w", deploymentWorkspaceUsage, oneXWorkspaceID)
+}
+
+// addDeploymentWorkspaceFlagWithoutLetter is addDeploymentWorkspaceFlag for a
+// command where 1.x gave -w to another flag (astro deployment logs' --warn).
+func addDeploymentWorkspaceFlagWithoutLetter(fs *pflag.FlagSet) {
 	addWorkspaceFlag(fs, &workspaceID, "", deploymentWorkspaceUsage, oneXWorkspaceID)
 }
 

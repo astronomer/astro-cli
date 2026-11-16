@@ -430,8 +430,8 @@ func TestFollowProjectResolvesALinkWhereverADeploymentGoes(t *testing.T) {
 	t.Run("deployment name", func(t *testing.T) {
 		inProject(t, testProjectManifest)
 		cmd := &cobra.Command{Use: "logs"}
-		addDeploymentFlag(cmd.Flags(), "", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
-		require.NoError(t, cmd.ParseFlags([]string{"-n", "test"}))
+		addDeploymentFlag(cmd.Flags(), "", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
+		require.NoError(t, cmd.ParseFlags([]string{"--deployment-name", "test"}))
 		require.NoError(t, applyPreferredFlags(cmd, nil))
 		pick, err := followProject(cmd, nil)
 		require.NoError(t, err)
@@ -443,8 +443,8 @@ func TestFollowProjectResolvesALinkWhereverADeploymentGoes(t *testing.T) {
 	t.Run("a deployment name that is no link stays a name", func(t *testing.T) {
 		inProject(t, testProjectManifest)
 		cmd := &cobra.Command{Use: "logs"}
-		addDeploymentFlag(cmd.Flags(), "", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
-		require.NoError(t, cmd.ParseFlags([]string{"-n", "my deployment"}))
+		addDeploymentFlag(cmd.Flags(), "", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
+		require.NoError(t, cmd.ParseFlags([]string{"--deployment-name", "my deployment"}))
 		require.NoError(t, applyPreferredFlags(cmd, nil))
 		pick, err := followProject(cmd, nil)
 		require.NoError(t, err)

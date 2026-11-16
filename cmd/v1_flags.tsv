@@ -15,6 +15,13 @@
 # It records 1.x, so nothing in v2 changes it. The CLI embeds it: a flag v2
 # does not have is reported by what replaced it (removedFlags) only on a
 # command this says had it. See removed_flags.go.
+#
+# Astro Private Cloud's flags that 1.x registered only under some platform
+# version or feature flag (NFS, git sync, Astro Runtime, DAG-only deploys), or
+# on commands the rows above predate (hibernate, wake-up, adopt, unadopt,
+# runtime), with the shorthands they had: main's cmd/apc/deployment.go. They
+# are here so that a letter they held is refused by name, and is never read as
+# another flag. Their rows are among the rest, in order.
 astro,astro-hosted,apc	api	no-color		bool
 astro,astro-hosted,apc	api airflow	airflow-version		string
 astro,astro-hosted,apc	api airflow	api-url		string
@@ -162,6 +169,7 @@ astro,astro-hosted	deploy	test	t	string
 astro,astro-hosted	deploy	wait	w	bool
 astro,astro-hosted	deploy	wait-time		string
 astro,astro-hosted,apc	deploy	workspace-id		string
+apc	deployment adopt	label	l	string
 apc	deployment airflow upgrade	cancel	c	bool
 apc	deployment airflow upgrade	deployment-id	d	string
 apc	deployment airflow upgrade	desired-airflow-version	v	string
@@ -251,6 +259,8 @@ apc	deployment create	cluster-id		string
 astro,astro-hosted	deployment create	cluster-id	c	string
 astro-hosted	deployment create	cluster-type		string
 astro,astro-hosted	deployment create	dag-deploy		string
+apc	deployment create	dag-deployment-type	t	string
+apc	deployment create	dag-directory-path	p	string
 astro-hosted	deployment create	default-task-pod-cpu		string
 astro-hosted	deployment create	default-task-pod-memory		string
 astro,astro-hosted	deployment create	deployment-file		string
@@ -258,10 +268,16 @@ astro,astro-hosted	deployment create	description	d	string
 astro-hosted	deployment create	development-mode	m	string
 astro,astro-hosted	deployment create	enforce-cicd		bool
 astro,astro-hosted,apc	deployment create	executor	e	string
+apc	deployment create	executor	e	string
 astro,astro-hosted,apc	deployment create	force	f	bool
+apc	deployment create	force	f	bool
+apc	deployment create	git-branch-name	b	string
+apc	deployment create	git-repository-url	u	string
+apc	deployment create	git-revision	v	string
 astro-hosted	deployment create	high-availability	a	string
 apc	deployment create	label	l	string
 astro,astro-hosted	deployment create	name	n	string
+apc	deployment create	nfs-location	n	string
 astro-hosted	deployment create	region		string
 apc	deployment create	release-name	r	string
 astro-hosted	deployment create	remote-execution-enabled		bool
@@ -271,6 +287,7 @@ astro,astro-hosted	deployment create	runtime-version	v	string
 astro	deployment create	scheduler-au	s	string
 astro	deployment create	scheduler-replicas	r	string
 astro-hosted	deployment create	scheduler-size		string
+apc	deployment create	sync-interval	s	string
 astro-hosted	deployment create	task-log-bucket		string
 astro-hosted	deployment create	task-log-url-pattern		string
 astro-hosted	deployment create	type		string
@@ -285,9 +302,13 @@ apc	deployment delete	hard		bool
 astro,astro-hosted,apc	deployment delete	workspace-id		string
 astro,astro-hosted	deployment hibernate	deployment-name	n	string
 astro,astro-hosted	deployment hibernate	for	d	string
+apc	deployment hibernate	for	d	string
 astro,astro-hosted	deployment hibernate	force	f	bool
+apc	deployment hibernate	force	f	bool
 astro,astro-hosted	deployment hibernate	remove-override	r	bool
+apc	deployment hibernate	remove-override	r	bool
 astro,astro-hosted	deployment hibernate	until	u	string
+apc	deployment hibernate	until	u	string
 astro,astro-hosted	deployment hibernate	workspace-id		string
 astro,astro-hosted	deployment inspect	clean-output	c	bool
 astro,astro-hosted	deployment inspect	deployment-name	n	string
@@ -297,6 +318,7 @@ astro,astro-hosted	deployment inspect	show-workload-identity		bool
 astro,astro-hosted	deployment inspect	template	t	bool
 astro,astro-hosted	deployment inspect	workspace-id		string
 astro,astro-hosted,apc	deployment list	all	a	bool
+apc	deployment list	all	a	bool
 apc	deployment list	cluster-id		string
 astro,astro-hosted	deployment list	json		bool
 astro,astro-hosted	deployment list	output	o	string
@@ -352,6 +374,11 @@ astro,astro-hosted	deployment pool update	include-deferred		string
 astro,astro-hosted	deployment pool update	name		string
 astro,astro-hosted	deployment pool update	slots	s	string
 astro,astro-hosted	deployment pool update	workspace-id		string
+apc	deployment runtime migrate	cancel	c	bool
+apc	deployment runtime migrate	deployment-id	d	string
+apc	deployment runtime upgrade	cancel	c	bool
+apc	deployment runtime upgrade	deployment-id	d	string
+apc	deployment runtime upgrade	desired-runtime-version	v	string
 apc	deployment service-account create	category	c	string
 apc	deployment service-account create	deployment-id	d	string
 apc	deployment service-account create	label	l	string
@@ -428,28 +455,39 @@ astro,astro-hosted	deployment token workspace-token update	deployment-id		string
 astro,astro-hosted	deployment token workspace-token update	role	r	string
 astro,astro-hosted	deployment token workspace-token update	workspace-id		string
 astro,astro-hosted	deployment token workspace-token update	workspace-token-name	n	string
+apc	deployment unadopt	deployment-id	d	string
 astro-hosted	deployment update	allowed-ip-address-ranges		string
 astro,astro-hosted	deployment update	cicd-enforcement		string
 astro,astro-hosted	deployment update	clean-output	c	bool
 apc	deployment update	cloud-role	c	string
 astro,astro-hosted	deployment update	dag-deploy		string
+apc	deployment update	dag-deployment-type	t	string
+apc	deployment update	dag-directory-path	p	string
 astro-hosted	deployment update	default-task-pod-cpu		string
 astro-hosted	deployment update	default-task-pod-memory		string
 astro,astro-hosted	deployment update	deployment-file		string
 astro,astro-hosted	deployment update	deployment-name		string
 astro,astro-hosted,apc	deployment update	description	d	string
+apc	deployment update	description	d	string
 astro-hosted	deployment update	development-mode	m	string
 astro,astro-hosted	deployment update	enforce-cicd		bool
 astro,astro-hosted,apc	deployment update	executor	e	string
+apc	deployment update	executor	e	string
 astro,astro-hosted,apc	deployment update	force	f	bool
+apc	deployment update	force	f	bool
+apc	deployment update	git-branch-name	b	string
+apc	deployment update	git-repository-url	u	string
+apc	deployment update	git-revision	v	string
 astro-hosted	deployment update	high-availability	a	string
 apc	deployment update	label	l	string
 astro,astro-hosted	deployment update	name	n	string
+apc	deployment update	nfs-location	n	string
 astro-hosted	deployment update	resource-quota-cpu		string
 astro-hosted	deployment update	resource-quota-memory		string
 astro	deployment update	scheduler-au	s	string
 astro	deployment update	scheduler-replicas	r	string
 astro-hosted	deployment update	scheduler-size		string
+apc	deployment update	sync-interval	s	string
 astro-hosted	deployment update	task-log-bucket		string
 astro-hosted	deployment update	task-log-url-pattern		string
 astro,astro-hosted	deployment update	workload-identity		string
@@ -494,9 +532,13 @@ astro,astro-hosted	deployment variable update	secret	s	bool
 astro,astro-hosted	deployment variable update	workspace-id		string
 astro,astro-hosted	deployment wake-up	deployment-name	n	string
 astro,astro-hosted	deployment wake-up	for	d	string
+apc	deployment wake-up	for	d	string
 astro,astro-hosted	deployment wake-up	force	f	bool
+apc	deployment wake-up	force	f	bool
 astro,astro-hosted	deployment wake-up	remove-override	r	bool
+apc	deployment wake-up	remove-override	r	bool
 astro,astro-hosted	deployment wake-up	until	u	string
+apc	deployment wake-up	until	u	string
 astro,astro-hosted	deployment wake-up	workspace-id		string
 astro,astro-hosted	deployment worker-queue create	concurrency		string
 astro,astro-hosted	deployment worker-queue create	deployment-id	d	string

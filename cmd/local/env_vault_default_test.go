@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
@@ -202,14 +203,19 @@ func TestTheSecretFlagIsADeprecatedAlias(t *testing.T) {
 	if n := len(vaultFiles(t)); n != 1 {
 		t.Errorf("--secret should store in the vault: %d entries", n)
 	}
-	// Deprecated, so cobra prints the notice on use and help leaves it out.
+	// Deprecated, so the run says so on use (cliout.WarnDeprecated) and help
+	// leaves it out.
 	for _, verb := range []string{"set", "get", "delete"} {
 		cmd, _, err := newRootCmd(d).Find([]string{"local", "env", "variable", verb})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if f := cmd.Flags().Lookup("secret"); f == nil || f.Deprecated == "" || !strings.Contains(f.Deprecated, "--plain") {
-			t.Errorf("%s --secret = %+v, want it deprecated in favor of --plain", verb, f)
+		f := cmd.Flags().Lookup("secret")
+		if f == nil {
+			t.Fatalf("%s has no --secret", verb)
+		}
+		if use, ok := cliout.DeprecatedUse(f); !ok || !f.Hidden || !strings.Contains(use, "--plain") {
+			t.Errorf("%s --secret = %+v, want it deprecated in favor of --plain, and hidden", verb, f)
 		}
 	}
 
@@ -392,6 +398,37 @@ func TestAutoLinkIsTheFlagAndTheLabel(t *testing.T) {
 	} {
 		if _, _, err := run(t, dir, args...); err == nil || !strings.Contains(err.Error(), "unknown flag: --everywhere") {
 			t.Errorf("%v = %v, want --everywhere unknown", args, err)
+		}
+	}
+}
+
+// --secret says once per run that it is deprecated, whatever it was given
+// and however often, on stderr: under --output json stdout is still the one
+// result, and the exit code is the run's own.
+func TestADeprecatedSecretWarnsOnce(t *testing.T) {
+	for _, asJSON := range []bool{false, true} {
+		dir := secretEnvProject(t, "")
+		d, stdout, stderr := envDeps(t, dir, "")
+		args := []string{"local", "env", "variable", "set", "TOKEN", "--value", "x", "--secret", "--secret=true"}
+		if asJSON {
+			args = append(args, "--output", "json")
+		}
+		if err := execute(t, d, args...); err != nil {
+			t.Fatal(err)
+		}
+		const want = "--secret is deprecated: use --plain to opt out of the encrypted vault, which is the default (--secret=false still means --plain)"
+		if n := strings.Count(stderr.String(), want); n != 1 || strings.Count(stderr.String(), "deprecated") != 1 {
+			t.Errorf("json=%v: stderr = %q, want %q once", asJSON, stderr.String(), want)
+		}
+		if strings.Contains(stdout.String(), "deprecated") {
+			t.Errorf("json=%v: the warning reached stdout: %q", asJSON, stdout.String())
+		}
+		if asJSON {
+			var one map[string]any
+			dec := json.NewDecoder(strings.NewReader(stdout.String()))
+			if err := dec.Decode(&one); err != nil || dec.More() {
+				t.Errorf("stdout is not one document: %q (%v)", stdout.String(), err)
+			}
 		}
 	}
 }

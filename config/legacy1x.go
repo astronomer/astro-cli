@@ -15,7 +15,7 @@ import (
 // read; replacement is the same text `astro config` refuses the setting with.
 //
 // It resolves the way 1.x did: the project's .astro/config.yaml, where 1.x's
-// `astro config set` wrote without -g, over the home config. A project file
+// `astro config set` wrote without --global, over the home config. A project file
 // that sets the key decides it even at the default, since 1.x read that over
 // any global value.
 //

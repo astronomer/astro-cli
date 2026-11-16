@@ -183,7 +183,7 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentTeamRemoveCmd(out),
 		newDeploymentTeamAddCmd(out),
 	)
-	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose teams you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID(""))
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose teams you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID)
 	addOneXWorkspaceIDNoOp(cmd.PersistentFlags())
 	cliout.AddOutputFlag(cmd, &deploymentTeamOutput)
 	return cmd
@@ -268,8 +268,8 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 			return addDeploymentTeam(cmd, args, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "Deployment to add the team to: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID("w"))
-	cmd.Flags().StringVarP(&addDeploymentRole, "role", "r", "DEPLOYMENT_ADMIN", "The role for the "+
+	addDeploymentFlag(cmd.Flags(), "Deployment to add the team to: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID)
+	cmd.Flags().StringVar(&addDeploymentRole, "role", "DEPLOYMENT_ADMIN", "The role for the "+
 		"new team: DEPLOYMENT_ADMIN or a custom role name")
 	return cmd
 }
@@ -308,7 +308,7 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 			return updateDeploymentTeam(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&updateDeploymentRole, "role", "r", "", "The new role for the "+
+	cmd.Flags().StringVar(&updateDeploymentRole, "role", "", "The new role for the "+
 		"team: DEPLOYMENT_ADMIN or a custom role name")
 	return cmd
 }
@@ -359,7 +359,7 @@ func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentUserRemoveCmd(out),
 		newDeploymentUserAddCmd(out),
 	)
-	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose users you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID(""))
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose users you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID)
 	addOneXWorkspaceIDNoOp(cmd.PersistentFlags())
 	cliout.AddOutputFlag(cmd, &deploymentUserOutput)
 	return cmd
@@ -379,7 +379,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 			return addDeploymentUser(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&addDeploymentRole, "role", "r", "DEPLOYMENT_ADMIN", "The role for the "+
+	cmd.Flags().StringVar(&addDeploymentRole, "role", "DEPLOYMENT_ADMIN", "The role for the "+
 		"new user: DEPLOYMENT_ADMIN or a custom role name")
 	return cmd
 }
@@ -414,7 +414,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 			return updateDeploymentUser(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&updateDeploymentRole, "role", "r", "", "The new role for the "+
+	cmd.Flags().StringVar(&updateDeploymentRole, "role", "", "The new role for the "+
 		"user: DEPLOYMENT_ADMIN or a custom role name")
 	return cmd
 }
@@ -475,13 +475,13 @@ func newDeploymentLogsCmd(out io.Writer) *cobra.Command {
   astro deployment logs --deployment my-deployment --keyword "task failed"`,
 		RunE: func(cmd *cobra.Command, args []string) error { return deploymentLogs(cmd, args, out) },
 	}
-	cmd.Flags().BoolVarP(&warnLogs, "warn", "w", false, "Show logs with a log level of 'warning'")
-	cmd.Flags().BoolVarP(&errorLogs, "error", "e", false, "Show logs with a log level of 'error'")
-	cmd.Flags().BoolVarP(&infoLogs, "info", "i", false, "Show logs with a log level of 'info'")
-	cmd.Flags().StringVarP(&logsKeyword, "keyword", "k", "", "Show logs that contain this exact keyword or phrase")
-	cmd.Flags().IntVarP(&logCount, "log-count", "c", logCount, "Number of logs to show")
-	addDeploymentFlag(cmd.Flags(), "Deployment to show logs of: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
-	addDeploymentWorkspaceFlag(cmd.Flags())
+	cmd.Flags().BoolVar(&warnLogs, "warn", false, "Show logs with a log level of 'warning'")
+	cmd.Flags().BoolVar(&errorLogs, "error", false, "Show logs with a log level of 'error'")
+	cmd.Flags().BoolVar(&infoLogs, "info", false, "Show logs with a log level of 'info'")
+	cmd.Flags().StringVar(&logsKeyword, "keyword", "", "Show logs that contain this exact keyword or phrase")
+	cmd.Flags().IntVar(&logCount, "log-count", logCount, "Number of logs to show")
+	addDeploymentFlag(cmd.Flags(), "Deployment to show logs of: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
+	addDeploymentWorkspaceFlagWithoutLetter(cmd.Flags())
 	cmd.Flags().BoolVar(&logWebserver, "webserver", false, "Show logs from the webserver")
 	cmd.Flags().BoolVar(&logApiserver, "apiserver", false, "Show logs from the api server")
 	cmd.Flags().BoolVar(&logScheduler, "scheduler", false, "Show logs from the scheduler")
@@ -506,36 +506,36 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&label, "name", "n", "", "The Deployment's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace to create the Deployment in", oneXWorkspaceID)
-	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
-	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables Dag-only deploys for the Deployment")
-	cmd.Flags().StringVarP(&executor, "executor", "e", "CeleryExecutor", "The executor to use for the Deployment: CeleryExecutor, KubernetesExecutor or AstroExecutor")
-	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable")
+	cmd.Flags().StringVar(&description, "description", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
+	cmd.Flags().StringVar(&runtimeVersion, "runtime-version", "", "Runtime version for the Deployment")
+	cmd.Flags().StringVar(&dagDeploy, "dag-deploy", "", "Enables Dag-only deploys for the Deployment")
+	cmd.Flags().StringVar(&executor, "executor", "CeleryExecutor", "The executor to use for the Deployment: CeleryExecutor, KubernetesExecutor or AstroExecutor")
+	cmd.Flags().StringVar(&cicdEnforcement, "cicd-enforcement", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable")
 	cmd.Flags().StringVar(&cloneSource, "clone", "", cloneFlagUsage)
-	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
+	cmd.Flags().BoolVar(&waitForStatus, "wait", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
-	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "Print only the Deployment's YAML or JSON, with no other output")
-	cmd.Flags().StringVarP(&workloadIdentity, "workload-identity", "", "", "The Workload Identity to use for the Deployment")
+	cmd.Flags().BoolVar(&cleanOutput, "clean-output", false, "Print only the Deployment's YAML or JSON, with no other output")
+	cmd.Flags().StringVar(&workloadIdentity, "workload-identity", "", "The Workload Identity to use for the Deployment")
 	if organization.IsOrgHosted() {
-		cmd.Flags().StringVarP(&deploymentType, "type", "", standard, "The type of the Deployment: standard or dedicated")
-		cmd.Flags().StringVarP(&defaultTaskPodCPU, "default-task-pod-cpu", "", "", "The default task pod CPU to use for the Deployment. Example value: 0.25")
-		cmd.Flags().StringVarP(&defaultTaskPodMemory, "default-task-pod-memory", "", "", "The default task pod memory to use for the Deployment. Example value: 0.5Gi")
-		cmd.Flags().StringVarP(&resourceQuotaCPU, "resource-quota-cpu", "", "", "The Deployment's CPU resource quota. Example value: 10")
-		cmd.Flags().StringVarP(&resourceQuotaMemory, "resource-quota-memory", "", "", "The Deployment's memory resource quota. Example value: 20Gi")
-		cmd.Flags().StringVarP(&cloudProvider, "cloud-provider", "p", "azure", "The cloud provider to use for the Deployment: gcp, aws or azure")
-		cmd.Flags().StringVarP(&region, "region", "", "", "The cloud provider region to use for the Deployment")
-		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of scheduler for the Deployment. Possible values can be small, medium, large, extra_large")
-		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "disable", "Enables High Availability for the Deployment")
-		cmd.Flags().StringVarP(&developmentMode, "development-mode", "m", "disable", "Set to 'enable' to enable development-only features such as hibernation. When enabled, the Deployment will not have guaranteed uptime SLAs")
-		cmd.Flags().BoolVarP(&flagRemoteExecutionEnabled, "remote-execution-enabled", "", false, "Enables Remote Execution for the Deployment")
-		cmd.Flags().StringVarP(&flagAllowedIPAddressRanges, "allowed-ip-address-ranges", "", "", "A comma-separated list of allowed IP address ranges for the Deployment. By default, there's no IP restriction. Example: 203.0.113.0/24,198.51.100.42/32")
-		cmd.Flags().StringVarP(&flagTaskLogBucket, "task-log-bucket", "", "", "The bucket to use for storing task logs. Example: s3://my-bucket/airflow-logs")
-		cmd.Flags().StringVarP(&flagTaskLogURLPattern, "task-log-url-pattern", "", "", "The URL pattern to use for accessing task logs. Example: dag_id={{ ti.dag_id }}/run_id={{ ti.run_id }}/task_id={{ ti.task_id }}/{% if ti.map_index >= 0 %}map_index={{ ti.map_index }}/{% endif %}attempt={{ try_number|default(ti.try_number) }}/{{ ti.id }}.log")
+		cmd.Flags().StringVar(&deploymentType, "type", standard, "The type of the Deployment: standard or dedicated")
+		cmd.Flags().StringVar(&defaultTaskPodCPU, "default-task-pod-cpu", "", "The default task pod CPU to use for the Deployment. Example value: 0.25")
+		cmd.Flags().StringVar(&defaultTaskPodMemory, "default-task-pod-memory", "", "The default task pod memory to use for the Deployment. Example value: 0.5Gi")
+		cmd.Flags().StringVar(&resourceQuotaCPU, "resource-quota-cpu", "", "The Deployment's CPU resource quota. Example value: 10")
+		cmd.Flags().StringVar(&resourceQuotaMemory, "resource-quota-memory", "", "The Deployment's memory resource quota. Example value: 20Gi")
+		cmd.Flags().StringVar(&cloudProvider, "cloud-provider", "azure", "The cloud provider to use for the Deployment: gcp, aws or azure")
+		cmd.Flags().StringVar(&region, "region", "", "The cloud provider region to use for the Deployment")
+		cmd.Flags().StringVar(&schedulerSize, "scheduler-size", "", "The size of scheduler for the Deployment. Possible values can be small, medium, large, extra_large")
+		cmd.Flags().StringVar(&highAvailability, "high-availability", "disable", "Enables High Availability for the Deployment")
+		cmd.Flags().StringVar(&developmentMode, "development-mode", "disable", "Set to 'enable' to enable development-only features such as hibernation. When enabled, the Deployment will not have guaranteed uptime SLAs")
+		cmd.Flags().BoolVar(&flagRemoteExecutionEnabled, "remote-execution-enabled", false, "Enables Remote Execution for the Deployment")
+		cmd.Flags().StringVar(&flagAllowedIPAddressRanges, "allowed-ip-address-ranges", "", "A comma-separated list of allowed IP address ranges for the Deployment. By default, there's no IP restriction. Example: 203.0.113.0/24,198.51.100.42/32")
+		cmd.Flags().StringVar(&flagTaskLogBucket, "task-log-bucket", "", "The bucket to use for storing task logs. Example: s3://my-bucket/airflow-logs")
+		cmd.Flags().StringVar(&flagTaskLogURLPattern, "task-log-url-pattern", "", "The URL pattern to use for accessing task logs. Example: dag_id={{ ti.dag_id }}/run_id={{ ti.run_id }}/task_id={{ ti.task_id }}/{% if ti.map_index >= 0 %}map_index={{ ti.map_index }}/{% endif %}attempt={{ try_number|default(ti.try_number) }}/{{ ti.id }}.log")
 	} else {
-		cmd.Flags().IntVarP(&schedulerAU, "scheduler-au", "s", 0, "The Deployment's scheduler resources in AUs")
-		cmd.Flags().IntVarP(&schedulerReplicas, "scheduler-replicas", "r", 0, "The number of scheduler replicas for the Deployment")
+		cmd.Flags().IntVar(&schedulerAU, "scheduler-au", 0, "The Deployment's scheduler resources in AUs")
+		cmd.Flags().IntVar(&schedulerReplicas, "scheduler-replicas", 0, "The number of scheduler replicas for the Deployment")
 	}
-	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in. Run \"astro organization cluster list\" to see your Organization's cluster IDs")
+	cmd.Flags().StringVar(&clusterID, "cluster-id", "", "Cluster to create the Deployment in. Run \"astro organization cluster list\" to see your Organization's cluster IDs")
 	cmd.Flags().BoolVarP(&forceUpdate, "yes", "y", false, "Don't ask for confirmation, including after a warning about the Deployment's CI/CD enforcement")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -558,28 +558,28 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&label, "name", "n", "", "Update the Deployment's name. If the new name contains a space, specify the entire name within quotes \"\" ")
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace the Deployment is located in", oneXWorkspaceID)
-	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the Deployment: CeleryExecutor, KubernetesExecutor or AstroExecutor")
+	cmd.Flags().StringVar(&description, "description", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
+	cmd.Flags().StringVar(&executor, "executor", "", "The executor to use for the Deployment: CeleryExecutor, KubernetesExecutor or AstroExecutor")
 	cmd.Flags().BoolVarP(&forceUpdate, "yes", "y", false, "Don't ask for confirmation, including after a warning about the Deployment's CI/CD enforcement")
-	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "Whether deploys to the Deployment must use an API key or token, which forces them through CI/CD: enable or disable")
-	addDeploymentFlag(cmd.Flags(), "Deployment to update: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName(""))
-	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables Dag-only deploys for the deployment")
-	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "Print only the Deployment's YAML or JSON, with no other output")
-	cmd.Flags().StringVarP(&workloadIdentity, "workload-identity", "", "", "The Workload Identity to use for the Deployment")
+	cmd.Flags().StringVar(&cicdEnforcement, "cicd-enforcement", "", "Whether deploys to the Deployment must use an API key or token, which forces them through CI/CD: enable or disable")
+	addDeploymentFlag(cmd.Flags(), "Deployment to update: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName, withhold: true}, oneXDeploymentName)
+	cmd.Flags().StringVar(&dagDeploy, "dag-deploy", "", "Enables Dag-only deploys for the deployment")
+	cmd.Flags().BoolVar(&cleanOutput, "clean-output", false, "Print only the Deployment's YAML or JSON, with no other output")
+	cmd.Flags().StringVar(&workloadIdentity, "workload-identity", "", "The Workload Identity to use for the Deployment")
 	if organization.IsOrgHosted() {
-		cmd.Flags().StringVarP(&schedulerSize, "scheduler-size", "", "", "The size of Scheduler for the Deployment. Possible values can be small, medium, large, extra_large")
-		cmd.Flags().StringVarP(&highAvailability, "high-availability", "a", "", "Enables High Availability for the Deployment")
-		cmd.Flags().StringVarP(&defaultTaskPodCPU, "default-task-pod-cpu", "", "", "The Default Task Pod CPU to use for the Deployment. Example value: 0.25")
-		cmd.Flags().StringVarP(&defaultTaskPodMemory, "default-task-pod-memory", "", "", "The Default Taks Pod Memory to use for the Deployment. Example value: 0.5Gi")
-		cmd.Flags().StringVarP(&resourceQuotaCPU, "resource-quota-cpu", "", "", "The Resource Quota CPU to use for the Deployment. Example value: 10")
-		cmd.Flags().StringVarP(&resourceQuotaMemory, "resource-quota-memory", "", "", "The Resource Quota Memory to use for the Deployment. Example value: 20Gi")
-		cmd.Flags().StringVarP(&developmentMode, "development-mode", "m", "", "Whether the Deployment is for development only. If 'disable', the Deployment can be considered production for the purposes of support case priority, but development-only features such as hibernation will not be available. You can't update this value to 'enable' for existing non-development Deployments")
-		cmd.Flags().StringVarP(&flagAllowedIPAddressRanges, "allowed-ip-address-ranges", "", "", "A comma-separated list of allowed IP address ranges for the Deployment. By default, there's no IP restriction. Example: 203.0.113.0/24,198.51.100.42/32")
-		cmd.Flags().StringVarP(&flagTaskLogBucket, "task-log-bucket", "", "", "The bucket to use for storing task logs. Example: s3://my-bucket/airflow-logs")
-		cmd.Flags().StringVarP(&flagTaskLogURLPattern, "task-log-url-pattern", "", "", "The URL pattern to use for accessing task logs. Example: dag_id={{ ti.dag_id }}/run_id={{ ti.run_id }}/task_id={{ ti.task_id }}/{% if ti.map_index >= 0 %}map_index={{ ti.map_index }}/{% endif %}attempt={{ try_number|default(ti.try_number) }}/{{ ti.id }}.log")
+		cmd.Flags().StringVar(&schedulerSize, "scheduler-size", "", "The size of Scheduler for the Deployment. Possible values can be small, medium, large, extra_large")
+		cmd.Flags().StringVar(&highAvailability, "high-availability", "", "Enables High Availability for the Deployment")
+		cmd.Flags().StringVar(&defaultTaskPodCPU, "default-task-pod-cpu", "", "The Default Task Pod CPU to use for the Deployment. Example value: 0.25")
+		cmd.Flags().StringVar(&defaultTaskPodMemory, "default-task-pod-memory", "", "The Default Taks Pod Memory to use for the Deployment. Example value: 0.5Gi")
+		cmd.Flags().StringVar(&resourceQuotaCPU, "resource-quota-cpu", "", "The Resource Quota CPU to use for the Deployment. Example value: 10")
+		cmd.Flags().StringVar(&resourceQuotaMemory, "resource-quota-memory", "", "The Resource Quota Memory to use for the Deployment. Example value: 20Gi")
+		cmd.Flags().StringVar(&developmentMode, "development-mode", "", "Whether the Deployment is for development only. If 'disable', the Deployment can be considered production for the purposes of support case priority, but development-only features such as hibernation will not be available. You can't update this value to 'enable' for existing non-development Deployments")
+		cmd.Flags().StringVar(&flagAllowedIPAddressRanges, "allowed-ip-address-ranges", "", "A comma-separated list of allowed IP address ranges for the Deployment. By default, there's no IP restriction. Example: 203.0.113.0/24,198.51.100.42/32")
+		cmd.Flags().StringVar(&flagTaskLogBucket, "task-log-bucket", "", "The bucket to use for storing task logs. Example: s3://my-bucket/airflow-logs")
+		cmd.Flags().StringVar(&flagTaskLogURLPattern, "task-log-url-pattern", "", "The URL pattern to use for accessing task logs. Example: dag_id={{ ti.dag_id }}/run_id={{ ti.run_id }}/task_id={{ ti.task_id }}/{% if ti.map_index >= 0 %}map_index={{ ti.map_index }}/{% endif %}attempt={{ try_number|default(ti.try_number) }}/{{ ti.id }}.log")
 	} else {
-		cmd.Flags().IntVarP(&updateSchedulerAU, "scheduler-au", "s", 0, "The Deployment's Scheduler resources in AUs")
-		cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment")
+		cmd.Flags().IntVar(&updateSchedulerAU, "scheduler-au", 0, "The Deployment's Scheduler resources in AUs")
+		cmd.Flags().IntVar(&updateSchedulerReplicas, "scheduler-replicas", 0, "The number of Scheduler replicas for the Deployment")
 	}
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -599,7 +599,7 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error { return deploymentDelete(cmd, args, out) },
 	}
 	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting the Deployment")
-	addDeploymentFlag(cmd.Flags(), "Deployment to delete: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
+	addDeploymentFlag(cmd.Flags(), "Deployment to delete: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -635,10 +635,10 @@ func newDeploymentVariableListCmd(out io.Writer) *cobra.Command {
 			return deploymentVariableList(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&variableKey, "key", "k", "", "Specify a key to find a specific variable")
-	cmd.Flags().BoolVarP(&useEnvFile, "save", "s", false, "Save Deployment variables to an environment file")
-	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of the file to save environment variables to")
-	addDeploymentFlag(cmd.Flags(), "Deployment to list variables for: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID("d"), oneXDeploymentName("n"))
+	cmd.Flags().StringVar(&variableKey, "key", "", "Specify a key to find a specific variable")
+	cmd.Flags().BoolVar(&useEnvFile, "save", false, "Save Deployment variables to an environment file")
+	cmd.Flags().StringVar(&envFile, "env", ".env", "Location of the file to save environment variables to")
+	addDeploymentFlag(cmd.Flags(), "Deployment to list variables for: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID, oneXDeploymentName)
 
 	return cmd
 }
@@ -655,14 +655,14 @@ func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 			return deploymentVariableCreate(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&variableKey, "key", "k", "", "Key for the new variable")
-	cmd.Flags().StringVarP(&variableValue, "value", "v", "", "Value for the new variable")
-	cmd.Flags().BoolVarP(&useEnvFile, "load", "l", false, "Create environment variables loaded from an environment file")
-	cmd.Flags().BoolVarP(&makeSecret, "secret", "s", false, "Set the new environment variables as secrets")
-	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to load environment variables from")
+	cmd.Flags().StringVar(&variableKey, "key", "", "Key for the new variable")
+	cmd.Flags().StringVar(&variableValue, "value", "", "Value for the new variable")
+	cmd.Flags().BoolVar(&useEnvFile, "load", false, "Create environment variables loaded from an environment file")
+	cmd.Flags().BoolVar(&makeSecret, "secret", false, "Set the new environment variables as secrets")
+	cmd.Flags().StringVar(&envFile, "env", ".env", "Location of file to load environment variables from")
 	_ = cmd.Flags().MarkHidden("key")   //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	_ = cmd.Flags().MarkHidden("value") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	addDeploymentFlag(cmd.Flags(), "Deployment to create variables for: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID("d"), oneXDeploymentName("n"))
+	addDeploymentFlag(cmd.Flags(), "Deployment to create variables for: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID, oneXDeploymentName)
 
 	return cmd
 }
@@ -678,14 +678,14 @@ func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 			return deploymentVariableUpdate(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&variableKey, "key", "k", "", "Key of the variable to update")
-	cmd.Flags().StringVarP(&variableValue, "value", "v", "", "Value of the variable to update")
-	cmd.Flags().BoolVarP(&useEnvFile, "load", "l", false, "Update environment variables loaded from an environment file")
-	cmd.Flags().BoolVarP(&makeSecret, "secret", "s", false, "Set updated environment variables as secrets")
-	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file to load environment variables to update from")
+	cmd.Flags().StringVar(&variableKey, "key", "", "Key of the variable to update")
+	cmd.Flags().StringVar(&variableValue, "value", "", "Value of the variable to update")
+	cmd.Flags().BoolVar(&useEnvFile, "load", false, "Update environment variables loaded from an environment file")
+	cmd.Flags().BoolVar(&makeSecret, "secret", false, "Set updated environment variables as secrets")
+	cmd.Flags().StringVar(&envFile, "env", ".env", "Location of file to load environment variables to update from")
 	_ = cmd.Flags().MarkHidden("key")   //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	_ = cmd.Flags().MarkHidden("value") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	addDeploymentFlag(cmd.Flags(), "Deployment to update variables for: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID("d"), oneXDeploymentName("n"))
+	addDeploymentFlag(cmd.Flags(), "Deployment to update variables for: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID, oneXDeploymentName)
 
 	return cmd
 }
@@ -709,13 +709,13 @@ func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
 			return deploymentOverrideHibernation(cmd, args, out, true)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "Deployment to hibernate: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
+	addDeploymentFlag(cmd.Flags(), "Deployment to hibernate: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName, withhold: true}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
-	cmd.Flags().StringVarP(&until, "until", "u", "", "Specify the hibernation period using an end date and time. Example value: 2021-01-01T00:00:00Z")
-	cmd.Flags().StringVarP(&forDuration, "for", "d", "", "Specify the hibernation period using a duration. Example value: 1h30m")
-	cmd.Flags().BoolVarP(&removeOverride, "remove-override", "r", false, "Remove any existing override and resume regular hibernation schedule")
+	cmd.Flags().StringVar(&until, "until", "", "Specify the hibernation period using an end date and time. Example value: 2021-01-01T00:00:00Z")
+	cmd.Flags().StringVar(&forDuration, "for", "", "Specify the hibernation period using a duration. Example value: 1h30m")
+	cmd.Flags().BoolVar(&removeOverride, "remove-override", false, "Remove any existing override and resume regular hibernation schedule")
 	cmd.Flags().BoolVarP(&forceOverride, "yes", "y", false, "Don't ask for confirmation before hibernating the Deployment")
-	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to hibernate before ending the command")
+	cmd.Flags().BoolVar(&waitForStatus, "wait", false, "Wait for the Deployment to hibernate before ending the command")
 	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to hibernate before ending the command. Can only be used with --wait=true")
 	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
 	cmd.MarkFlagsMutuallyExclusive("wait", "remove-override")
@@ -742,13 +742,13 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 			return deploymentOverrideHibernation(cmd, args, out, false)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "Deployment to wake up: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
+	addDeploymentFlag(cmd.Flags(), "Deployment to wake up: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName, withhold: true}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
-	cmd.Flags().StringVarP(&until, "until", "u", "", "Specify the awake period using an end date. Example value: 2021-01-01T00:00:00Z")
-	cmd.Flags().StringVarP(&forDuration, "for", "d", "", "Specify the awake period using a duration. Example value: 1h30m")
-	cmd.Flags().BoolVarP(&removeOverride, "remove-override", "r", false, "Remove any existing override and resume the regular hibernation schedule")
+	cmd.Flags().StringVar(&until, "until", "", "Specify the awake period using an end date. Example value: 2021-01-01T00:00:00Z")
+	cmd.Flags().StringVar(&forDuration, "for", "", "Specify the awake period using a duration. Example value: 1h30m")
+	cmd.Flags().BoolVar(&removeOverride, "remove-override", false, "Remove any existing override and resume the regular hibernation schedule")
 	cmd.Flags().BoolVarP(&forceOverride, "yes", "y", false, "Don't ask for confirmation before waking up the Deployment")
-	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
+	cmd.Flags().BoolVar(&waitForStatus, "wait", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
 	cmd.MarkFlagsMutuallyExclusive("wait", "remove-override")
@@ -773,7 +773,7 @@ func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
 			return deploymentOpen(cmd, args, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "Deployment whose Airflow UI to open: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
+	addDeploymentFlag(cmd.Flags(), "Deployment whose Airflow UI to open: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -1282,7 +1282,7 @@ func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
 		newOrgTokenManageCmd(out),
 	)
 	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
-	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID(""))
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID)
 	cliout.AddOutputFlag(cmd, &deploymentTokenOutput)
 	return cmd
 }
@@ -1320,11 +1320,14 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
-	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the "+
+	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	cmd.Flags().StringVar(&tokenDescription, "description", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
+	cmd.Flags().StringVar(&tokenRole, "role", "", "The role for the "+
 		"token. Possible values are DEPLOYMENT_ADMIN or a custom role name")
-	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Days until the token expires, from 1 to 3650 (default: it never expires)")
+	cmd.Flags().IntVar(&tokenExpiration, "expiration", 0, "Days until the token expires, from 1 to 3650 (default: it never expires)")
+	// 1.x gave -d to --description on create and update, so --deployment takes no -d
+	// here: it shadows the group's, which has one, and a script's -d is refused.
+	addDeploymentFlag(cmd.Flags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID, withhold: true}, oneXDeploymentID)
 	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }
@@ -1344,11 +1347,14 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 			return updateDeploymentToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&name, "name", "t", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&deploymentTokenUpdateRole, "role", "r", "", "The new role for the "+
+	cmd.Flags().StringVar(&name, "name", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&tokenName, "new-name", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&tokenDescription, "description", "", "Updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
+	cmd.Flags().StringVar(&deploymentTokenUpdateRole, "role", "", "The new role for the "+
 		"token. Possible values are DEPLOYMENT_ADMIN or a custom role name. Without it, the token keeps its role")
+	// 1.x gave -d to --description on create and update, so --deployment takes no -d
+	// here: it shadows the group's, which has one, and a script's -d is refused.
+	addDeploymentFlag(cmd.Flags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID, withhold: true}, oneXDeploymentID)
 	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }
@@ -1368,8 +1374,8 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
 			return rotateDeploymentToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
-	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceRotate, "yes", "y", false, "Don't ask for confirmation before rotating the Deployment API token")
 
 	addOneXWorkspaceIDNoOp(cmd.Flags())
@@ -1391,7 +1397,7 @@ func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 			return deleteDeploymentToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting or removing the API token")
 
 	addOneXWorkspaceIDNoOp(cmd.Flags())
@@ -1447,8 +1453,8 @@ func newAddOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 			return addOrgTokenToDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to add to the "+
+	cmd.Flags().StringVar(&orgTokenName, "org-token-name", "", "The name of the Organization API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to add to the "+
 		"Organization API token: DEPLOYMENT_ADMIN or a custom role name")
 	return cmd
 }
@@ -1469,8 +1475,8 @@ func newUpdateOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 			return updateOrgTokenToDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to update the "+
+	cmd.Flags().StringVar(&orgTokenName, "org-token-name", "", "The name of the Organization API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to update the "+
 		"Organization API token to: DEPLOYMENT_ADMIN or a custom role name")
 	return cmd
 }
@@ -1491,10 +1497,10 @@ func newAddWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 			return addWorkspaceTokenDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&orgTokenName, "workspace-token-name", "n", "", "The name of the WORKSPACE API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to grant to the "+
+	cmd.Flags().StringVar(&orgTokenName, "workspace-token-name", "", "The name of the WORKSPACE API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to grant to the "+
 		"Workspace API token: DEPLOYMENT_ADMIN or a custom role name")
-	addWorkspaceFlag(cmd.Flags(), &workspaceID, "", "Workspace the token is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)", oneXWorkspaceID)
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace the token is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)", oneXWorkspaceID)
 	return cmd
 }
 
@@ -1514,8 +1520,8 @@ func newUpdateWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 			return updateWorkspaceTokenDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&orgTokenName, "workspace-token-name", "n", "", "The name of the WORKSPACE API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to grant to the "+
+	cmd.Flags().StringVar(&orgTokenName, "workspace-token-name", "", "The name of the WORKSPACE API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to grant to the "+
 		"Workspace API token: DEPLOYMENT_ADMIN or a custom role name")
 	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
@@ -1553,7 +1559,7 @@ func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 			return removeOrgTokenFromDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&orgTokenName, "org-token-name", "n", "", "The name of the Organization API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&orgTokenName, "org-token-name", "", "The name of the Organization API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
 	return cmd
 }
 
@@ -1573,8 +1579,8 @@ func newRemoveWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 			return removeWorkspaceTokenDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&orgTokenName, "workspace-token-name", "n", "", "The name of the WORKSPACE API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
-	addWorkspaceFlag(cmd.Flags(), &workspaceID, "", "Workspace the token is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)", oneXWorkspaceID)
+	cmd.Flags().StringVar(&orgTokenName, "workspace-token-name", "", "The name of the WORKSPACE API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace the token is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)", oneXWorkspaceID)
 	return cmd
 }
 

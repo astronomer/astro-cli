@@ -57,8 +57,8 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 			return workspaceUserAdd(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&workspaceUserWsRole, "role", "r", houston.WorkspaceViewerRole, "Role assigned to user")
-	cmd.Flags().StringVarP(&workspaceUserCreateEmail, "email", "e", "", "Email of the user you wish to add to this workspace")
+	cmd.Flags().StringVar(&workspaceUserWsRole, "role", houston.WorkspaceViewerRole, "Role assigned to user")
+	cmd.Flags().StringVar(&workspaceUserCreateEmail, "email", "", "Email of the user you wish to add to this workspace")
 	_ = cmd.MarkFlagRequired("email") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
@@ -76,7 +76,7 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
 			return workspaceUserUpdate(cmd, out, args)
 		},
 	}
-	cmd.Flags().StringVarP(&workspaceUserWsRole, "role", "r", houston.WorkspaceViewerRole, "Role assigned to user")
+	cmd.Flags().StringVar(&workspaceUserWsRole, "role", houston.WorkspaceViewerRole, "Role assigned to user")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -114,8 +114,8 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
-		cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated workspace user list")
-		cmd.Flags().IntVarP(&pageSize, "page-size", "s", 0, "Page size of the workspace user list if paginated is set to true")
+		cmd.Flags().BoolVar(&paginated, "paginated", false, "Paginated workspace user list")
+		cmd.Flags().IntVar(&pageSize, "page-size", 0, "Page size of the workspace user list if paginated is set to true")
 	}
 	addAccessOutputFlag(cmd)
 	return cmd
