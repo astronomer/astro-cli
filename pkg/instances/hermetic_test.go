@@ -24,7 +24,7 @@ const inheritedHome = "ASTRO_TEST_ISOLATED_HOME"
 func isolateHome() (finish func(code int) int) {
 	if parent := os.Getenv(inheritedHome); parent != "" {
 		// A helper process works in the home its parent made, and never a real one.
-		if home := os.Getenv("HOME"); !strings.HasPrefix(home, parent) {
+		if home := os.Getenv("HOME"); !strings.HasPrefix(home, parent+string(filepath.Separator)) {
 			fmt.Fprintf(os.Stderr, "isolateHome: a helper process runs with HOME=%q, outside its parent's %q\n", home, parent)
 			os.Exit(2)
 		}

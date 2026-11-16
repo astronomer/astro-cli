@@ -106,7 +106,13 @@ func isolate(watch *stateWatch) func(code int) int {
 		setDir("APPDATA", filepath.Join(root, "appdata"))
 		setDir("LOCALAPPDATA", filepath.Join(root, "localappdata"))
 	}
-	setDir("UV_PYTHON_INSTALL_DIR", uvPythonDir())
+	uvDir := uvPythonDir()
+	setDir("UV_PYTHON_INSTALL_DIR", uvDir)
+	// A directory someone else made first, or left open, would have uv run
+	// interpreters its maker can replace.
+	if info, err := os.Stat(uvDir); err != nil || !info.IsDir() || (runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
+		dief("the shared uv directory %s is not a private directory (stat: %v); remove it", uvDir, err)
+	}
 	// go-homedir caches the first home it resolves, which is the real one when
 	// anything asked before TestMain ran (a package-level var in config does).
 	homedir.Reset()

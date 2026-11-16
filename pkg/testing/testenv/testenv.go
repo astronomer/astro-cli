@@ -4,8 +4,10 @@
 // places a program keeps state move into a temporary directory the run removes,
 // and the OS keychain is replaced by an in-memory one.
 //
-// It imports nothing from this module, so any package's tests, including those
-// of packages pkg/testing itself imports, can use it from TestMain.
+// It imports only pkg/secrets (for the keyring guard) from this repository, and
+// pkg/secrets imports nothing of the root module, so any root-module package's
+// tests, including those of packages pkg/testing itself imports, can use it
+// from TestMain. The pkg/* modules cannot, and carry their own copy.
 package testenv
 
 // behaviorEnv is every environment variable the CLI reads that changes what
