@@ -64,7 +64,7 @@ func TestEachSettingIn1xConfigIsNamedAndTheFileGoes(t *testing.T) {
 		"unknown:\n  thing: 1\n", fakeSettings)
 
 	assert.Equal(t, []string{config1xRelPath + ": container.binary is a CLI setting, which Astro CLI v2 keeps per machine rather than per project. " +
-		"To keep it on this machine, run: astro config set -g container.binary podman"}, notesAbout(res, "container.binary"))
+		"To keep it on this machine, run: astro config set --global container.binary podman"}, notesAbout(res, "container.binary"))
 	assert.Empty(t, notesAbout(res, "remote.client_registry"), "a deploy setting is carried, not named")
 	assert.Contains(t, res.Advisories, config1xRelPath+": carried remote.client_registry into [tool.astro.deploy] client-registry in pyproject.toml")
 	assert.Equal(t, []string{config1xRelPath + ": webserver.port is an Astro CLI 1.x setting v2 does not have. " +
@@ -95,7 +95,7 @@ func TestASettingNoteDoesNotPrintWhatItMustNot(t *testing.T) {
 
 	binary := notesAbout(res, "container.binary")
 	require.Len(t, binary, 1)
-	assert.True(t, strings.HasSuffix(binary[0], "astro config set -g container.binary <value>"), binary[0])
+	assert.True(t, strings.HasSuffix(binary[0], "astro config set --global container.binary <value>"), binary[0])
 	token := notesAbout(res, "cloud.api.token")
 	require.Len(t, token, 1)
 	assert.NotContains(t, token[0], "s3cr3t-t0ken")

@@ -391,7 +391,7 @@ func TestDeploymentCoreJSON(t *testing.T) {
 		assert.Equal(t, "workspace-id", got.Deployment.Metadata.WorkspaceID)
 		assert.Equal(t, "etl-prod", got.Deployment.Configuration.Name)
 		assert.Equal(t, "test-workspace", got.Deployment.Configuration.WorkspaceName)
-		assert.Equal(t, "Current Workspace: test-workspace\n\n", r.stderr, "the note, on stderr")
+		assert.Equal(t, "Current Workspace: test-workspace\n\n", withoutDeprecations(r.stderr), "the note, on stderr")
 		m.AssertExpectations(t)
 	})
 
@@ -418,7 +418,7 @@ func TestDeploymentCoreJSON(t *testing.T) {
 	// Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, the
 	// update is to that Deployment, said on stderr; stdout is the result.
 	t.Run("an update naming nothing takes the token's Deployment", func(t *testing.T) {
-		testUtil.UseAPIToken(t, "deploymentId:"+coreDeploymentID)
+		testUtil.UseAPIToken(t, "workspaceId:workspace-id", "deploymentId:"+coreDeploymentID)
 		updated := coreDeployment()
 		updated.Name = "etl-prod-2"
 		m := new(astrov1_mocks.ClientWithResponsesInterface)
@@ -583,7 +583,7 @@ func TestDeploymentCoreJSONNeverAsks(t *testing.T) {
 			assert.Equal(t, string(cliout.KindInputRequired), got.Kind)
 			assert.Equal(t, cliout.ExitFailure, got.Code, "the code it reports is the one it exits with")
 			assert.Contains(t, got.Error, tc.answered)
-			assert.Empty(t, r.stderr)
+			assert.Empty(t, withoutDeprecations(r.stderr))
 		})
 	}
 }

@@ -195,7 +195,7 @@ func initHome(fs afero.Fs) {
 	// setters guard on ConfigFileUsed() which SetConfigFile
 	// above has already set, and saveConfig creates the parent directory
 	// before it writes the file — so the first `astro login` or `astro
-	// config set -g` still writes it.
+	// config set --global` still writes it.
 	switch err := readConfigFile(viperHome, fs); {
 	case err == nil:
 		delete(unreadableConfigs, HomeConfigFile)
@@ -335,4 +335,12 @@ func lockConfig(file string) (unlock func(), err error) {
 		return nil, fmt.Errorf("timed out after %s waiting for config lock %s — another astro process is holding it; wait for it to finish or kill it", lockTimeout, lockFile)
 	}
 	return func() { _ = lock.Unlock() }, nil //nolint:errcheck // error deliberately ignored in this shell code
+}
+
+// UnreadableHomeConfig returns the path of the home config file when it exists
+// and could not be parsed at startup. Its settings read as defaults then, so
+// "no context set" would be the answer to every question about the login, and
+// a caller that cannot go on without one says which file is the problem.
+func UnreadableHomeConfig() (string, bool) {
+	return HomeConfigFile, unreadableConfigs[HomeConfigFile]
 }

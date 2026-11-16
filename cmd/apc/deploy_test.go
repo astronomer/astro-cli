@@ -24,7 +24,7 @@ func TestDeployImageNameHandsOverTheImage(t *testing.T) {
 	t.Run("--image-name, from outside any project, to a Deployment by id", func(t *testing.T) {
 		inWorkingDir(t, true)
 		seen := deployMocks(t, deployPushed, nil)
-		run := runAPC(t, newAPCClient(), "", "deploy", "test-deployment-id", "--image-name", "img:1", "-f", "-o", "json")
+		run := runAPC(t, newAPCClient(), "", "deploy", "test-deployment-id", "--image-name", "img:1", "--force", "-o", "json")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		require.Len(t, seen.images, 1)
 		in := seen.images[0]

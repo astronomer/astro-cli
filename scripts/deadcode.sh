@@ -47,6 +47,7 @@ TEST_SUPPORT=(
   pkg/testing/
   pkg/input/testsupport.go
   config/config_test_utils.go
+  internal/telemetry/testsupport.go
 )
 
 work=$(mktemp -d)

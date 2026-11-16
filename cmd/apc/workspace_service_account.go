@@ -58,12 +58,12 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
-	cmd.Flags().StringVarP(&workspaceSAUserID, "user-id", "u", "", "ID of the user you want to link this service account to")
-	cmd.Flags().StringVarP(&workspaceSACategory, "category", "c", "default", "Category of the new service account")
+	cmd.Flags().StringVar(&workspaceSAUserID, "user-id", "", "ID of the user you want to link this service account to")
+	cmd.Flags().StringVar(&workspaceSACategory, "category", "default", "Category of the new service account")
 	// --name, as an Astro API token's; 1.x's --label, -l, is its alias.
 	cmd.Flags().StringVarP(&workspaceSAName, "name", "n", "", "Name of the new service account")
-	utils.AddAlias(cmd.Flags(), "label", "l", "name")
-	cmd.Flags().StringVarP(&workspaceSARole, "role", "r", houston.WorkspaceViewerRole, "Role (permissions) attached to the created service account")
+	utils.AddAlias(cmd.Flags(), "label", "name")
+	cmd.Flags().StringVar(&workspaceSARole, "role", houston.WorkspaceViewerRole, "Role (permissions) attached to the created service account")
 	_ = cmd.MarkFlagRequired("name") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd

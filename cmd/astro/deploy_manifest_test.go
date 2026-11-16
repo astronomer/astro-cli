@@ -1065,7 +1065,7 @@ func TestDeployRoutesManifestProject(t *testing.T) {
 // --prompt requested. The run gets as far as asking for --deployment, as one
 // without them does.
 func TestDeployAcceptsForceAndPromptOnAManifestProject(t *testing.T) {
-	for _, flag := range []string{"--force", "-f", "--prompt", "-p"} {
+	for _, flag := range []string{"--force", "--prompt"} {
 		t.Run(flag, func(t *testing.T) {
 			nonInteractiveDeploy(t)
 			testUtil.InitTestConfig(testUtil.LocalPlatform)

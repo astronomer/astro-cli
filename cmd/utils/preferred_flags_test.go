@@ -16,7 +16,7 @@ func aliasedFlagSet(t *testing.T, args ...string) (fs *pflag.FlagSet, workspace 
 	fs = pflag.NewFlagSet("test", pflag.ContinueOnError)
 	workspace = new(string)
 	fs.StringVar(workspace, "workspace", "", "")
-	AddAlias(fs, "workspace-id", "w", "workspace")
+	AddAlias(fs, "workspace-id", "workspace")
 	require.NoError(t, fs.Parse(args))
 	return fs, workspace
 }
@@ -27,12 +27,12 @@ func TestAddAliasHidesTheOldSpelling(t *testing.T) {
 	assert.True(t, IsAlias(fs.Lookup("workspace-id")))
 	assert.False(t, fs.Lookup("workspace").Hidden)
 	assert.False(t, IsAlias(fs.Lookup("workspace")))
-	assert.Equal(t, "w", fs.Lookup("workspace-id").Shorthand)
+	assert.Empty(t, fs.Lookup("workspace-id").Shorthand, "a letter means one thing: the alias takes none")
 }
 
 func TestApplyAliases(t *testing.T) {
 	t.Run("the alias reaches the flag it stands for", func(t *testing.T) {
-		for _, args := range [][]string{{"--workspace-id", "ws"}, {"-w", "ws"}} {
+		for _, args := range [][]string{{"--workspace-id", "ws"}} {
 			fs, workspace := aliasedFlagSet(t, args...)
 			require.NoError(t, ApplyAliases(fs))
 			assert.Equal(t, "ws", *workspace)
@@ -65,9 +65,9 @@ func TestApplyAliases(t *testing.T) {
 		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
 		deployment := new(string)
 		fs.StringVar(deployment, "deployment", "", "")
-		AddAlias(fs, "deployment-id", "d", "deployment")
-		AddAlias(fs, "deployment-name", "n", "deployment")
-		require.NoError(t, fs.Parse([]string{"-n", "prod", "-d", "cl123"}))
+		AddAlias(fs, "deployment-id", "deployment")
+		AddAlias(fs, "deployment-name", "deployment")
+		require.NoError(t, fs.Parse([]string{"--deployment-name", "prod", "--deployment-id", "cl123"}))
 		require.NoError(t, ApplyAliases(fs))
 		assert.Equal(t, "cl123", *deployment)
 	})

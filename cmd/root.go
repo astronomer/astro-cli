@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"io"
 	"os"
 	"sort"
@@ -30,6 +31,22 @@ var (
 	houstonClient  houston.ClientInterface
 	houstonVersion string
 )
+
+// trackSetupFailure runs the platform's pre-run, and when it stops the command
+// records that it did, with the kind of its error, before returning the error
+// unchanged: the chain stops at the first error, so the tracking hook that
+// follows never sees a command whose setup failed. The event is sent in the
+// background and delays nothing.
+func trackSetupFailure(preRun func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		err := preRun(cmd, args)
+		// An interrupt is the person ending the run, not a failure of setup.
+		if err != nil && !errors.Is(err, input.ErrInterrupted) {
+			telemetry.TrackSetupFailure(cmd, string(problemKinds.Of(err)))
+		}
+		return err
+	}
+}
 
 // platformPreRun is the root pre-run's version check and login
 // (CreateRootPersistentPreRunE); a test swaps it to see which commands reach
@@ -113,7 +130,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 			}
 			return utils.ChainRunEs(
 				SetupLogging,
-				platformPreRun(astroV1Client),
+				trackSetupFailure(platformPreRun(astroV1Client)),
 				telemetry.CreateTrackingHook(),
 			)(cmd, args)
 		},
@@ -121,7 +138,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// Defined ahead of the commands rather than with the rest of the root's
 	// setup below: apcCmd.NeedsPlatform reads the root's persistent flags to
 	// find which command a line runs.
-	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
+	rootCmd.PersistentFlags().StringVar(&verboseLevel, "verbosity", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	input.AddFlag(rootCmd.PersistentFlags())
 
 	rootCmd.AddCommand(

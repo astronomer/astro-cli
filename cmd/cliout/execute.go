@@ -94,6 +94,7 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	defer restoreHelp()
 
 	ResetStream()
+	ResetWarnOnce()
 	root.SetArgs(args)
 	cmd, err := root.ExecuteContextC(ctx)
 	if err == nil {

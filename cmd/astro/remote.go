@@ -82,10 +82,10 @@ func newRemoteDeployCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&remotePlatform, "platform", "", "Target platform for client image build (e.g., linux/amd64,linux/arm64). Defaults to host machine platform")
-	cmd.Flags().StringVarP(&remoteImageName, "image-name", "i", "", "Name of a custom image to deploy, or image name with custom tag; the image must be present on this machine")
+	cmd.Flags().StringVar(&remoteImageName, "image-name", "", "Name of a custom image to deploy, or image name with custom tag; the image must be present on this machine")
 	utils.AddBuildSecretFlag(cmd.Flags(), &remoteBuildSecrets)
 	cmd.Flags().StringVar(&remoteRegistry, "registry", "", "Repository to push the client image to, registry[:port]/repository with no tag: the one the Deployment's remote agents pull from. Default: the linked Deployment's client-registry, else [tool.astro.deploy] client-registry")
-	addDeploymentFlag(cmd.Flags(), "Deployment whose runtime version the client image is validated against: a link name of this project, or a Deployment id. A link's client-registry is the one pushed to", deploymentTargets{id: &remoteDeploymentID}, oneXDeploymentID(""))
+	addDeploymentFlag(cmd.Flags(), "Deployment whose runtime version the client image is validated against: a link name of this project, or a Deployment id. A link's client-registry is the one pushed to", deploymentTargets{id: &remoteDeploymentID}, oneXDeploymentID)
 	cliout.AddOutputFlag(cmd, &remoteOutput)
 
 	return cmd

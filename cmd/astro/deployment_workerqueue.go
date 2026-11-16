@@ -57,12 +57,12 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "Deployment that has the worker queue: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID("d"), oneXDeploymentName(""))
+	addDeploymentFlag(cmd.Flags(), "Deployment that has the worker queue: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID, oneXDeploymentName)
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue: up to 63 lowercase letters, digits or '-', starting with a letter")
-	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", 0, "The min worker count of the worker queue")
-	cmd.Flags().IntVarP(&maxWorkerCount, "max-count", "", 0, "The max worker count of the worker queue")
-	cmd.Flags().IntVarP(&concurrency, "concurrency", "", 0, "The concurrency (number of slots) of the worker queue")
-	cmd.Flags().StringVarP(&workerType, "worker-type", "t", "", "The worker type of the worker queue")
+	cmd.Flags().IntVar(&minWorkerCount, "min-count", 0, "The min worker count of the worker queue")
+	cmd.Flags().IntVar(&maxWorkerCount, "max-count", 0, "The max worker count of the worker queue")
+	cmd.Flags().IntVar(&concurrency, "concurrency", 0, "The concurrency (number of slots) of the worker queue")
+	cmd.Flags().StringVar(&workerType, "worker-type", "", "The worker type of the worker queue")
 
 	return cmd
 }
@@ -83,13 +83,13 @@ func newDeploymentWorkerQueueUpdateCmd(out io.Writer) *cobra.Command {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "Deployment that has the worker queue: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID("d"), oneXDeploymentName(""))
+	addDeploymentFlag(cmd.Flags(), "Deployment that has the worker queue: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID, oneXDeploymentName)
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue: up to 63 lowercase letters, digits or '-', starting with a letter")
 	cmd.Flags().BoolVarP(&force, "yes", "y", false, "Don't ask for confirmation, including after the warning about tasks assigned to the queue")
-	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", 0, "The min worker count of the worker queue")
-	cmd.Flags().IntVarP(&maxWorkerCount, "max-count", "", 0, "The max worker count of the worker queue")
-	cmd.Flags().IntVarP(&concurrency, "concurrency", "", 0, "The concurrency (number of slots) of the worker queue")
-	cmd.Flags().StringVarP(&workerType, "worker-type", "t", "", "The worker type of the worker queue")
+	cmd.Flags().IntVar(&minWorkerCount, "min-count", 0, "The min worker count of the worker queue")
+	cmd.Flags().IntVar(&maxWorkerCount, "max-count", 0, "The max worker count of the worker queue")
+	cmd.Flags().IntVar(&concurrency, "concurrency", 0, "The concurrency (number of slots) of the worker queue")
+	cmd.Flags().StringVar(&workerType, "worker-type", "", "The worker type of the worker queue")
 
 	return cmd
 }
@@ -109,7 +109,7 @@ func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 			return deploymentWorkerQueueDelete(cmd, args, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "Deployment that has the worker queue: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID("d"), oneXDeploymentName(""))
+	addDeploymentFlag(cmd.Flags(), "Deployment that has the worker queue: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{id: &deploymentID, name: &deploymentName}, oneXDeploymentID, oneXDeploymentName)
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue to delete")
 	cmd.Flags().BoolVarP(&force, "yes", "y", false, "Don't ask for confirmation, including after the warning about tasks assigned to the queue")
 	return cmd
