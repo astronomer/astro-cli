@@ -19,10 +19,10 @@ import (
 )
 
 // slimManifestEnvVar switches the slim manifest without disabling the step.
-// The step's own switch is the caller's ([tool.astro.deploy] cosmos-boost for
-// a project's Dags, --cosmos-boost for a bundle); optimizations under it are on by
-// default and switched per-feature by env var. The name matches the plugin's
-// convention for its own optimizations.
+// The step's own switch is the caller's: [tool.astro.deploy] cosmos-boost for
+// a project's Dags, --cosmos-boost for a bundle. Optimizations under it are
+// on by default and switched per-feature by env var. The name matches the
+// plugin's convention for its own optimizations.
 const slimManifestEnvVar = "ASTRO_COSMOS_BOOST_SLIM_MANIFEST_ENABLED"
 
 // slimManifestEnabled reports whether to produce the slim manifest: on when
@@ -46,9 +46,8 @@ func slimManifestEnabled() bool {
 // else at such a path - another producer's file, a link - is the user's and
 // ships untouched.
 //
-// With the step on ([tool.astro.deploy] cosmos-boost, or --cosmos-boost for a
-// bundle), the pre-deploy step runs
-// over root and its sidecars are added at the same paths, with the same
+// With the step on ([tool.astro.deploy] cosmos-boost, or --cosmos-boost for
+// a bundle), the pre-deploy step runs over root and its sidecars are added at the same paths, with the same
 // contents, the plugin has always read, in place of whatever is there: every
 // dbt project (dbt_project.yml) gets a .astro/dbt_metadata.json carrying its
 // content hash, which the plugin uses as a cache version key at parse time

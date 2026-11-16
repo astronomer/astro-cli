@@ -27,6 +27,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
+	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
@@ -392,6 +393,13 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	if res.Git.Uncommitted {
 		recap.Note("the project has uncommitted changes, so this deploy records no git commit")
 	}
+	// A prebuilt image records no commit whatever the settings say, so it
+	// gets no note about them.
+	if inProject && imageName == "" && m != nil {
+		if note := gitMetadataOffNote(config.WorkingPath, m.Astro.Deploy.GitMetadata); note != "" {
+			recap.Note(note)
+		}
+	}
 	if !inProject {
 		w := imageAloneWarning(&res, imageName)
 		warnings = append(warnings, w)
@@ -752,18 +760,25 @@ func (d manifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeploy.De
 // --git-metadata) asks for it, and this machine's deploy.git_metadata has not
 // turned it off. The global setting is an off switch only, so a project
 // committed with git-metadata = true never starts sending commit data from a
-// machine whose owner turned it off; when that happens the deploy says so on
-// errOut, in the words of the uncommitted-changes note.
-func gitMetadataAllowed(errOut io.Writer, wanted bool) bool {
-	if !wanted {
-		return false
-	}
-	if config.CFG.DeployGitMetadata.GetBool() {
-		return true
-	}
-	cliout.Note(errOut, "deploy.git_metadata is false in your global config, so this deploy records no git commit")
-	return false
+// machine whose owner turned it off.
+func gitMetadataAllowed(wanted bool) bool {
+	return wanted && config.CFG.DeployGitMetadata.GetBool()
 }
+
+// gitMetadataOffNote is the note a deploy of dir gives when the global
+// deploy.git_metadata kept it from recording a commit it would have: one it
+// wanted, from a git checkout. "" otherwise, so a deploy from a directory
+// that is no checkout says nothing about a commit it never had.
+func gitMetadataOffNote(dir string, wanted bool) string {
+	if !wanted || config.CFG.DeployGitMetadata.GetBool() || !git.IsGitRepository(dir) {
+		return ""
+	}
+	return gitMetadataOffText
+}
+
+// gitMetadataOffText says why a deploy recorded no commit, in the words of
+// the uncommitted-changes note.
+const gitMetadataOffText = "deploy.git_metadata is false in your global config, so this deploy records no git commit"
 
 // DeployDags ships the project's dags/ through the dags-only transport.
 func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
@@ -775,7 +790,7 @@ func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdepl
 		NoDagsBaseDir: in.NoDagsBaseDir,
 		Wait:          in.Wait,
 		WaitTime:      in.WaitTime,
-		GitMetadata:   gitMetadataAllowed(d.errOut, in.GitMetadata),
+		GitMetadata:   gitMetadataAllowed(in.GitMetadata),
 		CosmosBoost:   in.CosmosBoost,
 		Progress:      d.errOut,
 	}, d.login.client)
@@ -827,7 +842,7 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		NoDagsBaseDir:  in.NoDagsBaseDir,
 		Wait:           in.Wait,
 		WaitTime:       in.WaitTime,
-		GitMetadata:    in.ImageName == "" && gitMetadataAllowed(d.errOut, in.GitMetadata),
+		GitMetadata:    gitMetadataAllowed(in.GitMetadata),
 		CosmosBoost:    in.CosmosBoost,
 		Progress:       d.errOut,
 		ResolveInstall: imageinstall.Fill,
