@@ -41,8 +41,8 @@ func (e *invalidTokenError) Error() string        { return e.msg }
 func (e *invalidTokenError) Is(target error) bool { return target == ErrInvalidToken }
 
 // ErrTokenNoOrganization is a token whose claims name no organization, which
-// every Astro API token's do: the run cannot look anything up without one, and
-// the saved login's is not the token's.
+// no genuine Astro API token's lack: the run cannot look anything up without
+// one, and the saved login's is not the token's.
 var ErrTokenNoOrganization = errors.New("ASTRO_API_TOKEN names no organization: set a valid Astro API token, or unset it to use your login")
 
 // Identity is what an ASTRO_API_TOKEN is: its credential, and the selection its

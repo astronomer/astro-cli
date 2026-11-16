@@ -246,7 +246,7 @@ func (p *provider) load() {
 		// unusable is its own outage, named as the root names it: the run does
 		// not read the saved login instead.
 		ctx, err := login(p.domain)
-		if errors.Is(err, astrosession.ErrInvalidToken) {
+		if errors.Is(err, astrosession.ErrInvalidToken) || errors.Is(err, astrosession.ErrTokenNoOrganization) {
 			p.down = &outage{short: "unusable ASTRO_API_TOKEN", cause: err.Error()}
 			return
 		}

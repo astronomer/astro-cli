@@ -88,8 +88,8 @@ func Credential(stored string) string {
 	return airflowapi.BearerCredential(stored)
 }
 
-// Bearer returns the current identity's token exactly as it is stored, scheme
-// and all: airflowapi.BearerToken normalizes that away, and a second
+// Bearer returns the current identity's token: a saved login's exactly as it is stored, scheme
+// and all (an ASTRO_API_TOKEN comes without one): airflowapi.BearerToken normalizes that away, and a second
 // implementation of the same trimming here is one more place for the two to
 // disagree. It matches the seam pkg/instances takes for the astro auth
 // method, context and all, though nothing about reading the local config
@@ -205,6 +205,9 @@ func Login(domain string) (config.Context, error) {
 	if id, ok, err := TokenIdentity(); ok || err != nil {
 		if err != nil {
 			return config.Context{Domain: domain}, err
+		}
+		if id.Organization == "" {
+			return config.Context{Domain: domain}, ErrTokenNoOrganization
 		}
 		return config.Context{Domain: domain, Token: "Bearer " + id.Credential, Organization: id.Organization, Workspace: id.Workspace}, nil
 	}

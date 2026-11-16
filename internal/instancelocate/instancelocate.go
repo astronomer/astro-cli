@@ -128,7 +128,7 @@ func deploymentsOn(domain string) Deployments {
 }
 
 // tokenHost is the host an ASTRO_API_TOKEN is used on when a project names
-// none: the current context's, which ASTRO_DOMAIN overrides, else Astro's.
+// none: ASTRO_DOMAIN, else the current context's, else Astro's.
 func tokenHost() string {
 	if d, err := config.GetCurrentDomain(); err == nil {
 		return d
