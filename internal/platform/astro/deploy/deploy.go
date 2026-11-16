@@ -84,6 +84,9 @@ func includeMonitoringDag(orgHosted bool, deploymentType astrov1.DeploymentType)
 
 // dagsUpload is how a project's dags/ directory is uploaded.
 type dagsUpload struct {
+	// MonitoringDag adds Astronomer's monitoring Dag to the upload
+	// (includeMonitoringDag).
+	MonitoringDag bool
 	// NoDagsBaseDir is --no-dags-base-dir: the files go at the bundle's root
 	// rather than under dags/.
 	NoDagsBaseDir bool
@@ -92,8 +95,8 @@ type dagsUpload struct {
 	CosmosBoost bool
 }
 
-func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitoringDag bool, opts dagsUpload) (string, error) {
-	if monitoringDag {
+func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, opts dagsUpload) (string, error) {
+	if opts.MonitoringDag {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 		var monitoringDag string

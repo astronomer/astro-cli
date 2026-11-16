@@ -310,9 +310,8 @@ type BundleUpload struct {
 // uploadURL. The tarball is written to a temporary directory of its own, never
 // under bundlePath, so it cannot end up inside itself.
 func UploadBundle(bundlePath, uploadURL string, opts BundleUpload) (string, error) {
-	prependBaseDir, currentRuntimeVersion, errOut := opts.PrependBaseDir, opts.RuntimeVersion, opts.ErrOut
 	// If Airflow 3.x, check for symlinks pointing outside the bundle directory
-	if airflowversions.AirflowMajorVersionForRuntimeVersion(currentRuntimeVersion) == "3" {
+	if airflowversions.AirflowMajorVersionForRuntimeVersion(opts.RuntimeVersion) == "3" {
 		err := ValidateBundleSymlinks(bundlePath)
 		if err != nil {
 			return "", err
@@ -336,13 +335,13 @@ func UploadBundle(bundlePath, uploadURL string, opts BundleUpload) (string, erro
 	// stale one must not ship), and with cosmosBoost on ([tool.astro.deploy]
 	// cosmos-boost for a project's Dags, --cosmos-boost for a bundle), fresh
 	// ones are generated into the bundle, best-effort (a missing one is safe).
-	overlay, err := cosmosboost.BundleOverlay(bundlePath, opts.CosmosBoost, nil, errOut)
+	overlay, err := cosmosboost.BundleOverlay(bundlePath, opts.CosmosBoost, nil, opts.ErrOut)
 	if err != nil {
 		return "", err
 	}
 
 	// Generate the gzipped bundle tarball
-	err = fileutil.TarGz(bundlePath, tarGzFilePath, prependBaseDir, []string{".git/"}, overlay)
+	err = fileutil.TarGz(bundlePath, tarGzFilePath, opts.PrependBaseDir, []string{".git/"}, overlay)
 	if err != nil {
 		return "", err
 	}

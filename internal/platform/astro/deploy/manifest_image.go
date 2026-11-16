@@ -393,8 +393,8 @@ func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *a
 		deploymentType = *dep.Type
 	}
 	dagsPath := filepath.Join(projectDir, "dags")
-	monitoringDag := includeMonitoringDag(c.OrganizationProduct == string(astrov1.OrganizationProductHOSTED), deploymentType)
-	tarballVersion, err := uploadDags(dagsPath, uploadURL, dep.AstroRuntimeVersion, monitoringDag, opts)
+	opts.MonitoringDag = includeMonitoringDag(c.OrganizationProduct == string(astrov1.OrganizationProductHOSTED), deploymentType)
+	tarballVersion, err := uploadDags(dagsPath, uploadURL, dep.AstroRuntimeVersion, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), dagDeployDisabled) {
 			return "", fmt.Errorf(enableDagDeployMsg, deploymentID)
