@@ -1324,11 +1324,12 @@ func TestDeployManifestUsesTheManifestDomainsLogin(t *testing.T) {
 func TestDeployManifestSendsTheAPITokenToTheManifestDomain(t *testing.T) {
 	picked := setupDeployOnStage(t, manifestOnProd)
 	logInToProd(t)
-	t.Setenv(astrosession.EnvAPIToken, "ci-token")
+	ciToken := testUtil.MintAPIToken(t, time.Time{}, "organizationId:prod-org")
+	t.Setenv(astrosession.EnvAPIToken, ciToken)
 
 	_, err := execDeployCapture("test", "--dags")
 	require.NoError(t, err)
-	assert.Equal(t, "Bearer ci-token", picked.context.Token)
+	assert.Equal(t, "Bearer "+ciToken, picked.context.Token)
 	assert.Equal(t, "prod-org", picked.context.Organization)
 }
 

@@ -20,6 +20,10 @@ organization = "clorg456"  # the organization that workspace is in
   project reads the same workspace whoever starts it and from whichever app.
   `ASTRO_DOMAIN` is the explicit override: CI sets it beside
   `ASTRO_API_TOKEN`, and Astro Desktop reads it as its own host.
+- **Absent, `workspace` under `ASTRO_API_TOKEN`** is the Workspace a Workspace or
+  Deployment token's claims name, for `astro local` reading the project's
+  workspace. An Organization token names none, so nothing is read. A token run
+  never uses the saved login's Workspace.
 - **`domain` is normalized the way `astro login` stores a login:** lower-cased,
   with any `https://`, `cloud.` and trailing `/` removed, so
   `https://cloud.astronomer.io/` means `astronomer.io`. Written any other

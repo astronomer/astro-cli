@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -322,7 +323,7 @@ func TestUnnamedStatusIsUnreachable(t *testing.T) {
 func TestUnauthorizedWithAPITokenNamesTheVariable(t *testing.T) {
 	mc := mockClient(errResp(http.StatusUnauthorized, "token rejected"))
 	p := loggedInProvider(t, mc, true)
-	t.Setenv(astrosession.EnvAPIToken, "ci-token")
+	t.Setenv(astrosession.EnvAPIToken, testUtil.MintAPIToken(t, time.Time{}, "organizationId:org"))
 
 	_, ok := p.Lookup("X")
 	require.False(t, ok)

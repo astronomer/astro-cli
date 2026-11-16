@@ -529,21 +529,3 @@ func applyEnvironmentLogin(l *environmentLogin, c *Context) {
 		}
 	}
 }
-
-// HoldsEnvironmentLogin reports whether this process has applied an
-// environment login (UseEnvironmentLogin) to the current context. A run with
-// ASTRO_API_TOKEN set that does not has not been through the setup that gives
-// the token its own organization and workspace, and whatever it reads from the
-// context is the saved login's.
-func HoldsEnvironmentLogin() bool {
-	d, err := GetCurrentDomain()
-	if err != nil {
-		return false
-	}
-	key, err := (&Context{Domain: d}).GetContextKey()
-	if err != nil {
-		return false
-	}
-	_, ok := envLogin(key)
-	return ok
-}

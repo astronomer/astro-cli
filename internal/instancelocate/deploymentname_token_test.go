@@ -3,12 +3,15 @@ package instancelocate
 import (
 	"strings"
 	"testing"
+	"time"
+
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // Under an API token a Deployment name has no workspace to be looked up in, and
 // astro workspace switch is no way to give it one.
 func TestDeploymentNameWithNoWorkspaceUnderATokenDoesNotAdviseASwitch(t *testing.T) {
-	t.Setenv("ASTRO_API_TOKEN", "token")
+	t.Setenv("ASTRO_API_TOKEN", testUtil.MintAPIToken(t, time.Time{}, "organizationId:org"))
 	msg := (&DeploymentNameError{Name: "prod"}).Error()
 	if !strings.Contains(msg, "ASTRO_API_TOKEN") || strings.Contains(msg, "workspace switch") {
 		t.Errorf("message = %q", msg)

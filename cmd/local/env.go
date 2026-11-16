@@ -990,13 +990,14 @@ func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key 
 		return "", "", false, err
 	}
 	workspaceSource := declaredSource(schema, kind, name) == envschema.SourceWorkspace
-	if !workspaceSource && m.Astro.Workspace == "" {
+	workspaceID := emenv.WorkspaceID(&m.Astro)
+	if !workspaceSource && workspaceID == "" {
 		return "", "", false, nil
 	}
 	// reveal = true: get is the one deliberate reveal of a value.
 	wp := emenv.NewProvider(emenv.WorkspaceOf(&m.Astro), c.d.WorkspaceClients, true)
 	if v, has := wp.Lookup(key); has {
-		return v, localenv.WorkspaceSource(m.Astro.Workspace), true, nil
+		return v, localenv.WorkspaceSource(workspaceID), true, nil
 	}
 	if !workspaceSource {
 		// The linked workspace reaches every name, declared or not, but only a
@@ -1288,7 +1289,7 @@ func (c *cli) listOptions(projectDir string, m *manifest.Manifest) localenv.List
 	// it reads Environment Manager for presence only and pulls no secret.
 	if m != nil && c.d.WorkspaceClients != nil {
 		opts.WorkspaceProvider = emenv.NewProvider(emenv.WorkspaceOf(&m.Astro), c.d.WorkspaceClients, false)
-		opts.Workspace = m.Astro.Workspace
+		opts.Workspace = emenv.WorkspaceID(&m.Astro)
 	}
 	return opts
 }

@@ -39,6 +39,9 @@ var cloudSamples = map[cliout.ProblemKind][]error{
 		// arrives wrapped by github.com/pkg/errors, as cmd/astro wraps it.
 		pkgerrors.Wrap(config.ErrGetHomeString, "failed to get current Workspace"),
 		astrosession.ErrLoggedOut,
+		// An ASTRO_API_TOKEN the core tree cannot use, as the platform tree's
+		// setup words the same three.
+		astrosession.ErrAPITokenExpired, astrosession.ErrAPITokenMalformed, astrosession.ErrNotAPIToken, astrosession.ErrTokenNoOrganization,
 		// Deployment API keys in the environment, which no longer log in.
 		astroCmd.ErrLegacyAPIKeys,
 		// A login a run under --output json may not start, as Login words it.
