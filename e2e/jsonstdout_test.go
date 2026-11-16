@@ -231,6 +231,21 @@ var ownResultOnFailure = map[string]string{
 func newStateProject(t *testing.T, st jsonState, template string) *project {
 	t.Helper()
 	p := newProject(t)
+	stampKeyringUnavailable(t, p)
+	if st.platform != "" {
+		writeLogin(t, p, st.platform)
+	}
+	if template != "" {
+		copyTree(t, template, p.Dir)
+	}
+	return p
+}
+
+// stampKeyringUnavailable leaves p's vault the stamp a keyring that timed out
+// leaves, so no command reaches the OS keyring (the macOS Keychain, which asks
+// for a password) for a login. Write a login into p's home only after this.
+func stampKeyringUnavailable(t *testing.T, p *project) {
+	t.Helper()
 	dir := filepath.Join(p.home, ".astro", "secrets")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatalf("making the vault directory: %v", err)
@@ -239,13 +254,6 @@ func newStateProject(t *testing.T, st jsonState, template string) *project {
 	if err := os.WriteFile(filepath.Join(dir, "login-keyring-unavailable"), []byte("timeout"), 0o600); err != nil {
 		t.Fatalf("stamping the keyring unavailable: %v", err)
 	}
-	if st.platform != "" {
-		writeLogin(t, p, st.platform)
-	}
-	if template != "" {
-		copyTree(t, template, p.Dir)
-	}
-	return p
 }
 
 // copyTree copies the files under src into dst, which exists.

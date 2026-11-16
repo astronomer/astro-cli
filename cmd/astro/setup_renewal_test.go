@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -110,6 +111,10 @@ func TestCheckTokenHelper(t *testing.T) {
 	if home := os.Getenv("ASTRO_HOME"); home == "" || !strings.HasPrefix(config.HomeConfigFile, home) {
 		t.Fatalf("the helper's config is %s, not under ASTRO_HOME=%q", config.HomeConfigFile, home)
 	}
+	// Say the config is loaded, then wait for the parent to say both are.
+	if err := os.WriteFile(filepath.Join(filepath.Dir(start), fmt.Sprintf("ready-%d", os.Getpid())), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(5 * time.Millisecond) {
 		if _, err := os.Stat(start); err == nil {
 			break
@@ -168,7 +173,10 @@ func TestConcurrentLoginChecksRenewOnce(t *testing.T) {
 		require.NoError(t, cmd.Start())
 		cmds[i] = cmd
 	}
-	time.Sleep(200 * time.Millisecond) // both processes loaded the config
+	require.Eventually(t, func() bool { // both processes loaded the config
+		ready, _ := filepath.Glob(filepath.Join(filepath.Dir(start), "ready-*"))
+		return len(ready) == len(cmds)
+	}, 30*time.Second, 5*time.Millisecond)
 	require.NoError(t, os.WriteFile(start, nil, 0o600))
 	for i, cmd := range cmds {
 		if err := cmd.Wait(); err != nil {
@@ -176,4 +184,20 @@ func TestConcurrentLoginChecksRenewOnce(t *testing.T) {
 		}
 	}
 	assert.EqualValues(t, 1, calls.Load(), "refreshes")
+}
+
+// An expired login whose provider cannot be reached says nothing about its
+// refresh token, so no browser login is offered in its place: the error says
+// the login could not be renewed, with the network failure as its cause.
+func TestUnreachableProviderOnRefreshOffersNoLogin(t *testing.T) {
+	loginExpiringIn(t, -time.Hour)
+	idp := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	url := idp.URL + "/"
+	idp.Close() // the address now refuses connections
+	logins := stubLoginSeams(t, func() error { return nil }, func() (auth.Config, error) {
+		return auth.Config{ClientID: "client-id", DomainURL: url}, nil
+	})
+	err := checkToken(new(astrov1_mocks.ClientWithResponsesInterface), io.Discard)
+	require.ErrorIs(t, err, ErrLoginRenewal)
+	assert.Zero(t, logins.Load(), "the refresh token was never refused")
 }

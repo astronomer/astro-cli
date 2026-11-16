@@ -134,12 +134,25 @@ func IsTransportError(err error) bool {
 			return true
 		}
 	}
-	var dnsErr *net.DNSError
-	var netErr net.Error
+	var (
+		dnsErr *net.DNSError
+		opErr  *net.OpError
+		urlErr *url.Error
+		netErr net.Error
+	)
 	switch {
 	case errors.As(err, &dnsErr):
 		return true
-	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF), errors.Is(err, httpContext.DeadlineExceeded):
+	case errors.As(err, &opErr) && (opErr.Op == "dial" || opErr.Op == "read" || opErr.Op == "write"):
+		// What a connection that could not be made or broke is on every
+		// platform: Windows reports a refusal as its own socket error, which
+		// is none of the errno values above. A TLS alert is Op "remote error".
+		return true
+	case errors.Is(err, httpContext.DeadlineExceeded):
+		return true
+	case errors.As(err, &urlErr) && (errors.Is(urlErr.Err, io.EOF) || errors.Is(urlErr.Err, io.ErrUnexpectedEOF)):
+		// The client's request ended early. The same EOF from decoding a body
+		// the server did send is not one.
 		return true
 	case errors.As(err, &netErr):
 		return netErr.Timeout()

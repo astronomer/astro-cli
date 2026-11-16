@@ -467,7 +467,8 @@ type renewal struct {
 	// expired: the login's access token is past its expiry, so the failure
 	// leaves the command with nothing to run on.
 	expired bool
-	// rejected: the provider answered the refresh token and refused it.
+	// rejected: the provider answered the refresh token and refused it. A
+	// provider that could not be reached says nothing about the token.
 	rejected bool
 	// unsaved: the provider renewed the login and the config would not take it.
 	unsaved bool
@@ -480,12 +481,15 @@ type renewal struct {
 // loser). c is updated to the login as the lock found it. A nil error means the
 // login is renewed, by this process or another.
 func renewCurrentLogin(c *config.Context) (renewal, error) {
+	before, _ := c.GetExpiresIn() //nolint:errcheck // a missing expiry reads as expired, which renews
 	unlock := config.LockLoginRenewal()
 	defer unlock()
 	config.ReloadHome()
 	fresh, err := context.GetCurrentContext()
 	if err != nil {
-		return renewal{expired: true}, currentContextError(err)
+		// What the login looked like before the lock is all there is to judge
+		// by: a token that was still good stays good.
+		return renewal{expired: isExpired(before, 0)}, currentContextError(err)
 	}
 	expireTime, _ := fresh.GetExpiresIn() //nolint:errcheck // a missing expiry reads as expired, which renews
 	state := renewal{expired: isExpired(expireTime, 0)}
@@ -502,7 +506,7 @@ func renewCurrentLogin(c *config.Context) (renewal, error) {
 	}
 	res, err := refresh(c.RefreshToken, authConfig)
 	if err != nil {
-		state.rejected = true
+		state.rejected = !httputil.IsTransportError(err)
 		return state, err
 	}
 	if err := saveRenewedToken(c, &res); err != nil {
@@ -567,6 +571,9 @@ func isExpired(t time.Time, threshold time.Duration) bool {
 	return time.Now().Add(threshold).After(t)
 }
 
+// refreshTimeout is how long a token request may take.
+const refreshTimeout = 20 * time.Second
+
 // Refresh gets a new access token from the provided refresh token,
 // The request is used the default client_id and endpoint for device authentication.
 func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error) {
@@ -577,7 +584,8 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 		"refresh_token": {refreshToken},
 	}
 
-	client := &http.Client{}
+	// A bound, since a renewal holds the login-renewal lock while it waits.
+	client := &http.Client{Timeout: refreshTimeout}
 
 	r, err := http.NewRequestWithContext(http_context.Background(), http.MethodPost, addr, strings.NewReader(data.Encode())) // URL-encoded payload
 	if err != nil {

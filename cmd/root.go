@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"io"
 	"os"
 	"sort"
@@ -38,7 +39,8 @@ var (
 func trackSetupFailure(preRun func(*cobra.Command, []string) error) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		err := preRun(cmd, args)
-		if err != nil {
+		// An interrupt is the person ending the run, not a failure of setup.
+		if err != nil && !errors.Is(err, input.ErrInterrupted) {
 			telemetry.TrackSetupFailure(cmd, string(problemKinds.Of(err)))
 		}
 		return err
