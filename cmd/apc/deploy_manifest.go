@@ -317,6 +317,7 @@ func (d *apcManifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manif
 		RuntimeVersion: in.ImageRuntime,
 		ImageAlone:     in.ImageAlone,
 		Build:          in.Build,
+		ShaAsTag:       in.ShaAsTag || deployShaAsTag,
 		BuildSecrets:   in.BuildSecrets,
 		IncludeDags:    in.IncludeDags,
 		OnBuild:        in.OnBuild,

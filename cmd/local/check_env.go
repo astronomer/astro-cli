@@ -4,6 +4,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // envFindings turns what the start gate would say about [tool.astro.env] into
@@ -37,6 +38,21 @@ func envFindings(rep plan.EnvReport) []checks.Finding {
 			Section:  string(v.Section),
 			Key:      v.Key,
 			Message:  v.Reason,
+		})
+	}
+	return out
+}
+
+// manifestFindings are the manifest's warnings as check findings: keys it
+// carries that this build does not know, which a start runs past.
+func manifestFindings(m *manifest.Manifest) []checks.Finding {
+	out := make([]checks.Finding, 0, len(m.Warnings))
+	for _, w := range m.Warnings {
+		out = append(out, checks.Finding{
+			Kind:     checks.KindManifestWarning,
+			Severity: checks.SeverityWarning,
+			Key:      w.Key,
+			Message:  w.Reason,
 		})
 	}
 	return out

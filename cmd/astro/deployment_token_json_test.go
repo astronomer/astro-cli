@@ -164,6 +164,9 @@ func execTokenCmd(t *testing.T, client astrov1.APIClient, answers string, args .
 func execAstroCmd(t *testing.T, client astrov1.APIClient, answers string, newRoot func(io.Writer) *cobra.Command, args ...string) tokenRun {
 	t.Helper()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	if _, ok := os.LookupEnv("ASTRO_API_TOKEN"); ok {
+		testUtil.ApplyAPIToken(t)
+	}
 	testUtil.SetupOSArgsForGinkgo()
 	prevClient := astroV1Client
 	astroV1Client = client
@@ -173,6 +176,8 @@ func execAstroCmd(t *testing.T, client astrov1.APIClient, answers string, newRoo
 	// what an earlier run left, and what this one leaves for the next test.
 	tokenID, orgTokenID, workspaceTokenID = "", "", ""
 	t.Cleanup(func() { tokenID, orgTokenID, workspaceTokenID = "", "", "" })
+	// --clean-output sets a package variable a later test reads without building the command.
+	t.Cleanup(func() { cleanTokenOutput = false })
 	// --workspace-id, and deploy when it resolves one, set the
 	// package's workspaceID, which coalesceWorkspace reads before the context.
 	// Clear what an earlier run left, and what this one leaves.

@@ -170,11 +170,12 @@ func TestDeployClientImageRunsOnOneEngine(t *testing.T) {
 			require.NoError(t, err)
 			c.Token = "ctx-token"
 			require.NoError(t, c.SetContext())
-			require.NoError(t, config.CFG.RemoteClientRegistry.SetHomeString("registry.example.com/agents/client"))
 			cmd := withClientBuild(t, bin)
 
 			var got ClientDeploy
-			captureStdout(t, func() { got, err = DeployClientImage(InputClientDeploy{Path: dir}, nil) })
+			captureStdout(t, func() {
+				got, err = DeployClientImage(InputClientDeploy{Registry: "registry.example.com/agents/client", RegistrySource: "--registry", Path: dir}, nil)
+			})
 			require.NoError(t, err)
 
 			require.Len(t, cmd.calls, 5, "%v", cmd.calls)
@@ -212,13 +213,14 @@ func TestDeployClientImageLogsInOnlyToAnAstronomerRegistry(t *testing.T) {
 	require.NoError(t, err)
 	c.Token = "ctx-token"
 	require.NoError(t, c.SetContext())
-	require.NoError(t, config.CFG.RemoteClientRegistry.SetHomeString("registry.example.com/agents/client"))
 	require.NoError(t, config.CFG.RemoteBaseImageRegistry.SetHomeString("images.astronomer.cloud.attacker.example"))
 	t.Cleanup(func() { _ = config.CFG.RemoteBaseImageRegistry.SetHomeString("images.astronomer.cloud") })
 	cmd := withClientBuild(t, "docker")
 
 	var errOut bytes.Buffer
-	captureStdout(t, func() { _, err = DeployClientImage(InputClientDeploy{Path: dir, ErrOut: &errOut}, nil) })
+	captureStdout(t, func() {
+		_, err = DeployClientImage(InputClientDeploy{Registry: "registry.example.com/agents/client", RegistrySource: "--registry", Path: dir, ErrOut: &errOut}, nil)
+	})
 	require.NoError(t, err)
 
 	for i, call := range cmd.calls {

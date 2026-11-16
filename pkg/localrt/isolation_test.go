@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/testenv"
 )
 
 // isolatedCache is the cache root this package's tests run against, created by
@@ -36,20 +37,24 @@ var isolatedCache string
 // too: something else on the machine starting a project mid-run reads as a
 // leak, which cannot happen on CI and on a laptop means the ids it prints
 // belong to whatever was started.
-func TestMain(m *testing.M) { os.Exit(runIsolated(m)) }
-
-// runIsolated is TestMain's body, split out so its cleanup can be deferred.
-// os.Exit runs no deferred function, so the directories would otherwise
-// survive every early return and every panic — the suite leaving state behind,
-// one level down from the bug this file is about.
-func runIsolated(m *testing.M) int {
+func TestMain(m *testing.M) {
 	// Resolved before anything moves the lever, so it names the cache a test
 	// would reach if the isolation failed.
 	ambient, err := rt.CacheRoot()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "resolving the ambient cache:", err)
-		return 1
+		os.Exit(1)
 	}
+	// HOME and the state directories, for everything runIsolated does not name.
+	finish := testenv.Isolate()
+	os.Exit(finish(runIsolated(m, ambient)))
+}
+
+// runIsolated is TestMain's body, split out so its cleanup can be deferred.
+// os.Exit runs no deferred function, so the directories would otherwise
+// survive every early return and every panic — the suite leaving state behind,
+// one level down from the bug this file is about.
+func runIsolated(m *testing.M, ambient string) int {
 	before := recordIDs(ambient)
 
 	cache, err := isolatedDir("localrt-cache-")

@@ -289,7 +289,7 @@ contexts:
 func writeTestConfig(t *testing.T, yaml string) {
 	t.Helper()
 	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, []byte(yaml), 0o600))
+	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), []byte(yaml), 0o600))
 	config.InitConfig(fs)
 }
 

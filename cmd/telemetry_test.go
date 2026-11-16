@@ -27,7 +27,7 @@ func TestTelemetryCmd(t *testing.T) {
 	// Initialize config with a minimal home config to keep tests hermetic
 	fs := afero.NewMemMapFs()
 	configRaw := []byte("telemetry:\n  enabled: true\n")
-	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777))
 	config.InitConfig(fs)
 	t.Setenv("ASTRO_TELEMETRY_DISABLED", "")
 

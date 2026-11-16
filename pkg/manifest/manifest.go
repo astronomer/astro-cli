@@ -15,7 +15,7 @@
 //     section's keys, and it warns (Manifest.Warnings) rather than refuses.
 //
 // [tool.astro] is decoded by hand rather than through struct tags, because it
-// is authored config: an unknown key, a value of the wrong shape and a
+// is authored config: a misspelled key, a value of the wrong shape and a
 // contradictory link are all things its author should be told about, each
 // addressed by its dotted TOML key, and all of them at once.
 //
@@ -39,6 +39,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
@@ -298,6 +299,33 @@ type Astro struct {
 	// for Dockerfile's build, as written. Parse refuses it without a
 	// Dockerfile. Read it through BuildSecretSpecs.
 	BuildSecrets []string
+	// Deploy is [tool.astro.deploy], how the project deploys, with each
+	// setting's default applied when the table leaves it out.
+	Deploy Deploy
+}
+
+// Deploy is [tool.astro.deploy]: how every deploy of the project behaves,
+// whoever runs it. These are the project's to decide and commit, which is
+// why they are here and not CLI settings: a CI runner and every teammate
+// read the same values.
+type Deploy struct {
+	// ClientRegistry is client-registry, the image repository
+	// (registry[:port]/repository, no tag) `astro remote deploy` pushes the
+	// Remote Execution client image to: the one the project's remote agents
+	// pull from. Empty if unset. A link's own client-registry overrides it for
+	// that link's Deployment (Link.ClientRegistry). Only its shape as a string
+	// is checked here; the deploy checks it is a repository it can push to.
+	ClientRegistry string
+	// CosmosBoost is cosmos-boost, whether a deploy that uploads the project's
+	// Dags generates Cosmos Boost files for the dbt projects among them into
+	// the upload. False unless set.
+	CosmosBoost bool
+	// GitMetadata is git-metadata, whether a deploy records the commit it
+	// ships. True unless the table sets it false.
+	GitMetadata bool
+	// ShaAsTag is sha-as-tag, whether a deploy to Astro Private Cloud pushes
+	// its image by digest rather than by tag. False unless set.
+	ShaAsTag bool
 }
 
 // Link is one committed deployment link: an Airflow the project talks to,
@@ -335,6 +363,11 @@ type Link struct {
 	// Auth is how the CLI proves itself to this link's Airflow, with Method
 	// already resolved from the link's own auth table or its kind's default.
 	Auth Auth
+	// ClientRegistry is the repository `astro remote deploy` pushes this
+	// link's Remote Execution client image to: the link's own client-registry,
+	// else [tool.astro.deploy] client-registry. Set on astro links only, the
+	// one kind with remote agents to pull it.
+	ClientRegistry string
 	// Default marks the link a command falls through to when nothing else
 	// picked one: the last layer of the query commands' resolution rule, and
 	// the entry `astro deploy` highlights in its prompt. It does not decide a
@@ -564,6 +597,10 @@ const (
 	// it is refused rather than ignored: a link must not look like it names a
 	// host it is not reached on.
 	CodeDomainOnNonAPCLink ProblemCode = "domain_on_non_apc_link"
+	// CodeClientRegistryOnNonAstroLink is client-registry on a link that is
+	// not an astro link. Only an Astro Deployment runs remote agents, which
+	// pull the client image `astro remote deploy` pushes there.
+	CodeClientRegistryOnNonAstroLink ProblemCode = "client_registry_on_non_astro_link"
 	// CodeEnvironmentOnAPCLink is environment on an apc link, which names a
 	// Deployment instead.
 	CodeEnvironmentOnAPCLink ProblemCode = "environment_on_apc_link"
@@ -630,6 +667,7 @@ var problemCodes = []ProblemCode{
 	CodeWorkspaceOnNonAstroLink, CodeWorkspaceRequired, CodeMultipleDefaults,
 
 	CodeDomainRequired, CodeDomainOnNonAPCLink, CodeEnvironmentOnAPCLink, CodeURLOnAPCLink,
+	CodeClientRegistryOnNonAstroLink,
 
 	CodeURLInvalid, CodeURLNoScheme, CodeURLNotHTTP, CodeURLNoHost,
 	CodeURLHasCredentials,
@@ -695,6 +733,35 @@ const Marker = "pyproject.toml"
 // errors.Is(err, fs.ErrNotExist)); other failure shapes are
 // ErrNoAstroSection, ParseError, and ValidationError.
 func Load(path string) (*Manifest, error) {
+	m, err := load(path)
+	if err == nil && len(m.Warnings) > 0 {
+		if h := warningHandler.Load(); h != nil {
+			(*h)(path, m.Warnings)
+		}
+	}
+	return m, err
+}
+
+// warningHandler is SetWarningHandler's fn. Atomic, so a Load on one
+// goroutine never races a Set on another.
+var warningHandler atomic.Pointer[func(path string, warnings []Problem)]
+
+// SetWarningHandler has Load hand fn the warnings of every manifest it loads,
+// with the file's path, so a program shows them wherever it loads a project
+// rather than at each call site. A warning is a key this build does not know,
+// which a misspelling and a newer reader's key both are: a caller that
+// dropped them would deploy or run without a word about what it ignored. nil,
+// the default, hands them to no one; Manifest.Warnings holds them either way.
+// It is meant to be set once, at startup, before any Load.
+func SetWarningHandler(fn func(path string, warnings []Problem)) {
+	if fn == nil {
+		warningHandler.Store(nil)
+		return
+	}
+	warningHandler.Store(&fn)
+}
+
+func load(path string) (*Manifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -857,13 +924,14 @@ func stringList(v any) []string {
 // astroRoot prefixes every key under the section this package owns.
 const astroRoot = "tool.astro"
 
-// The keys each table defines. Anything else is a problem: this is authored
-// config, and a key that decodes to nothing — a misspelled `default` on the
-// link meant to be the default — would otherwise send a deploy somewhere else
-// in silence.
+// The keys each table defines. A key that is a near-miss of one of them is a
+// problem, and any other key a warning (unknownKeys): a misspelled `default`
+// on the link meant to be the default would otherwise send a deploy somewhere
+// else in silence, while a key a newer reader defines must not stop this one.
 var (
-	astroKeys = []string{"airflow", "build-secrets", "deployments", "dockerfile", "domain", "env", "organization", "packages", "pools", "runtime", "target", "targets", "workspace"}
-	linkKeys  = []string{"auth", "default", "deployment", "domain", "environment", "target", "url", "workspace"}
+	astroKeys  = []string{"airflow", "build-secrets", "deploy", "deployments", "dockerfile", "domain", "env", "organization", "packages", "pools", "runtime", "target", "targets", "workspace"}
+	linkKeys   = []string{"auth", "client-registry", "default", "deployment", "domain", "environment", "target", "url", "workspace"}
+	deployKeys = []string{"client-registry", "cosmos-boost", "git-metadata", "sha-as-tag"}
 )
 
 // ReservedLinkName is the word that means the Airflow running on this machine
@@ -949,6 +1017,7 @@ func (p *parser) astro(raw map[string]any) Astro {
 		Dockerfile:   strings.TrimSpace(p.str(astroRoot+".dockerfile", raw["dockerfile"])),
 		Runtime:      strings.TrimSpace(p.str(runtimeKey, raw["runtime"])),
 		BuildSecrets: p.buildSecrets(raw["build-secrets"]),
+		Deploy:       p.deploy(raw["deploy"]),
 	}
 	a.Deployments = p.links(raw["deployments"], &a)
 	if a.Domain != "" && a.Workspace == "" && !usesAstroLogin(a.Deployments) {
@@ -1074,10 +1143,9 @@ var reservedTargets = []string{"astro", "oss", "apc"}
 // targets decodes [tool.astro.targets], one plain-data section per backend.
 //
 // An unknown key in a section with a reader, or a section named for no
-// target, is a warning rather than a problem. The rest of [tool.astro] refuses
-// an unknown key, but these sections were documented as untyped and open, and
-// a manifest that loaded yesterday must not stop loading over a key that
-// never did anything. The warning is enough to catch the misspelling.
+// target, is a warning rather than a problem, as an unknown key is everywhere
+// in [tool.astro] (unknownKeys). These sections are open by design, so not
+// even a near-miss of a known key is refused here.
 func (p *parser) targets(v any) map[string]map[string]any {
 	const key = astroRoot + ".targets"
 	table := p.table(key, v)
@@ -1157,6 +1225,7 @@ func (p *parser) link(key string, table map[string]any, a *Astro) Link {
 	link.Domain = p.domain(key, kind, table["domain"])
 	link.Workspace = p.workspace(key, kind, table["workspace"], a.Workspace)
 	link.Auth = p.auth(key+".auth", table["auth"], kind)
+	link.ClientRegistry = p.linkClientRegistry(key, kind, table["client-registry"], a.Deploy.ClientRegistry)
 	if link.Auth.Method == AuthAPC && kind != KindAPC {
 		p.add(CodeAuthAPCOnNonAPCLink, key+".auth.method", fmt.Sprintf("the apc method reads the Astro Private Cloud login for an apc link's domain; this is %s link", KindWithArticle(kind)))
 	}
@@ -1314,12 +1383,71 @@ func (p *parser) workspace(key string, kind LinkKind, raw any, fallback string) 
 	return ws
 }
 
-// unknownKeys reports every key the table does not define.
+// DefaultDeploy is [tool.astro.deploy] when the project sets none of it: a
+// deploy records its commit, and nothing else is on. A deploy with no project
+// behaves as this. The zero Deploy is not it, since GitMetadata defaults on.
+func DefaultDeploy() Deploy {
+	return Deploy{GitMetadata: true}
+}
+
+// deploy decodes [tool.astro.deploy], applying each setting's default.
+func (p *parser) deploy(v any) Deploy {
+	const key = astroRoot + ".deploy"
+	d := DefaultDeploy()
+	table := p.table(key, v)
+	if table == nil {
+		return d
+	}
+	p.unknownKeys(key, table, deployKeys)
+	d.ClientRegistry = strings.TrimSpace(p.str(key+".client-registry", table["client-registry"]))
+	if raw, ok := table["git-metadata"]; ok {
+		d.GitMetadata = p.boolean(key+".git-metadata", raw)
+	}
+	d.CosmosBoost = p.boolean(key+".cosmos-boost", table["cosmos-boost"])
+	d.ShaAsTag = p.boolean(key+".sha-as-tag", table["sha-as-tag"])
+	return d
+}
+
+// linkClientRegistry is a link's client registry: its own client-registry,
+// else fallback, the project's. Only an astro link has one; the key on any
+// other kind is a problem, and the project's value does not reach it.
+func (p *parser) linkClientRegistry(key string, kind LinkKind, raw any, fallback string) string {
+	if kind != KindAstro {
+		if raw != nil {
+			p.add(CodeClientRegistryOnNonAstroLink, key+".client-registry",
+				fmt.Sprintf("only an astro link's Deployment runs remote agents that pull a client image, and this is %s link", KindWithArticle(kind)))
+		}
+		return ""
+	}
+	return firstNonEmpty(strings.TrimSpace(p.str(key+".client-registry", raw)), fallback)
+}
+
+// unknownKeys reports every key the table does not define: a problem when it
+// is a near-miss of a key the table does define (nearMiss), and a warning,
+// with the load going on without it, otherwise.
+//
+// A near-miss is a typo (nearMiss says how near). `defalt = true` on a link,
+// or `client_registry`
+// for client-registry, decodes to nothing, so the setting the author meant
+// silently does not apply; it is refused, naming the key it was meant to be.
+//
+// Any other unknown key is a warning, so a project stays readable by an older
+// build of this package. The file is committed and shared: a teammate on a
+// newer CLI, or a newer Astro Desktop, can write a key this build has never
+// heard of, and refusing the whole manifest over it would stop every older
+// reader from starting, deploying or opening the project at all. That holds
+// only while no new key is a near-miss of an older one in its table, which
+// TestNoKeyIsANearMissOfAnother keeps true.
 func (p *parser) unknownKeys(key string, table map[string]any, known []string) {
 	for name := range table {
-		if !slices.Contains(known, name) {
-			p.add(CodeUnknownKey, key+"."+name, "unknown key")
+		if slices.Contains(known, name) {
+			continue
 		}
+		if meant := nearMiss(name, known); meant != "" {
+			p.add(CodeUnknownKey, key+"."+name, "not a key: did you mean "+meant+"?")
+			continue
+		}
+		p.warn(CodeUnknownKey, key+"."+name, "unknown key, ignored: check its spelling, or whether a newer Astro CLI writes it")
 	}
 }
 

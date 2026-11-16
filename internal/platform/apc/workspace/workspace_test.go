@@ -193,7 +193,7 @@ func (s *Suite) TestGetCurrentWorkspace() {
 
 func (s *Suite) TestGetCurrentWorkspaceError() {
 	fs := afero.NewMemMapFs()
-	_ = afero.WriteFile(fs, config.HomeConfigFile, []byte(""), 0o777)
+	_ = afero.WriteFile(fs, config.HomeConfigFileForTesting(), []byte(""), 0o777)
 	config.InitConfig(fs)
 	_, err := GetCurrentWorkspace()
 	s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
@@ -214,7 +214,7 @@ contexts:
     workspace:
 `)
 	fs := afero.NewMemMapFs()
-	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777)
+	_ = afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777)
 	config.InitConfig(fs)
 	_, err := GetCurrentWorkspace()
 	s.EqualError(err, "current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
@@ -248,7 +248,7 @@ contexts:
     workspace:
 `)
 	fs := afero.NewMemMapFs()
-	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777)
+	_ = afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777)
 	config.InitConfig(fs)
 
 	api := new(mocks.ClientInterface)
@@ -283,7 +283,7 @@ contexts:
     workspace:
 `)
 	fs := afero.NewMemMapFs()
-	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777)
+	_ = afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777)
 	config.InitConfig(fs)
 
 	api := new(mocks.ClientInterface)
@@ -325,7 +325,7 @@ contexts:
     workspace:
 `)
 	fs := afero.NewMemMapFs()
-	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777)
+	_ = afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777)
 	config.InitConfig(fs)
 
 	api := new(mocks.ClientInterface)
@@ -378,7 +378,7 @@ contexts:
     workspace:
 `)
 	fs := afero.NewMemMapFs()
-	_ = afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777)
+	_ = afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777)
 	config.InitConfig(fs)
 
 	wsID := "ckbv7zvb100pe0760xp98qnh9"

@@ -12,7 +12,7 @@ import (
 // (schema_test.go). The requests themselves print the API's response and go
 // around Emit, so the watch sees only ls, describe and their failures.
 func TestMain(m *testing.M) {
-	testenv.Clear()
+	finish := testenv.Isolate()
 	watching := emitWatch().Arm()
-	os.Exit(watching.Finish(m.Run()))
+	os.Exit(finish(watching.Finish(m.Run())))
 }

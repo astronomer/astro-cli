@@ -64,6 +64,13 @@ type InputClientDeploy struct {
 	Platform     string
 	BuildSecrets []string
 	DeploymentID string
+	// Registry is the repository (registry[:port]/repository, no tag) the
+	// client image is pushed to: the one the Deployment's remote agents pull
+	// from. The command resolves it (--registry, the link's client-registry,
+	// [tool.astro.deploy] client-registry), and RegistrySource names where it
+	// came from, for an error about the value.
+	Registry       string
+	RegistrySource string
 	// ErrOut is the command's error writer, which the deploy's warnings go
 	// to; nil is stderr.
 	ErrOut io.Writer
@@ -75,7 +82,7 @@ func includeMonitoringDag(orgHosted bool, deploymentType astrov1.DeploymentType)
 	return !orgHosted && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
 }
 
-func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitoringDag, noDagsBaseDir bool) (string, error) {
+func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitoringDag, noDagsBaseDir, cosmosBoost bool) (string, error) {
 	if monitoringDag {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
@@ -102,7 +109,7 @@ func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitorin
 	// By default, prepend dags/ directory prefix. Use --no-dags-base-dir to place files at bundle root
 	// (needed for some Airflow 3.x deployments where sys.path includes the bundle root, not dags/).
 	prependBaseDir := !noDagsBaseDir
-	versionID, err := UploadBundle(dagsPath, dagsUploadURL, prependBaseDir, currentRuntimeVersion, nil)
+	versionID, err := UploadBundle(dagsPath, dagsUploadURL, prependBaseDir, cosmosBoost, currentRuntimeVersion, nil)
 	if err != nil {
 		return "", err
 	}
@@ -336,20 +343,16 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		return ClientDeploy{}, errors.Wrap(err, "failed to get current context")
 	}
 
-	// Get the remote client registry endpoint from config. It is checked as a
-	// new value is, so one saved with a tag (before the check, or by hand) is
-	// a clear error rather than Docker's "invalid reference format"; and
-	// before anything that calls the API, so a config problem is not hidden
-	// behind an auth or network one.
-	registryEndpoint, err := config.ClientRegistry()
-	if err != nil {
-		return ClientDeploy{}, err
-	}
+	// The registry is checked before anything calls the API, so a value with
+	// a tag is a clear error naming where it was written, rather than Docker's
+	// "invalid reference format", and is not hidden behind an auth or network
+	// error.
+	registryEndpoint := deployInput.Registry
 	if registryEndpoint == "" {
-		fmt.Println("The Astro CLI is not configured to push client images to your private registry.")
-		fmt.Println("For remote Deployments, client images must be stored in your private registry, not in Astronomer managed registries.")
-		fmt.Println("Please provide your private registry information so the Astro CLI can push client images.")
-		return ClientDeploy{}, fmt.Errorf("remote client registry is not configured. To configure it, run: '%s' and try again.", config.ClientRegistryFix())
+		return ClientDeploy{}, errors.New("no client registry to push to: pass --registry <registry>/<repository>")
+	}
+	if err := config.ValidateRegistryEndpoint(registryEndpoint); err != nil {
+		return ClientDeploy{}, fmt.Errorf("%s is not a usable registry endpoint: %w", deployInput.RegistrySource, err)
 	}
 
 	// Validate deployment runtime version if deployment ID is provided

@@ -100,6 +100,15 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 		}
 	}
 
+	// A 1.x project's .astro/config.yaml goes once it is converted, and each
+	// CLI setting it held is named with what replaces it.
+	if s := c.d.ProjectSetting1x; s != nil {
+		opts.Setting1x = func(key, value string) (scaffold.SettingReplacement, bool) {
+			global, removed, ok := s(key, value)
+			return scaffold.SettingReplacement{Global: global, Removed: removed}, ok
+		}
+	}
+
 	res, err := scaffold.Run(dir, opts)
 	if err != nil {
 		return err

@@ -61,7 +61,7 @@ func (s *Suite) TestOAuthAsksOnStderr() {
 // the result, on the command's writer.
 func (s *Suite) TestLoginAsksForTheWorkspaceOnStderr() {
 	fs := afero.NewMemMapFs()
-	s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFile, testUtil.NewTestConfig("localhost"), 0o600))
+	s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFileForTesting(), testUtil.NewTestConfig("localhost"), 0o600))
 	config.InitConfig(fs)
 	s.Require().NoError(config.CFG.Interactive.SetHomeString("false"))
 	s.Require().NoError(config.CFG.PageSize.SetHomeString("100"))
@@ -93,7 +93,7 @@ func (s *Suite) TestLoginAsksForTheWorkspaceOnStderr() {
 // Houston at houstonVersion, answering with answers.
 func (s *Suite) loginPaged(pageSize, houstonVersion, answers string, houstonMock *houstonMocks.ClientInterface) (out, stderr string, err error) {
 	fs := afero.NewMemMapFs()
-	s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFile, testUtil.NewTestConfig("localhost"), 0o600))
+	s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFileForTesting(), testUtil.NewTestConfig("localhost"), 0o600))
 	config.InitConfig(fs)
 	s.Require().NoError(config.CFG.Interactive.SetHomeString("true"))
 	s.Require().NoError(config.CFG.PageSize.SetHomeString(pageSize))

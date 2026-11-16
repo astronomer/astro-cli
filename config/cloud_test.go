@@ -26,7 +26,7 @@ contexts:
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
 `)
-	_ = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	_ = afero.WriteFile(fs, HomeConfigFileForTesting(), configRaw, 0o777)
 	InitConfig(fs)
 }
 

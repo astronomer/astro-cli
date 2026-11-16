@@ -36,6 +36,13 @@ type DeployBundleInput struct {
 	// ErrOut is the command's error writer, which the bundle's warnings go
 	// to; nil is stderr.
 	ErrOut io.Writer
+	// CosmosBoost is --cosmos-boost: generate Cosmos Boost files for a dbt
+	// bundle into the upload.
+	CosmosBoost bool
+	// NoGitMetadata is --git-metadata=false: record no commit. A bundle is
+	// outside any project, so the flag is its one switch; by default it
+	// records the commit it ships, as a project does.
+	NoGitMetadata bool
 }
 
 // BundleGit is the commit a bundle deploy recorded, when the bundle sits in a
@@ -86,10 +93,11 @@ func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
 		return BundleDeploy{}, fmt.Errorf(enableDagDeployMsg, input.DeploymentID)
 	}
 
-	// Check if git metadata is enabled (default: true)
+	// A bundle is outside any project, so no [tool.astro.deploy] git-metadata
+	// reaches it: it records the commit it ships unless --git-metadata=false.
 	var deployGit *astrov1.CreateDeployGitRequest
 	var commitMessage string
-	if config.CFG.DeployGitMetadata.GetBool() {
+	if !input.NoGitMetadata {
 		deployGit, commitMessage = retrieveLocalGitMetadata(input.BundlePath)
 	}
 
@@ -110,7 +118,7 @@ func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
 	}
 
 	// upload the bundle
-	tarballVersion, err := UploadBundle(input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.AstroRuntimeVersion, input.ErrOut)
+	tarballVersion, err := UploadBundle(input.BundlePath, *deploy.BundleUploadUrl, false, input.CosmosBoost, currentDeployment.AstroRuntimeVersion, input.ErrOut)
 	if err != nil {
 		return BundleDeploy{}, err
 	}
@@ -280,7 +288,7 @@ func ValidateBundleSymlinks(bundlePath string) error {
 // UploadBundle tars and gzips the directory bundlePath and uploads it to
 // uploadURL. The tarball is written to a temporary directory of its own, never
 // under bundlePath, so it cannot end up inside itself.
-func UploadBundle(bundlePath, uploadURL string, prependBaseDir bool, currentRuntimeVersion string, errOut io.Writer) (string, error) {
+func UploadBundle(bundlePath, uploadURL string, prependBaseDir, cosmosBoost bool, currentRuntimeVersion string, errOut io.Writer) (string, error) {
 	// If Airflow 3.x, check for symlinks pointing outside the bundle directory
 	if airflowversions.AirflowMajorVersionForRuntimeVersion(currentRuntimeVersion) == "3" {
 		err := ValidateBundleSymlinks(bundlePath)
@@ -303,9 +311,10 @@ func UploadBundle(bundlePath, uploadURL string, prependBaseDir bool, currentRunt
 
 	// Cosmos Boost: its sidecars go into the tarball only, never into the
 	// tree. Ones an earlier CLI wrote into the tree are always left out (a
-	// stale one must not ship), and with deploy.cosmos_boost on, fresh
+	// stale one must not ship), and with cosmosBoost on ([tool.astro.deploy]
+	// cosmos-boost for a project's Dags, --cosmos-boost for a bundle), fresh
 	// ones are generated into the bundle, best-effort (a missing one is safe).
-	overlay, err := cosmosboost.BundleOverlay(bundlePath, config.CFG.CosmosBoostPreDeploy.GetBool(), nil, errOut)
+	overlay, err := cosmosboost.BundleOverlay(bundlePath, cosmosBoost, nil, errOut)
 	if err != nil {
 		return "", err
 	}

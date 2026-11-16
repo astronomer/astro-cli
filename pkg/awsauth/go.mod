@@ -23,6 +23,7 @@ require (
 
 require (
 	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000 // indirect
+	github.com/astronomer/astro-cli/pkg/testenv v0.0.0-00010101000000-000000000000
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.23 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.30 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.30 // indirect
@@ -44,3 +45,5 @@ replace github.com/astronomer/astro-cli/pkg/airflowrt => ../airflowrt
 replace github.com/astronomer/astro-cli/pkg/instances => ../instances
 
 replace github.com/astronomer/astro-cli/pkg/manifest => ../manifest
+
+replace github.com/astronomer/astro-cli/pkg/testenv => ../testenv

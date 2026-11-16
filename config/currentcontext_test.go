@@ -15,7 +15,7 @@ func (s *Suite) TestCurrentContextWithoutLoginNeverResolvesTheLogin() {
 	defer forgetEnvironmentLogin()
 
 	fs := afero.NewMemMapFs()
-	s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, []byte(`context: example_com
+	s.Require().NoError(afero.WriteFile(fs, HomeConfigFileForTesting(), []byte(`context: example_com
 contexts:
   example_com:
     domain: example.com

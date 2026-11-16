@@ -15,7 +15,7 @@ func (s *Suite) TestLegacySettingNames() {
 		s.Equal(50, CFG.PageSize.GetInt())
 		s.Equal("30", CFG.HoustonDialTimeout.GetHomeString())
 		s.Equal("global", CFG.PageSize.HomeScope())
-		s.Equal("default", CFG.ShaAsTag.HomeScope())
+		s.Equal("default", CFG.Interactive.HomeScope())
 	})
 
 	// 1.x reads only the old name, so a value it saved after v2 last wrote
@@ -57,19 +57,11 @@ func (s *Suite) TestLegacySettingNames() {
 		// What 1.x's own set would do: change the top-level page_size, carry
 		// the rest, apc.page_size included.
 		s.Require().Contains(string(data), "\npage_size: 70\n")
-		s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, []byte(strings.Replace(string(data), "\npage_size: 70\n", "\npage_size: 30\n", 1)), 0o600))
+		s.Require().NoError(afero.WriteFile(fs, HomeConfigFileForTesting(), []byte(strings.Replace(string(data), "\npage_size: 70\n", "\npage_size: 30\n", 1)), 0o600))
 
 		InitConfig(fs)
 
 		s.Equal(30, CFG.PageSize.GetInt())
-	})
-
-	s.Run("a 1.x project config read by its path takes the 1.x name", func() {
-		s.startWithHomeConfig("config_version: 2\n")
-		dir := s.T().TempDir()
-		s.Require().NoError(afero.WriteFile(configFs, dir+"/.astro/config.yaml", []byte("remote:\n    client_registry: quay.io/acme/client\n"), 0o600))
-
-		s.Equal("quay.io/acme/client", CFG.RemoteClientRegistry.GetStringFor(dir))
 	})
 
 	s.Run("the cleanup removes a default written under the 1.x name", func() {

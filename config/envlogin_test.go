@@ -160,6 +160,7 @@ func TestAnEnvironmentLoginDoesNotReadTheVault(t *testing.T) {
 	}
 	// A new process, whose keyring does not answer.
 	keyring.MockInitWithError(errors.New("keyring locked"))
+	t.Cleanup(keyring.MockInit) // leave no error-injecting mock behind
 	fresh, err := secrets.NewLogins(filepath.Join(os.Getenv("ASTRO_HOME"), "secrets"))
 	if err != nil {
 		t.Fatal(err)
@@ -179,5 +180,32 @@ func TestAnEnvironmentLoginDoesNotReadTheVault(t *testing.T) {
 	}
 	if stamps, _ := filepath.Glob(filepath.Join(os.Getenv("ASTRO_HOME"), "secrets", "login-keyring-*")); len(stamps) != 0 {
 		t.Errorf("reading the context asked the keyring: %v", stamps)
+	}
+}
+
+// A context this process has written does not hide the contexts it only read
+// from the file: sharing a renewed login reaches every context on the tenant.
+func TestSharingReachesContextsOnlyReadFromTheFile(t *testing.T) {
+	loginHome(t, plaintextConfig+`  other_io:
+    domain: other.io
+    auth_domain: https://auth.example/
+    auth_client_id: client
+`, nil)
+	c, err := GetCurrentContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SetAuthTenant("https://auth.example/", "client"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SetSharedContextKey(tokenField, "Bearer shared"); err != nil {
+		t.Fatal(err)
+	}
+	other, err := (&Context{Domain: "other.io"}).GetContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.Token != "Bearer shared" {
+		t.Errorf("the context on the same tenant did not get the renewed token (len %d)", len(other.Token))
 	}
 }

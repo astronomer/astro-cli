@@ -85,7 +85,12 @@ The runtime image already is Airflow, so a generated image leaves both distribut
 
 ## `[tool.astro]`
 
-The section that makes a Python project an Astro project. Its absence is how the CLI tells an Astro project from a plain one. Every key it holds is listed below; a key that is not — a typo, a setting from another tool — is an error, so nothing you write here is quietly ignored.
+The section that makes a Python project an Astro project. Its absence is how the CLI tells an Astro project from a plain one. Every key it holds is listed below. A key that is not is one of two things:
+
+- **A near-miss of a key the table holds is an error**, naming the key it was meant to be: the same key in another case or with `_` for `-` (`build_secrets`), or, for a key of six letters or more, one a letter away, two swapped letters counting as one (`defalt` on a link, `workspce`). A misspelled setting would otherwise not apply, in silence.
+- **Any other key is a warning.** The manifest loads without it, and every command that reads the project prints the key on stderr, once; `astro local check` lists it as a `manifest_warning` finding, which `--strict` fails on. It is a warning rather than an error so a project stays readable when a teammate on a newer Astro CLI or Astro Desktop adds a key this one does not know. No two keys in a table are near-misses of each other, so a newer key is never mistaken for a typo of an older one.
+
+The same holds for a link's keys and a pool's. `[tool.astro.env]` and a link's `auth` table are the exceptions: an unknown key there is an error, since a misspelling there decides where a secret goes or how a request proves itself.
 
 There is no `airflow` key: the requirement is the one statement of the version, so nothing can run one Airflow in Docker mode and another in standalone. A manifest with an `airflow` line is refused until it is deleted, and the error quotes the requirement that decides the version:
 
@@ -278,6 +283,32 @@ The default target every deployment link inherits when the link sets none. A tar
 target = 'astro'
 ```
 
+## `[tool.astro.deploy]`
+
+How the project's deploys behave, whoever runs them. These live in the project, not in `astro config`, because they are the project's to decide: a teammate and a CI job that check the project out deploy it the same way. Every key is optional.
+
+```toml
+[tool.astro.deploy]
+client-registry = 'quay.io/acme/client'
+git-metadata = false
+```
+
+### `client-registry`
+
+The image repository `astro remote deploy` pushes the Remote Execution client image to: `registry[:port]/repository`, with no tag, since the deploy adds its own. It is the repository the project's remote agents pull from, configured on their side. A link can set its own (see [`client-registry` on a link](#client-registry-1)), and `astro remote deploy --registry` overrides both for one run, which is also the only way to name one outside a project. `astro remote deploy` checks the value is a repository it can push to and names this key when it is not. Astro CLI 1.x kept this as `remote.client_registry`; `astro init` carries it here.
+
+### `git-metadata`
+
+Whether a deploy records the commit it ships: its SHA, branch and, for a GitHub remote, its URL, with the commit message as the description when the deploy is given none. `true` unless set `false`. A project with uncommitted changes records none either way. A machine can also turn it off for every project with `astro config set --global deploy.git_metadata false`: that wins over `git-metadata = true`, and the deploy says why it recorded no commit. The global setting only turns it off, so a committed project can never start sending commit data from a machine whose owner turned it off. Astro CLI 1.x kept the project's choice in its `.astro/config.yaml` as `deploy.git_metadata`; `astro init` carries it here.
+
+### `cosmos-boost`
+
+Whether a deploy that uploads the project's Dags generates Cosmos Boost files for the dbt projects among them into the upload, so Cosmos skips parsing them at runtime. `false` unless set `true`. The files go into the upload only, never into the project. `astro deploy bundle`, which deploys a directory outside any project, takes `--cosmos-boost` instead. Astro CLI 1.x kept this as `cosmos_boost.pre_deploy`.
+
+### `sha-as-tag`
+
+Whether a deploy to Astro Private Cloud pushes its image by digest, and points the Deployment at it so, rather than by tag. `false` unless set `true`. `astro deploy --sha-as-tag` does the same for one run, which is the way for an `--image-name` deploy from outside a project. Astro CLI 1.x kept this as `sha_as_tag`.
+
 ## `[tool.astro.deployments.<name>]`
 
 One table per Airflow the project talks to, keyed by a name you choose (`dev`, `prod`, and so on). This is the committed inventory: a teammate who clones the repo has the same list you do, with nothing to pass around. `astro deploy` ships to one of these links, and the commands that query an Airflow read the same table.
@@ -296,7 +327,7 @@ There are five kinds of link, and the kind follows from what the link sets:
 
 A link names coordinates (`deployment` or `environment`) or a `url`, never both.
 
-Pick any name you like, with two rules: it cannot be empty, and it cannot be `local`, which always means the Airflow running on your own machine. Keys the table does not define are errors rather than silence — misspell `default` on the link you meant to be the default and the CLI says so, instead of quietly resolving to another link.
+Pick any name you like, with two rules: it cannot be empty, and it cannot be `local`, which always means the Airflow running on your own machine. A key the table does not define follows the rule above: misspell `default` on the link you meant to be the default (`defalt`, `defaults`) and the manifest is refused, naming `default`, rather than another link quietly staying the default.
 
 ### `deployment`
 
@@ -345,6 +376,10 @@ Every field that carries a credential is a `*-env` name: it names the environmen
 `exec`'s `command` is an array — the program and its arguments, as you would type them apart: `command = ['acme-airflow-token', '--profile', 'prod']`. The CLI runs the program directly and never through a shell, so a single string is an error rather than a quoting puzzle.
 
 Anything else is an error: an unknown method, a field the method does not take, a missing credential field, half a credential pair, both credential pairs at once.
+
+### `client-registry`
+
+On an Astro link only: the repository `astro remote deploy --deployment <name>` pushes the client image to, for a Deployment whose remote agents pull from somewhere other than the project's [`client-registry`](#client-registry). Unset, the link takes the project's. An error on any other kind of link, which has no remote agents.
 
 ### `default`
 
@@ -528,7 +563,7 @@ it cannot look enforced when it is not.
 
 A declaration may be both `optional` and defaulted. The default already satisfies the run gate, so `optional` changes nothing there — but it still says the value is not one a person has to supply, which is what a UI listing the environment needs in order to mark it.
 
-Unknown keys are an error, as they are everywhere in this section. That is why a typo'd `sensitiv` cannot quietly ship a secret to the wrong place.
+Unknown keys are an error in this section, unlike in the rest of `[tool.astro]`. That is why a typo'd `sensitiv` cannot quietly ship a secret to the wrong place.
 
 Plain env vars live directly under `[tool.astro.env]`. Connections and Airflow variables use their own sub-sections, which pick the `AIRFLOW_CONN_` / `AIRFLOW_VAR_` encoding — a connection `warehouse` resolves as `AIRFLOW_CONN_WAREHOUSE`, a variable `batch_size` as `AIRFLOW_VAR_BATCH_SIZE`.
 
@@ -609,7 +644,7 @@ project = 'acme-data'                  # the GCP project holding the environment
 location = 'us-central1'               # its region
 ```
 
-Any other key in those two sections, or a section named for no target, is a warning: the manifest still loads, and `astro local start` and `restart` print the key, since a misspelled `region` reads the same as no region at all. It is a warning rather than an error, unlike an unknown key elsewhere in `[tool.astro]`, because these sections are open by design: each backend owns its own section.
+Any other key in those two sections, or a section named for no target, is a warning: the manifest still loads, and `astro local start` and `restart` print the key, since a misspelled `region` reads the same as no region at all. These sections are open by design, so here even a near-miss of a known key is a warning, not an error.
 
 `astro` and `oss` are targets too, but nothing reads their sections yet. They are reserved: carried through as they are and never warned about, until a reader gives them a shape.
 

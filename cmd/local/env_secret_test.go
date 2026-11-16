@@ -211,6 +211,7 @@ func TestEnvDeleteSecret(t *testing.T) {
 func TestEnvSetSecretRefusesWithoutAKeyring(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	keyring.MockInitWithError(errors.New("no Secret Service available"))
+	t.Cleanup(keyring.MockInit) // leave no error-injecting mock behind
 
 	d, _, _ := envDeps(t, dir, "s3cr3t\n")
 	err := execute(t, d, "local", "env", "variable", "set", "API_TOKEN")

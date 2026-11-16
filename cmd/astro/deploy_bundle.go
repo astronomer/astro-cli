@@ -45,6 +45,8 @@ type deployBundleOptions struct {
 	wait        bool
 	waitTime    time.Duration
 	delete      bool
+	cosmosBoost bool
+	gitMetadata bool
 	output      cliout.Format
 }
 
@@ -76,6 +78,9 @@ func newDeployBundleCmd() *cobra.Command {
   # Deploy a dbt project elsewhere to a given Deployment
   astro deploy bundle <PATH> --deployment <DEPLOYMENT_ID>
 
+  # Deploy it with Cosmos Boost, so Cosmos skips parsing the dbt project
+  astro deploy bundle <PATH> --deployment <DEPLOYMENT_ID> --cosmos-boost
+
   # Deploy it to a Deployment named analytics in a given Workspace
   astro deploy bundle <PATH> --deployment analytics --workspace <WORKSPACE_ID>
 
@@ -94,6 +99,8 @@ func newDeployBundleCmd() *cobra.Command {
 	f.StringVar(&o.description, "description", "", "Description to store on the deploy")
 	f.BoolVar(&o.wait, "wait", false, "Wait for the Deployment to become healthy before ending the command")
 	f.DurationVar(&o.waitTime, "wait-time", deployWaitTime, "Time to wait for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
+	f.BoolVar(&o.cosmosBoost, "cosmos-boost", false, "Generate Cosmos Boost files for a dbt bundle into the upload, so Cosmos skips parsing the dbt project at runtime. A project's own deploys take [tool.astro.deploy] cosmos-boost instead")
+	f.BoolVar(&o.gitMetadata, "git-metadata", true, "Record the commit the bundle ships, its SHA, branch and URL, when it sits in a git checkout with no uncommitted changes. --git-metadata=false records none")
 	f.BoolVar(&o.delete, "delete", false, "Remove the bundle mounted at --mount-path (by default the one PATH's type would mount at) instead of deploying")
 	cliout.AddOutputFlag(cmd, &o.output)
 	return cmd
@@ -156,6 +163,8 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 		Description:   o.description,
 		AstroV1Client: login.client,
 		ErrOut:        cmd.ErrOrStderr(),
+		CosmosBoost:   o.cosmosBoost,
+		NoGitMetadata: !gitMetadataAllowed(o.gitMetadata),
 	}
 	if !login.current {
 		in.Login = &login.context
@@ -163,6 +172,11 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	res, err := DeployBundle(in)
 	if err != nil {
 		return err
+	}
+	// After the deploy, as a project deploy's recap gives it: a deploy that
+	// failed recorded nothing either way.
+	if note := gitMetadataOffNote(path, o.gitMetadata); note != "" {
+		cliout.Note(cmd.ErrOrStderr(), note)
 	}
 	bundlePath, err := filepath.Abs(path)
 	if err != nil {

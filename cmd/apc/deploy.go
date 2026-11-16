@@ -29,6 +29,7 @@ var (
 	imageName                          string
 	runtimeVersionForImageName         string
 	imagePresentOnRemote               bool
+	deployShaAsTag                     bool
 	ErrBothDagsOnlyAndImageOnlySet     = errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
 	ErrImageNameNotPassedForRemoteFlag = errors.New("--image-name is mandatory when --remote flag is passed")
 )
@@ -77,6 +78,7 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&isImageOnlyDeploy, "image", false, "Push only an image to your Deployment; works only for Dag-only, Git-sync-based and NFS-based Deployments")
 	cmd.Flags().StringVar(&imageName, "image-name", "", "Name of a prebuilt image to deploy instead of building one: an image on this machine, or with --remote one already in a registry. Outside a pyproject.toml project it deploys the image alone")
 	cmd.Flags().StringVar(&runtimeVersionForImageName, "runtime-version", "", "Astro Runtime version of the --remote image, which this machine cannot read from it. Example - 12.1.1. Required with --remote")
+	cmd.Flags().BoolVar(&deployShaAsTag, "sha-as-tag", false, "Push the image by digest, and point the Deployment at it so, rather than by tag. A project's deploys also do with sha-as-tag = true under [tool.astro.deploy]; this is the way for an --image-name deploy outside a project")
 	cmd.Flags().BoolVar(&imagePresentOnRemote, "remote", false, "Deploy the --image-name image from the registry it is already in, without pulling or pushing it; needs --runtime-version")
 	utils.AddBuildSecretFlag(cmd.Flags(), &deploySecrets)
 	cliout.AddOutputFlag(cmd, &deployOutput)

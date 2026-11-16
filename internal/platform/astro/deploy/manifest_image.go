@@ -44,6 +44,12 @@ type ManifestImageDeployInput struct {
 	// runtime and nothing offered.
 	Catalog      func() *runtimeversions.Catalog
 	DeploymentID string
+	// GitMetadata is [tool.astro.deploy] git-metadata: whether the deploy
+	// records the commit it ships.
+	GitMetadata bool
+	// CosmosBoost is [tool.astro.deploy] cosmos-boost: whether the Dags
+	// upload carries Cosmos Boost files for its dbt projects.
+	CosmosBoost bool
 	// BuildSecrets are docker build --secret specs for a declared Dockerfile's
 	// build (Build.Dockerfile).
 	BuildSecrets []string
@@ -152,7 +158,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	var gitInfo ManifestDeployGit
 	var commitMessage string
 	if in.ImageName == "" {
-		gitInfo, commitMessage = readManifestDeployGit(in.Build.ProjectDir)
+		gitInfo, commitMessage = readManifestDeployGit(in.Build.ProjectDir, in.GitMetadata)
 	}
 
 	// The deployment comes first: its rules are checked before the build,
@@ -238,7 +244,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	// pushed, unless the DAGs are inside the image.
 	var tarballVersion string
 	if dags.upload {
-		tarballVersion, err = uploadDeployDags(&c, in.Build.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
+		tarballVersion, err = uploadDeployDags(&c, in.Build.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir, in.CosmosBoost)
 		if err != nil {
 			return ManifestImageDeployResult{}, err
 		}
@@ -374,7 +380,7 @@ func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request, pod
 // created deploy's upload URL and returns the tarball version. Both manifest paths use
 // it: the dags-only deploy and a "both" image deploy, which ships the tarball to
 // fit the image just pushed.
-func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *astrov1.Deployment, created *astrov1.Deploy, noDagsBaseDir bool) (string, error) {
+func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *astrov1.Deployment, created *astrov1.Deploy, noDagsBaseDir, cosmosBoost bool) (string, error) {
 	uploadURL := ""
 	if created.DagsUploadUrl != nil {
 		uploadURL = *created.DagsUploadUrl
@@ -388,7 +394,7 @@ func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *a
 	}
 	dagsPath := filepath.Join(projectDir, "dags")
 	monitoringDag := includeMonitoringDag(c.OrganizationProduct == string(astrov1.OrganizationProductHOSTED), deploymentType)
-	tarballVersion, err := uploadDags(dagsPath, uploadURL, dep.AstroRuntimeVersion, monitoringDag, noDagsBaseDir)
+	tarballVersion, err := uploadDags(dagsPath, uploadURL, dep.AstroRuntimeVersion, monitoringDag, noDagsBaseDir, cosmosBoost)
 	if err != nil {
 		if strings.Contains(err.Error(), dagDeployDisabled) {
 			return "", fmt.Errorf(enableDagDeployMsg, deploymentID)

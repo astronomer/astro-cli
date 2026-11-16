@@ -23,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/secrets"
+	"github.com/astronomer/astro-cli/pkg/testing/testenv"
 )
 
 const otherDomain = "astronomer-dev.io"
@@ -366,6 +367,9 @@ func TestForcedRenewalHelper(t *testing.T) {
 		return auth.Config{ClientID: "client-id", DomainURL: idpURL + "/"}, nil
 	}
 	config.InitConfig(afero.NewOsFs())
+	// Never write outside the parent's temporary home, whatever the environment
+	// said.
+	testenv.RequireTemp(config.HomeConfigFile)
 	// Wait for the other process, so both read the same token before either
 	// renews it.
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(5 * time.Millisecond) {

@@ -36,11 +36,6 @@ func setupCosmosBoostEnv(t *testing.T) {
 	t.Cleanup(func() { config.HomeConfigPath = origHome })
 }
 
-func enableCosmosBoost(t *testing.T) {
-	t.Helper()
-	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("true"))
-}
-
 func writeDbtBundle(t *testing.T) string {
 	t.Helper()
 	bundleDir := t.TempDir()
@@ -101,12 +96,11 @@ func treeSnapshot(t *testing.T, root string) map[string]string {
 // path the plugin reads, and the project tree is left exactly as it was.
 func TestUploadBundleGeneratesSidecarsIntoTheBundle(t *testing.T) {
 	setupCosmosBoostEnv(t)
-	enableCosmosBoost(t)
 	bundleDir := writeDbtBundle(t)
 	uploaded := captureUploads(t)
 	before := treeSnapshot(t, bundleDir)
 
-	_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0", io.Discard)
+	_, err := UploadBundle(bundleDir, "http://upload-url", false, true, "0.0.0", io.Discard)
 	require.NoError(t, err)
 
 	assert.Equal(t, before, treeSnapshot(t, bundleDir), "the deploy must not write into the project")
@@ -129,12 +123,11 @@ func TestUploadBundleGeneratesSidecarsIntoTheBundle(t *testing.T) {
 // directory's own name, and the sidecars sit under it like every other file.
 func TestUploadBundleSidecarPathsUnderTheDagsBaseDir(t *testing.T) {
 	setupCosmosBoostEnv(t)
-	enableCosmosBoost(t)
 	dagsDir := filepath.Join(t.TempDir(), "dags")
 	writeTreeFile(t, dagsDir, "dbt/shop/dbt_project.yml", "name: shop\n")
 	uploaded := captureUploads(t)
 
-	_, err := UploadBundle(dagsDir, "http://upload-url", true, "0.0.0", io.Discard)
+	_, err := UploadBundle(dagsDir, "http://upload-url", true, true, "0.0.0", io.Discard)
 	require.NoError(t, err)
 
 	assert.Contains(t, uploaded(), "dags/dbt/shop/"+cosmosBoostArtifact)
@@ -156,7 +149,6 @@ func TestUploadBundleSlimManifest(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setupCosmosBoostEnv(t)
-			enableCosmosBoost(t)
 			if tc.envVar != "" {
 				t.Setenv("ASTRO_COSMOS_BOOST_SLIM_MANIFEST_ENABLED", tc.envVar)
 			}
@@ -165,7 +157,7 @@ func TestUploadBundleSlimManifest(t *testing.T) {
 			writeTreeFile(t, bundleDir, "target/manifest.json", `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`)
 			uploaded := captureUploads(t)
 
-			_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0", io.Discard)
+			_, err := UploadBundle(bundleDir, "http://upload-url", false, true, "0.0.0", io.Discard)
 			require.NoError(t, err)
 
 			assert.Contains(t, uploaded(), "target/.astro/dbt_metadata.json", "the manifest must still be stamped")
@@ -181,11 +173,11 @@ func TestUploadBundleSlimManifest(t *testing.T) {
 
 func TestUploadBundleSkipsPreDeployByDefault(t *testing.T) {
 	setupCosmosBoostEnv(t)
-	// cosmos_boost.pre_deploy defaults to false, so nothing may be produced.
+	// Off unless asked for, so nothing may be produced.
 	bundleDir := writeDbtBundle(t)
 	uploaded := captureUploads(t)
 
-	_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0", io.Discard)
+	_, err := UploadBundle(bundleDir, "http://upload-url", false, false, "0.0.0", io.Discard)
 	require.NoError(t, err)
 
 	assert.NotContains(t, uploaded(), cosmosBoostArtifact, "opt-in gate is off by default")
@@ -196,7 +188,6 @@ func TestUploadBundleSkipsPreDeployByDefault(t *testing.T) {
 // `astro deploy bundle` path (DeployBundle into UploadBundle).
 func TestDeployBundleDbtPathGeneratesSidecarsWhenEnabled(t *testing.T) {
 	setupCosmosBoostEnv(t)
-	enableCosmosBoost(t)
 
 	canCiCdDeploy = func(token string) bool { return true }
 
@@ -214,6 +205,7 @@ func TestDeployBundleDbtPathGeneratesSidecarsWhenEnabled(t *testing.T) {
 		DeploymentID:  "test-deployment-id",
 		BundleType:    "dbt",
 		AstroV1Client: mockV1Client,
+		CosmosBoost:   true,
 	})
 	require.NoError(t, err)
 
@@ -227,16 +219,13 @@ func TestDeployBundleDbtPathGeneratesSidecarsWhenEnabled(t *testing.T) {
 func TestUploadBundleLeavesOutStaleSidecars(t *testing.T) {
 	for _, enabled := range []bool{true, false} {
 		setupCosmosBoostEnv(t)
-		if enabled {
-			enableCosmosBoost(t)
-		}
 		bundleDir := writeDbtBundle(t)
 		stale := writeTreeFile(t, bundleDir, cosmosBoostArtifact, staleOursSidecar)
 		writeTreeFile(t, bundleDir, "gone/.astro/manifest.slim.json", `{"_generated_by":{"application":"astro"}}`)
 		uploaded := captureUploads(t)
 		before := treeSnapshot(t, bundleDir)
 
-		_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0", io.Discard)
+		_, err := UploadBundle(bundleDir, "http://upload-url", false, enabled, "0.0.0", io.Discard)
 		require.NoError(t, err)
 
 		assert.Equal(t, before, treeSnapshot(t, bundleDir), "enabled=%v: the tree must not change", enabled)
@@ -261,18 +250,17 @@ func TestUploadBundleForeignSidecar(t *testing.T) {
 		writeTreeFile(t, bundleDir, cosmosBoostArtifact, foreignSidecar)
 		uploaded := captureUploads(t)
 
-		_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0", io.Discard)
+		_, err := UploadBundle(bundleDir, "http://upload-url", false, false, "0.0.0", io.Discard)
 		require.NoError(t, err)
 		assert.Equal(t, foreignSidecar, uploaded()[cosmosBoostArtifact])
 	})
 	t.Run("enabled refuses", func(t *testing.T) {
 		setupCosmosBoostEnv(t)
-		enableCosmosBoost(t)
 		bundleDir := writeDbtBundle(t)
 		foreign := writeTreeFile(t, bundleDir, cosmosBoostArtifact, foreignSidecar)
 		uploaded := captureUploads(t)
 
-		_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0", io.Discard)
+		_, err := UploadBundle(bundleDir, "http://upload-url", false, true, "0.0.0", io.Discard)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "unrecognized producer")
@@ -287,13 +275,10 @@ func TestUploadBundleForeignSidecar(t *testing.T) {
 func TestUploadBundleMissingDirIsUnchanged(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
 		setupCosmosBoostEnv(t)
-		if enabled {
-			enableCosmosBoost(t)
-		}
 		dagsDir := filepath.Join(t.TempDir(), "dags")
 		uploaded := captureUploads(t)
 
-		_, err := UploadBundle(dagsDir, "http://upload-url", true, "0.0.0", io.Discard)
+		_, err := UploadBundle(dagsDir, "http://upload-url", true, enabled, "0.0.0", io.Discard)
 		require.NoError(t, err, "enabled=%v", enabled)
 		assert.Empty(t, uploaded(), "enabled=%v", enabled)
 		assert.NoDirExists(t, dagsDir)
@@ -307,13 +292,12 @@ func TestUploadBundleMissingDirIsUnchanged(t *testing.T) {
 // directory it bundles, where it used to land in the working directory.
 func TestUploadBundleFromTheWorkingDirectory(t *testing.T) {
 	setupCosmosBoostEnv(t)
-	enableCosmosBoost(t)
 	bundleDir := writeDbtBundle(t)
 	writeTreeFile(t, bundleDir, cosmosBoostArtifact, staleOursSidecar)
 	t.Chdir(bundleDir)
 	uploaded := captureUploads(t)
 
-	_, err := UploadBundle(".", "http://upload-url", false, "0.0.0", io.Discard)
+	_, err := UploadBundle(".", "http://upload-url", false, true, "0.0.0", io.Discard)
 	require.NoError(t, err)
 
 	names := make([]string, 0, len(uploaded()))

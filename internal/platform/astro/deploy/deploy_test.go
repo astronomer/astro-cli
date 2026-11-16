@@ -163,6 +163,9 @@ var (
 // clientDeployProject is a project with a Dockerfile.client FROM the agent
 // base and its client dependency files, in the cloud test config with a
 // logged-in context, pushing to registry.
+//
+// The registry is the one the command resolved, which the tests below pass
+// in their InputClientDeploy as testClientRegistry.
 func clientDeployProject(t *testing.T, token, registry string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -174,16 +177,19 @@ func clientDeployProject(t *testing.T, token, registry string) string {
 	require.NoError(t, err)
 	ctx.Token = token
 	require.NoError(t, ctx.SetContext())
-	require.NoError(t, config.CFG.RemoteClientRegistry.SetHomeString(registry))
+	testClientRegistry = registry
 	return dir
 }
+
+// testClientRegistry is the registry clientDeployProject last set up.
+var testClientRegistry string
 
 func TestDeployClientImage(t *testing.T) {
 	t.Run("successful client deploy", func(t *testing.T) {
 		dir := clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
 		cmd := withClientBuild(t, "docker")
 
-		got, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
+		got, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.NoError(t, err)
 		// The base image registry is logged in to as the CLI user with the
 		// context's token on stdin, then the image is built under the
@@ -201,7 +207,7 @@ func TestDeployClientImage(t *testing.T) {
 		dir := clientDeployProject(t, "", "test-registry.io/acme/client-image")
 		cmd := withClientBuild(t, "docker")
 
-		_, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
+		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.NoError(t, err)
 		assert.False(t, hasImageCall(cmd.calls, " login "), "nothing to log in with: %v", cmd.calls)
 	})
@@ -211,7 +217,7 @@ func TestDeployClientImage(t *testing.T) {
 		cmd := withClientBuild(t, "docker")
 		cmd.errs = map[string]error{"login": errors.New("login failed")}
 
-		_, err := DeployClientImage(InputClientDeploy{Path: "/test/path"}, nil)
+		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: "/test/path"}, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to authenticate with registry images.astronomer.cloud")
 		assert.Contains(t, err.Error(), "login failed")
@@ -227,11 +233,10 @@ func TestDeployClientImage(t *testing.T) {
 		cmd := withClientBuild(t, "docker")
 
 		// No API client: the registry is checked before anything calls the API.
-		_, err := DeployClientImage(InputClientDeploy{Path: "/test/path", DeploymentID: "test-deployment-id"}, nil)
+		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: "/test/path", DeploymentID: "test-deployment-id"}, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "is not a usable registry endpoint")
+		assert.Contains(t, err.Error(), "--registry is not a usable registry endpoint")
 		assert.Contains(t, err.Error(), "must not include an image tag")
-		assert.Contains(t, err.Error(), "astro config set --global deploy.remote_execution.client_registry")
 		assert.False(t, hasImageCall(cmd.calls, " build "), "nothing is built: %v", cmd.calls)
 	})
 
@@ -239,13 +244,9 @@ func TestDeployClientImage(t *testing.T) {
 		clientDeployProject(t, "test-token", "")
 		cmd := withClientBuild(t, "docker")
 
-		_, err := DeployClientImage(InputClientDeploy{Path: "/test/path"}, nil)
+		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: "/test/path"}, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "remote client registry is not configured")
-		// Outside a project the advice is the global command; config's own
-		// tests pin its wording.
-		assert.Contains(t, err.Error(), "'"+config.ClientRegistryFix()+"'")
-		assert.Contains(t, err.Error(), "config set --global")
+		assert.Contains(t, err.Error(), "no client registry to push to")
 		assert.Empty(t, cmd.calls, "no login, no build")
 	})
 
@@ -254,7 +255,7 @@ func TestDeployClientImage(t *testing.T) {
 		cmd := withClientBuild(t, "docker")
 		resolveContainerEngine = func() (string, []string, error) { return "", nil, errors.New("no container engine found") }
 
-		_, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
+		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.EqualError(t, err, "no container engine found")
 		assert.Empty(t, cmd.calls)
 	})
@@ -264,7 +265,7 @@ func TestDeployClientImage(t *testing.T) {
 		cmd := withClientBuild(t, "docker")
 		cmd.buildErr = errors.New("build failed")
 
-		_, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
+		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to build client image")
 		assert.False(t, hasImageCall(cmd.calls, " push "), "nothing is pushed: %v", cmd.calls)
@@ -275,7 +276,7 @@ func TestDeployClientImage(t *testing.T) {
 		cmd := withClientBuild(t, "docker")
 		cmd.errs = map[string]error{"push": errors.New("push failed")}
 
-		_, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
+		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to push client image")
 		assert.Contains(t, err.Error(), "push failed")
@@ -289,7 +290,9 @@ func TestDeployClientImage(t *testing.T) {
 		cmd.errs = map[string]error{"push": errors.New("denied: 403 Forbidden")}
 
 		var err error
-		out := captureStdout(t, func() { _, err = DeployClientImage(InputClientDeploy{Path: dir}, nil) })
+		out := captureStdout(t, func() {
+			_, err = DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
+		})
 		require.ErrorIs(t, err, imagebuild.ErrPushForbidden)
 		assert.Contains(t, err.Error(), "failed to push client image: failed to push image due to authentication error (403 Forbidden)")
 		assert.Contains(t, out, "Please ensure that you have logged in to test-registry.io/acme/client-image via docker login and try again")
@@ -299,7 +302,7 @@ func TestDeployClientImage(t *testing.T) {
 		clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
 		cmd := withClientBuild(t, "docker")
 
-		got, err := DeployClientImage(InputClientDeploy{Path: t.TempDir(), ImageName: "custom-image:tag"}, nil)
+		got, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: t.TempDir(), ImageName: "custom-image:tag"}, nil)
 		require.NoError(t, err)
 		// The remote tag is timestamp-based, not the user's "tag".
 		assert.True(t, strings.HasPrefix(got.Image, "test-registry.io/acme/client-image:deploy-"), got.Image)
@@ -783,6 +786,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 
 	t.Run("skip validation when no deployment ID", func(t *testing.T) {
 		deployInput := InputClientDeploy{
+			Registry: testClientRegistry, RegistrySource: "--registry",
 			Path: tempDir,
 		}
 
@@ -797,6 +801,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		assert.NoError(t, err)
 
 		deployInput := InputClientDeploy{
+			Registry: testClientRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -812,6 +817,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		deployInput := InputClientDeploy{
+			Registry: testClientRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -833,6 +839,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 
 		deployInput := InputClientDeploy{
+			Registry: testClientRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -869,6 +876,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		assert.NoError(t, err)
 
 		deployInput := InputClientDeploy{
+			Registry: testClientRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -903,6 +911,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		assert.NoError(t, err)
 
 		deployInput := InputClientDeploy{
+			Registry: testClientRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -938,6 +947,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		assert.NoError(t, err)
 
 		deployInput := InputClientDeploy{
+			Registry: testClientRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -974,6 +984,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		assert.NoError(t, err)
 
 		deployInput := InputClientDeploy{
+			Registry: testClientRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -1011,6 +1022,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		assert.NoError(t, err)
 
 		deployInput := InputClientDeploy{
+			Registry: testClientRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
@@ -1046,6 +1058,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		assert.NoError(t, err)
 
 		deployInput := InputClientDeploy{
+			Registry: testClientRegistry, RegistrySource: "--registry",
 			Path:         tempDir,
 			DeploymentID: "test-deployment-id",
 		}
