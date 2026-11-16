@@ -139,12 +139,12 @@ type Config struct {
 	HealthTimeout time.Duration
 	// ContainerBinary returns the container.binary setting for a project —
 	// "docker" or "podman" pins the engine docker mode drives, anything else
-	// (or a nil func) auto-detects from PATH, docker first. A func of the
-	// project path because the setting can be per project (a v1
-	// .astro/config.yaml over the global config), and the consumer owns
-	// reading it: the CLI from its config package, Astro Desktop from its own
-	// mirror of it. Called with "" where no one project is in question, which
-	// asks for the global value.
+	// (or a nil func) auto-detects from PATH, docker first. The consumer owns
+	// reading it: the CLI from its global config, Astro Desktop from its own
+	// mirror of it. It is a machine setting, which no project's files choose:
+	// the CLI ignores the project path, which stays in the signature so an
+	// embedder that resolves it per project still can. Called with "" where
+	// no one project is in question.
 	ContainerBinary func(projectPath string) string
 }
 

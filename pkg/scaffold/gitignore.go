@@ -53,7 +53,7 @@ var localIgnoreNotes = map[string]string{
 // localIgnoreHeader introduces localIgnoreRules when they are appended to an
 // existing .gitignore. It is the comment gitignoreTemplate puts above them.
 const localIgnoreHeader = "# Per-machine files Astro tools write into the project: local Airflow\n" +
-	"# state, credentials and tokens. .astro/config.yaml is shared; keep committing it.\n"
+	"# state, credentials and tokens.\n"
 
 // planIgnoreRules works out the change that would make an existing .gitignore
 // cover .env and every entry in localIgnoreRules, and returns nil when nothing

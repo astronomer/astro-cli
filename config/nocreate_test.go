@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// restoreConfigGlobals puts back the package state initHome and initProject
+// restoreConfigGlobals puts back the package state initHome
 // assign, when the test ends.
 //
 // The rest of this suite writes its fixture to whatever HomeConfigFile
@@ -26,11 +26,11 @@ import (
 // somebody adds a test.
 func (s *Suite) restoreConfigGlobals() {
 	origFile, origPath := HomeConfigFile, HomeConfigPath
-	origHomeV, origProjectV, origFs := viperHome, viperProject, configFs
+	origHomeV, origFs := viperHome, configFs
 	s.T().Cleanup(func() {
 		delete(unreadableConfigs, HomeConfigFile)
 		HomeConfigFile, HomeConfigPath = origFile, origPath
-		viperHome, viperProject, configFs = origHomeV, origProjectV, origFs
+		viperHome, configFs = origHomeV, origFs
 	})
 }
 
@@ -195,26 +195,3 @@ func (s *Suite) TestAFailedWriteLeavesTheConfigAsItWas() {
 type renameFailsFs struct{ afero.Fs }
 
 func (renameFailsFs) Rename(string, string) error { return os.ErrPermission }
-
-// The project config gets the same treatment as the home config: a file that
-// is gone is not a file a write could destroy.
-//
-// Without this, a project config that failed to parse and was then deleted —
-// by hand, or by a conversion rewriting the project — stayed on the
-// unreadable list for the life of the process, and the next write refused
-// itself over a file that was no longer there.
-func (s *Suite) TestInitProjectClearsTheRecordWhenTheFileIsGone() {
-	fs := afero.NewMemMapFs()
-	s.restoreConfigGlobals()
-
-	file := filepath.Join(WorkingPath, ConfigDir, ConfigFileNameWithExt)
-	s.NoError(afero.WriteFile(fs, file, []byte("broken: [unclosed\n"), 0o600))
-	s.T().Cleanup(func() { delete(unreadableConfigs, file) })
-
-	initProject(fs)
-	s.True(unreadableConfigs[file], "a project config that would not parse is recorded")
-
-	s.NoError(fs.Remove(file))
-	initProject(fs)
-	s.False(unreadableConfigs[file], "and the record goes when the file does")
-}

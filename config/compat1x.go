@@ -10,9 +10,10 @@ import (
 
 // 1.x coexistence.
 //
-// Astro CLI 1.x and v2 share ~/.astro/config.yaml, and v2 still reads a 1.x
-// project's .astro/config.yaml. Everything in this file exists so the two can
-// run side by side, and goes when that support ends:
+// Astro CLI 1.x and v2 share ~/.astro/config.yaml. (A 1.x project's own
+// .astro/config.yaml is read by astro init alone, to convert it: v2 takes no
+// setting from it.) Everything in this file exists so the two can run side by
+// side, and goes when that support ends:
 //
 //   - a renamed setting is read under its 1.x name, and written under both
 //     names while the file holds the 1.x one (names, keyIn, set);
@@ -46,14 +47,6 @@ func (c cfg) keyIn(v *viper.Viper) string {
 		}
 	}
 	return ""
-}
-
-// projectKey is keyIn for the 1.x project config, "" when there is none.
-func (c cfg) projectKey() string {
-	if !configExists(viperProject) {
-		return ""
-	}
-	return c.keyIn(viperProject)
 }
 
 // set stores value as c in v under its current name, and under each 1.x name

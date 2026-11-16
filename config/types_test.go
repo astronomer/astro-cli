@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"regexp"
 )
 
@@ -44,12 +43,6 @@ func (s *Suite) TestGetString() {
 	cfg.SetHomeString("1")
 	val := cfg.GetString()
 	s.Equal("1", val)
-
-	viperProject.SetConfigFile("test.yaml")
-	defer os.Remove("test.yaml")
-	cfg.SetProjectString("2")
-	val = cfg.GetString()
-	s.Equal("2", val)
 }
 
 func (s *Suite) TestGetInt() {
@@ -58,12 +51,6 @@ func (s *Suite) TestGetInt() {
 	cfg.SetHomeString("1")
 	val := cfg.GetInt()
 	s.Equal(1, val)
-
-	viperProject.SetConfigFile("test.yaml")
-	defer os.Remove("test.yaml")
-	cfg.SetProjectString("2")
-	val = cfg.GetInt()
-	s.Equal(2, val)
 }
 
 func (s *Suite) TestGetBool() {
@@ -72,12 +59,6 @@ func (s *Suite) TestGetBool() {
 	cfg.SetHomeString("true")
 	val := cfg.GetBool()
 	s.Equal(true, val)
-
-	viperProject.SetConfigFile("test.yaml")
-	defer os.Remove("test.yaml")
-	cfg.SetProjectString("false")
-	val = cfg.GetBool()
-	s.Equal(false, val)
 }
 
 // Before InitConfig has read a home config there is no context to find, and

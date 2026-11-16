@@ -9,9 +9,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
-// Astro CLI 1.x and v2 share the home config, and a 1.x project carries its
-// own .astro/config.yaml. These 1.x settings have no v2 setting: v2 leaves
-// them in the files, where 1.x still reads them, and applies none of them.
+// Astro CLI 1.x and v2 share the home config. These 1.x settings have no v2
+// setting: v2 leaves them in the file, where 1.x still reads them, and
+// applies none of them. (One a 1.x project's .astro/config.yaml set is
+// reported by astro init, which converts the project and deletes the file.)
 // Someone who set one in 1.x gets a different start from v2, so a start that
 // would have used one says what replaces it.
 const (
@@ -38,7 +39,7 @@ func (c *cli) warnLegacy1xSettings(r cliout.Renderer, p localrt.Plan) {
 	// for the 1.x one.
 	if p.RequestedPort <= 0 {
 		key := legacyPortKey(p.AirflowVersion)
-		if v, file, replacement := c.d.Legacy1xSetting(p.ProjectPath, key); v != "" && v != "0" {
+		if v, file, replacement := c.d.Legacy1xSetting(key); v != "" && v != "0" {
 			warnLegacy1x(r, file, key, portReason(v, replacement))
 		}
 	}
@@ -49,7 +50,7 @@ func (c *cli) warnLegacy1xSettings(r cliout.Renderer, p localrt.Plan) {
 	if p.Mode != localrt.ModeDocker || p.Dockerfile == "" || len(p.BuildSecrets) > 0 {
 		return
 	}
-	if v, file, replacement := c.d.Legacy1xSetting(p.ProjectPath, legacyBuildSecrets); v != "" {
+	if v, file, replacement := c.d.Legacy1xSetting(legacyBuildSecrets); v != "" {
 		warnLegacy1x(r, file, legacyBuildSecrets, "set, but it is an Astro CLI 1.x setting v2 does not apply. "+replacement)
 	}
 }

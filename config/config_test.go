@@ -89,15 +89,6 @@ func (s *Suite) TestInitHomeConfigOverride() {
 	s.Equal(filepath.Join("test", ".astro", "config.yaml"), viperHome.ConfigFileUsed())
 }
 
-func (s *Suite) TestInitProject() {
-	fs := afero.NewMemMapFs()
-	workingConfigPath := filepath.Join(WorkingPath, ConfigDir)
-	workingConfigFile := filepath.Join(workingConfigPath, ConfigFileNameWithExt)
-	fs.Create(workingConfigFile)
-	initProject(fs)
-	s.Contains(viperProject.ConfigFileUsed(), "config.yaml")
-}
-
 // TestSaveConfig_ConcurrentWritesProduceValidYAML stresses the file lock in
 // saveConfig: 20 goroutines each write a distinct key/value pair to the same
 // file. Without locking, viper.WriteConfigAs races interleave and can leave
