@@ -153,12 +153,19 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 	worst := checks.ExitOK
 	for _, t := range dedupeTargets(targets) {
 		rep := c.checkTarget(ctx, t, project, env, m, r, strict)
-		// The declared environment is this machine's, which only the astro
-		// target runs under; mwaa and composer set theirs on the platform,
-		// from the ENV_SETUP.md checklist `astro package` writes.
-		if t == checks.TargetAstro && rep.OpError == "" {
-			res := withEnvFindings(checks.Result{Findings: rep.Findings, DagCount: rep.DagCount, Errors: rep.Errors, Warnings: rep.Warnings}, append(manifestFindings(m), envFindings(envRep)...))
-			res = c.withRuntimeHints(ctx, project, m, res)
+		// The manifest's findings are the project file's, so every target
+		// reports them. The declared environment is this machine's, which
+		// only the astro target runs under; mwaa and composer set theirs on
+		// the platform, from the ENV_SETUP.md checklist `astro package` writes.
+		if rep.OpError == "" {
+			pre := manifestFindings(m)
+			if t == checks.TargetAstro {
+				pre = append(pre, envFindings(envRep)...)
+			}
+			res := withEnvFindings(checks.Result{Findings: rep.Findings, DagCount: rep.DagCount, Errors: rep.Errors, Warnings: rep.Warnings}, pre)
+			if t == checks.TargetAstro {
+				res = c.withRuntimeHints(ctx, project, m, res)
+			}
 			rep.Findings, rep.Errors, rep.Warnings = res.Findings, res.Errors, res.Warnings
 		}
 		reports = append(reports, rep)
@@ -541,6 +548,9 @@ func renderTracebacks(w io.Writer, findings []checks.Finding, budget *int) error
 }
 
 func findingLocation(f checks.Finding) string {
+	if f.Kind == checks.KindManifestWarning {
+		return f.Key
+	}
 	if f.Key != "" {
 		return envFindingLocation(f)
 	}

@@ -87,7 +87,7 @@ The runtime image already is Airflow, so a generated image leaves both distribut
 
 The section that makes a Python project an Astro project. Its absence is how the CLI tells an Astro project from a plain one. Every key it holds is listed below. A key that is not is one of two things:
 
-- **A near-miss of a key the table holds is an error**, naming the key it was meant to be: the same key in another case or with `_` for `-` (`build_secrets`), or one a letter or two away (`defalt` on a link, `workspce`). A misspelled setting would otherwise not apply, in silence.
+- **A near-miss of a key the table holds is an error**, naming the key it was meant to be: the same key in another case or with `_` for `-` (`build_secrets`), or, for a key of six letters or more, one a letter away, two swapped letters counting as one (`defalt` on a link, `workspce`). A misspelled setting would otherwise not apply, in silence.
 - **Any other key is a warning.** The manifest loads without it, and every command that reads the project prints the key on stderr, once; `astro local check` lists it as a `manifest_warning` finding, which `--strict` fails on. It is a warning rather than an error so a project stays readable when a teammate on a newer Astro CLI or Astro Desktop adds a key this one does not know. No two keys in a table are near-misses of each other, so a newer key is never mistaken for a typo of an older one.
 
 The same holds for a link's keys and a pool's. `[tool.astro.env]` and a link's `auth` table are the exceptions: an unknown key there is an error, since a misspelling there decides where a secret goes or how a request proves itself.

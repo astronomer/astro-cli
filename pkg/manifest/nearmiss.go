@@ -4,10 +4,14 @@ import "strings"
 
 // nearMiss is the key in known that name most likely misspells, or "" when
 // none is close: the same key once case and the _/- separators are set aside
-// (client_registry for client-registry), or one within a small edit distance,
-// 1 for a key of up to four letters and 2 for a longer one, a swap of two
-// neighbors counting as one edit (defalt for default). The closest wins, and
-// the first in known on a tie.
+// (client_registry for client-registry), or, for a key longer than shortKey,
+// one edit away, a swap of two neighbors counting as one (defalt for default,
+// workspce for workspace). The first in known wins.
+//
+// Deliberately narrow. Every near-miss rules a name out for a key a later
+// version adds to the table (TestNoKeyIsANearMissOfAnother), so a wider rule
+// would trade the names a table can grow into for typos that are a warning
+// anyway: tools beside pools, runtimes beside runtime, urls beside url.
 func nearMiss(name string, known []string) string {
 	norm := normalizeKey(name)
 	best, bestDist := "", -1
@@ -15,20 +19,20 @@ func nearMiss(name string, known []string) string {
 		if normalizeKey(k) == norm {
 			return k
 		}
-		limit := 2
 		if len(k) <= shortKey {
-			limit = 1
+			continue
 		}
-		if d := editDistance(strings.ToLower(name), k); d <= limit && (bestDist < 0 || d < bestDist) {
+		if d := editDistance(strings.ToLower(name), k); d <= 1 && (bestDist < 0 || d < bestDist) {
 			best, bestDist = k, d
 		}
 	}
 	return best
 }
 
-// shortKey is the longest key a near-miss is held to one edit of; two edits
-// of a short key reach too many unrelated words.
-const shortKey = 4
+// shortKey is the longest key held to case and separators only: one edit of
+// a key this short reaches too many words a later key could want (url, urls;
+// pools, tools).
+const shortKey = 5
 
 func normalizeKey(s string) string {
 	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
