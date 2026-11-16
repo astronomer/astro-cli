@@ -82,10 +82,10 @@ func (s *CmdSuite) TestConfigInAManifestProjectPointsAtGlobalAndPyproject() {
 	s.Contains(err.Error(), "astro config set show_warnings false --global")
 	s.Equal("true", config.CFG.ShowWarnings.GetHomeString())
 
-	_, err = executeCommand("config", "get", "deploy.git_metadata")
+	_, err = executeCommand("config", "get", "upgrade_message")
 	s.Error(err)
 	s.Contains(err.Error(), "pyproject.toml under [tool.astro]")
-	s.Contains(err.Error(), "astro config get deploy.git_metadata --global")
+	s.Contains(err.Error(), "astro config get upgrade_message --global")
 
 	_, err = executeCommand("config", "set", "show_warnings", "false", "--global")
 	s.NoError(err)

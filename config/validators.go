@@ -7,19 +7,9 @@ import (
 	"github.com/distribution/reference"
 )
 
-// registerValidator is a helper to register a validator for a config option
-func registerValidator(configPath string, validator ValidatorFunc) {
-	c := CFGStrMap[configPath]
-	c.RegisterValidator(validator)
-	CFGStrMap[configPath] = c
-}
-
-// registerValidators registers validation functions for config options
-func registerValidators() {
-	registerValidator(CFG.RemoteClientRegistry.Path, ValidateRegistryEndpoint)
-}
-
-// ValidateRegistryEndpoint validates a registry endpoint format
+// ValidateRegistryEndpoint checks a registry endpoint is a repository a deploy
+// can push to: registry[:port]/repository, with no tag or digest. astro remote
+// deploy checks the client registry with it, wherever the value came from.
 func ValidateRegistryEndpoint(endpoint string) error {
 	if endpoint == "" {
 		return fmt.Errorf("registry endpoint cannot be empty")
@@ -61,39 +51,4 @@ func ValidateRegistryEndpoint(endpoint string) error {
 	}
 
 	return nil
-}
-
-// ClientRegistry is deploy.remote_execution.client_registry (1.x's
-// remote.client_registry) as the CLI uses it: the global config's, "" when it
-// sets none. A saved value is checked as a new one is, since it may predate
-// the check or have been written into the file by hand, and one that is not a
-// registry endpoint a deploy can push to is an error naming the key that
-// holds it and the command that fixes it.
-func ClientRegistry() (string, error) {
-	value := CFG.RemoteClientRegistry.GetString()
-	if value == "" {
-		return "", nil
-	}
-	if err := ValidateRegistryEndpoint(value); err != nil {
-		return "", fmt.Errorf("%s in your global config is not a usable registry endpoint: %w. Fix it with: '%s'", clientRegistryKey(), err, ClientRegistryFix())
-	}
-	return value, nil
-}
-
-// ClientRegistryFix is the command that sets the client registry, for an
-// error that says to set it. It names the current key, which wins over the
-// 1.x one a value may have been read from.
-func ClientRegistryFix() string {
-	return "astro config set --global " + CFG.RemoteClientRegistry.Path + " <registry>/<repository>"
-}
-
-// clientRegistryKey is the name the home config sets the client registry
-// under, as the user would find it in the file: the current name, or the 1.x
-// one.
-func clientRegistryKey() string {
-	c := CFG.RemoteClientRegistry
-	if key := c.keyIn(viperHome); key != "" {
-		return key
-	}
-	return c.Path
 }

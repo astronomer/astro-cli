@@ -47,10 +47,15 @@ func (s *Suite) TestLegacy1xValueWithNoHomeConfig() {
 func (s *Suite) TestProjectSetting1x() {
 	s.restoreConfigGlobals()
 	initTestConfig()
-	global, removed, ok := ProjectSetting1x("remote.client_registry", "quay.io/acme/client")
+	global, removed, ok := ProjectSetting1x("remote.base_image_registry", "quay.io/acme/base")
 	s.True(ok)
-	s.Equal("deploy.remote_execution.client_registry", global, "a 1.x name is set under its v2 one")
+	s.Equal("deploy.remote_execution.base_image_registry", global, "a 1.x name is set under its v2 one")
 	s.Empty(removed)
+
+	global, removed, ok = ProjectSetting1x("remote.client_registry", "quay.io/acme/client")
+	s.True(ok)
+	s.Empty(global, "a deploy setting is the project's now")
+	s.Contains(removed, "[tool.astro.deploy]")
 
 	global, _, ok = ProjectSetting1x("container.binary", "podman")
 	s.True(ok)

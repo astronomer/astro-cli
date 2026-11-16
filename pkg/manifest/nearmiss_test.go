@@ -58,9 +58,10 @@ func TestANearMissIsRefusedAndANewKeyWarns(t *testing.T) {
 func TestNoKeyIsANearMissOfAnother(t *testing.T) {
 	allowed := map[[2]string]bool{{"target", "targets"}: true, {"targets", "target"}: true}
 	for table, keys := range map[string][]string{
-		"[tool.astro]": astroKeys,
-		"a link":       linkKeys,
-		"a pool":       poolKeys,
+		"[tool.astro]":        astroKeys,
+		"a link":              linkKeys,
+		"a pool":              poolKeys,
+		"[tool.astro.deploy]": deployKeys,
 	} {
 		for i, a := range keys {
 			others := append(append([]string{}, keys[:i]...), keys[i+1:]...)

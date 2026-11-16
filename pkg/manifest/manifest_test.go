@@ -1081,6 +1081,25 @@ url = "https://deployments.astro.corp.example/ckdep-apc/airflow"
 		wantKeys: []string{"tool.astro.deployments.prod-apc.url"},
 	},
 	{
+		// Only an Astro Deployment runs remote agents, which pull the client
+		// image astro remote deploy pushes.
+		name:      "client-registry on an mwaa link",
+		wantCodes: []ProblemCode{CodeClientRegistryOnNonAstroLink},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+
+[tool.astro.deployments.aws]
+target = "mwaa"
+environment = "orders-prod"
+client-registry = "quay.io/acme/client"
+`,
+		wantKeys: []string{"tool.astro.deployments.aws.client-registry"},
+	},
+	{
 		// An astro link's host is [tool.astro] domain. A domain on the link
 		// would look like it routes the link to another host, so it is
 		// refused, as any key a link does not take always was.

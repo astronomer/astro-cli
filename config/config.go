@@ -92,14 +92,14 @@ var (
 		OttoAutoUpdate:       newCfg("otto.auto_update", "true"),
 
 		// Astro: picking a Deployment, and deploying to it.
-		AutoSelect:              newCfg("deployment.auto_select", "false", "auto_select"),
+		AutoSelect: newCfg("deployment.auto_select", "false", "auto_select"),
+		// This machine's off switch for the commit a deploy records: false
+		// turns it off for every deploy from here, whatever a project's
+		// [tool.astro.deploy] git-metadata says. It never turns it on.
 		DeployGitMetadata:       newCfg("deploy.git_metadata", "true"),
-		CosmosBoostPreDeploy:    newCfg("deploy.cosmos_boost", "false", "cosmos_boost.pre_deploy"),
-		RemoteClientRegistry:    newCfg("deploy.remote_execution.client_registry", "", "remote.client_registry"),
 		RemoteBaseImageRegistry: newCfg("deploy.remote_execution.base_image_registry", "images.astronomer.cloud", "remote.base_image_registry"),
 
 		// Astro Private Cloud.
-		ShaAsTag:             newCfg("apc.sha_as_tag", "false", "sha_as_tag"),
 		PageSize:             newCfg("apc.page_size", "20", "page_size"),
 		Interactive:          newCfg("apc.interactive", "false", "interactive"),
 		HoustonDialTimeout:   newCfg("apc.dial_timeout", "10", "houston.dial_timeout"),
@@ -151,7 +151,6 @@ var (
 func InitConfig(fs afero.Fs) {
 	forgetEnvironmentLogin()
 	initHome(fs)
-	registerValidators()
 }
 
 // Init viper for config file in home directory

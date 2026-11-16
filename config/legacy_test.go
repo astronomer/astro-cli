@@ -15,7 +15,7 @@ func (s *Suite) TestLegacySettingNames() {
 		s.Equal(50, CFG.PageSize.GetInt())
 		s.Equal("30", CFG.HoustonDialTimeout.GetHomeString())
 		s.Equal("global", CFG.PageSize.HomeScope())
-		s.Equal("default", CFG.ShaAsTag.HomeScope())
+		s.Equal("default", CFG.Interactive.HomeScope())
 	})
 
 	// 1.x reads only the old name, so a value it saved after v2 last wrote

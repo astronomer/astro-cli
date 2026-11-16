@@ -163,7 +163,7 @@ func execRemoteRun(t *testing.T, args ...string) tokenRun {
 	t.Helper()
 	// remote deploy runs in a project.
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.deploy]\nclient-registry = \"registry.example.com/agents/client\"\n"), 0o600))
 	prev := config.WorkingPath
 	config.WorkingPath = dir
 	t.Cleanup(func() { config.WorkingPath = prev })

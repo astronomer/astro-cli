@@ -26,7 +26,6 @@ func (s *Suite) TestAProjectConfigSetsNothing() {
 	InitConfig(fs)
 
 	s.Equal("docker", CFG.DockerCommand.GetString(), "the global value")
-	s.Empty(CFG.RemoteClientRegistry.GetString(), "unset globally")
 	s.False(CFG.HoustonSkipVerifyTLS.GetBool(), "the default")
 	s.Equal(CFG.CloudAPIProtocol.Default, CFG.CloudAPIProtocol.GetString(), "the default")
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -53,7 +52,7 @@ func TestDeployClientImageReturnsWhatItPushed(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "packages-client.txt"), nil, 0o600))
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			cmd := withClientBuild(t, "docker")
-			config.CFG.RemoteClientRegistry.SetHomeString("registry.example.com/agents/client")
+			tc.in.Registry, tc.in.RegistrySource = "registry.example.com/agents/client", "--registry"
 			tc.in.Path = dir
 
 			r, w, err := os.Pipe()
