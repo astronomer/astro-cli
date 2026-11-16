@@ -31,13 +31,8 @@ func useRun(t *testing.T, kind runKind, saved string) {
 	case interactive:
 		// the saved login's own Workspace
 	case orgToken:
-		testUtil.UseAPIToken(t, "organizationId:org")
 		ctxWorkspace = ""
-	case wsToken:
-		testUtil.UseAPIToken(t, "organizationId:org", "workspaceId:ws-claim")
-		ctxWorkspace = "ws-claim"
-	case depToken:
-		testUtil.UseAPIToken(t, "organizationId:org", "workspaceId:ws-claim", "deploymentId:dep-claim")
+	case wsToken, depToken:
 		ctxWorkspace = "ws-claim"
 	}
 	writeConfig(t, fmt.Sprintf(`context: astronomer.io
@@ -51,6 +46,18 @@ contexts:
     token: Bearer y
     workspace: ws-stage
 `, ctxWorkspace))
+	// The token's setup overlays its claim on the context once the config is
+	// there to overlay it on.
+	switch kind {
+	case orgToken:
+		testUtil.UseAPIToken(t, "organizationId:org")
+	case wsToken:
+		testUtil.UseAPIToken(t, "organizationId:org", "workspaceId:ws-claim")
+	case depToken:
+		testUtil.UseAPIToken(t, "organizationId:org", "workspaceId:ws-claim", "deploymentId:dep-claim")
+	case interactive:
+		// the saved login's own Workspace
+	}
 }
 
 func TestResolveWorkspacePrecedence(t *testing.T) {
@@ -322,5 +329,28 @@ func TestMissingWorkspaceAdviceForADeploymentNameNamesTheID(t *testing.T) {
 	err := Resolve(Request{Accepts: ByDeployment}).Require()
 	if !errors.Is(err, ErrOrgTokenNoWorkspace) || !strings.HasSuffix(err.Error(), ", so pass -d with the Deployment id, or run in a project that links its workspace") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// A run with ASTRO_API_TOKEN whose setup did not apply the token to the context
+// reads the saved login's Workspace, which a token run never takes: it is no
+// Workspace at all, and never one labeled the token's.
+func TestResolveRefusesTheSavedWorkspaceUnderATokenThatWasNeverApplied(t *testing.T) {
+	useRun(t, interactive, "ws-saved")
+	// The token is in the environment, but nothing applied it to the context.
+	t.Setenv(EnvAPIToken, "a-token-nobody-applied")
+	got := Resolve(Request{})
+	if got.Workspace != "" || got.WorkspaceSource != SourceNone {
+		t.Fatalf("got %q from %v, want no Workspace", got.Workspace, got.WorkspaceSource)
+	}
+	if got.Require() == nil {
+		t.Fatal("Require() = nil for a run with no Workspace")
+	}
+
+	// Applied, the same token's claim is the run's own.
+	useRun(t, wsToken, "ws-saved")
+	got = Resolve(Request{})
+	if got.Workspace != "ws-claim" || got.WorkspaceSource != SourceToken {
+		t.Fatalf("got %q from %v, want ws-claim from the token", got.Workspace, got.WorkspaceSource)
 	}
 }

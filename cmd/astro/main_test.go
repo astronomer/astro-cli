@@ -28,9 +28,9 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	origArgs := os.Args
 	os.Args = []string{"astro"}
-	// A helper process (TestForcedRenewalHelper) works in the ASTRO_HOME its
+	// A helper process (TestForcedRenewalHelper, TestCheckTokenHelper) works in the ASTRO_HOME its
 	// parent test hands it through the environment.
-	if os.Getenv(renewHelperEnv) == "" {
+	if os.Getenv(renewHelperEnv) == "" && os.Getenv(checkTokenHelperEnv) == "" {
 		testenv.Clear()
 	}
 
