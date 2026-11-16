@@ -412,6 +412,12 @@ func RefreshLogin() error {
 	if c.RefreshToken == "" {
 		return errors.New("the current login has no refresh token")
 	}
+	return refreshLoginFrom(&c)
+}
+
+// refreshLoginFrom is RefreshLogin for the login c, which the caller read
+// before the call that was refused with it.
+func refreshLoginFrom(c *config.Context) error {
 	if renewalRetired(c.RefreshToken) {
 		return errRenewalRetired
 	}
@@ -424,7 +430,7 @@ func RefreshLogin() error {
 	if err != nil {
 		return err
 	}
-	if fresh.Token != c.Token && fresh.Token != "" && fresh.Token != "Bearer " {
+	if fresh.Token != c.Token && fresh.Token != "" && fresh.Token != "Bearer " && !needsRenewal(&fresh) {
 		return nil // another process renewed it while this one waited
 	}
 	if fresh.RefreshToken == "" {
@@ -476,7 +482,7 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 		// Inside the refresh margin but not past it the token still works, and a
 		// provider that is down, or a config that will not save, is no reason to
 		// fail a command that can run on it.
-		if renewed.unsaved {
+		if renewed.unsaved && claimUnsavedWarning() {
 			// The provider answered and may have retired the old refresh token,
 			// and the answer could not be kept: say so once, since a later run
 			// that finds this token expired will ask for a login.
@@ -511,7 +517,6 @@ type renewal struct {
 	// provider that could not be reached says nothing about the token.
 	rejected bool
 	// unsaved: the provider renewed the login and the config would not take it.
-	// It is true once per run, for the call that found out (see retireRenewal).
 	unsaved bool
 }
 
@@ -534,12 +539,20 @@ var (
 )
 
 // retireRenewal records that a renewal that spent refreshToken reached the
-// provider and was not saved, and reports whether this is the first time in
-// the run, which is when to say so.
-func retireRenewal(refreshToken string) bool {
+// provider and was not saved.
+func retireRenewal(refreshToken string) {
 	retiredMu.Lock()
 	defer retiredMu.Unlock()
 	retiredTokens[refreshToken] = true
+}
+
+// claimUnsavedWarning reports whether the caller is the first in the run to
+// warn that a renewal was not saved, and so should print it. Only the code that
+// prints calls it: a renewal that retires a token silently must not use up the
+// one warning.
+func claimUnsavedWarning() bool {
+	retiredMu.Lock()
+	defer retiredMu.Unlock()
 	first := !warnedUnsaved
 	warnedUnsaved = true
 	return first
@@ -603,7 +616,8 @@ func renewCurrentLogin(c *config.Context) (renewal, error) {
 	}
 	if err := saveRenewedToken(c, &res); err != nil {
 		if errors.Is(err, errLoginNotSaved) {
-			state.unsaved = retireRenewal(c.RefreshToken)
+			retireRenewal(c.RefreshToken)
+			state.unsaved = true
 		}
 		return state, err
 	}

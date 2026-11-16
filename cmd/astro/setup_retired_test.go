@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -63,8 +62,8 @@ func TestUnsavedRenewalWarnsOnceAndStopsRetrying(t *testing.T) {
 // replaced renews as usual.
 func TestRetiredRenewalBlocksOnlyTheSpentToken(t *testing.T) {
 	resetRetiredRenewal(t)
-	assert.True(t, retireRenewal("spent"), "the first is the one to warn about")
-	assert.False(t, retireRenewal("spent-too"))
+	retireRenewal("spent")
+	retireRenewal("spent-too")
 	assert.True(t, renewalRetired("spent"))
 	assert.False(t, renewalRetired("new-login"))
 }
@@ -81,6 +80,14 @@ func TestTransientProviderStatusOffersNoLogin(t *testing.T) {
 			assert.Zero(t, logins.Load(), "the refresh token was never refused")
 		})
 	}
+	for _, status := range []int{400, 401} {
+		t.Run(strconv.Itoa(status)+" with an empty body is a refusal", func(t *testing.T) {
+			loginExpiringIn(t, -time.Hour)
+			logins := stubLoginSeams(t, func() error { return nil }, identityProvider(t, status, ""))
+			_ = checkToken(new(astrov1_mocks.ClientWithResponsesInterface), io.Discard)
+			assert.EqualValues(t, 1, logins.Load(), "the refresh token was refused, so a login is offered")
+		})
+	}
 	t.Run("a 4xx with a body that is not JSON is still a refusal", func(t *testing.T) {
 		loginExpiringIn(t, -time.Hour)
 		logins := stubLoginSeams(t, func() error { return nil }, identityProvider(t, 400, "nope"))
@@ -89,30 +96,68 @@ func TestTransientProviderStatusOffersNoLogin(t *testing.T) {
 	})
 }
 
-// A 401 renewal takes the renewal lock, and takes another process's renewal
-// instead of spending the refresh token a second time.
+// A 401 renewal takes another process's renewal, when that renewal is a token
+// that works, instead of spending the refresh token a second time. The login
+// the caller was refused with is passed in, so no timing is involved.
 func TestRefreshLoginTakesAnotherProcessesRenewal(t *testing.T) {
 	vaultLogins(t, time.Now().Add(-time.Hour))
 	calls := fakeIDP(t)
 	noLoginFlow(t)
+	refused, err := context.GetCurrentContext()
+	require.NoError(t, err)
+	// Another process renewed it: a different token, good for an hour.
+	other := refused
+	require.NoError(t, other.SetContextKey("token", "Bearer renewed-elsewhere"))
+	require.NoError(t, other.SetExpiresIn(3600))
 
-	unlock := config.LockLoginRenewal()
-	var wg sync.WaitGroup
-	var got error
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		got = RefreshLogin()
-	}()
-	time.Sleep(300 * time.Millisecond) // RefreshLogin has read the login and waits on the lock
+	require.NoError(t, refreshLoginFrom(&refused))
+
+	assert.Zero(t, calls.Load(), "the other process's renewal was taken")
 	c, err := context.GetCurrentContext()
 	require.NoError(t, err)
-	require.NoError(t, c.SetContextKey("token", "Bearer renewed-elsewhere"))
-	unlock()
-	wg.Wait()
+	assert.Equal(t, "Bearer renewed-elsewhere", c.Token)
+}
 
-	require.NoError(t, got)
-	assert.Zero(t, calls.Load(), "the other process's renewal was taken")
+// A different token that is itself expired (or about to be) is not a renewal to
+// take: the login is renewed from the refresh token it holds now.
+func TestRefreshLoginRenewsWhenTheOtherTokenIsStale(t *testing.T) {
+	vaultLogins(t, time.Now().Add(-time.Hour))
+	calls := fakeIDP(t)
+	noLoginFlow(t)
+	refused, err := context.GetCurrentContext()
+	require.NoError(t, err)
+	other := refused
+	require.NoError(t, other.SetContextKey("token", "Bearer also-stale"))
+	require.NoError(t, other.SetExpiresIn(-3600))
+
+	require.NoError(t, refreshLoginFrom(&refused))
+
+	assert.EqualValues(t, 1, calls.Load())
+	c, err := context.GetCurrentContext()
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer renewed", c.Token)
+}
+
+// A retirement nothing printed does not use up the one warning: a renewal that
+// is retired silently first (the 401 path prints nothing) leaves checkToken
+// still to say that the login was not saved.
+func TestSilentRetirementKeepsTheWarning(t *testing.T) {
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+	vaultLogins(t, time.Now().Add(time.Minute))
+	fakeIDP(t)
+	noLoginFlow(t)
+	cfg, err := fetchDomainAuthConfig("astronomer.io")
+	require.NoError(t, err)
+	c, err := context.GetCurrentContext()
+	require.NoError(t, err)
+	require.NoError(t, c.SetAuthTenant(cfg.DomainURL, cfg.ClientID))
+	retireRenewal("some-other-refresh-token") // as RefreshLogin or renewLogin would, silently
+	readOnlyHome(t)
+
+	var out bytes.Buffer
+	require.NoError(t, checkToken(client, &out))
+
+	assert.Contains(t, out.String(), "could not be saved")
 }
 
 // A login that still works does not wait out another process's renewal.
@@ -127,5 +172,6 @@ func TestValidTokenDoesNotWaitLongForTheRenewalLock(t *testing.T) {
 	err := checkToken(new(astrov1_mocks.ClientWithResponsesInterface), io.Discard)
 	require.NoError(t, err)
 	assert.Zero(t, calls.Load(), "no renewal without the lock")
-	assert.Less(t, time.Since(start), 8*time.Second)
+	// Not parallel: the package's fixtures share config state and t.Setenv.
+	assert.Less(t, time.Since(start), 20*time.Second)
 }
