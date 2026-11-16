@@ -418,7 +418,7 @@ func TestDeploymentCoreJSON(t *testing.T) {
 	// Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, the
 	// update is to that Deployment, said on stderr; stdout is the result.
 	t.Run("an update naming nothing takes the token's Deployment", func(t *testing.T) {
-		testUtil.UseAPIToken(t, "deploymentId:"+coreDeploymentID)
+		testUtil.UseAPIToken(t, "workspaceId:workspace-id", "deploymentId:"+coreDeploymentID)
 		updated := coreDeployment()
 		updated.Name = "etl-prod-2"
 		m := new(astrov1_mocks.ClientWithResponsesInterface)

@@ -164,6 +164,9 @@ func execTokenCmd(t *testing.T, client astrov1.APIClient, answers string, args .
 func execAstroCmd(t *testing.T, client astrov1.APIClient, answers string, newRoot func(io.Writer) *cobra.Command, args ...string) tokenRun {
 	t.Helper()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	if _, ok := os.LookupEnv("ASTRO_API_TOKEN"); ok {
+		testUtil.ApplyAPIToken(t)
+	}
 	testUtil.SetupOSArgsForGinkgo()
 	prevClient := astroV1Client
 	astroV1Client = client

@@ -3,10 +3,13 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -291,4 +294,20 @@ func TestLoginCheckFailedLeavesTheLegacyAPIKeysRefusalAlone(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Setenv("ASTRO_API_TOKEN", "")
 	assert.Same(t, astroCmd.ErrLegacyAPIKeys, loginCheckFailed(astroCmd.ErrLegacyAPIKeys))
+}
+
+// An expired login that could not be renewed is unauthenticated whether or not
+// the identity provider was reachable: an unreachable one is no reason to call
+// the run offline, and the error names the way out.
+func TestLoginCheckFailedKeepsTheRenewalAndConfigFailures(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Setenv("ASTRO_API_TOKEN", "")
+	unreachable := &url.Error{Op: "Post", URL: "https://auth.invalid/oauth/token", Err: &net.OpError{Op: "dial", Err: os.NewSyscallError("connect", syscall.ECONNREFUSED)}}
+	renewal := fmt.Errorf("%w, run 'astro login' to log in again: %w", astroCmd.ErrLoginRenewal, unreachable)
+	err := loginCheckFailed(renewal)
+	assert.Same(t, renewal, err)
+	assert.Equal(t, KindUnauthenticated, problemKinds.Of(err))
+
+	unreadable := fmt.Errorf("%w: config.yaml did not parse", astroCmd.ErrConfigUnreadable)
+	assert.Same(t, unreadable, loginCheckFailed(unreadable))
 }

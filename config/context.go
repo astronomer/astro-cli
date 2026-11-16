@@ -306,7 +306,11 @@ func contextKeysSharingLogin(cKey string) []string {
 		return nil
 	}
 	var keys []string
-	for key := range viperHome.GetStringMap(contextsKey) {
+	// AllSettings, not GetStringMap(contextsKey): viper answers that from the
+	// highest layer that sets it, and a context this process has written
+	// (viper.Set) hides every context it only read from the file.
+	allContexts, _ := viperHome.AllSettings()[contextsKey].(map[string]interface{})
+	for key := range allContexts {
 		if strings.EqualFold(key, cKey) {
 			continue
 		}

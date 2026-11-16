@@ -182,3 +182,30 @@ func TestAnEnvironmentLoginDoesNotReadTheVault(t *testing.T) {
 		t.Errorf("reading the context asked the keyring: %v", stamps)
 	}
 }
+
+// A context this process has written does not hide the contexts it only read
+// from the file: sharing a renewed login reaches every context on the tenant.
+func TestSharingReachesContextsOnlyReadFromTheFile(t *testing.T) {
+	loginHome(t, plaintextConfig+`  other_io:
+    domain: other.io
+    auth_domain: https://auth.example/
+    auth_client_id: client
+`, nil)
+	c, err := GetCurrentContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SetAuthTenant("https://auth.example/", "client"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SetSharedContextKey(tokenField, "Bearer shared"); err != nil {
+		t.Fatal(err)
+	}
+	other, err := (&Context{Domain: "other.io"}).GetContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.Token != "Bearer shared" {
+		t.Errorf("the context on the same tenant did not get the renewed token (len %d)", len(other.Token))
+	}
+}

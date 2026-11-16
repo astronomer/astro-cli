@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	origArgs := os.Args
 	os.Args = []string{"astro"}
-	// A helper process (TestForcedRenewalHelper) keeps the home its parent made:
+	// A helper process (TestForcedRenewalHelper, TestCheckTokenHelper) keeps the home its parent made:
 	// Isolate sees the parent's marker and changes nothing.
 	finish := testenv.Isolate()
 
@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 	os.Args = origArgs
 
 	// A helper process runs one test for its parent, which judges the run.
-	if os.Getenv(renewHelperEnv) != "" {
+	if os.Getenv(renewHelperEnv) != "" || os.Getenv(checkTokenHelperEnv) != "" {
 		os.Exit(code)
 	}
 	os.Exit(finish(watching.Finish(code)))

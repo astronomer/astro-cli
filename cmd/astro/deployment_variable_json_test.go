@@ -337,7 +337,7 @@ func TestDeploymentVariableCreateJSON(t *testing.T) {
 	// Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, the
 	// variable goes on that Deployment, said on stderr.
 	t.Run("naming nothing takes the token's Deployment", func(t *testing.T) {
-		testUtil.UseAPIToken(t, "deploymentId:"+"test-id-1")
+		testUtil.UseAPIToken(t, "workspaceId:workspace-id", "deploymentId:"+"test-id-1")
 		withDeploymentVariables(t, twoVariables())
 		m := modifyMocks()
 		astroV1Client = m

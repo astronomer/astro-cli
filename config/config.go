@@ -384,3 +384,11 @@ func lockConfig(file string) (unlock func(), err error) {
 	}
 	return func() { _ = lock.Unlock() }, nil //nolint:errcheck // error deliberately ignored in this shell code
 }
+
+// UnreadableHomeConfig returns the path of the home config file when it exists
+// and could not be parsed at startup. Its settings read as defaults then, so
+// "no context set" would be the answer to every question about the login, and
+// a caller that cannot go on without one says which file is the problem.
+func UnreadableHomeConfig() (string, bool) {
+	return HomeConfigFile, unreadableConfigs[HomeConfigFile]
+}
