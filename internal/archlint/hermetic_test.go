@@ -240,7 +240,7 @@ func TestModuleIsolationCopiesMatchTheTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, templateBody, _ := strings.Cut(string(raw), "\n")
+	_, templateBody, _ := strings.Cut(lf(string(raw)), "\n")
 	for _, mod := range modules(t, root) {
 		if mod == "e2e" || slices.Contains(homeFree, mod) {
 			continue
@@ -252,13 +252,18 @@ func TestModuleIsolationCopiesMatchTheTemplate(t *testing.T) {
 				t.Errorf("%s/%s has no hermetic_test.go: copy internal/archlint/testdata/hermetic_template.go.txt there, changing only the package clause (%v)", mod, pkg.dir, err)
 				continue
 			}
-			first, body, _ := strings.Cut(string(got), "\n")
+			first, body, _ := strings.Cut(lf(string(got)), "\n")
 			if !strings.HasPrefix(first, "package ") || body != templateBody {
 				t.Errorf("%s differs from internal/archlint/testdata/hermetic_template.go.txt: change the template and copy it over every module test package, not one copy", filepath.ToSlash(file))
 			}
 		}
 	}
 }
+
+// lf is s with Windows line endings read as the newlines they stand for, so a
+// checkout that converted the copies and not the template (or the reverse) is
+// not a difference.
+func lf(s string) string { return strings.ReplaceAll(s, "\r\n", "\n") }
 
 // The template unsets every variable testenv does (those it does not unset by
 // prefix), so a variable added to testenv.behaviorEnv reaches the modules too.
