@@ -26,6 +26,7 @@ import (
 func TestAFreshMachineWithNoKeyringStoresAPlainGlobal(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	keyring.MockInitWithError(errors.New("no Secret Service available"))
+	t.Cleanup(keyring.MockInit) // leave no error-injecting mock behind
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatal(err)

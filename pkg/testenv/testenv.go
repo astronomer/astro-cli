@@ -1,0 +1,77 @@
+// Package testenv keeps a test binary from changing what the CLI does, and from
+// touching the machine it runs on. Every test package's TestMain calls [Main], or
+// [Isolate] where it has more to do around m.Run: the environment variables that
+// steer the CLI are unset, HOME and the other places a program keeps state move
+// into a temporary directory the run removes, and the OS keychain is replaced by
+// an in-memory one.
+//
+// It is a module of its own, with no dependency, so that the root module and
+// every pkg/* module (and e2e) share one copy. It cannot import pkg/secrets,
+// whose own tests use it: a package whose test binary links pkg/secrets passes
+// the keyring hooks in [Options]. The root module's pkg/testing/testenv does that
+// for every root package.
+package testenv
+
+// behaviorEnv is every environment variable the CLI reads that changes what
+// it does: who it logs in as, where its state lives, which domain it talks to,
+// and whether it may prompt. A developer's shell or a CI runner may export any
+// of them, and a test must not depend on that.
+var behaviorEnv = []string{
+	// Credentials and the session they select.
+	"ASTRO_API_TOKEN",
+	"ASTRONOMER_KEY_ID",
+	"ASTRONOMER_KEY_SECRET",
+	"ASTRO_DOMAIN",
+	"ASTRO_ORGANIZATION",
+	"ASTRO_DEPLOYMENT",
+	"ASTRO_REGISTRY_URL",
+	"ASTRO_LOCAL_HEALTH_TIMEOUT",
+	// Where the CLI keeps its state.
+	"ASTRO_HOME",
+	// Whether the run is non-interactive, or reports as a CI system.
+	"CI",
+	"JENKINS_URL",
+	"HUDSON_URL",
+	"TF_BUILD",
+	"GITHUB_ACTIONS",
+	"DEPLOY_ACTION",
+	"DEPLOY_ACTION_VERSION",
+	// Telemetry endpoints and debugging, and golden files rewritten in place.
+	"ASTRO_TELEMETRY_API_URL",
+	"ASTRO_TELEMETRY_DEBUG",
+	// Where the runtime catalog, constraints and freeze files come from.
+	"ASTRO_RUNTIME_CONSTRAINTS_URL",
+	"ASTRO_RUNTIME_FREEZE_URL",
+	"ASTRO_RUNTIME_VERSIONS_URL",
+	// uv settings the CLI reads. UV_CACHE_DIR is left alone: it only makes
+	// the suite faster.
+	"UV_EXCLUDE_NEWER",
+	"UV_NO_SYNC",
+	// The CI systems and agents the CLI detects for telemetry.
+	"GITLAB_CI",
+	"CIRCLECI",
+	"BITBUCKET_BUILD_NUMBER",
+	"CODEBUILD_BUILD_ID",
+	"TEAMCITY_VERSION",
+	"BUILDKITE",
+	"CF_BUILD_ID",
+	"TRAVIS",
+	"OTTO",
+	"CLAUDECODE",
+	"CLAUDE_CODE_ENTRYPOINT",
+	"CURSOR_TRACE_ID",
+	"CURSOR_AGENT",
+	"AIDER_MODEL",
+	"CONTINUE_GLOBAL_DIR",
+	"CORTEX_SESSION_ID",
+	"GEMINI_CLI",
+	"OPENCODE",
+	"CODEX_API_KEY",
+	"COPILOT_CLI",
+	"COPILOT_AGENT",
+	"AI_AGENT",
+	// Which release channel it reports, and how it renders.
+	"OTTO_CHANNEL",
+	"NO_COLOR",
+	"CLICOLOR",
+}

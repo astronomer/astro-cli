@@ -20,7 +20,7 @@ func initTestConfig(t *testing.T) {
 	t.Helper()
 	fs := afero.NewMemMapFs()
 	configRaw := []byte("telemetry:\n  enabled: true\n")
-	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777))
 	config.InitConfig(fs)
 }
 
@@ -96,7 +96,7 @@ func TestShowFirstRunNotice(t *testing.T) {
 	t.Run("prints notice on first call", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
 		configRaw := []byte("telemetry:\n  enabled: true\n")
-		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777))
 		config.InitConfig(fs)
 
 		oldStderr := os.Stderr
@@ -121,7 +121,7 @@ func TestShowFirstRunNotice(t *testing.T) {
 	t.Run("does not print on subsequent calls", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
 		configRaw := []byte("telemetry:\n  enabled: true\n  notice_shown: \"" + noticeVersion + "\"\n")
-		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777))
 		config.InitConfig(fs)
 
 		oldStderr := os.Stderr
@@ -144,7 +144,7 @@ func TestShowFirstRunNotice(t *testing.T) {
 	t.Run("reprints when the accepted notice predates the current version", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
 		configRaw := []byte("telemetry:\n  enabled: true\n  notice_shown: \"true\"\n")
-		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777))
 		config.InitConfig(fs)
 
 		oldStderr := os.Stderr
@@ -196,7 +196,7 @@ func TestCurrentToken(t *testing.T) {
 		fs := afero.NewMemMapFs()
 		configRaw := []byte("context: prod\ncontexts:\n  prod:\n    domain: " + domain +
 			"\n    token: \"Bearer " + token + "\"\n    organization: org-1\ntelemetry:\n  enabled: true\n")
-		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777))
 		config.InitConfig(fs)
 	}
 
@@ -241,7 +241,7 @@ func TestCurrentToken(t *testing.T) {
 		os.Setenv("ASTRO_API_TOKEN", "")
 		fs := afero.NewMemMapFs()
 		configRaw := []byte("context: prod\ncontexts:\n  prod:\n    domain: astronomer.io\n    token: \"Bearer \"\ntelemetry:\n  enabled: true\n")
-		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+		require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777))
 		config.InitConfig(fs)
 		assert.Empty(t, currentToken())
 	})

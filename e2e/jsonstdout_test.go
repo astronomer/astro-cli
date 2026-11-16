@@ -223,15 +223,11 @@ var ownResultOnFailure = map[string]string{
 // newStateProject is a fresh project on st's machine, with a copy of template
 // in its directory when template is not empty.
 //
-// Its vault holds the stamp a keyring that timed out leaves, so no command
-// reaches the OS keyring for a login: a login the config holds is otherwise
-// moved into the vault, whose key is in the keyring, and the keyring is the one
-// store no isolation lever relocates (doc.go). With the stamp the login stays
-// in the config, as on a machine with no keyring, which is what CI's are.
+// Like every project, it is stamped keyring-unavailable (stampKeyringUnavailable),
+// so the login it writes stays in the config.
 func newStateProject(t *testing.T, st jsonState, template string) *project {
 	t.Helper()
 	p := newProject(t)
-	stampKeyringUnavailable(t, p)
 	if st.platform != "" {
 		writeLogin(t, p, st.platform)
 	}
@@ -239,21 +235,6 @@ func newStateProject(t *testing.T, st jsonState, template string) *project {
 		copyTree(t, template, p.Dir)
 	}
 	return p
-}
-
-// stampKeyringUnavailable leaves p's vault the stamp a keyring that timed out
-// leaves, so no command reaches the OS keyring (the macOS Keychain, which asks
-// for a password) for a login. Write a login into p's home only after this.
-func stampKeyringUnavailable(t *testing.T, p *project) {
-	t.Helper()
-	dir := filepath.Join(p.home, ".astro", "secrets")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		t.Fatalf("making the vault directory: %v", err)
-	}
-	// pkg/secrets' loginStamp, and its "timeout" content.
-	if err := os.WriteFile(filepath.Join(dir, "login-keyring-unavailable"), []byte("timeout"), 0o600); err != nil {
-		t.Fatalf("stamping the keyring unavailable: %v", err)
-	}
 }
 
 // copyTree copies the files under src into dst, which exists.

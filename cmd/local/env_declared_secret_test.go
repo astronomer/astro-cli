@@ -243,6 +243,7 @@ func TestSetKeepsOneHomePerScope(t *testing.T) {
 func TestPlainSetNeedsNoKeyring(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	keyring.MockInitWithError(errors.New("no Secret Service available"))
+	t.Cleanup(keyring.MockInit) // leave no error-injecting mock behind
 
 	d, _, _ := envDeps(t, dir, "v\n")
 	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--plain"); err != nil {
@@ -265,6 +266,7 @@ func TestPlainSetNeedsNoKeyring(t *testing.T) {
 func TestDefaultSetRefusesWithoutAKeyring(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { secret = true }\n")
 	keyring.MockInitWithError(errors.New("no Secret Service available"))
+	t.Cleanup(keyring.MockInit) // leave no error-injecting mock behind
 
 	for _, name := range []string{"API_TOKEN", "UNDECLARED"} {
 		d, _, _ := envDeps(t, dir, "s3cr3t\n")

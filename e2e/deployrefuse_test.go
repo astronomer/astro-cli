@@ -308,7 +308,6 @@ func manifestProjectForDeploy(t *testing.T) *project {
 // as a person who is logged in.
 func logInWithoutWorkspace(t *testing.T, p *project) {
 	t.Helper()
-	stampKeyringUnavailable(t, p)
 	writeHomeContext(t, p, "cloud", `    token: Bearer e2e-not-a-token
     expiresin: 2100-01-01T00:00:00Z
     organization: e2e-organization

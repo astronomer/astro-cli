@@ -28,11 +28,9 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	origArgs := os.Args
 	os.Args = []string{"astro"}
-	// A helper process (TestForcedRenewalHelper, TestCheckTokenHelper) works in the ASTRO_HOME its
-	// parent test hands it through the environment.
-	if os.Getenv(renewHelperEnv) == "" && os.Getenv(checkTokenHelperEnv) == "" {
-		testenv.Clear()
-	}
+	// A helper process (TestForcedRenewalHelper, TestCheckTokenHelper) keeps the home its parent made:
+	// Isolate sees the parent's marker and changes nothing.
+	finish := testenv.Isolate()
 
 	// A login reads its auth config from api.<domain>, which no unit test may
 	// reach. The identity provider it names is under .test, which never
@@ -50,8 +48,8 @@ func TestMain(m *testing.M) {
 	os.Args = origArgs
 
 	// A helper process runs one test for its parent, which judges the run.
-	if os.Getenv(renewHelperEnv) != "" {
+	if os.Getenv(renewHelperEnv) != "" || os.Getenv(checkTokenHelperEnv) != "" {
 		os.Exit(code)
 	}
-	os.Exit(watching.Finish(code))
+	os.Exit(finish(watching.Finish(code)))
 }

@@ -75,10 +75,16 @@ type keyringAPI interface {
 type osKeyring struct{}
 
 func (osKeyring) Get(service, account string) (string, error) {
+	if err := refuseInTests(); err != nil {
+		return "", err
+	}
 	return keyring.Get(service, account)
 }
 
 func (osKeyring) Set(service, account, value string) error {
+	if err := refuseInTests(); err != nil {
+		return err
+	}
 	return keyring.Set(service, account, value)
 }
 

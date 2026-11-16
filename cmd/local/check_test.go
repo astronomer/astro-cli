@@ -247,7 +247,7 @@ func TestCheckNotesUndeclaredLocalValues(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	t.Setenv("ASTRO_HOME", "")
+	t.Setenv("ASTRO_HOME", home)
 	d, out := checkDeps(t)
 	dir, err := d.WorkingDir()
 	if err != nil {

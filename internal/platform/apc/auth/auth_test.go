@@ -127,7 +127,7 @@ func (s *Suite) TestBasicAuth() {
 func (s *Suite) TestSwitchToLastUsedWorkspace() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("localhost")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 	config.InitConfig(fs)
 
 	type args struct {
@@ -183,7 +183,7 @@ func (s *Suite) TestSwitchToLastUsedWorkspace() {
 func (s *Suite) TestRegistryAuthSuccess() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("localhost")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 	config.InitConfig(fs)
 
 	out := new(bytes.Buffer)
@@ -235,7 +235,7 @@ func (s *Suite) TestRegistryAuthSuccess() {
 func (s *Suite) TestRegistryAuthRegistryDomain() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("localhost")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 	config.InitConfig(fs)
 
 	tests := []struct {
@@ -308,7 +308,7 @@ func (s *Suite) TestRegistryAuthRegistryDomain() {
 func (s *Suite) TestRegistryAuthFailure() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig(testUtil.SoftwarePlatform)
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 	config.InitConfig(fs)
 
 	s.Run("registry failures", func() {
@@ -351,7 +351,7 @@ func (s *Suite) TestLoginSuccess() {
 	s.Run("default without workspace pagination switch", func() {
 		fs := afero.NewMemMapFs()
 		configYaml := testUtil.NewTestConfig("localhost")
-		afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+		afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 		config.InitConfig(fs)
 
 		houstonMock := new(houstonMocks.ClientInterface)
@@ -383,7 +383,7 @@ func (s *Suite) TestLoginSuccess() {
 	s.Run("default with more than one workspace", func() {
 		fs := afero.NewMemMapFs()
 		configYaml := testUtil.NewTestConfig("localhost")
-		afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+		afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 		config.InitConfig(fs)
 		config.CFG.Interactive.SetHomeString("false")
 		config.CFG.PageSize.SetHomeString("100")
@@ -413,7 +413,7 @@ func (s *Suite) TestLoginSuccess() {
 	s.Run("when interactive set to true, auto selected first workspace if returned one workspace", func() {
 		fs := afero.NewMemMapFs()
 		configYaml := testUtil.NewTestConfig("localhost")
-		afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+		afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 		config.InitConfig(fs)
 		config.CFG.Interactive.SetHomeString("true")
 		config.CFG.PageSize.SetHomeString("100")
@@ -442,7 +442,7 @@ func (s *Suite) TestLoginSuccess() {
 	s.Run("when interactive set to true, prompt user to select workspace with pagination", func() {
 		fs := afero.NewMemMapFs()
 		configYaml := testUtil.NewTestConfig("localhost")
-		afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+		afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 		config.InitConfig(fs)
 		config.CFG.Interactive.SetHomeString("true")
 		config.CFG.PageSize.SetHomeString("100")
@@ -475,7 +475,7 @@ func (s *Suite) TestLoginSuccess() {
 func (s *Suite) TestLoginWithToken() {
 	setup := func() {
 		fs := afero.NewMemMapFs()
-		s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFile, testUtil.NewTestConfig("localhost"), 0o600))
+		s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFileForTesting(), testUtil.NewTestConfig("localhost"), 0o600))
 		config.InitConfig(fs)
 	}
 	currentToken := func() string {
@@ -533,7 +533,7 @@ func (s *Suite) TestResolveAuthTokenRefusesNoToken() {
 func (s *Suite) TestLoginFailure() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("software")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 	config.InitConfig(fs)
 
 	s.Run("getAuthConfig failure", func() {
@@ -686,7 +686,7 @@ func (s *Suite) TestLogout() {
 func (s *Suite) TestCheckClusterDomain() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("localhost")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 	config.InitConfig(fs)
 
 	type args struct {
@@ -720,7 +720,7 @@ func (s *Suite) TestGetAuthTokenSuccess() {
 	defer testUtil.MockUserInput(s.T(), "\n")()
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("software")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 	config.InitConfig(fs)
 
 	houstonMock := new(houstonMocks.ClientInterface)
@@ -769,7 +769,7 @@ func (s *Suite) TestGetAuthTokenSuccess() {
 func (s *Suite) TestGetAuthTokenFailure() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("software")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
+	afero.WriteFile(fs, config.HomeConfigFileForTesting(), configYaml, 0o777)
 	config.InitConfig(fs)
 
 	got, err := getAuthToken("", "", &houston.AuthConfig{LocalEnabled: true}, &config.Context{Domain: "localhost"}, nil)

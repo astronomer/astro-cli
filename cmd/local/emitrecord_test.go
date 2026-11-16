@@ -64,9 +64,9 @@ func emitWatch() cliouttest.Watch {
 // afterwards. A single test cannot: the point is what every OTHER test
 // emitted.
 func TestMain(m *testing.M) {
-	testenv.Clear()
+	finish := testenv.Isolate()
 	watching := emitWatch().Arm()
-	os.Exit(watching.Finish(m.Run()))
+	os.Exit(finish(watching.Finish(m.Run())))
 }
 
 // This package's cases reach the watch through schemaCase.shared(): a

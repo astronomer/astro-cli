@@ -23,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/testing/testenv"
 )
 
 // readOnlyHome makes the directory holding the home config unwritable, so a
@@ -106,6 +107,7 @@ func TestCheckTokenHelper(t *testing.T) {
 		return nil
 	}
 	config.InitConfig(afero.NewOsFs())
+	testenv.RequireTemp(config.HomeConfigFile)
 	// Never touch a config that is not the parent's: a helper that lost its
 	// ASTRO_HOME would renew, and save over, the developer's own login.
 	if home := os.Getenv("ASTRO_HOME"); home == "" || !strings.HasPrefix(config.HomeConfigFile, home) {

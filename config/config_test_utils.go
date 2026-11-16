@@ -5,10 +5,44 @@ import (
 	"os"
 	"path/filepath"
 	"sync/atomic"
+	"testing"
 	"time"
 
+	homedir "github.com/mitchellh/go-homedir"
+
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/secrets"
+	"github.com/astronomer/astro-cli/pkg/testenv"
 )
+
+// A test binary's TestMain moves HOME and ASTRO_HOME into a temporary directory
+// (testenv.Isolate), but HomePath, HomeConfigPath and HomeConfigFile were worked
+// out from the real home when this package loaded, and initHome is the only
+// thing that would recompute them. Until a test reached InitConfig, anything
+// reading them (the API registry, the root hooks, otto, the login store, the
+// OpenAPI cache) would use the developer's own ~/.astro. So the isolation tells
+// this package to work them out again. testing.Testing keeps it out of the
+// shipped binary, which links the shared testenv module only for this.
+func init() {
+	if testing.Testing() {
+		testenv.AfterIsolate(resolveHomeForTesting)
+	}
+}
+
+// resolveHomeForTesting recomputes the home paths from the isolated HOME and
+// ASTRO_HOME, by the rule initHome uses, and stops the run if any of them is
+// not in the temporary directory.
+func resolveHomeForTesting() {
+	homedir.Reset()                     // go-homedir cached the real home when this package loaded
+	HomePath, _ = fileutil.GetHomeDir() //nolint:errcheck // as at package load
+	home := os.Getenv("ASTRO_HOME")
+	if home == "" {
+		home = HomePath
+	}
+	HomeConfigPath = filepath.Join(home, ConfigDir)
+	HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
+	testenv.RequireTemp(HomePath, HomeConfigPath, HomeConfigFile)
+}
 
 func CreateTempProject() (dir string, cleanup func(), err error) {
 	projectDir, err := os.MkdirTemp("", "")
@@ -28,6 +62,20 @@ func CreateTempProject() (dir string, cleanup func(), err error) {
 		configFile.Close()
 		os.RemoveAll(projectDir) //nolint:errcheck // best-effort cleanup
 	}, nil
+}
+
+// HomeConfigFileForTesting is the path InitConfig will read the home config
+// from, which HomeConfigFile is not until something has called InitConfig:
+// the variable starts as the real home's, worked out when the package loads,
+// before a test binary's TestMain has moved HOME and ASTRO_HOME. A test that
+// writes its fixture into an in-memory filesystem and then calls InitConfig
+// writes it here, so it is found whichever test ran first.
+func HomeConfigFileForTesting() string {
+	home := os.Getenv("ASTRO_HOME")
+	if home == "" {
+		home = HomePath
+	}
+	return filepath.Join(home, ConfigDir, ConfigFileNameWithExt)
 }
 
 // UseLoginsForTesting keeps logins in l for the rest of a test, in place of

@@ -700,8 +700,16 @@ func checkVaultUntouched(t *testing.T, p *project) {
 	t.Helper()
 	// pkg/secrets keeps the vault under $HOME/.astro, and the harness points
 	// HOME at the project's own temp directory.
-	if _, err := os.Stat(filepath.Join(p.home, ".astro", "secrets")); !os.IsNotExist(err) {
-		t.Errorf("a fixture reached the vault (stat: %v); a case that carries a value needs a keyring gate, not tier 0", err)
+	// The vault directory holds the keyring stamp the harness put there
+	// (stampKeyringUnavailable) and, if a fixture reached the vault, more.
+	entries, err := os.ReadDir(filepath.Join(p.home, ".astro", "secrets"))
+	if err != nil {
+		t.Fatalf("reading the vault directory: %v", err)
+	}
+	for _, e := range entries {
+		if e.Name() != keyringStampName {
+			t.Errorf("a fixture reached the vault (found %s); a case that carries a value needs a keyring gate, not tier 0", e.Name())
+		}
 	}
 }
 

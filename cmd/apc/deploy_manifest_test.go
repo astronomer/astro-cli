@@ -228,7 +228,7 @@ func TestOtherDomainNamesTheWayThere(t *testing.T) {
 	// A second context in an in-memory config, with no login stored for it.
 	fs := afero.NewMemMapFs()
 	cfg := strings.Replace(string(testUtil.NewTestConfig(testUtil.SoftwarePlatform)), "contexts:\n", "contexts:\n  astro_other_example:\n    domain: astro.other.example\n", 1)
-	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, []byte(cfg), 0o600))
+	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), []byte(cfg), 0o600))
 	config.InitConfig(fs)
 	t.Cleanup(func() { testUtil.InitTestConfig(testUtil.SoftwarePlatform) })
 	assert.ErrorContains(t, otherDomainThen("deploy again")("elsewhere", "astro.other.example"), "run astro context switch astro.other.example")

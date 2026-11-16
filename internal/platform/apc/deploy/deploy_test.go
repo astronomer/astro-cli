@@ -93,10 +93,10 @@ func (s *Suite) TestDeploymentNameDoesntExists() {
 func (s *Suite) SetupSuite() {
 	// Common setup logic for the test suite
 	s.fsForLocalConfig = afero.NewMemMapFs()
-	afero.WriteFile(s.fsForLocalConfig, config.HomeConfigFile, testUtil.NewTestConfig("localhost"), 0o777)
+	afero.WriteFile(s.fsForLocalConfig, config.HomeConfigFileForTesting(), testUtil.NewTestConfig("localhost"), 0o777)
 
 	s.fsForDockerConfig = afero.NewMemMapFs()
-	afero.WriteFile(s.fsForLocalConfig, config.HomeConfigFile, testUtil.NewTestConfig("docker"), 0o777)
+	afero.WriteFile(s.fsForLocalConfig, config.HomeConfigFileForTesting(), testUtil.NewTestConfig("docker"), 0o777)
 }
 
 func (s *Suite) SetupTest() {

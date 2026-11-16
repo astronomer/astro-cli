@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/astronomer/astro-cli/pkg/secrets"
+	"github.com/astronomer/astro-cli/pkg/testing/testenv"
 )
 
 // Another process saves a login after this one loaded the config: the
@@ -231,6 +232,9 @@ func TestWriteBackHelper(t *testing.T) {
 		t.Skip("run by TestAnotherProcessesWriteKeepsANewerLogin")
 	}
 	initHome(afero.NewOsFs())
+	// Never write outside the parent's temporary home, whatever the environment
+	// said.
+	testenv.RequireTemp(HomeConfigFile)
 	if err := os.WriteFile(os.Getenv("ASTRO_TEST_LOADED_FILE"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
