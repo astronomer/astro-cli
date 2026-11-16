@@ -809,6 +809,7 @@ func (c *cli) restartProject(ctx context.Context, o restartOptions) (*plan.Built
 		PythonCatalog:    c.pythonCatalog(ctx),
 
 		WorkspaceProvider: c.workspaceProvider(),
+		WorkspaceID:       emenv.WorkspaceID,
 	})
 	if err != nil {
 		return nil, c.reportBuildError(r, err)

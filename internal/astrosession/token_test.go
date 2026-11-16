@@ -123,3 +123,13 @@ func TestResolveUnderAnOrganizationTokenIgnoresTheSavedWorkspace(t *testing.T) {
 		}
 	}
 }
+
+// An unusable token that finds no Workspace is the run's error, not an
+// Organization token that "selects none".
+func TestMissingWorkspaceUnderAnUnusableTokenNamesTheToken(t *testing.T) {
+	t.Setenv(EnvAPIToken, testUtil.MintAPIToken(t, time.Now().Add(-time.Hour), "organizationId:org", "workspaceId:ws"))
+	err := Resolve(Request{Accepts: ByFlag}).Missing()
+	if !errors.Is(err, ErrAPITokenExpired) {
+		t.Fatalf("got %v, want the expired-token error", err)
+	}
+}

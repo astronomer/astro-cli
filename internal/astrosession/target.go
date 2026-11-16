@@ -266,6 +266,11 @@ func (t Target) Missing() error { //nolint:gocritic // a small value type
 		return t.readErr
 	}
 	if t.token {
+		// An unusable token names nothing because it is unusable, not because
+		// it is an Organization token: say so.
+		if _, _, err := TokenIdentity(); err != nil {
+			return err
+		}
 		return fmt.Errorf("%w, %s", ErrOrgTokenNoWorkspace, t.accepts.hint())
 	}
 	if t.noSaved != nil {
