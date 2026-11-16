@@ -82,7 +82,17 @@ func includeMonitoringDag(orgHosted bool, deploymentType astrov1.DeploymentType)
 	return !orgHosted && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
 }
 
-func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitoringDag, noDagsBaseDir, cosmosBoost bool) (string, error) {
+// dagsUpload is how a project's dags/ directory is uploaded.
+type dagsUpload struct {
+	// NoDagsBaseDir is --no-dags-base-dir: the files go at the bundle's root
+	// rather than under dags/.
+	NoDagsBaseDir bool
+	// CosmosBoost is [tool.astro.deploy] cosmos-boost: the upload carries
+	// Cosmos Boost files for the dbt projects among the Dags.
+	CosmosBoost bool
+}
+
+func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitoringDag bool, opts dagsUpload) (string, error) {
 	if monitoringDag {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
@@ -108,8 +118,11 @@ func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitorin
 
 	// By default, prepend dags/ directory prefix. Use --no-dags-base-dir to place files at bundle root
 	// (needed for some Airflow 3.x deployments where sys.path includes the bundle root, not dags/).
-	prependBaseDir := !noDagsBaseDir
-	versionID, err := UploadBundle(dagsPath, dagsUploadURL, prependBaseDir, cosmosBoost, currentRuntimeVersion, nil)
+	versionID, err := UploadBundle(dagsPath, dagsUploadURL, BundleUpload{
+		PrependBaseDir: !opts.NoDagsBaseDir,
+		CosmosBoost:    opts.CosmosBoost,
+		RuntimeVersion: currentRuntimeVersion,
+	})
 	if err != nil {
 		return "", err
 	}
