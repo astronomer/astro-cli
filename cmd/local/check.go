@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/checks"
@@ -112,7 +113,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 	// Best effort: the check is about the DAGs, and a listing that cannot be
 	// read only costs the note.
 	undeclared, _ := plan.UndeclaredLocal(project, m) //nolint:errcheck // informational, see above
-	if err := renderCheck(r, res, strict, provisioned, undeclared, m.Astro.Workspace); err != nil {
+	if err := renderCheck(r, res, strict, provisioned, undeclared, emenv.WorkspaceID(&m.Astro)); err != nil {
 		return err
 	}
 	if code := res.ExitCode(strict); code != checks.ExitOK {

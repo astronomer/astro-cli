@@ -24,23 +24,20 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 var (
 	authLogin             = auth.Login
 	fetchDomainAuthConfig = auth.FetchDomainAuthConfig
 	defaultDomain         = "astronomer.io"
-	parseAPIToken         = util.ParseAPIToken
-	// ErrNotAPIToken is ASTRO_API_TOKEN holding a token with no permissions,
-	// which no Astro API token lacks. The run does not fall back to the saved
-	// login: the person supplied a credential, and it is the one that failed.
-	ErrNotAPIToken = errors.New("ASTRO_API_TOKEN is not an Astro API token (it has no permissions): set a valid token, or unset it to use your login")
-	// ErrAPITokenExpired is ASTRO_API_TOKEN holding a token past its expiry.
-	ErrAPITokenExpired = errors.New("API Token is expired")
-	// ErrAPITokenMalformed is ASTRO_API_TOKEN holding something that is not a
-	// token at all.
-	ErrAPITokenMalformed = errors.New("API Token is invalid or malformed")
+	// ErrNotAPIToken, ErrAPITokenExpired and ErrAPITokenMalformed are the
+	// ways ASTRO_API_TOKEN can be unusable. They are astrosession's, which
+	// reads the token for both trees, so a token fails with the same sentence
+	// in either. The run does not fall back to the saved login: the person
+	// supplied a credential, and it is the one that failed.
+	ErrNotAPIToken       = astrosession.ErrNotAPIToken
+	ErrAPITokenExpired   = astrosession.ErrAPITokenExpired
+	ErrAPITokenMalformed = astrosession.ErrAPITokenMalformed
 	// ErrAPITokenOrganization is returned when the organization of an accepted
 	// API token can't be looked up, which leaves the context
 	// without one.
@@ -52,13 +49,6 @@ var (
 	// parsed, so no login can be read from it.
 	ErrConfigUnreadable = errors.New("the Astro config file could not be read")
 )
-
-// malformedTokenError is ErrAPITokenMalformed with the parser's reason, which
-// a test or a debug reader can reach but the message leaves out.
-type malformedTokenError struct{ cause error }
-
-func (e *malformedTokenError) Error() string   { return ErrAPITokenMalformed.Error() }
-func (e *malformedTokenError) Unwrap() []error { return []error{ErrAPITokenMalformed, e.cause} }
 
 // renewalError is ErrLoginRenewal with its cause.
 type renewalError struct{ cause error }
@@ -614,33 +604,24 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 }
 
 func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
-	// check os variables
-	// Read as every reader of the variable reads it: one holding only the
-	// scheme ("Bearer ") is no token, and one holding the scheme too is the
-	// token after it, so the login below does not carry it twice.
-	stored, ok := astrosession.APIToken()
-	if !ok {
+	// The token is read as the core tree reads it, by one parser: a value
+	// holding only the scheme ("Bearer ") is no token, one holding the scheme
+	// too is the token after it, so the login below does not carry it twice,
+	// and one that is malformed, expired or without permissions is the error.
+	id, ok, err := astrosession.TokenIdentity()
+	if !ok && err == nil {
 		return false, nil
 	}
-	astroAPIToken := astrosession.Credential(stored)
+	if err != nil {
+		return false, err
+	}
+	astroAPIToken := id.Credential
 	logger.Debug("Using an Astro API Token")
 
-	// Parse the token to peek at the custom claims
-	claims, err := parseAPIToken(astroAPIToken)
-	if err != nil {
-		return false, &malformedTokenError{cause: err}
-	}
-	if len(claims.Permissions) == 0 {
-		return false, ErrNotAPIToken
-	}
 	// A token with no expiry of its own reads as live for a year.
-	expiresAt := time.Now().AddDate(1, 0, 0)
-	if claims.ExpiresAt != nil {
-		if claims.ExpiresAt.Before(time.Now()) {
-			logger.Debugf("The given API Token %s has expired", claims.APITokenID)
-			return false, ErrAPITokenExpired
-		}
-		expiresAt = claims.ExpiresAt.Time
+	expiresAt := id.ExpiresAt
+	if expiresAt.IsZero() {
+		expiresAt = time.Now().AddDate(1, 0, 0)
 	}
 
 	domain, current := environmentDomain()
@@ -648,19 +629,7 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 		return false, err
 	}
 
-	var wsID, orgID string
-	for _, permission := range claims.Permissions {
-		permissionType, id, ok := strings.Cut(permission, ":")
-		if !ok {
-			continue
-		}
-		switch permissionType {
-		case "workspaceId":
-			wsID = id
-		case "organizationId":
-			orgID = id
-		}
-	}
+	wsID, orgID := id.Workspace, id.Organization
 
 	// Record the claims' selection before the lookup, so a lookup that fails
 	// softly (astro auth token) leaves the applied token with its own selection

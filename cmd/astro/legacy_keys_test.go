@@ -72,7 +72,6 @@ func TestDeploymentAPIKeysAreRefusedBeforeAnyRequest(t *testing.T) {
 // login.
 func TestAnAPITokenWinsOverDeploymentAPIKeys(t *testing.T) {
 	home := savedLogin(t, false)
-	realTokenParser(t)
 	noLoginFlow(t)
 	calls := fakeIDP(t)
 	token := apiToken(t, "token-and-keys")

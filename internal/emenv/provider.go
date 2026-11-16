@@ -240,7 +240,16 @@ func (p *provider) load() {
 		// is simply absent. What counts as logged in comes from
 		// internal/astrosession, so this and the query commands never disagree
 		// about whether there is a session.
+		//
+		// With ASTRO_API_TOKEN set the login is the token's own (organization
+		// and Workspace from its claims), never the saved one. A token that is
+		// unusable is its own outage, named as the root names it: the run does
+		// not read the saved login instead.
 		ctx, err := login(p.domain)
+		if errors.Is(err, astrosession.ErrInvalidToken) || errors.Is(err, astrosession.ErrTokenNoOrganization) {
+			p.down = &outage{short: "unusable ASTRO_API_TOKEN", cause: err.Error()}
+			return
+		}
 		if errors.Is(err, astrosession.ErrSessionExpired) {
 			p.down = p.classify(&httpError{code: http.StatusUnauthorized})
 			return
