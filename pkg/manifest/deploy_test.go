@@ -83,13 +83,20 @@ func TestDeploySettingsOfTheWrongShape(t *testing.T) {
 	}
 }
 
-// An unknown key in the table is a warning, as anywhere in [tool.astro].
-func TestAnUnknownDeployKeyWarns(t *testing.T) {
-	m, err := Parse([]byte(deployBase + "\n[tool.astro.deploy]\ncosmos_boost = true\n"))
+// An unknown key in the table is a warning, as anywhere in [tool.astro], and
+// a near-miss of one it defines (the 1.x spelling, say) is refused.
+func TestAnUnknownDeployKey(t *testing.T) {
+	m, err := Parse([]byte(deployBase + "\n[tool.astro.deploy]\nretries = 3\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.Warnings) != 1 || m.Warnings[0].Key != "tool.astro.deploy.cosmos_boost" {
+	if len(m.Warnings) != 1 || m.Warnings[0].Key != "tool.astro.deploy.retries" {
 		t.Errorf("got %+v", m.Warnings)
+	}
+
+	_, err = Parse([]byte(deployBase + "\n[tool.astro.deploy]\ncosmos_boost = true\n"))
+	ve := validationError(t, err)
+	if len(ve.Problems) != 1 || ve.Problems[0].Reason != "not a key: did you mean cosmos-boost?" {
+		t.Errorf("got %+v", ve.Problems)
 	}
 }

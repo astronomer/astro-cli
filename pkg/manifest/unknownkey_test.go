@@ -4,7 +4,8 @@ import (
 	"testing"
 )
 
-// unknownKeyCases are manifests carrying a key their table does not define.
+// unknownKeyCases are manifests carrying a key their table does not define,
+// and is no near-miss of one it does (a near-miss is refused: nearmiss_test.go).
 // Each loads, with a warning naming the key: a newer CLI or Astro Desktop may
 // write a key this build does not know, and an older reader of a committed,
 // shared file must still open the project.
@@ -13,8 +14,8 @@ var unknownKeyCases = []struct {
 }{
 	{
 		name:    "unknown key in [tool.astro]",
-		content: "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nairflw = \"3.1\"\n",
-		wantKey: "tool.astro.airflw",
+		content: "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\npalette = \"blue\"\n",
+		wantKey: "tool.astro.palette",
 	},
 	{
 		name: "unknown key on a link",
@@ -28,9 +29,9 @@ workspace = "ws-abc"
 
 [tool.astro.deployments.prod]
 deployment = "dep-xyz"
-defaults = true
+notes = "the prod link"
 `,
-		wantKey: "tool.astro.deployments.prod.defaults",
+		wantKey: "tool.astro.deployments.prod.notes",
 	},
 	{
 		name: "apc link with an organization",

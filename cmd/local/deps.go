@@ -211,6 +211,12 @@ type Deps struct {
 	// The root wires it, because the settings are config/'s. nil names every
 	// setting without a replacement.
 	ProjectSetting1x func(key, value string) (global, removed string, ok bool)
+
+	// ManifestWarningsShown is set when the root prints every loaded
+	// manifest's warnings itself (manifest.SetWarningHandler), so a start's
+	// text output does not repeat them. Its json warning events are emitted
+	// either way.
+	ManifestWarningsShown bool
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an

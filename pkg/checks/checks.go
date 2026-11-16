@@ -142,6 +142,10 @@ const (
 	// KindEnvInvalid is a declared value that is present but is not what its
 	// declaration says, which a start warns about and runs past. A warning.
 	KindEnvInvalid Kind = "env_invalid"
+	// KindManifestWarning is a key pyproject.toml carries that this build does
+	// not know: a misspelling, or a key a newer Astro CLI writes. The manifest
+	// loads without it, so it is a warning, which --strict fails on.
+	KindManifestWarning Kind = "manifest_warning"
 )
 
 // Finding is one thing the check noticed about one DAG or file. It is the unit
