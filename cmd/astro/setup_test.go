@@ -1,8 +1,6 @@
 package astro
 
 import (
-	"bytes"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -18,10 +16,10 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
-	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -242,129 +240,6 @@ func TestSetup(t *testing.T) {
 		err = Setup(cmd, mockV1Client)
 		assert.NoError(t, err)
 	})
-
-	t.Run("use API key", func(t *testing.T) {
-		mockOrgsResponse := astrov1.ListOrganizationsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrov1.OrganizationsPaginated{
-				Organizations: []astrov1.Organization{
-					{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
-				},
-			},
-		}
-		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("domain", "astronomer.io")
-		assert.NoError(t, err)
-
-		cmd := &cobra.Command{Use: "deploy"}
-		cmd, err = cmd.ExecuteC()
-		assert.NoError(t, err)
-
-		rootCmd := &cobra.Command{Use: "astro"}
-		rootCmd.AddCommand(cmd)
-
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
-			return nil
-		}
-
-		t.Setenv("ASTRONOMER_KEY_ID", "key")
-		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
-
-		origFetch := fetchDomainAuthConfig
-		fetchDomainAuthConfig = func(domain string) (auth.Config, error) {
-			return auth.Config{DomainURL: "https://auth." + domain + "/"}, nil
-		}
-		defer func() { fetchDomainAuthConfig = origFetch }()
-
-		mockResp := TokenResponse{
-			AccessToken: "test-token",
-			IDToken:     "test-id",
-		}
-		jsonResponse, err := json.Marshal(mockResp)
-		assert.NoError(t, err)
-
-		client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-		err = Setup(cmd, mockV1Client)
-		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
-	})
-}
-
-func TestCheckAPIKeys(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
-	t.Run("test context switch", func(t *testing.T) {
-		mockOrgsResponse := astrov1.ListOrganizationsResponse{
-			HTTPResponse: &http.Response{
-				StatusCode: 200,
-			},
-			JSON200: &astrov1.OrganizationsPaginated{
-				Organizations: []astrov1.Organization{
-					{Name: "test-org", Id: "test-org-id", Product: &mockOrganizationProduct},
-				},
-			},
-		}
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("domain", "astronomer.io")
-		assert.NoError(t, err)
-
-		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
-			return nil
-		}
-
-		// Stub auth config fetch so the test doesn't hit the network.
-		origFetch := fetchDomainAuthConfig
-		fetchDomainAuthConfig = func(domain string) (auth.Config, error) {
-			return auth.Config{DomainURL: "https://auth." + domain + "/"}, nil
-		}
-		defer func() { fetchDomainAuthConfig = origFetch }()
-
-		t.Setenv("ASTRONOMER_KEY_ID", "key")
-		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
-
-		mockResp := TokenResponse{
-			AccessToken: "test-token",
-			IDToken:     "test-id",
-		}
-		jsonResponse, err := json.Marshal(mockResp)
-		assert.NoError(t, err)
-
-		client = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
-
-		// Switch context
-		domain := "astronomer-dev.io"
-		err = context.Switch(domain)
-		assert.NoError(t, err)
-
-		// run CheckAPIKeys
-		_, err = checkAPIKeys(mockV1Client, false)
-		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
-	})
 }
 
 func TestCheckToken(t *testing.T) {
@@ -537,48 +412,6 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	// A Deployment-scoped token's one deploymentId permission is the
-	// Deployment a run that names none acts on; a workspace token's is none.
-	t.Run("a Deployment-scoped token records its Deployment", func(t *testing.T) {
-		t.Cleanup(func() { deployment.UseTokenDeployment("") })
-		deploymentClaims := mockClaims
-		deploymentClaims.Permissions = []string{
-			"apiTokenId:token-id", "deploymentId:deployment-id", "organizationId:org-ID", "orgShortName:org-ID", "workspaceId:workspace-id",
-		}
-		parseAPIToken = func(string) (*util.CustomClaims, error) { return &deploymentClaims, nil }
-		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
-		t.Setenv("ASTRO_API_TOKEN", "token")
-		require.NoError(t, context.Switch("astronomer-dev.io"))
-
-		_, err := checkAPIToken(mockV1Client)
-		require.NoError(t, err)
-		assert.Equal(t, "deployment-id", deployment.TokenDeployment())
-
-		parseAPIToken = func(string) (*util.CustomClaims, error) { return &mockClaims, nil }
-		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
-		_, err = checkAPIToken(mockV1Client)
-		require.NoError(t, err)
-		assert.Empty(t, deployment.TokenDeployment(), "a workspace token names no Deployment")
-	})
-
-	// A login that fails to set up records no Deployment, and a permission
-	// without a colon is skipped rather than a crash.
-	t.Run("a token whose organization cannot be looked up records no Deployment", func(t *testing.T) {
-		t.Cleanup(func() { deployment.UseTokenDeployment("") })
-		deployment.UseTokenDeployment("left-over")
-		deploymentClaims := mockClaims
-		deploymentClaims.Permissions = []string{"admin", "deploymentId:deployment-id", "organizationId:org-ID"}
-		parseAPIToken = func(string) (*util.CustomClaims, error) { return &deploymentClaims, nil }
-		failed := astrov1.ListOrganizationsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusTooManyRequests}}
-		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&failed, nil).Once()
-		t.Setenv("ASTRO_API_TOKEN", "token")
-		require.NoError(t, context.Switch("astronomer-dev.io"))
-
-		_, err := checkAPIToken(mockV1Client)
-		require.ErrorIs(t, err, ErrAPITokenOrganization)
-		assert.Empty(t, deployment.TokenDeployment())
-	})
-
 	t.Run("an organization that can't be looked up is an error", func(t *testing.T) {
 		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
 			return &mockClaims, nil
@@ -689,7 +522,7 @@ func TestCheckAPIToken(t *testing.T) {
 
 		// run checkAPIToken
 		_, err = checkAPIToken(mockV1Client)
-		assert.ErrorIs(t, err, errNotAPIToken)
+		assert.ErrorIs(t, err, ErrNotAPIToken)
 	})
 
 	t.Run("expired token", func(t *testing.T) {
@@ -729,7 +562,7 @@ func TestCheckAPIToken(t *testing.T) {
 
 		// run checkAPIToken
 		_, err = checkAPIToken(mockV1Client)
-		assert.ErrorIs(t, err, errExpiredAPIToken)
+		assert.ErrorIs(t, err, ErrAPITokenExpired)
 	})
 
 	t.Run("non-expiry token", func(t *testing.T) {
@@ -806,8 +639,7 @@ func TestSetupReadsTheAPITokenByTheOneRule(t *testing.T) {
 	errStop := errors.New("stop after the parse")
 	for env, parsed := range map[string]string{"Bearer ": "", "Bearer Bearer": "", "token": "token", "Bearer token": "token", "Bearer Bearer token": "token"} {
 		t.Setenv("ASTRO_API_TOKEN", env)
-		assert.Equal(t, parsed != "", envCredentials(), "ASTRO_API_TOKEN=%q", env)
-		assert.Equal(t, parsed != "", credentialFromEnv(), "ASTRO_API_TOKEN=%q", env)
+		assert.Equal(t, parsed != "", astrosession.HasAPIToken(), "ASTRO_API_TOKEN=%q", env)
 
 		var got string
 		parseAPIToken = func(token string) (*util.CustomClaims, error) {
@@ -822,24 +654,5 @@ func TestSetupReadsTheAPITokenByTheOneRule(t *testing.T) {
 			assert.ErrorIs(t, err, errStop, "ASTRO_API_TOKEN=%q", env)
 		}
 		assert.Equal(t, parsed, got, "ASTRO_API_TOKEN=%q: what was parsed", env)
-	}
-}
-
-// Only a token with exactly one deploymentId permission is scoped to a
-// Deployment.
-func TestTokenDeploymentID(t *testing.T) {
-	for name, tc := range map[string]struct {
-		permissions []string
-		want        string
-	}{
-		"one":            {[]string{"apiTokenId:t", "deploymentId:dep-1", "workspaceId:ws"}, "dep-1"},
-		"none":           {[]string{"apiTokenId:t", "workspaceId:ws", "organizationId:org"}, ""},
-		"two":            {[]string{"deploymentId:dep-1", "deploymentId:dep-2"}, ""},
-		"the same twice": {[]string{"deploymentId:dep-1", "deploymentId:dep-1"}, ""},
-		"empty":          {[]string{"deploymentId:"}, ""},
-	} {
-		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, tokenDeploymentID(tc.permissions))
-		})
 	}
 }

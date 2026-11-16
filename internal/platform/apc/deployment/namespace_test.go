@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"io"
 	"strings"
 
 	"github.com/stretchr/testify/mock"
@@ -20,14 +19,14 @@ func (s *Suite) TestNamespaceFromTheFlag() {
 	api.On("GetAvailableNamespaces", mock.Anything).Return([]houston.Namespace{{Name: "ns-a"}, {Name: "ns-b"}}, nil)
 	defer input.SetGuard(func() string { return "with --output json it cannot" })()
 
-	got, err := getDeploymentSelectionNamespaces(api, io.Discard, "c", "ns-b")
+	got, err := getDeploymentSelectionNamespaces(api, "c", "ns-b")
 	s.NoError(err)
 	s.Equal("ns-b", got)
 
-	_, err = getDeploymentSelectionNamespaces(api, io.Discard, "c", "ns-z")
+	_, err = getDeploymentSelectionNamespaces(api, "c", "ns-z")
 	s.EqualError(err, `namespace "ns-z" is not one this platform offers; use one of: ns-a, ns-b`)
 
-	_, err = getDeploymentSelectionNamespaces(api, io.Discard, "c", "")
+	_, err = getDeploymentSelectionNamespaces(api, "c", "")
 	s.ErrorContains(err, "--namespace")
 
 	got, err = getDeploymentNamespaceName("my-ns")
@@ -67,11 +66,11 @@ func (s *Suite) TestCreateNamespaceSettings() {
 	both := &houston.AppConfig{Flags: houston.FeatureFlags{ManualNamespaceNames: true, NamespaceFreeFormEntry: true}}
 	api := new(mocks.ClientInterface)
 	api.On("CreateDeployment", mock.MatchedBy(func(vars map[string]interface{}) bool { return vars["namespace"] == "not-in-the-pool" })).Return(&houston.Deployment{ID: "d"}, nil)
-	_, err := Create(req, api, io.Discard, both)
+	_, err := Create(req, api, both)
 	s.NoError(err, "free-form wins: the pool is not consulted")
 	api.AssertNotCalled(s.T(), "GetAvailableNamespaces", mock.Anything)
 
 	neither := &houston.AppConfig{}
-	_, err = Create(req, new(mocks.ClientInterface), io.Discard, neither)
+	_, err = Create(req, new(mocks.ClientInterface), neither)
 	s.ErrorIs(err, errNamespaceNotAsked)
 }

@@ -145,18 +145,18 @@ func newEnvConnDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func connFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&envConnValue, "value", "v", "", "The whole connection as a URI or JSON. Replaces it, where the field flags patch; a stored port or password is kept unless given")
-	cmd.Flags().StringVarP(&envConnType, "type", "t", "", "Connection type (e.g. postgres, http)")
+	cmd.Flags().StringVar(&envConnValue, "value", "", "The whole connection as a URI or JSON. Replaces it, where the field flags patch; a stored port or password is kept unless given")
+	cmd.Flags().StringVar(&envConnType, "type", "", "Connection type (e.g. postgres, http)")
 	cmd.Flags().StringVar(&envConnHost, "host", "", "Connection host")
-	cmd.Flags().StringVarP(&envConnLogin, "login", "l", "", "Connection login or username")
-	cmd.Flags().StringVarP(&envConnPassword, "password", "p", "", "Connection password; prefer piping it, since a flag lands in shell history. Empty keeps the stored one: the platform cannot clear a password")
+	cmd.Flags().StringVar(&envConnLogin, "login", "", "Connection login or username")
+	cmd.Flags().StringVar(&envConnPassword, "password", "", "Connection password; prefer piping it, since a flag lands in shell history. Empty keeps the stored one: the platform cannot clear a password")
 	cmd.Flags().StringVar(&envConnSchema, "schema", "", "Connection schema")
 	cmd.Flags().IntVar(&envConnPort, "port", 0, "Connection port")
 	cmd.Flags().StringVar(&envConnExtra, "extra", "", "Extra configuration as a JSON object string")
 }
 
 func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -173,7 +173,7 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 // has done the same since the tree was written. It is what --no-create is
 // for, and this is the first release where every noun has that flag.
 func runEnvConnSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}

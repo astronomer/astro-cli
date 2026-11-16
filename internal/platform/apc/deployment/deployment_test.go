@@ -1,13 +1,14 @@
 package deployment
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
@@ -197,8 +198,7 @@ func (s *Suite) TestCreate() {
 		// Have to use mock anything for now as vars is too big
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
-		created, err := Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, mockAppConfig)
 		s.NoError(err)
 		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
@@ -210,8 +210,7 @@ func (s *Suite) TestCreate() {
 		// Have to use mock anything for now as vars is too big
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
-		created, err := Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, mockAppConfig)
 		s.NoError(err)
 		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
@@ -224,8 +223,7 @@ func (s *Suite) TestCreate() {
 			return vars["mode"] == houston.OperatorDeploymentMode
 		})).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
-		_, err := Create(req, api, buf, mockAppConfig)
+		_, err := Create(req, api, mockAppConfig)
 		s.NoError(err)
 		api.AssertExpectations(s.T())
 		req.Mode = ""
@@ -239,8 +237,7 @@ func (s *Suite) TestCreate() {
 			return !ok
 		})).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
-		_, err := Create(req, api, buf, mockAppConfig)
+		_, err := Create(req, api, mockAppConfig)
 		s.NoError(err)
 		api.AssertExpectations(s.T())
 	})
@@ -252,8 +249,7 @@ func (s *Suite) TestCreate() {
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		triggerReplicas = 1
-		buf := new(bytes.Buffer)
-		created, err := Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, mockAppConfig)
 		s.NoError(err)
 		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
@@ -266,9 +262,8 @@ func (s *Suite) TestCreate() {
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		triggerReplicas = -1
-		buf := new(bytes.Buffer)
 		req = &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID, "", ""}
-		created, err := Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, mockAppConfig)
 		s.NoError(err)
 		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
@@ -283,8 +278,7 @@ func (s *Suite) TestCreate() {
 		nfsLocation = "test:/test"
 		triggerReplicas = 0
 
-		buf := new(bytes.Buffer)
-		created, err := Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, mockAppConfig)
 		s.NoError(err)
 		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
@@ -317,9 +311,8 @@ func (s *Suite) TestCreate() {
 		}
 
 		for _, tt := range myTests {
-			buf := new(bytes.Buffer)
 			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, "", runtimeVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas, clusterID, "", ""}
-			_, err := Create(createReq, api, buf, mockAppConfig)
+			_, err := Create(createReq, api, mockAppConfig)
 			if tt.expectedError != "" {
 				s.EqualError(err, tt.expectedError)
 			} else {
@@ -336,8 +329,6 @@ func (s *Suite) TestCreate() {
 		dagDeploymentType = houston.VolumeDeploymentType
 		nfsLocation = "test:/test"
 
-		buf := new(bytes.Buffer)
-
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
@@ -350,7 +341,7 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		created, err := Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, mockAppConfig)
 		s.NoError(err)
 		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
@@ -369,8 +360,6 @@ func (s *Suite) TestCreate() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockNamespaces, nil)
 
-		buf := new(bytes.Buffer)
-
 		// mock os.Stdin
 		input := []byte("5")
 		r, w, err := os.Pipe()
@@ -383,7 +372,7 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		_, err = Create(req, api, buf, &appConfig)
+		_, err = Create(req, api, &appConfig)
 		s.EqualError(err, "number is out of available range")
 		api.AssertExpectations(s.T())
 	})
@@ -397,8 +386,7 @@ func (s *Suite) TestCreate() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return([]houston.Namespace{}, errMock)
 
-		buf := new(bytes.Buffer)
-		_, err := Create(req, api, buf, &appConfig)
+		_, err := Create(req, api, &appConfig)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -407,8 +395,7 @@ func (s *Suite) TestCreate() {
 		api := new(mocks.ClientInterface)
 		api.On("CreateDeployment", mock.Anything).Return(nil, errMock)
 
-		buf := new(bytes.Buffer)
-		_, err := Create(req, api, buf, mockAppConfig)
+		_, err := Create(req, api, mockAppConfig)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -419,7 +406,6 @@ func (s *Suite) TestCreate() {
 		api := new(mocks.ClientInterface)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
 		// mock os.Stdin
 		input := []byte("test1")
 		r, w, err := os.Pipe()
@@ -432,7 +418,7 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		created, err := Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, mockAppConfig)
 		s.NoError(err)
 		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
@@ -441,7 +427,6 @@ func (s *Suite) TestCreate() {
 		api := new(mocks.ClientInterface)
 		api.On("CreateDeployment", mock.Anything).Return(nil, errMock)
 
-		buf := new(bytes.Buffer)
 		// mock os.Stdin
 		input := []byte("    ")
 		r, w, err := os.Pipe()
@@ -454,7 +439,7 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		_, err = Create(req, api, buf, mockAppConfig)
+		_, err = Create(req, api, mockAppConfig)
 		s.EqualError(err, "no kubernetes namespaces specified")
 	})
 }
@@ -679,7 +664,7 @@ func (s *Suite) TestUpdate() {
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		for _, dagDeploymentType := range []string{"", houston.ImageDeploymentType} {
-			got, err := Update(mockDeployment.ID, role, map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType, "", "", "", "", "", "", "", "", 1, 0, api, mockAppConfig)
+			got, err := Update(mockDeployment.ID, role, map[string]string{"executor": houston.CeleryExecutorType}, dagConfig(s, dagDeploymentType), "", 0, api, mockAppConfig)
 			s.NoError(err)
 			s.Equal(mockDeployment, got)
 			api.AssertExpectations(s.T())
@@ -693,7 +678,7 @@ func (s *Suite) TestUpdate() {
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		for _, dagDeploymentType := range []string{"", houston.ImageDeploymentType} {
-			got, err := Update(mockDeployment.ID, role, map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType, "", "", "", "", "", "", "", "", 1, 1, api, mockAppConfig)
+			got, err := Update(mockDeployment.ID, role, map[string]string{"executor": houston.CeleryExecutorType}, dagConfig(s, dagDeploymentType), "", 1, api, mockAppConfig)
 			s.NoError(err)
 			s.Equal(mockDeployment, got)
 			api.AssertExpectations(s.T())
@@ -707,7 +692,7 @@ func (s *Suite) TestUpdate() {
 		deploymentConfig := make(map[string]string)
 		deploymentConfig["executor"] = houston.CeleryExecutorType
 
-		_, err := Update(mockDeployment.ID, role, deploymentConfig, "", "", "", "", "", "", "", "", "", 1, 0, api, mockAppConfig)
+		_, err := Update(mockDeployment.ID, role, deploymentConfig, dagConfig(s, ""), "", 0, api, mockAppConfig)
 
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
@@ -733,8 +718,7 @@ func (s *Suite) TestAirflowUpgrade() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("UpdateDeploymentAirflow", expectedVars).Return(mockDeployment, nil)
-		buf := new(bytes.Buffer)
-		got, err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
+		got, err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api)
 		s.NoError(err)
 		s.Equal(VersionChangeStarted, got.Action)
 		s.Equal(ImageVersion{Image: ImageCertified, Version: "1.10.5"}, got.Current)
@@ -746,8 +730,7 @@ func (s *Suite) TestAirflowUpgrade() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, errGetDeploymentMock)
 
-		buf := new(bytes.Buffer)
-		_, err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
+		_, err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api)
 		s.Error(err, errGetDeploymentMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -758,8 +741,7 @@ func (s *Suite) TestAirflowUpgrade() {
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("UpdateDeploymentAirflow", expectedVars).Return(nil, errUpdateDeploymentMock)
 
-		buf := new(bytes.Buffer)
-		_, err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
+		_, err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api)
 		s.Error(err, errUpdateDeploymentMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -854,12 +836,12 @@ func (s *Suite) TestAirflowUpgradeCancel() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		buf := new(bytes.Buffer)
-		got, err := AirflowUpgrade(deploymentID, "", api, buf)
-		s.T().Log(buf.String()) // Log the buffer so that this test is recognized by go test
+		var got *VersionChange
+		drawn := captureStderr(s.T(), func() { got, err = AirflowUpgrade(deploymentID, "", api) })
+		s.T().Log(drawn) // Log the picker so that this test is recognized by go test
 
 		s.NoError(err)
-		rows, rest := s.picked(buf.String())
+		rows, rest := s.picked(drawn)
 		s.Empty(rest, "the picker is all it draws; the result is the caller's")
 		s.Equal([][]string{
 			{"#", "AIRFLOW", "VERSION"},
@@ -889,8 +871,6 @@ func (s *Suite) Test_getAirflowVersionSelection() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeploymentConfig", nil).Return(mockDeploymentConfig, nil)
 
-		buf := new(bytes.Buffer)
-
 		// mock os.Stdin
 		input := []byte("2")
 		r, w, err := os.Pipe()
@@ -903,8 +883,9 @@ func (s *Suite) Test_getAirflowVersionSelection() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		airflowVersion, err := getAirflowVersionSelection("1.10.7", api, buf)
-		s.T().Log(buf.String()) // Log the buffer so that this test is recognized by go test
+		var airflowVersion string
+		drawn := captureStderr(s.T(), func() { airflowVersion, err = getAirflowVersionSelection("1.10.7", api) })
+		s.T().Log(drawn) // Log the picker so that this test is recognized by go test
 		s.NoError(err)
 		s.Equal("1.10.12", airflowVersion)
 		api.AssertExpectations(s.T())
@@ -914,8 +895,7 @@ func (s *Suite) Test_getAirflowVersionSelection() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeploymentConfig", nil).Return(nil, errMock)
 
-		buf := new(bytes.Buffer)
-		airflowVersion, err := getAirflowVersionSelection("1.10.7", api, buf)
+		airflowVersion, err := getAirflowVersionSelection("1.10.7", api)
 		s.EqualError(err, errMock.Error())
 		s.Equal("", airflowVersion)
 		api.AssertExpectations(s.T())
@@ -970,8 +950,6 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockAvailableNamespaces, nil)
 
-		buf := new(bytes.Buffer)
-
 		// mock os.Stdin
 		input := []byte("1")
 		r, w, err := os.Pipe()
@@ -984,9 +962,10 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID", "")
+		var name string
+		drawn := captureStderr(s.T(), func() { name, err = getDeploymentSelectionNamespaces(api, "testClusterID", "") })
 		s.NoError(err)
-		rows, rest := s.picked(buf.String())
+		rows, rest := s.picked(drawn)
 		s.Equal([][]string{{"#", "AVAILABLE", "KUBERNETES", "NAMESPACES"}, {"1", "test1"}, {"2", "test2"}}, rows)
 		s.Empty(rest)
 		s.Equal("test1", name)
@@ -1005,7 +984,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 			api := new(mocks.ClientInterface)
 			api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockAvailableNamespaces, nil)
 			testUtil.MockUserInput(s.T(), answer)
-			_, err := getDeploymentSelectionNamespaces(api, new(bytes.Buffer), "testClusterID", "")
+			_, err := getDeploymentSelectionNamespaces(api, "testClusterID", "")
 			s.Equal(want, err, "answer %q", answer)
 		}
 	})
@@ -1014,8 +993,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return([]houston.Namespace{}, nil)
 
-		buf := new(bytes.Buffer)
-		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID", "")
+		name, err := getDeploymentSelectionNamespaces(api, "testClusterID", "")
 		expected := ``
 		s.Equal(expected, name)
 		s.EqualError(err, "no kubernetes namespaces are available")
@@ -1025,8 +1003,6 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 	s.Run("parse error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockAvailableNamespaces, nil)
-
-		buf := new(bytes.Buffer)
 
 		// mock os.Stdin
 		input := []byte("test")
@@ -1040,7 +1016,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID", "")
+		name, err := getDeploymentSelectionNamespaces(api, "testClusterID", "")
 		s.Equal("", name)
 		s.EqualError(err, "cannot parse test to int")
 		api.AssertExpectations(s.T())
@@ -1050,8 +1026,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		api := new(mocks.ClientInterface)
 		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(nil, errMock)
 
-		buf := new(bytes.Buffer)
-		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID", "")
+		name, err := getDeploymentSelectionNamespaces(api, "testClusterID", "")
 		s.Equal("", name)
 		s.EqualError(err, errMock.Error())
 	})
@@ -1165,8 +1140,7 @@ func (s *Suite) TestRuntimeUpgrade() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
-		buf := new(bytes.Buffer)
-		got, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		got, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api)
 		s.NoError(err)
 		s.Equal(VersionChangeStarted, got.Action)
 		s.Equal(ImageVersion{Image: ImageRuntime, Version: "4.2.4"}, got.Current)
@@ -1182,8 +1156,7 @@ func (s *Suite) TestRuntimeUpgrade() {
 		mockDeployment.DesiredAirflowVersion = ""
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
-		buf := new(bytes.Buffer)
-		got, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		got, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api)
 		s.NoError(err)
 		s.Equal(VersionChangeStarted, got.Action)
 		s.Equal(ImageVersion{Image: ImageRuntime, Version: "4.2.4"}, got.Current)
@@ -1199,8 +1172,7 @@ func (s *Suite) TestRuntimeUpgrade() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(&mockResp, nil)
 
-		buf := new(bytes.Buffer)
-		_, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		_, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api)
 		s.ErrorIs(err, errDeploymentNotOnRuntime)
 	})
 
@@ -1209,8 +1181,7 @@ func (s *Suite) TestRuntimeUpgrade() {
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
-		buf := new(bytes.Buffer)
-		_, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		_, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api)
 		s.Error(err, mockError.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -1222,8 +1193,7 @@ func (s *Suite) TestRuntimeUpgrade() {
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(nil, mockError)
 
-		buf := new(bytes.Buffer)
-		_, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		_, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api)
 		s.Error(err, mockError.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -1253,12 +1223,12 @@ func (s *Suite) TestRuntimeUpgrade() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		buf := new(bytes.Buffer)
-		got, err := RuntimeUpgrade(mockDeployment.ID, "", api, buf)
-		s.T().Log(buf.String()) // Log the buffer so that this test is recognized by go test
+		var got *VersionChange
+		drawn := captureStderr(s.T(), func() { got, err = RuntimeUpgrade(mockDeployment.ID, "", api) })
+		s.T().Log(drawn) // Log the picker so that this test is recognized by go test
 
 		s.NoError(err)
-		rows, rest := s.picked(buf.String())
+		rows, rest := s.picked(drawn)
 		s.Empty(rest, "the picker is all it draws; the result is the caller's")
 		s.Equal([][]string{{"#", "RUNTIME", "VERSION"}, {"1", "Runtime-4.2.5"}}, rows)
 		s.Equal(VersionChangeStarted, got.Action)
@@ -1570,4 +1540,35 @@ func (s *Suite) TestReadSSHKeyFileNormalizesCRLF() {
 	got, err := readSSHKeyFile(path)
 	s.Require().NoError(err)
 	s.Equal("-----BEGIN KEY-----\nabc\n-----END KEY-----\n", got)
+}
+
+// captureStderr returns what f writes to the process's stderr, which it swaps
+// for a pipe while f runs: the pickers are drawn there.
+func captureStderr(t *testing.T, f func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := os.Stderr
+	os.Stderr = w
+	done := make(chan string, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- string(b)
+	}()
+	defer func() {
+		os.Stderr = previous
+	}()
+	f()
+	os.Stderr = previous
+	w.Close()
+	return <-done
+}
+
+// dagConfig is the dag deployment settings of a request that names only a type.
+func dagConfig(s *Suite, dagDeploymentType string) map[string]interface{} {
+	config, err := BuildDagDeploymentConfig(dagDeploymentType, "", "", "", "", "", "", "", 1)
+	s.Require().NoError(err)
+	return config
 }

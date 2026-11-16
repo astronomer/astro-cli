@@ -2,11 +2,11 @@ package instancelocate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
@@ -35,7 +35,13 @@ type DeploymentNameError struct {
 func (e *DeploymentNameError) Error() string {
 	switch {
 	case e.Workspace == "":
-		return fmt.Sprintf("%q is not a Deployment id, and there is no workspace to find a Deployment of that name in: pass -d with the Deployment id, or run 'astro workspace switch'", e.Name)
+		// Under an API token the resolver says why no workspace is selected, and
+		// that 'astro workspace switch' is no way to give it one.
+		missing := astrosession.Resolve(astrosession.Request{
+			Accepts: astrosession.ByDeployment,
+			NoSaved: errors.New("there is no workspace to find a Deployment of that name in: pass -d with the Deployment id, or run 'astro workspace switch'"),
+		}).Missing()
+		return fmt.Sprintf("%q is not a Deployment id, and %s", e.Name, missing)
 	case len(e.IDs) == 0:
 		return fmt.Sprintf("no Deployment named %q in workspace %s", e.Name, e.Workspace)
 	}
@@ -162,21 +168,9 @@ func listOutage(domain, ws string, resp *astrov1.ListDeploymentsResponse) error 
 	return fmt.Errorf("Astro could not list the Deployments in workspace %s%s", ws, detail)
 }
 
-// Workspace reads the current workspace out of the login for domain, or out
-// of the current login context when domain is empty: where a Deployment name
-// is looked up when nothing else says. Empty when there is none.
+// Workspace is the workspace a Deployment name is looked up in when nothing
+// else says, on domain's host ("" is the current context's): the run's
+// selection there, which astrosession.Resolve decides. Empty when there is none.
 func Workspace(domain string) string {
-	if domain == "" {
-		ctx, err := config.GetCurrentContext()
-		if err != nil {
-			return ""
-		}
-		return ctx.Workspace
-	}
-	c := config.Context{Domain: domain}
-	ctx, err := c.GetContext()
-	if err != nil {
-		return ""
-	}
-	return ctx.Workspace
+	return astrosession.Resolve(astrosession.Request{Domain: domain}).Workspace
 }

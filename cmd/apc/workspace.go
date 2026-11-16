@@ -88,8 +88,8 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&workspaceCreateLabel, "name", "n", "", "Name for your new workspace")
-	utils.AddAlias(cmd.Flags(), "label", "l", "name")
-	cmd.Flags().StringVarP(&workspaceCreateDescription, "description", "d", "", "Description for your new workspace")
+	utils.AddAlias(cmd.Flags(), "label", "name")
+	cmd.Flags().StringVar(&workspaceCreateDescription, "description", "", "Description for your new workspace")
 	_ = cmd.MarkFlagRequired("name") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 
@@ -131,8 +131,8 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 	}
 
 	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
-		cmd.Flags().BoolVarP(&workspacePaginated, "paginated", "p", false, "Paginated workspace list")
-		cmd.Flags().IntVarP(&workspacePageSize, "page-size", "s", 0, "Page size of the workspace list if paginated is set to true")
+		cmd.Flags().BoolVar(&workspacePaginated, "paginated", false, "Paginated workspace list")
+		cmd.Flags().IntVar(&workspacePageSize, "page-size", 0, "Page size of the workspace list if paginated is set to true")
 	}
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 	return cmd
@@ -153,8 +153,8 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&workspaceUpdateLabel, "name", "n", "", "The new name you want to give to your workspace")
-	utils.AddAlias(cmd.Flags(), "label", "l", "name")
-	cmd.Flags().StringVarP(&workspaceUpdateDescription, "description", "d", "", "The new description you want to give to your workspace")
+	utils.AddAlias(cmd.Flags(), "label", "name")
+	cmd.Flags().StringVar(&workspaceUpdateDescription, "description", "", "The new description you want to give to your workspace")
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 
 	return cmd
@@ -201,7 +201,7 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	if err := confirmRemoval(fmt.Sprintf("\nAre you sure you want to delete Workspace %s? This cannot be undone.", args[0])); err != nil {
+	if err := confirm(fmt.Sprintf("\nAre you sure you want to delete Workspace %s? This cannot be undone.", args[0])); err != nil {
 		return err
 	}
 	w, err := workspace.Delete(args[0], houstonClient)

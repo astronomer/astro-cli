@@ -25,15 +25,6 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-func Contains(elems []string, v string) bool {
-	for _, s := range elems {
-		if v == s {
-			return true
-		}
-	}
-	return false
-}
-
 // Base64URLEncode delegates to astroauth.Base64URLEncode.
 // See https://datatracker.ietf.org/doc/html/rfc4648#section-5
 func Base64URLEncode(arg []byte) string {

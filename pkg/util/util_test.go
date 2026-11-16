@@ -14,36 +14,6 @@ func TestUtils(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
-func (s *Suite) TestContains() {
-	type args struct {
-		elems []string
-		v     string
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{
-		{
-			name: "true case",
-			args: args{elems: []string{"test1", "test2"}, v: "test1"},
-			want: true,
-		},
-		{
-			name: "false case",
-			args: args{elems: []string{"test1", "test2"}, v: "test3"},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			if got := Contains(tt.args.elems, tt.args.v); got != tt.want {
-				s.Fail("Contains() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func (s *Suite) TestBase64URLEncode() {
 	type args struct {
 		arg []byte

@@ -183,7 +183,7 @@ func TestWorkspaceTextIsUnchanged(t *testing.T) {
 		}, []string{"workspace", "ls"}, " NAME     ID     \n"},
 		{"create", func(a *mocks.ClientInterface) {
 			a.On("CreateWorkspace", houston.CreateWorkspaceRequest{Label: "new", Description: "N/A"}).Return(&houston.Workspace{ID: "cknew", Label: "new", Description: new("N/A")}, nil)
-		}, []string{"workspace", "create", "-l", "new"}, " NAME     ID        \n new      cknew     \n\n Successfully created workspace\n"},
+		}, []string{"workspace", "create", "--label", "new"}, " NAME     ID        \n new      cknew     \n\n Successfully created workspace\n"},
 		{"update", func(a *mocks.ClientInterface) {
 			a.On("UpdateWorkspace", houston.UpdateWorkspaceRequest{WorkspaceID: wsOther.ID, Args: map[string]string{"label": "renamed"}}).
 				Return(&houston.Workspace{ID: wsOther.ID, Label: "renamed", Description: new("desc b")}, nil)
@@ -201,7 +201,7 @@ func TestWorkspaceTextIsUnchanged(t *testing.T) {
 			got := runWorkspaceTree(t, api, "", true, tc.args...)
 			require.Equal(t, 0, got.code, "stderr:\n%s", got.stderr)
 			assert.Equal(t, tc.want, got.stdout)
-			assert.Empty(t, got.stderr)
+			assert.Empty(t, withoutDeprecations(got.stderr))
 			api.AssertExpectations(t)
 		})
 	}
@@ -222,7 +222,7 @@ func TestWorkspaceListJSON(t *testing.T) {
 		assert.Equal(t, []bool{false, true, false}, []bool{list.Workspaces[0].IsCurrent, list.Workspaces[1].IsCurrent, list.Workspaces[2].IsCurrent})
 		assert.Equal(t, "desc b", *list.Workspaces[0].Description)
 		assert.Equal(t, "2020-01-02T03:04:05.000Z", *list.Workspaces[0].CreatedAt)
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 	})
 	t.Run("what Houston gave no value for is null, not empty", func(t *testing.T) {
 		api := wsClient()
@@ -252,7 +252,7 @@ func TestWorkspaceListJSON(t *testing.T) {
 		decodeWorkspaceOutput(t, got.stdout, &e)
 		assert.Equal(t, "boom", e.Error)
 		assert.Equal(t, 1, e.Code)
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 	})
 }
 
@@ -271,14 +271,14 @@ func TestWorkspaceCreateAndUpdateJSON(t *testing.T) {
 		assert.Equal(t, "d", *w.Description)
 		assert.Equal(t, created.CreatedAt, *w.CreatedAt)
 		assert.False(t, w.IsCurrent, "creating does not switch")
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 	})
 	t.Run("update returns the workspace as it now is", func(t *testing.T) {
 		api := wsClient()
 		api.On("UpdateWorkspace", houston.UpdateWorkspaceRequest{WorkspaceID: currentWS, Args: map[string]string{"description": "new words"}}).
 			Return(&houston.Workspace{ID: currentWS, Label: "airflow", Description: new("new words")}, nil)
 
-		got := runWorkspaceTree(t, api, "", true, "workspace", "update", currentWS, "-d", "new words", "-o", "json")
+		got := runWorkspaceTree(t, api, "", true, "workspace", "update", currentWS, "--description", "new words", "-o", "json")
 		require.Equal(t, 0, got.code, "stdout:\n%s", got.stdout)
 		var w workspaceJSON
 		decodeWorkspaceOutput(t, got.stdout, &w)
@@ -310,7 +310,7 @@ func TestWorkspaceDeleteJSON(t *testing.T) {
 		assert.Equal(t, wsOther.ID, r.WorkspaceID)
 		assert.Equal(t, "second", *r.Label)
 		assert.Equal(t, "deleted", r.Action)
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 	})
 	t.Run("a workspace with Deployments is refused, exit 1", func(t *testing.T) {
 		api := wsClient()
@@ -338,7 +338,7 @@ func TestWorkspaceSwitchJSON(t *testing.T) {
 		assert.Equal(t, "second", w.Label)
 		assert.True(t, w.IsCurrent)
 		assert.Equal(t, wsOther.ID, currentContextWorkspace(t))
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 	})
 	t.Run("an ID Houston does not know is a failure, and switches nothing", func(t *testing.T) {
 		api := wsClient()
@@ -380,7 +380,7 @@ func TestWorkspaceSwitchJSON(t *testing.T) {
 		api := wsClient()
 		api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 2, PageNumber: 0}).Return([]houston.Workspace{wsCurrent, wsOther}, nil)
 
-		got := runWorkspaceTree(t, api, "q\n", true, "workspace", "switch", "-p", "-s", "2")
+		got := runWorkspaceTree(t, api, "q\n", true, "workspace", "switch", "--paginated", "--page-size", "2")
 		assert.Equal(t, 0, got.code)
 		assert.Empty(t, got.stdout)
 		assert.Contains(t, got.stderr, "n. next q. quit", "the picker is drawn on stderr")
@@ -402,10 +402,10 @@ func TestWorkspaceJSONReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 		}, []string{"workspace", "list", "-o", "json"}},
 		{"create", func(a *mocks.ClientInterface) {
 			a.On("CreateWorkspace", mock.Anything).Return(&wsOther, nil)
-		}, []string{"workspace", "create", "-l", "second", "-o", "json"}},
+		}, []string{"workspace", "create", "--label", "second", "-o", "json"}},
 		{"update", func(a *mocks.ClientInterface) {
 			a.On("UpdateWorkspace", mock.Anything).Return(&wsOther, nil)
-		}, []string{"workspace", "update", wsOther.ID, "-l", "second", "-o", "json"}},
+		}, []string{"workspace", "update", wsOther.ID, "--label", "second", "-o", "json"}},
 		{"delete", func(a *mocks.ClientInterface) {
 			a.On("DeleteWorkspace", wsOther.ID).Return(&wsOther, nil)
 		}, []string{"workspace", "delete", wsOther.ID, "--yes", "-o", "json"}},
@@ -422,7 +422,7 @@ func TestWorkspaceJSONReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 			decodeWorkspaceOutput(t, got.stdout, &v)
 			assert.Contains(t, got.stdout, wsOther.ID)
 			assert.Empty(t, got.processStdout, "the result left by the process's stdout, not the tree's out")
-			assert.Empty(t, got.stderr)
+			assert.Empty(t, withoutDeprecations(got.stderr))
 		})
 	}
 }
@@ -478,17 +478,17 @@ func TestWorkspaceSwitchPageSizeNote(t *testing.T) {
 		logs.Reset()
 		api := wsClient()
 		api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 100, PageNumber: 0}).Return([]houston.Workspace{wsCurrent}, nil)
-		got := runWorkspaceTree(t, api, "q\n", true, "workspace", "switch", "-p", "-s", "500")
+		got := runWorkspaceTree(t, api, "q\n", true, "workspace", "switch", "--paginated", "--page-size", "500")
 		assert.Equal(t, 0, got.code)
 		assert.Contains(t, logs.String(), note)
 	})
 	t.Run("json: only the refusal", func(t *testing.T) {
 		logs.Reset()
 		api := wsClient()
-		got := runWorkspaceTree(t, api, "", true, "workspace", "switch", "-p", "-s", "500", "-o", "json")
+		got := runWorkspaceTree(t, api, "", true, "workspace", "switch", "--paginated", "--page-size", "500", "-o", "json")
 		assert.Equal(t, 1, got.code)
 		assert.Contains(t, got.stdout, "input_required")
-		assert.Empty(t, got.stderr)
+		assert.Empty(t, withoutDeprecations(got.stderr))
 		assert.Empty(t, logs.String(), "no note before the refusal")
 	})
 }

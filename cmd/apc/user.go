@@ -47,8 +47,8 @@ func newUserCreateCmd(out io.Writer) *cobra.Command {
 			return renderUserCreated(r, &created)
 		},
 	}
-	cmd.Flags().StringVarP(&userEmail, "email", "e", "", "Email of the user to create on the platform. If not specified, you will be prompted to enter this value")
-	cmd.Flags().StringVarP(&userPassword, "password", "p", "", "Password to be set for the new user. If not specified, you will be prompted to enter this value")
+	cmd.Flags().StringVar(&userEmail, "email", "", "Email of the user to create on the platform. If not specified, you will be prompted to enter this value")
+	cmd.Flags().StringVar(&userPassword, "password", "", "Password to be set for the new user. If not specified, you will be prompted to enter this value")
 	addAccessOutputFlag(cmd)
 	return cmd
 }

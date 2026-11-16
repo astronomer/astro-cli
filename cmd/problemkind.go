@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/config"
@@ -23,8 +24,12 @@ import (
 // same vocabulary (see cliout.ProblemKind), and are composed with them below.
 const (
 	// KindUnauthenticated: there is no usable login — none was ever made, the
-	// API refused the token (401), or one was needed and this run may not
-	// start a browser login (--output json). Log in and try again.
+	// API refused the token (401), one was needed and this run may not
+	// start a browser login (--output json), or the environment holds both
+	// Deployment API key variables and no token, which no longer log in (set ASTRO_API_TOKEN),
+	// ASTRO_API_TOKEN is malformed, expired or has no permissions, the saved login
+	// expired and could not be renewed, or the home config did not parse.
+	// Log in and try again.
 	KindUnauthenticated cliout.ProblemKind = "unauthenticated"
 	// KindForbidden: the login is good but does not carry the permission this
 	// needs (403).
@@ -36,8 +41,9 @@ const (
 	// in a state the change cannot apply to (409). The Environment Manager's
 	// create, update and delete document it.
 	KindConflict cliout.ProblemKind = "conflict"
-	// KindAPIUnavailable: the API failed on its side (5xx). Transient as far as
-	// the CLI can tell; try again.
+	// KindAPIUnavailable: the API failed on its side (5xx), or the organization
+	// lookup of an API token got no answer at all. Transient as far as the CLI
+	// can tell; try again.
 	KindAPIUnavailable cliout.ProblemKind = "api_unavailable"
 	// KindNoDeployments: a command that needed a Deployment picked found
 	// none in the workspace (deployment.NoDeploymentsError). Nothing is
@@ -67,6 +73,13 @@ var cloudKinds = cliout.Kinds{
 			errors.Is(err, astrosession.ErrLoggedOut) ||
 			errors.Is(err, astroAuth.ErrLoginNeeded) ||
 			errors.Is(err, errNoAuthToken) ||
+			errors.Is(err, astroCmd.ErrLegacyAPIKeys) ||
+			errors.Is(err, config.ErrNotConnected) ||
+			errors.Is(err, astroCmd.ErrNotAPIToken) ||
+			errors.Is(err, astroCmd.ErrAPITokenExpired) ||
+			errors.Is(err, astroCmd.ErrAPITokenMalformed) ||
+			errors.Is(err, astroCmd.ErrLoginRenewal) ||
+			errors.Is(err, astroCmd.ErrConfigUnreadable) ||
 			httputil.HasStatus(err, http.StatusUnauthorized)
 	}},
 	{Kind: KindForbidden, Match: status(http.StatusForbidden)},
@@ -74,7 +87,11 @@ var cloudKinds = cliout.Kinds{
 	{Kind: KindConflict, Match: status(http.StatusConflict)},
 	{Kind: KindAPIUnavailable, Match: func(err error) bool {
 		var se *httputil.StatusError
-		return errors.As(err, &se) && se.StatusCode >= http.StatusInternalServerError
+		if errors.As(err, &se) && se.StatusCode >= http.StatusInternalServerError {
+			return true
+		}
+		// The organization lookup of an API token that never got an answer.
+		return errors.Is(err, astroCmd.ErrAPITokenOrganization) && httputil.IsTransportError(err)
 	}},
 	{Kind: KindNoDeployments, Match: func(err error) bool {
 		var none *deployment.NoDeploymentsError

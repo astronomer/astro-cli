@@ -419,7 +419,7 @@ func TestWorkspaceUpdateKeepsCICDEnforcementUnlessAsked(t *testing.T) {
 		{"name only, enforcement on", []string{"workspace", "update", "ws-prod", "--name", "Prod"}, "ws-prod", true},
 		{"name only, enforcement off", []string{"workspace", "update", curWorkspaceID, "--name", "Dev"}, curWorkspaceID, false},
 		{"--enforce-cicd OFF", []string{"workspace", "update", "ws-prod", "--enforce-cicd", "OFF"}, "ws-prod", false},
-		{"-e ON", []string{"workspace", "update", curWorkspaceID, "-e", "ON"}, curWorkspaceID, true},
+		{"-e ON", []string{"workspace", "update", curWorkspaceID, "--enforce-cicd", "ON"}, curWorkspaceID, true},
 	} {
 		for _, format := range []string{"text", "json"} {
 			t.Run(run.name+" "+format, func(t *testing.T) {

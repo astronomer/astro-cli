@@ -85,18 +85,18 @@ func NewDeployCmd() *cobra.Command {
 	// read by nothing, because astronomer/deploy-action passes it on every
 	// deploy (TestDeployManifestDeployActionInvocations); hidden, as there is
 	// nothing for anyone to choose.
-	cmd.Flags().BoolP("force", "f", false, utils.OneXNoOpUsage)
+	cmd.Flags().Bool("force", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("force") //nolint:errcheck // the flag is defined just above
 	// --prompt asked 1.x to offer the Deployment list even with one named. A
 	// deploy here asks whenever none is named, so it is accepted, hidden and
 	// read by nothing, as a pyproject.toml project's deploy always took it.
-	cmd.Flags().BoolP("prompt", "p", false, utils.OneXNoOpUsage)
+	cmd.Flags().Bool("prompt", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
-	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a prebuilt local image to deploy instead of building one. Outside a pyproject.toml project it deploys the image alone")
-	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only Dags to your Astro Deployment")
+	cmd.Flags().StringVar(&imageName, imageNameFlag, "", "Name of a prebuilt local image to deploy instead of building one. Outside a pyproject.toml project it deploys the image alone")
+	cmd.Flags().BoolVar(&dags, "dags", false, "Push only Dags to your Astro Deployment")
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
-	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment; with Dag Deploy enabled, its Dags are not affected")
-	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
+	cmd.Flags().BoolVar(&image, "image", false, "Push only an image to your Astro Deployment; with Dag Deploy enabled, its Dags are not affected")
+	cmd.Flags().BoolVar(&waitForDeploy, "wait", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	// No -d shorthand: on this command -d has meant --dags since v1, and moving
 	// it would turn `astro deploy -d` from a DAG-only deploy into a target
@@ -105,7 +105,7 @@ func NewDeployCmd() *cobra.Command {
 	utils.RefuseEmpty(cmd.Flags().Lookup("deployment"))
 	addWorkspaceFlag(cmd.Flags(), &manifestWorkspace, "", "Workspace for the deploy, overriding the context", oneXWorkspaceID)
 	cmd.Flags().StringVarP(&deployOutput, "output", "o", string(cliout.FormatText), "Output format: text or json")
-	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
+	cmd.Flags().StringVar(&deployDescription, "description", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
 
 	annotateDeployFlag(cmd, "image", deployGroupImage)
@@ -294,11 +294,16 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		warnings = append(warnings, msg)
 		recap.Warn(msg)
 	}
-	// The token is the current context's login: a project on another host is
-	// deployed under that host's, which names no Deployment.
+	// The run's Workspace and Deployment, as the one resolver decides them for
+	// the host the deploy runs on: the token is the current context's login, so
+	// a project on another host is deployed under that host's, which names no
+	// Deployment and no Workspace of the token's. The flag and the project's
+	// own Workspace are weighed in the deploy (internal/deploy), which knows
+	// which link it reads.
+	run := astrosession.Resolve(astrosession.Request{Login: login.selection(), Domain: login.context.Domain, WantDeployment: true, Accepts: astrosession.ByFlag | astrosession.ByProject, NoSaved: manifestdeploy.ErrNoWorkspace})
 	tokenID := ""
-	if login.current {
-		tokenID = deployment.TokenDeployment()
+	if run.DeploymentSource == astrosession.SourceToken {
+		tokenID = run.Deployment
 	}
 	target := targetOrTokenDeployment(errOut, m, linkName, manifestDeployment, tokenID)
 	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, target)
@@ -308,7 +313,8 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		LinkName:         linkName,
 		Deployment:       target,
 		WorkspaceID:      overrideWorkspace,
-		ContextWorkspace: login.context.Workspace,
+		ContextWorkspace: run.Workspace,
+		NoWorkspace:      run.Missing(),
 		DagsOnly:         dags,
 		// Outside a project the image ships alone: there are no DAGs here.
 		Image:         image,
@@ -620,6 +626,17 @@ type deployLogin struct {
 	// current reports the login is the current context's, which the
 	// workspace-level deployment picker assumes.
 	current bool
+}
+
+// selection is the login whose Workspace the run's selection is read from,
+// when it is the current context's, which the caller has already resolved;
+// another host's is left to the resolver, which will not hand a token run that
+// host's saved Workspace.
+func (l *deployLogin) selection() *config.Context {
+	if l.current {
+		return &l.context
+	}
+	return nil
 }
 
 // loginForDeploy picks the login a manifest deploy runs under from domain, the

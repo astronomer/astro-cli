@@ -2,8 +2,6 @@ package astro
 
 import (
 	"bufio"
-	"cmp"
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
@@ -88,13 +87,13 @@ func newDeployBundleCmd() *cobra.Command {
   astro deploy bundle --delete --deployment <DEPLOYMENT_ID>`,
 	}
 	f := cmd.Flags()
-	f.StringVarP(&o.mountPath, "mount-path", "m", "", "Path the bundle is mounted at in Airflow, for reference by Dags. Default: the type's, "+astrodeploy.DbtDefaultMountPathPrefix+"<project name> for a dbt project")
+	f.StringVar(&o.mountPath, "mount-path", "", "Path the bundle is mounted at in Airflow, for reference by Dags. Default: the type's, "+astrodeploy.DbtDefaultMountPathPrefix+"<project name> for a dbt project")
 	f.StringVar(&o.bundleType, "type", "", "Type of the bundle: "+types+", or any other label, which has no defaults. Default: detected from PATH, else none")
-	f.StringVar(&o.deployment, "deployment", "", "Deployment to deploy to: a link name from the project here, a Deployment id, or a Deployment name")
+	f.StringVarP(&o.deployment, "deployment", "d", "", "Deployment to deploy to: a link name from the project here, a Deployment id, or a Deployment name")
 	f.StringVar(&o.workspace, "workspace", "", "Workspace a Deployment name is looked up in, and whose Deployments are offered when no --deployment is given")
 	f.StringVar(&o.description, "description", "", "Description to store on the deploy")
-	f.BoolVarP(&o.wait, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
-	f.DurationVarP(&o.waitTime, "wait-time", "t", deployWaitTime, "Time to wait for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
+	f.BoolVar(&o.wait, "wait", false, "Wait for the Deployment to become healthy before ending the command")
+	f.DurationVar(&o.waitTime, "wait-time", deployWaitTime, "Time to wait for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	f.BoolVar(&o.delete, "delete", false, "Remove the bundle mounted at --mount-path (by default the one PATH's type would mount at) instead of deploying")
 	cliout.AddOutputFlag(cmd, &o.output)
 	return cmd
@@ -142,7 +141,7 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	if err != nil {
 		return err
 	}
-	targetID, target, login, err := bundleTarget(cmd.Context(), o.deployment, o.workspace, o.output)
+	targetID, target, login, err := bundleTarget(cmd, o.deployment, o.workspace, o.output)
 	if err != nil {
 		return err
 	}
@@ -182,7 +181,7 @@ func deleteBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	if err != nil {
 		return err
 	}
-	targetID, target, login, err := bundleTarget(cmd.Context(), o.deployment, o.workspace, o.output)
+	targetID, target, login, err := bundleTarget(cmd, o.deployment, o.workspace, o.output)
 	if err != nil {
 		return err
 	}
@@ -301,13 +300,13 @@ func bundleWait(cmd *cobra.Command, login *deployLogin, deploymentID string, wai
 // be asked (--output json, CI, --non-interactive), is refused as astro
 // deploy's is, with kind input_required. read is the Deployment when it was
 // picked, so the deploy need not read it again.
-func bundleTarget(ctx context.Context, name, workspace string, format cliout.Format) (id string, read *astrov1.Deployment, login deployLogin, err error) {
+func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Format) (id string, read *astrov1.Deployment, login deployLogin, err error) {
 	m := manifestHere()
 	domain := ""
 	if m != nil {
 		domain = m.Astro.LoginDomain()
 	}
-	login, err = loginForDeploy(ctx, domain)
+	login, err = loginForDeploy(cmd.Context(), domain)
 	if err != nil {
 		return "", nil, login, err
 	}
@@ -327,7 +326,8 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 		if m != nil {
 			projectWorkspace = m.Astro.Workspace
 		}
-		dep, err := deploymentNamed(name, cmp.Or(workspace, projectWorkspace, login.context.Workspace), &login)
+		ws := astrosession.Resolve(astrosession.Request{Workspace: workspace, Project: projectWorkspace, Login: login.selection(), Domain: login.context.Domain}).Workspace
+		dep, err := deploymentNamed(name, ws, &login)
 		if err != nil {
 			return "", nil, login, err
 		}
@@ -337,9 +337,9 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 	// A Deployment-scoped ASTRO_API_TOKEN names the one Deployment it can act
 	// on, as astro deploy reads it. The token is the current context's login,
 	// so it names nothing for a project on another host.
-	if id := deployment.TokenDeployment(); id != "" && login.current {
-		deployment.NoteTokenDeployment(os.Stderr, id)
-		return id, nil, login, nil
+	if run := astrosession.Resolve(astrosession.Request{Login: login.selection(), Domain: login.context.Domain, WantDeployment: true}); run.DeploymentSource == astrosession.SourceToken {
+		deployment.NoteTokenDeployment(os.Stderr, run.Deployment)
+		return run.Deployment, nil, login, nil
 	}
 	if format != cliout.FormatText || !mayAsk() {
 		return "", nil, login, input.Required(errBundleNoTarget)
@@ -349,7 +349,7 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 	}
 	ws := workspace
 	if ws == "" {
-		if ws, err = coalesceWorkspace(); err != nil {
+		if ws, err = coalesceWorkspace(cmd); err != nil {
 			return "", nil, login, fmt.Errorf("failed to find a valid workspace: %w", err)
 		}
 	}

@@ -10,7 +10,7 @@ import (
 // A 1.x project's .astro/config.yaml holds two kinds of thing: facts about the
 // project (project.name, project.workspace, the saved deploy target), which a
 // conversion carries into pyproject.toml, and CLI settings that
-// `astro config set` without -g wrote there, which Astro CLI v2 keeps per
+// `astro config set` without --global wrote there, which Astro CLI v2 keeps per
 // machine and never reads from a project. A conversion carries the first,
 // names each of the second with what replaces it, and then deletes the file,
 // so a converted project is described by its pyproject.toml alone.
@@ -18,7 +18,7 @@ import (
 // SettingReplacement is what replaces a CLI setting a 1.x project's
 // .astro/config.yaml set, as Options.Setting1x reports it.
 type SettingReplacement struct {
-	// Global is the setting's name in Astro CLI v2, which `astro config set -g`
+	// Global is the setting's name in Astro CLI v2, which `astro config set --global`
 	// sets for every project on the machine. Empty for a setting v2 removed.
 	Global string
 	// Removed is what replaces a setting v2 removed, in the words
@@ -97,7 +97,7 @@ func (from1x *project1x) settingNotes() []string {
 				value = ShellQuote(s.value)
 			}
 			notes = append(notes, head+" is a CLI setting, which Astro CLI v2 keeps per machine rather than per project. "+
-				"To keep it on this machine, run: astro config set -g "+fate.Global+" "+value)
+				"To keep it on this machine, run: astro config set --global "+fate.Global+" "+value)
 		case fate.Removed != "":
 			notes = append(notes, head+" is an Astro CLI 1.x setting v2 does not have. "+fate.Removed)
 		default:

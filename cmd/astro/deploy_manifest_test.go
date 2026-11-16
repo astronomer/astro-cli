@@ -956,8 +956,7 @@ workspace = "clw-ws"
 `
 	fake := &fakeCmdDeployer{}
 	setupManifestDeployWith(t, fake, unlinkedProject)
-	deployment.UseTokenDeployment(actionDeploymentID)
-	t.Cleanup(func() { deployment.UseTokenDeployment("") })
+	testUtil.UseAPIToken(t, "deploymentId:"+actionDeploymentID)
 
 	out, errOut, err := execDeployIO("", "--dags", "-o", "json")
 	require.NoError(t, err)
@@ -977,9 +976,8 @@ func TestDeployManifestTokensDeploymentInALinkedProject(t *testing.T) {
 	nonInteractiveDeploy(t)
 	fake := &fakeCmdDeployer{}
 	setupManifestDeploy(t, fake)
-	t.Cleanup(func() { deployment.UseTokenDeployment("") })
 
-	deployment.UseTokenDeployment("clx-dev")
+	testUtil.UseAPIToken(t, "deploymentId:"+"clx-dev")
 	_, errOut, err := execDeployIO("", "--dags")
 	require.NoError(t, err)
 	assert.Equal(t, "clx-dev", fake.dagInput.DeploymentID)
@@ -992,7 +990,7 @@ func TestDeployManifestTokensDeploymentInALinkedProject(t *testing.T) {
 	assert.NotContains(t, errOut, "ASTRO_API_TOKEN")
 
 	fake.dagInput = nil
-	deployment.UseTokenDeployment(actionDeploymentID)
+	testUtil.UseAPIToken(t, "deploymentId:"+actionDeploymentID)
 	_, errOut, err = execDeployIO("", "--dags")
 	require.Error(t, err)
 	assert.True(t, input.IsRequired(err), "%v", err)
@@ -1067,7 +1065,7 @@ func TestDeployRoutesManifestProject(t *testing.T) {
 // --prompt requested. The run gets as far as asking for --deployment, as one
 // without them does.
 func TestDeployAcceptsForceAndPromptOnAManifestProject(t *testing.T) {
-	for _, flag := range []string{"--force", "-f", "--prompt", "-p"} {
+	for _, flag := range []string{"--force", "--prompt"} {
 		t.Run(flag, func(t *testing.T) {
 			nonInteractiveDeploy(t)
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -1411,4 +1409,27 @@ func TestDeployManifestNamedIsNotAsked(t *testing.T) {
 		assert.NotContains(t, errOut, "Deploy to which deployment?", "%v", args)
 		assert.Contains(t, out, "to prod (deployment clx-dep).", "%v", args)
 	}
+}
+
+// A deploy under an Organization token that selects no Workspace, in a project
+// that names none and links nothing, says what a deploy takes to be given one:
+// the flag or the project, and that the token selects none.
+func TestDeployWithAnOrganizationTokenAndNoWorkspaceSaysWhatToPass(t *testing.T) {
+	const bareProject = `[project]
+name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+`
+	setupManifestDeployWith(t, &fakeCmdDeployer{}, bareProject)
+	interactiveDeploy(t)
+	testUtil.UseAPIToken(t, "organizationId:org")
+	c, err := config.GetCurrentContext()
+	require.NoError(t, err)
+	c.Workspace = ""
+	require.NoError(t, c.SetContext())
+
+	_, _, err = execDeployIO("")
+	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
+	assert.ErrorContains(t, err, "so pass --workspace, or run in a project linked to one")
 }

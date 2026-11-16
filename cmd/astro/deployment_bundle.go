@@ -3,7 +3,6 @@ package astro
 import (
 	"io"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
@@ -36,7 +35,7 @@ func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentBundleUpdateCmd(out),
 		newDeploymentBundleDeleteCmd(out),
 	)
-	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose bundles you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID(""))
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose bundles you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID)
 	addDeploymentWorkspaceFlag(cmd.PersistentFlags())
 	return cmd
 }
@@ -57,15 +56,15 @@ func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
   astro deployment bundle create --deployment <id> --name my-dags -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := coalesceWorkspace()
+			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
+				return err
 			}
 			cmd.SilenceUsage = true
 			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), astroV1Client, astroV1Alpha1Client)
 		},
 	}
-	cmd.Flags().StringVar(&bundleName, "name", "", "Name of the Dag bundle to create. Mutually exclusive with --mount-path")
+	cmd.Flags().StringVarP(&bundleName, "name", "n", "", "Name of the Dag bundle to create. Mutually exclusive with --mount-path")
 	cmd.Flags().StringVar(&bundleMountPath, "mount-path", "", "Mount path for a non-Dag bundle. Mutually exclusive with --name")
 	cmd.Flags().StringVar(&bundleNonDagType, "bundle-type", "", "Type of a non-Dag bundle (e.g. dbt). Only valid with --mount-path")
 	cmd.Flags().StringVar(&bundleDescription, "description", "", "Description for the bundle")
@@ -83,9 +82,9 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
   astro deployment bundle list --deployment <id> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := coalesceWorkspace()
+			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
+				return err
 			}
 			cmd.SilenceUsage = true
 			return deployment.ListBundlesWithFormat(ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
@@ -114,9 +113,9 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := coalesceWorkspace()
+			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
+				return err
 			}
 			cmd.SilenceUsage = true
 			var bundleID string
@@ -126,7 +125,7 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), astroV1Client, astroV1Alpha1Client)
 		},
 	}
-	cmd.Flags().StringVar(&bundleName, "name", "", "Identify the Dag bundle to update by name, instead of by ID")
+	cmd.Flags().StringVarP(&bundleName, "name", "n", "", "Identify the Dag bundle to update by name, instead of by ID")
 	cmd.Flags().StringVar(&bundleMountPath, "mount-path", "", "Identify the non-Dag bundle to update by mount path, instead of by ID")
 	cmd.Flags().StringVar(&bundleDescription, "description", "", "New description for the bundle")
 	cmd.Flags().StringSliceVar(&bundleDagBundleIDs, "dag-bundle-ids", nil, "Dag bundle IDs a non-Dag bundle is served alongside. Replaces the existing set")
@@ -153,9 +152,9 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := coalesceWorkspace()
+			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
+				return err
 			}
 			cmd.SilenceUsage = true
 			var bundleID string
@@ -165,7 +164,7 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 			return deployment.DeleteBundle(bundleID, bundleName, bundleMountPath, ws, deploymentID, forceBundleDelete, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
 		},
 	}
-	cmd.Flags().StringVar(&bundleName, "name", "", "Identify the Dag bundle to delete by name, instead of by ID")
+	cmd.Flags().StringVarP(&bundleName, "name", "n", "", "Identify the Dag bundle to delete by name, instead of by ID")
 	cmd.Flags().StringVar(&bundleMountPath, "mount-path", "", "Identify the non-Dag bundle to delete by mount path, instead of by ID")
 	cmd.Flags().BoolVarP(&forceBundleDelete, "yes", "y", false, "Don't ask for confirmation before deleting the bundle")
 	return cmd

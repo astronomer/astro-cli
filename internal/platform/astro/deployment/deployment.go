@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -154,7 +153,7 @@ func CanCiCdDeploy(bearerToken string) bool {
 		return false
 	}
 
-	// Only API Tokens and API Keys have permissions
+	// Only API Tokens have permissions
 	if len(claims.Permissions) > 0 {
 		return true
 	}
@@ -2011,7 +2010,7 @@ const (
 	ToRead Use = iota
 	// ToChange changes the Deployment or ships to it. It acts only on a
 	// Deployment the run named, the person picked, or the run's
-	// Deployment-scoped ASTRO_API_TOKEN is for (see UseTokenDeployment);
+	// Deployment-scoped ASTRO_API_TOKEN is for (see astrosession.TokenDeployment);
 	// never on one taken because it was the only one.
 	ToChange
 	// ToPick is ToChange for a Deployment that is always named or picked,
@@ -2020,22 +2019,6 @@ const (
 	// project.
 	ToPick
 )
-
-// tokenDeployment is the Deployment this process's ASTRO_API_TOKEN is scoped
-// to, or "" (see UseTokenDeployment).
-var tokenDeployment atomic.Value
-
-// UseTokenDeployment records, for this process only, the Deployment the run's
-// ASTRO_API_TOKEN is scoped to: "" for a token scoped to a workspace or an
-// organization, or for none. A run that names no Deployment acts on it (see
-// Use), since it is the one Deployment such a token can act on.
-func UseTokenDeployment(id string) { tokenDeployment.Store(id) }
-
-// TokenDeployment is the Deployment UseTokenDeployment recorded, or "".
-func TokenDeployment() string {
-	id, _ := tokenDeployment.Load().(string)
-	return id
-}
 
 // ErrTokenDeploymentNotFound is a run that named no Deployment, whose
 // ASTRO_API_TOKEN is scoped to a Deployment the workspace does not list.
@@ -2046,7 +2029,7 @@ var ErrTokenDeploymentNotFound = errors.New("the Deployment ASTRO_API_TOKEN is s
 // workspace does not list is an error, as is one filter leaves out: nothing
 // else is picked in its place.
 func fromToken(ws string, deployments []astrov1.Deployment, filter func(astrov1.Deployment) bool) (astrov1.Deployment, bool, error) {
-	id := TokenDeployment()
+	id := astrosession.TokenDeployment()
 	if id == "" {
 		return astrov1.Deployment{}, false, nil
 	}
@@ -2125,7 +2108,7 @@ func (e *TargetsDisagreeError) IsUsageError() bool { return true }
 // Deployment without asking: authenticated by an API token, or with
 // deployment.auto_select on.
 func mayAutoSelect() bool {
-	return astrosession.HasAPIToken() || os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != "" || config.CFG.AutoSelect.GetBool()
+	return astrosession.HasAPIToken() || config.CFG.AutoSelect.GetBool()
 }
 
 // GetDeployment is the Deployment in workspace ws that deploymentID or

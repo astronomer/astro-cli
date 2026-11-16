@@ -40,7 +40,7 @@ func legacyChoice(v *viper.Viper, key string) string {
 // ProjectSetting1x says what replaces key, a CLI setting a 1.x project's
 // .astro/config.yaml set to value, for the note astro init writes when it
 // converts the project and deletes the file. global is the setting's v2 name,
-// set for every project with `astro config set -g`; removed is what replaces
+// set for every project with `astro config set --global`; removed is what replaces
 // a setting v2 removed, in the words `astro config` refuses it with. ok is
 // false for a key that needs no note: no setting this CLI knows, the login
 // contexts, a removed setting at a value it shipped with, or a setting at the

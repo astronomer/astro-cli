@@ -16,10 +16,6 @@ func Debugf(format string, args ...interface{}) {
 	logger.Debugf(format, args...)
 }
 
-func Fatal(args ...interface{}) {
-	logger.Fatal(args...)
-}
-
 func GetLevel() logrus.Level {
 	return logger.GetLevel()
 }

@@ -107,8 +107,8 @@ func newEnvAirflowVarSetCmd(out io.Writer) *cobra.Command {
   # Set many from a dotenv file
   astro env airflow-variable set --from-file vars.env`,
 	}
-	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "The value; omit it to read from stdin or be prompted with echo off")
-	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "Mark the variable secret when it is created")
+	cmd.Flags().StringVar(&envVarValue, "value", "", "The value; omit it to read from stdin or be prompted with echo off")
+	cmd.Flags().BoolVar(&envVarSecret, "secret", false, "Mark the variable secret when it is created")
 	cmd.Flags().BoolVar(&envVarNoCreate, "no-create", false, "Fail if the variable does not exist, instead of creating it")
 	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Set many from a dotenv file ('-' reads stdin)")
 	addAutoLinkFlag(cmd)
@@ -133,7 +133,7 @@ func newEnvAirflowVarDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 }
 
 func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -174,7 +174,7 @@ func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvAirflowVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}

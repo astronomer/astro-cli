@@ -357,7 +357,7 @@ func stringField(m map[string]interface{}, field string) string {
 	return s
 }
 
-// Credentials from the environment (ASTRO_API_TOKEN, API keys) belong to the
+// Credentials from the environment (ASTRO_API_TOKEN) belong to the
 // process that was given them. UseEnvironmentLogin hands one to the context a
 // command runs on, and SetEnvironmentContextKey the organization and workspace
 // it is for: every read of that context in this process returns them, with no
@@ -517,4 +517,22 @@ func applyEnvironmentLogin(l *environmentLogin, c *Context) {
 			c.Workspace = value
 		}
 	}
+}
+
+// HoldsEnvironmentLogin reports whether this process has applied an
+// environment login (UseEnvironmentLogin) to the current context. A run with
+// ASTRO_API_TOKEN set that does not has not been through the setup that gives
+// the token its own organization and workspace, and whatever it reads from the
+// context is the saved login's.
+func HoldsEnvironmentLogin() bool {
+	d, err := GetCurrentDomain()
+	if err != nil {
+		return false
+	}
+	key, err := (&Context{Domain: d}).GetContextKey()
+	if err != nil {
+		return false
+	}
+	_, ok := envLogin(key)
+	return ok
 }

@@ -16,11 +16,14 @@ import (
 // --deployment and --workspace are the spellings help shows, and the ones
 // commands read, as on Astro. On a command 1.x had, the ones they replace,
 // --deployment-id and --workspace-id, keep working as they always have,
-// hidden, with the shorthand 1.x gave them (-d, -w): utils.AddAlias
+// hidden, without the shorthand 1.x gave them (-d, -w): utils.AddAlias
 // registers them, and the hook utils.ApplyPreferredFlagsIn installs hands
-// what they were given to the v2 flag, which is all a command reads. The v2
-// spellings take no shorthand here, so a 1.x shorthand keeps meaning exactly
-// what it did.
+// what they were given to the v2 flag, which is all a command reads. The
+// letters are the v2 flags' own (utils.ShortOptions): -d and -w name
+// --deployment and --workspace, which is what 1.x's -d and -w named too,
+// except on astro deploy, which gives neither letter to them: there -d was
+// --dags in 1.x, and a script that typed it is refused rather than read as a
+// Deployment.
 
 // applyPreferredFlagsIn has every runnable command in tree reconcile its
 // spellings before its argument check and its pre-runs, with the APC tree's
@@ -47,17 +50,17 @@ func (d *deploymentFlag) String() string     { return deploymentID }
 func (d *deploymentFlag) Set(v string) error { deploymentID = v; return nil }
 func (d *deploymentFlag) Type() string       { return "string" }
 
-// addDeploymentFlag registers --deployment on fs, with no shorthand, and with
-// oneX 1.x's --deployment-id as its hidden alias, with the shorthand 1.x gave
-// it there (oneXShorthand, "" for none). The alias takes an id alone, as in
+// addDeploymentFlag registers --deployment on fs, with its -d (shorthand is
+// "d", or "" on a command that withholds it), and with oneX 1.x's
+// --deployment-id as its hidden alias. The alias takes an id alone, as in
 // 1.x. It returns the flag's value.
-func addDeploymentFlag(fs *pflag.FlagSet, usage string, oneX bool, oneXShorthand string) *deploymentFlag {
+func addDeploymentFlag(fs *pflag.FlagSet, usage, shorthand string, oneX bool) *deploymentFlag {
 	deploymentID = ""
 	d := &deploymentFlag{}
-	fs.Var(d, "deployment", usage)
+	fs.VarP(d, "deployment", shorthand, usage)
 	utils.RefuseEmpty(fs.Lookup("deployment"))
 	if oneX {
-		utils.AddAlias(fs, "deployment-id", oneXShorthand, "deployment")
+		utils.AddAlias(fs, "deployment-id", "deployment")
 	}
 	return d
 }
@@ -66,15 +69,21 @@ func addDeploymentFlag(fs *pflag.FlagSet, usage string, oneX bool, oneXShorthand
 // Deployment id as its argument, which stays: either names the Deployment.
 // 1.x took it as the argument alone, so there is no 1.x spelling to keep.
 func addDeploymentArgFlag(cmd *cobra.Command) {
-	addDeploymentFlag(cmd.Flags(), "Deployment: a link name from the project's manifest, or a Deployment id", false, "").positional = true
+	addDeploymentFlag(cmd.Flags(), "Deployment: a link name from the project's manifest, or a Deployment id", "d", false).positional = true
+}
+
+// addDeploymentArgFlagWithoutLetter is addDeploymentArgFlag for a command
+// where 1.x gave -d to another flag (deployment update's --description).
+func addDeploymentArgFlagWithoutLetter(cmd *cobra.Command) {
+	addDeploymentFlag(cmd.Flags(), "Deployment: a link name from the project's manifest, or a Deployment id", "", false).positional = true
 }
 
 // addWorkspaceFlag registers --workspace on fs, read into workspaceID, with
-// no shorthand, and 1.x's --workspace-id as its hidden alias, with the
-// shorthand 1.x gave it there (oneXShorthand, "" for none). Every APC command
-// with a --workspace had --workspace-id in 1.x.
-func addWorkspaceFlag(fs *pflag.FlagSet, usage, oneXShorthand string) {
-	utils.AddWorkspaceFlag(fs, &workspaceID, "", usage, true, oneXShorthand)
+// its -w (shorthand is "w", or "" on a command that withholds it), and 1.x's
+// --workspace-id as its hidden alias. Every APC command with a --workspace
+// had --workspace-id in 1.x.
+func addWorkspaceFlag(fs *pflag.FlagSet, usage, shorthand string) {
+	utils.AddWorkspaceFlag(fs, &workspaceID, shorthand, usage, true)
 }
 
 // deploymentFlagOf is the --deployment on fs that addDeploymentFlag

@@ -427,6 +427,36 @@ func (s *Suite) TestTarFailsOnAFailedClose() {
 	s.EqualError(TarGz(source, "dags.tar", true, nil, TarOverlay{}), "close failed")
 }
 
+// An archive written where a symlink sits replaces the link, never the file it
+// points at: a project's dags.tar or dags.tar.gz held as a link elsewhere
+// leaves that file as it was.
+func (s *Suite) TestArchiveWritesReplaceASymlinkInsteadOfFollowingIt() {
+	source := s.T().TempDir()
+	s.Require().NoError(os.WriteFile(filepath.Join(source, "a.py"), []byte("a"), 0o600))
+	outside := filepath.Join(s.T().TempDir(), "precious")
+	s.Require().NoError(os.WriteFile(outside, []byte("keep me"), 0o600))
+	project := s.T().TempDir()
+	tarPath := filepath.Join(project, "dags.tar")
+	gzPath := tarPath + ".gz"
+	for _, link := range []string{tarPath, gzPath} {
+		if err := os.Symlink(outside, link); err != nil {
+			s.T().Skipf("cannot create a symlink here: %v", err)
+		}
+	}
+
+	s.Require().NoError(TarDir(source, tarPath, "dags"))
+	s.Require().NoError(GzipFile(tarPath, gzPath))
+
+	got, err := os.ReadFile(outside)
+	s.Require().NoError(err)
+	s.Equal("keep me", string(got), "the symlink's target was overwritten")
+	for _, p := range []string{tarPath, gzPath} {
+		info, err := os.Lstat(p)
+		s.Require().NoError(err)
+		s.True(info.Mode().IsRegular(), "%s is the archive itself, not a link", p)
+	}
+}
+
 func (s *Suite) TestReadFileToString() {
 	filePath := "./test.out"
 	content := "testing"

@@ -112,7 +112,7 @@ func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
   astro env variable link set --variable-key LOG_LEVEL --deployment <DEPLOYMENT_ID> --exclude`,
 	}
 	addLinkVariableFlags(cmd)
-	addDeploymentFlag(cmd.Flags(), "Deployment to link: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &envLinkDeploymentID}, oneXDeploymentID(""))
+	addDeploymentFlag(cmd.Flags(), "Deployment to link: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &envLinkDeploymentID}, oneXDeploymentID)
 	cmd.Flags().StringVar(&envLinkValue, "value", "", "The deployment's own value; omit it to clear any it had")
 	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Opt the deployment out of an auto-linked variable instead")
 	cmd.Flags().BoolVar(&envLinkNoCreate, "no-create", false, "Fail if the deployment is not already linked")
@@ -140,7 +140,7 @@ func newEnvVarLinkDeleteCmd(out io.Writer) *cobra.Command {
   astro env variable link delete --variable-key LOG_LEVEL --deployment <DEPLOYMENT_ID> --exclude`,
 	}
 	addLinkVariableFlags(cmd)
-	addDeploymentFlag(cmd.Flags(), "Deployment to unlink: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &envLinkDeploymentID}, oneXDeploymentID(""))
+	addDeploymentFlag(cmd.Flags(), "Deployment to unlink: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &envLinkDeploymentID}, oneXDeploymentID)
 	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Remove an exclude instead of a link")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
@@ -163,7 +163,7 @@ func newEnvVarLinkListCmd(out io.Writer) *cobra.Command {
 }
 
 func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -223,7 +223,7 @@ func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}

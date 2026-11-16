@@ -16,7 +16,7 @@ import (
 // AllSettings() over the top.
 //
 // Measured before the guard: a home config with one syntax error, plus
-// `astro config set -g page_size 50`, replaced the file's contexts and token
+// `astro config set --global page_size 50`, replaced the file's contexts and token
 // with 54 lines of defaults and reported success.
 func (s *Suite) TestSaveRefusesAConfigItCouldNotRead() {
 	fs := afero.NewMemMapFs()

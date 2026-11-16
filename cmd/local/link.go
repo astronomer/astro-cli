@@ -145,8 +145,8 @@ func newLinkAddCmd(c *cli) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.StringVar(&in.deployment, flagLinkDeployment, "", "Deployment ID (Astro's, or Astro Private Cloud's under an APC context)")
-	f.StringVar(&in.workspace, flagLinkWorkspace, "", "Workspace the Deployment is in (default: this project's, or the APC context's)")
+	f.StringVarP(&in.deployment, flagLinkDeployment, "d", "", "Deployment ID (Astro's, or Astro Private Cloud's under an APC context)")
+	f.StringVarP(&in.workspace, flagLinkWorkspace, "w", "", "Workspace the Deployment is in (default: this project's, or the APC context's)")
 	f.StringVar(&in.target, flagLinkTarget, "", "Platform: astro, mwaa, composer or apc (default: this project's, else the context's platform)")
 	f.StringVar(&in.environment, flagLinkEnvironment, "", "MWAA or Composer environment name")
 	f.StringVar(&in.url, flagLinkURL, "", "Airflow URL, for an Airflow no platform can look up")

@@ -48,7 +48,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
-		cmdArgs := []string{"worker-queue", "create", "-n", "test-queue", "-t", "test-worker-1"}
+		cmdArgs := []string{"worker-queue", "create", "-n", "test-queue", "--worker-type", "test-worker-1"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedoutput, actualOut)
@@ -66,7 +66,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
-		cmdArgs := []string{"worker-queue", "create", "-d", "test-id-1", "-t", "test-worker-1", "-n", "test-queue"}
+		cmdArgs := []string{"worker-queue", "create", "--deployment-id", "test-id-1", "--worker-type", "test-worker-1", "-n", "test-queue"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedoutput, actualOut)
@@ -84,7 +84,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
-		cmdArgs := []string{"worker-queue", "create", "--deployment-name", "test", "-t", "test-worker-1", "-n", "test-queue"}
+		cmdArgs := []string{"worker-queue", "create", "--deployment-name", "test", "--worker-type", "test-worker-1", "-n", "test-queue"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedoutput, actualOut)
@@ -102,7 +102,7 @@ func TestNewDeploymentWorkerQueueCreateCmd(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
-		cmdArgs := []string{"worker-queue", "create", "-d", "test-id-1", "-t", "test-worker-1"}
+		cmdArgs := []string{"worker-queue", "create", "--deployment-id", "test-id-1", "--worker-type", "test-worker-1"}
 		actualOut, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedoutput, actualOut)
@@ -206,7 +206,7 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 
 		// updating min count
-		cmdArgs := []string{"worker-queue", "update", "-n", "default", "-t", "test-worker-1", "--min-count", "0", "-y"}
+		cmdArgs := []string{"worker-queue", "update", "-n", "default", "--worker-type", "test-worker-1", "--min-count", "0", "-y"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOutMessage)

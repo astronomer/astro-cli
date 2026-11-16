@@ -84,7 +84,7 @@ func ClientRegistry() (string, error) {
 // error that says to set it. It names the current key, which wins over the
 // 1.x one a value may have been read from.
 func ClientRegistryFix() string {
-	return "astro config set -g " + CFG.RemoteClientRegistry.Path + " <registry>/<repository>"
+	return "astro config set --global " + CFG.RemoteClientRegistry.Path + " <registry>/<repository>"
 }
 
 // clientRegistryKey is the name the home config sets the client registry

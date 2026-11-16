@@ -17,7 +17,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
-	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -182,7 +181,7 @@ func TestDeploymentVariableListJSON(t *testing.T) {
 		decodeOne(t, run.stdout, &got)
 		assert.Equal(t, twoVariablesJSON(), got.Variables)
 		assert.NotContains(t, run.stdout, "do-not-print")
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 		m.AssertExpectations(t)
 	})
 
@@ -232,7 +231,7 @@ func TestDeploymentVariableListJSON(t *testing.T) {
 		var got variableListJSON
 		decodeOne(t, run.stdout, &got)
 		assert.Empty(t, got.Variables)
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 		m.AssertExpectations(t)
 	})
 
@@ -250,7 +249,7 @@ func TestDeploymentVariableListJSON(t *testing.T) {
 		decodeOne(t, run.stdout, &got)
 		assert.Equal(t, "usage", got.Kind)
 		assert.Contains(t, got.Error, `the Deployment id test-id-1 and the name "test-2" name different Deployments`)
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 		m.AssertExpectations(t)
 	})
 }
@@ -270,7 +269,7 @@ func TestDeploymentVariableListTextUnchanged(t *testing.T) {
 	requireRow(t, run.stdout, "1", "test-key-1", "test-value-1", "false")
 	requireRow(t, run.stdout, "2", "SECRET_KEY", maskedSecret, "true")
 	assert.NotContains(t, run.stdout, "do-not-print")
-	assert.Empty(t, run.stderr)
+	assert.Empty(t, withoutDeprecations(run.stderr))
 	m.AssertExpectations(t)
 }
 
@@ -315,7 +314,7 @@ func TestDeploymentVariableCreateJSON(t *testing.T) {
 			{Kind: "invalid", Input: "=nokey", Reason: "blank key or value"},
 		}, got.Outcomes, "one outcome per input, in the order given")
 		assert.Equal(t, twoVariablesJSON(), got.Variables)
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 		m.AssertExpectations(t)
 	})
 
@@ -331,15 +330,14 @@ func TestDeploymentVariableCreateJSON(t *testing.T) {
 		decodeOne(t, run.stdout, &got)
 		assert.Equal(t, []outcomeJSON{{Kind: "created", Key: "NEW"}}, got.Outcomes)
 		assert.Equal(t, twoVariablesJSON(), got.Variables)
-		assert.Empty(t, run.stderr)
+		assert.Empty(t, withoutDeprecations(run.stderr))
 		m.AssertExpectations(t)
 	})
 
 	// Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, the
 	// variable goes on that Deployment, said on stderr.
 	t.Run("naming nothing takes the token's Deployment", func(t *testing.T) {
-		deployment.UseTokenDeployment("test-id-1")
-		t.Cleanup(func() { deployment.UseTokenDeployment("") })
+		testUtil.UseAPIToken(t, "workspaceId:workspace-id", "deploymentId:"+"test-id-1")
 		withDeploymentVariables(t, twoVariables())
 		m := modifyMocks()
 		astroV1Client = m
@@ -418,7 +416,7 @@ func TestDeploymentVariableUpdateJSON(t *testing.T) {
 		{Kind: "invalid", Key: "B", Input: "B=", Reason: "blank key or value"},
 	}, got.Outcomes, "one outcome per input, in the order given")
 	assert.Equal(t, twoVariablesJSON(), got.Variables)
-	assert.Empty(t, run.stderr)
+	assert.Empty(t, withoutDeprecations(run.stderr))
 	m.AssertExpectations(t)
 }
 

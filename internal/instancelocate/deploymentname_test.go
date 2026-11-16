@@ -264,3 +264,26 @@ func TestWorkspaceReadsTheDomainsLogin(t *testing.T) {
 		t.Fatalf("Workspace = %q for a host with no login", ws)
 	}
 }
+
+// A name with no workspace to look it up in says why, by the run: under an API
+// token the resolver's words, with the advice for a name; for a saved login
+// the switch command.
+func TestDeploymentNameErrorWithNoWorkspaceIsWordedByTheRun(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.UseAPIToken(t, "organizationId:org")
+	err := (&DeploymentNameError{Name: "etl"}).Error()
+	for _, want := range []string{`"etl" is not a Deployment id, and `, "ASTRO_API_TOKEN selects none", "so pass -d with the Deployment id, or run in a project that links its workspace"} {
+		if !strings.Contains(err, want) {
+			t.Errorf("%q does not say %q", err, want)
+		}
+	}
+	if strings.Contains(err, "astro workspace switch") {
+		t.Errorf("a token run was sent to astro workspace switch: %q", err)
+	}
+
+	t.Setenv(astrosession.EnvAPIToken, "")
+	err = (&DeploymentNameError{Name: "etl"}).Error()
+	if !strings.Contains(err, "or run 'astro workspace switch'") || strings.Contains(err, "ASTRO_API_TOKEN") {
+		t.Errorf("a saved login's error is %q", err)
+	}
+}
