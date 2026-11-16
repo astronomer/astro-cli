@@ -8,10 +8,6 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-
-	homedir "github.com/mitchellh/go-homedir"
-
-	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
 // inheritedEnv marks a process that a test binary started from itself: a
@@ -32,7 +28,9 @@ const strictEnv = "ASTRO_TEST_STRICT_REALCONFIG"
 //		os.Exit(finish(m.Run()))
 //	}
 //
-// It does five things.
+// It does five things. A package whose test binary links pkg/secrets passes the
+// keyring hooks as Options (the root's pkg/testing/testenv does for every root
+// package).
 //
 //   - Unsets every variable in behaviorEnv, so the tests run the same under a
 //     shell that exports ASTRO_API_TOKEN and on a CI runner. A test that needs
@@ -45,9 +43,7 @@ const strictEnv = "ASTRO_TEST_STRICT_REALCONFIG"
 //     unset. Packages that worked out a path from the real home when they were
 //     loaded (config does) register an AfterIsolate hook that works it out
 //     again, so nothing starts out pointing at the real one.
-//   - Makes the default keyring an in-memory one (secrets.MockKeyringForTests,
-//     which is keyring.MockInit and the record pkg/secrets' guard needs, which
-//     refuses the OS keychain in a test binary otherwise).
+//   - Makes the default keyring an in-memory one, through Options.MockKeyring.
 //   - Points uv's managed Pythons at a directory shared by every test binary
 //     (see uvPythonDir), so tests that install one download it once, and never
 //     into ~/.local.
@@ -68,17 +64,64 @@ const strictEnv = "ASTRO_TEST_STRICT_REALCONFIG"
 //
 // It is for TestMain, where there is no *testing.T to Setenv through; a test
 // must never call it.
-func Isolate() (finish func(code int) int) {
+func Isolate(opts ...Options) (finish func(code int) int) {
+	var o Options
+	if len(opts) > 0 {
+		o = opts[0]
+	}
+	if o.KeepHome {
+		// Only the guard: the suite's own commands get homes of their own.
+		return keepHome(guards{watch: realStateWatch(), strict: CIIsSet() || os.Getenv(strictEnv) == "1", refusals: func() int { return 0 }})
+	}
 	if os.Getenv(inheritedEnv) != "" {
-		inherit()
+		inherit(o)
 		return func(code int) int { return code }
+	}
+	refusals := o.KeyringRefusals
+	if refusals == nil {
+		refusals = func() int { return 0 }
 	}
 	// Both are read here, before isolate unsets CI with the rest.
 	return isolate(guards{
 		watch:    realStateWatch(),
-		strict:   truthy(os.Getenv("CI")) || os.Getenv(strictEnv) == "1",
-		refusals: secrets.OSKeyringRefusals,
-	})
+		strict:   CIIsSet() || os.Getenv(strictEnv) == "1",
+		refusals: refusals,
+	}, o)
+}
+
+// Options are what a caller hands Isolate. The zero value is right for a package
+// that never reaches pkg/secrets.
+type Options struct {
+	// MockKeyring installs the in-memory keyring (and tells pkg/secrets, whose
+	// guard refuses the OS keychain in a test binary otherwise), and
+	// KeyringRefusals is how many times the OS keychain was asked for and
+	// refused. A package whose test binary links pkg/secrets passes both
+	// (secrets.MockKeyringForTests and secrets.OSKeyringRefusals); this module
+	// cannot import pkg/secrets itself, which uses it in its own tests.
+	MockKeyring     func()
+	KeyringRefusals func() int
+	// KeepHome leaves HOME, the XDG variables and the environment as they are and
+	// only watches the real config. It is for e2e, whose harness reads the
+	// developer's docker configuration and uv cache on purpose, and gives every
+	// command it runs a home of its own.
+	KeepHome bool
+}
+
+func (o Options) mockKeyring() {
+	if o.MockKeyring != nil {
+		o.MockKeyring()
+	}
+}
+
+// keepHome is Isolate for Options.KeepHome.
+func keepHome(g guards) func(code int) int {
+	return func(code int) int {
+		code, msg := g.verdict(code)
+		if msg != "" {
+			fmt.Fprint(os.Stderr, msg)
+		}
+		return code
+	}
 }
 
 // Main is the whole TestMain of a package with nothing to add to it:
@@ -88,8 +131,8 @@ func Isolate() (finish func(code int) int) {
 // It isolates the run, runs the tests, ends the run and exits with the code
 // Isolate's finish gives. A package that does more around m.Run, as cmd/astro
 // does with the emit watch, calls Isolate itself.
-func Main(m *testing.M) {
-	finish := Isolate()
+func Main(m *testing.M, opts ...Options) {
+	finish := Isolate(opts...)
 	os.Exit(finish(m.Run()))
 }
 
@@ -101,10 +144,14 @@ var afterIsolate []func()
 // called from an init function, before TestMain, and only in a test binary.
 func AfterIsolate(f func()) { afterIsolate = append(afterIsolate, f) }
 
-// truthy reports whether an environment value says yes, as CI systems spell it.
+// CIIsSet reports whether the CI environment variable says CI is on, by the same
+// rule as pkg/input's (input.Refusal): anything but empty, "0" or "false", in any
+// case and ignoring spaces.
+func CIIsSet() bool { return truthy(os.Getenv("CI")) }
+
 func truthy(v string) bool {
-	switch strings.ToLower(v) {
-	case "", "0", "false", "no":
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "", "0", "false":
 		return false
 	}
 	return true
@@ -147,7 +194,7 @@ var tempRoot string
 
 // isolate is Isolate with the guards given, so a test can point them at a
 // decoy instead of the developer's home.
-func isolate(g guards) func(code int) int {
+func isolate(g guards, o Options) func(code int) int {
 	for _, k := range behaviorEnv {
 		if err := os.Unsetenv(k); err != nil { //nolint:usetesting // for the whole package run
 			dief("unsetting %s: %v", k, err)
@@ -181,12 +228,9 @@ func isolate(g guards) func(code int) int {
 		setDir("LOCALAPPDATA", filepath.Join(root, "localappdata"))
 	}
 	setenv("UV_PYTHON_INSTALL_DIR", uvDir)
-	// go-homedir caches the first home it resolves, which is the real one when
-	// anything asked before TestMain ran.
-	homedir.Reset()
 	setenv(inheritedEnv, root)
 
-	mockKeyring()
+	o.mockKeyring()
 	for _, f := range afterIsolate {
 		f()
 	}
@@ -203,10 +247,8 @@ func isolate(g guards) func(code int) int {
 	}
 }
 
-func mockKeyring() { secrets.MockKeyringForTests() }
-
 // inherit is Isolate for a helper process.
-func inherit() {
+func inherit(o Options) {
 	// The marker is the parent's temporary root, and HOME is inside it. A stale
 	// or invented marker (exported from a shell, say) fails here, loudly, rather
 	// than switching the isolation off for the binary.
@@ -218,7 +260,7 @@ func inherit() {
 	if dir := os.Getenv("ASTRO_HOME"); !inTestArea(dir) {
 		dief("a helper process runs with ASTRO_HOME=%q, which is not in the test home %q or the temporary directory %s", dir, root, os.TempDir())
 	}
-	mockKeyring()
+	o.mockKeyring()
 	for _, f := range afterIsolate {
 		f()
 	}

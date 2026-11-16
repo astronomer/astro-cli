@@ -307,15 +307,6 @@ func imports(t *testing.T, path string) []string {
 	return out
 }
 
-// testenvImporters are the non-test files that may import pkg/testing/testenv,
-// each with why. testenv has none of pkg/testing's init (it cuts nothing off),
-// so the reason the rule exists does not apply to it; but it is test support, so
-// a file that ships needs a reason.
-var testenvImporters = map[string]string{
-	"config/config_test_utils.go": "registers testenv.AfterIsolate, from an init guarded by testing.Testing, so the " +
-		"home paths config works out when it loads are worked out again in a test binary's isolated home",
-}
-
 // TestOnlyTestsImportTheTestHelpers keeps pkg/testing out of the shipped
 // binary. Its init makes http.DefaultTransport refuse every host but this
 // machine (pkg/testing/nonetwork.go), which is the point in a test and would
@@ -327,14 +318,6 @@ var testenvImporters = map[string]string{
 func TestOnlyTestsImportTheTestHelpers(t *testing.T) {
 	root := repoRoot(t)
 	const helpers = modulePrefix + "pkg/testing"
-	// isTestHelper reports whether file rel importing p is the import the rule
-	// forbids: pkg/testing or below it, but for the files testenvImporters names.
-	isTestHelper := func(rel, p string) bool {
-		if p == helpers+"/testenv" && testenvImporters[filepath.ToSlash(rel)] != "" {
-			return false
-		}
-		return p == helpers || strings.HasPrefix(p, helpers+"/")
-	}
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -361,7 +344,7 @@ func TestOnlyTestsImportTheTestHelpers(t *testing.T) {
 		}
 		for _, imp := range f.Imports {
 			p, err := strconv.Unquote(imp.Path.Value)
-			if err == nil && isTestHelper(rel, p) {
+			if err == nil && (p == helpers || strings.HasPrefix(p, helpers+"/")) {
 				t.Errorf("%s imports %s: only a _test.go file may, because pkg/testing's init cuts the network off", rel, p)
 			}
 		}
@@ -583,11 +566,20 @@ func TestEveryPkgSubmoduleIsLinted(t *testing.T) {
 // this test then requires it here.
 func TestEveryLintedSubmoduleIsHeldToTheNoPrintRule(t *testing.T) {
 	root := repoRoot(t)
+	// printsByDesign are linted sub-modules that are not core: each says why it
+	// prints or exits.
+	printsByDesign := map[string]string{
+		"pkg/testenv": "test support called from TestMain: it reports a setup it cannot go on with on stderr and exits, and " +
+			"says why a passing package fails",
+	}
 	registered := make(map[string]bool, len(coreBelowCmd))
 	for _, p := range coreBelowCmd {
 		registered[p] = true
 	}
 	for _, m := range lintSubmodules(t, root) {
+		if printsByDesign[m] != "" {
+			continue
+		}
 		if !registered[m] {
 			t.Errorf("%s is in LINT_SUBMODULES but not in coreBelowCmd, so nothing enforces that it does not print "+
 				"or exit: a root golangci-lint run does not descend into a sub-module, and forbidigo is anchored "+

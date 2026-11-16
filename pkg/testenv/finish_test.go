@@ -6,14 +6,17 @@ import (
 	"runtime"
 	"strings"
 	"testing"
-
-	homedir "github.com/mitchellh/go-homedir"
 )
 
 // driveIsolate runs isolate with g inside this already-isolated test binary and
 // puts the environment back afterward, so a test can call the finish function
 // it returns.
 func driveIsolate(t *testing.T, g guards) func(code int) int {
+	t.Helper()
+	return driveIsolateWith(t, g, Options{})
+}
+
+func driveIsolateWith(t *testing.T, g guards, o Options) func(code int) int {
 	t.Helper()
 	saved := os.Environ()
 	hooks := afterIsolate
@@ -24,9 +27,8 @@ func driveIsolate(t *testing.T, g guards) func(code int) int {
 			os.Setenv(k, v) //nolint:usetesting // restoring the whole environment
 		}
 		afterIsolate = hooks
-		homedir.Reset()
 	})
-	return isolate(g)
+	return isolate(g, o)
 }
 
 // changedDecoy is a watch on a decoy home whose config changed after the watch
@@ -71,14 +73,6 @@ func TestFinishFailsOnAnOSKeychainRefusal(t *testing.T) {
 		g := guards{watch: newStateWatch(t.TempDir()), strict: strict, refusals: refused}
 		if got := driveIsolate(t, g)(0); got != 1 {
 			t.Errorf("strict=%v, 2 refusals: finish(0) = %d, want 1", strict, got)
-		}
-	}
-}
-
-func TestStrictFollowsCIAndTheStrictVariable(t *testing.T) {
-	for v, want := range map[string]bool{"": false, "0": false, "false": false, "FALSE": false, "true": true, "1": true, "yes": true} {
-		if got := truthy(v); got != want {
-			t.Errorf("truthy(%q) = %v, want %v", v, got, want)
 		}
 	}
 }

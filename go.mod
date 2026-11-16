@@ -142,6 +142,7 @@ require (
 	github.com/astronomer/astro-cli/pkg/manifest v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/platformversions v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/scaffold v0.0.0-00010101000000-000000000000
+	github.com/astronomer/astro-cli/pkg/testenv v0.0.0-00010101000000-000000000000
 	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/gofrs/flock v0.13.0
@@ -211,3 +212,5 @@ replace github.com/astronomer/astro-cli/pkg/awsauth => ./pkg/awsauth
 replace github.com/astronomer/astro-cli/pkg/googleauth => ./pkg/googleauth
 
 replace github.com/astronomer/astro-cli/pkg/emfetch => ./pkg/emfetch
+
+replace github.com/astronomer/astro-cli/pkg/testenv => ./pkg/testenv

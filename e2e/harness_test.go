@@ -16,6 +16,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/astronomer/astro-cli/pkg/testenv"
 )
 
 // testVersion is stamped into the binary under test.
@@ -85,7 +87,7 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
-	finish := guardRealConfig()
+	finish := testenv.Isolate(testenv.Options{KeepHome: true})
 	code, err := runSuite(m)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "e2e:", err)

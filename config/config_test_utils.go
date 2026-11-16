@@ -8,9 +8,11 @@ import (
 	"testing"
 	"time"
 
+	homedir "github.com/mitchellh/go-homedir"
+
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/secrets"
-	"github.com/astronomer/astro-cli/pkg/testing/testenv"
+	"github.com/astronomer/astro-cli/pkg/testenv"
 )
 
 // A test binary's TestMain moves HOME and ASTRO_HOME into a temporary directory
@@ -20,7 +22,7 @@ import (
 // reading them (the API registry, the root hooks, otto, the login store, the
 // OpenAPI cache) would use the developer's own ~/.astro. So the isolation tells
 // this package to work them out again. testing.Testing keeps it out of the
-// shipped binary, which imports testenv only for this.
+// shipped binary, which links the shared testenv module only for this.
 func init() {
 	if testing.Testing() {
 		testenv.AfterIsolate(resolveHomeForTesting)
@@ -31,6 +33,7 @@ func init() {
 // ASTRO_HOME, by the rule initHome uses, and stops the run if any of them is
 // not in the temporary directory.
 func resolveHomeForTesting() {
+	homedir.Reset()                     // go-homedir cached the real home when this package loaded
 	HomePath, _ = fileutil.GetHomeDir() //nolint:errcheck // as at package load
 	home := os.Getenv("ASTRO_HOME")
 	if home == "" {

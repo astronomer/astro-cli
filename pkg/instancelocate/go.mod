@@ -25,6 +25,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/astronomer/astro-cli/pkg/airflowapi v0.0.0-00010101000000-000000000000 // indirect
 	github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000 // indirect
+	github.com/astronomer/astro-cli/pkg/testenv v0.0.0-00010101000000-000000000000
 	github.com/pelletier/go-toml/v2 v2.4.4-0.20260718201843-686c980c4758 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
@@ -39,3 +40,5 @@ replace github.com/astronomer/astro-cli/pkg/airflowapi => ../airflowapi
 replace github.com/astronomer/astro-cli/pkg/airflowrt => ../airflowrt
 
 replace github.com/astronomer/astro-cli/pkg/manifest => ../manifest
+
+replace github.com/astronomer/astro-cli/pkg/testenv => ../testenv

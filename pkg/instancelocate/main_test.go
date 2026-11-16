@@ -1,13 +1,12 @@
 package instancelocate
 
 import (
-	"os"
 	"testing"
+
+	"github.com/astronomer/astro-cli/pkg/testenv"
 )
 
-// TestMain moves HOME and the state directories into a temporary one for the
-// package run (isolateHome), so no test touches the developer's machine.
-func TestMain(m *testing.M) {
-	finish := isolateHome()
-	os.Exit(finish(m.Run()))
-}
+// TestMain isolates the package run from the machine (pkg/testenv): the
+// environment variables that change what the CLI does are unset, HOME and the
+// state directories are a temporary one, and the keychain is in memory.
+func TestMain(m *testing.M) { testenv.Main(m) }

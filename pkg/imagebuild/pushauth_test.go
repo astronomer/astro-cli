@@ -18,12 +18,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/testenv"
 )
 
 // TestMain points DOCKER_CONFIG at an empty directory for the whole package,
 // so no test reads, or could write, the developer's own docker config.
 func TestMain(m *testing.M) {
-	finish := isolateHome()
+	finish := testenv.Isolate()
 	dir, err := os.MkdirTemp("", "imagebuild-docker-config-*")
 	if err != nil {
 		panic(err)

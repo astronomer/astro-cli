@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/testenv"
 )
 
 // isolatedCache is the cache root this package's tests run against, created by
@@ -45,7 +46,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	// HOME and the state directories, for everything runIsolated does not name.
-	finish := isolateHome()
+	finish := testenv.Isolate()
 	os.Exit(finish(runIsolated(m, ambient)))
 }
 

@@ -1,16 +1,14 @@
 package secrets
 
 import (
-	"os"
 	"testing"
+
+	"github.com/astronomer/astro-cli/pkg/testenv"
 )
 
-// TestMain moves HOME and the state directories into a temporary one for the
-// package run (isolateHome), and makes the default keyring an in-memory one, so
-// no test touches the developer's machine. Most tests here pass a fake keyringAPI
-// of their own; this is for any that reach the default one, which refuseInTests
-// would otherwise fail, and the run fails on any refusal.
+// TestMain isolates the package run from the machine (pkg/testenv): the
+// environment variables that change what the CLI does are unset, HOME and the
+// state directories are a temporary one, and the keychain is in memory.
 func TestMain(m *testing.M) {
-	finish := isolateHome(keyringHooks{Mock: MockKeyringForTests, Refusals: OSKeyringRefusals})
-	os.Exit(finish(m.Run()))
+	testenv.Main(m, testenv.Options{MockKeyring: MockKeyringForTests, KeyringRefusals: OSKeyringRefusals})
 }

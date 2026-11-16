@@ -6,78 +6,50 @@ import (
 	"go/token"
 	"io/fs"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
-	"regexp"
-	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
 
 // A test run must not touch the machine it runs on: not the developer's
 // ~/.astro (an agent's test once replaced its access token), not the OS
-// keychain (macOS prompts for it), not their uv Pythons. pkg/testing/testenv
-// makes a package's tests hermetic, from its TestMain. Nothing in a test
-// package makes it call it, so these tests do: a package added without one
-// fails here.
+// keychain (macOS prompts for it), not their uv Pythons. pkg/testenv makes a
+// test binary hermetic, from its TestMain. Nothing in a test package makes it
+// call it, so these tests do: a package added without one fails here.
 //
-// The root module's packages call testenv.Isolate. The pkg/* modules and e2e
-// are modules of their own and cannot import the root's testenv, so each test
-// package in them calls its own copy of the home isolation, isolateHome (or, in
-// e2e, guardRealConfig, which only watches the real config), from a hermetic_test.go.
-// Modules that cannot reach a home are exempt below, and what keeps that true
-// is checked.
+// The root module's packages call the root's front for it, pkg/testing/testenv,
+// which adds the pkg/secrets keyring hooks. The pkg/* modules and e2e call
+// pkg/testenv itself, and a package whose test binary links pkg/secrets passes
+// those hooks in testenv.Options.
 
-// hermeticExempt are the root-module test packages that may go without
-// testenv.Isolate, each with why. A package needs a reason that is true of
-// its tests, not of its code: "its tests set HOME themselves" is not one,
-// because a test that forgets to is the case this guards.
-//
-// Empty today: every test package in the root module reaches config/, which
-// reaches HOME, or is one a later test would.
-var hermeticExempt = map[string]string{}
+const (
+	testenvPath    = modulePrefix + "pkg/testenv"
+	testenvRootFor = modulePrefix + "pkg/testing/testenv"
+	secretsPath    = modulePrefix + "pkg/secrets"
+)
 
-// homeFree are the modules whose code and tests cannot reach a home or the
-// OS keychain, so a test package in them needs no isolation. It is not a
-// promise kept by hand: TestHomeFreeModulesReachNoHome fails when one of them
-// reads HOME, the XDG variables, ASTRO_HOME or a keyring, or requires a module
-// that is not itself in this list (the way manifest, which reads HOME, reaches
-// awsauth). A module that grows such a read moves out of this list into the
-// ones with an isolateHome copy.
-var homeFree = []string{
-	"pkg/airflowapi",
-	"pkg/airflowenv",
-	"pkg/airflowrt",
-	"pkg/astroauth",
-	"pkg/connmodel",
-	"pkg/container",
-	"pkg/emfetch",
-	"pkg/envschema",
-	"pkg/fsatomic",
-	"pkg/platformversions",
-}
+// testenvCalls are the calls a TestMain makes to isolate.
+var testenvCalls = []string{"Main", "Isolate"}
 
-// homeReads is what makes code able to reach a home or the keychain.
-var homeReads = regexp.MustCompile(`UserHomeDir|UserCacheDir|UserConfigDir|"HOME"|USERPROFILE|APPDATA|ASTRO_HOME|XDG_|go-keyring|go-homedir`)
-
-// isolators are the calls a TestMain makes to isolate: testenv.Main or
-// testenv.Isolate in the root module, and the copies in the modules of their own.
-var isolators = []string{"Isolate", "isolateHome", "guardRealConfig"}
-
-// testPackage is a directory with test files, and whether a TestMain in them
-// calls an isolator.
+// testPackage is a directory with test files, and what its TestMain does.
 type testPackage struct {
-	dir      string // relative to the repository root, slash-separated
-	isolated bool
+	dir      string // relative to the walked root, slash-separated
 	hasMain  bool
+	isolates bool   // a TestMain calls testenv.Main or testenv.Isolate
+	from     string // the import path of the testenv it calls
+	hooks    bool   // the call passes Options with MockKeyring and KeyringRefusals
 }
 
 // testPackages walks root for directories with _test.go files, not descending
-// into other modules unless module is that module's own root.
+// into other modules.
 func testPackages(t *testing.T, root string) []testPackage {
 	t.Helper()
 	var out []testPackage
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -85,33 +57,24 @@ func testPackages(t *testing.T, root string) []testPackage {
 			return nil
 		}
 		name := d.Name()
-		if path != root && (strings.HasPrefix(name, ".") || name == "testdata" || name == "vendor" || name == "node_modules") {
+		if p != root && (strings.HasPrefix(name, ".") || name == "testdata" || name == "vendor" || name == "node_modules") {
 			return filepath.SkipDir
 		}
-		if path != root {
-			if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
+		if p != root {
+			if _, err := os.Stat(filepath.Join(p, "go.mod")); err == nil {
 				return filepath.SkipDir // another module: walked from its own root
 			}
 		}
-		pkg := testPackage{}
-		files, err := filepath.Glob(filepath.Join(path, "*_test.go"))
+		files, err := filepath.Glob(filepath.Join(p, "*_test.go"))
 		if err != nil || len(files) == 0 {
 			return err
 		}
-		rel, err := filepath.Rel(root, path)
+		rel, err := filepath.Rel(root, p)
 		if err != nil {
 			return err
 		}
-		pkg.dir = filepath.ToSlash(rel)
-		for _, file := range files {
-			f, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.SkipObjectResolution)
-			if err != nil {
-				t.Fatalf("parse %s: %v", file, err)
-			}
-			main, calls := testMainCalls(f)
-			pkg.hasMain = pkg.hasMain || main
-			pkg.isolated = pkg.isolated || calls
-		}
+		pkg := testPackage{dir: filepath.ToSlash(rel)}
+		pkg.hasMain, pkg.isolates, pkg.from, pkg.hooks = testMainOf(t, files)
 		out = append(out, pkg)
 		return nil
 	})
@@ -121,10 +84,45 @@ func testPackages(t *testing.T, root string) []testPackage {
 	return out
 }
 
-// testMainCalls reports whether f declares TestMain, and whether its body calls
-// one of the isolators: testenv.Isolate, testenv.Main or a bare name (a copy in this package,
-// or Isolate inside testenv itself).
-func testMainCalls(f *ast.File) (hasMain, isolates bool) {
+// testMainOf reads the test files of one package for its TestMain and what it
+// calls to isolate.
+func testMainOf(t *testing.T, files []string) (hasMain, isolates bool, from string, hooks bool) {
+	t.Helper()
+	for _, file := range files {
+		f, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatalf("parse %s: %v", file, err)
+		}
+		main, call := testMainCall(f)
+		hasMain = hasMain || main
+		if call != nil {
+			isolates, from, hooks = true, call.from, call.hooks
+		}
+	}
+	return hasMain, isolates, from, hooks
+}
+
+// isolation is a TestMain's call to testenv.Main or testenv.Isolate.
+type isolation struct {
+	from  string // import path of testenv; "" for a bare call inside testenv itself
+	hooks bool
+}
+
+// testMainCall reports whether f declares TestMain, and the call it makes to
+// isolate, if any.
+func testMainCall(f *ast.File) (hasMain bool, call *isolation) {
+	imports := map[string]string{}
+	for _, imp := range f.Imports {
+		p, err := strconv.Unquote(imp.Path.Value)
+		if err != nil {
+			continue
+		}
+		name := path.Base(p)
+		if imp.Name != nil {
+			name = imp.Name.Name
+		}
+		imports[name] = p
+	}
 	for _, decl := range f.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
 		if !ok || fn.Recv != nil || fn.Name.Name != "TestMain" || fn.Body == nil {
@@ -132,24 +130,57 @@ func testMainCalls(f *ast.File) (hasMain, isolates bool) {
 		}
 		hasMain = true
 		ast.Inspect(fn.Body, func(n ast.Node) bool {
-			call, ok := n.(*ast.CallExpr)
+			c, ok := n.(*ast.CallExpr)
 			if !ok {
 				return true
 			}
-			switch fun := call.Fun.(type) {
+			switch fun := c.Fun.(type) {
 			case *ast.SelectorExpr:
-				if x, ok := fun.X.(*ast.Ident); ok && x.Name == "testenv" && (fun.Sel.Name == "Isolate" || fun.Sel.Name == "Main") {
-					isolates = true
+				if x, ok := fun.X.(*ast.Ident); ok && containsString(testenvCalls, fun.Sel.Name) && imports[x.Name] != "" &&
+					(imports[x.Name] == testenvPath || imports[x.Name] == testenvRootFor) {
+					call = &isolation{from: imports[x.Name], hooks: passesKeyringHooks(c)}
 				}
 			case *ast.Ident:
-				if slices.Contains(isolators, fun.Name) {
-					isolates = true
+				if containsString(testenvCalls, fun.Name) {
+					call = &isolation{hooks: passesKeyringHooks(c)}
 				}
 			}
 			return true
 		})
 	}
-	return hasMain, isolates
+	return hasMain, call
+}
+
+func containsString(list []string, s string) bool {
+	for _, e := range list {
+		if e == s {
+			return true
+		}
+	}
+	return false
+}
+
+// passesKeyringHooks reports whether the call has an Options literal setting both
+// MockKeyring and KeyringRefusals.
+func passesKeyringHooks(call *ast.CallExpr) bool {
+	for _, arg := range call.Args {
+		lit, ok := arg.(*ast.CompositeLit)
+		if !ok {
+			continue
+		}
+		keys := map[string]bool{}
+		for _, e := range lit.Elts {
+			if kv, ok := e.(*ast.KeyValueExpr); ok {
+				if id, ok := kv.Key.(*ast.Ident); ok {
+					keys[id.Name] = true
+				}
+			}
+		}
+		if keys["MockKeyring"] && keys["KeyringRefusals"] {
+			return true
+		}
+	}
+	return false
 }
 
 // modules lists the separate modules under the repository: the pkg/* ones and
@@ -174,164 +205,83 @@ func modules(t *testing.T, root string) []string {
 	return mods
 }
 
-// Every test package in the root module isolates its run, with testenv.Isolate
-// from TestMain.
+// Every test package in the root module isolates its run through the root's
+// front, which passes the keyring hooks.
 func TestEveryRootTestPackageIsolatesItsRun(t *testing.T) {
 	root := repoRoot(t)
-	used := map[string]bool{}
 	for _, pkg := range testPackages(t, root) {
-		dir := pkg.dir
-		if why, ok := hermeticExempt[dir]; ok {
-			used[dir] = true
-			if why == "" {
-				t.Errorf("hermeticExempt[%q] has no reason", dir)
-			}
-			continue
-		}
 		switch {
 		case !pkg.hasMain:
-			t.Errorf("%s has tests and no TestMain. Add one that calls testenv.Main(m) "+
+			t.Errorf("%s has tests and no TestMain. Add `func TestMain(m *testing.M) { testenv.Main(m) }` "+
 				"(pkg/testing/testenv): a test run must not touch the developer's HOME or the OS keychain. "+
-				"See docs/architecture.md, \"Tests never touch the machine\".", dir)
-		case !pkg.isolated:
-			t.Errorf("%s has a TestMain that does not call testenv.Isolate, so its tests run against the "+
-				"real HOME and keychain. Make it `testenv.Main(m)`, or call `finish := testenv.Isolate()` first and exit with `finish(m.Run())`.", dir)
-		}
-	}
-	for dir := range hermeticExempt {
-		if !used[dir] {
-			t.Errorf("hermeticExempt names %q, which is not a root-module test package: remove it", dir)
+				"See docs/architecture.md, \"Tests never touch the machine\".", pkg.dir)
+		case !pkg.isolates:
+			t.Errorf("%s has a TestMain that does not call testenv.Main or testenv.Isolate, so its tests run against the "+
+				"real HOME and keychain.", pkg.dir)
+		case pkg.from != testenvRootFor && pkg.dir != "pkg/testing/testenv":
+			t.Errorf("%s calls %q, not the root's pkg/testing/testenv, which passes the keyring hooks every root test binary needs", pkg.dir, pkg.from)
 		}
 	}
 }
 
-// Every test package in a module of its own isolates its run too, with its copy
-// of the isolation, unless the whole module is home-free.
+// Every test package in a module of its own isolates its run with pkg/testenv,
+// and one whose test binary links pkg/secrets passes the keyring hooks, or its
+// tests could reach the OS keychain, or fall back on its refusal unseen.
 func TestEveryModuleTestPackageIsolatesItsRun(t *testing.T) {
 	root := repoRoot(t)
 	for _, mod := range modules(t, root) {
-		if slices.Contains(homeFree, mod) {
-			continue
-		}
-		for _, pkg := range testPackages(t, filepath.Join(root, filepath.FromSlash(mod))) {
+		modDir := filepath.Join(root, filepath.FromSlash(mod))
+		links := linkingSecrets(t, modDir)
+		for _, pkg := range testPackages(t, modDir) {
 			dir := mod
 			if pkg.dir != "." {
 				dir = mod + "/" + pkg.dir
 			}
+			abs := filepath.Join(modDir, filepath.FromSlash(pkg.dir))
 			switch {
 			case !pkg.hasMain:
-				t.Errorf("%s has tests and no TestMain. Copy hermetic_test.go from another package of this module "+
-					"and call isolateHome from a TestMain (this module cannot import testenv). "+
-					"If the module cannot reach a home at all, add it to homeFree.", dir)
-			case !pkg.isolated:
-				t.Errorf("%s has a TestMain that does not call isolateHome (or guardRealConfig), so its tests "+
-					"run against the real HOME", dir)
+				t.Errorf("%s has tests and no TestMain. Add `func TestMain(m *testing.M) { testenv.Main(m) }` (pkg/testenv).", dir)
+			case !pkg.isolates:
+				t.Errorf("%s has a TestMain that does not call testenv.Main or testenv.Isolate, so its tests run against the real HOME", dir)
+			case pkg.from != "" && pkg.from != testenvPath:
+				t.Errorf("%s calls %q: a pkg module uses pkg/testenv", dir, pkg.from)
+			case (links[abs] || mod == "pkg/secrets") && !pkg.hooks && mod != "pkg/testenv":
+				t.Errorf("%s links pkg/secrets, so its TestMain passes the keyring hooks: "+
+					"testenv.Main(m, testenv.Options{MockKeyring: secrets.MockKeyringForTests, KeyringRefusals: secrets.OSKeyringRefusals})", dir)
 			}
 		}
 	}
 }
 
-// Every module test package's isolateHome is the template, unchanged but for the
-// package clause, so a fix to the isolation reaches all of them. e2e has its own
-// (it does not move HOME, see guardRealConfig) and is not one of them.
-func TestModuleIsolationCopiesMatchTheTemplate(t *testing.T) {
-	root := repoRoot(t)
-	raw, err := os.ReadFile(filepath.Join(root, "internal", "archlint", "testdata", "hermetic_template.go.txt"))
+// linkingSecrets lists the package directories of the module at dir whose test
+// binary links pkg/secrets. Only a module whose go.mod names pkg/secrets can
+// have one, so only those are asked.
+func linkingSecrets(t *testing.T, dir string) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	gomod, err := os.ReadFile(filepath.Join(dir, "go.mod"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, templateBody, _ := strings.Cut(lf(string(raw)), "\n")
-	for _, mod := range modules(t, root) {
-		if mod == "e2e" || slices.Contains(homeFree, mod) {
+	if !strings.Contains(string(gomod), secretsPath) {
+		return out
+	}
+	cmd := exec.CommandContext(t.Context(), "go", "list", "-test", "-f", "{{.Dir}}|{{join .Deps \" \"}}", "./...")
+	cmd.Dir = dir
+	raw, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go list in %s: %v", dir, err)
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		pkgDir, deps, ok := strings.Cut(line, "|")
+		if !ok {
 			continue
 		}
-		for _, pkg := range testPackages(t, filepath.Join(root, filepath.FromSlash(mod))) {
-			file := filepath.Join(root, filepath.FromSlash(mod), filepath.FromSlash(pkg.dir), "hermetic_test.go")
-			got, err := os.ReadFile(file)
-			if err != nil {
-				t.Errorf("%s/%s has no hermetic_test.go: copy internal/archlint/testdata/hermetic_template.go.txt there, changing only the package clause (%v)", mod, pkg.dir, err)
-				continue
-			}
-			first, body, _ := strings.Cut(lf(string(got)), "\n")
-			if !strings.HasPrefix(first, "package ") || body != templateBody {
-				t.Errorf("%s differs from internal/archlint/testdata/hermetic_template.go.txt: change the template and copy it over every module test package, not one copy", filepath.ToSlash(file))
+		for _, dep := range strings.Fields(deps) {
+			if dep == secretsPath {
+				out[filepath.FromSlash(filepath.ToSlash(pkgDir))] = true
 			}
 		}
 	}
-}
-
-// lf is s with Windows line endings read as the newlines they stand for, so a
-// checkout that converted the copies and not the template (or the reverse) is
-// not a difference.
-func lf(s string) string { return strings.ReplaceAll(s, "\r\n", "\n") }
-
-// The template unsets every variable testenv does (those it does not unset by
-// prefix), so a variable added to testenv.behaviorEnv reaches the modules too.
-func TestTemplateClearsWhatTestenvClears(t *testing.T) {
-	root := repoRoot(t)
-	template, err := os.ReadFile(filepath.Join(root, "internal", "archlint", "testdata", "hermetic_template.go.txt"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, "pkg", "testing", "testenv", "testenv.go"), nil, parser.SkipObjectResolution)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var names []string
-	ast.Inspect(f, func(n ast.Node) bool {
-		spec, ok := n.(*ast.ValueSpec)
-		if !ok || len(spec.Names) != 1 || spec.Names[0].Name != "behaviorEnv" || len(spec.Values) != 1 {
-			return true
-		}
-		if lit, ok := spec.Values[0].(*ast.CompositeLit); ok {
-			for _, e := range lit.Elts {
-				if s, ok := e.(*ast.BasicLit); ok {
-					names = append(names, strings.Trim(s.Value, `"`))
-				}
-			}
-		}
-		return false
-	})
-	if len(names) < 10 {
-		t.Fatalf("read %d names from testenv.behaviorEnv; this test no longer finds it", len(names))
-	}
-	for _, name := range names {
-		if strings.HasPrefix(name, "ASTRO_") || strings.HasPrefix(name, "ASTRONOMER_") {
-			continue // the template unsets these by prefix
-		}
-		if !strings.Contains(string(template), `"`+name+`"`) {
-			t.Errorf("testenv unsets %s and internal/archlint/testdata/hermetic_template.go.txt does not: add it to behaviorVars, and copy the template over every module test package", name)
-		}
-	}
-}
-
-// The modules exempt from isolation have to stay unable to reach a home.
-func TestHomeFreeModulesReachNoHome(t *testing.T) {
-	root := repoRoot(t)
-	all := modules(t, root)
-	for _, mod := range homeFree {
-		if !slices.Contains(all, mod) {
-			t.Errorf("homeFree names %q, which is not a module: remove it", mod)
-			continue
-		}
-		dir := filepath.Join(root, filepath.FromSlash(mod))
-		goFiles(t, root, mod, func(rel string) {
-			src, err := os.ReadFile(filepath.Join(root, rel))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if m := homeReads.Find(src); m != nil {
-				t.Errorf("%s reads %q, so %s can reach a home: take it out of homeFree and give its test packages isolateHome", rel, m, mod)
-			}
-		})
-		gomod, err := os.ReadFile(filepath.Join(dir, "go.mod"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, other := range regexp.MustCompile(`astro-cli/(pkg/[a-z]+)`).FindAllStringSubmatch(string(gomod), -1) {
-			if other[1] != mod && !slices.Contains(homeFree, other[1]) {
-				t.Errorf("%s requires %s, which is not home-free, so %s can reach a home through it", mod, other[1], mod)
-			}
-		}
-	}
+	return out
 }
