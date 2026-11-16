@@ -14,6 +14,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/version"
@@ -114,15 +115,34 @@ func NewRequestEditorFn(getTokenAndURL func() (token, baseURL string, err error)
 	}
 }
 
-// IsTransportError reports whether err is a request that never got an answer:
-// the host could not be reached or resolved, the connection broke, or the
+// IsTransportError reports whether err is a request that failed in transit in
+// a way a retry can fix: the host refused or reset the connection or could not
+// be reached, its name did not resolve, the connection ended early, or the
 // request timed out. An HTTP status, whatever it is, is an answer, and is a
-// StatusError instead.
+// StatusError instead. A failure a retry will not fix is not one: a canceled
+// request (the run ended), a certificate or TLS failure, a URL that is
+// malformed or names an unsupported scheme.
 func IsTransportError(err error) bool {
-	if errors.Is(err, httpContext.Canceled) {
-		return false // an interrupted request got no answer because the run ended
+	if err == nil || errors.Is(err, httpContext.Canceled) {
+		return false
 	}
-	var urlErr *url.Error
+	for _, errno := range []error{
+		syscall.ECONNREFUSED, syscall.ECONNRESET, syscall.ECONNABORTED, syscall.EPIPE,
+		syscall.EHOSTUNREACH, syscall.ENETUNREACH,
+	} {
+		if errors.Is(err, errno) {
+			return true
+		}
+	}
+	var dnsErr *net.DNSError
 	var netErr net.Error
-	return errors.As(err, &urlErr) || errors.As(err, &netErr) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, httpContext.DeadlineExceeded)
+	switch {
+	case errors.As(err, &dnsErr):
+		return true
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF), errors.Is(err, httpContext.DeadlineExceeded):
+		return true
+	case errors.As(err, &netErr):
+		return netErr.Timeout()
+	}
+	return false
 }

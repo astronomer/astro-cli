@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -300,7 +302,7 @@ func TestLoginCheckFailedLeavesTheLegacyAPIKeysRefusalAlone(t *testing.T) {
 func TestLoginCheckFailedKeepsTheRenewalAndConfigFailures(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Setenv("ASTRO_API_TOKEN", "")
-	unreachable := &url.Error{Op: "Post", URL: "https://auth.invalid/oauth/token", Err: &net.OpError{Op: "dial", Err: errors.New("connection refused")}}
+	unreachable := &url.Error{Op: "Post", URL: "https://auth.invalid/oauth/token", Err: &net.OpError{Op: "dial", Err: os.NewSyscallError("connect", syscall.ECONNREFUSED)}}
 	renewal := fmt.Errorf("%w, run 'astro login' to log in again: %w", astroCmd.ErrLoginRenewal, unreachable)
 	err := loginCheckFailed(renewal)
 	assert.Same(t, renewal, err)

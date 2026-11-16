@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
+	"syscall"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -36,7 +38,7 @@ func TestRootPersistentPreRunESetupErrors(t *testing.T) {
 		return CreateRootPersistentPreRunE(nil)(&cobra.Command{Use: "list"}, nil)
 	}
 
-	transport := &url.Error{Op: "Get", URL: "http://api.invalid/", Err: &net.OpError{Op: "dial", Err: errors.New("connection refused")}}
+	transport := &url.Error{Op: "Get", URL: "http://api.invalid/", Err: &net.OpError{Op: "dial", Err: os.NewSyscallError("connect", syscall.ECONNREFUSED)}}
 	hard := []struct {
 		name string
 		err  error

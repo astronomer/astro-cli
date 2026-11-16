@@ -190,16 +190,6 @@ func errorsIsTransport(err error) bool {
 	return errors.As(err, &urlErr)
 }
 
-func TestRenewalOutcome(t *testing.T) {
-	cause := io.ErrUnexpectedEOF
-	assert.NoError(t, renewalOutcome(time.Now().Add(time.Minute), nil))
-	assert.NoError(t, renewalOutcome(time.Now().Add(time.Minute), cause), "a token that still works is kept")
-	err := renewalOutcome(time.Now().Add(-time.Second), cause)
-	require.ErrorIs(t, err, ErrLoginRenewal)
-	assert.ErrorIs(t, err, cause)
-	assert.Error(t, renewalOutcome(time.Time{}, cause), "a login with no recorded expiry reads as expired")
-}
-
 func mintToken(t *testing.T, claims *util.CustomClaims) string {
 	t.Helper()
 	token, err := jwt.NewWithClaims(jwt.SigningMethodNone, claims).SignedString(jwt.UnsafeAllowNoneSignatureType)

@@ -9,8 +9,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -25,6 +27,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -180,7 +183,7 @@ func TestSavedLoginIsUsedWhenNoTokenIsGiven(t *testing.T) {
 func TestSetupFailuresAreOneJSONDocument(t *testing.T) {
 	origSetup := astroSetup
 	t.Cleanup(func() { astroSetup = origSetup })
-	transport := &url.Error{Op: "Get", URL: "http://api.invalid/", Err: &net.OpError{Op: "dial", Err: errors.New("connection refused")}}
+	transport := &url.Error{Op: "Get", URL: "http://api.invalid/", Err: &net.OpError{Op: "dial", Err: os.NewSyscallError("connect", syscall.ECONNREFUSED)}}
 
 	cases := []struct {
 		name string
@@ -229,14 +232,20 @@ func TestCorruptConfigFailsTheCommandAsOneDocument(t *testing.T) {
 	_, _ = captureProcessOutput(t, func(io.Writer) { config.InitConfig(fs) })
 	t.Cleanup(func() { testUtil.InitTestConfig(testUtil.CloudPlatform) })
 
-	run := runRoot(t, "deployment", "list", "-o", "json")
+	// `auth token` reads the login itself (it renews the one it prints), and
+	// gives the same answer as the commands that go through the root's setup.
+	for _, args := range [][]string{{"deployment", "list", "-o", "json"}, {"auth", "token", "-o", "json"}} {
+		t.Run(strings.Join(args[:2], " "), func(t *testing.T) {
+			run := runRoot(t, args...)
 
-	require.ErrorIs(t, run.err, astroCmd.ErrConfigUnreadable)
-	doc := oneErrorDocument(t, run.stdout)
-	assert.Equal(t, string(KindUnauthenticated), doc.Kind)
-	assert.Contains(t, doc.Error, config.HomeConfigFile)
-	assert.Contains(t, doc.Error, "did not parse")
-	assert.Empty(t, run.stderr)
+			require.ErrorIs(t, run.err, astroCmd.ErrConfigUnreadable)
+			doc := oneErrorDocument(t, run.stdout)
+			assert.Equal(t, string(KindUnauthenticated), doc.Kind)
+			assert.Contains(t, doc.Error, config.HomeConfigFile)
+			assert.Contains(t, doc.Error, "did not parse")
+			assert.Empty(t, run.stderr)
+		})
+	}
 }
 
 // Shell completion runs on every TAB, so it never logs in, refreshes a token,
@@ -303,4 +312,69 @@ func TestOrdinaryCommandsStillRunSetup(t *testing.T) {
 	run := runRoot(t, "workspace", "list", "-o", "json")
 	require.Error(t, run.err)
 	assert.Equal(t, 1, setups)
+}
+
+// A command the root's setup stopped is still recorded: one event, of its own
+// kind, carrying the command and the kind of the failure, sent anonymously, and
+// nothing that names the credential, the domain or the message. With telemetry
+// off nothing is sent.
+func TestSetupFailureIsTrackedWithItsKind(t *testing.T) {
+	telemetryOn := func(t *testing.T, api *recordingAPI) func() []telemetry.SentEvent {
+		useLocalAPI(t, api)
+		t.Setenv("ASTRO_TELEMETRY_DISABLED", "")
+		require.NoError(t, config.CFG.TelemetryEnabled.SetHomeString("true"))
+		require.NoError(t, config.CFG.TelemetryNoticeShown.SetHomeString("3"))
+		sent, restore := telemetry.CaptureEventsForTesting()
+		t.Cleanup(restore)
+		return sent
+	}
+
+	t.Run("a token with no permissions", func(t *testing.T) {
+		api := newRecordingAPI(t)
+		sent := telemetryOn(t, api)
+		token := mintJWT(t)
+		t.Setenv("ASTRO_API_TOKEN", token)
+
+		run := runRoot(t, "workspace", "list", "-o", "json")
+
+		require.ErrorIs(t, run.err, astroCmd.ErrNotAPIToken)
+		events := sent()
+		require.Len(t, events, 1, "one event, and not the command's own")
+		ev := events[0]
+		assert.Equal(t, telemetry.EventCommandSetupFailed, ev.Event)
+		assert.Equal(t, "workspace list", ev.Properties["command"])
+		assert.Equal(t, string(KindUnauthenticated), ev.Properties["error_kind"])
+		assert.Empty(t, ev.Token, "the credential that failed is not sent with the event")
+		body, err := json.Marshal(ev)
+		require.NoError(t, err)
+		for _, secret := range []string{token, "ASTRO_API_TOKEN", "no permissions", savedLoginToken, "saved-workspace", "saved-org", "localhost", api.URL} {
+			assert.NotContains(t, string(body), secret)
+		}
+		assert.Empty(t, api.requests())
+	})
+
+	t.Run("the run's own event is sent when setup passes", func(t *testing.T) {
+		api := newRecordingAPI(t)
+		sent := telemetryOn(t, api)
+		runRoot(t, "workspace", "list", "-o", "json") // the fake API answers 401
+		events := sent()
+		require.Len(t, events, 1)
+		assert.Equal(t, telemetry.EventCommandExecution, events[0].Event)
+		assert.NotContains(t, events[0].Properties, "error_kind")
+	})
+
+	t.Run("telemetry disabled sends nothing", func(t *testing.T) {
+		api := newRecordingAPI(t)
+		sent := telemetryOn(t, api)
+		t.Setenv("ASTRO_TELEMETRY_DISABLED", "1")
+		t.Setenv("ASTRO_API_TOKEN", mintJWT(t))
+		run := runRoot(t, "workspace", "list", "-o", "json")
+		require.ErrorIs(t, run.err, astroCmd.ErrNotAPIToken)
+		assert.Empty(t, sent())
+
+		t.Setenv("ASTRO_TELEMETRY_DISABLED", "")
+		require.NoError(t, config.CFG.TelemetryEnabled.SetHomeString("false"))
+		runRoot(t, "workspace", "list", "-o", "json")
+		assert.Empty(t, sent())
+	})
 }

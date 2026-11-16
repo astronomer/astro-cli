@@ -32,6 +32,12 @@ const (
 
 	// EventCommandExecution is the event type for CLI command tracking
 	EventCommandExecution = "CLI Command"
+
+	// EventCommandSetupFailed is the event type for a command the root's
+	// pre-run stopped, because the login it needs could not be set up. It is
+	// kept apart from EventCommandExecution so that a run which did nothing is
+	// never counted as a run which did something.
+	EventCommandSetupFailed = "CLI Command Setup Failed"
 )
 
 // IsEnabled checks if telemetry is enabled via env var and config
@@ -208,6 +214,23 @@ func TrackCommand(cmd *cobra.Command) {
 	sendRenamedFlags(cmd)
 }
 
+// TrackSetupFailure sends the event for a command the root's pre-run stopped
+// with an error of kind (the CLI's published kind for the failure, "" when it
+// has none). The event carries the command, the kind and the properties every
+// event carries, and nothing else: no message, which can name a file or a
+// domain, and no credential. It goes out anonymously, since the failure is
+// often the credential itself.
+func TrackSetupFailure(cmd *cobra.Command, kind string) {
+	if GetCommandPath(cmd) == "" || cmd.Hidden || !canTrack(cmd) {
+		return
+	}
+	properties := buildCommandProperties(cmd)
+	if kind != "" {
+		properties["error_kind"] = kind
+	}
+	trackWithToken(EventCommandSetupFailed, properties, "")
+}
+
 // TrackRemovedCommand sends the command event for the stub of a command Astro
 // CLI v2 removed, which TrackCommand leaves out because the stub is hidden.
 // The event marks it removed_command: the events are what tell us when nobody
@@ -235,7 +258,7 @@ func TrackRemovedCommand(cmd *cobra.Command) {
 // disable`, which would otherwise announce collection to someone in the act of
 // opting out, and a mistyped version of it, which would report the mistake.
 func canTrack(cmd *cobra.Command) bool {
-	if !IsEnabled() || isTestRun() {
+	if !IsEnabled() || isTestRunFn() {
 		return false
 	}
 
@@ -251,6 +274,12 @@ func canTrack(cmd *cobra.Command) bool {
 // track sends one event. It goes out in the background, unless debug mode asks
 // for it in the foreground.
 func track(event string, properties map[string]interface{}) {
+	trackWithToken(event, properties, currentToken())
+}
+
+// trackWithToken is track with the token to attach: "" sends the event
+// anonymously.
+func trackWithToken(event string, properties map[string]interface{}, token string) {
 	payload := sharedtel.TelemetryPayload{
 		Source:      SourceName,
 		Event:       event,
@@ -259,15 +288,21 @@ func track(event string, properties map[string]interface{}) {
 	}
 
 	apiURL := sharedtel.GetTelemetryAPIURL()
-	token := currentToken()
 
 	if isDebugMode() {
 		sendDebug(payload, apiURL, token)
 		return
 	}
 
-	spawnTelemetrySender(payload, apiURL, token)
+	dispatch(payload, apiURL, token)
 }
+
+// Seams for tests: whether this process is a test binary, which sends nothing,
+// and how an event leaves the process.
+var (
+	isTestRunFn = isTestRun
+	dispatch    = spawnTelemetrySender
+)
 
 // CreateTrackingHook returns a RunE function that tracks command execution
 func CreateTrackingHook() func(cmd *cobra.Command, args []string) error {

@@ -2,28 +2,64 @@ package httputil
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIsTransportError(t *testing.T) {
-	refused := &url.Error{Op: "Get", URL: "http://api.invalid/", Err: &net.OpError{Op: "dial", Err: errors.New("connection refused")}}
-	assert.True(t, IsTransportError(refused))
-	assert.True(t, IsTransportError(fmt.Errorf("listing organizations: %w", refused)))
-	assert.True(t, IsTransportError(&net.DNSError{Err: "no such host", Name: "api.invalid"}))
-	assert.True(t, IsTransportError(fmt.Errorf("read: %w", io.ErrUnexpectedEOF)))
-	assert.True(t, IsTransportError(context.DeadlineExceeded))
+	dial := func(err error) error {
+		return &url.Error{Op: "Get", URL: "http://api.invalid/", Err: &net.OpError{Op: "dial", Net: "tcp", Err: os.NewSyscallError("connect", err)}}
+	}
 
-	// An answer, whatever it says, is not a failure to get one.
-	assert.False(t, IsTransportError(NormalizeAPIError(&http.Response{StatusCode: http.StatusServiceUnavailable}, nil)))
-	assert.False(t, IsTransportError(&url.Error{Op: "Get", URL: "http://api.invalid/", Err: context.Canceled}), "an interrupted request is the run ending")
-	assert.False(t, IsTransportError(errors.New("boom")))
-	assert.False(t, IsTransportError(nil))
+	// Transient: a retry can fix them.
+	for name, err := range map[string]error{
+		"connection refused":     dial(syscall.ECONNREFUSED),
+		"connection reset":       dial(syscall.ECONNRESET),
+		"host unreachable":       dial(syscall.EHOSTUNREACH),
+		"network unreachable":    dial(syscall.ENETUNREACH),
+		"wrapped":                fmt.Errorf("listing organizations: %w", dial(syscall.ECONNREFUSED)),
+		"dns":                    &url.Error{Op: "Get", URL: "http://api.invalid/", Err: &net.DNSError{Err: "no such host", Name: "api.invalid", IsNotFound: true}},
+		"dns timeout":            &net.DNSError{Err: "i/o timeout", Name: "api.invalid", IsTimeout: true},
+		"connection ended early": fmt.Errorf("read: %w", io.ErrUnexpectedEOF),
+		"eof":                    &url.Error{Op: "Get", URL: "http://api.invalid/", Err: io.EOF},
+		"deadline":               context.DeadlineExceeded,
+		"timeout":                &url.Error{Op: "Get", URL: "http://api.invalid/", Err: &net.OpError{Op: "read", Err: timeoutErr{}}},
+	} {
+		assert.True(t, IsTransportError(err), name)
+	}
+
+	// Not transient, or not a transport failure at all.
+	for name, err := range map[string]error{
+		"nil":                      nil,
+		"canceled":                 &url.Error{Op: "Get", URL: "http://api.invalid/", Err: context.Canceled},
+		"unknown authority":        &url.Error{Op: "Get", URL: "https://api.invalid/", Err: x509.UnknownAuthorityError{}},
+		"invalid certificate":      &url.Error{Op: "Get", URL: "https://api.invalid/", Err: x509.CertificateInvalidError{Reason: x509.Expired}},
+		"hostname mismatch":        &url.Error{Op: "Get", URL: "https://api.invalid/", Err: x509.HostnameError{Host: "api.invalid"}},
+		"certificate verification": &url.Error{Op: "Get", URL: "https://api.invalid/", Err: &tls.CertificateVerificationError{Err: x509.UnknownAuthorityError{}}},
+		"not tls":                  &url.Error{Op: "Get", URL: "https://api.invalid/", Err: tls.RecordHeaderError{Msg: "first record does not look like a TLS handshake"}},
+		"unsupported scheme":       &url.Error{Op: "Get", URL: "ftp://api.invalid/", Err: errors.New(`unsupported protocol scheme "ftp"`)},
+		"malformed url":            &url.Error{Op: "parse", URL: "http://a b/", Err: url.InvalidHostError(" ")},
+		"a status":                 NormalizeAPIError(&http.Response{StatusCode: http.StatusServiceUnavailable}, nil),
+		"boom":                     errors.New("boom"),
+	} {
+		assert.False(t, IsTransportError(err), name)
+	}
 }
+
+// timeoutErr is a net.Error that timed out.
+type timeoutErr struct{}
+
+func (timeoutErr) Error() string   { return "i/o timeout" }
+func (timeoutErr) Timeout() bool   { return true }
+func (timeoutErr) Temporary() bool { return true }

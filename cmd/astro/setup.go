@@ -384,7 +384,11 @@ func loginContext(domain string) (config.Context, error) {
 	if domain != "" {
 		return context.GetContext(domain)
 	}
-	return context.GetCurrentContext()
+	c, err := context.GetCurrentContext()
+	if err != nil {
+		return c, currentContextError(err)
+	}
+	return c, nil
 }
 
 // RefreshLogin renews the current login's access token now, whatever expiry
@@ -429,55 +433,83 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 	if !isExpired(expireTime, auth.AccessTokenRefreshMargin) {
 		return nil
 	}
-	authConfig, err := fetchDomainAuthConfig(c.Domain)
-	if err != nil {
-		return renewalOutcome(expireTime, err)
-	}
-	if err := c.SetAuthTenant(authConfig.DomainURL, authConfig.ClientID); err != nil {
-		// A write that failed is not a provider that did not answer: the config
-		// cannot hold the renewal, so say so now rather than at expiry.
-		return renewalFailed(err)
-	}
-	res, err := refresh(c.RefreshToken, authConfig)
-	if err != nil {
-		if isExpired(expireTime, 0) {
-			// The refresh token no longer works: a person can log in again, so
-			// offer that. A run that may not ask reports the expiry instead.
-			if loginErr := authLogin(c.Domain, "", astroV1Client, out, false, false, false); loginErr != nil {
-				if errors.Is(loginErr, auth.ErrLoginNeeded) {
-					return renewalFailed(err)
-				}
-				return loginErr
-			}
-			// authLogin already persisted the new context, so don't fall through
-			// and overwrite it with the failed refresh's zero-value token
-			return nil
-		}
-		return renewalOutcome(expireTime, err)
-	}
-	if err := saveRenewedToken(&c, &res); err != nil {
-		// The refresh worked, so the provider may have retired the old refresh
-		// token: a renewal that was not saved is lost, not postponed.
-		return renewalFailed(err)
-	}
-	return nil
-}
-
-// renewalOutcome decides what a renewal that failed with err means for a
-// login whose access token expires at expireTime. Inside the refresh margin but
-// not past it the token still works, and an identity provider that is down is
-// no reason to fail a command that can run on it: that is the one failure here
-// that is logged and not returned. A renewal that could not be saved is always
-// returned.
-func renewalOutcome(expireTime time.Time, err error) error {
+	renewed, err := renewCurrentLogin(&c)
 	if err == nil {
 		return nil
 	}
-	if !isExpired(expireTime, 0) {
-		logger.Debugf("could not renew the Astro login, which has not expired yet: %v", err)
+	if !renewed.expired {
+		// Inside the refresh margin but not past it the token still works, and a
+		// provider that is down, or a config that will not save, is no reason to
+		// fail a command that can run on it. If the provider did answer and the
+		// answer could not be saved, it may have retired the old refresh token:
+		// the next run, with this token expired, will ask for a login.
+		logger.Debugf("could not renew the Astro login, which has not expired yet; continuing on the current access token (renewed at the provider but not saved: %t): %v", renewed.unsaved, err)
+		return nil
+	}
+	if renewed.rejected {
+		// The refresh token no longer works: a person can log in again, so
+		// offer that. A run that may not ask reports the expiry instead.
+		if loginErr := authLogin(c.Domain, "", astroV1Client, out, false, false, false); loginErr != nil {
+			if errors.Is(loginErr, auth.ErrLoginNeeded) {
+				return renewalFailed(err)
+			}
+			return loginErr
+		}
+		// authLogin already persisted the new context, so don't fall through
+		// and overwrite it with the failed refresh's zero-value token
 		return nil
 	}
 	return renewalFailed(err)
+}
+
+// renewal says how a renewal that failed failed.
+type renewal struct {
+	// expired: the login's access token is past its expiry, so the failure
+	// leaves the command with nothing to run on.
+	expired bool
+	// rejected: the provider answered the refresh token and refused it.
+	rejected bool
+	// unsaved: the provider renewed the login and the config would not take it.
+	unsaved bool
+}
+
+// renewCurrentLogin renews the current context's access token from its refresh
+// token and saves it, under the lock FreshLogin takes, so that processes which
+// find the same token stale renew it once: the others wait, re-read the login,
+// and take the renewal (a refresh token the provider rotates would fail the
+// loser). c is updated to the login as the lock found it. A nil error means the
+// login is renewed, by this process or another.
+func renewCurrentLogin(c *config.Context) (renewal, error) {
+	unlock := config.LockLoginRenewal()
+	defer unlock()
+	config.ReloadHome()
+	fresh, err := context.GetCurrentContext()
+	if err != nil {
+		return renewal{expired: true}, currentContextError(err)
+	}
+	expireTime, _ := fresh.GetExpiresIn() //nolint:errcheck // a missing expiry reads as expired, which renews
+	state := renewal{expired: isExpired(expireTime, 0)}
+	*c = fresh
+	if fresh.Token != "" && fresh.Token != "Bearer " && !isExpired(expireTime, auth.AccessTokenRefreshMargin) {
+		return state, nil // another process renewed it while this one waited
+	}
+	authConfig, err := fetchDomainAuthConfig(c.Domain)
+	if err != nil {
+		return state, err
+	}
+	if err := c.SetAuthTenant(authConfig.DomainURL, authConfig.ClientID); err != nil {
+		return state, err
+	}
+	res, err := refresh(c.RefreshToken, authConfig)
+	if err != nil {
+		state.rejected = true
+		return state, err
+	}
+	if err := saveRenewedToken(c, &res); err != nil {
+		state.unsaved = true
+		return state, err
+	}
+	return state, nil
 }
 
 // currentContextError says what is wrong with the current context in words that
@@ -640,6 +672,8 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 	// for this process only).
 	// The selection is recorded under the context the login was given to, by
 	// its domain, not under whatever domain the config re-read says.
+	// Again, now with the product the lookup found: the earlier call could not
+	// know it.
 	if err := useEnvironmentSelection(&config.Context{Domain: domain}, orgID, orgProduct, wsID); err != nil {
 		return false, err
 	}

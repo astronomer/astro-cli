@@ -79,13 +79,11 @@ func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobr
 				apcCmd.InitDebugLogs = append(apcCmd.InitDebugLogs, "Error comparing CLI versions: "+err.Error())
 			}
 		}
+		var err error
 		if context.IsCloudContext() {
-			if err := astroSetup(cmd, astroV1Client); err != nil {
-				apcCmd.PrintDebugLogs()
-				return err
-			}
+			err = astroSetup(cmd, astroV1Client)
 		}
 		apcCmd.PrintDebugLogs()
-		return nil
+		return err
 	}
 }
