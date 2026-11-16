@@ -156,7 +156,7 @@ func deploymentSaDelete(cmd *cobra.Command, args []string, out io.Writer) error 
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	if err := confirmRemoval(serviceAccountDeleteQuestion(args[0])); err != nil {
+	if err := confirm(serviceAccountDeleteQuestion(args[0])); err != nil {
 		return err
 	}
 	deleted, err := sa.DeleteUsingDeploymentUUID(args[0], deploymentID, houstonClient)

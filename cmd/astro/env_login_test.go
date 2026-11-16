@@ -3,7 +3,6 @@ package astro
 import (
 	"bytes"
 	"errors"
-	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -19,11 +18,9 @@ import (
 	"github.com/zalando/go-keyring"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/secrets"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -31,8 +28,6 @@ import (
 const (
 	savedToken   = "Bearer saved-access"
 	savedRefresh = "saved-refresh"
-	// envKeyToken is the access token the API key exchange returns.
-	envKeyToken = "key-access"
 )
 
 // savedLogin writes a config with a login for astronomer.io, the current
@@ -328,49 +323,6 @@ func TestWritingBackTheContextDoesNotSaveTheEnvironmentToken(t *testing.T) {
 			t.Setenv("ASTRO_API_TOKEN", "")
 			assertSavedLoginIntact(t, home, envToken)
 		})
-	}
-}
-
-// API keys are exchanged for an access token, which is the environment's
-// login just as ASTRO_API_TOKEN is.
-func TestEnvironmentAPIKeysLeaveTheSavedLoginUntouched(t *testing.T) {
-	for _, vault := range []bool{true, false} {
-		for name, orgsErr := range map[string]error{"accepted": nil, "rejected": errRejected} {
-			t.Run(name+map[bool]string{true: " vault", false: " config"}[vault], func(t *testing.T) {
-				home := savedLogin(t, vault)
-				noLoginFlow(t)
-				previousFetch, previousClient := fetchDomainAuthConfig, client
-				t.Cleanup(func() { fetchDomainAuthConfig, client = previousFetch, previousClient })
-				fetchDomainAuthConfig = func(domain string) (auth.Config, error) {
-					return auth.Config{DomainURL: "https://auth." + domain + "/"}, nil
-				}
-				client = testUtil.NewTestClient(func(*http.Request) *http.Response {
-					return &http.Response{
-						StatusCode: 200,
-						Body:       io.NopCloser(strings.NewReader(`{"access_token":"` + envKeyToken + `","expires_in":3600}`)),
-						Header:     make(http.Header),
-					}
-				})
-				t.Setenv("ASTRONOMER_KEY_ID", "env-key-id")
-				t.Setenv("ASTRONOMER_KEY_SECRET", "env-key-secret")
-				before := snapshot(t, home)
-
-				err := EnsureLogin(orgsClient(orgsErr))
-				if (err == nil) != (orgsErr == nil) {
-					t.Fatalf("login check err = %v, want an error = %v", err, orgsErr != nil)
-				}
-				if c, _ := config.GetCurrentContext(); orgsErr == nil && (c.Token != "Bearer "+envKeyToken || c.Organization != "env-org" || c.Workspace != "env-ws") {
-					t.Errorf("the command does not use the API key's login: token = %v, organization = %q, workspace = %q", c.Token == "Bearer "+envKeyToken, c.Organization, c.Workspace)
-				}
-				if changed := changedFiles(before, snapshot(t, home)); len(changed) != 0 {
-					t.Errorf("the login check changed %v", changed)
-				}
-
-				t.Setenv("ASTRONOMER_KEY_ID", "")
-				t.Setenv("ASTRONOMER_KEY_SECRET", "")
-				assertSavedLoginIntact(t, home, envKeyToken)
-			})
-		}
 	}
 }
 

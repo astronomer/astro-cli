@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
@@ -105,8 +106,7 @@ func TestLinkPickersIgnoreTheTokensDeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	stubLinkLogin(t, nil, nil)
 	shown := stubSelectDeployment(t)
-	deployment.UseTokenDeployment(linkedDep.Id)
-	t.Cleanup(func() { deployment.UseTokenDeployment("") })
+	testUtil.UseAPIToken(t, "deploymentId:"+linkedDep.Id)
 	client := astrov1_mocks.NewClientWithResponsesInterface(t)
 	client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(listResponse(http.StatusOK, linkedDep, pickedDep), nil).Once()
 	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(getResponse(&pickedDep), nil).Once()
@@ -283,4 +283,12 @@ func TestLoginCheckFailedReadsTheAPITokenByTheOneRule(t *testing.T) {
 			assert.Contains(t, err.Error(), "checking your", "ASTRO_API_TOKEN=%q", env)
 		}
 	}
+}
+
+// The refusal of Deployment API keys is not the saved login's failure, so it
+// is not worded as one.
+func TestLoginCheckFailedLeavesTheLegacyAPIKeysRefusalAlone(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Setenv("ASTRO_API_TOKEN", "")
+	assert.Same(t, astroCmd.ErrLegacyAPIKeys, loginCheckFailed(astroCmd.ErrLegacyAPIKeys))
 }

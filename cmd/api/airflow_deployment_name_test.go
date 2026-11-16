@@ -150,6 +150,7 @@ func TestDeploymentNameMissingOrAmbiguous(t *testing.T) {
 
 // With no workspace anywhere a name has nowhere to be looked up.
 func TestDeploymentNameWithNoWorkspace(t *testing.T) {
+	t.Setenv("ASTRO_API_TOKEN", "") // a token run gets another message
 	writeAPIProject(t, "")
 	listed := astroLookups(t)
 	ctx, err := config.GetCurrentContext()

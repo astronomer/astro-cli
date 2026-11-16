@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 
+	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
@@ -38,6 +39,8 @@ var cloudSamples = map[cliout.ProblemKind][]error{
 		// arrives wrapped by github.com/pkg/errors, as cmd/astro wraps it.
 		pkgerrors.Wrap(config.ErrGetHomeString, "failed to get current Workspace"),
 		astrosession.ErrLoggedOut,
+		// Deployment API keys in the environment, which no longer log in.
+		astroCmd.ErrLegacyAPIKeys,
 		// A login a run under --output json may not start, as Login words it.
 		fmt.Errorf("%w; with --output json it cannot — run astro login first", astroAuth.ErrLoginNeeded),
 	},
@@ -229,5 +232,17 @@ func TestAJSONUsageErrorAtTheRoot(t *testing.T) {
 				t.Errorf("got %+v", obj)
 			}
 		})
+	}
+}
+
+// Deployment API keys fail as an unauthenticated run, exit 1, not as a usage
+// error: the command was invoked rightly and has no login to run under.
+func TestLegacyAPIKeysAreUnauthenticatedNotUsage(t *testing.T) {
+	err := fmt.Errorf("checking login: %w", astroCmd.ErrLegacyAPIKeys)
+	if got := problemKinds.Of(err); got != KindUnauthenticated {
+		t.Errorf("kind = %q, want %q", got, KindUnauthenticated)
+	}
+	if cliout.IsUsage(err) {
+		t.Error("the refusal is a usage error, which exits 2")
 	}
 }

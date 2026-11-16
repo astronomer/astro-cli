@@ -14,7 +14,7 @@ func pickIndex(i int) apitoken.Picker {
 // findAndRotate rotates the token id or name means, as the command does once
 // a person has confirmed. What a rotate returns is TestRotateTokenResult's.
 func findAndRotate(id, name string, client astrov1.APIClient) error {
-	ws, org, err := Target("")
+	ws, org, err := target("")
 	if err != nil {
 		return err
 	}
@@ -30,7 +30,7 @@ func findAndRotate(id, name string, client astrov1.APIClient) error {
 // command does once a person has confirmed. What a delete returns is
 // TestDeleteTokenResult's.
 func findAndDelete(id, name string, client astrov1.APIClient) error {
-	ws, org, err := Target("")
+	ws, org, err := target("")
 	if err != nil {
 		return err
 	}

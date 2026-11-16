@@ -85,7 +85,7 @@ The runtime image already is Airflow, so a generated image leaves both distribut
 
 ## `[tool.astro]`
 
-The section that makes a Python project an Astro project. Its absence is how the CLI tells an Astro project from a plain one. Every key it holds is listed below; a key that is not — a typo, a setting from another tool — is an error, so nothing you write here is quietly ignored.
+The section that makes a Python project an Astro project. Its absence is how the CLI tells an Astro project from a plain one. Every key it holds is listed below. A key that is not (a typo, a setting from another tool, or a key a newer Astro CLI or Astro Desktop writes) is a warning: the manifest still loads without it, and `astro local start` and `restart` print the key, so a misspelling is said rather than quietly ignored. It is a warning rather than an error so a project stays readable when a teammate on a newer CLI adds a key this one does not know. The same holds for a link's keys and a pool's. `[tool.astro.env]` is the exception: an unknown key there is an error, see below.
 
 There is no `airflow` key: the requirement is the one statement of the version, so nothing can run one Airflow in Docker mode and another in standalone. A manifest with an `airflow` line is refused until it is deleted, and the error quotes the requirement that decides the version:
 
@@ -296,7 +296,7 @@ There are five kinds of link, and the kind follows from what the link sets:
 
 A link names coordinates (`deployment` or `environment`) or a `url`, never both.
 
-Pick any name you like, with two rules: it cannot be empty, and it cannot be `local`, which always means the Airflow running on your own machine. Keys the table does not define are errors rather than silence — misspell `default` on the link you meant to be the default and the CLI says so, instead of quietly resolving to another link.
+Pick any name you like, with two rules: it cannot be empty, and it cannot be `local`, which always means the Airflow running on your own machine. Keys the table does not define are warnings rather than silence: misspell `default` on the link you meant to be the default and `astro local start` says so, though the link loads without it.
 
 ### `deployment`
 
@@ -609,7 +609,7 @@ project = 'acme-data'                  # the GCP project holding the environment
 location = 'us-central1'               # its region
 ```
 
-Any other key in those two sections, or a section named for no target, is a warning: the manifest still loads, and `astro local start` and `restart` print the key, since a misspelled `region` reads the same as no region at all. It is a warning rather than an error, unlike an unknown key elsewhere in `[tool.astro]`, because these sections are open by design: each backend owns its own section.
+Any other key in those two sections, or a section named for no target, is a warning: the manifest still loads, and `astro local start` and `restart` print the key, since a misspelled `region` reads the same as no region at all. It is a warning, as an unknown key is elsewhere in `[tool.astro]` but `[tool.astro.env]`.
 
 `astro` and `oss` are targets too, but nothing reads their sections yet. They are reserved: carried through as they are and never warned about, until a reader gives them a shape.
 

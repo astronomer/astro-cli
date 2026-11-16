@@ -122,7 +122,7 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 	// bare stdout; under json that is a note, not the result.
 	defer strayStdoutToStderr(format)()
 
-	ws, err := coalesceWorkspace()
+	ws, err := deploymentWorkspace(cmd, deploymentID, "")
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) 
 	cmd.SilenceUsage = true
 	defer strayStdoutToStderr(format)()
 
-	ws, err := coalesceWorkspace()
+	ws, err := deploymentWorkspace(cmd, deploymentID, "")
 	if err != nil {
 		return err
 	}

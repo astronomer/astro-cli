@@ -233,7 +233,7 @@ error.
 When the login is for another host than the current context's, the command
 refreshes that login if it is stale and stops with the "not logged in" message
 if there is none. It runs as if `ASTRO_DOMAIN` named that host, and it never
-moves the current-context pointer. With `ASTRO_API_TOKEN` or an API key set,
+moves the current-context pointer. With `ASTRO_API_TOKEN` set,
 the command stays on the host the environment names: the CLI stores a login
 for a token on the host it runs on and makes that host current, so a switch
 would move the pointer. A manifest that does not load stops the command, as it

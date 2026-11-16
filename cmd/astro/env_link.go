@@ -269,7 +269,7 @@ func newEnvLinkListCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command 
 }
 
 func runEnvLinkSet(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -303,7 +303,7 @@ func runEnvLinkSet(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags)
 }
 
 func runEnvLinkDelete(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -329,7 +329,7 @@ func runEnvLinkDelete(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFla
 }
 
 func runEnvLinkList(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}

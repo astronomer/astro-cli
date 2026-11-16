@@ -57,14 +57,14 @@ func addScopePersistentFlags(cmd *cobra.Command) {
 
 // envScope resolves the active scope, validating mutual exclusivity and falling
 // back to the current workspace from context when neither flag is set.
-func envScope() (env.Scope, error) {
+func envScope(cmd *cobra.Command) (env.Scope, error) {
 	if envWorkspaceID != "" && envDeploymentID != "" {
 		return env.Scope{}, env.ErrScopeAmbiguous
 	}
 	if envWorkspaceID == "" && envDeploymentID == "" {
-		ws, err := coalesceWorkspace()
+		ws, err := coalesceWorkspace(cmd)
 		if err != nil {
-			return env.Scope{}, fmt.Errorf("%w (and falling back to workspace context: %s)", env.ErrScopeNotSpecified, err.Error())
+			return env.Scope{}, fmt.Errorf("%w (and falling back to workspace context: %w)", env.ErrScopeNotSpecified, err)
 		}
 		return env.Scope{WorkspaceID: ws}, nil
 	}
@@ -172,7 +172,7 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 }
 
 func runEnvList(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}

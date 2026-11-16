@@ -13,6 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -393,12 +394,12 @@ func TestDeploymentFlagReportsAManifestThatDoesNotLoad(t *testing.T) {
 func TestDeploymentDeleteByLinkNamesTheDeployment(t *testing.T) {
 	linkedProject(t)
 	run := runAPC(t, newAPCClient(), "n\n", "deployment", "delete", "--deployment", "prod")
-	require.NoError(t, run.err)
+	require.ErrorIs(t, run.err, input.ErrAborted)
 	assert.True(t, run.stdinRead)
 	assert.Contains(t, run.stdout+run.stderr, "Link prod names Deployment dep-prod.")
 
 	run = runAPC(t, newAPCClient(), "n\n", "deployment", "delete", "dep-prod")
-	require.NoError(t, run.err)
+	require.ErrorIs(t, run.err, input.ErrAborted)
 	assert.NotContains(t, run.stdout+run.stderr, "names Deployment")
 }
 

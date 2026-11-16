@@ -1314,11 +1314,20 @@ func (p *parser) workspace(key string, kind LinkKind, raw any, fallback string) 
 	return ws
 }
 
-// unknownKeys reports every key the table does not define.
+// unknownKeys warns about every key the table does not define, and the load
+// goes on without it.
+//
+// A warning and not a problem, so a project stays readable by an older build
+// of this package. The file is committed and shared: a teammate on a newer
+// CLI, or a newer Astro Desktop, can write a key this build has never heard
+// of, and refusing the whole manifest over it would stop every older reader
+// from starting, deploying or opening the project at all. The warning still
+// names the key, so a misspelling (`defaults = true` on a link) is said out
+// loud rather than silently ignored.
 func (p *parser) unknownKeys(key string, table map[string]any, known []string) {
 	for name := range table {
 		if !slices.Contains(known, name) {
-			p.add(CodeUnknownKey, key+"."+name, "unknown key")
+			p.warn(CodeUnknownKey, key+"."+name, "unknown key, ignored: check its spelling, or whether a newer Astro CLI writes it")
 		}
 	}
 }

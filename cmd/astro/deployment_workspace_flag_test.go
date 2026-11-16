@@ -176,6 +176,7 @@ func TestWorkspaceTokenAddAndRemovePickInTheWorkspaceTheyArePointedAt(t *testing
 		})
 	}
 	t.Run("a token given by name with no workspace anywhere says to pass one", func(t *testing.T) {
+		t.Setenv("ASTRO_API_TOKEN", "") // a token run gets another message
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		noWorkspaceContext(t)
 		tokenID, orgTokenID, workspaceTokenID = "", "", ""

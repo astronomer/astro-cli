@@ -131,11 +131,12 @@ func isUnauthorized(err error) bool {
 
 // loginCheckFailed says why deploy's login check did not pass. Only a refused
 // token is a session that expired; anything else keeps its own words. An
-// ASTRO_API_TOKEN failure is the token's own message, since the login is not
+// ASTRO_API_TOKEN failure, and the refusal of Deployment API keys, are their
+// own messages, since the login is not
 // what failed, and an unreachable host is the workspace link's offline cause.
 func loginCheckFailed(err error) error {
 	switch {
-	case astrosession.HasAPIToken():
+	case astrosession.HasAPIToken(), errors.Is(err, astroCmd.ErrLegacyAPIKeys):
 		return err
 	case isOffline(err):
 		return offline()

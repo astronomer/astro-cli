@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/browser"
 
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -25,6 +26,7 @@ import (
 )
 
 var (
+	errNoWorkspace             = errors.New("no workspace set in context: switch to one with astro workspace switch")
 	ErrInvalidProjectSelection = errors.New("invalid project selection")
 	ErrNoProjectsFound         = errors.New("no Astro IDE projects found in workspace")
 	// DefaultDirPerm is the default permission for directories
@@ -57,6 +59,10 @@ func ListProjects(client astrov1alpha1.APIClient) ([]astrov1alpha1.AstroIdeProje
 	if err != nil {
 		return []astrov1alpha1.AstroIdeProject{}, err
 	}
+	run := astrosession.Resolve(astrosession.Request{Login: &ctx, NoSaved: errNoWorkspace})
+	if err := run.Require(); err != nil {
+		return []astrov1alpha1.AstroIdeProject{}, err
+	}
 
 	sorts := []astrov1alpha1.ListAstroIdeProjectsParamsSorts{"name:asc"}
 	limit := 1000
@@ -65,7 +71,7 @@ func ListProjects(client astrov1alpha1.APIClient) ([]astrov1alpha1.AstroIdeProje
 		Sorts: &sorts,
 	}
 
-	resp, err := client.ListAstroIdeProjectsWithResponse(httpContext.Background(), ctx.Organization, ctx.Workspace, workspaceListParams)
+	resp, err := client.ListAstroIdeProjectsWithResponse(httpContext.Background(), ctx.Organization, run.Workspace, workspaceListParams)
 	if err != nil {
 		return []astrov1alpha1.AstroIdeProject{}, err
 	}
