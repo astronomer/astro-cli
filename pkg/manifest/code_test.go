@@ -72,7 +72,13 @@ func TestEveryProblemCarriesACodeAndAReason(t *testing.T) {
 func TestEveryCodeIsReachable(t *testing.T) {
 	raised := map[ProblemCode]bool{}
 	record := func(content string) {
-		_, err := Load(write(t, content))
+		m, err := Load(write(t, content))
+		if err == nil {
+			for _, w := range m.Warnings {
+				raised[w.Code] = true
+			}
+			return
+		}
 		var ve *ValidationError
 		if !errors.As(err, &ve) {
 			return
@@ -82,6 +88,9 @@ func TestEveryCodeIsReachable(t *testing.T) {
 		}
 	}
 	for _, tc := range validationCases {
+		record(tc.content)
+	}
+	for _, tc := range unknownKeyCases {
 		record(tc.content)
 	}
 	for _, tc := range authCases() {

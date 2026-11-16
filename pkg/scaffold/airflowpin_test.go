@@ -651,14 +651,14 @@ func TestMigrateAirflowKeySwitchesCoreForAnAirflow2(t *testing.T) {
 // problem. With another one, the result would still not load, so nothing is
 // written and the error names what is left.
 func TestMigrateAirflowKeyRefusesAManifestWithOtherProblems(t *testing.T) {
-	body := strings.Replace(leftoverFixture, "packages = ['libpq-dev']", "packages = ['libpq-dev']\npackagez = ['git']", 1)
+	body := strings.Replace(leftoverFixture, "packages = ['libpq-dev']", "packages = ['libpq-dev']\nworkspace = ''", 1)
 	dir, path := writeEditFixture(t, body, 0o644)
 
 	_, err := MigrateAirflowKey(dir, nil)
 
 	var ve *manifest.ValidationError
 	require.ErrorAs(t, err, &ve)
-	assert.Contains(t, err.Error(), "tool.astro.packagez")
+	assert.Contains(t, err.Error(), "tool.astro.workspace")
 	assert.Equal(t, body, readFile(t, path))
 }
 

@@ -100,9 +100,9 @@ func (p stubTargetParser) ParseWith(context.Context, string, checks.ParseInput) 
 // a project the check can report on.
 const validManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\", \"pandas\"]\n[tool.astro]\n"
 
-// brokenManifest fails manifest.Load on an unknown [tool.astro] key. Named
+// brokenManifest fails manifest.Load on a [tool.astro] packages that is not a list. Named
 // beside its valid counterpart so a change to Load's strictness is one edit.
-const brokenManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\nbogus_key = 'x'\n"
+const brokenManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\npackages = 'curl'\n"
 
 func TestTargetComposerPassesCleanly(t *testing.T) {
 	d, out := targetDeps(t)
@@ -355,7 +355,7 @@ func TestCheckReportsAManifestProblemBeforeTheEnvironment(t *testing.T) {
 		t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitEnvNotReady)
 	}
 	// On stdout, where docs/install.md tells an agent to read it.
-	if !strings.Contains(out.String(), "bogus_key") {
+	if !strings.Contains(out.String(), "tool.astro.packages") {
 		t.Errorf("stdout should name the manifest key, got %q", out.String())
 	}
 	if strings.Contains(out.String(), "astro local start") {
@@ -391,7 +391,7 @@ func TestCheckManifestProblemJSONCarriesAnErrorEvent(t *testing.T) {
 	if got.Event != "error" {
 		t.Errorf("event = %q, want \"error\"", got.Event)
 	}
-	if !strings.Contains(got.Message, "bogus_key") {
+	if !strings.Contains(got.Message, "tool.astro.packages") {
 		t.Errorf("message should name the key, got %q", got.Message)
 	}
 }
@@ -425,7 +425,7 @@ func TestCheckAndTargetAstroAgreeOnAnInvalidManifest(t *testing.T) {
 			if exit.Code != checks.ExitEnvNotReady {
 				t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitEnvNotReady)
 			}
-			if !strings.Contains(out.String(), "bogus_key") {
+			if !strings.Contains(out.String(), "tool.astro.packages") {
 				t.Errorf("stdout should name the manifest key, got %q", out.String())
 			}
 		})
