@@ -189,6 +189,35 @@ func (g guards) verdict(code int) (exit int, msg string) {
 		"(an astro login in another terminal) changed it. It fails the package when CI is set or %s=1.\n", list, strictEnv)
 }
 
+// testControlEnv are the variables a developer sets on purpose to steer a test
+// run, not the CLI: they survive the ASTRO_ sweep, together with every
+// ASTRO_TEST_ variable (the tests' own: the helper marker, the strict switch, the
+// helpers' signals). Clearing one would make `ASTRO_UPDATE_SCHEMAS=1 go test`
+// (make update-schemas) silently do nothing. Add one here, with why, when a test
+// reads a control from the environment.
+var testControlEnv = []string{
+	// cmd/cliout/cliouttest: rewrite the golden JSON schemas instead of checking them.
+	"ASTRO_UPDATE_SCHEMAS",
+}
+
+// sweepable reports whether the sweep unsets the variable called name: every
+// ASTRO_ and ASTRONOMER_ one but the test controls.
+func sweepable(name string) bool {
+	upper := strings.ToUpper(name)
+	if !strings.HasPrefix(upper, "ASTRO_") && !strings.HasPrefix(upper, "ASTRONOMER_") {
+		return false
+	}
+	if strings.HasPrefix(upper, "ASTRO_TEST_") {
+		return false
+	}
+	for _, keep := range testControlEnv {
+		if upper == keep {
+			return false
+		}
+	}
+	return true
+}
+
 // tempRoot is the temporary home, for dief to remove.
 var tempRoot string
 
@@ -202,14 +231,14 @@ func isolate(g guards, o Options) func(code int) int {
 	}
 	// The list above is the variables known to matter; every other ASTRO_ and
 	// ASTRONOMER_ one is the CLI's too (ASTRO_UV_BIN, ASTRO_AIRFLOW_INDEX_URL, ...),
-	// and a shell may export it. The ASTRO_TEST_ ones are the tests' own.
+	// and a shell may export it. Test controls survive (see sweepable).
 	for _, kv := range os.Environ() {
 		name, _, _ := strings.Cut(kv, "=")
-		upper := strings.ToUpper(name)
-		if (strings.HasPrefix(upper, "ASTRO_") || strings.HasPrefix(upper, "ASTRONOMER_")) && !strings.HasPrefix(upper, "ASTRO_TEST_") {
-			if err := os.Unsetenv(name); err != nil { //nolint:usetesting // for the whole package run
-				dief("unsetting %s: %v", name, err)
-			}
+		if !sweepable(name) {
+			continue
+		}
+		if err := os.Unsetenv(name); err != nil { //nolint:usetesting // for the whole package run
+			dief("unsetting %s: %v", name, err)
 		}
 	}
 	// Before anything is made, so a refusal leaves nothing behind.
@@ -265,8 +294,8 @@ func inherit(o Options) {
 	// or invented marker (exported from a shell, say) fails here, loudly, rather
 	// than switching the isolation off for the binary.
 	root := os.Getenv(inheritedEnv)
-	if !within(root, os.TempDir()) {
-		dief("%s=%q is not a directory in the temporary directory %s, so it is not a home a test binary made; unset it", inheritedEnv, root, os.TempDir())
+	if !strictlyWithin(root, os.TempDir()) {
+		dief("%s=%q is not a directory inside the temporary directory %s, so it is not a home a test binary made; unset it", inheritedEnv, root, os.TempDir())
 	}
 	if home := os.Getenv("HOME"); !within(home, root) {
 		dief("a helper process runs with HOME=%q, which is not inside %s=%q: its parent's home. "+
@@ -315,6 +344,10 @@ func within(path, dir string) bool {
 	rel, err := filepath.Rel(a, b)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
+
+// strictlyWithin is within, but not for path equal to dir: the temporary
+// directory itself is not a home a test binary made.
+func strictlyWithin(path, dir string) bool { return within(path, dir) && !within(dir, path) }
 
 // resolve is p with symlinks followed in the part that exists.
 func resolve(p string) string {

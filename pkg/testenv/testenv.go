@@ -39,7 +39,6 @@ var behaviorEnv = []string{
 	// Telemetry endpoints and debugging, and golden files rewritten in place.
 	"ASTRO_TELEMETRY_API_URL",
 	"ASTRO_TELEMETRY_DEBUG",
-	"ASTRO_UPDATE_SCHEMAS",
 	// Where the runtime catalog, constraints and freeze files come from.
 	"ASTRO_RUNTIME_CONSTRAINTS_URL",
 	"ASTRO_RUNTIME_FREEZE_URL",

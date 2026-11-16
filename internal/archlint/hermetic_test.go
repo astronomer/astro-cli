@@ -75,6 +75,11 @@ func testPackages(t *testing.T, root string) []testPackage {
 		}
 		pkg := testPackage{dir: filepath.ToSlash(rel)}
 		pkg.hasMain, pkg.isolates, pkg.from, pkg.hooks = testMainOf(t, files)
+		// A bare Main or Isolate is testenv's own only inside testenv; anywhere
+		// else it is some local function that happens to be named like it.
+		if pkg.isolates && pkg.from == "" && !isTestenvDir(root, pkg.dir) {
+			pkg.isolates = false
+		}
 		out = append(out, pkg)
 		return nil
 	})
@@ -82,6 +87,15 @@ func testPackages(t *testing.T, root string) []testPackage {
 		t.Fatal(err)
 	}
 	return out
+}
+
+// isTestenvDir reports whether dir, in the tree walked from root, holds testenv
+// itself: pkg/testing/testenv in the root module, or the root of pkg/testenv.
+func isTestenvDir(root, dir string) bool {
+	if dir == "pkg/testing/testenv" {
+		return true
+	}
+	return dir == "." && filepath.Base(root) == "testenv" && filepath.Base(filepath.Dir(root)) == "pkg"
 }
 
 // testMainOf reads the test files of one package for its TestMain and what it
@@ -161,7 +175,8 @@ func containsString(list []string, s string) bool {
 }
 
 // passesKeyringHooks reports whether the call has an Options literal setting both
-// MockKeyring and KeyringRefusals.
+// MockKeyring and KeyringRefusals to something other than nil. It reads the
+// source: a hook behind a build tag or an `if false` is a limit it does not see.
 func passesKeyringHooks(call *ast.CallExpr) bool {
 	for _, arg := range call.Args {
 		lit, ok := arg.(*ast.CompositeLit)
@@ -170,10 +185,16 @@ func passesKeyringHooks(call *ast.CallExpr) bool {
 		}
 		keys := map[string]bool{}
 		for _, e := range lit.Elts {
-			if kv, ok := e.(*ast.KeyValueExpr); ok {
-				if id, ok := kv.Key.(*ast.Ident); ok {
-					keys[id.Name] = true
-				}
+			kv, ok := e.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			// A hook set to nil is no hook.
+			if v, ok := kv.Value.(*ast.Ident); ok && v.Name == "nil" {
+				continue
+			}
+			if id, ok := kv.Key.(*ast.Ident); ok {
+				keys[id.Name] = true
 			}
 		}
 		if keys["MockKeyring"] && keys["KeyringRefusals"] {
