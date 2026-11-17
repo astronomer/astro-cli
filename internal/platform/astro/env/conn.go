@@ -5,12 +5,13 @@ import (
 	"errors"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 )
 
 const objectTypeConn = astrov1.CONNECTION
 
-var errConnTypeRequired = errors.New("connection type is required (e.g. --type postgres)")
+var errConnTypeRequired = apitoken.Usage(errors.New("connection type is required (e.g. --type postgres)"))
 
 // ConnInput is the user-supplied data needed to create or update a connection.
 // Type is required on create. All other fields are optional and overlaid as a

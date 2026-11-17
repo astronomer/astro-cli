@@ -480,7 +480,7 @@ func connFieldsGiven(cmd *cobra.Command) bool {
 // id from the key it was given. Taking one here would imply it tags the record.
 func connValueFromFields(f *connFields, password string) (string, error) {
 	if f.connType == "" {
-		return "", errors.New("a connection needs a type: pass --type, or give the whole connection as a URI or JSON")
+		return "", cliout.Usage(errors.New("a connection needs a type: pass --type, or give the whole connection as a URI or JSON"))
 	}
 	conn := connmodel.Connection{
 		ConnType:     f.connType,

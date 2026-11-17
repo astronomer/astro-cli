@@ -76,7 +76,7 @@ func linkVariableIDOrKey() (string, error) {
 	if envLinkVariableKey != "" {
 		return envLinkVariableKey, nil
 	}
-	return "", errors.New("--variable-id or --variable-key cannot be empty")
+	return "", cliout.Usage(errors.New("--variable-id or --variable-key cannot be empty"))
 }
 
 // newRemovedLinkCreateCmd is the `link create` tombstone. The nouns' stub

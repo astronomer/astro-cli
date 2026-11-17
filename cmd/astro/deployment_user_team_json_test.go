@@ -197,20 +197,21 @@ func TestDeploymentUserTeamJSONFailures(t *testing.T) {
 		client func(t *testing.T) astrov1.APIClient
 		args   []string
 		want   string
+		code   int
 	}{
-		{"user add of nobody", with(all), []string{"deployment", "user", "add", "nobody@example.com", d}, "no user was found for the email you provided"},
-		{"user update the API refuses", with(all, refusesUserRoles), []string{"deployment", "user", "update", "ada@example.com", "--role", "custom-role", d}, "you may not grant that role"},
-		{"team remove the API refuses", with(all, refusesTeamRoles), []string{"deployment", "team", "remove", "team-eng", d}, "you may not grant that role"},
-		{"team add naming no Deployment", with(all), []string{"deployment", "team", "add", "team-eng"}, "required flag --deployment not set"},
+		{"user add of nobody", with(all), []string{"deployment", "user", "add", "nobody@example.com", d}, "no user was found for the email you provided", cliout.ExitFailure},
+		{"user update the API refuses", with(all, refusesUserRoles), []string{"deployment", "user", "update", "ada@example.com", "--role", "custom-role", d}, "you may not grant that role", cliout.ExitFailure},
+		{"team remove the API refuses", with(all, refusesTeamRoles), []string{"deployment", "team", "remove", "team-eng", d}, "you may not grant that role", cliout.ExitFailure},
+		{"team add naming no Deployment", with(all), []string{"deployment", "team", "add", "team-eng"}, "required flag --deployment not set", cliout.ExitUsage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := execAstroCmd(t, tc.client(t), "", newDeploymentRootCmd, append(tc.args, "-o", "json")...)
 			require.Error(t, r.err)
-			assert.Equal(t, cliout.ExitFailure, r.code)
+			assert.Equal(t, tc.code, r.code)
 			var got errorJSON
 			decodeOne(t, r.stdout, &got)
 			assert.Contains(t, got.Error, tc.want)
-			assert.Equal(t, cliout.ExitFailure, got.Code)
+			assert.Equal(t, tc.code, got.Code)
 			assert.Empty(t, r.stderr)
 		})
 	}

@@ -55,7 +55,7 @@ func deploymentClone(cmd *cobra.Command, out io.Writer, format cliout.Format) er
 		return cliout.Usage(errCloneNeedsName)
 	}
 	if cmd.Flags().Changed("wait-time") && !waitForStatus {
-		return errors.New("cannot use --wait-time with --wait=false")
+		return cliout.Usage(errors.New("cannot use --wait-time with --wait=false"))
 	}
 	cmd.SilenceUsage = true
 

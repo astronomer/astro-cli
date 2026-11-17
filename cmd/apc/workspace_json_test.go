@@ -289,7 +289,7 @@ func TestWorkspaceCreateAndUpdateJSON(t *testing.T) {
 	t.Run("update with nothing to change is refused before Houston is asked", func(t *testing.T) {
 		api := wsClient()
 		got := runWorkspaceTree(t, api, "", true, "workspace", "update", currentWS, "-o", "json")
-		assert.Equal(t, 1, got.code)
+		assert.Equal(t, cliout.ExitUsage, got.code)
 		var e wsErrorObject
 		decodeWorkspaceOutput(t, got.stdout, &e)
 		assert.Equal(t, errUpdateWorkspaceInvalidArgs.Error(), e.Error)

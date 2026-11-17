@@ -103,9 +103,9 @@ func refuseImageFlags() error {
 	case isDagOnlyDeploy && (imageName != "" || imagePresentOnRemote):
 		return cliout.Usage(errDagsWithImageSource())
 	case imagePresentOnRemote && imageName == "":
-		return ErrImageNameNotPassedForRemoteFlag
+		return cliout.Usage(ErrImageNameNotPassedForRemoteFlag)
 	case imagePresentOnRemote && runtimeVersionForImageName == "":
-		return deploy.ErrRuntimeVersionNotPassedForRemoteImage
+		return cliout.Usage(deploy.ErrRuntimeVersionNotPassedForRemoteImage)
 	}
 	return nil
 }

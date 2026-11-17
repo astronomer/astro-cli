@@ -352,7 +352,7 @@ func buildConnInput(cmd *cobra.Command, idOrKey string) (env.ConnInput, error) {
 		return connInputFromValue(cmd, idOrKey, envConnValue)
 	}
 	if envConnType == "" {
-		return env.ConnInput{}, errors.New("a connection needs a type: pass --type, or --value with a URI or connection JSON that carries one")
+		return env.ConnInput{}, cliout.Usage(errors.New("a connection needs a type: pass --type, or --value with a URI or connection JSON that carries one"))
 	}
 	// Optional fields are sent only when the user explicitly set the flag, so
 	// passing --host="" (etc.) is preserved as "clear this field" rather than

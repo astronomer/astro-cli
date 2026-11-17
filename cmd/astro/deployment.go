@@ -894,7 +894,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 
 	if cmd.Flags().Changed("wait-time") && !waitForStatus {
-		return errors.New("cannot use --wait-time with --wait=false")
+		return cliout.Usage(errors.New("cannot use --wait-time with --wait=false"))
 	}
 
 	var coreDeploymentType astrov1.DeploymentType
@@ -1126,7 +1126,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 	}
 
 	if cmd.Flags().Changed("wait-time") && !waitForStatus {
-		return errors.New("cannot use --wait-time with --wait=false")
+		return cliout.Usage(errors.New("cannot use --wait-time with --wait=false"))
 	}
 
 	// Silence Usage as we have now validated command input

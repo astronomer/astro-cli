@@ -179,7 +179,7 @@ func resolveClientTarget(m *manifest.Manifest, registry, deployment string) (cli
 	}
 	switch {
 	case m == nil:
-		return clientTarget{}, errors.New("no client registry: pass --registry <registry>/<repository>, the repository the Deployment's remote agents pull the client image from. Outside a project it is the only way to name one")
+		return clientTarget{}, cliout.Usage(errors.New("no client registry: pass --registry <registry>/<repository>, the repository the Deployment's remote agents pull the client image from. Outside a project it is the only way to name one"))
 	case link != nil && link.ClientRegistry != "":
 		t.registry = link.ClientRegistry
 		t.source = projectClientRegistry

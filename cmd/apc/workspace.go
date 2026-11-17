@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	errUpdateWorkspaceInvalidArgs  = errors.New("must specify at least one attribute to update (--name or --description)")
+	errUpdateWorkspaceInvalidArgs  = cliout.Usage(errors.New("must specify at least one attribute to update (--name or --description)"))
 	errCreateWorkspaceMissingLabel = errors.New("must specify a name for your workspace")
 )
 
