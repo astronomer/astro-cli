@@ -185,8 +185,9 @@ func (g guards) verdict(code int) (exit int, msg string) {
 			"See docs/architecture.md, \"Tests never touch the machine\".\n", list)
 	}
 	return code, fmt.Sprintf("\ntestenv: WARNING: the developer's real config changed during this run:\n  %s\n"+
-		"A test may have reached the real ~/.astro instead of the temporary home, or something else on this machine "+
-		"(an astro login in another terminal) changed it. It fails the package when CI is set or %s=1.\n", list, strictEnv)
+		"If an astro login (or any astro command) ran in another terminal during this run, this is harmless: that is "+
+		"what changed it. A test that reached the real ~/.astro instead of the temporary home would also show here. "+
+		"It only fails the package in CI or with %s=1.\n", list, strictEnv)
 }
 
 // testControlEnv are the variables a developer sets on purpose to steer a test
@@ -218,6 +219,20 @@ func sweepable(name string) bool {
 	return true
 }
 
+// isCLIEnv reports whether name is in the ASTRO_ or ASTRONOMER_ family the
+// sweep covers.
+func isCLIEnv(name string) bool {
+	upper := strings.ToUpper(name)
+	return strings.HasPrefix(upper, "ASTRO_") || strings.HasPrefix(upper, "ASTRONOMER_")
+}
+
+// noteCleared says on stderr that the run cleared a variable that was set (its
+// name only: the value may be a credential), so a developer whose test switch
+// stopped working learns why.
+func noteCleared(name string) {
+	fmt.Fprintf(os.Stderr, "testenv: cleared %s from the environment for this test run; to keep a test switch, name it ASTRO_TEST_* or add it to testControlEnv\n", name)
+}
+
 // tempRoot is the temporary home, for dief to remove.
 var tempRoot string
 
@@ -225,6 +240,9 @@ var tempRoot string
 // decoy instead of the developer's home.
 func isolate(g guards, o Options) func(code int) int {
 	for _, k := range behaviorEnv {
+		if _, set := os.LookupEnv(k); set && isCLIEnv(k) {
+			noteCleared(k)
+		}
 		if err := os.Unsetenv(k); err != nil { //nolint:usetesting // for the whole package run
 			dief("unsetting %s: %v", k, err)
 		}
@@ -240,6 +258,7 @@ func isolate(g guards, o Options) func(code int) int {
 		if err := os.Unsetenv(name); err != nil { //nolint:usetesting // for the whole package run
 			dief("unsetting %s: %v", name, err)
 		}
+		noteCleared(name)
 	}
 	// Before anything is made, so a refusal leaves nothing behind.
 	uvDir, err := prepareUVDir()

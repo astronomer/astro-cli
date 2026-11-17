@@ -38,3 +38,19 @@ func TestTrackSetupFailure(t *testing.T) {
 		assert.Empty(t, ev.Token, "sent anonymously")
 	}
 }
+
+// A setup failure on a first run sends nothing and writes nothing: the notice
+// it would show is a config write, which the failing run must not make.
+func TestTrackSetupFailureLeavesAFirstRunAlone(t *testing.T) {
+	initTestConfig(t)
+	root := &cobra.Command{Use: "astro"}
+	deploy := &cobra.Command{Use: "deploy"}
+	root.AddCommand(deploy)
+	sent, restore := CaptureEventsForTesting()
+	t.Cleanup(restore)
+
+	TrackSetupFailure(deploy, "unauthenticated")
+
+	assert.Empty(t, sent())
+	assert.False(t, noticeShown(), "the notice was not marked shown")
+}
