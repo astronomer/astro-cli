@@ -56,11 +56,11 @@ func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
   astro deployment bundle create --deployment <id> --name my-dags -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
+			ws, client, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
 				return err
 			}
-			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), astroV1Client, astroV1Alpha1Client)
+			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), client, astroV1Alpha1Client)
 		},
 	}
 	cmd.Flags().StringVarP(&bundleName, "name", "n", "", "Name of the Dag bundle to create. Mutually exclusive with --mount-path")
@@ -81,11 +81,11 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
   astro deployment bundle list --deployment <id> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
+			ws, client, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
 				return err
 			}
-			return deployment.ListBundlesWithFormat(ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
+			return deployment.ListBundlesWithFormat(ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, client, astroV1Alpha1Client)
 		},
 	}
 	return cmd
@@ -111,7 +111,7 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
+			ws, client, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
 				return err
 			}
@@ -119,7 +119,7 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 			if len(args) > 0 {
 				bundleID = args[0]
 			}
-			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), astroV1Client, astroV1Alpha1Client)
+			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), client, astroV1Alpha1Client)
 		},
 	}
 	cmd.Flags().StringVarP(&bundleName, "name", "n", "", "Identify the Dag bundle to update by name, instead of by ID")
@@ -149,7 +149,7 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
+			ws, client, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 			if err != nil {
 				return err
 			}
@@ -157,7 +157,7 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 			if len(args) > 0 {
 				bundleID = args[0]
 			}
-			return deployment.DeleteBundle(bundleID, bundleName, bundleMountPath, ws, deploymentID, forceBundleDelete, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
+			return deployment.DeleteBundle(bundleID, bundleName, bundleMountPath, ws, deploymentID, forceBundleDelete, cliout.Renderer{Format: bundleOutput, Out: out}, client, astroV1Alpha1Client)
 		},
 	}
 	cmd.Flags().StringVarP(&bundleName, "name", "n", "", "Identify the Dag bundle to delete by name, instead of by ID")

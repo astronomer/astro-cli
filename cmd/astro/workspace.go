@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
@@ -999,28 +1000,31 @@ func argOrID(args []string) string {
 }
 
 // deploymentWorkspace is the Workspace a command that acts on one Deployment
-// looks it up in. A Deployment given by id is identified by it, so a run that
-// has no Workspace goes on without one: an Organization token selects none, and
-// a saved login may have none current. The Deployment is fetched by id, and its
-// own Workspace is the one the rest of the command works in. Given a Workspace
-// the id is looked for in it, as it always was, with no extra call. A name, or a
-// pick, still needs a Workspace, and fails here as before, ahead of any
-// question or API call. A failure to find the Workspace is worded with msg
-// ("" for none).
-func deploymentWorkspace(cmd *cobra.Command, id, msg string) (string, error) {
+// looks it up in, and the client to look it up with. A Deployment given by id
+// is identified by it, so a run that has no Workspace goes on without one: an
+// Organization token selects none, and a saved login may have none current.
+// The Deployment is fetched by id, and its own Workspace is the one the rest
+// of the command works in. The client returned is then handed that fetched
+// Deployment (deployment.WithFetched), so the command's own lookup of it asks
+// the API for nothing more: the id is one GET. Given a Workspace the id is
+// looked for in it, as it always was, with no extra call, and the client is
+// the run's own. A name, or a pick, still needs a Workspace, and fails here as
+// before, ahead of any question or API call. A failure to find the Workspace
+// is worded with msg ("" for none).
+func deploymentWorkspace(cmd *cobra.Command, id, msg string) (string, astrov1.APIClient, error) {
 	t := workspaceTarget(cmd, workspaceID, 0, workspace.ErrCurrentNotSet)
 	// Only an id identifies a Deployment with no Workspace; a name that is not
 	// one goes on to say there is no Workspace to look it up in.
 	if !t.Found() && util.IsCUID(id) {
 		d, err := deployment.GetDeploymentByID("", id, astroV1Client)
 		if err != nil {
-			return "", fmt.Errorf("no Workspace is selected, so Deployment %s was fetched by its id, which failed (pass --workspace to look it up in a Workspace instead): %w", id, err)
+			return "", astroV1Client, fmt.Errorf("no Workspace is selected, so Deployment %s was fetched by its id, which failed (pass --workspace to look it up in a Workspace instead): %w", id, err)
 		}
-		return d.WorkspaceId, nil
+		return d.WorkspaceId, deployment.WithFetched(astroV1Client, d), nil
 	}
 	ws, err := coalesceFrom(t)
 	if err != nil && msg != "" {
-		return "", wrapWorkspaceErr(err, msg)
+		return "", astroV1Client, wrapWorkspaceErr(err, msg)
 	}
-	return ws, err
+	return ws, astroV1Client, err
 }

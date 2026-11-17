@@ -2122,6 +2122,14 @@ func mayAutoSelect() bool {
 // creates a Deployment: a workspace with none to pick from is a
 // *NoDeploymentsError.
 func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFilter func(deployment astrov1.Deployment) bool, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+	// One the caller already fetched by its id (see WithFetched) is that
+	// Deployment: nothing is listed or read again.
+	if d, ok := fetchedFor(astroV1Client, ws, deploymentID); ok {
+		if deploymentName != "" && d.Name != deploymentName {
+			return astrov1.Deployment{}, &TargetsDisagreeError{ID: deploymentID, Name: deploymentName, IDsName: d.Name}
+		}
+		return d, nil
+	}
 	deployments, err := ListDeployments(ws, "", astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())

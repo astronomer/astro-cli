@@ -51,7 +51,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
-	wsID, err := deploymentWorkspace(cmd, argOrID(args), "")
+	wsID, client, err := deploymentWorkspace(cmd, argOrID(args), "")
 	if err != nil {
 		return err
 	}
@@ -72,5 +72,5 @@ func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
 		format = cliout.FormatText
 	}
 	r := cliout.Renderer{Format: format, Out: out}
-	return inspect.Print(wsID, deploymentName, deploymentID, astroV1Client, out, r, requestedField, showWorkloadIdentity)
+	return inspect.Print(wsID, deploymentName, deploymentID, client, out, r, requestedField, showWorkloadIdentity)
 }
