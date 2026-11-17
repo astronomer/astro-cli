@@ -1,6 +1,8 @@
 package telemetry
 
 import (
+	"slices"
+
 	"github.com/spf13/cobra"
 )
 
@@ -34,6 +36,11 @@ var queuedRenamedFlags *renamedFlags
 func RecordRenamedFlags(cmd *cobra.Command, renamed, current []string) {
 	if len(renamed) == 0 {
 		return
+	}
+	// A run that gives a deprecated command its hidden flag aliases records
+	// twice (the flags, then the command's own path): one event holds both.
+	if q := queuedRenamedFlags; q != nil && q.cmd == cmd {
+		renamed, current = append(slices.Clone(q.renamed), renamed...), append(slices.Clone(q.current), current...)
 	}
 	queuedRenamedFlags = &renamedFlags{cmd: cmd, renamed: renamed, current: current}
 	if cmd.Annotations[SkipPreRunAnnotation] == "true" {

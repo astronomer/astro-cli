@@ -176,7 +176,7 @@ func UpdateToken(id, name, newName, description, role, workspaceID string, token
 		tokenTypes = []TokenType{TokenTypeWORKSPACE, TokenTypeORGANIZATION}
 	}
 
-	token, err := FindToken(id, name, workspaceID, organizationID, tokenTypes, pick, client)
+	token, err := FindTokenIn(id, name, workspaceID, organizationID, tokenTypes, pick, client)
 	if err != nil {
 		return apitoken.Update{}, err
 	}
@@ -477,6 +477,24 @@ func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenT
 		}
 	}
 	return token, err
+}
+
+// FindTokenIn is FindToken for a command that changes the token in the
+// Workspace (update, rotate, delete, remove). The API serves any token of the
+// Organization by its ID, so a token given by ID that holds no role in the
+// Workspace is refused, as a usage error naming the Workspace: only a
+// Workspace's own tokens, and Organization tokens with a role in it, are its to
+// change. A run with no Workspace (an Organization token's, given an ID) has
+// none to check against.
+func FindTokenIn(id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (astrov1.ApiToken, error) {
+	token, err := FindToken(id, name, workspaceID, organizationID, tokenTypes, pick, client)
+	if err != nil {
+		return token, err
+	}
+	if id != "" && workspaceID != "" && workspaceRoleOf(&token, workspaceID) == "" {
+		return token, apitoken.Usage(fmt.Errorf("the API token %s has no role in this Workspace: only a Workspace's own tokens, and Organization tokens with a role in it, are found here", id))
+	}
+	return token, nil
 }
 
 // RemoveOrgTokenWorkspaceRole removes the workspace-scope role from an

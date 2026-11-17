@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	workspaceService "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // DeploymentTokenType narrows ListTokens results by token Scope (client-side filter,
@@ -429,6 +430,13 @@ func getDeploymentToken(id, name, deploymentID string, tokens []astrov1.ApiToken
 		if len(matchedTokens) == 1 {
 			token = matchedTokens[0]
 		} else if len(matchedTokens) > 1 {
+			// Refused before the picker, so a run that may not ask (-o json,
+			// no terminal) says what would answer it: --name is given and
+			// answers nothing here, so only the token's ID does.
+			if err := input.MayAsk(fmt.Sprintf("Several API tokens are named %s; which one?", name),
+				input.About("an API token"), input.AnsweredBy("the token's ID instead of its name")); err != nil {
+				return astrov1.ApiToken{}, err
+			}
 			token, err = apitoken.Pick(pick, fmt.Sprintf(pickSharedNameHead, name), matchedTokens, roleOf)
 			if err != nil {
 				return astrov1.ApiToken{}, err
@@ -479,6 +487,12 @@ func FindToken(id, name, deploymentID string, tokenTypes []DeploymentTokenType, 
 		token, err = getTokenByID(id, organizationID, client)
 		if err != nil {
 			return token, err
+		}
+		// The API serves any token of the Organization by its ID. One that
+		// holds no role on this Deployment is not this Deployment's to
+		// change, whichever scope it is of: its own tokens hold one here.
+		if deploymentID != "" && deploymentRoleOf(&token, deploymentID) == "" {
+			return token, apitoken.Usage(fmt.Errorf("the API token %s has no role on this Deployment: only a Deployment's own tokens, and Workspace and Organization tokens with a role on it, are found here", id))
 		}
 	}
 	if len(tokenTypes) > 0 {

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -18,21 +19,36 @@ import (
 // spelling, and what replaces it (also below the root). The token groups'
 // own verbs moved up to the token command itself, and the links' delete is
 // remove.
-type deprecatedVerb struct{ instead string }
+type deprecatedVerb struct{ instead, suffix string }
 
 func (d deprecatedVerb) warning(path []string) string {
-	return "astro " + strings.Join(path, " ") + " is deprecated: use astro " + d.instead
+	return "astro " + strings.Join(path, " ") + " is deprecated: use astro " + d.instead + d.suffix
 }
 
 var deprecatedVerbs = func() map[string]deprecatedVerb {
 	m := map[string]deprecatedVerb{}
+	const (
+		removeNote = " --yes (without --yes, remove asks for confirmation, which this spelling never did)"
+		listNote   = ", which lists the tokens of every scope, not only %s tokens: tell them apart by the scope field of -o json"
+	)
 	for _, verb := range []string{"add", "update", "remove", "list"} {
-		m["workspace token organization-token "+verb] = deprecatedVerb{"workspace token " + verb}
-		m["deployment token workspace-token "+verb] = deprecatedVerb{"deployment token " + verb}
-		m["deployment token organization-token "+verb] = deprecatedVerb{"deployment token " + verb}
+		for _, g := range []struct{ old, new, kind string }{
+			{"workspace token organization-token ", "workspace token ", "Organization"},
+			{"deployment token workspace-token ", "deployment token ", "Workspace"},
+			{"deployment token organization-token ", "deployment token ", "Organization"},
+		} {
+			d := deprecatedVerb{instead: g.new + verb}
+			switch verb {
+			case "remove":
+				d.suffix = removeNote
+			case "list":
+				d.suffix = fmt.Sprintf(listNote, g.kind)
+			}
+			m[g.old+verb] = d
+		}
 	}
 	for _, link := range []string{"variable", "connection", "airflow-variable"} {
-		m["env "+link+" link delete"] = deprecatedVerb{"env " + link + " link remove"}
+		m["env "+link+" link delete"] = deprecatedVerb{instead: "env " + link + " link remove"}
 	}
 	return m
 }()
@@ -66,6 +82,20 @@ func TestEveryDeprecatedVerbWarnsOncePerRun(t *testing.T) {
 	assert.Equal(t, 2*len(deprecatedVerbs), checked, "both Astro trees have every deprecated verb")
 }
 
+// A deprecated verb is recorded as the hidden flag aliases are, one event with
+// the old path beside the new, so we know when it can go; nothing else rides
+// on it. Its own flag aliases ride in the same event.
+func TestADeprecatedVerbIsRecordedForTelemetry(t *testing.T) {
+	got := recordRenamedFlags(t)
+	root, _ := disarmedTree(t, astroTree)
+	executeRoot(root, "workspace", "token", "organization-token", "add", "--org-token-name", "x")
+	executeRoot(root, "env", "variable", "link", "delete")
+	require.Len(t, *got, 3, "the flag alias and the verb each record, and a link delete records once")
+	assert.Equal(t, renamedFlagEvent{"astro workspace token organization-token add", []string{"--org-token-name"}, []string{"--name"}}, (*got)[0])
+	assert.Equal(t, renamedFlagEvent{"astro workspace token organization-token add", []string{"workspace token organization-token add"}, []string{"workspace token add"}}, (*got)[1])
+	assert.Equal(t, renamedFlagEvent{"astro env variable link delete", []string{"env variable link delete"}, []string{"env variable link remove"}}, (*got)[2])
+}
+
 // The alias is typed the way it was in 1.x, by its own short alias too, and
 // the line names the verb, not the letters typed.
 func TestADeprecatedVerbTypedByItsAliasNamesTheVerb(t *testing.T) {
@@ -76,7 +106,7 @@ func TestADeprecatedVerbTypedByItsAliasNamesTheVerb(t *testing.T) {
 		}
 		// organization-token remove answers to rm, as every remove does.
 		_, stderr, _ := executeRoot(root, "workspace", "token", "organization-token", "rm")
-		assert.Equal(t, []string{"astro workspace token organization-token remove is deprecated: use astro workspace token remove"}, warningLines(stderr), c.name)
+		assert.Equal(t, []string{"astro workspace token organization-token remove is deprecated: use astro workspace token remove --yes (without --yes, remove asks for confirmation, which this spelling never did)"}, warningLines(stderr), c.name)
 	}
 }
 

@@ -2,10 +2,13 @@ package cliout
 
 import (
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/astronomer/astro-cli/internal/telemetry"
 )
 
 // A spelling that still works but that v2 means to drop (a hidden 1.x flag
@@ -96,6 +99,11 @@ func WarnDeprecatedFlags(w io.Writer, cmd *cobra.Command) {
 	})
 }
 
+// RecordRenamed queues the telemetry event of a deprecated spelling a run used
+// (telemetry.RecordRenamedFlags, as the hidden flag aliases do); a test swaps it
+// to see what was sent.
+var RecordRenamed = telemetry.RecordRenamedFlags
+
 // DeprecatedCommandAnnotation marks, with "true", a command that is a
 // deprecated spelling (DeprecateCommand), for the tests that hold each one to
 // its table.
@@ -106,12 +114,17 @@ const DeprecatedCommandAnnotation = "astro.deprecated-command"
 // it did, and says once per run (WarnDeprecated) that the spelling is
 // deprecated, naming what to type instead. replacement reads the command
 // path to use from cmd as it was typed (cmd.Parent().CommandPath()+" remove"),
-// since the tree around it is known only once it is built. It returns cmd.
+// since the tree around it is known only once it is built. suffix, when the
+// new spelling is not quite the old one (it asks where the old one did not,
+// it shows more), follows the path in the warning: "use astro x remove --yes".
+// The run is noted for telemetry as the hidden flag aliases are
+// (telemetry.RecordRenamedFlags), the old path beside the new one, so we know
+// when the old verb can go. It returns cmd.
 //
 // The warning is given with the arguments check, which runs for a command
 // that is typed whatever happens next, as a hidden flag alias's does, and
 // not in the run, so a test that replaces every run still sees it.
-func DeprecateCommand(cmd *cobra.Command, replacement func(cmd *cobra.Command) string) *cobra.Command {
+func DeprecateCommand(cmd *cobra.Command, replacement func(cmd *cobra.Command) string, suffix string) *cobra.Command {
 	cmd.Hidden = true
 	if cmd.Annotations == nil {
 		cmd.Annotations = map[string]string{}
@@ -122,7 +135,9 @@ func DeprecateCommand(cmd *cobra.Command, replacement func(cmd *cobra.Command) s
 		check = cobra.ArbitraryArgs
 	}
 	cmd.Args = func(c *cobra.Command, args []string) error {
-		WarnDeprecated(c.ErrOrStderr(), c.CommandPath(), "use "+replacement(c))
+		instead := replacement(c)
+		WarnDeprecated(c.ErrOrStderr(), c.CommandPath(), "use "+instead+suffix)
+		RecordRenamed(c, []string{strings.TrimPrefix(c.CommandPath(), c.Root().Name()+" ")}, []string{strings.TrimPrefix(instead, c.Root().Name()+" ")})
 		return check(c, args)
 	}
 	return cmd

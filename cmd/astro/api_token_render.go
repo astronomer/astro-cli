@@ -223,10 +223,25 @@ func refuseRemoveOfOwn(removeCmd *cobra.Command, token *astrov1.ApiToken, own st
 // scripts as a deprecated spelling of the same verb one level up.
 func deprecatedTokenGroup(group *cobra.Command) *cobra.Command {
 	group.Hidden = true
+	kind := "Organization"
+	if group.Name() == "workspace-token" {
+		kind = "Workspace"
+	}
 	for _, verb := range group.Commands() {
+		// Two of the new verbs are not quite the old ones, and the warning
+		// says how: the flat list shows every scope, where the old one showed
+		// one kind, and the flat remove asks to confirm, where the old one
+		// did not, which a run with no terminal fails on without --yes.
+		suffix := ""
+		switch verb.Name() {
+		case "list":
+			suffix = ", which lists the tokens of every scope, not only " + kind + " tokens: tell them apart by the scope field of -o json"
+		case "remove":
+			suffix = " --yes (without --yes, remove asks for confirmation, which this spelling never did)"
+		}
 		cliout.DeprecateCommand(verb, func(c *cobra.Command) string {
 			return c.Parent().Parent().CommandPath() + " " + c.Name()
-		})
+		}, suffix)
 	}
 	return group
 }

@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -20,6 +21,14 @@ import (
 // grant and revoke a broader token's role, update changes either. The
 // per-command texts are pinned in the token tables beside these; these are the
 // refusals, the scope the deployment verbs work out, and the old spellings.
+
+// What the warning of a deprecated remove or list adds to the path to use:
+// the new verb is not quite the old one.
+const removeNote = " --yes (without --yes, remove asks for confirmation, which this spelling never did)"
+
+func listNote(kind string) string {
+	return ", which lists the tokens of every scope, not only " + kind + " tokens: tell them apart by the scope field of -o json"
+}
 
 // warnings are the deprecation warnings a run printed, without their label.
 func warnings(stderr string) []string {
@@ -218,6 +227,69 @@ func TestDeploymentTokenAddUpdateRemoveWorkOutTheScope(t *testing.T) {
 	})
 }
 
+// The API serves any token of the Organization by its ID. A token given by ID
+// that holds no role in the Workspace or on the Deployment is not that scope's
+// to change, whichever verb names it: it is refused as a usage error naming the
+// scope, and nothing is changed (the clients have no call that changes a token).
+func TestATokenGivenByIDMustHaveARoleInTheScope(t *testing.T) {
+	// Tokens with a role only on or in some other Deployment or Workspace.
+	otherDep, otherWs, otherOrg := jsonTokenFixtures()
+	otherDep.Roles = &[]astrov1.ApiTokenRole{{EntityType: astrov1.ApiTokenRoleEntityTypeDEPLOYMENT, EntityId: "clother0000000000000000001", Role: "DEPLOYMENT_ADMIN"}}
+	otherWs.Roles = &[]astrov1.ApiTokenRole{{EntityType: astrov1.ApiTokenRoleEntityTypeWORKSPACE, EntityId: "clotherws00000000000000001", Role: "WORKSPACE_MEMBER"}}
+	otherOrg.Roles = &[]astrov1.ApiTokenRole{{EntityType: astrov1.ApiTokenRoleEntityTypeORGANIZATION, EntityId: "test-org-id", Role: "ORGANIZATION_MEMBER"}}
+	d := "--deployment=" + tokDeploymentID
+	depWant := "the API token %s has no role on this Deployment: only a Deployment's own tokens, and Workspace and Organization tokens with a role on it, are found here"
+	wsWant := "the API token %s has no role in this Workspace: only a Workspace's own tokens, and Organization tokens with a role in it, are found here"
+
+	for _, tc := range []struct {
+		name string
+		root func(io.Writer) *cobra.Command
+		tok  astrov1.ApiToken
+		args []string
+		want string
+	}{
+		{"deployment delete", newDeploymentRootCmd, otherDep, []string{"deployment", "token", "delete", "tok-dep", d, "--yes"}, depWant},
+		{"deployment remove", newDeploymentRootCmd, otherOrg, []string{"deployment", "token", "remove", "tok-org", d, "--yes"}, depWant},
+		{"deployment update", newDeploymentRootCmd, otherDep, []string{"deployment", "token", "update", "tok-dep", d, "--role", "DEPLOYMENT_MEMBER"}, depWant},
+		{"deployment rotate", newDeploymentRootCmd, otherDep, []string{"deployment", "token", "rotate", "tok-dep", d, "--yes"}, depWant},
+		{"workspace delete", newWorkspaceCmd, otherWs, []string{"workspace", "token", "delete", "tok-ws", "--yes"}, wsWant},
+		{"workspace remove", newWorkspaceCmd, otherOrg, []string{"workspace", "token", "remove", "tok-org", "--yes"}, wsWant},
+		{"workspace update", newWorkspaceCmd, otherWs, []string{"workspace", "token", "update", "tok-ws", "--role", "WORKSPACE_OWNER"}, wsWant},
+		{"workspace rotate", newWorkspaceCmd, otherWs, []string{"workspace", "token", "rotate", "tok-ws", "--yes"}, wsWant},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := execAstroCmd(t, fakeTokens([]astrov1.ApiToken{tc.tok})(t), "", tc.root, tc.args...)
+			require.Error(t, r.err)
+			assert.Equal(t, fmt.Sprintf(tc.want, tc.tok.Id), r.err.Error())
+			assert.True(t, cliout.IsUsage(r.err))
+			assert.Equal(t, cliout.ExitUsage, r.code)
+		})
+	}
+}
+
+// Two tokens that share the name given are told apart by ID, which is what a
+// run that may not ask says: --name is already given, so it is not offered as
+// the answer.
+func TestASharedNameIsAnsweredByTheTokenIDAlone(t *testing.T) {
+	dep, ws, _ := jsonTokenFixtures()
+	twin := ws
+	twin.Id, twin.Name = "tok-twin", dep.Name // a Workspace token named like the Deployment's own
+	d := "--deployment=" + tokDeploymentID
+	for _, args := range [][]string{
+		{"token", "delete", "--name", dep.Name, d, "--yes", "-o", "json"},
+		{"token", "update", "--name", dep.Name, d, "--role", "DEPLOYMENT_MEMBER", "-o", "json"},
+		{"token", "remove", "--name", dep.Name, d, "--yes", "-o", "json"},
+	} {
+		r := execTokenCmd(t, tokenMock(t, dep, twin), "", args...)
+		require.Error(t, r.err, args)
+		var got errorJSON
+		decodeOne(t, r.stdout, &got)
+		assert.Equal(t, string(cliout.KindInputRequired), got.Kind, args)
+		assert.Contains(t, got.Error, "the token's ID instead of its name", args)
+		assert.NotContains(t, got.Error, "or --name", args)
+	}
+}
+
 // A delete or a remove that has to ask offers only the tokens it can act on,
 // so no row of its picker is one it would refuse; a token it is told by name
 // or ID is found among all of them, and refused with what to use instead.
@@ -304,7 +376,7 @@ func TestTheOldTokenSpellingsStillRunAndWarn(t *testing.T) {
 			[]string{"workspace", "token", "organization-token", "remove", "--org-token-name", "org-token"},
 			[]string{
 				"--org-token-name is deprecated: use --name",
-				"astro workspace token organization-token remove is deprecated: use astro workspace token remove",
+				"astro workspace token organization-token remove is deprecated: use astro workspace token remove" + removeNote,
 			},
 		},
 		{
@@ -315,7 +387,7 @@ func TestTheOldTokenSpellingsStillRunAndWarn(t *testing.T) {
 		{
 			"workspace organization-token list", newWorkspaceCmd, fakeTokens(wsOrg),
 			[]string{"workspace", "token", "organization-token", "list"},
-			[]string{"astro workspace token organization-token list is deprecated: use astro workspace token list"},
+			[]string{"astro workspace token organization-token list is deprecated: use astro workspace token list" + listNote("Organization")},
 		},
 		{
 			"deployment workspace-token remove, by the old flag", newDeploymentRootCmd, func(t *testing.T) astrov1.APIClient {
@@ -326,13 +398,13 @@ func TestTheOldTokenSpellingsStillRunAndWarn(t *testing.T) {
 			[]string{"deployment", "token", "workspace-token", "remove", "--workspace-token-name", "ws-token", d, "--workspace=" + tokWorkspaceID},
 			[]string{
 				"--workspace-token-name is deprecated: use --name",
-				"astro deployment token workspace-token remove is deprecated: use astro deployment token remove",
+				"astro deployment token workspace-token remove is deprecated: use astro deployment token remove" + removeNote,
 			},
 		},
 		{
 			"deployment organization-token list", newDeploymentRootCmd, func(t *testing.T) astrov1.APIClient { return tokenMock(t, org) },
 			[]string{"deployment", "token", "organization-token", "list", d},
-			[]string{"astro deployment token organization-token list is deprecated: use astro deployment token list"},
+			[]string{"astro deployment token organization-token list is deprecated: use astro deployment token list" + listNote("Organization")},
 		},
 	} {
 		for _, asJSON := range []bool{false, true} {

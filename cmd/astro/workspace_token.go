@@ -142,7 +142,7 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	ws := target.Workspace
 	tokenTypes := []workspacetoken.TokenType{workspacetoken.TokenTypeWORKSPACE}
 	pick := workspaceTokenPicker("Please select the Workspace API token you would like to rotate:")
-	token, err := workspacetoken.FindToken(tokenID, name, ws, org, tokenTypes, pick, astroV1Client)
+	token, err := workspacetoken.FindTokenIn(tokenID, name, ws, org, tokenTypes, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	// reported as missing; a token picked is offered only among the ones this
 	// can delete.
 	pick := workspaceTokenPicker("Please select the API token you would like to delete from the Workspace:")
-	token, err := workspacetoken.FindToken(tokenID, name, ws, org, offeredWorkspaceTokens(workspacetoken.TokenTypeWORKSPACE), pick, astroV1Client)
+	token, err := workspacetoken.FindTokenIn(tokenID, name, ws, org, offeredWorkspaceTokens(workspacetoken.TokenTypeWORKSPACE), pick, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func removeWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 	ws := target.Workspace
 	pick := workspaceTokenPicker("Please select the Organization API token you would like to remove from the Workspace:")
-	token, err := workspacetoken.FindToken(tokenID, name, ws, org, offeredWorkspaceTokens(workspacetoken.TokenTypeORGANIZATION), pick, astroV1Client)
+	token, err := workspacetoken.FindTokenIn(tokenID, name, ws, org, offeredWorkspaceTokens(workspacetoken.TokenTypeORGANIZATION), pick, astroV1Client)
 	if err != nil {
 		return err
 	}

@@ -191,7 +191,7 @@ func deprecatedLinkDelete(cmd *cobra.Command) *cobra.Command {
 	cmd.Use, cmd.Aliases = deprecatedLinkVerb, nil
 	return cliout.DeprecateCommand(cmd, func(c *cobra.Command) string {
 		return c.Parent().CommandPath() + " remove"
-	})
+	}, "")
 }
 
 // addLinkObjectFlags wires the identifier flags for the linked object:

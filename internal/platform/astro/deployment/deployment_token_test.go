@@ -243,6 +243,13 @@ func pickSecond(string, []apitoken.Token) (int, error) { return 1, nil }
 
 // findAndRotate and findAndDelete are what the commands do: find the token,
 // then act on it.
+// getOwnTokenResponse answers a get by ID with a token that holds a role on
+// this Deployment, as a token found by ID must.
+var getOwnTokenResponse = astrov1.GetApiTokenResponse{
+	HTTPResponse: &http.Response{StatusCode: 200},
+	JSON200:      &apiToken1,
+}
+
 func findAndRotate(id, name string, client astrov1.APIClient) (apitoken.Token, error) {
 	tokenTypes := []DeploymentTokenType{DeploymentTokenTypeDEPLOYMENT}
 	token, err := FindToken(id, name, deploymentID, tokenTypes, pickSecond, client)
@@ -443,7 +450,7 @@ func (s *Suite) TestRotateToken() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKDeploymentToken, nil)
+		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getOwnTokenResponse, nil)
 		mockClient.On("RotateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RotateDeploymentAPITokenResponseOK, nil)
 		res, err := findAndRotate("token1", "", mockClient)
 		s.NoError(err)
@@ -520,7 +527,7 @@ func (s *Suite) TestDeleteToken() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKDeploymentToken, nil)
+		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getOwnTokenResponse, nil)
 		mockClient.On("DeleteApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil)
 		res, err := findAndDelete("token1", "", mockClient)
 		s.NoError(err)
