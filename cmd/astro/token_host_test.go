@@ -115,8 +115,8 @@ func TestEnvironmentDomainLeavesTheSavedContextsAlone(t *testing.T) {
 	noLoginFlow(t)
 	devSaved(t, home)
 	projectNamingHost(t, "astronomer-stage.io")
-	if got := environmentDomain(); got != "astronomer-stage.io" {
-		t.Fatalf("environmentDomain() = %q", got)
+	if got, err := environmentDomain(); err != nil || got != "astronomer-stage.io" {
+		t.Fatalf("environmentDomain() = %q, %v", got, err)
 	}
 	t.Setenv("ASTRO_API_TOKEN", apiToken(t, "env-holds"))
 	before := snapshot(t, home)
@@ -190,32 +190,90 @@ func TestATokenRunNeedsNoWritableConfig(t *testing.T) {
 	}
 }
 
-// Setup runs for every command, so a manifest that does not load names no
-// host there: the run is on ASTRO_DOMAIN's, else the default, and a command
-// that is no project's (astro organization list) still works.
-func TestATokenRunWithABrokenManifestIsOnASTRODOMAINOrTheDefault(t *testing.T) {
-	for _, tc := range []struct{ astroDomain, want string }{
-		{"", "astronomer.io"},
-		{"astronomer-test.io", "astronomer-test.io"},
-	} {
-		t.Run("ASTRO_DOMAIN="+tc.astroDomain, func(t *testing.T) {
+// workingIn makes dir the working directory of the test, with body as its
+// pyproject.toml when body is not empty.
+func workingIn(t *testing.T, body string) {
+	t.Helper()
+	dir := t.TempDir()
+	if body != "" {
+		if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prev := config.WorkingPath
+	config.WorkingPath = dir
+	t.Cleanup(func() { config.WorkingPath = prev })
+}
+
+// Setup runs for every command, so the manifest's domain is read leniently: a
+// manifest whose TOML parses but fails validation (a domain with no workspace,
+// here) still names its host, and a command that is no project's still works.
+func TestATokenRunWithAnInvalidManifestUsesItsDomain(t *testing.T) {
+	for _, astroDomain := range []string{"", "astronomer-test.io"} {
+		t.Run("ASTRO_DOMAIN="+astroDomain, func(t *testing.T) {
 			home := savedLogin(t, false)
 			noLoginFlow(t)
 			devSaved(t, home)
-			// A domain with no workspace is invalid.
-			dir := t.TempDir()
-			body := "[project]\nname = 'demo'\n\n[tool.astro]\ndomain = 'astronomer-stage.io'\n"
-			if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(body), 0o600); err != nil {
-				t.Fatal(err)
-			}
-			prev := config.WorkingPath
-			config.WorkingPath = dir
-			t.Cleanup(func() { config.WorkingPath = prev })
-			t.Setenv("ASTRO_DOMAIN", tc.astroDomain)
-			t.Setenv("ASTRO_API_TOKEN", apiToken(t, "env-bad-manifest"))
+			workingIn(t, "[project]\nname = 'demo'\n\n[tool.astro]\ndomain = 'astronomer-stage.io'\n")
+			t.Setenv("ASTRO_DOMAIN", astroDomain)
+			t.Setenv("ASTRO_API_TOKEN", apiToken(t, "env-invalid-manifest"))
 
 			if err := EnsureLogin(orgsClient(nil)); err != nil {
 				t.Fatalf("a command that is no project's failed over the manifest: %v", err)
+			}
+			c, err := config.GetCurrentContext()
+			if err != nil || c.Domain != "astronomer-stage.io" {
+				t.Errorf("the run's host is %q (%v), want the manifest's", c.Domain, err)
+			}
+		})
+	}
+}
+
+// A pyproject.toml that does not parse might name a domain, and that domain
+// outranks ASTRO_DOMAIN, so the run stops before anything is sent: no host is
+// guessed.
+func TestATokenRunWithUnparseableTOMLSendsNothing(t *testing.T) {
+	for _, astroDomain := range []string{"", "astronomer-test.io"} {
+		t.Run("ASTRO_DOMAIN="+astroDomain, func(t *testing.T) {
+			home := savedLogin(t, false)
+			noLoginFlow(t)
+			devSaved(t, home)
+			workingIn(t, "[project]\nname = 'demo'\n\n[tool.astro\ndomain = 'astronomer-stage.io'\n")
+			t.Setenv("ASTRO_DOMAIN", astroDomain)
+			t.Setenv("ASTRO_API_TOKEN", apiToken(t, "env-unparseable"))
+			client := orgsClient(nil)
+
+			err := EnsureLogin(client)
+			if err == nil {
+				t.Fatal("a token run with an unparseable pyproject.toml went on")
+			}
+			if !strings.Contains(err.Error(), "pyproject.toml") || !strings.Contains(err.Error(), "fix it") {
+				t.Errorf("the error does not name the file and the fix: %v", err)
+			}
+			client.AssertNotCalled(t, "ListOrganizationsWithResponse", mock.Anything, mock.Anything)
+			client.AssertNotCalled(t, "ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything)
+		})
+	}
+}
+
+// With no pyproject.toml at all, or one with no [tool.astro] domain, nothing
+// names a manifest host: ASTRO_DOMAIN's, else the default.
+func TestATokenRunWithNoManifestDomainIsOnASTRODOMAINOrTheDefault(t *testing.T) {
+	for _, tc := range []struct{ name, pyproject, astroDomain, want string }{
+		{"no pyproject, no ASTRO_DOMAIN", "", "", "astronomer.io"},
+		{"no pyproject, ASTRO_DOMAIN", "", "astronomer-test.io", "astronomer-test.io"},
+		{"no [tool.astro], no ASTRO_DOMAIN", "[project]\nname = 'demo'\n", "", "astronomer.io"},
+		{"no [tool.astro], ASTRO_DOMAIN", "[project]\nname = 'demo'\n", "astronomer-test.io", "astronomer-test.io"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home := savedLogin(t, false)
+			noLoginFlow(t)
+			devSaved(t, home)
+			workingIn(t, tc.pyproject)
+			t.Setenv("ASTRO_DOMAIN", tc.astroDomain)
+			t.Setenv("ASTRO_API_TOKEN", apiToken(t, "env-no-manifest-domain"))
+			if err := EnsureLogin(orgsClient(nil)); err != nil {
+				t.Fatal(err)
 			}
 			c, err := config.GetCurrentContext()
 			if err != nil || c.Domain != tc.want {

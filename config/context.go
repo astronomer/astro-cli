@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
@@ -269,9 +270,31 @@ func (c *Context) SetSharedLogin(token, refreshToken string, expiresIn int64, us
 	return saveConfig(viperHome, HomeConfigFile)
 }
 
+// unsavedSelectionNote tells a person that a selection (a workspace or
+// organization switch) made under ASTRO_API_TOKEN, on a host with no saved
+// context, was not saved. A var so a test reads it.
+var unsavedSelectionNote = func(cKey, field string) {
+	fmt.Fprintf(os.Stderr, "%s the %s selected in this ASTRO_API_TOKEN run was not saved: there is no saved login for %s, and a token run never changes saved logins.\n", ansi.NoteLabel(os.Stderr), strings.ReplaceAll(field, "_", " "), strings.ReplaceAll(cKey, "_", "."))
+}
+
+// existsOnlyForEnvironmentLogin reports whether the context under cKey exists
+// for this run only because an environment login is held for it: nothing is
+// saved for it.
+func existsOnlyForEnvironmentLogin(cKey string) bool {
+	return !viperHome.IsSet(contextsKey+"."+cKey) && heldEnvironmentLogin(cKey)
+}
+
 // setContextField updates one field in one context and persists the config.
 func setContextField(cKey, field string, value interface{}) error {
 	field = strings.ToLower(field)
+	if existsOnlyForEnvironmentLogin(cKey) {
+		// A token run's context on a host with no saved context is the
+		// token's login in memory. A selection written to it would save a
+		// partial entry for a host nobody logged in to, and a token run never
+		// changes saved contexts, so it is not saved.
+		unsavedSelectionNote(cKey, field)
+		return nil
+	}
 	if s, ok := value.(string); ok && isLoginField(field) {
 		putLoginField(cKey, field, s)
 	} else {

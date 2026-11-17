@@ -734,7 +734,10 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 		expiresAt = time.Now().AddDate(1, 0, 0)
 	}
 
-	domain := environmentDomain()
+	domain, err := environmentDomain()
+	if err != nil {
+		return false, err
+	}
 	if err := useEnvironmentLogin(domain, "Bearer "+astroAPIToken, expiresAt); err != nil {
 		return false, err
 	}
@@ -765,26 +768,6 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 		return false, err
 	}
 	return true, nil
-}
-
-// environmentDomain returns the host an ASTRO_API_TOKEN run is on, by the one
-// rule of a token run (astrosession.TokenHost): the project manifest's
-// `domain`, else ASTRO_DOMAIN, else astronomer.io. The saved context's host is
-// not consulted, so a machine whose current context is dev still sends a token
-// to the host the run names.
-//
-// The manifest is read tolerantly: setup runs for every command, and one that
-// is no project's (astro organization list) must not fail over a broken
-// pyproject.toml in its directory or a parent. A manifest that does not load
-// names no domain here, so the host is ASTRO_DOMAIN's, else the default. The
-// commands that follow the project load it themselves, before setup runs
-// (followProjectPreRun), and stop on the same error.
-func environmentDomain() string {
-	var project string
-	if m, err := projectManifest(config.WorkingPath); err == nil && m != nil {
-		project = m.Astro.Domain
-	}
-	return astrosession.TokenHost("", project)
 }
 
 // useEnvironmentLogin makes token, from the environment, the login of
