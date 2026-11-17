@@ -423,6 +423,16 @@ func environmentLoginDomain() string {
 	return envLoginHeld.domain
 }
 
+// heldEnvironmentLogin reports whether this process holds an environment login
+// for the context under cKey. Such a context exists for the run though nothing
+// is saved for it, so a token run on a host with no saved context needs no
+// context written to the config.
+func heldEnvironmentLogin(cKey string) bool {
+	envLoginMu.Lock()
+	defer envLoginMu.Unlock()
+	return holdsEnvironmentLogin(cKey)
+}
+
 // SetEnvironmentContextKey is SetContextKey for the organization and workspace
 // an environment credential is for: like the credential, the value holds for
 // this process only. The context must have an environment login.

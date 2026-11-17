@@ -75,12 +75,12 @@ type projectPick struct {
 // of its own (cliout.RemovedCommand).
 func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		before, _ := config.GetCurrentContext() //nolint:errcheck // with no context there is nothing to compare, and the login check below reports it
+		before := selectionBeforeSetup()
 		pick, err := followProject(cmd, args)
 		if err != nil {
 			return err
 		}
-		switched := pick.domain != "" && pick.domain != manifest.NormalizeDomain(before.Domain) && !astrosession.HasAPIToken()
+		switched := pick.domain != "" && !astrosession.HasAPIToken() && pick.domain != manifest.NormalizeDomain(before.Domain)
 		if switched {
 			if _, err := astrosession.BearerFor(cmd.Context(), pick.domain); err != nil {
 				return err
@@ -98,6 +98,23 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 		}
 		return nil
 	}
+}
+
+// selectionBeforeSetup is the login the project's note is compared with, read
+// before setup has run. Under ASTRO_API_TOKEN it is the token's own Workspace,
+// from its claims: the saved login is out of reach for the run, and resolving
+// it here would reach the keyring or vault, and may rewrite the config, for a
+// cosmetic note. With no token it is the current context.
+func selectionBeforeSetup() config.Context {
+	if astrosession.HasAPIToken() {
+		id, _, err := astrosession.TokenIdentity()
+		if err != nil {
+			return config.Context{} // setup reports an unusable token
+		}
+		return config.Context{Workspace: id.Workspace}
+	}
+	before, _ := config.GetCurrentContext() //nolint:errcheck // with no context there is nothing to compare, and the login check below reports it
+	return before
 }
 
 // followProject reads the project around the working directory, if any, and

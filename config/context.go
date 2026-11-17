@@ -72,7 +72,12 @@ func CurrentWorkspace() (string, error) {
 	return c.Workspace, nil
 }
 
-// Get CurrentDonain returns the currently configured astro domain, or an error if one is not set
+// GetCurrentDomain returns the currently configured astro domain, or an error
+// if one is not set. It is token-aware: in a run with ASTRO_API_TOKEN applied
+// (an environment login is held) it is that login's host, whatever the saved
+// current context or ASTRO_DOMAIN say. Callers that want the saved pointer, as
+// `astro context list` and `astro context switch` do, run before any login is
+// held and read it as it is.
 func GetCurrentDomain() (string, error) {
 	// An environment login (ASTRO_API_TOKEN) holds the host the run is on,
 	// ahead of ASTRO_DOMAIN and the saved current context.
@@ -125,7 +130,7 @@ func (c *Context) ContextExists() bool {
 		return false
 	}
 
-	return viperHome.IsSet(contextsKey + "." + key)
+	return viperHome.IsSet(contextsKey+"."+key) || heldEnvironmentLogin(key)
 }
 
 // GetContext gets the full context from the specified Context receiver struct

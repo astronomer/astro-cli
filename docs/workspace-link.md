@@ -248,7 +248,7 @@ if there is none. It runs as if `ASTRO_DOMAIN` named that host, and it never
 moves the current-context pointer. With `ASTRO_API_TOKEN` set,
 the command stays on the host the run names (the project's `domain`, else
 `ASTRO_DOMAIN`, else `astronomer.io`, never the saved context's): the CLI makes
-that host current for this process only, so a switch would move the pointer. A manifest that does not load stops the command, as it
+that host current for this process only, and reads or changes no saved context, so a switch would move the pointer. A manifest that does not load stops the command, as it
 stops `astro af`. When the project picks a workspace or a host
 the context would not have, the command says so on stderr:
 
