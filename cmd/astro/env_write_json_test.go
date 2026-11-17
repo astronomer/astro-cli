@@ -424,7 +424,7 @@ func TestEnvWritesMaskSecretsTheAPIReturned(t *testing.T) {
 		{"variable", "set", "K", "--value", "new", ws},
 		{"variable", "delete", "K", "--yes", ws},
 		{"variable", "link", "set", "--variable-key", "K", dep, "--value", "new", ws},
-		{"variable", "link", "delete", "--variable-key", "K", dep, ws},
+		{"variable", "link", "remove", "--variable-key", "K", dep, ws},
 	} {
 		r := execEnvJSON(t, leaky(), append(args, "-o", "json")...)
 		require.NoError(t, r.err, args)
@@ -513,7 +513,7 @@ func TestEnvLinkChangesJSON(t *testing.T) {
 		assert.Equal(t, "own", **got.Links[0].OverrideValue)
 
 		got = env.VarLinksReport{}
-		r = execEnvJSON(t, wjClient(t), "variable", "link", "delete", "--variable-key", "LINKED", dep, ws, "-o", "json")
+		r = execEnvJSON(t, wjClient(t), "variable", "link", "remove", "--variable-key", "LINKED", dep, ws, "-o", "json")
 		require.NoError(t, r.err, r.stdout)
 		decodeOne(t, r.stdout, &got)
 		assert.Empty(t, got.Links)
@@ -527,7 +527,7 @@ func TestEnvLinkChangesJSON(t *testing.T) {
 		mc.AssertCalled(t, "ExcludeLinkingEnvironmentObjectWithResponse", mock.Anything, mock.Anything, wjID, mock.Anything)
 
 		got = env.VarLinksReport{}
-		r = execEnvJSON(t, wjClient(t), "variable", "link", "delete", "--variable-key", "EXCL", dep, "--exclude", ws, "-o", "json")
+		r = execEnvJSON(t, wjClient(t), "variable", "link", "remove", "--variable-key", "EXCL", dep, "--exclude", ws, "-o", "json")
 		require.NoError(t, r.err, r.stdout)
 		decodeOne(t, r.stdout, &got)
 		assert.Empty(t, got.ExcludeLinks)
@@ -543,7 +543,7 @@ func TestEnvLinkChangesJSON(t *testing.T) {
 			assert.Equal(t, wjDeployment, got.Links[0].DeploymentID)
 
 			got = env.LinksReport{}
-			r = execEnvJSON(t, wjClient(t), n.noun, "link", "delete", n.keyFlag, "LINKED", dep, ws, "-o", "json")
+			r = execEnvJSON(t, wjClient(t), n.noun, "link", "remove", n.keyFlag, "LINKED", dep, ws, "-o", "json")
 			require.NoError(t, r.err, r.stdout)
 			decodeOne(t, r.stdout, &got)
 			assert.Empty(t, got.Links)
@@ -555,7 +555,7 @@ func TestEnvLinkChangesJSON(t *testing.T) {
 			assert.Equal(t, []string{wjDeployment}, got.ExcludeLinks)
 
 			got = env.LinksReport{}
-			r = execEnvJSON(t, wjClient(t), n.noun, "link", "delete", n.keyFlag, "EXCL", dep, "--exclude", ws, "-o", "json")
+			r = execEnvJSON(t, wjClient(t), n.noun, "link", "remove", n.keyFlag, "EXCL", dep, "--exclude", ws, "-o", "json")
 			require.NoError(t, r.err, r.stdout)
 			decodeOne(t, r.stdout, &got)
 			assert.Empty(t, got.ExcludeLinks)

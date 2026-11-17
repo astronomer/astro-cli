@@ -130,7 +130,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 				// Metrics exports have no link commands to suggest.
 				s.NotContains(err.Error(), "link")
 			} else {
-				s.Contains(err.Error(), "astro env "+k.name+" link delete")
+				s.Contains(err.Error(), "astro env "+k.name+" link remove")
 			}
 			mc.AssertExpectations(s.T())
 			mc.AssertNotCalled(s.T(), "DeleteEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything)

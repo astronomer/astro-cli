@@ -33,7 +33,6 @@ var (
 	tokenName                  string
 	tokenDescription           string
 	tokenRole                  string
-	orgTokenName               string
 	tokenID                    string
 	orgTokenID                 string
 	workspaceTokenID           string
@@ -307,7 +306,8 @@ func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceTokenRotateCmd(out),
 		deleteCmd,
 		newWorkspaceTokenAddOrgTokenCmd(out),
-		newWorkspaceOrgTokenManageCmd(out),
+		newWorkspaceTokenRemoveCmd(out),
+		deprecatedTokenGroup(newWorkspaceOrgTokenManageCmd(out), "Organization"),
 	)
 	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	addWorkspaceFlag(cmd.PersistentFlags(), &workspaceID, "w", "Workspace whose tokens you'd like to manage", oneXWorkspaceID)
@@ -401,14 +401,17 @@ func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
-		Short:   "Update a Workspace or Organization API token",
-		Long:    "Update a Workspace or Organization API token that has a role in an Astro Workspace. Identify the token by its ID or by its current name (--name).",
+		Short:   "Update a Workspace or Organization API token in a Workspace",
+		Long:    "Update an API token that has a role in an Astro Workspace. A Workspace token can change its name, description and role. An Organization token can change only its role in this Workspace: its name and description are changed with astro organization token update. Identify the token by its ID or by its current name (--name).",
 		Example: `
-  # Rename a token and change its role
+  # Rename a Workspace token and change its role
   astro workspace token update <TOKEN_ID> --new-name "Updated Token" --role WORKSPACE_OPERATOR
 
   # Find a token by its name and change its description
   astro workspace token update --name "My Token" --description "Updated description"
+
+  # Change the role an Organization token has in this Workspace
+  astro workspace token update --name "My Org Token" --role WORKSPACE_MEMBER
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceToken(cmd, args, out)
@@ -451,8 +454,8 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
 		Aliases: []string{"rm"},
-		Short:   "Delete a Workspace API token or remove an Organization API token from a Workspace",
-		Long:    "Delete a Workspace API token or remove an Organization token's Workspace role. Deleting a Workspace token revokes it permanently. Removing an Organization token only revokes its Workspace role — the token continues to work at other scopes.",
+		Short:   "Delete a Workspace API token",
+		Long:    "Delete one of the Workspace's own API tokens. Deleting a token revokes it permanently. An Organization token that has a role in the Workspace is not the Workspace's to delete: astro workspace token remove takes its role off the Workspace, and the token continues to work at other scopes.",
 		Example: `
   # Delete a token by its ID
   astro workspace token delete <TOKEN_ID>
@@ -465,8 +468,29 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting or removing the API token")
+	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting the API token")
 
+	return cmd
+}
+
+func newWorkspaceTokenRemoveCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "remove [TOKEN_ID]",
+		Short: "Remove an Organization API token from a Workspace",
+		Long:  "Remove an Organization API token's role in a Workspace. The token continues to work at other scopes. The Workspace's own tokens have no role to remove: astro workspace token delete deletes them. Identify the token by its ID or by its name (--name).",
+		Example: `
+  # Remove an Organization token from the current Workspace
+  astro workspace token remove <ORG_TOKEN_ID>
+
+  # Find the Organization token by its name, without confirming
+  astro workspace token remove --name "My Org Token" --yes
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return removeWorkspaceToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the Organization API token to be removed from the Workspace. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before removing the API token from the Workspace")
 	return cmd
 }
 
@@ -474,19 +498,19 @@ func newWorkspaceTokenAddOrgTokenCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [ORG_TOKEN_ID]",
 		Short: "Add an Organization API token to an Astro Workspace",
-		Long:  "Add an Organization API token to an Astro Workspace. Identify the token by its ID or by its name (--org-token-name).",
+		Long:  "Add an Organization API token to an Astro Workspace, with a Workspace role. Identify the token by its ID or by its name (--name).",
 		Example: `
   # Add an Organization token to the current Workspace as a member
   astro workspace token add <ORG_TOKEN_ID> --role WORKSPACE_MEMBER
 
   # Find the Organization token by its name
-  astro workspace token add --org-token-name "My Org Token" --role WORKSPACE_OPERATOR
+  astro workspace token add --name "My Org Token" --role WORKSPACE_OPERATOR
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addOrgTokenToWorkspace(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgTokenName, "org-token-name", "", "The name of the Organization API token you want to add to a Workspace. If the name contains a space, specify the entire name within quotes \"\" ")
+	addTokenNameFlag(cmd, "The name of the Organization API token you want to add to a Workspace. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Workspace role to grant to the "+
 		"Organization API token. Possible values are "+allowedWorkspaceRoleNamesProse)
 	return cmd
@@ -512,18 +536,18 @@ func newAddOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [ORG_TOKEN_ID]",
 		Short: "Add an Organization API token to a Workspace",
-		Long:  "Add an Organization API token to a Workspace. Identify the token by its ID or by its name (--org-token-name).",
+		Long:  "Add an Organization API token to a Workspace. Identify the token by its ID or by its name (--name).",
 		Example: `  # Give an Organization token the member role in the current Workspace
   astro workspace token organization-token add <ORG_TOKEN_ID> --role WORKSPACE_MEMBER
 
   # Find the Organization token by its name
-  astro workspace token organization-token add --org-token-name "My Org Token" \
+  astro workspace token organization-token add --name "My Org Token" \
     --role WORKSPACE_OPERATOR`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addOrgTokenWorkspaceRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgTokenName, "org-token-name", "", "The name of the Organization API token you want to add to a Workspace. If the name contains a space, specify the entire name within quotes \"\" ")
+	addTokenNameFlag(cmd, "The name of the Organization API token you want to add to a Workspace. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Workspace role to grant to the "+
 		"Organization API token. Possible values are "+allowedWorkspaceRoleNamesProse)
 	return cmd
@@ -533,14 +557,14 @@ func newUpdateOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update [ORG_TOKEN_ID]",
 		Short: "Update an Organization API token's Workspace Role",
-		Long:  "Update an Organization API token's Workspace Role. Identify the token by its ID or by its name (--org-token-name).",
+		Long:  "Update an Organization API token's Workspace Role. Identify the token by its ID or by its name (--name).",
 		Example: `  # Make an Organization token an operator in the current Workspace
   astro workspace token organization-token update <ORG_TOKEN_ID> --role WORKSPACE_OPERATOR`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateOrgTokenWorkspaceRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgTokenName, "org-token-name", "", "The name of the Organization API token you want to update in a Workspace. If the name contains a space, specify the entire name within quotes \"\" ")
+	addTokenNameFlag(cmd, "The name of the Organization API token you want to update in a Workspace. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Workspace role to update the "+
 		"Organization API token. Possible values are "+allowedWorkspaceRoleNamesProse)
 	return cmd
@@ -551,17 +575,17 @@ func newRemoveOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 		Use:     "remove [ORG_TOKEN_ID]",
 		Aliases: []string{"rm"},
 		Short:   "Remove an Organization API token's Workspace Role",
-		Long:    "Remove an Organization API token's Workspace Role. Identify the token by its ID or by its name (--org-token-name).",
+		Long:    "Remove an Organization API token's Workspace Role. Identify the token by its ID or by its name (--name).",
 		Example: `  # Remove an Organization token from the current Workspace
   astro workspace token organization-token remove <ORG_TOKEN_ID>
 
   # Find the Organization token by its name
-  astro workspace token organization-token remove --org-token-name "My Org Token"`,
+  astro workspace token organization-token remove --name "My Org Token"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeOrganizationTokenWorkspaceRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgTokenName, "org-token-name", "", "The name of the Organization API token you want to remove from a Workspace. If the name contains a space, specify the entire name within quotes \"\" ")
+	addTokenNameFlag(cmd, "The name of the Organization API token you want to remove from a Workspace. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
 	return cmd
 }
 

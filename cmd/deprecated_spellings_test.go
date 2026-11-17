@@ -86,10 +86,17 @@ func TestEveryDeprecatedAliasWarnsOncePerRun(t *testing.T) {
 				if asJSON && !cliout.HasOutput(target) {
 					continue
 				}
+				wantHere := want
+				if isDeprecatedVerb(target) {
+					// The command is itself a deprecated spelling (see
+					// deprecated_verbs_test.go), and says so once too.
+					wantHere = append(slices.Clone(want), deprecatedVerbs[strings.Join(use.path, " ")].warning(use.path))
+					slices.Sort(wantHere)
+				}
 				stdout, stderr, _ := executeRoot(root, line...)
 				got := warningLines(stderr)
 				slices.Sort(got)
-				assert.Equal(t, want, got, "[%s] astro %s", c.name, strings.Join(line, " "))
+				assert.Equal(t, wantHere, got, "[%s] astro %s", c.name, strings.Join(line, " "))
 				assert.NotContains(t, stdout, "deprecated", "[%s] astro %s: nothing on stdout", c.name, strings.Join(line, " "))
 				if asJSON {
 					assert.Equal(t, 1, strings.Count(stdout, "\n"), "[%s] astro %s: stdout is one document: %q", c.name, strings.Join(line, " "), stdout)

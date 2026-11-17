@@ -30,11 +30,11 @@ func resetTokenCommandFlags(t *testing.T) {
 		astroV1Client = prevClient
 		workspaceTokenOutput = prevOutput
 		updateWorkspaceRole, addWorkspaceRole, tokenRole, tokenID, orgTokenID, workspaceTokenID = "", "", "", "", "", ""
-		deploymentID, tokenName, orgTokenName = "", "", ""
+		deploymentID, tokenName = "", ""
 		forceDelete, forceRotate, cleanTokenOutput = false, false, false
 	})
 	updateWorkspaceRole, addWorkspaceRole, tokenRole, tokenID, orgTokenID, workspaceTokenID = "", "", "", "", "", ""
-	deploymentID, tokenName, orgTokenName = "", "", ""
+	deploymentID, tokenName = "", ""
 	forceDelete, forceRotate, cleanTokenOutput = false, false, false
 	workspaceTokenOutput = cliout.FormatText
 }
