@@ -387,7 +387,7 @@ func deploymentNamed(name, ws string, login *deployLogin) (*astrov1.Deployment, 
 	case 0:
 		// Named wrong, as a link name that is not one would be: a usage
 		// mistake, not a failure of the deploy.
-		return nil, cliout.Usage(fmt.Errorf("no Deployment named %s in workspace %s: pass a Deployment id, a link name of the project here, or the name of a Deployment in that workspace", name, ws))
+		return nil, cliout.UsageNoHelp(fmt.Errorf("no Deployment named %s in workspace %s: pass a Deployment id, a link name of the project here, or the name of a Deployment in that workspace", name, ws))
 	case 1:
 		return &found[0], nil
 	}
