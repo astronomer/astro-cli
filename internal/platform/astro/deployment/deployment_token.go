@@ -492,7 +492,7 @@ func FindToken(id, name, deploymentID string, tokenTypes []DeploymentTokenType, 
 		// holds no role on this Deployment is not this Deployment's to
 		// change, whichever scope it is of: its own tokens hold one here.
 		if deploymentID != "" && deploymentRoleOf(&token, deploymentID) == "" {
-			return token, apitoken.Usage(fmt.Errorf("the API token %s has no role on this Deployment: only a Deployment's own tokens, and Workspace and Organization tokens with a role on it, are found here", id))
+			return token, apitoken.Usage(fmt.Errorf("the API token %s has no role on this Deployment: only a Deployment's own tokens, and Workspace and Organization tokens with a role on it, are found here; to give a token a role on it, use astro deployment token add", id))
 		}
 	}
 	if len(tokenTypes) > 0 {

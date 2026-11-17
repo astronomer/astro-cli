@@ -307,7 +307,7 @@ func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 		deleteCmd,
 		newWorkspaceTokenAddOrgTokenCmd(out),
 		newWorkspaceTokenRemoveCmd(out),
-		deprecatedTokenGroup(newWorkspaceOrgTokenManageCmd(out)),
+		deprecatedTokenGroup(newWorkspaceOrgTokenManageCmd(out), "Organization"),
 	)
 	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	addWorkspaceFlag(cmd.PersistentFlags(), &workspaceID, "w", "Workspace whose tokens you'd like to manage", oneXWorkspaceID)

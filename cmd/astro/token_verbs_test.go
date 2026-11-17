@@ -238,8 +238,8 @@ func TestATokenGivenByIDMustHaveARoleInTheScope(t *testing.T) {
 	otherWs.Roles = &[]astrov1.ApiTokenRole{{EntityType: astrov1.ApiTokenRoleEntityTypeWORKSPACE, EntityId: "clotherws00000000000000001", Role: "WORKSPACE_MEMBER"}}
 	otherOrg.Roles = &[]astrov1.ApiTokenRole{{EntityType: astrov1.ApiTokenRoleEntityTypeORGANIZATION, EntityId: "test-org-id", Role: "ORGANIZATION_MEMBER"}}
 	d := "--deployment=" + tokDeploymentID
-	depWant := "the API token %s has no role on this Deployment: only a Deployment's own tokens, and Workspace and Organization tokens with a role on it, are found here"
-	wsWant := "the API token %s has no role in this Workspace: only a Workspace's own tokens, and Organization tokens with a role in it, are found here"
+	depWant := "the API token %s has no role on this Deployment: only a Deployment's own tokens, and Workspace and Organization tokens with a role on it, are found here; to give a token a role on it, use astro deployment token add"
+	wsWant := "the API token %s has no role in this Workspace: only a Workspace's own tokens, and Organization tokens with a role in it, are found here; to give an Organization token a role in it, use astro workspace token add"
 
 	for _, tc := range []struct {
 		name string

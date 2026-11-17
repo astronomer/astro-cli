@@ -38,7 +38,8 @@ func RecordRenamedFlags(cmd *cobra.Command, renamed, current []string) {
 		return
 	}
 	// A run that gives a deprecated command its hidden flag aliases records
-	// twice (the flags, then the command's own path): one event holds both.
+	// twice (the flags and the command's own path, in whichever order the
+	// argument checks run): one event holds both.
 	if q := queuedRenamedFlags; q != nil && q.cmd == cmd {
 		renamed, current = append(slices.Clone(q.renamed), renamed...), append(slices.Clone(q.current), current...)
 	}

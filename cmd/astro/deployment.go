@@ -1280,8 +1280,8 @@ func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
 		deleteCmd,
 		newDeploymentTokenAddCmd(out),
 		newDeploymentTokenRemoveCmd(out),
-		deprecatedTokenGroup(newWorkspaceTokenManageCmd(out)),
-		deprecatedTokenGroup(newOrgTokenManageCmd(out)),
+		deprecatedTokenGroup(newWorkspaceTokenManageCmd(out), "Workspace"),
+		deprecatedTokenGroup(newOrgTokenManageCmd(out), "Organization"),
 	)
 	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID)

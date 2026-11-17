@@ -487,12 +487,20 @@ func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenT
 // change. A run with no Workspace (an Organization token's, given an ID) has
 // none to check against.
 func FindTokenIn(id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (astrov1.ApiToken, error) {
-	token, err := FindToken(id, name, workspaceID, organizationID, tokenTypes, pick, client)
+	if id == "" || workspaceID == "" {
+		return FindToken(id, name, workspaceID, organizationID, tokenTypes, pick, client)
+	}
+	// By ID, the role is checked before the type, as on a Deployment, so a
+	// foreign token gets the same message whichever command names it.
+	token, err := FindToken(id, name, workspaceID, organizationID, nil, pick, client)
 	if err != nil {
 		return token, err
 	}
-	if id != "" && workspaceID != "" && workspaceRoleOf(&token, workspaceID) == "" {
-		return token, apitoken.Usage(fmt.Errorf("the API token %s has no role in this Workspace: only a Workspace's own tokens, and Organization tokens with a role in it, are found here", id))
+	if workspaceRoleOf(&token, workspaceID) == "" {
+		return token, apitoken.Usage(fmt.Errorf("the API token %s has no role in this Workspace: only a Workspace's own tokens, and Organization tokens with a role in it, are found here; to give an Organization token a role in it, use astro workspace token add", id))
+	}
+	if len(tokenTypes) > 0 && !slices.Contains(tokenTypes, TokenType(token.Scope)) {
+		return token, errWrongTokenTypeSelected
 	}
 	return token, nil
 }

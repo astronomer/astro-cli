@@ -220,13 +220,12 @@ func refuseRemoveOfOwn(removeCmd *cobra.Command, token *astrov1.ApiToken, own st
 
 // deprecatedTokenGroup hides group, an old subgroup of a token command whose
 // verbs moved up to the token command, and marks each verb it keeps for
-// scripts as a deprecated spelling of the same verb one level up.
-func deprecatedTokenGroup(group *cobra.Command) *cobra.Command {
+// scripts as a deprecated spelling of the same verb one level up. kind is the
+// scope of the tokens the group handled (Workspace, Organization), which the
+// warning of its list verb names; it is given, not read from the group's name,
+// so that renaming a group cannot quietly change it.
+func deprecatedTokenGroup(group *cobra.Command, kind string) *cobra.Command {
 	group.Hidden = true
-	kind := "Organization"
-	if group.Name() == "workspace-token" {
-		kind = "Workspace"
-	}
 	for _, verb := range group.Commands() {
 		// Two of the new verbs are not quite the old ones, and the warning
 		// says how: the flat list shows every scope, where the old one showed
