@@ -38,6 +38,7 @@ func TestTheRootAloneKeepsTheUsageBlockOutAndDecidesThePointer(t *testing.T) {
 		{"marker that does not opt out", optsOutOfHelp{pointer: true}, nil, "Error: which of these ids\n" + pointer},
 		{"marker that opts out", optsOutOfHelp{}, nil, "Error: which of these ids\n"},
 		{"opt-out wrapped further", fmt.Errorf("context: %w", UsageNoHelp(errors.New("use astro x instead"))), nil, "Error: context: use astro x instead\n"},
+		{"opt-out under Usage", Usage(UsageNoHelp(errors.New("use astro x instead"))), nil, "Error: use astro x instead\n"},
 		{"usage error found before the run", nil, []string{"--bogus"}, "Error: unknown flag: --bogus\n" + pointer},
 		{"a run's opt-out does not reach one found before it", UsageNoHelp(errors.New("unused")), []string{"--bogus"}, "Error: unknown flag: --bogus\n" + pointer},
 	} {

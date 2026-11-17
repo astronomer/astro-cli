@@ -2104,6 +2104,9 @@ func (e *TargetsDisagreeError) Error() string {
 // cliout.IsUsage, which this package cannot import.
 func (e *TargetsDisagreeError) IsUsageError() bool { return true }
 
+// OmitsHelpPointer keeps the pointer to help off the error: it says what to pass.
+func (e *TargetsDisagreeError) OmitsHelpPointer() bool { return true }
+
 // mayAutoSelect reports whether this run is set up to take a workspace's only
 // Deployment without asking: authenticated by an API token, or with
 // deployment.auto_select on.

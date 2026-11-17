@@ -50,6 +50,9 @@ func RemovedCommand(use string, aliases []string, short string, run func(cmd *co
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if run == nil {
+				return nil
+			}
 			err := run(cmd, args)
 			if IsUsage(err) {
 				return UsageNoHelp(err)

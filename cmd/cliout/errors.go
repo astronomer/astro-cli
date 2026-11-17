@@ -140,9 +140,11 @@ func hasCobraUsagePrefix(err error) bool {
 // run opted out of the pointer to the command's help, with UsageNoHelp or,
 // from a package that cannot import cliout, an OmitsHelpPointer method.
 func omitsHelpPointer(err error) bool {
-	var u *usageError
-	if errors.As(err, &u) && u.noHelp {
-		return true
+	// Any mark in the chain counts, so Usage around a UsageNoHelp keeps it.
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		if u, ok := e.(*usageError); ok && u.noHelp { //nolint:errorlint // walking the chain by hand
+			return true
+		}
 	}
 	var o helpPointerOptOut
 	return errors.As(err, &o) && o.OmitsHelpPointer()
