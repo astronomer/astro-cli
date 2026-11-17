@@ -1278,8 +1278,10 @@ func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentTokenUpdateCmd(out),
 		newDeploymentTokenRotateCmd(out),
 		deleteCmd,
-		newWorkspaceTokenManageCmd(out),
-		newOrgTokenManageCmd(out),
+		newDeploymentTokenAddCmd(out),
+		newDeploymentTokenRemoveCmd(out),
+		deprecatedTokenGroup(newWorkspaceTokenManageCmd(out), "Workspace"),
+		deprecatedTokenGroup(newOrgTokenManageCmd(out), "Organization"),
 	)
 	cmd.AddCommand(cliout.RemovedAlias("de", deleteCmd))
 	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose tokens you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID)
@@ -1336,13 +1338,17 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
-		Short:   "Update a Deployment API token",
-		Long:    "Update a Deployment API token's name, description, or role. Identify the token by its ID (positional argument) or current name (--name). Only what you pass changes: without --role the token keeps its role, and a --role the token already holds is refused before anything changes.",
-		Example: `  # Rename a token
+		Short:   "Update a Deployment, Workspace or Organization API token in a Deployment",
+		Long:    "Update an API token that has a role on a Deployment. A Deployment token can change its name, description and role. A Workspace or Organization token can change only its role on this Deployment: its name and description are changed where the token lives. Identify the token by its ID (positional argument) or current name (--name). Only what you pass changes: without --role the token keeps its role, and a --role the token already holds is refused before anything changes.",
+		Example: `  # Rename a Deployment token
   astro deployment token update <TOKEN_ID> --deployment <DEPLOYMENT_ID> --new-name my-new-token-name
 
   # Change a token's role
-  astro deployment token update <TOKEN_ID> --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
+  astro deployment token update <TOKEN_ID> --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN
+
+  # Change the role a Workspace or Organization token has on the Deployment
+  astro deployment token update --name my-ws-token --deployment <DEPLOYMENT_ID> \
+    --role DEPLOYMENT_MEMBER`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateDeploymentToken(cmd, args, out)
 		},
@@ -1387,7 +1393,7 @@ func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete [TOKEN_ID]",
 		Aliases: []string{"rm"},
 		Short:   "Delete a Deployment API token",
-		Long:    "Permanently revoke a Deployment API token. All access the token grants is immediately revoked.",
+		Long:    "Permanently revoke one of the Deployment's own API tokens. All access the token grants is immediately revoked. A Workspace or Organization token that has a role on the Deployment is not the Deployment's to delete: astro deployment token remove takes its role off the Deployment.",
 		Example: `  # Delete a token
   astro deployment token delete <TOKEN_ID> --deployment <DEPLOYMENT_ID>
 
@@ -1398,10 +1404,73 @@ func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting or removing the API token")
+	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting the API token")
 
 	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
+}
+
+func newDeploymentTokenRemoveCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "remove [TOKEN_ID]",
+		Short: "Remove a Workspace or Organization API token from a Deployment",
+		Long:  "Remove a Workspace or Organization API token's role on a Deployment. The token continues to work at other scopes. Which of the two it is, is worked out from the token. The Deployment's own tokens have no role to remove: astro deployment token delete deletes them. Name the token by its ID or with --name.",
+		Example: `  # Remove a token's role on a Deployment
+  astro deployment token remove <TOKEN_ID> --deployment <DEPLOYMENT_ID>
+
+  # Name the token instead of giving its ID, without confirming
+  astro deployment token remove --name my-token --deployment <DEPLOYMENT_ID> --yes`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return removeDeploymentToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the Workspace or Organization API token to be removed from the Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before removing the API token from the Deployment")
+	return cmd
+}
+
+func newDeploymentTokenAddCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "add [TOKEN_ID]",
+		Short: "Add a Workspace or Organization API token to a Deployment",
+		Long:  "Add a Workspace or Organization API token to a Deployment with a role: DEPLOYMENT_ADMIN or a custom role name. Which of the two it is, is worked out from the token. Name the token by its ID or with --name; a Workspace token named with --name is looked for in --workspace.",
+		Example: `  # Give a token admin access to a Deployment
+  astro deployment token add <TOKEN_ID> --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN
+
+  # Name the token instead of giving its ID
+  astro deployment token add --name my-token --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return addDeploymentToken(cmd, args, out)
+		},
+	}
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the Workspace or Organization API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to grant to the "+
+		"API token: DEPLOYMENT_ADMIN or a custom role name")
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace a Workspace token given by name is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
+	return cmd
+}
+
+func addDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errRequiredFlag("deployment", "astro deployment list")
+	}
+	return runDeploymentTokenAdd(cmd, args, out)
+}
+
+func removeDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
+	if deploymentID == "" {
+		return errRequiredFlag("deployment", "astro deployment list")
+	}
+	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
+		return err
+	}
+	// if an id was provided in the args we use it
+	if len(args) > 0 {
+		// make sure the id is lowercase
+		tokenID = strings.ToLower(args[0])
+	}
+	cmd.SilenceUsage = true
+	return runDeploymentTokenRemoveRole(cmd, deploymentTokenOutput, out)
 }
 
 func newOrgTokenManageCmd(out io.Writer) *cobra.Command {
@@ -1441,19 +1510,19 @@ func newAddOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [ORG_TOKEN_ID]",
 		Short: "Add an Organization API token to a Deployment",
-		Long:  "Add an Organization API token to a Deployment with a role: DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --org-token-name.",
+		Long:  "Add an Organization API token to a Deployment with a role: DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --name.",
 		Example: `  # Give an Organization token admin access to a Deployment
   astro deployment token organization-token add <ORG_TOKEN_ID> --deployment <DEPLOYMENT_ID> \
     --role DEPLOYMENT_ADMIN
 
   # Name the token instead of giving its ID
-  astro deployment token organization-token add --org-token-name my-org-token \
+  astro deployment token organization-token add --name my-org-token \
     --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addOrgTokenToDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgTokenName, "org-token-name", "", "The name of the Organization API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	addTokenNameFlag(cmd, "The name of the Organization API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to add to the "+
 		"Organization API token: DEPLOYMENT_ADMIN or a custom role name")
 	return cmd
@@ -1463,19 +1532,19 @@ func newUpdateOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update [ORG_TOKEN_ID]",
 		Short: "Update an Organization API token's Deployment Role",
-		Long:  "Update an Organization API token's Deployment Role to DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --org-token-name.",
+		Long:  "Update an Organization API token's Deployment Role to DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --name.",
 		Example: `  # Change an Organization token's role in a Deployment
   astro deployment token organization-token update <ORG_TOKEN_ID> --deployment <DEPLOYMENT_ID> \
     --role DEPLOYMENT_ADMIN
 
   # Name the token instead of giving its ID
-  astro deployment token organization-token update --org-token-name my-org-token \
+  astro deployment token organization-token update --name my-org-token \
     --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateOrgTokenToDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgTokenName, "org-token-name", "", "The name of the Organization API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	addTokenNameFlag(cmd, "The name of the Organization API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to update the "+
 		"Organization API token to: DEPLOYMENT_ADMIN or a custom role name")
 	return cmd
@@ -1485,19 +1554,19 @@ func newAddWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [WORKSPACE_TOKEN_ID]",
 		Short: "Add a Workspace API token's Deployment Role",
-		Long:  "Add a Workspace API token to a Deployment with a role: DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --workspace-token-name.",
+		Long:  "Add a Workspace API token to a Deployment with a role: DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --name.",
 		Example: `  # Give a Workspace token admin access to a Deployment
   astro deployment token workspace-token add <WORKSPACE_TOKEN_ID> --deployment <DEPLOYMENT_ID> \
     --role DEPLOYMENT_ADMIN
 
   # Name the token instead of giving its ID
-  astro deployment token workspace-token add --workspace-token-name my-ws-token \
+  astro deployment token workspace-token add --name my-ws-token \
     --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addWorkspaceTokenDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgTokenName, "workspace-token-name", "", "The name of the WORKSPACE API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	addTokenNameFlag(cmd, "The name of the WORKSPACE API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "workspace-token-name")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to grant to the "+
 		"Workspace API token: DEPLOYMENT_ADMIN or a custom role name")
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace the token is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)", oneXWorkspaceID)
@@ -1508,19 +1577,19 @@ func newUpdateWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update [WORKSPACE_TOKEN_ID]",
 		Short: "Update a Workspace API token's Deployment Role",
-		Long:  "Update a Workspace API token's Deployment Role to DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --workspace-token-name.",
+		Long:  "Update a Workspace API token's Deployment Role to DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --name.",
 		Example: `  # Change a Workspace token's role in a Deployment
   astro deployment token workspace-token update <WORKSPACE_TOKEN_ID> --deployment <DEPLOYMENT_ID> \
     --role DEPLOYMENT_ADMIN
 
   # Name the token instead of giving its ID
-  astro deployment token workspace-token update --workspace-token-name my-ws-token \
+  astro deployment token workspace-token update --name my-ws-token \
     --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceTokenDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgTokenName, "workspace-token-name", "", "The name of the WORKSPACE API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	addTokenNameFlag(cmd, "The name of the WORKSPACE API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "workspace-token-name")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to grant to the "+
 		"Workspace API token: DEPLOYMENT_ADMIN or a custom role name")
 	addOneXWorkspaceIDNoOp(cmd.Flags())
@@ -1548,18 +1617,18 @@ func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 		Use:     "remove [ORG_TOKEN_ID]",
 		Aliases: []string{"rm"},
 		Short:   "Remove an Organization API token's Deployment Role",
-		Long:    "Remove an Organization API token's Deployment Role. Name the token by its ID or with --org-token-name.",
+		Long:    "Remove an Organization API token's Deployment Role. Name the token by its ID or with --name.",
 		Example: `  # Remove an Organization token's role in a Deployment
   astro deployment token organization-token remove <ORG_TOKEN_ID> --deployment <DEPLOYMENT_ID>
 
   # Name the token instead of giving its ID
-  astro deployment token organization-token remove --org-token-name my-org-token \
+  astro deployment token organization-token remove --name my-org-token \
     --deployment <DEPLOYMENT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeOrgTokenFromDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgTokenName, "org-token-name", "", "The name of the Organization API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	addTokenNameFlag(cmd, "The name of the Organization API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
 	return cmd
 }
 
@@ -1568,18 +1637,18 @@ func newRemoveWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 		Use:     "remove [WORKSPACE_TOKEN_ID]",
 		Aliases: []string{"rm"},
 		Short:   "Remove a Workspace API token's Deployment Role",
-		Long:    "Remove a Workspace API token's Deployment Role. Name the token by its ID or with --workspace-token-name.",
+		Long:    "Remove a Workspace API token's Deployment Role. Name the token by its ID or with --name.",
 		Example: `  # Remove a Workspace token's role in a Deployment
   astro deployment token workspace-token remove <WORKSPACE_TOKEN_ID> --deployment <DEPLOYMENT_ID>
 
   # Name the token instead of giving its ID
-  astro deployment token workspace-token remove --workspace-token-name my-ws-token \
+  astro deployment token workspace-token remove --name my-ws-token \
     --deployment <DEPLOYMENT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeWorkspaceTokenDeploymentRole(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgTokenName, "workspace-token-name", "", "The name of the WORKSPACE API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	addTokenNameFlag(cmd, "The name of the WORKSPACE API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "workspace-token-name")
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace the token is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)", oneXWorkspaceID)
 	return cmd
 }
@@ -1760,7 +1829,7 @@ func deleteDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 	}
 
 	cmd.SilenceUsage = true
-	return runDeploymentTokenDelete(deploymentTokenOutput, out)
+	return runDeploymentTokenDelete(cmd, deploymentTokenOutput, out)
 }
 
 func getOverrideUntil(until, forDuration string) (*time.Time, error) {

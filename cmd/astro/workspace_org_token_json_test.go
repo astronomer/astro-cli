@@ -132,7 +132,11 @@ func runTokenCases(t *testing.T, cases []tokenCase) {
 			if tc.wantErr != "" {
 				require.Error(t, r.err)
 				assert.Equal(t, tc.wantErr, r.err.Error())
-				assert.Equal(t, cliout.ExitFailure, r.code)
+				if cliout.IsUsage(r.err) {
+					assert.Equal(t, cliout.ExitUsage, r.code, "a verb that does not fit the token is a usage error, exit 2")
+				} else {
+					assert.Equal(t, cliout.ExitFailure, r.code)
+				}
 				if errors.Is(r.err, input.ErrAborted) {
 					assert.Empty(t, r.stdout, "a decline is not a result")
 				}
@@ -173,9 +177,9 @@ func secretShown(kind, verb, name string) func(t *testing.T, out string) {
 // else (`TOKEN=$(astro workspace token create ... --clean-output)`).
 func onlyTheSecret(t *testing.T, out string) { assert.Equal(t, tokSecret+"\n", out) }
 
-// withNumber is row with the picker's number.
-func withNumber(n string, row map[string]string) map[string]string {
-	out := map[string]string{"#": n}
+// firstRow is row as the picker numbers the first of its choices.
+func firstRow(row map[string]string) map[string]string {
+	out := map[string]string{"#": "1"}
 	for k, v := range row {
 		out[k] = v
 	}
@@ -243,8 +247,8 @@ func TestWorkspaceTokenText(t *testing.T) {
 			name: "update through the picker", root: newWorkspaceCmd, client: fakeTokens([]astrov1.ApiToken{ws}, updatesToken(ws, ws)), answers: "1\n",
 			args: []string{"workspace", "token", "update", "--description", "d"},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Please select the Workspace API token you would like to update:", "> Astro Workspace API token ws-token was successfully updated")
-				assert.Equal(t, []map[string]string{withNumber("1", wsTokRow)}, tableRows(t, out, "#"))
+				requireInOrder(t, out, "Please select the API token you would like to update:", "> Astro Workspace API token ws-token was successfully updated")
+				assert.Equal(t, []map[string]string{firstRow(wsTokRow)}, tableRows(t, out, "#"))
 			},
 		},
 		{
@@ -311,14 +315,27 @@ func TestWorkspaceTokenText(t *testing.T) {
 			args: []string{"workspace", "token", "delete", "--yes"},
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out, "Please select the API token you would like to delete from the Workspace:", "> Astro Workspace API token ws-token was successfully deleted")
-				assert.Equal(t, []map[string]string{withNumber("1", wsTokRow), withNumber("2", orgTokRow)}, tableRows(t, out, "#"))
+				assert.Equal(t, []map[string]string{firstRow(wsTokRow)}, tableRows(t, out, "#"), "the picker offers only the Workspace's own tokens, the ones delete takes")
 			},
 		},
 		{
-			// An Organization token is not the Workspace's to delete:
-			// deleting it here removes it from the Workspace, and says so.
-			name: "delete an organization token removes it", root: newWorkspaceCmd, client: fakeTokens(both, setsRoles("tok-org")), answers: "y\n",
-			args: []string{"workspace", "token", "delete", "tok-org"},
+			// An Organization token is not the Workspace's to delete: delete
+			// refuses it, asks nothing, and changes nothing (the fake has no
+			// role call to answer), and names remove.
+			name: "delete refuses an organization token", root: newWorkspaceCmd, client: fakeTokens(both), answers: "y\n",
+			args:    []string{"workspace", "token", "delete", "tok-org"},
+			check:   func(t *testing.T, out string) { assert.NotContains(t, out, "Are you sure") },
+			wantErr: "org-token is an Organization API token, not one of this Workspace's own. astro workspace token delete deletes a Workspace's own tokens; use astro workspace token remove to take the token's role off the Workspace",
+		},
+		{
+			name: "remove refuses the workspace's own token", root: newWorkspaceCmd, client: fakeTokens(both), answers: "y\n",
+			args:    []string{"workspace", "token", "remove", "tok-ws"},
+			check:   func(t *testing.T, out string) { assert.NotContains(t, out, "Are you sure") },
+			wantErr: "ws-token is this Workspace's own API token. astro workspace token remove takes a broader token's role off the Workspace; use astro workspace token delete to delete it",
+		},
+		{
+			name: "remove an organization token", root: newWorkspaceCmd, client: fakeTokens(both, setsRoles("tok-org")), answers: "y\n",
+			args: []string{"workspace", "token", "remove", "tok-org"},
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out,
 					"Are you sure you want to remove the org-token API token from the Workspace? (y/n)",
@@ -328,9 +345,20 @@ func TestWorkspaceTokenText(t *testing.T) {
 		},
 		{
 			name: "remove declined", root: newWorkspaceCmd, client: fakeTokens(both), answers: "n\n",
-			args:    []string{"workspace", "token", "delete", "tok-org"},
+			args:    []string{"workspace", "token", "remove", "tok-org"},
 			check:   says("Are you sure you want to remove the org-token API token from the Workspace? (y/n)"),
 			wantErr: "aborted",
+		},
+		{
+			name: "update an organization token changes its role in the Workspace", root: newWorkspaceCmd, client: fakeTokens(both, setsRoles("tok-org")),
+			args:  []string{"workspace", "token", "update", "tok-org", "--role", "WORKSPACE_MEMBER"},
+			check: says("Astro Organization API token org-token was successfully updated in the Workspace"),
+		},
+		{
+			name: "update refuses to rename an organization token", root: newWorkspaceCmd, client: fakeTokens(both),
+			args:    []string{"workspace", "token", "update", "tok-org", "--new-name", "renamed"},
+			check:   func(t *testing.T, out string) { assert.Empty(t, out) },
+			wantErr: "an Organization API token has its name and description changed in the Organization, not in a Workspace",
 		},
 		{name: "add", root: newWorkspaceCmd, client: fakeTokens([]astrov1.ApiToken{orgOnly(org)}, setsRoles("tok-org")), args: []string{"workspace", "token", "add", "tok-org", "--role", "WORKSPACE_MEMBER"}, check: says("Astro Organization API token org-token was successfully added to the Workspace")},
 		{
@@ -362,7 +390,7 @@ func TestWorkspaceTokenText(t *testing.T) {
 			args: []string{"workspace", "token", "organization-token", "update", "--role", "WORKSPACE_OWNER"},
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out, "Please select the Organization API token whose Workspace role you would like to update:", "> Astro Organization API token org-token was successfully added/updated to the Workspace")
-				assert.Equal(t, []map[string]string{withNumber("1", orgTokRow)}, tableRows(t, out, "#"))
+				assert.Equal(t, []map[string]string{firstRow(orgTokRow)}, tableRows(t, out, "#"))
 			},
 		},
 		{name: "organization-token remove", root: newWorkspaceCmd, client: fakeTokens(both, setsRoles("tok-org")), args: []string{"workspace", "token", "organization-token", "remove", "tok-org"}, check: says("Astro Organization API token org-token was successfully removed from the Workspace")},
@@ -398,7 +426,7 @@ func TestDeploymentTokenPicksWithTheOtherFamiliesTables(t *testing.T) {
 	d := "--deployment=" + tokDeploymentID
 	// The deployment family names no Workspace here. The tokens offered are
 	// the current Workspace's, and so are the roles shown with them.
-	wsPicked := withNumber("1", wsTokRow)
+	wsPicked := firstRow(wsTokRow)
 
 	runTokenCases(t, []tokenCase{
 		{
@@ -657,7 +685,8 @@ func TestWorkspaceTokenJSON(t *testing.T) {
 		{name: "update without --role keeps the role", client: fakeTokens(both, updatesToken(ws, ws)), args: []string{"workspace", "token", "update", "tok-ws", "--description", "d"}, check: jsonIsToken(wsTokJSON("WORKSPACE_MEMBER"))},
 		{name: "rotate carries the new secret", client: fakeTokens(both, rotatesToken(ws)), args: []string{"workspace", "token", "rotate", "tok-ws", "--yes"}, check: jsonIsToken(jsonWithSecret(wsTokJSON("WORKSPACE_MEMBER")))},
 		{name: "delete", client: fakeTokens(both, deletesToken("tok-ws")), args: []string{"workspace", "token", "delete", "tok-ws", "--yes"}, check: jsonWsRemoval(wsRemovalJSON{ID: "tok-ws", Name: "ws-token", Scope: "WORKSPACE", WorkspaceID: curWorkspaceID, Action: "deleted"})},
-		{name: "delete of an organization token removes it", client: fakeTokens(both, setsRoles("tok-org")), args: []string{"workspace", "token", "delete", "tok-org", "--yes"}, check: jsonWsRemoval(wsRemovalJSON{ID: "tok-org", Name: "org-token", Scope: "ORGANIZATION", WorkspaceID: curWorkspaceID, Action: "removed"})},
+		{name: "remove of an organization token takes its role away", client: fakeTokens(both, setsRoles("tok-org")), args: []string{"workspace", "token", "remove", "tok-org", "--yes"}, check: jsonWsRemoval(wsRemovalJSON{ID: "tok-org", Name: "org-token", Scope: "ORGANIZATION", WorkspaceID: curWorkspaceID, Action: "removed"})},
+		{name: "update of an organization token changes its role", client: fakeTokens(both, setsRoles("tok-org")), args: []string{"workspace", "token", "update", "tok-org", "--role", "WORKSPACE_OWNER"}, check: jsonIsToken(orgTokJSON("WORKSPACE_OWNER"))},
 		{name: "add", client: fakeTokens([]astrov1.ApiToken{orgOnly(org)}, setsRoles("tok-org")), args: []string{"workspace", "token", "add", "tok-org", "--role", "WORKSPACE_MEMBER"}, check: jsonIsToken(orgTokJSON("WORKSPACE_MEMBER"))},
 		{name: "organization-token add", client: fakeTokens([]astrov1.ApiToken{orgOnly(org)}, setsRoles("tok-org")), args: []string{"workspace", "token", "organization-token", "add", "tok-org", "--role", "WORKSPACE_AUTHOR"}, check: jsonIsToken(orgTokJSON("WORKSPACE_AUTHOR"))},
 		{name: "organization-token update", client: fakeTokens(both, setsRoles("tok-org")), args: []string{"workspace", "token", "organization-token", "update", "tok-org", "--role", "WORKSPACE_OWNER"}, check: jsonIsToken(orgTokJSON("WORKSPACE_OWNER"))},
@@ -668,7 +697,7 @@ func TestWorkspaceTokenJSON(t *testing.T) {
 			require.NoError(t, r.err)
 			assert.Equal(t, 0, r.code)
 			tc.check(t, r.stdout)
-			assert.Empty(t, r.stderr)
+			requireOnlyDeprecationWarnings(t, r.stderr)
 		})
 	}
 }
@@ -783,7 +812,7 @@ func TestWorkspaceOrganizationTokenJSONNeverAsks(t *testing.T) {
 	}{
 		{"ws rotate without --yes", newWorkspaceCmd, both, []string{"workspace", "token", "rotate", "tok-ws"}, "pass --yes"},
 		{"ws delete without --yes", newWorkspaceCmd, both, []string{"workspace", "token", "delete", "tok-ws"}, "pass --yes"},
-		{"ws remove without --yes", newWorkspaceCmd, both, []string{"workspace", "token", "delete", "tok-org"}, "pass --yes"},
+		{"ws remove without --yes", newWorkspaceCmd, both, []string{"workspace", "token", "remove", "tok-org"}, "pass --yes"},
 		{"ws update naming no token", newWorkspaceCmd, both, []string{"workspace", "token", "update", "--description", "d"}, "pass the token ID or --name"},
 		{"ws rotate naming no token", newWorkspaceCmd, both, []string{"workspace", "token", "rotate", "--yes"}, "pass the token ID or --name"},
 		{"ws delete naming no token", newWorkspaceCmd, both, []string{"workspace", "token", "delete", "--yes"}, "pass the token ID or --name"},
@@ -791,17 +820,17 @@ func TestWorkspaceOrganizationTokenJSONNeverAsks(t *testing.T) {
 		{"ws create naming no name", newWorkspaceCmd, both, []string{"workspace", "token", "create", "--role", "WORKSPACE_MEMBER"}, "pass --name"},
 		{"ws create naming no role", newWorkspaceCmd, both, []string{"workspace", "token", "create", "--name", "n"}, "pass --role"},
 		{"ws add naming no role", newWorkspaceCmd, both, []string{"workspace", "token", "add", "tok-org"}, "pass --role"},
-		{"ws add naming no token", newWorkspaceCmd, both, []string{"workspace", "token", "add", "--role", "WORKSPACE_MEMBER"}, "pass the token ID or --org-token-name"},
+		{"ws add naming no token", newWorkspaceCmd, both, []string{"workspace", "token", "add", "--role", "WORKSPACE_MEMBER"}, "pass the token ID or --name"},
 		{"ws organization-token add naming no role", newWorkspaceCmd, both, []string{"workspace", "token", "organization-token", "add", "tok-org"}, "pass --role"},
-		{"ws organization-token add naming no token", newWorkspaceCmd, both, []string{"workspace", "token", "organization-token", "add", "--role", "WORKSPACE_MEMBER"}, "pass the token ID or --org-token-name"},
-		{"ws organization-token update naming no token", newWorkspaceCmd, both, []string{"workspace", "token", "organization-token", "update", "--role", "WORKSPACE_MEMBER"}, "pass the token ID or --org-token-name"},
-		{"ws organization-token remove naming no token", newWorkspaceCmd, both, []string{"workspace", "token", "organization-token", "remove"}, "pass the token ID or --org-token-name"},
+		{"ws organization-token add naming no token", newWorkspaceCmd, both, []string{"workspace", "token", "organization-token", "add", "--role", "WORKSPACE_MEMBER"}, "pass the token ID or --name"},
+		{"ws organization-token update naming no token", newWorkspaceCmd, both, []string{"workspace", "token", "organization-token", "update", "--role", "WORKSPACE_MEMBER"}, "pass the token ID or --name"},
+		{"ws organization-token remove naming no token", newWorkspaceCmd, both, []string{"workspace", "token", "organization-token", "remove"}, "pass the token ID or --name"},
 		{"org rotate without --yes", newOrganizationCmd, orgs, []string{"organization", "token", "rotate", "tok-org"}, "pass --yes"},
 		{"org delete without --yes", newOrganizationCmd, orgs, []string{"organization", "token", "delete", "tok-org"}, "pass --yes"},
 		{"org update naming no token", newOrganizationCmd, orgs, []string{"organization", "token", "update", "--description", "d"}, "pass the token ID or --name"},
 		{"org roles naming no token", newOrganizationCmd, orgs, []string{"organization", "token", "roles"}, "pass the token ID"},
 		{"org create naming no role", newOrganizationCmd, orgs, []string{"organization", "token", "create", "--name", "n"}, "pass --role"},
-		{"deployment workspace-token update naming no token", newDeploymentRootCmd, both, []string{"deployment", "token", "workspace-token", "update", "--deployment=" + tokDeploymentID, "--role", "DEPLOYMENT_ADMIN"}, "pass the token ID or --workspace-token-name"},
+		{"deployment workspace-token update naming no token", newDeploymentRootCmd, both, []string{"deployment", "token", "workspace-token", "update", "--deployment=" + tokDeploymentID, "--role", "DEPLOYMENT_ADMIN"}, "pass the token ID or --name"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -814,7 +843,7 @@ func TestWorkspaceOrganizationTokenJSONNeverAsks(t *testing.T) {
 			assert.Equal(t, string(cliout.KindInputRequired), got.Kind)
 			assert.Equal(t, cliout.ExitFailure, got.Code, "the code it reports is the one it exits with")
 			assert.Contains(t, got.Error, tc.answered)
-			assert.Empty(t, r.stderr)
+			requireOnlyDeprecationWarnings(t, r.stderr)
 		})
 	}
 }

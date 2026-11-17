@@ -116,6 +116,12 @@ func listOrgScopedAPITokens(client astrov1.APIClient) ([]astrov1.ApiToken, error
 	return tokens, nil
 }
 
+// ScopedTokens lists the Organization-scoped API tokens, as the API has them,
+// for a command in another family that picks among them.
+func ScopedTokens(client astrov1.APIClient) ([]astrov1.ApiToken, error) {
+	return listOrgScopedAPITokens(client)
+}
+
 // getOrganizationToken picks the token id or name means from tokens, offering
 // each with its Organization role when a person has to choose.
 func getOrganizationToken(id, name string, tokens []astrov1.ApiToken, pick apitoken.Picker) (token astrov1.ApiToken, err error) {

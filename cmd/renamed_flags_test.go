@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
 )
 
@@ -21,11 +22,12 @@ type renamedFlagEvent struct {
 func recordRenamedFlags(t *testing.T) *[]renamedFlagEvent {
 	t.Helper()
 	got := &[]renamedFlagEvent{}
-	orig := utils.RecordRenamedFlags
-	utils.RecordRenamedFlags = func(cmd *cobra.Command, renamed, current []string) {
+	orig, origVerb := utils.RecordRenamedFlags, cliout.RecordRenamed
+	record := func(cmd *cobra.Command, renamed, current []string) {
 		*got = append(*got, renamedFlagEvent{cmd.CommandPath(), renamed, current})
 	}
-	t.Cleanup(func() { utils.RecordRenamedFlags = orig })
+	utils.RecordRenamedFlags, cliout.RecordRenamed = record, record
+	t.Cleanup(func() { utils.RecordRenamedFlags, cliout.RecordRenamed = orig, origVerb })
 	return got
 }
 

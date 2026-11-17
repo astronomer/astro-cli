@@ -61,7 +61,7 @@ var connLinkNoun = linkNoun{
 
   # list links, and remove one
   astro env connection link list --connection-key db --workspace <ws>
-  astro env connection link delete --connection-key db --workspace <ws> --deployment <dep>`,
+  astro env connection link remove --connection-key db --workspace <ws> --deployment <dep>`,
 	addOverrideFlags: func(cmd *cobra.Command, f *linkFlags) {
 		cmd.Flags().StringVar(&f.conn.connType, "type", "", "The deployment's own connection type")
 		cmd.Flags().StringVar(&f.conn.host, "host", "", "The deployment's own host")
@@ -96,7 +96,7 @@ var airflowVarLinkNoun = linkNoun{
 
   # list links, and remove one
   astro env airflow-variable link list --airflow-variable-key region --workspace <ws>
-  astro env airflow-variable link delete --airflow-variable-key region --workspace <ws> \
+  astro env airflow-variable link remove --airflow-variable-key region --workspace <ws> \
     --deployment <dep>`,
 	addOverrideFlags: func(cmd *cobra.Command, f *linkFlags) {
 		cmd.Flags().StringVar(&f.value, "value", "", "The deployment's own value; omit it to clear any it had")
@@ -172,10 +172,26 @@ func newEnvLinkRootCmd(out io.Writer, n *linkNoun) *cobra.Command {
 	f := &linkFlags{}
 	cmd.AddCommand(
 		newEnvLinkSetCmd(out, n, f),
-		newEnvLinkDeleteCmd(out, n, f),
+		newEnvLinkRemoveCmd(out, n, f),
+		deprecatedLinkDelete(newEnvLinkRemoveCmd(out, n, f)),
 		newEnvLinkListCmd(out, n, f),
 	)
 	return cmd
+}
+
+// deprecatedLinkVerb is what a link group's remove was called before.
+const deprecatedLinkVerb = "delete"
+
+// deprecatedLinkDelete turns cmd, a fresh build of a link group's remove
+// command, into `delete`, the spelling the verb had before it was called
+// remove: hidden, still unlinking, and saying once per run that the spelling is
+// deprecated. Its flags are cmd's, bound to the same values, so the two take
+// the same arguments.
+func deprecatedLinkDelete(cmd *cobra.Command) *cobra.Command {
+	cmd.Use, cmd.Aliases = deprecatedLinkVerb, nil
+	return cliout.DeprecateCommand(cmd, func(c *cobra.Command) string {
+		return c.Parent().CommandPath() + " remove"
+	}, "")
 }
 
 // addLinkObjectFlags wires the identifier flags for the linked object:
@@ -230,19 +246,19 @@ func newEnvLinkSetCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command {
 	return cmd
 }
 
-func newEnvLinkDeleteCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command {
+func newEnvLinkRemoveCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete",
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a link or exclude",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runEnvLinkDelete(cmd, out, n, f)
+			return runEnvLinkRemove(cmd, out, n, f)
 		},
 		Example: fmt.Sprintf(`  # Unlink a workspace %[1]s from a Deployment
-  astro env %[2]s link delete --%[2]s-key <KEY> --deployment <DEPLOYMENT_ID>
+  astro env %[2]s link remove --%[2]s-key <KEY> --deployment <DEPLOYMENT_ID>
 
   # Remove an exclude, so an auto-linked %[1]s reaches the Deployment again
-  astro env %[2]s link delete --%[2]s-key <KEY> \
+  astro env %[2]s link remove --%[2]s-key <KEY> \
     --deployment <DEPLOYMENT_ID> --exclude`, n.what, n.noun),
 	}
 	addLinkObjectFlags(cmd, n, f)
@@ -302,7 +318,7 @@ func runEnvLinkSet(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags)
 	return linkChanged(cmd, r, report, line)
 }
 
-func runEnvLinkDelete(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags) error {
+func runEnvLinkRemove(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags) error {
 	scope, err := envScope(cmd)
 	if err != nil {
 		return err

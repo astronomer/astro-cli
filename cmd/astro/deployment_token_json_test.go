@@ -531,20 +531,47 @@ func TestDeploymentTokenText(t *testing.T) {
 			wantErr: "aborted",
 		},
 		{
-			// A Workspace token is not the Deployment's to delete: deleting it
-			// here removes it from the Deployment, and says so.
-			name: "delete a workspace token removes it",
+			// A Workspace token is not the Deployment's to delete: delete
+			// refuses it, asks nothing and changes nothing (the mock has no
+			// delete or role call to answer), and names remove.
+			name: "delete refuses a workspace token",
+			client: func(t *testing.T) astrov1.APIClient {
+				return tokenMock(t, ws)
+			},
+			answers: "y\n",
+			args:    []string{"token", "delete", "tok-ws", d},
+			check:   func(t *testing.T, out string) { assert.NotContains(t, out, "Are you sure") },
+			wantErr: "ws-token is a Workspace API token, not one of this Deployment's own. astro deployment token delete deletes a Deployment's own tokens; use astro deployment token remove to take the token's role off the Deployment",
+		},
+		{
+			name: "delete refuses an organization token",
+			client: func(t *testing.T) astrov1.APIClient {
+				return tokenMock(t, org)
+			},
+			args:    []string{"token", "delete", "tok-org", d, "--yes"},
+			check:   func(t *testing.T, out string) {},
+			wantErr: "org-token is an Organization API token, not one of this Deployment's own. astro deployment token delete deletes a Deployment's own tokens; use astro deployment token remove to take the token's role off the Deployment",
+		},
+		{
+			name:    "remove refuses the deployment's own token",
+			client:  func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep) },
+			args:    []string{"token", "remove", "tok-dep", d, "--yes"},
+			check:   func(t *testing.T, out string) {},
+			wantErr: "ci-deploy is this Deployment's own API token. astro deployment token remove takes a broader token's role off the Deployment; use astro deployment token delete to delete it",
+		},
+		{
+			name: "remove a workspace token",
 			client: func(t *testing.T) astrov1.APIClient {
 				m := tokenMock(t, ws)
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
 			answers: "y\n",
-			args:    []string{"token", "delete", "tok-ws", d},
+			args:    []string{"token", "remove", "tok-ws", d},
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out,
 					"Are you sure you want to remove the ws-token API token from the Deployment? (y/n)",
-					"Astro API token ws-token was successfully removed from the Deployment")
+					"Astro Workspace API token ws-token was successfully removed from the Deployment")
 				assert.NotContains(t, out, "WARNING", "a removal can be undone")
 			},
 		},
@@ -552,7 +579,7 @@ func TestDeploymentTokenText(t *testing.T) {
 			name:    "remove declined",
 			client:  func(t *testing.T) astrov1.APIClient { return tokenMock(t, ws) },
 			answers: "n\n",
-			args:    []string{"token", "delete", "tok-ws", d},
+			args:    []string{"token", "remove", "tok-ws", d},
 			check: says(
 				"Are you sure you want to remove the ws-token API token from the Deployment? (y/n)"),
 			wantErr: "aborted",
@@ -628,7 +655,11 @@ func TestDeploymentTokenText(t *testing.T) {
 			if tc.wantErr != "" {
 				require.Error(t, r.err)
 				assert.Equal(t, tc.wantErr, r.err.Error())
-				assert.Equal(t, cliout.ExitFailure, r.code)
+				if cliout.IsUsage(r.err) {
+					assert.Equal(t, cliout.ExitUsage, r.code, "a verb that does not fit the token is a usage error, exit 2")
+				} else {
+					assert.Equal(t, cliout.ExitFailure, r.code)
+				}
 				if errors.Is(r.err, input.ErrAborted) {
 					assert.Empty(t, r.stdout, "a decline is not a result")
 				}
@@ -855,14 +886,73 @@ func TestDeploymentTokenJSON(t *testing.T) {
 			check: removal("tok-dep", "ci-deploy", "DEPLOYMENT", "deleted"),
 		},
 		{
-			name: "delete of a workspace token removes it",
+			name: "remove of a workspace token takes its role away",
 			client: func(t *testing.T) astrov1.APIClient {
 				m := tokenMock(t, ws)
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args:  []string{"token", "delete", "tok-ws", d, "--yes"},
+			args:  []string{"token", "remove", "tok-ws", d, "--yes"},
 			check: removal("tok-ws", "ws-token", "WORKSPACE", "removed"),
+		},
+		{
+			name: "remove of an organization token takes its role away",
+			client: func(t *testing.T) astrov1.APIClient {
+				m := tokenMock(t, org)
+				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-org", mock.Anything).Return(rolesOK(), nil)
+				return m
+			},
+			args:  []string{"token", "remove", "tok-org", d, "--yes"},
+			check: removal("tok-org", "org-token", "ORGANIZATION", "removed"),
+		},
+		{
+			name: "add of a workspace token, found by its ID",
+			client: func(t *testing.T) astrov1.APIClient {
+				_, bare, _ := jsonTokenFixtures()
+				bare.Roles = &[]astrov1.ApiTokenRole{{EntityType: astrov1.ApiTokenRoleEntityTypeWORKSPACE, EntityId: tokWorkspaceID, Role: "WORKSPACE_MEMBER"}}
+				m := tokenMock(t, bare)
+				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
+				return m
+			},
+			args: []string{"token", "add", "tok-ws", d, "--role", "DEPLOYMENT_MEMBER"},
+			check: func(t *testing.T, out string) {
+				var got tokenJSON
+				decodeOne(t, out, &got)
+				assert.Equal(t, "WORKSPACE", got.Scope)
+				assert.Equal(t, "DEPLOYMENT_MEMBER", got.Role)
+			},
+		},
+		{
+			name: "add of an organization token, found by its ID",
+			client: func(t *testing.T) astrov1.APIClient {
+				_, _, bare := jsonTokenFixtures()
+				bare.Roles = &[]astrov1.ApiTokenRole{{EntityType: astrov1.ApiTokenRoleEntityTypeORGANIZATION, EntityId: "test-org-id", Role: "ORGANIZATION_MEMBER"}}
+				m := tokenMock(t, bare)
+				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-org", mock.Anything).Return(rolesOK(), nil)
+				return m
+			},
+			args: []string{"token", "add", "tok-org", d, "--role", "DEPLOYMENT_ADMIN"},
+			check: func(t *testing.T, out string) {
+				var got tokenJSON
+				decodeOne(t, out, &got)
+				assert.Equal(t, "ORGANIZATION", got.Scope)
+				assert.Equal(t, "DEPLOYMENT_ADMIN", got.Role)
+			},
+		},
+		{
+			name: "update of a workspace token changes its role on the Deployment",
+			client: func(t *testing.T) astrov1.APIClient {
+				m := tokenMock(t, ws)
+				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
+				return m
+			},
+			args: []string{"token", "update", "tok-ws", d, "--role", "DEPLOYMENT_ADMIN"},
+			check: func(t *testing.T, out string) {
+				var got tokenJSON
+				decodeOne(t, out, &got)
+				assert.Equal(t, "WORKSPACE", got.Scope)
+				assert.Equal(t, "DEPLOYMENT_ADMIN", got.Role)
+			},
 		},
 		{
 			name: "organization-token add",
@@ -935,7 +1025,7 @@ func TestDeploymentTokenJSON(t *testing.T) {
 			require.NoError(t, r.err)
 			assert.Equal(t, 0, r.code)
 			tc.check(t, r.stdout)
-			assert.Empty(t, r.stderr)
+			requireOnlyDeprecationWarnings(t, r.stderr)
 		})
 	}
 }
@@ -972,13 +1062,14 @@ func TestDeploymentTokenJSONNeverAsks(t *testing.T) {
 	}{
 		{"rotate without --yes", func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep) }, []string{"token", "rotate", "tok-dep", d}, "pass --yes"},
 		{"delete without --yes", func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep) }, []string{"token", "delete", "tok-dep", d}, "pass --yes"},
-		{"remove without --yes", func(t *testing.T) astrov1.APIClient { return tokenMock(t, ws) }, []string{"token", "delete", "tok-ws", d}, "pass --yes"},
+		{"remove without --yes", func(t *testing.T) astrov1.APIClient { return tokenMock(t, ws) }, []string{"token", "remove", "tok-ws", d}, "pass --yes"},
+		{"add naming no token", func(t *testing.T) astrov1.APIClient { return tokenMock(t, ws) }, []string{"token", "add", d, "--role", "DEPLOYMENT_ADMIN"}, "pass the token ID or --name"},
 		{"update naming no token", func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep) }, []string{"token", "update", d, "--role", "DEPLOYMENT_MEMBER"}, "pass the token ID or --name"},
 		{"rotate naming no token", func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep) }, []string{"token", "rotate", d, "--yes"}, "pass the token ID or --name"},
 		{"create naming no name", func(t *testing.T) astrov1.APIClient { return tokenMock(t) }, []string{"token", "create", d, "--role", "DEPLOYMENT_ADMIN"}, "pass --name"},
-		{"workspace-token add naming no token", func(t *testing.T) astrov1.APIClient { return tokenMock(t, ws) }, []string{"token", "workspace-token", "add", d, "--role", "DEPLOYMENT_ADMIN"}, "pass the token ID or --workspace-token-name"},
-		{"workspace-token remove naming no token", func(t *testing.T) astrov1.APIClient { return tokenMock(t, ws) }, []string{"token", "workspace-token", "remove", d}, "pass the token ID or --workspace-token-name"},
-		{"organization-token add naming no token", func(t *testing.T) astrov1.APIClient { return tokenMock(t) }, []string{"token", "organization-token", "add", d, "--role", "DEPLOYMENT_ADMIN"}, "pass the token ID or --org-token-name"},
+		{"workspace-token add naming no token", func(t *testing.T) astrov1.APIClient { return tokenMock(t, ws) }, []string{"token", "workspace-token", "add", d, "--role", "DEPLOYMENT_ADMIN"}, "pass the token ID or --name"},
+		{"workspace-token remove naming no token", func(t *testing.T) astrov1.APIClient { return tokenMock(t, ws) }, []string{"token", "workspace-token", "remove", d}, "pass the token ID or --name"},
+		{"organization-token add naming no token", func(t *testing.T) astrov1.APIClient { return tokenMock(t) }, []string{"token", "organization-token", "add", d, "--role", "DEPLOYMENT_ADMIN"}, "pass the token ID or --name"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -991,7 +1082,7 @@ func TestDeploymentTokenJSONNeverAsks(t *testing.T) {
 			assert.Equal(t, string(cliout.KindInputRequired), got.Kind)
 			assert.Equal(t, cliout.ExitFailure, got.Code, "the code it reports is the one it exits with")
 			assert.Contains(t, got.Error, tc.answered)
-			assert.Empty(t, r.stderr)
+			requireOnlyDeprecationWarnings(t, r.stderr)
 		})
 	}
 }
