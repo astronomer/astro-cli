@@ -318,20 +318,31 @@ func (c *Context) ResumeLoginVault() error {
 // times; past that, or when the lock cannot be taken at all, the renewal goes
 // ahead unlocked, which costs at worst a second refresh, as before the lock.
 func LockLoginRenewal() (unlock func()) {
+	unlock, _ = LockLoginRenewalFor(renewalLockAttempts)
+	return unlock
+}
+
+// LockLoginRenewalFor is LockLoginRenewal with a bound of attempts waits of
+// fsatomic.LockTimeout each, for a caller that can do without the renewal: one
+// whose access token still works has no reason to wait out another process's
+// renewal. contended reports that every wait timed out, so another process
+// holds the lock; the returned unlock is then a no-op, and a caller may skip
+// the renewal or go ahead unlocked.
+func LockLoginRenewalFor(attempts int) (unlock func(), contended bool) {
 	noop := func() {}
 	if err := os.MkdirAll(HomeConfigPath, dirPerm); err != nil {
-		return noop
+		return noop, false
 	}
-	for range renewalLockAttempts {
+	for range attempts {
 		unlock, err := fsatomic.Lock(HomeConfigFile + ".renew.lock")
 		if err == nil {
-			return unlock
+			return unlock, false
 		}
 		if !errors.Is(err, fsatomic.ErrLockTimeout) {
-			break
+			return noop, false
 		}
 	}
-	return noop
+	return noop, true
 }
 
 // renewalLockAttempts times fsatomic.LockTimeout is how long a renewal waits
