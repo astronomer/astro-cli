@@ -313,6 +313,10 @@ func bundleWait(cmd *cobra.Command, login *deployLogin, deploymentID string, wai
 // deploy's is, with kind input_required. read is the Deployment when it was
 // picked, so the deploy need not read it again.
 func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Format) (id string, read *astrov1.Deployment, login deployLogin, err error) {
+	// A token for one Workspace acts in no other: refused before a request.
+	if err := astrosession.CheckWorkspace(workspace, astrosession.SourceFlag); err != nil {
+		return "", nil, login, err
+	}
 	m := manifestHere()
 	domain := ""
 	if m != nil {
@@ -338,7 +342,11 @@ func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Form
 		if m != nil {
 			projectWorkspace = m.Astro.Workspace
 		}
-		ws := astrosession.Resolve(astrosession.Request{Workspace: workspace, Project: projectWorkspace, Login: login.selection(), Domain: login.context.Domain}).Workspace
+		run := astrosession.Resolve(astrosession.Request{Workspace: workspace, Project: projectWorkspace, Login: login.selection(), Domain: login.context.Domain})
+		if err := run.Disagrees(); err != nil {
+			return "", nil, login, err
+		}
+		ws := run.Workspace
 		dep, err := deploymentNamed(name, ws, &login)
 		if err != nil {
 			return "", nil, login, err
@@ -362,6 +370,9 @@ func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Form
 	ws := workspace
 	if ws == "" {
 		if ws, err = coalesceWorkspace(cmd); err != nil {
+			if isWorkspaceRefusal(err) {
+				return "", nil, login, err
+			}
 			return "", nil, login, fmt.Errorf("failed to find a valid workspace: %w", err)
 		}
 	}

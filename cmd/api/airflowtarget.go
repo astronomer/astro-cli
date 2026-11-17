@@ -435,6 +435,9 @@ func lookupDeployment(override, orgID, ref string, project *manifest.Astro, ctx 
 		return dep, nil
 	}
 	run := astrosession.Resolve(astrosession.Request{Login: ctx, Project: project.Workspace})
+	if err := run.Disagrees(); err != nil {
+		return astrov1.Deployment{}, err
+	}
 	ws, wsOrg := run.Workspace, ctx.Organization
 	if run.WorkspaceSource == astrosession.SourceProject {
 		// The project's workspace is on the project's host. Listed through a

@@ -368,7 +368,7 @@ func (c *cli) startProject(ctx context.Context, opts plan.Options, buildSecretFl
 	}
 	// Turn on Environment Manager resolution for workspace-source env values.
 	opts.WorkspaceProvider = c.workspaceProvider()
-	opts.WorkspaceID = emenv.WorkspaceID
+	opts.WorkspaceID = emenv.WorkspaceFor
 	opts.BuildSecretFlags = buildSecretFlag
 	opts.PythonCatalog = c.pythonCatalog(ctx)
 	if opts.Mode != localrt.ModeDocker {
@@ -808,7 +808,7 @@ func (c *cli) restartProject(ctx context.Context, o restartOptions) (*plan.Built
 		PythonCatalog:    c.pythonCatalog(ctx),
 
 		WorkspaceProvider: c.workspaceProvider(),
-		WorkspaceID:       emenv.WorkspaceID,
+		WorkspaceID:       emenv.WorkspaceFor,
 	})
 	if err != nil {
 		return nil, c.reportBuildError(r, err)
@@ -1216,7 +1216,7 @@ func (c *cli) environment(ctx context.Context, withWorkspace, noSync bool) (loca
 	opts := plan.Options{AllowMissing: true}
 	if withWorkspace {
 		opts.WorkspaceProvider = c.workspaceProvider()
-		opts.WorkspaceID = emenv.WorkspaceID
+		opts.WorkspaceID = emenv.WorkspaceFor
 	}
 	built, err := plan.Build(dir, opts)
 	if err != nil {

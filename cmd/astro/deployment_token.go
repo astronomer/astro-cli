@@ -276,6 +276,10 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 // as an Organization token's, can still name one.
 func workspaceTokenWorkspace(cmd *cobra.Command, id string) (string, error) {
 	ws, err := coalesceWorkspaceOr(cmd, astrosession.ByID)
+	if isWorkspaceRefusal(err) {
+		// A Workspace named against the token is no better for a token given by id.
+		return "", err
+	}
 	if err != nil && id == "" {
 		if errors.Is(err, astrosession.ErrOrgTokenNoWorkspace) {
 			return "", err

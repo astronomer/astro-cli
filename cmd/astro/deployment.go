@@ -782,7 +782,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	if !allDeployments {
 		var err error
 		if ws, err = coalesceWorkspace(cmd); err != nil {
-			return errors.Wrap(err, "failed to find a valid workspace")
+			return wrapWorkspaceErr(err, "failed to find a valid workspace")
 		}
 	}
 
@@ -822,7 +822,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Find Workspace ID
 	ws, err := coalesceWorkspace(cmd)
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid Workspace")
+		return wrapWorkspaceErr(err, "failed to find a valid Workspace")
 	}
 	workspaceID = ws
 

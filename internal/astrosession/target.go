@@ -50,7 +50,28 @@ const (
 	SourceToken
 	// SourceContext is the Workspace a saved interactive login last used.
 	SourceContext
+	// SourcePath is a Workspace id the person wrote in a request path.
+	SourcePath
 )
+
+// From is the source worded for a message ("--workspace", "the project's
+// link"), "" for none.
+func (s Source) From() string {
+	switch s {
+	case SourceFlag:
+		return "--workspace"
+	case SourceProject:
+		return "the project's link"
+	case SourceToken:
+		return "ASTRO_API_TOKEN"
+	case SourceContext:
+		return "the saved login"
+	case SourcePath:
+		return "the request path"
+	case SourceNone:
+	}
+	return ""
+}
 
 // WorkspaceAdvice is the ways a command lets a person name a Workspace,
 // besides the token's claim and the saved login. It only picks the advice a
@@ -136,6 +157,62 @@ func (e *noWorkspaceError) Error() string {
 
 func (e *noWorkspaceError) Is(target error) bool { return target == ErrOrgTokenNoWorkspace }
 
+// WorkspaceDisagreeError is a run whose API token is for one Workspace and
+// whose --workspace, project link or request path names another. It is a usage
+// error found before any request: the token can act only in its own Workspace,
+// so the request would be refused, and which of the two the person meant is
+// not something to guess. 1.x let the flag win and failed at the API.
+type WorkspaceDisagreeError struct {
+	// Deployment is true for a Deployment token, false for a Workspace token.
+	Deployment bool
+	// Claim is the Workspace the token is for, Named the one the run named.
+	Claim, Named string
+	// Source is where Named came from.
+	Source Source
+}
+
+func (e *WorkspaceDisagreeError) Error() string {
+	token := "a Workspace token for " + e.Claim
+	if e.Deployment {
+		token = "a Deployment token for Workspace " + e.Claim
+	}
+	var fix string
+	switch e.Source {
+	case SourceFlag:
+		fix = "drop --workspace, or use a token for " + e.Named
+	case SourceProject:
+		fix = "run outside that project, or use a token for " + e.Named
+	default:
+		fix = "use a token for " + e.Named
+	}
+	return fmt.Sprintf("ASTRO_API_TOKEN is %s, but %s names %s: %s", token, e.Source.From(), e.Named, fix)
+}
+
+// IsUsageError marks WorkspaceDisagreeError as a usage error for
+// cliout.IsUsage, which this package cannot import.
+func (e *WorkspaceDisagreeError) IsUsageError() bool { return true }
+
+// OmitsHelpPointer keeps the pointer to help off the error: it says what to
+// change, which the command's help does not.
+func (e *WorkspaceDisagreeError) OmitsHelpPointer() bool { return true }
+
+// CheckWorkspace is nil unless the run holds a Workspace or Deployment token
+// (a workspaceId claim) for a Workspace other than named, the one a person
+// named through source: the flag, the project's link, or a path. A command
+// family that reads a Workspace without Resolve (the core tree's manifest
+// link) calls it with what it read. An Organization token has no claim, and a
+// run with no token has nothing to disagree with.
+func CheckWorkspace(named string, source Source) error {
+	if named == "" {
+		return nil
+	}
+	id := claimsOf()
+	if id.Workspace == "" || id.Workspace == named {
+		return nil
+	}
+	return &WorkspaceDisagreeError{Deployment: id.Deployment != "", Claim: id.Workspace, Named: named, Source: source}
+}
+
 // Request is what a command knows about the Workspace and Deployment it acts on.
 type Request struct {
 	// Workspace is --workspace, "" when not given.
@@ -188,6 +265,9 @@ type Target struct {
 	// readErr is why the login could not be read, when the request asked.
 	readErr error
 	token   bool
+	// disagree is the flag's or the project's Workspace refused against the
+	// token's own (see WorkspaceDisagreeError).
+	disagree error
 }
 
 // Resolve decides the run's Workspace and Deployment. It reads the current
@@ -206,6 +286,13 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 		if r.LoginError {
 			t.readErr = err
 		}
+	}
+
+	// The flag, then the project, won above before the token's claim was
+	// considered. A Workspace the token cannot act in is refused here, not
+	// obeyed and left for the API to turn down.
+	if t.token && (t.WorkspaceSource == SourceFlag || t.WorkspaceSource == SourceProject) {
+		t.disagree = CheckWorkspace(t.Workspace, t.WorkspaceSource)
 	}
 
 	switch {
@@ -283,10 +370,22 @@ func (t Target) Found() bool { //nolint:gocritic // a small value type
 	return t.Workspace != ""
 }
 
+// Disagrees is the error for a Workspace named by the flag or the project that
+// is not the one the run's Workspace or Deployment token is for, nil when they
+// agree or the run has no such token (see WorkspaceDisagreeError). A caller
+// that reads Workspace without calling Require checks it first.
+func (t Target) Disagrees() error { //nolint:gocritic // a small value type
+	return t.disagree
+}
+
 // Require is nil when the run has a Workspace, else the error for its absence
-// (Missing). A command that asks a question or calls the API calls it first,
-// so nothing is asked on the way to this error.
+// (Missing), or the one for a Workspace its token cannot act in (Disagrees). A
+// command that asks a question or calls the API calls it first, so nothing is
+// asked on the way to this error.
 func (t Target) Require() error { //nolint:gocritic // a small value type
+	if t.disagree != nil {
+		return t.disagree
+	}
 	if t.Found() {
 		return nil
 	}

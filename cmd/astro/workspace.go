@@ -951,9 +951,26 @@ func coalesceFrom(t astrosession.Target) (string, error) { //nolint:gocritic // 
 		return "", err
 	}
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get current Workspace")
+		return "", wrapWorkspaceErr(err, "failed to get current Workspace")
 	}
 	return ws, nil
+}
+
+// isWorkspaceRefusal reports whether err is a Workspace the run's API token
+// is not for (astrosession.WorkspaceDisagreeError). It says in full what to
+// change, so what found it does not wrap it in what it was looking for.
+func isWorkspaceRefusal(err error) bool {
+	var disagree *astrosession.WorkspaceDisagreeError
+	return errors.As(err, &disagree)
+}
+
+// wrapWorkspaceErr is err, saying msg first, unless err is a refusal
+// (isWorkspaceRefusal), which stands as it is.
+func wrapWorkspaceErr(err error, msg string) error {
+	if isWorkspaceRefusal(err) {
+		return err
+	}
+	return errors.Wrap(err, msg)
 }
 
 func selectWorkspaceRole() (string, error) {
@@ -1003,7 +1020,7 @@ func deploymentWorkspace(cmd *cobra.Command, id, msg string) (string, error) {
 	}
 	ws, err := coalesceFrom(t)
 	if err != nil && msg != "" {
-		return "", errors.Wrap(err, msg)
+		return "", wrapWorkspaceErr(err, msg)
 	}
 	return ws, err
 }

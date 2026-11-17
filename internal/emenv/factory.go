@@ -72,6 +72,20 @@ func WorkspaceID(a *manifest.Astro) string {
 	return ""
 }
 
+// WorkspaceFor is WorkspaceID for a run that is about to read with it. It is
+// refused, with the usage error astrosession.CheckWorkspace gives, when the
+// manifest links a Workspace other than the one the run's Workspace or
+// Deployment token is for: the token can act in its own Workspace alone, so
+// reading the linked one would only be turned down by the API, after a
+// request. An Organization token, or a run with none, has no claim to
+// disagree with.
+func WorkspaceFor(a *manifest.Astro) (string, error) {
+	if err := astrosession.CheckWorkspace(a.Workspace, astrosession.SourceProject); err != nil {
+		return "", err
+	}
+	return WorkspaceID(a), nil
+}
+
 // NewProvider builds the workspace Environment Manager provider for a run: it
 // resolves `source = "workspace"` names against ws's objects, read with the
 // login stored for ws.Domain, under ws.Organization, else that login's

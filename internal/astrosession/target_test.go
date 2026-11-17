@@ -104,7 +104,10 @@ func TestResolveWorkspacePrecedence(t *testing.T) {
 			if got.Found() != (tt.want != "") {
 				t.Fatalf("Found() = %v for %q", got.Found(), tt.want)
 			}
-			if err := got.Require(); (err == nil) != (tt.want != "") {
+			// A Workspace named against a token for another is refused by Require,
+			// though Resolve still reports what won
+			// (TestResolveRefusesAWorkspaceTheTokenIsNotFor).
+			if err := got.Require(); (err == nil) != (tt.want != "") && got.Disagrees() == nil {
 				t.Fatalf("Require() = %v for %q", err, tt.want)
 			}
 		})

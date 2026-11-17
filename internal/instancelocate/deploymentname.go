@@ -100,6 +100,11 @@ func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace, proje
 	if util.IsCUID(ref) {
 		return ref, nil
 	}
+	// The project's workspace is where a name is looked up. A token for another
+	// Workspace cannot list it: refused before the login is read, or a request made.
+	if err := astrosession.CheckWorkspace(projectWorkspace, astrosession.SourceProject); err != nil {
+		return "", err
+	}
 	ws := projectWorkspace
 	if ws == "" && l.workspace != nil {
 		ws = l.workspace()

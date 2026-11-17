@@ -270,6 +270,10 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 
 	// --workspace, or its 1.x spelling --workspace-id.
 	overrideWorkspace := manifestWorkspace
+	// A token for one Workspace deploys to no other: refused before a request.
+	if err := astrosession.CheckWorkspace(overrideWorkspace, astrosession.SourceFlag); err != nil {
+		return manifestDeployErr(cmd, err)
+	}
 
 	// A prompt has to be answered by someone at a terminal, and json output has
 	// to stay a stream a program can parse — a question on stderr with the run

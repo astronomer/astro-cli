@@ -93,6 +93,12 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 		if err := parentPreRun(group, cmd, args); err != nil {
 			return err
 		}
+		// A project link the run's token is not for is refused once the command
+		// asks for its Workspace (astrosession.Target.Require); no note says the
+		// project chose it.
+		if astrosession.CheckWorkspace(pick.workspace, astrosession.SourceProject) != nil {
+			return nil
+		}
 		if note := projectNote(cmd.Context(), pick, before.Workspace, switched); note != "" {
 			fmt.Fprintln(cmd.ErrOrStderr(), note)
 		}
