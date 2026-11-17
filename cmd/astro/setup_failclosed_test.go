@@ -62,6 +62,7 @@ const rejectedRefresh = `{"error":"invalid_grant","error_description":"Unknown o
 // expiresIn (negative: it expired that long ago), with a refresh token.
 func loginExpiringIn(t *testing.T, expiresIn time.Duration) {
 	t.Helper()
+	resetRetiredRenewal(t)
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Cleanup(func() { testUtil.InitTestConfig(testUtil.CloudPlatform) })
 	c, err := context.GetCurrentContext()

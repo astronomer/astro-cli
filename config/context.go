@@ -237,6 +237,28 @@ func (c *Context) SetSharedExpiresIn(value int64) error {
 	return shareContextField(cKey, "expiresin", time.Now().Add(time.Duration(value)*time.Second))
 }
 
+// SetSharedLogin saves a whole login (access token, refresh token, expiry in
+// seconds from now, and email) to this context and to every other context on
+// its tenant, in one config save. Four SetShared* calls are four saves, and a
+// failure part way leaves a new access token beside the retired refresh token.
+func (c *Context) SetSharedLogin(token, refreshToken string, expiresIn int64, userEmail string) error {
+	cKey, err := c.GetContextKey()
+	if err != nil {
+		return err
+	}
+	expiresAt := time.Now().Add(time.Duration(expiresIn) * time.Second)
+	for _, key := range append([]string{cKey}, contextKeysSharingLogin(cKey)...) {
+		// One vault write for the pair, so a failure between two can never
+		// leave the new access token beside the old refresh token.
+		fields := saveContextLogin(key, secrets.Login{Token: token, RefreshToken: refreshToken})
+		putContextField(key, tokenField, fields.Token)
+		putContextField(key, refreshTokenField, fields.RefreshToken)
+		putContextField(key, "expiresin", expiresAt)
+		putContextField(key, "user_email", userEmail)
+	}
+	return saveConfig(viperHome, HomeConfigFile)
+}
+
 // setContextField updates one field in one context and persists the config.
 func setContextField(cKey, field string, value interface{}) error {
 	field = strings.ToLower(field)
