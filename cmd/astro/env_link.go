@@ -289,7 +289,6 @@ func runEnvLinkSet(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags)
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := f.idOrKey(n)
 	if err != nil {
@@ -323,7 +322,6 @@ func runEnvLinkRemove(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFla
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := f.idOrKey(n)
 	if err != nil {
@@ -348,7 +346,6 @@ func runEnvLinkList(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := f.idOrKey(n)
 	if err != nil {

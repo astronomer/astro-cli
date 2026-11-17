@@ -152,7 +152,6 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	in := &astrodeploy.DeployBundleInput{
 		BundlePath:    path,
@@ -199,7 +198,6 @@ func deleteBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	in := &astrodeploy.DeleteBundleInput{
 		MountPath:     b.mountPath,

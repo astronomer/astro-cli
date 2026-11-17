@@ -57,7 +57,6 @@ func newContextListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all contexts",
 		Long:    "List all Astro and APC contexts or domains that you've authenticated to on this machine",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
 			list, err := context.List()
 			if err != nil {
 				return err
@@ -112,7 +111,6 @@ func newContextSwitchCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 // text, an Astro switch says what its login check found, as it always has,
 // and an APC switch prints the context table.
 func switchContext(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, r cliout.Renderer) error {
-	cmd.SilenceUsage = true
 	if len(args) == 0 {
 		domain, err := pickContext(cmd.InOrStdin(), cmd.ErrOrStderr())
 		if err != nil {
@@ -235,7 +233,6 @@ func newContextDeleteCmd() *cobra.Command {
 		Short:   "Delete a context",
 		Long:    "Delete a locally stored context to Astro or APC",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.SilenceUsage = true
 			out := cmd.OutOrStdout()
 			removal, err := context.Delete(domainutil.ExpandShortName(args[0]), noPrompt)
 			if err != nil {

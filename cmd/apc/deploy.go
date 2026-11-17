@@ -187,16 +187,11 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 	where := utils.Locate(config.WorkingPath)
 	inProject := where.AtRoot(config.WorkingPath)
 	if !inProject && !where.None() {
-		// Not a usage mistake to print the usage block under: what is in
-		// the directory decided it.
-		cmd.SilenceUsage = true
 		return utils.NoDeployableProject(where)
 	}
 	if err := refuseImageFlags(); err != nil {
-		cmd.SilenceUsage = true
 		return err
 	}
-	cmd.SilenceUsage = true
 	if inProject {
 		return deployManifest(cmd, args, &where, out)
 	}

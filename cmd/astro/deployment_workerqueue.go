@@ -117,7 +117,6 @@ func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 
 func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.Writer) error {
 	format := deploymentWorkerQueueOutput
-	cmd.SilenceUsage = true
 	// The Deployment picker and the update the change is sent as print to
 	// bare stdout; under json that is a note, not the result.
 	defer strayStdoutToStderr(format)()
@@ -144,7 +143,6 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 
 func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) error {
 	format := deploymentWorkerQueueOutput
-	cmd.SilenceUsage = true
 	defer strayStdoutToStderr(format)()
 
 	ws, err := deploymentWorkspace(cmd, deploymentID, "")

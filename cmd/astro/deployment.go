@@ -222,16 +222,15 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listDeploymentTeam(cmd *cobra.Command, out io.Writer) error {
+func listDeploymentTeam(_ *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
 
-	cmd.SilenceUsage = true
 	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: deploymentTeamOutput, Out: out})
 }
 
-func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+func removeDeploymentTeam(_ *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -241,7 +240,6 @@ func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 	if len(args) > 0 {
 		id = args[0]
 	}
-	cmd.SilenceUsage = true
 	if id == "" {
 		if err := mayPick("a team", teamIDAnswer); err != nil {
 			return err
@@ -274,7 +272,7 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+func addDeploymentTeam(_ *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -283,7 +281,6 @@ func addDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	if len(args) > 0 {
 		id = args[0]
 	}
-	cmd.SilenceUsage = true
 	if id == "" {
 		if err := mayPick("a team", teamIDAnswer); err != nil {
 			return err
@@ -313,7 +310,7 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func updateDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+func updateDeploymentTeam(_ *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -332,7 +329,6 @@ func updateDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 		updateDeploymentRole = answer
 	}
 
-	cmd.SilenceUsage = true
 	if id == "" {
 		if err := mayPick("a team", teamIDAnswer); err != nil {
 			return err
@@ -790,9 +786,6 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 		}
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
 	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out})
 }
 
@@ -925,8 +918,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 			return fmt.Errorf("%s is %w", cloudProvider, errInvalidCloudProvider)
 		}
 	}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	d, err := deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment, cmd.ErrOrStderr())
 	if d.Id == "" {
 		return err
@@ -955,9 +946,6 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	// clean output
 	deployment.CleanOutput = cleanOutput
@@ -1024,9 +1012,6 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 		return err
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
 	// Get release name from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
@@ -1046,9 +1031,6 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	vars, err := deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, astroV1Client)
 	if err != nil {
@@ -1076,9 +1058,6 @@ func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, 
 		return err
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
 	res, err := deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile,
 		deploymentName, args, useEnvFile, makeSecret, update, astroV1Client)
 	if err != nil {
@@ -1098,7 +1077,6 @@ func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
 	if len(args) > 0 {
 		deploymentID = args[0]
 	}
-	cmd.SilenceUsage = true
 
 	res, err := deployment.UI(ws, deploymentID, deploymentName, astroV1Client)
 	if err != nil {
@@ -1128,9 +1106,6 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 	if cmd.Flags().Changed("wait-time") && !waitForStatus {
 		return cliout.Usage(errors.New("cannot use --wait-time with --wait=false"))
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	r := cliout.Renderer{Format: format, Out: out}
 	action := "wake up"
@@ -1170,7 +1145,7 @@ func isValidCloudProvider(cloudProvider astrov1.ClusterCloudProvider) bool {
 	return cloudProvider == astrov1.ClusterCloudProviderGCP || cloudProvider == astrov1.ClusterCloudProviderAWS || cloudProvider == astrov1.ClusterCloudProviderAZURE
 }
 
-func addDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
+func addDeploymentUser(_ *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1182,7 +1157,6 @@ func addDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
 		email = strings.ToLower(args[0])
 	}
 
-	cmd.SilenceUsage = true
 	if email == "" {
 		if err := mayPick("a user", userEmailAnswer); err != nil {
 			return err
@@ -1195,16 +1169,15 @@ func addDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	return renderLines(deploymentUserOutput, out, &u, fmt.Sprintf("The user %s was successfully added to the deployment with the role %s", u.Email, u.DeploymentRole))
 }
 
-func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
+func listDeploymentUser(_ *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
 
-	cmd.SilenceUsage = true
 	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: deploymentUserOutput, Out: out})
 }
 
-func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
+func updateDeploymentUser(_ *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1225,7 +1198,6 @@ func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) erro
 		updateDeploymentRole = answer
 	}
 
-	cmd.SilenceUsage = true
 	if email == "" {
 		if err := mayPick("a user", userEmailAnswer); err != nil {
 			return err
@@ -1238,7 +1210,7 @@ func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) erro
 	return renderLines(deploymentUserOutput, out, &u, fmt.Sprintf("The deployment user %s role was successfully updated to %s", u.Email, u.DeploymentRole))
 }
 
-func removeDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
+func removeDeploymentUser(_ *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1250,7 +1222,6 @@ func removeDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) erro
 		email = strings.ToLower(args[0])
 	}
 
-	cmd.SilenceUsage = true
 	if email == "" {
 		if err := mayPick("a user", userEmailAnswer); err != nil {
 			return err
@@ -1469,7 +1440,6 @@ func removeDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 		// make sure the id is lowercase
 		tokenID = strings.ToLower(args[0])
 	}
-	cmd.SilenceUsage = true
 	return runDeploymentTokenRemoveRole(cmd, deploymentTokenOutput, out)
 }
 
@@ -1666,7 +1636,6 @@ func removeOrgTokenFromDeploymentRole(cmd *cobra.Command, args []string, out io.
 		orgTokenID = strings.ToLower(args[0])
 	}
 
-	cmd.SilenceUsage = true
 	return runDeploymentTokenRemove(cmd, deploymentTokenOutput, out, tokenKindOrganization)
 }
 
@@ -1683,7 +1652,6 @@ func removeWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out i
 		workspaceTokenID = strings.ToLower(args[0])
 	}
 
-	cmd.SilenceUsage = true
 	return runDeploymentTokenRemove(cmd, deploymentTokenOutput, out, tokenKindWorkspace)
 }
 
@@ -1716,7 +1684,7 @@ func newListWorkspaceTokensInDeployment(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listOrganizationTokensInDeployment(cmd *cobra.Command, out io.Writer) error {
+func listOrganizationTokensInDeployment(_ *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1725,11 +1693,10 @@ func listOrganizationTokensInDeployment(cmd *cobra.Command, out io.Writer) error
 	}
 	// if an id was provided in the args we use it
 
-	cmd.SilenceUsage = true
 	return runDeploymentTokenList(deploymentTokenOutput, out, deployment.DeploymentTokenTypeORGANIZATION)
 }
 
-func listWorkspaceTokensInDeployment(cmd *cobra.Command, out io.Writer) error {
+func listWorkspaceTokensInDeployment(_ *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1738,22 +1705,20 @@ func listWorkspaceTokensInDeployment(cmd *cobra.Command, out io.Writer) error {
 	}
 	// if an id was provided in the args we use it
 
-	cmd.SilenceUsage = true
 	return runDeploymentTokenList(deploymentTokenOutput, out, deployment.DeploymentTokenTypeWORKSPACE)
 }
 
-func listDeploymentToken(cmd *cobra.Command, out io.Writer) error {
+func listDeploymentToken(_ *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
 	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 	return runDeploymentTokenList(deploymentTokenOutput, out)
 }
 
-func createDeploymentToken(cmd *cobra.Command, out io.Writer) error {
+func createDeploymentToken(_ *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1778,11 +1743,10 @@ func createDeploymentToken(cmd *cobra.Command, out io.Writer) error {
 		tokenRole = answer
 	}
 
-	cmd.SilenceUsage = true
 	return runDeploymentTokenCreate(deploymentTokenOutput, out)
 }
 
-func updateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
+func updateDeploymentToken(_ *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1795,11 +1759,10 @@ func updateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 		tokenID = strings.ToLower(args[0])
 	}
 
-	cmd.SilenceUsage = true
 	return runDeploymentTokenUpdate(deploymentTokenOutput, out)
 }
 
-func rotateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
+func rotateDeploymentToken(_ *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1811,7 +1774,6 @@ func rotateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 		// make sure the id is lowercase
 		tokenID = strings.ToLower(args[0])
 	}
-	cmd.SilenceUsage = true
 	return runDeploymentTokenRotate(deploymentTokenOutput, out)
 }
 
@@ -1828,7 +1790,6 @@ func deleteDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 		tokenID = strings.ToLower(args[0])
 	}
 
-	cmd.SilenceUsage = true
 	return runDeploymentTokenDelete(cmd, deploymentTokenOutput, out)
 }
 

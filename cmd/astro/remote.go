@@ -74,7 +74,6 @@ func newRemoteDeployCmd() *cobra.Command {
 			if where.AtRoot(config.WorkingPath) || (remoteImageName != "" && where.None()) {
 				return nil
 			}
-			cmd.SilenceUsage = true
 			return utils.NoDeployableProject(where)
 		},
 		RunE:    remoteDeploy,
@@ -100,8 +99,6 @@ var deployClientImage = astrodeploy.DeployClientImage
 
 // remoteDeploy handles the remote deploy functionality
 func remoteDeploy(cmd *cobra.Command, args []string) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	// The build's and the push's own output, and the notes on the way, are
 	// what text mode has always shown; under json they go to stderr.
 	defer strayStdoutToStderr(remoteOutput)()

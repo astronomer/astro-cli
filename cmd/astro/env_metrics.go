@@ -137,7 +137,6 @@ func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	objs, err := env.ListMetricsExports(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -154,7 +153,6 @@ func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	obj, err := env.GetMetricsExport(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -178,7 +176,6 @@ func runEnvMetricsSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	in, err := buildMetricsInput(cmd)
 	if err != nil {

@@ -77,6 +77,9 @@ func execDeploymentCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
 	cmd := newDeploymentRootCmd(buf)
 	cmd.SetOut(buf)
+	// cliout.Execute turns this on for the root of a real run, which keeps cobra's
+	// usage block out of every command's error.
+	cmd.SilenceUsage = true
 	cmd.SetArgs(args)
 	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()

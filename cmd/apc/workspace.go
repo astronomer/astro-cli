@@ -160,7 +160,7 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
+func workspaceCreate(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	if workspaceCreateLabel == "" {
 		return errCreateWorkspaceMissingLabel
@@ -170,8 +170,6 @@ func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
 		workspaceCreateDescription = "N/A"
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	w, err := workspace.Create(workspaceCreateLabel, workspaceCreateDescription, houstonClient)
 	if err != nil {
 		return err
@@ -179,10 +177,8 @@ func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
 	return emitWorkspace(r, w, "\n Successfully created workspace")
 }
 
-func workspaceList(cmd *cobra.Command, out io.Writer) error {
+func workspaceList(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	ws, err := workspace.List(houstonClient)
 	if err != nil {
 		return err
@@ -196,10 +192,8 @@ func workspaceList(cmd *cobra.Command, out io.Writer) error {
 	return emitWorkspaceList(r, ws, c.Workspace)
 }
 
-func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceDelete(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	if err := confirm(fmt.Sprintf("\nAre you sure you want to delete Workspace %s? This cannot be undone.", args[0])); err != nil {
 		return err
@@ -211,7 +205,7 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 	return emitWorkspaceRemoval(r, args[0], w)
 }
 
-func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceUpdate(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	argsMap := map[string]string{}
 	if workspaceUpdateDescription != "" {
@@ -225,9 +219,6 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 		return errUpdateWorkspaceInvalidArgs
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
 	w, err := workspace.Update(args[0], houstonClient, argsMap)
 	if err != nil {
 		return err
@@ -235,10 +226,8 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 	return emitWorkspace(r, w, "\n Successfully updated workspace")
 }
 
-func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceSwitch(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	id := ""
 

@@ -51,8 +51,6 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
-	cmd.SilenceUsage = true
-
 	wsID, err := deploymentWorkspace(cmd, argOrID(args), "")
 	if err != nil {
 		return err

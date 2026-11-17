@@ -178,7 +178,6 @@ func runEnvList(cmd *cobra.Command, out io.Writer) error {
 	}
 	// -o dotenv never gets here: the flag refuses it while parsing, with
 	// env.ErrInventoryHasNoValues (newEnvListCmd).
-	cmd.SilenceUsage = true
 
 	items, err := env.ListInventory(scope, envResolveLinked, astroV1Client)
 	if err != nil {

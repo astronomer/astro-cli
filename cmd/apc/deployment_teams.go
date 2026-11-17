@@ -118,10 +118,8 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func deploymentTeamsList(cmd *cobra.Command, out io.Writer, _ []string) error {
+func deploymentTeamsList(_ *cobra.Command, out io.Writer, _ []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	ts, err := deployment.ListTeamRoles(deploymentID, houstonClient)
 	// The text has always refused a Deployment Houston lists no team for.
 	// A list is [] when it is empty, so json publishes that: Houston
@@ -136,14 +134,12 @@ func deploymentTeamsList(cmd *cobra.Command, out io.Writer, _ []string) error {
 	return renderDeploymentTeamList(r, deploymentID, ts)
 }
 
-func deploymentTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
+func deploymentTeamAdd(_ *cobra.Command, out io.Writer, _ []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	role, err := deployment.AddTeam(deploymentID, teamID, deploymentRole, houstonClient)
 	if err != nil {
 		return err
@@ -151,24 +147,20 @@ func deploymentTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
 	return renderDeploymentTeamChange(r, deploymentID, teamID, role, true)
 }
 
-func deploymentTeamRemove(cmd *cobra.Command, out io.Writer, args []string) error {
+func deploymentTeamRemove(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	if err := deployment.RemoveTeam(deploymentID, args[0], houstonClient); err != nil {
 		return err
 	}
 	return renderDeploymentTeamRemoval(r, deploymentID, args[0])
 }
 
-func deploymentTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+func deploymentTeamUpdate(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	role, err := deployment.UpdateTeamRole(deploymentID, args[0], deploymentRole, houstonClient)
 	if err != nil {
 		return err

@@ -41,7 +41,6 @@ func newTeamGetCmd(out io.Writer) *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r := cliout.Renderer{Format: accessOutput, Out: out}
-			cmd.SilenceUsage = true
 			d, err := teams.Get(args[0], usersEnabled || all, houstonClient)
 			if err != nil {
 				return err
@@ -91,7 +90,6 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r := cliout.Renderer{Format: accessOutput, Out: out}
-			cmd.SilenceUsage = true
 			change, err := teams.Update(args[0], teamRole, houstonClient)
 			if err != nil {
 				return err
@@ -105,12 +103,11 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listTeam(cmd *cobra.Command, out io.Writer, paginated bool, pageSize int) error {
+func listTeam(_ *cobra.Command, out io.Writer, paginated bool, pageSize int) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if paginated && r.Format == cliout.FormatJSON {
 		return cliout.Usage(errListPaginatedUnderJSON)
 	}
-	cmd.SilenceUsage = true
 	// Under json the interactive setting does not apply: the whole list is
 	// the result.
 	if r.Format != cliout.FormatJSON && (config.CFG.Interactive.GetBool() || paginated) {

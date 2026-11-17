@@ -159,7 +159,6 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	objs, err := env.ListConns(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -176,7 +175,6 @@ func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	obj, err := env.GetConn(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -220,7 +218,6 @@ func runEnvConnSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	in, err := buildConnInput(cmd, idOrKey)
 	if err != nil {

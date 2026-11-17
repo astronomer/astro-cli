@@ -181,7 +181,7 @@ func newEnvCmd(c *cli) *cobra.Command {
 func helpOrUnknownSubcommand(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		if hint := removedVerbHint(cmd, args[0]); hint != "" {
-			return cliout.Usage(errors.New(hint))
+			return cliout.UsageNoHelp(errors.New(hint))
 		}
 	}
 	return cliout.GroupHelp(cmd, args)

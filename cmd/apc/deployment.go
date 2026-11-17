@@ -651,9 +651,6 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		return errNoAppConfig
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
 	executorType, err := validateExecutorArg(executor)
 	if err != nil {
 		return err
@@ -733,8 +730,6 @@ func deploymentHibernate(cmd *cobra.Command, hibernate bool, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	id := deploymentID
 	if err := deployment.CheckHibernation(id, houstonClient); err != nil {
@@ -804,8 +799,6 @@ func deploymentDelete(cmd *cobra.Command, out io.Writer) error {
 	if err := requireDeployment(cmd); err != nil {
 		return err
 	}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	// Deletions are always hard deletes now (PLX-575): all data associated with
 	// the Deployment, including the database, is permanently removed. Confirm
 	// before proceeding, unless --yes already did.
@@ -827,16 +820,13 @@ func deploymentDelete(cmd *cobra.Command, out io.Writer) error {
 	}))
 }
 
-func deploymentAdopt(cmd *cobra.Command, out io.Writer) error {
+func deploymentAdopt(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	req := &houston.AdoptDeploymentRequest{
 		WorkspaceID:             ws,
@@ -863,10 +853,8 @@ func dangerPrompt(text string) string {
 	return "\n" + cliout.DangerLabel(os.Stderr) + " " + text
 }
 
-func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
+func deploymentUnadopt(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	if err := confirm(dangerPrompt(cliDeploymentUnadoptPrompt)); err != nil {
 		return err
@@ -886,7 +874,7 @@ func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
 	}))
 }
 
-func deploymentList(cmd *cobra.Command, out io.Writer) error {
+func deploymentList(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 
 	// --all lists every workspace's, so it needs no workspace, and a context
@@ -898,9 +886,6 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 			return fmt.Errorf("failed to find a valid workspace: %w", err)
 		}
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	ds, err := deployment.List(ws, allDeployments, houstonClient, clusterID)
 	if err != nil {
@@ -935,9 +920,6 @@ func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string,
 	if deploymentUpdateName != "" {
 		argsMap["label"] = deploymentUpdateName
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
@@ -1000,10 +982,8 @@ func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string,
 	return emitUpdated(r, d)
 }
 
-func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
+func deploymentAirflowUpgrade(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	var (
 		change *deployment.VersionChange
 		err    error
@@ -1019,10 +999,8 @@ func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
 	return emitVersionChange(r, airflowUpgrade, change)
 }
 
-func deploymentRuntimeUpgrade(cmd *cobra.Command, out io.Writer) error {
+func deploymentRuntimeUpgrade(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	var (
 		change *deployment.VersionChange
 		err    error
@@ -1038,10 +1016,8 @@ func deploymentRuntimeUpgrade(cmd *cobra.Command, out io.Writer) error {
 	return emitVersionChange(r, runtimeUpgrade, change)
 }
 
-func deploymentRuntimeMigrate(cmd *cobra.Command, out io.Writer) error {
+func deploymentRuntimeMigrate(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	var (
 		change *deployment.VersionChange
 		err    error

@@ -22,7 +22,7 @@ const RemovedCommandAnnotation = "removedCommand"
 //   - Hidden, so help teaches only what exists.
 //   - Any arguments, with flag parsing off, so an old invocation's subcommand
 //     and flags reach the guidance instead of dying on an unknown flag.
-//   - Usage silenced: the guidance is the whole message.
+//   - No pointer to the help (UsageNoHelp): the guidance is the whole message.
 //   - A pre-run of its own, which runs the root's and no group's.
 //   - --output declared, though never parsed: Execute reads it from the raw
 //     arguments for a usage error, so under -o json the failure is the one
@@ -39,7 +39,6 @@ func RemovedCommand(use string, aliases []string, short string, run func(cmd *co
 		Hidden:             true,
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
-		SilenceUsage:       true,
 		Annotations:        map[string]string{RemovedCommandAnnotation: "true"},
 		// Its own, so cobra never picks a group's on its way up (`astro env`
 		// and `astro deployment` look the project up): only the root's runs,
@@ -50,7 +49,13 @@ func RemovedCommand(use string, aliases []string, short string, run func(cmd *co
 			}
 			return nil
 		},
-		RunE: run,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			err := run(cmd, args)
+			if IsUsage(err) {
+				return UsageNoHelp(err)
+			}
+			return err
+		},
 	}
 	AddOutputFlag(cmd, new(Format))
 	return cmd

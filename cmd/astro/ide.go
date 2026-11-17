@@ -108,8 +108,7 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listIDEProjects(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listIDEProjects(_ *cobra.Command, out io.Writer) error {
 	list, err := ide.List(astroV1Alpha1Client)
 	if err != nil {
 		return err
@@ -128,7 +127,6 @@ func importIDEProject(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	cmd.SilenceUsage = true
 	res, err := ide.ImportProject(cmd.Context(), astroV1Alpha1Client, astroIDEExporter, ideProjectID, ideSessionID, orgID, wsID, ideImportYes, cliout.NotesTo(cmd, ideProjectOutput, out))
 	if err != nil {
 		return err
@@ -148,7 +146,6 @@ func exportProject(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	cmd.SilenceUsage = true
 	res, err := ide.ExportProject(astroV1Alpha1Client, astroV1Client, ideProjectID, orgID, wsID, force, cliout.NotesTo(cmd, format, out))
 	if err != nil {
 		return err

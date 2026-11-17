@@ -19,7 +19,6 @@ func newProxyServeCmd(d Deps) *cobra.Command {
 		Short:         "Run the local reverse proxy server (internal)",
 		Hidden:        true,
 		Args:          cobra.NoArgs,
-		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// The daemon re-execs the CLI into this command, so NewDeps

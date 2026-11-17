@@ -53,6 +53,10 @@ func (e *NameError) Error() string {
 // this package cannot import.
 func (e *NameError) IsUsageError() bool { return true }
 
+// OmitsHelpPointer keeps the pointer to the command's help off NameError: it
+// says which ids the name could mean, which the help cannot.
+func (e *NameError) OmitsHelpPointer() bool { return true }
+
 // Unwrap is errInvalidDeployment for a name that found none.
 func (e *NameError) Unwrap() error {
 	if len(e.Matches) == 0 {

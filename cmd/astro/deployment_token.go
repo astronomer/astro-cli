@@ -177,7 +177,6 @@ func runDeploymentTokenAdd(cmd *cobra.Command, args []string, out io.Writer) err
 		}
 		tokenRole = answer
 	}
-	cmd.SilenceUsage = true
 	pick := newTokenPicker(tokenHeader(deploymentRoleHeader), tokenRow, errInvalidDeploymentTokenKey, "--name", "Please select the Workspace or Organization API token you would like to add to the Deployment:")
 	token, err := deployment.AddToken(id, name, tokenRole, ws, deploymentID, nil, pick, astroV1Client)
 	if err != nil {
@@ -237,7 +236,6 @@ func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, ki
 		}
 		tokenRole = answer
 	}
-	cmd.SilenceUsage = true
 	return runDeploymentTokenUpsert(deploymentTokenOutput, out, kind, operation, ws)
 }
 

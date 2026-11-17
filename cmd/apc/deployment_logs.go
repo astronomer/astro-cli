@@ -230,7 +230,6 @@ func showLogs(cmd *cobra.Command, components []string, out io.Writer) error {
 	if follow && len(components) != 1 {
 		return cliout.Usage(fmt.Errorf("--follow streams one component's logs: name one, with a flag such as --scheduler, or --component"))
 	}
-	cmd.SilenceUsage = true
 	r := cliout.Renderer{Format: logsOutput, Out: out}
 	if follow {
 		component := components[0]

@@ -260,3 +260,18 @@ func TimeAgo(date time.Time) string {
 		return "Just now"
 	}
 }
+
+// UsageNoHelp is Usage for an error whose message already names what to run
+// instead, such as the verb that fits the token: the pointer to the command's
+// help would only bury it. cmd/cliout reads the OmitsHelpPointer mark
+// (cliout.UsageNoHelp).
+func UsageNoHelp(err error) error {
+	if err == nil {
+		return nil
+	}
+	return usageNoHelpError{usageError{err}}
+}
+
+type usageNoHelpError struct{ usageError }
+
+func (usageNoHelpError) OmitsHelpPointer() bool { return true }
