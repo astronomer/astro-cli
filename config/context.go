@@ -292,7 +292,12 @@ func setContextField(cKey, field string, value interface{}) error {
 		// token's login in memory. A selection written to it would save a
 		// partial entry for a host nobody logged in to, and a token run never
 		// changes saved contexts, so it is not saved.
-		unsavedSelectionNote(cKey, field)
+		//
+		// Only a selection is worth a note. The login fields and the email an
+		// organization switch writes back as it read them are the token's own.
+		if slices.Contains(environmentFields, field) || field == "last_used_workspace" {
+			unsavedSelectionNote(cKey, field)
+		}
 		return nil
 	}
 	if s, ok := value.(string); ok && isLoginField(field) {

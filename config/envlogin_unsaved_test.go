@@ -38,6 +38,16 @@ func TestASelectionOnAContextThatExistsOnlyForATokenIsNotSaved(t *testing.T) {
 	if len(notes) != 3 {
 		t.Errorf("notes = %v, want one per selection", notes)
 	}
+	// What an organization switch writes back as it read it is no selection:
+	// not saved either, and no note.
+	for _, field := range []string{"token", "refreshtoken", "user_email"} {
+		if err := held.SetContextKey(field, "as-read"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(notes) != 3 {
+		t.Errorf("a login field written back gave a note: %v", notes)
+	}
 	after, err := os.ReadFile(HomeConfigFile)
 	if err != nil {
 		t.Fatal(err)
