@@ -99,7 +99,17 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 		if astrosession.CheckWorkspace(pick.workspace, astrosession.SourceProject) != nil {
 			return nil
 		}
-		if note := projectNote(cmd.Context(), pick, before.Workspace, switched); note != "" {
+		// Nothing but the result goes with a json run.
+		if cliout.IsJSON(cmd) {
+			return nil
+		}
+		// What the run's Workspace is, by the one resolver, where a token (not
+		// the flag, which names it itself) could have been its source.
+		var run astrosession.Target
+		if astrosession.HasAPIToken() && !workspaceChosen(cmd.Flags()) {
+			run = astrosession.Resolve(astrosession.Request{Project: pick.workspace})
+		}
+		if note := sourceNote(cmd.Context(), pick, before.Workspace, switched, run); note != "" {
 			fmt.Fprintln(cmd.ErrOrStderr(), note)
 		}
 		return nil
@@ -272,6 +282,22 @@ func parentPreRun(group, cmd *cobra.Command, args []string) error {
 		}
 	}
 	return nil
+}
+
+// sourceNote is the line that says where the command's Workspace came from,
+// when that is a surprise: the project link chose a different one than the
+// context would have (projectNote), or a token run took its Workspace from the
+// token's claim, which run (the resolver's answer, so its source is not
+// recomputed here) says. It is empty when the flag named the Workspace or the
+// project chose what the context would have.
+func sourceNote(ctx context.Context, pick projectPick, contextWorkspace string, switched bool, run astrosession.Target) string { //nolint:gocritic // a small value type
+	if note := projectNote(ctx, pick, contextWorkspace, switched); note != "" {
+		return note
+	}
+	if run.WorkspaceSource == astrosession.SourceToken && run.Workspace != "" {
+		return fmt.Sprintf("using workspace %s from %s", run.Workspace, run.WorkspaceSource.Label("--workspace"))
+	}
+	return ""
 }
 
 // projectNote is the line that says the project, not the context, chose where

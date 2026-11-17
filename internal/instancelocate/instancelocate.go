@@ -73,7 +73,7 @@ type locator struct {
 	organization func() (string, error)
 	// workspace is the login's current workspace, where a Deployment name is
 	// looked up when the project names none. Empty when the login has none.
-	workspace func() string
+	workspace func() (string, astrosession.Source)
 	// httpClient carries the Composer lookup. nil in production, where
 	// pkg/instancelocate supplies one with its own timeout; a test hands in
 	// its stub server's.
@@ -105,7 +105,7 @@ func New(domain string) instances.Locator {
 			return astrosession.BearerFor(ctx, domain)
 		},
 		organization:  func() (string, error) { return Organization(domain) },
-		workspace:     func() string { return Workspace(domain) },
+		workspace:     func() (string, astrosession.Source) { return workspaceOf(domain) },
 		googleToken:   googleauth.AccessToken,
 		googleAccount: googleauth.Account,
 	}

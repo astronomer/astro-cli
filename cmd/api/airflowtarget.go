@@ -456,7 +456,12 @@ func lookupDeployment(override, orgID, ref string, project *manifest.Astro, ctx 
 	}
 	deps, err := deployment.ListDeployments(ws, wsOrg, client)
 	if err != nil {
-		return astrov1.Deployment{}, fmt.Errorf("listing the Deployments in workspace %s: %w", ws, err)
+		return astrov1.Deployment{}, run.Explain(fmt.Errorf("listing the Deployments in workspace %s: %w", ws, err))
 	}
-	return instancelocate.NamedDeployment(deps, ref, ws)
+	dep, err := instancelocate.NamedDeployment(deps, ref, ws)
+	if err != nil {
+		// Where the workspace came from, as the listing's error says.
+		return astrov1.Deployment{}, run.Explain(err)
+	}
+	return dep, nil
 }

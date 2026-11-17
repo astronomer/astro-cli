@@ -105,10 +105,12 @@ func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace, proje
 	if err := astrosession.CheckWorkspace(projectWorkspace, astrosession.SourceProject); err != nil {
 		return "", err
 	}
-	ws := projectWorkspace
+	ws, src := projectWorkspace, astrosession.SourceProject
 	if ws == "" && l.workspace != nil {
-		ws = l.workspace()
+		ws, src = l.workspace()
 	}
+	// An error about the workspace says where it came from.
+	from := astrosession.Target{Workspace: ws, WorkspaceSource: src}
 	// The login comes first: a machine with none has no workspace either, and
 	// logging in is the fix that also supplies one.
 	token, org, err := l.identity(ctx)
@@ -125,11 +127,11 @@ func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace, proje
 	}
 	deployments, err := l.listDeployments(ctx, token, org, ws)
 	if err != nil {
-		return "", err
+		return "", from.Explain(err)
 	}
 	dep, err := NamedDeployment(deployments, ref, ws)
 	if err != nil {
-		return "", err
+		return "", from.Explain(err)
 	}
 	return dep.Id, nil
 }
@@ -177,5 +179,12 @@ func listOutage(domain, ws string, resp *astrov1.ListDeploymentsResponse) error 
 // else says, on domain's host ("" is the current context's): the run's
 // selection there, which astrosession.Resolve decides. Empty when there is none.
 func Workspace(domain string) string {
-	return astrosession.Resolve(astrosession.Request{Domain: domain}).Workspace
+	ws, _ := workspaceOf(domain)
+	return ws
+}
+
+// workspaceOf is Workspace and where the resolver took it from.
+func workspaceOf(domain string) (string, astrosession.Source) {
+	t := astrosession.Resolve(astrosession.Request{Domain: domain})
+	return t.Workspace, t.WorkspaceSource
 }

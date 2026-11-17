@@ -205,9 +205,9 @@ func TestDeploymentNameInAProjectLeadsWithTheLinks(t *testing.T) {
 	)
 	projectIn(t, `workspace = "`+projectWS+`"`)
 	_, err := targetOf(&AirflowOptions{Deployment: "prdo"})
-	require.EqualError(t, err, "no link or Deployment named \"prdo\". Deployments this project links: prod\nno Deployment named \"prdo\" in workspace ws-project")
+	require.EqualError(t, err, "no link or Deployment named \"prdo\". Deployments this project links: prod\nno Deployment named \"prdo\" in workspace ws-project (from the project link)")
 	_, err = targetOf(&AirflowOptions{Deployment: "twin"})
-	require.EqualError(t, err, "2 Deployments are named \"twin\" in workspace ws-project: pass -d with one's id (dep-a, dep-b)\nDeployments this project links: prod")
+	require.EqualError(t, err, "2 Deployments are named \"twin\" in workspace ws-project (from the project link): pass -d with one's id (dep-a, dep-b)\nDeployments this project links: prod")
 }
 
 // The flags reach the lookup through the command: -W and --workspace-id are

@@ -1,12 +1,14 @@
 package astrosession
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -53,6 +55,80 @@ const (
 	// SourcePath is a Workspace id the person wrote in a request path.
 	SourcePath
 )
+
+// Label is the source as a parenthesis names it, "from --workspace" or "from
+// the project link", for the Workspace (flag is "--workspace") or the
+// Deployment ("--deployment") it chose. "" is no source: the saved login is
+// the run's own and is not named where it is what anyone expected.
+func (s Source) Label(flag string) string {
+	switch s {
+	case SourceFlag:
+		return flag
+	case SourceProject:
+		return "the project link"
+	case SourceToken:
+		return "ASTRO_API_TOKEN"
+	case SourcePath:
+		return "the request path"
+	case SourceNone, SourceContext:
+	}
+	return ""
+}
+
+// DescribeWorkspace is "workspace id (from --workspace)" for a Workspace a
+// source the person can see chose (the flag, the project link, the token, a
+// path), and "workspace id" for any other.
+func DescribeWorkspace(id string, s Source) string {
+	if from := s.Label("--workspace"); from != "" {
+		return fmt.Sprintf("workspace %s (from %s)", id, from)
+	}
+	return "workspace " + id
+}
+
+// Explain is err with the Workspace it names worded with where the run took
+// it from: "workspace B (from --workspace)", for an error about looking in a
+// Workspace the run was handed (not found, no access, nothing in it). It reads
+// the Workspace out of the text, where "workspace <id>" is, or "this
+// workspace" with no id, so what built the error need not know where its
+// Workspace came from; it is err, unchanged, when the text names neither, when
+// the source is the saved login or none, or when it has been explained. The
+// result unwraps to err, so the error's kind and code are what they were.
+func (t Target) Explain(err error) error { //nolint:gocritic // a small value type
+	if err == nil || t.Workspace == "" {
+		return err
+	}
+	named := DescribeWorkspace(t.Workspace, t.WorkspaceSource)
+	if named == "workspace "+t.Workspace {
+		return err
+	}
+	msg := err.Error()
+	if strings.Contains(msg, named) {
+		return err
+	}
+	var rewritten string
+	switch {
+	case strings.Contains(msg, "workspace "+t.Workspace):
+		rewritten = strings.Replace(msg, "workspace "+t.Workspace, named, 1)
+	case strings.Contains(msg, "Workspace "+t.Workspace):
+		rewritten = strings.Replace(msg, "Workspace "+t.Workspace, "W"+named[1:], 1)
+	case strings.Contains(msg, "this workspace"):
+		rewritten = strings.Replace(msg, "this workspace", named, 1)
+	default:
+		return err
+	}
+	return &explainedError{msg: rewritten, err: err}
+}
+
+// explainedError is an error reworded by Target.Explain. It unwraps to the
+// original, so errors.Is and errors.As, and with them the kind and the exit
+// code, see what they saw.
+type explainedError struct {
+	msg string
+	err error
+}
+
+func (e *explainedError) Error() string { return e.msg }
+func (e *explainedError) Unwrap() error { return e.err }
 
 // From is the source worded for a message ("--workspace", "the project's
 // link"), "" for none.
@@ -305,7 +381,24 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 			t.Deployment, t.DeploymentSource = id, SourceToken
 		}
 	}
+	logger.Debugf("%s", t.trace())
 	return t
+}
+
+// trace is the one line a debug log gives for a resolution: which Workspace
+// and Deployment the run acts on, and where each came from.
+func (t Target) trace() string { //nolint:gocritic // a small value type
+	return fmt.Sprintf("workspace %s (%s), deployment %s (%s)",
+		cmp.Or(t.Workspace, "none"), cmp.Or(t.WorkspaceSource.Label("--workspace"), t.WorkspaceSource.name()),
+		cmp.Or(t.Deployment, "none"), cmp.Or(t.DeploymentSource.Label("--deployment"), t.DeploymentSource.name()))
+}
+
+// name is the source for a log, where Label has none to give.
+func (s Source) name() string {
+	if s == SourceContext {
+		return "the saved login"
+	}
+	return "no source"
 }
 
 // fromLogin is the Workspace of the login the run is on, and which kind of

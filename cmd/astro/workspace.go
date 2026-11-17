@@ -916,7 +916,10 @@ func workspaceTarget(cmd *cobra.Command, flag string, extra astrosession.Workspa
 		req.Project = f.workspace
 		req.Advice |= astrosession.ByProject
 	}
-	return astrosession.Resolve(req)
+	t := astrosession.Resolve(req)
+	// So an error the run ends in names where its Workspace came from.
+	rememberTarget(cmd, t)
+	return t
 }
 
 // requiredWorkspace is workspaceTarget's Workspace, or the error for its

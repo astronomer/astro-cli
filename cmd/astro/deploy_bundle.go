@@ -349,7 +349,8 @@ func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Form
 		ws := run.Workspace
 		dep, err := deploymentNamed(name, ws, &login)
 		if err != nil {
-			return "", nil, login, err
+			// Where the workspace came from, as the error names it.
+			return "", nil, login, run.Explain(err)
 		}
 		return dep.Id, dep, login, nil
 	}
