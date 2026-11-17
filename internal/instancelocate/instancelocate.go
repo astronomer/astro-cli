@@ -114,12 +114,12 @@ func New(domain string) instances.Locator {
 // deploymentsOn is the v1 client for domain's control plane. Its token is left
 // empty because astroDeployment puts the session's bearer on every request.
 func deploymentsOn(domain string) Deployments {
-	if domain == "" && astrosession.HasAPIToken() {
+	if astrosession.HasAPIToken() {
 		// A token run needs no login on the machine and never reads the saved
 		// one, so a project that names no host (its manifest's domain is
 		// already folded into domain) is on the token run's: ASTRO_DOMAIN,
 		// else Astro's.
-		domain = astrosession.TokenHost("", "")
+		domain = astrosession.TokenHost(domain, "")
 	}
 	if domain == "" {
 		return astrov1.NewV1Client(httputil.NewHTTPClient())

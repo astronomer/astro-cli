@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/astronomer/astro-cli/config"
 )
 
@@ -105,8 +107,8 @@ func TestEnvironmentDomainLeavesTheCurrentContextAlone(t *testing.T) {
 	noLoginFlow(t)
 	devSaved(t, home)
 	projectNamingHost(t, "astronomer-stage.io")
-	if domain, current := environmentDomain(); domain != "astronomer-stage.io" || current {
-		t.Fatalf("environmentDomain() = %q, %v", domain, current)
+	if domain, current, err := environmentDomain(); err != nil || domain != "astronomer-stage.io" || current {
+		t.Fatalf("environmentDomain() = %q, %v, %v", domain, current, err)
 	}
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -115,4 +117,26 @@ func TestEnvironmentDomainLeavesTheCurrentContextAlone(t *testing.T) {
 	if c.Domain != "astronomer-dev.io" {
 		t.Errorf("the current context is %q, want the saved dev one", c.Domain)
 	}
+}
+
+// A manifest that does not load stops a token run before anything is sent: its
+// domain is unknown, and another host would get the token.
+func TestATokenRunWithAnUnreadableManifestSendsNothing(t *testing.T) {
+	home := savedLogin(t, false)
+	noLoginFlow(t)
+	devSaved(t, home)
+	dir := t.TempDir()
+	body := "[project]\nname = 'demo'\n\n[tool.astro]\ndomain = 'astronomer-stage.io'\n"
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prev := config.WorkingPath
+	config.WorkingPath = dir
+	t.Cleanup(func() { config.WorkingPath = prev })
+	t.Setenv("ASTRO_API_TOKEN", apiToken(t, "env-bad-manifest"))
+	client := orgsClient(nil)
+	if err := EnsureLogin(client); err == nil {
+		t.Fatal("a token run with an unreadable manifest went on")
+	}
+	client.AssertNotCalled(t, "ListOrganizationsWithResponse", mock.Anything, mock.Anything)
 }

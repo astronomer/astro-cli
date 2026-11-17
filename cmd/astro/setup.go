@@ -735,7 +735,10 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 		expiresAt = time.Now().AddDate(1, 0, 0)
 	}
 
-	domain, current := environmentDomain()
+	domain, current, err := environmentDomain()
+	if err != nil {
+		return false, err
+	}
 	if err := useEnvironmentLogin(domain, current, "Bearer "+astroAPIToken, expiresAt); err != nil {
 		return false, err
 	}
@@ -774,14 +777,21 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 // not consulted, so a machine whose current context is dev still sends a token
 // to the host the run names. current reports whether that host is already the
 // current context's, an existing one, so nothing need be made current for it.
-func environmentDomain() (domain string, current bool) {
+//
+// A manifest that does not load is the run's error: its domain is unknown, and
+// guessing another host would send the token there.
+func environmentDomain() (domain string, current bool, err error) {
 	var project string
-	if m, err := projectManifest(config.WorkingPath); err == nil && m != nil {
+	m, err := projectManifest(config.WorkingPath)
+	if err != nil {
+		return "", false, err
+	}
+	if m != nil {
 		project = m.Astro.Domain
 	}
 	domain = astrosession.TokenHost("", project)
-	d, err := config.GetCurrentDomain()
-	return domain, err == nil && manifest.NormalizeDomain(d) == domain && context.Exists(domain)
+	d, derr := config.GetCurrentDomain()
+	return domain, derr == nil && manifest.NormalizeDomain(d) == domain && context.Exists(domain), nil
 }
 
 // useEnvironmentLogin makes token, from the environment, the login of
