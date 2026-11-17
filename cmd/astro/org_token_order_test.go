@@ -2,8 +2,8 @@ package astro
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -139,23 +139,35 @@ func TestMissingWorkspaceIsSaidBeforeAQuestionThatCannotBeAsked(t *testing.T) {
 	}
 }
 
-// `deployment token workspace-token add` reads the Workspace its token is found
-// in, and says there is none before it asks for the role.
-func TestDeploymentTokenAddSaysThereIsNoWorkspaceBeforeAskingForARole(t *testing.T) {
+// `deployment token workspace-token add` looks for its token in the Deployment's
+// own Workspace, so an Organization token, which selects none, still has one to
+// look in: it reads the Deployment for it, and asks for nothing first.
+func TestDeploymentTokenAddNeedsNoWorkspaceOfItsOwn(t *testing.T) {
 	withWorkspaces(t, "", "")
 	runWithToken(t, "apiTokenId:token-id", "organizationId:env-org")
 	resetTokenCommandFlags(t)
-	astroV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
 	deploymentID = "dep-id"
+	tokenRole = "DEPLOYMENT_ADMIN"
+	t.Cleanup(func() { tokenRole = "" })
+
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("GetDeploymentWithResponse", mock.Anything, "env-org", "dep-id").Return(&astrov1.GetDeploymentResponse{
+		HTTPResponse: &http.Response{StatusCode: http.StatusOK}, JSON200: &astrov1.Deployment{Id: "dep-id", WorkspaceId: "ws-of-deployment"},
+	}, nil).Once()
+	// The look for the token in that Workspace is where this stops.
+	mc.On("ListApiTokensWithResponse", mock.Anything, "env-org", mock.MatchedBy(func(p *astrov1.ListApiTokensParams) bool {
+		return p.WorkspaceId != nil && *p.WorkspaceId == "ws-of-deployment"
+	})).Return(nil, errors.New("stop here")).Once()
+	astroV1Client = mc
 
 	var err error
 	asked := captureStderr(t, func() {
 		err = setTokenDeploymentRole(&cobra.Command{}, nil, &bytes.Buffer{}, tokenKindWorkspace, tokenRoleAdd)
 	})
-	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
-	assert.Empty(t, asked, "a question was written before the error")
-	assert.Equal(t, 1, strings.Count(err.Error(), "pass --workspace"), "the advice is given once: %v", err)
-	assert.Contains(t, err.Error(), "so pass --workspace or give the token's ID")
+	require.ErrorContains(t, err, "stop here")
+	require.NotErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
+	assert.Empty(t, asked, "a question was written before the look")
+	mc.AssertExpectations(t)
 }
 
 // The ide commands say what an Organization token can do about it.

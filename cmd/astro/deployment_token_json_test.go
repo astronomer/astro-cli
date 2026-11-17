@@ -110,6 +110,11 @@ func tokenMock(t *testing.T, tokens ...astrov1.ApiToken) *astrov1_mocks.ClientWi
 	t.Helper()
 	m := new(astrov1_mocks.ClientWithResponsesInterface)
 	m.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(listTokensResp(tokens...), nil).Maybe()
+	// The Deployment the add commands read to learn the Workspace its Workspace
+	// tokens are in: the test config's own.
+	m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, tokDeploymentID).Return(&astrov1.GetDeploymentResponse{
+		HTTPResponse: ok200(), JSON200: &astrov1.Deployment{Id: tokDeploymentID, WorkspaceId: curWorkspaceID},
+	}, nil).Maybe()
 	for i := range tokens {
 		m.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, tokens[i].Id).Return(getTokenResp(tokens[i]), nil).Maybe()
 	}

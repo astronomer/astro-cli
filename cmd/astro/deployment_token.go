@@ -159,12 +159,12 @@ func runDeploymentTokenAdd(cmd *cobra.Command, args []string, out io.Writer) err
 		id = strings.ToLower(args[0])
 	}
 	// A token given by name is looked for among the Organization's and the
-	// Workspace's. A run with no Workspace to look in (an Organization
-	// token's) looks among the Organization's alone, and says so when that
-	// finds nothing.
+	// Deployment's own Workspace's (tokenSearchWorkspace). A Deployment that
+	// could not be read has no Workspace to look in, so the search is among
+	// the Organization's alone, and says so when that finds nothing.
 	ws, wsErr := "", error(nil)
 	if id == "" {
-		ws, wsErr = workspaceTokenWorkspace(cmd, id)
+		ws, wsErr = tokenSearchWorkspace(id)
 		// A Workspace the run named itself is not quietly left out.
 		if wsErr != nil && workspaceID != "" {
 			return wsErr
@@ -221,7 +221,7 @@ func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, ki
 	ws := ""
 	if kind == tokenKindWorkspace && operation == tokenRoleAdd {
 		var err error
-		if ws, err = workspaceTokenWorkspace(cmd, workspaceTokenID); err != nil {
+		if ws, err = tokenSearchWorkspace(workspaceTokenID); err != nil {
 			return err
 		}
 	}
@@ -267,6 +267,35 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 		return err
 	}
 	return renderTokenLine(format, out, token, fmt.Sprintf("Astro %s API token %s was successfully added/updated to the Deployment", kind, token.Name))
+}
+
+// tokenSearchWorkspace is the Workspace an add looks for a Workspace token
+// named by --name, or picked, in: the Deployment's own. A Workspace token can
+// hold a role only on Deployments of its own Workspace, so no other Workspace
+// has a token the add could use; the caller's current or the project's
+// Workspace, which this once searched, are not the Deployment's. It is read
+// from the Deployment by its ID.
+//
+// --workspace is the person's explicit override and wins, as it does
+// everywhere; under an ASTRO_API_TOKEN a Workspace the token is not for is
+// refused (astrosession.WorkspaceDisagreeError), like any other. A token given
+// by ID (tokenID) is read wherever it is, so no Workspace is looked for and
+// the Deployment is not read.
+func tokenSearchWorkspace(tokenID string) (string, error) {
+	if workspaceID != "" {
+		if err := astrosession.CheckWorkspace(workspaceID, astrosession.SourceFlag); err != nil {
+			return "", err
+		}
+		return workspaceID, nil
+	}
+	if tokenID != "" {
+		return "", nil
+	}
+	d, err := deployment.GetDeploymentByID("", deploymentID, astroV1Client)
+	if err != nil {
+		return "", fmt.Errorf("could not read Deployment %s to find the Workspace its Workspace tokens are in; pass --workspace: %w", deploymentID, err)
+	}
+	return d.WorkspaceId, nil
 }
 
 // workspaceTokenWorkspace is the workspace an add or remove finds its

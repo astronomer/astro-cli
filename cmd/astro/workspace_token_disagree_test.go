@@ -53,6 +53,20 @@ func TestTokenForAnotherWorkspaceIsRefusedBeforeAnyRequest(t *testing.T) {
 			want:  "ASTRO_API_TOKEN is a Workspace token for " + claimWS + ", but --workspace names clflagworkspace00000001: drop --workspace, or use a token for clflagworkspace00000001",
 		},
 		{
+			// --workspace overrides where deployment token add looks for the token,
+			// and a token run is held to its own Workspace for it.
+			name:  "token add --workspace override against a workspace token",
+			token: []string{"organizationId:org", "workspaceId:" + claimWS},
+			args:  []string{"deployment", "token", "add", "--name", "ci", "--deployment", "cldeployment000000001", "--role", "DEPLOYMENT_ADMIN", "--workspace", "clflagworkspace00000001"},
+			want:  "ASTRO_API_TOKEN is a Workspace token for " + claimWS + ", but --workspace names clflagworkspace00000001: drop --workspace, or use a token for clflagworkspace00000001",
+		},
+		{
+			name:  "workspace-token add --workspace override against a deployment token",
+			token: []string{"organizationId:org", "workspaceId:" + claimWS, "deploymentId:cldeployment000000001"},
+			args:  []string{"deployment", "token", "workspace-token", "add", "--name", "ci", "--deployment", "cldeployment000000001", "--role", "DEPLOYMENT_ADMIN", "--workspace", "clflagworkspace00000001"},
+			want:  "ASTRO_API_TOKEN is a Deployment token for Workspace " + claimWS + ", but --workspace names clflagworkspace00000001: drop --workspace, or use a token for clflagworkspace00000001",
+		},
+		{
 			name:    "project link against a workspace token",
 			token:   []string{"organizationId:org", "workspaceId:" + claimWS},
 			project: testProjectManifest,
