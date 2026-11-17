@@ -75,7 +75,7 @@ func Scope(workspaceID string) (astrosession.Target, string, error) {
 	if err != nil {
 		return astrosession.Target{}, "", err
 	}
-	return astrosession.Resolve(astrosession.Request{Workspace: workspaceID, Accepts: astrosession.ByFlag}), ctx.Organization, nil
+	return astrosession.Resolve(astrosession.Request{Workspace: workspaceID, Advice: astrosession.ByFlag}), ctx.Organization, nil
 }
 
 // target is Scope for a command that acts on the Workspace: the Workspace and

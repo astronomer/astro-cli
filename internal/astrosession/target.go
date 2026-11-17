@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -51,14 +52,15 @@ const (
 	SourceContext
 )
 
-// Accepts is what a command lets a person name a Workspace with, besides the
-// token's claim and the saved login. It words the advice a missing Workspace
-// gets, so it never offers a way the command would not take.
-type Accepts uint8
+// WorkspaceAdvice is the ways a command lets a person name a Workspace,
+// besides the token's claim and the saved login. It only picks the advice a
+// missing Workspace gets (see Missing), so that never offers a way the command
+// would not take. It does not decide which Workspace the run acts on.
+type WorkspaceAdvice uint8
 
 const (
 	// ByFlag is --workspace. Every command has it.
-	ByFlag Accepts = 1 << iota
+	ByFlag WorkspaceAdvice = 1 << iota
 	// ByProject is a project linked to a Workspace, for the command families
 	// that follow the project.
 	ByProject
@@ -73,34 +75,41 @@ const (
 	ByDeployment
 )
 
-// The advice that follows ErrOrgTokenNoWorkspace, by what the command takes.
-const (
-	hintFlag          = "so pass --workspace"
-	hintFlagOrProject = "so pass --workspace, or run in a project linked to one"
-	// hintFlagOrID is for a command that finds a token in the Workspace,
-	// unless the token is given by ID.
-	hintFlagOrID = "so pass --workspace or the token's ID, or run in a project linked to one"
-	hintPath     = "so write the id in the path"
-	hintDeployID = "so pass -d with the Deployment id, or run in a project that links its workspace"
-	// hintCurrent is for a command that acts on the current Workspace alone,
-	// which a run with an API token does not have.
-	hintCurrent = "so use a Workspace API token"
-)
+// adviceFor is the sentence for each way, in the order they are offered.
+var adviceFor = []struct {
+	way  WorkspaceAdvice
+	text string
+}{
+	{ByFlag, "pass --workspace"},
+	{ByDeployment, "pass -d with the Deployment's id"},
+	{ByProject, "run it in a project linked to a Workspace"},
+	{ByID, "give the token's ID"},
+	{ByPath, "write the Workspace's id in the path"},
+}
 
-func (a Accepts) hint() string {
-	switch {
-	case a&ByPath != 0:
-		return hintPath
-	case a&ByDeployment != 0:
-		return hintDeployID
-	case a&ByID != 0:
-		return hintFlagOrID
-	case a&ByProject != 0:
-		return hintFlagOrProject
-	case a&ByFlag != 0:
-		return hintFlag
+// hintCurrent is for a command that acts on the current Workspace alone,
+// which a run with an API token does not have.
+const hintCurrent = "so use a Workspace API token"
+
+// hint is the advice that follows ErrOrgTokenNoWorkspace, built from every way
+// the command takes: "so pass --workspace, run it in a project linked to a
+// Workspace, or give the token's ID".
+func (a WorkspaceAdvice) hint() string {
+	var ways []string
+	for _, w := range adviceFor {
+		if a&w.way != 0 {
+			ways = append(ways, w.text)
+		}
 	}
-	return hintCurrent
+	switch len(ways) {
+	case 0:
+		return hintCurrent
+	case 1:
+		return "so " + ways[0]
+	case 2:
+		return "so " + ways[0] + " or " + ways[1]
+	}
+	return "so " + strings.Join(ways[:len(ways)-1], ", ") + ", or " + ways[len(ways)-1]
 }
 
 // ErrNoWorkspace is a command that needs a Workspace, run on a saved login
@@ -140,8 +149,9 @@ type Request struct {
 	// flag's, else a Deployment token's. A caller that wants only the
 	// Workspace does not pay for reading the token.
 	WantDeployment bool
-	// Accepts is what the command takes, for the advice.
-	Accepts Accepts
+	// Advice is the ways the command takes a Workspace, for the advice a
+	// missing one gets. It changes no Workspace.
+	Advice WorkspaceAdvice
 	// Login is the login whose selection is read, for a caller handed one;
 	// nil is the current context. It is read as the run's own (a token's
 	// claim, or a saved login's Workspace), whatever Domain says.
@@ -173,7 +183,7 @@ type Target struct {
 	// DeploymentSource is SourceFlag, SourceToken or SourceNone.
 	DeploymentSource Source
 
-	accepts Accepts
+	advice  WorkspaceAdvice
 	noSaved error
 	// readErr is why the login could not be read, when the request asked.
 	readErr error
@@ -183,7 +193,7 @@ type Target struct {
 // Resolve decides the run's Workspace and Deployment. It reads the current
 // context and ASTRO_API_TOKEN, and never prompts or calls the API.
 func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
-	t := Target{accepts: r.Accepts, noSaved: r.NoSaved, token: HasAPIToken()}
+	t := Target{advice: r.Advice, noSaved: r.NoSaved, token: HasAPIToken()}
 
 	switch {
 	case r.Workspace != "":
@@ -309,7 +319,7 @@ func (t Target) Missing() error { //nolint:gocritic // a small value type
 			// does: do not call it an Organization token.
 			kind = "a Deployment token with no workspaceId claim"
 		}
-		return &noWorkspaceError{kind: kind, hint: t.accepts.hint()}
+		return &noWorkspaceError{kind: kind, hint: t.advice.hint()}
 	}
 	if t.noSaved != nil {
 		return t.noSaved
@@ -331,7 +341,7 @@ func TokenDeployment() string {
 // has no project link or other way to name one: the Workspace, or the error
 // for there being none.
 func RequireWorkspace(flag string) (string, error) {
-	t := Resolve(Request{Workspace: flag, Accepts: ByFlag, LoginError: true})
+	t := Resolve(Request{Workspace: flag, Advice: ByFlag, LoginError: true})
 	if err := t.Require(); err != nil {
 		return "", err
 	}

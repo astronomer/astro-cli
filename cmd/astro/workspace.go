@@ -909,11 +909,11 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 // saved login. noSaved is what a saved login with no Workspace says (nil for
 // astrosession.ErrNoWorkspace). extra is what else the command accepts in place of a Workspace
 // (astrosession.ByID), for the advice a missing one gets.
-func workspaceTarget(cmd *cobra.Command, flag string, extra astrosession.Accepts, noSaved error) astrosession.Target {
-	req := astrosession.Request{Workspace: flag, Accepts: astrosession.ByFlag | extra, NoSaved: noSaved, LoginError: true}
+func workspaceTarget(cmd *cobra.Command, flag string, extra astrosession.WorkspaceAdvice, noSaved error) astrosession.Target {
+	req := astrosession.Request{Workspace: flag, Advice: astrosession.ByFlag | extra, NoSaved: noSaved, LoginError: true}
 	if f, ok := projectFollowOf(cmd); ok {
 		req.Project = f.workspace
-		req.Accepts |= astrosession.ByProject
+		req.Advice |= astrosession.ByProject
 	}
 	return astrosession.Resolve(req)
 }
@@ -941,7 +941,7 @@ func coalesceWorkspace(cmd *cobra.Command) (string, error) {
 
 // coalesceWorkspaceOr is coalesceWorkspace for a command that also takes
 // something in place of a Workspace (extra), which its advice then names.
-func coalesceWorkspaceOr(cmd *cobra.Command, extra astrosession.Accepts) (string, error) {
+func coalesceWorkspaceOr(cmd *cobra.Command, extra astrosession.WorkspaceAdvice) (string, error) {
 	return coalesceFrom(workspaceTarget(cmd, workspaceID, extra, workspace.ErrCurrentNotSet))
 }
 

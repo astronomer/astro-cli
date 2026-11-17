@@ -298,7 +298,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	// Deployment and no Workspace of the token's. The flag and the project's
 	// own Workspace are weighed in the deploy (internal/deploy), which knows
 	// which link it reads.
-	run := astrosession.Resolve(astrosession.Request{Login: login.selection(), Domain: login.context.Domain, WantDeployment: true, Accepts: astrosession.ByFlag | astrosession.ByProject, NoSaved: manifestdeploy.ErrNoWorkspace})
+	run := astrosession.Resolve(astrosession.Request{Login: login.selection(), Domain: login.context.Domain, WantDeployment: true, Advice: astrosession.ByFlag | astrosession.ByProject, NoSaved: manifestdeploy.ErrNoWorkspace})
 	tokenID := ""
 	if run.DeploymentSource == astrosession.SourceToken {
 		tokenID = run.Deployment

@@ -273,7 +273,7 @@ func TestAFDeploymentNameUnderAnOrganizationTokenWithNoWorkspaceSaysSo(t *testin
 		t.Fatal("a Deployment name with no Workspace to look in succeeded")
 	}
 	msg := err.Error()
-	for _, want := range []string{`"etl" is not a Deployment id`, "the API token in ASTRO_API_TOKEN selects none", "so pass -d with the Deployment id, or run in a project that links its workspace"} {
+	for _, want := range []string{`"etl" is not a Deployment id`, "the API token in ASTRO_API_TOKEN selects none", "so pass -d with the Deployment's id or run it in a project linked to a Workspace"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("error %q lacks %q", msg, want)
 		}

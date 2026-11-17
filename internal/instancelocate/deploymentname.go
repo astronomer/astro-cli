@@ -38,7 +38,7 @@ func (e *DeploymentNameError) Error() string {
 		// Under an API token the resolver says why no workspace is selected, and
 		// that 'astro workspace switch' is no way to give it one.
 		missing := astrosession.Resolve(astrosession.Request{
-			Accepts: astrosession.ByDeployment,
+			Advice:  astrosession.ByDeployment | astrosession.ByProject,
 			NoSaved: errors.New("there is no workspace to find a Deployment of that name in: pass -d with the Deployment id, or run 'astro workspace switch'"),
 		}).Missing()
 		return fmt.Sprintf("%q is not a Deployment id, and %s", e.Name, missing)

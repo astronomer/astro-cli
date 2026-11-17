@@ -1432,5 +1432,5 @@ dependencies = ["apache-airflow==3.1.*"]
 
 	_, _, err = execDeployIO("")
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
-	assert.ErrorContains(t, err, "so pass --workspace, or run in a project linked to one")
+	assert.ErrorContains(t, err, "so pass --workspace or run it in a project linked to a Workspace")
 }

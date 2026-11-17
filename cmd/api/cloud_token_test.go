@@ -16,7 +16,7 @@ func TestFillPlaceholdersWithNoWorkspaceUnderATokenSaysToWriteTheID(t *testing.T
 	_, err := fillPlaceholders("/workspaces/{workspaceId}", &config.Context{Organization: "org-123"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "an Organization token does not")
-	assert.Contains(t, err.Error(), "write the id in the path")
+	assert.Contains(t, err.Error(), "write the Workspace's id in the path")
 	assert.NotContains(t, err.Error(), "workspace switch")
 
 	t.Setenv("ASTRO_API_TOKEN", "")

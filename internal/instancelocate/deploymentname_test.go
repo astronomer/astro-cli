@@ -272,7 +272,7 @@ func TestDeploymentNameErrorWithNoWorkspaceIsWordedByTheRun(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	testUtil.UseAPIToken(t, "organizationId:org")
 	err := (&DeploymentNameError{Name: "etl"}).Error()
-	for _, want := range []string{`"etl" is not a Deployment id, and `, "ASTRO_API_TOKEN selects none", "so pass -d with the Deployment id, or run in a project that links its workspace"} {
+	for _, want := range []string{`"etl" is not a Deployment id, and `, "ASTRO_API_TOKEN selects none", "so pass -d with the Deployment's id or run it in a project linked to a Workspace"} {
 		if !strings.Contains(err, want) {
 			t.Errorf("%q does not say %q", err, want)
 		}

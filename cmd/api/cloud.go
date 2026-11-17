@@ -360,7 +360,7 @@ func fillPlaceholders(path string, ctx *config.Context) (string, error) {
 		case "workspaceid":
 			t := astrosession.Resolve(astrosession.Request{
 				Login:   ctx,
-				Accepts: astrosession.ByPath,
+				Advice:  astrosession.ByPath,
 				NoSaved: errors.New("workspaceId not set in context (run 'astro workspace switch')"),
 			})
 			if err := t.Require(); err != nil {

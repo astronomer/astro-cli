@@ -155,7 +155,7 @@ func TestDeploymentTokenAddSaysThereIsNoWorkspaceBeforeAskingForARole(t *testing
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
 	assert.Empty(t, asked, "a question was written before the error")
 	assert.Equal(t, 1, strings.Count(err.Error(), "pass --workspace"), "the advice is given once: %v", err)
-	assert.Contains(t, err.Error(), "so pass --workspace or the token's ID, or run in a project linked to one")
+	assert.Contains(t, err.Error(), "so pass --workspace or give the token's ID")
 }
 
 // The ide commands say what an Organization token can do about it.

@@ -106,7 +106,7 @@ func TestTheMissingWorkspaceAdviceNamesOnlyWhatTheCommandTakes(t *testing.T) {
 
 	_, err = coalesceWorkspace(followingProject(""))
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
-	assert.Contains(t, err.Error(), "--workspace, or run in a project")
+	assert.Contains(t, err.Error(), "--workspace or run it in a project")
 }
 
 // Creating or updating a Workspace token posts a Workspace id, so there must be
