@@ -31,14 +31,13 @@ const envConnExamples = `
 
 func newEnvConnRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "connection",
-		Aliases:                    []string{"conn", "connections"},
-		Short:                      "Manage connections",
-		Long:                       "Manage connections on Astro, scoped to a workspace or a deployment.",
-		Example:                    envConnExamples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Use:     "connection",
+		Aliases: []string{"conn", "connections"},
+		Short:   "Manage connections",
+		Long:    "Manage connections on Astro, scoped to a workspace or a deployment.",
+		Example: envConnExamples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
 	addScopePersistentFlags(cmd)

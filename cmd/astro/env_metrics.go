@@ -29,14 +29,13 @@ const envMetricsExamples = `
 
 func newEnvMetricsExportRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "metrics-export",
-		Aliases:                    []string{"metrics", "metrics-exports"},
-		Short:                      "Manage metrics exports",
-		Long:                       "Manage metrics exports on Astro, scoped to a workspace or a deployment.",
-		Example:                    envMetricsExamples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Use:     "metrics-export",
+		Aliases: []string{"metrics", "metrics-exports"},
+		Short:   "Manage metrics exports",
+		Long:    "Manage metrics exports on Astro, scoped to a workspace or a deployment.",
+		Example: envMetricsExamples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
 	addScopePersistentFlags(cmd)

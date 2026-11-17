@@ -32,14 +32,13 @@ const envVarExamples = `
 
 func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "variable",
-		Aliases:                    []string{"var", "variables", "vars"},
-		Short:                      "Manage environment variables",
-		Long:                       "Manage environment variables on Astro, scoped to a workspace or a deployment.",
-		Example:                    envVarExamples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Use:     "variable",
+		Aliases: []string{"var", "variables", "vars"},
+		Short:   "Manage environment variables",
+		Long:    "Manage environment variables on Astro, scoped to a workspace or a deployment.",
+		Example: envVarExamples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
 	addScopePersistentFlags(cmd)

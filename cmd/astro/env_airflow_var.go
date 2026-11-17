@@ -26,14 +26,13 @@ const envAirflowVarExamples = `
 
 func newEnvAirflowVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "airflow-variable",
-		Aliases:                    []string{"airflow-var", "airflow-vars", "airflow-variables"},
-		Short:                      "Manage Airflow variables",
-		Long:                       "Manage Airflow variables on Astro, scoped to a workspace or a deployment.",
-		Example:                    envAirflowVarExamples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Use:     "airflow-variable",
+		Aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},
+		Short:   "Manage Airflow variables",
+		Long:    "Manage Airflow variables on Astro, scoped to a workspace or a deployment.",
+		Example: envAirflowVarExamples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
 	addScopePersistentFlags(cmd)

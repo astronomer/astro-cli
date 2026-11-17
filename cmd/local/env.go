@@ -160,9 +160,8 @@ func newEnvCmd(c *cli) *cobra.Command {
 			"vault, global vault, the linked workspace's Environment Manager, a declaration's " +
 			"default. Every source reaches Airflow whole, declared or not. " +
 			"A workspace that cannot be read is skipped with a note.",
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       helpOrUnknownSubcommand,
-		SuggestionsMinimumDistance: 2,
+		Args: cobra.ArbitraryArgs,
+		RunE: helpOrUnknownSubcommand,
 	}
 	cmd.PersistentFlags().BoolVar(&scope.project, "project", false, "Act on the project's values (the default inside a project)")
 	cmd.PersistentFlags().BoolVar(&scope.global, "global", false, "Act on the global values every linked project gets (the default outside a project)")
@@ -317,14 +316,13 @@ func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		// Spelled twice, a rename leaves every hint composed from Noun naming a
 		// command that no longer exists — which is the failure Noun exists to
 		// prevent, so it cannot be the one thing that drifts from it.
-		Use:                        localenv.Noun(k.kind),
-		Aliases:                    k.aliases,
-		SuggestionsMinimumDistance: 2,
-		Short:                      "Manage " + k.label + "s",
-		Long:                       "Manage " + k.label + "s for local Airflow.",
-		Example:                    k.example,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       helpOrUnknownSubcommand,
+		Use:     localenv.Noun(k.kind),
+		Aliases: k.aliases,
+		Short:   "Manage " + k.label + "s",
+		Long:    "Manage " + k.label + "s for local Airflow.",
+		Example: k.example,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    helpOrUnknownSubcommand,
 	}
 	// Reads, then the write, then the destructive one — the same order
 	// `astro env` uses for the same four verbs, so help reads the same

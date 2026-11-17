@@ -189,12 +189,11 @@ func runEnvList(cmd *cobra.Command, out io.Writer) error {
 
 func newEnvRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "env",
-		Aliases:                    []string{"environment"},
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
-		Short:                      "Manage environment objects on Astro",
+		Use:     "env",
+		Aliases: []string{"environment"},
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
+		Short:   "Manage environment objects on Astro",
 		Long: `Manage environment objects on Astro: environment variables, connections, Airflow variables, and metrics exports, scoped to a workspace or a deployment.
 
 Objects here can be shared across deployments from a workspace, or set on one deployment with --deployment.`,
