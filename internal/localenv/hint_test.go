@@ -1,12 +1,17 @@
 package localenv
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/astronomer/astro-cli/pkg/scaffold"
+)
 
 // The hints are commands to run as printed. A name from a .env key can hold
 // shell syntax, and stays one quoted argument; an ordinary name prints bare.
 func TestHintsQuoteTheName(t *testing.T) {
 	const hostile = "X; touch pwned #"
-	const quoted = "'X; touch pwned #'"
+	// One quoted word, in whichever quotes this OS's shells read.
+	quoted := scaffold.ShellQuote(hostile)
 	noun := Noun(KindEnv)
 	for _, tc := range []struct {
 		name, got, want string

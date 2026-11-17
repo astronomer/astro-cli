@@ -1161,9 +1161,9 @@ func TestKeptDockerfilePipInstallsAreReported(t *testing.T) {
 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
-	assert.Contains(t, res.Notes, "Dockerfile: a pip step installs "+
-		"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3. For standalone mode too, run: "+
-		"uv add 'example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3'")
+	const spec = "example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3"
+	assert.Contains(t, res.Notes, "Dockerfile: a pip step installs "+spec+
+		". For standalone mode too, run: uv add "+ShellQuote(spec))
 	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.NotContains(t, strings.Join(m.Project.Dependencies, "\n"), "example-lib", "the note reports; it does not add")
