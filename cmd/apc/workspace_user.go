@@ -121,7 +121,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func workspaceUserAdd(cmd *cobra.Command, out io.Writer) error {
+func workspaceUserAdd(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -132,8 +132,6 @@ func workspaceUserAdd(cmd *cobra.Command, out io.Writer) error {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	w, added, err := workspace.Add(ws, workspaceUserCreateEmail, workspaceUserWsRole, houstonClient)
 	if err != nil {
 		return err
@@ -141,7 +139,7 @@ func workspaceUserAdd(cmd *cobra.Command, out io.Writer) error {
 	return renderWorkspaceUserAdded(r, w, workspaceUserCreateEmail, &added)
 }
 
-func workspaceUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceUserUpdate(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -152,8 +150,6 @@ func workspaceUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	change, err := workspace.UpdateRole(ws, args[0], workspaceUserWsRole, houstonClient)
 	if err != nil {
 		return err
@@ -161,15 +157,12 @@ func workspaceUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error
 	return renderWorkspaceUserUpdated(r, args[0], &change)
 }
 
-func workspaceUserRemove(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceUserRemove(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	// A user with no Workspace role there is refused before anything is
 	// sent: workspaceUser answers for any active user with the email,

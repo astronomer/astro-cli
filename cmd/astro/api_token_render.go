@@ -206,7 +206,7 @@ func groupPath(cmd *cobra.Command) string {
 // the command can do with it is take its role away, which remove does. It is
 // a usage error: the verb does not fit the token.
 func refuseDeleteOfBroader(deleteCmd *cobra.Command, token *astrov1.ApiToken, own string) error {
-	return cliout.Usage(fmt.Errorf("%s is %s API token, not one of this %s's own. %s deletes a %s's own tokens; use %s remove to take the token's role off the %s",
+	return cliout.UsageNoHelp(fmt.Errorf("%s is %s API token, not one of this %s's own. %s deletes a %s's own tokens; use %s remove to take the token's role off the %s",
 		token.Name, article(scopeNoun(token.Scope)), own, deleteCmd.CommandPath(), own, groupPath(deleteCmd), own))
 }
 
@@ -214,7 +214,7 @@ func refuseDeleteOfBroader(deleteCmd *cobra.Command, token *astrov1.ApiToken, ow
 // token: it has no role on its own scope to take away, and delete is what ends
 // it. A usage error, like refuseDeleteOfBroader.
 func refuseRemoveOfOwn(removeCmd *cobra.Command, token *astrov1.ApiToken, own string) error {
-	return cliout.Usage(fmt.Errorf("%s is this %s's own API token. %s takes a broader token's role off the %s; use %s delete to delete it",
+	return cliout.UsageNoHelp(fmt.Errorf("%s is this %s's own API token. %s takes a broader token's role off the %s; use %s delete to delete it",
 		token.Name, own, removeCmd.CommandPath(), own, groupPath(removeCmd)))
 }
 

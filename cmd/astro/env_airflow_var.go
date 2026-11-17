@@ -26,14 +26,13 @@ const envAirflowVarExamples = `
 
 func newEnvAirflowVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "airflow-variable",
-		Aliases:                    []string{"airflow-var", "airflow-vars", "airflow-variables"},
-		Short:                      "Manage Airflow variables",
-		Long:                       "Manage Airflow variables on Astro, scoped to a workspace or a deployment.",
-		Example:                    envAirflowVarExamples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Use:     "airflow-variable",
+		Aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},
+		Short:   "Manage Airflow variables",
+		Long:    "Manage Airflow variables on Astro, scoped to a workspace or a deployment.",
+		Example: envAirflowVarExamples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
 	addScopePersistentFlags(cmd)
@@ -137,7 +136,6 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	objs, err := env.ListAirflowVars(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -154,7 +152,6 @@ func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	obj, err := env.GetAirflowVar(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -169,7 +166,6 @@ func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 	return runFromFileSet(cmd, r, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, fromFileFns{env.CreateAirflowVar, env.UpdateAirflowVar, env.GetAirflowVar})
 }
 
@@ -179,7 +175,6 @@ func runEnvAirflowVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	value, err := readSetValue(cmd, "value", envVarValue, fmt.Sprintf("new value for %s", idOrKey))
 	if err != nil {

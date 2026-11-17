@@ -29,14 +29,13 @@ const envMetricsExamples = `
 
 func newEnvMetricsExportRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "metrics-export",
-		Aliases:                    []string{"metrics", "metrics-exports"},
-		Short:                      "Manage metrics exports",
-		Long:                       "Manage metrics exports on Astro, scoped to a workspace or a deployment.",
-		Example:                    envMetricsExamples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Use:     "metrics-export",
+		Aliases: []string{"metrics", "metrics-exports"},
+		Short:   "Manage metrics exports",
+		Long:    "Manage metrics exports on Astro, scoped to a workspace or a deployment.",
+		Example: envMetricsExamples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
 	addScopePersistentFlags(cmd)
@@ -138,7 +137,6 @@ func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	objs, err := env.ListMetricsExports(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -155,7 +153,6 @@ func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	obj, err := env.GetMetricsExport(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -179,7 +176,6 @@ func runEnvMetricsSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	in, err := buildMetricsInput(cmd)
 	if err != nil {

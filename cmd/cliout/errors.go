@@ -34,6 +34,9 @@ func (e jsonShown) Unwrap() error { return e.err }
 // unknown flag or subcommand, a flag value it does not accept, the wrong
 // number of arguments — and nothing ran. It exits 2 and publishes the kind
 // `usage`.
+//
+// Execute follows it with a pointer to the command's help: the right
+// invocation is there. UsageNoHelp is the one that does not.
 func Usage(err error) error {
 	if err == nil {
 		return nil
@@ -41,13 +44,36 @@ func Usage(err error) error {
 	return &usageError{err: err}
 }
 
+// UsageNoHelp marks err as a usage error that exits 2 and publishes the kind
+// `usage`, as Usage does, but that Execute does not follow with the pointer to
+// the command's help. It is for an error whose message already says what to
+// run instead, so the command's help would settle nothing and the pointer
+// would bury it: a removed command's stub names its replacement, a verb that
+// does not fit a token names the one that does, a Deployment name several
+// Deployments share lists their ids.
+//
+// It governs only an error the command returns once it runs. A usage error
+// found before then (a flag that does not parse, the argument count, a missing
+// required flag, an unknown subcommand) always gets the pointer, since its
+// command's help is where the right invocation is.
+//
+// A package that cannot import cliout opts out by giving its error an
+// OmitsHelpPointer method that returns true, as it marks a usage error with
+// IsUsageError.
+func UsageNoHelp(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &usageError{err: err, noHelp: true}
+}
+
 // misinvoked marks err as a usage error found before the command ran: a flag
 // that does not parse, the wrong number of arguments, a word that names no
-// subcommand. Execute points at the command's help for these whatever the
-// command's SilenceUsage says, since its help is where the right invocation
-// is. A usage error a command returns once it runs is a judgement about its
-// input (a Deployment name several Deployments share), and a command that
-// silenced its usage first says its help would not settle it.
+// subcommand. Execute always points at the command's help for these, since its
+// help is where the right invocation is, and UsageNoHelp cannot opt out of it.
+// A usage error a command returns once it runs is a judgement about its input
+// (a Deployment name several Deployments share), and says with UsageNoHelp
+// when its help would not settle it.
 //
 // An error already marked Usage gets its mark replaced rather than a second
 // one around it, so what it wraps is still one Unwrap away.
@@ -67,6 +93,8 @@ func misinvoked(err error) error {
 type usageError struct {
 	err       error
 	beforeRun bool
+	// noHelp is UsageNoHelp: no pointer to the command's help follows.
+	noHelp bool
 }
 
 func (e *usageError) Error() string { return e.err.Error() }
@@ -107,6 +135,24 @@ func hasCobraUsagePrefix(err error) bool {
 	}
 	return false
 }
+
+// omitsHelpPointer reports whether a usage error the command returned from its
+// run opted out of the pointer to the command's help, with UsageNoHelp or,
+// from a package that cannot import cliout, an OmitsHelpPointer method.
+func omitsHelpPointer(err error) bool {
+	// Any mark in the chain counts, so Usage around a UsageNoHelp keeps it.
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		if u, ok := e.(*usageError); ok && u.noHelp { //nolint:errorlint // walking the chain by hand
+			return true
+		}
+	}
+	var o helpPointerOptOut
+	return errors.As(err, &o) && o.OmitsHelpPointer()
+}
+
+// helpPointerOptOut is what a package that cannot import cliout implements to
+// opt its usage error out of the pointer to help (UsageNoHelp).
+type helpPointerOptOut interface{ OmitsHelpPointer() bool }
 
 // usageMarker is an error a package that cannot import cliout (one under
 // internal/platform) marks as a usage error itself, such as a Deployment name

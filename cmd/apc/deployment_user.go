@@ -121,10 +121,8 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func deploymentUserList(cmd *cobra.Command, out io.Writer) error {
+func deploymentUserList(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	users, err := deployment.UserList(deploymentID, deploymentUserEmail, deploymentUserID, deploymentUserFullname, houstonClient)
 	if errors.Is(err, deployment.ErrNoDeploymentUsers) {
 		return renderNoDeploymentUsers(r)
@@ -135,14 +133,12 @@ func deploymentUserList(cmd *cobra.Command, out io.Writer) error {
 	return renderDeploymentUserList(r, users)
 }
 
-func deploymentUserAdd(cmd *cobra.Command, out io.Writer) error {
+func deploymentUserAdd(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	u, err := deployment.Add(deploymentID, deploymentUserEmail, deploymentUserRole, houstonClient)
 	if err != nil {
 		return err
@@ -150,10 +146,8 @@ func deploymentUserAdd(cmd *cobra.Command, out io.Writer) error {
 	return renderDeploymentUserChange(r, deploymentID, deploymentUserEmail, &u, true)
 }
 
-func deploymentUserRemove(cmd *cobra.Command, out io.Writer, args []string) error {
+func deploymentUserRemove(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	u, err := deployment.RemoveUser(deploymentID, args[0], houstonClient)
 	if err != nil {
 		return err
@@ -161,14 +155,12 @@ func deploymentUserRemove(cmd *cobra.Command, out io.Writer, args []string) erro
 	return renderDeploymentUserRemoval(r, deploymentID, args[0], &u)
 }
 
-func deploymentUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+func deploymentUserUpdate(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	u, err := deployment.UpdateUser(deploymentID, args[0], deploymentUserRole, houstonClient)
 	if err != nil {
 		return err

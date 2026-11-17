@@ -44,9 +44,8 @@ func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 			"its own value. Identify the variable with --variable-key or --variable-id.",
 		Example: envVarLinkExamples,
 
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Args: cobra.ArbitraryArgs,
+		RunE: cliout.GroupHelp,
 	}
 	cmd.AddCommand(
 		newEnvVarLinkSetCmd(out),
@@ -77,7 +76,7 @@ func linkVariableIDOrKey() (string, error) {
 	if envLinkVariableKey != "" {
 		return envLinkVariableKey, nil
 	}
-	return "", errors.New("--variable-id or --variable-key cannot be empty")
+	return "", cliout.Usage(errors.New("--variable-id or --variable-key cannot be empty"))
 }
 
 // newRemovedLinkCreateCmd is the `link create` tombstone. The nouns' stub
@@ -169,7 +168,6 @@ func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := linkVariableIDOrKey()
 	if err != nil {
@@ -203,7 +201,6 @@ func runEnvVarLinkRemove(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := linkVariableIDOrKey()
 	if err != nil {
@@ -228,7 +225,6 @@ func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := linkVariableIDOrKey()
 	if err != nil {

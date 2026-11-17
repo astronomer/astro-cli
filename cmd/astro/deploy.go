@@ -151,8 +151,6 @@ func deploy(cmd *cobra.Command, args []string) error {
 	if imageName != "" && where.None() {
 		return deployManifest(cmd, args, nil)
 	}
-	// Not a usage mistake, so no usage block under the error.
-	cmd.SilenceUsage = true
 	return utils.NoDeployableProject(where)
 }
 
@@ -223,7 +221,6 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	if err := refuseFlagCombinations(cmd, inProject); err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	out := cmd.OutOrStdout()
 

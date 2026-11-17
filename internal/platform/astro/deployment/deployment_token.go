@@ -137,7 +137,7 @@ func UpdateToken(id, name, newName, description, role, deploymentID string, toke
 	}
 	broader := string(token.Scope) != deploymentEntity
 	if broader && (newName != "" || description != "") {
-		return apitoken.Update{}, apitoken.Usage(ErrBroaderTokenNotRenamed)
+		return apitoken.Update{}, apitoken.UsageNoHelp(ErrBroaderTokenNotRenamed)
 	}
 
 	currentRole := deploymentRoleOf(&token, deploymentID)
@@ -300,7 +300,7 @@ func AddToken(id, name, role, workspaceID, deploymentID string, scopes []Deploym
 	}
 	switch {
 	case string(token.Scope) == deploymentEntity:
-		return apitoken.Token{}, apitoken.Usage(errDeploymentScopedAdd)
+		return apitoken.Token{}, apitoken.UsageNoHelp(errDeploymentScopedAdd)
 	case !slices.Contains(scopes, DeploymentTokenType(token.Scope)):
 		return apitoken.Token{}, errWrongTokenTypeSelected
 	}
@@ -492,7 +492,7 @@ func FindToken(id, name, deploymentID string, tokenTypes []DeploymentTokenType, 
 		// holds no role on this Deployment is not this Deployment's to
 		// change, whichever scope it is of: its own tokens hold one here.
 		if deploymentID != "" && deploymentRoleOf(&token, deploymentID) == "" {
-			return token, apitoken.Usage(fmt.Errorf("the API token %s has no role on this Deployment: only a Deployment's own tokens, and Workspace and Organization tokens with a role on it, are found here; to give a token a role on it, use astro deployment token add", id))
+			return token, apitoken.UsageNoHelp(fmt.Errorf("the API token %s has no role on this Deployment: only a Deployment's own tokens, and Workspace and Organization tokens with a role on it, are found here; to give a token a role on it, use astro deployment token add", id))
 		}
 	}
 	if len(tokenTypes) > 0 {

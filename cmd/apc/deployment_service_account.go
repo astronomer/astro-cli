@@ -124,7 +124,7 @@ func serviceAccountDeleteQuestion(id string) string {
 	return fmt.Sprintf("\nAre you sure you want to delete service account %s? This cannot be undone.", id)
 }
 
-func deploymentSaCreate(cmd *cobra.Command, out io.Writer) error {
+func deploymentSaCreate(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if deploymentSACreateName == "" {
 		return errServiceAccountNameEmpty
@@ -132,8 +132,6 @@ func deploymentSaCreate(cmd *cobra.Command, out io.Writer) error {
 	if err := validateDeploymentRole(deploymentSACreateRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	created, err := sa.CreateUsingDeploymentUUID(deploymentID, deploymentSACreateName, deploymentSACreateCategory, deploymentSACreateRole, houstonClient)
 	if err != nil {
 		return err
@@ -141,10 +139,8 @@ func deploymentSaCreate(cmd *cobra.Command, out io.Writer) error {
 	return renderServiceAccountCreated(r, &created)
 }
 
-func deploymentSaList(cmd *cobra.Command, out io.Writer) error {
+func deploymentSaList(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	sas, err := sa.GetDeploymentServiceAccounts(deploymentID, houstonClient)
 	if err != nil {
 		return err
@@ -152,10 +148,8 @@ func deploymentSaList(cmd *cobra.Command, out io.Writer) error {
 	return renderServiceAccountList(r, sas)
 }
 
-func deploymentSaDelete(cmd *cobra.Command, args []string, out io.Writer) error {
+func deploymentSaDelete(_ *cobra.Command, args []string, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	if err := confirm(serviceAccountDeleteQuestion(args[0])); err != nil {
 		return err
 	}

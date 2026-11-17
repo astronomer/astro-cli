@@ -192,11 +192,10 @@ func (c *cli) warnRefresh(r cliout.Renderer, p pinRefresh) {
 
 func newUpgradeCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "upgrade",
-		Short:                      "Move this project to a new version of what it runs",
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       helpOrUnknownSubcommand,
-		SuggestionsMinimumDistance: 2,
+		Use:   "upgrade",
+		Short: "Move this project to a new version of what it runs",
+		Args:  cobra.ArbitraryArgs,
+		RunE:  helpOrUnknownSubcommand,
 	}
 	cmd.AddCommand(newUpgradeAirflowCmd(c), newUpgradeRuntimeCmd(c))
 	return cmd

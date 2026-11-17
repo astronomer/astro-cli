@@ -109,7 +109,7 @@ func TestDeployImageFlagRefusals(t *testing.T) {
 				seen := deployMocks(t, deployPushed, nil)
 				api := newAPCClient()
 				run := runAPC(t, api, "", append([]string{"deploy", "test-deployment-id", "-o", "json"}, tc.args...)...)
-				assert.Equal(t, 1, run.code)
+				assert.Equal(t, cliout.ExitUsage, run.code)
 				assert.ErrorIs(t, run.err, tc.want)
 				assert.Empty(t, seen.images)
 				for _, method := range []string{"GetWorkspace", "ListDeployments", "GetDeployment", "UpdateDeploymentImage"} {

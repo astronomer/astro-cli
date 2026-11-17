@@ -32,14 +32,13 @@ const envVarExamples = `
 
 func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "variable",
-		Aliases:                    []string{"var", "variables", "vars"},
-		Short:                      "Manage environment variables",
-		Long:                       "Manage environment variables on Astro, scoped to a workspace or a deployment.",
-		Example:                    envVarExamples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Use:     "variable",
+		Aliases: []string{"var", "variables", "vars"},
+		Short:   "Manage environment variables",
+		Long:    "Manage environment variables on Astro, scoped to a workspace or a deployment.",
+		Example: envVarExamples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
 	addScopePersistentFlags(cmd)
@@ -181,7 +180,6 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
 	if export && f == cliout.FormatText {
 		f = formatDotenv
 	}
-	cmd.SilenceUsage = true
 
 	objs, err := env.ListVars(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -201,7 +199,6 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	obj, err := env.GetVar(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -219,7 +216,6 @@ func runEnvVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 	return runFromFileSet(cmd, r, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, fromFileFns{env.CreateVar, env.UpdateVar, env.GetVar})
 }
 
@@ -229,7 +225,6 @@ func runEnvVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	value, err := readSetValue(cmd, "value", envVarValue, fmt.Sprintf("new value for %s", idOrKey))
 	if err != nil {

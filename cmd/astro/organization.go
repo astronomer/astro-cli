@@ -245,16 +245,12 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func organizationList(cmd *cobra.Command, out io.Writer) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
+func organizationList(_ *cobra.Command, out io.Writer) error {
 	return organization.ListWithFormat(astroV1Client, cliout.Renderer{Format: organizationListOutput, Out: out})
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	format := organizationSwitchOutput
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	organizationNameOrID := ""
 
@@ -300,9 +296,6 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 }
 
 func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
 	fmt.Fprintln(cliout.NotesTo(cmd, auditLogsOutput, out), "This may take some time depending on how many days are being exported.")
 	export, err := orgExportAuditLogs(astroV1Client,
 		orgName, auditLogsOutputFilePath, auditLogsEarliestParam)
@@ -312,7 +305,7 @@ func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
 	return emitAuditLogExport(cliout.Renderer{Format: auditLogsOutput, Out: out}, export)
 }
 
-func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
+func userInvite(_ *cobra.Command, args []string, out io.Writer) error {
 	var email string
 
 	// if an email was provided in the args we use it
@@ -328,7 +321,6 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 		email = answer
 	}
 
-	cmd.SilenceUsage = true
 	inv, err := user.CreateInvite(email, role, astroV1Client)
 	if err != nil {
 		return err
@@ -336,12 +328,11 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 	return renderLines(organizationUserOutput, out, &inv, fmt.Sprintf("invite for %s with role %s created", inv.Email, inv.Role))
 }
 
-func listUsers(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listUsers(_ *cobra.Command, out io.Writer) error {
 	return user.ListOrgUsersWithFormat(astroV1Client, cliout.Renderer{Format: organizationUserOutput, Out: out})
 }
 
-func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
+func userUpdate(_ *cobra.Command, args []string, out io.Writer) error {
 	var email string
 
 	// if an email was provided in the args we use it
@@ -359,7 +350,6 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		updateRole = answer
 	}
 
-	cmd.SilenceUsage = true
 	if email == "" {
 		if err := mayPick("a user", userEmailAnswer); err != nil {
 			return err
@@ -408,8 +398,7 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listTeams(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listTeams(_ *cobra.Command, out io.Writer) error {
 	return team.ListOrgTeamsWithFormat(astroV1Client, cliout.Renderer{Format: organizationTeamOutput, Out: out})
 }
 
@@ -440,9 +429,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-	cmd.SilenceUsage = true
-
+func teamUpdate(_ *cobra.Command, out io.Writer, args []string) error {
 	id := ""
 
 	if len(args) == 1 {
@@ -480,8 +467,7 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func teamCreate(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func teamCreate(_ *cobra.Command, out io.Writer) error {
 	if teamOrgRole == "" {
 		// Refused before the line introducing the choice, so a run that
 		// cannot ask prints nothing.
@@ -528,9 +514,7 @@ func newTeamDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
-	cmd.SilenceUsage = true
-
+func teamDelete(_ *cobra.Command, out io.Writer, args []string) error {
 	id := ""
 
 	if len(args) == 1 {
@@ -581,8 +565,7 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func removeTeamUser(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func removeTeamUser(_ *cobra.Command, out io.Writer) error {
 	if err := mayPickTeamAndUser("a team member"); err != nil {
 		return err
 	}
@@ -627,8 +610,7 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addTeamUser(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func addTeamUser(_ *cobra.Command, out io.Writer) error {
 	if err := mayPickTeamAndUser("a user"); err != nil {
 		return err
 	}
@@ -659,8 +641,7 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listUsersCmd(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listUsersCmd(_ *cobra.Command, out io.Writer) error {
 	if teamID == "" {
 		if err := mayPick("a team", teamIDFlag); err != nil {
 			return err
@@ -890,8 +871,7 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listRoles(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listRoles(_ *cobra.Command, out io.Writer) error {
 	roles, err := roleClient.ListData(astroV1Client, shouldIncludeDefaultRoles)
 	if err != nil {
 		return err
@@ -929,7 +909,6 @@ func newOrganizationClusterListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listClusters(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listClusters(_ *cobra.Command, out io.Writer) error {
 	return organization.ListClustersWithFormat(astroV1Client, cliout.Renderer{Format: organizationClusterListOutput, Out: out})
 }

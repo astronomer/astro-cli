@@ -31,14 +31,13 @@ const envConnExamples = `
 
 func newEnvConnRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "connection",
-		Aliases:                    []string{"conn", "connections"},
-		Short:                      "Manage connections",
-		Long:                       "Manage connections on Astro, scoped to a workspace or a deployment.",
-		Example:                    envConnExamples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Use:     "connection",
+		Aliases: []string{"conn", "connections"},
+		Short:   "Manage connections",
+		Long:    "Manage connections on Astro, scoped to a workspace or a deployment.",
+		Example: envConnExamples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
 	addScopePersistentFlags(cmd)
@@ -160,7 +159,6 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	objs, err := env.ListConns(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -177,7 +175,6 @@ func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	obj, err := env.GetConn(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -221,7 +218,6 @@ func runEnvConnSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	in, err := buildConnInput(cmd, idOrKey)
 	if err != nil {
@@ -353,7 +349,7 @@ func buildConnInput(cmd *cobra.Command, idOrKey string) (env.ConnInput, error) {
 		return connInputFromValue(cmd, idOrKey, envConnValue)
 	}
 	if envConnType == "" {
-		return env.ConnInput{}, errors.New("a connection needs a type: pass --type, or --value with a URI or connection JSON that carries one")
+		return env.ConnInput{}, cliout.Usage(errors.New("a connection needs a type: pass --type, or --value with a URI or connection JSON that carries one"))
 	}
 	// Optional fields are sent only when the user explicitly set the flag, so
 	// passing --host="" (etc.) is preserved as "clear this field" rather than

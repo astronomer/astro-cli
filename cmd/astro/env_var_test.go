@@ -29,6 +29,9 @@ func execEnvCmd(args ...string) (string, error) {
 	cmd := newEnvRootCmd(buf)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
+	// cliout.Execute turns this on for the root of a real run, which keeps cobra's
+	// usage block out of every command's error.
+	cmd.SilenceUsage = true
 	var verbosity string
 	cmd.PersistentFlags().StringVar(&verbosity, "verbosity", "", "")
 	cmd.SetArgs(args)

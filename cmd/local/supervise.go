@@ -18,7 +18,6 @@ func newSuperviseCmd(_ Deps) *cobra.Command {
 		Hidden:             true,
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
-		SilenceUsage:       true,
 		SilenceErrors:      true,
 		RunE: func(_ *cobra.Command, args []string) error {
 			return localrt.RunSupervisor(args)

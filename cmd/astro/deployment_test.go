@@ -396,6 +396,9 @@ func execDeploymentCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
 	cmd := newDeploymentRootCmd(buf)
 	cmd.SetOut(buf)
+	// cliout.Execute turns this on for the root of a real run, which keeps cobra's
+	// usage block out of every command's error.
+	cmd.SilenceUsage = true
 	// The real CLI registers --verbosity as a persistent flag on the root command.
 	// Tests invoke the deployment subcommand directly, so we stub the flag here to
 	// mirror production setup and avoid "unknown flag" errors when scenarios pass it.
@@ -979,9 +982,8 @@ func TestDeploymentUpdate(t *testing.T) {
 		ctx.Workspace = ""
 		require.NoError(t, ctx.SetContext())
 		defer testUtil.InitTestConfig(testUtil.LocalPlatform)
-		resp, err := execDeploymentCmd("update", "--deployment-name", "doesnotexist")
+		_, err = execDeploymentCmd("update", "--deployment-name", "doesnotexist")
 		assert.ErrorContains(t, err, "failed to find a valid Workspace")
-		assert.Contains(t, resp, "Usage:\n")
 	})
 	t.Run("updates a deployment with small scheduler size", func(t *testing.T) {
 		setHostedOrg(t, ws)
@@ -1361,11 +1363,9 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			err = ctx.SetContext()
 			assert.NoError(t, err)
 			defer testUtil.InitTestConfig(testUtil.LocalPlatform)
-			expectedOut := "Usage:\n"
 			cmdArgs := []string{tt.command, "--deployment-name", "doesnotexist"}
-			resp, err := execDeploymentCmd(cmdArgs...)
+			_, err = execDeploymentCmd(cmdArgs...)
 			assert.ErrorContains(t, err, "failed to find a valid workspace")
-			assert.Contains(t, resp, expectedOut)
 		})
 	}
 }

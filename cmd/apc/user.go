@@ -39,7 +39,6 @@ func newUserCreateCmd(out io.Writer) *cobra.Command {
 		Example: createUserExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r := cliout.Renderer{Format: accessOutput, Out: out}
-			cmd.SilenceUsage = true
 			created, err := user.Create(userEmail, userPassword, houstonClient)
 			if err != nil {
 				return err

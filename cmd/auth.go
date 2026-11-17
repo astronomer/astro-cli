@@ -133,10 +133,7 @@ func apcPlatformVersion(domain string) string {
 	return houstonVersion
 }
 
-func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
+func runLogin(_ *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
 	if err := resumeLoginVault(args); err != nil {
 		return err
 	}
@@ -164,7 +161,7 @@ func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient
 	return apcLogin(ctx.Domain, oAuth, "", "", token, apcPlatformVersion(ctx.Domain), houstonClient, out)
 }
 
-func logout(cmd *cobra.Command, args []string, out io.Writer) error {
+func logout(_ *cobra.Command, args []string, out io.Writer) error {
 	var domain string
 	if len(args) == 1 {
 		domain = domainutil.ExpandShortName(args[0])
@@ -175,9 +172,6 @@ func logout(cmd *cobra.Command, args []string, out io.Writer) error {
 		}
 		domain = c.Domain
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	if context.IsCloudDomain(domain) {
 		return cloudLogout(domain, out)
@@ -295,10 +289,7 @@ type authToken struct {
 
 // printAuthToken publishes the login's token. In text it is the token and
 // nothing else, so `$(astro auth token)` is the token.
-func printAuthToken(cmd *cobra.Command, contextDomain string, force bool, r cliout.Renderer) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
+func printAuthToken(_ *cobra.Command, contextDomain string, force bool, r cliout.Renderer) error {
 	c, err := astroCmd.FreshLogin(contextDomain, force)
 	if err != nil {
 		return err

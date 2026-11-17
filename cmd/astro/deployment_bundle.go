@@ -60,7 +60,6 @@ func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cmd.SilenceUsage = true
 			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), astroV1Client, astroV1Alpha1Client)
 		},
 	}
@@ -86,7 +85,6 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cmd.SilenceUsage = true
 			return deployment.ListBundlesWithFormat(ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
 		},
 	}
@@ -117,7 +115,6 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cmd.SilenceUsage = true
 			var bundleID string
 			if len(args) > 0 {
 				bundleID = args[0]
@@ -156,7 +153,6 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cmd.SilenceUsage = true
 			var bundleID string
 			if len(args) > 0 {
 				bundleID = args[0]

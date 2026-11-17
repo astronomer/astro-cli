@@ -34,7 +34,7 @@ const (
 // unknown flag fails: a usage error (exit 2), naming the settings the name is
 // most likely a typo of, when any are close. It wraps errInvalidConfigPath.
 func unknownSetting(name string) error {
-	return cliout.Usage(fmt.Errorf("%w: %q.%s Run astro config list to see every setting.",
+	return cliout.UsageNoHelp(fmt.Errorf("%w: %q.%s Run astro config list to see every setting.",
 		errInvalidConfigPath, name, suggestSettings(name)))
 }
 
@@ -98,7 +98,7 @@ func refuseRemovedConfigKey(key string) error {
 	if !ok {
 		return nil
 	}
-	return cliout.Usage(fmt.Errorf("%s was removed in Astro CLI v2: %s", key, reason))
+	return cliout.UsageNoHelp(fmt.Errorf("%s was removed in Astro CLI v2: %s", key, reason))
 }
 
 var (
@@ -208,14 +208,12 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	// without --global.
 	if cmd.Name() == "set" || cmd.Name() == "get" {
 		if err := refuseRemovedConfigKey(args[0]); err != nil {
-			cmd.SilenceUsage = true
 			return err
 		}
 		// An unknown name too, for the same reason: the scope checks below
 		// would otherwise answer it with advice to run it with --global, which
 		// then fails.
 		if _, ok := config.CFGStrMap[args[0]]; !ok {
-			cmd.SilenceUsage = true
 			return unknownSetting(args[0])
 		}
 	}
@@ -230,7 +228,6 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 		quoted[i] = scaffold.ShellQuote(a)
 	}
 	c := "astro config " + cmd.Name() + " " + strings.Join(quoted, " ") + " --global"
-	cmd.SilenceUsage = true
 	switch {
 	case project.HasManifest(config.WorkingPath):
 		return fmt.Errorf(configUseWithManifestMsg, args[0], cmd.Name(), c)
@@ -252,9 +249,6 @@ func is1xProject() bool {
 // configGet publishes one setting's global value, the built-in default when
 // the home config does not set it; set says whether it does.
 func configGet(cmd *cobra.Command, args []string) error {
-	// Cobra has checked the argument count, so what can fail from here is
-	// the name or the value, which the usage text does not help with.
-	cmd.SilenceUsage = true
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
 		return unknownSetting(args[0])
@@ -272,7 +266,6 @@ func configSet(cmd *cobra.Command, args []string) error {
 	if err := refuseRemovedConfigKey(args[0]); err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
 		return unknownSetting(args[0])

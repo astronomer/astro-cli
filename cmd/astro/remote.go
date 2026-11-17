@@ -74,7 +74,6 @@ func newRemoteDeployCmd() *cobra.Command {
 			if where.AtRoot(config.WorkingPath) || (remoteImageName != "" && where.None()) {
 				return nil
 			}
-			cmd.SilenceUsage = true
 			return utils.NoDeployableProject(where)
 		},
 		RunE:    remoteDeploy,
@@ -100,8 +99,6 @@ var deployClientImage = astrodeploy.DeployClientImage
 
 // remoteDeploy handles the remote deploy functionality
 func remoteDeploy(cmd *cobra.Command, args []string) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	// The build's and the push's own output, and the notes on the way, are
 	// what text mode has always shown; under json they go to stderr.
 	defer strayStdoutToStderr(remoteOutput)()
@@ -179,7 +176,7 @@ func resolveClientTarget(m *manifest.Manifest, registry, deployment string) (cli
 	}
 	switch {
 	case m == nil:
-		return clientTarget{}, errors.New("no client registry: pass --registry <registry>/<repository>, the repository the Deployment's remote agents pull the client image from. Outside a project it is the only way to name one")
+		return clientTarget{}, cliout.Usage(errors.New("no client registry: pass --registry <registry>/<repository>, the repository the Deployment's remote agents pull the client image from. Outside a project it is the only way to name one"))
 	case link != nil && link.ClientRegistry != "":
 		t.registry = link.ClientRegistry
 		t.source = projectClientRegistry

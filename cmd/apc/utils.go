@@ -48,7 +48,6 @@ func removeCmd(c *cobra.Command, cmdName string, r houston.VersionRestrictions) 
 	c.RunE = func(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%s needs Astro Private Cloud %s; this platform reports %s", cmdName, versionNeeded(r), houstonVersion)
 	}
-	c.SilenceUsage = true       // the version is the whole message; a usage block buries it
 	c.ResetCommands()           // remove all the subcommands
 	c.DisableFlagParsing = true // to disable help flag
 }

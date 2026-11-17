@@ -121,11 +121,10 @@ func (c *cli) readStatus() (localrt.Status, error) {
 func NewLocalCmd(d Deps) *cobra.Command {
 	c := &cli{d: d}
 	cmd := &cobra.Command{
-		Use:          "local",
-		Short:        "Run Apache Airflow locally from your project",
-		Long:         "Run and manage a local Apache Airflow for the current project. Works offline, no account needed.",
-		Args:         cobra.ArbitraryArgs,
-		SilenceUsage: true,
+		Use:   "local",
+		Short: "Run Apache Airflow locally from your project",
+		Long:  "Run and manage a local Apache Airflow for the current project. Works offline, no account needed.",
+		Args:  cobra.ArbitraryArgs,
 		// A bare `astro local` prints help and succeeds; an unknown subcommand
 		// fails. Without a RunE cobra treats this non-runnable parent as a help
 		// request and exits 0 even on a typo (it returns flag.ErrHelp before it
@@ -138,7 +137,7 @@ func NewLocalCmd(d Deps) *cobra.Command {
 			// out of v1 habit, get named rather than refused: `init` moved up
 			// to `astro init`, and `ps` was always `status`.
 			if replacement, ok := devReplacementFor(args[0]); ok {
-				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Use %s", args[0], cmd.CommandPath(), replacement))
+				return cliout.UsageNoHelp(fmt.Errorf("unknown command %q for %q. Use %s", args[0], cmd.CommandPath(), replacement))
 			}
 			return cliout.UnknownSubcommand(cmd, args[0])
 		},

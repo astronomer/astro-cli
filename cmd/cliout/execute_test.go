@@ -395,41 +395,49 @@ func TestASilencedRootPrintsTheErrorAlone(t *testing.T) {
 	assert.True(t, root.SilenceUsage)
 }
 
-// A usage error a silenced command returns from its run is judged by its own
-// mark, not by its wording: astro local's refusal of a 1.x verb reads like
-// cobra's unknown command, and still gets no pointer.
+// A usage error a command returns from its run is judged by its own mark, not
+// by its wording: astro local's refusal of a 1.x verb reads like cobra's
+// unknown command, and gets the pointer it opted out of.
 func TestARunsUsageErrorIsNotTakenForCobrasByItsWording(t *testing.T) {
 	root := testTree(nil)
 	leaf, _, err := root.Find([]string{"thing", "list"})
 	require.NoError(t, err)
-	leaf.SilenceUsage = true
 	leaf.RunE = func(*cobra.Command, []string) error {
-		return Usage(errors.New(`unknown command "init" for "astro thing list". Use astro init`))
+		return UsageNoHelp(errors.New(`unknown command "init" for "astro thing list". Use astro init`))
 	}
 	r := execTree(context.Background(), root, "thing", "list")
 	assert.Equal(t, "Error: unknown command \"init\" for \"astro thing list\". Use astro init\n", r.stderr)
 }
 
-// A usage error the command returns once it runs points at its help unless
-// the command silenced its usage first, which is how it says its help would
-// not settle it (a Deployment name several Deployments share).
-func TestAUsageErrorFromTheRunHonoursSilenceUsage(t *testing.T) {
-	ambiguous := Usage(errors.New("2 Deployments are named prod"))
+// A usage error the command returns once it runs points at its help unless it
+// opted out with UsageNoHelp, which is how it says its help would not settle
+// it (a Deployment name several Deployments share). The command's own
+// SilenceUsage changes neither.
+func TestAUsageErrorFromTheRunPointsAtHelpUnlessItOptsOut(t *testing.T) {
+	ambiguous := errors.New("2 Deployments are named prod")
+	pointed := "Error: 2 Deployments are named prod\nRun astro thing list --help for usage.\n"
 
-	r := execTree(context.Background(), testTree(ambiguous), "thing", "list")
+	r := execTree(context.Background(), testTree(Usage(ambiguous)), "thing", "list")
 	assert.Equal(t, ExitUsage, ExitCode(context.Background(), r.err))
-	assert.Equal(t, "Error: 2 Deployments are named prod\nRun astro thing list --help for usage.\n", r.stderr)
+	assert.Equal(t, pointed, r.stderr)
 
 	root := testTree(nil)
 	leaf, _, err := root.Find([]string{"thing", "list"})
 	require.NoError(t, err)
-	leaf.RunE = func(cmd *cobra.Command, _ []string) error {
-		cmd.SilenceUsage = true
-		return ambiguous
-	}
+	leaf.SilenceUsage = true
+	leaf.RunE = func(*cobra.Command, []string) error { return Usage(ambiguous) }
 	r = execTree(context.Background(), root, "thing", "list")
+	assert.Equal(t, pointed, r.stderr, "a command's SilenceUsage does not drop the pointer")
+
+	r = execTree(context.Background(), testTree(UsageNoHelp(ambiguous)), "thing", "list")
 	assert.Equal(t, ExitUsage, ExitCode(context.Background(), r.err))
 	assert.Equal(t, "Error: 2 Deployments are named prod\n", r.stderr)
+
+	// Under json the opt-out is the same usage error, kind and code.
+	r = execTree(context.Background(), testTree(UsageNoHelp(ambiguous)), "thing", "list", "-o", "json")
+	obj := decodeOne(t, r.stdout)
+	assert.Equal(t, ExitUsage, obj.Code)
+	assert.Equal(t, KindUsage, obj.Kind)
 }
 
 // A removed command's stub is hidden and its message names what replaced it,

@@ -164,10 +164,9 @@ func newEnvLinkRootCmd(out io.Writer, n *linkNoun) *cobra.Command {
 		Short:   fmt.Sprintf("Manage which deployments a workspace %s reaches", n.what),
 		Long: fmt.Sprintf("Control which deployments a workspace %s reaches, and give a deployment "+
 			"its own values. Identify the %s with --%s-key or --%s-id.", n.what, n.what, n.noun, n.noun),
-		Example:                    n.examples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Example: n.examples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	f := &linkFlags{}
 	cmd.AddCommand(
@@ -290,7 +289,6 @@ func runEnvLinkSet(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags)
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := f.idOrKey(n)
 	if err != nil {
@@ -324,7 +322,6 @@ func runEnvLinkRemove(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFla
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := f.idOrKey(n)
 	if err != nil {
@@ -349,7 +346,6 @@ func runEnvLinkList(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := f.idOrKey(n)
 	if err != nil {

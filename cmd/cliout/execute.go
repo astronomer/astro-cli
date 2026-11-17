@@ -57,8 +57,8 @@ func ExitCode(ctx context.Context, err error) int {
 //     stdout and nothing on stderr;
 //   - any other command prints "Error: ..." on stderr, and for a usage error
 //     a pointer to the failing command's help, with the flag it likely meant
-//     when one is clearly close (see the text-mode branch below for when a
-//     command's SilenceUsage drops the pointer). Never the usage block
+//     when one is clearly close (UsageNoHelp drops the pointer: see the
+//     text-mode branch below). Never the usage block
 //     itself: cobra's automatic usage is off for every command;
 //   - a command that already reported its failure — an ExitError, or an error
 //     marked JSONShown — gets nothing added in either mode.
@@ -134,14 +134,14 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	//
 	// A root that silenced its usage silences the pointer everywhere (its
 	// setting from before the run, quietUsage, since the run forces it on).
-	// Below the root, one found before the command ran always gets it: its
-	// help is where the right invocation is, and a command that silences its
-	// usage up front (all of astro local) silenced the block, not this. One
-	// the command returned itself does unless the command silenced its usage,
-	// which is how it says its help would not settle it (a removed command's
-	// stub, a Deployment name several Deployments share).
-	silencedRun := cmd != root && cmd.SilenceUsage && !isMisinvoked(err)
-	if quietUsage || silencedRun || ExitCode(ctx, err) != ExitUsage {
+	// Below the root, a command's own SilenceUsage decides nothing here: it
+	// only keeps cobra's block out, which the root's forced setting already
+	// does. One found before the command ran always gets the pointer, since
+	// its help is where the right invocation is. One the command returned
+	// itself does too, unless it says its help would not settle it with
+	// UsageNoHelp (a removed command's stub, a Deployment name several
+	// Deployments share).
+	if quietUsage || (omitsHelpPointer(err) && !isMisinvoked(err)) || ExitCode(ctx, err) != ExitUsage {
 		return err
 	}
 	if flag := suggestFlag(cmd, err); flag != "" {

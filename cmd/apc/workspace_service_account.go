@@ -107,7 +107,7 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func workspaceSaCreate(cmd *cobra.Command, out io.Writer) error {
+func workspaceSaCreate(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if workspaceSAName == "" {
 		return errServiceAccountNameEmpty
@@ -120,8 +120,6 @@ func workspaceSaCreate(cmd *cobra.Command, out io.Writer) error {
 	if err := validateWorkspaceRole(workspaceSARole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	created, err := sa.CreateUsingWorkspaceUUID(ws, workspaceSAName, workspaceSACategory, workspaceSARole, houstonClient)
 	if err != nil {
 		return err
@@ -129,15 +127,13 @@ func workspaceSaCreate(cmd *cobra.Command, out io.Writer) error {
 	return renderServiceAccountCreated(r, &created)
 }
 
-func workspaceSaList(cmd *cobra.Command, out io.Writer) error {
+func workspaceSaList(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	sas, err := sa.GetWorkspaceServiceAccounts(ws, houstonClient)
 	if err != nil {
 		return err
@@ -145,15 +141,13 @@ func workspaceSaList(cmd *cobra.Command, out io.Writer) error {
 	return renderServiceAccountList(r, sas)
 }
 
-func workspaceSaDelete(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceSaDelete(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	if err := confirm(serviceAccountDeleteQuestion(args[0])); err != nil {
 		return err
 	}

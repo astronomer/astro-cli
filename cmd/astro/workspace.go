@@ -627,8 +627,7 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listWorkspaceTeam(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listWorkspaceTeam(_ *cobra.Command, out io.Writer) error {
 	return team.ListWorkspaceTeamsWithFormat(astroV1Client, workspaceID, cliout.Renderer{Format: workspaceTeamOutput, Out: out})
 }
 
@@ -643,7 +642,6 @@ func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	if len(args) > 0 {
 		id = args[0]
 	}
-	cmd.SilenceUsage = true
 	if id == "" {
 		if err := mayPick("a team", teamIDAnswer); err != nil {
 			return err
@@ -689,7 +687,6 @@ func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	if len(args) > 0 {
 		id = args[0]
 	}
-	cmd.SilenceUsage = true
 	if id == "" {
 		if err := mayPick("a team", teamIDAnswer); err != nil {
 			return err
@@ -745,7 +742,6 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 		}
 	}
 
-	cmd.SilenceUsage = true
 	if id == "" {
 		if err := mayPick("a team", teamIDAnswer); err != nil {
 			return err
@@ -758,20 +754,16 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	return renderLines(workspaceTeamOutput, out, &t, fmt.Sprintf("The workspace team %s role was successfully updated to %s", teamLabel(&t), t.WorkspaceRole))
 }
 
-func workspaceList(cmd *cobra.Command, out io.Writer) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
+func workspaceList(_ *cobra.Command, out io.Writer) error {
 	return workspace.ListWithFormat(astroV1Client, cliout.Renderer{Format: workspaceListOutput, Out: out})
 }
 
-func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceSwitch(_ *cobra.Command, out io.Writer, args []string) error {
 	workspaceNameOrID := ""
 
 	if len(args) == 1 {
 		workspaceNameOrID = args[0]
 	}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	ws, err := workspace.SwitchTo(workspaceNameOrID, astroV1Client, os.Stderr)
 	if err != nil {
 		return err
@@ -779,8 +771,7 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	return emitWorkspaceSwitch(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, ws)
 }
 
-func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func workspaceCreate(_ *cobra.Command, out io.Writer) error {
 	ws, err := workspace.Create(workspaceName, workspaceDescription, enforceCD, astroV1Client)
 	if err != nil {
 		return err
@@ -794,7 +785,6 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 	if len(args) == 1 {
 		id = args[0]
 	}
-	cmd.SilenceUsage = true
 	// Left out, the setting stays as it is: Update keeps the Workspace's own
 	// for an empty value.
 	enforce := ""
@@ -812,13 +802,12 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, &res.Workspace, fmt.Sprintf("Astro Workspace %s was successfully updated", res.PreviousName))
 }
 
-func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceDelete(_ *cobra.Command, out io.Writer, args []string) error {
 	id := ""
 
 	if len(args) == 1 {
 		id = args[0]
 	}
-	cmd.SilenceUsage = true
 	removal, err := workspace.Delete(id, workspaceDeleteYes, os.Stderr, astroV1Client)
 	if err != nil {
 		return err
@@ -839,7 +828,6 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 		email = strings.ToLower(args[0])
 	}
 
-	cmd.SilenceUsage = true
 	if email == "" {
 		if err := mayPick("a user", userEmailAnswer); err != nil {
 			return err
@@ -852,8 +840,7 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	return renderLines(workspaceUserOutput, out, &u, fmt.Sprintf("The user %s was successfully added to the workspace with the role %s", u.Email, u.WorkspaceRole))
 }
 
-func listWorkspaceUser(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listWorkspaceUser(_ *cobra.Command, out io.Writer) error {
 	return user.ListWorkspaceUsersWithFormat(astroV1Client, workspaceID, cliout.Renderer{Format: workspaceUserOutput, Out: out})
 }
 
@@ -879,7 +866,6 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 		updateWorkspaceRole = answer
 	}
 
-	cmd.SilenceUsage = true
 	if email == "" {
 		if err := mayPick("a user", userEmailAnswer); err != nil {
 			return err
@@ -905,7 +891,6 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 		email = strings.ToLower(args[0])
 	}
 
-	cmd.SilenceUsage = true
 	if email == "" {
 		if err := mayPick("a user", userEmailAnswer); err != nil {
 			return err

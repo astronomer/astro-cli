@@ -160,9 +160,8 @@ func newEnvCmd(c *cli) *cobra.Command {
 			"vault, global vault, the linked workspace's Environment Manager, a declaration's " +
 			"default. Every source reaches Airflow whole, declared or not. " +
 			"A workspace that cannot be read is skipped with a note.",
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       helpOrUnknownSubcommand,
-		SuggestionsMinimumDistance: 2,
+		Args: cobra.ArbitraryArgs,
+		RunE: helpOrUnknownSubcommand,
 	}
 	cmd.PersistentFlags().BoolVar(&scope.project, "project", false, "Act on the project's values (the default inside a project)")
 	cmd.PersistentFlags().BoolVar(&scope.global, "global", false, "Act on the global values every linked project gets (the default outside a project)")
@@ -182,7 +181,7 @@ func newEnvCmd(c *cli) *cobra.Command {
 func helpOrUnknownSubcommand(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		if hint := removedVerbHint(cmd, args[0]); hint != "" {
-			return cliout.Usage(errors.New(hint))
+			return cliout.UsageNoHelp(errors.New(hint))
 		}
 	}
 	return cliout.GroupHelp(cmd, args)
@@ -317,14 +316,13 @@ func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		// Spelled twice, a rename leaves every hint composed from Noun naming a
 		// command that no longer exists — which is the failure Noun exists to
 		// prevent, so it cannot be the one thing that drifts from it.
-		Use:                        localenv.Noun(k.kind),
-		Aliases:                    k.aliases,
-		SuggestionsMinimumDistance: 2,
-		Short:                      "Manage " + k.label + "s",
-		Long:                       "Manage " + k.label + "s for local Airflow.",
-		Example:                    k.example,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       helpOrUnknownSubcommand,
+		Use:     localenv.Noun(k.kind),
+		Aliases: k.aliases,
+		Short:   "Manage " + k.label + "s",
+		Long:    "Manage " + k.label + "s for local Airflow.",
+		Example: k.example,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    helpOrUnknownSubcommand,
 	}
 	// Reads, then the write, then the destructive one — the same order
 	// `astro env` uses for the same four verbs, so help reads the same
@@ -482,7 +480,7 @@ func connFieldsGiven(cmd *cobra.Command) bool {
 // id from the key it was given. Taking one here would imply it tags the record.
 func connValueFromFields(f *connFields, password string) (string, error) {
 	if f.connType == "" {
-		return "", errors.New("a connection needs a type: pass --type, or give the whole connection as a URI or JSON")
+		return "", cliout.Usage(errors.New("a connection needs a type: pass --type, or give the whole connection as a URI or JSON"))
 	}
 	conn := connmodel.Connection{
 		ConnType:     f.connType,

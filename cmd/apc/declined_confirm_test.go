@@ -359,7 +359,7 @@ func TestDagDeployQuestionFollowsValidation(t *testing.T) {
 
 		run := runAPCGated(t, api, true, "y\n", "deployment", "update", "dep-1", "--dag-deployment-type", "volume")
 
-		assert.Equal(t, 1, run.code)
+		assert.Equal(t, cliout.ExitUsage, run.code)
 		require.Error(t, run.err)
 		assert.NotErrorIs(t, run.err, input.ErrAborted)
 		assert.False(t, run.stdinRead)
