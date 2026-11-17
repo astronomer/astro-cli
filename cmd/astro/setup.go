@@ -24,12 +24,12 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 var (
 	authLogin             = auth.Login
 	fetchDomainAuthConfig = auth.FetchDomainAuthConfig
-	defaultDomain         = "astronomer.io"
 	// ErrNotAPIToken, ErrAPITokenExpired and ErrAPITokenMalformed are the
 	// ways ASTRO_API_TOKEN can be unusable. They are astrosession's, which
 	// reads the token for both trees, so a token fails with the same sentence
@@ -657,33 +657,41 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 	return true, nil
 }
 
-// environmentDomain returns the domain a credential from the environment is
-// used on: the current context's, or when there is none, ASTRO_DOMAIN's or
-// astronomer.io. current reports the first case. It reads no saved login.
+// environmentDomain returns the host an ASTRO_API_TOKEN run is on, by the one
+// rule of a token run (astrosession.TokenHost): the project manifest's
+// `domain`, else ASTRO_DOMAIN, else astronomer.io. The saved context's host is
+// not consulted, so a machine whose current context is dev still sends a token
+// to the host the run names. current reports whether that host is already the
+// current context's, an existing one, so nothing need be made current for it.
 func environmentDomain() (domain string, current bool) {
-	if d, err := config.GetCurrentDomain(); err == nil && context.Exists(d) {
-		return d, true
+	var project string
+	if m, err := projectManifest(config.WorkingPath); err == nil && m != nil {
+		project = m.Astro.Domain
 	}
-	if d := os.Getenv("ASTRO_DOMAIN"); d != "" {
-		return d, false
-	}
-	return defaultDomain, false
+	domain = astrosession.TokenHost("", project)
+	d, err := config.GetCurrentDomain()
+	return domain, err == nil && manifest.NormalizeDomain(d) == domain && context.Exists(domain)
 }
 
 // useEnvironmentLogin makes token, from the environment, the login of
 // domain's context for this process only. The saved login stays as it is. A
-// domain that is not current is made current, and its context created when
-// there is none, so the command stays on the host the environment names. A
-// failure is the run's: without the overlay the context would read as the
-// saved login.
+// domain that is not current is current for this process through the login
+// itself (config.GetCurrentDomain reads the host of an environment login
+// first), and its context is created when there is none, so the command stays
+// on the host the run names.
+// The saved current context is left alone: the run takes nothing from it, and
+// changes nothing in it. A failure is the run's: without the overlay the
+// context would read as the saved login.
 func useEnvironmentLogin(domain string, current bool, token string, expiresAt time.Time) error {
 	c := config.Context{Domain: domain}
 	if err := c.UseEnvironmentLogin(token, expiresAt); err != nil {
 		return fmt.Errorf("cannot apply ASTRO_API_TOKEN to this run: %w", err)
 	}
 	if !current {
-		if err := context.Switch(domain); err != nil {
-			return fmt.Errorf("cannot switch to %s for ASTRO_API_TOKEN: %w", domain, err)
+		if !context.Exists(domain) {
+			if err := context.SetContext(domain); err != nil {
+				return fmt.Errorf("cannot create the %s context for ASTRO_API_TOKEN: %w", domain, err)
+			}
 		}
 	}
 	return nil

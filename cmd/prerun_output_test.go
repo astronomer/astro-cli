@@ -96,6 +96,9 @@ func TestPreRunLeavesJSONStdoutAlone(t *testing.T) {
 			t.Setenv("ASTRO_API_TOKEN", "")
 			if tc.apiToken {
 				t.Setenv("ASTRO_API_TOKEN", apiToken)
+				// A token run is on ASTRO_DOMAIN, else astronomer.io, never the
+				// saved context's host: name the host the fake API answers for.
+				t.Setenv("ASTRO_DOMAIN", "localhost")
 			} else {
 				c, err := config.GetCurrentContext()
 				require.NoError(t, err)

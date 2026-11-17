@@ -74,6 +74,11 @@ func CurrentWorkspace() (string, error) {
 
 // Get CurrentDonain returns the currently configured astro domain, or an error if one is not set
 func GetCurrentDomain() (string, error) {
+	// An environment login (ASTRO_API_TOKEN) holds the host the run is on,
+	// ahead of ASTRO_DOMAIN and the saved current context.
+	if domain := environmentLoginDomain(); domain != "" {
+		return domain, nil
+	}
 	var domain string
 	if domain = os.Getenv("ASTRO_DOMAIN"); domain == "" {
 		if domain = CFG.Context.GetHomeString(); domain == "" {

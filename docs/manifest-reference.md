@@ -255,7 +255,7 @@ workspace = 'your-workspace-id'
 
 ### `domain`
 
-The Astro host that `workspace` and deployment links with `method = 'astro'` live on, such as `astronomer.io`. It is the host you give `astro login`, and it is read the same way, so `https://cloud.astronomer.io/` also means `astronomer.io`. Values that resolve from the workspace are read with your login for this domain, even while the CLI is switched to another one, and so are Astro deployment links with `method = 'astro'`. `astro deploy` uses the same login, for a deployment link and for a Deployment named by bare id. If it is absent, it means `ASTRO_DOMAIN` if that is set, else `astronomer.io` for the workspace and your current login for deployment links. Setting it is an error when the project has no `workspace` and no deployment link with `method = 'astro'`, since nothing would use it. Astro Desktop writes it with the workspace. See [workspace-link.md](workspace-link.md).
+The Astro host that `workspace` and deployment links with `method = 'astro'` live on, such as `astronomer.io`. It is the host you give `astro login`, and it is read the same way, so `https://cloud.astronomer.io/` also means `astronomer.io`. Values that resolve from the workspace are read with your login for this domain, even while the CLI is switched to another one, and so are Astro deployment links with `method = 'astro'`. `astro deploy` uses the same login, for a deployment link and for a Deployment named by bare id. If it is absent, it means `ASTRO_DOMAIN` if that is set, else `astronomer.io` for the workspace and your current login for deployment links. Under `ASTRO_API_TOKEN` it is the host of every lookup the run makes, Deployments and Environment Manager alike, and the saved context is never read for it: with no `domain` and no `ASTRO_DOMAIN` a token run is on `astronomer.io`, even when the current context is another host. Setting it is an error when the project has no `workspace` and no deployment link with `method = 'astro'`, since nothing would use it. Astro Desktop writes it with the workspace. See [workspace-link.md](workspace-link.md).
 
 ```toml
 [tool.astro]
@@ -361,7 +361,7 @@ The table is optional on every kind but the endpoint one, where there is no safe
 
 | `method` | Where the credential comes from | Fields |
 | -- | -- | -- |
-| `astro` | `ASTRO_API_TOKEN` (and then never your saved login), else your `astro login` session for [`domain`](#domain) (the current one if the project names no domain) | none |
+| `astro` | `ASTRO_API_TOKEN` (and then never your saved login), else your `astro login` session for [`domain`](#domain) (the current one if the project names no domain; a token run is on `domain`, else `ASTRO_DOMAIN`, else `astronomer.io`, never the saved context's) | none |
 | `aws` | the AWS credential chain (env, profile, SSO, instance role) | none |
 | `google` | Application Default Credentials | none |
 | `basic` | a username and password | `username-env`, `password-env` |

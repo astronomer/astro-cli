@@ -39,7 +39,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	pkglocate "github.com/astronomer/astro-cli/pkg/instancelocate"
 	"github.com/astronomer/astro-cli/pkg/instances"
-	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // Deployments is the two control-plane calls this package makes: reading a
@@ -116,25 +115,17 @@ func New(domain string) instances.Locator {
 // empty because astroDeployment puts the session's bearer on every request.
 func deploymentsOn(domain string) Deployments {
 	if domain == "" && astrosession.HasAPIToken() {
-		// A token run needs no login on the machine, so it may have no current
-		// context to name its host: the environment's, else the default, as the
-		// platform tree's setup chooses it.
-		domain = tokenHost()
+		// A token run needs no login on the machine and never reads the saved
+		// one, so a project that names no host (its manifest's domain is
+		// already folded into domain) is on the token run's: ASTRO_DOMAIN,
+		// else Astro's.
+		domain = astrosession.TokenHost("", "")
 	}
 	if domain == "" {
 		return astrov1.NewV1Client(httputil.NewHTTPClient())
 	}
 	c := config.Context{Domain: domain}
 	return astrov1.NewV1ClientForLogin(httputil.NewHTTPClient(), "", c.GetPublicRESTAPIURL("v1"))
-}
-
-// tokenHost is the host an ASTRO_API_TOKEN is used on when a project names
-// none: ASTRO_DOMAIN, else the current context's, else Astro's.
-func tokenHost() string {
-	if d, err := config.GetCurrentDomain(); err == nil {
-		return d
-	}
-	return manifest.DefaultWorkspaceDomain
 }
 
 // GoogleChain is implemented by a locator that resolves Application Default

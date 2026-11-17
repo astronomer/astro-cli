@@ -48,8 +48,16 @@ type Workspace struct {
 
 // WorkspaceOf is the workspace a run reads for a's manifest: the one it links,
 // else a token's own (see WorkspaceID).
+//
+// The host is the manifest's domain, else ASTRO_DOMAIN, else astronomer.io, in a
+// run with a token (astrosession.TokenHost) and in one without alike; the saved
+// context's host is in neither.
 func WorkspaceOf(a *manifest.Astro) Workspace {
-	return Workspace{ID: WorkspaceID(a), Domain: a.WorkspaceDomain(), Organization: a.Organization}
+	domain := a.WorkspaceDomain()
+	if astrosession.HasAPIToken() {
+		domain = astrosession.TokenHost("", a.Domain)
+	}
+	return Workspace{ID: WorkspaceID(a), Domain: domain, Organization: a.Organization}
 }
 
 // WorkspaceID is the Workspace a run reads Environment Manager objects from:

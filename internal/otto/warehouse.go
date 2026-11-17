@@ -36,12 +36,16 @@ var workspaceClients emenv.ClientFactory = emenv.Clients
 // links no workspace.
 func workspaceConnections(projectDir string) ([]connmodel.Connection, error) {
 	m, err := manifest.Load(filepath.Join(projectDir, project.Marker))
-	if err != nil || m.Astro.Workspace == "" {
+	if err != nil {
 		// Intended: the warehouses are best effort, and a manifest that does
 		// not load links no workspace to read. A start reports the manifest
 		// error itself; the launch should not fail over it here.
 		return nil, nil //nolint:nilerr // no readable manifest links no workspace
 	}
+	// The workspace is the one a start reads: the manifest's, else a token's
+	// own claim (emenv.WorkspaceID), so a Workspace token with no manifest
+	// workspace still reads its Workspace. WorkspaceConnections reads nothing
+	// when neither names one.
 	return emenv.WorkspaceConnections(emenv.WorkspaceOf(&m.Astro), workspaceClients, warehouseReadTimeout)
 }
 

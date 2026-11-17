@@ -209,3 +209,30 @@ func TestSharingReachesContextsOnlyReadFromTheFile(t *testing.T) {
 		t.Errorf("the context on the same tenant did not get the renewed token (len %d)", len(other.Token))
 	}
 }
+
+// The host an environment login is for is the run's current one, ahead of
+// ASTRO_DOMAIN and the saved current context, and is forgotten with the login.
+func TestAnEnvironmentLoginIsOnItsOwnHost(t *testing.T) {
+	loginHome(t, plaintextConfig+`  other_io:
+    domain: other.io
+    token: Bearer other-access
+`, nil)
+	t.Setenv("ASTRO_DOMAIN", "")
+	saved, err := GetCurrentDomain()
+	if err != nil || saved == "other.io" {
+		t.Fatalf("the saved current domain is %q (%v)", saved, err)
+	}
+	other := Context{Domain: "other.io"}
+	if err := other.UseEnvironmentLogin(envToken, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(forgetEnvironmentLogin)
+	t.Setenv("ASTRO_DOMAIN", "third.io")
+	if got, err := GetCurrentDomain(); err != nil || got != "other.io" {
+		t.Errorf("the current domain is %q (%v), want the environment login's other.io", got, err)
+	}
+	forgetEnvironmentLogin()
+	if got, err := GetCurrentDomain(); err != nil || got != "third.io" {
+		t.Errorf("after the login is forgotten the current domain is %q (%v), want ASTRO_DOMAIN's", got, err)
+	}
+}
