@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -214,4 +215,33 @@ func (s *CmdSuite) TestContextDeleteOutput() {
 		s.Equal(1, failure.Code)
 		s.Contains(failure.Error, "nope.example.com")
 	})
+}
+
+// `astro context list` and `astro context switch` need no login, so a token in
+// ASTRO_API_TOKEN is never applied for them: they show and move the saved
+// pointer, and the token's host (which only a run that applied it has) is not
+// in it.
+func (s *CmdSuite) TestContextCommandsWithATokenSetStillUseTheSavedPointer() {
+	previous := cloudSwitch
+	s.T().Cleanup(func() { cloudSwitch = previous })
+	cloudSwitch = func(domain string, _ astrov1.APIClient, _ io.Writer) error { return context.Switch(domain) }
+	s.savedContexts()
+	s.T().Setenv("ASTRO_DOMAIN", "")
+	s.T().Setenv("ASTRO_API_TOKEN", testUtil.MintAPIToken(s.T(), time.Now().Add(time.Hour), "organizationId:org", "workspaceId:ws"))
+
+	stdout, _, err := runContextCmd("list", "-o", "json")
+	s.Require().NoError(err)
+	var current []string
+	for _, info := range decodeOne[context.InfoList](s, stdout).Contexts {
+		if info.IsCurrent {
+			current = append(current, info.Domain)
+		}
+	}
+	s.Equal([]string{"astronomer.io"}, current, "the saved current context")
+
+	_, _, err = runContextCmd("switch", "dev", "-o", "json")
+	s.Require().NoError(err)
+	domain, err := config.GetCurrentDomain()
+	s.NoError(err)
+	s.Equal("astronomer-dev.io", domain, "the switch moved the saved pointer")
 }

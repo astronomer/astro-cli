@@ -120,8 +120,9 @@ func TestResolveSavedLoginWithNoWorkspace(t *testing.T) {
 	}
 }
 
-// A token's claim is the run's selection on the current host alone, and a
-// saved login's Workspace on another host is that login's, not this run's.
+// A token's claim is the run's selection on whatever host the run is on (the
+// host rule is TokenHost's, not the saved context's), and a saved login's
+// Workspace on another host is that login's, not this run's.
 func TestResolveOnAnotherHost(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -134,8 +135,8 @@ func TestResolveOnAnotherHost(t *testing.T) {
 		{"interactive login takes the other host's saved Workspace", interactive, "", "astronomer-stage.io", "ws-stage", SourceContext},
 		{"interactive login on its own host", interactive, "", "astronomer.io", "ws-saved", SourceContext},
 		{"organization token takes none from another host", orgToken, "", "astronomer-stage.io", "", SourceNone},
-		{"workspace token's claim is not another host's", wsToken, "", "astronomer-stage.io", "", SourceNone},
-		{"deployment token's claim is not another host's", depToken, "", "astronomer-stage.io", "", SourceNone},
+		{"workspace token's claim applies on the run's host, saved context or not", wsToken, "", "astronomer-stage.io", "ws-claim", SourceToken},
+		{"deployment token's claim applies on the run's host, saved context or not", depToken, "", "astronomer-stage.io", "ws-claim", SourceToken},
 		{"workspace token on its own host", wsToken, "", "astronomer.io", "ws-claim", SourceToken},
 		{"the domain is read as the config spells it", wsToken, "", "ASTRONOMER_IO", "ws-claim", SourceToken},
 		{"a flag wins on another host", orgToken, "ws-flag", "astronomer-stage.io", "ws-flag", SourceFlag},
@@ -167,7 +168,7 @@ func TestResolveDeployment(t *testing.T) {
 		{"workspace token names none", wsToken, "", "", "", SourceNone},
 		{"organization token names none", orgToken, "", "", "", SourceNone},
 		{"deployment token on its own host", depToken, "", "astronomer.io", "dep-claim", SourceToken},
-		{"deployment token is no Deployment of another host", depToken, "", "astronomer-stage.io", "", SourceNone},
+		{"deployment token's Deployment applies on the run's host", depToken, "", "astronomer-stage.io", "dep-claim", SourceToken},
 		{"flag on another host", depToken, "dep-flag", "astronomer-stage.io", "dep-flag", SourceFlag},
 	}
 	for _, tt := range tests {

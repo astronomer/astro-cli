@@ -3,9 +3,10 @@ package astrosession
 import (
 	"errors"
 	"fmt"
-	"strings"
+	"os"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // This file is the one place that decides which Astro Workspace (and, for a
@@ -24,9 +25,11 @@ import (
 //
 // A run with ASTRO_API_TOKEN reads step 3 from the token itself (see
 // TokenIdentity), in the platform tree and in the core tree alike, and never
-// reads the context for it: the saved login's Workspace is out of reach
-// whether or not the root's setup overlaid the token on the context (it does
-// not, in the core tree). Step 4 is only for a run with no token.
+// reads the context for it, nor for the host (see TokenHost): the saved
+// login's Workspace and host are out of reach whether or not the root's setup
+// overlaid the token on the context (it does not, in the core tree). The
+// token's claims apply on the token run's host, whichever that is. Step 4 is
+// only for a run with no token.
 //
 // A Target records where the answer came from, and, when there is none, what
 // would supply one, so the "no Workspace" error and its advice are formed
@@ -110,6 +113,20 @@ var ErrNoWorkspace = errors.New("no Workspace is selected: pass --workspace, or 
 // run with a token never takes the one the person's saved login last used.
 var ErrOrgTokenNoWorkspace = errors.New("no Workspace is selected: the API token in ASTRO_API_TOKEN selects none (an Organization token does not)")
 
+// noWorkspaceError is ErrOrgTokenNoWorkspace worded for the kind of token the
+// run has, so the cause it names is the token's own. It is
+// ErrOrgTokenNoWorkspace for errors.Is whatever the kind.
+type noWorkspaceError struct {
+	kind string
+	hint string
+}
+
+func (e *noWorkspaceError) Error() string {
+	return fmt.Sprintf("no Workspace is selected: the API token in ASTRO_API_TOKEN selects none (%s does not), %s", e.kind, e.hint)
+}
+
+func (e *noWorkspaceError) Is(target error) bool { return target == ErrOrgTokenNoWorkspace }
+
 // Request is what a command knows about the Workspace and Deployment it acts on.
 type Request struct {
 	// Workspace is --workspace, "" when not given.
@@ -130,8 +147,9 @@ type Request struct {
 	// claim, or a saved login's Workspace), whatever Domain says.
 	Login *config.Context
 	// Domain is the host the command runs on, "" for the current context's.
-	// An API token's claim is the run's selection on the current host only,
-	// and a saved login's Workspace on another host is another login's.
+	// A saved login's Workspace on another host is another login's. It does
+	// not limit an API token's claims: they apply on the token run's host
+	// (see TokenHost), which is the host the command runs on.
 	Domain string
 	// LoginError makes a login that cannot be read (none at all) the error of a
 	// missing Workspace, rather than the "no Workspace" one, for a command that
@@ -166,7 +184,6 @@ type Target struct {
 // context and ASTRO_API_TOKEN, and never prompts or calls the API.
 func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 	t := Target{accepts: r.Accepts, noSaved: r.NoSaved, token: HasAPIToken()}
-	onCurrent := r.Domain == "" || sameDomain(r.Domain, currentDomain())
 
 	switch {
 	case r.Workspace != "":
@@ -175,7 +192,7 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 		t.Workspace, t.WorkspaceSource = r.Project, SourceProject
 	default:
 		var err error
-		t.Workspace, t.WorkspaceSource, err = fromLogin(r.Login, r.Domain, t.token, onCurrent)
+		t.Workspace, t.WorkspaceSource, err = fromLogin(r.Login, r.Domain, t.token)
 		if r.LoginError {
 			t.readErr = err
 		}
@@ -184,7 +201,9 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 	switch {
 	case r.Deployment != "":
 		t.Deployment, t.DeploymentSource = r.Deployment, SourceFlag
-	case onCurrent && r.WantDeployment:
+	case r.WantDeployment:
+		// A Deployment token's claim applies on the token run's host; with no
+		// token there is none.
 		if id := TokenDeployment(); id != "" {
 			t.Deployment, t.DeploymentSource = id, SourceToken
 		}
@@ -195,14 +214,14 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 // fromLogin is the Workspace of the login the run is on, and which kind of
 // source that is. The error is a login that cannot be read at all, which names
 // no Workspace.
-func fromLogin(login *config.Context, domain string, token, onCurrent bool) (string, Source, error) {
+func fromLogin(login *config.Context, domain string, token bool) (string, Source, error) {
 	var ws string
 	switch {
-	case token && (login != nil || domain == "" || onCurrent):
-		// An API token's claim is the run's selection on the current host,
-		// read from the token itself. No context is read, so the saved login's
-		// Workspace is out of reach whether or not setup overlaid the token on
-		// it, and a machine with no login at all still has a selection.
+	case token:
+		// An API token's claim is the run's selection, read from the token
+		// itself. No context is read, so the saved login's Workspace is out of
+		// reach whether or not setup overlaid the token on it, and a machine
+		// with no login at all still has a selection.
 		ws = claimsOf().Workspace
 	case login != nil:
 		ws = login.Workspace
@@ -212,9 +231,6 @@ func fromLogin(login *config.Context, domain string, token, onCurrent bool) (str
 			return "", SourceNone, err
 		}
 		ws = ctx.Workspace
-	case token:
-		// Another host's saved Workspace is not one this run chose.
-		return "", SourceNone, nil
 	default:
 		ctx, err := (&config.Context{Domain: domain}).GetContext()
 		if err != nil {
@@ -231,16 +247,25 @@ func fromLogin(login *config.Context, domain string, token, onCurrent bool) (str
 	return ws, SourceContext, nil
 }
 
-func currentDomain() string {
-	d, err := config.GetCurrentDomain()
-	if err != nil {
-		return ""
+// TokenHost is the Astro host a run with ASTRO_API_TOKEN uses, for every
+// lookup it makes (Deployments, Environment Manager, the Workspace's
+// objects): the host the command names on its command line (explicit), else
+// the project manifest's [tool.astro] domain (project), else ASTRO_DOMAIN,
+// else astronomer.io. Each is normalized as `astro login` stores a host
+// ("https://cloud.astronomer-dev.io/" is "astronomer-dev.io").
+//
+// The saved context is not in the list: a token run takes nothing from the
+// saved login, its host included, so a machine switched to dev by an earlier
+// `astro login` does not send a production token to dev. A token is one
+// credential for one host, and the run must name it. A run with no token does
+// not use this rule.
+func TokenHost(explicit, project string) string {
+	for _, d := range []string{explicit, project, os.Getenv("ASTRO_DOMAIN")} {
+		if h := manifest.NormalizeDomain(d); h != "" {
+			return h
+		}
 	}
-	return d
-}
-
-func sameDomain(a, b string) bool {
-	return strings.EqualFold(strings.ReplaceAll(a, "_", "."), strings.ReplaceAll(b, "_", "."))
+	return manifest.DefaultWorkspaceDomain
 }
 
 // Found reports whether a source named a Workspace.
@@ -268,10 +293,23 @@ func (t Target) Missing() error { //nolint:gocritic // a small value type
 	if t.token {
 		// An unusable token names nothing because it is unusable, not because
 		// it is an Organization token: say so.
-		if _, _, err := TokenIdentity(); err != nil {
+		id, _, err := TokenIdentity()
+		if err != nil {
 			return err
 		}
-		return fmt.Errorf("%w, %s", ErrOrgTokenNoWorkspace, t.accepts.hint())
+		if id.Workspace != "" {
+			// A Workspace or Deployment token names its Workspace, so Resolve
+			// never leaves it without one; a Target built by hand does not get
+			// a message that blames the token's kind.
+			return fmt.Errorf("no Workspace is selected, though the API token in ASTRO_API_TOKEN names Workspace %s", id.Workspace)
+		}
+		kind := "an Organization token"
+		if id.Deployment != "" {
+			// It names no Workspace either, which a genuine Deployment token
+			// does: do not call it an Organization token.
+			kind = "a Deployment token with no workspaceId claim"
+		}
+		return &noWorkspaceError{kind: kind, hint: t.accepts.hint()}
 	}
 	if t.noSaved != nil {
 		return t.noSaved

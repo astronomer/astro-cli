@@ -376,7 +376,9 @@ func stringField(m map[string]interface{}, field string) string {
 // saved selection stay as they were, for the next command run without the
 // variable, and a token that turns out to be bad is never kept.
 type environmentLogin struct {
-	cKey      string
+	cKey string
+	// domain is the host the credential is for, as the run named it.
+	domain    string
 	token     string
 	expiresAt time.Time
 	// fields holds the selection made for the credential, by config field.
@@ -404,8 +406,31 @@ func (c *Context) UseEnvironmentLogin(token string, expiresAt time.Time) error {
 	}
 	envLoginMu.Lock()
 	defer envLoginMu.Unlock()
-	envLoginHeld = &environmentLogin{cKey: cKey, token: token, expiresAt: expiresAt, fields: map[string]string{}}
+	envLoginHeld = &environmentLogin{cKey: cKey, domain: c.Domain, token: token, expiresAt: expiresAt, fields: map[string]string{}}
 	return nil
+}
+
+// environmentLoginDomain is the host of the environment login this process
+// holds, "" when it holds none. The login's host is the run's current one:
+// a token run names its host itself (the project's domain, ASTRO_DOMAIN or
+// Astro's), and the saved current context is not what it is on.
+func environmentLoginDomain() string {
+	envLoginMu.Lock()
+	defer envLoginMu.Unlock()
+	if envLoginHeld == nil {
+		return ""
+	}
+	return envLoginHeld.domain
+}
+
+// heldEnvironmentLogin reports whether this process holds an environment login
+// for the context under cKey. Such a context exists for the run though nothing
+// is saved for it, so a token run on a host with no saved context needs no
+// context written to the config.
+func heldEnvironmentLogin(cKey string) bool {
+	envLoginMu.Lock()
+	defer envLoginMu.Unlock()
+	return holdsEnvironmentLogin(cKey)
 }
 
 // SetEnvironmentContextKey is SetContextKey for the organization and workspace

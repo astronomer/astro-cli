@@ -20,6 +20,12 @@ organization = "clorg456"  # the organization that workspace is in
   project reads the same workspace whoever starts it and from whichever app.
   `ASTRO_DOMAIN` is the explicit override: CI sets it beside
   `ASTRO_API_TOKEN`, and Astro Desktop reads it as its own host.
+- **Under `ASTRO_API_TOKEN`, the host is the same for everything the run does.**
+  A token run never reads the saved context, its host included: the host is
+  the project's `domain`, else `ASTRO_DOMAIN`, else `astronomer.io`, for the
+  Deployment lookups of `astro af` and `astro local` and for the Environment
+  Manager reads alike. A machine whose current context is dev still sends the
+  token to `astronomer.io`, unless `domain` or `ASTRO_DOMAIN` names dev.
 - **Absent, `workspace` under `ASTRO_API_TOKEN`** is the Workspace a Workspace or
   Deployment token's claims name, for `astro local` reading the project's
   workspace. An Organization token names none, so nothing is read. A token run
@@ -189,7 +195,9 @@ current-context pointer. The Deployment lookup
 goes to that host's control plane under that login's organization. The one
 difference is the default: with neither `domain` nor `ASTRO_DOMAIN` set, a
 deployment link uses the current login rather than `astronomer.io`, so a
-project that names no host keeps working for someone logged in to another host. The
+project that names no host keeps working for someone logged in to another host. A
+run with `ASTRO_API_TOKEN` is the exception: it never reads the saved context, so
+with neither `domain` nor `ASTRO_DOMAIN` set it is on `astronomer.io`. The
 "not logged in" and "session expired" messages are the ones in the table above.
 
 ## Commands that manage Astro
@@ -239,9 +247,9 @@ When the login is for another host than the current context's, the command
 refreshes that login if it is stale and stops with the "not logged in" message
 if there is none. It runs as if `ASTRO_DOMAIN` named that host, and it never
 moves the current-context pointer. With `ASTRO_API_TOKEN` set,
-the command stays on the host the environment names: the CLI stores a login
-for a token on the host it runs on and makes that host current, so a switch
-would move the pointer. A manifest that does not load stops the command, as it
+the command stays on the host the run names (the project's `domain`, else
+`ASTRO_DOMAIN`, else `astronomer.io`, never the saved context's): the CLI makes
+that host current for this process only, and reads or changes no saved context, so a switch would move the pointer. A manifest that does not load stops the command, as it
 stops `astro af`. When the project picks a workspace or a host
 the context would not have, the command says so on stderr:
 
