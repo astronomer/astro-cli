@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 const (
@@ -60,7 +61,13 @@ var DefaultHosts = []string{
 // Every client in the CLI that names no transport of its own reads
 // http.DefaultTransport per request, so this has to run once, before any
 // command does.
-func Install(getenv func(string) string) error {
+//
+// notice, when not nil, is called with the socket's path the first time a
+// request reaches the socket, at most once per process. It is how the CLI
+// tells the user their requests went somewhere other than the network: a
+// socket set without their knowledge would otherwise be invisible. A command
+// that never talks to a listed host never calls it.
+func Install(getenv func(string) string, notice func(socket string)) error {
 	socket := strings.TrimSpace(getenv(SocketEnv))
 	if socket == "" {
 		return nil
@@ -77,7 +84,11 @@ func Install(getenv func(string) string) error {
 	if raw := strings.TrimSpace(getenv(HostsEnv)); raw != "" {
 		hosts = strings.Split(raw, ",")
 	}
-	rt, err := NewRouter(socket, hosts, http.DefaultTransport)
+	var connected func()
+	if notice != nil {
+		connected = func() { notice(socket) }
+	}
+	rt, err := NewRouter(socket, hosts, http.DefaultTransport, connected)
 	if err != nil {
 		return err
 	}
@@ -94,13 +105,14 @@ type Router struct {
 }
 
 // NewRouter builds a Router over socketPath for the given host patterns.
-// direct carries every request whose host is not in the list.
-func NewRouter(socketPath string, hosts []string, direct http.RoundTripper) (*Router, error) {
+// direct carries every request whose host is not in the list. connected, when
+// not nil, runs once, after the first connection to the socket succeeds.
+func NewRouter(socketPath string, hosts []string, direct http.RoundTripper, connected func()) (*Router, error) {
 	m, err := parseHosts(hosts)
 	if err != nil {
 		return nil, err
 	}
-	return &Router{socket: socketTransport(socketPath), direct: direct, matcher: m}, nil
+	return &Router{socket: socketTransport(socketPath, connected), direct: direct, matcher: m}, nil
 }
 
 // RoundTrip implements http.RoundTripper.
@@ -125,12 +137,24 @@ func (r *Router) CloseIdleConnections() {
 // net/http then writes the https request over it as HTTP/1.1, unencrypted.
 // No proxy applies to it, and keep-alives are off so each request is judged
 // on a connection of its own, as gh does.
-func socketTransport(socketPath string) *http.Transport {
+//
+// Before each dial the socket is checked (checkSocket): on Unix, one another
+// user owns, or one in a directory where others could swap it, is refused,
+// since whoever owns the socket receives every request in plaintext, token
+// included.
+func socketTransport(socketPath string, connected func()) *http.Transport {
+	var once sync.Once
 	dial := func(ctx context.Context, _, _ string) (net.Conn, error) {
+		if err := checkSocket(socketPath); err != nil {
+			return nil, fmt.Errorf("connect to %s set by %s: %w", socketPath, SocketEnv, err)
+		}
 		var d net.Dialer
 		conn, err := d.DialContext(ctx, "unix", socketPath)
 		if err != nil {
 			return nil, fmt.Errorf("connect to %s set by %s: %w", socketPath, SocketEnv, err)
+		}
+		if connected != nil {
+			once.Do(connected)
 		}
 		return conn, nil
 	}

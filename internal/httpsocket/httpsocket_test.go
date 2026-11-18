@@ -73,7 +73,7 @@ func get(t *testing.T, rt http.RoundTripper, url, auth string) string {
 func TestAstroHostsGoThroughTheSocketInPlaintext(t *testing.T) {
 	path, got := listen(t)
 	direct := &directRecorder{}
-	rt, err := NewRouter(path, DefaultHosts, direct)
+	rt, err := NewRouter(path, DefaultHosts, direct, nil)
 	require.NoError(t, err)
 
 	cases := []struct{ url, host, uri string }{
@@ -102,7 +102,7 @@ func TestAstroHostsGoThroughTheSocketInPlaintext(t *testing.T) {
 func TestOtherHostsGoDirect(t *testing.T) {
 	path, got := listen(t)
 	direct := &directRecorder{}
-	rt, err := NewRouter(path, DefaultHosts, direct)
+	rt, err := NewRouter(path, DefaultHosts, direct, nil)
 	require.NoError(t, err)
 
 	for _, url := range []string{
@@ -127,7 +127,7 @@ func TestOtherHostsGoDirect(t *testing.T) {
 func TestHostsOverride(t *testing.T) {
 	path, got := listen(t)
 	direct := &directRecorder{}
-	rt, err := NewRouter(path, []string{" Astro.Example.com ", "", "*.corp.internal"}, direct)
+	rt, err := NewRouter(path, []string{" Astro.Example.com ", "", "*.corp.internal"}, direct, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "from socket", get(t, rt, "https://astro.example.com/v1/x", ""))
@@ -149,7 +149,7 @@ func TestBadHostLists(t *testing.T) {
 		{"https://api.astronomer.io"},
 		{"api.astronomer.io:443"},
 	} {
-		_, err := NewRouter("/nowhere", hosts, http.DefaultTransport)
+		_, err := NewRouter("/nowhere", hosts, http.DefaultTransport, nil)
 		assert.Error(t, err, "%q", hosts)
 	}
 }
@@ -163,7 +163,7 @@ func TestMissingSocket(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { os.RemoveAll(dir) })
 	direct := &directRecorder{}
-	rt, err := NewRouter(filepath.Join(dir, "absent"), DefaultHosts, direct)
+	rt, err := NewRouter(filepath.Join(dir, "absent"), DefaultHosts, direct, nil)
 	require.NoError(t, err)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://api.astronomer.io/v1/x", http.NoBody)
 	require.NoError(t, err)
@@ -184,12 +184,12 @@ func TestInstall(t *testing.T) {
 	}
 
 	t.Run("unset changes nothing", func(t *testing.T) {
-		require.NoError(t, Install(env(nil)))
+		require.NoError(t, Install(env(nil), nil))
 		assert.Same(t, original, http.DefaultTransport)
 	})
 
 	t.Run("a bad host list is an error and changes nothing", func(t *testing.T) {
-		err := Install(env(map[string]string{SocketEnv: "/tmp/s", HostsEnv: "api*.example.com"}))
+		err := Install(env(map[string]string{SocketEnv: "/tmp/s", HostsEnv: "api*.example.com"}), nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), HostsEnv)
 		assert.Same(t, original, http.DefaultTransport)
@@ -199,7 +199,7 @@ func TestInstall(t *testing.T) {
 		t.Cleanup(func() { http.DefaultTransport = original })
 		want, err := filepath.Abs("rel.sock")
 		require.NoError(t, err)
-		require.NoError(t, Install(env(map[string]string{SocketEnv: "rel.sock"})))
+		require.NoError(t, Install(env(map[string]string{SocketEnv: "rel.sock"}), nil))
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://api.astronomer.io/v1/x", http.NoBody)
 		require.NoError(t, err)
 		resp, err := (&http.Client{}).Do(req)
@@ -214,7 +214,7 @@ func TestInstall(t *testing.T) {
 		t.Cleanup(func() { http.DefaultTransport = original })
 		path, got := listen(t)
 		// An empty host list means the default, as an unset one does.
-		require.NoError(t, Install(env(map[string]string{SocketEnv: path, HostsEnv: " "})))
+		require.NoError(t, Install(env(map[string]string{SocketEnv: path, HostsEnv: " "}), nil))
 		require.IsType(t, &Router{}, http.DefaultTransport)
 		assert.Same(t, original, http.DefaultTransport.(*Router).direct)
 

@@ -22,6 +22,22 @@ To choose the hosts yourself, set `ASTRO_HTTP_UNIX_SOCKET_HOSTS` to a comma-sepa
 
 A relative path is resolved once, against the directory the command started in. A socket nobody is listening on is an error that names `ASTRO_HTTP_UNIX_SOCKET`. The CLI never falls back to the network for a host on the list.
 
+The first time a command's request reaches the socket, the CLI says so on stderr, once:
+
+```console
+$ astro deployment list
+Note: requests to Astro go through /Users/you/.local/run/astro.sock (ASTRO_HTTP_UNIX_SOCKET)
+ NAME       ...
+```
+
+A command that never talks to a listed host (`astro version`, `astro local start`, an Airflow on `localhost`) prints nothing, and stdout is untouched, so `-o json` output stays parseable. The note cannot be turned off: its job is to make a socket set without your knowledge visible.
+
+## Trusting the listener
+
+Whatever listens on the socket is trusted completely. It receives every request in plaintext, including whatever `Authorization` header the CLI sends, which is your real token unless the listener gave you a stand-in. There is no TLS on the socket, so the CLI cannot tell the listener from the real host, and it acts on whatever the listener answers.
+
+So put the socket in a directory only you can write to, such as one under your home directory, rather than a shared one. On Linux and macOS the CLI refuses, before sending anything, a socket that another user owns, or one in a directory any user can write to that lacks the sticky bit, where another user could replace it. Symlinks are followed, and the socket they point at is what is checked. On Windows, access is governed by the directory's ACL and the CLI checks nothing.
+
 ## Credentials
 
 The CLI still sends an `Authorization` header, so the listener has something to replace. What the CLI needs to start is a token it will accept:
