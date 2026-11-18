@@ -143,6 +143,11 @@ type WatchOptions struct {
 	// declared Dockerfile): a file a caller's own start reads, which an edit
 	// to should restart Airflow for. Each needs a Path.
 	Files []WatchedFile
+
+	// onReady is called once the watch is registered and has checked what
+	// changed while the start ran: an edit made after it is seen. A seam for
+	// this package's tests, which otherwise have to guess how long that takes.
+	onReady func()
 }
 
 // WatchProject keeps a running project's Airflow in step with edits to its
@@ -213,6 +218,7 @@ func (r *Runtime) WatchProject(ctx context.Context, o WatchOptions) error {
 		},
 		restart: o.Restart,
 		emit:    o.OnEvent,
+		onReady: o.onReady,
 		watchDir: func(rel string) {
 			//nolint:errcheck // best effort: a Dockerfile in a directory that does not exist yet is a start failure the restart reports
 			addDir(filepath.Join(dir, rel))

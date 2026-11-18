@@ -354,6 +354,7 @@ func TestWatchProjectSeesEditsOnDisk(t *testing.T) {
 	require.NoError(t, os.WriteFile(pyprojectPath, []byte(head), 0o600))
 
 	restarts := make(chan Change, 4)
+	ready := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	var r Runtime
@@ -362,15 +363,29 @@ func TestWatchProjectSeesEditsOnDisk(t *testing.T) {
 			ProjectPath: dir,
 			Mode:        ModeStandalone,
 			Debounce:    50 * time.Millisecond,
+			// Returns the manifest this start was built from, read before the
+			// test hears of the restart. Returning nil had the watch reload it
+			// after the callback, by when the test may already have renamed
+			// the next edit into place: the reload took that edit as what was
+			// started, and the edit's own event then found nothing changed.
 			Restart: func(_ context.Context, c Change) (*manifest.Manifest, error) {
+				started, err := manifest.Load(pyprojectPath)
 				restarts <- c
-				return nil, nil
+				return started, err
 			},
+			onReady: func() { close(ready) },
 		})
 	}()
-	// fsnotify registers the directory before WatchProject reads any event,
-	// but the goroutine may not have got there yet.
-	time.Sleep(200 * time.Millisecond)
+	// An edit made before the watch is registered is never seen, so the
+	// first write waits for it rather than for a guessed delay: a fixed sleep
+	// here lost the race on loaded CI runners and failed with "no restart".
+	select {
+	case <-ready:
+	case err := <-done:
+		t.Fatalf("WatchProject returned before it was ready: %v", err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("the watch never became ready")
+	}
 
 	waitRestart := func() Change {
 		t.Helper()
