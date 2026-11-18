@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // requireInputRequired asserts stdout is the one error object a refused
@@ -37,7 +38,6 @@ func TestAJSONConfirmationIsNeverAsked(t *testing.T) {
 	d, out, errOut := queryDeps(t)
 	answer := strings.NewReader("y\n")
 	d.Stdin = answer
-	d.Interactive = func() bool { return true }
 	err := execute(t, d, afName, "runs", "delete", "orders_etl", "run_1", "--url", stub.URL, "-o", "json")
 
 	msg := requireInputRequired(t, out.String(), err)
@@ -55,13 +55,13 @@ func TestAJSONConfirmationIsNeverAsked(t *testing.T) {
 	}
 }
 
-// The same refusal without a terminal keeps its words and its exit status;
+// The same refusal at the end of the input keeps its words and its exit status;
 // only the kind is new.
-func TestAConfirmationWithNoTerminalIsInputRequired(t *testing.T) {
+func TestAConfirmationWithNoAnswerIsInputRequired(t *testing.T) {
 	stub := newAirflowStub(t)
 	d, _, _ := queryDeps(t)
 	err := execute(t, d, afName, "runs", "delete", "orders_etl", "run_1", "--url", stub.URL)
-	if err == nil || err.Error() != "confirmation needed but stdin is not interactive; pass --yes to proceed" {
+	if err == nil || err.Error() != "confirmation needed but input ended with no answer; pass --yes to proceed" {
 		t.Fatalf("err = %v, want the refusal in its own words", err)
 	}
 	if code := cliout.ExitCode(t.Context(), err); code != cliout.ExitFailure {
@@ -79,7 +79,6 @@ func TestAJSONPickerIsNeverDrawn(t *testing.T) {
 	d, out, _ := instanceDeps(t, dir)
 	answer := strings.NewReader("1\n")
 	d.Stdin = answer
-	d.Interactive = func() bool { return true }
 	d.OutputTerminal = func() bool { return true }
 
 	err := execute(t, d, "link", "remove", "-o", "json")
@@ -99,7 +98,6 @@ func TestAJSONAmbiguousDeploymentIsInputRequired(t *testing.T) {
 	dir := instanceProject(t, ambiguousManifest)
 	d, out, errOut := instanceDeps(t, dir)
 	d.Stdin = strings.NewReader("2\n")
-	d.Interactive = func() bool { return true }
 
 	err := execute(t, d, afName, "dags", "list", "-o", "json")
 
@@ -109,5 +107,40 @@ func TestAJSONAmbiguousDeploymentIsInputRequired(t *testing.T) {
 	}
 	if strings.Contains(errOut.String(), "Which deployment") {
 		t.Errorf("a json run prompted: %q", errOut)
+	}
+}
+
+// With no terminal on stdin, or none on stderr, a confirmation is refused
+// before it is written or read, naming --yes, as the same refusal CI and json
+// get: a piped answer is never read.
+func TestAConfirmationWithNoTerminalIsRefusedBeforeItIsAsked(t *testing.T) {
+	for name, tc := range map[string]struct {
+		stdin, stderr bool
+		why           string
+	}{
+		"stdin not a terminal":  {false, true, "stdin is not a terminal"},
+		"stderr not a terminal": {true, false, "stderr is not a terminal"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer input.SetTerminals(tc.stdin, tc.stderr)()
+			stub := newAirflowStub(t)
+			d, _, errOut := queryDeps(t)
+			answer := strings.NewReader("y\n")
+			d.Stdin = answer
+			err := execute(t, d, afName, "runs", "delete", "orders_etl", "run_1", "--url", stub.URL)
+			if !input.IsRequired(err) {
+				t.Fatalf("err = %v, want input_required", err)
+			}
+			msg := err.Error()
+			if !strings.Contains(msg, tc.why) || !strings.Contains(msg, "pass --yes") {
+				t.Errorf("the refusal should say why and name --yes: %q", msg)
+			}
+			if answer.Len() == 0 {
+				t.Error("an answer was read")
+			}
+			if strings.Contains(errOut.String(), "[y/N]") {
+				t.Errorf("a question was written: %q", errOut)
+			}
+		})
 	}
 }

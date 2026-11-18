@@ -4,6 +4,8 @@ import (
 	"flag"
 	"os"
 	"testing"
+
+	"github.com/astronomer/astro-cli/pkg/testing/testenv"
 )
 
 // TestMain pins os.Args to a single non-test argument for the whole package run.
@@ -22,8 +24,9 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	origArgs := os.Args
 	os.Args = []string{"astro"}
+	finish := testenv.Isolate()
 	watching := emitWatch().Arm()
 	code := m.Run()
 	os.Args = origArgs
-	os.Exit(watching.Finish(code))
+	os.Exit(finish(watching.Finish(code)))
 }

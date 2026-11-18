@@ -14,36 +14,6 @@ func TestUtils(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
-func (s *Suite) TestContains() {
-	type args struct {
-		elems []string
-		v     string
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{
-		{
-			name: "true case",
-			args: args{elems: []string{"test1", "test2"}, v: "test1"},
-			want: true,
-		},
-		{
-			name: "false case",
-			args: args{elems: []string{"test1", "test2"}, v: "test3"},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			if got := Contains(tt.args.elems, tt.args.v); got != tt.want {
-				s.Fail("Contains() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func (s *Suite) TestBase64URLEncode() {
 	type args struct {
 		arg []byte
@@ -270,6 +240,24 @@ func (s *Suite) TestIsAstronomerRegistry() {
 			got := IsAstronomerRegistry(tt.args.registry)
 			s.Equal(tt.want, got)
 		})
+	}
+}
+
+// Only the registry host itself takes an Astro token: a host that contains
+// one, or text that mentions one, is not it.
+func (s *Suite) TestIsAstronomerRegistryHost() {
+	for registry, want := range map[string]bool{
+		astronomerRegistries[0]:                    true,
+		astronomerRegistries[1]:                    true,
+		"images.astronomer-stage.cloud/":           true,
+		"Images.Astronomer.Cloud":                  true,
+		"images.astronomer.cloud.attacker.example": false,
+		"evil.example/images.astronomer.cloud":     false,
+		"FROM images.astronomer.cloud/base:1":      false,
+		"quay.io":                                  false,
+		"":                                         false,
+	} {
+		s.Equal(want, IsAstronomerRegistryHost(registry), registry)
 	}
 }
 

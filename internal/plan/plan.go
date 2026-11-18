@@ -51,6 +51,9 @@ type Options struct {
 	// directly would make every plan build import a platform, which the layer
 	// rules forbid below cmd/ (docs/architecture.md).
 	WorkspaceProvider func(astro *manifest.Astro, reveal bool) envresolve.Provider
+	// WorkspaceID is the Workspace the provider reads for a manifest, when it
+	// is not only the manifest's (a token run's own). Nil means the manifest's.
+	WorkspaceID func(astro *manifest.Astro) string
 	// AllowMissing starts even when a required value has no source, instead
 	// of returning *MissingEnvError: `--allow-missing`, and Astro Desktop's
 	// Start anyway. The missing values come back on Built.StartedWithout for
@@ -390,6 +393,20 @@ type resolvedEnv struct {
 	workspaceNote  string
 }
 
+// refuser is a workspace provider that can say it declined a read: its token is
+// for another Workspace than the one linked (emenv's provider).
+type refuser interface{ Refusal() error }
+
+// providerRefusal is the error for a read the workspace provider declined, nil
+// when it made its reads or was never asked for any. A start that needs no
+// Workspace value never asks, so a link its token cannot act in does not stop it.
+func providerRefusal(p envresolve.Provider) error {
+	if r, ok := p.(refuser); ok {
+		return r.Refusal()
+	}
+	return nil
+}
+
 func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (resolvedEnv, error) {
 	var startedWithout []envresolve.Missing
 	schema, err := envschema.ParseSchema(m.Astro.Env)
@@ -416,6 +433,10 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	}
 	res, err := envresolve.Resolve(in)
 	if err != nil {
+		return resolvedEnv{}, err
+	}
+	// A Workspace value was asked for that the run's token cannot be sent for.
+	if err := providerRefusal(in.WorkspaceProvider); err != nil {
 		return resolvedEnv{}, err
 	}
 	// The start GATE is missing-required only: a value with no source blocks
@@ -507,9 +528,16 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 		delete(inj, k)
 	}
 	var wsNote string
-	if in.WorkspaceProvider != nil && m.Astro.Workspace != "" {
+	workspaceID := m.Astro.Workspace
+	if opts.WorkspaceID != nil {
+		workspaceID = opts.WorkspaceID(&m.Astro)
+	}
+	if in.WorkspaceProvider != nil && workspaceID != "" {
 		shellWon = append(shellWon, workspaceUndeclared(in.WorkspaceProvider, schema, src, inj, secretInj)...)
-		wsNote = workspaceNote(in.WorkspaceProvider, m.Astro.Workspace)
+		// What the tier holds beyond the declared names is a best-effort read: a
+		// provider whose token is for another Workspace sent nothing, and the
+		// start goes on without those values rather than being refused for them.
+		wsNote = workspaceNote(in.WorkspaceProvider, workspaceID)
 	}
 	return resolvedEnv{
 		env:            inj,

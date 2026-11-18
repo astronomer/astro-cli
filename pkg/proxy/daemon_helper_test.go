@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/astronomer/astro-cli/pkg/testenv"
 )
 
 // freePort is a loopback port nothing is listening on.
@@ -59,7 +61,8 @@ func TestMain(m *testing.M) {
 		time.Sleep(time.Minute)
 		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	finish := testenv.Isolate()
+	os.Exit(finish(m.Run()))
 }
 
 func readLog(d *Daemon) string {

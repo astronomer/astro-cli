@@ -19,9 +19,8 @@ func NewAPICmdWithOutput(out io.Writer) *cobra.Command {
 	var noColor bool
 
 	cmd := &cobra.Command{
-		Use:          "api",
-		Short:        "Make authenticated API requests to Astronomer services",
-		SilenceUsage: true,
+		Use:   "api",
+		Short: "Make authenticated API requests to Astronomer services",
 		Long: `Make authenticated HTTP requests to Astronomer APIs and print responses.
 
 The 'astro api' command provides direct access to Astronomer's REST APIs.
@@ -43,16 +42,6 @@ Use "astro api [command] --help" for more information about a command.`,
 					return err
 				}
 			}
-
-			// Cobra does not inherit SilenceUsage to subcommands, so propagate
-			// it here. The cmd parameter is the actual subcommand being executed,
-			// not the parent where PersistentPreRunE is defined.
-			//
-			// Errors are not silenced anywhere in the family: a failure is
-			// reported once, by cliout.Execute. A request whose error body was
-			// already printed returns a SilentError, which Execute takes as
-			// already presented and adds nothing to.
-			cmd.SilenceUsage = true
 
 			if noColor {
 				color.NoColor = true

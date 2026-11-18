@@ -32,7 +32,11 @@ func TestDecidingThePlatformReadsNoLogin(t *testing.T) {
 			p := newProject(t)
 			writeHomeContext(t, p, platform, "    token: \"Bearer \"\n")
 			// The vault's directory, as a file: pkg/secrets refuses it before
-			// it asks the keyring anything.
+			// it asks the keyring anything. It replaces the directory the
+			// harness stamped (stampKeyringUnavailable).
+			if err := os.RemoveAll(filepath.Join(p.home, ".astro", "secrets")); err != nil {
+				t.Fatal(err)
+			}
 			if err := os.WriteFile(filepath.Join(p.home, ".astro", "secrets"), nil, 0o600); err != nil {
 				t.Fatal(err)
 			}

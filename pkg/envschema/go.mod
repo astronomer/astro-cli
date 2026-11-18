@@ -18,8 +18,13 @@ require (
 // Indirect through airflowenv, and required here because a dependency's own
 // replace lines are never honoured — only the main module's count.
 
-require github.com/astronomer/astro-cli/pkg/connmodel v0.0.0-00010101000000-000000000000 // indirect
+require (
+	github.com/astronomer/astro-cli/pkg/connmodel v0.0.0-00010101000000-000000000000 // indirect
+	github.com/astronomer/astro-cli/pkg/testenv v0.0.0-00010101000000-000000000000
+)
 
 replace github.com/astronomer/astro-cli/pkg/airflowenv => ../airflowenv
 
 replace github.com/astronomer/astro-cli/pkg/connmodel => ../connmodel
+
+replace github.com/astronomer/astro-cli/pkg/testenv => ../testenv

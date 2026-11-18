@@ -318,20 +318,31 @@ func (c *Context) ResumeLoginVault() error {
 // times; past that, or when the lock cannot be taken at all, the renewal goes
 // ahead unlocked, which costs at worst a second refresh, as before the lock.
 func LockLoginRenewal() (unlock func()) {
+	unlock, _ = LockLoginRenewalFor(renewalLockAttempts)
+	return unlock
+}
+
+// LockLoginRenewalFor is LockLoginRenewal with a bound of attempts waits of
+// fsatomic.LockTimeout each, for a caller that can do without the renewal: one
+// whose access token still works has no reason to wait out another process's
+// renewal. contended reports that every wait timed out, so another process
+// holds the lock; the returned unlock is then a no-op, and a caller may skip
+// the renewal or go ahead unlocked.
+func LockLoginRenewalFor(attempts int) (unlock func(), contended bool) {
 	noop := func() {}
 	if err := os.MkdirAll(HomeConfigPath, dirPerm); err != nil {
-		return noop
+		return noop, false
 	}
-	for range renewalLockAttempts {
+	for range attempts {
 		unlock, err := fsatomic.Lock(HomeConfigFile + ".renew.lock")
 		if err == nil {
-			return unlock
+			return unlock, false
 		}
 		if !errors.Is(err, fsatomic.ErrLockTimeout) {
-			break
+			return noop, false
 		}
 	}
-	return noop
+	return noop, true
 }
 
 // renewalLockAttempts times fsatomic.LockTimeout is how long a renewal waits
@@ -357,7 +368,7 @@ func stringField(m map[string]interface{}, field string) string {
 	return s
 }
 
-// Credentials from the environment (ASTRO_API_TOKEN, API keys) belong to the
+// Credentials from the environment (ASTRO_API_TOKEN) belong to the
 // process that was given them. UseEnvironmentLogin hands one to the context a
 // command runs on, and SetEnvironmentContextKey the organization and workspace
 // it is for: every read of that context in this process returns them, with no
@@ -365,7 +376,9 @@ func stringField(m map[string]interface{}, field string) string {
 // saved selection stay as they were, for the next command run without the
 // variable, and a token that turns out to be bad is never kept.
 type environmentLogin struct {
-	cKey      string
+	cKey string
+	// domain is the host the credential is for, as the run named it.
+	domain    string
 	token     string
 	expiresAt time.Time
 	// fields holds the selection made for the credential, by config field.
@@ -393,8 +406,31 @@ func (c *Context) UseEnvironmentLogin(token string, expiresAt time.Time) error {
 	}
 	envLoginMu.Lock()
 	defer envLoginMu.Unlock()
-	envLoginHeld = &environmentLogin{cKey: cKey, token: token, expiresAt: expiresAt, fields: map[string]string{}}
+	envLoginHeld = &environmentLogin{cKey: cKey, domain: c.Domain, token: token, expiresAt: expiresAt, fields: map[string]string{}}
 	return nil
+}
+
+// environmentLoginDomain is the host of the environment login this process
+// holds, "" when it holds none. The login's host is the run's current one:
+// a token run names its host itself (the project's domain, ASTRO_DOMAIN or
+// Astro's), and the saved current context is not what it is on.
+func environmentLoginDomain() string {
+	envLoginMu.Lock()
+	defer envLoginMu.Unlock()
+	if envLoginHeld == nil {
+		return ""
+	}
+	return envLoginHeld.domain
+}
+
+// heldEnvironmentLogin reports whether this process holds an environment login
+// for the context under cKey. Such a context exists for the run though nothing
+// is saved for it, so a token run on a host with no saved context needs no
+// context written to the config.
+func heldEnvironmentLogin(cKey string) bool {
+	envLoginMu.Lock()
+	defer envLoginMu.Unlock()
+	return holdsEnvironmentLogin(cKey)
 }
 
 // SetEnvironmentContextKey is SetContextKey for the organization and workspace

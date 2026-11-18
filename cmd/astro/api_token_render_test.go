@@ -1,12 +1,27 @@
 package astro
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 )
+
+// requireOnlyDeprecationWarnings fails on anything on stderr that is not a
+// deprecation warning: a run through a deprecated spelling says so there, and
+// nothing else is allowed to.
+func requireOnlyDeprecationWarnings(t *testing.T, stderr string) {
+	t.Helper()
+	for line := range strings.Lines(stderr) {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		assert.True(t, strings.HasPrefix(line, "Warning: ") && strings.Contains(line, " is deprecated: "), "stderr holds only deprecation warnings, not %q", line)
+	}
+}
 
 // The token tables' columns stay where they have always been, and KIND, added
 // later, is last: a script reading a table by position finds every earlier

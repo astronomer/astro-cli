@@ -123,7 +123,7 @@ func TestDeployBundleTypes(t *testing.T) {
 		project := dbtProject(t)
 		config.WorkingPath = project
 		captured := fakeDeployBundle(t)
-		r := execBundleRun(t, nil, "", "--deployment", bundleTestID, "-m", "/usr/local/airflow/dbt/custom")
+		r := execBundleRun(t, nil, "", "--deployment", bundleTestID, "--mount-path", "/usr/local/airflow/dbt/custom")
 		require.NoError(t, r.err, r.stderr)
 		assert.Equal(t, project, (*captured).BundlePath)
 		assert.Equal(t, "/usr/local/airflow/dbt/custom", (*captured).MountPath)
@@ -295,6 +295,7 @@ func TestDeployBundleTarget(t *testing.T) {
 			assert.Contains(t, got.Error, "pass --deployment with a Deployment id, a Deployment name, or a link name")
 		})
 		t.Run(name+": none named, without a terminal", func(t *testing.T) {
+			nonInteractiveDeploy(t)
 			bundle := dbtProject(t)
 			noBundleTransport(t)
 			r := execBundleRun(t, nil, "", with(bundle)...)
@@ -418,7 +419,7 @@ func TestDeployBundleDeploymentByName(t *testing.T) {
 		var got errorJSON
 		decodeOne(t, r.stdout, &got)
 		assert.Equal(t, string(cliout.KindUsage), got.Kind)
-		assert.Contains(t, got.Error, `2 Deployments are named "analytics" in workspace clxdbtworkspace0000000000: pass --deployment with one's id (`+dbtTestDeploymentID+", clxdbtother00000000000000)")
+		assert.Contains(t, got.Error, `2 Deployments are named "analytics" in workspace clxdbtworkspace0000000000 (from --workspace): pass --deployment with one's id (`+dbtTestDeploymentID+", clxdbtother00000000000000)")
 	})
 }
 

@@ -3,6 +3,7 @@ package input
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -25,31 +26,12 @@ var ErrAborted = errors.New("aborted")
 // under --output json. It is the confirmation a command that changes
 // something asks, so a decline is one failure everywhere.
 func ConfirmOrAbort(promptText string, opts ...Option) error {
-	if err := MayAsk(promptText, opts...); err != nil {
-		return err
-	}
-	fmt.Fprintf(os.Stderr, "%s (y/n) ", promptText)
-	line, err := ReadLine(stdin(), os.Stderr)
-	if errors.Is(err, ErrInterrupted) {
-		return err
-	}
-	answer := strings.ToLower(strings.TrimSpace(line))
-	if err != nil {
-		// Input that ended left the prompt's line open: end it, so what
-		// follows starts on a fresh one.
-		fmt.Fprintln(os.Stderr)
-	}
-	if err != nil && answer == "" {
-		e := &RequiredError{Prompt: promptText, Reason: "stdin ended before an answer"}
-		for _, o := range opts {
-			o(e)
-		}
-		return e
-	}
-	if answer == "y" || answer == "yes" {
-		return nil
-	}
-	return ErrAborted
+	return (&Confirmation{
+		Question: promptText,
+		In:       os.Stdin,
+		Out:      os.Stderr,
+		Options:  opts,
+	}).Ask()
 }
 
 // Text requests a user for input text and returns it. It returns a
@@ -62,11 +44,20 @@ func Text(promptText string, opts ...Option) (string, error) {
 	if promptText != "" {
 		fmt.Fprint(os.Stderr, promptText)
 	}
-	// A read that ends is the answer so far, as it always was; an
-	// interrupt is not an answer.
+	// A read that ends is the answer so far, as it always was, unless it ends
+	// with nothing: that is nobody answering, refused naming the flag like a
+	// question this run could not ask. An interrupt is not an answer either.
 	text, err := ReadLine(reader, os.Stderr)
 	if errors.Is(err, ErrInterrupted) {
 		return "", err
+	}
+	if err != nil && text == "" {
+		fmt.Fprintln(os.Stderr)
+		if !errors.Is(err, io.EOF) {
+			// A read that failed is not stdin ending: say what failed.
+			return "", fmt.Errorf("reading the answer to %s: %w", Quote(promptText), err)
+		}
+		return "", endedRequired(promptText, opts)
 	}
 	return strings.Trim(text, "\r\n"), nil
 }
@@ -89,13 +80,30 @@ func Confirm(promptText string, opts ...Option) (bool, error) {
 	if err != nil {
 		// Input that ended left the prompt's line open.
 		fmt.Fprintln(os.Stderr)
+		if text == "" {
+			if !errors.Is(err, io.EOF) {
+				return false, fmt.Errorf("reading the answer to %s: %w", Quote(promptText), err)
+			}
+			return false, endedRequired(promptText, opts)
+		}
 	}
 	return strings.Trim(text, "\r\n") == "y", nil
 }
 
+// endedRequired is the refusal for a question whose input ended with no
+// answer: nobody answered, so the answer has to come as the flag opts name.
+func endedRequired(promptText string, opts []Option) error {
+	e := &RequiredError{Prompt: promptText, Reason: EndedReason}
+	for _, o := range opts {
+		o(e)
+	}
+	return ApplyHint(e)
+}
+
 // Password requests a users passord, does not print out what they entered, and
 // returns it. It returns a *RequiredError, and reads nothing, when this run may
-// not ask (see SetGuard).
+// not ask (see SetGuard), which includes a stdin that is not a terminal: a
+// password is never read where it cannot be hidden.
 func Password(promptText string, opts ...Option) (string, error) {
 	if err := MayAsk(promptText, opts...); err != nil {
 		return "", err
@@ -108,3 +116,7 @@ func Password(promptText string, opts ...Option) (string, error) {
 	}
 	return password, nil
 }
+
+// EndedReason is the reason a question gives when its input ended with no
+// answer, as opposed to a run that may not ask at all.
+const EndedReason = "stdin ended before an answer"

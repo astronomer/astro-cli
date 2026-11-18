@@ -19,6 +19,7 @@ import (
 	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -32,7 +33,7 @@ var (
 	forceLogin             bool
 	loginInVault           bool
 
-	cloudLogin  = astroAuth.Login
+	cloudLogin  = astroAuth.LoginCommand
 	cloudLogout = astroAuth.Logout
 	apcLogin    = apcAuth.Login
 	apcLogout   = apcAuth.Logout
@@ -80,7 +81,10 @@ func signupForDomain(domain string) bool {
 	case signin, token != "": // a token login opens no browser, so it keeps its old behavior
 		return false
 	default:
-		return astroAuth.ShouldSignup(domain)
+		// A first run is a guess that this is a new account, which opens the sign-up
+		// screen and preselects creating an organization. A run that may not ask
+		// cannot confirm the guess, so only --signup says so there.
+		return input.CanAsk() && astroAuth.ShouldSignup(domain)
 	}
 }
 
@@ -129,10 +133,7 @@ func apcPlatformVersion(domain string) string {
 	return houstonVersion
 }
 
-func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
+func runLogin(_ *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
 	if err := resumeLoginVault(args); err != nil {
 		return err
 	}
@@ -160,7 +161,7 @@ func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient
 	return apcLogin(ctx.Domain, oAuth, "", "", token, apcPlatformVersion(ctx.Domain), houstonClient, out)
 }
 
-func logout(cmd *cobra.Command, args []string, out io.Writer) error {
+func logout(_ *cobra.Command, args []string, out io.Writer) error {
 	var domain string
 	if len(args) == 1 {
 		domain = domainutil.ExpandShortName(args[0])
@@ -171,9 +172,6 @@ func logout(cmd *cobra.Command, args []string, out io.Writer) error {
 		}
 		domain = c.Domain
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	if context.IsCloudDomain(domain) {
 		return cloudLogout(domain, out)
@@ -217,9 +215,9 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
   astro auth login <BASEDOMAIN> --token-login <TOKEN>`,
 	}
 
-	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
-	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token, with no browser or prompt: for Astro and APC, such as in CI/CD")
-	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for APC login")
+	cmd.Flags().BoolVar(&shouldDisplayLoginLink, "login-link", false, "Get login link to login on a separate device for cloud CLI login")
+	cmd.Flags().StringVar(&token, "token-login", "", "Login with a token, with no browser or prompt: for Astro and APC, such as in CI/CD")
+	cmd.Flags().BoolVar(&oAuth, "oauth", false, "Do not prompt for local auth for APC login")
 	cmd.Flags().BoolVar(&signup, "signup", false, "Create a new Astro account instead of signing in to an existing one")
 	cmd.Flags().BoolVar(&signin, "signin", false, "Sign in to an existing Astro account instead of creating one")
 	cmd.Flags().BoolVar(&forceLogin, "force", false, "Log in through the browser even when a saved login still works, and ask for the password again")
@@ -271,7 +269,7 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
   # The token with its domain and expiry, for a script
   astro auth token -o json`,
 	}
-	cmd.Flags().StringVarP(&tokenDomain, "domain", "d", "", "Print the token for a specific context domain instead of the current context")
+	cmd.Flags().StringVar(&tokenDomain, "domain", "", "Print the token for a specific context domain instead of the current context")
 	cmd.Flags().BoolVar(&forceRenew, "force", false, "Renew the token from the saved login even if it has not expired yet")
 	cliout.AddOutputFlag(cmd, &output)
 	return cmd
@@ -291,10 +289,7 @@ type authToken struct {
 
 // printAuthToken publishes the login's token. In text it is the token and
 // nothing else, so `$(astro auth token)` is the token.
-func printAuthToken(cmd *cobra.Command, contextDomain string, force bool, r cliout.Renderer) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
+func printAuthToken(_ *cobra.Command, contextDomain string, force bool, r cliout.Renderer) error {
 	c, err := astroCmd.FreshLogin(contextDomain, force)
 	if err != nil {
 		return err

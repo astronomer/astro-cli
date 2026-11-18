@@ -41,6 +41,9 @@ const (
 // team package's) check for themselves too, but cannot say what answers them,
 // because that depends on the command.
 func mayPick(what, answeredBy string) error {
+	// Said here so the shared picker, which cannot know it, names it too when its
+	// own input ends.
+	input.HintAnswer(what, answeredBy)
 	return input.MayAsk("\n> ", input.About(what), input.AnsweredBy(answeredBy))
 }
 

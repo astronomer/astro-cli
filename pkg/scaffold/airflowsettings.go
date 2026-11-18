@@ -591,7 +591,7 @@ func poolsLabel(pools map[string]manifest.Pool) string {
 	if len(pools) == 0 {
 		return ""
 	}
-	return manifest.Marker + " (migrated " + plural(len(pools), "pool", "pools") + " from " + SettingsRelPath + " into [tool.astro.pools])"
+	return manifest.Marker + " (moved in " + plural(len(pools), "pool", "pools") + " from " + SettingsRelPath + ")"
 }
 
 // keptFor says why a carried file stays, for the advisory that says its

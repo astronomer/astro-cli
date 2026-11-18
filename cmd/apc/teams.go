@@ -41,7 +41,6 @@ func newTeamGetCmd(out io.Writer) *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r := cliout.Renderer{Format: accessOutput, Out: out}
-			cmd.SilenceUsage = true
 			d, err := teams.Get(args[0], usersEnabled || all, houstonClient)
 			if err != nil {
 				return err
@@ -49,8 +48,8 @@ func newTeamGetCmd(out io.Writer) *cobra.Command {
 			return renderTeamDetail(r, &d, rolesEnabled || all)
 		},
 	}
-	cmd.Flags().BoolVarP(&usersEnabled, "users", "u", false, "Get user details of the team")
-	cmd.Flags().BoolVarP(&rolesEnabled, "roles", "r", false, "Get role details of the team")
+	cmd.Flags().BoolVar(&usersEnabled, "users", false, "Get user details of the team")
+	cmd.Flags().BoolVar(&rolesEnabled, "roles", false, "Get role details of the team")
 	cmd.Flags().BoolVarP(&all, "all", "a", false, "Use all of the filters")
 	addAccessOutputFlag(cmd)
 	return cmd
@@ -73,8 +72,8 @@ func newTeamListCmd(out io.Writer) *cobra.Command {
 			return listTeam(cmd, out, paginated, pageSize)
 		},
 	}
-	cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated team list")
-	cmd.Flags().IntVarP(&pageSize, "page-size", "s", 0, "Page size of the team list if paginated is set to true")
+	cmd.Flags().BoolVar(&paginated, "paginated", false, "Paginated team list")
+	cmd.Flags().IntVar(&pageSize, "page-size", 0, "Page size of the team list if paginated is set to true")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -91,7 +90,6 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r := cliout.Renderer{Format: accessOutput, Out: out}
-			cmd.SilenceUsage = true
 			change, err := teams.Update(args[0], teamRole, houstonClient)
 			if err != nil {
 				return err
@@ -99,18 +97,17 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 			return renderTeamUpdated(r, &change)
 		},
 	}
-	cmd.Flags().StringVarP(&teamRole, "role", "r", "", "Role assigned to the team, one of: SYSTEM_VIEWER, SYSTEM_EDITOR, SYSTEM_ADMIN, NONE")
+	cmd.Flags().StringVar(&teamRole, "role", "", "Role assigned to the team, one of: SYSTEM_VIEWER, SYSTEM_EDITOR, SYSTEM_ADMIN, NONE")
 	_ = cmd.MarkFlagRequired("role") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
 }
 
-func listTeam(cmd *cobra.Command, out io.Writer, paginated bool, pageSize int) error {
+func listTeam(_ *cobra.Command, out io.Writer, paginated bool, pageSize int) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if paginated && r.Format == cliout.FormatJSON {
 		return cliout.Usage(errListPaginatedUnderJSON)
 	}
-	cmd.SilenceUsage = true
 	// Under json the interactive setting does not apply: the whole list is
 	// the result.
 	if r.Format != cliout.FormatJSON && (config.CFG.Interactive.GetBool() || paginated) {

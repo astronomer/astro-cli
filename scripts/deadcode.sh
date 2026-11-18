@@ -45,7 +45,9 @@ TEST_SUPPORT=(
   cmd/cliout/cliouttest/
   internal/platform/astro/apitoken/apitokentest/
   pkg/testing/
+  pkg/input/testsupport.go
   config/config_test_utils.go
+  internal/telemetry/testsupport.go
 )
 
 work=$(mktemp -d)

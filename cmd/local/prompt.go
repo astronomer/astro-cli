@@ -1,11 +1,6 @@
 package local
 
 import (
-	"errors"
-	"fmt"
-	"io"
-	"strings"
-
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
@@ -20,35 +15,19 @@ func (c *cli) confirmUnless(yes bool, question string) error {
 	return c.confirm(question)
 }
 
-// confirm asks a yes/no question, defaulting to no. A run that may not ask
-// (--output json) is refused before anything is written or read, and a closed
-// or empty stdin (EOF) is an error, not a silent "no": in scripts
-// the caller must decide with --yes. Both are input_required.
+// confirm asks a yes/no question, defaulting to no, through the shared
+// confirmation every command uses (input.Confirmation): a run that may not ask
+// is refused before anything is written or read, a closed or empty stdin is an
+// input_required error naming --yes rather than a silent "no", any other
+// answer but a yes is input.ErrAborted, and Ctrl-C ends the question at once
+// with input.ErrInterrupted. This only supplies astro local's streams and its
+// "[y/N]" wording.
 func (c *cli) confirm(question string) error {
-	if err := input.MayAsk(question, input.AnsweredBy("--yes")); err != nil {
-		return err
-	}
-	fmt.Fprintf(c.d.Stderr, "%s [y/N] ", question)
-	line, err := input.ReadLine(input.Reader(c.d.Stdin), c.d.Stderr)
-	if errors.Is(err, input.ErrInterrupted) {
-		return err
-	}
-	line = strings.TrimSpace(line)
-	if err != nil {
-		// Input that ended left the prompt's line open: end it, so what
-		// follows starts on a fresh one.
-		fmt.Fprintln(c.d.Stderr)
-	}
-	if err != nil && line == "" {
-		if errors.Is(err, io.EOF) {
-			return input.Required(errors.New("confirmation needed but stdin is not interactive; pass --yes to proceed"))
-		}
-		return err
-	}
-	switch strings.ToLower(line) {
-	case "y", "yes":
-		return nil
-	default:
-		return input.ErrAborted
-	}
+	return (&input.Confirmation{
+		Question: question,
+		Choices:  " [y/N] ",
+		In:       c.d.Stdin,
+		Out:      c.d.Stderr,
+		Options:  []input.Option{input.AnsweredBy("--yes")},
+	}).Ask()
 }

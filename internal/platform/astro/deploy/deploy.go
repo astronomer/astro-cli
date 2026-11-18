@@ -22,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/azure"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -64,6 +65,13 @@ type InputClientDeploy struct {
 	Platform     string
 	BuildSecrets []string
 	DeploymentID string
+	// Registry is the repository (registry[:port]/repository, no tag) the
+	// client image is pushed to: the one the Deployment's remote agents pull
+	// from. The command resolves it (--registry, the link's client-registry,
+	// [tool.astro.deploy] client-registry), and RegistrySource names where it
+	// came from, for an error about the value.
+	Registry       string
+	RegistrySource string
 	// ErrOut is the command's error writer, which the deploy's warnings go
 	// to; nil is stderr.
 	ErrOut io.Writer
@@ -75,8 +83,42 @@ func includeMonitoringDag(orgHosted bool, deploymentType astrov1.DeploymentType)
 	return !orgHosted && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
 }
 
-func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitoringDag, noDagsBaseDir bool) (string, error) {
-	if monitoringDag {
+// dagsUpload is how a project's dags/ directory is uploaded.
+type dagsUpload struct {
+	// MonitoringDag adds Astronomer's monitoring Dag to the upload
+	// (includeMonitoringDag).
+	MonitoringDag bool
+	// NoDagsBaseDir is --no-dags-base-dir: the files go at the bundle's root
+	// rather than under dags/.
+	NoDagsBaseDir bool
+	// CosmosBoost is [tool.astro.deploy] cosmos-boost: the upload carries
+	// Cosmos Boost files for the dbt projects among the Dags.
+	CosmosBoost bool
+}
+
+// monitoringDagPerm and monitoringDagDirPerm are the modes writeMonitoringDag
+// creates the Dag and, when missing, its directory with.
+const (
+	monitoringDagPerm    = 0o644
+	monitoringDagDirPerm = 0o755
+)
+
+// writeMonitoringDag writes the monitoring Dag at path, a name the CLI picks in
+// the project's dags/ directory, for the upload to carry and the deploy to
+// remove after. It is published through a temp file and a rename, which
+// replaces whatever is at path, a symlink included, rather than writing through
+// it: a project's dags/astronomer_monitoring_dag.py held as a link elsewhere
+// would otherwise have the file it points at overwritten, and the cleanup
+// would remove only the link.
+func writeMonitoringDag(path, content string) error {
+	if err := os.MkdirAll(filepath.Dir(path), monitoringDagDirPerm); err != nil {
+		return err
+	}
+	return fsatomic.WriteFile(path, []byte(content), monitoringDagPerm)
+}
+
+func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, opts dagsUpload) (string, error) {
+	if opts.MonitoringDag {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
 		var monitoringDag string
@@ -89,8 +131,7 @@ func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitorin
 			return "", errors.New("unsupported Airflow major version for runtime version " + currentRuntimeVersion)
 		}
 
-		// Create monitoring dag file
-		err := fileutil.WriteStringToFile(monitoringDagPath, monitoringDag)
+		err := writeMonitoringDag(monitoringDagPath, monitoringDag)
 		if err != nil {
 			return "", err
 		}
@@ -101,8 +142,11 @@ func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitorin
 
 	// By default, prepend dags/ directory prefix. Use --no-dags-base-dir to place files at bundle root
 	// (needed for some Airflow 3.x deployments where sys.path includes the bundle root, not dags/).
-	prependBaseDir := !noDagsBaseDir
-	versionID, err := UploadBundle(dagsPath, dagsUploadURL, prependBaseDir, currentRuntimeVersion, nil)
+	versionID, err := UploadBundle(dagsPath, dagsUploadURL, BundleUpload{
+		PrependBaseDir: !opts.NoDagsBaseDir,
+		CosmosBoost:    opts.CosmosBoost,
+		RuntimeVersion: currentRuntimeVersion,
+	})
 	if err != nil {
 		return "", err
 	}
@@ -285,6 +329,14 @@ func setupClientDependencyFiles(buildDir string) error {
 		clientPath := filepath.Join(buildDir, clientFile)
 		regularPath := filepath.Join(buildDir, regularFile)
 
+		// The project's own requirements.txt or packages.txt was copied here
+		// as it is, symlink included, and CopyFile writes through a symlink.
+		// Remove it first so the write lands in the build context, not on
+		// the file a symlink points at (a monorepo's shared requirements.txt,
+		// say), which the client deps would otherwise overwrite.
+		if err := os.Remove(regularPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to replace %s in build context: %w", regularFile, err)
+		}
 		// Copy client file content to the regular file location (requires client file to exist)
 		if err := fileutil.CopyFile(clientPath, regularPath); err != nil {
 			return fmt.Errorf("failed to copy %s to %s in build context: %w", clientFile, regularFile, err)
@@ -328,20 +380,16 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		return ClientDeploy{}, errors.Wrap(err, "failed to get current context")
 	}
 
-	// Get the remote client registry endpoint from config. It is checked as a
-	// new value is, so one saved with a tag (before the check, or by hand) is
-	// a clear error rather than Docker's "invalid reference format"; and
-	// before anything that calls the API, so a config problem is not hidden
-	// behind an auth or network one.
-	registryEndpoint, err := config.ClientRegistry()
-	if err != nil {
-		return ClientDeploy{}, err
-	}
+	// The registry is checked before anything calls the API, so a value with
+	// a tag is a clear error naming where it was written, rather than Docker's
+	// "invalid reference format", and is not hidden behind an auth or network
+	// error.
+	registryEndpoint := deployInput.Registry
 	if registryEndpoint == "" {
-		fmt.Println("The Astro CLI is not configured to push client images to your private registry.")
-		fmt.Println("For remote Deployments, client images must be stored in your private registry, not in Astronomer managed registries.")
-		fmt.Println("Please provide your private registry information so the Astro CLI can push client images.")
-		return ClientDeploy{}, fmt.Errorf("remote client registry is not configured. To configure it, run: '%s' and try again.", config.ClientRegistryFix())
+		return ClientDeploy{}, errors.New("no client registry to push to: pass --registry <registry>/<repository>")
+	}
+	if err := config.ValidateRegistryEndpoint(registryEndpoint); err != nil {
+		return ClientDeploy{}, fmt.Errorf("%s is not a usable registry endpoint: %w", deployInput.RegistrySource, err)
 	}
 
 	// Validate deployment runtime version if deployment ID is provided
@@ -379,17 +427,24 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		// This is needed because Dockerfile.client uses base images from a private registry
 
 		// Skip registry login if the base image registry is not from astronomer, check the content of the Dockerfile.client file
+		errOut := deployInput.ErrOut
+		if errOut == nil {
+			errOut = ansi.Messages
+		}
 		dockerfileClientContent, err := fileutil.ReadFileToString(filepath.Join(deployInput.Path, "Dockerfile.client"))
-		if util.IsAstronomerRegistry(dockerfileClientContent) || err != nil {
-			// login to the registry
+		needsLogin := util.IsAstronomerRegistry(dockerfileClientContent) || err != nil
+		baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
+		switch {
+		case !needsLogin:
+		case !util.IsAstronomerRegistryHost(baseImageRegistry):
+			// The login sends the Astro token, so it goes to an Astronomer
+			// registry or nowhere: the setting can come from a project's
+			// .astro/config.yaml, and any other host would just collect it.
+			ansi.Warn(errOut, fmt.Sprintf("the base image registry %q is not an Astronomer registry, so astro does not log in to it with your Astro token; the build pulls with the credentials the container engine already has", baseImageRegistry))
+		default:
 			if err != nil {
-				errOut := deployInput.ErrOut
-				if errOut == nil {
-					errOut = ansi.Messages
-				}
 				ansi.Warn(errOut, "could not read Dockerfile.client, so astro assumes its base image is on images.astronomer.cloud and logs in to that registry")
 			}
-			baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
 			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)
 			err := loginBaseImageRegistry(ctx, engine, baseImageRegistry, c.Token)
 			if err != nil {

@@ -57,8 +57,8 @@ func ExitCode(ctx context.Context, err error) int {
 //     stdout and nothing on stderr;
 //   - any other command prints "Error: ..." on stderr, and for a usage error
 //     a pointer to the failing command's help, with the flag it likely meant
-//     when one is clearly close (see the text-mode branch below for when a
-//     command's SilenceUsage drops the pointer). Never the usage block
+//     when one is clearly close (UsageNoHelp drops the pointer: see the
+//     text-mode branch below). Never the usage block
 //     itself: cobra's automatic usage is off for every command;
 //   - a command that already reported its failure — an ExitError, or an error
 //     marked JSONShown — gets nothing added in either mode.
@@ -82,7 +82,10 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	root.SilenceErrors, root.SilenceUsage = true, true
 	defer func() { root.SilenceErrors, root.SilenceUsage = quietErrors, quietUsage }()
 
-	defer input.SetGuard(refuseUnderJSON(root, args))()
+	defer input.SetGuard(refuseToAsk(root, args))()
+	// What answers a shared picker is per command and per run.
+	input.ClearHints()
+	defer input.ClearHints()
 	// The run's first Ctrl-C cancels ctx; a question waiting for a line ends
 	// at once on it, rather than after a second Ctrl-C or an Enter.
 	defer input.SetInterrupt(ctx)()
@@ -91,6 +94,7 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	defer restoreHelp()
 
 	ResetStream()
+	ResetWarnOnce()
 	root.SetArgs(args)
 	cmd, err := root.ExecuteContextC(ctx)
 	if err == nil {
@@ -130,14 +134,14 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	//
 	// A root that silenced its usage silences the pointer everywhere (its
 	// setting from before the run, quietUsage, since the run forces it on).
-	// Below the root, one found before the command ran always gets it: its
-	// help is where the right invocation is, and a command that silences its
-	// usage up front (all of astro local) silenced the block, not this. One
-	// the command returned itself does unless the command silenced its usage,
-	// which is how it says its help would not settle it (a removed command's
-	// stub, a Deployment name several Deployments share).
-	silencedRun := cmd != root && cmd.SilenceUsage && !isMisinvoked(err)
-	if quietUsage || silencedRun || ExitCode(ctx, err) != ExitUsage {
+	// Below the root, a command's own SilenceUsage decides nothing here: it
+	// only keeps cobra's block out, which the root's forced setting already
+	// does. One found before the command ran always gets the pointer, since
+	// its help is where the right invocation is. One the command returned
+	// itself does too, unless it says its help would not settle it with
+	// UsageNoHelp (a removed command's stub, a Deployment name several
+	// Deployments share).
+	if quietUsage || (omitsHelpPointer(err) && !isMisinvoked(err)) || ExitCode(ctx, err) != ExitUsage {
 		return err
 	}
 	if flag := suggestFlag(cmd, err); flag != "" {
@@ -147,28 +151,28 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	return err
 }
 
-// refuseUnderJSON is the prompt guard for one run: a command whose --output is
-// json asks nothing (pkg/input.SetGuard). A question on a terminal with the
-// run blocked on stdin is not a result a program can parse, and an agent or a
-// script driving the CLI has nobody at the keyboard to answer it — it hangs.
-// The answer has to come with the invocation instead, and the refusal says
-// which flag carries it.
+// refuseToAsk is the prompt guard for one run, and the one place its
+// interaction mode is resolved (input.Refusal): a run asks nothing under
+// --output json, with stdin or stderr not a terminal, with CI set (or Jenkins
+// or Azure Pipelines saying so), or with --non-interactive (pkg/input.SetGuard).
+// A question with the run blocked on stdin is not a result a program can
+// parse, and an agent, a script or a CI job driving the CLI has nobody to
+// answer it — it hangs. The answer has to come with the invocation instead, and
+// the refusal says which flag carries it.
 //
 // The command is found the way cobra will find it, before it runs, and its
-// flag read only when a question comes up: by then cobra has parsed it, so
-// the guard answers from the value the command itself sees, with no reading
-// of raw arguments.
-func refuseUnderJSON(root *cobra.Command, args []string) func() string {
+// flags read only when a question comes up: by then cobra has parsed them, so
+// the guard answers from the values the command itself sees, with no reading
+// of raw arguments. A line that resolves to no command still gets the guard,
+// for the terminals' and the environment's part of the rule.
+func refuseToAsk(root *cobra.Command, args []string) func() string {
 	cmd := findTarget(root, args)
-	if cmd == nil {
-		return nil
-	}
 	return func() string {
-		f := cmd.Flag("output")
-		if f == nil || f.Value.String() != string(FormatJSON) {
-			return ""
+		if cmd == nil {
+			return input.Refusal(false, nil)
 		}
-		return "with --output json it cannot"
+		f := cmd.Flag("output")
+		return input.Refusal(f != nil && f.Value.String() == string(FormatJSON), cmd.Flag(input.NonInteractiveFlag))
 	}
 }
 

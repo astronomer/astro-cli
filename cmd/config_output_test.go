@@ -30,52 +30,38 @@ func (s *CmdSuite) with1xProjectOnDisk(project string) {
 func (s *CmdSuite) TestConfigGetOutput() {
 	s.Run("text is the line it always printed", func() {
 		s.initConfigFiles("page_size: 50\n", "")
-		stdout, _, err := runConfigCmd("get", "apc.page_size", "-g")
+		stdout, _, err := runConfigCmd("get", "apc.page_size", "--global")
 		s.NoError(err)
 		s.Equal("apc.page_size: 50\n", stdout)
 	})
 
-	s.Run("json with -g publishes the global value, and whether the home config sets it", func() {
+	s.Run("json with --global publishes the global value, and whether the home config sets it", func() {
 		s.initConfigFiles("page_size: 50\n", "")
-		stdout, stderr, err := runConfigCmd("get", "apc.page_size", "-g", "-o", "json")
+		stdout, stderr, err := runConfigCmd("get", "apc.page_size", "--global", "-o", "json")
 		s.NoError(err)
 		s.Empty(stderr)
 		s.Equal(configSetting{Key: "apc.page_size", Value: "50", Scope: "global", Set: true}, decodeOne[configSetting](s, stdout))
 
-		stdout, _, err = runConfigCmd("get", "show_warnings", "-g", "-o", "json")
+		stdout, _, err = runConfigCmd("get", "show_warnings", "--global", "-o", "json")
 		s.NoError(err)
 		s.Equal(configSetting{Key: "show_warnings", Value: "true", Scope: "global", Set: false}, decodeOne[configSetting](s, stdout),
 			"the built-in default, as the text prints it")
 	})
 
-	s.Run("json in a 1.x project publishes the project's own value", func() {
+	s.Run("in a 1.x project, without --global it refuses, and with --global it is the global value", func() {
 		s.initConfigFiles("page_size: 50\n", "page_size: 70\n")
 		s.with1xProjectOnDisk("page_size: 70\n")
-		stdout, _, err := runConfigCmd("get", "apc.page_size", "-o", "json")
-		s.NoError(err)
-		s.Equal(configSetting{Key: "apc.page_size", Value: "70", Scope: "project", Set: true}, decodeOne[configSetting](s, stdout))
-	})
+		_, _, err := runConfigCmd("get", "apc.page_size", "-o", "json")
+		s.ErrorContains(err, "Astro CLI v2 reads no settings from a project's .astro/config.yaml")
 
-	s.Run("json and text in a 1.x project that does not set it say so, without falling back", func() {
-		s.initConfigFiles("page_size: 50\n", "show_warnings: false\n")
-		s.with1xProjectOnDisk("show_warnings: false\n")
-		stdout, _, err := runConfigCmd("get", "apc.page_size", "-o", "json")
+		stdout, _, err := runConfigCmd("get", "apc.page_size", "--global", "-o", "json")
 		s.NoError(err)
-		s.Equal(configSetting{Key: "apc.page_size", Value: "", Scope: "project", Set: false}, decodeOne[configSetting](s, stdout))
-
-		stdout, _, err = runConfigCmd("get", "apc.page_size")
-		s.NoError(err)
-		s.Equal("apc.page_size: \n", stdout, "the text prints the same empty value")
-
-		stdout, _, err = runConfigCmd("list", "-o", "json")
-		s.NoError(err)
-		s.Contains(decodeOne[configSettings](s, stdout).Settings, configSetting{Key: "apc.page_size", Value: "50", Scope: "global", Set: true},
-			"list is where the value in effect is")
+		s.Equal(configSetting{Key: "apc.page_size", Value: "50", Scope: "global", Set: true}, decodeOne[configSetting](s, stdout))
 	})
 
 	s.Run("json fails as one error object for a setting that does not exist", func() {
 		s.initConfigFiles("page_size: 50\n", "")
-		stdout, stderr, err := runConfigCmd("get", "nope", "-g", "-o", "json")
+		stdout, stderr, err := runConfigCmd("get", "nope", "--global", "-o", "json")
 		s.ErrorIs(err, errInvalidConfigPath)
 		s.Empty(stderr)
 		failure := decodeOne[cliout.ErrorObject](s, stdout)
@@ -87,33 +73,32 @@ func (s *CmdSuite) TestConfigGetOutput() {
 func (s *CmdSuite) TestConfigSetOutput() {
 	s.Run("text is the line it always printed", func() {
 		s.initConfigFiles("page_size: 50\n", "")
-		stdout, _, err := runConfigCmd("set", "apc.page_size", "60", "-g")
+		stdout, _, err := runConfigCmd("set", "apc.page_size", "60", "--global")
 		s.NoError(err)
 		s.Equal("Setting apc.page_size to 60 successfully\n\n", stdout)
 	})
 
 	s.Run("json publishes the setting as set", func() {
 		s.initConfigFiles("page_size: 50\n", "")
-		stdout, stderr, err := runConfigCmd("set", "apc.page_size", "60", "-g", "-o", "json")
+		stdout, stderr, err := runConfigCmd("set", "apc.page_size", "60", "--global", "-o", "json")
 		s.NoError(err)
 		s.Empty(stderr)
 		s.Equal(configSetting{Key: "apc.page_size", Value: "60", Scope: "global", Set: true}, decodeOne[configSetting](s, stdout))
 		s.Equal("60", config.CFG.PageSize.GetHomeString(), "and wrote it")
 	})
 
-	s.Run("json in a 1.x project sets the project's value", func() {
+	s.Run("in a 1.x project, without --global it refuses and writes nothing", func() {
 		s.initConfigFiles("page_size: 50\n", "page_size: 70\n")
 		s.with1xProjectOnDisk("page_size: 70\n")
-		stdout, _, err := runConfigCmd("set", "apc.page_size", "80", "-o", "json")
-		s.NoError(err)
-		s.Equal(configSetting{Key: "apc.page_size", Value: "80", Scope: "project", Set: true}, decodeOne[configSetting](s, stdout))
-		s.Equal("80", config.CFG.PageSize.GetProjectString())
+		_, _, err := runConfigCmd("set", "apc.page_size", "80", "-o", "json")
+		s.ErrorContains(err, "Astro CLI v2 reads no settings from a project's .astro/config.yaml")
+		s.ErrorContains(err, "astro config set apc.page_size 80 --global")
 		s.Equal("50", config.CFG.PageSize.GetHomeString(), "the global value is untouched")
 	})
 
 	s.Run("json refuses a removed setting as a usage error", func() {
 		s.initConfigFiles("page_size: 50\n", "")
-		stdout, stderr, err := runConfigCmd("set", "dev.mode", "standalone", "-g", "-o", "json")
+		stdout, stderr, err := runConfigCmd("set", "dev.mode", "standalone", "--global", "-o", "json")
 		s.Error(err)
 		s.Empty(stderr)
 		failure := decodeOne[cliout.ErrorObject](s, stdout)
@@ -125,7 +110,7 @@ func (s *CmdSuite) TestConfigSetOutput() {
 func (s *CmdSuite) TestConfigListOutput() {
 	s.Run("json lists every setting under settings, by key", func() {
 		s.initConfigFiles("page_size: 50\ncontexts:\n  a:\n    token: t0ken-value\ncloud:\n  api:\n    token: t0ken-value\n", "")
-		stdout, stderr, err := runConfigCmd("list", "-g", "-o", "json")
+		stdout, stderr, err := runConfigCmd("list", "--global", "-o", "json")
 		s.NoError(err)
 		s.Empty(stderr)
 		list := decodeOne[configSettings](s, stdout)
@@ -148,12 +133,12 @@ func (s *CmdSuite) TestConfigListOutput() {
 		s.NotContains(stdout, "t0ken-value")
 	})
 
-	s.Run("json in a 1.x project reads each value where commands run there do", func() {
+	s.Run("json in a 1.x project lists the global values", func() {
 		s.initConfigFiles("page_size: 50\n", "page_size: 70\n")
 		s.with1xProjectOnDisk("page_size: 70\n")
 		stdout, _, err := runConfigCmd("list", "-o", "json")
 		s.NoError(err)
 		list := decodeOne[configSettings](s, stdout)
-		s.Contains(list.Settings, configSetting{Key: "apc.page_size", Value: "70", Scope: "project", Set: true})
+		s.Contains(list.Settings, configSetting{Key: "apc.page_size", Value: "50", Scope: "global", Set: true})
 	})
 }

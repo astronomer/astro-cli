@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -160,6 +161,7 @@ func TestAnEnvironmentLoginDoesNotReadTheVault(t *testing.T) {
 	}
 	// A new process, whose keyring does not answer.
 	keyring.MockInitWithError(errors.New("keyring locked"))
+	t.Cleanup(keyring.MockInit) // leave no error-injecting mock behind
 	fresh, err := secrets.NewLogins(filepath.Join(os.Getenv("ASTRO_HOME"), "secrets"))
 	if err != nil {
 		t.Fatal(err)
@@ -179,5 +181,102 @@ func TestAnEnvironmentLoginDoesNotReadTheVault(t *testing.T) {
 	}
 	if stamps, _ := filepath.Glob(filepath.Join(os.Getenv("ASTRO_HOME"), "secrets", "login-keyring-*")); len(stamps) != 0 {
 		t.Errorf("reading the context asked the keyring: %v", stamps)
+	}
+}
+
+// A context this process has written does not hide the contexts it only read
+// from the file: sharing a renewed login reaches every context on the tenant.
+func TestSharingReachesContextsOnlyReadFromTheFile(t *testing.T) {
+	loginHome(t, plaintextConfig+`  other_io:
+    domain: other.io
+    auth_domain: https://auth.example/
+    auth_client_id: client
+`, nil)
+	c, err := GetCurrentContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SetAuthTenant("https://auth.example/", "client"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SetSharedContextKey(tokenField, "Bearer shared"); err != nil {
+		t.Fatal(err)
+	}
+	other, err := (&Context{Domain: "other.io"}).GetContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.Token != "Bearer shared" {
+		t.Errorf("the context on the same tenant did not get the renewed token (len %d)", len(other.Token))
+	}
+}
+
+// The host an environment login is for is the run's current one, ahead of
+// ASTRO_DOMAIN and the saved current context, and is forgotten with the login.
+func TestAnEnvironmentLoginIsOnItsOwnHost(t *testing.T) {
+	loginHome(t, plaintextConfig+`  other_io:
+    domain: other.io
+    token: Bearer other-access
+`, nil)
+	t.Setenv("ASTRO_DOMAIN", "")
+	saved, err := GetCurrentDomain()
+	if err != nil || saved == "other.io" {
+		t.Fatalf("the saved current domain is %q (%v)", saved, err)
+	}
+	other := Context{Domain: "other.io"}
+	if err := other.UseEnvironmentLogin(envToken, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(forgetEnvironmentLogin)
+	t.Setenv("ASTRO_DOMAIN", "third.io")
+	if got, err := GetCurrentDomain(); err != nil || got != "other.io" {
+		t.Errorf("the current domain is %q (%v), want the environment login's other.io", got, err)
+	}
+	forgetEnvironmentLogin()
+	if got, err := GetCurrentDomain(); err != nil || got != "third.io" {
+		t.Errorf("after the login is forgotten the current domain is %q (%v), want ASTRO_DOMAIN's", got, err)
+	}
+}
+
+// An environment login stands in for its host's context in memory: the context
+// exists and reads as the login, though none is saved, and a later save of
+// another context (a telemetry id, a switch) does not write one.
+func TestAnEnvironmentLoginNeedsNoSavedContext(t *testing.T) {
+	loginHome(t, plaintextConfig+`  other_io:
+    domain: other.io
+    token: Bearer other-access
+`, nil)
+	t.Setenv("ASTRO_DOMAIN", "")
+	held := Context{Domain: "held.io"}
+	if held.ContextExists() {
+		t.Fatal("the test needs a host with no saved context")
+	}
+	if err := held.UseEnvironmentLogin(envToken, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(forgetEnvironmentLogin)
+	if !held.ContextExists() {
+		t.Fatal("the context of a held environment login does not exist")
+	}
+	got, err := held.GetContext()
+	if err != nil || got.Token != envToken || got.Domain != "held.io" {
+		t.Fatalf("the held context reads as domain %q, token matches %v (%v)", got.Domain, got.Token == envToken, err)
+	}
+
+	other := Context{Domain: "other.io"}
+	if err := other.SetContextKey("user_email", "someone@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(HomeConfigFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "held") || strings.Contains(string(raw), envToken) {
+		t.Errorf("a save wrote the held context:\n%s", raw)
+	}
+
+	forgetEnvironmentLogin()
+	if held.ContextExists() {
+		t.Error("the context outlives the login that stood for it")
 	}
 }

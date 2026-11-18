@@ -70,7 +70,7 @@ dependencies = [
 ]
 ```
 
-`astro init` also lists `apache-airflow-core` and `apache-airflow-task-sdk` beside the requirement, with no version. They state nothing: `[tool.uv.sources]` applies only to direct dependencies, and listing them is what lets uv take them from Astronomer's index (see [`[tool.uv]`](#tooluv)). A bare `apache-airflow-core` beside the `apache-airflow` requirement is not a second statement of the version.
+A bare `apache-airflow-core` or `apache-airflow-task-sdk` beside the requirement is not a second statement of the version. `astro init` lists both only where Astronomer's index is routed per package, so a source can apply to them (see [`[tool.uv]`](#tooluv)); with that index as the project's default they are not needed. Moving a project to the default index leaves them in place, since you may have listed them yourself.
 
 Pin one series (`==3.3.*`, which tracks its patch releases) or one release (`==3.3.2`). Mind the wildcard: without it, `==3.3` is the one release 3.3.0, as it is to pip and uv, not the newest 3.3. Extras and environment markers are fine. The manifest is refused, in every mode, when the requirement leaves the version unclear:
 
@@ -85,7 +85,12 @@ The runtime image already is Airflow, so a generated image leaves both distribut
 
 ## `[tool.astro]`
 
-The section that makes a Python project an Astro project. Its absence is how the CLI tells an Astro project from a plain one. Every key it holds is listed below; a key that is not — a typo, a setting from another tool — is an error, so nothing you write here is quietly ignored.
+The section that makes a Python project an Astro project. Its absence is how the CLI tells an Astro project from a plain one. Every key it holds is listed below. A key that is not is one of two things:
+
+- **A near-miss of a key the table holds is an error**, naming the key it was meant to be: the same key in another case or with `_` for `-` (`build_secrets`), or, for a key of six letters or more, one a letter away, two swapped letters counting as one (`defalt` on a link, `workspce`). A misspelled setting would otherwise not apply, in silence.
+- **Any other key is a warning.** The manifest loads without it, and every command that reads the project prints the key on stderr, once; `astro local check` lists it as a `manifest_warning` finding, which `--strict` fails on. It is a warning rather than an error so a project stays readable when a teammate on a newer Astro CLI or Astro Desktop adds a key this one does not know. No two keys in a table are near-misses of each other, so a newer key is never mistaken for a typo of an older one.
+
+The same holds for a link's keys and a pool's. `[tool.astro.env]` and a link's `auth` table are the exceptions: an unknown key there is an error, since a misspelling there decides where a secret goes or how a request proves itself.
 
 There is no `airflow` key: the requirement is the one statement of the version, so nothing can run one Airflow in Docker mode and another in standalone. A manifest with an `airflow` line is refused until it is deleted, and the error quotes the requirement that decides the version:
 
@@ -225,6 +230,8 @@ build-secrets = ['id=netrc,env=NETRC_CONTENT', 'id=pip,src=~/.config/pip/pip.con
 
 Each entry takes an `id` and exactly one source: `env=` names an environment variable, and `src=` names a file. A `src=` has to be an absolute path or start with `~/`, which the CLI expands to your home directory, since Docker does not. A relative path is refused, because Docker would read it from whatever directory the command runs in. Keep the secret file outside the project, too: the build context is the project, so a file inside it would be copied into the image. An entry that is not a spec, such as a bare value or a `value=` key, is refused, and the error does not repeat the entry, in case it is the secret.
 
+A git dependency from a private repository (`corona @ git+https://github.com/org/corona.git@<sha>`) needs a `netrc` secret, since the image's install has no other credentials: `build-secrets = ['id=netrc,env=NETRC']`, with `NETRC` holding `machine github.com login x-access-token password <token>`. Without it, the build fails naming the host it could not log in to.
+
 Without a declared `dockerfile`, the list can hold only a secret with id `netrc`. Any other id is refused when the manifest is read, by `astro local check` and every other command (`build_secrets_without_dockerfile`), for the reason the flag is refused there. A bad entry is `build_secret_invalid`.
 
 When an image build runs, each `env=` source it uses has to be set, even when Docker could reuse the cached step that mounts the secret. If the variable is empty or not set, the command stops before it builds and names the secret's id. It names the variable too when the name is in upper case, since a `$VAR` the shell replaced with a token could look like a name. Without this check, Docker would mount nothing and the build would fail later, in the step that reads the secret. A spec that does not parse, or whose `env=` is not a variable name, is refused too, and the error does not repeat it.
@@ -248,7 +255,7 @@ workspace = 'your-workspace-id'
 
 ### `domain`
 
-The Astro host that `workspace` and deployment links with `method = 'astro'` live on, such as `astronomer.io`. It is the host you give `astro login`, and it is read the same way, so `https://cloud.astronomer.io/` also means `astronomer.io`. Values that resolve from the workspace are read with your login for this domain, even while the CLI is switched to another one, and so are Astro deployment links with `method = 'astro'`. `astro deploy` uses the same login, for a deployment link and for a Deployment named by bare id. If it is absent, it means `ASTRO_DOMAIN` if that is set, else `astronomer.io` for the workspace and your current login for deployment links. Setting it is an error when the project has no `workspace` and no deployment link with `method = 'astro'`, since nothing would use it. Astro Desktop writes it with the workspace. See [workspace-link.md](workspace-link.md).
+The Astro host that `workspace` and deployment links with `method = 'astro'` live on, such as `astronomer.io`. It is the host you give `astro login`, and it is read the same way, so `https://cloud.astronomer.io/` also means `astronomer.io`. Values that resolve from the workspace are read with your login for this domain, even while the CLI is switched to another one, and so are Astro deployment links with `method = 'astro'`. `astro deploy` uses the same login, for a deployment link and for a Deployment named by bare id. If it is absent, it means `ASTRO_DOMAIN` if that is set, else `astronomer.io` for the workspace and your current login for deployment links. Under `ASTRO_API_TOKEN` it is the host of every lookup the run makes, Deployments and Environment Manager alike, and the saved context is never read for it: with no `domain` and no `ASTRO_DOMAIN` a token run is on `astronomer.io`, even when the current context is another host. Setting it is an error when the project has no `workspace` and no deployment link with `method = 'astro'`, since nothing would use it. Astro Desktop writes it with the workspace. See [workspace-link.md](workspace-link.md).
 
 ```toml
 [tool.astro]
@@ -276,6 +283,32 @@ The default target every deployment link inherits when the link sets none. A tar
 target = 'astro'
 ```
 
+## `[tool.astro.deploy]`
+
+How the project's deploys behave, whoever runs them. These live in the project, not in `astro config`, because they are the project's to decide: a teammate and a CI job that check the project out deploy it the same way. Every key is optional.
+
+```toml
+[tool.astro.deploy]
+client-registry = 'quay.io/acme/client'
+git-metadata = false
+```
+
+### `client-registry`
+
+The image repository `astro remote deploy` pushes the Remote Execution client image to: `registry[:port]/repository`, with no tag, since the deploy adds its own. It is the repository the project's remote agents pull from, configured on their side. A link can set its own (see [`client-registry` on a link](#client-registry-1)), and `astro remote deploy --registry` overrides both for one run, which is also the only way to name one outside a project. `astro remote deploy` checks the value is a repository it can push to and names this key when it is not. Astro CLI 1.x kept this as `remote.client_registry`; `astro init` carries it here.
+
+### `git-metadata`
+
+Whether a deploy records the commit it ships: its SHA, branch and, for a GitHub remote, its URL, with the commit message as the description when the deploy is given none. `true` unless set `false`. A project with uncommitted changes records none either way. A machine can also turn it off for every project with `astro config set --global deploy.git_metadata false`: that wins over `git-metadata = true`, and the deploy says why it recorded no commit. The global setting only turns it off, so a committed project can never start sending commit data from a machine whose owner turned it off. Astro CLI 1.x kept the project's choice in its `.astro/config.yaml` as `deploy.git_metadata`; `astro init` carries it here.
+
+### `cosmos-boost`
+
+Whether a deploy that uploads the project's Dags generates Cosmos Boost files for the dbt projects among them into the upload, so Cosmos skips parsing them at runtime. `false` unless set `true`. The files go into the upload only, never into the project. `astro deploy bundle`, which deploys a directory outside any project, takes `--cosmos-boost` instead. Astro CLI 1.x kept this as `cosmos_boost.pre_deploy`.
+
+### `sha-as-tag`
+
+Whether a deploy to Astro Private Cloud pushes its image by digest, and points the Deployment at it so, rather than by tag. `false` unless set `true`. `astro deploy --sha-as-tag` does the same for one run, which is the way for an `--image-name` deploy from outside a project. Astro CLI 1.x kept this as `sha_as_tag`.
+
 ## `[tool.astro.deployments.<name>]`
 
 One table per Airflow the project talks to, keyed by a name you choose (`dev`, `prod`, and so on). This is the committed inventory: a teammate who clones the repo has the same list you do, with nothing to pass around. `astro deploy` ships to one of these links, and the commands that query an Airflow read the same table.
@@ -294,7 +327,7 @@ There are five kinds of link, and the kind follows from what the link sets:
 
 A link names coordinates (`deployment` or `environment`) or a `url`, never both.
 
-Pick any name you like, with two rules: it cannot be empty, and it cannot be `local`, which always means the Airflow running on your own machine. Keys the table does not define are errors rather than silence — misspell `default` on the link you meant to be the default and the CLI says so, instead of quietly resolving to another link.
+Pick any name you like, with two rules: it cannot be empty, and it cannot be `local`, which always means the Airflow running on your own machine. A key the table does not define follows the rule above: misspell `default` on the link you meant to be the default (`defalt`, `defaults`) and the manifest is refused, naming `default`, rather than another link quietly staying the default.
 
 ### `deployment`
 
@@ -328,7 +361,7 @@ The table is optional on every kind but the endpoint one, where there is no safe
 
 | `method` | Where the credential comes from | Fields |
 | -- | -- | -- |
-| `astro` | `ASTRO_API_TOKEN`, else your `astro login` session for [`domain`](#domain) (the current one if the project names no domain) | none |
+| `astro` | `ASTRO_API_TOKEN` (and then never your saved login), else your `astro login` session for [`domain`](#domain) (the current one if the project names no domain; a token run is on `domain`, else `ASTRO_DOMAIN`, else `astronomer.io`, never the saved context's) | none |
 | `aws` | the AWS credential chain (env, profile, SSO, instance role) | none |
 | `google` | Application Default Credentials | none |
 | `basic` | a username and password | `username-env`, `password-env` |
@@ -343,6 +376,10 @@ Every field that carries a credential is a `*-env` name: it names the environmen
 `exec`'s `command` is an array — the program and its arguments, as you would type them apart: `command = ['acme-airflow-token', '--profile', 'prod']`. The CLI runs the program directly and never through a shell, so a single string is an error rather than a quoting puzzle.
 
 Anything else is an error: an unknown method, a field the method does not take, a missing credential field, half a credential pair, both credential pairs at once.
+
+### `client-registry`
+
+On an Astro link only: the repository `astro remote deploy --deployment <name>` pushes the client image to, for a Deployment whose remote agents pull from somewhere other than the project's [`client-registry`](#client-registry). Unset, the link takes the project's. An error on any other kind of link, which has no remote agents.
 
 ### `default`
 
@@ -405,7 +442,7 @@ The two levels fold together at parse time, so by the time the CLI acts on a lin
 
 `astro link add <name>` writes a link, `astro link remove <name>` removes one, and `astro link default <name>` moves the `default` mark (`--unset` clears it). Astro Desktop's link editor writes through the same code, so both refuse a link the next read would not load, and both leave the rest of the file, comments included, as it was.
 
-In a terminal, a missing argument is asked for instead: `astro link add` with no `--deployment` lists the Astro Deployments in the project's workspace (else your current one) with the picker `astro deploy` uses, and names the link after the one chosen, lowercased with each run of other characters turned into a dash; `remove` and `default` list the project's links. A run that cannot be asked, with no terminal or with `--output json`, never prompts and names the missing argument instead.
+A missing argument is asked for instead: `astro link add` with no `--deployment` lists the Astro Deployments in the project's workspace (else your current one) with the picker `astro deploy` uses, and names the link after the one chosen, lowercased with each run of other characters turned into a dash; `remove` and `default` list the project's links. A run that cannot be asked (no terminal, CI, `--non-interactive` or `--output json`) never prompts and names the missing argument instead.
 
 Under an Astro Private Cloud context, `astro link add` writes an `apc` link when no `--target` is given and `[tool.astro] target` is unset or `astro`, on the current context's domain. A project whose target is `mwaa` or `composer` keeps that kind, so `--environment` and its coordinates work as they do under Astro, unless `--deployment` is given: that names an APC Deployment, so the link is `apc`, as under Astro it is an Astro link. With no `--deployment` it lists the APC Deployments of `--workspace`, else the context's current workspace (never `[tool.astro] workspace`, which is Astro's), and names the link the same way. Otherwise the link's workspace is `--workspace`, else the context's. `--target mwaa`, `composer`, `astro` and `--url` still link those kinds there. Under an Astro context, `--target apc` is refused: the domain is the APC context's, so switch to it first.
 
@@ -526,7 +563,7 @@ it cannot look enforced when it is not.
 
 A declaration may be both `optional` and defaulted. The default already satisfies the run gate, so `optional` changes nothing there — but it still says the value is not one a person has to supply, which is what a UI listing the environment needs in order to mark it.
 
-Unknown keys are an error, as they are everywhere in this section. That is why a typo'd `sensitiv` cannot quietly ship a secret to the wrong place.
+Unknown keys are an error in this section, unlike in the rest of `[tool.astro]`. That is why a typo'd `sensitiv` cannot quietly ship a secret to the wrong place.
 
 Plain env vars live directly under `[tool.astro.env]`. Connections and Airflow variables use their own sub-sections, which pick the `AIRFLOW_CONN_` / `AIRFLOW_VAR_` encoding — a connection `warehouse` resolves as `AIRFLOW_CONN_WAREHOUSE`, a variable `batch_size` as `AIRFLOW_VAR_BATCH_SIZE`.
 
@@ -607,7 +644,7 @@ project = 'acme-data'                  # the GCP project holding the environment
 location = 'us-central1'               # its region
 ```
 
-Any other key in those two sections, or a section named for no target, is a warning: the manifest still loads, and `astro local start` and `restart` print the key, since a misspelled `region` reads the same as no region at all. It is a warning rather than an error, unlike an unknown key elsewhere in `[tool.astro]`, because these sections are open by design: each backend owns its own section.
+Any other key in those two sections, or a section named for no target, is a warning: the manifest still loads, and `astro local start` and `restart` print the key, since a misspelled `region` reads the same as no region at all. These sections are open by design, so here even a near-miss of a known key is a warning, not an error.
 
 `astro` and `oss` are targets too, but nothing reads their sections yet. They are reserved: carried through as they are and never warned about, until a reader gives them a shape.
 
@@ -627,31 +664,30 @@ constraint-dependencies = [
     'SQLAlchemy==2.0.50',
 ]
 
-[tool.uv.sources]
-apache-airflow = {index = 'astronomer'}
-apache-airflow-core = {index = 'astronomer'}
-apache-airflow-task-sdk = {index = 'astronomer'}
-
 [[tool.uv.index]]
 name = 'astronomer'
 url = 'https://pip.astronomer.io/v2/'
-explicit = true
-
-[tool.uv.exclude-newer-package]
-apache-airflow = false
-apache-airflow-core = false
-apache-airflow-task-sdk = false
+default = true
 ```
 
 - **The pins** are the ones the runtime image pins. The release is the one the runtime catalog says a deployment runs: the one the [`runtime`](#runtime) build carries when it is set, and otherwise the one the newest runtime of the requirement's series carries. The catalog does not name the build, so the newest `+astro` build of that release on the index is taken.
 - **The runtime's own constraints** follow them, under one comment that records the build and Python they come from. They are the runtime's constraints file, which its image installs under (`/etc/pip-constraints.txt` in the image), read from `https://cdn.astronomer.io/runtime-constraints/` for the build the project builds on: the declared Dockerfile's `FROM`, else [`runtime`](#runtime), else the newest build of the Airflow pin, on the Python the project runs. Besides Airflow and the Task SDK, which the pins above hold, that is SQLAlchemy on Airflow 3. The comment is also the committed record of which runtime build the project builds on. Set `ASTRO_RUNTIME_CONSTRAINTS_URL` to read the files from a mirror. A runtime that publishes no such file (Airflow 2 before 11.0.0) gets none; one that cannot be read keeps what is written; under an `exclude-newer` cutoff (in `[tool.uv]`, the project's `uv.toml`, or a `UV_EXCLUDE_NEWER`) they are taken out, since the runtime's versions may postdate it. A line you write above the comment or below them stays yours, an exact pin of another package right under them included: only packages the runtime constrains are its.
-- **The index is explicit**, so uv takes only the three packages the sources name from it. Every other package still comes from PyPI, or from the indexes you add.
+- **The index is the project's default.** It serves Astronomer's builds and passes every other package through from PyPI, so no `[tool.uv.sources]` entry is needed, and the image's installs use the same index. uv asks a project's other indexes before the default and stops at the first that has a package, and settings outside the project replace the default, so where one of the following applies the index is written `explicit = true` instead, with a `[tool.uv.sources]` entry naming it for each of the three packages and `apache-airflow-core` and `apache-airflow-task-sdk` listed in `dependencies` (sources apply only to direct dependencies). In the project, which every machine that reads `pyproject.toml` shares:
+    - it lists another `[[tool.uv.index]]` that is not `explicit` (an explicit index is asked only for the packages that name it), default or not, or sets `[tool.uv]` `index-url`, `extra-index-url` or `find-links`;
+    - a `uv.toml` beside `pyproject.toml` sets `index`, `index-url`, `extra-index-url` or `find-links`.
+
+  On this machine only:
+    - `UV_DEFAULT_INDEX`, `UV_INDEX_URL`, `UV_INDEX`, `UV_EXTRA_INDEX_URL` or `UV_FIND_LINKS` is set;
+    - the `uv.toml` that `UV_CONFIG_FILE` names, your user one (`$XDG_CONFIG_HOME/uv/uv.toml` or `~/.config/uv/uv.toml`; `%APPDATA%\uv\uv.toml` on Windows) or the system one sets one of those four keys;
+    - `ASTRO_AIRFLOW_INDEX_URL` points at a mirror of Astronomer's index rather than Astronomer's own address, since a mirror may carry only Astronomer's builds.
+
+  `astro init` and `astro local upgrade airflow`/`runtime` heed both lists, and say which one applied. `astro local start` heeds only the first: it never rewrites a committed `pyproject.toml` because of one machine's settings. With one of the second list set, it leaves the files as they are and prints a note naming the setting, which may stop uv from finding Astronomer's build. Settings only another machine has, such as a CI job's `UV_INDEX_URL`, cannot be seen when the CLI writes: if your CI sets one, keep the index explicit by listing your index in `pyproject.toml`.
 - **`environments`** limits the lockfile to the platforms Airflow runs on locally. Without it, uv also locks for Intel macOS, where one package's marker (shap's `numba<0.63`) pulls numba and llvmlite back to releases that do not build. A project that names its own `environments` keeps them. On an Intel Mac, `astro local start` stops before uv and says so: run Docker mode with `--docker`, or add `"sys_platform == 'darwin' and platform_machine == 'x86_64'"` to the list. Windows is left out too: standalone does not run there, so a Docker-mode project on Windows that runs `uv sync`, `uv run` or `uv add` on the host needs `"sys_platform == 'win32'"` added.
-- **`exclude-newer-package`** turns any `exclude-newer` cutoff off for the three packages, `false` for each. Astronomer's index shows upload times only in the text of its pages, which uv does not read, so under a cutoff, the project's own or a `UV_EXCLUDE_NEWER`, uv would treat every build as too new. This is why the CLI needs uv 0.9.25 or later.
+- **`exclude-newer`** needs no override. Astronomer's index pages carry an upload time for every file, and packages that are not Astronomer's are redirected to PyPI, which has them too, so a cutoff, the project's own or a `UV_EXCLUDE_NEWER`, applies to Astronomer's builds as it does to everything else. Projects written by earlier releases carry `exclude-newer-package` entries set to `false` for `apache-airflow`, `apache-airflow-core` and `apache-airflow-task-sdk`; the CLI takes out those entries, exactly as it wrote them, the next time it writes the settings above, and leaves any other `exclude-newer-package` entry of yours.
 
 When `astro init` writes or changes these settings, it runs `uv lock` so `uv.lock` follows them: it creates the lock for a new project and updates an existing one, and says which, with how many packages moved. Without uv it says to run `uv lock`; a lock that fails warns with uv's reason, and init still succeeds.
 
-A standalone `astro local start` keeps these settings current. When the pin or `runtime` moves, or Astronomer ships a newer build of the release, it rewrites them and says so. It leaves your other keys and your comments alone, and it never takes over an index named `astronomer` at another address, or a source you wrote for one of the three packages: it warns and writes nothing instead. When Astronomer's index has no build the requirement covers, it takes out the pins, the sources, the index and the `environments` it wrote, and Airflow comes from PyPI; the bare `apache-airflow-core` and `apache-airflow-task-sdk` stay, except on Airflow 2, which has neither. When the index cannot be read, it leaves the settings as they are, unless the pin has moved off the build's release, in which case it takes out everything it wrote, as for an index with no build.
+A standalone `astro local start` keeps these settings current. When the pin or `runtime` moves, or Astronomer ships a newer build of the release, it rewrites them and says so. It leaves your other keys and your comments alone, and it never takes over an index named `astronomer` at another address, or a source you wrote for one of the three packages: it warns and writes nothing instead. It keeps the layout the project has: a project an earlier release wrote, with the index `explicit` and a source per package, stays so, since moving it changes every package's registry in `uv.lock`. `astro local upgrade airflow` and `astro local upgrade runtime` move it to the default index when nothing above (either list) calls for explicit routing, take out the sources they wrote, keep your own, and say that `uv.lock`'s registries change. A start does move a project on the default index back to explicit routing once something in the project (the first list) calls for it. When Astronomer's index has no build the requirement covers, it takes out the pins, the sources, the index and the `environments` it wrote, and Airflow comes from PyPI. When the index cannot be read, it leaves the settings as they are, unless the pin has moved off the build's release, in which case it takes out everything it wrote, as for an index with no build.
 
 To add a dependency, run `uv add <package>`. It keeps the pins, and a running standalone Airflow picks the package up.
 
@@ -660,7 +696,7 @@ To add a dependency, run `uv add <package>`. It keeps the pins, and a running st
 Standalone mode installs what the project declares. Docker mode and a deployment run the runtime image, which also has what it preinstalls: pandas, psycopg2, kubernetes and a few providers among them. A Dag that imports one of those without declaring it works in Docker mode and on a deployment, and fails in standalone with `ModuleNotFoundError`. Declare what your Dags import. `astro local check` says so when the missing module is, by name, a package the image ships, at the image's version, which a deployment then installs as it already runs:
 
 ```
-hint: Astro Runtime 3.3-11 ships pandas 2.3.3, but this project doesn't list it: uv add 'pandas==2.3.3'
+hint: Astro Runtime 3.3-11 ships pandas 2.3.3, but this project doesn't list it: uv add pandas==2.3.3
 ```
 
 It matches the missing module's top-level name exactly against the image's package names, reads the image's package list from `https://cdn.astronomer.io/runtime-freeze/` (`ASTRO_RUNTIME_FREEZE_URL` for a mirror) only when a Dag is missing a module, and gives no hint for a module whose package has another name (`yaml` is PyYAML's, `airflow.providers.celery` is a provider's) or when the list cannot be read. `--target astro` gives the same hints. To run exactly what a deployment runs, start in Docker mode.

@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
@@ -86,7 +85,7 @@ func assertGitHubCommit(t *testing.T, g *astrov1.CreateDeployGitRequest) {
 
 func TestDeployManifestDags_RecordsTheCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false)})
+	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false), GitMetadata: true})
 
 	assertGitHubCommit(t, req.Git)
 	require.NotNil(t, req.Description)
@@ -97,7 +96,7 @@ func TestDeployManifestDags_RecordsTheCommit(t *testing.T) {
 
 func TestDeployManifestDags_KeepsAGivenDescription(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false), Description: "hotfix"})
+	_, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false), Description: "hotfix", GitMetadata: true})
 
 	assertGitHubCommit(t, req.Git)
 	assert.Equal(t, "hotfix", *req.Description)
@@ -105,7 +104,7 @@ func TestDeployManifestDags_KeepsAGivenDescription(t *testing.T) {
 
 func TestDeployManifestDags_UncommittedChangesRecordNoCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, true)})
+	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, true), GitMetadata: true})
 
 	assert.Nil(t, req.Git)
 	assert.Empty(t, *req.Description)
@@ -113,12 +112,11 @@ func TestDeployManifestDags_UncommittedChangesRecordNoCommit(t *testing.T) {
 	assert.True(t, res.Git.Uncommitted)
 }
 
-func TestDeployManifestDags_GitMetadataSettingOff(t *testing.T) {
+// [tool.astro.deploy] git-metadata = false: the deploy records no commit.
+func TestDeployManifestDags_GitMetadataOff(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	require.NoError(t, config.CFG.DeployGitMetadata.SetHomeString("false"))
-	t.Cleanup(func() { _ = config.CFG.DeployGitMetadata.SetHomeString("true") })
 
-	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false)})
+	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false), GitMetadata: false})
 
 	assert.Nil(t, req.Git)
 	assert.Empty(t, *req.Description)
@@ -127,7 +125,7 @@ func TestDeployManifestDags_GitMetadataSettingOff(t *testing.T) {
 
 func TestDeployManifestDags_OutsideAGitCheckoutRecordsNoCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestProjectDir(t)})
+	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestProjectDir(t), GitMetadata: true})
 
 	assert.Nil(t, req.Git)
 	assert.Equal(t, ManifestDeployGit{}, res.Git)
@@ -160,6 +158,7 @@ func TestDeployManifestImage_RecordsTheCommit(t *testing.T) {
 			ProjectDir:     manifestGitProjectDir(t, false),
 			AirflowVersion: "3.1",
 		},
+		GitMetadata: true,
 	})
 
 	assertGitHubCommit(t, req.Git)

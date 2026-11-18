@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/checks"
@@ -53,7 +54,7 @@ func TestRuntimeHintNamesThePackageTheImageShips(t *testing.T) {
 	}}
 	got := c.withRuntimeHints(context.Background(), t.TempDir(), m, res).Findings
 
-	want := "Astro Runtime 3.3-9 ships pandas 2.3.3, but this project doesn't list it: uv add 'pandas==2.3.3'"
+	want := "Astro Runtime 3.3-9 ships pandas 2.3.3, but this project doesn't list it: uv add pandas==2.3.3"
 	if got[0].Hint != want {
 		t.Errorf("hint = %q, want %q", got[0].Hint, want)
 	}
@@ -66,6 +67,29 @@ func TestRuntimeHintNamesThePackageTheImageShips(t *testing.T) {
 	}
 	if got[5].Hint != want {
 		t.Errorf("pandas.io hint = %q, want pandas'", got[5].Hint)
+	}
+}
+
+// The hint runs as printed: a freeze pin carrying shell syntax, as a hostile
+// mirror could serve, stays one quoted argument to uv add.
+func TestRuntimeHintQuotesThePin(t *testing.T) {
+	d, _ := testDeps(t)
+	d.RuntimeCatalog = func(context.Context) *runtimeversions.Catalog { return constraintsCatalog(t) }
+	d.RuntimeFreeze = func(context.Context, string, string) ([]string, error) {
+		return []string{"pandas==2.3.3'$(touch${IFS}pwned)'"}, nil
+	}
+	c := &cli{d: d}
+	m, err := manifest.Parse([]byte(buildManifest))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := checks.Result{Findings: []checks.Finding{
+		{Kind: checks.KindImportError, Message: "ModuleNotFoundError: No module named 'pandas'"},
+	}}
+	got := c.withRuntimeHints(context.Background(), t.TempDir(), m, res).Findings
+	want := `uv add 'pandas==2.3.3'\''$(touch${IFS}pwned)'\'''`
+	if !strings.HasSuffix(got[0].Hint, want) {
+		t.Errorf("hint = %q, want it to end with %q", got[0].Hint, want)
 	}
 }
 

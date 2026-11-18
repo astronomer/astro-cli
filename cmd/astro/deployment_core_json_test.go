@@ -15,6 +15,7 @@ import (
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/input"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // What `astro deployment create`, `update`, `delete`, `hibernate` and
@@ -390,7 +391,7 @@ func TestDeploymentCoreJSON(t *testing.T) {
 		assert.Equal(t, "workspace-id", got.Deployment.Metadata.WorkspaceID)
 		assert.Equal(t, "etl-prod", got.Deployment.Configuration.Name)
 		assert.Equal(t, "test-workspace", got.Deployment.Configuration.WorkspaceName)
-		assert.Equal(t, "Current Workspace: test-workspace\n\n", r.stderr, "the note, on stderr")
+		assert.Equal(t, "Current Workspace: test-workspace\n\n", withoutDeprecations(r.stderr), "the note, on stderr")
 		m.AssertExpectations(t)
 	})
 
@@ -417,8 +418,7 @@ func TestDeploymentCoreJSON(t *testing.T) {
 	// Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, the
 	// update is to that Deployment, said on stderr; stdout is the result.
 	t.Run("an update naming nothing takes the token's Deployment", func(t *testing.T) {
-		deployment.UseTokenDeployment(coreDeploymentID)
-		t.Cleanup(func() { deployment.UseTokenDeployment("") })
+		testUtil.UseAPIToken(t, "workspaceId:workspace-id", "deploymentId:"+coreDeploymentID)
 		updated := coreDeployment()
 		updated.Name = "etl-prod-2"
 		m := new(astrov1_mocks.ClientWithResponsesInterface)
@@ -583,7 +583,7 @@ func TestDeploymentCoreJSONNeverAsks(t *testing.T) {
 			assert.Equal(t, string(cliout.KindInputRequired), got.Kind)
 			assert.Equal(t, cliout.ExitFailure, got.Code, "the code it reports is the one it exits with")
 			assert.Contains(t, got.Error, tc.answered)
-			assert.Empty(t, r.stderr)
+			assert.Empty(t, withoutDeprecations(r.stderr))
 		})
 	}
 }
@@ -602,16 +602,22 @@ func TestDeploymentCoreNothingToActOnFails(t *testing.T) {
 		args []string
 		want string
 		code int
+		// ci is a run that may not ask: a delete naming none is refused, naming
+		// --deployment, rather than asking which Deployment to delete.
+		ci bool
 	}{
-		{"delete, naming none", []string{"delete", "--yes"}, "pass --deployment", cliout.ExitFailure},
-		{"delete, naming one", []string{"delete", coreDeploymentID, "--yes"}, "the Deployment specified was not found in this workspace", cliout.ExitFailure},
-		{"hibernate, naming none", []string{"hibernate", "--yes"}, noneHere, cliout.ExitFailure},
-		{"wake-up, naming one by name", []string{"wake-up", "--deployment-name", "etl-dev", "--yes"}, `no Deployment named "etl-dev" in workspace ws-empty`, cliout.ExitUsage},
-		{"--remove-override, naming none", []string{"wake-up", "--remove-override", "--yes"}, noneHere, cliout.ExitFailure},
+		{"delete, naming none", []string{"delete", "--yes"}, "pass --deployment", cliout.ExitFailure, true},
+		{"delete, naming one", []string{"delete", coreDeploymentID, "--yes"}, "the Deployment specified was not found in this workspace", cliout.ExitFailure, false},
+		{"hibernate, naming none", []string{"hibernate", "--yes"}, noneHere, cliout.ExitFailure, false},
+		{"wake-up, naming one by name", []string{"wake-up", "--deployment-name", "etl-dev", "--yes"}, `no Deployment named "etl-dev" in workspace ws-empty`, cliout.ExitUsage, false},
+		{"--remove-override, naming none", []string{"wake-up", "--remove-override", "--yes"}, noneHere, cliout.ExitFailure, false},
 	}
 	for _, tc := range cases {
 		for _, format := range []string{"text", "json"} {
 			t.Run(tc.name+" "+format, func(t *testing.T) {
+				if tc.ci {
+					t.Setenv("CI", "true")
+				}
 				r := execDeploymentRun(t, coreMock(t), "", append(tc.args, "--workspace-id", "ws-empty", "-o", format)...)
 				assert.Equal(t, tc.code, r.code)
 				require.Error(t, r.err)

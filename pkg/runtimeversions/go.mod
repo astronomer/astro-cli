@@ -7,3 +7,7 @@ go 1.26.10
 // (astro init, the Airflow 2 image lookup, Astro Desktop's runtime poller) pays
 // for nothing beyond the standard library, which is the point of it being a
 // leaf of its own rather than a corner of pkg/imagebuild.
+
+require github.com/astronomer/astro-cli/pkg/testenv v0.0.0-00010101000000-000000000000
+
+replace github.com/astronomer/astro-cli/pkg/testenv => ../testenv

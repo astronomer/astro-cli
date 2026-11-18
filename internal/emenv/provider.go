@@ -73,7 +73,11 @@ type provider struct {
 	// timeout bounds the read; zero means fetchTimeout.
 	timeout time.Duration
 
-	once    sync.Once
+	once sync.Once
+	// refused is the error for a read the run's token cannot make: the
+	// Workspace is not the one a Workspace or Deployment token is for. The
+	// read is not made; Refusal says why.
+	refused error
 	objects map[string]objectValue
 	// secretsIncluded records whether the fetch that filled objects asked for
 	// secret values and was not refused, which is what separates "the org
@@ -230,17 +234,41 @@ func (p *provider) read() emfetch.Read {
 	return emfetch.Read{Domain: p.domain, Workspace: p.workspaceID, Organization: p.org, OrganizationDeclared: p.organization != ""}
 }
 
+// Refusal is the usage error for a read the provider was asked for and refused
+// because the run's API token is for another Workspace than the one it was
+// asked to read (astrosession.CheckWorkspace), nil when it read, or was never
+// asked. A caller that asked the provider for values reads it afterwards: a run
+// that never needed the Workspace's values is never refused.
+func (p *provider) Refusal() error {
+	return p.refused
+}
+
 // load fetches the workspace's objects once, recording a whole-provider outage
 // on any failure so Lookup stays silent and Label/Diagnose explain.
 func (p *provider) load() {
 	p.once.Do(func() {
+		// A token for another Workspace never asks about this one: nothing is
+		// sent, and whoever asked reads Refusal.
+		if err := astrosession.CheckWorkspace(p.workspaceID, astrosession.SourceProject); err != nil {
+			p.refused = err
+			return
+		}
 		// The manifest's domain picks the login and the org, not the current
 		// context: a production-linked project keeps reading production while
 		// the CLI is switched to dev. No login for that domain and the provider
 		// is simply absent. What counts as logged in comes from
 		// internal/astrosession, so this and the query commands never disagree
 		// about whether there is a session.
+		//
+		// With ASTRO_API_TOKEN set the login is the token's own (organization
+		// and Workspace from its claims), never the saved one. A token that is
+		// unusable is its own outage, named as the root names it: the run does
+		// not read the saved login instead.
 		ctx, err := login(p.domain)
+		if errors.Is(err, astrosession.ErrInvalidToken) || errors.Is(err, astrosession.ErrTokenNoOrganization) {
+			p.down = &outage{short: "unusable ASTRO_API_TOKEN", cause: err.Error()}
+			return
+		}
 		if errors.Is(err, astrosession.ErrSessionExpired) {
 			p.down = p.classify(&httpError{code: http.StatusUnauthorized})
 			return

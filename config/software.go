@@ -60,9 +60,9 @@ func (c *Context) GetSoftwareAPIURL() string {
 
 	return fmt.Sprintf(
 		"%s://houston.%s:%s/v1",
-		CFG.CloudAPIProtocol.GetString(),
+		apiProtocol(),
 		c.Domain,
-		CFG.APCAPIPort.GetString(),
+		apiPort(),
 	)
 }
 
@@ -74,7 +74,7 @@ func (c *Context) GetSoftwareAppURL() string {
 
 	return fmt.Sprintf(
 		"%s://app.%s",
-		CFG.CloudAPIProtocol.GetString(),
+		apiProtocol(),
 		c.Domain,
 	)
 }
@@ -87,8 +87,8 @@ func (c *Context) GetSoftwareWebsocketURL() string {
 
 	return fmt.Sprintf(
 		"%s://houston.%s:%s/ws",
-		CFG.APCWSProtocol.GetString(),
+		wsProtocol(),
 		c.Domain,
-		CFG.APCAPIPort.GetString(),
+		apiPort(),
 	)
 }

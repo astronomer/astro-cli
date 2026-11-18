@@ -68,9 +68,15 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 	if password == "" {
 		var err error
 		password, err = input.Password(inputPassword)
-		// A refusal and an interrupt (Ctrl-C at the raw prompt, or the run
-		// canceled) stop here; a read that ends falls through to the empty
-		// answer, as it always has.
+		// A refusal (a run that may not ask, or a stdin that is not a terminal,
+		// where a hidden answer cannot be read) and an interrupt stop here; a read
+		// that fails at the terminal falls through to the empty answer, as it
+		// always has.
+		if input.IsRequired(err) {
+			// No flag takes this password, so say where it can come from
+			// rather than naming one.
+			return "", input.Required(errors.New("this login needs a password typed at a terminal, and this run cannot ask for one: log in with the browser (astro login) instead"))
+		}
 		if input.Unanswered(err) {
 			return "", err
 		}

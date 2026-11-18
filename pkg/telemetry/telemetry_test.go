@@ -130,6 +130,22 @@ func TestDetectAgentSpecificMarkerBeatsAIAgent(t *testing.T) {
 	assert.Equal(t, "otto", DetectAgent())
 }
 
+func TestIsCISystemSet(t *testing.T) {
+	clearEnv(t, envVarNames(ciEnvVars))
+	assert.False(t, IsCISystemSet("jenkins"))
+
+	// Not decided by the order of the list: a provider listed earlier being
+	// set does not hide a later one.
+	t.Setenv("GITHUB_ACTIONS", "true")
+	t.Setenv("HUDSON_URL", "http://jenkins:8080")
+	assert.True(t, IsCISystemSet("jenkins"), "either variable of the system counts")
+	assert.False(t, IsCISystemSet("azure-devops"))
+
+	t.Setenv("HUDSON_URL", "")
+	assert.False(t, IsCISystemSet("jenkins"), "empty is not set")
+	assert.False(t, IsCISystemSet("no-such-system"))
+}
+
 func TestDetectCISystem(t *testing.T) {
 	ciVars := envVarNames(ciEnvVars)
 	clearEnv(t, ciVars)

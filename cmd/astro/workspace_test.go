@@ -3,12 +3,15 @@ package astro
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -120,11 +123,24 @@ func TestWorkspaceSwitch(t *testing.T) {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
+	// The picker is a question, so it is drawn on stderr and stdout carries the
+	// result alone.
+	asked, askedW, err := os.Pipe()
+	require.NoError(t, err)
+	stderr := os.Stderr
+	os.Stderr = askedW
 	cmdArgs := []string{"switch"}
 	resp, err := execWorkspaceCmd(cmdArgs...)
+	os.Stderr = stderr
+	require.NoError(t, askedW.Close())
+	drawn, readErr := io.ReadAll(asked)
+	require.NoError(t, readErr)
 	assert.NoError(t, err)
 	assert.Contains(t, resp, "workspace-id")
-	assert.Contains(t, resp, "test-workspace")
+	assert.NotContains(t, resp, "test-workspace", "the picker was drawn on stdout")
+	assert.NotContains(t, resp, "#", "the picker was drawn on stdout")
+	assert.Contains(t, string(drawn), "test-workspace")
+	assert.Contains(t, string(drawn), "\n> ")
 	mockClient.AssertExpectations(t)
 }
 
@@ -150,7 +166,7 @@ func TestCoalesceWorkspace(t *testing.T) {
 		setCurrentWorkspace(t, "")
 		workspaceID = "explicit-workspace-id"
 
-		ws, err := coalesceWorkspace()
+		ws, err := coalesceWorkspace(&cobra.Command{})
 		assert.NoError(t, err)
 		assert.Equal(t, "explicit-workspace-id", ws)
 	})
@@ -160,7 +176,7 @@ func TestCoalesceWorkspace(t *testing.T) {
 		setCurrentWorkspace(t, "context-workspace-id")
 		workspaceID = "explicit-workspace-id"
 
-		ws, err := coalesceWorkspace()
+		ws, err := coalesceWorkspace(&cobra.Command{})
 		assert.NoError(t, err)
 		assert.Equal(t, "explicit-workspace-id", ws)
 	})
@@ -170,7 +186,7 @@ func TestCoalesceWorkspace(t *testing.T) {
 		setCurrentWorkspace(t, "context-workspace-id")
 		workspaceID = ""
 
-		ws, err := coalesceWorkspace()
+		ws, err := coalesceWorkspace(&cobra.Command{})
 		assert.NoError(t, err)
 		assert.Equal(t, "context-workspace-id", ws)
 	})
@@ -180,7 +196,7 @@ func TestCoalesceWorkspace(t *testing.T) {
 		setCurrentWorkspace(t, "")
 		workspaceID = ""
 
-		_, err := coalesceWorkspace()
+		_, err := coalesceWorkspace(&cobra.Command{})
 		assert.Error(t, err)
 	})
 }

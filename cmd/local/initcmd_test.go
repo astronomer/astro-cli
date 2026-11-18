@@ -184,7 +184,7 @@ func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	if strings.Contains(handoff, "heavy") || strings.Contains(handoff, "airflow_settings.yaml") {
 		t.Errorf("the carried pool is still left to do:\n%s", out)
 	}
-	if !strings.Contains(out, "migrated 1 pool from airflow_settings.yaml into [tool.astro.pools]") {
+	if !strings.Contains(out, "moved in 1 pool from airflow_settings.yaml") {
 		t.Errorf("the run did not say the pool moved:\n%s", out)
 	}
 	// And not the old instruction to move the whole file by hand, which now
@@ -206,7 +206,7 @@ func TestInitListsWhatItCouldNotCarry(t *testing.T) {
 	if strings.Contains(handoff, "requirements.txt") {
 		t.Errorf("requirements.txt was carried, so it must not be work left to do:\n%s", out)
 	}
-	if !strings.Contains(out, "migrated 1 from requirements.txt") {
+	if !strings.Contains(out, "moved in 1 package from requirements.txt") {
 		t.Errorf("the conversion did not say it carried requirements.txt:\n%s", out)
 	}
 }
@@ -225,7 +225,7 @@ func TestInitSaysCreatedWhenItWroteTheManifest(t *testing.T) {
 	if !strings.Contains(out, "Created Astro project") {
 		t.Errorf("want Created, got:\n%s", out)
 	}
-	if !strings.Contains(out, ".gitignore (added the .env rule)") {
+	if !strings.Contains(out, ".gitignore  added the .env rule") {
 		t.Errorf("gitignore edit not reported:\n%s", out)
 	}
 }
@@ -607,5 +607,45 @@ func TestTheDevStubConvertsTheRootFromBelow(t *testing.T) {
 	}
 	if n := strings.Count(err.Error(), want); n != 1 {
 		t.Errorf("the convert command is named %d times, want once:\n%v", n, err)
+	}
+}
+
+// init's file list leads with the file, one change a line, collapses what
+// was created bare, kept or removed for one reason, and groups the Deployment
+// links under one line.
+func TestRenderInitGroupsTheFileList(t *testing.T) {
+	res := &scaffold.Result{
+		Dir: "/p", Name: "p", AirflowVersion: "3.3", Adopted: true,
+		Updated: []string{".gitignore (added the per-machine rules)", "pyproject.toml (added the Astro settings)"},
+		Created: []string{"AGENTS.md", "pyproject.toml (moved in 2 packages from requirements.txt)"},
+		Skipped: []string{"dags", ".gitignore"},
+		Deleted: []string{"requirements.txt (now in pyproject.toml)", "packages.txt (now in pyproject.toml)"},
+		Info:    []string{"docker-compose.override.yml: applies to astro local start --docker only"},
+		Notes: []string{
+			"Dockerfile: a pip step installs x. For standalone mode too, run: uv add 'x'",
+			scaffold.LinkNotePrefix + "astro link add a --deployment d1 --workspace <workspace-id>",
+			scaffold.LinkNotePrefix + "astro link add b --deployment d2 --workspace <workspace-id>",
+		},
+	}
+	var b strings.Builder
+	if err := renderInit(&b, res, "astro local start"); err != nil {
+		t.Fatal(err)
+	}
+	want := "Adopted Astro project p (Airflow 3.3) in /p\n" +
+		"  .gitignore      added the per-machine rules\n" +
+		"  pyproject.toml  added the Astro settings\n" +
+		"  pyproject.toml  moved in 2 packages from requirements.txt\n" +
+		"  Created         AGENTS.md\n" +
+		"  Removed         requirements.txt, packages.txt (now in pyproject.toml)\n" +
+		"  Kept            dags\n" +
+		"\nNote: docker-compose.override.yml: applies to astro local start --docker only\n" +
+		"\nLeft to do:\n" +
+		"  Dockerfile: a pip step installs x. For standalone mode too, run: uv add 'x'\n" +
+		"  Link the Deployments .astro/config.yaml lists:\n" +
+		"    astro link add a --deployment d1 --workspace <workspace-id>\n" +
+		"    astro link add b --deployment d2 --workspace <workspace-id>\n" +
+		"\nNext: astro local start\n"
+	if got := b.String(); got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
 }

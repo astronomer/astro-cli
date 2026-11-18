@@ -35,7 +35,9 @@ var (
 // wireLinkPickers wires the link pickers for the current context's platform.
 // Under Astro they list Astro Deployments and workspaces through the Astro
 // login. Under Astro Private Cloud, `astro link add` links that platform's
-// Deployments instead (withAPCLinking), and the Astro pickers stay nil.
+// Deployments instead (withAPCLinking), and the Astro pickers stay nil. out is
+// where the pickers draw: stderr in production, as every question is asked
+// there, so stdout holds a command's result only.
 func wireLinkPickers(d *local.Deps, platform string, client astrov1.APIClient, houstonClient houston.ClientInterface, out io.Writer) {
 	if platform != cloudPlatform {
 		withAPCLinking(d, houstonClient)
@@ -129,11 +131,16 @@ func isUnauthorized(err error) bool {
 
 // loginCheckFailed says why deploy's login check did not pass. Only a refused
 // token is a session that expired; anything else keeps its own words. An
-// ASTRO_API_TOKEN failure is the token's own message, since the login is not
+// ASTRO_API_TOKEN failure, the refusal of Deployment API keys, an expired login
+// that could not be renewed and a config that did not parse are their
+// own messages, since the login is not
 // what failed, and an unreachable host is the workspace link's offline cause.
 func loginCheckFailed(err error) error {
 	switch {
-	case astrosession.HasAPIToken():
+	case astrosession.HasAPIToken(), errors.Is(err, astroCmd.ErrLegacyAPIKeys), errors.Is(err, astroCmd.ErrLoginRenewal), errors.Is(err, astroCmd.ErrConfigUnreadable):
+		// A login that expired and could not be renewed says so itself, whether
+		// or not the provider was reachable: it is unauthenticated, and its
+		// cause names the way out.
 		return err
 	case isOffline(err):
 		return offline()

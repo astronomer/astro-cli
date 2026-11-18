@@ -14,8 +14,11 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/picker"
 )
@@ -130,14 +133,14 @@ var (
 // deploymentTokenPicker picks among a Deployment's tokens, by their role on
 // it. Its question names no action; it has always been the same for every
 // command that asks it.
-func deploymentTokenPicker(nameFlag string) apitoken.Picker {
-	return newTokenPicker(tokenHeader(deploymentRoleHeader), tokenRow, errInvalidDeploymentTokenKey, nameFlag, "Please select the Deployment API token:")
+func deploymentTokenPicker() apitoken.Picker {
+	return newTokenPicker(tokenHeader(deploymentRoleHeader), tokenRow, errInvalidDeploymentTokenKey, "--name", "Please select the Deployment API token:")
 }
 
 // workspaceTokenPicker picks among a Workspace's tokens, by their role on it,
 // asking question.
-func workspaceTokenPicker(nameFlag, question string) apitoken.Picker {
-	return newTokenPicker(tokenHeader(workspaceRoleHeader), tokenRow, errInvalidWorkspaceTokenKey, nameFlag, question)
+func workspaceTokenPicker(question string) apitoken.Picker {
+	return newTokenPicker(tokenHeader(workspaceRoleHeader), tokenRow, errInvalidWorkspaceTokenKey, "--name", question)
 }
 
 // organizationTokenPicker picks among the Organization's tokens, asking
@@ -173,4 +176,71 @@ func confirmTokenChange(warning, question string) error {
 // does nothing.
 func mayPickRole() error {
 	return input.MayAsk("\n> ", input.About("a role"), input.AnsweredBy("--role"))
+}
+
+// scopeNoun names the scope of a token as the messages do.
+func scopeNoun(scope astrov1.ApiTokenScope) string {
+	switch scope {
+	case astrov1.ApiTokenScopeWORKSPACE:
+		return "Workspace"
+	case astrov1.ApiTokenScopeORGANIZATION:
+		return "Organization"
+	case astrov1.ApiTokenScopeDEPLOYMENT:
+		return "Deployment"
+	}
+	return string(scope)
+}
+
+// groupPath is the path of the command group cmd is a verb of
+// (astro workspace token), which the other verb is under.
+func groupPath(cmd *cobra.Command) string {
+	if cmd.HasParent() {
+		return cmd.Parent().CommandPath()
+	}
+	return ""
+}
+
+// refuseDeleteOfBroader is the refusal of a delete that names a token of a
+// broader scope than the one the command is about (a Workspace's delete given
+// an Organization token): the token is not the scope's to delete, and what
+// the command can do with it is take its role away, which remove does. It is
+// a usage error: the verb does not fit the token.
+func refuseDeleteOfBroader(deleteCmd *cobra.Command, token *astrov1.ApiToken, own string) error {
+	return cliout.UsageNoHelp(fmt.Errorf("%s is %s API token, not one of this %s's own. %s deletes a %s's own tokens; use %s remove to take the token's role off the %s",
+		token.Name, article(scopeNoun(token.Scope)), own, deleteCmd.CommandPath(), own, groupPath(deleteCmd), own))
+}
+
+// refuseRemoveOfOwn is the refusal of a remove that names the scope's own
+// token: it has no role on its own scope to take away, and delete is what ends
+// it. A usage error, like refuseDeleteOfBroader.
+func refuseRemoveOfOwn(removeCmd *cobra.Command, token *astrov1.ApiToken, own string) error {
+	return cliout.UsageNoHelp(fmt.Errorf("%s is this %s's own API token. %s takes a broader token's role off the %s; use %s delete to delete it",
+		token.Name, own, removeCmd.CommandPath(), own, groupPath(removeCmd)))
+}
+
+// deprecatedTokenGroup hides group, an old subgroup of a token command whose
+// verbs moved up to the token command, and marks each verb it keeps for
+// scripts as a deprecated spelling of the same verb one level up. kind is the
+// scope of the tokens the group handled (Workspace, Organization), which the
+// warning of its list verb names; it is given, not read from the group's name,
+// so that renaming a group cannot quietly change it.
+func deprecatedTokenGroup(group *cobra.Command, kind string) *cobra.Command {
+	group.Hidden = true
+	for _, verb := range group.Commands() {
+		// Two of the new verbs are not quite the old ones, and the warning
+		// says how: the flat list shows every scope, where the old one showed
+		// one kind, and the flat remove asks to confirm, where the old one
+		// did not, which a run with no terminal fails on without --yes.
+		suffix := ""
+		switch verb.Name() {
+		case "list":
+			suffix = ", which lists the tokens of every scope, not only " + kind + " tokens: tell them apart by the scope field of -o json"
+		case "remove":
+			suffix = " --yes (without --yes, remove asks for confirmation, which this spelling never did)"
+		}
+		cliout.DeprecateCommand(verb, func(c *cobra.Command) string {
+			return c.Parent().Parent().CommandPath() + " " + c.Name()
+		}, suffix)
+	}
+	return group
 }

@@ -5,9 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
+	"github.com/astronomer/astro-cli/pkg/testing/testenv"
 )
 
 // TestMain pins os.Args to a single non-test argument for the whole package run.
@@ -24,15 +24,13 @@ import (
 //
 // It also watches what the commands publish through cliout.Renderer.Emit, and
 // fails a passing run that published a shape no golden pins (schema_test.go).
-//
-// Many cases run 1.x command lines to pin what they print, so the rename hint
-// a 1.x spelling prints on stderr is hidden here; cmd's renamed_flags_test.go
-// is where the hint is tested.
 func TestMain(m *testing.M) {
 	flag.Parse()
 	origArgs := os.Args
 	os.Args = []string{"astro"}
-	os.Setenv(utils.RenameHintsDisabledEnv, "1") //nolint:usetesting // for the whole package run
+	// A helper process (TestForcedRenewalHelper, TestCheckTokenHelper) keeps the home its parent made:
+	// Isolate sees the parent's marker and changes nothing.
+	finish := testenv.Isolate()
 
 	// A login reads its auth config from api.<domain>, which no unit test may
 	// reach. The identity provider it names is under .test, which never
@@ -50,8 +48,8 @@ func TestMain(m *testing.M) {
 	os.Args = origArgs
 
 	// A helper process runs one test for its parent, which judges the run.
-	if os.Getenv(renewHelperEnv) != "" {
+	if os.Getenv(renewHelperEnv) != "" || os.Getenv(checkTokenHelperEnv) != "" {
 		os.Exit(code)
 	}
-	os.Exit(watching.Finish(code))
+	os.Exit(finish(watching.Finish(code)))
 }

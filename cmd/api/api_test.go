@@ -63,19 +63,6 @@ func TestPersistentPreRunE_NoRootHook(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestPersistentPreRunE_SilenceUsagePropagated(t *testing.T) {
-	apiCmd := newRootWithAPI(nil)
-
-	child := &cobra.Command{Use: "child"}
-	apiCmd.AddCommand(child)
-
-	assert.False(t, child.SilenceUsage)
-
-	err := apiCmd.PersistentPreRunE(child, []string{})
-	require.NoError(t, err)
-	assert.True(t, child.SilenceUsage, "PersistentPreRunE should propagate SilenceUsage to subcommands")
-}
-
 func TestNewAPICmdWithOutput_SubcommandRegistration(t *testing.T) {
 	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer))
 

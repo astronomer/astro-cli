@@ -276,7 +276,6 @@ func TestPromptPinsAndIsNeverAskedTwice(t *testing.T) {
 	dir := instanceProject(t, ambiguousManifest)
 	d, _, errOut := instanceDeps(t, dir)
 	d.Stdin = strings.NewReader("2\n")
-	d.Interactive = func() bool { return true }
 	c := &cli{d: d}
 
 	sel, err := c.resolveDeployment(deploymentFlags{})
@@ -300,7 +299,6 @@ func TestPromptPinsAndIsNeverAskedTwice(t *testing.T) {
 	// Second run: the pin answers, and nothing is asked.
 	d2, _, errOut2 := instanceDeps(t, dir)
 	d2.Stdin = strings.NewReader("")
-	d2.Interactive = func() bool { return true }
 	c2 := &cli{d: d2}
 	sel, err = c2.resolveDeployment(deploymentFlags{})
 	if err != nil {
@@ -459,7 +457,6 @@ func TestJSONRunsNeverPrompt(t *testing.T) {
 	dir := instanceProject(t, ambiguousManifest)
 	d, _, errOut := instanceDeps(t, dir)
 	d.Stdin = strings.NewReader("2\n")
-	d.Interactive = func() bool { return true }
 	c := &cli{d: d, output: cliout.FormatJSON}
 
 	_, err := c.resolveDeployment(deploymentFlags{})

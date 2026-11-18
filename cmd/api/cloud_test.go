@@ -48,7 +48,7 @@ contexts:
     organization: test-org
     workspace: test-ws
 `)
-	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, configRaw, 0o777))
+	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777))
 	config.InitConfig(fs)
 	config.CFG.CloudAPIProtocol.SetHomeString("https")
 }
@@ -187,6 +187,7 @@ func TestFillPlaceholders(t *testing.T) {
 	})
 
 	t.Run("error when workspaceId missing", func(t *testing.T) {
+		t.Setenv("ASTRO_API_TOKEN", "") // a token run gets another message
 		emptyCtx := &config.Context{}
 		_, err := fillPlaceholders("/workspaces/{workspaceId}", emptyCtx)
 		require.Error(t, err)
@@ -604,4 +605,75 @@ func TestInitCloudSpecCache_LocalFile_IgnoresSpecTokenEnvVar(t *testing.T) {
 	endpoints := opts.specCache.GetEndpoints()
 	require.Len(t, endpoints, 1)
 	assert.Equal(t, "/ignoretoken", endpoints[0].Path)
+}
+
+// --- --labs flag -------------------------------------------------------------
+
+func TestCloudLabsFlag(t *testing.T) {
+	cmd := NewCloudCmd(new(bytes.Buffer))
+
+	flag := cmd.PersistentFlags().Lookup("labs")
+	require.NotNil(t, flag, "--labs flag should exist")
+	assert.False(t, flag.Hidden, "--labs should be visible")
+}
+
+func TestCloudLabsFlag_ExclusiveWithSpecURL(t *testing.T) {
+	initTestConfig(t)
+
+	for _, args := range [][]string{
+		{"--labs", "--spec-url", "https://example.com/spec.json", "ListItems"},
+		{"ls", "--labs", "--spec-url", "https://example.com/spec.json"},
+	} {
+		cmd := NewCloudCmd(new(bytes.Buffer))
+		cmd.SetArgs(args)
+		cmd.SilenceUsage = true
+		cmd.SilenceErrors = true
+		err := cmd.Execute()
+		require.Error(t, err, "args: %v", args)
+		assert.Contains(t, err.Error(), "none of the others can be")
+	}
+}
+
+func TestInitCloudSpecCache_Labs(t *testing.T) {
+	initTestConfig(t)
+
+	tests := []struct {
+		domain  string
+		specURL string
+	}{
+		{"astronomer.io", "https://api.astronomer.io/spec/labs/v1"},
+		{"astronomer-dev.io", "https://api.astronomer-dev.io/spec/labs/v1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.domain, func(t *testing.T) {
+			opts := &CloudOptions{Labs: true}
+			err := initCloudSpecCache(opts, &config.Context{Domain: tt.domain})
+			require.NoError(t, err)
+			require.NotNil(t, opts.specCache)
+			assert.Equal(t, tt.specURL, opts.specCache.GetSpecURL())
+		})
+	}
+}
+
+func TestRunCloud_Labs_BaseURL(t *testing.T) {
+	initTestConfig(t)
+
+	specJSON := []byte(`{"openapi":"3.0.0","info":{"title":"Labs","version":"1.1"},"servers":[{"url":"/labs/v1.1"}],"paths":{"/organizations/{organizationId}/items":{"get":{"operationId":"ListItems","responses":{"200":{"description":"OK"}}}}}}`)
+	tmpFile := filepath.Join(t.TempDir(), "labs.json")
+	require.NoError(t, os.WriteFile(tmpFile, specJSON, 0o600))
+
+	out := new(bytes.Buffer)
+	opts := &CloudOptions{
+		RequestOptions: RequestOptions{
+			Out:          out,
+			ErrOut:       out,
+			RequestPath:  "ListItems",
+			GenerateCurl: true,
+			specCache:    openapi.NewCacheForLocalFile(tmpFile),
+		},
+		Labs: true,
+	}
+
+	require.NoError(t, runCloud(opts))
+	assert.Contains(t, out.String(), "https://api.astronomer.io/labs/v1.1/organizations/test-org/items")
 }

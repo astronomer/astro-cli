@@ -178,6 +178,7 @@ var publishedPayloads = []cliouttest.Case{
 	// astro deployment hibernate and wake-up: the override the Deployment now
 	// has, which is null after --remove-override.
 	{Name: "deployment-hibernation", Value: deployment.HibernationResult{}},
+	{Name: "deployment-open", Value: deployment.UIResult{}},
 	// astro deployment worker-queue create, update and delete: the queue
 	// as the change left it, or as it was before a delete.
 	{Name: "deployment-worker-queue", Value: workerqueue.Result{}},

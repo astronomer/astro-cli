@@ -65,6 +65,14 @@ type HibernationResult struct {
 	Override     *HibernationOverride `json:"hibernation_override"`
 }
 
+// UIResult is `astro deployment open`'s result: the Deployment and the URL of
+// its Airflow UI.
+type UIResult struct {
+	DeploymentID string `json:"deployment_id"`
+	Name         string `json:"name"`
+	URL          string `json:"url"`
+}
+
 // HibernationOverride is an override of a Deployment's hibernation schedule,
 // under the key and with the fields `deployment inspect` gives it in the
 // Deployment's metadata: whether it holds the Deployment hibernating or

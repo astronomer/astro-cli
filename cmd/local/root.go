@@ -9,8 +9,7 @@ import (
 // AddCmds returns every top-level core command, ready to register on a root.
 // Each carries the skip-pre-run annotation on all its leaves, so the shell
 // root's pre-run (config load, telemetry, network) never runs for them:
-// `astro local` works offline with no account. Usage is silenced tree-wide so
-// a failed command shows just its error. How the error is reported — prose on
+// `astro local` works offline with no account. How an error is reported — prose on
 // stderr, or one json object under --output json — is the root's, through
 // cliout.Execute, so it is the same for every command in the CLI.
 func AddCmds(d Deps) []*cobra.Command {
@@ -31,9 +30,6 @@ func AddCmds(d Deps) []*cobra.Command {
 	// `astro local af` (NewLocalCmd).
 	cmds = append(cmds, newAfCmd(d, func() target { return &deploymentTarget{} }))
 	cmds = append(cmds, rootAliasCmds(d)...)
-	for _, cmd := range cmds {
-		silenceUsage(cmd)
-	}
 	return cmds
 }
 
@@ -65,15 +61,6 @@ func queryFamilies(d Deps, newTarget func() target) []*cobra.Command {
 		cmds = append(cmds, build(d, newTarget()))
 	}
 	return cmds
-}
-
-// silenceUsage suppresses cobra's usage dump on error for cmd and every
-// descendant. Errors are left to the runner to print.
-func silenceUsage(cmd *cobra.Command) {
-	cmd.SilenceUsage = true
-	for _, sub := range cmd.Commands() {
-		silenceUsage(sub)
-	}
 }
 
 // rootAliasCmds builds `astro start`, `astro stop`, and `astro logs` as

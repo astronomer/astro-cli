@@ -32,14 +32,13 @@ const envVarExamples = `
 
 func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "variable",
-		Aliases:                    []string{"var", "variables", "vars"},
-		Short:                      "Manage environment variables",
-		Long:                       "Manage environment variables on Astro, scoped to a workspace or a deployment.",
-		Example:                    envVarExamples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Use:     "variable",
+		Aliases: []string{"var", "variables", "vars"},
+		Short:   "Manage environment variables",
+		Long:    "Manage environment variables on Astro, scoped to a workspace or a deployment.",
+		Example: envVarExamples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
 	addScopePersistentFlags(cmd)
@@ -142,8 +141,8 @@ func newEnvVarSetCmd(out io.Writer) *cobra.Command {
   # Set many from a dotenv file
   astro env variable set --from-file .env`,
 	}
-	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "The value; omit it to read from stdin or be prompted with echo off")
-	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "Mark the variable secret when it is created; to change it later, delete and re-create it")
+	cmd.Flags().StringVar(&envVarValue, "value", "", "The value; omit it to read from stdin or be prompted with echo off")
+	cmd.Flags().BoolVar(&envVarSecret, "secret", false, "Mark the variable secret when it is created; to change it later, delete and re-create it")
 	cmd.Flags().BoolVar(&envVarNoCreate, "no-create", false, "Fail if the variable does not exist, instead of creating it")
 	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Set many from a dotenv file ('-' reads stdin)")
 	addAutoLinkFlag(cmd)
@@ -173,7 +172,7 @@ func newEnvVarDeleteCmd(out io.Writer) *cobra.Command {
 // runEnvVarList is `variable list`, and `variable export`, whose text is the
 // dotenv file and whose json is the list's: the same variables, as data.
 func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
@@ -181,7 +180,6 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
 	if export && f == cliout.FormatText {
 		f = formatDotenv
 	}
-	cmd.SilenceUsage = true
 
 	objs, err := env.ListVars(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -197,11 +195,10 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
 }
 
 func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	obj, err := env.GetVar(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -214,22 +211,20 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 }
 
 func runEnvVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 	return runFromFileSet(cmd, r, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, fromFileFns{env.CreateVar, env.UpdateVar, env.GetVar})
 }
 
 func runEnvVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	value, err := readSetValue(cmd, "value", envVarValue, fmt.Sprintf("new value for %s", idOrKey))
 	if err != nil {

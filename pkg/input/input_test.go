@@ -81,11 +81,15 @@ func (s *Suite) TestConfirm() {
 			errAssertion: assert.NoError,
 		},
 		{
-			name:         "no input",
-			inputString:  "",
-			args:         args{promptText: "enter y or n"},
-			want:         false,
-			errAssertion: assert.NoError,
+			// Nobody answering is not a no: it is a question this run could
+			// not get answered.
+			name:        "no input",
+			inputString: "",
+			args:        args{promptText: "enter y or n"},
+			want:        false,
+			errAssertion: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.True(t, IsRequired(err), "%v", err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -124,16 +128,33 @@ func (s *Suite) TestPassword() {
 		want         string
 		errAssertion assert.ErrorAssertionFunc
 	}{
+		// A hidden answer is never read from a stdin that is not a terminal,
+		// piped or ended: it would be echoed by whatever types at the far end,
+		// or taken from a pipe not meant as a password. It is input_required,
+		// not the terminal error of taking a pipe for a terminal.
 		{
-			name:         "unsupported error",
-			inputString:  "",
-			args:         args{"enter pass"},
-			want:         "",
-			errAssertion: assert.Error,
+			name:        "a pipe is refused, not read",
+			inputString: "hunter2\n",
+			args:        args{"enter pass"},
+			want:        "",
+			errAssertion: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.True(t, IsRequired(err), "%v", err) && assert.NotContains(t, err.Error(), "ioctl")
+			},
+		},
+		{
+			name:        "ended input is refused too",
+			inputString: "",
+			args:        args{"enter pass"},
+			want:        "",
+			errAssertion: func(t assert.TestingT, err error, _ ...interface{}) bool {
+				return assert.True(t, IsRequired(err), "%v", err)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			// No terminal on stdin: a hidden answer is refused, not read.
+			defer SetTerminals(false, true)()
 			// mock os.Stdin
 			input := []byte(tt.inputString)
 			r, w, err := os.Pipe()

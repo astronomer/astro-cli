@@ -9,6 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/ide"
 )
 
@@ -78,8 +79,8 @@ func newIDEImportProjectCmd(out io.Writer) *cobra.Command {
   # Import a project from a specific Astro IDE session
   astro ide project import --project-id <PROJECT_ID> --session-id <SESSION_ID>`,
 	}
-	cmd.Flags().StringVarP(&ideProjectID, "project-id", "p", "", "Project ID to import")
-	cmd.Flags().StringVarP(&ideSessionID, "session-id", "s", "", "Session ID to import")
+	cmd.Flags().StringVar(&ideProjectID, "project-id", "", "Project ID to import")
+	cmd.Flags().StringVar(&ideSessionID, "session-id", "", "Session ID to import")
 	cmd.Flags().BoolVarP(&ideImportYes, "yes", "y", false, "Import into the current directory without asking when it is not empty")
 	return cmd
 }
@@ -102,13 +103,12 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
   # Export it even though the Astro IDE project is locked
   astro ide project export --project-id <PROJECT_ID> --force`,
 	}
-	cmd.Flags().StringVarP(&ideProjectID, "project-id", "p", "", "Project ID to export")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force export to overwrite project lock")
+	cmd.Flags().StringVar(&ideProjectID, "project-id", "", "Project ID to export")
+	cmd.Flags().BoolVar(&force, "force", false, "Force export to overwrite project lock")
 	return cmd
 }
 
-func listIDEProjects(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listIDEProjects(_ *cobra.Command, out io.Writer) error {
 	list, err := ide.List(astroV1Alpha1Client)
 	if err != nil {
 		return err
@@ -127,7 +127,6 @@ func importIDEProject(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	cmd.SilenceUsage = true
 	res, err := ide.ImportProject(cmd.Context(), astroV1Alpha1Client, astroIDEExporter, ideProjectID, ideSessionID, orgID, wsID, ideImportYes, cliout.NotesTo(cmd, ideProjectOutput, out))
 	if err != nil {
 		return err
@@ -147,7 +146,6 @@ func exportProject(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	cmd.SilenceUsage = true
 	res, err := ide.ExportProject(astroV1Alpha1Client, astroV1Client, ideProjectID, orgID, wsID, force, cliout.NotesTo(cmd, format, out))
 	if err != nil {
 		return err
@@ -169,10 +167,14 @@ func validateWorkspaceAndOrgID(ctx *config.Context) (orgID, wsID string, err err
 		return "", "", errors.New("no organization ID provided and no organization set in context. Please set context or provide organization ID")
 	}
 
-	wsID = ctx.Workspace
-	if wsID == "" {
-		return "", "", errors.New("no workspace ID provided and no workspace set in context. Please set context or provide workspace ID")
+	t := astrosession.Resolve(astrosession.Request{
+		Login:   ctx,
+		NoSaved: errors.New("no workspace ID provided and no workspace set in context. Please set context or provide workspace ID"),
+	})
+	if err := t.Require(); err != nil {
+		return "", "", err
 	}
+	wsID = t.Workspace
 
 	return orgID, wsID, nil
 }

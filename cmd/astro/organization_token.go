@@ -23,11 +23,10 @@ import (
 // family, registered once on its group.
 var organizationTokenOutput cliout.Format
 
-func listOrganizationToken(cmd *cobra.Command, out io.Writer) error {
+func listOrganizationToken(_ *cobra.Command, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 	tokens, err := organization.ListTokens(astroV1Client)
 	if err != nil {
 		return err
@@ -35,12 +34,11 @@ func listOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	return renderTokenList(organizationTokenOutput, out, tokens, organizationRoleHeader)
 }
 
-func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer) error {
+func listOrganizationTokenRoles(_ *cobra.Command, args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
 	tokenArg(args, &tokenID)
-	cmd.SilenceUsage = true
 	// roles takes no --name: only the token ID answers its picker.
 	roles, err := organization.ListTokenRoles(tokenID, organizationTokenPicker("", "Please select the Organization API token whose roles you would like to list:"), astroV1Client)
 	if err != nil {
@@ -53,7 +51,7 @@ func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer
 	return cliout.Renderer{Format: organizationTokenOutput, Out: out}.Emit(apitoken.RoleList{Roles: roles}, cliout.Text(tab.Render))
 }
 
-func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
+func createOrganizationToken(_ *cobra.Command, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
@@ -77,7 +75,6 @@ func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 			return err
 		}
 	}
-	cmd.SilenceUsage = true
 
 	created, err := organization.CreateToken(tokenName, tokenDescription, tokenRole, tokenExpiration, astroV1Client)
 	if err != nil {
@@ -86,12 +83,11 @@ func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	return renderTokenSecret(organizationTokenOutput, out, &created, "Organization", "created", tokenName, cleanTokenOutput)
 }
 
-func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
+func updateOrganizationToken(_ *cobra.Command, args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
 	tokenArg(args, &tokenID)
-	cmd.SilenceUsage = true
 	res, err := organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole,
 		organizationTokenPicker("--name", "Please select the Organization API token you would like to update:"), astroV1Client)
 	if err != nil {
@@ -100,12 +96,11 @@ func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	return renderTokenLine(organizationTokenOutput, out, res.Token, fmt.Sprintf("Astro Organization API token %s was successfully updated", res.PreviousName))
 }
 
-func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
+func rotateOrganizationToken(_ *cobra.Command, args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
 	tokenArg(args, &tokenID)
-	cmd.SilenceUsage = true
 	pick := organizationTokenPicker("--name", "Please select the Organization API token you would like to rotate:")
 	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)
 	if err != nil {
@@ -126,12 +121,11 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	return renderTokenSecret(organizationTokenOutput, out, &rotated, "Organization", "rotated", token.Name, cleanTokenOutput)
 }
 
-func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
+func deleteOrganizationToken(_ *cobra.Command, args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
 	tokenArg(args, &tokenID)
-	cmd.SilenceUsage = true
 	pick := organizationTokenPicker("--name", "Please select the Organization API token you would like to delete:")
 	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)
 	if err != nil {

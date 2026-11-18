@@ -33,7 +33,7 @@ const envVarLinkExamples = `
 
   # list links, and remove one
   astro env variable link list --variable-key DATABASE_URL --workspace <ws>
-  astro env variable link delete --variable-key DATABASE_URL --workspace <ws> --deployment <dep>`
+  astro env variable link remove --variable-key DATABASE_URL --workspace <ws> --deployment <dep>`
 
 func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -44,14 +44,14 @@ func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 			"its own value. Identify the variable with --variable-key or --variable-id.",
 		Example: envVarLinkExamples,
 
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Args: cobra.ArbitraryArgs,
+		RunE: cliout.GroupHelp,
 	}
 	cmd.AddCommand(
 		newEnvVarLinkSetCmd(out),
 		newRemovedLinkCreateCmd(),
-		newEnvVarLinkDeleteCmd(out),
+		newEnvVarLinkRemoveCmd(out),
+		deprecatedLinkDelete(newEnvVarLinkRemoveCmd(out)),
 		newEnvVarLinkListCmd(out),
 	)
 	return cmd
@@ -76,7 +76,7 @@ func linkVariableIDOrKey() (string, error) {
 	if envLinkVariableKey != "" {
 		return envLinkVariableKey, nil
 	}
-	return "", errors.New("--variable-id or --variable-key cannot be empty")
+	return "", cliout.Usage(errors.New("--variable-id or --variable-key cannot be empty"))
 }
 
 // newRemovedLinkCreateCmd is the `link create` tombstone. The nouns' stub
@@ -112,7 +112,7 @@ func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
   astro env variable link set --variable-key LOG_LEVEL --deployment <DEPLOYMENT_ID> --exclude`,
 	}
 	addLinkVariableFlags(cmd)
-	addDeploymentFlag(cmd.Flags(), "Deployment to link: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &envLinkDeploymentID}, oneXDeploymentID(""))
+	addDeploymentFlag(cmd.Flags(), "Deployment to link: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &envLinkDeploymentID}, oneXDeploymentID)
 	cmd.Flags().StringVar(&envLinkValue, "value", "", "The deployment's own value; omit it to clear any it had")
 	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Opt the deployment out of an auto-linked variable instead")
 	cmd.Flags().BoolVar(&envLinkNoCreate, "no-create", false, "Fail if the deployment is not already linked")
@@ -125,22 +125,22 @@ func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newEnvVarLinkDeleteCmd(out io.Writer) *cobra.Command {
+func newEnvVarLinkRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete",
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a link or exclude",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runEnvVarLinkDelete(cmd, out)
+			return runEnvVarLinkRemove(cmd, out)
 		},
 		Example: `  # Unlink a workspace variable from a Deployment
-  astro env variable link delete --variable-key DATABASE_URL --deployment <DEPLOYMENT_ID>
+  astro env variable link remove --variable-key DATABASE_URL --deployment <DEPLOYMENT_ID>
 
   # Remove an exclude, so an auto-linked variable reaches the Deployment again
-  astro env variable link delete --variable-key LOG_LEVEL --deployment <DEPLOYMENT_ID> --exclude`,
+  astro env variable link remove --variable-key LOG_LEVEL --deployment <DEPLOYMENT_ID> --exclude`,
 	}
 	addLinkVariableFlags(cmd)
-	addDeploymentFlag(cmd.Flags(), "Deployment to unlink: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &envLinkDeploymentID}, oneXDeploymentID(""))
+	addDeploymentFlag(cmd.Flags(), "Deployment to unlink: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &envLinkDeploymentID}, oneXDeploymentID)
 	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Remove an exclude instead of a link")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
@@ -163,12 +163,11 @@ func newEnvVarLinkListCmd(out io.Writer) *cobra.Command {
 }
 
 func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := linkVariableIDOrKey()
 	if err != nil {
@@ -196,13 +195,12 @@ func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 	return linkChanged(cmd, r, report, line)
 }
 
-func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+func runEnvVarLinkRemove(cmd *cobra.Command, out io.Writer) error {
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := linkVariableIDOrKey()
 	if err != nil {
@@ -223,11 +221,10 @@ func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	idOrKey, err := linkVariableIDOrKey()
 	if err != nil {

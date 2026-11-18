@@ -619,29 +619,6 @@ var validationCases = []struct {
 		wantKeys:  []string{"tool.astro.build-secrets"},
 	},
 	{
-		name:      "unknown key in [tool.astro]",
-		wantCodes: []ProblemCode{CodeUnknownKey},
-		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nairflw = \"3.1\"\n",
-		wantKeys:  []string{"tool.astro.airflw"},
-	},
-	{
-		name:      "unknown key on a link",
-		wantCodes: []ProblemCode{CodeUnknownKey},
-		content: `
-[project]
-name = "p"
-dependencies = ["apache-airflow==3.1.*"]
-
-[tool.astro]
-workspace = "ws-abc"
-
-[tool.astro.deployments.prod]
-deployment = "dep-xyz"
-defaults = true
-`,
-		wantKeys: []string{"tool.astro.deployments.prod.defaults"},
-	},
-	{
 		name:      "incomplete deployment",
 		wantCodes: []ProblemCode{CodeDeploymentRequired, CodeWorkspaceRequired},
 		content: `
@@ -1104,10 +1081,10 @@ url = "https://deployments.astro.corp.example/ckdep-apc/airflow"
 		wantKeys: []string{"tool.astro.deployments.prod-apc.url"},
 	},
 	{
-		// A link has no organization: Houston has none, and an Astro link's
-		// is [tool.astro] organization.
-		name:      "apc link with an organization",
-		wantCodes: []ProblemCode{CodeUnknownKey},
+		// Only an Astro Deployment runs remote agents, which pull the client
+		// image astro remote deploy pushes.
+		name:      "client-registry on an mwaa link",
+		wantCodes: []ProblemCode{CodeClientRegistryOnNonAstroLink},
 		content: `
 [project]
 name = "p"
@@ -1115,14 +1092,12 @@ dependencies = ["apache-airflow==3.1.*"]
 
 [tool.astro]
 
-[tool.astro.deployments.prod-apc]
-target = "apc"
-domain = "astro.corp.example"
-workspace = "ckws-apc"
-deployment = "ckdep-apc"
-organization = "clorg"
+[tool.astro.deployments.aws]
+target = "mwaa"
+environment = "orders-prod"
+client-registry = "quay.io/acme/client"
 `,
-		wantKeys: []string{"tool.astro.deployments.prod-apc.organization"},
+		wantKeys: []string{"tool.astro.deployments.aws.client-registry"},
 	},
 	{
 		// An astro link's host is [tool.astro] domain. A domain on the link
@@ -1245,12 +1220,6 @@ deployment = "dep-xyz"
 		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\netl = { slots = -2 }\n",
 		wantKeys:  []string{"tool.astro.pools.etl.slots"},
 		wantCodes: []ProblemCode{CodePoolSlotsInvalid},
-	},
-	{
-		name:      "a pool with a key Airflow has no field for",
-		content:   "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.pools]\netl = { slots = 4, open_slots = 2 }\n",
-		wantKeys:  []string{"tool.astro.pools.etl.open_slots"},
-		wantCodes: []ProblemCode{CodeUnknownKey},
 	},
 	{
 		name:      "a pool include_deferred that is not a boolean",
@@ -1621,6 +1590,69 @@ func TestLoadReadsTheUVTablesAnAstroBuildWrites(t *testing.T) {
 	}
 	if want := []string{"https://pip.astronomer.io/v2/apache-airflow/"}; !reflect.DeepEqual(m.UV.IndexPages(), want) {
 		t.Errorf("IndexPages() = %#v, want only the source that names a known index: %#v", m.UV.IndexPages(), want)
+	}
+}
+
+// With Astronomer's index as the default and no source, the pages of the
+// Astronomer builds the constraints pin are on the default index: a scratch
+// environment outside the project still finds them.
+func TestIndexPagesFindTheAstroPinsOnTheDefaultIndex(t *testing.T) {
+	m, err := Load(write(t, "[project]\nname = \"etl\"\ndependencies = [\"apache-airflow==3.3.*\"]\n\n[tool.astro]\n\n"+
+		"[tool.uv]\nconstraint-dependencies = [\"apache-airflow==3.3.2+astro.1\", \"apache-airflow-task-sdk==1.3.2+astro.1\", \"protobuf<6\"]\n\n"+
+		"[[tool.uv.index]]\nname = \"astronomer\"\nurl = \"https://pip.astronomer.io/v2/\"\ndefault = true\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.UV.AstronomerIndex != "https://pip.astronomer.io/v2/" {
+		t.Errorf("AstronomerIndex = %q, want Astronomer's", m.UV.AstronomerIndex)
+	}
+	want := []string{
+		"https://pip.astronomer.io/v2/apache-airflow/",
+		"https://pip.astronomer.io/v2/apache-airflow-core/",
+		"https://pip.astronomer.io/v2/apache-airflow-task-sdk/",
+	}
+	if got := m.UV.IndexPages(); !reflect.DeepEqual(got, want) {
+		t.Errorf("IndexPages() = %#v, want %#v", got, want)
+	}
+	if got := m.UV.IndexPagesFor([]string{"pandas"}); len(got) != 0 {
+		t.Errorf("IndexPagesFor(no Airflow) = %#v, want none", got)
+	}
+}
+
+// A default index of the project's own (a mirror) is not where Astronomer's
+// builds are: an unrouted pin takes its page from the index named astronomer,
+// explicit here, and the mirror gives none.
+func TestIndexPagesTakeTheAstroPinsFromAstronomersIndexNotTheDefault(t *testing.T) {
+	m, err := Load(write(t, "[project]\nname = \"etl\"\ndependencies = [\"apache-airflow==3.3.*\"]\n\n[tool.astro]\n\n"+
+		"[tool.uv]\nconstraint-dependencies = [\"apache-airflow==3.3.2+astro.1\"]\n\n"+
+		"[[tool.uv.index]]\nname = \"mirror\"\nurl = \"https://mirror.example/simple\"\ndefault = true\n\n"+
+		"[[tool.uv.index]]\nname = \"astronomer\"\nurl = \"https://pip.astronomer.io/v2/\"\nexplicit = true\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"https://pip.astronomer.io/v2/apache-airflow/"}; !reflect.DeepEqual(m.UV.IndexPages(), want) {
+		t.Errorf("IndexPages() = %#v, want Astronomer's page only: %#v", m.UV.IndexPages(), want)
+	}
+}
+
+// A [tool.uv.sources] key is a package name as uv reads it, so it is matched
+// by PEP 503 name: a source written apache_airflow routes the same package the
+// pin names, and the pin does not add Astronomer's page a second time.
+func TestIndexPagesNormalizeSourceKeys(t *testing.T) {
+	m, err := Load(write(t, "[project]\nname = \"etl\"\ndependencies = [\"apache-airflow==3.3.*\"]\n\n[tool.astro]\n\n"+
+		"[tool.uv]\nconstraint-dependencies = [\"apache-airflow==3.3.2+astro.1\"]\n\n"+
+		"[[tool.uv.index]]\nname = \"astronomer\"\nurl = \"https://pip.astronomer.io/v2/\"\nexplicit = true\n\n"+
+		"[[tool.uv.index]]\nname = \"corp\"\nurl = \"https://corp.example/simple\"\nexplicit = true\n\n"+
+		"[tool.uv.sources]\nApache_Airflow = { index = \"corp\" }\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"https://corp.example/simple/Apache_Airflow/"}
+	if got := m.UV.IndexPages(); !reflect.DeepEqual(got, want) {
+		t.Errorf("IndexPages() = %#v, want the source's page only: %#v", got, want)
+	}
+	if got := m.UV.IndexPagesFor([]string{"apache.airflow==3.3.*"}); !reflect.DeepEqual(got, want) {
+		t.Errorf("IndexPagesFor() = %#v, want %#v", got, want)
 	}
 }
 

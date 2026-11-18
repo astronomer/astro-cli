@@ -8,14 +8,15 @@ import (
 
 	giturls "github.com/whilp/git-urls"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/apc/workspace"
 )
 
 var (
 	ErrInvalidDAGDeploymentType = errors.New("please specify the correct Dag deployment type, one of the following: image, volume, git_sync(if enabled in platform config), dag_deploy(if enabled in platform config)")
-	errNFSLocationNotFound      = errors.New("please specify the nfs location via --nfs-location flag")
-	errGitRepoNotFound          = errors.New("please specify a valid git repository URL via --git-repository-url")
+	errNFSLocationNotFound      = cliout.Usage(errors.New("please specify the nfs location via --nfs-location flag"))
+	errGitRepoNotFound          = cliout.Usage(errors.New("please specify a valid git repository URL via --git-repository-url"))
 	errInvalidExecutorType      = errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s, or Astro's spellings LocalExecutor, CeleryExecutor, KubernetesExecutor")
 	errAstroExecutorOnAPC       = errors.New("AstroExecutor is an Astro executor, and Astro Private Cloud has no equivalent: specify one of local, celery, kubernetes (or LocalExecutor, CeleryExecutor, KubernetesExecutor)")
 	errNoWorkspaceFound         = errors.New("no valid workspace source found")

@@ -8,6 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // ListItem is one row of `astro local env list`: a declared name with the
@@ -594,32 +595,36 @@ func declaredKeySet(schema *envschema.Schema) map[string]bool {
 	return set
 }
 
+// The hints below are commands to run as printed, so each quotes the name for
+// the shell: a name can come from a .env key, which nothing stops holding
+// shell syntax. An ordinary name (MY_VAR, my_conn) prints bare.
+
 // removeHint is the exact `astro local env <noun> delete` command for an
 // orphan, with the scope flag that names the file it lives in.
 func removeHint(kind Kind, name string, scope Scope) string {
-	return "astro local env " + Noun(kind) + " delete " + name + " --" + string(scope)
+	return "astro local env " + Noun(kind) + " delete " + scaffold.ShellQuote(name) + " --" + string(scope)
 }
 
 // DeclareHint is the exact `astro local env <noun> declare` command for a
 // name. A declaration lives in the project's pyproject.toml whichever file
 // holds the value, so it takes no scope flag.
 func DeclareHint(kind Kind, name string) string {
-	return "astro local env " + Noun(kind) + " declare " + name
+	return "astro local env " + Noun(kind) + " declare " + scaffold.ShellQuote(name)
 }
 
 // SetHint is the `astro local env <noun> set` command for a name. It names no
 // value: set prompts for one and refuses it as an argument.
 func SetHint(kind Kind, name string) string {
-	return "astro local env " + Noun(kind) + " set " + name
+	return "astro local env " + Noun(kind) + " set " + scaffold.ShellQuote(name)
 }
 
 // UndeclareHint is the `astro local env <noun> undeclare` command for a name.
 func UndeclareHint(kind Kind, name string) string {
-	return "astro local env " + Noun(kind) + " undeclare " + name
+	return "astro local env " + Noun(kind) + " undeclare " + scaffold.ShellQuote(name)
 }
 
 // LinkHint is the command that links a global vault entry to the project it
 // is run in.
 func LinkHint(kind Kind, name string) string {
-	return "astro local env " + Noun(kind) + " link " + name
+	return "astro local env " + Noun(kind) + " link " + scaffold.ShellQuote(name)
 }

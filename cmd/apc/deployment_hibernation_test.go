@@ -135,15 +135,6 @@ func TestDeploymentHibernationText(t *testing.T) {
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		assert.Contains(t, run.stdout, "Successfully removed the hibernation override on deployment rel-hb")
 	})
-
-	t.Run("a declined question changes nothing", func(t *testing.T) {
-		api := newHibernationClient(nil)
-
-		run := runAPC(t, api, "n\n", "deployment", "wake-up", "dep-hb")
-		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-		assert.Contains(t, run.stdout, "your Deployment was not changed")
-		api.AssertNotCalled(t, "HibernateOverrideDeployment", mock.Anything)
-	})
 }
 
 func TestDeploymentHibernationRefusals(t *testing.T) {

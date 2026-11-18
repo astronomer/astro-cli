@@ -60,6 +60,12 @@ func NextLabel(w io.Writer) string {
 	return labelFor(w, "Next:", Palette.Cyan)
 }
 
+// TodoLabel is the cyan "Left to do:" that heads the work a run leaves to do
+// by hand.
+func TodoLabel(w io.Writer) string {
+	return labelFor(w, "Left to do:", Palette.Cyan)
+}
+
 // labelFor colors text by the palette of the stream w is, which leaves it
 // plain where that stream does not color (NO_COLOR among them), and leaves it
 // plain on any other writer.

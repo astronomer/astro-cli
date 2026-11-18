@@ -55,5 +55,5 @@ func (c *Context) GetPublicRESTAPIURL(version string) string {
 		return CFG.AstroLocalCoreURL.GetString() + "/" + version
 	}
 
-	return domainutil.GetURLToEndpoint(CFG.CloudAPIProtocol.GetString(), domainutil.FormatDomain(c.Domain), version)
+	return domainutil.GetURLToEndpoint(apiProtocol(), domainutil.FormatDomain(c.Domain), version)
 }

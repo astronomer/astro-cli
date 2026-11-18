@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // Everything in this file exists for one transition: a project that ran under
@@ -57,23 +58,30 @@ type config1x struct {
 	} `yaml:"project"`
 }
 
-// read1xConfig loads a project's config the way the 1.x CLI resolved it: the project's
-// own .astro/config.yaml, falling back to the home config for the name, which
-// is what cfg.GetString does.
+// legacyProjectName is the name `astro dev` ran this project under, as the 1.x
+// CLI resolved it: project.name in the project's own .astro/config.yaml,
+// falling back to the home config's. kept reports that the file is there,
+// which is what Astro CLI 1.x needs to treat the directory as a project.
 //
-// A project without a config never ran under 1.x, so an absent file is "nothing
-// to say" rather than an error.
-func read1xConfig(projectPath string) (config1x, bool) {
+// astro init deletes that file when it converts a project, carrying the name
+// into [project] name, so without the file the manifest's name is the one to
+// try. A name that does not match costs a lookup that finds nothing, since the
+// 1.x volume name also hashes the path, and this is silent on a miss.
+func legacyProjectName(projectPath string) (name string, kept bool) {
 	cfg, ok := read1xConfigFile(filepath.Join(projectPath, ".astro", "config.yaml"))
 	if !ok {
-		return cfg, false
+		m, err := manifest.Load(filepath.Join(projectPath, manifest.Marker))
+		if err != nil {
+			return "", false
+		}
+		return m.Project.Name, false
 	}
 	if cfg.Project.Name == "" {
 		if home, ok := read1xConfigFile(home1xConfigPath()); ok {
 			cfg.Project.Name = home.Project.Name
 		}
 	}
-	return cfg, true
+	return cfg.Project.Name, true
 }
 
 // home1xConfigPath mirrors config.initHome: $ASTRO_HOME/.astro/config.yaml when
@@ -264,14 +272,17 @@ func (e *Engine) noteLegacyDatabase(ctx context.Context, conn engineConn, projec
 	if cb.OnLine == nil || own != volumeAbsent {
 		return
 	}
-	cfg, ok := read1xConfig(projectPath)
-	if !ok || cfg.Project.Name == "" {
+	name, kept := legacyProjectName(projectPath)
+	if name == "" {
 		return
 	}
-	legacyConn, legacy, found := e.findLegacyVolume(ctx, conn, projectPath, cfg.Project.Name)
+	legacyConn, legacy, found := e.findLegacyVolume(ctx, conn, projectPath, name)
 	if found != volumePresent {
 		return
 	}
-	e.systemLine(cb, fmt.Sprintf("starting with a new local Airflow database. The one astro dev used is left untouched in the %s volume %s, "+
-		"and Astro CLI 1.x can still start it", legacyConn.bin, legacy))
+	line := fmt.Sprintf("starting with a new local Airflow database. The one astro dev used is left untouched in the %s volume %s", legacyConn.bin, legacy)
+	if kept {
+		line += ", and Astro CLI 1.x can still start it"
+	}
+	e.systemLine(cb, line)
 }

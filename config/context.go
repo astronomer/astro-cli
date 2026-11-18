@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
@@ -72,8 +73,18 @@ func CurrentWorkspace() (string, error) {
 	return c.Workspace, nil
 }
 
-// Get CurrentDonain returns the currently configured astro domain, or an error if one is not set
+// GetCurrentDomain returns the currently configured astro domain, or an error
+// if one is not set. It is token-aware: in a run with ASTRO_API_TOKEN applied
+// (an environment login is held) it is that login's host, whatever the saved
+// current context or ASTRO_DOMAIN say. Callers that want the saved pointer, as
+// `astro context list` and `astro context switch` do, run before any login is
+// held and read it as it is.
 func GetCurrentDomain() (string, error) {
+	// An environment login (ASTRO_API_TOKEN) holds the host the run is on,
+	// ahead of ASTRO_DOMAIN and the saved current context.
+	if domain := environmentLoginDomain(); domain != "" {
+		return domain, nil
+	}
 	var domain string
 	if domain = os.Getenv("ASTRO_DOMAIN"); domain == "" {
 		if domain = CFG.Context.GetHomeString(); domain == "" {
@@ -120,7 +131,7 @@ func (c *Context) ContextExists() bool {
 		return false
 	}
 
-	return viperHome.IsSet(contextsKey + "." + key)
+	return viperHome.IsSet(contextsKey+"."+key) || heldEnvironmentLogin(key)
 }
 
 // GetContext gets the full context from the specified Context receiver struct
@@ -237,9 +248,58 @@ func (c *Context) SetSharedExpiresIn(value int64) error {
 	return shareContextField(cKey, "expiresin", time.Now().Add(time.Duration(value)*time.Second))
 }
 
+// SetSharedLogin saves a whole login (access token, refresh token, expiry in
+// seconds from now, and email) to this context and to every other context on
+// its tenant, in one config save. Four SetShared* calls are four saves, and a
+// failure part way leaves a new access token beside the retired refresh token.
+func (c *Context) SetSharedLogin(token, refreshToken string, expiresIn int64, userEmail string) error {
+	cKey, err := c.GetContextKey()
+	if err != nil {
+		return err
+	}
+	expiresAt := time.Now().Add(time.Duration(expiresIn) * time.Second)
+	for _, key := range append([]string{cKey}, contextKeysSharingLogin(cKey)...) {
+		// One vault write for the pair, so a failure between two can never
+		// leave the new access token beside the old refresh token.
+		fields := saveContextLogin(key, secrets.Login{Token: token, RefreshToken: refreshToken})
+		putContextField(key, tokenField, fields.Token)
+		putContextField(key, refreshTokenField, fields.RefreshToken)
+		putContextField(key, "expiresin", expiresAt)
+		putContextField(key, "user_email", userEmail)
+	}
+	return saveConfig(viperHome, HomeConfigFile)
+}
+
+// unsavedSelectionNote tells a person that a selection (a workspace or
+// organization switch) made under ASTRO_API_TOKEN, on a host with no saved
+// context, was not saved. A var so a test reads it.
+var unsavedSelectionNote = func(cKey, field string) {
+	fmt.Fprintf(os.Stderr, "%s the %s selected in this ASTRO_API_TOKEN run was not saved: there is no saved login for %s, and a token run never changes saved logins.\n", ansi.NoteLabel(os.Stderr), strings.ReplaceAll(field, "_", " "), strings.ReplaceAll(cKey, "_", "."))
+}
+
+// existsOnlyForEnvironmentLogin reports whether the context under cKey exists
+// for this run only because an environment login is held for it: nothing is
+// saved for it.
+func existsOnlyForEnvironmentLogin(cKey string) bool {
+	return !viperHome.IsSet(contextsKey+"."+cKey) && heldEnvironmentLogin(cKey)
+}
+
 // setContextField updates one field in one context and persists the config.
 func setContextField(cKey, field string, value interface{}) error {
 	field = strings.ToLower(field)
+	if existsOnlyForEnvironmentLogin(cKey) {
+		// A token run's context on a host with no saved context is the
+		// token's login in memory. A selection written to it would save a
+		// partial entry for a host nobody logged in to, and a token run never
+		// changes saved contexts, so it is not saved.
+		//
+		// Only a selection is worth a note. The login fields and the email an
+		// organization switch writes back as it read them are the token's own.
+		if slices.Contains(environmentFields, field) || field == "last_used_workspace" {
+			unsavedSelectionNote(cKey, field)
+		}
+		return nil
+	}
 	if s, ok := value.(string); ok && isLoginField(field) {
 		putLoginField(cKey, field, s)
 	} else {
@@ -306,7 +366,11 @@ func contextKeysSharingLogin(cKey string) []string {
 		return nil
 	}
 	var keys []string
-	for key := range viperHome.GetStringMap(contextsKey) {
+	// AllSettings, not GetStringMap(contextsKey): viper answers that from the
+	// highest layer that sets it, and a context this process has written
+	// (viper.Set) hides every context it only read from the file.
+	allContexts, _ := viperHome.AllSettings()[contextsKey].(map[string]interface{})
+	for key := range allContexts {
 		if strings.EqualFold(key, cKey) {
 			continue
 		}

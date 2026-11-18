@@ -47,8 +47,13 @@ type Request struct {
 	// WorkspaceID is the --workspace override, "" if unset.
 	WorkspaceID string
 	// ContextWorkspace is the workspace of the login the deploy runs under,
-	// the fallback.
+	// the fallback. On Astro it is the run's resolved Workspace
+	// (astrosession.Resolve): a token's claim or the saved login's.
 	ContextWorkspace string
+	// NoWorkspace is what a deploy that needs a workspace and finds none says,
+	// nil being ErrNoWorkspace. It is read only when none was found. On Astro it is the resolver's: what a run with
+	// an API token, or a saved login, has to do to supply one.
+	NoWorkspace error
 	// DagsOnly is --dags: ship only the dags/ directory, no image, no Docker.
 	DagsOnly bool
 	// Image is --image: an image-only deploy, leaving the running dags in place.
@@ -217,6 +222,12 @@ type DagDeploy struct {
 	NoDagsBaseDir bool
 	Wait          bool
 	WaitTime      time.Duration
+	// GitMetadata is [tool.astro.deploy] git-metadata: whether the deploy
+	// records the commit it ships.
+	GitMetadata bool
+	// CosmosBoost is [tool.astro.deploy] cosmos-boost: whether the Dags
+	// upload carries Cosmos Boost files for its dbt projects.
+	CosmosBoost bool
 }
 
 // DagResult is what the transport reports after a dags-only deploy.
@@ -235,6 +246,15 @@ type DagResult struct {
 type ImageDeploy struct {
 	DeploymentID string
 	WorkspaceID  string
+	// ShaAsTag is [tool.astro.deploy] sha-as-tag: an Astro Private Cloud
+	// deploy pushes the image by digest rather than by tag.
+	ShaAsTag bool
+	// GitMetadata is [tool.astro.deploy] git-metadata: whether the deploy
+	// records the commit it ships.
+	GitMetadata bool
+	// CosmosBoost is [tool.astro.deploy] cosmos-boost: whether the Dags
+	// upload carries Cosmos Boost files for its dbt projects.
+	CosmosBoost bool
 	// Build is the project's root (Build.ProjectDir) and the manifest's
 	// image-deciding fields, as imagebuild.ManifestBuildOf reads them.
 	Build imagebuild.ManifestBuild
@@ -413,8 +433,18 @@ func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.Proje
 	})
 }
 
+// deploySettings is the project's [tool.astro.deploy], or its defaults for a
+// deploy with no project (an --image-name deploy from outside one).
+func deploySettings(m *manifest.Manifest) manifest.Deploy {
+	if m == nil {
+		return manifest.DefaultDeploy()
+	}
+	return m.Astro.Deploy
+}
+
 // runDagsOnly ships just the dags/ directory through the transport.
 func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
+	settings := deploySettings(req.Manifest)
 	dag, err := d.DeployDags(&DagDeploy{
 		DeploymentID:  target.DeploymentID,
 		WorkspaceID:   target.WorkspaceID,
@@ -423,6 +453,8 @@ func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 		NoDagsBaseDir: req.NoDagsBaseDir,
 		Wait:          req.Wait,
 		WaitTime:      req.WaitTime,
+		GitMetadata:   settings.GitMetadata,
+		CosmosBoost:   settings.CosmosBoost,
 	})
 	if err != nil {
 		return Result{}, err
@@ -454,10 +486,14 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 	// every project that generates its image. imagebuild passes a generated build
 	// only the netrc secret, and checkImageSource has warned about the rest.
 	includeDags := !req.Image && !req.ImageAlone
+	settings := deploySettings(req.Manifest)
 	img, err := d.DeployImage(&ImageDeploy{
 		DeploymentID:    target.DeploymentID,
 		WorkspaceID:     target.WorkspaceID,
 		Build:           imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest),
+		GitMetadata:     settings.GitMetadata,
+		CosmosBoost:     settings.CosmosBoost,
+		ShaAsTag:        settings.ShaAsTag,
 		BuildSecrets:    req.BuildSecrets,
 		ImageName:       req.ImageName,
 		ImageInRegistry: req.ImageInRegistry,
@@ -790,12 +826,18 @@ func namedTarget(req Request, name string, links map[string]manifest.Link) (Targ
 	}, nil
 }
 
+// ErrNoWorkspace is a deploy with no Workspace to pick a Deployment in.
+var ErrNoWorkspace = errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
+
 // unlinkedTarget runs the workspace-level pick/create flow, for a project whose
 // manifest declares no deployment links at all, and links what it picks.
 func unlinkedTarget(req Request, d Deployer) (Target, error) {
 	workspaceID := listWorkspace(req)
 	if workspaceID == "" {
-		return Target{}, errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
+		if req.NoWorkspace != nil {
+			return Target{}, req.NoWorkspace
+		}
+		return Target{}, ErrNoWorkspace
 	}
 	if !req.Interactive {
 		if req.Manifest == nil {

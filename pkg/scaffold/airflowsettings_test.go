@@ -443,7 +443,7 @@ func TestASettingsFileWhoseValuesReachTheVaultIsRetired(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoFileExists(t, filepath.Join(dir, SettingsRelPath))
-	require.Contains(t, res.Deleted, SettingsRelPath+" (migrated into the encrypted vault and pyproject.toml, removed)")
+	require.Contains(t, res.Deleted, SettingsRelPath+" (now in pyproject.toml and the encrypted vault)")
 	require.Equal(t, "tok-123", writer.stored["API_TOKEN"])
 	require.False(t, anyContains(res.Advisories, "plaintext"), "%v", res.Advisories)
 	require.False(t, anyContains(res.Notes, SettingsRelPath), "%v", res.Notes)
@@ -797,7 +797,7 @@ func TestTheStock1xSettingsFileIsRetired(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoFileExists(t, filepath.Join(dir, SettingsRelPath))
-	require.Contains(t, res.Deleted, SettingsRelPath+" (nothing to carry, removed)")
+	require.Contains(t, res.Deleted, SettingsRelPath+" (nothing in it to keep)")
 	require.False(t, anyContains(res.Notes, SettingsRelPath), "%v", res.Notes)
 	require.Empty(t, res.Advisories)
 	require.Empty(t, writer.stored)
@@ -821,7 +821,7 @@ func TestTheStockTemplatesBlankEntriesDoNotBlockARealOne(t *testing.T) {
 	require.Equal(t, "tok-123", writer.stored["API_TOKEN"])
 	require.Len(t, writer.stored, 1)
 	require.NoFileExists(t, filepath.Join(dir, SettingsRelPath))
-	require.Contains(t, res.Deleted, SettingsRelPath+" (migrated into the encrypted vault and pyproject.toml, removed)")
+	require.Contains(t, res.Deleted, SettingsRelPath+" (now in pyproject.toml and the encrypted vault)")
 	require.False(t, anyContains(res.Notes, SettingsRelPath), "%v", res.Notes)
 }
 

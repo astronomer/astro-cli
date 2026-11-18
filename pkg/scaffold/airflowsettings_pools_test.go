@@ -40,8 +40,8 @@ func TestPoolsAreCarriedIntoTheManifest(t *testing.T) {
 	}, m.Astro.Pools)
 
 	require.NoFileExists(t, filepath.Join(dir, SettingsRelPath))
-	require.Contains(t, res.Deleted, SettingsRelPath+" (migrated into pyproject.toml, removed)")
-	require.Contains(t, res.Created, "pyproject.toml (migrated 3 pools from "+SettingsRelPath+" into [tool.astro.pools])")
+	require.Contains(t, res.Deleted, SettingsRelPath+" (now in pyproject.toml)")
+	require.Contains(t, res.Created, "pyproject.toml (moved in 3 pools from "+SettingsRelPath+")")
 }
 
 // The adopt arm writes them too.
@@ -57,7 +57,7 @@ func TestPoolsAreCarriedIntoAnAdoptedManifest(t *testing.T) {
 	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	require.Equal(t, map[string]manifest.Pool{"etl": {Slots: 4}}, m.Astro.Pools)
-	require.Contains(t, res.Updated, "pyproject.toml (migrated 1 pool from "+SettingsRelPath+" into [tool.astro.pools])")
+	require.Contains(t, res.Updated, "pyproject.toml (moved in 1 pool from "+SettingsRelPath+")")
 }
 
 // A pool Airflow could not take is not carried, and the file stays as its

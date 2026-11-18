@@ -29,12 +29,17 @@ func execEnvCmd(args ...string) (string, error) {
 	cmd := newEnvRootCmd(buf)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
+	// cliout.Execute turns this on for the root of a real run, which keeps cobra's
+	// usage block out of every command's error.
+	cmd.SilenceUsage = true
 	var verbosity string
 	cmd.PersistentFlags().StringVar(&verbosity, "verbosity", "", "")
 	cmd.SetArgs(args)
 	testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
-	return buf.String(), err
+	// The tests spell flags as 1.x did where that is what they test, and say
+	// nothing of the deprecation warning that costs.
+	return withoutDeprecations(buf.String()), err
 }
 
 // expectAbsent mocks the key lookup `set` makes before it decides whether to
@@ -140,9 +145,6 @@ func TestEnvVarDeleteRequiresYes(t *testing.T) {
 func TestEnvVarDeleteDeclinedFailsAborted(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	defer resetEnvFlags()
-	orig := stdinIsTerminal
-	stdinIsTerminal = func() bool { return true }
-	t.Cleanup(func() { stdinIsTerminal = orig })
 	defer testUtil.MockUserInput(t, "n\n")()
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)

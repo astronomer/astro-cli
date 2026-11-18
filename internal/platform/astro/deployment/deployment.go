@@ -10,12 +10,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
-	"golang.org/x/term"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
@@ -50,9 +48,9 @@ var (
 	parseToken    = util.ParseAPIToken
 	CleanOutput   = false
 
-	// stdinIsTerminal reports whether someone is at the keyboard to pick a
-	// Deployment. A var so a test can stand in for a terminal.
-	stdinIsTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
+	// mayAsk reports whether this run may ask which Deployment to pick (input.CanAsk).
+	// A var so a test can answer either way.
+	mayAsk = input.CanAsk
 )
 
 const (
@@ -155,7 +153,7 @@ func CanCiCdDeploy(bearerToken string) bool {
 		return false
 	}
 
-	// Only API Tokens and API Keys have permissions
+	// Only API Tokens have permissions
 	if len(claims.Permissions) > 0 {
 		return true
 	}
@@ -1554,10 +1552,7 @@ func updateResourceQuotaMemory(resourceQuotaMemory string, deployment *astrov1.D
 var (
 	// errDeleteNeedsTarget is a delete with no Deployment named and nobody to
 	// pick one. --yes answers the confirmation, never which Deployment.
-	errDeleteNeedsTarget = errors.New("astro deployment delete needs the Deployment to delete, and there is no terminal to pick it from: pass --deployment, or the Deployment id as the argument. --yes skips the confirmation and never chooses the Deployment")
-	// errDeleteNeedsConfirmation is a delete without --yes and nobody to
-	// type the confirmation.
-	errDeleteNeedsConfirmation = errors.New("astro deployment delete asks for the Deployment's name to confirm, and there is no terminal to type it at: pass --yes")
+	errDeleteNeedsTarget = errors.New("astro deployment delete needs the Deployment to delete, and this run cannot ask which one: pass --deployment, or the Deployment id as the argument. --yes skips the confirmation and never chooses the Deployment")
 	// errDeleteNotConfirmed is a confirmation answered with anything but the
 	// Deployment's name: declined, as every declined confirmation is
 	// (input.ErrAborted), saying why.
@@ -1565,10 +1560,10 @@ var (
 )
 
 // Delete deletes a Deployment, after the person types its name unless
-// forceDelete. A run with no terminal must name the Deployment: it is never
+// forceDelete. A run that cannot ask must name the Deployment: it is never
 // picked for it, whatever forceDelete says.
 func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Client astrov1.APIClient) (*Removal, error) {
-	if deploymentID == "" && deploymentName == "" && !stdinIsTerminal() {
+	if deploymentID == "" && deploymentName == "" && !mayAsk() {
 		return nil, input.Required(errDeleteNeedsTarget)
 	}
 
@@ -1587,11 +1582,6 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 			input.About("the Deployment's name, to confirm the delete"), input.AnsweredBy("--yes"))
 		if err != nil {
 			return nil, err
-		}
-		// Nothing typed with no terminal is nobody there to type it: say
-		// what answers the question, not that the answer was wrong.
-		if typed == "" && !stdinIsTerminal() {
-			return nil, input.Required(errDeleteNeedsConfirmation)
 		}
 		if typed != currentDeployment.Name {
 			return nil, fmt.Errorf("%w (\"%s\"): the Deployment was not deleted", errDeleteNotConfirmed, currentDeployment.Name)
@@ -2020,7 +2010,7 @@ const (
 	ToRead Use = iota
 	// ToChange changes the Deployment or ships to it. It acts only on a
 	// Deployment the run named, the person picked, or the run's
-	// Deployment-scoped ASTRO_API_TOKEN is for (see UseTokenDeployment);
+	// Deployment-scoped ASTRO_API_TOKEN is for (see astrosession.TokenDeployment);
 	// never on one taken because it was the only one.
 	ToChange
 	// ToPick is ToChange for a Deployment that is always named or picked,
@@ -2029,22 +2019,6 @@ const (
 	// project.
 	ToPick
 )
-
-// tokenDeployment is the Deployment this process's ASTRO_API_TOKEN is scoped
-// to, or "" (see UseTokenDeployment).
-var tokenDeployment atomic.Value
-
-// UseTokenDeployment records, for this process only, the Deployment the run's
-// ASTRO_API_TOKEN is scoped to: "" for a token scoped to a workspace or an
-// organization, or for none. A run that names no Deployment acts on it (see
-// Use), since it is the one Deployment such a token can act on.
-func UseTokenDeployment(id string) { tokenDeployment.Store(id) }
-
-// TokenDeployment is the Deployment UseTokenDeployment recorded, or "".
-func TokenDeployment() string {
-	id, _ := tokenDeployment.Load().(string)
-	return id
-}
 
 // ErrTokenDeploymentNotFound is a run that named no Deployment, whose
 // ASTRO_API_TOKEN is scoped to a Deployment the workspace does not list.
@@ -2055,7 +2029,7 @@ var ErrTokenDeploymentNotFound = errors.New("the Deployment ASTRO_API_TOKEN is s
 // workspace does not list is an error, as is one filter leaves out: nothing
 // else is picked in its place.
 func fromToken(ws string, deployments []astrov1.Deployment, filter func(astrov1.Deployment) bool) (astrov1.Deployment, bool, error) {
-	id := TokenDeployment()
+	id := astrosession.TokenDeployment()
 	if id == "" {
 		return astrov1.Deployment{}, false, nil
 	}
@@ -2130,11 +2104,14 @@ func (e *TargetsDisagreeError) Error() string {
 // cliout.IsUsage, which this package cannot import.
 func (e *TargetsDisagreeError) IsUsageError() bool { return true }
 
+// OmitsHelpPointer keeps the pointer to help off the error: it says what to pass.
+func (e *TargetsDisagreeError) OmitsHelpPointer() bool { return true }
+
 // mayAutoSelect reports whether this run is set up to take a workspace's only
 // Deployment without asking: authenticated by an API token, or with
 // deployment.auto_select on.
 func mayAutoSelect() bool {
-	return astrosession.HasAPIToken() || os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != "" || config.CFG.AutoSelect.GetBool()
+	return astrosession.HasAPIToken() || config.CFG.AutoSelect.GetBool()
 }
 
 // GetDeployment is the Deployment in workspace ws that deploymentID or
@@ -2145,6 +2122,14 @@ func mayAutoSelect() bool {
 // creates a Deployment: a workspace with none to pick from is a
 // *NoDeploymentsError.
 func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFilter func(deployment astrov1.Deployment) bool, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+	// One the caller already fetched by its id (see WithFetched) is that
+	// Deployment: nothing is listed or read again.
+	if d, ok := fetchedFor(astroV1Client, ws, deploymentID); ok {
+		if deploymentName != "" && d.Name != deploymentName {
+			return astrov1.Deployment{}, &TargetsDisagreeError{ID: deploymentID, Name: deploymentName, IDsName: d.Name}
+		}
+		return d, nil
+	}
 	deployments, err := ListDeployments(ws, "", astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
@@ -2204,7 +2189,7 @@ func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, fil
 		}
 		// 1.x took it here for every command. A change waits for someone to
 		// pick it, and a run with nobody to ask is told to name it.
-		if !stdinIsTerminal() {
+		if !mayAsk() {
 			return astrov1.Deployment{}, input.Required(fmt.Errorf("%s (%s) is the only Deployment in workspace %s this command can act on, but a command that changes a Deployment does not choose one by itself: pass --deployment", deployments[0].Name, deployments[0].Id, ws))
 		}
 	}

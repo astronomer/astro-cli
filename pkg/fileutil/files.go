@@ -81,31 +81,6 @@ func Exists(filePath string, fs afero.Fs) (bool, error) {
 	return false, nil
 }
 
-// WriteStringToFile write a string to a file
-func WriteStringToFile(filePath, s string) error {
-	return WriteToFile(filePath, strings.NewReader(s))
-}
-
-// WriteToFile writes an io.Reader to a file if it does not exst
-func WriteToFile(filePath string, r io.Reader) error {
-	dir := filepath.Dir(filePath)
-	if dir != "" {
-		if err := os.MkdirAll(dir, perm); err != nil {
-			return err
-		}
-	}
-
-	file, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-
-	defer file.Close()
-
-	_, err = io.Copy(file, r)
-	return err
-}
-
 // TarOverlay changes what Tar writes without touching source. Paths are
 // slash-separated and relative to source, before any base directory is
 // prepended.
@@ -147,7 +122,27 @@ func TarDir(source, target, baseDir string) error {
 }
 
 // createTarFile creates the tarball writeTar writes; a test fails its Close.
-var createTarFile = func(name string) (io.WriteCloser, error) { return os.Create(name) }
+var createTarFile = func(name string) (io.WriteCloser, error) { return createFresh(name) }
+
+// createFresh creates name as a new file for an archive the CLI writes,
+// replacing whatever is there. os.Create would write through a symlink at
+// name - a dags.tar a project holds as a link, say - and truncate the file it
+// points at, outside the project. Removing the entry first unlinks a symlink
+// rather than its target, and O_EXCL fails on one put back in between instead
+// of following it. A directory at name is left alone, and fails the create as
+// os.Create fails on one.
+func createFresh(name string) (*os.File, error) {
+	if info, err := os.Lstat(name); err == nil && !info.IsDir() {
+		if err := os.Remove(name); err != nil {
+			return nil, err
+		}
+	}
+	return os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, archiveFileMode)
+}
+
+// archiveFileMode is the mode createFresh creates with, os.Create's: the
+// user's umask decides the rest.
+const archiveFileMode = 0o666
 
 // writeTar writes the tarball, gzip-compressed with gzipped. A tarball whose
 // footer, compressed stream or file did not close is not one - a full disk
@@ -447,8 +442,8 @@ func UploadFile(args *UploadFileArguments) error {
 			}
 			continue
 		}
-		defer response.Body.Close()          //nolint:gocritic // intentional in this shell code
 		data, _ := io.ReadAll(response.Body) //nolint:errcheck // error deliberately ignored in this shell code
+		response.Body.Close()
 		responseStatusCode := response.StatusCode
 
 		// Return success for 2xx status code
@@ -490,7 +485,7 @@ func GzipFile(srcFilePath, destFilePath string) error {
 	}
 	defer srcFile.Close()
 
-	destFile, err := os.Create(destFilePath)
+	destFile, err := createFresh(destFilePath)
 	if err != nil {
 		return err
 	}

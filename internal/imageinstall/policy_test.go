@@ -171,3 +171,14 @@ func TestApplyLetsALeftOutPackageComeFromAPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"six==1.17.0"}, lists.Requirements)
 }
+
+// A project whose default index is Astronomer's routes nothing: every package
+// installs by name through the image's own index, which is Astronomer's too,
+// and Airflow's distributions are the runtime's in any case.
+func TestReadProjectRoutesNothingThroughTheDefaultIndex(t *testing.T) {
+	p, err := readProject([]byte("[project]\nname = 'demo'\ndependencies = ['apache-airflow==3.3.*', 'pandas']\n\n" +
+		"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\ndefault = true\n"))
+	require.NoError(t, err)
+	assert.Empty(t, p.routed)
+	assert.Contains(t, p.own, "pandas")
+}

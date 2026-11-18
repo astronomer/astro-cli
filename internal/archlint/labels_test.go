@@ -37,7 +37,7 @@ var labelAllowed = map[string]string{
 // pkg/ansi: at its start or after any newline ("\nWarning: …", "done.\nNote:
 // …"), after any spaces, in any case; or a string that is a label on its own
 // ("Warning:"), handed to a print call as its own argument.
-var labelLiteral = regexp.MustCompile(`(?i)(^|\n)[ \t]*(warning|error|note|next): |^\s*(warning|error|note|next):\s*$`)
+var labelLiteral = regexp.MustCompile(`(?i)(^|\n)[ \t]*(warning|error|note|next|left to do):( |\n|$)|^\s*(warning|error|note|next|left to do):\s*$`)
 
 // No non-test string literal holds a Warning, Error, Note or Next label,
 // except what labelAllowed names. An allowlist key is a file, or a file and
@@ -70,9 +70,9 @@ func TestLabelsComeFromCliout(t *testing.T) {
 	}
 	sort.Strings(problems)
 	if len(problems) > 0 {
-		t.Errorf("%d string literals start with a Warning, Error, Note or Next label:\n\t%s\n\n"+
+		t.Errorf("%d string literals start with a Warning, Error, Note, Next or Left to do label:\n\t%s\n\n"+
 			"Print the label through cmd/cliout (or pkg/ansi, from internal/) instead: Warn, Note, or WarningLabel, NextLabel, "+
-			"ErrorLabel, NoteLabel, DangerLabel beside the message, so it is colored on a terminal and "+
+			"ErrorLabel, NoteLabel, DangerLabel, TodoLabel beside the message, so it is colored on a terminal and "+
 			"spelled the same everywhere. If the text is not the CLI's own label, for example another "+
 			"tool's output being parsed, add it to labelAllowed in internal/archlint/labels_test.go "+
 			"and say why.", len(problems), strings.Join(problems, "\n\t"))

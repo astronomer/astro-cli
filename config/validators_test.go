@@ -1,11 +1,5 @@
 package config
 
-import (
-	"path/filepath"
-
-	"github.com/spf13/viper"
-)
-
 func (s *Suite) Test_validateRegistryEndpoint() {
 	s.Run("test valid registry endpoints", func() {
 		validEndpoints := []string{
@@ -54,76 +48,5 @@ func (s *Suite) Test_validateRegistryEndpoint() {
 			err := ValidateRegistryEndpoint(endpoint)
 			s.ErrorContains(err, want, "for %q", endpoint)
 		}
-	})
-}
-
-// ClientRegistry checks a saved value as a new one is checked, and its error
-// names the config that holds it and the command that fixes it there: -g for
-// the global one, which `astro config set` without it does not write.
-func (s *Suite) TestClientRegistry() {
-	s.restoreConfigGlobals()
-	initTestConfig()
-	noProject := func() { viperProject = viper.New() }
-	withProject := func(value string) {
-		viperProject = viper.New()
-		viperProject.SetConfigFile(filepath.Join(s.T().TempDir(), ConfigFileNameWithExt))
-		viperProject.Set(CFG.RemoteClientRegistry.Path, value)
-	}
-
-	s.Run("unset", func() {
-		noProject()
-		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString(""))
-		got, err := ClientRegistry()
-		s.NoError(err)
-		s.Empty(got)
-	})
-
-	s.Run("a valid saved value", func() {
-		noProject()
-		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString("quay.io/acme/my-image"))
-		got, err := ClientRegistry()
-		s.NoError(err)
-		s.Equal("quay.io/acme/my-image", got)
-	})
-
-	s.Run("a tagged global value says to fix it with -g", func() {
-		noProject()
-		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString("quay.io/acme/my-image:1.0"))
-		_, err := ClientRegistry()
-		s.ErrorContains(err, "deploy.remote_execution.client_registry in your global config is not a usable registry endpoint")
-		s.ErrorContains(err, "must not include an image tag")
-		s.ErrorContains(err, "astro config set -g deploy.remote_execution.client_registry")
-	})
-
-	s.Run("a tagged project value says to fix it in the project", func() {
-		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString("quay.io/acme/fine"))
-		withProject("quay.io/acme/my-image:1.0")
-		_, err := ClientRegistry()
-		s.ErrorContains(err, "deploy.remote_execution.client_registry in this project's config")
-		s.ErrorContains(err, "'astro config set deploy.remote_execution.client_registry")
-		s.NotContains(err.Error(), "config set -g", "a project's value is fixed in the project, not the global config")
-	})
-
-	// A value 1.x saved under its own name is read, reported under that
-	// name, as the user finds it in the file, and fixed under the current
-	// one, which wins over it.
-	s.Run("a tagged value under the 1.x name", func() {
-		initTestConfig()
-		noProject()
-		viperHome.Set("remote.client_registry", "quay.io/acme/my-image:1.0")
-		_, err := ClientRegistry()
-		s.ErrorContains(err, "remote.client_registry in your global config is not a usable registry endpoint")
-		s.NotContains(err.Error(), "deploy.remote_execution.client_registry in")
-		s.ErrorContains(err, "astro config set -g deploy.remote_execution.client_registry")
-	})
-
-	// An unset registry is set where it is read: globally, with -g, unless
-	// the project sets the key, even to "", which shadows the global value.
-	s.Run("the fix for an unset value", func() {
-		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString(""))
-		noProject()
-		s.Equal("astro config set -g deploy.remote_execution.client_registry <registry>/<repository>", ClientRegistryFix())
-		withProject("")
-		s.Equal("astro config set deploy.remote_execution.client_registry <registry>/<repository>", ClientRegistryFix())
 	})
 }

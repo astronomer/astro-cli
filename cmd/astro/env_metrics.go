@@ -29,14 +29,13 @@ const envMetricsExamples = `
 
 func newEnvMetricsExportRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "metrics-export",
-		Aliases:                    []string{"metrics", "metrics-exports"},
-		Short:                      "Manage metrics exports",
-		Long:                       "Manage metrics exports on Astro, scoped to a workspace or a deployment.",
-		Example:                    envMetricsExamples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Use:     "metrics-export",
+		Aliases: []string{"metrics", "metrics-exports"},
+		Short:   "Manage metrics exports",
+		Long:    "Manage metrics exports on Astro, scoped to a workspace or a deployment.",
+		Example: envMetricsExamples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
 	addScopePersistentFlags(cmd)
@@ -134,11 +133,10 @@ func metricsCommonFlags(cmd *cobra.Command) {
 }
 
 func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	objs, err := env.ListMetricsExports(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -151,11 +149,10 @@ func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	obj, err := env.GetMetricsExport(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -174,12 +171,11 @@ func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 // They are therefore checked on the create path only, and the error names both
 // the missing flags and the reason they are suddenly needed.
 func runEnvMetricsSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	in, err := buildMetricsInput(cmd)
 	if err != nil {

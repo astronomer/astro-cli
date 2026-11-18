@@ -101,6 +101,7 @@ func TestDeployRefusesA1xProject(t *testing.T) {
 
 	parent := newProject(t)
 	make1xProject(t, parent)
+	logInWithoutWorkspace(t, parent)
 	before := listTree(t, parent.Dir)
 
 	for _, args := range [][]string{
@@ -142,6 +143,7 @@ func TestDeployOutsideAProject(t *testing.T) {
 	tier(t, 0)
 
 	p := newProject(t)
+	logInWithoutWorkspace(t, p)
 	r := p.run("deploy", "dep-id").requireFailure()
 	if !strings.Contains(r.Stderr, "not an Astro project directory") || !strings.Contains(r.Stderr, "astro init") {
 		t.Errorf("want the no-project advice\n%s", r.output())
@@ -162,6 +164,7 @@ func TestDeployImageNameOutsideAProject(t *testing.T) {
 
 	t.Run("outside any project", func(t *testing.T) {
 		p := newProject(t)
+		logInWithoutWorkspace(t, p)
 		r := runIn(t, p, "deploy", "dep-id", "--image-name", "img:1").requireFailure()
 		if !strings.Contains(r.Stderr, "an image deploy needs") {
 			t.Errorf("want it past the project check, stopped at the container engine\n%s", r.output())
@@ -174,6 +177,7 @@ func TestDeployImageNameOutsideAProject(t *testing.T) {
 	t.Run("in a 1.x project", func(t *testing.T) {
 		p := newProject(t)
 		make1xProject(t, p)
+		logInWithoutWorkspace(t, p)
 		var payload struct {
 			Error string `json:"error"`
 			Kind  string `json:"kind"`
@@ -293,7 +297,23 @@ func manifestProjectForDeploy(t *testing.T) *project {
 	t.Helper()
 	p := newProject(t)
 	p.run("init", "--name", "deployable").requireSuccess()
+	logInWithoutWorkspace(t, p)
 	return p
+}
+
+// logInWithoutWorkspace gives p's home a good saved login on Astro (it does not
+// expire, and the API it names refuses connections) that has no current
+// Workspace. The root's setup fails closed on a machine with no login at all,
+// before the deploy gets to the refusals these cases are about, so they run
+// as a person who is logged in.
+func logInWithoutWorkspace(t *testing.T, p *project) {
+	t.Helper()
+	writeHomeContext(t, p, "cloud", `    token: Bearer e2e-not-a-token
+    expiresin: 2100-01-01T00:00:00Z
+    organization: e2e-organization
+    organization_product: HOSTED
+    user_email: e2e@example.invalid
+`)
 }
 
 // declareDockerfile adds `dockerfile = "Dockerfile"` under [tool.astro].
@@ -372,7 +392,7 @@ func TestAPCDeployRefusesWhatItCannotDeploy(t *testing.T) {
 		{"a 1.x project", make1xProject, []string{"deploy", "dep-id"}, []string{"Astro CLI 1.x layout", "Convert it with astro init, or deploy it with Astro CLI 1.x"}, "no_project"},
 		{"--image-name from a 1.x project", make1xProject, []string{"deploy", "dep-id", "--image-name", "img:1"}, []string{"Astro CLI 1.x layout"}, "no_project"},
 		{"--dags from a 1.x project", make1xProject, []string{"deploy", "dep-id", "--dags"}, []string{"Astro CLI 1.x layout", "Astro CLI v2 deploys only pyproject.toml projects"}, "no_project"},
-		{"a pyproject.toml project's deploy that names no Deployment", initProject, []string{"deploy"}, []string{"this project links no deployment and this run cannot be asked", "--deployment"}, "input_required"},
+		{"a pyproject.toml project's deploy that names no Deployment", initProject, []string{"deploy", "--non-interactive"}, []string{"this project links no deployment and this run cannot be asked", "--deployment"}, "input_required"},
 		{"an apc link on another installation", func(t *testing.T, p *project) {
 			initProject(t, p)
 			addAPCLink(t, p, "elsewhere", "astro.other.example")

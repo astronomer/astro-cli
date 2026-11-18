@@ -32,8 +32,9 @@ import (
 const (
 	plainSetHelp    = "Store the value unencrypted: in the project's .env, or for a global, in the vault without encryption"
 	plainNarrowHelp = "In a project, act on the plain .env only, not the vault"
-	// legacySecretUsage is the deprecation notice cobra prints for --secret.
-	legacySecretUsage = "values are stored in the encrypted vault by default; use --plain to opt out (--secret=false still means --plain)"
+	// legacyStoreFlagUse is what the deprecation warning says to type instead of
+	// --secret (cliout.WarnDeprecated).
+	legacyStoreFlagUse = "use --plain to opt out of the encrypted vault, which is the default (--secret=false still means --plain)"
 )
 
 // scopeFlags carries the shared --project/--global choice and the store
@@ -63,17 +64,18 @@ type scopeFlags struct {
 func addStoreFlags(cmd *cobra.Command, scope *scopeFlags, plainHelp string) {
 	cmd.Flags().BoolVar(&scope.plain, "plain", false, plainHelp)
 	cmd.Flags().BoolVar(&scope.legacySecret, "secret", false, "Deprecated: the vault is the default")
-	_ = cmd.Flags().MarkDeprecated("secret", legacySecretUsage) //nolint:errcheck // the flag was just registered
+	cliout.DeprecateFlag(cmd.Flags().Lookup("secret"), legacyStoreFlagUse)
 }
 
 // readStoreFlags folds the deprecated --secret into --plain. --secret is the
 // default and changes nothing; --secret=false, which used to mean a plain
 // file, still does, so a script written for it keeps its meaning. --plain with
 // --secret asks for both stores at once and is refused.
-func readStoreFlags(cmd *cobra.Command, scope *scopeFlags) error {
+func readStoreFlags(cmd *cobra.Command, stderr io.Writer, scope *scopeFlags) error {
 	if !cmd.Flags().Changed("secret") {
 		return nil
 	}
+	cliout.WarnDeprecatedFlags(stderr, cmd)
 	if scope.legacySecret && scope.plain {
 		return errors.New("--plain and --secret cannot be used together: the vault is the default, and --plain opts out of it")
 	}
@@ -158,9 +160,8 @@ func newEnvCmd(c *cli) *cobra.Command {
 			"vault, global vault, the linked workspace's Environment Manager, a declaration's " +
 			"default. Every source reaches Airflow whole, declared or not. " +
 			"A workspace that cannot be read is skipped with a note.",
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       helpOrUnknownSubcommand,
-		SuggestionsMinimumDistance: 2,
+		Args: cobra.ArbitraryArgs,
+		RunE: helpOrUnknownSubcommand,
 	}
 	cmd.PersistentFlags().BoolVar(&scope.project, "project", false, "Act on the project's values (the default inside a project)")
 	cmd.PersistentFlags().BoolVar(&scope.global, "global", false, "Act on the global values every linked project gets (the default outside a project)")
@@ -180,7 +181,7 @@ func newEnvCmd(c *cli) *cobra.Command {
 func helpOrUnknownSubcommand(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		if hint := removedVerbHint(cmd, args[0]); hint != "" {
-			return cliout.Usage(errors.New(hint))
+			return cliout.UsageNoHelp(errors.New(hint))
 		}
 	}
 	return cliout.GroupHelp(cmd, args)
@@ -315,14 +316,13 @@ func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		// Spelled twice, a rename leaves every hint composed from Noun naming a
 		// command that no longer exists — which is the failure Noun exists to
 		// prevent, so it cannot be the one thing that drifts from it.
-		Use:                        localenv.Noun(k.kind),
-		Aliases:                    k.aliases,
-		SuggestionsMinimumDistance: 2,
-		Short:                      "Manage " + k.label + "s",
-		Long:                       "Manage " + k.label + "s for local Airflow.",
-		Example:                    k.example,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       helpOrUnknownSubcommand,
+		Use:     localenv.Noun(k.kind),
+		Aliases: k.aliases,
+		Short:   "Manage " + k.label + "s",
+		Long:    "Manage " + k.label + "s for local Airflow.",
+		Example: k.example,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    helpOrUnknownSubcommand,
 	}
 	// Reads, then the write, then the destructive one — the same order
 	// `astro env` uses for the same four verbs, so help reads the same
@@ -384,7 +384,7 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Example: example,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := readStoreFlags(cmd, scope); err != nil {
+			if err := readStoreFlags(cmd, c.d.Stderr, scope); err != nil {
 				return err
 			}
 			// The route is decided before the value is read, so a save the
@@ -435,9 +435,9 @@ var connFieldFlagNames = []string{"type", "host", "login", "password", "schema",
 // addConnFieldFlags registers the per-field flags on a connection's `set`.
 //
 // The long names are the cloud sibling's, so the same invocation describes the
-// same connection in both trees. The single-letter forms are not: cloud has
-// -t/-l/-p free, but here -p next to --project reads as the scope flag, and a
-// shorthand that invites the wrong guess is worse than no shorthand.
+// same connection in both trees. The single-letter forms are not carried: a
+// short option is one of the table's (utils.ShortOptions), and -p next to
+// --project would read as the scope flag.
 func addConnFieldFlags(cmd *cobra.Command, f *connFields) {
 	cmd.Flags().StringVar(&f.connType, "type", "", "Connection type (e.g. postgres, http)")
 	cmd.Flags().StringVar(&f.host, "host", "", "Connection host")
@@ -480,7 +480,7 @@ func connFieldsGiven(cmd *cobra.Command) bool {
 // id from the key it was given. Taking one here would imply it tags the record.
 func connValueFromFields(f *connFields, password string) (string, error) {
 	if f.connType == "" {
-		return "", errors.New("a connection needs a type: pass --type, or give the whole connection as a URI or JSON")
+		return "", cliout.Usage(errors.New("a connection needs a type: pass --type, or give the whole connection as a URI or JSON"))
 	}
 	conn := connmodel.Connection{
 		ConnType:     f.connType,
@@ -510,7 +510,7 @@ func newEnvGetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			"  astro local env " + localenv.Noun(k.kind) + " get " + exampleName(k.kind) + " --global",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := readStoreFlags(cmd, scope); err != nil {
+			if err := readStoreFlags(cmd, c.d.Stderr, scope); err != nil {
 				return err
 			}
 			return c.runEnvGet(scope, k.kind, args[0])
@@ -539,7 +539,7 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			"  astro local env " + localenv.Noun(k.kind) + " delete " + exampleName(k.kind) + " --undeclare",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := readStoreFlags(cmd, scope); err != nil {
+			if err := readStoreFlags(cmd, c.d.Stderr, scope); err != nil {
 				return err
 			}
 			return c.runEnvDelete(scope, k.kind, args[0], undeclare)
@@ -585,7 +585,7 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			return c.runEnvList(scope, all, only)
 		},
 	}
-	cmd.Flags().BoolVar(&all, "all", false, "Also include every known project's .env, and vault globals not linked to this project")
+	cmd.Flags().BoolVarP(&all, "all", "a", false, "Also include every known project's .env, and vault globals not linked to this project")
 	return cmd
 }
 
@@ -988,13 +988,17 @@ func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key 
 		return "", "", false, err
 	}
 	workspaceSource := declaredSource(schema, kind, name) == envschema.SourceWorkspace
-	if !workspaceSource && m.Astro.Workspace == "" {
+	workspaceID, err := emenv.WorkspaceFor(&m.Astro)
+	if err != nil {
+		return "", "", false, err
+	}
+	if !workspaceSource && workspaceID == "" {
 		return "", "", false, nil
 	}
 	// reveal = true: get is the one deliberate reveal of a value.
 	wp := emenv.NewProvider(emenv.WorkspaceOf(&m.Astro), c.d.WorkspaceClients, true)
 	if v, has := wp.Lookup(key); has {
-		return v, localenv.WorkspaceSource(m.Astro.Workspace), true, nil
+		return v, localenv.WorkspaceSource(workspaceID), true, nil
 	}
 	if !workspaceSource {
 		// The linked workspace reaches every name, declared or not, but only a
@@ -1232,6 +1236,13 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 	if err != nil {
 		return err
 	}
+	if m != nil && c.d.WorkspaceClients != nil {
+		// The list reads the linked workspace: refused before it does when the
+		// run's token is for another one.
+		if _, err := emenv.WorkspaceFor(&m.Astro); err != nil {
+			return err
+		}
+	}
 	opts := c.listOptions(projectDir, m)
 	opts.All = all
 	switch {
@@ -1286,7 +1297,7 @@ func (c *cli) listOptions(projectDir string, m *manifest.Manifest) localenv.List
 	// it reads Environment Manager for presence only and pulls no secret.
 	if m != nil && c.d.WorkspaceClients != nil {
 		opts.WorkspaceProvider = emenv.NewProvider(emenv.WorkspaceOf(&m.Astro), c.d.WorkspaceClients, false)
-		opts.Workspace = m.Astro.Workspace
+		opts.Workspace = emenv.WorkspaceID(&m.Astro)
 	}
 	return opts
 }
@@ -1479,7 +1490,14 @@ func (c *cli) readSetValue(cmd *cobra.Command, in *setInput, fields *connFields,
 		if err != nil {
 			return "", fmt.Errorf("reading stdin: %w", err)
 		}
-		return strings.TrimRight(string(b), "\r\n"), nil
+		v := strings.TrimRight(string(b), "\r\n")
+		if v == "" {
+			// A stdin with nothing on it (/dev/null, a closed pipe, an empty
+			// pipe) is no value, not the empty string: writing it would
+			// silently blank the variable. Setting one to empty is --value "".
+			return "", errors.New("no value supplied: pass --value, or pipe one on stdin")
+		}
+		return v, nil
 	}
 	prompt := fmt.Sprintf("Value for %s %s: ", localenv.Noun(kind), name)
 	if err := input.MayAsk(prompt, input.AnsweredBy("--value or --stdin")); err != nil {

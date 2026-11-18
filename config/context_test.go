@@ -20,7 +20,7 @@ local:
   enabled: true
   host: http://example.com:8871/v1
 `)
-	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	err = afero.WriteFile(fs, HomeConfigFileForTesting(), configRaw, 0o777)
 	InitConfig(fs)
 	_, err = GetCurrentContext()
 	s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
@@ -44,7 +44,7 @@ contexts:
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
 `)
-	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	err = afero.WriteFile(fs, HomeConfigFileForTesting(), configRaw, 0o777)
 	InitConfig(fs)
 
 	ctx := Context{
@@ -78,7 +78,7 @@ contexts:
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace:
 `)
-	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	err = afero.WriteFile(fs, HomeConfigFileForTesting(), configRaw, 0o777)
 	InitConfig(fs)
 
 	ctx := Context{
@@ -112,7 +112,7 @@ contexts:
     last_used_workspace: ck05r3bor07h40d02y2hw4n4v
     workspace: ck05r3bor07h40d02y2hw4n4v
 `)
-	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	err = afero.WriteFile(fs, HomeConfigFileForTesting(), configRaw, 0o777)
 	InitConfig(fs)
 	ctx, err := GetCurrentContext()
 	s.NoError(err)
@@ -130,7 +130,7 @@ func (s *Suite) TestCurrentWorkspaceNeverResolvesTheLogin() {
 	defer restore()
 
 	fs := afero.NewMemMapFs()
-	s.NoError(afero.WriteFile(fs, HomeConfigFile, []byte(`context: example_com
+	s.NoError(afero.WriteFile(fs, HomeConfigFileForTesting(), []byte(`context: example_com
 contexts:
   example_com:
     domain: example.com
@@ -188,7 +188,7 @@ contexts:
     last_used_workspace: ck05r3bor07h40d02y2hw4n4w
     workspace: ck05r3bor07h40d02y2hw4n4w
 `)
-	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	err = afero.WriteFile(fs, HomeConfigFileForTesting(), configRaw, 0o777)
 	InitConfig(fs)
 	s.T().Setenv("ASTRO_DOMAIN", "stage.example.com")
 	ctx, err := GetCurrentContext()
@@ -216,7 +216,7 @@ contexts:
     workspace: ck05r3bor07h40d02y2hw4n4v
     organization: test-org-id
 `)
-	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	err = afero.WriteFile(fs, HomeConfigFileForTesting(), configRaw, 0o777)
 	InitConfig(fs)
 	ctx := Context{Domain: "example.com"}
 	err := ctx.DeleteContext()
@@ -286,7 +286,7 @@ contexts:
     organization: org-id
     workspace: ws-id
 `)
-	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
+	err = afero.WriteFile(fs, HomeConfigFileForTesting(), configRaw, 0o777)
 	s.Require().NoError(err)
 	InitConfig(fs)
 
@@ -330,7 +330,7 @@ contexts:
     domain: pr3333.astronomer-dev.io
     token: Bearer never-recorded
 `)
-	s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777))
+	s.Require().NoError(afero.WriteFile(fs, HomeConfigFileForTesting(), configRaw, 0o777))
 	InitConfig(fs)
 
 	ctx := Context{Domain: "pr1111.astronomer-dev.io"}
@@ -418,7 +418,7 @@ contexts:
     auth_domain: https://sandbox.example.com/
     auth_client_id: sandbox-client
 `)
-		s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777))
+		s.Require().NoError(afero.WriteFile(fs, HomeConfigFileForTesting(), configRaw, 0o777))
 		InitConfig(fs)
 
 		sharing, err := ContextsSharingLogin("https://sandbox.example.com/", "sandbox-client")
@@ -485,7 +485,7 @@ func (s *Suite) TestExpiresIn() {
 // under "ExpiresIn" it sat beside the old one, and a read could find either.
 func (s *Suite) TestExpiresInReplacesTheLoadedExpiry() {
 	fs := afero.NewMemMapFs()
-	s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, []byte(`
+	s.Require().NoError(afero.WriteFile(fs, HomeConfigFileForTesting(), []byte(`
 context: localhost
 contexts:
   localhost:

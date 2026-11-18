@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	errUpdateWorkspaceInvalidArgs  = errors.New("must specify at least one attribute to update (--name or --description)")
+	errUpdateWorkspaceInvalidArgs  = cliout.Usage(errors.New("must specify at least one attribute to update (--name or --description)"))
 	errCreateWorkspaceMissingLabel = errors.New("must specify a name for your workspace")
 )
 
@@ -88,8 +88,8 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&workspaceCreateLabel, "name", "n", "", "Name for your new workspace")
-	utils.AddAlias(cmd.Flags(), "label", "l", "name")
-	cmd.Flags().StringVarP(&workspaceCreateDescription, "description", "d", "", "Description for your new workspace")
+	utils.AddAlias(cmd.Flags(), "label", "name")
+	cmd.Flags().StringVar(&workspaceCreateDescription, "description", "", "Description for your new workspace")
 	_ = cmd.MarkFlagRequired("name") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 
@@ -131,8 +131,8 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 	}
 
 	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
-		cmd.Flags().BoolVarP(&workspacePaginated, "paginated", "p", false, "Paginated workspace list")
-		cmd.Flags().IntVarP(&workspacePageSize, "page-size", "s", 0, "Page size of the workspace list if paginated is set to true")
+		cmd.Flags().BoolVar(&workspacePaginated, "paginated", false, "Paginated workspace list")
+		cmd.Flags().IntVar(&workspacePageSize, "page-size", 0, "Page size of the workspace list if paginated is set to true")
 	}
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 	return cmd
@@ -153,14 +153,14 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&workspaceUpdateLabel, "name", "n", "", "The new name you want to give to your workspace")
-	utils.AddAlias(cmd.Flags(), "label", "l", "name")
-	cmd.Flags().StringVarP(&workspaceUpdateDescription, "description", "d", "", "The new description you want to give to your workspace")
+	utils.AddAlias(cmd.Flags(), "label", "name")
+	cmd.Flags().StringVar(&workspaceUpdateDescription, "description", "", "The new description you want to give to your workspace")
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 
 	return cmd
 }
 
-func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
+func workspaceCreate(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	if workspaceCreateLabel == "" {
 		return errCreateWorkspaceMissingLabel
@@ -170,8 +170,6 @@ func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
 		workspaceCreateDescription = "N/A"
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	w, err := workspace.Create(workspaceCreateLabel, workspaceCreateDescription, houstonClient)
 	if err != nil {
 		return err
@@ -179,10 +177,8 @@ func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
 	return emitWorkspace(r, w, "\n Successfully created workspace")
 }
 
-func workspaceList(cmd *cobra.Command, out io.Writer) error {
+func workspaceList(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	ws, err := workspace.List(houstonClient)
 	if err != nil {
 		return err
@@ -196,12 +192,10 @@ func workspaceList(cmd *cobra.Command, out io.Writer) error {
 	return emitWorkspaceList(r, ws, c.Workspace)
 }
 
-func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceDelete(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
-	if err := confirmRemoval(fmt.Sprintf("\nAre you sure you want to delete Workspace %s? This cannot be undone.", args[0])); err != nil {
+	if err := confirm(fmt.Sprintf("\nAre you sure you want to delete Workspace %s? This cannot be undone.", args[0])); err != nil {
 		return err
 	}
 	w, err := workspace.Delete(args[0], houstonClient)
@@ -211,7 +205,7 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 	return emitWorkspaceRemoval(r, args[0], w)
 }
 
-func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceUpdate(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	argsMap := map[string]string{}
 	if workspaceUpdateDescription != "" {
@@ -225,9 +219,6 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 		return errUpdateWorkspaceInvalidArgs
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
 	w, err := workspace.Update(args[0], houstonClient, argsMap)
 	if err != nil {
 		return err
@@ -235,10 +226,8 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 	return emitWorkspace(r, w, "\n Successfully updated workspace")
 }
 
-func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceSwitch(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	id := ""
 

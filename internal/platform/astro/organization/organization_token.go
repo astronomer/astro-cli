@@ -12,6 +12,7 @@ import (
 	"fmt"
 
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
@@ -56,8 +57,9 @@ func AddOrgTokenToWorkspace(id, name, role, workspaceID string, pick apitoken.Pi
 	if err != nil {
 		return apitoken.Token{}, err
 	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
+	workspaceID, err = astrosession.RequireWorkspace(workspaceID)
+	if err != nil {
+		return apitoken.Token{}, err
 	}
 	token, err := FindToken(id, name, ctx.Organization, pick, client)
 	if err != nil {
@@ -112,6 +114,12 @@ func listOrgScopedAPITokens(client astrov1.APIClient) ([]astrov1.ApiToken, error
 		offset += limit
 	}
 	return tokens, nil
+}
+
+// ScopedTokens lists the Organization-scoped API tokens, as the API has them,
+// for a command in another family that picks among them.
+func ScopedTokens(client astrov1.APIClient) ([]astrov1.ApiToken, error) {
+	return listOrgScopedAPITokens(client)
 }
 
 // getOrganizationToken picks the token id or name means from tokens, offering

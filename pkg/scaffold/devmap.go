@@ -23,7 +23,7 @@ func DevReplacements() []DevReplacement {
 		{"parse", "astro local check"},
 		{"build", "astro package"},
 		{"kill", "astro local reset --yes"},
-		{"pytest", "uv run pytest"},
+		{"pytest", "astro local run pytest"},
 		{"init", "astro init"},
 		// There is no "object import" row: 1.x's import covered connections and
 		// variables together, no single v2 command does, and the honest answer

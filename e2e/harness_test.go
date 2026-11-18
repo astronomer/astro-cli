@@ -16,6 +16,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/astronomer/astro-cli/pkg/testenv"
 )
 
 // testVersion is stamped into the binary under test.
@@ -85,12 +87,13 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
+	finish := testenv.Isolate(testenv.Options{KeepHome: true})
 	code, err := runSuite(m)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "e2e:", err)
 		os.Exit(1)
 	}
-	os.Exit(code)
+	os.Exit(finish(code))
 }
 
 // runSuite exists so the build's temp directory can be cleaned up with a defer,
@@ -282,6 +285,9 @@ type project struct {
 	// to its built-in series, and a case that needs a real catalog serves one
 	// or names the live one.
 	catalogURL string
+	// stdin is what commands read on stdin, when a case pipes something in;
+	// empty is /dev/null.
+	stdin string
 }
 
 // unreachableCatalog refuses connections at once, so a lookup fails fast rather
@@ -346,6 +352,7 @@ func newNamedProject(t *testing.T, name string) *project {
 		cache: mkdir(t, base, "cache"),
 	}
 	p.shareUVCache()
+	stampKeyringUnavailable(t, p.home)
 	return p
 }
 
@@ -426,6 +433,10 @@ func mkdir(t *testing.T, parts ...string) string {
 var leaky = []string{
 	"ASTRO_", "AIRFLOW_", "XDG_", "UV_",
 	"HOME", "USERPROFILE", "NO_COLOR", "VIRTUAL_ENV",
+	// Whether a run may ask is decided by CI (input.Refusal), so a runner that
+	// sets it would turn every case that expects a question into a refusal. A
+	// case about CI sets it itself, through extra.
+	"CI", "JENKINS_URL", "HUDSON_URL", "TF_BUILD",
 }
 
 // env is the whole environment a command runs with: the ambient one, minus
@@ -556,6 +567,14 @@ func (p *project) run(args ...string) *result {
 	return p.runWith(nil, args...)
 }
 
+// runPiped is run with stdin piped from stdin, as `echo y | astro ...` does.
+func (p *project) runPiped(stdin string, args ...string) *result {
+	p.t.Helper()
+	p.stdin = stdin
+	defer func() { p.stdin = "" }()
+	return p.run(args...)
+}
+
 // runSlow is run with the bound a command that drives a real Airflow needs.
 //
 // Tier 2 only. `astro local start` installs what the project is missing,
@@ -585,6 +604,9 @@ func (p *project) runBounded(bound time.Duration, extra map[string]string, args 
 	cmd.Env = p.env(extra)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	if p.stdin != "" {
+		cmd.Stdin = strings.NewReader(p.stdin)
+	}
 	// A command that outlives its bound fails its test with where it hung,
 	// not only that it did: its stderr ends with every goroutine's stack.
 	dumpStacksOnTimeout(cmd)

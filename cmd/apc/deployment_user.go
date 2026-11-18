@@ -41,7 +41,7 @@ func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Deployment user resources",
 		Long:    "Users can be added or removed from Deployment",
 	}
-	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose users to manage: a link name from the project's manifest, or a Deployment id", true, "")
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose users to manage: a link name from the project's manifest, or a Deployment id", "d", true)
 	_ = cmd.MarkPersistentFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.AddCommand(
 		newDeploymentUserListCmd(out),
@@ -62,8 +62,8 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 			return deploymentUserList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentUserID, "user-id", "u", "", "ID of the user to search for")
-	cmd.Flags().StringVarP(&deploymentUserEmail, "email", "e", "", "Email of the user to search for")
+	cmd.Flags().StringVar(&deploymentUserID, "user-id", "", "ID of the user to search for")
+	cmd.Flags().StringVar(&deploymentUserEmail, "email", "", "Email of the user to search for")
 	cmd.Flags().StringVarP(&deploymentUserFullname, "name", "n", "", "Full name of the user to search for")
 	addAccessOutputFlag(cmd)
 	return cmd
@@ -80,8 +80,8 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 			return deploymentUserAdd(cmd, out)
 		},
 	}
-	cmd.PersistentFlags().StringVarP(&deploymentUserRole, "role", "r", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
-	cmd.Flags().StringVarP(&deploymentUserEmail, "email", "e", "", "Email of the user to add to the Deployment")
+	cmd.PersistentFlags().StringVar(&deploymentUserRole, "role", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
+	cmd.Flags().StringVar(&deploymentUserEmail, "email", "", "Email of the user to add to the Deployment")
 
 	_ = cmd.MarkFlagRequired("email") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 
@@ -116,15 +116,13 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 			return deploymentUserUpdate(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVarP(&deploymentUserRole, "role", "r", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
+	cmd.PersistentFlags().StringVar(&deploymentUserRole, "role", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
 
-func deploymentUserList(cmd *cobra.Command, out io.Writer) error {
+func deploymentUserList(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	users, err := deployment.UserList(deploymentID, deploymentUserEmail, deploymentUserID, deploymentUserFullname, houstonClient)
 	if errors.Is(err, deployment.ErrNoDeploymentUsers) {
 		return renderNoDeploymentUsers(r)
@@ -135,14 +133,12 @@ func deploymentUserList(cmd *cobra.Command, out io.Writer) error {
 	return renderDeploymentUserList(r, users)
 }
 
-func deploymentUserAdd(cmd *cobra.Command, out io.Writer) error {
+func deploymentUserAdd(_ *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	u, err := deployment.Add(deploymentID, deploymentUserEmail, deploymentUserRole, houstonClient)
 	if err != nil {
 		return err
@@ -150,10 +146,8 @@ func deploymentUserAdd(cmd *cobra.Command, out io.Writer) error {
 	return renderDeploymentUserChange(r, deploymentID, deploymentUserEmail, &u, true)
 }
 
-func deploymentUserRemove(cmd *cobra.Command, out io.Writer, args []string) error {
+func deploymentUserRemove(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	u, err := deployment.RemoveUser(deploymentID, args[0], houstonClient)
 	if err != nil {
 		return err
@@ -161,14 +155,12 @@ func deploymentUserRemove(cmd *cobra.Command, out io.Writer, args []string) erro
 	return renderDeploymentUserRemoval(r, deploymentID, args[0], &u)
 }
 
-func deploymentUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+func deploymentUserUpdate(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	u, err := deployment.UpdateUser(deploymentID, args[0], deploymentUserRole, houstonClient)
 	if err != nil {
 		return err

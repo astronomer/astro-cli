@@ -73,6 +73,9 @@ type ManifestImage struct {
 	// Build is the project's root and the manifest's image-deciding fields
 	// (imagebuild.ManifestBuildOf).
 	Build imagebuild.ManifestBuild
+	// ShaAsTag is [tool.astro.deploy] sha-as-tag: push the image by digest,
+	// and name it so in the mutation, rather than by tag.
+	ShaAsTag bool
 	// BuildSecrets are docker build --secret specs for a declared
 	// Dockerfile's build.
 	BuildSecrets []string
@@ -218,7 +221,7 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 
 	fmt.Fprintf(progress, houstonDeploymentPrompt, t.release)
 	c, _ := config.GetCurrentContext() //nolint:errcheck // the target lookup has already read it
-	pushed, err := pushManifestImage(ctx, client, &c, t, engine, &pushedImage{local: localImage, named: in.ImageName, runtime: runtimeVersion}, in.Description, progress)
+	pushed, err := pushManifestImage(ctx, client, &c, t, engine, &pushedImage{local: localImage, named: in.ImageName, runtime: runtimeVersion}, in.Description, in.ShaAsTag, progress)
 	if err != nil {
 		return ManifestImageResult{}, err
 	}
@@ -639,9 +642,9 @@ func checkDagsInImage(in *ManifestImage, req *imagebuild.Request, podman func() 
 // user's container config. A BYO registry takes the push on the engine's own
 // login, and the image by the updateDeploymentImage mutation, which reads no
 // labels, so the runtime and the deploy's description go with it.
-func pushManifestImage(ctx context.Context, client houston.ClientInterface, c *config.Context, t *manifestTarget, engine imageEngine, img *pushedImage, description string, progress io.Writer) (string, error) {
+func pushManifestImage(ctx context.Context, client houston.ClientInterface, c *config.Context, t *manifestTarget, engine imageEngine, img *pushedImage, description string, shaAsTag bool, progress io.Writer) (string, error) {
 	var registry, remoteImage string
-	push := imagebuild.PushRequest{Source: img.local, Digest: config.CFG.ShaAsTag.GetBool(), Out: progress}
+	push := imagebuild.PushRequest{Source: img.local, Digest: shaAsTag, Out: progress}
 	if t.byo {
 		registry = t.appConfig.BYORegistryDomain
 		remoteImage = fmt.Sprintf("%s:%s-%s", registry, t.release, t.nextTag)

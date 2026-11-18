@@ -23,7 +23,7 @@ func AddCmds(v1Client astrov1.APIClient, v1Alpha1Client astrov1alpha1.APIClient,
 	astroV1Client = v1Client
 	astroV1Alpha1Client = v1Alpha1Client
 	astroIDEExporter = ideExporter
-	return []*cobra.Command{
+	cmds := []*cobra.Command{
 		NewDeployCmd(),
 		newDeploymentRootCmd(out),
 		newEnvRootCmd(out),
@@ -33,4 +33,10 @@ func AddCmds(v1Client astrov1.APIClient, v1Alpha1Client astrov1alpha1.APIClient,
 		newIDECommand(out),
 		newRemoteRootCmd(out),
 	}
+	// An error about the Workspace a run was pointed at says where that came
+	// from (workspace_source.go).
+	for _, c := range cmds {
+		explainWorkspaceErrors(c)
+	}
+	return cmds
 }

@@ -29,6 +29,7 @@ var (
 	imageName                          string
 	runtimeVersionForImageName         string
 	imagePresentOnRemote               bool
+	deployShaAsTag                     bool
 	ErrBothDagsOnlyAndImageOnlySet     = errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
 	ErrImageNameNotPassedForRemoteFlag = errors.New("--image-name is mandatory when --remote flag is passed")
 )
@@ -63,26 +64,27 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 	// --force answered 1.x's uncommitted-changes check, which v2's deploy
 	// does not make. It stays, accepted, hidden and read by nothing, as on
 	// Astro, because astronomer/deploy-action passes --force on every deploy.
-	cmd.Flags().BoolVarP(&deployForce, "force", "f", false, utils.OneXNoOpUsage)
+	cmd.Flags().BoolVar(&deployForce, "force", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("force") //nolint:errcheck // the flag is defined just above
 	// --prompt asked 1.x to offer the Deployment list even with one named. A
 	// deploy here asks whenever none is named, so it is accepted, hidden and
 	// read by nothing, as on Astro.
-	cmd.Flags().BoolP("prompt", "p", false, utils.OneXNoOpUsage)
+	cmd.Flags().Bool("prompt", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
 	cmd.Flags().StringVar(&deployDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
 	utils.RefuseEmpty(cmd.Flags().Lookup("deployment"))
 	addWorkspaceFlag(cmd.Flags(), "Workspace for the deploy, overriding the context", "")
 	cmd.Flags().StringVar(&description, "description", "", "Description to attach to the deploy, for traceability (default: one based on the deploy type)")
-	cmd.Flags().BoolVarP(&isImageOnlyDeploy, "image", "", false, "Push only an image to your Deployment; works only for Dag-only, Git-sync-based and NFS-based Deployments")
-	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a prebuilt image to deploy instead of building one: an image on this machine, or with --remote one already in a registry. Outside a pyproject.toml project it deploys the image alone")
+	cmd.Flags().BoolVar(&isImageOnlyDeploy, "image", false, "Push only an image to your Deployment; works only for Dag-only, Git-sync-based and NFS-based Deployments")
+	cmd.Flags().StringVar(&imageName, "image-name", "", "Name of a prebuilt image to deploy instead of building one: an image on this machine, or with --remote one already in a registry. Outside a pyproject.toml project it deploys the image alone")
 	cmd.Flags().StringVar(&runtimeVersionForImageName, "runtime-version", "", "Astro Runtime version of the --remote image, which this machine cannot read from it. Example - 12.1.1. Required with --remote")
-	cmd.Flags().BoolVarP(&imagePresentOnRemote, "remote", "", false, "Deploy the --image-name image from the registry it is already in, without pulling or pushing it; needs --runtime-version")
+	cmd.Flags().BoolVar(&deployShaAsTag, "sha-as-tag", false, "Push the image by digest, and point the Deployment at it so, rather than by tag. A project's deploys also do with sha-as-tag = true under [tool.astro.deploy]; this is the way for an --image-name deploy outside a project")
+	cmd.Flags().BoolVar(&imagePresentOnRemote, "remote", false, "Deploy the --image-name image from the registry it is already in, without pulling or pushing it; needs --runtime-version")
 	utils.AddBuildSecretFlag(cmd.Flags(), &deploySecrets)
 	cliout.AddOutputFlag(cmd, &deployOutput)
 
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
-		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only the Dags of the pyproject.toml project here to your Deployment")
+		cmd.Flags().BoolVar(&isDagOnlyDeploy, "dags", false, "Push only the Dags of the pyproject.toml project here to your Deployment")
 	}
 	applyPreferredFlagsIn(cmd)
 	return cmd
@@ -101,9 +103,9 @@ func refuseImageFlags() error {
 	case isDagOnlyDeploy && (imageName != "" || imagePresentOnRemote):
 		return cliout.Usage(errDagsWithImageSource())
 	case imagePresentOnRemote && imageName == "":
-		return ErrImageNameNotPassedForRemoteFlag
+		return cliout.Usage(ErrImageNameNotPassedForRemoteFlag)
 	case imagePresentOnRemote && runtimeVersionForImageName == "":
-		return deploy.ErrRuntimeVersionNotPassedForRemoteImage
+		return cliout.Usage(deploy.ErrRuntimeVersionNotPassedForRemoteImage)
 	}
 	return nil
 }
@@ -185,16 +187,11 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 	where := utils.Locate(config.WorkingPath)
 	inProject := where.AtRoot(config.WorkingPath)
 	if !inProject && !where.None() {
-		// Not a usage mistake to print the usage block under: what is in
-		// the directory decided it.
-		cmd.SilenceUsage = true
 		return utils.NoDeployableProject(where)
 	}
 	if err := refuseImageFlags(); err != nil {
-		cmd.SilenceUsage = true
 		return err
 	}
-	cmd.SilenceUsage = true
 	if inProject {
 		return deployManifest(cmd, args, &where, out)
 	}

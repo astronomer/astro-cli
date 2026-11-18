@@ -26,6 +26,7 @@ require (
 )
 
 require (
+	github.com/astronomer/astro-cli/pkg/testenv v0.0.0-00010101000000-000000000000
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.4-0.20260718201843-686c980c4758 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -42,3 +43,5 @@ replace github.com/astronomer/astro-cli/pkg/manifest => ../manifest
 replace github.com/astronomer/astro-cli/pkg/proxy => ../proxy
 
 replace github.com/astronomer/astro-cli/pkg/uv => ../uv
+
+replace github.com/astronomer/astro-cli/pkg/testenv => ../testenv

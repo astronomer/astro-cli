@@ -268,13 +268,13 @@ const (
 
 var mockV1Client *astrov1_mocks.ClientWithResponsesInterface
 
-// standInForATerminal makes stdinIsTerminal answer terminal, until the test
+// standInForATerminal makes mayAsk answer asks, until the test
 // ends: the tests pipe what a person would type.
 func standInForATerminal(t *testing.T, terminal bool) {
 	t.Helper()
-	previous := stdinIsTerminal
-	stdinIsTerminal = func() bool { return terminal }
-	t.Cleanup(func() { stdinIsTerminal = previous })
+	previous := mayAsk
+	mayAsk = func() bool { return terminal }
+	t.Cleanup(func() { mayAsk = previous })
 }
 
 func (s *Suite) SetupTest() {
@@ -588,14 +588,12 @@ func (s *Suite) TestGetDeployment() {
 	}
 }
 
-// Named nothing, with an API token, deployment.auto_select, or ASTRONOMER_KEY_*
+// Named nothing, with an API token or deployment.auto_select
 // set and one Deployment in the workspace: a read takes it, saying so on
 // stderr; a change never does. With a terminal it asks, and with none it
 // fails, naming the flag.
 func (s *Suite) TestGetDeploymentAutoSelectsOnlyToRead() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	s.T().Setenv("ASTRONOMER_KEY_ID", "")
-	s.T().Setenv("ASTRONOMER_KEY_SECRET", "")
 	s.T().Setenv("ASTRO_API_TOKEN", "ci-token")
 	one := astrov1.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
@@ -627,13 +625,52 @@ func (s *Suite) TestGetDeploymentAutoSelectsOnlyToRead() {
 		s.Contains(err.Error(), "pass --deployment")
 	})
 
+	// Several Deployments and no target: in CI the picker is refused up front
+	// (nothing drawn, nothing read), and at a stdin that ends with no answer it
+	// is asked and fails the same way. Both name --deployment, and neither is
+	// the vague "invalid Deployment selected".
+	two := astrov1.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		JSON200: &astrov1.DeploymentsPaginated{Deployments: []astrov1.Deployment{
+			{Id: "test-id-1", Name: "one"}, {Id: "test-id-2", Name: "two"},
+		}},
+	}
+	s.Run("several Deployments in CI is input_required naming --deployment, and draws nothing", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&two, nil).Once()
+		s.T().Cleanup(input.SetGuard(func() string { return "with CI set it cannot" }))
+		defer testUtil.MockUserInput(s.T(), "1\n")()
+
+		var err error
+		stderr := capture(s.T(), &os.Stderr, func() {
+			_, err = GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
+		})
+		s.Require().Error(err)
+		s.True(input.IsRequired(err), "%v", err)
+		s.NotErrorIs(err, ErrInvalidDeploymentKey)
+		s.Contains(err.Error(), "pass --deployment")
+		s.Empty(stderr, "nothing was drawn")
+	})
+
+	s.Run("several Deployments with stdin at its end is input_required naming --deployment", func() {
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&two, nil).Once()
+		defer testUtil.MockUserInput(s.T(), "")()
+
+		_, err := GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
+		s.Require().Error(err)
+		s.True(input.IsRequired(err), "%v", err)
+		s.NotErrorIs(err, ErrInvalidDeploymentKey)
+		s.Contains(err.Error(), "pass --deployment")
+	})
+
 	s.Run("a change with a terminal asks", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&one, nil).Once()
 
-		// Nothing typed is no pick.
+		// Nothing typed is no pick: not an invalid one, but nobody answering,
+		// which names the flag.
 		defer testUtil.MockUserInput(s.T(), "")()
 		_, err := GetDeployment(ws, "", "", ToChange, nil, mockV1Client)
-		s.ErrorIs(err, ErrInvalidDeploymentKey)
+		s.True(input.IsRequired(err), "%v", err)
+		s.Contains(err.Error(), "pass --deployment")
 	})
 
 	s.Run("a change with a terminal takes what is picked", func() {
@@ -672,8 +709,7 @@ func capture(t *testing.T, stream **os.File, f func()) string {
 // until the test ends.
 func withTokenDeployment(t *testing.T, id string) {
 	t.Helper()
-	UseTokenDeployment(id)
-	t.Cleanup(func() { UseTokenDeployment("") })
+	testUtil.UseAPIToken(t, "deploymentId:"+id)
 }
 
 // Named nothing, under an ASTRO_API_TOKEN scoped to one Deployment, a change
@@ -757,7 +793,7 @@ func (s *Suite) TestGetDeploymentFromADeploymentToken() {
 
 		defer testUtil.MockUserInput(s.T(), "")() // nothing typed: no pick
 		got, err := GetDeployment(ws, "", "", ToPick, nil, mockV1Client)
-		s.ErrorIs(err, ErrInvalidDeploymentKey, "asked, not taken: %v", got.Id)
+		s.True(input.IsRequired(err), "asked, not taken: %v %v", got.Id, err)
 	})
 
 	s.Run("a delete with --yes and no terminal still needs its target", func() {
@@ -1900,8 +1936,6 @@ func (s *Suite) TestCanCiCdDeploy() {
 // token, so it asks (and, with nothing to read, fails).
 func (s *Suite) TestSelectDeploymentReadsTheAPITokenByTheOneRule() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	s.T().Setenv("ASTRONOMER_KEY_ID", "")
-	s.T().Setenv("ASTRONOMER_KEY_SECRET", "")
 	only := []astrov1.Deployment{{Id: "dep-1", Name: "only"}}
 	for env, asks := range map[string]bool{"Bearer ": true, "Bearer Bearer": true, "ci-token": false, "Bearer ci-token": false} {
 		s.Run(env, func() {
@@ -2658,7 +2692,7 @@ func (s *Suite) TestDelete() {
 		removal, err := Delete("test-id-1", ws, "", false, mockV1Client)
 		s.Nil(removal)
 		s.True(input.IsRequired(err), "%v", err)
-		s.ErrorIs(err, errDeleteNeedsConfirmation)
+		s.Contains(err.Error(), "pass --yes")
 		mockV1Client.AssertExpectations(s.T())
 	})
 

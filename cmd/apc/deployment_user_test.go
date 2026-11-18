@@ -74,7 +74,7 @@ func (s *Suite) TestDeploymentUserList() {
 	api.On("ListDeploymentUsers", houston.ListDeploymentUsersRequest{UserID: "test-user-id", Email: "test-email", FullName: "test-name", DeploymentID: "test-id"}).Return(mockUser, nil).Once()
 	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 	houstonClient = api
-	output, err := execDeploymentCmd("user", "list", "--deployment-id", "test-id", "-u", "test-user-id", "-e", "test-email", "-n", "test-name")
+	output, err := execDeploymentCmd("user", "list", "--deployment-id", "test-id", "--user-id", "test-user-id", "--email", "test-email", "-n", "test-name")
 	s.NoError(err)
 	s.Contains(output, "test-id")
 	s.Contains(output, "test-name")

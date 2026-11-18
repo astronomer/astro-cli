@@ -73,7 +73,7 @@ type locator struct {
 	organization func() (string, error)
 	// workspace is the login's current workspace, where a Deployment name is
 	// looked up when the project names none. Empty when the login has none.
-	workspace func() string
+	workspace func() (string, astrosession.Source)
 	// httpClient carries the Composer lookup. nil in production, where
 	// pkg/instancelocate supplies one with its own timeout; a test hands in
 	// its stub server's.
@@ -105,7 +105,7 @@ func New(domain string) instances.Locator {
 			return astrosession.BearerFor(ctx, domain)
 		},
 		organization:  func() (string, error) { return Organization(domain) },
-		workspace:     func() string { return Workspace(domain) },
+		workspace:     func() (string, astrosession.Source) { return workspaceOf(domain) },
 		googleToken:   googleauth.AccessToken,
 		googleAccount: googleauth.Account,
 	}
@@ -114,6 +114,13 @@ func New(domain string) instances.Locator {
 // deploymentsOn is the v1 client for domain's control plane. Its token is left
 // empty because astroDeployment puts the session's bearer on every request.
 func deploymentsOn(domain string) Deployments {
+	if astrosession.HasAPIToken() {
+		// A token run needs no login on the machine and never reads the saved
+		// one, so a project that names no host (its manifest's domain is
+		// already folded into domain) is on the token run's: ASTRO_DOMAIN,
+		// else Astro's.
+		domain = astrosession.TokenHost(domain, "")
+	}
 	if domain == "" {
 		return astrov1.NewV1Client(httputil.NewHTTPClient())
 	}
@@ -185,7 +192,20 @@ func (l *locator) BaseURL(ctx context.Context, i instances.Instance) (string, er
 // Reaching an astro link there needs a Deployment lookup, and the lookup needs
 // an org, so the message says which half is missing rather than reporting the
 // whole machine as logged out.
+//
+// With ASTRO_API_TOKEN set the organization is the token's own claim, on either
+// path, and the saved login is never read: a token's credential with the saved
+// login's organization is an identity nobody chose.
 func Organization(domain string) (string, error) {
+	if id, ok, err := astrosession.TokenIdentity(); ok || err != nil {
+		if err != nil {
+			return "", err
+		}
+		if id.Organization == "" {
+			return "", astrosession.ErrTokenNoOrganization
+		}
+		return id.Organization, nil
+	}
 	if domain == "" {
 		ctx, err := config.GetCurrentContext()
 		if err != nil {

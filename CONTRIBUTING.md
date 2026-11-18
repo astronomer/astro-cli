@@ -39,6 +39,15 @@ Match the test style of the package you're editing — some packages use testify
 
 The layer rules are enforced by a plain Go test in `internal/archlint`, so `make test` catches violations with no extra tooling. It checks that `internal/` never imports `cmd/`, that core packages below `cmd/` never print or exit or log fatally, and that core packages never import `config/` or the shell `cmd` tree (see core and shell in [docs/architecture.md](docs/architecture.md#core-and-shell)).
 
+### Adding a test package
+
+- Every test package's `TestMain` is `func TestMain(m *testing.M) { testenv.Main(m) }` (the root's `pkg/testing/testenv`, or `pkg/testenv` in a `pkg/*` module). `internal/archlint` fails a package without it.
+- Under it, `HOME`, `ASTRO_HOME` and the keychain are fake: a temporary directory and an in-memory keyring. A test cannot reach your real `~/.astro` or the OS keychain, and one that tries fails.
+- The `ASTRO_*` and `ASTRONOMER_*` variables are cleared for the run (stderr names each one it cleared). A test switch you set from the shell is named `ASTRO_TEST_*`, or listed in `testControlEnv`, and survives.
+- A run that needs the real machine (the real home, keychain or Docker) belongs in `e2e`, behind a tier and an opt-in, not in a unit test.
+
+See [Tests never touch the machine](docs/architecture.md#tests-never-touch-the-machine).
+
 ## Lint and format
 
 ```bash

@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 )
 
@@ -49,24 +50,35 @@ const (
 // subroot. Used by every `astro env <type>` subroot so the scope semantics
 // are uniform across types.
 func addScopePersistentFlags(cmd *cobra.Command) {
-	addWorkspaceFlag(cmd.PersistentFlags(), &envWorkspaceID, "", envWorkspaceUsage, oneXWorkspaceID)
-	addDeploymentFlag(cmd.PersistentFlags(), envDeploymentUsage, deploymentTargets{id: &envDeploymentID, scope: true}, oneXDeploymentID(""))
+	addWorkspaceFlag(cmd.PersistentFlags(), &envWorkspaceID, "w", envWorkspaceUsage, oneXWorkspaceID)
+	addDeploymentFlag(cmd.PersistentFlags(), envDeploymentUsage, deploymentTargets{id: &envDeploymentID, scope: true}, oneXDeploymentID)
 	cmd.PersistentFlags().BoolVar(&envIncludeSecrets, "include-secrets", false, "Show secret values (org policy must allow it)")
 	cmd.PersistentFlags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 }
 
 // envScope resolves the active scope, validating mutual exclusivity and falling
 // back to the current workspace from context when neither flag is set.
-func envScope() (env.Scope, error) {
+func envScope(cmd *cobra.Command) (env.Scope, error) {
 	if envWorkspaceID != "" && envDeploymentID != "" {
 		return env.Scope{}, env.ErrScopeAmbiguous
 	}
 	if envWorkspaceID == "" && envDeploymentID == "" {
-		ws, err := coalesceWorkspace()
+		ws, err := coalesceWorkspace(cmd)
+		if isWorkspaceRefusal(err) {
+			return env.Scope{}, err
+		}
 		if err != nil {
-			return env.Scope{}, fmt.Errorf("%w (and falling back to workspace context: %s)", env.ErrScopeNotSpecified, err.Error())
+			return env.Scope{}, fmt.Errorf("%w (and falling back to workspace context: %w)", env.ErrScopeNotSpecified, err)
 		}
 		return env.Scope{WorkspaceID: ws}, nil
+	}
+	// --workspace is read here, not through the resolver: a token for another
+	// Workspace is refused all the same.
+	if err := astrosession.CheckWorkspace(envWorkspaceID, astrosession.SourceFlag); err != nil {
+		return env.Scope{}, err
+	}
+	if envWorkspaceID != "" {
+		rememberTarget(cmd, astrosession.Target{Workspace: envWorkspaceID, WorkspaceSource: astrosession.SourceFlag})
 	}
 	return env.Scope{WorkspaceID: envWorkspaceID, DeploymentID: envDeploymentID}, nil
 }
@@ -165,20 +177,19 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 	//
 	// 1.x had no env list, so it takes only the v2 spellings: no hidden
 	// --workspace-id or --deployment-id for a 1.x script to have used.
-	addWorkspaceFlag(cmd.Flags(), &envWorkspaceID, "", envWorkspaceUsage)
+	addWorkspaceFlag(cmd.Flags(), &envWorkspaceID, "w", envWorkspaceUsage)
 	addDeploymentFlag(cmd.Flags(), envDeploymentUsage, deploymentTargets{id: &envDeploymentID, scope: true})
 	cmd.Flags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 	return cmd
 }
 
 func runEnvList(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
 	// -o dotenv never gets here: the flag refuses it while parsing, with
 	// env.ErrInventoryHasNoValues (newEnvListCmd).
-	cmd.SilenceUsage = true
 
 	items, err := env.ListInventory(scope, envResolveLinked, astroV1Client)
 	if err != nil {
@@ -189,12 +200,11 @@ func runEnvList(cmd *cobra.Command, out io.Writer) error {
 
 func newEnvRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "env",
-		Aliases:                    []string{"environment"},
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
-		Short:                      "Manage environment objects on Astro",
+		Use:     "env",
+		Aliases: []string{"environment"},
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
+		Short:   "Manage environment objects on Astro",
 		Long: `Manage environment objects on Astro: environment variables, connections, Airflow variables, and metrics exports, scoped to a workspace or a deployment.
 
 Objects here can be shared across deployments from a workspace, or set on one deployment with --deployment.`,

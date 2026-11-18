@@ -12,7 +12,7 @@ func (s *Suite) startWithHomeConfig(content string) afero.Fs {
 	s.withAstroHome(s.T().TempDir())
 	fs := afero.NewMemMapFs()
 	initHome(fs) // sets HomeConfigFile from ASTRO_HOME; no file, so nothing is written
-	s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, []byte(content), 0o600))
+	s.Require().NoError(afero.WriteFile(fs, HomeConfigFileForTesting(), []byte(content), 0o600))
 	InitConfig(fs)
 	return fs
 }
@@ -109,7 +109,7 @@ func (s *Suite) TestMigrateHomeConfig() {
 		s.withAstroHome(s.T().TempDir())
 		mem := afero.NewMemMapFs()
 		initHome(mem)
-		s.Require().NoError(afero.WriteFile(mem, HomeConfigFile, []byte(dumpedHomeConfig), 0o600))
+		s.Require().NoError(afero.WriteFile(mem, HomeConfigFileForTesting(), []byte(dumpedHomeConfig), 0o600))
 		ro := afero.NewReadOnlyFs(mem)
 
 		s.NotPanics(func() { InitConfig(ro) })

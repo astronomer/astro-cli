@@ -36,7 +36,7 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Workspace Team resources",
 		Long:    "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
-	addWorkspaceFlag(cmd.PersistentFlags(), "Workspace whose teams to manage (default: the current context's)", "")
+	addWorkspaceFlag(cmd.PersistentFlags(), "Workspace whose teams to manage (default: the current context's)", "w")
 	cmd.AddCommand(
 		newWorkspaceTeamAddCmd(out),
 		newWorkspaceTeamUpdateCmd(out),
@@ -62,7 +62,7 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the
 	// MarkFlagRequired looks, so marking it so failed, unseen, and a run
 	// without one asked Houston about the team "".
 	_ = cmd.MarkPersistentFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	cmd.PersistentFlags().StringVarP(&workspaceTeamRole, "role", "r", houston.WorkspaceViewerRole, "Workspace role assigned to team")
+	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "Workspace role assigned to team")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -78,7 +78,7 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 			return workspaceTeamUpdate(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVarP(&workspaceTeamRole, "role", "r", houston.WorkspaceViewerRole, "Workspace role assigned to team")
+	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "Workspace role assigned to team")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -114,7 +114,7 @@ func newWorkspaceTeamsListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func workspaceTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
+func workspaceTeamAdd(_ *cobra.Command, out io.Writer, _ []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -125,8 +125,6 @@ func workspaceTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	w, err := workspace.AddTeam(ws, teamID, workspaceTeamRole, houstonClient)
 	if err != nil {
 		return err
@@ -134,7 +132,7 @@ func workspaceTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
 	return renderWorkspaceTeamAdded(r, w, teamID, workspaceTeamRole)
 }
 
-func workspaceTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+func workspaceTeamUpdate(_ *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -145,8 +143,6 @@ func workspaceTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) error
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	change, err := workspace.UpdateTeamRole(ws, args[0], workspaceTeamRole, houstonClient)
 	if err != nil {
 		return err
@@ -161,8 +157,6 @@ func workspaceTeamRm(cmd *cobra.Command, out io.Writer, args []string) error {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	removal, err := workspace.RemoveTeam(ws, args[0], houstonClient)
 	if err != nil {
 		return err
@@ -170,15 +164,13 @@ func workspaceTeamRm(cmd *cobra.Command, out io.Writer, args []string) error {
 	return renderWorkspaceTeamRemoved(r, cliout.NotesTo(cmd, r.Format, out), &removal, args[0])
 }
 
-func workspaceTeamsList(cmd *cobra.Command, out io.Writer, _ []string) error {
+func workspaceTeamsList(_ *cobra.Command, out io.Writer, _ []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 	ts, err := workspace.ListTeamRoles(ws, houstonClient)
 	if err != nil {
 		return err

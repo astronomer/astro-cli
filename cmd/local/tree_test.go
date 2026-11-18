@@ -308,11 +308,13 @@ func TestQueryFamiliesShareTheSelectorFlags(t *testing.T) {
 }
 
 // One shorthand means one thing across the core tree — the commands AddCmds
-// returns, not the shell surface those mount alongside, which has its own older
-// spellings (see TestDashDMeansDeploymentOutsideTheAllowlist in package cmd). `af`
-// reused -t for tags, task ids, and try numbers in commands that sit next to
-// each other; carrying that over would make -t unreadable, and -o would shadow
-// --output outright. Nothing enforces this in cobra, so it is enforced here.
+// returns, not the shell surface those mount alongside. TestShortOptionsFollowTheTable
+// in package cmd holds every tree to utils.ShortOptions; this holds the core
+// tree to one meaning per letter without the table, so a letter that drifts
+// here fails in this package first. `af` reused -t for tags, task ids, and try
+// numbers in commands that sit next to each other; carrying that over would
+// make -t unreadable, and -o would shadow --output outright. Nothing enforces
+// this in cobra, so it is enforced here.
 func TestShorthandsMeanOneThingEachAcrossTheCoreTree(t *testing.T) {
 	d, _ := testDeps(t)
 	// meaning maps a shorthand to the flag name that claimed it, and where.
@@ -367,7 +369,7 @@ func TestEveryReplacementNamesARealCommand(t *testing.T) {
 	root := newRootCmd(d)
 	for _, m := range devReplacements() {
 		if !strings.HasPrefix(m.Replacement, "astro ") {
-			continue // uv run pytest, and anything else outside this tree
+			continue // anything outside this tree
 		}
 		var path []string
 		for _, word := range strings.Fields(strings.TrimPrefix(m.Replacement, "astro ")) {
@@ -376,7 +378,12 @@ func TestEveryReplacementNamesARealCommand(t *testing.T) {
 			}
 			path = append(path, word)
 		}
-		found, _, err := root.Find(path)
+		found, rest, err := root.Find(path)
+		// astro local run pytest: run takes the command to run as arguments,
+		// so what is left past it is not a subcommand to resolve.
+		if err == nil && found != nil && found.CommandPath() == "astro local run" && len(rest) > 0 {
+			path = path[:len(path)-len(rest)]
+		}
 		if err != nil || found == nil || found.CommandPath() != "astro "+strings.Join(path, " ") {
 			t.Errorf("astro dev %s points at %q, which does not resolve; the table and the tree disagree",
 				m.Command, m.Replacement)

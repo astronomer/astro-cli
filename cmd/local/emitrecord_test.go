@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/testing/testenv"
 )
 
 // What a command actually emits, watched at the door by cliouttest.Watch,
@@ -63,8 +64,9 @@ func emitWatch() cliouttest.Watch {
 // afterwards. A single test cannot: the point is what every OTHER test
 // emitted.
 func TestMain(m *testing.M) {
+	finish := testenv.Isolate()
 	watching := emitWatch().Arm()
-	os.Exit(watching.Finish(m.Run()))
+	os.Exit(finish(watching.Finish(m.Run())))
 }
 
 // This package's cases reach the watch through schemaCase.shared(): a

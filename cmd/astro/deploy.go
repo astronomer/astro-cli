@@ -14,7 +14,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
@@ -28,7 +27,9 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
+	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -85,18 +86,18 @@ func NewDeployCmd() *cobra.Command {
 	// read by nothing, because astronomer/deploy-action passes it on every
 	// deploy (TestDeployManifestDeployActionInvocations); hidden, as there is
 	// nothing for anyone to choose.
-	cmd.Flags().BoolP("force", "f", false, utils.OneXNoOpUsage)
+	cmd.Flags().Bool("force", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("force") //nolint:errcheck // the flag is defined just above
 	// --prompt asked 1.x to offer the Deployment list even with one named. A
 	// deploy here asks whenever none is named, so it is accepted, hidden and
 	// read by nothing, as a pyproject.toml project's deploy always took it.
-	cmd.Flags().BoolP("prompt", "p", false, utils.OneXNoOpUsage)
+	cmd.Flags().Bool("prompt", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
-	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a prebuilt local image to deploy instead of building one. Outside a pyproject.toml project it deploys the image alone")
-	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only Dags to your Astro Deployment")
+	cmd.Flags().StringVar(&imageName, imageNameFlag, "", "Name of a prebuilt local image to deploy instead of building one. Outside a pyproject.toml project it deploys the image alone")
+	cmd.Flags().BoolVar(&dags, "dags", false, "Push only Dags to your Astro Deployment")
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
-	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment; with Dag Deploy enabled, its Dags are not affected")
-	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
+	cmd.Flags().BoolVar(&image, "image", false, "Push only an image to your Astro Deployment; with Dag Deploy enabled, its Dags are not affected")
+	cmd.Flags().BoolVar(&waitForDeploy, "wait", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	// No -d shorthand: on this command -d has meant --dags since v1, and moving
 	// it would turn `astro deploy -d` from a DAG-only deploy into a target
@@ -105,7 +106,7 @@ func NewDeployCmd() *cobra.Command {
 	utils.RefuseEmpty(cmd.Flags().Lookup("deployment"))
 	addWorkspaceFlag(cmd.Flags(), &manifestWorkspace, "", "Workspace for the deploy, overriding the context", oneXWorkspaceID)
 	cmd.Flags().StringVarP(&deployOutput, "output", "o", string(cliout.FormatText), "Output format: text or json")
-	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
+	cmd.Flags().StringVar(&deployDescription, "description", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
 
 	annotateDeployFlag(cmd, "image", deployGroupImage)
@@ -150,8 +151,6 @@ func deploy(cmd *cobra.Command, args []string) error {
 	if imageName != "" && where.None() {
 		return deployManifest(cmd, args, nil)
 	}
-	// Not a usage mistake, so no usage block under the error.
-	cmd.SilenceUsage = true
 	return utils.NoDeployableProject(where)
 }
 
@@ -222,7 +221,6 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	if err := refuseFlagCombinations(cmd, inProject); err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	out := cmd.OutOrStdout()
 
@@ -272,12 +270,17 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 
 	// --workspace, or its 1.x spelling --workspace-id.
 	overrideWorkspace := manifestWorkspace
+	// A token for one Workspace deploys to no other: refused before a request.
+	if err := astrosession.CheckWorkspace(overrideWorkspace, astrosession.SourceFlag); err != nil {
+		return manifestDeployErr(cmd, err)
+	}
 
-	// A prompt has to be answered by someone, and json output has to stay a
-	// stream a program can parse — a question on stderr with the run blocked on
-	// stdin is not that. So json mode is non-interactive whatever stdin is, and
-	// must name its target like any other script.
-	interactive := format == cliout.FormatText && stdinIsTerminal()
+	// A prompt has to be answered by someone at a terminal, and json output has
+	// to stay a stream a program can parse — a question on stderr with the run
+	// blocked on stdin is not that. So json mode is non-interactive whatever the
+	// terminals are, as is a run with no terminal, CI or --non-interactive, and
+	// each must name its target like any other script.
+	interactive := format == cliout.FormatText && mayAsk()
 
 	errOut := cmd.ErrOrStderr()
 	// Every warning the deploy gives goes to stderr, led by a yellow
@@ -293,11 +296,19 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		warnings = append(warnings, msg)
 		recap.Warn(msg)
 	}
-	// The token is the current context's login: a project on another host is
-	// deployed under that host's, which names no Deployment.
+	// The run's Workspace and Deployment, as the one resolver decides them for
+	// the host the deploy runs on: the token is the current context's login, so
+	// a project on another host is deployed under that host's, which names no
+	// Deployment and no Workspace of the token's. The flag and the project's
+	// own Workspace are weighed in the deploy (internal/deploy), which knows
+	// which link it reads. Only --workspace is held to a token's Workspace
+	// here (CheckWorkspace above): a deploy by explicit Deployment id never
+	// looks anything up in the project's, so refusing a link that differs
+	// from the token's would break deploys that work.
+	run := astrosession.Resolve(astrosession.Request{Login: login.selection(), Domain: login.context.Domain, WantDeployment: true, Advice: astrosession.ByFlag | astrosession.ByProject, NoSaved: manifestdeploy.ErrNoWorkspace})
 	tokenID := ""
-	if login.current {
-		tokenID = deployment.TokenDeployment()
+	if run.DeploymentSource == astrosession.SourceToken {
+		tokenID = run.Deployment
 	}
 	target := targetOrTokenDeployment(errOut, m, linkName, manifestDeployment, tokenID)
 	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, target)
@@ -307,7 +318,8 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		LinkName:         linkName,
 		Deployment:       target,
 		WorkspaceID:      overrideWorkspace,
-		ContextWorkspace: login.context.Workspace,
+		ContextWorkspace: run.Workspace,
+		NoWorkspace:      run.Missing(),
 		DagsOnly:         dags,
 		// Outside a project the image ships alone: there are no DAGs here.
 		Image:         image,
@@ -385,6 +397,9 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	if res.Git.Uncommitted {
 		recap.Note("the project has uncommitted changes, so this deploy records no git commit")
 	}
+	if note := projectGitMetadataOffNote(m, imageName); note != "" {
+		recap.Note(note)
+	}
 	if !inProject {
 		w := imageAloneWarning(&res, imageName)
 		warnings = append(warnings, w)
@@ -459,10 +474,10 @@ func noteIgnoredDeploymentEnv(w io.Writer, m *manifest.Manifest, interactive boo
 	}
 }
 
-// stdinIsTerminal reports whether this run can be asked which deployment to
-// ship to. It is a var rather than the call itself so a test can drive the
-// prompt without a pty.
-var stdinIsTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
+// mayAsk reports whether this run can be asked which deployment to ship to
+// (input.CanAsk: stdin and stderr are terminals, and not under json, CI or
+// --non-interactive). It is a var so a test can drive both answers.
+var mayAsk = input.CanAsk
 
 // deployJSON is the single object `astro deploy --output json` emits when a manifest
 // deploy finishes. Fields that do not apply to a deploy kind are omitted: a
@@ -621,6 +636,17 @@ type deployLogin struct {
 	current bool
 }
 
+// selection is the login whose Workspace the run's selection is read from,
+// when it is the current context's, which the caller has already resolved;
+// another host's is left to the resolver, which will not hand a token run that
+// host's saved Workspace.
+func (l *deployLogin) selection() *config.Context {
+	if l.current {
+		return &l.context
+	}
+	return nil
+}
+
 // loginForDeploy picks the login a manifest deploy runs under from domain, the
 // project's Astro host (manifest.Astro.LoginDomain): the login stored for that
 // host, even while the CLI is switched to another, the same one `astro af`
@@ -729,6 +755,41 @@ func (d manifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeploy.De
 	return manifestdeploy.Deployment{ID: dep.Id, Name: dep.Name, WorkspaceID: dep.WorkspaceId}, nil
 }
 
+// gitMetadataAllowed reports whether a deploy records the commit it ships:
+// the project's [tool.astro.deploy] git-metadata (or a bundle's
+// --git-metadata) asks for it, and this machine's deploy.git_metadata has not
+// turned it off. The global setting is an off switch only, so a project
+// committed with git-metadata = true never starts sending commit data from a
+// machine whose owner turned it off.
+func gitMetadataAllowed(wanted bool) bool {
+	return wanted && config.CFG.DeployGitMetadata.GetBool()
+}
+
+// gitMetadataOffNote is the note a deploy of dir gives when the global
+// deploy.git_metadata kept it from recording a commit it would have: one it
+// wanted, from a git checkout. "" otherwise, so a deploy from a directory
+// that is no checkout says nothing about a commit it never had.
+func gitMetadataOffNote(dir string, wanted bool) string {
+	if !wanted || config.CFG.DeployGitMetadata.GetBool() || !git.IsGitRepository(dir) {
+		return ""
+	}
+	return gitMetadataOffText
+}
+
+// projectGitMetadataOffNote is gitMetadataOffNote for a project deploy: none
+// with no project (m nil), and none for a prebuilt image (imageName), which
+// records no commit whatever the settings say.
+func projectGitMetadataOffNote(m *manifest.Manifest, imageName string) string {
+	if m == nil || imageName != "" {
+		return ""
+	}
+	return gitMetadataOffNote(config.WorkingPath, m.Astro.Deploy.GitMetadata)
+}
+
+// gitMetadataOffText says why a deploy recorded no commit, in the words of
+// the uncommitted-changes note.
+const gitMetadataOffText = "deploy.git_metadata is false in your global config, so this deploy records no git commit"
+
 // DeployDags ships the project's dags/ through the dags-only transport.
 func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
 	res, err := astrodeploy.DeployManifestDags(astrodeploy.ManifestDagDeployInput{
@@ -739,6 +800,8 @@ func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdepl
 		NoDagsBaseDir: in.NoDagsBaseDir,
 		Wait:          in.Wait,
 		WaitTime:      in.WaitTime,
+		GitMetadata:   gitMetadataAllowed(in.GitMetadata),
+		CosmosBoost:   in.CosmosBoost,
 		Progress:      d.errOut,
 	}, d.login.client)
 	if err != nil {
@@ -789,6 +852,8 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		NoDagsBaseDir:  in.NoDagsBaseDir,
 		Wait:           in.Wait,
 		WaitTime:       in.WaitTime,
+		GitMetadata:    gitMetadataAllowed(in.GitMetadata),
+		CosmosBoost:    in.CosmosBoost,
 		Progress:       d.errOut,
 		ResolveInstall: imageinstall.Fill,
 	}, d.login.client)

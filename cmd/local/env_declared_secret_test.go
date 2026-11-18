@@ -243,6 +243,7 @@ func TestSetKeepsOneHomePerScope(t *testing.T) {
 func TestPlainSetNeedsNoKeyring(t *testing.T) {
 	dir := secretEnvProject(t, "")
 	keyring.MockInitWithError(errors.New("no Secret Service available"))
+	t.Cleanup(keyring.MockInit) // leave no error-injecting mock behind
 
 	d, _, _ := envDeps(t, dir, "v\n")
 	if err := execute(t, d, "local", "env", "variable", "set", "TOKEN", "--plain"); err != nil {
@@ -265,6 +266,7 @@ func TestPlainSetNeedsNoKeyring(t *testing.T) {
 func TestDefaultSetRefusesWithoutAKeyring(t *testing.T) {
 	dir := secretEnvProject(t, "[tool.astro.env]\nAPI_TOKEN = { secret = true }\n")
 	keyring.MockInitWithError(errors.New("no Secret Service available"))
+	t.Cleanup(keyring.MockInit) // leave no error-injecting mock behind
 
 	for _, name := range []string{"API_TOKEN", "UNDECLARED"} {
 		d, _, _ := envDeps(t, dir, "s3cr3t\n")
@@ -320,5 +322,29 @@ func TestDeletePlaintextCopyOfASecretNameIsAllowed(t *testing.T) {
 	}
 	if keys := dotenvKeys(t, filepath.Join(dir, ".env")); hasKey(keys, "API_TOKEN") {
 		t.Errorf("delete --plain left the plaintext copy (keys: %v)", keys)
+	}
+}
+
+// A stdin with nothing on it (/dev/null, a closed pipe) is no value: the set
+// is refused and writes nothing, rather than silently blanking the variable.
+// Setting one to the empty string is --value "".
+func TestPlainSetFromAnEmptyStdinIsRefused(t *testing.T) {
+	dir := secretEnvProject(t, "")
+
+	d, _, _ := envDeps(t, dir, "")
+	err := execute(t, d, "local", "env", "variable", "set", "BAR", "--plain")
+	if err == nil || !strings.Contains(err.Error(), "no value supplied") {
+		t.Fatalf("err = %v, want a refusal for the empty stdin", err)
+	}
+	if keys := dotenvKeys(t, filepath.Join(dir, ".env")); hasKey(keys, "BAR") {
+		t.Errorf("BAR was written from an empty stdin (keys: %v)", keys)
+	}
+
+	d, _, _ = envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "variable", "set", "BAR", "--plain", "--value", ""); err != nil {
+		t.Fatalf("an explicit empty --value is legitimate: %v", err)
+	}
+	if keys := dotenvKeys(t, filepath.Join(dir, ".env")); !hasKey(keys, "BAR") {
+		t.Errorf("an explicit empty value should be written (keys: %v)", keys)
 	}
 }

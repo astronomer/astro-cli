@@ -118,11 +118,32 @@ func TestDeleteAndRemoveAnswerToRm(t *testing.T) {
 			if cmd.Name() != "delete" && cmd.Name() != "remove" || cliout.IsRemovedCommand(cmd) || isVersionGateStub(cmd) {
 				return
 			}
-			if !slices.Equal(cmd.Aliases, []string{"rm"}) {
+			// A token group has both verbs side by side (delete ends the
+			// scope's own token, remove takes a broader token's role away),
+			// and a word names one command: the destructive verb keeps rm.
+			// A delete that is not alone (a hidden spelling of remove aside)
+			// is the one that has it, and its remove has none.
+			if cmd.Name() == "remove" && siblingNamed(cmd, "delete") != nil && !isDeprecatedVerb(siblingNamed(cmd, "delete")) {
+				if len(cmd.Aliases) != 0 {
+					t.Errorf("[%s] %s answers to %v; beside a delete, rm is the delete's and remove answers to nothing else", tree.name, cmd.CommandPath(), cmd.Aliases)
+				}
+				return
+			}
+			if !slices.Equal(cmd.Aliases, []string{"rm"}) && !(isDeprecatedVerb(cmd) && len(cmd.Aliases) == 0) {
 				t.Errorf("[%s] %s answers to %v; a %s answers to rm and nothing else", tree.name, cmd.CommandPath(), cmd.Aliases, cmd.Name())
 			}
 		})
 	}
+}
+
+// siblingNamed is the command under cmd's parent with the given name, or nil.
+func siblingNamed(cmd *cobra.Command, name string) *cobra.Command {
+	for _, sibling := range cmd.Parent().Commands() {
+		if sibling.Name() == name {
+			return sibling
+		}
+	}
+	return nil
 }
 
 // TestNoCommandAnswersToAWordAnAncestorAnswersTo is the general form of the

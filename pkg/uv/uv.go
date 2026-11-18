@@ -31,10 +31,9 @@ import (
 // MinVersion is the oldest uv this package accepts. uv is pre-1.0 and moves
 // fast — flags appear and lockfile revisions bump between minors — so New
 // checks the floor once instead of letting individual calls fail strangely
-// later. 0.9.25 (January 2026) is the first that reads `false` in
-// exclude-newer-package, which the [tool.uv] settings `astro init` writes for
-// Astronomer's build of Airflow need: that index lists no upload times, so any
-// exclude-newer would otherwise hide every build.
+// later. 0.9.25 (January 2026) is the floor the CLI has held since it wrote
+// `exclude-newer-package = false` for Astronomer's Airflow; it no longer
+// writes that, but the floor stays so a uv that worked yesterday still does.
 const MinVersion = "0.9.25"
 
 // EnvBin overrides discovery entirely: when set, its value is the uv binary

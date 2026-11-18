@@ -100,9 +100,10 @@ func (p stubTargetParser) ParseWith(context.Context, string, checks.ParseInput) 
 // a project the check can report on.
 const validManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\", \"pandas\"]\n[tool.astro]\n"
 
-// brokenManifest fails manifest.Load on an unknown [tool.astro] key. Named
-// beside its valid counterpart so a change to Load's strictness is one edit.
-const brokenManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\nbogus_key = 'x'\n"
+// brokenManifest fails manifest.Load on a [tool.astro] packages that is not
+// a list. Named beside its valid counterpart so a change to Load's strictness
+// is one edit.
+const brokenManifest = "[project]\nname = 'demo'\ndependencies = [\"apache-airflow==3.1.*\"]\n[tool.astro]\npackages = 'curl'\n"
 
 func TestTargetComposerPassesCleanly(t *testing.T) {
 	d, out := targetDeps(t)
@@ -246,7 +247,7 @@ func TestCheckNotesUndeclaredLocalValues(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	t.Setenv("ASTRO_HOME", "")
+	t.Setenv("ASTRO_HOME", home)
 	d, out := checkDeps(t)
 	dir, err := d.WorkingDir()
 	if err != nil {
@@ -329,6 +330,58 @@ func TestCheckStrictTurnsWarningIntoFailure(t *testing.T) {
 	}
 }
 
+// A key pyproject.toml carries that this build does not know is a check
+// finding: a warning, which --strict fails on, so CI that gates on the check
+// still hears about it. A near-miss of a known key is refused when the
+// manifest loads, which the check reports like any manifest problem.
+func TestCheckReportsAnUnknownManifestKey(t *testing.T) {
+	withKey := func(t *testing.T) (Deps, *bytes.Buffer) {
+		t.Helper()
+		d, out := checkDeps(t)
+		dir, _ := d.WorkingDir()
+		if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(validManifest+"palette = 'blue'\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		d.Checks = stubParser{}
+		return d, out
+	}
+	d, out := withKey(t)
+	if err := execute(t, d, "local", "check"); err != nil {
+		t.Fatalf("an unknown key is a warning, exit zero: %v", err)
+	}
+	if row, ok := lineContaining(out.String(), "manifest_warning"); !ok || !strings.Contains(row, "tool.astro.palette") {
+		t.Errorf("want a manifest_warning row naming the key, got %q", out.String())
+	}
+	if loc := findingLocation(checks.Finding{Kind: checks.KindManifestWarning, Key: "tool.astro.palette"}); loc != "tool.astro.palette" {
+		t.Errorf("the location is the key alone, got %q", loc)
+	}
+
+	d2, _ := withKey(t)
+	err := execute(t, d2, "local", "check", "--strict")
+	var exit *cliout.ExitError
+	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
+		t.Fatalf("--strict must fail on it, got %v", err)
+	}
+}
+
+// The manifest is the project's, whatever platform the check is for, so a
+// --target check reports its unknown keys too and --strict fails on them.
+func TestATargetCheckReportsAnUnknownManifestKey(t *testing.T) {
+	d, out := targetDeps(t)
+	dir, _ := d.WorkingDir()
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(validManifest+"palette = 'blue'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := execute(t, d, "local", "check", "--target", "mwaa", "--strict")
+	var exit *cliout.ExitError
+	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
+		t.Fatalf("--strict must fail on it, got %v", err)
+	}
+	if !strings.Contains(out.String(), "tool.astro.palette") {
+		t.Errorf("want the key in the report, got %q", out.String())
+	}
+}
+
 // A manifest problem is cheap, certain, and offline; a missing environment is
 // expensive to fix and may not be the real problem. So when both are true the
 // manifest is what the user hears about — otherwise they go and build an
@@ -355,7 +408,7 @@ func TestCheckReportsAManifestProblemBeforeTheEnvironment(t *testing.T) {
 		t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitEnvNotReady)
 	}
 	// On stdout, where docs/install.md tells an agent to read it.
-	if !strings.Contains(out.String(), "bogus_key") {
+	if !strings.Contains(out.String(), "tool.astro.packages") {
 		t.Errorf("stdout should name the manifest key, got %q", out.String())
 	}
 	if strings.Contains(out.String(), "astro local start") {
@@ -391,7 +444,7 @@ func TestCheckManifestProblemJSONCarriesAnErrorEvent(t *testing.T) {
 	if got.Event != "error" {
 		t.Errorf("event = %q, want \"error\"", got.Event)
 	}
-	if !strings.Contains(got.Message, "bogus_key") {
+	if !strings.Contains(got.Message, "tool.astro.packages") {
 		t.Errorf("message should name the key, got %q", got.Message)
 	}
 }
@@ -425,7 +478,7 @@ func TestCheckAndTargetAstroAgreeOnAnInvalidManifest(t *testing.T) {
 			if exit.Code != checks.ExitEnvNotReady {
 				t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitEnvNotReady)
 			}
-			if !strings.Contains(out.String(), "bogus_key") {
+			if !strings.Contains(out.String(), "tool.astro.packages") {
 				t.Errorf("stdout should name the manifest key, got %q", out.String())
 			}
 		})

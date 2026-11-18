@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/connmodel"
@@ -45,9 +46,44 @@ type Workspace struct {
 	Organization string
 }
 
-// WorkspaceOf is the workspace a's manifest links.
+// WorkspaceOf is the workspace a run reads for a's manifest: the one it links,
+// else a token's own (see WorkspaceID).
+//
+// The host is the manifest's domain, else ASTRO_DOMAIN, else astronomer.io, with
+// a token or without (a.WorkspaceDomain is astrosession.TokenHost's rule for a
+// run whose command names no domain); the saved context's host is in neither.
 func WorkspaceOf(a *manifest.Astro) Workspace {
-	return Workspace{ID: a.Workspace, Domain: a.WorkspaceDomain(), Organization: a.Organization}
+	return Workspace{ID: WorkspaceID(a), Domain: a.WorkspaceDomain(), Organization: a.Organization}
+}
+
+// WorkspaceID is the Workspace a run reads Environment Manager objects from:
+// the manifest's `workspace` when it names one, else, in a run with
+// ASTRO_API_TOKEN, the Workspace the token's claims name (a Workspace or
+// Deployment token has one), and else "". An Organization token names none, so
+// the manifest must; the saved login's last Workspace is never used, token or
+// not, because the manifest is what links a project to a Workspace.
+func WorkspaceID(a *manifest.Astro) string {
+	if a.Workspace != "" {
+		return a.Workspace
+	}
+	if id, ok, err := astrosession.TokenIdentity(); ok && err == nil {
+		return id.Workspace
+	}
+	return ""
+}
+
+// WorkspaceFor is WorkspaceID for a run that is about to read with it. It is
+// refused, with the usage error astrosession.CheckWorkspace gives, when the
+// manifest links a Workspace other than the one the run's Workspace or
+// Deployment token is for: the token can act in its own Workspace alone, so
+// reading the linked one would only be turned down by the API, after a
+// request. An Organization token, or a run with none, has no claim to
+// disagree with.
+func WorkspaceFor(a *manifest.Astro) (string, error) {
+	if err := astrosession.CheckWorkspace(a.Workspace, astrosession.SourceProject); err != nil {
+		return "", err
+	}
+	return WorkspaceID(a), nil
 }
 
 // NewProvider builds the workspace Environment Manager provider for a run: it
@@ -58,10 +94,15 @@ func WorkspaceOf(a *manifest.Astro) Workspace {
 // provider serves the whole run, so its fetch is shared across every
 // workspace-source name.
 //
-// An empty ws.ID means the manifest sets no top-level `workspace`, which a
-// workspace source needs: the provider is then unavailable and names the fix.
+// An empty ws.ID means the manifest sets no top-level `workspace` and the
+// run has no token naming one (see WorkspaceID), which a workspace source
+// needs: the provider is then unavailable and names the fix.
 func NewProvider(ws Workspace, clientFor ClientFactory, reveal bool) envresolve.Provider {
 	if ws.ID == "" {
+		if _, ok, err := astrosession.TokenIdentity(); ok && err != nil {
+			// An unusable token is the run's failure, not a missing key.
+			return Unavailable(err.Error())
+		}
 		return Unavailable(emfetch.CauseNoWorkspace.Text(ws.Domain, ""))
 	}
 	return newProvider(ws, clientFor, reveal)

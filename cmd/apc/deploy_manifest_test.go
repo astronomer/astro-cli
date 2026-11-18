@@ -177,9 +177,9 @@ func TestDeployManifestNeverPicks(t *testing.T) {
 // of those links it.
 func TestDeployManifestAsks(t *testing.T) {
 	dir := linkedProject(t)
-	prev := stdinIsTerminal
-	stdinIsTerminal = func() bool { return true }
-	t.Cleanup(func() { stdinIsTerminal = prev })
+	prev := mayAsk
+	mayAsk = func() bool { return true }
+	t.Cleanup(func() { mayAsk = prev })
 	asked := manifestDeploys(t, builtAndPushed)
 	api := newAPCClient()
 	api.On("ListDeployments", houston.ListDeploymentsRequest{WorkspaceID: "ck05r3bor07h40d02y2hw4n4v"}).Return([]houston.Deployment{
@@ -228,7 +228,7 @@ func TestOtherDomainNamesTheWayThere(t *testing.T) {
 	// A second context in an in-memory config, with no login stored for it.
 	fs := afero.NewMemMapFs()
 	cfg := strings.Replace(string(testUtil.NewTestConfig(testUtil.SoftwarePlatform)), "contexts:\n", "contexts:\n  astro_other_example:\n    domain: astro.other.example\n", 1)
-	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, []byte(cfg), 0o600))
+	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFileForTesting(), []byte(cfg), 0o600))
 	config.InitConfig(fs)
 	t.Cleanup(func() { testUtil.InitTestConfig(testUtil.SoftwarePlatform) })
 	assert.ErrorContains(t, otherDomainThen("deploy again")("elsewhere", "astro.other.example"), "run astro context switch astro.other.example")
@@ -312,7 +312,7 @@ func requireInOrder(t *testing.T, out string, parts ...string) {
 func TestDeployManifestTakesForceAndPrompt(t *testing.T) {
 	linkedProject(t)
 	asked := manifestDeploys(t, builtAndPushed)
-	run := runAPC(t, newAPCClient(), "", "deploy", "prod", "--force", "-p", "-o", "json")
+	run := runAPC(t, newAPCClient(), "", "deploy", "prod", "--force", "--prompt", "-o", "json")
 	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 	require.Len(t, *asked, 1)
 	assert.Equal(t, "dep-prod", (*asked)[0].DeploymentID)
@@ -377,9 +377,9 @@ func TestDeployManifestRefusesDagsWithImage(t *testing.T) {
 // asking is a terminal for one test: the deploy may ask.
 func asking(t *testing.T) {
 	t.Helper()
-	prev := stdinIsTerminal
-	stdinIsTerminal = func() bool { return true }
-	t.Cleanup(func() { stdinIsTerminal = prev })
+	prev := mayAsk
+	mayAsk = func() bool { return true }
+	t.Cleanup(func() { mayAsk = prev })
 }
 
 // promptAPI is a Houston whose workspace lists dep-old and dep-new, which no

@@ -407,13 +407,13 @@ func TestDeployManifestImagePushCarriesTheToken(t *testing.T) {
 func TestDeployManifestImageToABYORegistryByDigest(t *testing.T) {
 	cmd := withManifestEngine(t, "3.1-5")
 	client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.1-5", listed: houstonLists, version: "1.0.0", byo: true}).client(t)
-	require.NoError(t, config.CFG.ShaAsTag.SetHomeString("true"))
-	t.Cleanup(func() { _ = config.CFG.ShaAsTag.SetHomeString("false") })
 	client.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{
 		ReleaseName: "my-release", Image: "byo.example.com/team/repo@sha256:abc", AirflowVersion: "3.1.1", RuntimeVersion: "3.1-5", DeployRevisionDescription: "ship it",
 	}).Return(nil, nil).Once()
 	var warnings []string
-	res, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings))
+	in := manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings)
+	in.ShaAsTag = true
+	res, err := DeployManifestImage(client, in)
 	require.NoError(t, err)
 	assert.Equal(t, "byo.example.com/team/repo@sha256:abc", res.Image)
 	assert.Empty(t, cmd.pushAuth, "no credential of the deploy's")

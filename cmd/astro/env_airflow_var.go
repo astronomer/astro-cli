@@ -26,14 +26,13 @@ const envAirflowVarExamples = `
 
 func newEnvAirflowVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                        "airflow-variable",
-		Aliases:                    []string{"airflow-var", "airflow-vars", "airflow-variables"},
-		Short:                      "Manage Airflow variables",
-		Long:                       "Manage Airflow variables on Astro, scoped to a workspace or a deployment.",
-		Example:                    envAirflowVarExamples,
-		Args:                       cobra.ArbitraryArgs,
-		RunE:                       cliout.GroupHelp,
-		SuggestionsMinimumDistance: 2,
+		Use:     "airflow-variable",
+		Aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},
+		Short:   "Manage Airflow variables",
+		Long:    "Manage Airflow variables on Astro, scoped to a workspace or a deployment.",
+		Example: envAirflowVarExamples,
+		Args:    cobra.ArbitraryArgs,
+		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
 	addScopePersistentFlags(cmd)
@@ -107,8 +106,8 @@ func newEnvAirflowVarSetCmd(out io.Writer) *cobra.Command {
   # Set many from a dotenv file
   astro env airflow-variable set --from-file vars.env`,
 	}
-	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "The value; omit it to read from stdin or be prompted with echo off")
-	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "Mark the variable secret when it is created")
+	cmd.Flags().StringVar(&envVarValue, "value", "", "The value; omit it to read from stdin or be prompted with echo off")
+	cmd.Flags().BoolVar(&envVarSecret, "secret", false, "Mark the variable secret when it is created")
 	cmd.Flags().BoolVar(&envVarNoCreate, "no-create", false, "Fail if the variable does not exist, instead of creating it")
 	cmd.Flags().StringVar(&envVarFromFile, "from-file", "", "Set many from a dotenv file ('-' reads stdin)")
 	addAutoLinkFlag(cmd)
@@ -133,11 +132,10 @@ func newEnvAirflowVarDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	objs, err := env.ListAirflowVars(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -150,11 +148,10 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
 
 	obj, err := env.GetAirflowVar(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
@@ -164,22 +161,20 @@ func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 }
 
 func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 	return runFromFileSet(cmd, r, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, fromFileFns{env.CreateAirflowVar, env.UpdateAirflowVar, env.GetAirflowVar})
 }
 
 func runEnvAirflowVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
+	scope, err := envScope(cmd)
 	if err != nil {
 		return err
 	}
 	r := cliout.Renderer{Format: envOutput, Out: out}
-	cmd.SilenceUsage = true
 
 	value, err := readSetValue(cmd, "value", envVarValue, fmt.Sprintf("new value for %s", idOrKey))
 	if err != nil {

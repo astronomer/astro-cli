@@ -15,11 +15,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -47,7 +49,10 @@ const (
 	replaceInit    = "astro init"
 
 	flagWithWorkspace = "with-workspace"
+	flagNoSync        = "no-sync"
 )
+
+const noSyncHelp = "With nothing running, use the project's virtualenv as it is instead of building or updating it first (also set by UV_NO_SYNC)"
 
 const withWorkspaceHelp = "With Airflow stopped, fetch the values declared source = \"workspace\" from the Environment Manager, as a start does (needs network and astro login)"
 
@@ -116,11 +121,10 @@ func (c *cli) readStatus() (localrt.Status, error) {
 func NewLocalCmd(d Deps) *cobra.Command {
 	c := &cli{d: d}
 	cmd := &cobra.Command{
-		Use:          "local",
-		Short:        "Run Apache Airflow locally from your project",
-		Long:         "Run and manage a local Apache Airflow for the current project. Works offline, no account needed.",
-		Args:         cobra.ArbitraryArgs,
-		SilenceUsage: true,
+		Use:   "local",
+		Short: "Run Apache Airflow locally from your project",
+		Long:  "Run and manage a local Apache Airflow for the current project. Works offline, no account needed.",
+		Args:  cobra.ArbitraryArgs,
 		// A bare `astro local` prints help and succeeds; an unknown subcommand
 		// fails. Without a RunE cobra treats this non-runnable parent as a help
 		// request and exits 0 even on a typo (it returns flag.ErrHelp before it
@@ -133,7 +137,7 @@ func NewLocalCmd(d Deps) *cobra.Command {
 			// out of v1 habit, get named rather than refused: `init` moved up
 			// to `astro init`, and `ps` was always `status`.
 			if replacement, ok := devReplacementFor(args[0]); ok {
-				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Use %s", args[0], cmd.CommandPath(), replacement))
+				return cliout.UsageNoHelp(fmt.Errorf("unknown command %q for %q. Use %s", args[0], cmd.CommandPath(), replacement))
 			}
 			return cliout.UnknownSubcommand(cmd, args[0])
 		},
@@ -364,6 +368,7 @@ func (c *cli) startProject(ctx context.Context, opts plan.Options, buildSecretFl
 	}
 	// Turn on Environment Manager resolution for workspace-source env values.
 	opts.WorkspaceProvider = c.workspaceProvider()
+	opts.WorkspaceID = emenv.WorkspaceID
 	opts.BuildSecretFlags = buildSecretFlag
 	opts.PythonCatalog = c.pythonCatalog(ctx)
 	if opts.Mode != localrt.ModeDocker {
@@ -373,7 +378,7 @@ func (c *cli) startProject(ctx context.Context, opts plan.Options, buildSecretFl
 	if err != nil {
 		return nil, c.reportBuildError(r, err)
 	}
-	warnManifest(r, built.ManifestWarnings)
+	c.warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
 	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)
@@ -492,7 +497,10 @@ func warnLocalFilesInImage(r cliout.Renderer, p localrt.Plan) {
 // [tool.astro.targets.<name>] key nothing reads, most likely a misspelling of
 // one that is. The key and reason ride as their own fields, as an env warning's
 // do, so a json consumer need not parse the prose.
-func warnManifest(r cliout.Renderer, warnings []manifest.Problem) {
+func (c *cli) warnManifest(r cliout.Renderer, warnings []manifest.Problem) {
+	if r.Format == cliout.FormatText && c.d.ManifestWarningsShown {
+		return
+	}
 	for _, w := range warnings {
 		emitWarning(r, event{
 			Event:  "warning",
@@ -800,6 +808,7 @@ func (c *cli) restartProject(ctx context.Context, o restartOptions) (*plan.Built
 		PythonCatalog:    c.pythonCatalog(ctx),
 
 		WorkspaceProvider: c.workspaceProvider(),
+		WorkspaceID:       emenv.WorkspaceID,
 	})
 	if err != nil {
 		return nil, c.reportBuildError(r, err)
@@ -808,7 +817,7 @@ func (c *cli) restartProject(ctx context.Context, o restartOptions) (*plan.Built
 	if err != nil {
 		return nil, err
 	}
-	warnManifest(r, built.ManifestWarnings)
+	c.warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
 	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)
@@ -939,7 +948,7 @@ func newListCmd(c *cli) *cobra.Command {
 			return c.runList(opts.all, opts.clean)
 		},
 	}
-	cmd.Flags().BoolVar(&opts.all, "all", false, "Include stale records whose Airflow is no longer running")
+	cmd.Flags().BoolVarP(&opts.all, "all", "a", false, "Include stale records whose Airflow is no longer running")
 	cmd.Flags().BoolVar(&opts.clean, "clean", false, "Remove stale records whose process or compose project is gone")
 	return cmd
 }
@@ -1104,7 +1113,7 @@ func newLogsCmd(c *cli) *cobra.Command {
 		Example: "  # Show every log line so far\n" +
 			"  astro local logs\n\n" +
 			"  # Follow the scheduler's log, starting from its last 100 lines\n" +
-			"  astro local logs --component scheduler --tail 100 -f",
+			"  astro local logs --component scheduler --tail 100 --follow",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runLogs(cmd.Context(), opts.follow, opts.tail, opts.components)
@@ -1142,23 +1151,32 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 }
 
 func newRunCmd(c *cli) *cobra.Command {
-	var withWorkspace bool
+	var withWorkspace, noSync bool
 	cmd := &cobra.Command{
 		Use:   nameRun + " <COMMAND> [ARGS...]",
 		Short: "Run a command inside this project's Airflow environment",
+		Long: "Run a command inside this project's Airflow environment.\n\n" +
+			"With Airflow running, the command attaches to it and shares its port and metadata database. " +
+			"With nothing running, a standalone project first builds or updates its virtualenv from pyproject.toml, " +
+			"as uv run does, so the command works in a fresh checkout or in CI. The first build can take a few minutes. " +
+			"Its progress goes to stderr; stdout stays the command's own. " +
+			"Pass --" + flagNoSync + " (or set UV_NO_SYNC) to use the virtualenv as it is.",
 		Example: "  # Run the tests in the project's environment\n" +
 			"  astro local run pytest\n\n" +
 			"  # Run an Airflow CLI command\n" +
-			"  astro local run airflow dags list",
+			"  astro local run airflow dags list\n\n" +
+			"  # Use the existing virtualenv without updating it\n" +
+			"  astro local run --" + flagNoSync + " pytest",
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return c.runExec(cmd.Context(), args, withWorkspace)
+			return c.runExec(cmd.Context(), args, withWorkspace, noSync)
 		},
 	}
 	// Everything after the first positional belongs to the wrapped
 	// command, not to us.
 	cmd.Flags().SetInterspersed(false)
 	cmd.Flags().BoolVar(&withWorkspace, flagWithWorkspace, false, withWorkspaceHelp)
+	cmd.Flags().BoolVar(&noSync, flagNoSync, false, noSyncHelp)
 	return cmd
 }
 
@@ -1166,13 +1184,15 @@ func newRunCmd(c *cli) *cobra.Command {
 // is attached, so a command shares its port and metadata DB. With nothing
 // running, a standalone project's command runs in its venv under the
 // environment a start would give it, so `astro local run pytest` needs no
-// Airflow. Docker mode runs commands inside its containers, which have to be
-// up.
+// Airflow. That venv is built or brought up to date first, as `uv run` does,
+// unless noSync (or UV_NO_SYNC) says to use it as it is; a running Airflow is
+// never synced, because that would rebuild the venv under it. Docker mode runs
+// commands inside its containers, which have to be up.
 //
 // A stopped run stays offline unless withWorkspace asks for the values only
 // the Environment Manager holds. Then it resolves them as a start does, and a
 // value it cannot fetch fails the run the way it fails a start.
-func (c *cli) environment(withWorkspace bool) (localrt.Airflow, error) {
+func (c *cli) environment(ctx context.Context, withWorkspace, noSync bool) (localrt.Airflow, error) {
 	dir, err := c.projectPath()
 	if err != nil {
 		return nil, err
@@ -1196,6 +1216,7 @@ func (c *cli) environment(withWorkspace bool) (localrt.Airflow, error) {
 	opts := plan.Options{AllowMissing: true}
 	if withWorkspace {
 		opts.WorkspaceProvider = c.workspaceProvider()
+		opts.WorkspaceID = emenv.WorkspaceID
 	}
 	built, err := plan.Build(dir, opts)
 	if err != nil {
@@ -1222,7 +1243,24 @@ func (c *cli) environment(withWorkspace bool) (localrt.Airflow, error) {
 	warnWorkspaceUnread(stderr, built.WorkspaceNote)
 	warnWithout(stderr, "running", local)
 	warnWorkspaceSkipped(stderr, workspace)
-	return c.d.Runtime.Stopped(built.Plan)
+	// A docker plan has no venv to build; Stopped refuses it as before.
+	skipped := noSync || uvNoSyncSet()
+	if !skipped && built.Plan.Mode != localrt.ModeDocker {
+		if err := c.syncEnvironment(ctx, built.Plan); err != nil {
+			// Airflow may have come up since the status was read, and a sync
+			// refuses to rebuild the venv under it. Attach, as the running
+			// path does.
+			if now, serr := c.d.Runtime.ReadStatus(dir); serr == nil && now.State == localrt.StateRunning {
+				return c.d.Runtime.Attach(dir)
+			}
+			return nil, err
+		}
+	}
+	af, err := c.d.Runtime.Stopped(built.Plan)
+	if skipped && errors.Is(err, localrt.ErrNotRunning) {
+		err = fmt.Errorf("%w; drop --%s and unset UV_NO_SYNC to let this command build it", err, flagNoSync)
+	}
+	return af, err
 }
 
 // warnWorkspaceSkipped reports, in one line, the required values an offline
@@ -1256,8 +1294,8 @@ func (e notRunning) Error() string { return string(e) }
 
 func (e notRunning) Is(target error) bool { return target == localrt.ErrNotRunning }
 
-func (c *cli) runExec(ctx context.Context, argv []string, withWorkspace bool) error {
-	af, err := c.environment(withWorkspace)
+func (c *cli) runExec(ctx context.Context, argv []string, withWorkspace, noSync bool) error {
+	af, err := c.environment(ctx, withWorkspace, noSync)
 	if err != nil {
 		return err
 	}
@@ -1272,7 +1310,7 @@ func (c *cli) runExec(ctx context.Context, argv []string, withWorkspace bool) er
 }
 
 func newShellCmd(c *cli) *cobra.Command {
-	var withWorkspace bool
+	var withWorkspace, noSync bool
 	cmd := &cobra.Command{
 		Use:   "shell",
 		Short: "Open a shell inside this project's Airflow environment",
@@ -1280,16 +1318,17 @@ func newShellCmd(c *cli) *cobra.Command {
 			"  astro local shell",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return c.runShell(cmd.Context(), withWorkspace)
+			return c.runShell(cmd.Context(), withWorkspace, noSync)
 		},
 	}
 	cmd.Flags().String("shell", "", "Shell to launch instead of your login shell (not built yet)")
 	cmd.Flags().BoolVar(&withWorkspace, flagWithWorkspace, false, withWorkspaceHelp)
+	cmd.Flags().BoolVar(&noSync, flagNoSync, false, noSyncHelp)
 	return cmd
 }
 
-func (c *cli) runShell(ctx context.Context, withWorkspace bool) error {
-	af, err := c.environment(withWorkspace)
+func (c *cli) runShell(ctx context.Context, withWorkspace, noSync bool) error {
+	af, err := c.environment(ctx, withWorkspace, noSync)
 	if err != nil {
 		return err
 	}
@@ -1369,11 +1408,21 @@ func newResetCmd(c *cli) *cobra.Command {
 
 func (c *cli) runReset(ctx context.Context, yes bool) error {
 	r := c.renderer()
-	if err := c.confirmUnless(yes, "Wipe this project's local Airflow state?"); err != nil {
-		return err
-	}
+	// Everything that can fail without consent fails first: a directory with
+	// no project, or a run with no home for the state reset would wipe, is
+	// refused before it is asked to wipe anything, and the question names the
+	// project it would wipe.
 	dir, err := c.projectPath()
 	if err != nil {
+		return err
+	}
+	if c.d.HomeErr != nil {
+		return c.d.HomeErr
+	}
+	// The path is cleaned where the question is built: a directory can be
+	// named with escape sequences, and the question reaches the terminal as
+	// written.
+	if err := c.confirmUnless(yes, fmt.Sprintf("Wipe the local Airflow state (database, logs, environment) of %s?", input.Clean(dir))); err != nil {
 		return err
 	}
 	// Runtime.Reset rather than Stop with Clean: stop goes through Attach,

@@ -1,7 +1,6 @@
 package deployment
 
 import (
-	"bytes"
 	"os"
 
 	"github.com/stretchr/testify/mock"
@@ -43,9 +42,9 @@ func (s *Suite) TestRuntimeVersionsCompareAsHoustonComparesThem() {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	drawn := new(bytes.Buffer)
-	got, err := getRuntimeVersionSelection("12.1.0", "2.10.5", "c", api, drawn)
+	var got string
+	drawn := captureStderr(s.T(), func() { got, err = getRuntimeVersionSelection("12.1.0", "2.10.5", "c", api) })
 	s.NoError(err)
 	s.Equal("3.0-1", got, "the second row is the Airflow 3 Runtime")
-	s.Contains(drawn.String(), "Runtime-3.0-1")
+	s.Contains(drawn, "Runtime-3.0-1")
 }

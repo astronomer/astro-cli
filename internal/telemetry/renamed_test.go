@@ -7,6 +7,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// A command recorded twice in one run (its flag alias, then its own deprecated
+// path) sends one event holding both.
+func TestRenamedFlagsOfOneCommandAreOneEvent(t *testing.T) {
+	t.Cleanup(func() { queuedRenamedFlags = nil })
+	cmd := &cobra.Command{Use: "add"}
+	RecordRenamedFlags(cmd, []string{"--org-token-name"}, []string{"--name"})
+	RecordRenamedFlags(cmd, []string{"a b add"}, []string{"a add"})
+	q := takeRenamedFlags(cmd)
+	if assert.NotNil(t, q) {
+		assert.Equal(t, []string{"--org-token-name", "a b add"}, q.renamed)
+		assert.Equal(t, []string{"--name", "a add"}, q.current)
+	}
+}
+
 // What a run queues waits for its own command's event, and is taken once.
 func TestRenamedFlagsWaitForTheirCommand(t *testing.T) {
 	t.Cleanup(func() { queuedRenamedFlags = nil })

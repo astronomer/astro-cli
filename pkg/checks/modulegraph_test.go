@@ -40,6 +40,10 @@ func TestTheModuleGraphStaysANearLeaf(t *testing.T) {
 		// module (the CLI, Astro Desktop) links already.
 		"github.com/astronomer/astro-cli/pkg/manifest": true,
 		"github.com/pelletier/go-toml/v2":              true,
+		// Test-only: the shared isolation every test package's TestMain calls
+		// (pkg/testenv). It has no dependency of its own, and no non-test file here
+		// imports it, so it adds a line to a consumer's module graph and no code.
+		"github.com/astronomer/astro-cli/pkg/testenv": true,
 		// Test-only, with the transitive set go list reports for it. Written
 		// from `go list -m all` rather than from memory.
 		"github.com/stretchr/testify": true,

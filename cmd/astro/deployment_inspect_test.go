@@ -21,7 +21,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
-		cmdArgs := []string{"inspect", "-n", "test"}
+		cmdArgs := []string{"inspect", "--deployment-name", "test"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, deploymentResponse.JSON200.Namespace)
@@ -45,7 +45,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-		cmdArgs := []string{"inspect", "-n", "test", "-k", "metadata.cluster_id"}
+		cmdArgs := []string{"inspect", "--deployment-name", "test", "--key", "metadata.cluster_id"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
@@ -54,7 +54,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-		cmdArgs := []string{"inspect", "-n", "test"}
+		cmdArgs := []string{"inspect", "--deployment-name", "test"}
 		out, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, out, `workload_identity: ""`)
@@ -64,7 +64,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-		cmdArgs := []string{"inspect", "-n", "test", "--show-workload-identity"}
+		cmdArgs := []string{"inspect", "--deployment-name", "test", "--show-workload-identity"}
 		out, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, out, fmt.Sprintf(`workload_identity: %s`, mockWorkloadIdentity))
@@ -73,7 +73,7 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.Initial)
 		expectedOut := "Usage:\n"
-		cmdArgs := []string{"inspect", "-n", "doesnotexist"}
+		cmdArgs := []string{"inspect", "--deployment-name", "doesnotexist"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 		assert.NotContains(t, resp, expectedOut)

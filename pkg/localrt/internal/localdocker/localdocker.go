@@ -336,6 +336,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	}
 
 	env := airflowEnv(name, webPort, major, p.Env, p.SecretEnv)
+	secrets := secretDecls(p.SecretEnv, env)
 	composePath, err := e.writeComposeFile(stateDir, composeInput{
 		ProjectName: name,
 		Image:       image,
@@ -347,6 +348,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		PostgresPort: pgPort,
 		Env:          env,
 		PassEnv:      passEnv(p.PassthroughEnv, p.SecretEnv, env),
+		SecretEnv:    secrets,
 		Mounts:       projectMounts(projectPath),
 		DBCommand:    dbCommand(major),
 		Services:     airflowServices(major),
@@ -387,7 +389,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		files:      composeFiles(composePath, projectPath),
 		name:       name,
 		projectDir: projectPath,
-		extraEnv:   secretEnviron(p.SecretEnv),
+		extraEnv:   secretEnviron(declaredSecrets(p.SecretEnv, secrets)),
 	}
 	if err := e.bringUp(ctx, &up, mayCleanUp, cb); err != nil {
 		return nil, err
@@ -1092,8 +1094,8 @@ type composeLine struct {
 	name       string
 	projectDir string
 	// extraEnv is added to the compose process environment on top of the engine
-	// connection's own. It carries SecretEnv values, which the file declares
-	// without recording (see passEnv) and RunInImage names with bare -e flags.
+	// connection's own. It carries SecretEnv values under their secretRef
+	// aliases, which the file's references interpolate (see secretDecls).
 	extraEnv []string
 }
 
@@ -1123,16 +1125,12 @@ func (l composeLine) argv(args ...string) []string {
 // into spare capacity would leak one project's secrets into the next command
 // that reused it.
 //
-// The connection goes LAST, and that ordering is load-bearing. os/exec keeps
-// the last duplicate of a key, so anything in extraEnv that collides with
-// DOCKER_HOST, CONTAINER_HOST or DOCKER_CONFIG would otherwise retarget this
-// very compose invocation — a project's Airflow env is caller-supplied and can
-// name anything, so a plan carrying DOCKER_HOST for a DockerOperator DAG would
-// silently point the start at a different daemon while Stop, which uses
-// conn.env untouched, still looked at the right one. A secret that loses to
-// the engine connection reaches the container with the connection's value
-// instead of its own; a compose command talking to the wrong daemon is
-// unrecoverable from the UI.
+// extraEnv carries project values only under their secretRef aliases, never
+// as themselves, so nothing in it can be one of compose's own settings: a
+// project's DOCKER_HOST (a DockerOperator DAG's), DOCKER_CONTEXT or
+// COMPOSE_PROFILES reaches the container through the file's reference and
+// cannot retarget or reconfigure this invocation. The connection still goes
+// last, so it decides any variable both name.
 func (l composeLine) env() []string {
 	out := make([]string, 0, len(l.extraEnv)+len(l.conn.env))
 	out = append(out, l.extraEnv...)

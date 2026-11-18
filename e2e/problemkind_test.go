@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -136,12 +137,14 @@ func TestATextFailurePrintsNoUsageBlock(t *testing.T) {
 // process exits 1 rather than waiting on stdin — through the binary, because
 // the guard is installed by the binary's own root.
 //
-// Tier 0: `astro local reset` asks before it looks for a project, so a bare
-// directory reaches the question.
+// Tier 0: `astro local reset` finds the project before it asks, so the
+// directory holds a manifest; nothing is started, and the question is the
+// first thing reset would do there.
 func TestAJSONRunNeverPrompts(t *testing.T) {
 	tier(t, 0)
 
 	p := newProject(t)
+	write(t, filepath.Join(p.Dir, "pyproject.toml"), "[project]\nname = 'demo'\n[tool.astro]\n")
 
 	r := p.run("local", "reset", "--output", "json")
 	if r.ExitCode != 1 {
@@ -157,5 +160,32 @@ func TestAJSONRunNeverPrompts(t *testing.T) {
 	}
 	if strings.Contains(r.Stderr, "[y/N]") {
 		t.Errorf("a json run asked its question\n%s", r.output())
+	}
+}
+
+// Reset finds the project before it asks to wipe it: in a directory with no
+// project it fails as no_project, as every local command does, and the
+// question never appears, in text mode with no terminal either.
+func TestResetWithNoProjectFailsBeforeAsking(t *testing.T) {
+	tier(t, 0)
+
+	p := newProject(t)
+
+	r := p.run("local", "reset", "--output", "json")
+	if r.ExitCode != 1 {
+		t.Fatalf("exit %d, want 1\n%s", r.ExitCode, r.output())
+	}
+	var emitted map[string]any
+	r.requireJSON(&emitted)
+	if emitted["kind"] != "no_project" {
+		t.Errorf("want kind no_project, got %v", emitted)
+	}
+
+	r = p.run("local", "reset")
+	if r.ExitCode != 1 {
+		t.Fatalf("exit %d, want 1\n%s", r.ExitCode, r.output())
+	}
+	if !strings.Contains(r.Stderr, "no Astro project found") || strings.Contains(r.Stderr, "[y/N]") {
+		t.Errorf("want the no-project error and no question\n%s", r.output())
 	}
 }

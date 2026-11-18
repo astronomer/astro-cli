@@ -164,10 +164,10 @@ func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 	cliout.OnBadFormat(cmd, func(_ string, refused error) error {
 		return fmt.Errorf("%w; -o is the output format, and --output-file takes the path", refused)
 	})
-	cmd.Flags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for")
+	cmd.Flags().StringVar(&orgName, "organization-name", "", "Name of the Organization to manage audit logs for")
 	// No shorthand: -o is --output, as on every other command.
 	cmd.Flags().StringVar(&auditLogsOutputFilePath, "output-file", "", "Path to a file for storing exported audit logs. Defaults to a file in the current directory named for the Organization, the days and the date")
-	cmd.Flags().IntVarP(&auditLogsEarliestParam, "include", "i", auditLogsEarliestParamDefaultValue,
+	cmd.Flags().IntVar(&auditLogsEarliestParam, "include", auditLogsEarliestParamDefaultValue,
 		"Number of days in the past to start exporting logs from, from 1 to 90")
 	return cmd
 }
@@ -206,7 +206,7 @@ func newOrganizationUserInviteCmd(out io.Writer) *cobra.Command {
 			return userInvite(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&role, "role", "r", "ORGANIZATION_MEMBER", "The role for the "+
+	cmd.Flags().StringVar(&role, "role", "ORGANIZATION_MEMBER", "The role for the "+
 		"user. Possible values are "+allowedOrganizationRoleNamesProse)
 	return cmd
 }
@@ -240,21 +240,17 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 			return userUpdate(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&updateRole, "role", "r", "", "The new role for the "+
+	cmd.Flags().StringVar(&updateRole, "role", "", "The new role for the "+
 		"user. Possible values are "+allowedOrganizationRoleNamesProse)
 	return cmd
 }
 
-func organizationList(cmd *cobra.Command, out io.Writer) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
+func organizationList(_ *cobra.Command, out io.Writer) error {
 	return organization.ListWithFormat(astroV1Client, cliout.Renderer{Format: organizationListOutput, Out: out})
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	format := organizationSwitchOutput
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	organizationNameOrID := ""
 
@@ -262,7 +258,7 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationNameOrID = args[0]
 	}
 
-	asks := cliout.NotesTo(cmd, format, out)
+	asks := os.Stderr
 	switched, err := orgSwitch(organizationNameOrID, astroV1Client, asks)
 	if err != nil {
 		return err
@@ -300,9 +296,6 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 }
 
 func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
 	fmt.Fprintln(cliout.NotesTo(cmd, auditLogsOutput, out), "This may take some time depending on how many days are being exported.")
 	export, err := orgExportAuditLogs(astroV1Client,
 		orgName, auditLogsOutputFilePath, auditLogsEarliestParam)
@@ -312,7 +305,7 @@ func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
 	return emitAuditLogExport(cliout.Renderer{Format: auditLogsOutput, Out: out}, export)
 }
 
-func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
+func userInvite(_ *cobra.Command, args []string, out io.Writer) error {
 	var email string
 
 	// if an email was provided in the args we use it
@@ -328,7 +321,6 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 		email = answer
 	}
 
-	cmd.SilenceUsage = true
 	inv, err := user.CreateInvite(email, role, astroV1Client)
 	if err != nil {
 		return err
@@ -336,12 +328,11 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 	return renderLines(organizationUserOutput, out, &inv, fmt.Sprintf("invite for %s with role %s created", inv.Email, inv.Role))
 }
 
-func listUsers(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listUsers(_ *cobra.Command, out io.Writer) error {
 	return user.ListOrgUsersWithFormat(astroV1Client, cliout.Renderer{Format: organizationUserOutput, Out: out})
 }
 
-func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
+func userUpdate(_ *cobra.Command, args []string, out io.Writer) error {
 	var email string
 
 	// if an email was provided in the args we use it
@@ -359,7 +350,6 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		updateRole = answer
 	}
 
-	cmd.SilenceUsage = true
 	if email == "" {
 		if err := mayPick("a user", userEmailAnswer); err != nil {
 			return err
@@ -408,8 +398,7 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listTeams(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listTeams(_ *cobra.Command, out io.Writer) error {
 	return team.ListOrgTeamsWithFormat(astroV1Client, cliout.Renderer{Format: organizationTeamOutput, Out: out})
 }
 
@@ -433,16 +422,14 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().
-		StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
-	cmd.Flags().StringVarP(&updateOrganizationRole, "role", "r", "", "The new role for the "+
+		StringVar(&teamDescription, "description", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
+	cmd.Flags().StringVar(&updateOrganizationRole, "role", "", "The new role for the "+
 		"team. Possible values are "+allowedOrganizationRoleNamesProse)
 	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation on an IDP-managed team")
 	return cmd
 }
 
-func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-	cmd.SilenceUsage = true
-
+func teamUpdate(_ *cobra.Command, out io.Writer, args []string) error {
 	id := ""
 
 	if len(args) == 1 {
@@ -474,14 +461,13 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire team within quotes \"\" ")
-	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team in quotes \"\"")
-	cmd.Flags().StringVarP(&teamOrgRole, "role", "r", "", "The role for the new team. Possible values are "+allowedOrganizationRoleNamesProse)
+	cmd.Flags().StringVar(&teamDescription, "description", "", "Description of the Team. If the description contains a space, specify the entire team in quotes \"\"")
+	cmd.Flags().StringVar(&teamOrgRole, "role", "", "The role for the new team. Possible values are "+allowedOrganizationRoleNamesProse)
 
 	return cmd
 }
 
-func teamCreate(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func teamCreate(_ *cobra.Command, out io.Writer) error {
 	if teamOrgRole == "" {
 		// Refused before the line introducing the choice, so a run that
 		// cannot ask prints nothing.
@@ -528,9 +514,7 @@ func newTeamDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
-	cmd.SilenceUsage = true
-
+func teamDelete(_ *cobra.Command, out io.Writer, args []string) error {
 	id := ""
 
 	if len(args) == 1 {
@@ -575,14 +559,13 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 			return removeTeamUser(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's unique identifier \"\" ")
-	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's unique identifier \"\"")
+	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's unique identifier \"\" ")
+	cmd.Flags().StringVar(&userID, "user-id", "", "The User's unique identifier \"\"")
 	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation on an IDP-managed team")
 	return cmd
 }
 
-func removeTeamUser(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func removeTeamUser(_ *cobra.Command, out io.Writer) error {
 	if err := mayPickTeamAndUser("a team member"); err != nil {
 		return err
 	}
@@ -621,14 +604,13 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 			return addTeamUser(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's unique identifier \"\" ")
-	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's unique identifier \"\"")
+	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's unique identifier \"\" ")
+	cmd.Flags().StringVar(&userID, "user-id", "", "The User's unique identifier \"\"")
 	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation on an IDP-managed team")
 	return cmd
 }
 
-func addTeamUser(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func addTeamUser(_ *cobra.Command, out io.Writer) error {
 	if err := mayPickTeamAndUser("a user"); err != nil {
 		return err
 	}
@@ -655,12 +637,11 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
 			return listUsersCmd(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's id \"\" ")
+	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's id \"\" ")
 	return cmd
 }
 
-func listUsersCmd(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listUsersCmd(_ *cobra.Command, out io.Writer) error {
 	if teamID == "" {
 		if err := mayPick("a team", teamIDFlag); err != nil {
 			return err
@@ -755,10 +736,10 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
-	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
-	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Expiration of the token in days, from 1 to 3650. Without it, the token does not expire")
+	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	cmd.Flags().StringVar(&tokenDescription, "description", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
+	cmd.Flags().StringVar(&tokenRole, "role", "", "The role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
+	cmd.Flags().IntVar(&tokenExpiration, "expiration", 0, "Expiration of the token in days, from 1 to 3650. Without it, the token does not expire")
 	return cmd
 }
 
@@ -779,10 +760,10 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 			return updateOrganizationToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&name, "name", "t", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the token. Possible values are "+allowedOrganizationRoleNamesProse+". Without it, the token keeps its role")
+	cmd.Flags().StringVar(&name, "name", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&tokenName, "new-name", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().StringVar(&tokenDescription, "description", "", "Updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
+	cmd.Flags().StringVar(&tokenRole, "role", "", "The new role for the token. Possible values are "+allowedOrganizationRoleNamesProse+". Without it, the token keeps its role")
 	return cmd
 }
 
@@ -791,8 +772,8 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rotate [TOKEN_ID]",
 		Aliases: []string{"ro"},
-		Short:   "Rotate a Organization API token",
-		Long:    "Rotate a Organization API token. You can only rotate Organization API tokens. You cannot rotate Workspace API tokens with this command",
+		Short:   "Rotate an Organization API token",
+		Long:    "Rotate an Organization API token. You can only rotate Organization API tokens. You cannot rotate Workspace API tokens with this command",
 		Example: `
   # Rotate a token by its ID
   astro organization token rotate <TOKEN_ID>
@@ -804,8 +785,8 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
 			return rotateOrganizationToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
-	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceRotate, "yes", "y", false, "Don't ask for confirmation before rotating the Organization API token")
 
 	return cmd
@@ -815,7 +796,7 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete [TOKEN_ID]",
 		Aliases: []string{"rm"},
-		Short:   "Delete a Organization API token or remove an Organization API token from a Organization",
+		Short:   "Delete an Organization API token",
 		Long:    "Permanently revoke an Organization API token. All access the token grants — including any Workspace and Deployment roles — is immediately revoked.",
 		Example: `
   # Delete a token by its ID
@@ -828,8 +809,8 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 			return deleteOrganizationToken(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting or removing the API token")
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
+	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting the API token")
 
 	return cmd
 }
@@ -885,13 +866,12 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 			return listRoles(cmd, out)
 		},
 	}
-	cmd.Flags().BoolVarP(&shouldIncludeDefaultRoles, "include-default-roles", "i", false, "Should include default roles in response")
+	cmd.Flags().BoolVar(&shouldIncludeDefaultRoles, "include-default-roles", false, "Should include default roles in response")
 
 	return cmd
 }
 
-func listRoles(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listRoles(_ *cobra.Command, out io.Writer) error {
 	roles, err := roleClient.ListData(astroV1Client, shouldIncludeDefaultRoles)
 	if err != nil {
 		return err
@@ -929,7 +909,6 @@ func newOrganizationClusterListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listClusters(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
+func listClusters(_ *cobra.Command, out io.Writer) error {
 	return organization.ListClustersWithFormat(astroV1Client, cliout.Renderer{Format: organizationClusterListOutput, Out: out})
 }

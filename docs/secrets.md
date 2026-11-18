@@ -103,7 +103,7 @@ Every command takes `--output json`. The nouns and their aliases:
 
 **Input.** A value is never a bare argument, which would land in shell history and `ps`. With `--stdin`, or when stdin is not a terminal, it is read from stdin; otherwise a no-echo prompt asks for it. `--value <v>` is the scripting escape hatch and is documented as leaking into history. A `NAME=value` form is not accepted. This applies to every set, secret or not.
 
-**Connections.** `connection set <id>` takes a whole connection, as a URI (`postgres://user:pass@host:5432/db`) or the connection JSON, or field by field with the cloud sibling's flags: `--type`, `--host`, `--login`, `--password`, `--schema`, `--port`, `--extra` (no short forms, since `-p` beside `--project` would read as the scope). Both shapes are encoded through the shared `airflowenv` codec into identical records.
+**Connections.** `connection set <id>` takes a whole connection, as a URI (`postgres://user:pass@host:5432/db`) or the connection JSON, or field by field with the cloud sibling's flags: `--type`, `--host`, `--login`, `--password`, `--schema`, `--port`, `--extra` (no short forms: a short option is one of [the table's](architecture.md#short-options), and `-p` beside `--project` would read as the scope). Both shapes are encoded through the shared `airflowenv` codec into identical records.
 
 ### `get`
 
@@ -208,7 +208,7 @@ The access and refresh tokens `astro login` saves live in the vault too, one ent
 - **A login that cannot be read** (keyring unavailable in this session, a damaged entry) reads as signed out with a warning, and is not deleted by code that writes back the empty fields it read; only signing out removes it.
 - **Another process's login.** Writing the config for any other reason keeps the token fields another process saved since this one started, unless this process changed that context's login itself.
 - **A lost master key.** Logins do not keep a vault whose master key is gone from making a new one, since logging in again recovers them: the old logins are removed and read as signed out. Other encrypted values still refuse a new key.
-- **Environment credentials.** `ASTRO_API_TOKEN` and the other variables are read before any saved login, as before.
+- **Environment credentials.** `ASTRO_API_TOKEN` and the other variables are read before any saved login, as before. A run with `ASTRO_API_TOKEN` uses the token and never the saved login: the workspace tier is read with the token, in the token's organization, from the workspace the flag or the manifest's `workspace` names, else the one a Workspace or Deployment token's claims name. An Organization token names none, so a project with no `workspace` key reads no workspace tier under it. The host is the token run's, never the saved context's: the manifest's `domain`, else `ASTRO_DOMAIN`, else `astronomer.io`, the same host the run's Deployment lookups use.
 - **Logout** removes the vault entry and leaves both fields empty.
 
 ## Security notes

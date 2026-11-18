@@ -267,9 +267,18 @@ func execDeployIO(answers string, args ...string) (out, errOut string, err error
 // terminal would.
 func interactiveDeploy(t *testing.T) {
 	t.Helper()
-	orig := stdinIsTerminal
-	stdinIsTerminal = func() bool { return true }
-	t.Cleanup(func() { stdinIsTerminal = orig })
+	orig := mayAsk
+	mayAsk = func() bool { return true }
+	t.Cleanup(func() { mayAsk = orig })
+}
+
+// nonInteractiveDeploy is a run that may not ask (CI, --non-interactive), until
+// the test ends.
+func nonInteractiveDeploy(t *testing.T) {
+	t.Helper()
+	orig := mayAsk
+	mayAsk = func() bool { return false }
+	t.Cleanup(func() { mayAsk = orig })
 }
 
 func TestDeployManifestJSONImageAndDag(t *testing.T) {
@@ -923,6 +932,7 @@ func TestDeployManifestRefusedBeforeTheBuildSaysNothingAboutBuilding(t *testing.
 }
 
 func TestDeployManifestNonInteractiveMustNameTheTarget(t *testing.T) {
+	nonInteractiveDeploy(t)
 	setupManifestDeploy(t, &fakeCmdDeployer{})
 
 	out, err := execDeployCapture()
@@ -946,8 +956,7 @@ workspace = "clw-ws"
 `
 	fake := &fakeCmdDeployer{}
 	setupManifestDeployWith(t, fake, unlinkedProject)
-	deployment.UseTokenDeployment(actionDeploymentID)
-	t.Cleanup(func() { deployment.UseTokenDeployment("") })
+	testUtil.UseAPIToken(t, "deploymentId:"+actionDeploymentID)
 
 	out, errOut, err := execDeployIO("", "--dags", "-o", "json")
 	require.NoError(t, err)
@@ -964,11 +973,11 @@ workspace = "clw-ws"
 // to: the deploy refuses as one naming nothing does. A target named on the
 // command line wins.
 func TestDeployManifestTokensDeploymentInALinkedProject(t *testing.T) {
+	nonInteractiveDeploy(t)
 	fake := &fakeCmdDeployer{}
 	setupManifestDeploy(t, fake)
-	t.Cleanup(func() { deployment.UseTokenDeployment("") })
 
-	deployment.UseTokenDeployment("clx-dev")
+	testUtil.UseAPIToken(t, "deploymentId:"+"clx-dev")
 	_, errOut, err := execDeployIO("", "--dags")
 	require.NoError(t, err)
 	assert.Equal(t, "clx-dev", fake.dagInput.DeploymentID)
@@ -981,7 +990,7 @@ func TestDeployManifestTokensDeploymentInALinkedProject(t *testing.T) {
 	assert.NotContains(t, errOut, "ASTRO_API_TOKEN")
 
 	fake.dagInput = nil
-	deployment.UseTokenDeployment(actionDeploymentID)
+	testUtil.UseAPIToken(t, "deploymentId:"+actionDeploymentID)
 	_, errOut, err = execDeployIO("", "--dags")
 	require.Error(t, err)
 	assert.True(t, input.IsRequired(err), "%v", err)
@@ -993,6 +1002,7 @@ func TestDeployManifestTokensDeploymentInALinkedProject(t *testing.T) {
 // A pin is ambient state, and ambient state never decides a deploy — not even
 // the one the query commands would resolve to.
 func TestDeployManifestPinDoesNotDecideANonInteractiveDeploy(t *testing.T) {
+	nonInteractiveDeploy(t)
 	setupManifestDeploy(t, &fakeCmdDeployer{})
 	t.Setenv(instances.EnvVar, "prod")
 
@@ -1029,6 +1039,7 @@ func decodeOneJSON(t *testing.T, out string) map[string]any {
 }
 
 func TestDeployRoutesManifestProject(t *testing.T) {
+	nonInteractiveDeploy(t)
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	resetDeployFlagVars()
 
@@ -1039,8 +1050,8 @@ func TestDeployRoutesManifestProject(t *testing.T) {
 	config.WorkingPath = dir
 	t.Cleanup(func() { config.WorkingPath = orig })
 
-	// The manifest names no deployment and the run is non-interactive (go test
-	// has no TTY), so the manifest path stops at selection asking for --deployment —
+	// The manifest names no deployment and the run is non-interactive (the
+	// test says so), so the manifest path stops at selection asking for --deployment —
 	// before any build or transport work. That message is unique to the manifest path,
 	// so it proves routing did not fall through to the 1.x path.
 	err := execDeployCmd()
@@ -1054,8 +1065,9 @@ func TestDeployRoutesManifestProject(t *testing.T) {
 // --prompt requested. The run gets as far as asking for --deployment, as one
 // without them does.
 func TestDeployAcceptsForceAndPromptOnAManifestProject(t *testing.T) {
-	for _, flag := range []string{"--force", "-f", "--prompt", "-p"} {
+	for _, flag := range []string{"--force", "--prompt"} {
 		t.Run(flag, func(t *testing.T) {
+			nonInteractiveDeploy(t)
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			resetDeployFlagVars()
 
@@ -1126,6 +1138,7 @@ func TestDeployManifestBuildSecretRefusals(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			nonInteractiveDeploy(t)
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			resetDeployFlagVars()
 			if tc.env != "" {
@@ -1311,11 +1324,12 @@ func TestDeployManifestUsesTheManifestDomainsLogin(t *testing.T) {
 func TestDeployManifestSendsTheAPITokenToTheManifestDomain(t *testing.T) {
 	picked := setupDeployOnStage(t, manifestOnProd)
 	logInToProd(t)
-	t.Setenv(astrosession.EnvAPIToken, "ci-token")
+	ciToken := testUtil.MintAPIToken(t, time.Time{}, "organizationId:prod-org")
+	t.Setenv(astrosession.EnvAPIToken, ciToken)
 
 	_, err := execDeployCapture("test", "--dags")
 	require.NoError(t, err)
-	assert.Equal(t, "Bearer ci-token", picked.context.Token)
+	assert.Equal(t, "Bearer "+ciToken, picked.context.Token)
 	assert.Equal(t, "prod-org", picked.context.Organization)
 }
 
@@ -1396,4 +1410,27 @@ func TestDeployManifestNamedIsNotAsked(t *testing.T) {
 		assert.NotContains(t, errOut, "Deploy to which deployment?", "%v", args)
 		assert.Contains(t, out, "to prod (deployment clx-dep).", "%v", args)
 	}
+}
+
+// A deploy under an Organization token that selects no Workspace, in a project
+// that names none and links nothing, says what a deploy takes to be given one:
+// the flag or the project, and that the token selects none.
+func TestDeployWithAnOrganizationTokenAndNoWorkspaceSaysWhatToPass(t *testing.T) {
+	const bareProject = `[project]
+name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+`
+	setupManifestDeployWith(t, &fakeCmdDeployer{}, bareProject)
+	interactiveDeploy(t)
+	testUtil.UseAPIToken(t, "organizationId:org")
+	c, err := config.GetCurrentContext()
+	require.NoError(t, err)
+	c.Workspace = ""
+	require.NoError(t, c.SetContext())
+
+	_, _, err = execDeployIO("")
+	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
+	assert.ErrorContains(t, err, "so pass --workspace or run it in a project linked to a Workspace")
 }

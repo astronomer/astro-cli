@@ -49,7 +49,6 @@ func newOttoCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 		Use:                "otto [ARGS]...",
 		Short:              "Start the Otto AI agent",
 		Long:               "Start the Otto AI agent for AI-assisted Airflow development and operations. All flags and arguments are forwarded directly to Otto.",
-		SilenceUsage:       true,
 		DisableFlagParsing: true,
 		RunE: func(_ *cobra.Command, args []string) error {
 			return ottoRun(args, astroV1Client)

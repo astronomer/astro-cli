@@ -3,6 +3,7 @@ package openapi
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -10,8 +11,11 @@ import (
 
 const (
 	// AirflowGitHubRawURLBase is the base URL for fetching raw files from the Airflow GitHub repo.
-	AirflowGitHubRawURLBase = "https://raw.githubusercontent.com/apache/airflow/refs/tags"
+	AirflowGitHubRawURLBase = "https://raw.githubusercontent.com/apache/airflow/refs"
 )
+
+// pep440ReleaseSegment matches the numeric release segment of a PEP 440 version ("3.4.0" in "3.4.0.dev1").
+var pep440ReleaseSegment = regexp.MustCompile(`^\d+(\.\d+)*`)
 
 // NormalizeAirflowVersion strips build metadata (everything after "+") to get the base version.
 // Prerelease info (after "-") is preserved.
@@ -46,7 +50,8 @@ var AirflowVersionRanges = []VersionRange{
 // Ranges are matched by iterating in reverse order and returning the first range
 // whose Version is <= the given version.
 func GetSpecPathForVersion(version string) (string, error) {
-	v, err := semver.NewVersion(version)
+	// Airflow versions are PEP 440 (3.4.0.dev1, 3.1.0rc1), which semver rejects; compare the release segment.
+	v, err := semver.NewVersion(pep440ReleaseSegment.FindString(version))
 	if err != nil {
 		return "", fmt.Errorf("invalid version %q: %w", version, err)
 	}
@@ -77,5 +82,11 @@ func BuildAirflowSpecURL(version string) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s/%s/%s", AirflowGitHubRawURLBase, normalizedVersion, specPath), nil
+	ref := "tags/" + normalizedVersion
+	if strings.Contains(normalizedVersion, ".dev") {
+		// Dev builds have no upstream tag; use the release branch they're built from.
+		v := semver.MustParse(pep440ReleaseSegment.FindString(normalizedVersion))
+		ref = fmt.Sprintf("heads/v%d-%d-test", v.Major(), v.Minor())
+	}
+	return fmt.Sprintf("%s/%s/%s", AirflowGitHubRawURLBase, ref, specPath), nil
 }

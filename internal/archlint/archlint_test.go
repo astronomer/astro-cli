@@ -567,11 +567,20 @@ func TestEveryPkgSubmoduleIsLinted(t *testing.T) {
 // this test then requires it here.
 func TestEveryLintedSubmoduleIsHeldToTheNoPrintRule(t *testing.T) {
 	root := repoRoot(t)
+	// printsByDesign are linted sub-modules that are not core: each says why it
+	// prints or exits.
+	printsByDesign := map[string]string{
+		"pkg/testenv": "test support called from TestMain: it reports a setup it cannot go on with on stderr and exits, and " +
+			"says why a passing package fails",
+	}
 	registered := make(map[string]bool, len(coreBelowCmd))
 	for _, p := range coreBelowCmd {
 		registered[p] = true
 	}
 	for _, m := range lintSubmodules(t, root) {
+		if printsByDesign[m] != "" {
+			continue
+		}
 		if !registered[m] {
 			t.Errorf("%s is in LINT_SUBMODULES but not in coreBelowCmd, so nothing enforces that it does not print "+
 				"or exit: a root golangci-lint run does not descend into a sub-module, and forbidigo is anchored "+

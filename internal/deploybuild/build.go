@@ -11,6 +11,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 // Platform is the platform a deploy image is built at: the one a Deployment
@@ -121,9 +122,13 @@ func PrebuiltRuntime(image string, readLabel LabelReader) (string, error) {
 // ImageTag is the local tag the built deploy image carries. It appends a
 // hash of the full project path (same idea as localdocker's composeProjectName),
 // so two same-named projects in different directories never share a tag.
+//
+// The directory name goes through proxy.SanitizeLabel, as the compose project
+// name, and so the astro-local image, does: a Docker repository name is
+// lowercase, and a build with a tag that breaks its grammar fails.
 func ImageTag(projectDir string) string {
-	label := filepath.Base(projectDir)
-	if label == "" || label == "." || label == string(filepath.Separator) {
+	label := proxy.SanitizeLabel(filepath.Base(projectDir))
+	if label == "" {
 		label = "project"
 	}
 	if id, err := localrt.ProjectID(projectDir); err == nil && len(id) >= 6 {

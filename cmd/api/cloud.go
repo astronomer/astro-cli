@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/apirequest"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/openapi"
@@ -22,6 +24,7 @@ import (
 // CloudOptions holds all options for the cloud api command.
 type CloudOptions struct {
 	RequestOptions
+	Labs            bool
 	SpecURL         string // hidden flag: alternative OpenAPI spec URL
 	SpecTokenEnvVar string // hidden flag: env var name containing auth token for spec fetch
 }
@@ -92,7 +95,10 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   astro api cloud /organizations/{organizationId} -i
 
   # Verbose mode showing full request/response
-  astro api cloud /organizations/{organizationId} --verbose`,
+  astro api cloud /organizations/{organizationId} --verbose
+
+  # Use the Labs API, which adds experimental endpoints
+  astro api cloud ls --labs`,
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			opts.RequestMethodPassed = cmd.Flags().Changed("method")
@@ -127,12 +133,14 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 
 	// Other flags
 	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Output a curl command instead of executing the request")
+	cmd.PersistentFlags().BoolVar(&opts.Labs, "labs", false, "Use the Labs API, which adds experimental endpoints to the Cloud API")
 	cmd.PersistentFlags().StringVar(&opts.SpecURL, "spec-url", "", "OpenAPI spec URL or file path (overrides default Cloud API spec)")
 	cmd.PersistentFlags().StringVar(&opts.SpecTokenEnvVar, "spec-token-env-var", "", "Environment variable containing auth token for fetching the spec")
 	//nolint:errcheck // error deliberately ignored in this shell code
 	cmd.PersistentFlags().MarkHidden("spec-url")
 	//nolint:errcheck // error deliberately ignored in this shell code
 	cmd.PersistentFlags().MarkHidden("spec-token-env-var")
+	cmd.MarkFlagsMutuallyExclusive("labs", "spec-url")
 
 	// Add list and describe subcommands (cloud-specific to support lazy cache init)
 	cmd.AddCommand(NewCloudListCmd(out, opts))
@@ -187,6 +195,12 @@ func runCloud(opts *CloudOptions) error {
 		return fmt.Errorf("applying path params: %w", err)
 	}
 
+	// A Workspace id written in the path names a Workspace as --workspace does:
+	// a token for another one is refused before the request.
+	if err := checkPathWorkspace(requestPath); err != nil {
+		return err
+	}
+
 	// Fill context placeholders in the path
 	requestPath, err = fillPlaceholders(requestPath, &ctx)
 	if err != nil {
@@ -212,7 +226,7 @@ func runCloud(opts *CloudOptions) error {
 
 	// Build the full URL using the domain-derived base URL
 	var baseURL string
-	if opts.SpecURL != "" {
+	if opts.SpecURL != "" || opts.Labs {
 		if err := opts.specCache.Load(false); err != nil {
 			return fmt.Errorf("loading spec: %w", err)
 		}
@@ -334,6 +348,26 @@ func runCloudInteractive(opts *CloudOptions) error {
 // placeholderRE matches placeholders like {organizationId}, {workspaceId}, {dag_id}, etc.
 var placeholderRE = regexp.MustCompile(`\{([a-zA-Z][a-zA-Z0-9_]*)\}`)
 
+// workspacePathRE matches a Workspace id written where the path has a
+// workspaces segment: /workspaces/<id>. A placeholder in its place is not an id.
+var workspacePathRE = regexp.MustCompile(`/workspaces/([^/?#{}]+)`)
+
+// checkPathWorkspace is the error for a path that writes the id of a Workspace
+// other than the one the run's Workspace or Deployment token is for
+// (astrosession.CheckWorkspace), nil otherwise.
+func checkPathWorkspace(path string) error {
+	// The path itself: a query string or fragment names no Workspace.
+	if i := strings.IndexAny(path, "?#"); i >= 0 {
+		path = path[:i]
+	}
+	for _, m := range workspacePathRE.FindAllStringSubmatch(path, -1) {
+		if err := astrosession.CheckWorkspace(m[1], astrosession.SourcePath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // fillPlaceholders replaces placeholders with values from the context.
 func fillPlaceholders(path string, ctx *config.Context) (string, error) {
 	var errs []string
@@ -350,11 +384,16 @@ func fillPlaceholders(path string, ctx *config.Context) (string, error) {
 			}
 			return ctx.Organization
 		case "workspaceid":
-			if ctx.Workspace == "" {
-				errs = append(errs, "workspaceId not set in context (run 'astro workspace switch')")
+			t := astrosession.Resolve(astrosession.Request{
+				Login:   ctx,
+				Advice:  astrosession.ByPath,
+				NoSaved: errors.New("workspaceId not set in context (run 'astro workspace switch')"),
+			})
+			if err := t.Require(); err != nil {
+				errs = append(errs, err.Error())
 				return match
 			}
-			return ctx.Workspace
+			return t.Workspace
 		default:
 			// Keep unknown placeholders as-is (user might provide them)
 			return match
@@ -417,13 +456,19 @@ func initCloudSpecCache(opts *CloudOptions, ctx *config.Context) error {
 		return nil
 	}
 
-	domain := domainutil.FormatDomain(ctx.Domain)
-	specURL := ctx.GetPublicRESTAPIURL("spec/v1.0")
+	specPath := "spec/v1.0"
+	if opts.Labs {
+		specPath = "spec/labs/v1"
+	}
+	specURL := ctx.GetPublicRESTAPIURL(specPath)
 	if specURL == "" {
 		return fmt.Errorf("could not determine API spec URL for domain %q. Check your login context", ctx.Domain)
 	}
-	cachePath := filepath.Join(config.HomeConfigPath, openapi.CloudCacheFileNameForDomain(domain))
-	opts.specCache = openapi.NewCacheWithOptions(specURL, cachePath)
+	cacheFile := openapi.CloudCacheFileNameForDomain(domainutil.FormatDomain(ctx.Domain))
+	if opts.Labs {
+		cacheFile = openapi.SpecCacheFileName(specURL)
+	}
+	opts.specCache = openapi.NewCacheWithOptions(specURL, filepath.Join(config.HomeConfigPath, cacheFile))
 	return nil
 }
 

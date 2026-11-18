@@ -431,7 +431,9 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 // the base is pulled differ, so keeping one call site is what stops the two
 // modes drifting on flags.
 func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir string, cb rt.Callbacks) (string, error) {
+	var auth gitAuthHost
 	w := &rt.LineWriter{Emit: func(line string) {
+		auth.scan(line)
 		if cb.OnLine != nil {
 			cb.OnLine(rt.LogLine{Component: "build", Time: b.now(), Text: line})
 		}
@@ -459,6 +461,9 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 		args = append(args, "--platform", req.Platform)
 	}
 	args = append(args, contextDir)
+	// A stream the caller hands over (a debug build on the terminal) goes to
+	// docker as it is, so its progress display works; only output through w is
+	// read for gitAuthHost.
 	stdio := rt.Stdio{Out: w, Err: w}
 	if req.Stdout != nil {
 		stdio.Out = req.Stdout
@@ -476,6 +481,9 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 	}
 	w.Flush()
 	if err != nil {
+		if explained := auth.explain(err, req.buildSecrets()); explained != err {
+			return "", explained
+		}
 		// The two modes fail for different reasons and a user reading this has
 		// to know which file to open: ours, or theirs.
 		if req.Dockerfile != "" {

@@ -13,6 +13,7 @@ import (
 	"slices"
 
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
@@ -37,6 +38,12 @@ var (
 	ErrWorkspaceTokenNotFound = errors.New("no Workspace API token was found for the API token name you provided")
 	errOrgTokenInWorkspace    = errors.New("this Organization API token has already been added to the Workspace with that role")
 	errWrongTokenTypeSelected = errors.New("the token selected is not of the type you are trying to modify")
+	errNotWorkspaceScoped     = errors.New("only a Workspace API token is deleted from a Workspace")
+	errWorkspaceScoped        = errors.New("a Workspace API token is not removed from its own Workspace, only deleted")
+	// ErrOrgTokenNotRenamed: an Organization token's name and description are
+	// the Organization's to change, so an update of one from a Workspace
+	// changes its role here and nothing else.
+	ErrOrgTokenNotRenamed = errors.New("an Organization API token has its name and description changed in the Organization, not in a Workspace")
 )
 
 const (
@@ -57,24 +64,38 @@ func workspaceRoleReader(workspaceID string) func(*astrov1.ApiToken) string {
 	return func(t *astrov1.ApiToken) string { return workspaceRoleOf(t, workspaceID) }
 }
 
-// Target resolves the Workspace a command means, "" being the current one, and
-// the Organization it is in.
-func Target(workspaceID string) (wsID, organizationID string, err error) {
+// Scope resolves the Workspace a command means, "" being the current one, and
+// the Organization it is in. The Target may have no Workspace: a run with an
+// API token has no current one, and an Organization token selects none. A
+// command that acts on the Workspace calls Require on it, which fails, before
+// the command asks or calls the API; the ones that may not need it (rotating a
+// token, deleting a Workspace token, both given by ID) do not.
+func Scope(workspaceID string) (astrosession.Target, string, error) {
 	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return astrosession.Target{}, "", err
+	}
+	return astrosession.Resolve(astrosession.Request{Workspace: workspaceID, Advice: astrosession.ByFlag}), ctx.Organization, nil
+}
+
+// target is Scope for a command that acts on the Workspace: the Workspace and
+// the Organization, or the error for there being none.
+func target(workspaceID string) (wsID, organizationID string, err error) {
+	t, organizationID, err := Scope(workspaceID)
 	if err != nil {
 		return "", "", err
 	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
+	if err := t.Require(); err != nil {
+		return "", "", err
 	}
-	return workspaceID, ctx.Organization, nil
+	return t.Workspace, organizationID, nil
 }
 
 // ListTokens lists tokens with a role in the Workspace ("" is the current
 // one), each with its role there. tokenTypes, when not empty, keeps only those
 // scopes. The list is empty, never nil, when there are none.
 func ListTokens(client astrov1.APIClient, workspaceID string, tokenTypes []TokenType) ([]apitoken.Token, error) {
-	workspaceID, _, err := Target(workspaceID)
+	workspaceID, _, err := target(workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +115,7 @@ func CreateToken(name, description, role, workspaceID string, expiration int, cl
 	if name == "" {
 		return apitoken.Token{}, workspaceService.ErrInvalidTokenName
 	}
-	workspaceID, organizationID, err := Target(workspaceID)
+	workspaceID, organizationID, err := target(workspaceID)
 	if err != nil {
 		return apitoken.Token{}, err
 	}
@@ -120,35 +141,55 @@ func CreateToken(name, description, role, workspaceID string, expiration int, cl
 	return apitoken.WithSecret(apitoken.FromAPI(created, role), created), nil
 }
 
-// UpdateToken updates a Workspace-scoped API token's name and description,
-// and its role on the Workspace when role is not "". An empty newName or
-// description keeps the token's own; an empty role leaves the role alone, and
-// no role change is sent.
+// UpdateToken updates an API token the Workspace has: a Workspace-scoped
+// token's name, description and role on the Workspace, or an Organization
+// token's role on the Workspace, the one thing of it the Workspace owns. An
+// empty newName or description keeps the token's own; an empty role leaves
+// the role alone, and no role change is sent. tokenTypes, when not empty, are
+// the scopes the command may act on; none means both.
 //
 // A role that is not a Workspace role is refused before anything is asked or
 // sent, and a role the token already holds on the Workspace before anything
 // is sent. The role is changed before the name and description, so a role
 // the API refuses leaves the token as it was; the name and description are
-// sent only when one is given.
-func UpdateToken(id, name, newName, description, role, workspaceID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
+// sent only when one is given, and never for an Organization token
+// (ErrOrgTokenNotRenamed).
+func UpdateToken(id, name, newName, description, role, workspaceID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
 	if role != "" {
 		if err := user.IsWorkspaceRoleValid(role); err != nil {
 			return apitoken.Update{}, err
 		}
 	}
-	workspaceID, organizationID, err := Target(workspaceID)
+	// A rename by ID reads no Workspace; a role change does, and a lookup by
+	// name (FindToken) asks for one itself.
+	t, organizationID, err := Scope(workspaceID)
 	if err != nil {
 		return apitoken.Update{}, err
 	}
-	tokenTypes := []TokenType{TokenTypeWORKSPACE}
+	if role != "" {
+		if err := t.Require(); err != nil {
+			return apitoken.Update{}, err
+		}
+	}
+	workspaceID = t.Workspace
+	if len(tokenTypes) == 0 {
+		tokenTypes = []TokenType{TokenTypeWORKSPACE, TokenTypeORGANIZATION}
+	}
 
-	token, err := FindToken(id, name, workspaceID, organizationID, tokenTypes, pick, client)
+	token, err := FindTokenIn(id, name, workspaceID, organizationID, tokenTypes, pick, client)
 	if err != nil {
 		return apitoken.Update{}, err
+	}
+	broader := string(token.Scope) != workspaceEntity
+	if broader && (newName != "" || description != "") {
+		return apitoken.Update{}, apitoken.UsageNoHelp(ErrOrgTokenNotRenamed)
 	}
 
 	currentRole := workspaceRoleOf(&token, workspaceID)
 	if role != "" && role == currentRole {
+		if broader {
+			return apitoken.Update{}, errOrgTokenInWorkspace
+		}
 		return apitoken.Update{}, errWorkspaceTokenRoleSet
 	}
 	if role != "" {
@@ -212,10 +253,11 @@ func updateNameAndDescription(token *astrov1.ApiToken, newName, description, org
 // RotateToken rotates the secret of token, which FindToken found, and returns
 // it with the new secret and its role on workspaceID.
 func RotateToken(token astrov1.ApiToken, workspaceID string, client astrov1.APIClient) (apitoken.Token, error) { //nolint:gocritic // ApiToken is what FindToken returns
-	workspaceID, organizationID, err := Target(workspaceID)
+	t, organizationID, err := Scope(workspaceID)
 	if err != nil {
 		return apitoken.Token{}, err
 	}
+	workspaceID = t.Workspace
 	resp, err := client.RotateApiTokenWithResponse(httpContext.Background(), organizationID, token.Id)
 	if err != nil {
 		return apitoken.Token{}, err
@@ -231,32 +273,45 @@ func RotateToken(token astrov1.ApiToken, workspaceID string, client astrov1.APIC
 	return apitoken.WithSecret(apitoken.FromAPI(rotated, role), rotated), nil
 }
 
-// DeleteToken deletes token when it is Workspace-scoped, and otherwise (an
-// Organization token with a role on the Workspace) removes its Workspace role,
-// leaving the token itself.
+// DeleteToken deletes token, a Workspace-scoped token FindToken found. A token
+// of a broader scope is not the Workspace's to delete: RemoveToken takes its
+// role on the Workspace away instead.
 func DeleteToken(token astrov1.ApiToken, workspaceID string, client astrov1.APIClient) (apitoken.WorkspaceRemoval, error) { //nolint:gocritic // ApiToken is what FindToken returns
-	workspaceID, organizationID, err := Target(workspaceID)
+	if string(token.Scope) != workspaceEntity {
+		return apitoken.WorkspaceRemoval{}, errNotWorkspaceScoped
+	}
+	t, organizationID, err := Scope(workspaceID)
 	if err != nil {
 		return apitoken.WorkspaceRemoval{}, err
 	}
-	removal := apitoken.WorkspaceRemoval{ID: token.Id, Name: token.Name, Scope: string(token.Scope), WorkspaceID: workspaceID}
-	if string(token.Scope) == workspaceEntity {
-		resp, err := client.DeleteApiTokenWithResponse(httpContext.Background(), organizationID, token.Id)
-		if err != nil {
-			return apitoken.WorkspaceRemoval{}, err
-		}
-		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-			return apitoken.WorkspaceRemoval{}, err
-		}
-		removal.Action = apitoken.Deleted
-		return removal, nil
+	removal := apitoken.WorkspaceRemoval{ID: token.Id, Name: token.Name, Scope: string(token.Scope), WorkspaceID: t.Workspace}
+	resp, err := client.DeleteApiTokenWithResponse(httpContext.Background(), organizationID, token.Id)
+	if err != nil {
+		return apitoken.WorkspaceRemoval{}, err
 	}
-	// Detach by removing the workspace role.
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		return apitoken.WorkspaceRemoval{}, err
+	}
+	removal.Action = apitoken.Deleted
+	return removal, nil
+}
+
+// RemoveToken takes the role of token, a token of a broader scope than the
+// Workspace that FindToken found, on the Workspace away, leaving the token
+// itself. A Workspace-scoped token has no role to take from its own
+// Workspace: DeleteToken deletes it.
+func RemoveToken(token astrov1.ApiToken, workspaceID string, client astrov1.APIClient) (apitoken.WorkspaceRemoval, error) { //nolint:gocritic // ApiToken is what FindToken returns
+	if string(token.Scope) == workspaceEntity {
+		return apitoken.WorkspaceRemoval{}, errWorkspaceScoped
+	}
+	workspaceID, organizationID, err := target(workspaceID)
+	if err != nil {
+		return apitoken.WorkspaceRemoval{}, err
+	}
 	if err := setWorkspaceRole(&token, workspaceID, "", organizationID, client); err != nil {
 		return apitoken.WorkspaceRemoval{}, err
 	}
-	removal.Action = apitoken.Removed
-	return removal, nil
+	return apitoken.WorkspaceRemoval{ID: token.Id, Name: token.Name, Scope: string(token.Scope), WorkspaceID: workspaceID, Action: apitoken.Removed}, nil
 }
 
 // setWorkspaceRole gives token role on workspaceID, or takes its role there
@@ -270,15 +325,19 @@ func setWorkspaceRole(token *astrov1.ApiToken, workspaceID, role, organizationID
 	return astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 }
 
+// TokensOf lists the tokens with a role in the Workspace, as the API has them,
+// of the scopes in tokenTypes (all of them when it is empty), for a command in
+// another family that picks among them.
+func TokensOf(workspaceID string, tokenTypes []TokenType, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
+	return getWorkspaceTokens(workspaceID, tokenTypes, client)
+}
+
 // getWorkspaceTokens lists tokens with a role in the given workspace, then filters client-side
 // by token scope if tokenTypes is not empty.
 func getWorkspaceTokens(workspaceID string, tokenTypes []TokenType, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
-	ctx, err := context.GetCurrentContext()
+	workspaceID, organizationID, err := target(workspaceID)
 	if err != nil {
 		return nil, err
-	}
-	if workspaceID == "" {
-		workspaceID = ctx.Workspace
 	}
 	wsID := workspaceID
 	limit := tokenPaginationLim
@@ -290,7 +349,7 @@ func getWorkspaceTokens(workspaceID string, tokenTypes []TokenType, client astro
 			Offset:      &offset,
 			Limit:       &limit,
 		}
-		resp, err := client.ListApiTokensWithResponse(httpContext.Background(), ctx.Organization, params)
+		resp, err := client.ListApiTokensWithResponse(httpContext.Background(), organizationID, params)
 		if err != nil {
 			return nil, err
 		}
@@ -386,7 +445,7 @@ func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenT
 	if id == "" {
 		// Resolved here, not only in the list, so the roles offered are the
 		// ones on the Workspace listed.
-		workspaceID, _, err = Target(workspaceID)
+		workspaceID, _, err = target(workspaceID)
 		if err != nil {
 			return token, err
 		}
@@ -420,10 +479,36 @@ func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenT
 	return token, err
 }
 
+// FindTokenIn is FindToken for a command that changes the token in the
+// Workspace (update, rotate, delete, remove). The API serves any token of the
+// Organization by its ID, so a token given by ID that holds no role in the
+// Workspace is refused, as a usage error naming the Workspace: only a
+// Workspace's own tokens, and Organization tokens with a role in it, are its to
+// change. A run with no Workspace (an Organization token's, given an ID) has
+// none to check against.
+func FindTokenIn(id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (astrov1.ApiToken, error) {
+	if id == "" || workspaceID == "" {
+		return FindToken(id, name, workspaceID, organizationID, tokenTypes, pick, client)
+	}
+	// By ID, the role is checked before the type, as on a Deployment, so a
+	// foreign token gets the same message whichever command names it.
+	token, err := FindToken(id, name, workspaceID, organizationID, nil, pick, client)
+	if err != nil {
+		return token, err
+	}
+	if workspaceRoleOf(&token, workspaceID) == "" {
+		return token, apitoken.UsageNoHelp(fmt.Errorf("the API token %s has no role in this Workspace: only a Workspace's own tokens, and Organization tokens with a role in it, are found here; to give an Organization token a role in it, use astro workspace token add", id))
+	}
+	if len(tokenTypes) > 0 && !slices.Contains(tokenTypes, TokenType(token.Scope)) {
+		return token, errWrongTokenTypeSelected
+	}
+	return token, nil
+}
+
 // RemoveOrgTokenWorkspaceRole removes the workspace-scope role from an
 // Organization token, found among the Workspace's through pick.
 func RemoveOrgTokenWorkspaceRole(id, name, workspaceID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.WorkspaceRemoval, error) {
-	workspaceID, organizationID, err := Target(workspaceID)
+	workspaceID, organizationID, err := target(workspaceID)
 	if err != nil {
 		return apitoken.WorkspaceRemoval{}, err
 	}
@@ -444,7 +529,7 @@ func RemoveOrgTokenWorkspaceRole(id, name, workspaceID string, pick apitoken.Pic
 // Organization tokens; either asks through pick, which the caller chooses to
 // suit.
 func UpsertOrgTokenWorkspaceRole(id, name, role, workspaceID, operation string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
-	workspaceID, organizationID, err := Target(workspaceID)
+	workspaceID, organizationID, err := target(workspaceID)
 	if err != nil {
 		return apitoken.Token{}, err
 	}

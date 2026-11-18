@@ -396,6 +396,9 @@ func execDeploymentCmd(args ...string) (string, error) {
 	buf := new(bytes.Buffer)
 	cmd := newDeploymentRootCmd(buf)
 	cmd.SetOut(buf)
+	// cliout.Execute turns this on for the root of a real run, which keeps cobra's
+	// usage block out of every command's error.
+	cmd.SilenceUsage = true
 	// The real CLI registers --verbosity as a persistent flag on the root command.
 	// Tests invoke the deployment subcommand directly, so we stub the flag here to
 	// mirror production setup and avoid "unknown flag" errors when scenarios pass it.
@@ -537,15 +540,15 @@ func TestDeploymentLogs(t *testing.T) {
 	astroV1Client = mockV1Client
 	astroV1Client = mockV1Client
 
-	cmdArgs := []string{"logs", "test-id-1", "-w"}
+	cmdArgs := []string{"logs", "test-id-1", "--warn"}
 	_, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "-e"}
+	cmdArgs = []string{"logs", "test-id-1", "--error"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "-i"}
+	cmdArgs = []string{"logs", "test-id-1", "--info"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	mockV1Client.AssertExpectations(t)
@@ -562,15 +565,15 @@ func TestDeploymentLogsMultipleComponents(t *testing.T) {
 	astroV1Client = mockV1Client
 	astroV1Client = mockV1Client
 
-	cmdArgs := []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "-w"}
+	cmdArgs := []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "--warn"}
 	_, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "-e"}
+	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "--error"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
-	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "-i"}
+	cmdArgs = []string{"logs", "test-id-1", "--webserver", "--scheduler", "--workers", "--triggerer", "--info"}
 	_, err = execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	mockV1Client.AssertExpectations(t)
@@ -979,9 +982,8 @@ func TestDeploymentUpdate(t *testing.T) {
 		ctx.Workspace = ""
 		require.NoError(t, ctx.SetContext())
 		defer testUtil.InitTestConfig(testUtil.LocalPlatform)
-		resp, err := execDeploymentCmd("update", "-n", "doesnotexist")
+		_, err = execDeploymentCmd("update", "--deployment-name", "doesnotexist")
 		assert.ErrorContains(t, err, "failed to find a valid Workspace")
-		assert.Contains(t, resp, "Usage:\n")
 	})
 	t.Run("updates a deployment with small scheduler size", func(t *testing.T) {
 		setHostedOrg(t, ws)
@@ -1361,11 +1363,9 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			err = ctx.SetContext()
 			assert.NoError(t, err)
 			defer testUtil.InitTestConfig(testUtil.LocalPlatform)
-			expectedOut := "Usage:\n"
-			cmdArgs := []string{tt.command, "-n", "doesnotexist"}
-			resp, err := execDeploymentCmd(cmdArgs...)
+			cmdArgs := []string{tt.command, "--deployment-name", "doesnotexist"}
+			_, err = execDeploymentCmd(cmdArgs...)
 			assert.ErrorContains(t, err, "failed to find a valid workspace")
-			assert.Contains(t, resp, expectedOut)
 		})
 	}
 }
@@ -1429,5 +1429,68 @@ func TestIsValidCloudProvider(t *testing.T) {
 	t.Run("returns false if cloudProvider is not gcp,aws or azure", func(t *testing.T) {
 		actual := isValidCloudProvider("ibm")
 		assert.False(t, actual)
+	})
+}
+
+func TestDeploymentOpen(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	prevOpen := openDeploymentUI
+	t.Cleanup(func() { openDeploymentUI = prevOpen })
+
+	t.Run("returns an error when the Deployment name is not found", func(t *testing.T) {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		astroV1Client = mockV1Client
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+
+		// 1.x's spelling, which v2 takes as an alias of --deployment.
+		_, err := execDeploymentCmd("open", "--deployment-name", "missing")
+		assert.ErrorContains(t, err, `no Deployment named "missing"`)
+		mockV1Client.AssertExpectations(t)
+	})
+
+	for _, tc := range []struct {
+		name   string
+		opens  bool
+		output string
+	}{
+		{name: "opens the Airflow UI", opens: true, output: "Opened the Airflow UI for Deployment"},
+		{name: "prints the link when the browser cannot be opened", opens: false, output: "Unable to open the Airflow UI, please visit the following link: https://test-url"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var opened string
+			openDeploymentUI = func(url string) bool {
+				opened = url
+				return tc.opens
+			}
+			mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+			astroV1Client = mockV1Client
+			mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+			mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+
+			out, err := execDeploymentCmd("open", "test-id-1")
+			require.NoError(t, err)
+			assert.Equal(t, "https://test-url", opened)
+			assert.Contains(t, out, tc.output)
+			mockV1Client.AssertExpectations(t)
+		})
+	}
+
+	t.Run("under --output json, publishes the URL and opens nothing", func(t *testing.T) {
+		openDeploymentUI = func(string) bool {
+			t.Error("opened a browser under --output json")
+			return true
+		}
+		t.Cleanup(func() { deploymentOutput = cliout.FormatText })
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		astroV1Client = mockV1Client
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+
+		out, err := execDeploymentCmd("open", "test-id-1", "--output", "json")
+		require.NoError(t, err)
+		var res deployment.UIResult
+		require.NoError(t, json.Unmarshal([]byte(out), &res), out)
+		assert.Equal(t, deployment.UIResult{DeploymentID: "test-id-1", Name: "test-deployment-label", URL: "https://test-url"}, res)
+		mockV1Client.AssertExpectations(t)
 	})
 }

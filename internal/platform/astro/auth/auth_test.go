@@ -5,13 +5,14 @@ import (
 	stdcontext "context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -371,99 +372,200 @@ func TestAuthorizeError(t *testing.T) {
 	})
 }
 
-func TestAuthorizeCallbackHandler(t *testing.T) {
+func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests share the listener helpers
 	// The callback answers the browser with a redirect to auth.astronomer.io.
 	// The test checks where it points without following it there.
 	client := httputil.NewHTTPClient()
 	client.HTTPClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	previous := httpClient
-	t.Cleanup(func() { httpClient = previous })
+	previousClient, previousServer, previousTimeout, previousListening, previousShutdown := httpClient, callbackServer, callbackTimeout, callbackListening, callbackShutdownTimeout
+	t.Cleanup(func() {
+		httpClient, callbackServer, callbackTimeout, callbackListening, callbackShutdownTimeout = previousClient, previousServer, previousTimeout, previousListening, previousShutdown
+	})
 	httpClient = client
-	t.Run("success", func(t *testing.T) {
-		callbackServer = "localhost:12345"
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			awaitCallbackServer(t, callbackServer)
 
-			opts := &httputil.DoOptions{
-				Method: http.MethodGet,
-				Path:   "http://localhost:12345/callback?code=test",
+	// bound is the address the last callback listener opened.
+	var bound string
+	// setup gives a subtest its own explicit callback settings, restored when
+	// it ends, so no subtest depends on what an earlier one left behind.
+	setup := func(t *testing.T) {
+		t.Helper()
+		server, timeout, listening, shutdown := callbackServer, callbackTimeout, callbackListening, callbackShutdownTimeout
+		t.Cleanup(func() {
+			callbackServer, callbackTimeout, callbackListening, callbackShutdownTimeout = server, timeout, listening, shutdown
+		})
+		bound = ""
+		callbackServer = "localhost:0"
+		callbackTimeout = 10 * time.Second
+		callbackListening = func(net.Addr) {}
+		callbackShutdownTimeout = time.Second
+	}
+	// requirePortFree checks that a finished login released its port.
+	requirePortFree := func(t *testing.T) {
+		t.Helper()
+		if !assert.NotEmpty(t, bound, "the callback listener never opened") {
+			return
+		}
+		again, err := net.Listen("tcp", bound)
+		if assert.NoError(t, err, "the callback listener outlived the login") {
+			again.Close()
+		}
+		bound = ""
+	}
+
+	// callbackAt binds an ephemeral port, so no other process can hold it, and
+	// requests the callback with the given query once the listener is open.
+	// With preconnect it first opens an idle connection, as a browser may.
+	// The returned func waits for the request to finish.
+	callbackAt := func(t *testing.T, query, wantLocation string, preconnect bool) (wait func()) {
+		t.Helper()
+		setup(t)
+		done := make(chan struct{})
+		callbackListening = func(addr net.Addr) {
+			bound = addr.String()
+			go func() {
+				defer close(done)
+				if preconnect {
+					idle, err := net.Dial("tcp", bound)
+					if assert.NoError(t, err) {
+						// Held open past the login, as a browser's preconnect is.
+						t.Cleanup(func() { idle.Close() })
+					}
+				}
+				opts := &httputil.DoOptions{
+					Method: http.MethodGet,
+					Path:   fmt.Sprintf("http://%s/callback?%s", addr, query),
+				}
+				res, cbErr := client.Do(opts)
+				if assert.NoError(t, cbErr) {
+					defer res.Body.Close()
+					assert.Equal(t, http.StatusFound, res.StatusCode)
+					assert.Equal(t, wantLocation, res.Header.Get("Location"))
+				}
+			}()
+		}
+		return func() {
+			t.Helper()
+			if bound == "" {
+				return // the listener never opened; requirePortFree reports it
 			}
-			res, cbErr := client.Do(opts)
-			if assert.NoError(t, cbErr) {
-				defer res.Body.Close()
-				assert.Equal(t, http.StatusFound, res.StatusCode)
-				assert.Equal(t, "https://auth.astronomer.io/device/success", res.Header.Get("Location"))
+			select {
+			case <-done:
+			case <-time.After(10 * time.Second):
+				t.Error("the callback request never finished")
 			}
-		}()
+		}
+	}
+
+	t.Run("success", func(t *testing.T) {
+		wait := callbackAt(t, "code=test", "https://auth.astronomer.io/device/success", false)
 		code, err := authorizeCallback(io.Discard)
 		assert.Equal(t, "test", code)
 		assert.NoError(t, err)
-		wg.Wait()
+		wait()
+		requirePortFree(t)
 	})
 
 	t.Run("an address already taken returns an error", func(t *testing.T) {
 		held, err := net.Listen("tcp", "localhost:0")
 		assert.NoError(t, err)
 		defer held.Close()
-		previous := callbackServer
-		t.Cleanup(func() { callbackServer = previous })
+		setup(t)
 		callbackServer = held.Addr().String()
 
 		code, err := authorizeCallback(io.Discard)
-		assert.Error(t, err)
 		assert.Empty(t, code)
-		assert.Contains(t, err.Error(), "cannot open the login callback on "+held.Addr().String())
-		assert.Contains(t, err.Error(), "Close any other astro login")
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "cannot open the login callback on "+held.Addr().String())
+			assert.Contains(t, err.Error(), "Close any other astro login")
+		}
 	})
 
 	t.Run("error", func(t *testing.T) {
-		callbackServer = "localhost:12346"
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			awaitCallbackServer(t, callbackServer)
-			opts := &httputil.DoOptions{
-				Method: http.MethodGet,
-				Path:   "http://localhost:12346/callback?error=error&error_description=fatal_error",
-			}
-			res, cbErr := client.Do(opts)
-			if assert.NoError(t, cbErr) {
-				defer res.Body.Close()
-				assert.Equal(t, http.StatusFound, res.StatusCode)
-				assert.Equal(t, "https://auth.astronomer.io/device/denied", res.Header.Get("Location"))
-			}
-		}()
+		wait := callbackAt(t, "error=error&error_description=fatal_error", "https://auth.astronomer.io/device/denied", false)
 		_, err := authorizeCallback(io.Discard)
-		assert.Contains(t, err.Error(), "fatal_error")
-		wg.Wait()
+		assert.ErrorContains(t, err, "fatal_error")
+		wait()
+		requirePortFree(t)
 	})
 
 	t.Run("timeout", func(t *testing.T) {
-		callbackServer = "localhost:12347"
+		setup(t)
+		callbackListening = func(addr net.Addr) { bound = addr.String() }
 		callbackTimeout = 5 * time.Millisecond
 		_, err := authorizeCallback(io.Discard)
-		assert.Contains(t, err.Error(), "the operation has timed out")
+		assert.ErrorContains(t, err, "the operation has timed out")
+		requirePortFree(t)
+	})
+
+	// A browser may open an idle connection to the callback before it sends the
+	// request. It must neither slow the login down nor print a warning.
+	for _, tc := range []struct{ name, query, location, wantErr string }{
+		{"success", "code=test", "https://auth.astronomer.io/device/success", ""},
+		{"error", "error=error&error_description=fatal_error", "https://auth.astronomer.io/device/denied", "fatal_error"},
+	} {
+		t.Run("an idle connection does not hold up a login that ends in "+tc.name, func(t *testing.T) {
+			// A generous bound, so a login that waits on the idle connection
+			// is told apart from a slow machine.
+			wait := callbackAt(t, tc.query, tc.location, true)
+			callbackShutdownTimeout = 5 * time.Second
+			var out bytes.Buffer
+			start := time.Now()
+			code, err := authorizeCallback(&out)
+			elapsed := time.Since(start)
+			if tc.wantErr == "" {
+				assert.Equal(t, "test", code)
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.wantErr)
+			}
+			wait()
+			assert.Less(t, elapsed, callbackShutdownTimeout/2, "the login waited on the idle connection")
+			assert.Empty(t, out.String())
+			requirePortFree(t)
+		})
+	}
+
+	t.Run("a login does not see the result of an earlier one", func(t *testing.T) {
+		for _, code := range []string{"first", "second"} {
+			wait := callbackAt(t, "code="+code, "https://auth.astronomer.io/device/success", false)
+			got, err := authorizeCallback(io.Discard)
+			assert.NoError(t, err)
+			assert.Equal(t, code, got)
+			wait()
+			requirePortFree(t)
+		}
 	})
 }
 
-// awaitCallbackServer waits for authorizeCallback, which runs in the
-// test's own goroutine, to open its listener. A fixed sleep would be both
-// slower and still a race.
-func awaitCallbackServer(t *testing.T, addr string) {
-	t.Helper()
-	for range 400 {
-		conn, err := net.Dial("tcp", addr)
-		if err == nil {
-			conn.Close()
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
+func TestCallbackMuxKeepsTheFirstResult(t *testing.T) {
+	results := make(chan CallbackMessage, 1)
+	mux := callbackMux(results)
+	// A hit with no code and no error leaves the slot free for the real result,
+	// and is not told the login succeeded.
+	for _, target := range []string{"/callback", "/callback?code="} {
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, http.NoBody))
+		assert.Equal(t, http.StatusBadRequest, rec.Code, target)
+		assert.Empty(t, rec.Header().Get("Location"), target)
+		assert.Empty(t, results, target)
 	}
-	t.Errorf("the login callback never opened %s", addr)
+
+	for _, target := range []string{"/callback?code=first", "/callback?code=second", "/callback?error=denied", "/callback?code=third"} {
+		done := make(chan *httptest.ResponseRecorder, 1)
+		go func() {
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, http.NoBody))
+			done <- rec
+		}()
+		select {
+		case rec := <-done:
+			assert.Equal(t, http.StatusFound, rec.Code, target)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("the callback handler blocked on %s", target)
+		}
+	}
+	assert.Equal(t, "first", (<-results).authorizationCode)
+	assert.Empty(t, results)
 }
 
 func TestShouldSignup(t *testing.T) {
@@ -737,13 +839,20 @@ func TestAuthDeviceLogin(t *testing.T) {
 	})
 }
 
-// stubStdinIsTerminal answers the terminal check with one value, and puts the
-// real check back when the test ends.
-func stubStdinIsTerminal(t *testing.T, isTerminal bool) {
+// stubStdinIsTerminal says whether stdin is a terminal, and installs the guard
+// Execute would from it, so a login that finds none is refused as the rule
+// refuses it. Both are put back when the test ends, or by the function it
+// returns.
+func stubStdinIsTerminal(t *testing.T, isTerminal bool) (restore func()) {
 	t.Helper()
-	previous := stdinIsTerminal
-	t.Cleanup(func() { stdinIsTerminal = previous })
-	stdinIsTerminal = func() bool { return isTerminal }
+	restoreTerminals := input.SetTerminals(isTerminal, true)
+	restoreGuard := func() {}
+	if !isTerminal {
+		restoreGuard = input.SetGuard(func() string { return input.Refusal(false, nil) })
+	}
+	restore = func() { restoreGuard(); restoreTerminals() }
+	t.Cleanup(restore)
+	return restore
 }
 
 // stubStdin makes stdin hold text, and returns it so a test can read what the
@@ -962,8 +1071,11 @@ func TestCheckUserSession(t *testing.T) {
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrganizationsResponseEmpty, nil).Once()
 		ctx := config.Context{Domain: "test-domain"}
 		buf := new(bytes.Buffer)
+		// A stdin with no answer is nobody answering the offer to create an
+		// organization: input_required, naming the flag that answers it.
 		err := CheckUserSession(&ctx, mockV1Client, buf)
-		assert.Contains(t, err.Error(), "Please contact your Astro Organization Owner to be invited to the organization")
+		assert.True(t, input.IsRequired(err), "%v", err)
+		assert.Contains(t, err.Error(), "Create or join an Organization")
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -1249,10 +1361,9 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 		assert.NotContains(t, buf.String(), "Creating your organization")
 		mockV1Client.AssertExpectations(t)
 	})
-
-	// The question can come from the login inside any command, and only
-	// `astro login` has --signup, so the refusal names the command too.
-	t.Run("a run that may not ask is refused, naming astro login", func(t *testing.T) {
+	// The question can come from the login inside any command, and only a
+	// person can answer it: a run that cannot ask says what resolves it.
+	t.Run("a run that may not ask is refused, saying what resolves it", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		t.Cleanup(input.SetGuard(func() string { return "with --output json it cannot" }))
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
@@ -1262,7 +1373,7 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 		ctx := config.Context{Domain: "test-domain"}
 		err := checkUserSession(&ctx, mockV1Client, new(bytes.Buffer), false)
 		assert.True(t, input.IsRequired(err), "err: %v", err)
-		assert.ErrorContains(t, err, "pass --signup to astro login")
+		assert.ErrorContains(t, err, "Create or join an Organization in the Astro UI")
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -1311,7 +1422,8 @@ func TestLoginRefusedWhenTheRunMayNotAsk(t *testing.T) {
 
 	assert.ErrorIs(t, err, ErrLoginNeeded)
 	assert.False(t, input.IsRequired(err), "no flag answers a login, so it is not input_required")
-	assert.ErrorContains(t, err, "with --output json it cannot — run astro login first, or set ASTRO_API_TOKEN")
+	assert.ErrorContains(t, err, "with --output json it cannot — set ASTRO_API_TOKEN (astro login prints a link")
+	assert.NotContains(t, err.Error(), "run astro login first", "the refusal must not send the person to a command it also refuses")
 	assert.Empty(t, string(printed), "nothing reaches stdout")
 }
 
@@ -1652,7 +1764,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		var out string
 		errOut := captureStderr(t, func() {
 			out = captureStdout(t, func() {
-				assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+				assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 			})
 		})
 
@@ -1681,7 +1793,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		mockV1Client := checkUserSessionMocks()
 
 		captureStdout(t, func() {
-			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+			assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 		})
 
 		assert.Equal(t, 0, *browserLogins)
@@ -1700,7 +1812,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		mockV1Client := checkUserSessionMocks()
 
 		captureStdout(t, func() {
-			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+			assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 		})
 
 		assert.Equal(t, 1, *browserLogins)
@@ -1719,7 +1831,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			saveLogin(t, domain, "", "", 0)
 			browserLogins := browserAuthenticator(t)
-			stubStdinIsTerminal(t, terminal)
+			restoreTerminals := stubStdinIsTerminal(t, terminal)
 			mockV1Client := checkUserSessionMocks()
 			if terminal {
 				// The Enter the prompt waits for.
@@ -1735,7 +1847,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 			var out string
 			errOut := captureStderr(t, func() {
 				out = captureStdout(t, func() {
-					assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+					assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 				})
 			})
 
@@ -1748,6 +1860,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 				assert.Contains(t, errOut, "Please visit the following link")
 			}
 			assert.Contains(t, errOut, "Logging in as")
+			restoreTerminals()
 		}
 	})
 
@@ -1758,7 +1871,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		mockV1Client := checkUserSessionMocks()
 
 		captureStdout(t, func() {
-			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+			assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 		})
 
 		assert.Equal(t, 1, *browserLogins)
@@ -1772,7 +1885,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		mockV1Client := checkUserSessionMocks()
 
 		captureStdout(t, func() {
-			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+			assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 		})
 
 		assert.Equal(t, 0, *browserLogins)
@@ -1819,7 +1932,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		mockV1Client := checkUserSessionMocks()
 
 		captureStdout(t, func() {
-			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+			assert.NoError(t, LoginCommand(domain, "", mockV1Client, io.Discard, false, false, false))
 		})
 
 		assert.Equal(t, 1, *browserLogins)
@@ -1846,7 +1959,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 			mockV1Client := checkUserSessionMocks()
 
 			captureStdout(t, func() {
-				assert.NoError(t, Login(domain, tc.token, mockV1Client, io.Discard, false, tc.signup, tc.force))
+				assert.NoError(t, LoginCommand(domain, tc.token, mockV1Client, io.Discard, false, tc.signup, tc.force))
 			})
 
 			assert.Equal(t, tc.browserLogins, *browserLogins)
@@ -2160,4 +2273,71 @@ func TestWriteToContextKeepsTokenOnlyLoginOnItsOwnHost(t *testing.T) {
 	assert.Equal(t, "Bearer pasted", own.Token)
 	assert.Empty(t, own.RefreshToken)
 	assert.Equal(t, "user@astronomer.test", own.UserEmail)
+}
+
+// An explicit astro login works in a run that may not ask (CI,
+// --non-interactive): running the command is the consent, so it prints the
+// login link and waits for the browser's callback instead of being refused. A
+// login another command starts (Login) is still refused there.
+func TestExplicitLoginWorksWhenTheRunMayNotAsk(t *testing.T) {
+	for _, reason := range []string{"with CI set it cannot", "with --non-interactive it cannot", "with --output json it cannot", "stdin is not a terminal", "stderr is not a terminal"} {
+		t.Run(reason, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			stubAuthConfig(t, testAuthConfig)
+			stubRefresh(t, astroauth.TokenResponse{}, errMock)
+			stubStdinIsTerminal(t, true)
+			t.Cleanup(input.SetGuard(func() string { return reason }))
+			previous := authenticator
+			t.Cleanup(func() { authenticator = previous })
+			// The link path never starts a browser: a run that cannot ask has
+			// nobody to open one for, and a test must never open a real one.
+			opened := 0
+			previousOpen := openURL
+			t.Cleanup(func() { openURL = previousOpen })
+			openURL = func(string) error { opened++; return nil }
+			reached := false
+			authenticator = Authenticator{
+				callbackHandler: func() (string, error) {
+					reached = true
+					return "", errMock
+				},
+			}
+
+			var err error
+			printed := captureStderr(t, func() {
+				err = LoginCommand("astronomer.io", "", new(astrov1_mocks.ClientWithResponsesInterface), io.Discard, false, false, false)
+			})
+			assert.Zero(t, opened, "the browser was opened")
+			assert.ErrorIs(t, err, errMock, "the login reached the browser callback, not a refusal")
+			assert.NotErrorIs(t, err, ErrLoginNeeded)
+			assert.True(t, reached, "the callback was waited on")
+			assert.Contains(t, printed, "Please visit the following link", "the link is printed")
+			assert.NotContains(t, printed, "Press Enter", "no pause for Enter in a run that may not ask")
+
+			// --login-link is not refused either.
+			reached = false
+			err = LoginCommand("astronomer.io", "", new(astrov1_mocks.ClientWithResponsesInterface), io.Discard, true, false, true)
+			assert.ErrorIs(t, err, errMock)
+			assert.Zero(t, opened, "--login-link opened the browser")
+			assert.True(t, reached)
+
+			// The implicit login stays refused, and does not loop.
+			reached = false
+			err = Login("astronomer.io", "", new(astrov1_mocks.ClientWithResponsesInterface), io.Discard, false, false, false)
+			assert.ErrorIs(t, err, ErrLoginNeeded)
+			assert.False(t, reached, "an implicit login started a browser login")
+			assert.NotContains(t, err.Error(), "run astro login first")
+			assert.Contains(t, err.Error(), "ASTRO_API_TOKEN")
+		})
+	}
+}
+
+// A login with no organization, in a run that could not ask whether to create
+// one, says what resolves it, not a flag that restarts the login.
+func TestNoOrganizationRefusalNamesWhatResolvesIt(t *testing.T) {
+	t.Cleanup(input.SetGuard(func() string { return "with CI set it cannot" }))
+	_, err := askToCreateOrganization("astronomer.io", io.Discard)
+	assert.True(t, input.IsRequired(err), "%v", err)
+	assert.ErrorContains(t, err, "Create or join an Organization in the Astro UI")
+	assert.NotContains(t, err.Error(), "--signup")
 }

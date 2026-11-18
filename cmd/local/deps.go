@@ -115,16 +115,10 @@ type Deps struct {
 	// Deployment by default (target = "apc"), on this context's domain.
 	APC *APCLinking
 
-	// Interactive reports whether this run may ask the user a question. It is a
-	// seam rather than a stdin type-assertion so a test can drive the prompt
-	// path without a pty. nil means non-interactive, which is the safe default:
-	// a run that cannot be asked is never blocked waiting for an answer.
-	Interactive func() bool
-
-	// OutputTerminal reports whether stdout is a terminal, for a command whose
-	// question and whose report both go to stdout: `astro use | grep prod` has a
-	// terminal on stdin and still wants the report, not a picker it cannot see.
-	// nil means not a terminal.
+	// OutputTerminal reports whether stdout is a terminal, for a bare `astro use`:
+	// with its stdin and stderr at a terminal it may ask, but `astro use | grep
+	// prod` still wants the report, not a picker whose answer goes nowhere. nil
+	// means not a terminal.
 	OutputTerminal func() bool
 
 	// JSONStyle lays out a json result. The zero value, cliout.StyleAuto, is
@@ -202,14 +196,27 @@ type Deps struct {
 	LaunchOtto func(prompt string) error
 
 	// Legacy1xSetting reads key, an Astro CLI 1.x setting v2 does not apply,
-	// for the project at projectDir as 1.x did (its .astro/config.yaml over
-	// the home config): its value when the user chose one (not 1.x's
-	// default), "" otherwise; the file that sets it; and what replaces it, as
+	// from the home config 1.x shares: its value when the user chose one (not
+	// 1.x's default), "" otherwise; the file that sets it; and what replaces it, as
 	// `astro config` says when it refuses the setting. A start reads it only
 	// to say what replaces the setting (warnLegacy1xSettings). The root wires
 	// it, because the read touches config/, which this tree never imports.
 	// nil reads as nothing set.
-	Legacy1xSetting func(projectDir, key string) (value, file, replacement string)
+	Legacy1xSetting func(key string) (value, file, replacement string)
+
+	// ProjectSetting1x says what replaces a CLI setting a 1.x project's
+	// .astro/config.yaml sets, for the note init writes about it when it
+	// converts the project and deletes the file (scaffold.Options.Setting1x):
+	// the v2 name to set it globally under, or what replaces a removed one.
+	// The root wires it, because the settings are config/'s. nil names every
+	// setting without a replacement.
+	ProjectSetting1x func(key, value string) (global, removed string, ok bool)
+
+	// ManifestWarningsShown is set when the root prints every loaded
+	// manifest's warnings itself (manifest.SetWarningHandler), so a start's
+	// text output does not repeat them. Its json warning events are emitted
+	// either way.
+	ManifestWarningsShown bool
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an
@@ -221,6 +228,10 @@ type Runtime interface {
 	// venv while no Airflow runs on it, under the environment a start of p
 	// would give Airflow. It backs `astro local run` and `shell` offline.
 	Stopped(p localrt.Plan) (localrt.Airflow, error)
+	// Sync builds or updates a standalone project's venv without starting
+	// Airflow, as a start's first step does. `astro local run` and `shell` call
+	// it before Stopped, and only when nothing is running.
+	Sync(ctx context.Context, p localrt.Plan, cb localrt.Callbacks) error
 	// LogSource returns a handle for reading a project's logs. Unlike Attach
 	// it also serves a stopped standalone project, whose log file outlives its
 	// record; the handle's Logs reads that file.
@@ -253,7 +264,6 @@ func NewDeps() Deps {
 		WorkspaceClients:   emenv.Clients,
 		Session:            astrosession.BearerFor,
 		Locator:            instancelocate.New,
-		Interactive:        stdinIsTerminal,
 		OutputTerminal:     stdoutIsTerminal,
 		AirflowDefault:     catalogDefault,
 		RuntimeCheck:       runtimecatalog.CheckRuntime,
@@ -279,11 +289,6 @@ func NewDeps() Deps {
 		d.Watch = rt.WatchProject
 	}
 	return d
-}
-
-// stdinIsTerminal is the production answer to "can this run ask a question".
-func stdinIsTerminal() bool {
-	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
 // stdoutIsTerminal is the production answer to "will the user see what this
@@ -378,7 +383,10 @@ func (r homelessRuntime) Start(context.Context, localrt.Plan, localrt.Callbacks)
 }
 func (r homelessRuntime) Attach(string) (localrt.Airflow, error)        { return nil, r.err }
 func (r homelessRuntime) Stopped(localrt.Plan) (localrt.Airflow, error) { return nil, r.err }
-func (r homelessRuntime) LogSource(string) (localrt.Airflow, error)     { return nil, r.err }
+func (r homelessRuntime) Sync(context.Context, localrt.Plan, localrt.Callbacks) error {
+	return r.err
+}
+func (r homelessRuntime) LogSource(string) (localrt.Airflow, error) { return nil, r.err }
 func (r homelessRuntime) ReadStatus(string) (localrt.Status, error) {
 	return localrt.Status{}, r.err
 }
