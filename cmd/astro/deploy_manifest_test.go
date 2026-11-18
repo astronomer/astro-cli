@@ -1377,7 +1377,7 @@ func TestDeployManifestPickerNeverCreatesADeployment(t *testing.T) {
 	_, err := d.ResolveUnlinked("clw-ws")
 	var none *deployment.NoDeploymentsError
 	require.ErrorAs(t, err, &none)
-	assert.EqualError(t, err, "no Deployments found in workspace clw-ws (from the project link): create one with astro deployment create")
+	assert.EqualError(t, err, "no Deployments found in workspace clw-ws: create one with astro deployment create")
 }
 
 // The prompt waits on the workspace's list, so a list that does not answer is

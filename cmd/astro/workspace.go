@@ -946,13 +946,20 @@ func coalesceWorkspace(cmd *cobra.Command) (string, error) {
 // coalesceWorkspaceOr is coalesceWorkspace for a command that also takes
 // something in place of a Workspace (extra), which its advice then names.
 func coalesceWorkspaceOr(cmd *cobra.Command, extra astrosession.WorkspaceAdvice) (string, error) {
-	return coalesceFrom(workspaceTarget(cmd, workspaceID, extra, workspace.ErrCurrentNotSet))
+	_, ws, err := coalesceTargetOr(cmd, extra)
+	return ws, err
 }
 
 // coalesceTarget is coalesceWorkspace with the Target it came from, for a
 // command that tells a lookup where its Workspace came from.
 func coalesceTarget(cmd *cobra.Command) (astrosession.Target, string, error) {
-	t := workspaceTarget(cmd, workspaceID, 0, workspace.ErrCurrentNotSet)
+	return coalesceTargetOr(cmd, 0)
+}
+
+// coalesceTargetOr is coalesceTarget for a command that also takes something in
+// place of a Workspace (extra).
+func coalesceTargetOr(cmd *cobra.Command, extra astrosession.WorkspaceAdvice) (astrosession.Target, string, error) {
+	t := workspaceTarget(cmd, workspaceID, extra, workspace.ErrCurrentNotSet)
 	ws, err := coalesceFrom(t)
 	return t, ws, err
 }
