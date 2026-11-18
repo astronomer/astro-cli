@@ -270,3 +270,76 @@ func TestDeployManifestDags_MonitoringDagFollowsTheLoginsOrg(t *testing.T) {
 	}, client)
 	require.NoError(t, err)
 }
+
+// The monitoring Dag goes at a name the CLI picks in the project's dags/, so a
+// symlink already there (a project's, pointing elsewhere) is replaced rather
+// than written through: the file it points at keeps its content.
+func TestWriteMonitoringDagReplacesASymlinkInsteadOfFollowingIt(t *testing.T) {
+	outside := filepath.Join(t.TempDir(), "precious")
+	require.NoError(t, os.WriteFile(outside, []byte("keep me"), 0o600))
+	path := filepath.Join(t.TempDir(), "dags", "astronomer_monitoring_dag.py")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	if err := os.Symlink(outside, path); err != nil {
+		t.Skipf("cannot create a symlink here: %v", err)
+	}
+
+	require.NoError(t, writeMonitoringDag(path, af3MonitoringDag))
+
+	got, err := os.ReadFile(outside)
+	require.NoError(t, err)
+	assert.Equal(t, "keep me", string(got), "the symlink's target was overwritten")
+	info, err := os.Lstat(path)
+	require.NoError(t, err)
+	assert.True(t, info.Mode().IsRegular(), "the monitoring Dag is a file of its own, not a link")
+	got, err = os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, af3MonitoringDag, string(got))
+}
+
+// Through a whole Dag deploy that carries the monitoring Dag: a symlink at its
+// name leaves the file it points at untouched, and the deploy removes what it
+// wrote.
+func TestDeployManifestDags_MonitoringDagNeverWritesThroughASymlink(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudStagePlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+
+	hybrid := astrov1.DeploymentTypeHYBRID
+	client.On("GetDeploymentWithResponse", mock.Anything, "hybrid-org", "test-deployment-id").Return(&astrov1.GetDeploymentResponse{
+		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		JSON200: &astrov1.Deployment{
+			Id:                  "test-deployment-id",
+			OrganizationId:      "hybrid-org",
+			AstroRuntimeVersion: "7.0.0",
+			Type:                &hybrid,
+			IsDagDeployEnabled:  true,
+		},
+	}, nil)
+	mockCreateDagDeploy(client, "https://upload-url")
+	mockFinalizeDeploy(client)
+	dir := manifestProjectDir(t)
+	outside := filepath.Join(t.TempDir(), "precious")
+	require.NoError(t, os.WriteFile(outside, []byte("keep me"), 0o600))
+	link := filepath.Join(dir, "dags", "astronomer_monitoring_dag.py")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("cannot create a symlink here: %v", err)
+	}
+	azureUploader = func(string, io.Reader) (string, error) {
+		info, err := os.Lstat(link)
+		require.NoError(t, err, "the monitoring Dag is in the upload")
+		assert.True(t, info.Mode().IsRegular(), "the upload carries the monitoring Dag itself, not the link")
+		return "tarball-v1", nil
+	}
+
+	_, err := DeployManifestDags(ManifestDagDeployInput{
+		Login:        &config.Context{Domain: "astronomer.io", Organization: "hybrid-org", OrganizationProduct: "HYBRID", Token: "Bearer hybrid-token"},
+		ProjectDir:   dir,
+		DeploymentID: "test-deployment-id",
+	}, client)
+	require.NoError(t, err)
+
+	got, err := os.ReadFile(outside)
+	require.NoError(t, err)
+	assert.Equal(t, "keep me", string(got), "the symlink's target was overwritten")
+	_, err = os.Lstat(link)
+	assert.True(t, os.IsNotExist(err), "the deploy removes the monitoring Dag it wrote")
+}

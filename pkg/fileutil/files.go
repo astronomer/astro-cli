@@ -81,31 +81,6 @@ func Exists(filePath string, fs afero.Fs) (bool, error) {
 	return false, nil
 }
 
-// WriteStringToFile write a string to a file
-func WriteStringToFile(filePath, s string) error {
-	return WriteToFile(filePath, strings.NewReader(s))
-}
-
-// WriteToFile writes an io.Reader to a file if it does not exst
-func WriteToFile(filePath string, r io.Reader) error {
-	dir := filepath.Dir(filePath)
-	if dir != "" {
-		if err := os.MkdirAll(dir, perm); err != nil {
-			return err
-		}
-	}
-
-	file, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-
-	defer file.Close()
-
-	_, err = io.Copy(file, r)
-	return err
-}
-
 // TarOverlay changes what Tar writes without touching source. Paths are
 // slash-separated and relative to source, before any base directory is
 // prepended.

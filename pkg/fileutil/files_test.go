@@ -116,34 +116,6 @@ func (s *Suite) TestExists() {
 	}
 }
 
-func (s *Suite) TestWriteStringToFile() {
-	type args struct {
-		path string
-		s    string
-	}
-	tests := []struct {
-		name         string
-		args         args
-		errAssertion assert.ErrorAssertionFunc
-	}{
-		{
-			name:         "basic case",
-			args:         args{path: "./test.out", s: "testing"},
-			errAssertion: assert.NoError,
-		},
-	}
-	defer afero.NewOsFs().Remove("./test.out")
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			if tt.errAssertion(s.T(), WriteStringToFile(tt.args.path, tt.args.s)) {
-				return
-			}
-			_, err := os.Open(tt.args.path)
-			s.NoError(err, "Error opening file %s", tt.args.path)
-		})
-	}
-}
-
 func (s *Suite) TestTar() {
 	// create a test directory with a sub-directory "source" for the tar contents
 	testDirPath, _ := os.MkdirTemp("", "")
@@ -154,7 +126,7 @@ func (s *Suite) TestTar() {
 	// create a test file, and a symlink to it
 	testFileName := "test.txt"
 	testFilePath := filepath.Join(testSourceDirPath, testFileName)
-	WriteStringToFile(testFilePath, "testing")
+	writeTestFile(s.T(), testFilePath, "testing")
 	symlinkFileName := "symlink"
 	symlinkFilePath := filepath.Join(testSourceDirPath, symlinkFileName)
 	os.Symlink(testFilePath, symlinkFilePath)
@@ -165,14 +137,14 @@ func (s *Suite) TestTar() {
 	testSubDirPath := filepath.Join(testSourceDirPath, testSubDirName)
 	testSubDirFilePath := filepath.Join(testSubDirPath, testSubDirFileName)
 	_ = os.Mkdir(testSubDirPath, os.ModePerm)
-	WriteStringToFile(testSubDirFilePath, "testing")
+	writeTestFile(s.T(), testSubDirFilePath, "testing")
 
-	WriteStringToFile(filepath.Join(testSourceDirPath, "__pycache__", "dag.cpython-313.pyc"), "bytecode")
-	WriteStringToFile(filepath.Join(testSubDirPath, "__pycache__", "helper.cpython-313.pyc"), "bytecode")
+	writeTestFile(s.T(), filepath.Join(testSourceDirPath, "__pycache__", "dag.cpython-313.pyc"), "bytecode")
+	writeTestFile(s.T(), filepath.Join(testSubDirPath, "__pycache__", "helper.cpython-313.pyc"), "bytecode")
 	airflowIgnoreName := ".airflowignore"
-	WriteStringToFile(filepath.Join(testSourceDirPath, airflowIgnoreName), "scratch/")
+	writeTestFile(s.T(), filepath.Join(testSourceDirPath, airflowIgnoreName), "scratch/")
 	sourcelessPycName := "vendored.pyc"
-	WriteStringToFile(filepath.Join(testSourceDirPath, sourcelessPycName), "bytecode")
+	writeTestFile(s.T(), filepath.Join(testSourceDirPath, sourcelessPycName), "bytecode")
 
 	type args struct {
 		source         string
@@ -460,7 +432,7 @@ func (s *Suite) TestArchiveWritesReplaceASymlinkInsteadOfFollowingIt() {
 func (s *Suite) TestReadFileToString() {
 	filePath := "./test.out"
 	content := "testing"
-	WriteStringToFile(filePath, content)
+	writeTestFile(s.T(), filePath, content)
 	defer afero.NewOsFs().Remove(filePath)
 	type args struct {
 		path string
@@ -502,7 +474,7 @@ func (s *Suite) TestReadFileToString() {
 func (s *Suite) TestFilesWithExtension() {
 	filePath := "./test.py"
 	content := "testing"
-	WriteStringToFile(filePath, content)
+	writeTestFile(s.T(), filePath, content)
 	defer afero.NewOsFs().Remove(filePath)
 
 	expectedFiles := []string{"test.py"}
@@ -1067,4 +1039,11 @@ func tarNames(t *testing.T, target string) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// writeTestFile writes s to path for a test, creating its directory.
+func writeTestFile(t *testing.T, path, s string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(s), 0o600))
 }
