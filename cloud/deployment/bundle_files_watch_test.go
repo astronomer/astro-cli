@@ -82,6 +82,14 @@ func mockSyncWrite(s *Suite, mockStreamClient *astrov1alpha1_mocks.ClientInterfa
 	}).Return(directoryWritten(newVersion), nil).Once()
 }
 
+// replaceLocalFile replaces the file at name in one rename, as an editor that
+// saves atomically does, so a sync never reads it half written.
+func replaceLocalFile(s *Suite, name, content string) {
+	temp := filepath.Join(s.T().TempDir(), filepath.Base(name))
+	s.NoError(os.WriteFile(temp, []byte(content), 0o600))
+	s.NoError(os.Rename(temp, name))
+}
+
 // startWatch runs a watching sync of fromDir into my-files:dags until stop is
 // called or the test ends.
 func startWatch(s *Suite, fromDir string, mockV1Alpha1Client *astrov1alpha1_mocks.ClientWithResponsesInterface, mockStreamClient *astrov1alpha1_mocks.ClientInterface) (out *watchOutput, done <-chan error, stop func()) {
@@ -243,7 +251,7 @@ func (s *Suite) TestSyncBundleFilesWatch() {
 				mockV1Alpha1Client.AssertExpectations(s.T())
 				return
 			case <-ticker.C:
-				writeLocalFiles(s, fromDir, map[string]string{"log.txt": strconv.Itoa(i)})
+				replaceLocalFile(s, filepath.Join(fromDir, "log.txt"), strconv.Itoa(i))
 			case <-timeout:
 				s.FailNow("timed out waiting for a sync while the file kept changing")
 			}
