@@ -418,3 +418,22 @@ func TestPathLockIsPerFileNotPerSpelling(t *testing.T) {
 		t.Error("two files share one lock")
 	}
 }
+
+// The published file carries the mode asked for, not the 0600 the temp file is
+// created with: a 0644 manifest stays 0644 after an edit.
+func TestWriteFileAppliesTheRequestedMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no Unix permission bits")
+	}
+	path := filepath.Join(t.TempDir(), "pyproject.toml")
+	if err := WriteFile(path, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o644 {
+		t.Errorf("mode = %o, want 644", got)
+	}
+}

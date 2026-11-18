@@ -159,11 +159,8 @@ func showFirstRunNotice() {
 	}
 	fmt.Fprintln(os.Stderr,
 		"The Astro CLI collects usage data to help us prioritize and invest in CLI features.\n"+
-			"Commands, OS, and CLI version are tracked — never arguments or their values.\n"+
-			"A command or flag the CLI does not have, and an old flag name it still accepts,\n"+
-			"are tracked too, so we can see what to add and what to remove.\n"+
+			"Command and flag names, OS, and CLI version are tracked — never argument or flag values.\n"+
 			"While you are logged in, events are linked to your Astro organization.\n"+
-			"Logged-out usage stays anonymous.\n"+
 			"Opt out anytime: astro telemetry disable or ASTRO_TELEMETRY_DISABLED=1")
 	_ = config.CFG.TelemetryNoticeShown.SetHomeString(noticeVersion) //nolint:errcheck // best-effort telemetry write
 }

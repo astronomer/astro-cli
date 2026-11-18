@@ -64,13 +64,16 @@ func WriteFile(path string, data []byte, perm fs.FileMode) error {
 	}
 	tmpPath := tmp.Name()
 	_, werr := tmp.Write(data)
+	if werr == nil {
+		// CreateTemp creates 0o600; make the published mode explicit. Through
+		// the open file rather than by name: someone else able to write in dir
+		// could swap tmpPath for a symlink, and a chmod by name would then
+		// change whatever file it points at instead.
+		werr = tmp.Chmod(perm)
+	}
 	cerr := tmp.Close()
 	if werr == nil {
 		werr = cerr
-	}
-	if werr == nil {
-		// CreateTemp creates 0o600; make the published mode explicit.
-		werr = os.Chmod(tmpPath, perm)
 	}
 	if werr == nil {
 		lock := pathLock(path)

@@ -14,4 +14,5 @@ How v2 works:
 - [secrets.md](secrets.md): local environment values, the vault, precedence, and `astro local env`.
 - [workspace-link.md](workspace-link.md): values read from a linked Astro workspace, and which login reads them.
 - [instances.md](instances.md): which Airflow a command talks to, `astro use`, and link authentication.
+- [http-unix-socket.md](http-unix-socket.md): sending requests to Astronomer's hosts through a Unix socket (`ASTRO_HTTP_UNIX_SOCKET`).
 - [deploy.md](deploy.md): `astro deploy`, `astro package`, and `astro local check --target`.
