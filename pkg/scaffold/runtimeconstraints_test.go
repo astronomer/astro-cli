@@ -21,13 +21,14 @@ func withConstraints(t *testing.T, src string, rc *RuntimeConstraints) string {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(src), 0o600))
-	require.NoError(t, SetAstroBuildWith(dir, nil, build332, rc))
+	_, err := SetAstroBuildOpts(dir, nil, build332, AstroBuildOptions{Constraints: rc})
+	require.NoError(t, err)
 	out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	return string(out)
 }
 
-func TestSetAstroBuildWithWritesTheRuntimesLinesUnderTheRecord(t *testing.T) {
+func TestSetAstroBuildOptsWritesTheRuntimesLinesUnderTheRecord(t *testing.T) {
 	got := withConstraints(t, astroHead+"\n[tool.uv]\nconstraint-dependencies = [\n    'urllib3<3',\n]\n", &rc339)
 	assert.Contains(t, got, "    'urllib3<3',\n    'apache-airflow==3.3.2+astro.1',\n    'apache-airflow-task-sdk==1.3.2+astro.1',\n"+
 		"    # Astro Runtime 3.3-9 (Python 3.14) constrains these. astro writes them.\n    'SQLAlchemy==2.0.50',\n")

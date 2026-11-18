@@ -65,15 +65,6 @@ var (
 	astroDists      = []string{runtimeversions.DistAirflow, runtimeversions.DistCore, runtimeversions.DistTaskSDK}
 )
 
-// SetAstroBuild writes b into the manifest in dir, through EditManifest: the
-// [tool.uv] settings above, and the two distributions sources need listed. A
-// zero b takes out what an earlier one wrote, for an Airflow Astronomer has no
-// build of, which then comes from PyPI. It leaves every other [tool.uv] key,
-// and every comment, as it was.
-func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild) error {
-	return SetAstroBuildWith(dir, wrap, b, nil)
-}
-
 // RuntimeConstraints is what an Astro Runtime image's own install holds
 // packages to (the runtime's constraints file), for one build and Python.
 // Lines are its name==version lines as published.
@@ -82,20 +73,14 @@ type RuntimeConstraints struct {
 	Lines         []string
 }
 
-// SetAstroBuildWith is SetAstroBuild that also writes rc: rc's lines other
-// than the Airflow distributions' (which b's pins hold), under one comment
-// recording rc's build and Python (manifest.RuntimeRecord), in place of the
-// lines and the record an earlier rc wrote. A nil rc leaves those as they
-// are; a zero one takes them out. Where the array cannot hold a comment (an
-// inline [tool.uv]), no record and no lines are written.
-func SetAstroBuildWith(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, rc *RuntimeConstraints) error {
-	_, err := SetAstroBuildOpts(dir, wrap, b, AstroBuildOptions{Constraints: rc})
-	return err
-}
-
 // AstroBuildOptions are SetAstroBuildOpts's choices beyond the build.
 type AstroBuildOptions struct {
-	// Constraints is SetAstroBuildWith's rc.
+	// Constraints are written too: their lines other than the Airflow
+	// distributions' (which the build's pins hold), under one comment recording
+	// their build and Python (manifest.RuntimeRecord), in place of the lines and
+	// the record earlier ones wrote. Nil leaves those as they are; a zero value
+	// takes them out. Where the array cannot hold a comment (an inline
+	// [tool.uv]), no record and no lines are written.
 	Constraints *RuntimeConstraints
 	// MoveToDefaultIndex lets the write make Astronomer's index the project's
 	// default where an earlier astro wrote it explicit, with a source per
@@ -131,8 +116,11 @@ type AstroIndex struct {
 	Moved bool
 }
 
-// SetAstroBuildOpts is SetAstroBuildWith with opts, and says how it left
-// Astronomer's index.
+// SetAstroBuildOpts writes b into the manifest in dir, through EditManifest:
+// the [tool.uv] settings above, and the two distributions sources need listed,
+// and says how it left Astronomer's index. A zero b takes out what an earlier
+// one wrote, for an Airflow Astronomer has no build of, which then comes from
+// PyPI. It leaves every other [tool.uv] key, and every comment, as it was.
 func SetAstroBuildOpts(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, opts AstroBuildOptions) (AstroIndex, error) {
 	var out AstroIndex
 	err := EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
@@ -236,7 +224,7 @@ func dropExcludeNewerOverrides(ed tomledit.Editor) {
 }
 
 // ErrNotAstrosToWrite reports [tool.uv] settings the project wrote itself
-// where SetAstroBuild would write its own: an index named "astronomer" at
+// where SetAstroBuildOpts would write its own: an index named "astronomer" at
 // another address, or a source for a rebuilt distribution that names another
 // index. They are left alone, and nothing is written.
 var ErrNotAstrosToWrite = errors.New("pyproject.toml already sets this itself")

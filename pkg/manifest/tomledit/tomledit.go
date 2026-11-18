@@ -116,20 +116,6 @@ func Values(list []any) []any {
 	return out
 }
 
-// hasComment reports whether value is an array holding a Comment.
-func hasComment(value any) bool {
-	list, ok := value.([]any)
-	if !ok {
-		return false
-	}
-	for _, v := range list {
-		if _, isComment := v.(Comment); isComment {
-			return true
-		}
-	}
-	return false
-}
-
 // ParseError reports input that does not decode as TOML.
 type ParseError struct {
 	Err error

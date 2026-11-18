@@ -278,3 +278,17 @@ func arrayIndex(s string, full []string) (int, error) {
 	}
 	return n, nil
 }
+
+// hasComment reports whether value is an array holding a Comment.
+func hasComment(value any) bool {
+	list, ok := value.([]any)
+	if !ok {
+		return false
+	}
+	for _, v := range list {
+		if _, isComment := v.(Comment); isComment {
+			return true
+		}
+	}
+	return false
+}

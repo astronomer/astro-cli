@@ -22,7 +22,7 @@ import (
 // refreshAstroBuild brings the [tool.uv] settings that hold a project to
 // Astronomer's build of Airflow up to date with its Airflow pin and runtime
 // build, before a standalone start syncs the environment from them
-// (scaffold.SetAstroBuild). `astro init` writes them; this keeps them right
+// (scaffold.SetAstroBuildOpts). `astro init` writes them; this keeps them right
 // after the pin moves, a new build ships, or a project predates them. Docker
 // mode builds from the runtime image and never reads them.
 //
