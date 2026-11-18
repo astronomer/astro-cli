@@ -111,8 +111,13 @@ func TokenIdentity() (id Identity, ok bool, err error) {
 		case "organizationId":
 			id.Organization = v
 		case "workspaceId":
-			id.Workspace = v
-			workspaces[v] = true
+			// Whitespace around an id is not a different Workspace, and an
+			// empty claim names none: neither decides which Workspace the
+			// token is for.
+			if v = strings.TrimSpace(v); v != "" {
+				id.Workspace = v
+				workspaces[v] = true
+			}
 		case "deploymentId":
 			deployments++
 			id.Deployment = v

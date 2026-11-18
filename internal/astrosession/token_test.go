@@ -20,6 +20,12 @@ func TestTokenIdentityReadsTheClaims(t *testing.T) {
 		{"deployment", []string{"organizationId:org", "workspaceId:ws", "deploymentId:dep"}, Identity{Organization: "org", Workspace: "ws", Deployment: "dep"}},
 		{"several different workspaces are none", []string{"organizationId:org", "workspaceId:a", "workspaceId:b"}, Identity{Organization: "org"}},
 		{"the same workspace twice is one", []string{"organizationId:org", "workspaceId:a", "workspaceId:a"}, Identity{Organization: "org", Workspace: "a"}},
+		{"whitespace around an id is the same workspace", []string{"organizationId:org", "workspaceId: ws1", "workspaceId:ws1 "}, Identity{Organization: "org", Workspace: "ws1"}},
+		{"an id is read without its whitespace", []string{"organizationId:org", "workspaceId: ws1 "}, Identity{Organization: "org", Workspace: "ws1"}},
+		{"an empty claim does not drop a real one", []string{"organizationId:org", "workspaceId:ws1", "workspaceId:"}, Identity{Organization: "org", Workspace: "ws1"}},
+		{"an empty claim first does not either", []string{"organizationId:org", "workspaceId:", "workspaceId:ws1"}, Identity{Organization: "org", Workspace: "ws1"}},
+		{"only empty claims name none", []string{"organizationId:org", "workspaceId:", "workspaceId:  "}, Identity{Organization: "org"}},
+		{"different ids stay different after trimming", []string{"organizationId:org", "workspaceId: a", "workspaceId:b"}, Identity{Organization: "org"}},
 		{"several deployments are none", []string{"organizationId:org", "deploymentId:a", "deploymentId:b"}, Identity{Organization: "org"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
