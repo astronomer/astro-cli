@@ -175,15 +175,9 @@ func listOutage(domain, ws string, resp *astrov1.ListDeploymentsResponse) error 
 	return fmt.Errorf("Astro could not list the Deployments in workspace %s%s", ws, detail)
 }
 
-// Workspace is the workspace a Deployment name is looked up in when nothing
-// else says, on domain's host ("" is the current context's): the run's
-// selection there, which astrosession.Resolve decides. Empty when there is none.
-func Workspace(domain string) string {
-	ws, _ := workspaceOf(domain)
-	return ws
-}
-
-// workspaceOf is Workspace and where the resolver took it from.
+// workspaceOf is the workspace a Deployment name is looked up in when nothing
+// else says, on domain's host ("" is the current context's), and where the
+// resolver took it from: the run's selection there. Empty when there is none.
 func workspaceOf(domain string) (string, astrosession.Source) {
 	t := astrosession.Resolve(astrosession.Request{Domain: domain})
 	return t.Workspace, t.WorkspaceSource

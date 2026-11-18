@@ -395,6 +395,17 @@ type resolvedEnv struct {
 	workspaceNote  string
 }
 
+// checkWorkspaceLink is the error for a manifest whose Workspace link the run
+// cannot act in (Options.WorkspaceID), nil when it can or the run has no such
+// check.
+func checkWorkspaceLink(m *manifest.Manifest, opts Options) error {
+	if opts.WorkspaceID == nil {
+		return nil
+	}
+	_, err := opts.WorkspaceID(&m.Astro)
+	return err
+}
+
 func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (resolvedEnv, error) {
 	var startedWithout []envresolve.Missing
 	schema, err := envschema.ParseSchema(m.Astro.Env)
@@ -411,12 +422,10 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	// resolves from it.
 	vault := vaultenv.Load(proj.Dir)
 	in := envresolve.Inputs{Schema: schema, Providers: src.Providers(vault.Providers())}
-	if opts.WorkspaceID != nil {
-		// Before the provider is built, which is the first thing to read the
-		// workspace: a link the run's token cannot act in is refused unread.
-		if _, err := opts.WorkspaceID(&m.Astro); err != nil {
-			return resolvedEnv{}, err
-		}
+	// Before the provider is built, which is the first thing to read the
+	// workspace: a link the run's token cannot act in is refused unread.
+	if err := checkWorkspaceLink(m, opts); err != nil {
+		return resolvedEnv{}, err
 	}
 	if opts.WorkspaceProvider != nil {
 		// reveal = true: start needs the real values to run Airflow. Both modes:

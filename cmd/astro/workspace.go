@@ -1014,7 +1014,7 @@ func argOrID(args []string) string {
 // the run's own. A name, or a pick, still needs a Workspace, and fails here as
 // before, ahead of any question or API call. A failure to find the Workspace
 // is worded with msg ("" for none).
-func deploymentWorkspace(cmd *cobra.Command, id, msg string) (string, astrov1.APIClient, error) {
+func deploymentWorkspace(cmd *cobra.Command, id, msg string) (ws string, client astrov1.APIClient, err error) {
 	t := workspaceTarget(cmd, workspaceID, 0, workspace.ErrCurrentNotSet)
 	// Only an id identifies a Deployment with no Workspace; a name that is not
 	// one goes on to say there is no Workspace to look it up in.
@@ -1025,7 +1025,7 @@ func deploymentWorkspace(cmd *cobra.Command, id, msg string) (string, astrov1.AP
 		}
 		return d.WorkspaceId, deployment.WithFetched(astroV1Client, d), nil
 	}
-	ws, err := coalesceFrom(t)
+	ws, err = coalesceFrom(t)
 	if err != nil && msg != "" {
 		return "", astroV1Client, wrapWorkspaceErr(err, msg)
 	}

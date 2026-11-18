@@ -257,10 +257,10 @@ func TestWorkspaceReadsTheDomainsLogin(t *testing.T) {
 	if err := prod.SetContextKey("workspace", "ws-prod"); err != nil {
 		t.Fatal(err)
 	}
-	if ws := Workspace("astronomer.io"); ws != "ws-prod" {
+	if ws, _ := workspaceOf("astronomer.io"); ws != "ws-prod" {
 		t.Fatalf("Workspace = %q, want the astronomer.io login's", ws)
 	}
-	if ws := Workspace("astronomer-stage.io"); ws != "" {
+	if ws, _ := workspaceOf("astronomer-stage.io"); ws != "" {
 		t.Fatalf("Workspace = %q for a host with no login", ws)
 	}
 }

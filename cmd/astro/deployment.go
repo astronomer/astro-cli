@@ -1421,11 +1421,11 @@ func newDeploymentTokenAddCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
+func addDeploymentToken(_ *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	return runDeploymentTokenAdd(cmd, args, out)
+	return runDeploymentTokenAdd(args, out)
 }
 
 func removeDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1566,20 +1566,20 @@ func newUpdateWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addOrgTokenToDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
-	return setTokenDeploymentRole(cmd, args, out, tokenKindOrganization, tokenRoleAdd)
+func addOrgTokenToDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+	return setTokenDeploymentRole(args, out, tokenKindOrganization, tokenRoleAdd)
 }
 
-func updateOrgTokenToDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
-	return setTokenDeploymentRole(cmd, args, out, tokenKindOrganization, tokenRoleUpdate)
+func updateOrgTokenToDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+	return setTokenDeploymentRole(args, out, tokenKindOrganization, tokenRoleUpdate)
 }
 
-func addWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
-	return setTokenDeploymentRole(cmd, args, out, tokenKindWorkspace, tokenRoleAdd)
+func addWorkspaceTokenDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+	return setTokenDeploymentRole(args, out, tokenKindWorkspace, tokenRoleAdd)
 }
 
-func updateWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
-	return setTokenDeploymentRole(cmd, args, out, tokenKindWorkspace, tokenRoleUpdate)
+func updateWorkspaceTokenDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+	return setTokenDeploymentRole(args, out, tokenKindWorkspace, tokenRoleUpdate)
 }
 
 func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {

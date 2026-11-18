@@ -150,7 +150,7 @@ func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out 
 // runDeploymentTokenAdd runs `deployment token add`: it gives a Workspace or
 // an Organization token a role on the Deployment, which of the two it is being
 // found out from the token (deployment.AddToken).
-func runDeploymentTokenAdd(cmd *cobra.Command, args []string, out io.Writer) error {
+func runDeploymentTokenAdd(args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ const (
 // setTokenDeploymentRole runs `deployment token {workspace,organization}-token
 // {add,update}`: it gives a token of kind a role on the Deployment, asking
 // for the role when --role named none.
-func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, kind, operation string) error {
+func setTokenDeploymentRole(args []string, out io.Writer, kind, operation string) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}

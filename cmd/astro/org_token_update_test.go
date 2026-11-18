@@ -13,7 +13,6 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/astrosession"
-	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 )
@@ -69,10 +68,10 @@ func TestAnAPITokenDoesNotTakeAnotherHostsSavedWorkspace(t *testing.T) {
 
 	assert.Equal(t, "other-ws", func() string {
 		t.Setenv("ASTRO_API_TOKEN", "")
-		return instancelocate.Workspace(other.Domain)
+		return astrosession.Resolve(astrosession.Request{Domain: other.Domain}).Workspace
 	}(), "a saved login keeps its own workspace")
 
 	t.Setenv("ASTRO_API_TOKEN", tokenWith(t, "apiTokenId:token-id", "organizationId:env-org"))
-	assert.Empty(t, instancelocate.Workspace(other.Domain), "a token run took another host's saved workspace")
-	assert.Empty(t, instancelocate.Workspace(current), "a token run took the saved workspace of its own host")
+	assert.Empty(t, astrosession.Resolve(astrosession.Request{Domain: other.Domain}).Workspace, "a token run took another host's saved workspace")
+	assert.Empty(t, astrosession.Resolve(astrosession.Request{Domain: current}).Workspace, "a token run took the saved workspace of its own host")
 }

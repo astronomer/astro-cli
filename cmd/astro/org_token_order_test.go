@@ -162,7 +162,7 @@ func TestDeploymentTokenAddNeedsNoWorkspaceOfItsOwn(t *testing.T) {
 
 	var err error
 	asked := captureStderr(t, func() {
-		err = setTokenDeploymentRole(&cobra.Command{}, nil, &bytes.Buffer{}, tokenKindWorkspace, tokenRoleAdd)
+		err = setTokenDeploymentRole(nil, &bytes.Buffer{}, tokenKindWorkspace, tokenRoleAdd)
 	})
 	require.ErrorContains(t, err, "stop here")
 	require.NotErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)

@@ -56,6 +56,12 @@ const (
 	SourcePath
 )
 
+// The words a source goes by in a message.
+const (
+	flagWorkspace = "--workspace"
+	labelPath     = "the request path"
+)
+
 // Label is the source as a parenthesis names it, "from --workspace" or "from
 // the project link", for the Workspace (flag is "--workspace") or the
 // Deployment ("--deployment") it chose. "" is no source: the saved login is
@@ -67,9 +73,9 @@ func (s Source) Label(flag string) string {
 	case SourceProject:
 		return "the project link"
 	case SourceToken:
-		return "ASTRO_API_TOKEN"
+		return EnvAPIToken
 	case SourcePath:
-		return "the request path"
+		return labelPath
 	case SourceNone, SourceContext:
 	}
 	return ""
@@ -79,71 +85,26 @@ func (s Source) Label(flag string) string {
 // source the person can see chose (the flag, the project link, the token, a
 // path), and "workspace id" for any other.
 func DescribeWorkspace(id string, s Source) string {
-	if from := s.Label("--workspace"); from != "" {
+	if from := s.Label(flagWorkspace); from != "" {
 		return fmt.Sprintf("workspace %s (from %s)", id, from)
 	}
 	return "workspace " + id
 }
-
-// Explain is err with the Workspace it names worded with where the run took
-// it from: "workspace B (from --workspace)", for an error about looking in a
-// Workspace the run was handed (not found, no access, nothing in it). It reads
-// the Workspace out of the text, where "workspace <id>" is, or "this
-// workspace" with no id, so what built the error need not know where its
-// Workspace came from; it is err, unchanged, when the text names neither, when
-// the source is the saved login or none, or when it has been explained. The
-// result unwraps to err, so the error's kind and code are what they were.
-func (t Target) Explain(err error) error { //nolint:gocritic // a small value type
-	if err == nil || t.Workspace == "" {
-		return err
-	}
-	named := DescribeWorkspace(t.Workspace, t.WorkspaceSource)
-	if named == "workspace "+t.Workspace {
-		return err
-	}
-	msg := err.Error()
-	if strings.Contains(msg, named) {
-		return err
-	}
-	var rewritten string
-	switch {
-	case strings.Contains(msg, "workspace "+t.Workspace):
-		rewritten = strings.Replace(msg, "workspace "+t.Workspace, named, 1)
-	case strings.Contains(msg, "Workspace "+t.Workspace):
-		rewritten = strings.Replace(msg, "Workspace "+t.Workspace, "W"+named[1:], 1)
-	case strings.Contains(msg, "this workspace"):
-		rewritten = strings.Replace(msg, "this workspace", named, 1)
-	default:
-		return err
-	}
-	return &explainedError{msg: rewritten, err: err}
-}
-
-// explainedError is an error reworded by Target.Explain. It unwraps to the
-// original, so errors.Is and errors.As, and with them the kind and the exit
-// code, see what they saw.
-type explainedError struct {
-	msg string
-	err error
-}
-
-func (e *explainedError) Error() string { return e.msg }
-func (e *explainedError) Unwrap() error { return e.err }
 
 // From is the source worded for a message ("--workspace", "the project's
 // link"), "" for none.
 func (s Source) From() string {
 	switch s {
 	case SourceFlag:
-		return "--workspace"
+		return flagWorkspace
 	case SourceProject:
 		return "the project's link"
 	case SourceToken:
-		return "ASTRO_API_TOKEN"
+		return EnvAPIToken
 	case SourceContext:
 		return "the saved login"
 	case SourcePath:
-		return "the request path"
+		return labelPath
 	case SourceNone:
 	}
 	return ""
@@ -258,7 +219,7 @@ func (e *WorkspaceDisagreeError) Error() string {
 		fix = "drop --workspace, or use a token for " + e.Named
 	case SourceProject:
 		fix = "run outside that project, or use a token for " + e.Named
-	default:
+	case SourceNone, SourceToken, SourceContext, SourcePath:
 		fix = "use a token for " + e.Named
 	}
 	return fmt.Sprintf("ASTRO_API_TOKEN is %s, but %s names %s: %s", token, e.Source.From(), e.Named, fix)
@@ -346,6 +307,51 @@ type Target struct {
 	disagree error
 }
 
+// Explain is err with the Workspace it names worded with where the run took
+// it from: "workspace B (from --workspace)", for an error about looking in a
+// Workspace the run was handed (not found, no access, nothing in it). It reads
+// the Workspace out of the text, where "workspace <id>" is, or "this
+// workspace" with no id, so what built the error need not know where its
+// Workspace came from; it is err, unchanged, when the text names neither, when
+// the source is the saved login or none, or when it has been explained. The
+// result unwraps to err, so the error's kind and code are what they were.
+func (t Target) Explain(err error) error { //nolint:gocritic // a small value type
+	if err == nil || t.Workspace == "" {
+		return err
+	}
+	named := DescribeWorkspace(t.Workspace, t.WorkspaceSource)
+	if named == "workspace "+t.Workspace {
+		return err
+	}
+	msg := err.Error()
+	if strings.Contains(msg, named) {
+		return err
+	}
+	var rewritten string
+	switch {
+	case strings.Contains(msg, "workspace "+t.Workspace):
+		rewritten = strings.Replace(msg, "workspace "+t.Workspace, named, 1)
+	case strings.Contains(msg, "Workspace "+t.Workspace):
+		rewritten = strings.Replace(msg, "Workspace "+t.Workspace, "W"+named[1:], 1)
+	case strings.Contains(msg, "this workspace"):
+		rewritten = strings.Replace(msg, "this workspace", named, 1)
+	default:
+		return err
+	}
+	return &explainedError{msg: rewritten, err: err}
+}
+
+// explainedError is an error reworded by Target.Explain. It unwraps to the
+// original, so errors.Is and errors.As, and with them the kind and the exit
+// code, see what they saw.
+type explainedError struct {
+	msg string
+	err error
+}
+
+func (e *explainedError) Error() string { return e.msg }
+func (e *explainedError) Unwrap() error { return e.err }
+
 // Resolve decides the run's Workspace and Deployment. It reads the current
 // context and ASTRO_API_TOKEN, and never prompts or calls the API.
 func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
@@ -389,7 +395,7 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 // and Deployment the run acts on, and where each came from.
 func (t Target) trace() string { //nolint:gocritic // a small value type
 	return fmt.Sprintf("workspace %s (%s), deployment %s (%s)",
-		cmp.Or(t.Workspace, "none"), cmp.Or(t.WorkspaceSource.Label("--workspace"), t.WorkspaceSource.name()),
+		cmp.Or(t.Workspace, "none"), cmp.Or(t.WorkspaceSource.Label(flagWorkspace), t.WorkspaceSource.name()),
 		cmp.Or(t.Deployment, "none"), cmp.Or(t.DeploymentSource.Label("--deployment"), t.DeploymentSource.name()))
 }
 
