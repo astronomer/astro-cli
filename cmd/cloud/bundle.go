@@ -30,8 +30,8 @@ func newBundleRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "bundle",
 		Aliases: []string{"bundles"},
-		Short:   "Manage Dag and non-Dag bundles, their versions and their files",
-		Long:    "Manage the bundles registered on an Astro Deployment, their versions, and the files in file bundles. Dag bundles carry Dags and are targeted by 'astro deploy --dag-bundle-name'; non-Dag bundles mount other content (e.g. dbt projects) at a path.",
+		Short:   "Manage Dag and non-Dag bundles and their versions",
+		Long:    "Manage the bundles registered on an Astro Deployment and their versions. Dag bundles carry Dags and are targeted by 'astro deploy --dag-bundle-name'; non-Dag bundles mount other content (e.g. dbt projects) at a path.",
 	}
 	cmd.SetOut(out)
 	cmd.AddCommand(
@@ -51,12 +51,9 @@ func newBundleCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a bundle on an Astro Deployment",
-		Long:  "Create a Dag bundle (with --name) or a non-Dag bundle (with --mount-path) on an Astro Deployment. A deploy bundle is written by 'astro deploy'; a file bundle (--type file) has its files written with 'astro bundle files' and must be a Dag bundle.",
+		Long:  "Create a Dag bundle (with --name) or a non-Dag bundle (with --mount-path) on an Astro Deployment.",
 		Example: `  # Create a named Dag bundle
   astro bundle create --deployment-id <id> --name my-dags
-
-  # Create a file bundle
-  astro bundle create --deployment-id <id> --name my-files --type file
 
   # Create a non-Dag bundle mounted at a path
   astro bundle create --deployment-id <id> --mount-path /usr/local/airflow/dbt --bundle-type dbt`,
@@ -75,6 +72,7 @@ func newBundleCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&bundleNonDagType, "bundle-type", "", "Type of a non-Dag bundle (e.g. dbt). Only valid with --mount-path")
 	cmd.Flags().StringVar(&bundleDescription, "description", "", "Description for the bundle")
 	cmd.Flags().StringSliceVar(&bundleDagBundleIDs, "dag-bundle-ids", nil, "Dag bundle IDs a non-Dag bundle is served alongside. Only valid with --mount-path")
+	_ = cmd.Flags().MarkHidden("type")
 	return cmd
 }
 

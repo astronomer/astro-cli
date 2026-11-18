@@ -8,7 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/astronomer/astro-cli/astro-client-v1"
+	astrov1 "github.com/astronomer/astro-cli/astro-client-v1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/astro-client-v1alpha1"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
@@ -47,7 +47,6 @@ type BundleVersionList struct {
 func bundleTableConfig() *output.TableConfig {
 	columns := []output.Column[astrov1alpha1.DeploymentBundle]{
 		{Header: "BUNDLE ID", Value: func(b astrov1alpha1.DeploymentBundle) string { return b.Id }},
-		{Header: "TYPE", Value: func(b astrov1alpha1.DeploymentBundle) string { return orNA(strings.ToLower(string(b.Type))) }},
 		{Header: "IS DAG BUNDLE", Value: func(b astrov1alpha1.DeploymentBundle) string {
 			return fmt.Sprintf("%t", b.IsDagBundle != nil && *b.IsDagBundle)
 		}},
