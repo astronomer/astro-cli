@@ -151,6 +151,22 @@ a `workspace`, and only a name nothing local sets reports the cause.
   values and prints one line:
   `workspace <id> not read (<reason>): starting without its values. <cause>`,
   unless a required `source = "workspace"` name needs it.
+- **A token for another Workspace refuses the read, not the start, unless a
+  value needs it.** Under an `ASTRO_API_TOKEN` for a Workspace other than the
+  linked one, nothing is sent. A `source = "workspace"` name that no local
+  source supplies refuses the start, naming both Workspaces
+  (`ASTRO_API_TOKEN is a Workspace token for A, but the project's link names B`).
+  When only the undeclared values would have been read, the start goes on
+  without them and, in text mode, prints one note on stderr:
+  `workspace <id> not read (the API token is for another Workspace): starting without its values. <the refusal>`,
+  which names both Workspaces as the refusal does. A refusal is not an outage,
+  so this is a separate note from the line above (`plan.Built.WorkspaceRefusal`),
+  and `-o json` never prints it.
+- **A local value wins before the token is consulted.** A name declared
+  `source = "workspace"` that a local source supplies (the project's `.env`,
+  the vault, the shell) starts under a token for another Workspace: the local
+  value wins, so the Workspace is never asked and nothing is refused. This is
+  intended; the refusal is for a read that would have been made.
 - **Nothing is written to disk.** Values travel to Airflow as `SecretEnv`, so
   Docker mode keeps them out of its compose file too (see
   [secrets.md](secrets.md#what-reaches-airflow)). There is no cache. A

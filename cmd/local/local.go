@@ -391,6 +391,7 @@ func (c *cli) startProject(ctx context.Context, opts plan.Options, buildSecretFl
 	}
 	warnEnvValues(r, built.EnvWarnings)
 	warnWorkspaceUnread(r, built.WorkspaceNote)
+	noteWorkspaceRefused(r, built.WorkspaceRefusal)
 	warnWithout(r, "started", built.StartedWithout)
 	warnLocalFilesInImage(r, built.Plan)
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
@@ -620,6 +621,20 @@ func (c *cli) pythonCatalog(ctx context.Context) func() *runtimeversions.Catalog
 	return func() *runtimeversions.Catalog { return c.d.RuntimeCatalog(ctx) }
 }
 
+// noteWorkspaceRefused says on stderr that the linked workspace's values were
+// not read because the run's token is for another Workspace (plan.Built's
+// WorkspaceRefusal). A note for a person: a json run does not get it.
+func noteWorkspaceRefused(r cliout.Renderer, note string) {
+	if note == "" || r.Format != cliout.FormatText {
+		return
+	}
+	w := r.Err
+	if w == nil {
+		w = r.Out
+	}
+	cliout.Note(w, note)
+}
+
 func warnWorkspaceUnread(r cliout.Renderer, note string) {
 	if note == "" {
 		return
@@ -830,6 +845,7 @@ func (c *cli) restartProject(ctx context.Context, o restartOptions) (*plan.Built
 	}
 	warnEnvValues(r, built.EnvWarnings)
 	warnWorkspaceUnread(r, built.WorkspaceNote)
+	noteWorkspaceRefused(r, built.WorkspaceRefusal)
 	warnWithout(r, "started", built.StartedWithout)
 	warnLocalFilesInImage(r, built.Plan)
 	// Before the stop, like the build: a refusal leaves Airflow running.
@@ -1241,6 +1257,7 @@ func (c *cli) environment(ctx context.Context, withWorkspace, noSync bool) (loca
 	// On stderr: stdout belongs to the command being run.
 	stderr := cliout.Renderer{Format: cliout.FormatText, Out: c.d.Stderr}
 	warnWorkspaceUnread(stderr, built.WorkspaceNote)
+	noteWorkspaceRefused(stderr, built.WorkspaceRefusal)
 	warnWithout(stderr, "running", local)
 	warnWorkspaceSkipped(stderr, workspace)
 	// A docker plan has no venv to build; Stopped refuses it as before.

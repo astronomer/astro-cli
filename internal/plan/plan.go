@@ -99,6 +99,14 @@ type Built struct {
 	// manifest links none, or the tier was not asked for. Carried out for the
 	// same reason as EnvWarnings.
 	WorkspaceNote string
+	// WorkspaceRefusal is one line saying the linked workspace's values were not
+	// read because the run's API token is for another Workspace, and the start
+	// went on without them, or empty when nothing was refused. A refusal never
+	// shows in WorkspaceNote (the provider was not down: it sent nothing), and
+	// a start that needs a Workspace value is refused outright, so this is
+	// only the undeclared values: every declared name was supplied locally.
+	// Carried out for the same reason as EnvWarnings.
+	WorkspaceRefusal string
 	// PythonNote is one line saying requires-python admits none of the
 	// Pythons the runtime build ships, so a generated image of the project
 	// would be refused while the venv goes ahead on uv's choice; empty
@@ -184,6 +192,7 @@ func Build(workingDir string, opts Options) (*Built, error) {
 		EnvWarnings:      resolved.warnings,
 		StartedWithout:   resolved.startedWithout,
 		WorkspaceNote:    resolved.workspaceNote,
+		WorkspaceRefusal: resolved.workspaceRefusal,
 		ManifestWarnings: m.Warnings,
 		Pools:            m.Astro.Pools,
 		Plan:             p,
@@ -391,6 +400,9 @@ type resolvedEnv struct {
 	warnings       []envschema.Violation
 	startedWithout []envresolve.Missing
 	workspaceNote  string
+	// workspaceRefusal is workspaceNote's counterpart for a read the run's
+	// token refused (see Built.WorkspaceRefusal).
+	workspaceRefusal string
 }
 
 // refuser is a workspace provider that can say it declined a read: its token is
@@ -527,7 +539,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 		secretInj[k] = v
 		delete(inj, k)
 	}
-	var wsNote string
+	var wsNote, wsRefusal string
 	workspaceID := m.Astro.Workspace
 	if opts.WorkspaceID != nil {
 		workspaceID = opts.WorkspaceID(&m.Astro)
@@ -538,6 +550,11 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 		// provider whose token is for another Workspace sent nothing, and the
 		// start goes on without those values rather than being refused for them.
 		wsNote = workspaceNote(in.WorkspaceProvider, workspaceID)
+		// Reading the undeclared values is what asks a provider that no
+		// declared name asked, so a token for another Workspace is refused
+		// only now. Local values won every declared name, so the start goes on;
+		// say that the Workspace's were not read, and why, which names both.
+		wsRefusal = workspaceRefusal(in.WorkspaceProvider, workspaceID)
 	}
 	return resolvedEnv{
 		env:            inj,
@@ -546,6 +563,8 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 		warnings:       valueWarnings(res.Violations),
 		startedWithout: startedWithout,
 		workspaceNote:  wsNote,
+
+		workspaceRefusal: wsRefusal,
 	}, nil
 }
 
@@ -596,6 +615,18 @@ func workspaceNote(wp envresolve.Provider, workspace string) string {
 		return envresolve.SkippedNote(wp, workspace)
 	}
 	return fmt.Sprintf("workspace %s not read (%s): starting without its values. %s", workspace, short, cause)
+}
+
+// workspaceRefusal is the line a start prints when the linked workspace's
+// provider declined its reads because the run's API token is for another
+// Workspace, which names both Workspaces as the refusal does; empty when it
+// declined nothing.
+func workspaceRefusal(wp envresolve.Provider, workspace string) string {
+	err := providerRefusal(wp)
+	if err == nil {
+		return ""
+	}
+	return fmt.Sprintf("workspace %s not read (the API token is for another Workspace): starting without its values. %s", workspace, err)
 }
 
 // valueWarnings is the violations a start reports without refusing: everything
