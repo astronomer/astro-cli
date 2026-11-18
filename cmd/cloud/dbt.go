@@ -133,11 +133,11 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 	}
 
 	// get the deployment id to deploy the dbt project to
-	deploymentID, err := resolveDeploymentIDFromArgsFlags(args, workspaceID, deploymentName)
+	resolvedDeploymentID, err := resolveDeploymentIDFromArgsFlags(args, workspaceID, deploymentName)
 	if err != nil {
 		return err
 	}
-	fmt.Println("Initiating dbt deploy for deployment ID: " + deploymentID)
+	fmt.Println("Initiating dbt deploy for deployment ID: " + resolvedDeploymentID)
 
 	// if the mount path is not provided, derive it from the dbt project name
 	if mountPath == "" {
@@ -149,7 +149,7 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 	deployBundleInput := &cloud.DeployBundleInput{
 		BundlePath:    dbtProjectPath,
 		MountPath:     mountPath,
-		DeploymentID:  deploymentID,
+		DeploymentID:  resolvedDeploymentID,
 		BundleType:    dbtBundleType,
 		Description:   deployDescription,
 		Wait:          waitForDeploy,
@@ -205,11 +205,11 @@ func deleteDbt(cmd *cobra.Command, args []string) error {
 	}
 
 	// get the deployment id to delete the dbt project
-	deploymentID, err := resolveDeploymentIDFromArgsFlags(args, workspaceID, deploymentName)
+	resolvedDeploymentID, err := resolveDeploymentIDFromArgsFlags(args, workspaceID, deploymentName)
 	if err != nil {
 		return err
 	}
-	fmt.Println("Initiating dbt delete deploy for deployment ID: " + deploymentID)
+	fmt.Println("Initiating dbt delete deploy for deployment ID: " + resolvedDeploymentID)
 
 	// if the mount path is not provided, derive it from the dbt project name
 	if mountPath == "" {
@@ -235,7 +235,7 @@ func deleteDbt(cmd *cobra.Command, args []string) error {
 
 	deleteBundleInput := &cloud.DeleteBundleInput{
 		MountPath:     mountPath,
-		DeploymentID:  deploymentID,
+		DeploymentID:  resolvedDeploymentID,
 		WorkspaceID:   workspaceID,
 		BundleType:    dbtBundleType,
 		Description:   deployDescription,
