@@ -22,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/azure"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -95,6 +96,27 @@ type dagsUpload struct {
 	CosmosBoost bool
 }
 
+// monitoringDagPerm and monitoringDagDirPerm are the modes writeMonitoringDag
+// creates the Dag and, when missing, its directory with.
+const (
+	monitoringDagPerm    = 0o644
+	monitoringDagDirPerm = 0o755
+)
+
+// writeMonitoringDag writes the monitoring Dag at path, a name the CLI picks in
+// the project's dags/ directory, for the upload to carry and the deploy to
+// remove after. It is published through a temp file and a rename, which
+// replaces whatever is at path, a symlink included, rather than writing through
+// it: a project's dags/astronomer_monitoring_dag.py held as a link elsewhere
+// would otherwise have the file it points at overwritten, and the cleanup
+// would remove only the link.
+func writeMonitoringDag(path, content string) error {
+	if err := os.MkdirAll(filepath.Dir(path), monitoringDagDirPerm); err != nil {
+		return err
+	}
+	return fsatomic.WriteFile(path, []byte(content), monitoringDagPerm)
+}
+
 func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, opts dagsUpload) (string, error) {
 	if opts.MonitoringDag {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
@@ -109,8 +131,7 @@ func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, opts dags
 			return "", errors.New("unsupported Airflow major version for runtime version " + currentRuntimeVersion)
 		}
 
-		// Create monitoring dag file
-		err := fileutil.WriteStringToFile(monitoringDagPath, monitoringDag)
+		err := writeMonitoringDag(monitoringDagPath, monitoringDag)
 		if err != nil {
 			return "", err
 		}
