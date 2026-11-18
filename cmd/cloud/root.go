@@ -11,15 +11,17 @@ import (
 )
 
 var (
-	astroV1Client       astrov1.APIClient
-	astroV1Alpha1Client astrov1alpha1.APIClient
-	airflowAPIClient    airflow.Client
+	astroV1Client             astrov1.APIClient
+	astroV1Alpha1Client       astrov1alpha1.APIClient
+	astroV1Alpha1StreamClient astrov1alpha1.ClientInterface
+	airflowAPIClient          airflow.Client
 )
 
 // AddCmds adds all the command initialized in this package for the cmd package to import
-func AddCmds(v1Client astrov1.APIClient, airflowClient airflow.Client, v1Alpha1Client astrov1alpha1.APIClient, out io.Writer) []*cobra.Command {
+func AddCmds(v1Client astrov1.APIClient, airflowClient airflow.Client, v1Alpha1Client astrov1alpha1.APIClient, v1Alpha1StreamClient astrov1alpha1.ClientInterface, out io.Writer) []*cobra.Command {
 	astroV1Client = v1Client
 	astroV1Alpha1Client = v1Alpha1Client
+	astroV1Alpha1StreamClient = v1Alpha1StreamClient
 	airflowAPIClient = airflowClient
 	return []*cobra.Command{
 		NewDeployCmd(),
