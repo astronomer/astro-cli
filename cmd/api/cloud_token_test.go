@@ -39,6 +39,7 @@ func TestCheckPathWorkspaceRefusesAnotherWorkspaceThanTheTokens(t *testing.T) {
 	require.NoError(t, checkPathWorkspace("/organizations/org/workspaces/ws-mine/deployments"))
 	require.NoError(t, checkPathWorkspace("/organizations/org/workspaces/{workspaceId}/deployments"))
 	require.NoError(t, checkPathWorkspace("/organizations/org/deployments"))
+	require.NoError(t, checkPathWorkspace("/organizations/org/deployments?filter=/workspaces/ws-other"))
 
 	t.Setenv("ASTRO_API_TOKEN", testUtil.MintAPIToken(t, time.Time{}, "organizationId:org"))
 	require.NoError(t, checkPathWorkspace("/organizations/org/workspaces/ws-other/deployments"))

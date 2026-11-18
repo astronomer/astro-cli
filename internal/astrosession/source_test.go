@@ -33,6 +33,7 @@ func TestExplainNamesWhereTheWorkspaceCameFrom(t *testing.T) {
 		{"the saved login is nobody's surprise", Target{Workspace: "wsB", WorkspaceSource: SourceContext}, "no Deployment in workspace wsB", "no Deployment in workspace wsB"},
 		{"no workspace", Target{}, "no Deployment in workspace wsB", "no Deployment in workspace wsB"},
 		{"another workspace's text", Target{Workspace: "wsB", WorkspaceSource: SourceFlag}, "no Deployment in workspace wsC", "no Deployment in workspace wsC"},
+		{"an id that is a prefix of another", Target{Workspace: "wsB", WorkspaceSource: SourceFlag}, "no Deployment in workspace wsBX", "no Deployment in workspace wsBX"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -328,11 +331,18 @@ func (t Target) Explain(err error) error { //nolint:gocritic // a small value ty
 		return err
 	}
 	var rewritten string
+	// The id is the whole word: "workspace foo" is not in "workspace foobar".
+	byID := regexp.MustCompile(`([wW])orkspace ` + regexp.QuoteMeta(t.Workspace) + `\b`)
 	switch {
-	case strings.Contains(msg, "workspace "+t.Workspace):
-		rewritten = strings.Replace(msg, "workspace "+t.Workspace, named, 1)
-	case strings.Contains(msg, "Workspace "+t.Workspace):
-		rewritten = strings.Replace(msg, "Workspace "+t.Workspace, "W"+named[1:], 1)
+	case byID.MatchString(msg):
+		done := false
+		rewritten = byID.ReplaceAllStringFunc(msg, func(m string) string {
+			if done {
+				return m
+			}
+			done = true
+			return m[:1] + named[1:]
+		})
 	case strings.Contains(msg, "this workspace"):
 		rewritten = strings.Replace(msg, "this workspace", named, 1)
 	default:
@@ -387,7 +397,9 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 			t.Deployment, t.DeploymentSource = id, SourceToken
 		}
 	}
-	logger.Debugf("%s", t.trace())
+	if logger.IsLevelEnabled(logrus.DebugLevel) {
+		logger.Debugf("%s", t.trace())
+	}
 	return t
 }
 

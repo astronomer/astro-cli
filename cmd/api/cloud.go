@@ -356,6 +356,10 @@ var workspacePathRE = regexp.MustCompile(`/workspaces/([^/?#{}]+)`)
 // other than the one the run's Workspace or Deployment token is for
 // (astrosession.CheckWorkspace), nil otherwise.
 func checkPathWorkspace(path string) error {
+	// The path itself: a query string or fragment names no Workspace.
+	if i := strings.IndexAny(path, "?#"); i >= 0 {
+		path = path[:i]
+	}
 	for _, m := range workspacePathRE.FindAllStringSubmatch(path, -1) {
 		if err := astrosession.CheckWorkspace(m[1], astrosession.SourcePath); err != nil {
 			return err
