@@ -77,9 +77,6 @@ func envScope(cmd *cobra.Command) (env.Scope, error) {
 	if err := astrosession.CheckWorkspace(envWorkspaceID, astrosession.SourceFlag); err != nil {
 		return env.Scope{}, err
 	}
-	if envWorkspaceID != "" {
-		rememberTarget(cmd, astrosession.Target{Workspace: envWorkspaceID, WorkspaceSource: astrosession.SourceFlag})
-	}
 	return env.Scope{WorkspaceID: envWorkspaceID, DeploymentID: envDeploymentID}, nil
 }
 

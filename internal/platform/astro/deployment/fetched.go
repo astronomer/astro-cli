@@ -25,9 +25,18 @@ func WithFetched(client astrov1.APIClient, d astrov1.Deployment) astrov1.APIClie
 // fetchedFor is the Deployment id, in workspace ws, that client was handed
 // with WithFetched, and whether it was.
 func fetchedFor(client astrov1.APIClient, ws, id string) (astrov1.Deployment, bool) {
-	f, ok := client.(*fetchedClient)
-	if !ok || f.d.Id != id || f.d.WorkspaceId != ws {
-		return astrov1.Deployment{}, false
+	for client != nil {
+		switch c := client.(type) {
+		case *fetchedClient:
+			if c.d.Id == id && c.d.WorkspaceId == ws {
+				return c.d, true
+			}
+			return astrov1.Deployment{}, false
+		case *sourcedClient:
+			client = c.APIClient
+		default:
+			return astrov1.Deployment{}, false
+		}
 	}
-	return f.d, true
+	return astrov1.Deployment{}, false
 }

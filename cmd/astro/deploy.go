@@ -748,7 +748,7 @@ func (d manifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeploy.De
 	if !d.login.current {
 		return manifestdeploy.Deployment{}, errPickerOtherHost(d.login.context.Domain)
 	}
-	dep, err := deployment.GetDeployment(workspaceID, "", "", deployment.ToChange, nil, d.login.client)
+	dep, err := deployment.GetDeployment(workspaceID, "", "", deployment.ToChange, nil, deployment.WithWorkspaceSource(d.login.client, workspaceID, astrosession.SourceProject))
 	if err != nil {
 		return manifestdeploy.Deployment{}, err
 	}

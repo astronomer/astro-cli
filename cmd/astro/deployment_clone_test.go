@@ -122,7 +122,7 @@ func TestDeploymentCloneSourceByName(t *testing.T) {
 		var got errorJSON
 		decodeOne(t, r.stdout, &got)
 		assert.Equal(t, string(cliout.KindUsage), got.Kind)
-		assert.Contains(t, got.Error, `2 Deployments are named "etl-prod" in workspace workspace-id: pass --clone with one's id`)
+		assert.Contains(t, got.Error, `2 Deployments are named "etl-prod" in workspace workspace-id (from --workspace): pass --clone with one's id`)
 		assert.Contains(t, got.Error, cloneSourceID)
 		assert.Contains(t, got.Error, other.Id)
 		m.AssertNotCalled(t, "CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)

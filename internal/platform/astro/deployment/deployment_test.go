@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
@@ -1941,7 +1942,7 @@ func (s *Suite) TestSelectDeploymentReadsTheAPITokenByTheOneRule() {
 		s.Run(env, func() {
 			s.T().Setenv("ASTRO_API_TOKEN", env)
 			defer testUtil.MockUserInput(s.T(), "")()
-			got, err := deploymentSelectionProcess(ws, only, nil, ToRead)
+			got, err := deploymentSelectionProcess(ws, astrosession.SourceNone, only, nil, ToRead)
 			if asks {
 				s.Error(err)
 				return

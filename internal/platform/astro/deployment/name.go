@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 )
 
@@ -20,8 +21,9 @@ type NameError struct {
 	// Name is the name given.
 	Name string
 	// Workspace is the workspace it was looked up in, "" for the whole
-	// organization.
+	// organization, and Source where the run took it from.
 	Workspace string
+	Source    astrosession.Source
 	// Matches are the Deployments of that name, when there are several.
 	Matches []astrov1.Deployment
 	// Flag is how the run names a Deployment by id instead: "--deployment",
@@ -32,7 +34,7 @@ type NameError struct {
 func (e *NameError) Error() string {
 	where := "the organization"
 	if e.Workspace != "" {
-		where = "workspace " + e.Workspace
+		where = astrosession.DescribeWorkspace(e.Workspace, e.Source)
 	}
 	if len(e.Matches) == 0 {
 		return fmt.Sprintf("no Deployment named %q in %s that your account or API token can see", e.Name, where)
@@ -79,7 +81,7 @@ func deploymentWorkspace(d *astrov1.Deployment) string {
 // (hibernate and wake-up take development Deployments alone); when none of
 // them is, the name is still taken, so the command says why it cannot act.
 // None, or several, is a *NameError.
-func oneNamed(deployments []astrov1.Deployment, name, ws string, eligible func(astrov1.Deployment) bool) (string, error) {
+func oneNamed(deployments []astrov1.Deployment, name, ws string, src astrosession.Source, eligible func(astrov1.Deployment) bool) (string, error) {
 	named := namedIn(deployments, name)
 	if eligible != nil && len(named) > 1 {
 		var can []astrov1.Deployment
@@ -93,7 +95,7 @@ func oneNamed(deployments []astrov1.Deployment, name, ws string, eligible func(a
 		}
 	}
 	if len(named) != 1 {
-		return "", &NameError{Name: name, Workspace: ws, Matches: named, Flag: "--deployment"}
+		return "", &NameError{Name: name, Workspace: ws, Source: src, Matches: named, Flag: "--deployment"}
 	}
 	return named[0].Id, nil
 }

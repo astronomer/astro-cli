@@ -189,12 +189,12 @@ func TestDeploymentIDListsUnderTheProjectsOrganization(t *testing.T) {
 // workspace: only the Deployments of the one asked for count.
 func TestNamedDeploymentCountsOnlyTheWorkspaceAskedFor(t *testing.T) {
 	deps := []astrov1.Deployment{dep("dep-elsewhere", "etl-prod", "ws-other"), dep("dep-a", "twin", "ws-given"), dep("dep-b", "twin", "ws-other")}
-	_, err := NamedDeployment(deps, "etl-prod", "ws-given")
+	_, err := NamedDeployment(deps, "etl-prod", "ws-given", astrosession.SourceNone)
 	var nameErr *DeploymentNameError
 	if !errors.As(err, &nameErr) || !nameErr.NotFound() {
 		t.Fatalf("err = %v, want none in ws-given", err)
 	}
-	if got, err := NamedDeployment(deps, "twin", "ws-given"); err != nil || got.Id != "dep-a" {
+	if got, err := NamedDeployment(deps, "twin", "ws-given", astrosession.SourceNone); err != nil || got.Id != "dep-a" {
 		t.Fatalf("got, err = %q, %v; want the one twin in ws-given", got.Id, err)
 	}
 }

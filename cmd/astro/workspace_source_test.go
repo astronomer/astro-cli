@@ -1,12 +1,10 @@
 package astro
 
 import (
-	"io"
 	"net/http"
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -14,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -101,17 +100,11 @@ func TestProjectNoteIsNotWrittenUnderJSON(t *testing.T) {
 // the host the test's login is on.
 var projectWithoutHost = strings.Replace(testProjectManifest, "domain = \"astronomer.io\"\n", "", 1)
 
-// explainedDeploymentRoot is the deployment commands as the CLI mounts them:
-// under the wrapper that names where a failed run's Workspace came from.
-func explainedDeploymentRoot(out io.Writer) *cobra.Command {
-	c := newDeploymentRootCmd(out)
-	explainWorkspaceErrors(c)
-	return c
-}
-
 // A lookup that fails in the Workspace the run was pointed at names where that
 // Workspace came from, whichever of the flag, the project link and the token it
 // was, and the error's kind and exit code are those of the error underneath.
+// The words come from the error's own fields (deployment.NotFoundError), built
+// with the Workspace's source, and not from a rewrite of its text.
 func TestFailedLookupNamesWhereTheWorkspaceCameFrom(t *testing.T) {
 	notFound := func(string) *astrov1_mocks.ClientWithResponsesInterface {
 		mc := new(astrov1_mocks.ClientWithResponsesInterface)
@@ -138,7 +131,7 @@ func TestFailedLookupNamesWhereTheWorkspaceCameFrom(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			run := func(newRoot func(io.Writer) *cobra.Command, extra ...string) tokenRun {
+			run := func(extra ...string) tokenRun {
 				testUtil.InitTestConfig(testUtil.CloudPlatform)
 				if tt.token != nil {
 					testUtil.UseAPIToken(t, tt.token...)
@@ -147,24 +140,20 @@ func TestFailedLookupNamesWhereTheWorkspaceCameFrom(t *testing.T) {
 					inProject(t, tt.project)
 				}
 				mc := notFound(tt.ws)
-				return execAstroCmd(t, mc, "", newRoot, append(append([]string{"deployment"}, tt.args...), extra...)...)
+				return execAstroCmd(t, mc, "", newDeploymentRootCmd, append(append([]string{"deployment"}, tt.args...), extra...)...)
 			}
 
-			plain := run(newDeploymentRootCmd)
-			explained := run(explainedDeploymentRoot)
-			require.Error(t, plain.err)
-			require.Error(t, explained.err)
-			assert.NotContains(t, plain.err.Error(), "(from ")
-			assert.Contains(t, explained.err.Error(), "workspace "+tt.ws+" (from "+tt.from+")")
-			assert.Equal(t, plain.code, explained.code, "the exit code is the error underneath's")
+			got := run()
+			require.Error(t, got.err)
+			assert.Contains(t, got.err.Error(), "workspace "+tt.ws+" (from "+tt.from+")")
+			var nf *deployment.NotFoundError
+			require.ErrorAs(t, got.err, &nf)
+			assert.Equal(t, tt.ws, nf.Workspace)
 
-			plainJSON := run(newDeploymentRootCmd, "-o", "json")
-			explainedJSON := run(explainedDeploymentRoot, "-o", "json")
-			var p, e errorJSON
-			decodeOne(t, plainJSON.stdout, &p)
-			decodeOne(t, explainedJSON.stdout, &e)
-			assert.Equal(t, p.Kind, e.Kind, "the kind is the error underneath's")
-			assert.Equal(t, p.Code, e.Code)
+			gotJSON := run("-o", "json")
+			var e errorJSON
+			decodeOne(t, gotJSON.stdout, &e)
+			assert.Equal(t, got.code, gotJSON.code)
 			assert.Contains(t, e.Error, "workspace "+tt.ws+" (from "+tt.from+")")
 			assert.NotEqual(t, string(cliout.KindUsage), e.Kind)
 		})

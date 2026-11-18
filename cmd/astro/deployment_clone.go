@@ -60,14 +60,14 @@ func deploymentClone(cmd *cobra.Command, out io.Writer, format cliout.Format) er
 
 	// A name is looked up where the command is pointed, as for any other
 	// command naming a Deployment; an id is read wherever it is.
-	ws, err := coalesceWorkspace(cmd)
+	t, ws, err := coalesceTarget(cmd)
 	if isWorkspaceRefusal(err) {
 		return err
 	}
 	if err != nil && !util.IsCUID(cloneSource) {
 		return fmt.Errorf("failed to find a valid Workspace: %w", err)
 	}
-	src, err := deployment.CloneSource(cloneSource, ws, astroV1Client)
+	src, err := deployment.CloneSource(cloneSource, ws, deployment.WithWorkspaceSource(astroV1Client, ws, t.WorkspaceSource))
 	if err != nil {
 		return err
 	}

@@ -917,9 +917,7 @@ func workspaceTarget(cmd *cobra.Command, flag string, extra astrosession.Workspa
 		req.Advice |= astrosession.ByProject
 	}
 	t := astrosession.Resolve(req)
-	// So an error the run ends in names where its Workspace came from, and a
-	// Workspace the token supplied is said so, now that the command uses it.
-	rememberTarget(cmd, t)
+	// A Workspace the token supplied is said so, now that the command uses it.
 	noteTokenWorkspace(cmd, t)
 	return t
 }
@@ -949,6 +947,14 @@ func coalesceWorkspace(cmd *cobra.Command) (string, error) {
 // something in place of a Workspace (extra), which its advice then names.
 func coalesceWorkspaceOr(cmd *cobra.Command, extra astrosession.WorkspaceAdvice) (string, error) {
 	return coalesceFrom(workspaceTarget(cmd, workspaceID, extra, workspace.ErrCurrentNotSet))
+}
+
+// coalesceTarget is coalesceWorkspace with the Target it came from, for a
+// command that tells a lookup where its Workspace came from.
+func coalesceTarget(cmd *cobra.Command) (astrosession.Target, string, error) {
+	t := workspaceTarget(cmd, workspaceID, 0, workspace.ErrCurrentNotSet)
+	ws, err := coalesceFrom(t)
+	return t, ws, err
 }
 
 func coalesceFrom(t astrosession.Target) (string, error) { //nolint:gocritic // a small value type
@@ -1031,5 +1037,7 @@ func deploymentWorkspace(cmd *cobra.Command, id, msg string) (ws string, client 
 	if err != nil && msg != "" {
 		return "", astroV1Client, wrapWorkspaceErr(err, msg)
 	}
-	return ws, astroV1Client, err
+	// The client knows where the Workspace came from, so a lookup in it that
+	// fails says so (deployment.WithWorkspaceSource).
+	return ws, deployment.WithWorkspaceSource(astroV1Client, ws, t.WorkspaceSource), err
 }

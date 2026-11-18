@@ -596,7 +596,7 @@ func TestDeploymentCoreJSONNeverAsks(t *testing.T) {
 // named there is nothing to act on. A delete naming none with nobody to ask
 // is refused before it looks: --yes never chooses what to delete.
 func TestDeploymentCoreNothingToActOnFails(t *testing.T) {
-	const noneHere = "no Deployments found in workspace ws-empty: create one with astro deployment create"
+	const noneHere = "no Deployments found in workspace ws-empty (from --workspace): create one with astro deployment create"
 	cases := []struct {
 		name string
 		args []string
@@ -607,9 +607,9 @@ func TestDeploymentCoreNothingToActOnFails(t *testing.T) {
 		ci bool
 	}{
 		{"delete, naming none", []string{"delete", "--yes"}, "pass --deployment", cliout.ExitFailure, true},
-		{"delete, naming one", []string{"delete", coreDeploymentID, "--yes"}, "the Deployment specified was not found in this workspace", cliout.ExitFailure, false},
+		{"delete, naming one", []string{"delete", coreDeploymentID, "--yes"}, "the Deployment specified was not found in workspace ws-empty (from --workspace)", cliout.ExitFailure, false},
 		{"hibernate, naming none", []string{"hibernate", "--yes"}, noneHere, cliout.ExitFailure, false},
-		{"wake-up, naming one by name", []string{"wake-up", "--deployment-name", "etl-dev", "--yes"}, `no Deployment named "etl-dev" in workspace ws-empty`, cliout.ExitUsage, false},
+		{"wake-up, naming one by name", []string{"wake-up", "--deployment-name", "etl-dev", "--yes"}, `no Deployment named "etl-dev" in workspace ws-empty (from --workspace)`, cliout.ExitUsage, false},
 		{"--remove-override, naming none", []string{"wake-up", "--remove-override", "--yes"}, noneHere, cliout.ExitFailure, false},
 	}
 	for _, tc := range cases {
