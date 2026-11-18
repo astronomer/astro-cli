@@ -3,11 +3,9 @@ package auth
 import (
 	"cmp"
 	http_context "context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -32,7 +30,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 const (
@@ -341,14 +338,10 @@ func quitOnInterrupt() (stop func()) {
 }
 
 func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink, signup, force bool) (Result, error) {
-	// Generate PKCE verifier and challenge
-	token := make([]byte, 32)                            //nolint:mnd // the value is clear from context
-	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // reviewed; not a new risk in this shell code
-	r.Read(token)
-	verifier := util.Base64URLEncode(token)
-	hash32 := sha256.Sum256([]byte(verifier)) // Sum256 returns a [32]byte
-	hash := hash32[:]
-	challenge := util.Base64URLEncode(hash)
+	verifier, challenge, err := astroauth.GeneratePKCE()
+	if err != nil {
+		return Result{}, err
+	}
 	spinnerMessage := "Waiting for login to complete in browser"
 	var res Result
 

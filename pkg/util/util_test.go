@@ -14,28 +14,6 @@ func TestUtils(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
-func (s *Suite) TestBase64URLEncode() {
-	type args struct {
-		arg []byte
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{
-			name: "basic case",
-			args: args{[]byte(`testing url encode functionality`)},
-			want: "dGVzdGluZyB1cmwgZW5jb2RlIGZ1bmN0aW9uYWxpdHk",
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			s.Equal(tt.want, Base64URLEncode(tt.args.arg))
-		})
-	}
-}
-
 func (s *Suite) TestCheckEnvBool() {
 	type args struct {
 		arg string
