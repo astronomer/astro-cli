@@ -8,9 +8,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
+	"github.com/astronomer/astro-cli/internal/usageerr"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
@@ -24,10 +24,10 @@ import (
 const bundleListLimit = 1000
 
 var (
-	errCreateBundleTarget   = apitoken.Usage(errors.New("specify exactly one of --name (Dag bundle) or --mount-path (non-Dag bundle)"))
-	errDagBundleNonDagFlags = apitoken.Usage(errors.New("--bundle-type and --dag-bundle-ids are only valid for non-Dag bundles (--mount-path)"))
-	errUpdateBundleNoOp     = apitoken.Usage(errors.New("specify at least one of --description or --dag-bundle-ids"))
-	errBundleSelector       = apitoken.Usage(errors.New("specify exactly one bundle identifier: the BUNDLE-ID argument, --name (Dag bundle), or --mount-path (non-Dag bundle)"))
+	errCreateBundleTarget   = usageerr.Usage(errors.New("specify exactly one of --name (Dag bundle) or --mount-path (non-Dag bundle)"))
+	errDagBundleNonDagFlags = usageerr.Usage(errors.New("--bundle-type and --dag-bundle-ids are only valid for non-Dag bundles (--mount-path)"))
+	errUpdateBundleNoOp     = usageerr.Usage(errors.New("specify at least one of --description or --dag-bundle-ids"))
+	errBundleSelector       = usageerr.Usage(errors.New("specify exactly one bundle identifier: the BUNDLE-ID argument, --name (Dag bundle), or --mount-path (non-Dag bundle)"))
 	errNoBundleInResponse   = errors.New("the API returned no bundle")
 	errNoBundleList         = errors.New("the API returned no bundle list")
 )

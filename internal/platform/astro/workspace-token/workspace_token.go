@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	workspaceService "github.com/astronomer/astro-cli/internal/platform/astro/workspace"
+	"github.com/astronomer/astro-cli/internal/usageerr"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
@@ -182,7 +183,7 @@ func UpdateToken(id, name, newName, description, role, workspaceID string, token
 	}
 	broader := string(token.Scope) != workspaceEntity
 	if broader && (newName != "" || description != "") {
-		return apitoken.Update{}, apitoken.UsageNoHelp(ErrOrgTokenNotRenamed)
+		return apitoken.Update{}, usageerr.NoHelp(ErrOrgTokenNotRenamed)
 	}
 
 	currentRole := workspaceRoleOf(&token, workspaceID)
@@ -497,7 +498,7 @@ func FindTokenIn(id, name, workspaceID, organizationID string, tokenTypes []Toke
 		return token, err
 	}
 	if workspaceRoleOf(&token, workspaceID) == "" {
-		return token, apitoken.UsageNoHelp(fmt.Errorf("the API token %s has no role in this Workspace: only a Workspace's own tokens, and Organization tokens with a role in it, are found here; to give an Organization token a role in it, use astro workspace token add", id))
+		return token, usageerr.NoHelp(fmt.Errorf("the API token %s has no role in this Workspace: only a Workspace's own tokens, and Organization tokens with a role in it, are found here; to give an Organization token a role in it, use astro workspace token add", id))
 	}
 	if len(tokenTypes) > 0 && !slices.Contains(tokenTypes, TokenType(token.Scope)) {
 		return token, errWrongTokenTypeSelected

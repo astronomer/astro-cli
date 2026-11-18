@@ -10,8 +10,8 @@ import (
 	"sort"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/internal/usageerr"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -20,7 +20,7 @@ import (
 // error" from the platform.
 func validateDeploymentID(depID string) error {
 	if depID == "" {
-		return apitoken.Usage(errors.New("--deployment cannot be empty"))
+		return usageerr.Usage(errors.New("--deployment cannot be empty"))
 	}
 	if !util.IsCUID(depID) {
 		return fmt.Errorf("%q is not a valid deployment ID (expected a CUID)", depID)

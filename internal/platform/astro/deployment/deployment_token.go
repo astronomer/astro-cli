@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	workspaceService "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
+	"github.com/astronomer/astro-cli/internal/usageerr"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
@@ -137,7 +138,7 @@ func UpdateToken(id, name, newName, description, role, deploymentID string, toke
 	}
 	broader := string(token.Scope) != deploymentEntity
 	if broader && (newName != "" || description != "") {
-		return apitoken.Update{}, apitoken.UsageNoHelp(ErrBroaderTokenNotRenamed)
+		return apitoken.Update{}, usageerr.NoHelp(ErrBroaderTokenNotRenamed)
 	}
 
 	currentRole := deploymentRoleOf(&token, deploymentID)
@@ -280,7 +281,7 @@ func RemoveToken(token astrov1.ApiToken, deploymentID string, client astrov1.API
 // changes it.
 func AddToken(id, name, role, workspaceID, deploymentID string, scopes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
 	if role == "" {
-		return apitoken.Token{}, apitoken.Usage(errRoleRequired)
+		return apitoken.Token{}, usageerr.Usage(errRoleRequired)
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -300,7 +301,7 @@ func AddToken(id, name, role, workspaceID, deploymentID string, scopes []Deploym
 	}
 	switch {
 	case string(token.Scope) == deploymentEntity:
-		return apitoken.Token{}, apitoken.UsageNoHelp(errDeploymentScopedAdd)
+		return apitoken.Token{}, usageerr.NoHelp(errDeploymentScopedAdd)
 	case !slices.Contains(scopes, DeploymentTokenType(token.Scope)):
 		return apitoken.Token{}, errWrongTokenTypeSelected
 	}
@@ -492,7 +493,7 @@ func FindToken(id, name, deploymentID string, tokenTypes []DeploymentTokenType, 
 		// holds no role on this Deployment is not this Deployment's to
 		// change, whichever scope it is of: its own tokens hold one here.
 		if deploymentID != "" && deploymentRoleOf(&token, deploymentID) == "" {
-			return token, apitoken.UsageNoHelp(fmt.Errorf("the API token %s has no role on this Deployment: only a Deployment's own tokens, and Workspace and Organization tokens with a role on it, are found here; to give a token a role on it, use astro deployment token add", id))
+			return token, usageerr.NoHelp(fmt.Errorf("the API token %s has no role on this Deployment: only a Deployment's own tokens, and Workspace and Organization tokens with a role on it, are found here; to give a token a role on it, use astro deployment token add", id))
 		}
 	}
 	if len(tokenTypes) > 0 {

@@ -5,8 +5,8 @@ import (
 	"errors"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/internal/usageerr"
 )
 
 const objectTypeMetrics = astrov1.METRICSEXPORT
@@ -47,10 +47,10 @@ func CreateMetricsExport(scope Scope, key string, in *MetricsInput, astroV1Clien
 		return nil, err
 	}
 	if in.Endpoint == "" {
-		return nil, apitoken.Usage(errors.New("metrics export endpoint is required (--endpoint)"))
+		return nil, usageerr.Usage(errors.New("metrics export endpoint is required (--endpoint)"))
 	}
 	if in.ExporterType == "" {
-		return nil, apitoken.Usage(errors.New("metrics export exporter type is required (e.g. --exporter-type PROMETHEUS)"))
+		return nil, usageerr.Usage(errors.New("metrics export exporter type is required (e.g. --exporter-type PROMETHEUS)"))
 	}
 	c, err := config.GetCurrentContext()
 	if err != nil {
