@@ -767,6 +767,7 @@ func TestAstroBuildQuotesTheContextCommands(t *testing.T) {
 	}
 	res, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
-	assert.Equal(t, "docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret 'id=netrc,src=/Users/a b/.netrc' '"+req.ContextDir+"'",
+	assert.Equal(t, "docker build --platform linux/amd64 --tag astro-package/my-project:latest --secret "+
+		scaffold.ShellQuote("id=netrc,src=/Users/a b/.netrc")+" "+scaffold.ShellQuote(req.ContextDir),
 		res.NextSteps[0])
 }

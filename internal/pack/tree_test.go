@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/platformversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // project builds a project directory with a dags/ folder and returns its path.
@@ -440,7 +441,7 @@ func TestMWAANextStepsNameTheDeclaredBucket(t *testing.T) {
 		{"with scheme", "bucket = 's3://acme-airflow-orders'\n", " s3://acme-airflow-orders/"},
 		{"bare name, trailing slash", "bucket = 'acme-airflow-orders/'\n", " s3://acme-airflow-orders/"},
 		{"no bucket", "region = 'us-east-1'\n", " s3://<your-mwaa-bucket>/"},
-		{"placeholder written as the bucket", "bucket = '<your-mwaa-bucket>'\n", " 's3://<your-mwaa-bucket>/'"},
+		{"placeholder written as the bucket", "bucket = '<your-mwaa-bucket>'\n", " " + scaffold.ShellQuote("s3://<your-mwaa-bucket>/")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m, err := manifest.Parse([]byte("[project]\nname = 'demo'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n\n[tool.astro.targets.mwaa]\n" + tc.section))
@@ -466,7 +467,7 @@ func TestMWAANextStepsQuoteTheBucketAndPath(t *testing.T) {
 	res, err := NewMWAATarget().Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
 	require.NotEmpty(t, res.NextSteps)
-	assert.Equal(t, "aws s3 sync '"+req.OutDir+"/' 's3://x; touch pwned #/'", res.NextSteps[0])
+	assert.Equal(t, "aws s3 sync "+scaffold.ShellQuote(req.OutDir+"/")+" "+scaffold.ShellQuote("s3://x; touch pwned #/"), res.NextSteps[0])
 }
 
 // --- Composer ----------------------------------------------------------------
@@ -549,9 +550,9 @@ func TestComposerNextStepsQuoteThePaths(t *testing.T) {
 	res, err := NewComposerTarget().Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
 	require.Len(t, res.NextSteps, 3)
-	assert.True(t, strings.HasSuffix(res.NextSteps[0], " --source='"+req.OutDir+"/dags'"), res.NextSteps[0])
-	assert.True(t, strings.HasSuffix(res.NextSteps[1], " --source='"+req.OutDir+"/plugins'"), res.NextSteps[1])
-	assert.True(t, strings.HasSuffix(res.NextSteps[2], " '"+req.OutDir+"/"+composerDepsFile+"'"), res.NextSteps[2])
+	assert.True(t, strings.HasSuffix(res.NextSteps[0], " "+scaffold.ShellQuote("--source="+req.OutDir+"/dags")), res.NextSteps[0])
+	assert.True(t, strings.HasSuffix(res.NextSteps[1], " "+scaffold.ShellQuote("--source="+req.OutDir+"/plugins")), res.NextSteps[1])
+	assert.True(t, strings.HasSuffix(res.NextSteps[2], " "+scaffold.ShellQuote(req.OutDir+"/"+composerDepsFile)), res.NextSteps[2])
 }
 
 // --- env checklist -----------------------------------------------------------
