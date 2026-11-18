@@ -155,6 +155,24 @@ func (h *loopHarness) quiet() {
 	}
 }
 
+// watchedDirs is a copy of the directories the loop has asked to watch so
+// far. It copies under the lock and returns, so a failed assertion on the
+// result never leaves h.mu held for the loop to block on.
+func (h *loopHarness) watchedDirs() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.watched)
+}
+
+// waitWatched waits for the loop to watch dir. The loop watches a new
+// manifest's directories after the restart that brought it in has reported
+// WatchRestarted, so a test that has just seen that event can be ahead of it.
+func (h *loopHarness) waitWatched(dir string) {
+	h.t.Helper()
+	require.Eventually(h.t, func() bool { return slices.Contains(h.watchedDirs(), dir) },
+		5*time.Second, 10*time.Millisecond, "the loop never watched %q", dir)
+}
+
 func (h *loopHarness) kinds(n int) []WatchEventKind { //nolint:unparam // a count, not a constant: every case so far happens to wait for two
 	h.t.Helper()
 	out := make([]WatchEventKind, n)
@@ -507,10 +525,8 @@ func TestWatchFollowsAMovedDockerfile(t *testing.T) {
 	moved := pyproject(t, baseDeps, "dockerfile = \"build/Dockerfile\"\n")
 	h.save(moved, nil, manifest.Marker)
 	require.Equal(t, []WatchEventKind{WatchRestarting, WatchRestarted}, h.kinds(2))
-	h.mu.Lock()
-	require.Contains(t, h.watched, "docker")
-	require.Contains(t, h.watched, "build")
-	h.mu.Unlock()
+	require.Contains(t, h.watchedDirs(), "docker")
+	h.waitWatched("build")
 
 	h.save(moved, nil, "build/Dockerfile")
 	e := h.next()
@@ -570,9 +586,7 @@ var settingsFile = WatchedFile{
 func TestWatchRestartsForACallersFile(t *testing.T) {
 	m := pyproject(t, baseDeps, "")
 	h := newLoopHarnessWithFiles(t, ModeStandalone, m, settingsFile)
-	h.mu.Lock()
-	require.Equal(t, []string{"config"}, h.watched, "a file below the root has its directory watched")
-	h.mu.Unlock()
+	require.Equal(t, []string{"config"}, h.watchedDirs(), "a file below the root has its directory watched")
 
 	h.save(m, nil, "config/settings.yaml")
 	e := h.next()
