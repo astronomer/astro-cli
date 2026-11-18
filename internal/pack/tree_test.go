@@ -550,8 +550,8 @@ func TestComposerNextStepsQuoteThePaths(t *testing.T) {
 	res, err := NewComposerTarget().Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
 	require.Len(t, res.NextSteps, 3)
-	assert.True(t, strings.HasSuffix(res.NextSteps[0], " --source="+scaffold.ShellQuote(req.OutDir+"/dags")), res.NextSteps[0])
-	assert.True(t, strings.HasSuffix(res.NextSteps[1], " --source="+scaffold.ShellQuote(req.OutDir+"/plugins")), res.NextSteps[1])
+	assert.True(t, strings.HasSuffix(res.NextSteps[0], " "+scaffold.ShellQuote("--source="+req.OutDir+"/dags")), res.NextSteps[0])
+	assert.True(t, strings.HasSuffix(res.NextSteps[1], " "+scaffold.ShellQuote("--source="+req.OutDir+"/plugins")), res.NextSteps[1])
 	assert.True(t, strings.HasSuffix(res.NextSteps[2], " "+scaffold.ShellQuote(req.OutDir+"/"+composerDepsFile)), res.NextSteps[2])
 }
 

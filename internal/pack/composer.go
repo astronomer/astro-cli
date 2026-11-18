@@ -119,13 +119,15 @@ func composerRequirements(deps []string) string {
 // through the Composer storage commands, and PyPI dependencies to the
 // environment through an update. The storage commands take an environment and
 // location, so the user never needs the bucket name. Each path argument is
-// quoted for the shell, as every printed command is.
+// quoted for the shell, as every printed command is: a --source flag as one
+// whole word, since Windows PowerShell 5.1 mangles a quote that starts partway
+// into one when it passes it to a program.
 func composerNextSteps(outDir string, hasPlugins bool) []string {
 	steps := []string{
-		fmt.Sprintf("gcloud composer environments storage dags import --environment=<env> --location=<region> --source=%s", scaffold.ShellQuote(outDir+"/dags")),
+		fmt.Sprintf("gcloud composer environments storage dags import --environment=<env> --location=<region> %s", scaffold.ShellQuote("--source="+outDir+"/dags")),
 	}
 	if hasPlugins {
-		steps = append(steps, fmt.Sprintf("gcloud composer environments storage plugins import --environment=<env> --location=<region> --source=%s", scaffold.ShellQuote(outDir+"/plugins")))
+		steps = append(steps, fmt.Sprintf("gcloud composer environments storage plugins import --environment=<env> --location=<region> %s", scaffold.ShellQuote("--source="+outDir+"/plugins")))
 	}
 	steps = append(steps, fmt.Sprintf("gcloud composer environments update <env> --location=<region> --update-pypi-packages-from-file %s", scaffold.ShellQuote(outDir+"/"+composerDepsFile)))
 	return steps

@@ -24,6 +24,13 @@ func TestShellQuote(t *testing.T) {
 		{"a|b<c>(d)", "windows", `"a|b<c>(d)"`},
 		{"it's", "windows", `"it's"`},
 		{"", "windows", `""`},
+		{"wow!", "windows", `"wow!"`},
+		{"café dir", "windows", `"café dir"`},
+		// A trailing backslash run is doubled, or \" would escape the closing
+		// quote; one before an inner character is left alone.
+		{`C:\my dir\`, "windows", `"C:\my dir\\"`},
+		{`C:\my dir\\`, "windows", `"C:\my dir\\\\"`},
+		{`C:\my dir\x`, "windows", `"C:\my dir\x"`},
 		// What either shell expands inside double quotes keeps single quotes,
 		// which PowerShell still reads correctly.
 		{"%PATH%", "windows", "'%PATH%'"},
@@ -31,6 +38,8 @@ func TestShellQuote(t *testing.T) {
 		{"$HOME", "windows", "'$HOME'"},
 		{"a`b", "windows", "'a`b'"},
 		{`say "hi"`, "windows", `'say "hi"'`},
+		{"tab\there", "windows", "'tab\there'"},
+		{"line\nbreak", "windows", "'line\nbreak'"},
 	} {
 		if got := shellQuote(tc.in, tc.goos); got != tc.want {
 			t.Errorf("shellQuote(%q, %s) = %s, want %s", tc.in, tc.goos, got, tc.want)
