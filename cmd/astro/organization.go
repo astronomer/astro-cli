@@ -85,7 +85,7 @@ func newOrganizationListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro organization list
   astro organization list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return organizationList(cmd, out)
+			return organizationList(out)
 		},
 	}
 	cliout.AddOutputFlag(cmd, &organizationListOutput)
@@ -203,7 +203,7 @@ func newOrganizationUserInviteCmd(out io.Writer) *cobra.Command {
   astro organization user invite user@company.com --role ORGANIZATION_BILLING_ADMIN
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return userInvite(cmd, args, out)
+			return userInvite(args, out)
 		},
 	}
 	cmd.Flags().StringVar(&role, "role", "ORGANIZATION_MEMBER", "The role for the "+
@@ -220,7 +220,7 @@ func newOrganizationUserListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro organization user list
   astro organization user list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listUsers(cmd, out)
+			return listUsers(out)
 		},
 	}
 	return cmd
@@ -237,7 +237,7 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
   astro organization user update user@company.com --role ORGANIZATION_OWNER
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return userUpdate(cmd, args, out)
+			return userUpdate(args, out)
 		},
 	}
 	cmd.Flags().StringVar(&updateRole, "role", "", "The new role for the "+
@@ -245,7 +245,7 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func organizationList(_ *cobra.Command, out io.Writer) error {
+func organizationList(out io.Writer) error {
 	return organization.ListWithFormat(astroV1Client, cliout.Renderer{Format: organizationListOutput, Out: out})
 }
 
@@ -305,7 +305,7 @@ func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
 	return emitAuditLogExport(cliout.Renderer{Format: auditLogsOutput, Out: out}, export)
 }
 
-func userInvite(_ *cobra.Command, args []string, out io.Writer) error {
+func userInvite(args []string, out io.Writer) error {
 	var email string
 
 	// if an email was provided in the args we use it
@@ -328,11 +328,11 @@ func userInvite(_ *cobra.Command, args []string, out io.Writer) error {
 	return renderLines(organizationUserOutput, out, &inv, fmt.Sprintf("invite for %s with role %s created", inv.Email, inv.Role))
 }
 
-func listUsers(_ *cobra.Command, out io.Writer) error {
+func listUsers(out io.Writer) error {
 	return user.ListOrgUsersWithFormat(astroV1Client, cliout.Renderer{Format: organizationUserOutput, Out: out})
 }
 
-func userUpdate(_ *cobra.Command, args []string, out io.Writer) error {
+func userUpdate(args []string, out io.Writer) error {
 	var email string
 
 	// if an email was provided in the args we use it
@@ -392,13 +392,13 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro organization team list
   astro organization team list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listTeams(cmd, out)
+			return listTeams(out)
 		},
 	}
 	return cmd
 }
 
-func listTeams(_ *cobra.Command, out io.Writer) error {
+func listTeams(out io.Writer) error {
 	return team.ListOrgTeamsWithFormat(astroV1Client, cliout.Renderer{Format: organizationTeamOutput, Out: out})
 }
 
@@ -417,7 +417,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
   astro organization team update <TEAM_ID> --description "Updated description"
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return teamUpdate(cmd, out, args)
+			return teamUpdate(out, args)
 		},
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -429,7 +429,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func teamUpdate(_ *cobra.Command, out io.Writer, args []string) error {
+func teamUpdate(out io.Writer, args []string) error {
 	id := ""
 
 	if len(args) == 1 {
@@ -457,7 +457,7 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
     --role ORGANIZATION_MEMBER
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return teamCreate(cmd, out)
+			return teamCreate(out)
 		},
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire team within quotes \"\" ")
@@ -467,7 +467,7 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func teamCreate(_ *cobra.Command, out io.Writer) error {
+func teamCreate(out io.Writer) error {
 	if teamOrgRole == "" {
 		// Refused before the line introducing the choice, so a run that
 		// cannot ask prints nothing.
@@ -507,14 +507,14 @@ func newTeamDeleteCmd(out io.Writer) *cobra.Command {
   astro organization team delete <TEAM_ID> --yes
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return teamDelete(cmd, out, args)
+			return teamDelete(out, args)
 		},
 	}
 	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation before deleting the team")
 	return cmd
 }
 
-func teamDelete(_ *cobra.Command, out io.Writer, args []string) error {
+func teamDelete(out io.Writer, args []string) error {
 	id := ""
 
 	if len(args) == 1 {
@@ -556,7 +556,7 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
   astro organization team user remove --team-id <TEAM_ID> --user-id <USER_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return removeTeamUser(cmd, out)
+			return removeTeamUser(out)
 		},
 	}
 	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's unique identifier \"\" ")
@@ -565,7 +565,7 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func removeTeamUser(_ *cobra.Command, out io.Writer) error {
+func removeTeamUser(out io.Writer) error {
 	if err := mayPickTeamAndUser("a team member"); err != nil {
 		return err
 	}
@@ -601,7 +601,7 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
   astro organization team user add --team-id <TEAM_ID> --user-id <USER_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addTeamUser(cmd, out)
+			return addTeamUser(out)
 		},
 	}
 	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's unique identifier \"\" ")
@@ -610,7 +610,7 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addTeamUser(_ *cobra.Command, out io.Writer) error {
+func addTeamUser(out io.Writer) error {
 	if err := mayPickTeamAndUser("a user"); err != nil {
 		return err
 	}
@@ -634,14 +634,14 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
   astro organization team user list
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listUsersCmd(cmd, out)
+			return listUsersCmd(out)
 		},
 	}
 	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's id \"\" ")
 	return cmd
 }
 
-func listUsersCmd(_ *cobra.Command, out io.Writer) error {
+func listUsersCmd(out io.Writer) error {
 	if teamID == "" {
 		if err := mayPick("a team", teamIDFlag); err != nil {
 			return err
@@ -693,7 +693,7 @@ func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
   astro organization token list --organization-id <ORGANIZATION_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listOrganizationToken(cmd, out)
+			return listOrganizationToken(out)
 		},
 	}
 	return cmd
@@ -708,7 +708,7 @@ func newOrganizationTokenListRolesCmd(out io.Writer) *cobra.Command {
   astro organization token roles <TOKEN_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listOrganizationTokenRoles(cmd, args, out)
+			return listOrganizationTokenRoles(args, out)
 		},
 	}
 	return cmd
@@ -732,7 +732,7 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
     --expiration 365 --clean-output
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createOrganizationToken(cmd, out)
+			return createOrganizationToken(out)
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -757,7 +757,7 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
   astro organization token update --name "My Token" --description "Updated description"
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateOrganizationToken(cmd, args, out)
+			return updateOrganizationToken(args, out)
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -782,7 +782,7 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
   astro organization token rotate --name "My Token" --yes --clean-output
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return rotateOrganizationToken(cmd, args, out)
+			return rotateOrganizationToken(args, out)
 		},
 	}
 	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
@@ -806,7 +806,7 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
   astro organization token delete --name "My Token" --yes
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deleteOrganizationToken(cmd, args, out)
+			return deleteOrganizationToken(args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -863,7 +863,7 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
   astro organization role list -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listRoles(cmd, out)
+			return listRoles(out)
 		},
 	}
 	cmd.Flags().BoolVar(&shouldIncludeDefaultRoles, "include-default-roles", false, "Should include default roles in response")
@@ -871,7 +871,7 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listRoles(_ *cobra.Command, out io.Writer) error {
+func listRoles(out io.Writer) error {
 	roles, err := roleClient.ListData(astroV1Client, shouldIncludeDefaultRoles)
 	if err != nil {
 		return err
@@ -902,13 +902,13 @@ func newOrganizationClusterListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro organization cluster list
   astro organization cluster list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listClusters(cmd, out)
+			return listClusters(out)
 		},
 	}
 	cliout.AddOutputFlag(cmd, &organizationClusterListOutput)
 	return cmd
 }
 
-func listClusters(_ *cobra.Command, out io.Writer) error {
+func listClusters(out io.Writer) error {
 	return organization.ListClustersWithFormat(astroV1Client, cliout.Renderer{Format: organizationClusterListOutput, Out: out})
 }

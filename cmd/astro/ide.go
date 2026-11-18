@@ -53,7 +53,7 @@ func newIDEListProjectCmd(out io.Writer) *cobra.Command {
 		Short:   "List all Astro IDE projects in your workspace",
 		Long:    "List all Astro IDE projects in your workspace and optionally select one for future commands.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listIDEProjects(cmd, out)
+			return listIDEProjects(out)
 		},
 		Example: `  # List all IDE projects in your workspace
   astro ide project list`,
@@ -108,7 +108,7 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listIDEProjects(_ *cobra.Command, out io.Writer) error {
+func listIDEProjects(out io.Writer) error {
 	list, err := ide.List(astroV1Alpha1Client)
 	if err != nil {
 		return err

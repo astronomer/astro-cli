@@ -59,7 +59,7 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 		Long:    "Search for Deployment users",
 		Example: deploymentUserListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUserList(cmd, out)
+			return deploymentUserList(out)
 		},
 	}
 	cmd.Flags().StringVar(&deploymentUserID, "user-id", "", "ID of the user to search for")
@@ -77,7 +77,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 		Args:    argOrFlag("email", "email"),
 		Example: deploymentUserCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUserAdd(cmd, out)
+			return deploymentUserAdd(out)
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentUserRole, "role", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
@@ -98,7 +98,7 @@ func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 		Args:    cobra.ExactArgs(1),
 		Example: deploymentUserRemoveExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUserRemove(cmd, out, args)
+			return deploymentUserRemove(out, args)
 		},
 	}
 	addAccessOutputFlag(cmd)
@@ -113,7 +113,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 		Args:    cobra.ExactArgs(1),
 		Example: deploymentUserUpdateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUserUpdate(cmd, out, args)
+			return deploymentUserUpdate(out, args)
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentUserRole, "role", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
@@ -121,7 +121,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func deploymentUserList(_ *cobra.Command, out io.Writer) error {
+func deploymentUserList(out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	users, err := deployment.UserList(deploymentID, deploymentUserEmail, deploymentUserID, deploymentUserFullname, houstonClient)
 	if errors.Is(err, deployment.ErrNoDeploymentUsers) {
@@ -133,7 +133,7 @@ func deploymentUserList(_ *cobra.Command, out io.Writer) error {
 	return renderDeploymentUserList(r, users)
 }
 
-func deploymentUserAdd(_ *cobra.Command, out io.Writer) error {
+func deploymentUserAdd(out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
@@ -146,7 +146,7 @@ func deploymentUserAdd(_ *cobra.Command, out io.Writer) error {
 	return renderDeploymentUserChange(r, deploymentID, deploymentUserEmail, &u, true)
 }
 
-func deploymentUserRemove(_ *cobra.Command, out io.Writer, args []string) error {
+func deploymentUserRemove(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	u, err := deployment.RemoveUser(deploymentID, args[0], houstonClient)
 	if err != nil {
@@ -155,7 +155,7 @@ func deploymentUserRemove(_ *cobra.Command, out io.Writer, args []string) error 
 	return renderDeploymentUserRemoval(r, deploymentID, args[0], &u)
 }
 
-func deploymentUserUpdate(_ *cobra.Command, out io.Writer, args []string) error {
+func deploymentUserUpdate(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)

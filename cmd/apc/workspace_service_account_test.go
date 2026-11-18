@@ -3,7 +3,6 @@ package apc
 import (
 	"bytes"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
@@ -55,11 +54,11 @@ func (s *Suite) TestWorkspaceSaCreate() {
 	workspaceSARole = houston.WorkspaceAdminRole
 	houstonMock.On("CreateWorkspaceServiceAccount", mock.Anything).Return(&houston.WorkspaceServiceAccount{}, nil).Once()
 
-	err := workspaceSaCreate(&cobra.Command{}, buf)
+	err := workspaceSaCreate(buf)
 	s.NoError(err)
 
 	workspaceSARole = "invalid-role"
-	err = workspaceSaCreate(&cobra.Command{}, buf)
+	err = workspaceSaCreate(buf)
 	s.Error(err)
 	s.Contains(err.Error(), "failed to find a valid role")
 
@@ -80,7 +79,7 @@ func (s *Suite) TestWorkspaceSaDelete() {
 	// As --yes does: the question is the command's, and tested there.
 	skipPrompt = true
 	defer func() { skipPrompt = false }()
-	err := workspaceSaDelete(&cobra.Command{}, buf, []string{saID})
+	err := workspaceSaDelete(buf, []string{saID})
 	s.NoError(err)
 
 	houstonMock.AssertExpectations(s.T())

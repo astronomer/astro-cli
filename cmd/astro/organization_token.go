@@ -10,8 +10,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/spf13/cobra"
-
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
@@ -23,7 +21,7 @@ import (
 // family, registered once on its group.
 var organizationTokenOutput cliout.Format
 
-func listOrganizationToken(_ *cobra.Command, out io.Writer) error {
+func listOrganizationToken(out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
@@ -34,7 +32,7 @@ func listOrganizationToken(_ *cobra.Command, out io.Writer) error {
 	return renderTokenList(organizationTokenOutput, out, tokens, organizationRoleHeader)
 }
 
-func listOrganizationTokenRoles(_ *cobra.Command, args []string, out io.Writer) error {
+func listOrganizationTokenRoles(args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
@@ -51,7 +49,7 @@ func listOrganizationTokenRoles(_ *cobra.Command, args []string, out io.Writer) 
 	return cliout.Renderer{Format: organizationTokenOutput, Out: out}.Emit(apitoken.RoleList{Roles: roles}, cliout.Text(tab.Render))
 }
 
-func createOrganizationToken(_ *cobra.Command, out io.Writer) error {
+func createOrganizationToken(out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
@@ -83,7 +81,7 @@ func createOrganizationToken(_ *cobra.Command, out io.Writer) error {
 	return renderTokenSecret(organizationTokenOutput, out, &created, "Organization", "created", tokenName, cleanTokenOutput)
 }
 
-func updateOrganizationToken(_ *cobra.Command, args []string, out io.Writer) error {
+func updateOrganizationToken(args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
@@ -96,7 +94,7 @@ func updateOrganizationToken(_ *cobra.Command, args []string, out io.Writer) err
 	return renderTokenLine(organizationTokenOutput, out, res.Token, fmt.Sprintf("Astro Organization API token %s was successfully updated", res.PreviousName))
 }
 
-func rotateOrganizationToken(_ *cobra.Command, args []string, out io.Writer) error {
+func rotateOrganizationToken(args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
@@ -121,7 +119,7 @@ func rotateOrganizationToken(_ *cobra.Command, args []string, out io.Writer) err
 	return renderTokenSecret(organizationTokenOutput, out, &rotated, "Organization", "rotated", token.Name, cleanTokenOutput)
 }
 
-func deleteOrganizationToken(_ *cobra.Command, args []string, out io.Writer) error {
+func deleteOrganizationToken(args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}

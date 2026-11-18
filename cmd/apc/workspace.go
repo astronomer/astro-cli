@@ -68,7 +68,7 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 		Long:    "List APC Workspaces",
 		Example: `  astro workspace list`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceList(cmd, out)
+			return workspaceList(out)
 		},
 	}
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
@@ -84,7 +84,7 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 		Example: `  # Create a Workspace with a name and a description
   astro workspace create --name my-workspace --description "Production pipelines"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceCreate(cmd, out)
+			return workspaceCreate(out)
 		},
 	}
 	cmd.Flags().StringVarP(&workspaceCreateLabel, "name", "n", "", "Name for your new workspace")
@@ -105,7 +105,7 @@ func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 		Example: workspaceDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceDelete(cmd, out, args)
+			return workspaceDelete(out, args)
 		},
 	}
 	addYesFlag(cmd, "Don't ask for confirmation before deleting the Workspace")
@@ -126,7 +126,7 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
   astro workspace switch`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceSwitch(cmd, out, args)
+			return workspaceSwitch(out, args)
 		},
 	}
 
@@ -148,7 +148,7 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
   astro workspace update <WORKSPACE_ID> --name my-new-name --description "My new description"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceUpdate(cmd, out, args)
+			return workspaceUpdate(out, args)
 		},
 	}
 
@@ -160,7 +160,7 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func workspaceCreate(_ *cobra.Command, out io.Writer) error {
+func workspaceCreate(out io.Writer) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	if workspaceCreateLabel == "" {
 		return errCreateWorkspaceMissingLabel
@@ -177,7 +177,7 @@ func workspaceCreate(_ *cobra.Command, out io.Writer) error {
 	return emitWorkspace(r, w, "\n Successfully created workspace")
 }
 
-func workspaceList(_ *cobra.Command, out io.Writer) error {
+func workspaceList(out io.Writer) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	ws, err := workspace.List(houstonClient)
 	if err != nil {
@@ -192,7 +192,7 @@ func workspaceList(_ *cobra.Command, out io.Writer) error {
 	return emitWorkspaceList(r, ws, c.Workspace)
 }
 
-func workspaceDelete(_ *cobra.Command, out io.Writer, args []string) error {
+func workspaceDelete(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 
 	if err := confirm(fmt.Sprintf("\nAre you sure you want to delete Workspace %s? This cannot be undone.", args[0])); err != nil {
@@ -205,7 +205,7 @@ func workspaceDelete(_ *cobra.Command, out io.Writer, args []string) error {
 	return emitWorkspaceRemoval(r, args[0], w)
 }
 
-func workspaceUpdate(_ *cobra.Command, out io.Writer, args []string) error {
+func workspaceUpdate(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	argsMap := map[string]string{}
 	if workspaceUpdateDescription != "" {
@@ -226,7 +226,7 @@ func workspaceUpdate(_ *cobra.Command, out io.Writer, args []string) error {
 	return emitWorkspace(r, w, "\n Successfully updated workspace")
 }
 
-func workspaceSwitch(_ *cobra.Command, out io.Writer, args []string) error {
+func workspaceSwitch(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 
 	id := ""

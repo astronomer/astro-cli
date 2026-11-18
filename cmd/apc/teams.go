@@ -69,7 +69,7 @@ func newTeamListCmd(out io.Writer) *cobra.Command {
   # List teams a page at a time
   astro team list --paginated --page-size 20`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listTeam(cmd, out, paginated, pageSize)
+			return listTeam(out, paginated, pageSize)
 		},
 	}
 	cmd.Flags().BoolVar(&paginated, "paginated", false, "Paginated team list")
@@ -103,7 +103,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listTeam(_ *cobra.Command, out io.Writer, paginated bool, pageSize int) error {
+func listTeam(out io.Writer, paginated bool, pageSize int) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if paginated && r.Format == cliout.FormatJSON {
 		return cliout.Usage(errListPaginatedUnderJSON)

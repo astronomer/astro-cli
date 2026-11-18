@@ -67,7 +67,7 @@ func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command {
 		Long:    "Create a service account in the APC platform",
 		Example: deploymentSaCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentSaCreate(cmd, out)
+			return deploymentSaCreate(out)
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, "d", true)
@@ -90,7 +90,7 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 		Long:    "List service accounts inside a deployment",
 		Example: deploymentSaListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentSaList(cmd, out)
+			return deploymentSaList(out)
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, "d", true)
@@ -108,7 +108,7 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 		Example: deploymentSaDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentSaDelete(cmd, args, out)
+			return deploymentSaDelete(args, out)
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, "d", true)
@@ -124,7 +124,7 @@ func serviceAccountDeleteQuestion(id string) string {
 	return fmt.Sprintf("\nAre you sure you want to delete service account %s? This cannot be undone.", id)
 }
 
-func deploymentSaCreate(_ *cobra.Command, out io.Writer) error {
+func deploymentSaCreate(out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if deploymentSACreateName == "" {
 		return errServiceAccountNameEmpty
@@ -139,7 +139,7 @@ func deploymentSaCreate(_ *cobra.Command, out io.Writer) error {
 	return renderServiceAccountCreated(r, &created)
 }
 
-func deploymentSaList(_ *cobra.Command, out io.Writer) error {
+func deploymentSaList(out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	sas, err := sa.GetDeploymentServiceAccounts(deploymentID, houstonClient)
 	if err != nil {
@@ -148,7 +148,7 @@ func deploymentSaList(_ *cobra.Command, out io.Writer) error {
 	return renderServiceAccountList(r, sas)
 }
 
-func deploymentSaDelete(_ *cobra.Command, args []string, out io.Writer) error {
+func deploymentSaDelete(args []string, out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := confirm(serviceAccountDeleteQuestion(args[0])); err != nil {
 		return err

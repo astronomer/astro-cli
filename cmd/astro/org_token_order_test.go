@@ -69,7 +69,7 @@ func TestRotateAndDeleteAWorkspaceTokenByIDNeedNoWorkspace(t *testing.T) {
 	}{
 		"rotate": {
 			run: func(cmd *cobra.Command, out *bytes.Buffer) error {
-				return rotateWorkspaceToken(cmd, []string{"token-id"}, out)
+				return rotateWorkspaceToken([]string{"token-id"}, out)
 			},
 			endpoint: "RotateApiTokenWithResponse",
 			want:     "new-secret",
@@ -115,8 +115,8 @@ func TestMissingWorkspaceIsSaidBeforeAQuestionThatCannotBeAsked(t *testing.T) {
 		"workspace user update":     func() error { return updateWorkspaceUser(cmd, nil, &out) },
 		"workspace user remove":     func() error { return removeWorkspaceUser(cmd, nil, &out) },
 		"workspace token create":    func() error { return createWorkspaceToken(cmd, &out) },
-		"workspace token update":    func() error { return updateWorkspaceToken(cmd, nil, &out) },
-		"organization-token remove": func() error { return removeOrganizationTokenWorkspaceRole(cmd, nil, &out) },
+		"workspace token update":    func() error { return updateWorkspaceToken(nil, &out) },
+		"organization-token remove": func() error { return removeOrganizationTokenWorkspaceRole(nil, &out) },
 		"workspace token add":       func() error { return addOrgTokenToWorkspace(cmd, nil, &out) },
 		"organization-token add":    func() error { return addOrgTokenWorkspaceRole(cmd, nil, &out) },
 		"organization-token update": func() error { return updateOrgTokenWorkspaceRole(cmd, nil, &out) },

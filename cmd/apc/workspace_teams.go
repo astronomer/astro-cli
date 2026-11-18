@@ -54,7 +54,7 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the
 		Args:    argOrFlag("team-id", "team"),
 		Example: workspaceTeamAddExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceTeamAdd(cmd, out, args)
+			return workspaceTeamAdd(out, args)
 		},
 	}
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team ID to be assigned to workspace")
@@ -75,7 +75,7 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 		Example: workspaceTeamUpdateExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceTeamUpdate(cmd, out, args)
+			return workspaceTeamUpdate(out, args)
 		},
 	}
 	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "Workspace role assigned to team")
@@ -107,14 +107,14 @@ func newWorkspaceTeamsListCmd(out io.Writer) *cobra.Command {
 		Long:    "List Teams inside an APC Workspace",
 		Example: workspaceTeamsListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceTeamsList(cmd, out, args)
+			return workspaceTeamsList(out, args)
 		},
 	}
 	addAccessOutputFlag(cmd)
 	return cmd
 }
 
-func workspaceTeamAdd(_ *cobra.Command, out io.Writer, _ []string) error {
+func workspaceTeamAdd(out io.Writer, _ []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -132,7 +132,7 @@ func workspaceTeamAdd(_ *cobra.Command, out io.Writer, _ []string) error {
 	return renderWorkspaceTeamAdded(r, w, teamID, workspaceTeamRole)
 }
 
-func workspaceTeamUpdate(_ *cobra.Command, out io.Writer, args []string) error {
+func workspaceTeamUpdate(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -164,7 +164,7 @@ func workspaceTeamRm(cmd *cobra.Command, out io.Writer, args []string) error {
 	return renderWorkspaceTeamRemoved(r, cliout.NotesTo(cmd, r.Format, out), &removal, args[0])
 }
 
-func workspaceTeamsList(_ *cobra.Command, out io.Writer, _ []string) error {
+func workspaceTeamsList(out io.Writer, _ []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {

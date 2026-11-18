@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -36,7 +35,7 @@ func TestUpdateAWorkspaceTokenByIDUnderAnOrganizationToken(t *testing.T) {
 		t.Cleanup(func() { tokenName = "" })
 
 		var out bytes.Buffer
-		require.NoError(t, updateWorkspaceToken(&cobra.Command{}, nil, &out))
+		require.NoError(t, updateWorkspaceToken(nil, &out))
 		mc.AssertCalled(t, "UpdateApiTokenWithResponse", mock.Anything, "env-org", "token-id", mock.Anything)
 	})
 
@@ -47,7 +46,7 @@ func TestUpdateAWorkspaceTokenByIDUnderAnOrganizationToken(t *testing.T) {
 		t.Cleanup(func() { tokenRole = "" })
 
 		var err error
-		asked := captureStderr(t, func() { err = updateWorkspaceToken(&cobra.Command{}, nil, &bytes.Buffer{}) })
+		asked := captureStderr(t, func() { err = updateWorkspaceToken(nil, &bytes.Buffer{}) })
 		require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
 		assert.Empty(t, asked)
 	})
