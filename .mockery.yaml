@@ -40,6 +40,9 @@ packages:
       ClientWithResponsesInterface:
         config:
           filename: client.go
+      ClientInterface:
+        config:
+          filename: raw_client.go
   github.com/astronomer/astro-cli/pkg/azure:
     config:
       dir: pkg/azure/mocks
