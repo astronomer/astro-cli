@@ -34,6 +34,31 @@ func TestBuildRefusesAWorkspaceTheTokenIsNotForOnlyWhenItReadsIt(t *testing.T) {
 		mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything)
 	})
 
+	// A start whose declared names were all supplied locally still reads what the
+	// Workspace holds beyond them, and the token refuses that read. The start
+	// goes on, and says the Workspace's values were not read and why, naming
+	// both Workspaces as the refusal does.
+	t.Run("only undeclared values would be read", func(t *testing.T) {
+		body := strings.Replace(workspaceManifest, "\n[tool.astro.env]\nDATA_WAREHOUSE_URI = { source = 'workspace' }\n", "", 1)
+		dir := newWorkspaceProject(t, body)
+		mc := new(astrov1_mocks.ClientWithResponsesInterface)
+		built, err := Build(dir, Options{WorkspaceProvider: emProvider(mc)})
+		if err != nil {
+			t.Fatalf("Build: %v", err)
+		}
+		for _, want := range []string{"workspace cmws not read", "starting without its values", "ws-of-the-token", "the project's link names cmws"} {
+			if !strings.Contains(built.WorkspaceRefusal, want) {
+				t.Errorf("WorkspaceRefusal = %q, want it to contain %q", built.WorkspaceRefusal, want)
+			}
+		}
+		if built.WorkspaceNote != "" {
+			t.Errorf("WorkspaceNote = %q: a refusal is not an outage", built.WorkspaceNote)
+		}
+		if len(mc.Calls) != 0 {
+			t.Fatalf("%d requests were made for a Workspace the token is not for", len(mc.Calls))
+		}
+	})
+
 	t.Run("no value needs the workspace", func(t *testing.T) {
 		body := strings.Replace(workspaceManifest, "\n[tool.astro.env]\nDATA_WAREHOUSE_URI = { source = 'workspace' }\n", "", 1)
 		dir := newWorkspaceProject(t, body)

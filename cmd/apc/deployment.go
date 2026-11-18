@@ -398,7 +398,7 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 		Long:    "Adopt an existing operator-managed Airflow custom resource into APC. The custom resource, its namespace, and its metadata database are left untouched; adopting only creates the corresponding Deployment record in APC.",
 		Example: deploymentAdoptExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentAdopt(cmd, out)
+			return deploymentAdopt(out)
 		},
 	}
 	cmd.Flags().StringVar(&clusterID, "cluster-id", "", "ID of the cluster the Airflow custom resource is running on")
@@ -426,7 +426,7 @@ func newDeploymentUnadoptCmd(out io.Writer) *cobra.Command {
 		Long:    "Release an adopted Deployment back to operator-only management. The Airflow custom resource, its namespace, and its metadata database are left untouched; only the APC Deployment record is removed.",
 		Example: deploymentUnadoptExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUnadopt(cmd, out)
+			return deploymentUnadopt(out)
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), "Adopted Deployment to release: a link name from the project's manifest, or a Deployment id", "d", true)
@@ -448,7 +448,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
   # List Deployments across all Workspaces
   astro deployment list --all`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentList(cmd, out)
+			return deploymentList(out)
 		},
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show Deployments across all Workspaces")
@@ -558,7 +558,7 @@ func newDeploymentAirflowUpgradeCmd(out io.Writer) *cobra.Command {
 		Long:    "Upgrade Airflow version",
 		Example: deploymentAirflowUpgradeExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentAirflowUpgrade(cmd, out)
+			return deploymentAirflowUpgrade(out)
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", "d", true)
@@ -591,7 +591,7 @@ func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command { //nolint:dup
 		Long:    "Upgrade Runtime image version",
 		Example: deploymentRuntimeUpgradeExample,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return deploymentRuntimeUpgrade(cmd, out)
+			return deploymentRuntimeUpgrade(out)
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", "d", true)
@@ -610,7 +610,7 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 		Long:    "Migrate to runtime image based deployment",
 		Example: deploymentRuntimeMigrateExample,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return deploymentRuntimeMigrate(cmd, out)
+			return deploymentRuntimeMigrate(out)
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), "Deployment to migrate: a link name from the project's manifest, or a Deployment id", "d", true)
@@ -820,7 +820,7 @@ func deploymentDelete(cmd *cobra.Command, out io.Writer) error {
 	}))
 }
 
-func deploymentAdopt(_ *cobra.Command, out io.Writer) error {
+func deploymentAdopt(out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 
 	ws, err := coalesceWorkspace()
@@ -853,7 +853,7 @@ func dangerPrompt(text string) string {
 	return "\n" + cliout.DangerLabel(os.Stderr) + " " + text
 }
 
-func deploymentUnadopt(_ *cobra.Command, out io.Writer) error {
+func deploymentUnadopt(out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 
 	if err := confirm(dangerPrompt(cliDeploymentUnadoptPrompt)); err != nil {
@@ -874,7 +874,7 @@ func deploymentUnadopt(_ *cobra.Command, out io.Writer) error {
 	}))
 }
 
-func deploymentList(_ *cobra.Command, out io.Writer) error {
+func deploymentList(out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 
 	// --all lists every workspace's, so it needs no workspace, and a context
@@ -982,7 +982,7 @@ func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string,
 	return emitUpdated(r, d)
 }
 
-func deploymentAirflowUpgrade(_ *cobra.Command, out io.Writer) error {
+func deploymentAirflowUpgrade(out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 	var (
 		change *deployment.VersionChange
@@ -999,7 +999,7 @@ func deploymentAirflowUpgrade(_ *cobra.Command, out io.Writer) error {
 	return emitVersionChange(r, airflowUpgrade, change)
 }
 
-func deploymentRuntimeUpgrade(_ *cobra.Command, out io.Writer) error {
+func deploymentRuntimeUpgrade(out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 	var (
 		change *deployment.VersionChange
@@ -1016,7 +1016,7 @@ func deploymentRuntimeUpgrade(_ *cobra.Command, out io.Writer) error {
 	return emitVersionChange(r, runtimeUpgrade, change)
 }
 
-func deploymentRuntimeMigrate(_ *cobra.Command, out io.Writer) error {
+func deploymentRuntimeMigrate(out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 	var (
 		change *deployment.VersionChange

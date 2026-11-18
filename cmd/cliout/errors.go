@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/astronomer/astro-cli/internal/usageerr"
 )
 
 // ExitError carries a process exit code up to main, which is the only place
@@ -146,18 +148,14 @@ func omitsHelpPointer(err error) bool {
 			return true
 		}
 	}
-	var o helpPointerOptOut
+	var o usageerr.HelpOptOut
 	return errors.As(err, &o) && o.OmitsHelpPointer()
 }
 
-// helpPointerOptOut is what a package that cannot import cliout implements to
-// opt its usage error out of the pointer to help (UsageNoHelp).
-type helpPointerOptOut interface{ OmitsHelpPointer() bool }
-
-// usageMarker is an error a package that cannot import cliout (one under
-// internal/platform) marks as a usage error itself, such as a Deployment name
-// several Deployments share.
-type usageMarker interface{ IsUsageError() bool }
+// A package that cannot import cliout marks its usage errors with
+// internal/usageerr (Usage, NoHelp), or implements usageerr.Marker and
+// usageerr.HelpOptOut on a type of its own, such as a Deployment name several
+// Deployments share. IsUsage and omitsHelpPointer read those marks.
 
 // IsUsage reports whether err is a usage error.
 func IsUsage(err error) bool {
@@ -168,7 +166,7 @@ func IsUsage(err error) bool {
 	if errors.As(err, &u) {
 		return true
 	}
-	var m usageMarker
+	var m usageerr.Marker
 	if errors.As(err, &m) && m.IsUsageError() {
 		return true
 	}

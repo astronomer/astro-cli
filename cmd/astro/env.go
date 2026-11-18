@@ -63,24 +63,26 @@ func envScope(cmd *cobra.Command) (env.Scope, error) {
 		return env.Scope{}, env.ErrScopeAmbiguous
 	}
 	if envWorkspaceID == "" && envDeploymentID == "" {
-		ws, err := coalesceWorkspace(cmd)
+		t, ws, err := coalesceTarget(cmd)
 		if isWorkspaceRefusal(err) {
 			return env.Scope{}, err
 		}
 		if err != nil {
 			return env.Scope{}, fmt.Errorf("%w (and falling back to workspace context: %w)", env.ErrScopeNotSpecified, err)
 		}
-		return env.Scope{WorkspaceID: ws}, nil
+		return env.Scope{WorkspaceID: ws, Source: t.WorkspaceSource}, nil
 	}
 	// --workspace is read here, not through the resolver: a token for another
 	// Workspace is refused all the same.
 	if err := astrosession.CheckWorkspace(envWorkspaceID, astrosession.SourceFlag); err != nil {
 		return env.Scope{}, err
 	}
+	// Only a Workspace the flag named has a source: --deployment alone names none.
+	src := astrosession.SourceNone
 	if envWorkspaceID != "" {
-		rememberTarget(cmd, astrosession.Target{Workspace: envWorkspaceID, WorkspaceSource: astrosession.SourceFlag})
+		src = astrosession.SourceFlag
 	}
-	return env.Scope{WorkspaceID: envWorkspaceID, DeploymentID: envDeploymentID}, nil
+	return env.Scope{WorkspaceID: envWorkspaceID, DeploymentID: envDeploymentID, Source: src}, nil
 }
 
 // shared flag values for `astro env` subcommands.

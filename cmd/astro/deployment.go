@@ -201,7 +201,7 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
   # List them as JSON
   astro deployment team list --deployment <DEPLOYMENT_ID> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listDeploymentTeam(cmd, out)
+			return listDeploymentTeam(out)
 		},
 	}
 	return cmd
@@ -216,13 +216,13 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 		Example: `  # Remove a team from a Deployment
   astro deployment team remove <TEAM_ID> --deployment <DEPLOYMENT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return removeDeploymentTeam(cmd, args, out)
+			return removeDeploymentTeam(args, out)
 		},
 	}
 	return cmd
 }
 
-func listDeploymentTeam(_ *cobra.Command, out io.Writer) error {
+func listDeploymentTeam(out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -230,7 +230,7 @@ func listDeploymentTeam(_ *cobra.Command, out io.Writer) error {
 	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: deploymentTeamOutput, Out: out})
 }
 
-func removeDeploymentTeam(_ *cobra.Command, args []string, out io.Writer) error {
+func removeDeploymentTeam(args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -263,7 +263,7 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
   # Add it with a custom role
   astro deployment team add <TEAM_ID> --deployment <DEPLOYMENT_ID> --role <CUSTOM_ROLE>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addDeploymentTeam(cmd, args, out)
+			return addDeploymentTeam(args, out)
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), "Deployment to add the team to: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID)
@@ -272,7 +272,7 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addDeploymentTeam(_ *cobra.Command, args []string, out io.Writer) error {
+func addDeploymentTeam(args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -302,7 +302,7 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 		Example: `  # Make a team an admin of a Deployment
   astro deployment team update <TEAM_ID> --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateDeploymentTeam(cmd, args, out)
+			return updateDeploymentTeam(args, out)
 		},
 	}
 	cmd.Flags().StringVar(&updateDeploymentRole, "role", "", "The new role for the "+
@@ -310,7 +310,7 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func updateDeploymentTeam(_ *cobra.Command, args []string, out io.Writer) error {
+func updateDeploymentTeam(args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -372,7 +372,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
   # Add them with a custom role
   astro deployment user add user@company.com --deployment <DEPLOYMENT_ID> --role <CUSTOM_ROLE>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addDeploymentUser(cmd, args, out)
+			return addDeploymentUser(args, out)
 		},
 	}
 	cmd.Flags().StringVar(&addDeploymentRole, "role", "DEPLOYMENT_ADMIN", "The role for the "+
@@ -392,7 +392,7 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
   # List them as JSON
   astro deployment user list --deployment <DEPLOYMENT_ID> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listDeploymentUser(cmd, out)
+			return listDeploymentUser(out)
 		},
 	}
 	return cmd
@@ -407,7 +407,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 		Example: `  # Make a user an admin of a Deployment
   astro deployment user update user@company.com --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateDeploymentUser(cmd, args, out)
+			return updateDeploymentUser(args, out)
 		},
 	}
 	cmd.Flags().StringVar(&updateDeploymentRole, "role", "", "The new role for the "+
@@ -424,7 +424,7 @@ func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 		Example: `  # Remove a user's direct role from a Deployment
   astro deployment user remove user@company.com --deployment <DEPLOYMENT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return removeDeploymentUser(cmd, args, out)
+			return removeDeploymentUser(args, out)
 		},
 	}
 	return cmd
@@ -1145,7 +1145,7 @@ func isValidCloudProvider(cloudProvider astrov1.ClusterCloudProvider) bool {
 	return cloudProvider == astrov1.ClusterCloudProviderGCP || cloudProvider == astrov1.ClusterCloudProviderAWS || cloudProvider == astrov1.ClusterCloudProviderAZURE
 }
 
-func addDeploymentUser(_ *cobra.Command, args []string, out io.Writer) error {
+func addDeploymentUser(args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1169,7 +1169,7 @@ func addDeploymentUser(_ *cobra.Command, args []string, out io.Writer) error {
 	return renderLines(deploymentUserOutput, out, &u, fmt.Sprintf("The user %s was successfully added to the deployment with the role %s", u.Email, u.DeploymentRole))
 }
 
-func listDeploymentUser(_ *cobra.Command, out io.Writer) error {
+func listDeploymentUser(out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1177,7 +1177,7 @@ func listDeploymentUser(_ *cobra.Command, out io.Writer) error {
 	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: deploymentUserOutput, Out: out})
 }
 
-func updateDeploymentUser(_ *cobra.Command, args []string, out io.Writer) error {
+func updateDeploymentUser(args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1210,7 +1210,7 @@ func updateDeploymentUser(_ *cobra.Command, args []string, out io.Writer) error 
 	return renderLines(deploymentUserOutput, out, &u, fmt.Sprintf("The deployment user %s role was successfully updated to %s", u.Email, u.DeploymentRole))
 }
 
-func removeDeploymentUser(_ *cobra.Command, args []string, out io.Writer) error {
+func removeDeploymentUser(args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1269,7 +1269,7 @@ func newDeploymentTokenListCmd(out io.Writer) *cobra.Command {
 		Example: `  # List the API tokens with a role in a Deployment
   astro deployment token list --deployment <DEPLOYMENT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listDeploymentToken(cmd, out)
+			return listDeploymentToken(out)
 		},
 	}
 	addOneXWorkspaceIDNoOp(cmd.Flags())
@@ -1289,7 +1289,7 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
   astro deployment token create --name my-token --role DEPLOYMENT_ADMIN \
     --deployment <DEPLOYMENT_ID> --expiration 30 --clean-output`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createDeploymentToken(cmd, out)
+			return createDeploymentToken(out)
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -1321,7 +1321,7 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
   astro deployment token update --name my-ws-token --deployment <DEPLOYMENT_ID> \
     --role DEPLOYMENT_MEMBER`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateDeploymentToken(cmd, args, out)
+			return updateDeploymentToken(args, out)
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -1348,7 +1348,7 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
   # Rotate it without asking for confirmation
   astro deployment token rotate <TOKEN_ID> --deployment <DEPLOYMENT_ID> --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return rotateDeploymentToken(cmd, args, out)
+			return rotateDeploymentToken(args, out)
 		},
 	}
 	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
@@ -1411,7 +1411,7 @@ func newDeploymentTokenAddCmd(out io.Writer) *cobra.Command {
   # Name the token instead of giving its ID
   astro deployment token add --name my-token --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addDeploymentToken(cmd, args, out)
+			return addDeploymentToken(args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the Workspace or Organization API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -1421,7 +1421,7 @@ func newDeploymentTokenAddCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addDeploymentToken(_ *cobra.Command, args []string, out io.Writer) error {
+func addDeploymentToken(args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1489,7 +1489,7 @@ func newAddOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
   astro deployment token organization-token add --name my-org-token \
     --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addOrgTokenToDeploymentRole(cmd, args, out)
+			return addOrgTokenToDeploymentRole(args, out)
 		},
 	}
 	addTokenNameFlag(cmd, "The name of the Organization API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
@@ -1511,7 +1511,7 @@ func newUpdateOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
   astro deployment token organization-token update --name my-org-token \
     --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateOrgTokenToDeploymentRole(cmd, args, out)
+			return updateOrgTokenToDeploymentRole(args, out)
 		},
 	}
 	addTokenNameFlag(cmd, "The name of the Organization API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
@@ -1533,7 +1533,7 @@ func newAddWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
   astro deployment token workspace-token add --name my-ws-token \
     --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addWorkspaceTokenDeploymentRole(cmd, args, out)
+			return addWorkspaceTokenDeploymentRole(args, out)
 		},
 	}
 	addTokenNameFlag(cmd, "The name of the WORKSPACE API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "workspace-token-name")
@@ -1556,7 +1556,7 @@ func newUpdateWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
   astro deployment token workspace-token update --name my-ws-token \
     --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateWorkspaceTokenDeploymentRole(cmd, args, out)
+			return updateWorkspaceTokenDeploymentRole(args, out)
 		},
 	}
 	addTokenNameFlag(cmd, "The name of the WORKSPACE API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "workspace-token-name")
@@ -1566,19 +1566,19 @@ func newUpdateWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addOrgTokenToDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+func addOrgTokenToDeploymentRole(args []string, out io.Writer) error {
 	return setTokenDeploymentRole(args, out, tokenKindOrganization, tokenRoleAdd)
 }
 
-func updateOrgTokenToDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+func updateOrgTokenToDeploymentRole(args []string, out io.Writer) error {
 	return setTokenDeploymentRole(args, out, tokenKindOrganization, tokenRoleUpdate)
 }
 
-func addWorkspaceTokenDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+func addWorkspaceTokenDeploymentRole(args []string, out io.Writer) error {
 	return setTokenDeploymentRole(args, out, tokenKindWorkspace, tokenRoleAdd)
 }
 
-func updateWorkspaceTokenDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+func updateWorkspaceTokenDeploymentRole(args []string, out io.Writer) error {
 	return setTokenDeploymentRole(args, out, tokenKindWorkspace, tokenRoleUpdate)
 }
 
@@ -1663,7 +1663,7 @@ func newListOrganizationTokensInDeployment(out io.Writer) *cobra.Command {
 		Example: `  # List the Organization tokens with a role in a Deployment
   astro deployment token organization-token list --deployment <DEPLOYMENT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listOrganizationTokensInDeployment(cmd, out)
+			return listOrganizationTokensInDeployment(out)
 		},
 	}
 	return cmd
@@ -1677,14 +1677,14 @@ func newListWorkspaceTokensInDeployment(out io.Writer) *cobra.Command {
 		Example: `  # List the Workspace tokens with a role in a Deployment
   astro deployment token workspace-token list --deployment <DEPLOYMENT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listWorkspaceTokensInDeployment(cmd, out)
+			return listWorkspaceTokensInDeployment(out)
 		},
 	}
 	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }
 
-func listOrganizationTokensInDeployment(_ *cobra.Command, out io.Writer) error {
+func listOrganizationTokensInDeployment(out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1696,7 +1696,7 @@ func listOrganizationTokensInDeployment(_ *cobra.Command, out io.Writer) error {
 	return runDeploymentTokenList(deploymentTokenOutput, out, deployment.DeploymentTokenTypeORGANIZATION)
 }
 
-func listWorkspaceTokensInDeployment(_ *cobra.Command, out io.Writer) error {
+func listWorkspaceTokensInDeployment(out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1708,7 +1708,7 @@ func listWorkspaceTokensInDeployment(_ *cobra.Command, out io.Writer) error {
 	return runDeploymentTokenList(deploymentTokenOutput, out, deployment.DeploymentTokenTypeWORKSPACE)
 }
 
-func listDeploymentToken(_ *cobra.Command, out io.Writer) error {
+func listDeploymentToken(out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1718,7 +1718,7 @@ func listDeploymentToken(_ *cobra.Command, out io.Writer) error {
 	return runDeploymentTokenList(deploymentTokenOutput, out)
 }
 
-func createDeploymentToken(_ *cobra.Command, out io.Writer) error {
+func createDeploymentToken(out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1746,7 +1746,7 @@ func createDeploymentToken(_ *cobra.Command, out io.Writer) error {
 	return runDeploymentTokenCreate(deploymentTokenOutput, out)
 }
 
-func updateDeploymentToken(_ *cobra.Command, args []string, out io.Writer) error {
+func updateDeploymentToken(args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1762,7 +1762,7 @@ func updateDeploymentToken(_ *cobra.Command, args []string, out io.Writer) error
 	return runDeploymentTokenUpdate(deploymentTokenOutput, out)
 }
 
-func rotateDeploymentToken(_ *cobra.Command, args []string, out io.Writer) error {
+func rotateDeploymentToken(args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}

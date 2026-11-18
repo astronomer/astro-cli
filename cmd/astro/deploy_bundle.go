@@ -347,10 +347,9 @@ func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Form
 			return "", nil, login, err
 		}
 		ws := run.Workspace
-		dep, err := deploymentNamed(name, ws, &login)
+		dep, err := deploymentNamed(name, ws, run.WorkspaceSource, &login)
 		if err != nil {
-			// Where the workspace came from, as the error names it.
-			return "", nil, login, run.Explain(err)
+			return "", nil, login, err
 		}
 		return dep.Id, dep, login, nil
 	}
@@ -368,16 +367,18 @@ func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Form
 	if !login.current {
 		return "", nil, login, errPickerOtherHost(login.context.Domain)
 	}
-	ws := workspace
+	ws, src := workspace, astrosession.SourceFlag
 	if ws == "" {
-		if ws, err = coalesceWorkspace(cmd); err != nil {
+		var t astrosession.Target
+		if t, ws, err = coalesceTarget(cmd); err != nil {
 			if isWorkspaceRefusal(err) {
 				return "", nil, login, err
 			}
 			return "", nil, login, fmt.Errorf("failed to find a valid workspace: %w", err)
 		}
+		src = t.WorkspaceSource
 	}
-	picked, err := deployment.GetDeployment(ws, "", "", deployment.ToChange, nil, login.client)
+	picked, err := deployment.GetDeployment(ws, "", "", deployment.ToChange, nil, deployment.WithWorkspaceSource(login.client, ws, src))
 	if err != nil {
 		return "", nil, login, err
 	}
@@ -387,11 +388,11 @@ func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Form
 // deploymentNamed is the one Deployment called name in workspace ws, listed
 // under login. None, or more than one, is an error that says so, naming the
 // ids of the ones that share the name.
-func deploymentNamed(name, ws string, login *deployLogin) (*astrov1.Deployment, error) {
+func deploymentNamed(name, ws string, src astrosession.Source, login *deployLogin) (*astrov1.Deployment, error) {
 	if ws == "" {
 		return nil, cliout.Usage(fmt.Errorf("--deployment %s is not a link of the project here or a Deployment id, and there is no Workspace to look it up by name in: pass --workspace, or the Deployment id", name))
 	}
-	found, err := deployment.DeploymentsNamed(name, ws, login.context.Organization, login.client)
+	found, err := deployment.DeploymentsNamed(name, ws, login.context.Organization, deployment.WithWorkspaceSource(login.client, ws, src))
 	if err != nil {
 		return nil, err
 	}
@@ -399,11 +400,11 @@ func deploymentNamed(name, ws string, login *deployLogin) (*astrov1.Deployment, 
 	case 0:
 		// Named wrong, as a link name that is not one would be: a usage
 		// mistake, not a failure of the deploy.
-		return nil, cliout.UsageNoHelp(fmt.Errorf("no Deployment named %s in workspace %s: pass a Deployment id, a link name of the project here, or the name of a Deployment in that workspace", name, ws))
+		return nil, cliout.UsageNoHelp(fmt.Errorf("no Deployment named %s in %s: pass a Deployment id, a link name of the project here, or the name of a Deployment in that workspace", name, astrosession.DescribeWorkspace(ws, src)))
 	case 1:
 		return &found[0], nil
 	}
-	return nil, &deployment.NameError{Name: name, Workspace: ws, Matches: found, Flag: "--deployment"}
+	return nil, &deployment.NameError{Name: name, Workspace: ws, Source: src, Matches: found, Flag: "--deployment"}
 }
 
 // errBundleNoTarget is a bundle deploy or delete that names no Deployment and

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/instances"
@@ -60,7 +61,7 @@ func (l findingLocator) DeploymentID(_ context.Context, ref, projectWorkspace, p
 			in = append(in, l.deployments[i])
 		}
 	}
-	dep, err := instancelocate.NamedDeployment(in, ref, ws)
+	dep, err := instancelocate.NamedDeployment(in, ref, ws, astrosession.SourceNone)
 	return dep.Id, err
 }
 

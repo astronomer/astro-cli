@@ -26,8 +26,10 @@ import (
 type DeploymentNameError struct {
 	// Name is the value given.
 	Name string
-	// Workspace is where it was looked for, empty when there was nowhere.
+	// Workspace is where it was looked for, empty when there was nowhere, and
+	// Source where the run took it from.
 	Workspace string
+	Source    astrosession.Source
 	// IDs are the Deployments of that name, when there are several.
 	IDs []string
 }
@@ -43,9 +45,9 @@ func (e *DeploymentNameError) Error() string {
 		}).Missing()
 		return fmt.Sprintf("%q is not a Deployment id, and %s", e.Name, missing)
 	case len(e.IDs) == 0:
-		return fmt.Sprintf("no Deployment named %q in workspace %s", e.Name, e.Workspace)
+		return fmt.Sprintf("no Deployment named %q in %s", e.Name, astrosession.DescribeWorkspace(e.Workspace, e.Source))
 	}
-	return fmt.Sprintf("%d Deployments are named %q in workspace %s: pass -d with one's id (%s)", len(e.IDs), e.Name, e.Workspace, strings.Join(e.IDs, ", "))
+	return fmt.Sprintf("%d Deployments are named %q in %s: pass -d with one's id (%s)", len(e.IDs), e.Name, astrosession.DescribeWorkspace(e.Workspace, e.Source), strings.Join(e.IDs, ", "))
 }
 
 // NotFound reports a name that found no Deployment: none of that name, or no
@@ -57,8 +59,9 @@ func (e *DeploymentNameError) NotFound() bool { return len(e.IDs) == 0 }
 // called name. One in another workspace is not counted, so a listing that
 // ignored its workspace filter cannot answer from elsewhere. None, or
 // several, is a *DeploymentNameError; an empty workspace is one too, since
-// there was nowhere to look.
-func NamedDeployment(deployments []astrov1.Deployment, name, workspace string) (astrov1.Deployment, error) {
+// there was nowhere to look. src is where the run took workspace from, which
+// the error names.
+func NamedDeployment(deployments []astrov1.Deployment, name, workspace string, src astrosession.Source) (astrov1.Deployment, error) {
 	if workspace == "" {
 		return astrov1.Deployment{}, &DeploymentNameError{Name: name}
 	}
@@ -71,7 +74,7 @@ func NamedDeployment(deployments []astrov1.Deployment, name, workspace string) (
 	if len(found) == 1 {
 		return found[0], nil
 	}
-	nameErr := &DeploymentNameError{Name: name, Workspace: workspace}
+	nameErr := &DeploymentNameError{Name: name, Workspace: workspace, Source: src}
 	for i := range found {
 		nameErr.IDs = append(nameErr.IDs, found[i].Id)
 	}
@@ -109,8 +112,6 @@ func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace, proje
 	if ws == "" && l.workspace != nil {
 		ws, src = l.workspace()
 	}
-	// An error about the workspace says where it came from.
-	from := astrosession.Target{Workspace: ws, WorkspaceSource: src}
 	// The login comes first: a machine with none has no workspace either, and
 	// logging in is the fix that also supplies one.
 	token, org, err := l.identity(ctx)
@@ -125,29 +126,33 @@ func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace, proje
 		// login's token reads whichever organization the login is scoped to.
 		org = projectOrganization
 	}
-	deployments, err := l.listDeployments(ctx, token, org, ws)
+	deployments, err := l.listDeployments(ctx, token, org, ws, src)
 	if err != nil {
-		return "", from.Explain(err)
+		return "", err
 	}
-	dep, err := NamedDeployment(deployments, ref, ws)
+	dep, err := NamedDeployment(deployments, ref, ws, src)
 	if err != nil {
-		return "", from.Explain(err)
+		return "", err
 	}
 	return dep.Id, nil
 }
 
 // listDeployments is every Deployment in workspace ws, under the session's
 // bearer for the same reason astroDeployment puts it on its call.
-func (l *locator) listDeployments(ctx context.Context, token, org, ws string) ([]astrov1.Deployment, error) {
+func (l *locator) listDeployments(ctx context.Context, token, org, ws string, src astrosession.Source) ([]astrov1.Deployment, error) {
 	limit := 1000
 	return pagination.Collect("deployments", func(offset int) ([]astrov1.Deployment, int, error) {
 		params := &astrov1.ListDeploymentsParams{Limit: &limit, Offset: &offset, WorkspaceIds: &[]string{ws}}
 		resp, err := l.deployments.ListDeploymentsWithResponse(ctx, org, params, bearer(token))
 		if err != nil {
-			return nil, 0, fmt.Errorf("could not reach Astro to list the Deployments in workspace %s — check your connection: %w", ws, err)
+			return nil, 0, &astrosession.WorkspaceError{
+				Workspace: ws, Source: src, Err: err,
+				Before: "could not reach Astro to list the Deployments in ",
+				After:  " — check your connection: " + err.Error(),
+			}
 		}
 		if resp.JSON200 == nil {
-			return nil, 0, listOutage(l.domain, ws, resp)
+			return nil, 0, listOutage(l.domain, ws, src, resp)
 		}
 		return resp.JSON200.Deployments, resp.JSON200.TotalCount, nil
 	})
@@ -155,16 +160,25 @@ func (l *locator) listDeployments(ctx context.Context, token, org, ws string) ([
 
 // listOutage names what the control plane said to a listing, in the words
 // deploymentOutage uses for a lookup.
-func listOutage(domain, ws string, resp *astrov1.ListDeploymentsResponse) error {
+func listOutage(domain, ws string, src astrosession.Source, resp *astrov1.ListDeploymentsResponse) error {
 	status := 0
 	if resp.HTTPResponse != nil {
 		status = resp.HTTPResponse.StatusCode
 	}
 	switch status {
 	case http.StatusUnauthorized:
-		return fmt.Errorf("%w (listing the Deployments in workspace %s)", astrosession.Rejected(domain), ws)
+		rejected := astrosession.Rejected(domain)
+		return &astrosession.WorkspaceError{
+			Workspace: ws, Source: src, Err: rejected,
+			Before: rejected.Error() + " (listing the Deployments in ",
+			After:  ")",
+		}
 	case http.StatusForbidden:
-		return fmt.Errorf("you do not have access to workspace %s — ask a workspace admin to grant it", ws)
+		return &astrosession.WorkspaceError{
+			Workspace: ws, Source: src,
+			Before: "you do not have access to ",
+			After:  " — ask a workspace admin to grant it",
+		}
 	}
 	detail := ""
 	if resp.HTTPResponse != nil {
@@ -172,7 +186,11 @@ func listOutage(domain, ws string, resp *astrov1.ListDeploymentsResponse) error 
 			detail = ": " + apiErr.Error()
 		}
 	}
-	return fmt.Errorf("Astro could not list the Deployments in workspace %s%s", ws, detail)
+	return &astrosession.WorkspaceError{
+		Workspace: ws, Source: src,
+		Before: "Astro could not list the Deployments in ",
+		After:  detail,
+	}
 }
 
 // workspaceOf is the workspace a Deployment name is looked up in when nothing

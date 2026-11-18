@@ -56,27 +56,27 @@ func (s *CmdSuite) TestLogin() {
 	}
 
 	// cloud login success
-	login(&cobra.Command{}, []string{cloudDomain}, nil, buf)
+	login([]string{cloudDomain}, nil, buf)
 
 	// software login success
 	testUtil.InitTestConfig(testUtil.Initial)
-	login(&cobra.Command{}, []string{apcDomain}, nil, buf)
+	login([]string{apcDomain}, nil, buf)
 
 	// no domain, cloud login
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	login(&cobra.Command{}, []string{}, nil, buf)
+	login([]string{}, nil, buf)
 
 	// no domain, software login
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	login(&cobra.Command{}, []string{}, nil, buf)
+	login([]string{}, nil, buf)
 
 	// no domain, no current context set
 	config.ResetCurrentContext()
-	login(&cobra.Command{}, []string{}, nil, buf)
+	login([]string{}, nil, buf)
 
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	apcDomain = "software.astronomer.io"
-	login(&cobra.Command{}, []string{apcDomain}, nil, buf)
+	login([]string{apcDomain}, nil, buf)
 	s.Contains(buf.String(), "To login to APC follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 }
 
@@ -95,20 +95,20 @@ func (s *CmdSuite) TestLoginSignup() {
 	const knownDomain, newDomain = "astronomer.io", "astronomer-dev.io"
 
 	signup, signin = true, false
-	s.NoError(login(&cobra.Command{}, []string{knownDomain}, nil, buf))
+	s.NoError(login([]string{knownDomain}, nil, buf))
 	s.True(got)
 
 	signup, signin = false, true
-	s.NoError(login(&cobra.Command{}, []string{newDomain}, nil, buf))
+	s.NoError(login([]string{newDomain}, nil, buf))
 	s.False(got)
 
 	signup, signin = false, false
-	s.NoError(login(&cobra.Command{}, []string{knownDomain}, nil, buf))
+	s.NoError(login([]string{knownDomain}, nil, buf))
 	s.False(got)
 
 	// Only production takes new accounts, so another environment signs in even
 	// with nothing saved for it.
-	s.NoError(login(&cobra.Command{}, []string{newDomain}, nil, buf))
+	s.NoError(login([]string{newDomain}, nil, buf))
 	s.False(got)
 }
 
@@ -124,12 +124,12 @@ func (s *CmdSuite) TestLoginSignupNewProductionAccount() {
 	}
 	buf := new(bytes.Buffer)
 
-	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	s.NoError(login([]string{"astronomer.io"}, nil, buf))
 	s.True(got)
 
 	// A token login opens no browser, so it stays on the sign-in path.
 	token = "a-token"
-	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	s.NoError(login([]string{"astronomer.io"}, nil, buf))
 	s.False(got)
 }
 
@@ -152,7 +152,7 @@ func (s *CmdSuite) TestLoginShortNames() {
 		"pr12345.astronomer-dev.io": "pr12345.astronomer-dev.io",
 	}
 	for name, want := range tests {
-		s.NoError(login(&cobra.Command{}, []string{name}, nil, new(bytes.Buffer)))
+		s.NoError(login([]string{name}, nil, new(bytes.Buffer)))
 		s.Equal(want, got, name)
 	}
 }
@@ -168,13 +168,13 @@ func (s *CmdSuite) TestLoginForce() {
 	s.T().Cleanup(func() { forceLogin = false })
 	buf := new(bytes.Buffer)
 
-	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	s.NoError(login([]string{"astronomer.io"}, nil, buf))
 	s.False(got)
 
 	forceLogin = true
-	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	s.NoError(login([]string{"astronomer.io"}, nil, buf))
 	s.True(got)
-	s.NoError(login(&cobra.Command{}, []string{}, nil, buf))
+	s.NoError(login([]string{}, nil, buf))
 	s.True(got)
 }
 
@@ -208,13 +208,13 @@ func (s *CmdSuite) TestLoginVault() {
 	l.Resolve(cfg, key, older)
 	inVault := secrets.Login{Token: secrets.LoginInVault}
 
-	s.NoError(login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf))
+	s.NoError(login([]string{"astronomer.io"}, nil, buf))
 	s.True(l.Save(cfg, key, older) == older, "without --vault the login left the config")
 
 	loginInVault = true
 	// Spelled the way the login page's address is, which the login saves
 	// under astronomer.io.
-	s.NoError(login(&cobra.Command{}, []string{"cloud.astronomer.io"}, nil, buf))
+	s.NoError(login([]string{"cloud.astronomer.io"}, nil, buf))
 	s.True(l.Save(cfg, key, older) == inVault, "--vault did not let the login back into the vault")
 }
 
@@ -251,9 +251,9 @@ func (s *CmdSuite) TestLoginPassesTheTokenToAPC() {
 	token = "ci-token"
 
 	testUtil.InitTestConfig(testUtil.Initial)
-	s.NoError(login(&cobra.Command{}, []string{"astronomer_dev.com"}, nil, new(bytes.Buffer)))
+	s.NoError(login([]string{"astronomer_dev.com"}, nil, new(bytes.Buffer)))
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	s.NoError(login(&cobra.Command{}, []string{}, nil, new(bytes.Buffer)))
+	s.NoError(login([]string{}, nil, new(bytes.Buffer)))
 	s.Equal([]string{"ci-token", "ci-token"}, got)
 }
 
@@ -266,7 +266,7 @@ func (s *CmdSuite) TestLoginEmailVerificationPending() {
 	}
 
 	buf := new(bytes.Buffer)
-	err := login(&cobra.Command{}, []string{"astronomer.io"}, nil, buf)
+	err := login([]string{"astronomer.io"}, nil, buf)
 	s.NoError(err)
 	s.Contains(buf.String(), "Check your inbox for a verification email")
 	s.Contains(buf.String(), "run 'astro login' to finish signing in")
@@ -291,38 +291,38 @@ func (s *CmdSuite) TestLogout() {
 	}
 
 	// cloud logout success
-	err := logout(&cobra.Command{}, []string{localDomain}, os.Stdout)
+	err := logout([]string{localDomain}, os.Stdout)
 	s.NoError(err)
 
 	// a cloud logout that fails fails the command, so it exits non-zero
 	cloudLogoutErr = errors.New("failed to clear the credentials")
-	err = logout(&cobra.Command{}, []string{localDomain}, os.Stdout)
+	err = logout([]string{localDomain}, os.Stdout)
 	s.ErrorIs(err, cloudLogoutErr)
 	cloudLogoutErr = nil
 
 	// software logout success
-	err = logout(&cobra.Command{}, []string{apcDomain}, os.Stdout)
+	err = logout([]string{apcDomain}, os.Stdout)
 	s.NoError(err)
 
 	// an APC logout that fails fails the command too
 	apcLogoutErr = errors.New("failed to find a login")
-	err = logout(&cobra.Command{}, []string{apcDomain}, os.Stdout)
+	err = logout([]string{apcDomain}, os.Stdout)
 	s.ErrorIs(err, apcLogoutErr)
 	apcLogoutErr = nil
 
 	// no domain, cloud logout
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	err = logout(&cobra.Command{}, []string{}, os.Stdout)
+	err = logout([]string{}, os.Stdout)
 	s.NoError(err)
 
 	// no domain, software logout
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	err = logout(&cobra.Command{}, []string{}, os.Stdout)
+	err = logout([]string{}, os.Stdout)
 	s.NoError(err)
 
 	// no domain, no current context set
 	config.ResetCurrentContext()
-	err = logout(&cobra.Command{}, []string{}, os.Stdout)
+	err = logout([]string{}, os.Stdout)
 	s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
 }
 
@@ -338,7 +338,7 @@ func (s *CmdSuite) TestLogoutExpandsShortNames() {
 	}
 
 	for short, host := range map[string]string{"prod": "astronomer.io", "dev": "astronomer-dev.io", "pr41523": "pr41523.astronomer-dev.io"} {
-		s.NoError(logout(&cobra.Command{}, []string{short}, io.Discard))
+		s.NoError(logout([]string{short}, io.Discard))
 		s.Equal(host, loggedOut)
 	}
 }
@@ -354,7 +354,7 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", "Bearer "+expectedToken)
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, "", false, textTo(buf))
+	err = printAuthToken("", false, textTo(buf))
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
@@ -363,7 +363,7 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", expectedToken)
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, "", false, textTo(buf))
+	err = printAuthToken("", false, textTo(buf))
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
@@ -372,13 +372,13 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", "")
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, "", false, textTo(buf))
+	err = printAuthToken("", false, textTo(buf))
 	s.EqualError(err, "no token found. Please run 'astro login' to authenticate")
 
 	// Test with no current context set
 	buf.Reset()
 	config.ResetCurrentContext()
-	err = printAuthToken(&cobra.Command{}, "", false, textTo(buf))
+	err = printAuthToken("", false, textTo(buf))
 	s.Error(err)
 }
 
@@ -495,13 +495,13 @@ func (s *CmdSuite) TestAuthTokenWithContext() {
 	s.NoError(err)
 
 	// Retrieve token using explicit context domain
-	err = printAuthToken(&cobra.Command{}, c.Domain, false, textTo(buf))
+	err = printAuthToken(c.Domain, false, textTo(buf))
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
 	// Test with non-existent context
 	buf.Reset()
-	err = printAuthToken(&cobra.Command{}, "nonexistent.domain.com", false, textTo(buf))
+	err = printAuthToken("nonexistent.domain.com", false, textTo(buf))
 	s.Error(err)
 }
 

@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	errInvalidDeployment         = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
+	errInvalidDeployment         = fmt.Errorf(deploymentNotFoundFmt, "this workspace")
 	ErrInvalidDeploymentKey      = errors.New("invalid Deployment selected")
 	errInvalidClusterKey         = errors.New("invalid Cluster selected")
 	errInvalidRegionKey          = errors.New("invalid Region selected")
@@ -52,6 +52,10 @@ var (
 	// A var so a test can answer either way.
 	mayAsk = input.CanAsk
 )
+
+// deploymentNotFoundFmt is errInvalidDeployment's message, with the Workspace
+// looked in where %s is.
+const deploymentNotFoundFmt = "the Deployment specified was not found in %s. Your account or API Key may not have access to the deployment specified"
 
 const (
 	NoDeploymentInWSMsg = "no Deployments found in workspace"
@@ -2028,18 +2032,22 @@ var ErrTokenDeploymentNotFound = errors.New("the Deployment ASTRO_API_TOKEN is s
 // Deployment-scoped token is for, and whether the token names one. One the
 // workspace does not list is an error, as is one filter leaves out: nothing
 // else is picked in its place.
-func fromToken(ws string, deployments []astrov1.Deployment, filter func(astrov1.Deployment) bool) (astrov1.Deployment, bool, error) {
+func fromToken(ws string, src astrosession.Source, deployments []astrov1.Deployment, filter func(astrov1.Deployment) bool) (astrov1.Deployment, bool, error) {
 	id := astrosession.TokenDeployment()
 	if id == "" {
 		return astrov1.Deployment{}, false, nil
 	}
 	i := slices.IndexFunc(deployments, func(d astrov1.Deployment) bool { return d.Id == id })
 	if i < 0 {
-		return astrov1.Deployment{}, true, fmt.Errorf("%w: %s is not in workspace %s. Pass --deployment, or --workspace with its workspace", ErrTokenDeploymentNotFound, id, ws)
+		return astrov1.Deployment{}, true, &astrosession.WorkspaceError{
+			Workspace: ws, Source: src, Err: ErrTokenDeploymentNotFound,
+			Before: ErrTokenDeploymentNotFound.Error() + ": " + id + " is not in ",
+			After:  ". Pass --deployment, or --workspace with its workspace",
+		}
 	}
 	d := deployments[i]
 	if filter != nil && !filter(d) {
-		return astrov1.Deployment{}, true, &NoneEligibleError{Workspace: ws, Token: d.Name + " (" + d.Id + ")"}
+		return astrov1.Deployment{}, true, &NoneEligibleError{Workspace: ws, Source: src, Token: d.Name + " (" + d.Id + ")"}
 	}
 	NoteTokenDeployment(os.Stderr, d.Name+" ("+d.Id+")")
 	return d, true, nil
@@ -2056,20 +2064,62 @@ func NoteTokenDeployment(w io.Writer, deployment string) {
 // NoDeploymentsError is a command that needed a Deployment picked in a
 // workspace that has none. Nothing is created in its place.
 type NoDeploymentsError struct {
-	// Workspace is the workspace that has none.
+	// Workspace is the workspace that has none, and Source where the run took
+	// it from.
 	Workspace string
+	Source    astrosession.Source
 }
 
 func (e *NoDeploymentsError) Error() string {
-	return fmt.Sprintf("%s %s: create one with astro deployment create", NoDeploymentInWSMsg, e.Workspace)
+	return fmt.Sprintf("%s %s: create one with astro deployment create", NoDeploymentInWSMsg, astrosession.Annotate(e.Workspace, e.Source))
+}
+
+// NotFoundError is a Deployment that a lookup in a Workspace did not find: the
+// Workspace has none with that id, or could not be listed. The message names
+// the Workspace, and where the run took it from when that is a source a person
+// can see (the flag, the project link, the token); the saved login is the
+// run's own, and the message says only "this workspace". It is
+// errInvalidDeployment for errors.Is, and unwraps to the listing's error when
+// there was one.
+type NotFoundError struct {
+	// Workspace is the Workspace looked in, Source where the run took it from.
+	Workspace string
+	Source    astrosession.Source
+	// Err is why the Workspace could not be listed, nil when it was and had no
+	// such Deployment.
+	Err error
+}
+
+func (e *NotFoundError) Error() string {
+	where := "this workspace"
+	if e.Source.Label("--workspace") != "" {
+		where = astrosession.DescribeWorkspace(e.Workspace, e.Source)
+	}
+	msg := fmt.Sprintf(deploymentNotFoundFmt, where)
+	if e.Err != nil {
+		msg += ": " + e.Err.Error()
+	}
+	return msg
+}
+
+// Unwrap is errInvalidDeployment when the Workspace was listed and had no such
+// Deployment, and only the listing's error when it could not be listed: an
+// outage is not a "not found", and keeps its own kind and code.
+func (e *NotFoundError) Unwrap() error {
+	if e.Err != nil {
+		return e.Err
+	}
+	return errInvalidDeployment
 }
 
 // NoneEligibleError is a workspace with Deployments, none of which the
 // command can act on (hibernate takes development Deployments alone, and a
 // link picker leaves out what the project already links).
 type NoneEligibleError struct {
-	// Workspace is the workspace looked in.
+	// Workspace is the workspace looked in, and Source where the run took it
+	// from.
 	Workspace string
+	Source    astrosession.Source
 	// Token, when set, is the Deployment the run's ASTRO_API_TOKEN is scoped
 	// to (its name and id), which the command cannot act on.
 	Token string
@@ -2084,7 +2134,7 @@ func (e *NoneEligibleError) Error() string {
 	if e.Token != "" {
 		return fmt.Sprintf("the Deployment ASTRO_API_TOKEN is scoped to, %s, is not %s", e.Token, need)
 	}
-	return fmt.Sprintf("none of the Deployments in workspace %s is %s", e.Workspace, need)
+	return fmt.Sprintf("none of the Deployments in %s is %s", astrosession.DescribeWorkspace(e.Workspace, e.Source), need)
 }
 
 // TargetsDisagreeError is a run that named its Deployment both by id and by
@@ -2130,9 +2180,10 @@ func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFi
 		}
 		return d, nil
 	}
+	src := sourceFor(astroV1Client, ws)
 	deployments, err := ListDeployments(ws, "", astroV1Client)
 	if err != nil {
-		return astrov1.Deployment{}, errors.Wrap(err, errInvalidDeployment.Error())
+		return astrov1.Deployment{}, &NotFoundError{Workspace: ws, Source: src, Err: err}
 	}
 
 	var id string
@@ -2140,18 +2191,18 @@ func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFi
 	case deploymentID != "":
 		i := slices.IndexFunc(deployments, func(d astrov1.Deployment) bool { return d.Id == deploymentID })
 		if i < 0 {
-			return astrov1.Deployment{}, errInvalidDeployment
+			return astrov1.Deployment{}, &NotFoundError{Workspace: ws, Source: src}
 		}
 		if deploymentName != "" && deployments[i].Name != deploymentName {
 			return astrov1.Deployment{}, &TargetsDisagreeError{ID: deploymentID, Name: deploymentName, IDsName: deployments[i].Name}
 		}
 		id = deploymentID
 	case deploymentName != "":
-		if id, err = oneNamed(deployments, deploymentName, ws, selectionFilter); err != nil {
+		if id, err = oneNamed(deployments, deploymentName, ws, src, selectionFilter); err != nil {
 			return astrov1.Deployment{}, err
 		}
 	default:
-		picked, err := deploymentSelectionProcess(ws, deployments, selectionFilter, use)
+		picked, err := deploymentSelectionProcess(ws, src, deployments, selectionFilter, use)
 		if err != nil {
 			return astrov1.Deployment{}, err
 		}
@@ -2164,12 +2215,12 @@ func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFi
 // leaves, that the run's Deployment-scoped ASTRO_API_TOKEN is for (except for
 // a delete), else for a ToRead caller the only one when mayAutoSelect, else
 // the one the person picks.
-func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, filter func(deployment astrov1.Deployment) bool, use Use) (astrov1.Deployment, error) {
+func deploymentSelectionProcess(ws string, src astrosession.Source, deployments []astrov1.Deployment, filter func(deployment astrov1.Deployment) bool, use Use) (astrov1.Deployment, error) {
 	if len(deployments) == 0 {
-		return astrov1.Deployment{}, &NoDeploymentsError{Workspace: ws}
+		return astrov1.Deployment{}, &NoDeploymentsError{Workspace: ws, Source: src}
 	}
 	if use != ToPick {
-		if d, ok, err := fromToken(ws, deployments, filter); ok || err != nil {
+		if d, ok, err := fromToken(ws, src, deployments, filter); ok || err != nil {
 			return d, err
 		}
 	}
@@ -2177,7 +2228,7 @@ func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, fil
 		deployments = util.Filter(deployments, filter)
 	}
 	if len(deployments) == 0 {
-		return astrov1.Deployment{}, &NoneEligibleError{Workspace: ws}
+		return astrov1.Deployment{}, &NoneEligibleError{Workspace: ws, Source: src}
 	}
 	if len(deployments) == 1 && mayAutoSelect() {
 		if use == ToRead {
@@ -2190,7 +2241,7 @@ func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, fil
 		// 1.x took it here for every command. A change waits for someone to
 		// pick it, and a run with nobody to ask is told to name it.
 		if !mayAsk() {
-			return astrov1.Deployment{}, input.Required(fmt.Errorf("%s (%s) is the only Deployment in workspace %s this command can act on, but a command that changes a Deployment does not choose one by itself: pass --deployment", deployments[0].Name, deployments[0].Id, ws))
+			return astrov1.Deployment{}, input.Required(fmt.Errorf("%s (%s) is the only Deployment in %s this command can act on, but a command that changes a Deployment does not choose one by itself: pass --deployment", deployments[0].Name, deployments[0].Id, astrosession.DescribeWorkspace(ws, src)))
 		}
 	}
 	return SelectDeployment(deployments, "Select a Deployment")

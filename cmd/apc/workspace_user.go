@@ -54,7 +54,7 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
   astro workspace user add user@company.com --role WORKSPACE_EDITOR \
     --workspace <WORKSPACE_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceUserAdd(cmd, out)
+			return workspaceUserAdd(out)
 		},
 	}
 	cmd.Flags().StringVar(&workspaceUserWsRole, "role", houston.WorkspaceViewerRole, "Role assigned to user")
@@ -73,7 +73,7 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
   astro workspace user update user@company.com --role WORKSPACE_ADMIN`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceUserUpdate(cmd, out, args)
+			return workspaceUserUpdate(out, args)
 		},
 	}
 	cmd.Flags().StringVar(&workspaceUserWsRole, "role", houston.WorkspaceViewerRole, "Role assigned to user")
@@ -91,7 +91,7 @@ func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
   astro workspace user remove user@company.com`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceUserRemove(cmd, out, args)
+			return workspaceUserRemove(out, args)
 		},
 	}
 	addAccessOutputFlag(cmd)
@@ -110,7 +110,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
   # List the users in another Workspace
   astro workspace user list --workspace <WORKSPACE_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceUserList(cmd, out)
+			return workspaceUserList(out)
 		},
 	}
 	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
@@ -121,7 +121,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func workspaceUserAdd(_ *cobra.Command, out io.Writer) error {
+func workspaceUserAdd(out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -139,7 +139,7 @@ func workspaceUserAdd(_ *cobra.Command, out io.Writer) error {
 	return renderWorkspaceUserAdded(r, w, workspaceUserCreateEmail, &added)
 }
 
-func workspaceUserUpdate(_ *cobra.Command, out io.Writer, args []string) error {
+func workspaceUserUpdate(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -157,7 +157,7 @@ func workspaceUserUpdate(_ *cobra.Command, out io.Writer, args []string) error {
 	return renderWorkspaceUserUpdated(r, args[0], &change)
 }
 
-func workspaceUserRemove(_ *cobra.Command, out io.Writer, args []string) error {
+func workspaceUserRemove(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -183,7 +183,7 @@ func workspaceUserRemove(_ *cobra.Command, out io.Writer, args []string) error {
 // through a list by asking which page to show next, and json asks nothing.
 var errListPaginatedUnderJSON = errors.New("--paginated pages through the list by asking which page to show next, so it cannot be used with --output json; leave it out to publish the whole list")
 
-func workspaceUserList(_ *cobra.Command, out io.Writer) error {
+func workspaceUserList(out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if paginated && r.Format == cliout.FormatJSON {
 		return cliout.Usage(errListPaginatedUnderJSON)

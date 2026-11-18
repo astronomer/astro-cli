@@ -22,17 +22,18 @@ func CloneSource(ref, ws string, astroV1Client astrov1.APIClient) (astrov1.Deplo
 	if ws == "" {
 		return astrov1.Deployment{}, fmt.Errorf("no Workspace to look up the Deployment named %q in: pass --workspace, or its id to --clone", ref)
 	}
+	src := sourceFor(astroV1Client, ws)
 	named, err := DeploymentsNamed(ref, ws, "", astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, err
 	}
 	switch len(named) {
 	case 0:
-		return astrov1.Deployment{}, fmt.Errorf("%w. Pass its id to --clone to copy one from another workspace", &NameError{Name: ref, Workspace: ws, Flag: "--clone"})
+		return astrov1.Deployment{}, fmt.Errorf("%w. Pass its id to --clone to copy one from another workspace", &NameError{Name: ref, Workspace: ws, Source: src, Flag: "--clone"})
 	case 1:
 		return GetDeploymentByID("", named[0].Id, astroV1Client)
 	}
-	return astrov1.Deployment{}, &NameError{Name: ref, Workspace: ws, Matches: named, Flag: "--clone"}
+	return astrov1.Deployment{}, &NameError{Name: ref, Workspace: ws, Source: src, Matches: named, Flag: "--clone"}
 }
 
 // DeploymentsNamed is every Deployment in workspace ws called name, listed

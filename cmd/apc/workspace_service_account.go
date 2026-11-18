@@ -54,7 +54,7 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command {
 		Long:    "Create a service account in the APC platform",
 		Example: workspaceSaCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceSaCreate(cmd, out)
+			return workspaceSaCreate(out)
 		},
 	}
 	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
@@ -77,7 +77,7 @@ func newWorkspaceSaListCmd(out io.Writer) *cobra.Command {
 		Long:    "List service accounts inside a workspace",
 		Example: workspaceSaListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceSaList(cmd, out)
+			return workspaceSaList(out)
 		},
 	}
 	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
@@ -98,7 +98,7 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
   # Delete it without the confirmation, from a script
   astro workspace service-account delete <SERVICE_ACCOUNT_ID> --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceSaDelete(cmd, out, args)
+			return workspaceSaDelete(out, args)
 		},
 	}
 	addYesFlag(cmd, "Don't ask for confirmation before deleting the service account")
@@ -107,7 +107,7 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func workspaceSaCreate(_ *cobra.Command, out io.Writer) error {
+func workspaceSaCreate(out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if workspaceSAName == "" {
 		return errServiceAccountNameEmpty
@@ -127,7 +127,7 @@ func workspaceSaCreate(_ *cobra.Command, out io.Writer) error {
 	return renderServiceAccountCreated(r, &created)
 }
 
-func workspaceSaList(_ *cobra.Command, out io.Writer) error {
+func workspaceSaList(out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -141,7 +141,7 @@ func workspaceSaList(_ *cobra.Command, out io.Writer) error {
 	return renderServiceAccountList(r, sas)
 }
 
-func workspaceSaDelete(_ *cobra.Command, out io.Writer, args []string) error {
+func workspaceSaDelete(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {

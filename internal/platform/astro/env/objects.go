@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/emfetch"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -35,6 +36,10 @@ const getObjectListLimit = 2
 type Scope struct {
 	WorkspaceID  string
 	DeploymentID string
+	// Source is where the run took WorkspaceID from (--workspace, the project
+	// link, the token's claim), so an error that says the Workspace the run
+	// looked in names it. SourceNone for the saved login, or no Workspace.
+	Source astrosession.Source
 }
 
 func (s Scope) Validate() error {
@@ -210,8 +215,14 @@ func checkInScope(obj *astrov1.EnvironmentObject, id string, scope Scope, object
 		return nil
 	}
 	owner := strings.ToLower(string(obj.Scope))
-	msg := fmt.Sprintf("%s %s belongs to %s %s, not %s %s. To address it, pass --%s %s",
-		want, id, owner, obj.ScopeEntityId, strings.ToLower(string(wantScope)), wantEntity, owner, obj.ScopeEntityId)
+	// The Workspace the run looked in says where it came from; the owner is
+	// the object's own, not a Workspace the run chose, so it does not.
+	wanted := strings.ToLower(string(wantScope)) + " " + wantEntity
+	if wantScope == astrov1.EnvironmentObjectScopeWORKSPACE {
+		wanted = astrosession.DescribeWorkspace(wantEntity, scope.Source)
+	}
+	msg := fmt.Sprintf("%s %s belongs to %s %s, not %s. To address it, pass --%s %s",
+		want, id, owner, obj.ScopeEntityId, wanted, owner, obj.ScopeEntityId)
 	if obj.Scope == astrov1.EnvironmentObjectScopeWORKSPACE && scope.DeploymentID != "" && objectType != objectTypeMetrics {
 		msg = fmt.Sprintf("%s %s belongs to workspace %s, not deployment %s. To change it everywhere, pass --workspace %s. "+
 			"To remove it from just this deployment, use astro env %s link remove (or link set --exclude if it is auto-linked)",

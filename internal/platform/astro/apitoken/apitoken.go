@@ -106,21 +106,6 @@ func RenameFailedAfterRole(role string, err error) error {
 	return fmt.Errorf("the token's role was updated to %s, but updating its name and description failed: %w", role, err)
 }
 
-// Usage marks err as a usage error: the command was invoked wrongly, such as
-// a verb that does not fit the token it names. The packages that return it
-// cannot import cmd/cliout, which recognizes the mark (IsUsageError).
-func Usage(err error) error {
-	if err == nil {
-		return nil
-	}
-	return usageError{err}
-}
-
-type usageError struct{ error }
-
-func (e usageError) Unwrap() error    { return e.error }
-func (usageError) IsUsageError() bool { return true }
-
 // Role is one role a token holds, on one object.
 type Role struct {
 	EntityType string `json:"entity_type"`
@@ -260,18 +245,3 @@ func TimeAgo(date time.Time) string {
 		return "Just now"
 	}
 }
-
-// UsageNoHelp is Usage for an error whose message already names what to run
-// instead, such as the verb that fits the token: the pointer to the command's
-// help would only bury it. cmd/cliout reads the OmitsHelpPointer mark
-// (cliout.UsageNoHelp).
-func UsageNoHelp(err error) error {
-	if err == nil {
-		return nil
-	}
-	return usageNoHelpError{usageError{err}}
-}
-
-type usageNoHelpError struct{ usageError }
-
-func (usageNoHelpError) OmitsHelpPointer() bool { return true }

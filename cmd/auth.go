@@ -63,8 +63,8 @@ func newLogoutCommand(out io.Writer) *cobra.Command {
 const signupVerificationMsg = `Thanks for signing up. Check your inbox for a verification email.
 After you verify your email address, run 'astro login' to finish signing in.`
 
-func login(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
-	err := runLogin(cmd, args, astroV1Client, out)
+func login(args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
+	err := runLogin(args, astroV1Client, out)
 	if errors.Is(err, astroAuth.ErrEmailVerificationPending) {
 		fmt.Fprintf(out, "\n%s\n", signupVerificationMsg)
 		return nil
@@ -133,7 +133,7 @@ func apcPlatformVersion(domain string) string {
 	return houstonVersion
 }
 
-func runLogin(_ *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
+func runLogin(args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
 	if err := resumeLoginVault(args); err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func runLogin(_ *cobra.Command, args []string, astroV1Client astrov1.APIClient, 
 	return apcLogin(ctx.Domain, oAuth, "", "", token, apcPlatformVersion(ctx.Domain), houstonClient, out)
 }
 
-func logout(_ *cobra.Command, args []string, out io.Writer) error {
+func logout(args []string, out io.Writer) error {
 	var domain string
 	if len(args) == 1 {
 		domain = domainutil.ExpandShortName(args[0])
@@ -200,7 +200,7 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 		Long:  "Authenticate to Astro or APC. A saved login for the domain that still works is reused without a browser; use --force to log in again. Without a saved account for astronomer.io, the browser opens the sign-up screen; use --signin for an existing account.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return login(cmd, args, astroV1Client, out)
+			return login(args, astroV1Client, out)
 		},
 		Example: `  # Log in to Astro in the browser
   astro auth login
@@ -234,7 +234,7 @@ func newAuthLogoutCommand(out io.Writer) *cobra.Command {
 		Short: "Log out of Astronomer",
 		Long:  "Log out of Astronomer",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return logout(cmd, args, out)
+			return logout(args, out)
 		},
 		Args: cobra.MaximumNArgs(1),
 		Example: `  # Log out of the current context
@@ -258,7 +258,7 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
 		Long:  "Print the current authentication token to standard output. This is useful for using the token in scripts or CI/CD pipelines.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return printAuthToken(cmd, tokenDomain, forceRenew, cliout.Renderer{Format: output, Out: out})
+			return printAuthToken(tokenDomain, forceRenew, cliout.Renderer{Format: output, Out: out})
 		},
 		Example: `  # Print the current context's token
   astro auth token
@@ -289,7 +289,7 @@ type authToken struct {
 
 // printAuthToken publishes the login's token. In text it is the token and
 // nothing else, so `$(astro auth token)` is the token.
-func printAuthToken(_ *cobra.Command, contextDomain string, force bool, r cliout.Renderer) error {
+func printAuthToken(contextDomain string, force bool, r cliout.Renderer) error {
 	c, err := astroCmd.FreshLogin(contextDomain, force)
 	if err != nil {
 		return err

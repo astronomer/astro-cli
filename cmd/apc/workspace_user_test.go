@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
@@ -78,17 +77,17 @@ func (s *Suite) TestWorkspaceUserAdd() {
 	// success case
 	buf := new(bytes.Buffer)
 	workspaceUserWsRole = houston.WorkspaceAdminRole
-	err := workspaceUserAdd(&cobra.Command{}, buf)
+	err := workspaceUserAdd(buf)
 	s.NoError(err)
 
 	// houston error case
 	houstonMock.On("AddWorkspaceUser", mock.Anything).Return(nil, errMockHouston).Once()
-	err = workspaceUserAdd(&cobra.Command{}, buf)
+	err = workspaceUserAdd(buf)
 	s.ErrorIs(err, errMockHouston)
 
 	// invalid role case
 	workspaceUserWsRole = "invalid-role"
-	err = workspaceUserAdd(&cobra.Command{}, buf)
+	err = workspaceUserAdd(buf)
 	s.Error(err)
 	s.Contains(err.Error(), "failed to find a valid role")
 
@@ -116,17 +115,17 @@ func (s *Suite) TestWorkspaceUserUpdate() {
 	// success case
 	buf := new(bytes.Buffer)
 	workspaceUserWsRole = houston.WorkspaceAdminRole
-	err := workspaceUserUpdate(&cobra.Command{}, buf, []string{mockEmail})
+	err := workspaceUserUpdate(buf, []string{mockEmail})
 	s.NoError(err)
 
 	// houston error case
 	houstonMock.On("UpdateWorkspaceUserRole", mock.Anything).Return("", errMockHouston).Once()
-	err = workspaceUserUpdate(&cobra.Command{}, buf, []string{mockEmail})
+	err = workspaceUserUpdate(buf, []string{mockEmail})
 	s.ErrorIs(err, errMockHouston)
 
 	// invalid role case
 	workspaceUserWsRole = "invalid-role"
-	err = workspaceUserUpdate(&cobra.Command{}, buf, []string{mockEmail})
+	err = workspaceUserUpdate(buf, []string{mockEmail})
 	s.Error(err)
 	s.Contains(err.Error(), "failed to find a valid role")
 
@@ -160,7 +159,7 @@ func (s *Suite) TestWorkspaceUserList() {
 	defer func() { houstonClient = currentClient }()
 
 	buf := new(bytes.Buffer)
-	err = workspaceUserList(&cobra.Command{}, buf)
+	err = workspaceUserList(buf)
 	s.NoError(err)
 	content := buf.String()
 	s.Contains(content, mockResponse[0].Username)
@@ -210,7 +209,7 @@ func (s *Suite) TestWorkspaceUserListPaginated() {
 		os.Stdin = r
 
 		paginated = true
-		err = workspaceUserList(&cobra.Command{}, buf)
+		err = workspaceUserList(buf)
 		s.NoError(err)
 		content := buf.String()
 		s.Contains(content, mockResponse[0].Username)
@@ -260,7 +259,7 @@ func (s *Suite) TestWorkspaceUserListPaginated() {
 
 		paginated = true
 		pageSize = -10
-		err = workspaceUserList(&cobra.Command{}, buf)
+		err = workspaceUserList(buf)
 		s.NoError(err)
 		content := buf.String()
 		s.Contains(content, mockResponse[0].Username)

@@ -249,3 +249,16 @@ func TestLegacyAPIKeysAreUnauthenticatedNotUsage(t *testing.T) {
 		t.Error("the refusal is a usage error, which exits 2")
 	}
 }
+
+// A Deployment lookup that could not list its Workspace keeps the listing's
+// kind: an outage is api_unavailable, not the not_found a missing Deployment is.
+func TestADeploymentLookupOutageKeepsTheListingsKind(t *testing.T) {
+	outage := &deployment.NotFoundError{Workspace: "ws", Source: astrosession.SourceFlag, Err: apiFailure(http.StatusServiceUnavailable)}
+	if got := problemKinds.Of(fmt.Errorf("lookup: %w", outage)); got != KindAPIUnavailable {
+		t.Errorf("kind of a listing outage = %q, want %q", got, KindAPIUnavailable)
+	}
+	forbidden := &deployment.NotFoundError{Workspace: "ws", Err: apiFailure(http.StatusForbidden)}
+	if got := problemKinds.Of(forbidden); got != KindForbidden {
+		t.Errorf("kind of a refused listing = %q, want %q", got, KindForbidden)
+	}
+}

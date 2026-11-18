@@ -748,11 +748,30 @@ func (d manifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeploy.De
 	if !d.login.current {
 		return manifestdeploy.Deployment{}, errPickerOtherHost(d.login.context.Domain)
 	}
-	dep, err := deployment.GetDeployment(workspaceID, "", "", deployment.ToChange, nil, d.login.client)
+	dep, err := deployment.GetDeployment(workspaceID, "", "", deployment.ToChange, nil, deployment.WithWorkspaceSource(d.login.client, workspaceID, d.workspaceSource(workspaceID)))
 	if err != nil {
 		return manifestdeploy.Deployment{}, err
 	}
 	return manifestdeploy.Deployment{ID: dep.Id, Name: dep.Name, WorkspaceID: dep.WorkspaceId}, nil
+}
+
+// workspaceSource is where the deploy took ws from: --workspace, the project's
+// [tool.astro] workspace, or the run's own selection (the token's claim, or the
+// saved login, which is not named).
+func (d manifestDeployer) workspaceSource(ws string) astrosession.Source {
+	if ws == "" {
+		return astrosession.SourceNone
+	}
+	if manifestWorkspace == ws {
+		return astrosession.SourceFlag
+	}
+	if m := manifestHere(); m != nil && m.Astro.Workspace == ws {
+		return astrosession.SourceProject
+	}
+	if own := astrosession.Resolve(astrosession.Request{Login: d.login.selection(), Domain: d.login.context.Domain}); own.Workspace == ws {
+		return own.WorkspaceSource
+	}
+	return astrosession.SourceNone
 }
 
 // gitMetadataAllowed reports whether a deploy records the commit it ships:

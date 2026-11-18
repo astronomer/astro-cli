@@ -52,6 +52,7 @@ var coreBelowCmd = []string{
 	"internal/proxydaemon",
 	"internal/runtimecatalog",
 	"internal/shipcheck",
+	"internal/usageerr",
 	"internal/userstate",
 	"internal/vaultenv",
 	"pkg/airflowapi",

@@ -13,56 +13,55 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
-// An error about looking in a Workspace names where the run took it from, for
-// a source a person can see; the saved login is the run's own and is not named.
-func TestExplainNamesWhereTheWorkspaceCameFrom(t *testing.T) {
-	tests := []struct {
-		name   string
-		target Target
-		err    string
-		want   string
-	}{
-		{"flag, not found", Target{Workspace: "wsB", WorkspaceSource: SourceFlag}, `no Deployment named "etl" in workspace wsB`, `no Deployment named "etl" in workspace wsB (from --workspace)`},
-		{"flag, permission", Target{Workspace: "wsB", WorkspaceSource: SourceFlag}, "you do not have access to workspace wsB: ask an admin", "you do not have access to workspace wsB (from --workspace): ask an admin"},
-		{"project link", Target{Workspace: "wsB", WorkspaceSource: SourceProject}, "no Deployment named x in workspace wsB", "no Deployment named x in workspace wsB (from the project link)"},
-		{"token claim", Target{Workspace: "wsB", WorkspaceSource: SourceToken}, "no Deployment named x in workspace wsB", "no Deployment named x in workspace wsB (from ASTRO_API_TOKEN)"},
-		{"a capital W", Target{Workspace: "wsB", WorkspaceSource: SourceFlag}, "list failed in Workspace wsB", "list failed in Workspace wsB (from --workspace)"},
-		{"no id in the text", Target{Workspace: "wsB", WorkspaceSource: SourceFlag}, "the Deployment specified was not found in this workspace. Your account may not have access", "the Deployment specified was not found in workspace wsB (from --workspace). Your account may not have access"},
-		{"only the first mention", Target{Workspace: "wsB", WorkspaceSource: SourceFlag}, "workspace wsB, and workspace wsB again", "workspace wsB (from --workspace), and workspace wsB again"},
-		{"already explained", Target{Workspace: "wsB", WorkspaceSource: SourceFlag}, "no Deployment in workspace wsB (from --workspace)", "no Deployment in workspace wsB (from --workspace)"},
-		{"the saved login is nobody's surprise", Target{Workspace: "wsB", WorkspaceSource: SourceContext}, "no Deployment in workspace wsB", "no Deployment in workspace wsB"},
-		{"no workspace", Target{}, "no Deployment in workspace wsB", "no Deployment in workspace wsB"},
-		{"another workspace's text", Target{Workspace: "wsB", WorkspaceSource: SourceFlag}, "no Deployment in workspace wsC", "no Deployment in workspace wsC"},
-		{"an id that is a prefix of another", Target{Workspace: "wsB", WorkspaceSource: SourceFlag}, "no Deployment in workspace wsBX", "no Deployment in workspace wsBX"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.target.Explain(errors.New(tt.err))
-			if got.Error() != tt.want {
-				t.Fatalf("Explain = %q, want %q", got, tt.want)
-			}
-		})
-	}
-	if (Target{Workspace: "wsB", WorkspaceSource: SourceFlag}).Explain(nil) != nil {
-		t.Fatal("Explain(nil) is not nil")
-	}
-}
-
-// The reworded error is the original underneath, so its kind and exit code,
-// which are found by what it wraps, do not change.
+// statusLike is a cause whose kind and exit code are found by what wraps it.
 type statusLike struct{ code int }
 
 func (e *statusLike) Error() string { return fmt.Sprintf("status %d", e.code) }
 
-func TestExplainKeepsTheOriginalErrorUnderneath(t *testing.T) {
-	orig := fmt.Errorf("no access to workspace wsB: %w", &statusLike{403})
-	got := (Target{Workspace: "wsB", WorkspaceSource: SourceFlag}).Explain(orig)
-	if got.Error() == orig.Error() {
-		t.Fatal("the error was not reworded")
+// An error about looking in a Workspace is built with the Workspace's id and
+// source, so its message names the source a person can see; the saved login
+// is the run's own and is not named.
+func TestWorkspaceErrorNamesWhereTheWorkspaceCameFrom(t *testing.T) {
+	tests := []struct {
+		name   string
+		source Source
+		want   string
+	}{
+		{"flag", SourceFlag, "no access to workspace wsB (from --workspace): ask an admin"},
+		{"project link", SourceProject, "no access to workspace wsB (from the project link): ask an admin"},
+		{"token claim", SourceToken, "no access to workspace wsB (from ASTRO_API_TOKEN): ask an admin"},
+		{"request path", SourcePath, "no access to workspace wsB (from the request path): ask an admin"},
+		{"the saved login is nobody's surprise", SourceContext, "no access to workspace wsB: ask an admin"},
+		{"no source", SourceNone, "no access to workspace wsB: ask an admin"},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := &WorkspaceError{Workspace: "wsB", Source: tt.source, Before: "no access to ", After: ": ask an admin"}
+			if got := err.Error(); got != tt.want {
+				t.Fatalf("Error = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+// The error unwraps to its cause, so the kind and exit code, which are found
+// by what it wraps, do not depend on the words; errors.As finds the Workspace
+// and the source it carries, and a message about another Workspace is not
+// labeled with this one's source.
+func TestWorkspaceErrorKeepsTheCauseAndCarriesTheSource(t *testing.T) {
+	cause := &statusLike{403}
+	err := fmt.Errorf("listing: %w", &WorkspaceError{Workspace: "wsB", Source: SourceFlag, Before: "no access to ", Err: cause})
 	var s *statusLike
-	if !errors.Is(got, orig) || !errors.As(got, &s) || s.code != 403 {
-		t.Fatalf("%v does not unwrap to what it was", got)
+	if !errors.As(err, &s) || s.code != 403 || !errors.Is(err, cause) {
+		t.Fatalf("%v does not unwrap to its cause", err)
+	}
+	var w *WorkspaceError
+	if !errors.As(err, &w) || w.Workspace != "wsB" || w.Source != SourceFlag {
+		t.Fatalf("errors.As = %+v", w)
+	}
+	other := &WorkspaceError{Workspace: "wsC", Source: SourceNone, Before: "no access to "}
+	if got := other.Error(); got != "no access to workspace wsC" {
+		t.Fatalf("another Workspace's error = %q", got)
 	}
 }
 
@@ -89,6 +88,12 @@ func TestSourceLabelsAreTheWordsOfTheNotes(t *testing.T) {
 	}
 	if got := DescribeWorkspace("wsB", SourceContext); got != "workspace wsB" {
 		t.Errorf("DescribeWorkspace of the saved login = %q", got)
+	}
+	if got := Annotate("wsB", SourceProject); got != "wsB (from the project link)" {
+		t.Errorf("Annotate = %q", got)
+	}
+	if got := Annotate("wsB", SourceNone); got != "wsB" {
+		t.Errorf("Annotate of no source = %q", got)
 	}
 }
 

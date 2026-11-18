@@ -52,17 +52,17 @@ func tokenArg(args []string, id *string) {
 	}
 }
 
-func listWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
-	return runWorkspaceTokenList(cmd, out, nil)
+func listWorkspaceToken(out io.Writer) error {
+	return runWorkspaceTokenList(out, nil)
 }
 
 // listOrganizationTokensInWorkspace lists the Organization tokens with a role
 // on the Workspace.
-func listOrganizationTokensInWorkspace(cmd *cobra.Command, out io.Writer) error {
-	return runWorkspaceTokenList(cmd, out, []workspacetoken.TokenType{workspacetoken.TokenTypeORGANIZATION})
+func listOrganizationTokensInWorkspace(out io.Writer) error {
+	return runWorkspaceTokenList(out, []workspacetoken.TokenType{workspacetoken.TokenTypeORGANIZATION})
 }
 
-func runWorkspaceTokenList(_ *cobra.Command, out io.Writer, tokenTypes []workspacetoken.TokenType) error {
+func runWorkspaceTokenList(out io.Writer, tokenTypes []workspacetoken.TokenType) error {
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	return renderTokenSecret(workspaceTokenOutput, out, &created, "Workspace", "created", tokenName, cleanTokenOutput)
 }
 
-func updateWorkspaceToken(_ *cobra.Command, args []string, out io.Writer) error {
+func updateWorkspaceToken(args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func updateWorkspaceToken(_ *cobra.Command, args []string, out io.Writer) error 
 	return renderTokenLine(workspaceTokenOutput, out, res.Token, line)
 }
 
-func rotateWorkspaceToken(_ *cobra.Command, args []string, out io.Writer) error {
+func rotateWorkspaceToken(args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}
@@ -305,7 +305,7 @@ func upsertOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 	return renderTokenLine(workspaceTokenOutput, out, token, fmt.Sprintf("Astro Organization API token %s was successfully added/updated to the Workspace", token.Name))
 }
 
-func removeOrganizationTokenWorkspaceRole(_ *cobra.Command, args []string, out io.Writer) error {
+func removeOrganizationTokenWorkspaceRole(args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}

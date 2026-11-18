@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -84,15 +83,43 @@ func (s Source) Label(flag string) string {
 	return ""
 }
 
-// DescribeWorkspace is "workspace id (from --workspace)" for a Workspace a
-// source the person can see chose (the flag, the project link, the token, a
-// path), and "workspace id" for any other.
-func DescribeWorkspace(id string, s Source) string {
+// Annotate is the Workspace id with where the run took it from, "id (from
+// --workspace)", for a Workspace a source the person can see chose (the flag,
+// the project link, the token, a path), and the bare id for any other.
+func Annotate(id string, s Source) string {
 	if from := s.Label(flagWorkspace); from != "" {
-		return fmt.Sprintf("workspace %s (from %s)", id, from)
+		return fmt.Sprintf("%s (from %s)", id, from)
 	}
-	return "workspace " + id
+	return id
 }
+
+// DescribeWorkspace is "workspace id (from --workspace)" for a Workspace a
+// source the person can see chose, and "workspace id" for any other.
+func DescribeWorkspace(id string, s Source) string {
+	return "workspace " + Annotate(id, s)
+}
+
+// WorkspaceError is an error about looking in one Workspace (not found, no
+// access, nothing in it). It carries the Workspace's id and where the run took
+// it from, and its message names both: Before, then "workspace id (from
+// --workspace)", then After. What built the error knew its Workspace and its
+// source, so the message was formed with the source in it, and nothing rewrites
+// it afterwards. It unwraps to Err, so the cause's kind and code are unchanged.
+type WorkspaceError struct {
+	// Workspace is the id of the Workspace looked in, Source where it came from.
+	Workspace string
+	Source    Source
+	// Before and After are the message around the Workspace's description.
+	Before, After string
+	// Err is the cause, nil for none.
+	Err error
+}
+
+func (e *WorkspaceError) Error() string {
+	return e.Before + DescribeWorkspace(e.Workspace, e.Source) + e.After
+}
+
+func (e *WorkspaceError) Unwrap() error { return e.Err }
 
 // From is the source worded for a message ("--workspace", "the project's
 // link"), "" for none.
@@ -309,58 +336,6 @@ type Target struct {
 	// token's own (see WorkspaceDisagreeError).
 	disagree error
 }
-
-// Explain is err with the Workspace it names worded with where the run took
-// it from: "workspace B (from --workspace)", for an error about looking in a
-// Workspace the run was handed (not found, no access, nothing in it). It reads
-// the Workspace out of the text, where "workspace <id>" is, or "this
-// workspace" with no id, so what built the error need not know where its
-// Workspace came from; it is err, unchanged, when the text names neither, when
-// the source is the saved login or none, or when it has been explained. The
-// result unwraps to err, so the error's kind and code are what they were.
-func (t Target) Explain(err error) error { //nolint:gocritic // a small value type
-	if err == nil || t.Workspace == "" {
-		return err
-	}
-	named := DescribeWorkspace(t.Workspace, t.WorkspaceSource)
-	if named == "workspace "+t.Workspace {
-		return err
-	}
-	msg := err.Error()
-	if strings.Contains(msg, named) {
-		return err
-	}
-	var rewritten string
-	// The id is the whole word: "workspace foo" is not in "workspace foobar".
-	byID := regexp.MustCompile(`([wW])orkspace ` + regexp.QuoteMeta(t.Workspace) + `\b`)
-	switch {
-	case byID.MatchString(msg):
-		done := false
-		rewritten = byID.ReplaceAllStringFunc(msg, func(m string) string {
-			if done {
-				return m
-			}
-			done = true
-			return m[:1] + named[1:]
-		})
-	case strings.Contains(msg, "this workspace"):
-		rewritten = strings.Replace(msg, "this workspace", named, 1)
-	default:
-		return err
-	}
-	return &explainedError{msg: rewritten, err: err}
-}
-
-// explainedError is an error reworded by Target.Explain. It unwraps to the
-// original, so errors.Is and errors.As, and with them the kind and the exit
-// code, see what they saw.
-type explainedError struct {
-	msg string
-	err error
-}
-
-func (e *explainedError) Error() string { return e.msg }
-func (e *explainedError) Unwrap() error { return e.err }
 
 // Resolve decides the run's Workspace and Deployment. It reads the current
 // context and ASTRO_API_TOKEN, and never prompts or calls the API.
