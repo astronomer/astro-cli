@@ -10,7 +10,6 @@ import (
 	"github.com/lucsky/cuid"
 	"github.com/pkg/errors"
 
-	"github.com/astronomer/astro-cli/pkg/astroauth"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -23,12 +22,6 @@ type CustomClaims struct {
 	RsaKeyID              string   `json:"kid"`
 	APITokenID            string   `json:"apiTokenId"`
 	jwt.RegisteredClaims
-}
-
-// Base64URLEncode delegates to astroauth.Base64URLEncode.
-// See https://datatracker.ietf.org/doc/html/rfc4648#section-5
-func Base64URLEncode(arg []byte) string {
-	return astroauth.Base64URLEncode(arg)
 }
 
 func CheckEnvBool(envBool string) bool {
