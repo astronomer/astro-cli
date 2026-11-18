@@ -82,12 +82,16 @@ func mockSyncWrite(s *Suite, mockStreamClient *astrov1alpha1_mocks.ClientInterfa
 	}).Return(directoryWritten(newVersion), nil).Once()
 }
 
-// replaceLocalFile replaces the file at name in one rename, as an editor that
-// saves atomically does, so a sync never reads it half written.
-func replaceLocalFile(s *Suite, name, content string) {
-	temp := filepath.Join(s.T().TempDir(), filepath.Base(name))
-	s.NoError(os.WriteFile(temp, []byte(content), 0o600))
-	s.NoError(os.Rename(temp, name))
+// replaceLocalFiles writes each file under dir in one rename, as an editor that
+// saves atomically does, so a sync running meanwhile never reads one half written.
+func replaceLocalFiles(s *Suite, dir string, files map[string]string) {
+	for name, content := range files {
+		filePath := filepath.Join(dir, filepath.FromSlash(name))
+		s.NoError(os.MkdirAll(filepath.Dir(filePath), 0o755))
+		temp := filepath.Join(s.T().TempDir(), filepath.Base(filePath))
+		s.NoError(os.WriteFile(temp, []byte(content), 0o600))
+		s.NoError(os.Rename(temp, filePath))
+	}
 }
 
 // startWatch runs a watching sync of fromDir into my-files:dags until stop is
@@ -126,11 +130,11 @@ func (s *Suite) TestSyncBundleFilesWatch() {
 		s.Equal(map[string]string{"a.py": "a"}, receive(s, writes))
 		receive(s, out.watching)
 
-		writeLocalFiles(s, fromDir, map[string]string{"sub/b.py": "b"})
+		replaceLocalFiles(s, fromDir, map[string]string{"sub/b.py": "b"})
 		s.NoError(os.Remove(filepath.Join(fromDir, "a.py")))
 		s.Equal(map[string]string{"sub/b.py": "b", "__DEL__a.py": ""}, receive(s, writes))
 
-		writeLocalFiles(s, fromDir, map[string]string{"sub/b.py": "b2", ".env": "secret"})
+		replaceLocalFiles(s, fromDir, map[string]string{"sub/b.py": "b2", ".env": "secret"})
 		s.Equal(map[string]string{"sub/b.py": "b2"}, receive(s, writes))
 
 		stop()
@@ -156,7 +160,7 @@ func (s *Suite) TestSyncBundleFilesWatch() {
 		out, done, stop := startWatch(s, "./src", mockV1Alpha1Client, mockStreamClient)
 		receive(s, out.watching)
 
-		writeLocalFiles(s, "src", map[string]string{"deep/er/c.py": "c2"})
+		replaceLocalFiles(s, "src", map[string]string{"deep/er/c.py": "c2"})
 		s.Equal(map[string]string{"deep/er/c.py": "c2"}, receive(s, writes))
 
 		s.NoError(os.Remove(filepath.Join("src", "sub", "b.py")))
@@ -220,7 +224,7 @@ func (s *Suite) TestSyncBundleFilesWatch() {
 		_, done, stop := startWatch(s, fromDir, mockV1Alpha1Client, mockStreamClient)
 		s.Equal(map[string]string{"a.py": "a", "b.log": "b"}, receive(s, writes))
 
-		writeLocalFiles(s, fromDir, map[string]string{".gitignore": "*.log\n", "b.log": "b2"})
+		replaceLocalFiles(s, fromDir, map[string]string{".gitignore": "*.log\n", "b.log": "b2"})
 		s.Equal(map[string]string{".gitignore": "*.log\n"}, receive(s, writes))
 
 		stop()
@@ -251,7 +255,7 @@ func (s *Suite) TestSyncBundleFilesWatch() {
 				mockV1Alpha1Client.AssertExpectations(s.T())
 				return
 			case <-ticker.C:
-				replaceLocalFile(s, filepath.Join(fromDir, "log.txt"), strconv.Itoa(i))
+				replaceLocalFiles(s, fromDir, map[string]string{"log.txt": strconv.Itoa(i)})
 			case <-timeout:
 				s.FailNow("timed out waiting for a sync while the file kept changing")
 			}
@@ -283,7 +287,7 @@ func (s *Suite) TestSyncBundleFilesWatch() {
 
 		out, done, _ := startWatch(s, fromDir, mockV1Alpha1Client, mockStreamClient)
 		receive(s, out.watching)
-		writeLocalFiles(s, fromDir, map[string]string{"a.py": "a2"})
+		replaceLocalFiles(s, fromDir, map[string]string{"a.py": "a2"})
 		s.EqualError(receive(s, done), "bundle has moved on; re-read and retry")
 		mockV1Alpha1Client.AssertExpectations(s.T())
 	})
