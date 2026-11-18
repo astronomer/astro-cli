@@ -85,11 +85,13 @@ func TestDeploymentCommandsAddressedByIDNeedNoWorkspaceUnderAnOrganizationToken(
 			out, err := execDeploymentCmd(tc.args...)
 			require.NoError(t, err)
 			assert.Contains(t, out, tc.want)
-			// The ID was fetched before anything was listed, and the list was
-			// of the Deployment's own Workspace.
-			require.GreaterOrEqual(t, len(mc.Calls), 2)
+			// The ID was fetched, once, and the command went on with that
+			// Deployment: the Workspace it is in was not listed, and it was
+			// not fetched again.
+			require.NotEmpty(t, mc.Calls)
 			assert.Equal(t, "GetDeploymentWithResponse", mc.Calls[0].Method)
-			mc.AssertCalled(t, "ListDeploymentsWithResponse", mock.Anything, "env-org", listedInDeploymentsWorkspace("workspace-id"))
+			assert.Equal(t, 1, getsOf(mc), "fetches of the Deployment")
+			mc.AssertNotCalled(t, "ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }

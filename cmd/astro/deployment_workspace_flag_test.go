@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bytes"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -121,33 +122,54 @@ func TestOneXWorkspaceIDNoOpLeavesTheProjectInCharge(t *testing.T) {
 	})
 }
 
-// workspace-token add and remove pick the Workspace token among the
-// workspace the command is pointed at: --workspace, else the project's, else
-// the context's.
-func TestWorkspaceTokenAddAndRemovePickInTheWorkspaceTheyArePointedAt(t *testing.T) {
+// deploymentsWorkspace is the Workspace the Deployment of the cases below is
+// in: neither the project's, nor the explicit one, nor the context's.
+const deploymentsWorkspace = "cldeploymentsworkspace0001"
+
+// A Workspace token can hold a role only on Deployments of its own Workspace,
+// so workspace-token add looks for the token it is given by name in the
+// Deployment's own Workspace, whatever Workspace the project or the context
+// names: it reads the Deployment for that. --workspace is the explicit
+// override. remove picks the Workspace token among the workspace the command is
+// pointed at: --workspace, else the project's, else the context's.
+func TestWorkspaceTokenAddSearchesTheDeploymentsWorkspaceAndRemoveTheOneItIsPointedAt(t *testing.T) {
 	_, wsTok, _ := tokenFixtures()
 	inWS := func(ws string) any {
 		return mock.MatchedBy(func(p *astrov1.ListApiTokensParams) bool {
 			return p.WorkspaceId != nil && *p.WorkspaceId == ws
 		})
 	}
-	client := func(t *testing.T, ws string) *astrov1_mocks.ClientWithResponsesInterface {
+	// client answers the token lookup in searched, and, for an add, the read of
+	// the Deployment (in deploymentsWorkspace) that finds it.
+	client := func(t *testing.T, searched string, readsDeployment bool) *astrov1_mocks.ClientWithResponsesInterface {
 		t.Helper()
 		// A token id an earlier test's argument left in the package would
 		// skip the lookup by name these cases are about.
 		tokenID, orgTokenID, workspaceTokenID = "", "", ""
 		mc := new(astrov1_mocks.ClientWithResponsesInterface)
-		mc.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, inWS(ws)).Return(listTokensResp(wsTok), nil).Once()
+		mc.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, inWS(searched)).Return(listTokensResp(wsTok), nil).Once()
 		mc.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, wsTok.Id).Return(getTokenResp(wsTok), nil).Once()
 		mc.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, wsTok.Id, mock.Anything).Return(rolesOK(), nil).Once()
+		if readsDeployment {
+			mc.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, otherDep).Return(&astrov1.GetDeploymentResponse{
+				HTTPResponse: ok200(), JSON200: &astrov1.Deployment{Id: otherDep, WorkspaceId: deploymentsWorkspace},
+			}, nil).Once()
+		}
 		return mc
 	}
 	for _, verb := range [][]string{{"add", "--role", "DEPLOYMENT_ADMIN"}, {"remove"}} {
+		add := verb[0] == "add"
 		args := append([]string{"token", "workspace-token", verb[0], "--name", wsTok.Name, "--deployment", otherDep}, verb[1:]...)
 		t.Run(verb[0]+" in a project", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			inProject(t, testProjectManifest)
-			mc := client(t, projectWS)
+			// The project's Workspace is A and the Deployment is in B: B for an
+			// add, A for a remove.
+			searched := projectWS
+			if add {
+				searched = deploymentsWorkspace
+			}
+			mc := client(t, searched, add)
 			expectWorkspaceName(mc)
 			astroV1Client = mc
 			_, err := execDeploymentCmd(args...)
@@ -157,7 +179,8 @@ func TestWorkspaceTokenAddAndRemovePickInTheWorkspaceTheyArePointedAt(t *testing
 		t.Run(verb[0]+" with --workspace in a project", func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			inProject(t, testProjectManifest)
-			mc := client(t, "clexplicitworkspace000001")
+			// The override is searched, and the Deployment is not even read.
+			mc := client(t, "clexplicitworkspace000001", false)
 			astroV1Client = mc
 			_, err := execDeploymentCmd(append(args, "--workspace", "clexplicitworkspace000001")...)
 			require.NoError(t, err)
@@ -168,25 +191,49 @@ func TestWorkspaceTokenAddAndRemovePickInTheWorkspaceTheyArePointedAt(t *testing
 			t.Cleanup(func() { workspaceID = "" })
 			c, err := config.GetCurrentContext()
 			require.NoError(t, err)
-			mc := client(t, c.Workspace)
+			searched := c.Workspace
+			if add {
+				searched = deploymentsWorkspace
+			}
+			mc := client(t, searched, add)
 			astroV1Client = mc
 			_, err = execDeploymentCmd(args...)
 			require.NoError(t, err)
 			mc.AssertExpectations(t)
 		})
 	}
-	t.Run("a token given by name with no workspace anywhere says to pass one", func(t *testing.T) {
+	t.Run("an add with no workspace anywhere still finds the Deployment's", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		noWorkspaceContext(t)
+		mc := client(t, deploymentsWorkspace, true)
+		astroV1Client = mc
+		_, err := execDeploymentCmd("token", "workspace-token", "add", "--name", wsTok.Name, "--deployment", otherDep, "--role", "DEPLOYMENT_ADMIN")
+		require.NoError(t, err)
+		mc.AssertExpectations(t)
+	})
+	t.Run("an add that cannot read the Deployment says so, and that --workspace names one", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		tokenID, orgTokenID, workspaceTokenID = "", "", ""
+		mc := new(astrov1_mocks.ClientWithResponsesInterface)
+		mc.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, otherDep).Return(&astrov1.GetDeploymentResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusNotFound}, Body: []byte(`{"message":"nope"}`),
+		}, nil).Once()
+		astroV1Client = mc
+		_, err := execDeploymentCmd("token", "workspace-token", "add", "--name", wsTok.Name, "--deployment", otherDep, "--role", "DEPLOYMENT_ADMIN")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "could not read Deployment "+otherDep+" to find the Workspace its Workspace tokens are in; pass --workspace: ")
+		assert.Contains(t, err.Error(), "nope")
+		mc.AssertExpectations(t)
+	})
+	t.Run("a remove with no workspace anywhere says to pass one", func(t *testing.T) {
 		t.Setenv("ASTRO_API_TOKEN", "") // a token run gets another message
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		noWorkspaceContext(t)
 		tokenID, orgTokenID, workspaceTokenID = "", "", ""
 		astroV1Client = new(astrov1_mocks.ClientWithResponsesInterface) // asked nothing
-		for _, verb := range [][]string{{"add", "--role", "DEPLOYMENT_ADMIN"}, {"remove"}} {
-			args := append([]string{"token", "workspace-token", verb[0], "--name", wsTok.Name, "--deployment", otherDep}, verb[1:]...)
-			_, err := execDeploymentCmd(args...)
-			require.Error(t, err, verb[0])
-			assert.Contains(t, err.Error(), "failed to find a valid workspace to find the Workspace token in; pass --workspace, or the token's ID: ", verb[0])
-		}
+		_, err := execDeploymentCmd("token", "workspace-token", "remove", "--name", wsTok.Name, "--deployment", otherDep)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to find a valid workspace to find the Workspace token in; pass --workspace, or the token's ID: ")
 	})
 	t.Run("a token given by id needs no workspace", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -200,6 +247,41 @@ func TestWorkspaceTokenAddAndRemovePickInTheWorkspaceTheyArePointedAt(t *testing
 		require.NoError(t, err)
 		mc.AssertExpectations(t)
 	})
+}
+
+// deployment token add --name looks for a Workspace token among those of the
+// Deployment's own Workspace, not the project's or the context's: with the
+// project's Workspace A and the Deployment in B, B is searched and A is not.
+func TestDeploymentTokenAddByNameSearchesTheDeploymentsWorkspaceNotTheProjects(t *testing.T) {
+	_, wsTok, orgTok := tokenFixtures()
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	inProject(t, testProjectManifest)
+	tokenID, orgTokenID, workspaceTokenID = "", "", ""
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	mc.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, otherDep).Return(&astrov1.GetDeploymentResponse{
+		HTTPResponse: ok200(), JSON200: &astrov1.Deployment{Id: otherDep, WorkspaceId: deploymentsWorkspace},
+	}, nil).Once()
+	inAWorkspace := func(p *astrov1.ListApiTokensParams) bool { return p.WorkspaceId != nil }
+	mc.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(inAWorkspace)).Return(listTokensResp(wsTok), nil)
+	mc.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(p *astrov1.ListApiTokensParams) bool { return !inAWorkspace(p) })).Return(listTokensResp(orgTok), nil)
+	mc.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, wsTok.Id).Return(getTokenResp(wsTok), nil).Once()
+	mc.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, wsTok.Id, mock.Anything).Return(rolesOK(), nil).Once()
+	expectWorkspaceName(mc)
+	astroV1Client = mc
+
+	_, err := execDeploymentCmd("token", "add", "--name", wsTok.Name, "--deployment", otherDep, "--role", "DEPLOYMENT_ADMIN")
+	require.NoError(t, err)
+
+	var searched []string
+	for i := range mc.Calls {
+		if mc.Calls[i].Method != "ListApiTokensWithResponse" {
+			continue
+		}
+		if p, ok := mc.Calls[i].Arguments.Get(2).(*astrov1.ListApiTokensParams); ok && p.WorkspaceId != nil {
+			searched = append(searched, *p.WorkspaceId)
+		}
+	}
+	assert.Equal(t, []string{deploymentsWorkspace}, searched, "the Workspaces whose tokens were listed; the project's is %s", projectWS)
 }
 
 // noWorkspaceContext leaves the current context with no workspace, as an

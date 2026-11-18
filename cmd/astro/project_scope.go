@@ -32,6 +32,9 @@ const deploymentArgAnnotation = "astro.deployment-arg"
 type projectFollow struct {
 	// workspace is the project's workspace, "" when the project names none.
 	workspace string
+	// noted is whether the run has said its Workspace came from the token's
+	// claim (noteTokenWorkspace), so it says so once. nil is no record.
+	noted *bool
 }
 
 type projectFollowKey struct{}
@@ -89,9 +92,19 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 				return err
 			}
 		}
-		cmd.SetContext(withProjectFollow(cmd.Context(), projectFollow{workspace: pick.workspace}))
+		cmd.SetContext(withProjectFollow(cmd.Context(), projectFollow{workspace: pick.workspace, noted: new(bool)}))
 		if err := parentPreRun(group, cmd, args); err != nil {
 			return err
+		}
+		// A project link the run's token is not for is refused once the command
+		// asks for its Workspace (astrosession.Target.Require); no note says the
+		// project chose it.
+		if astrosession.CheckWorkspace(pick.workspace, astrosession.SourceProject) != nil {
+			return nil
+		}
+		// Nothing but the result goes with a json run.
+		if cliout.IsJSON(cmd) {
+			return nil
 		}
 		if note := projectNote(cmd.Context(), pick, before.Workspace, switched); note != "" {
 			fmt.Fprintln(cmd.ErrOrStderr(), note)
@@ -266,6 +279,26 @@ func parentPreRun(group, cmd *cobra.Command, args []string) error {
 		}
 	}
 	return nil
+}
+
+// noteTokenWorkspace says on stderr, once, that the run's Workspace came from
+// its API token's claim, when t, the resolver's answer for a command that is
+// about to use it, says so (t.WorkspaceSource, not recomputed). It is for a
+// person: not under -o json, and not for a Workspace the flag or the project
+// named, which is no surprise. A command that never resolves its Workspace (a
+// token given by ID, a Deployment given by ID with --workspace) says nothing.
+func noteTokenWorkspace(cmd *cobra.Command, t astrosession.Target) { //nolint:gocritic // a small value type
+	f, ok := projectFollowOf(cmd)
+	if !ok || t.WorkspaceSource != astrosession.SourceToken || t.Workspace == "" || cliout.IsJSON(cmd) {
+		return
+	}
+	if f.noted != nil {
+		if *f.noted {
+			return
+		}
+		*f.noted = true
+	}
+	fmt.Fprintf(cmd.ErrOrStderr(), "using workspace %s from %s\n", t.Workspace, t.WorkspaceSource.Label("--workspace"))
 }
 
 // projectNote is the line that says the project, not the context, chose where

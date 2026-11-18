@@ -393,6 +393,20 @@ type resolvedEnv struct {
 	workspaceNote  string
 }
 
+// refuser is a workspace provider that can say it declined a read: its token is
+// for another Workspace than the one linked (emenv's provider).
+type refuser interface{ Refusal() error }
+
+// providerRefusal is the error for a read the workspace provider declined, nil
+// when it made its reads or was never asked for any. A start that needs no
+// Workspace value never asks, so a link its token cannot act in does not stop it.
+func providerRefusal(p envresolve.Provider) error {
+	if r, ok := p.(refuser); ok {
+		return r.Refusal()
+	}
+	return nil
+}
+
 func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (resolvedEnv, error) {
 	var startedWithout []envresolve.Missing
 	schema, err := envschema.ParseSchema(m.Astro.Env)
@@ -419,6 +433,10 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	}
 	res, err := envresolve.Resolve(in)
 	if err != nil {
+		return resolvedEnv{}, err
+	}
+	// A Workspace value was asked for that the run's token cannot be sent for.
+	if err := providerRefusal(in.WorkspaceProvider); err != nil {
 		return resolvedEnv{}, err
 	}
 	// The start GATE is missing-required only: a value with no source blocks
@@ -516,6 +534,9 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	}
 	if in.WorkspaceProvider != nil && workspaceID != "" {
 		shellWon = append(shellWon, workspaceUndeclared(in.WorkspaceProvider, schema, src, inj, secretInj)...)
+		// What the tier holds beyond the declared names is a best-effort read: a
+		// provider whose token is for another Workspace sent nothing, and the
+		// start goes on without those values rather than being refused for them.
 		wsNote = workspaceNote(in.WorkspaceProvider, workspaceID)
 	}
 	return resolvedEnv{

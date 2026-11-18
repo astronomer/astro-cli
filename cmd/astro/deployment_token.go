@@ -150,7 +150,7 @@ func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out 
 // runDeploymentTokenAdd runs `deployment token add`: it gives a Workspace or
 // an Organization token a role on the Deployment, which of the two it is being
 // found out from the token (deployment.AddToken).
-func runDeploymentTokenAdd(cmd *cobra.Command, args []string, out io.Writer) error {
+func runDeploymentTokenAdd(args []string, out io.Writer) error {
 	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
@@ -159,12 +159,12 @@ func runDeploymentTokenAdd(cmd *cobra.Command, args []string, out io.Writer) err
 		id = strings.ToLower(args[0])
 	}
 	// A token given by name is looked for among the Organization's and the
-	// Workspace's. A run with no Workspace to look in (an Organization
-	// token's) looks among the Organization's alone, and says so when that
-	// finds nothing.
+	// Deployment's own Workspace's (tokenSearchWorkspace). A Deployment that
+	// could not be read has no Workspace to look in, so the search is among
+	// the Organization's alone, and says so when that finds nothing.
 	ws, wsErr := "", error(nil)
 	if id == "" {
-		ws, wsErr = workspaceTokenWorkspace(cmd, id)
+		ws, wsErr = tokenSearchWorkspace(id)
 		// A Workspace the run named itself is not quietly left out.
 		if wsErr != nil && workspaceID != "" {
 			return wsErr
@@ -201,7 +201,7 @@ const (
 // setTokenDeploymentRole runs `deployment token {workspace,organization}-token
 // {add,update}`: it gives a token of kind a role on the Deployment, asking
 // for the role when --role named none.
-func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, kind, operation string) error {
+func setTokenDeploymentRole(args []string, out io.Writer, kind, operation string) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -221,7 +221,7 @@ func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, ki
 	ws := ""
 	if kind == tokenKindWorkspace && operation == tokenRoleAdd {
 		var err error
-		if ws, err = workspaceTokenWorkspace(cmd, workspaceTokenID); err != nil {
+		if ws, err = tokenSearchWorkspace(workspaceTokenID); err != nil {
 			return err
 		}
 	}
@@ -269,6 +269,35 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 	return renderTokenLine(format, out, token, fmt.Sprintf("Astro %s API token %s was successfully added/updated to the Deployment", kind, token.Name))
 }
 
+// tokenSearchWorkspace is the Workspace an add looks for a Workspace token
+// named by --name, or picked, in: the Deployment's own. A Workspace token can
+// hold a role only on Deployments of its own Workspace, so no other Workspace
+// has a token the add could use; the caller's current or the project's
+// Workspace, which this once searched, are not the Deployment's. It is read
+// from the Deployment by its ID.
+//
+// --workspace is the person's explicit override and wins, as it does
+// everywhere; under an ASTRO_API_TOKEN a Workspace the token is not for is
+// refused (astrosession.WorkspaceDisagreeError), like any other. A token given
+// by ID (tokenID) is read wherever it is, so no Workspace is looked for and
+// the Deployment is not read.
+func tokenSearchWorkspace(tokenID string) (string, error) {
+	if workspaceID != "" {
+		if err := astrosession.CheckWorkspace(workspaceID, astrosession.SourceFlag); err != nil {
+			return "", err
+		}
+		return workspaceID, nil
+	}
+	if tokenID != "" {
+		return "", nil
+	}
+	d, err := deployment.GetDeploymentByID("", deploymentID, astroV1Client)
+	if err != nil {
+		return "", fmt.Errorf("could not read Deployment %s to find the Workspace its Workspace tokens are in; pass --workspace: %w", deploymentID, err)
+	}
+	return d.WorkspaceId, nil
+}
+
 // workspaceTokenWorkspace is the workspace an add or remove finds its
 // Workspace token in: --workspace, else the project's, else the current one
 // (coalesceWorkspace). A token given by id (the argument, id) is read
@@ -276,6 +305,10 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 // as an Organization token's, can still name one.
 func workspaceTokenWorkspace(cmd *cobra.Command, id string) (string, error) {
 	ws, err := coalesceWorkspaceOr(cmd, astrosession.ByID)
+	if isWorkspaceRefusal(err) {
+		// A Workspace named against the token is no better for a token given by id.
+		return "", err
+	}
 	if err != nil && id == "" {
 		if errors.Is(err, astrosession.ErrOrgTokenNoWorkspace) {
 			return "", err

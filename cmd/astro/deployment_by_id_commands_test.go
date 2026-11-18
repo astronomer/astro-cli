@@ -22,9 +22,8 @@ import (
 // byIDClient is a client that knows one Deployment, wqDeploymentID, in
 // workspace-id, with the reads and writes these commands make. The Deployment
 // is fetched by ID gets explicit counts: gets is how many times, so a second
-// fetch shows. Each by-ID command costs the resolver's fetch, one list of the
-// Deployment's own Workspace, and the library's own fetch again (more where the
-// command re-reads the Deployment after a change).
+// fetch shows. Each by-ID command costs the resolver's one fetch and nothing
+// more: the library takes the Deployment it was handed (deployment.WithFetched).
 func byIDClient(t *testing.T) *astrov1_mocks.ClientWithResponsesInterface {
 	t.Helper()
 	d := wqDeployment()
@@ -81,35 +80,35 @@ func TestMoreDeploymentCommandsAddressedByIDNeedNoWorkspace(t *testing.T) {
 		extra func(*astrov1_mocks.ClientWithResponsesInterface)
 	}{
 		"update": {
-			args: []string{"update", wqDeploymentID, "--name", "renamed", "--yes"}, gets: 2, lists: 1,
+			args: []string{"update", wqDeploymentID, "--name", "renamed", "--yes"}, gets: 1, lists: 0,
 			extra: func(m *astrov1_mocks.ClientWithResponsesInterface) {
 				m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, wqDeploymentID, mock.Anything).Return(&updated, nil).Once()
 			},
 		},
 		"hibernate": {
-			args: []string{"hibernate", wqDeploymentID, "--yes"}, gets: 2, lists: 1,
+			args: []string{"hibernate", wqDeploymentID, "--yes"}, gets: 1, lists: 0,
 			extra: func(m *astrov1_mocks.ClientWithResponsesInterface) {
 				m.On("UpdateDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, wqDeploymentID, mock.Anything).Return(&override, nil).Once()
 			},
 		},
 		"wake-up": {
-			args: []string{"wake-up", wqDeploymentID, "--yes"}, gets: 2, lists: 1,
+			args: []string{"wake-up", wqDeploymentID, "--yes"}, gets: 1, lists: 0,
 			extra: func(m *astrov1_mocks.ClientWithResponsesInterface) {
 				m.On("UpdateDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, wqDeploymentID, mock.Anything).Return(&override, nil).Once()
 			},
 		},
-		"inspect": {args: []string{"inspect", wqDeploymentID, "-o", "json"}, gets: 2, lists: 1},
+		"inspect": {args: []string{"inspect", wqDeploymentID, "-o", "json"}, gets: 1, lists: 0},
 		"open": {
-			args: []string{"open", wqDeploymentID, "-o", "json"}, gets: 2, lists: 1,
+			args: []string{"open", wqDeploymentID, "-o", "json"}, gets: 1, lists: 0,
 		},
 		"worker-queue create": {
-			args: []string{"worker-queue", "create", "--deployment-id", wqDeploymentID, "--name", "reports", "--worker-type", "a5"}, gets: 3, lists: 2,
+			args: []string{"worker-queue", "create", "--deployment-id", wqDeploymentID, "--name", "reports", "--worker-type", "a5"}, gets: 1, lists: 0,
 			extra: func(m *astrov1_mocks.ClientWithResponsesInterface) {
 				m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, wqDeploymentID, mock.Anything).Return(&updated, nil).Once()
 			},
 		},
 		"worker-queue delete": {
-			args: []string{"worker-queue", "delete", "--deployment-id", wqDeploymentID, "--name", "etl-queue", "--yes"}, gets: 3, lists: 2,
+			args: []string{"worker-queue", "delete", "--deployment-id", wqDeploymentID, "--name", "etl-queue", "--yes"}, gets: 1, lists: 0,
 			extra: func(m *astrov1_mocks.ClientWithResponsesInterface) {
 				m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, wqDeploymentID, mock.Anything).Return(&updated, nil).Once()
 			},
@@ -175,17 +174,17 @@ func TestDeploymentBundleCommandsAddressedByIDNeedNoWorkspace(t *testing.T) {
 			_, err := execDeploymentCmd(tc.args...)
 			require.NoError(t, err)
 			assert.Equal(t, "GetDeploymentWithResponse", m.Calls[0].Method)
-			assert.Equal(t, 2, getsOf(m), "fetches of the Deployment")
-			assert.Equal(t, 1, callsTo(m, "ListDeploymentsWithResponse"))
+			assert.Equal(t, 1, getsOf(m), "fetches of the Deployment")
+			assert.Equal(t, 0, callsTo(m, "ListDeploymentsWithResponse"))
 			m.AssertExpectations(t)
 			a.AssertExpectations(t)
 		})
 	}
 }
 
-// delete, logs and variable list pin their counts too: the resolver's fetch,
-// the list, and the library's fetch.
-func TestByIDCommandsFetchTheDeploymentTwice(t *testing.T) {
+// delete pins its counts too: a Deployment given by ID is one GET, the resolver's,
+// which the library then uses instead of listing the Workspace and fetching again.
+func TestByIDCommandsFetchTheDeploymentOnce(t *testing.T) {
 	orgTokenNoWorkspace(t)
 	m := byIDClient(t)
 	astroV1Client = m
@@ -193,8 +192,8 @@ func TestByIDCommandsFetchTheDeploymentTwice(t *testing.T) {
 	m.On("DeleteDeploymentWithResponse", mock.Anything, mock.Anything, wqDeploymentID).Return(&deleted, nil).Once()
 	_, err := execDeploymentCmd("delete", wqDeploymentID, "--yes")
 	require.NoError(t, err)
-	assert.Equal(t, 2, getsOf(m))
-	assert.Equal(t, 1, callsTo(m, "ListDeploymentsWithResponse"))
+	assert.Equal(t, 1, getsOf(m))
+	assert.Equal(t, 0, callsTo(m, "ListDeploymentsWithResponse"))
 	m.AssertExpectations(t)
 }
 

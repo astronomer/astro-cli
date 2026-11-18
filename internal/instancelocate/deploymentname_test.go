@@ -84,7 +84,7 @@ func finder(fake *fakeDeployments) *locator {
 		deployments:  fake,
 		session:      func(context.Context) (string, error) { return "Bearer session", nil },
 		organization: func() (string, error) { return "cl-org", nil },
-		workspace:    func() string { return "ws-login" },
+		workspace:    func() (string, astrosession.Source) { return "ws-login", astrosession.SourceContext },
 	}
 }
 
@@ -140,7 +140,7 @@ func TestDeploymentIDNameMissingOrAmbiguous(t *testing.T) {
 	if !errors.As(err, &nameErr) || !nameErr.NotFound() {
 		t.Fatalf("err = %v, want a name that found nothing", err)
 	}
-	if err.Error() != `no Deployment named "etl-prod" in workspace ws-given` {
+	if err.Error() != `no Deployment named "etl-prod" in workspace ws-given (from the project link)` {
 		t.Errorf("err = %q", err)
 	}
 
@@ -148,7 +148,7 @@ func TestDeploymentIDNameMissingOrAmbiguous(t *testing.T) {
 	if !errors.As(err, &nameErr) || nameErr.NotFound() {
 		t.Fatalf("err = %v, want a name several Deployments share", err)
 	}
-	if err.Error() != `2 Deployments are named "twin" in workspace ws-given: pass -d with one's id (dep-a, dep-b)` {
+	if err.Error() != `2 Deployments are named "twin" in workspace ws-given (from the project link): pass -d with one's id (dep-a, dep-b)` {
 		t.Errorf("err = %q", err)
 	}
 }
@@ -158,7 +158,7 @@ func TestDeploymentIDNameMissingOrAmbiguous(t *testing.T) {
 func TestDeploymentIDNameWithNoWorkspace(t *testing.T) {
 	fake := &fakeDeployments{t: t}
 	l := finder(fake)
-	l.workspace = func() string { return "" }
+	l.workspace = func() (string, astrosession.Source) { return "", astrosession.SourceNone }
 	_, err := l.DeploymentID(context.Background(), "etl-prod", "", "")
 	var nameErr *DeploymentNameError
 	if !errors.As(err, &nameErr) || !nameErr.NotFound() {
@@ -231,7 +231,7 @@ func TestDeploymentIDReadsEveryPage(t *testing.T) {
 // is what a name with no workspace is told.
 func TestDeploymentIDLoggedOutSaysLogIn(t *testing.T) {
 	l := finder(&fakeDeployments{t: t})
-	l.workspace = func() string { return "" }
+	l.workspace = func() (string, astrosession.Source) { return "", astrosession.SourceNone }
 	l.session = func(context.Context) (string, error) { return "", nil }
 	_, err := l.DeploymentID(context.Background(), "etl-prod", "", "")
 	if !errors.Is(err, astrosession.ErrLoggedOut) {
@@ -257,10 +257,10 @@ func TestWorkspaceReadsTheDomainsLogin(t *testing.T) {
 	if err := prod.SetContextKey("workspace", "ws-prod"); err != nil {
 		t.Fatal(err)
 	}
-	if ws := Workspace("astronomer.io"); ws != "ws-prod" {
+	if ws, _ := workspaceOf("astronomer.io"); ws != "ws-prod" {
 		t.Fatalf("Workspace = %q, want the astronomer.io login's", ws)
 	}
-	if ws := Workspace("astronomer-stage.io"); ws != "" {
+	if ws, _ := workspaceOf("astronomer-stage.io"); ws != "" {
 		t.Fatalf("Workspace = %q for a host with no login", ws)
 	}
 }
@@ -272,7 +272,7 @@ func TestDeploymentNameErrorWithNoWorkspaceIsWordedByTheRun(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	testUtil.UseAPIToken(t, "organizationId:org")
 	err := (&DeploymentNameError{Name: "etl"}).Error()
-	for _, want := range []string{`"etl" is not a Deployment id, and `, "ASTRO_API_TOKEN selects none", "so pass -d with the Deployment id, or run in a project that links its workspace"} {
+	for _, want := range []string{`"etl" is not a Deployment id, and `, "ASTRO_API_TOKEN selects none", "so pass -d with the Deployment's id or run it in a project linked to a Workspace"} {
 		if !strings.Contains(err, want) {
 			t.Errorf("%q does not say %q", err, want)
 		}

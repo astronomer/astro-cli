@@ -16,9 +16,9 @@ func TestUnlinkedTargetWithNoWorkspaceUnderATokenNamesTheProject(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Setenv("ASTRO_API_TOKEN", testUtil.MintAPIToken(t, time.Time{}, "organizationId:org"))
 	// The resolver words the error, for what an Astro deploy accepts.
-	run := astrosession.Resolve(astrosession.Request{Accepts: astrosession.ByFlag | astrosession.ByProject, NoSaved: ErrNoWorkspace})
+	run := astrosession.Resolve(astrosession.Request{Advice: astrosession.ByFlag | astrosession.ByProject, NoSaved: ErrNoWorkspace})
 	_, err := unlinkedTarget(Request{NoWorkspace: run.Missing()}, nil)
-	if err == nil || !strings.Contains(err.Error(), "--workspace, or run in a project") {
+	if err == nil || !strings.Contains(err.Error(), "--workspace or run it in a project") {
 		t.Errorf("err = %v", err)
 	}
 

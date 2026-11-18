@@ -270,6 +270,10 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 
 	// --workspace, or its 1.x spelling --workspace-id.
 	overrideWorkspace := manifestWorkspace
+	// A token for one Workspace deploys to no other: refused before a request.
+	if err := astrosession.CheckWorkspace(overrideWorkspace, astrosession.SourceFlag); err != nil {
+		return manifestDeployErr(cmd, err)
+	}
 
 	// A prompt has to be answered by someone at a terminal, and json output has
 	// to stay a stream a program can parse — a question on stderr with the run
@@ -297,8 +301,11 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	// a project on another host is deployed under that host's, which names no
 	// Deployment and no Workspace of the token's. The flag and the project's
 	// own Workspace are weighed in the deploy (internal/deploy), which knows
-	// which link it reads.
-	run := astrosession.Resolve(astrosession.Request{Login: login.selection(), Domain: login.context.Domain, WantDeployment: true, Accepts: astrosession.ByFlag | astrosession.ByProject, NoSaved: manifestdeploy.ErrNoWorkspace})
+	// which link it reads. Only --workspace is held to a token's Workspace
+	// here (CheckWorkspace above): a deploy by explicit Deployment id never
+	// looks anything up in the project's, so refusing a link that differs
+	// from the token's would break deploys that work.
+	run := astrosession.Resolve(astrosession.Request{Login: login.selection(), Domain: login.context.Domain, WantDeployment: true, Advice: astrosession.ByFlag | astrosession.ByProject, NoSaved: manifestdeploy.ErrNoWorkspace})
 	tokenID := ""
 	if run.DeploymentSource == astrosession.SourceToken {
 		tokenID = run.Deployment

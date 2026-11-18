@@ -150,6 +150,14 @@ func HasOutput(cmd *cobra.Command) bool {
 	return outputValue(cmd) != nil
 }
 
+// IsJSON reports whether cmd's --output, as it was parsed, is json: a run
+// whose stdout is one document, and whose stderr carries no commentary a
+// person did not ask for.
+func IsJSON(cmd *cobra.Command) bool {
+	v := outputValue(cmd)
+	return v != nil && Format(v.String()) == FormatJSON
+}
+
 // FormatList is what cmd's --output takes, in the words its help gives them
 // ("text, json or dotenv"), or "" when cmd has no such flag (HasOutput).
 func FormatList(cmd *cobra.Command) string {

@@ -988,7 +988,10 @@ func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key 
 		return "", "", false, err
 	}
 	workspaceSource := declaredSource(schema, kind, name) == envschema.SourceWorkspace
-	workspaceID := emenv.WorkspaceID(&m.Astro)
+	workspaceID, err := emenv.WorkspaceFor(&m.Astro)
+	if err != nil {
+		return "", "", false, err
+	}
 	if !workspaceSource && workspaceID == "" {
 		return "", "", false, nil
 	}
@@ -1232,6 +1235,13 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 	m, schema, err := c.loadManifestSchema(projectDir)
 	if err != nil {
 		return err
+	}
+	if m != nil && c.d.WorkspaceClients != nil {
+		// The list reads the linked workspace: refused before it does when the
+		// run's token is for another one.
+		if _, err := emenv.WorkspaceFor(&m.Astro); err != nil {
+			return err
+		}
 	}
 	opts := c.listOptions(projectDir, m)
 	opts.All = all

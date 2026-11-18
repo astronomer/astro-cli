@@ -195,6 +195,12 @@ func runCloud(opts *CloudOptions) error {
 		return fmt.Errorf("applying path params: %w", err)
 	}
 
+	// A Workspace id written in the path names a Workspace as --workspace does:
+	// a token for another one is refused before the request.
+	if err := checkPathWorkspace(requestPath); err != nil {
+		return err
+	}
+
 	// Fill context placeholders in the path
 	requestPath, err = fillPlaceholders(requestPath, &ctx)
 	if err != nil {
@@ -342,6 +348,26 @@ func runCloudInteractive(opts *CloudOptions) error {
 // placeholderRE matches placeholders like {organizationId}, {workspaceId}, {dag_id}, etc.
 var placeholderRE = regexp.MustCompile(`\{([a-zA-Z][a-zA-Z0-9_]*)\}`)
 
+// workspacePathRE matches a Workspace id written where the path has a
+// workspaces segment: /workspaces/<id>. A placeholder in its place is not an id.
+var workspacePathRE = regexp.MustCompile(`/workspaces/([^/?#{}]+)`)
+
+// checkPathWorkspace is the error for a path that writes the id of a Workspace
+// other than the one the run's Workspace or Deployment token is for
+// (astrosession.CheckWorkspace), nil otherwise.
+func checkPathWorkspace(path string) error {
+	// The path itself: a query string or fragment names no Workspace.
+	if i := strings.IndexAny(path, "?#"); i >= 0 {
+		path = path[:i]
+	}
+	for _, m := range workspacePathRE.FindAllStringSubmatch(path, -1) {
+		if err := astrosession.CheckWorkspace(m[1], astrosession.SourcePath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // fillPlaceholders replaces placeholders with values from the context.
 func fillPlaceholders(path string, ctx *config.Context) (string, error) {
 	var errs []string
@@ -360,7 +386,7 @@ func fillPlaceholders(path string, ctx *config.Context) (string, error) {
 		case "workspaceid":
 			t := astrosession.Resolve(astrosession.Request{
 				Login:   ctx,
-				Accepts: astrosession.ByPath,
+				Advice:  astrosession.ByPath,
 				NoSaved: errors.New("workspaceId not set in context (run 'astro workspace switch')"),
 			})
 			if err := t.Require(); err != nil {

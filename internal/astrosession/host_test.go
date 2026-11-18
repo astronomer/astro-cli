@@ -114,7 +114,7 @@ func TestMissingNamesTheTokensKind(t *testing.T) {
 	t.Run("organization token", func(t *testing.T) {
 		writeConfig(t, "")
 		testUtil.UseAPIToken(t, "organizationId:org")
-		err := Resolve(Request{Accepts: ByFlag}).Missing()
+		err := Resolve(Request{Advice: ByFlag}).Missing()
 		if !errors.Is(err, ErrOrgTokenNoWorkspace) {
 			t.Fatalf("Missing() = %v, want ErrOrgTokenNoWorkspace", err)
 		}
@@ -127,7 +127,7 @@ func TestMissingNamesTheTokensKind(t *testing.T) {
 	t.Run("deployment token with no workspace claim", func(t *testing.T) {
 		writeConfig(t, "")
 		testUtil.UseAPIToken(t, "organizationId:org", "deploymentId:dep")
-		err := Resolve(Request{Accepts: ByFlag}).Missing()
+		err := Resolve(Request{Advice: ByFlag}).Missing()
 		if !errors.Is(err, ErrOrgTokenNoWorkspace) {
 			t.Fatalf("Missing() = %v, want ErrOrgTokenNoWorkspace", err)
 		}

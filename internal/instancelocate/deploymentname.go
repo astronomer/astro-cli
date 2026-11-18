@@ -38,7 +38,7 @@ func (e *DeploymentNameError) Error() string {
 		// Under an API token the resolver says why no workspace is selected, and
 		// that 'astro workspace switch' is no way to give it one.
 		missing := astrosession.Resolve(astrosession.Request{
-			Accepts: astrosession.ByDeployment,
+			Advice:  astrosession.ByDeployment | astrosession.ByProject,
 			NoSaved: errors.New("there is no workspace to find a Deployment of that name in: pass -d with the Deployment id, or run 'astro workspace switch'"),
 		}).Missing()
 		return fmt.Sprintf("%q is not a Deployment id, and %s", e.Name, missing)
@@ -100,10 +100,17 @@ func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace, proje
 	if util.IsCUID(ref) {
 		return ref, nil
 	}
-	ws := projectWorkspace
-	if ws == "" && l.workspace != nil {
-		ws = l.workspace()
+	// The project's workspace is where a name is looked up. A token for another
+	// Workspace cannot list it: refused before the login is read, or a request made.
+	if err := astrosession.CheckWorkspace(projectWorkspace, astrosession.SourceProject); err != nil {
+		return "", err
 	}
+	ws, src := projectWorkspace, astrosession.SourceProject
+	if ws == "" && l.workspace != nil {
+		ws, src = l.workspace()
+	}
+	// An error about the workspace says where it came from.
+	from := astrosession.Target{Workspace: ws, WorkspaceSource: src}
 	// The login comes first: a machine with none has no workspace either, and
 	// logging in is the fix that also supplies one.
 	token, org, err := l.identity(ctx)
@@ -120,11 +127,11 @@ func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace, proje
 	}
 	deployments, err := l.listDeployments(ctx, token, org, ws)
 	if err != nil {
-		return "", err
+		return "", from.Explain(err)
 	}
 	dep, err := NamedDeployment(deployments, ref, ws)
 	if err != nil {
-		return "", err
+		return "", from.Explain(err)
 	}
 	return dep.Id, nil
 }
@@ -168,9 +175,10 @@ func listOutage(domain, ws string, resp *astrov1.ListDeploymentsResponse) error 
 	return fmt.Errorf("Astro could not list the Deployments in workspace %s%s", ws, detail)
 }
 
-// Workspace is the workspace a Deployment name is looked up in when nothing
-// else says, on domain's host ("" is the current context's): the run's
-// selection there, which astrosession.Resolve decides. Empty when there is none.
-func Workspace(domain string) string {
-	return astrosession.Resolve(astrosession.Request{Domain: domain}).Workspace
+// workspaceOf is the workspace a Deployment name is looked up in when nothing
+// else says, on domain's host ("" is the current context's), and where the
+// resolver took it from: the run's selection there. Empty when there is none.
+func workspaceOf(domain string) (string, astrosession.Source) {
+	t := astrosession.Resolve(astrosession.Request{Domain: domain})
+	return t.Workspace, t.WorkspaceSource
 }

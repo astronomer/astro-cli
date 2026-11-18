@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
@@ -909,13 +910,18 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 // saved login. noSaved is what a saved login with no Workspace says (nil for
 // astrosession.ErrNoWorkspace). extra is what else the command accepts in place of a Workspace
 // (astrosession.ByID), for the advice a missing one gets.
-func workspaceTarget(cmd *cobra.Command, flag string, extra astrosession.Accepts, noSaved error) astrosession.Target {
-	req := astrosession.Request{Workspace: flag, Accepts: astrosession.ByFlag | extra, NoSaved: noSaved, LoginError: true}
+func workspaceTarget(cmd *cobra.Command, flag string, extra astrosession.WorkspaceAdvice, noSaved error) astrosession.Target {
+	req := astrosession.Request{Workspace: flag, Advice: astrosession.ByFlag | extra, NoSaved: noSaved, LoginError: true}
 	if f, ok := projectFollowOf(cmd); ok {
 		req.Project = f.workspace
-		req.Accepts |= astrosession.ByProject
+		req.Advice |= astrosession.ByProject
 	}
-	return astrosession.Resolve(req)
+	t := astrosession.Resolve(req)
+	// So an error the run ends in names where its Workspace came from, and a
+	// Workspace the token supplied is said so, now that the command uses it.
+	rememberTarget(cmd, t)
+	noteTokenWorkspace(cmd, t)
+	return t
 }
 
 // requiredWorkspace is workspaceTarget's Workspace, or the error for its
@@ -941,7 +947,7 @@ func coalesceWorkspace(cmd *cobra.Command) (string, error) {
 
 // coalesceWorkspaceOr is coalesceWorkspace for a command that also takes
 // something in place of a Workspace (extra), which its advice then names.
-func coalesceWorkspaceOr(cmd *cobra.Command, extra astrosession.Accepts) (string, error) {
+func coalesceWorkspaceOr(cmd *cobra.Command, extra astrosession.WorkspaceAdvice) (string, error) {
 	return coalesceFrom(workspaceTarget(cmd, workspaceID, extra, workspace.ErrCurrentNotSet))
 }
 
@@ -951,9 +957,26 @@ func coalesceFrom(t astrosession.Target) (string, error) { //nolint:gocritic // 
 		return "", err
 	}
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get current Workspace")
+		return "", wrapWorkspaceErr(err, "failed to get current Workspace")
 	}
 	return ws, nil
+}
+
+// isWorkspaceRefusal reports whether err is a Workspace the run's API token
+// is not for (astrosession.WorkspaceDisagreeError). It says in full what to
+// change, so what found it does not wrap it in what it was looking for.
+func isWorkspaceRefusal(err error) bool {
+	var disagree *astrosession.WorkspaceDisagreeError
+	return errors.As(err, &disagree)
+}
+
+// wrapWorkspaceErr is err, saying msg first, unless err is a refusal
+// (isWorkspaceRefusal), which stands as it is.
+func wrapWorkspaceErr(err error, msg string) error {
+	if isWorkspaceRefusal(err) {
+		return err
+	}
+	return errors.Wrap(err, msg)
 }
 
 func selectWorkspaceRole() (string, error) {
@@ -982,28 +1005,31 @@ func argOrID(args []string) string {
 }
 
 // deploymentWorkspace is the Workspace a command that acts on one Deployment
-// looks it up in. A Deployment given by id is identified by it, so a run that
-// has no Workspace goes on without one: an Organization token selects none, and
-// a saved login may have none current. The Deployment is fetched by id, and its
-// own Workspace is the one the rest of the command works in. Given a Workspace
-// the id is looked for in it, as it always was, with no extra call. A name, or a
-// pick, still needs a Workspace, and fails here as before, ahead of any
-// question or API call. A failure to find the Workspace is worded with msg
-// ("" for none).
-func deploymentWorkspace(cmd *cobra.Command, id, msg string) (string, error) {
+// looks it up in, and the client to look it up with. A Deployment given by id
+// is identified by it, so a run that has no Workspace goes on without one: an
+// Organization token selects none, and a saved login may have none current.
+// The Deployment is fetched by id, and its own Workspace is the one the rest
+// of the command works in. The client returned is then handed that fetched
+// Deployment (deployment.WithFetched), so the command's own lookup of it asks
+// the API for nothing more: the id is one GET. Given a Workspace the id is
+// looked for in it, as it always was, with no extra call, and the client is
+// the run's own. A name, or a pick, still needs a Workspace, and fails here as
+// before, ahead of any question or API call. A failure to find the Workspace
+// is worded with msg ("" for none).
+func deploymentWorkspace(cmd *cobra.Command, id, msg string) (ws string, client astrov1.APIClient, err error) {
 	t := workspaceTarget(cmd, workspaceID, 0, workspace.ErrCurrentNotSet)
 	// Only an id identifies a Deployment with no Workspace; a name that is not
 	// one goes on to say there is no Workspace to look it up in.
 	if !t.Found() && util.IsCUID(id) {
 		d, err := deployment.GetDeploymentByID("", id, astroV1Client)
 		if err != nil {
-			return "", fmt.Errorf("no Workspace is selected, so Deployment %s was fetched by its id, which failed (pass --workspace to look it up in a Workspace instead): %w", id, err)
+			return "", astroV1Client, fmt.Errorf("no Workspace is selected, so Deployment %s was fetched by its id, which failed (pass --workspace to look it up in a Workspace instead): %w", id, err)
 		}
-		return d.WorkspaceId, nil
+		return d.WorkspaceId, deployment.WithFetched(astroV1Client, d), nil
 	}
-	ws, err := coalesceFrom(t)
+	ws, err = coalesceFrom(t)
 	if err != nil && msg != "" {
-		return "", errors.Wrap(err, msg)
+		return "", astroV1Client, wrapWorkspaceErr(err, msg)
 	}
-	return ws, err
+	return ws, astroV1Client, err
 }

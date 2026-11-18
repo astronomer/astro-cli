@@ -104,7 +104,10 @@ func TestResolveWorkspacePrecedence(t *testing.T) {
 			if got.Found() != (tt.want != "") {
 				t.Fatalf("Found() = %v for %q", got.Found(), tt.want)
 			}
-			if err := got.Require(); (err == nil) != (tt.want != "") {
+			// A Workspace named against a token for another is refused by Require,
+			// though Resolve still reports what won
+			// (TestResolveRefusesAWorkspaceTheTokenIsNotFor).
+			if err := got.Require(); (err == nil) != (tt.want != "") && got.Disagrees() == nil {
 				t.Fatalf("Require() = %v for %q", err, tt.want)
 			}
 		})
@@ -223,14 +226,14 @@ func TestMissingWorkspaceIsWordedByWhatTheCommandAccepts(t *testing.T) {
 	tests := []struct {
 		name    string
 		kind    runKind
-		accepts Accepts
+		advice  WorkspaceAdvice
 		noSaved error
 		is      error
 		suffix  string
 	}{
 		{"organization token, flag", orgToken, ByFlag, nil, ErrOrgTokenNoWorkspace, ", so pass --workspace"},
-		{"organization token, flag and project", orgToken, ByFlag | ByProject, nil, ErrOrgTokenNoWorkspace, ", so pass --workspace, or run in a project linked to one"},
-		{"organization token, flag, project and id", orgToken, ByFlag | ByProject | ByID, nil, ErrOrgTokenNoWorkspace, ", so pass --workspace or the token's ID, or run in a project linked to one"},
+		{"organization token, flag and project", orgToken, ByFlag | ByProject, nil, ErrOrgTokenNoWorkspace, ", so pass --workspace or run it in a project linked to a Workspace"},
+		{"organization token, flag, project and id", orgToken, ByFlag | ByProject | ByID, nil, ErrOrgTokenNoWorkspace, ", so pass --workspace, run it in a project linked to a Workspace, or give the token's ID"},
 		{"organization token, current only", orgToken, 0, nil, ErrOrgTokenNoWorkspace, ", so use a Workspace API token"},
 		{"organization token ignores the saved login's words", orgToken, ByFlag, custom, ErrOrgTokenNoWorkspace, ", so pass --workspace"},
 		{"saved login", interactive, ByFlag, nil, ErrNoWorkspace, ""},
@@ -239,7 +242,7 @@ func TestMissingWorkspaceIsWordedByWhatTheCommandAccepts(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			useRun(t, tt.kind, "")
-			got := Resolve(Request{Accepts: tt.accepts, NoSaved: tt.noSaved})
+			got := Resolve(Request{Advice: tt.advice, NoSaved: tt.noSaved})
 			err := got.Require()
 			if !errors.Is(err, tt.is) {
 				t.Fatalf("err = %v, want %v", err, tt.is)
@@ -306,14 +309,6 @@ func TestRequireWorkspaceTakesTheFlagOrTheRunsOwn(t *testing.T) {
 	}
 }
 
-func TestMissingWorkspaceAdviceForAPathNamesThePath(t *testing.T) {
-	useRun(t, orgToken, "")
-	err := Resolve(Request{Accepts: ByPath}).Require()
-	if !errors.Is(err, ErrOrgTokenNoWorkspace) || !strings.HasSuffix(err.Error(), ", so write the id in the path") {
-		t.Fatalf("err = %v", err)
-	}
-}
-
 // A caller that asks for no Deployment gets none from a token, whatever it names.
 func TestResolveReadsTheTokenForADeploymentOnlyWhenAsked(t *testing.T) {
 	useRun(t, depToken, "ws-saved")
@@ -322,14 +317,6 @@ func TestResolveReadsTheTokenForADeploymentOnlyWhenAsked(t *testing.T) {
 	}
 	if got := Resolve(Request{WantDeployment: true}); got.Deployment != "dep-claim" {
 		t.Fatalf("got %q when asked", got.Deployment)
-	}
-}
-
-func TestMissingWorkspaceAdviceForADeploymentNameNamesTheID(t *testing.T) {
-	useRun(t, orgToken, "")
-	err := Resolve(Request{Accepts: ByDeployment}).Require()
-	if !errors.Is(err, ErrOrgTokenNoWorkspace) || !strings.HasSuffix(err.Error(), ", so pass -d with the Deployment id, or run in a project that links its workspace") {
-		t.Fatalf("err = %v", err)
 	}
 }
 
@@ -353,5 +340,54 @@ func TestResolveRefusesTheSavedWorkspaceUnderATokenThatWasNeverApplied(t *testin
 	got = Resolve(Request{})
 	if got.Workspace != "ws-claim" || got.WorkspaceSource != SourceToken {
 		t.Fatalf("got %q from %v, want ws-claim from the token", got.Workspace, got.WorkspaceSource)
+	}
+}
+
+// The advice is built from every way the command takes a Workspace, so none is
+// dropped when several are set. The rows are the combinations commands use.
+func TestAdviceNamesEveryWayTheCommandTakes(t *testing.T) {
+	tests := []struct {
+		name   string
+		advice WorkspaceAdvice
+		want   string
+	}{
+		{"nothing is taken: the current Workspace alone", 0, "so use a Workspace API token"},
+		{"flag", ByFlag, "so pass --workspace"},
+		{"flag and project", ByFlag | ByProject, "so pass --workspace or run it in a project linked to a Workspace"},
+		{"flag and id", ByFlag | ByID, "so pass --workspace or give the token's ID"},
+		{"flag, project and id", ByFlag | ByProject | ByID, "so pass --workspace, run it in a project linked to a Workspace, or give the token's ID"},
+		{"path", ByPath, "so write the Workspace's id in the path"},
+		{"deployment and project", ByDeployment | ByProject, "so pass -d with the Deployment's id or run it in a project linked to a Workspace"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.advice.hint(); got != tt.want {
+				t.Fatalf("hint() = %q, want %q", got, tt.want)
+			}
+			useRun(t, orgToken, "")
+			err := Resolve(Request{Advice: tt.advice}).Require()
+			if !errors.Is(err, ErrOrgTokenNoWorkspace) || !strings.HasSuffix(err.Error(), ", "+tt.want) {
+				t.Fatalf("err = %v, want it to end %q", err, ", "+tt.want)
+			}
+		})
+	}
+}
+
+// Every way has words, and the words are in the order the ways are declared.
+func TestAdviceCoversEveryWay(t *testing.T) {
+	var all WorkspaceAdvice
+	for _, w := range adviceFor {
+		all |= w.way
+	}
+	for _, way := range []WorkspaceAdvice{ByFlag, ByProject, ByID, ByPath, ByDeployment} {
+		if all&way == 0 {
+			t.Fatalf("way %b has no words", way)
+		}
+	}
+	got := all.hint()
+	for _, w := range adviceFor {
+		if !strings.Contains(got, w.text) {
+			t.Fatalf("%q is missing %q", got, w.text)
+		}
 	}
 }

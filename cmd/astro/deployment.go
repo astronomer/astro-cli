@@ -782,7 +782,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	if !allDeployments {
 		var err error
 		if ws, err = coalesceWorkspace(cmd); err != nil {
-			return errors.Wrap(err, "failed to find a valid workspace")
+			return wrapWorkspaceErr(err, "failed to find a valid workspace")
 		}
 	}
 
@@ -795,13 +795,13 @@ func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
 		deploymentID = args[0]
 	}
 
-	ws, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid Workspace")
+	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid Workspace")
 	if err != nil {
 		return err
 	}
 	logServer := logWebserver || logApiserver
 
-	res, err := deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logServer, logScheduler, logTriggerer, logWorkers, logDagProcessor, logComponents, warnLogs, errorLogs, infoLogs, logCount, astroV1Client)
+	res, err := deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logServer, logScheduler, logTriggerer, logWorkers, logDagProcessor, logComponents, warnLogs, errorLogs, infoLogs, logCount, client)
 	if err != nil {
 		return err
 	}
@@ -822,7 +822,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Find Workspace ID
 	ws, err := coalesceWorkspace(cmd)
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid Workspace")
+		return wrapWorkspaceErr(err, "failed to find a valid Workspace")
 	}
 	workspaceID = ws
 
@@ -942,7 +942,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		return err
 	}
 	// Find Workspace ID
-	ws, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid Workspace")
+	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid Workspace")
 	if err != nil {
 		return err
 	}
@@ -982,7 +982,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		deploymentID = args[0]
 	}
 
-	res, err := deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, []astrov1.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroV1Client, cmd.ErrOrStderr())
+	res, err := deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, []astrov1.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, client, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}
@@ -1007,7 +1007,7 @@ func normalizeSchedulerSizeFlag() error {
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 	defer strayStdoutToStderr(deploymentOutput)()
-	ws, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid Workspace")
+	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid Workspace")
 	if err != nil {
 		return err
 	}
@@ -1017,7 +1017,7 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 		deploymentID = args[0]
 	}
 
-	removal, err := deployment.Delete(deploymentID, ws, deploymentName, forceDelete, astroV1Client)
+	removal, err := deployment.Delete(deploymentID, ws, deploymentName, forceDelete, client)
 	if err != nil {
 		return err
 	}
@@ -1027,12 +1027,12 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error {
 	defer strayStdoutToStderr(deploymentVariableOutput)()
 
-	ws, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
+	ws, client, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
 	if err != nil {
 		return err
 	}
 
-	vars, err := deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, astroV1Client)
+	vars, err := deployment.VariableList(deploymentID, variableKey, ws, envFile, deploymentName, useEnvFile, client)
 	if err != nil {
 		return err
 	}
@@ -1053,13 +1053,13 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, update bool, wsErr string) error {
 	defer strayStdoutToStderr(deploymentVariableOutput)()
 
-	ws, err := deploymentWorkspace(cmd, deploymentID, wsErr)
+	ws, client, err := deploymentWorkspace(cmd, deploymentID, wsErr)
 	if err != nil {
 		return err
 	}
 
 	res, err := deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile,
-		deploymentName, args, useEnvFile, makeSecret, update, astroV1Client)
+		deploymentName, args, useEnvFile, makeSecret, update, client)
 	if err != nil {
 		return err
 	}
@@ -1070,7 +1070,7 @@ func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, 
 var openDeploymentUI = deployment.OpenInBrowser
 
 func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
-	ws, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid workspace")
+	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid workspace")
 	if err != nil {
 		return err
 	}
@@ -1078,7 +1078,7 @@ func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
 		deploymentID = args[0]
 	}
 
-	res, err := deployment.UI(ws, deploymentID, deploymentName, astroV1Client)
+	res, err := deployment.UI(ws, deploymentID, deploymentName, client)
 	if err != nil {
 		return err
 	}
@@ -1093,7 +1093,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 	// The --wait prints its progress to bare stdout; under json that is a
 	// note, not the result.
 	defer strayStdoutToStderr(format)()
-	ws, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid workspace")
+	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid workspace")
 	if err != nil {
 		return err
 	}
@@ -1114,7 +1114,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 	}
 
 	if removeOverride {
-		res, err := deployment.DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName, forceOverride, astroV1Client)
+		res, err := deployment.DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName, forceOverride, client)
 		if err != nil {
 			return err
 		}
@@ -1126,7 +1126,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 		return err
 	}
 
-	res, err := deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, astroV1Client)
+	res, err := deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, client)
 	if err != nil {
 		return err
 	}
@@ -1421,11 +1421,11 @@ func newDeploymentTokenAddCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
+func addDeploymentToken(_ *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	return runDeploymentTokenAdd(cmd, args, out)
+	return runDeploymentTokenAdd(args, out)
 }
 
 func removeDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1566,20 +1566,20 @@ func newUpdateWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addOrgTokenToDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
-	return setTokenDeploymentRole(cmd, args, out, tokenKindOrganization, tokenRoleAdd)
+func addOrgTokenToDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+	return setTokenDeploymentRole(args, out, tokenKindOrganization, tokenRoleAdd)
 }
 
-func updateOrgTokenToDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
-	return setTokenDeploymentRole(cmd, args, out, tokenKindOrganization, tokenRoleUpdate)
+func updateOrgTokenToDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+	return setTokenDeploymentRole(args, out, tokenKindOrganization, tokenRoleUpdate)
 }
 
-func addWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
-	return setTokenDeploymentRole(cmd, args, out, tokenKindWorkspace, tokenRoleAdd)
+func addWorkspaceTokenDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+	return setTokenDeploymentRole(args, out, tokenKindWorkspace, tokenRoleAdd)
 }
 
-func updateWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
-	return setTokenDeploymentRole(cmd, args, out, tokenKindWorkspace, tokenRoleUpdate)
+func updateWorkspaceTokenDeploymentRole(_ *cobra.Command, args []string, out io.Writer) error {
+	return setTokenDeploymentRole(args, out, tokenKindWorkspace, tokenRoleUpdate)
 }
 
 func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {

@@ -18,6 +18,8 @@ func TestTokenIdentityReadsTheClaims(t *testing.T) {
 		{"organization", []string{"organizationId:org"}, Identity{Organization: "org"}},
 		{"workspace", []string{"organizationId:org", "workspaceId:ws"}, Identity{Organization: "org", Workspace: "ws"}},
 		{"deployment", []string{"organizationId:org", "workspaceId:ws", "deploymentId:dep"}, Identity{Organization: "org", Workspace: "ws", Deployment: "dep"}},
+		{"several different workspaces are none", []string{"organizationId:org", "workspaceId:a", "workspaceId:b"}, Identity{Organization: "org"}},
+		{"the same workspace twice is one", []string{"organizationId:org", "workspaceId:a", "workspaceId:a"}, Identity{Organization: "org", Workspace: "a"}},
 		{"several deployments are none", []string{"organizationId:org", "deploymentId:a", "deploymentId:b"}, Identity{Organization: "org"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -128,7 +130,7 @@ func TestResolveUnderAnOrganizationTokenIgnoresTheSavedWorkspace(t *testing.T) {
 // Organization token that "selects none".
 func TestMissingWorkspaceUnderAnUnusableTokenNamesTheToken(t *testing.T) {
 	t.Setenv(EnvAPIToken, testUtil.MintAPIToken(t, time.Now().Add(-time.Hour), "organizationId:org", "workspaceId:ws"))
-	err := Resolve(Request{Accepts: ByFlag}).Missing()
+	err := Resolve(Request{Advice: ByFlag}).Missing()
 	if !errors.Is(err, ErrAPITokenExpired) {
 		t.Fatalf("got %v, want the expired-token error", err)
 	}

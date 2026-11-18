@@ -54,6 +54,20 @@ var (
 	depToken = tokenKind{"deployment", []string{"organizationId:" + tokenOrg, "workspaceId:" + tokenWS, "deploymentId:" + etlDepID}}
 )
 
+// claiming is kind with its Workspace claim (if it has one) for ws: a token for
+// the Workspace the project links, the only one a project's link and a
+// Workspace token can agree on.
+func claiming(kind tokenKind, ws string) tokenKind {
+	out := tokenKind{name: kind.name}
+	for _, p := range kind.permissions {
+		if strings.HasPrefix(p, "workspaceId:") {
+			p = "workspaceId:" + ws
+		}
+		out.permissions = append(out.permissions, p)
+	}
+	return out
+}
+
 // fakeAstro is the control plane and an Airflow in one server.
 type fakeAstro struct {
 	*airflowStub
@@ -224,7 +238,7 @@ func TestAFDeploymentNameUnderATokenUsesOnlyTheToken(t *testing.T) {
 		t.Run(kind.name, func(t *testing.T) {
 			f := newFakeAstro(t)
 			useFakeAstro(t, f)
-			token := useToken(t, kind)
+			token := useToken(t, claiming(kind, linkedWS))
 			d := productionDeps(t, linkedProject(t))
 			if err := execute(t, d, "af", "pools", "list", "-d", "etl"); err != nil {
 				t.Fatal(err)
@@ -273,7 +287,7 @@ func TestAFDeploymentNameUnderAnOrganizationTokenWithNoWorkspaceSaysSo(t *testin
 		t.Fatal("a Deployment name with no Workspace to look in succeeded")
 	}
 	msg := err.Error()
-	for _, want := range []string{`"etl" is not a Deployment id`, "the API token in ASTRO_API_TOKEN selects none", "so pass -d with the Deployment id, or run in a project that links its workspace"} {
+	for _, want := range []string{`"etl" is not a Deployment id`, "the API token in ASTRO_API_TOKEN selects none", "so pass -d with the Deployment's id or run it in a project linked to a Workspace"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("error %q lacks %q", msg, want)
 		}
@@ -314,7 +328,7 @@ func TestLocalEnvListWorkspaceSourceUnderATokenUsesOnlyTheToken(t *testing.T) {
 		t.Run(kind.name, func(t *testing.T) {
 			f := newFakeAstro(t)
 			useFakeAstro(t, f)
-			token := useToken(t, kind)
+			token := useToken(t, claiming(kind, "cmws"))
 			d := productionDeps(t, workspaceEnvProject(t))
 			stdout := d.Stdout.(interface{ String() string })
 			if err := execute(t, d, "local", "env", "list", "--all", "--output", "json"); err != nil {
@@ -494,5 +508,49 @@ func TestAnUnusableTokenFailsTheCoreTreeAndFallsBackToNothing(t *testing.T) {
 				t.Errorf("a request was made with an unusable token: %v", reqs)
 			}
 		})
+	}
+}
+
+// A Workspace or Deployment token acts in its own Workspace alone. A project
+// that links another is refused before any request, in the core tree as in the
+// cloud one: af -d <name> looks the name up in the project's Workspace, and
+// local env list reads it.
+func TestCoreTreeRefusesAProjectLinkTheTokenIsNotFor(t *testing.T) {
+	commands := []struct {
+		name    string
+		project func(*testing.T) string
+		args    []string
+		linked  string
+	}{
+		{"af -d name", linkedProject, []string{"af", "pools", "list", "-d", "etl"}, linkedWS},
+		{"local env list", workspaceEnvProject, []string{"local", "env", "list", "--all", "--output", "json"}, "cmws"},
+	}
+	for _, kind := range []struct {
+		token tokenKind
+		what  string
+	}{
+		{wsToken, "a Workspace token for " + tokenWS},
+		{depToken, "a Deployment token for Workspace " + tokenWS},
+	} {
+		for _, c := range commands {
+			t.Run(kind.token.name+" "+c.name, func(t *testing.T) {
+				f := newFakeAstro(t)
+				useFakeAstro(t, f)
+				useToken(t, kind.token)
+				d := productionDeps(t, c.project(t))
+				err := execute(t, d, c.args...)
+				want := "ASTRO_API_TOKEN is " + kind.what + ", but the project's link names " + c.linked
+				if err == nil || !strings.Contains(err.Error(), want) {
+					t.Fatalf("err = %v, want it to say %q", err, want)
+				}
+				var disagree *astrosession.WorkspaceDisagreeError
+				if !errors.As(err, &disagree) {
+					t.Fatalf("err = %T, want a *WorkspaceDisagreeError", err)
+				}
+				if reqs := f.requests(); len(reqs) != 0 {
+					t.Errorf("%d requests were made before the refusal: %+v", len(reqs), reqs)
+				}
+			})
+		}
 	}
 }
