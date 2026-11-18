@@ -50,7 +50,8 @@ func shellQuote(s, goos string) string {
 // a word. None turns up in a path or a variable name.
 func windowsDoubleQuotable(s string) bool {
 	return !strings.ContainsFunc(s, func(r rune) bool {
-		return r < ' ' || r == 0x7f || strings.ContainsRune("\"%$`", r)
+		// 0x60 is the backtick, PowerShell's escape character.
+		return r < ' ' || r == 0x7f || r == 0x60 || strings.ContainsRune(`"%$`, r)
 	})
 }
 

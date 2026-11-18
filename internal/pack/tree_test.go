@@ -441,7 +441,7 @@ func TestMWAANextStepsNameTheDeclaredBucket(t *testing.T) {
 		{"with scheme", "bucket = 's3://acme-airflow-orders'\n", " s3://acme-airflow-orders/"},
 		{"bare name, trailing slash", "bucket = 'acme-airflow-orders/'\n", " s3://acme-airflow-orders/"},
 		{"no bucket", "region = 'us-east-1'\n", " s3://<your-mwaa-bucket>/"},
-		{"placeholder written as the bucket", "bucket = '<your-mwaa-bucket>'\n", " 's3://<your-mwaa-bucket>/'"},
+		{"placeholder written as the bucket", "bucket = '<your-mwaa-bucket>'\n", " " + scaffold.ShellQuote("s3://<your-mwaa-bucket>/")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m, err := manifest.Parse([]byte("[project]\nname = 'demo'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n\n[tool.astro.targets.mwaa]\n" + tc.section))

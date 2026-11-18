@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -96,7 +97,7 @@ func (s *CmdSuite) TestConfigSuggestionQuotesAValueWithSpaces() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.useManifestProject()
 	_, err := executeCommand("config", "set", "internal.astro.localhost.core_url", "http://my host")
-	s.ErrorContains(err, "astro config set internal.astro.localhost.core_url 'http://my host' --global")
+	s.ErrorContains(err, "astro config set internal.astro.localhost.core_url "+scaffold.ShellQuote("http://my host")+" --global")
 }
 
 // A converted project that still has its 1.x .astro/config.yaml has no
