@@ -26,6 +26,12 @@ func TestTokenIdentityReadsTheClaims(t *testing.T) {
 		{"an empty claim first does not either", []string{"organizationId:org", "workspaceId:", "workspaceId:ws1"}, Identity{Organization: "org", Workspace: "ws1"}},
 		{"only empty claims name none", []string{"organizationId:org", "workspaceId:", "workspaceId:  "}, Identity{Organization: "org"}},
 		{"different ids stay different after trimming", []string{"organizationId:org", "workspaceId: a", "workspaceId:b"}, Identity{Organization: "org"}},
+		{"an empty deployment claim does not drop a real one", []string{"organizationId:org", "workspaceId:ws", "deploymentId:dep", "deploymentId:"}, Identity{Organization: "org", Workspace: "ws", Deployment: "dep"}},
+		{"an empty deployment claim first does not either", []string{"organizationId:org", "workspaceId:ws", "deploymentId:", "deploymentId:dep"}, Identity{Organization: "org", Workspace: "ws", Deployment: "dep"}},
+		{"a deployment id is read without its padding", []string{"organizationId:org", "workspaceId:ws", "deploymentId: dep "}, Identity{Organization: "org", Workspace: "ws", Deployment: "dep"}},
+		{"only empty deployment claims name none", []string{"organizationId:org", "workspaceId:ws", "deploymentId:", "deploymentId:  "}, Identity{Organization: "org", Workspace: "ws"}},
+		{"an empty organization claim does not drop a real one", []string{"organizationId:org", "organizationId:"}, Identity{Organization: "org"}},
+		{"an organization id is read without its padding", []string{"organizationId: org "}, Identity{Organization: "org"}},
 		{"several deployments are none", []string{"organizationId:org", "deploymentId:a", "deploymentId:b"}, Identity{Organization: "org"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

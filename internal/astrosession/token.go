@@ -109,7 +109,9 @@ func TokenIdentity() (id Identity, ok bool, err error) {
 		}
 		switch kind {
 		case "organizationId":
-			id.Organization = v
+			if v = strings.TrimSpace(v); v != "" {
+				id.Organization = v
+			}
 		case "workspaceId":
 			// Whitespace around an id is not a different Workspace, and an
 			// empty claim names none: neither decides which Workspace the
@@ -119,8 +121,12 @@ func TokenIdentity() (id Identity, ok bool, err error) {
 				workspaces[v] = true
 			}
 		case "deploymentId":
-			deployments++
-			id.Deployment = v
+			// As for workspaceId: an empty claim names nothing, and padding
+			// around an id is not a different Deployment.
+			if v = strings.TrimSpace(v); v != "" {
+				deployments++
+				id.Deployment = v
+			}
 		}
 	}
 	if deployments != 1 {
