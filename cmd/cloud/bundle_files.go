@@ -26,6 +26,7 @@ func newBundleFilesRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "files",
 		Aliases: []string{"file"},
+		Hidden:  true,
 		Short:   "Manage the files in file bundles",
 		Long:    "List, read, copy, move and remove the files in file bundles. A path in a bundle is written BUNDLE:PATH, where BUNDLE is the bundle's name or ID, and a trailing slash names a directory. DEPLOYMENT_ID:BUNDLE:PATH names a bundle on another Deployment than --deployment-id. Every write creates a new version of the bundle.\n\nA bundle holds at most 10,000 files of at most 1 MiB each and 100 MiB in all, at paths of at most 192 bytes made of ASCII letters, digits, '/', '.', '_' and '-'. A copy from local files checks them first, and names every file that breaks these limits before sending anything.",
 	}
