@@ -12,17 +12,46 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Whoever owns the socket receives every request in plaintext, token
-// included, so a socket that belongs to someone else is refused before a byte
-// is sent.
-func TestSocketOwnedByAnotherUserIsRefused(t *testing.T) {
-	path, got := listen(t)
+// playAnotherUser makes the socket's owner (this process's user) look like
+// someone else to checkSocket.
+func playAnotherUser(t *testing.T) {
+	t.Helper()
 	me := currentUID
 	t.Cleanup(func() { currentUID = me })
 	currentUID = func() int { return me() + 1 }
+}
 
+// A socket in a directory only its owner can write to is accepted whoever owns
+// it: nobody else could have put it there. This is the container case, where a
+// mounted socket keeps the host's numeric owner.
+func TestSocketOwnedByAnotherUserInAPrivateDirectoryIsAccepted(t *testing.T) {
+	path, got := listen(t)
+	playAnotherUser(t)
+	rt, err := NewRouter(path, DefaultHosts, &directRecorder{}, nil)
+	require.NoError(t, err)
+	require.NoError(t, do(t, rt, "https://api.astronomer.io/v1/x"))
+	<-got
+}
+
+// In a shared directory with the sticky bit, such as /tmp, another user could
+// have created the socket first. Whoever owns the socket receives every
+// request in plaintext, token included, so one that is not this user's is
+// refused before a byte is sent.
+func TestSocketOwnedByAnotherUserInASharedDirectoryIsRefused(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("run as root, the socket is root's, which is trusted in any directory")
+	}
+	path, got := listen(t)
+	require.NoError(t, os.Chmod(filepath.Dir(path), 0o777|fs.ModeSticky))
+
+	rt, err := NewRouter(path, DefaultHosts, &directRecorder{}, nil)
+	require.NoError(t, err)
+	require.NoError(t, do(t, rt, "https://api.astronomer.io/v1/x"), "this user's own socket in a shared directory")
+	<-got
+
+	playAnotherUser(t)
 	calls := 0
-	rt, err := NewRouter(path, DefaultHosts, &directRecorder{}, func() { calls++ })
+	rt, err = NewRouter(path, DefaultHosts, &directRecorder{}, func() { calls++ })
 	require.NoError(t, err)
 	err = do(t, rt, "https://api.astronomer.io/v1/x")
 	require.Error(t, err)
@@ -36,36 +65,42 @@ func TestSocketOwnedByAnotherUserIsRefused(t *testing.T) {
 	}
 }
 
-// A socket in a directory any user can write to, without the sticky bit, can
-// be replaced by another user between the check and the dial.
+// Without the sticky bit, any user can replace the socket between the check
+// and the dial, so it is refused whoever owns it.
 func TestSocketInAWorldWritableDirectoryIsRefused(t *testing.T) {
 	path, _ := listen(t)
-	dir := filepath.Dir(path)
-	require.NoError(t, os.Chmod(dir, 0o777))
+	require.NoError(t, os.Chmod(filepath.Dir(path), 0o777))
 	rt, err := NewRouter(path, DefaultHosts, &directRecorder{}, nil)
 	require.NoError(t, err)
 	err = do(t, rt, "https://api.astronomer.io/v1/x")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "any user can write to")
-
-	// The sticky bit (as on /tmp) stops others replacing a file they do not
-	// own, so the same directory with it set is fine.
-	require.NoError(t, os.Chmod(dir, 0o777|fs.ModeSticky))
-	require.NoError(t, do(t, rt, "https://api.astronomer.io/v1/x"))
 }
 
-// A symlink to the socket is judged by the socket it points at.
+// A symlink is judged by the socket it leads to and that socket's directory,
+// not by where the link itself lives.
 func TestSocketThroughASymlinkIsCheckedAtItsTarget(t *testing.T) {
 	path, got := listen(t)
-	link := filepath.Join(filepath.Dir(path), "link")
+	linkDir, err := os.MkdirTemp("", "hl")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(linkDir) })
+	link := filepath.Join(linkDir, "link")
 	require.NoError(t, os.Symlink(path, link))
+
 	rt, err := NewRouter(link, DefaultHosts, &directRecorder{}, nil)
 	require.NoError(t, err)
 	require.NoError(t, do(t, rt, "https://api.astronomer.io/v1/x"))
 	<-got
 
-	me := currentUID
-	t.Cleanup(func() { currentUID = me })
-	currentUID = func() int { return me() + 1 }
-	require.Error(t, do(t, rt, "https://api.astronomer.io/v1/x"))
+	require.NoError(t, os.Chmod(filepath.Dir(path), 0o777))
+	err = do(t, rt, "https://api.astronomer.io/v1/x")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), filepath.Dir(path))
+}
+
+func TestOwnerTrusted(t *testing.T) {
+	assert.True(t, ownerTrusted(501, 501), "this user's own socket")
+	assert.True(t, ownerTrusted(0, 501), "root's socket")
+	assert.False(t, ownerTrusted(502, 501), "another user's socket")
+	assert.True(t, ownerTrusted(0, 0), "root's socket, as root")
 }

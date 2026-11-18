@@ -36,7 +36,15 @@ A command that never talks to a listed host (`astro version`, `astro local start
 
 Whatever listens on the socket is trusted completely. It receives every request in plaintext, including whatever `Authorization` header the CLI sends, which is your real token unless the listener gave you a stand-in. There is no TLS on the socket, so the CLI cannot tell the listener from the real host, and it acts on whatever the listener answers.
 
-So put the socket in a directory only you can write to, such as one under your home directory, rather than a shared one. On Linux and macOS the CLI refuses, before sending anything, a socket that another user owns, or one in a directory any user can write to that lacks the sticky bit, where another user could replace it. Symlinks are followed, and the socket they point at is what is checked. On Windows, access is governed by the directory's ACL and the CLI checks nothing.
+So put the socket in a directory only you can write to, such as one under your home directory, rather than a shared one. On Linux and macOS the CLI checks the socket's directory before sending anything:
+
+| the socket's directory | the CLI |
+| --- | --- |
+| writable only by its owner (`~/.run`, a directory mounted into a container) | accepts the socket, whoever owns it |
+| writable by any user, with the sticky bit (`/tmp`) | accepts it only if it is yours or root's, since another user could have created it first |
+| writable by any user, without the sticky bit | refuses it, since another user could replace it |
+
+A socket's owner only matters in a shared directory because a socket mounted into a container or a sandbox keeps the host's numeric owner, so inside it often belongs to another user or to `nobody`. Symlinks are followed, and the socket they lead to and its directory are what is checked. On Windows, access is governed by the directory's ACL and the CLI checks nothing.
 
 ## Credentials
 
