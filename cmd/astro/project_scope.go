@@ -32,6 +32,9 @@ const deploymentArgAnnotation = "astro.deployment-arg"
 type projectFollow struct {
 	// workspace is the project's workspace, "" when the project names none.
 	workspace string
+	// noted is whether the run has said its Workspace came from the token's
+	// claim (noteTokenWorkspace), so it says so once. nil is no record.
+	noted *bool
 }
 
 type projectFollowKey struct{}
@@ -89,7 +92,7 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 				return err
 			}
 		}
-		cmd.SetContext(withProjectFollow(cmd.Context(), projectFollow{workspace: pick.workspace}))
+		cmd.SetContext(withProjectFollow(cmd.Context(), projectFollow{workspace: pick.workspace, noted: new(bool)}))
 		if err := parentPreRun(group, cmd, args); err != nil {
 			return err
 		}
@@ -103,13 +106,7 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 		if cliout.IsJSON(cmd) {
 			return nil
 		}
-		// What the run's Workspace is, by the one resolver, where a token (not
-		// the flag, which names it itself) could have been its source.
-		var run astrosession.Target
-		if astrosession.HasAPIToken() && !workspaceChosen(cmd.Flags()) {
-			run = astrosession.Resolve(astrosession.Request{Project: pick.workspace})
-		}
-		if note := sourceNote(cmd.Context(), pick, before.Workspace, switched, run); note != "" {
+		if note := projectNote(cmd.Context(), pick, before.Workspace, switched); note != "" {
 			fmt.Fprintln(cmd.ErrOrStderr(), note)
 		}
 		return nil
@@ -284,20 +281,24 @@ func parentPreRun(group, cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// sourceNote is the line that says where the command's Workspace came from,
-// when that is a surprise: the project link chose a different one than the
-// context would have (projectNote), or a token run took its Workspace from the
-// token's claim, which run (the resolver's answer, so its source is not
-// recomputed here) says. It is empty when the flag named the Workspace or the
-// project chose what the context would have.
-func sourceNote(ctx context.Context, pick projectPick, contextWorkspace string, switched bool, run astrosession.Target) string { //nolint:gocritic // a small value type
-	if note := projectNote(ctx, pick, contextWorkspace, switched); note != "" {
-		return note
+// noteTokenWorkspace says on stderr, once, that the run's Workspace came from
+// its API token's claim, when t, the resolver's answer for a command that is
+// about to use it, says so (t.WorkspaceSource, not recomputed). It is for a
+// person: not under -o json, and not for a Workspace the flag or the project
+// named, which is no surprise. A command that never resolves its Workspace (a
+// token given by ID, a Deployment given by ID with --workspace) says nothing.
+func noteTokenWorkspace(cmd *cobra.Command, t astrosession.Target) { //nolint:gocritic // a small value type
+	f, ok := projectFollowOf(cmd)
+	if !ok || t.WorkspaceSource != astrosession.SourceToken || t.Workspace == "" || cliout.IsJSON(cmd) {
+		return
 	}
-	if run.WorkspaceSource == astrosession.SourceToken && run.Workspace != "" {
-		return fmt.Sprintf("using workspace %s from %s", run.Workspace, run.WorkspaceSource.Label("--workspace"))
+	if f.noted != nil {
+		if *f.noted {
+			return
+		}
+		*f.noted = true
 	}
-	return ""
+	fmt.Fprintf(cmd.ErrOrStderr(), "using workspace %s from %s\n", t.Workspace, t.WorkspaceSource.Label("--workspace"))
 }
 
 // projectNote is the line that says the project, not the context, chose where

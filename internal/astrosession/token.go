@@ -101,6 +101,7 @@ func TokenIdentity() (id Identity, ok bool, err error) {
 		id.ExpiresAt = claims.ExpiresAt.Time
 	}
 	deployments := 0
+	workspaces := map[string]bool{}
 	for _, permission := range claims.Permissions {
 		kind, v, found := strings.Cut(permission, ":")
 		if !found {
@@ -111,6 +112,7 @@ func TokenIdentity() (id Identity, ok bool, err error) {
 			id.Organization = v
 		case "workspaceId":
 			id.Workspace = v
+			workspaces[v] = true
 		case "deploymentId":
 			deployments++
 			id.Deployment = v
@@ -118,6 +120,11 @@ func TokenIdentity() (id Identity, ok bool, err error) {
 	}
 	if deployments != 1 {
 		id.Deployment = ""
+	}
+	// Several different Workspaces are no Workspace claim, as several
+	// Deployments are no Deployment's: the token is not for one to act in.
+	if len(workspaces) > 1 {
+		id.Workspace = ""
 	}
 	return id, true, nil
 }

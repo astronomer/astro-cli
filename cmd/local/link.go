@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
@@ -441,6 +442,16 @@ func refuseExisting(m *manifest.Manifest, name string, replace bool) error {
 // else one picked from the login's list. It returns the link's name: the one
 // given, or else the Deployment's name as scaffold.LinkNameFor spells it.
 func (c *cli) pickAstroDeployment(link *scaffold.Link, m *manifest.Manifest, name string) (string, error) {
+	// The Deployments are listed in this Workspace, with the run's token if it
+	// has one, which is for one Workspace: refused before the list, not by it.
+	if err := astrosession.CheckWorkspace(link.Workspace, astrosession.SourceFlag); err != nil {
+		return "", err
+	}
+	if link.Workspace == "" {
+		if err := astrosession.CheckWorkspace(m.Astro.Workspace, astrosession.SourceProject); err != nil {
+			return "", err
+		}
+	}
 	ws := firstNonEmpty(link.Workspace, m.Astro.Workspace)
 	if ws == "" && c.d.CurrentWorkspace != nil {
 		ws = c.d.CurrentWorkspace()

@@ -53,9 +53,7 @@ type Options struct {
 	WorkspaceProvider func(astro *manifest.Astro, reveal bool) envresolve.Provider
 	// WorkspaceID is the Workspace the provider reads for a manifest, when it
 	// is not only the manifest's (a token run's own). Nil means the manifest's.
-	// An error refuses the run before the provider reads anything: a manifest
-	// link that disagrees with the run's token (emenv.WorkspaceFor).
-	WorkspaceID func(astro *manifest.Astro) (string, error)
+	WorkspaceID func(astro *manifest.Astro) string
 	// AllowMissing starts even when a required value has no source, instead
 	// of returning *MissingEnvError: `--allow-missing`, and Astro Desktop's
 	// Start anyway. The missing values come back on Built.StartedWithout for
@@ -395,15 +393,18 @@ type resolvedEnv struct {
 	workspaceNote  string
 }
 
-// checkWorkspaceLink is the error for a manifest whose Workspace link the run
-// cannot act in (Options.WorkspaceID), nil when it can or the run has no such
-// check.
-func checkWorkspaceLink(m *manifest.Manifest, opts Options) error {
-	if opts.WorkspaceID == nil {
-		return nil
+// refuser is a workspace provider that can say it declined a read: its token is
+// for another Workspace than the one linked (emenv's provider).
+type refuser interface{ Refusal() error }
+
+// providerRefusal is the error for a read the workspace provider declined, nil
+// when it made its reads or was never asked for any. A start that needs no
+// Workspace value never asks, so a link its token cannot act in does not stop it.
+func providerRefusal(p envresolve.Provider) error {
+	if r, ok := p.(refuser); ok {
+		return r.Refusal()
 	}
-	_, err := opts.WorkspaceID(&m.Astro)
-	return err
+	return nil
 }
 
 func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (resolvedEnv, error) {
@@ -422,11 +423,6 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	// resolves from it.
 	vault := vaultenv.Load(proj.Dir)
 	in := envresolve.Inputs{Schema: schema, Providers: src.Providers(vault.Providers())}
-	// Before the provider is built, which is the first thing to read the
-	// workspace: a link the run's token cannot act in is refused unread.
-	if err := checkWorkspaceLink(m, opts); err != nil {
-		return resolvedEnv{}, err
-	}
 	if opts.WorkspaceProvider != nil {
 		// reveal = true: start needs the real values to run Airflow. Both modes:
 		// a value resolved here travels as SecretEnv (below), which docker mode
@@ -437,6 +433,10 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	}
 	res, err := envresolve.Resolve(in)
 	if err != nil {
+		return resolvedEnv{}, err
+	}
+	// A Workspace value was asked for that the run's token cannot be sent for.
+	if err := providerRefusal(in.WorkspaceProvider); err != nil {
 		return resolvedEnv{}, err
 	}
 	// The start GATE is missing-required only: a value with no source blocks
@@ -530,10 +530,13 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 	var wsNote string
 	workspaceID := m.Astro.Workspace
 	if opts.WorkspaceID != nil {
-		workspaceID, _ = opts.WorkspaceID(&m.Astro) //nolint:errcheck // refused above, before anything was read
+		workspaceID = opts.WorkspaceID(&m.Astro)
 	}
 	if in.WorkspaceProvider != nil && workspaceID != "" {
 		shellWon = append(shellWon, workspaceUndeclared(in.WorkspaceProvider, schema, src, inj, secretInj)...)
+		// What the tier holds beyond the declared names is a best-effort read: a
+		// provider whose token is for another Workspace sent nothing, and the
+		// start goes on without those values rather than being refused for them.
 		wsNote = workspaceNote(in.WorkspaceProvider, workspaceID)
 	}
 	return resolvedEnv{

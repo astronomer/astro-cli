@@ -917,8 +917,10 @@ func workspaceTarget(cmd *cobra.Command, flag string, extra astrosession.Workspa
 		req.Advice |= astrosession.ByProject
 	}
 	t := astrosession.Resolve(req)
-	// So an error the run ends in names where its Workspace came from.
+	// So an error the run ends in names where its Workspace came from, and a
+	// Workspace the token supplied is said so, now that the command uses it.
 	rememberTarget(cmd, t)
+	noteTokenWorkspace(cmd, t)
 	return t
 }
 

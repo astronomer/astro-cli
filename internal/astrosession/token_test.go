@@ -18,6 +18,8 @@ func TestTokenIdentityReadsTheClaims(t *testing.T) {
 		{"organization", []string{"organizationId:org"}, Identity{Organization: "org"}},
 		{"workspace", []string{"organizationId:org", "workspaceId:ws"}, Identity{Organization: "org", Workspace: "ws"}},
 		{"deployment", []string{"organizationId:org", "workspaceId:ws", "deploymentId:dep"}, Identity{Organization: "org", Workspace: "ws", Deployment: "dep"}},
+		{"several different workspaces are none", []string{"organizationId:org", "workspaceId:a", "workspaceId:b"}, Identity{Organization: "org"}},
+		{"the same workspace twice is one", []string{"organizationId:org", "workspaceId:a", "workspaceId:a"}, Identity{Organization: "org", Workspace: "a"}},
 		{"several deployments are none", []string{"organizationId:org", "deploymentId:a", "deploymentId:b"}, Identity{Organization: "org"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
