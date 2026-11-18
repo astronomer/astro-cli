@@ -1029,7 +1029,7 @@ func (s *Suite) TestUploadBundleDirectory() {
 			_, _ = io.ReadAll(args.Get(6).(io.Reader))
 		}).Return(nil, io.ErrUnexpectedEOF).Once()
 
-		_, err := uploadBundleDirectory(s.T().TempDir(), []string{"missing.py"}, &astrov1alpha1.WriteBundleDirectoryParams{}, bundleRef{bundleID: "bundle-1"}, mockStreamClient)
+		_, err := uploadBundleDirectory(s.T().TempDir(), &bundleSyncPlan{added: []string{"missing.py"}}, &astrov1alpha1.WriteBundleDirectoryParams{}, bundleRef{bundleID: "bundle-1"}, mockStreamClient)
 		s.ErrorContains(err, "failed to read missing.py")
 	})
 
@@ -1047,17 +1047,22 @@ func (s *Suite) TestUploadBundleDirectory() {
 		mockStreamClient.On("WriteBundleDirectoryWithBody", mock.Anything, mock.Anything, mock.Anything, "bundle-1", mock.Anything, bundleFileContentType, mock.Anything).Run(readBody).Return(rateLimited, nil).Once()
 		mockStreamClient.On("WriteBundleDirectoryWithBody", mock.Anything, mock.Anything, mock.Anything, "bundle-1", mock.Anything, bundleFileContentType, mock.Anything).Run(readBody).Return(directoryWritten("v2"), nil).Once()
 
-		version, err := uploadBundleDirectory(fromDir, []string{"a.py"}, &astrov1alpha1.WriteBundleDirectoryParams{}, bundleRef{bundleID: "bundle-1"}, mockStreamClient)
+		version, err := uploadBundleDirectory(fromDir, &bundleSyncPlan{added: []string{"a.py"}}, &astrov1alpha1.WriteBundleDirectoryParams{}, bundleRef{bundleID: "bundle-1"}, mockStreamClient)
 		s.NoError(err)
 		s.Equal("v2", version)
 		s.Equal([]map[string]string{{"a.py": "a"}, {"a.py": "a"}}, sent)
 	})
 
-	s.Run("packs the files", func() {
+	s.Run("packs deletes, then files", func() {
 		fromDir := s.T().TempDir()
 		writeLocalFiles(s, fromDir, map[string]string{"foo": "now a file"})
+		plan := &bundleSyncPlan{
+			added:   []string{"foo"},
+			deleted: []string{"foo/bar.py"},
+		}
+
 		var archive bytes.Buffer
-		s.Require().NoError(packBundleDirectory(&archive, fromDir, []string{"foo"}))
+		s.Require().NoError(packBundleDirectory(&archive, fromDir, plan))
 		gzipReader, err := gzip.NewReader(&archive)
 		s.Require().NoError(err)
 		tarReader := tar.NewReader(gzipReader)
@@ -1072,7 +1077,7 @@ func (s *Suite) TestUploadBundleDirectory() {
 			s.Require().NoError(err)
 			entries = append(entries, header.Name+"="+string(content))
 		}
-		s.Equal([]string{"foo=now a file"}, entries)
+		s.Equal([]string{"__DEL__foo/bar.py=", "foo=now a file"}, entries)
 	})
 }
 
