@@ -2,7 +2,6 @@ package astroauth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -35,7 +34,7 @@ func FetchUserInfo(authCfg AuthConfig, accessToken string, opts ...RequestOption
 	defer resp.Body.Close()
 
 	var info UserInfo
-	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+	if err := decodeJSON(resp.Body, &info); err != nil {
 		return nil, fmt.Errorf("cannot decode userinfo: %w", err)
 	}
 	if info.Email == "" {
