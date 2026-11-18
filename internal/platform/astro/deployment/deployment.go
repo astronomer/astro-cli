@@ -2102,11 +2102,14 @@ func (e *NotFoundError) Error() string {
 	return msg
 }
 
-func (e *NotFoundError) Unwrap() []error {
-	if e.Err == nil {
-		return []error{errInvalidDeployment}
+// Unwrap is errInvalidDeployment when the Workspace was listed and had no such
+// Deployment, and only the listing's error when it could not be listed: an
+// outage is not a "not found", and keeps its own kind and code.
+func (e *NotFoundError) Unwrap() error {
+	if e.Err != nil {
+		return e.Err
 	}
-	return []error{errInvalidDeployment, e.Err}
+	return errInvalidDeployment
 }
 
 // NoneEligibleError is a workspace with Deployments, none of which the

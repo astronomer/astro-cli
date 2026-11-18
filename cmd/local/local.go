@@ -625,14 +625,22 @@ func (c *cli) pythonCatalog(ctx context.Context) func() *runtimeversions.Catalog
 // not read because the run's token is for another Workspace (plan.Built's
 // WorkspaceRefusal). A note for a person: a json run does not get it.
 func noteWorkspaceRefused(r cliout.Renderer, note string) {
-	if note == "" || r.Format != cliout.FormatText {
-		return
+	if w := textWriter(r); w != nil && note != "" {
+		cliout.Note(w, note)
 	}
-	w := r.Err
-	if w == nil {
-		w = r.Out
+}
+
+// textWriter is where a note or warning for a person goes: stderr, else the
+// renderer's output, and nil when there is neither or the run is not in text
+// mode, so the caller writes nothing. Every such line picks its writer here.
+func textWriter(r cliout.Renderer) io.Writer {
+	if r.Format != cliout.FormatText {
+		return nil
 	}
-	cliout.Note(w, note)
+	if r.Err != nil {
+		return r.Err
+	}
+	return r.Out
 }
 
 func warnWorkspaceUnread(r cliout.Renderer, note string) {
@@ -670,11 +678,9 @@ func emitWarning(r cliout.Renderer, e event) {
 		r.EmitEvent(e, func(io.Writer) error { return nil })
 		return
 	}
-	w := r.Err
-	if w == nil {
-		w = r.Out
+	if w := textWriter(r); w != nil {
+		cliout.Warn(w, e.Text)
 	}
-	cliout.Warn(w, e.Text)
 }
 
 // reportBuildError renders a plan-build failure. A *plan.MissingEnvError in

@@ -62,7 +62,7 @@ func TestLookupErrorsNameTheWorkspacesSource(t *testing.T) {
 			// A Workspace that cannot be listed keeps its cause.
 			_, err = GetDeployment("wsA", "nope", "", ToRead, nil, sourced(listing(http.StatusNotFound)))
 			require.ErrorAs(t, err, &notFound)
-			require.ErrorIs(t, err, errInvalidDeployment)
+			require.NotErrorIs(t, err, errInvalidDeployment)
 			assert.NotNil(t, notFound.Err)
 			if visible {
 				assert.Contains(t, err.Error(), tt.named)
@@ -139,4 +139,24 @@ func TestSourceAndFetchedClientsCompose(t *testing.T) {
 	_, err = GetDeployment("wsA", "other", "", ToRead, nil, client)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "workspace wsA (from --workspace)")
+}
+
+// A Workspace that could not be listed is an outage, not a missing Deployment:
+// a 5xx listing error does not satisfy the not-found sentinel, keeps its own
+// error underneath, and its message is the one it had. A Workspace that listed
+// and has no such Deployment is the sentinel.
+func TestListingFailureIsNotADeploymentNotFound(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := WithWorkspaceSource(listing(http.StatusServiceUnavailable), "wsA", astrosession.SourceFlag)
+	_, err := GetDeployment("wsA", "dep", "", ToRead, nil, client)
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, errInvalidDeployment)
+	var notFound *NotFoundError
+	require.ErrorAs(t, err, &notFound)
+	require.NotNil(t, notFound.Err)
+	assert.ErrorIs(t, err, notFound.Err)
+	assert.Contains(t, err.Error(), "the Deployment specified was not found in workspace wsA (from --workspace)")
+
+	_, err = GetDeployment("wsA", "dep", "", ToRead, nil, WithWorkspaceSource(listing(http.StatusOK), "wsA", astrosession.SourceFlag))
+	assert.ErrorIs(t, err, errInvalidDeployment)
 }

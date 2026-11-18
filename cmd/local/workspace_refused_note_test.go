@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/envresolve"
 )
 
 // The note that the Workspace's values were not read is for a person: one line
@@ -34,4 +35,27 @@ func TestNoteWorkspaceRefusedIsTextOnly(t *testing.T) {
 	if out.Len() != 0 || errw.Len() != 0 {
 		t.Errorf("with no refusal: stdout %q, stderr %q, want nothing", out.String(), errw.String())
 	}
+}
+
+// A renderer with no writer at all, or one in json mode, is written to
+// nowhere, and does not panic: the one place that picks the writer says so.
+func TestTextWriterIsNilWithNowhereToWrite(t *testing.T) {
+	var out, errw bytes.Buffer
+	if w := textWriter(cliout.Renderer{Format: cliout.FormatText, Out: &out, Err: &errw}); w != &errw {
+		t.Errorf("writer = %v, want stderr", w)
+	}
+	if w := textWriter(cliout.Renderer{Format: cliout.FormatText, Out: &out}); w != &out {
+		t.Errorf("writer = %v, want stdout when there is no stderr", w)
+	}
+	if w := textWriter(cliout.Renderer{Format: cliout.FormatText}); w != nil {
+		t.Errorf("writer = %v, want nil with neither", w)
+	}
+	if w := textWriter(cliout.Renderer{Format: cliout.FormatJSON, Out: &out, Err: &errw}); w != nil {
+		t.Errorf("writer = %v, want nil under json", w)
+	}
+	// None of the three lines panics, or writes, with nowhere to write.
+	bare := cliout.Renderer{Format: cliout.FormatText}
+	noteWorkspaceRefused(bare, "a note")
+	warnWorkspaceUnread(bare, "a warning")
+	warnWorkspaceSkipped(bare, []envresolve.Missing{{Name: "X"}})
 }

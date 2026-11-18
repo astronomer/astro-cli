@@ -31,6 +31,15 @@ func TestEnvScopeRecordsTheWorkspacesSource(t *testing.T) {
 		assert.Equal(t, astrosession.SourceFlag, scope.Source)
 		assert.Equal(t, "clflagworkspace00000001", scope.WorkspaceID)
 	})
+	t.Run("--deployment alone names no Workspace and no source", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		reset(t)
+		envDeploymentID = "cldeployment000000001"
+		scope, err := envScope(&cobra.Command{})
+		require.NoError(t, err)
+		assert.Equal(t, astrosession.SourceNone, scope.Source)
+		assert.Empty(t, scope.WorkspaceID)
+	})
 	t.Run("the project link", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		reset(t)
@@ -58,4 +67,18 @@ func TestEnvScopeRecordsTheWorkspacesSource(t *testing.T) {
 		assert.Equal(t, astrosession.SourceContext, scope.Source)
 		assert.Empty(t, scope.Source.Label("--workspace"))
 	})
+}
+
+// A Workspace that cannot be found hands back the run's own client, not one
+// that vouches for an empty Workspace's source.
+func TestDeploymentWorkspaceFailureReturnsThePlainClient(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	testUtil.UseAPIToken(t, "organizationId:org")
+	prev := workspaceID
+	t.Cleanup(func() { workspaceID = prev })
+	workspaceID = ""
+	ws, client, err := deploymentWorkspace(&cobra.Command{}, "etl", "")
+	require.Error(t, err)
+	assert.Empty(t, ws)
+	assert.Equal(t, astroV1Client, client)
 }

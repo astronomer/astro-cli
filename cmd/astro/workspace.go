@@ -1044,6 +1044,9 @@ func deploymentWorkspace(cmd *cobra.Command, id, msg string) (ws string, client 
 	if err != nil && msg != "" {
 		return "", astroV1Client, wrapWorkspaceErr(err, msg)
 	}
+	if ws == "" {
+		return ws, astroV1Client, err
+	}
 	// The client knows where the Workspace came from, so a lookup in it that
 	// fails says so (deployment.WithWorkspaceSource).
 	return ws, deployment.WithWorkspaceSource(astroV1Client, ws, t.WorkspaceSource), err

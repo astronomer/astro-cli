@@ -77,7 +77,12 @@ func envScope(cmd *cobra.Command) (env.Scope, error) {
 	if err := astrosession.CheckWorkspace(envWorkspaceID, astrosession.SourceFlag); err != nil {
 		return env.Scope{}, err
 	}
-	return env.Scope{WorkspaceID: envWorkspaceID, DeploymentID: envDeploymentID, Source: astrosession.SourceFlag}, nil
+	// Only a Workspace the flag named has a source: --deployment alone names none.
+	src := astrosession.SourceNone
+	if envWorkspaceID != "" {
+		src = astrosession.SourceFlag
+	}
+	return env.Scope{WorkspaceID: envWorkspaceID, DeploymentID: envDeploymentID, Source: src}, nil
 }
 
 // shared flag values for `astro env` subcommands.

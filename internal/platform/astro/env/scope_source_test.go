@@ -45,3 +45,18 @@ func (s *Suite) TestOutOfScopeNamesTheWorkspacesSource() {
 	s.Contains(err.Error(), "belongs to workspace "+wsID+", not deployment "+depID)
 	s.NotContains(err.Error(), "(from ")
 }
+
+// A scope with no Workspace (--deployment alone) names none: the mismatch
+// reads as a deployment's, and never as "workspace  (from --workspace)".
+func (s *Suite) TestOutOfScopeWithNoWorkspaceNamesNone() {
+	id, depID, otherDep := cuid.New(), cuid.New(), cuid.New()
+	obj := &astrov1.EnvironmentObject{
+		Id: &id, ObjectKey: "K", ObjectType: astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE,
+		Scope: astrov1.EnvironmentObjectScopeDEPLOYMENT, ScopeEntityId: otherDep,
+	}
+	err := checkInScope(obj, id, Scope{DeploymentID: depID, Source: astrosession.SourceNone}, objectTypeVar)
+	s.ErrorIs(err, ErrOutOfScope)
+	s.Contains(err.Error(), "belongs to deployment "+otherDep+", not deployment "+depID)
+	s.NotContains(err.Error(), "(from ")
+	s.NotContains(err.Error(), "workspace  ")
+}
