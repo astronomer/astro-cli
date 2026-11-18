@@ -2,7 +2,6 @@ package astroauth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -49,7 +48,7 @@ func ExchangeCode(authCfg AuthConfig, verifier, code string, opts ...RequestOpti
 	defer resp.Body.Close()
 
 	var tokenResp TokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+	if err := decodeJSON(resp.Body, &tokenResp); err != nil {
 		return nil, fmt.Errorf("cannot decode token response: %w", err)
 	}
 	if tokenResp.Error != nil {
@@ -81,7 +80,7 @@ func RefreshToken(authCfg AuthConfig, refreshTok string, opts ...RequestOption) 
 	defer resp.Body.Close()
 
 	var tokenResp TokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+	if err := decodeJSON(resp.Body, &tokenResp); err != nil {
 		return nil, fmt.Errorf("cannot decode refresh response: %w", err)
 	}
 	if tokenResp.Error != nil {

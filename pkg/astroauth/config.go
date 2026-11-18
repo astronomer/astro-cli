@@ -2,7 +2,6 @@ package astroauth
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -44,7 +43,7 @@ func FetchAuthConfig(domain string, opts ...RequestOption) (AuthConfig, error) {
 	}
 
 	var cfg AuthConfig
-	if err := json.NewDecoder(resp.Body).Decode(&cfg); err != nil {
+	if err := decodeJSON(resp.Body, &cfg); err != nil {
 		return AuthConfig{}, fmt.Errorf("cannot decode auth config: %w", err)
 	}
 	return cfg, nil
