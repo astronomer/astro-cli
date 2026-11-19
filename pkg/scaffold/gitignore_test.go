@@ -52,6 +52,14 @@ func TestCoversEnv(t *testing.T) {
 		".env\r\ndist",
 		// Re-ignored after a negation: last match wins in both directions.
 		"!.env\n.env",
+		"!.env\n.env",
+		// Negations that do not match .env leave it ignored.
+		".env\n!.gitkeep",
+		".env\n!dags/",
+		".env\n!*.py",
+		".env\n!include/keep.txt",
+		// Re-ignored after a broad negation.
+		".env\n!**/*\n.env",
 	}
 	for _, g := range covered {
 		assert.Truef(t, coversEnv(g), "coversEnv(%q) = false, want true", g)
@@ -70,6 +78,13 @@ func TestCoversEnv(t *testing.T) {
 		// exists to stop a credential being committed.
 		".env\n!.env",
 		"*.env\n!.env",
+		// A broad negation re-includes .env just as !.env does.
+		".env\n!**/*",
+		".env\n!*",
+		".env\n!/*",
+		".env\n!.*",
+		".env\n!.env*",
+		".env\n!**",
 		// Leading whitespace is part of a git pattern (only trailing is
 		// stripped), so this ignores a file whose name starts with two spaces.
 		"  .env",
@@ -262,8 +277,51 @@ func TestHasIgnoreRule(t *testing.T) {
 		// Broader patterns are not recognized; the rule is appended beside them,
 		// which is redundant rather than wrong.
 		".astro/",
+		// A broad negation after the rule re-includes its file.
+		rule + "\n!**/*",
+		rule + "\n!*.json",
 	} {
 		assert.Falsef(t, hasIgnoreRule(g, rule), "hasIgnoreRule(%q) = true, want false", g)
+	}
+	// A negation that matches something else leaves the rule standing.
+	for _, g := range []string{rule + "\n!.gitkeep", rule + "\n!dags/"} {
+		assert.Truef(t, hasIgnoreRule(g, rule), "hasIgnoreRule(%q) = false, want true", g)
+	}
+}
+
+// coversEnv may read a .gitignore as not covering .env when git would ignore
+// it (a redundant rule, a spare warning), never the reverse. Asked of git
+// itself for each file here: whenever coversEnv says covered, git ignores .env.
+func TestCoversEnvNeverClaimsMoreThanGit(t *testing.T) {
+	gitBin, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git is not on PATH")
+	}
+	for _, g := range []string{
+		".env",
+		".env\n!.env",
+		".env\n!**/*",
+		".env\n!*",
+		".env\n!.*",
+		".env\n!.gitkeep",
+		".env\n!dags/",
+		".env\n!**/*\n.env",
+		"*.env\n!*",
+		"**/.env\n!**",
+	} {
+		dir := t.TempDir()
+		writeGitignore(t, dir, g)
+		run := func(args ...string) error {
+			cmd := exec.Command(gitBin, args...)
+			cmd.Dir = dir
+			cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1")
+			return cmd.Run()
+		}
+		require.NoError(t, run("init", "-q"))
+		gitIgnores := run("check-ignore", "-q", ".env") == nil
+		if coversEnv(g) {
+			assert.Truef(t, gitIgnores, "coversEnv(%q) = true, but git tracks .env", g)
+		}
 	}
 }
 
