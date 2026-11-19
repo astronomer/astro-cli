@@ -6,15 +6,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"text/template"
 
 	"github.com/fatih/color"
 	"github.com/itchyny/gojq"
-	"github.com/mattn/go-isatty"
 	jsoncolor "github.com/neilotoole/jsoncolor"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
@@ -219,12 +218,7 @@ func isColorEnabled(out io.Writer) bool {
 
 // isTerminal reports whether w is a terminal. A variable so tests can stand
 // one in for a buffer.
-var isTerminal = func(w io.Writer) bool {
-	if f, ok := w.(*os.File); ok {
-		return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
-	}
-	return false
-}
+var isTerminal = cliout.IsTerminal
 
 // forTerminal is s as it is written to w. A response's text, printed as it
 // came, reaches a terminal without its escape sequences and other control

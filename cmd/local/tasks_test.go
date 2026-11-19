@@ -1,6 +1,7 @@
 package local
 
 import (
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -223,5 +224,54 @@ func TestTasksClearResetsTheRunAndNeedsConsent(t *testing.T) {
 	}
 	if !strings.Contains(out, "would clear 1 task instance(s)") {
 		t.Errorf("stdout = %q", out)
+	}
+}
+
+// standInTerminal makes outputIsTerminal report true for the test's buffers.
+func standInTerminal(t *testing.T) {
+	t.Helper()
+	orig := outputIsTerminal
+	t.Cleanup(func() { outputIsTerminal = orig })
+	outputIsTerminal = func(io.Writer) bool { return true }
+}
+
+// A task's log and a string XCom are Airflow's text, which a task can put
+// anything in. To a terminal they go without what it would act on (here a
+// clipboard write and a screen clear), keeping their line breaks; to a pipe
+// they go byte for byte.
+func TestTaskOutputReachesATerminalWithoutEscapes(t *testing.T) {
+	const payload = "\x1b]52;c;aGk=\x07\x1b[2J"
+	run := func(t *testing.T, args ...string) string {
+		t.Helper()
+		af2 := newAirflow2Stub(t)
+		af2.route(http.MethodGet, "/api/v1/dags/orders_etl/dagRuns/run_1/taskInstances/load/logs/1",
+			"line one\nline two"+payload)
+		af2.route(http.MethodGet, "/api/v1/dags/orders_etl/dagRuns/run_1/taskInstances/load/xcomEntries/note",
+			`{"key":"note","task_id":"load","dag_id":"orders_etl","value":"line one\nline two\u001b]52;c;aGk=\u0007\u001b[2J"}`)
+		out, _, err := runQuery(t, af2, args...)
+		if err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		return out
+	}
+	for name, args := range map[string][]string{
+		"a log":   {"tasks", "logs", "orders_etl", "run_1", "load"},
+		"an xcom": {"tasks", "xcom", "orders_etl", "run_1", "load", "--key", "note"},
+	} {
+		t.Run(name+", to a terminal", func(t *testing.T) {
+			standInTerminal(t)
+			out := run(t, args...)
+			if strings.ContainsAny(out, "\x1b\x07") {
+				t.Errorf("a terminal escape reached the terminal: %q", out)
+			}
+			if !strings.Contains(out, "line one\nline two") {
+				t.Errorf("the line break was lost: %q", out)
+			}
+		})
+		t.Run(name+", to a pipe", func(t *testing.T) {
+			if out := run(t, args...); !strings.Contains(out, "line one\nline two"+payload) {
+				t.Errorf("piped output was changed: %q", out)
+			}
+		})
 	}
 }
