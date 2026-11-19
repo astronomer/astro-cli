@@ -127,12 +127,18 @@ func planIgnoreRules(projectDir string) (*Change, error) {
 // given there.
 func hasIgnoreRule(gitignore, rule string) bool {
 	has := false
+	base := path.Base(strings.TrimSuffix(rule, "/"))
 	for _, line := range strings.Split(gitignore, "\n") {
 		line = strings.TrimRight(line, " \t\r")
 		negated := strings.HasPrefix(line, "!")
-		line = strings.TrimPrefix(line, "!")
-		if line == rule || line == "/"+rule {
+		switch pattern := strings.TrimPrefix(line, "!"); {
+		case pattern == rule || pattern == "/"+rule:
 			has = !negated
+		case reincludes(line, base):
+			// A later negation that re-includes the rule's files by name
+			// (!**/*, say) undoes it, so it reads as missing and is appended
+			// after, where it wins again.
+			has = false
 		}
 	}
 	return has
@@ -170,9 +176,34 @@ func coversEnv(gitignore string) bool {
 		switch strings.TrimPrefix(line, "!") {
 		case ".env", "/.env", "*.env", ".env*", "**/.env":
 			covered = !negated
+		default:
+			// A negation re-includes whatever it matches, so a broad one
+			// (!*, !**/*, !.*) after the .env rule leaves .env tracked. A
+			// positive pattern is still recognized only by the spellings
+			// above, so an exotic one reads as not covering, as the doc says.
+			if reincludes(line, ".env") {
+				covered = false
+			}
 		}
 	}
 	return covered
+}
+
+// reincludes reports whether line is a negation (!pattern) that matches a
+// file called name at the project's root, read the way ignoresRootFile reads a
+// pattern: a leading / or **/ dropped, a directory pattern (trailing /) or one
+// with a / inside left unread. It is how a broad negation such as !**/* is
+// seen to undo an earlier rule that the spelling checks above matched.
+func reincludes(line, name string) bool {
+	if !strings.HasPrefix(line, "!") || strings.HasSuffix(line, "/") {
+		return false
+	}
+	pattern := strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(line, "!"), "/"), "**/")
+	if pattern == "" || strings.Contains(pattern, "/") {
+		return false
+	}
+	ok, err := path.Match(pattern, name)
+	return err == nil && ok
 }
 
 // uvLockFile is the lock every image installs from, which has to be committed.
