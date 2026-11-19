@@ -27,7 +27,7 @@ func FetchUserInfo(authCfg AuthConfig, accessToken string, opts ...RequestOption
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := o.httpClient.Do(req)
+	resp, err := withoutRedirects(o.httpClient).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("userinfo request failed: %w", err)
 	}

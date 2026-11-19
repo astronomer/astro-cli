@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,4 +94,50 @@ func TestAddOSVersion(t *testing.T) {
 	assert.Equal(t, "Desktop's own", props[osVersionProperty])
 
 	addOSVersion(nil)
+}
+
+// An https telemetry API that redirects to plain http is not followed, so a
+// token never goes out unencrypted; an https-to-https redirect still is.
+func TestSendDoesNotFollowADowngrade(t *testing.T) {
+	var plainReached atomic.Bool
+	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		plainReached.Store(true)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer plain.Close()
+
+	var tlsAuth string
+	tlsSrv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/downgrade":
+			http.Redirect(w, r, plain.URL+"/events", http.StatusTemporaryRedirect)
+		case "/moved":
+			http.Redirect(w, r, "/events", http.StatusTemporaryRedirect)
+		default:
+			tlsAuth = r.Header.Get("Authorization")
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer tlsSrv.Close()
+
+	// The production client with only its Transport swapped for one that
+	// trusts the test server, so its own redirect policy is what runs.
+	orig := sendClient
+	t.Cleanup(func() { sendClient = orig })
+	withTLS := *orig
+	withTLS.Transport = tlsSrv.Client().Transport
+	sendClient = &withTLS
+
+	_, err := SendWithToken(testPayload(), tlsSrv.URL+"/downgrade", "tok-abc")
+	require.ErrorIs(t, err, errDowngradeRedirect)
+	assert.False(t, plainReached.Load(), "the plain-http target was sent the request")
+
+	status, err := SendWithToken(testPayload(), tlsSrv.URL+"/moved", "tok-abc")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, status)
+	assert.Equal(t, "Bearer tok-abc", tlsAuth)
+}
+
+func TestSendClientNamesNoTransport(t *testing.T) {
+	assert.Nil(t, sendClient.Transport, "a nil Transport reads http.DefaultTransport, where the CLI installs its socket routing")
 }

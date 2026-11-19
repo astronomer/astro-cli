@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,6 +18,29 @@ const (
 	// maxStdinBytes is the maximum bytes to read from stdin for the telemetry payload
 	maxStdinBytes = 64 * 1024 // 64KB
 )
+
+// maxRedirects is net/http's own limit, which a CheckRedirect of our own
+// replaces and so has to keep.
+const maxRedirects = 10
+
+var errDowngradeRedirect = errors.New("telemetry API redirected from https to http; not following it")
+
+// sendClient is the client events go out on. It names no Transport, so it
+// reads http.DefaultTransport per request, as http.DefaultClient does, and
+// whatever the process installed there still applies. It follows redirects
+// as http.DefaultClient would, except from https to plain http: the request
+// can carry a bearer token, and a downgrade would send it unencrypted.
+var sendClient = &http.Client{CheckRedirect: refuseDowngrade}
+
+func refuseDowngrade(req *http.Request, via []*http.Request) error {
+	if len(via) >= maxRedirects {
+		return fmt.Errorf("stopped after %d redirects", maxRedirects)
+	}
+	if via[0].URL.Scheme == "https" && req.URL.Scheme != "https" {
+		return errDowngradeRedirect
+	}
+	return nil
+}
 
 // Send posts a TelemetryPayload synchronously without credentials, returning the
 // HTTP status code. Callers holding an Astro token should use SendWithToken.
@@ -48,13 +72,13 @@ func SendWithToken(payload TelemetryPayload, apiURL, token string) (int, error) 
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := sendClient.Do(req)
 	if err != nil {
 		return 0, err
 	}
 	defer resp.Body.Close()
 
-	// Drain body to allow connection reuse by http.DefaultClient
+	// Drain body to allow connection reuse
 	_, _ = io.Copy(io.Discard, resp.Body) //nolint:errcheck // a body that will not drain costs the next request a new connection, nothing this one can act on
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

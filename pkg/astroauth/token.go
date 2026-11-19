@@ -41,7 +41,7 @@ func ExchangeCode(authCfg AuthConfig, verifier, code string, opts ...RequestOpti
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := o.httpClient.Do(req)
+	resp, err := withoutRedirects(o.httpClient).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("token exchange failed: %w", err)
 	}
@@ -73,7 +73,7 @@ func RefreshToken(authCfg AuthConfig, refreshTok string, opts ...RequestOption) 
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := o.httpClient.Do(req)
+	resp, err := withoutRedirects(o.httpClient).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("token refresh failed: %w", err)
 	}
