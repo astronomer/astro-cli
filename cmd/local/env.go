@@ -1031,6 +1031,13 @@ func declaredSpec(schema *envschema.Schema, kind localenv.Kind, name string) (en
 	case localenv.KindConn:
 		specs = schema.Connections
 	}
+	// Declarations are keyed by their folded name (envschema.FoldName): an
+	// Airflow variable or connection declared as api_key is the one set as
+	// API_KEY, since both reach Airflow as the same AIRFLOW_VAR_/AIRFLOW_CONN_
+	// key. An env var's name is used as written, and FoldName leaves it so.
+	if folded, err := envschema.FoldName(sectionFor(kind), name); err == nil {
+		name = folded
+	}
 	spec, ok := specs[name]
 	return spec, ok
 }

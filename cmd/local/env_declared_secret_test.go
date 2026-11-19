@@ -147,6 +147,10 @@ func TestSetRefusesPlaintextForADeclaredSecretName(t *testing.T) {
 		{"variable", "[tool.astro.env]\nAPI_TOKEN = { secret = true }\n", "variable", "API_TOKEN", "s3cr3t", "API_TOKEN"},
 		{"airflow variable", "[tool.astro.env.airflow_variables]\napi_key = { secret = true }\n", "airflow-variable", "api_key", "s3cr3t", "AIRFLOW_VAR_API_KEY"},
 		{"connection", "[tool.astro.env.connections]\ndb_main = {}\n", "connection", "db_main", "postgres://u:p@h/db", "AIRFLOW_CONN_DB_MAIN"},
+		// Another spelling of a declared Airflow name is the same name to
+		// Airflow, and so declared too.
+		{"airflow variable in another case", "[tool.astro.env.airflow_variables]\napi_key = { secret = true }\n", "airflow-variable", "API_KEY", "s3cr3t", "AIRFLOW_VAR_API_KEY"},
+		{"connection in another case", "[tool.astro.env.connections]\ndb_main = {}\n", "connection", "DB_Main", "postgres://u:p@h/db", "AIRFLOW_CONN_DB_MAIN"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
