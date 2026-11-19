@@ -1357,6 +1357,9 @@ func TestDeployManifestOnTheCurrentDomainUsesTheCurrentContext(t *testing.T) {
 // The workspace-level picker lists Deployments under the current context, so a
 // project on another host is told to name one instead.
 func TestDeployManifestPickerRefusesAnotherHost(t *testing.T) {
+	// ResolveUnlinked names a Workspace by where it came from, and a
+	// --workspace an earlier test passed is still in manifestWorkspace.
+	resetDeployFlagVars()
 	d := manifestDeployer{login: &deployLogin{context: config.Context{Domain: "astronomer.io"}}}
 	_, err := d.ResolveUnlinked("clw-ws")
 	require.Error(t, err)
@@ -1368,6 +1371,9 @@ func TestDeployManifestPickerRefusesAnotherHost(t *testing.T) {
 // a deploy never creates its target. The client fails on any call, a create
 // among them.
 func TestDeployManifestPickerNeverCreatesADeployment(t *testing.T) {
+	// ResolveUnlinked names a Workspace by where it came from, and a
+	// --workspace an earlier test passed is still in manifestWorkspace.
+	resetDeployFlagVars()
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	orig := deployment.ListDeployments
 	t.Cleanup(func() { deployment.ListDeployments = orig })
