@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -451,8 +453,25 @@ func (c *Client) run(ctx context.Context, project string, env []string, stdio St
 	// Run first, read the tail second: a return statement's operands are
 	// evaluated left to right, so the tail has to be read in its own statement
 	// to hold anything.
+	start := time.Now()
+	slog.DebugContext(ctx, "running", "cmd", logLine(c.bin, args), "dir", project)
 	err := normalizeWaitError(cmd.Run())
+	if err != nil {
+		slog.DebugContext(ctx, "failed", "cmd", logLine(c.bin, args), "took", time.Since(start).Round(time.Millisecond), "err", err)
+	} else {
+		slog.DebugContext(ctx, "finished", "cmd", logLine(c.bin, args), "took", time.Since(start).Round(time.Millisecond))
+	}
 	return stderrTail.String(), err
+}
+
+// urlUserinfo is the user:password@ of a URL, which a requirement or an index
+// can carry (git+https://token@host/...).
+var urlUserinfo = regexp.MustCompile(`(://)[^/@\s]+@`)
+
+// logLine is a uv command line as the debug log shows it: on one line, with
+// any credentials in a URL masked.
+func logLine(bin string, args []string) string {
+	return urlUserinfo.ReplaceAllString(strings.Join(append([]string{bin}, args...), " "), "${1}***@")
 }
 
 // isPoisonedVenv reports whether stderr is uv failing to read back something it

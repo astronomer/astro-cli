@@ -3,6 +3,8 @@ package apc
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -12,7 +14,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houston_mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -156,28 +157,12 @@ func (s *AddCmdSuite) TestNeedsPlatform() {
 	}
 }
 
-func (s *AddCmdSuite) TestSetupLogs() {
-	buf := new(bytes.Buffer)
-	err := SetUpLogs(buf, "info")
-	s.NoError(err)
-	s.Equal("info", logger.GetLevel().String())
-
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	err = config.CFG.Verbosity.SetHomeString("error")
-	s.NoError(err)
-
-	err = SetUpLogs(buf, "warning")
-	s.NoError(err)
-	s.Equal("error", logger.GetLevel().String())
-
-	err = SetUpLogs(buf, "invalid-level")
-	s.EqualError(err, "not a valid logrus Level: \"invalid-level\"")
-}
-
 func (s *AddCmdSuite) TestPrintDebugLogs() {
 	buf := new(bytes.Buffer)
-	err := SetUpLogs(buf, "debug")
-	s.NoError(err)
+	logger.SetOutput(buf)
+	level := logger.GetLevel()
+	logger.SetLevel(slog.LevelDebug)
+	s.T().Cleanup(func() { logger.SetOutput(os.Stderr); logger.SetLevel(level) })
 
 	InitDebugLogs = []string{"test log line"}
 

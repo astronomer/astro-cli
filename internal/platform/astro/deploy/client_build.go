@@ -7,11 +7,10 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
@@ -68,7 +67,7 @@ func clientBuildRequest(contextDir, tag string, platforms, secrets []string, bin
 // is not there to push.
 func buildClientImage(projectDir, contextDir, tag string, platforms, secrets []string, engine imagebuild.Engine) error {
 	s := spinner.NewSpinner("Building project image…")
-	debug := logger.IsLevelEnabled(logrus.DebugLevel)
+	debug := logger.Enabled(slog.LevelDebug)
 	if !debug {
 		s.Start()
 		defer s.Stop()

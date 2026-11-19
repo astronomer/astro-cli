@@ -3,10 +3,9 @@ package otto
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -37,8 +36,8 @@ func redirectCLILogs() (io.Closer, error) {
 	logger.SetOutput(f)
 	// Bump level now that logs go to a file, so update hints and debug lines
 	// are captured instead of being dropped by the default warn threshold.
-	if logger.GetLevel() < logrus.InfoLevel {
-		logger.SetLevel(logrus.InfoLevel)
+	if logger.GetLevel() > slog.LevelInfo {
+		logger.SetLevel(slog.LevelInfo)
 	}
 	return f, nil
 }

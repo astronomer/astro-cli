@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -469,7 +469,7 @@ func TestWorkspaceSwitchPageSizeNote(t *testing.T) {
 	logs := new(bytes.Buffer)
 	logger.SetOutput(logs)
 	level := logger.GetLevel()
-	logger.SetLevel(logrus.WarnLevel)
+	logger.SetLevel(slog.LevelWarn)
 	t.Cleanup(func() {
 		logger.SetOutput(os.Stderr)
 		logger.SetLevel(level)

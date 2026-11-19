@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +12,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 type AuthPayload struct {
@@ -144,7 +145,7 @@ func Subscribe(jwtToken, url, queryMessage string, notes io.Writer, onLog func(D
 		return err
 	case <-interrupt:
 		stopped.Store(true)
-		log.Println("Bye bye ...")
+		logger.Debug("log subscription interrupted, stopping it")
 		return stopAndWait(ws, notes, done)
 	}
 }

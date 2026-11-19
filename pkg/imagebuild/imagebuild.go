@@ -39,6 +39,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -335,7 +336,19 @@ func (execCommander) RunIn(ctx context.Context, dir string, extraEnv []string, s
 	// A nil reader/writer means "none": os/exec routes a nil Stdout/Stderr to the
 	// null device, so a silent probe needs no extra plumbing.
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = s.In, s.Out, s.Err
-	return cmd.Run()
+	// The added environment is logged by name only: it is where a build's
+	// secrets travel. The arguments carry none (a --secret names one).
+	line := strings.Join(append([]string{name}, args...), " ")
+	envNames := make([]string, 0, len(extraEnv))
+	for _, kv := range extraEnv {
+		k, _, _ := strings.Cut(kv, "=")
+		envNames = append(envNames, k)
+	}
+	start := time.Now()
+	slog.DebugContext(ctx, "running", "cmd", line, "dir", dir, "env", strings.Join(envNames, ","))
+	err := cmd.Run()
+	slog.DebugContext(ctx, "finished", "cmd", line, "took", time.Since(start).Round(time.Millisecond), "err", err)
+	return err
 }
 
 // Build produces the image to run and returns its reference.

@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
@@ -123,14 +122,14 @@ func TestResolveWritesOneDebugLine(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			useRun(t, tt.kind, "ws-saved")
-			logger.SetLevel(logrus.DebugLevel)
+			logger.SetLevel(slog.LevelDebug)
 			buf.Reset()
 			Resolve(tt.req)
 			lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 			if len(lines) != 1 || !strings.Contains(lines[0], tt.want) {
 				t.Fatalf("debug log = %q, want one line with %q", buf.String(), tt.want)
 			}
-			logger.SetLevel(logrus.InfoLevel)
+			logger.SetLevel(slog.LevelInfo)
 			buf.Reset()
 			Resolve(tt.req)
 			if buf.Len() != 0 {
