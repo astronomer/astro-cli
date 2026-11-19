@@ -43,6 +43,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -329,6 +330,10 @@ func (c execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, n
 	return c.RunIn(ctx, "", extraEnv, s, name, args...)
 }
 
+// urlUserinfo is the user:password@ of a URL, up to the last @ before the
+// path, masked in a command's debug line.
+var urlUserinfo = regexp.MustCompile(`(://)[^/\s]*@`)
+
 func (execCommander) RunIn(ctx context.Context, dir string, extraEnv []string, s rt.Stdio, name string, args ...string) error {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Dir = dir
@@ -337,8 +342,9 @@ func (execCommander) RunIn(ctx context.Context, dir string, extraEnv []string, s
 	// null device, so a silent probe needs no extra plumbing.
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = s.In, s.Out, s.Err
 	// The added environment is logged by name only: it is where a build's
-	// secrets travel. The arguments carry none (a --secret names one).
-	line := strings.Join(append([]string{name}, args...), " ")
+	// secrets travel. The arguments carry none (a --secret names one), but a
+	// URL's credentials are masked all the same.
+	line := urlUserinfo.ReplaceAllString(strings.Join(append([]string{name}, args...), " "), "${1}***@")
 	envNames := make([]string, 0, len(extraEnv))
 	for _, kv := range extraEnv {
 		k, _, _ := strings.Cut(kv, "=")

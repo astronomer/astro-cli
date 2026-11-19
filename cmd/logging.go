@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
@@ -81,8 +82,10 @@ func SetupLogging(cmd *cobra.Command, _ []string) error {
 		break
 	}
 	logger.SetLevel(level)
+	// Written past the level: a level of error, or a 1.x "fatal", would
+	// otherwise hide the very typo that set it.
 	for _, b := range bad {
-		logger.Warnf("ignoring %s", b)
+		ansi.Warn(logOutput(), "ignoring "+b)
 	}
 	return nil
 }

@@ -465,8 +465,10 @@ func (c *Client) run(ctx context.Context, project string, env []string, stdio St
 }
 
 // urlUserinfo is the user:password@ of a URL, which a requirement or an index
-// can carry (git+https://token@host/...).
-var urlUserinfo = regexp.MustCompile(`(://)[^/@\s]+@`)
+// can carry (git+https://token@host/...). It runs to the last @ before the
+// path, so a password holding a raw @ is masked whole; a / is not allowed
+// unencoded in userinfo, and stopping at one keeps a git ref's @ in the path.
+var urlUserinfo = regexp.MustCompile(`(://)[^/\s]*@`)
 
 // logLine is a uv command line as the debug log shows it: on one line, with
 // any credentials in a URL masked.

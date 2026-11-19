@@ -3,6 +3,7 @@ package localshared
 import (
 	"context"
 	"log/slog"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -59,10 +60,15 @@ func (c *CommandLog) End(err error, stderr []byte) {
 	slog.DebugContext(c.ctx, "failed", attrs...)
 }
 
+// urlUserinfo is the user:password@ of a URL, up to the last @ before the
+// path, so a password holding a raw @ is masked whole. (A / is not allowed
+// unencoded in userinfo; stopping at one keeps a git ref's @ in the path.)
+var urlUserinfo = regexp.MustCompile(`(://)[^/\s]*@`)
+
 // CommandLine is name and args as one line, to read rather than to paste:
-// arguments are not quoted.
+// arguments are not quoted, and credentials in a URL are masked.
 func CommandLine(name string, args []string) string {
-	return strings.Join(append([]string{name}, args...), " ")
+	return urlUserinfo.ReplaceAllString(strings.Join(append([]string{name}, args...), " "), "${1}***@")
 }
 
 // EnvNames is the names in a KEY=value environment, comma-separated, without

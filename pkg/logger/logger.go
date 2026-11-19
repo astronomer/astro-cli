@@ -25,8 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mattn/go-isatty"
-
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
@@ -94,7 +92,11 @@ func SetOutput(w io.Writer) {
 }
 
 // Debug writes a debug line made of args, as fmt.Sprint makes one.
-func Debug(args ...any) { logf(slog.LevelDebug, "", args) }
+func Debug(args ...any) {
+	if Enabled(slog.LevelDebug) {
+		std.Log(context.Background(), slog.LevelDebug, fmt.Sprint(args...))
+	}
+}
 
 // Debugf writes a debug line.
 func Debugf(format string, args ...any) { logf(slog.LevelDebug, format, args) }
@@ -107,16 +109,9 @@ func Warnf(format string, args ...any) { logf(slog.LevelWarn, format, args) }
 
 // logf formats only once it knows the line will be written.
 func logf(l slog.Level, format string, args []any) {
-	if !Enabled(l) {
-		return
+	if Enabled(l) {
+		std.Log(context.Background(), l, fmt.Sprintf(format, args...))
 	}
-	var msg string
-	if format == "" {
-		msg = fmt.Sprint(args...)
-	} else {
-		msg = fmt.Sprintf(format, args...)
-	}
-	std.Log(context.Background(), l, msg)
 }
 
 // handler writes a record as one line a person reads: the label the CLI leads
@@ -151,7 +146,10 @@ func (h *handler) Handle(_ context.Context, r slog.Record) error { //nolint:gocr
 	}
 	b.WriteString(label(out, r.Level))
 	b.WriteByte(' ')
-	b.WriteString(input.Lines(r.Message))
+	// A message may run to several lines (a report, a server's error);
+	// continuation lines are indented, so none can pass for a line of its own
+	// with a label of its choosing.
+	b.WriteString(strings.ReplaceAll(strings.TrimRight(input.Lines(r.Message), "\n"), "\n", "\n    "))
 	b.WriteString(h.attrs)
 	r.Attrs(func(a slog.Attr) bool {
 		writeAttr(&b, h.group, a)
@@ -224,9 +222,15 @@ func label(w io.Writer, l slog.Level) string {
 	}
 }
 
-// stamped reports whether lines to w carry the time: a file that is not a
-// terminal does, anything else (a terminal, a test's buffer) does not.
+// stamped reports whether lines to w carry the time: a regular file does (the
+// proxy daemon's log, otto's), read later. A terminal, a pipe (stderr piped
+// into a CI log, which stamps lines itself) and a test's buffer do not, so a
+// warning reads the same however stderr is redirected.
 func stamped(w io.Writer) bool {
 	f, ok := w.(*os.File)
-	return ok && !isatty.IsTerminal(f.Fd()) && !isatty.IsCygwinTerminal(f.Fd())
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	return err == nil && info.Mode().IsRegular()
 }

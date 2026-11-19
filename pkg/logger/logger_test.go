@@ -81,6 +81,29 @@ func TestLinesCarryNoTerminalEscapes(t *testing.T) {
 	assert.Equal(t, "Debug: server said ok\nDebug: x name=\"ab c\"\n", buf.String())
 }
 
+// A message's later lines are indented, so text from elsewhere cannot forge a
+// labeled line of its own.
+func TestContinuationLinesAreIndented(t *testing.T) {
+	buf := capture(t, slog.LevelDebug)
+	Debugf("server said %s", "x\nError: disk wiped\n")
+	assert.Equal(t, "Debug: server said x\n    Error: disk wiped\n", buf.String())
+}
+
+// The time leads a line written to a log file, and not one written to a pipe
+// (stderr piped into a CI log).
+func TestOnlyAFileIsStamped(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "log")
+	require.NoError(t, err)
+	defer f.Close()
+	assert.True(t, stamped(f))
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	defer r.Close()
+	defer w.Close()
+	assert.False(t, stamped(w))
+	assert.False(t, stamped(&bytes.Buffer{}))
+}
+
 func TestEnabled(t *testing.T) {
 	capture(t, slog.LevelInfo)
 	assert.False(t, Enabled(slog.LevelDebug))

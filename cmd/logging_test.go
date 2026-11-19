@@ -76,11 +76,12 @@ func TestSetupLoggingReportsABadLevel(t *testing.T) {
 	t.Cleanup(func() { logOutput = orig })
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Setenv(verbosityEnv, "loud")
-	require.NoError(t, config.CFG.Verbosity.SetHomeString("trace"))
+	// A setting of fatal logs nothing, and the report is still written.
+	require.NoError(t, config.CFG.Verbosity.SetHomeString("fatal"))
 	root := &cobra.Command{Use: "astro"}
 	addVerbosityFlag(root.PersistentFlags())
 	require.NoError(t, SetupLogging(root, nil))
-	assert.Equal(t, slog.LevelDebug, logger.GetLevel())
+	assert.Equal(t, logger.LevelOff, logger.GetLevel())
 	assert.Equal(t, "Warning: ignoring ASTRO_VERBOSITY: \"loud\" is not a log level: use debug, info, warn or error\n", buf.String())
 }
 
