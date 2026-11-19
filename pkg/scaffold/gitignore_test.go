@@ -289,25 +289,44 @@ func TestHasIgnoreRule(t *testing.T) {
 	}
 }
 
-// coversEnv may read a .gitignore as not covering .env when git would ignore
-// it (a redundant rule, a spare warning), never the reverse. Asked of git
-// itself for each file here: whenever coversEnv says covered, git ignores .env.
-func TestCoversEnvNeverClaimsMoreThanGit(t *testing.T) {
+// coversEnv and ignoresRootFile give git's own answer for the committed
+// .gitignore, asked of git itself for each file here: whenever git ignores the
+// root file, they say so, and whenever git tracks it, they say that.
+func TestIgnoreReadingAgreesWithGit(t *testing.T) {
 	gitBin, err := exec.LookPath("git")
 	if err != nil {
 		t.Skip("git is not on PATH")
 	}
 	for _, g := range []string{
+		"",
 		".env",
+		"/.env",
+		".env  ",
+		"  .env",
+		".env\r\ndist",
 		".env\n!.env",
+		"!.env\n.env",
 		".env\n!**/*",
 		".env\n!*",
+		".env\n!/*",
 		".env\n!.*",
+		".env\n!.env*",
 		".env\n!.gitkeep",
 		".env\n!dags/",
+		".env\n!*.py",
 		".env\n!**/*\n.env",
 		"*.env\n!*",
 		"**/.env\n!**",
+		// Spellings the old reader did not know, which git does.
+		".e*",
+		".?nv",
+		"[.]env",
+		"*",
+		".env/",
+		"dags/.env",
+		"*.lock",
+		"uv.lock\n!uv.lock",
+		"**/uv.lock",
 	} {
 		dir := t.TempDir()
 		writeGitignore(t, dir, g)
@@ -318,10 +337,11 @@ func TestCoversEnvNeverClaimsMoreThanGit(t *testing.T) {
 			return cmd.Run()
 		}
 		require.NoError(t, run("init", "-q"))
-		gitIgnores := run("check-ignore", "-q", ".env") == nil
-		if coversEnv(g) {
-			assert.Truef(t, gitIgnores, "coversEnv(%q) = true, but git tracks .env", g)
+		for _, name := range []string{".env", "uv.lock"} {
+			gitIgnores := run("check-ignore", "-q", name) == nil
+			assert.Equalf(t, gitIgnores, ignoresRootFile(g, name), "ignoresRootFile(%q, %q) disagrees with git", g, name)
 		}
+		assert.Equalf(t, run("check-ignore", "-q", ".env") == nil, coversEnv(g), "coversEnv(%q) disagrees with git", g)
 	}
 }
 
