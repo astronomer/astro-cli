@@ -25,6 +25,10 @@ test:
 test-installer:
 	bash scripts/test-godownloader.sh
 
+# The same under busybox's sh, awk, sed and sort, where there is no curl
+test-installer-alpine:
+	docker run --rm -v "${PWD}:/src:ro" alpine:3.20 sh -c 'apk add --no-cache -q bash && bash /src/scripts/test-godownloader.sh'
+
 temp-astro:
 	cd $(shell mktemp -d) && ${PWD}/astro dev init
 
