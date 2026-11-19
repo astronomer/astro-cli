@@ -106,7 +106,9 @@ func decodeXComValue(raw json.RawMessage) (any, error) {
 // JSON quotes, so text reads as text, and anything else as indented JSON.
 func renderXComValue(w io.Writer, value any) error {
 	if text, ok := value.(string); ok {
-		_, err := fmt.Fprintln(w, text)
+		// Printed as it is, so to a terminal without what it would act on
+		// (terminalText); anything else is JSON, which escapes those itself.
+		_, err := fmt.Fprintln(w, terminalText(w, text))
 		return err
 	}
 	//astro:non-output-json // the value alone for text output; --output json goes through Emit

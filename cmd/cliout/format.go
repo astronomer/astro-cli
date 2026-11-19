@@ -292,14 +292,21 @@ const (
 // --no-color` sets it. The terminal test is the one pkg/ansi and the old
 // pkg/output printer use.
 func StyleFor(w io.Writer) Style {
-	f, ok := w.(*os.File)
-	if !ok || !(isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())) {
+	if !IsTerminal(w) {
 		return StyleCompact
 	}
 	if color.NoColor {
 		return StyleIndented
 	}
 	return StyleColor
+}
+
+// IsTerminal reports whether w is a terminal: the test StyleFor makes, and the
+// one a command makes before it cleans text from elsewhere (input.Lines) that a
+// terminal would act on, leaving what goes to a file or a pipe as it came.
+func IsTerminal(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	return ok && (isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd()))
 }
 
 // Emit writes v, a command's result. In json mode it is laid out by
