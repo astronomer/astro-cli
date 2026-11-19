@@ -225,3 +225,31 @@ func TestEnvSourcedNoteOnlyOnNotFound(t *testing.T) {
 		t.Errorf("err = %v, want a forbidden error with no env note", err)
 	}
 }
+
+// Text output prints an Airflow value without what a terminal would act on (an
+// escape sequence: here a clipboard write and a screen clear), keeping its line
+// breaks; json keeps the value exactly as Airflow sent it.
+func TestVariablesGetPrintsNoTerminalEscapes(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/variables/k",
+		`{"key":"k","value":"line one\nline two\u001b]52;c;aGk=\u0007\u001b[2J","description":"d"}`)
+
+	out, _, err := runQuery(t, stub, "variables", "get", "k")
+	if err != nil {
+		t.Fatalf("variables get: %v", err)
+	}
+	if strings.ContainsAny(out, "\x1b\x07") {
+		t.Errorf("text output carries a terminal escape: %q", out)
+	}
+	if !strings.Contains(out, "line one\nline two") {
+		t.Errorf("text output lost the value's line break: %q", out)
+	}
+
+	out, _, err = runQuery(t, stub, "variables", "get", "k", "-o", "json")
+	if err != nil {
+		t.Fatalf("variables get -o json: %v", err)
+	}
+	if v := decodeJSON(t, out); v["value"] != "line one\nline two\x1b]52;c;aGk=\x07\x1b[2J" {
+		t.Errorf("json value = %q, want it as Airflow sent it", v["value"])
+	}
+}
