@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -695,4 +696,17 @@ func TestKindsOf(t *testing.T) {
 	assert.Equal(t, KindUsage, k.Of(Usage(errBoom)), "usage wins over every row")
 	assert.Equal(t, ProblemKind(""), k.Of(errors.New("other")))
 	assert.Equal(t, ProblemKind(""), k.Of(nil))
+}
+
+// An error's text can carry what a server sent. To a terminal it goes without
+// the escapes the terminal would act on, its line breaks kept; to a file or a
+// pipe, as it is.
+func TestErrorTextForATerminal(t *testing.T) {
+	err := errors.New("bad gateway\x1b]52;c;aGk=\x07\nretry")
+	assert.Equal(t, err.Error(), errorText(io.Discard, err), "a pipe gets the error as it is")
+
+	orig := stderrIsTerminal
+	t.Cleanup(func() { stderrIsTerminal = orig })
+	stderrIsTerminal = func(io.Writer) bool { return true }
+	assert.Equal(t, "bad gateway\nretry", errorText(io.Discard, err))
 }

@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // gap is the space after each column's widest cell.
@@ -43,16 +45,14 @@ type Table struct {
 	rows [][]string
 }
 
-// cellReplacer makes arbitrary text safe for one tabwriter cell. tabwriter
-// ends a cell at \t and \v and a line at \n and \f, whatever its flags, so
-// each of those becomes a space.
-var cellReplacer = strings.NewReplacer("\t", " ", "\v", " ", "\r", "", "\n", " ", "\f", " ")
-
-// AddRow appends one row, a cell per column.
+// AddRow appends one row, a cell per column. Each cell goes in as input.Cell
+// has it: tabwriter ends a cell at \t and \v and a line at \n and \f,
+// whatever its flags, so each of those becomes a space, and a terminal would
+// act on an escape in a value from somewhere else.
 func (t *Table) AddRow(cells ...string) {
 	row := make([]string, len(cells))
 	for i, c := range cells {
-		row[i] = cellReplacer.Replace(c)
+		row[i] = input.Cell(c)
 	}
 	t.rows = append(t.rows, row)
 }

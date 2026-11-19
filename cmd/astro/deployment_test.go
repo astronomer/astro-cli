@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -1493,4 +1494,26 @@ func TestDeploymentOpen(t *testing.T) {
 		assert.Equal(t, deployment.UIResult{DeploymentID: "test-id-1", Name: "test-deployment-label", URL: "https://test-url"}, res)
 		mockV1Client.AssertExpectations(t)
 	})
+}
+
+// A Deployment's log line is whatever its code wrote: to a terminal it goes
+// without escapes, to a pipe as it came.
+func TestDeploymentLogsReachATerminalWithoutEscapes(t *testing.T) {
+	res := &deployment.LogsResult{DeploymentName: "d", Hours: 1, Entries: []deployment.LogEntry{
+		{Source: "scheduler", Message: "line\x1b]52;c;aGk=\x07\x1b[2J"},
+	}}
+	run := func() string {
+		var buf bytes.Buffer
+		cmd := &cobra.Command{}
+		require.NoError(t, emitLogs(cmd, cliout.Renderer{Format: cliout.FormatText, Out: &buf}, res))
+		return buf.String()
+	}
+	assert.Contains(t, run(), "line\x1b]52;c;aGk=\x07\x1b[2J", "a pipe gets the log as it came")
+
+	orig := logsToTerminal
+	t.Cleanup(func() { logsToTerminal = orig })
+	logsToTerminal = func(io.Writer) bool { return true }
+	out := run()
+	assert.NotContains(t, out, "\x1b")
+	assert.Contains(t, out, "line scheduler")
 }

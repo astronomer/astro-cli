@@ -92,3 +92,18 @@ func (s *Suite) TestLines() {
 		s.Run(tc.name, func() { s.Equal(tc.want, Lines(tc.in)) })
 	}
 }
+
+// Cell is one line with its own spacing kept, and nothing a terminal would act on.
+func (s *Suite) TestCell() {
+	cases := []struct{ name, in, want string }{
+		{"plain text is unchanged", "my deployment", "my deployment"},
+		{"its own spacing is kept", "two  spaces", "two  spaces"},
+		{"a line break and a tab become spaces", "a\nb\tc", "a b c"},
+		{"a CRLF becomes one space", "a\r\nb", "a b"},
+		{"an escape sequence is removed whole", "prod\x1b]52;c;aGk=\x07\x1b[2J", "prod"},
+		{"a bidi override is dropped", "run \u202Egnp.exe", "run gnp.exe"},
+	}
+	for _, tc := range cases {
+		s.Run(tc.name, func() { s.Equal(tc.want, Cell(tc.in)) })
+	}
+}

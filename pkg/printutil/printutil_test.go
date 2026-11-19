@@ -264,3 +264,15 @@ func (s *Suite) TestTableDynamicPadding() {
 		})
 	}
 }
+
+// A cell from an API reaches the table one line and without escapes, and the
+// columns are measured on what is printed.
+func (s *Suite) TestTableAddRowCleansCells() {
+	tab := Table{Padding: []int{10, 10}, DynamicPadding: true, Header: []string{"NAME", "ID"}}
+	tab.AddRow([]string{"prod\x1b]52;c;aGk=\x07\x1b[2J", "a\nb"}, false)
+	var buf bytes.Buffer
+	s.NoError(tab.Print(&buf))
+	s.NotContains(buf.String(), "\x1b")
+	s.NotContains(buf.String(), "\x07")
+	s.Equal([]string{"prod", "a b"}, tab.Rows[0].Raw)
+}

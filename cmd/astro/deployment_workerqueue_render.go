@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/workerqueue"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 var (
@@ -43,13 +44,25 @@ func emitLogs(cmd *cobra.Command, r cliout.Renderer, res *deployment.LogsResult)
 		_, err := fmt.Fprintf(w, "No matching logs have been recorded in the past %d hours for Deployment %s\n", res.Hours, res.DeploymentName)
 		return err
 	}
+	// A log line is whatever the Deployment's code wrote, so to a terminal it
+	// goes without what the terminal would act on (input.Lines); to a file or
+	// a pipe, as it came.
+	terminal := logsToTerminal(r.Out)
 	for i := range res.Entries {
 		e := &res.Entries[i]
+		message := e.Message
+		if terminal {
+			message = input.Lines(message)
+		}
 		if err := r.EmitEvent(e, cliout.Text(func(b *bufio.Writer) {
-			fmt.Fprintf(b, "%s %s\n", e.Message, e.Source)
+			fmt.Fprintf(b, "%s %s\n", message, e.Source)
 		})); err != nil {
 			return err
 		}
 	}
 	return nil
 }
+
+// logsToTerminal reports whether deployment logs write to a terminal. A
+// variable so a test can stand one in for a buffer.
+var logsToTerminal = cliout.IsTerminal

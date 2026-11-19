@@ -123,7 +123,7 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	if quietErrors || (cmd != root && cmd.SilenceErrors) {
 		return err
 	}
-	root.PrintErrln(errorPrefixFor(cmd.ErrPrefix(), root.ErrOrStderr()), err.Error())
+	root.PrintErrln(errorPrefixFor(cmd.ErrPrefix(), root.ErrOrStderr()), errorText(root.ErrOrStderr(), err))
 	// A failure that is not a usage error is the whole message: the command
 	// was invoked rightly, so its usage would only bury the error. A usage
 	// error points at the failing command's help rather than printing it, with
@@ -275,4 +275,20 @@ func ArgsAskForJSON(args []string, shorthand string) bool {
 		}
 	}
 	return false
+}
+
+// stderrIsTerminal reports whether w is a terminal. A variable so a test can
+// stand one in for a buffer.
+var stderrIsTerminal = IsTerminal
+
+// errorText is err's message as the text-mode error line prints it to w. An
+// error can carry what a server sent (an API's message, a proxy's page), and
+// to a terminal it goes without the escapes and other control characters the
+// terminal would act on (input.Lines), its line breaks kept. To a file or a
+// pipe it goes as it is.
+func errorText(w io.Writer, err error) string {
+	if stderrIsTerminal(w) {
+		return input.Lines(err.Error())
+	}
+	return err.Error()
 }
