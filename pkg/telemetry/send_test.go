@@ -94,3 +94,45 @@ func TestAddOSVersion(t *testing.T) {
 
 	addOSVersion(nil)
 }
+
+// An https telemetry API that redirects to plain http is not followed, so a
+// token never goes out unencrypted; an https-to-https redirect still is.
+func TestSendDoesNotFollowADowngrade(t *testing.T) {
+	plainReached := false
+	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		plainReached = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer plain.Close()
+
+	var tlsAuth string
+	tlsSrv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/downgrade":
+			http.Redirect(w, r, plain.URL+"/events", http.StatusTemporaryRedirect)
+		case "/moved":
+			http.Redirect(w, r, "/events", http.StatusTemporaryRedirect)
+		default:
+			tlsAuth = r.Header.Get("Authorization")
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer tlsSrv.Close()
+
+	orig := sendClient
+	t.Cleanup(func() { sendClient = orig })
+	sendClient = &http.Client{Transport: tlsSrv.Client().Transport, CheckRedirect: refuseDowngrade}
+
+	_, err := SendWithToken(testPayload(), tlsSrv.URL+"/downgrade", "tok-abc")
+	require.ErrorIs(t, err, errDowngradeRedirect)
+	assert.False(t, plainReached, "the plain-http target was sent the request")
+
+	status, err := SendWithToken(testPayload(), tlsSrv.URL+"/moved", "tok-abc")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, status)
+	assert.Equal(t, "Bearer tok-abc", tlsAuth)
+}
+
+func TestSendClientNamesNoTransport(t *testing.T) {
+	assert.Nil(t, sendClient.Transport, "a nil Transport reads http.DefaultTransport, where the CLI installs its socket routing")
+}
