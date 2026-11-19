@@ -33,11 +33,36 @@ type DoOptions struct {
 	Path    string
 }
 
-// NewHTTPClient returns a new HTTP Client
+// NewHTTPClient returns a new HTTP Client. It follows redirects as
+// http.DefaultClient does, except from https to plain http
+// (RefuseDowngradeRedirect): the requests it makes carry the context's token.
 func NewHTTPClient() *HTTPClient {
 	return &HTTPClient{
-		HTTPClient: &http.Client{},
+		HTTPClient: &http.Client{CheckRedirect: RefuseDowngradeRedirect},
 	}
+}
+
+// maxRedirects is net/http's own limit, which a CheckRedirect of our own
+// replaces and so has to keep.
+const maxRedirects = 10
+
+// ErrDowngradeRedirect is a redirect from https to plain http, which
+// RefuseDowngradeRedirect will not follow.
+var ErrDowngradeRedirect = errors.New("redirected from https to http; not following it")
+
+// RefuseDowngradeRedirect is an http.Client CheckRedirect that follows
+// redirects as the default policy does, up to the same ten, except from https
+// to plain http. Go keeps a request's Authorization header on a redirect to
+// the same host whatever the scheme, so following one would send the token
+// unencrypted.
+func RefuseDowngradeRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= maxRedirects {
+		return fmt.Errorf("stopped after %d redirects", maxRedirects)
+	}
+	if via[0].URL.Scheme == "https" && req.URL.Scheme != "https" {
+		return ErrDowngradeRedirect
+	}
+	return nil
 }
 
 // Do executes the given HTTP request and returns the HTTP Response
