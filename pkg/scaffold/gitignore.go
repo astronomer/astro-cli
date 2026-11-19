@@ -11,9 +11,10 @@ package scaffold
 import (
 	"errors"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
+
+	ignorefmt "github.com/go-git/go-git/v5/plumbing/format/gitignore"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 )
@@ -117,93 +118,69 @@ func planIgnoreRules(projectDir string) (*Change, error) {
 	}, nil
 }
 
-// hasIgnoreRule reports whether a .gitignore states rule, as written or
-// anchored with a leading slash, without negating it on a later line.
+// ignoreMatcher reads a .gitignore's text with go-git's gitignore rules, which
+// are git's own: the last matching pattern wins, a ! pattern re-includes, a
+// trailing / matches only a directory, ** spans directories. Only this file is
+// read, not .git/info/exclude or a global excludes file: what a teammate's
+// clone ignores is what the committed .gitignore says.
 //
-// It matches spellings, not what git would ignore, so a broader pattern that
-// covers the same files (.astro/, say) reads as missing and the rule is
-// appended beside it. That errs the harmless way: a redundant line, never a
-// missing one. Whitespace is read the way coversEnv reads it, for the reasons
-// given there.
-func hasIgnoreRule(gitignore, rule string) bool {
-	has := false
-	base := path.Base(strings.TrimSuffix(rule, "/"))
-	for _, line := range strings.Split(gitignore, "\n") {
-		line = strings.TrimRight(line, " \t\r")
-		negated := strings.HasPrefix(line, "!")
-		switch pattern := strings.TrimPrefix(line, "!"); {
-		case pattern == rule || pattern == "/"+rule:
-			has = !negated
-		case reincludes(line, base):
-			// A later negation that re-includes the rule's files by name
-			// (!**/*, say) undoes it, so it reads as missing and is appended
-			// after, where it wins again.
-			has = false
-		}
-	}
-	return has
-}
-
-// coversEnv reports whether a .gitignore leaves the .env file ignored. It
-// recognizes the plain and common wildcard spellings; an exotic pattern that
-// happens to match is treated as not covering, so the worst case is a harmless
-// extra warning, never a missed one.
-//
-// That promise is the whole point of the function — a missed warning is how a
-// credential reaches a commit — and two details are what keep it. Both were
-// wrong when this moved here from internal/localenv.
-//
-// LAST MATCH WINS, and negation counts. git applies patterns in order and a
-// later `!.env` re-includes the file, so returning true at the first match read
-// `.env` followed by `!.env` as ignored when git tracks it. That is the
-// false-negative direction the doc above rules out, reached by the one gitignore
-// feature specifically designed to undo an earlier rule.
-//
-// LEADING WHITESPACE IS PART OF THE PATTERN. git strips trailing whitespace
-// unless it is escaped, and keeps leading whitespace, so `  .env` is a pattern
-// for a file whose name begins with two spaces. Trimming both ends read that as
-// covering `.env`, which it does not.
-func coversEnv(gitignore string) bool {
-	covered := false
-	for _, line := range strings.Split(gitignore, "\n") {
-		// Trailing only: \r as well, so a CRLF file is not read as a set of
-		// patterns that all end in a carriage return.
+// Each line loses its trailing whitespace (and a CRLF file's \r) first, as git
+// strips it; leading whitespace stays part of the pattern, as in git, so
+// "  .env" names a file whose name starts with two spaces.
+func ignoreMatcher(content string) ignorefmt.Matcher {
+	var patterns []ignorefmt.Pattern
+	for _, line := range strings.Split(content, "\n") {
 		line = strings.TrimRight(line, " \t\r")
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		negated := strings.HasPrefix(line, "!")
-		switch strings.TrimPrefix(line, "!") {
-		case ".env", "/.env", "*.env", ".env*", "**/.env":
-			covered = !negated
-		default:
-			// A negation re-includes whatever it matches, so a broad one
-			// (!*, !**/*, !.*) after the .env rule leaves .env tracked. A
-			// positive pattern is still recognized only by the spellings
-			// above, so an exotic one reads as not covering, as the doc says.
-			if reincludes(line, ".env") {
-				covered = false
-			}
-		}
+		patterns = append(patterns, ignorefmt.ParsePattern(line, nil))
 	}
-	return covered
+	return ignorefmt.NewMatcher(patterns)
 }
 
-// reincludes reports whether line is a negation (!pattern) that matches a
-// file called name at the project's root, read the way ignoresRootFile reads a
-// pattern: a leading / or **/ dropped, a directory pattern (trailing /) or one
-// with a / inside left unread. It is how a broad negation such as !**/* is
-// seen to undo an earlier rule that the spelling checks above matched.
-func reincludes(line, name string) bool {
-	if !strings.HasPrefix(line, "!") || strings.HasSuffix(line, "/") {
+// hasIgnoreRule reports whether a .gitignore states rule, as written or
+// anchored with a leading slash, and still ignores what it names: a later
+// line that re-includes it (!**/*, say) undoes it, as git reads the file.
+//
+// The spelling check is on purpose. planIgnoreRules appends what this says is
+// missing, and a broader pattern that covers the same files (.astro/, say)
+// does not make the specific rule present: it reads as missing and is
+// appended beside it, a redundant line rather than a missing one.
+func hasIgnoreRule(content, rule string) bool {
+	stated := false
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimRight(line, " \t\r")
+		if line == rule || line == "/"+rule {
+			stated = true
+		}
+	}
+	if !stated {
 		return false
 	}
-	pattern := strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(line, "!"), "/"), "**/")
-	if pattern == "" || strings.Contains(pattern, "/") {
-		return false
-	}
-	ok, err := path.Match(pattern, name)
-	return err == nil && ok
+	parts, isDir := ruleSample(rule)
+	return ignoreMatcher(content).Match(parts, isDir)
+}
+
+// ruleSample is a path rule names, for asking a matcher whether the rule is
+// still in force: its wildcards filled in (.astro/*.local.yaml is
+// .astro/x.local.yaml), and a directory rule (.astro/standalone/) asked as
+// that directory.
+func ruleSample(rule string) (parts []string, isDir bool) {
+	rule = strings.TrimPrefix(rule, "/")
+	isDir = strings.HasSuffix(rule, "/")
+	rule = strings.TrimSuffix(rule, "/")
+	rule = strings.NewReplacer("**", "x", "*", "x", "?", "x").Replace(rule)
+	return strings.Split(rule, "/"), isDir
+}
+
+// coversEnv reports whether a .gitignore leaves the project's .env ignored, as
+// git reads the file (ignoreMatcher). A missed answer here is how a credential
+// reaches a commit, so it has to be git's answer, not a reading of the common
+// spellings: a later !.env, or a broader !**/*, re-includes the file, and an
+// unusual pattern that does match it (.e*) covers it.
+func coversEnv(content string) bool {
+	return ignoreMatcher(content).Match([]string{".env"}, false)
 }
 
 // uvLockFile is the lock every image installs from, which has to be committed.
@@ -213,26 +190,8 @@ const uvLockFile = "uv.lock"
 const uvLockUnignoreNote = "# uv.lock pins what every image of this project installs, so it is committed.\n"
 
 // ignoresRootFile reports whether a .gitignore's own rules leave name, a file
-// at the project's root, ignored: the last pattern that matches it wins, and
-// a ! pattern re-includes it. It reads the plain spellings (uv.lock, /uv.lock,
-// **/uv.lock, *.lock and other globs on the name), not every git rule, and
-// not what another ignore file adds; a pattern it cannot read counts as not
-// matching, so the worst case is a rule not added.
-func ignoresRootFile(gitignore, name string) bool {
-	ignored := false
-	for _, line := range strings.Split(gitignore, "\n") {
-		line = strings.TrimRight(line, " \t\r")
-		if line == "" || strings.HasPrefix(line, "#") || strings.HasSuffix(line, "/") {
-			continue
-		}
-		negated := strings.HasPrefix(line, "!")
-		pattern := strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(line, "!"), "/"), "**/")
-		if strings.Contains(pattern, "/") {
-			continue
-		}
-		if ok, err := path.Match(pattern, name); err == nil && ok {
-			ignored = !negated
-		}
-	}
-	return ignored
+// at the project's root, ignored, as git reads the file (ignoreMatcher). Not
+// what another ignore file adds.
+func ignoresRootFile(content, name string) bool {
+	return ignoreMatcher(content).Match([]string{name}, false)
 }
