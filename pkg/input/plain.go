@@ -35,6 +35,25 @@ func Plain(s string) string {
 // print.
 func Clean(s string) string { return strip(s, false) }
 
+// Lines is text as a multi-line value shows it: without escapes, control
+// characters or misleadingRune characters, but with its line breaks and tabs,
+// so a pretty-printed JSON value still reads as one. A CRLF line break becomes
+// a plain newline, and a carriage return on its own, which would let a later
+// part of the text overwrite an earlier one on screen, is dropped. It is for
+// text from somewhere else (an Airflow API response) printed as it is.
+func Lines(s string) string {
+	s = ansiEscape.ReplaceAllString(strings.ReplaceAll(s, "\r\n", "\n"), "")
+	return strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' {
+			return r
+		}
+		if unicode.IsControl(r) || misleadingRune(r) {
+			return -1
+		}
+		return r
+	}, s)
+}
+
 // strip removes escapes, control characters and misleadingRune characters from
 // s. keepSpace keeps the white space (a newline or a tab) for the caller to
 // collapse.

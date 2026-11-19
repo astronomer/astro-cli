@@ -69,3 +69,26 @@ func (s *Suite) TestClean() {
 	s.Equal("/p/proj", Clean("/p/pr\x1b]0;title\x07oj\n\t\u202E"))
 	s.Equal("C:\\Users\\me\\proj", Clean("C:\\Users\\me\\proj"))
 }
+
+// Lines keeps a value's line breaks and tabs and drops what a terminal would act
+// on: an escape sequence whole, any other control character, a bidi override.
+func (s *Suite) TestLines() {
+	cases := []struct {
+		name, in, want string
+	}{
+		{"plain text is unchanged", "upstream key", "upstream key"},
+		{"line breaks and tabs stay", "{\n\t\"a\": 1\n}", "{\n\t\"a\": 1\n}"},
+		{"a CRLF line break becomes a newline", "one\r\ntwo", "one\ntwo"},
+		{"a lone carriage return is dropped", "safe\rspoofed", "safespoofed"},
+		{"a color escape is removed whole", "\x1b[31mred\x1b[0m", "red"},
+		{"a clipboard write is removed whole", "note\x1b]52;c;aGk=\x07!", "note!"},
+		{"a screen clear is removed whole", "\x1b[2J\x1b[Hfake prompt", "fake prompt"},
+		{"a lone escape, a bell and a backspace are dropped", "a\x1bb\x07c\x08d", "abcd"},
+		{"a C1 control is dropped", "a\u009bb", "ab"},
+		{"a right-to-left override is dropped", "run \u202Egnp.exe", "run gnp.exe"},
+		{"text in another script is unchanged", "caf\u00e9 \u65e5\u672c", "caf\u00e9 \u65e5\u672c"},
+	}
+	for _, tc := range cases {
+		s.Run(tc.name, func() { s.Equal(tc.want, Lines(tc.in)) })
+	}
+}

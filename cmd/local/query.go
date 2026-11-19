@@ -14,6 +14,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 )
 
@@ -391,13 +392,17 @@ type field struct {
 // value is dropped rather than shown as a dash: the two API generations send
 // different fields, and a column of blanks for what this Airflow never had is
 // noise a reader has to learn to ignore.
+//
+// A value is printed as input.Lines has it. Most of them are Airflow's (a
+// Variable, a run's note), written by whoever can edit them, and an escape in
+// one would be acted on by the terminal instead of shown.
 func renderFields(w io.Writer, fields []field) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	for _, f := range fields {
 		if f.value == "" {
 			continue
 		}
-		fmt.Fprintf(tw, "%s:\t%s\n", f.name, f.value)
+		fmt.Fprintf(tw, "%s:\t%s\n", f.name, input.Lines(f.value))
 	}
 	return tw.Flush()
 }
@@ -424,7 +429,9 @@ func renderTable[T any](w io.Writer, rows []T, empty string, headers []string, c
 		// itself owns, and dashing it in place would rewrite the data.
 		columns := append([]string(nil), cells(row)...)
 		for i, cell := range columns {
-			columns[i] = dash(cell)
+			// One line per row: input.Plain drops what a terminal would act
+			// on and folds a line break into a space.
+			columns[i] = dash(input.Plain(cell))
 		}
 		fmt.Fprintln(tw, strings.Join(columns, "\t"))
 	}
