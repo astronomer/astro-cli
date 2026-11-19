@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/logrusorgru/aurora"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -84,4 +85,27 @@ func (s *Suite) TestNoColorTurnsColorOff() {
 
 	s.T().Setenv(cliColorForce, "1")
 	s.Contains(ForStderr().Red("x"), "\x1b[", "CLICOLOR_FORCE wins over NO_COLOR")
+}
+
+// A styled name is text, not a format, and reaches the terminal without what
+// it would act on, whether or not color is on. A line break stays, for a
+// prompt that starts on a fresh line.
+func (s *Suite) TestStylingTakesTextAsText() {
+	for _, on := range []bool{false, true} {
+		orig := color
+		color = aurora.NewAurora(on)
+		p := Palette{aurora.NewAurora(on)}
+		for name, style := range map[string]func(string) string{
+			"Bold": Bold, "Green": Green, "Cyan": Cyan,
+			"Palette.Bold": p.Bold, "Palette.Red": p.Red, "Palette.Green": p.Green,
+			"Palette.Cyan": p.Cyan, "Palette.Yellow": p.Yellow,
+		} {
+			got := style("50% off\x1b]52;c;aGk=\x07\x1b[2J")
+			s.Contains(got, "50% off", "%s (color %v) read the text as a format", name, on)
+			s.NotContains(got, "]52;", "%s (color %v) let a clipboard write through", name, on)
+			s.NotContains(got, "\x1b[2J", "%s (color %v) let a screen clear through", name, on)
+			s.Contains(style("\nTeam name: "), "\nTeam name: ", "%s (color %v) lost the line break", name, on)
+		}
+		color = orig
+	}
 }
