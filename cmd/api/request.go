@@ -73,7 +73,7 @@ func refusedResponse(out, errOut io.Writer, status int, body []byte) error {
 		return &SilentError{StatusCode: status}
 	}
 	if text := bytes.TrimSpace(body); len(text) > 0 {
-		fmt.Fprintf(errOut, "%s\n", text)
+		fmt.Fprintf(errOut, "%s\n", forTerminal(errOut, string(text)))
 	}
 	return &RequestError{StatusCode: status}
 }
