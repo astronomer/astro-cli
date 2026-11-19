@@ -107,7 +107,8 @@ func TestSetAstroBuildKeepsTheUsersTable(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, manifest.Marker)
 	require.NoError(t, os.WriteFile(path, []byte(out), 0o600))
-	require.NoError(t, SetAstroBuild(dir, nil, build332))
+	_, err := SetAstroBuildOpts(dir, nil, build332, AstroBuildOptions{})
+	require.NoError(t, err)
 	again, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, out, string(again), "writing the same build twice changed the file")
@@ -120,7 +121,8 @@ func TestSetAstroBuildMovesToANewBuild(t *testing.T) {
 	path := filepath.Join(dir, manifest.Marker)
 	require.NoError(t, os.WriteFile(path, []byte(out), 0o600))
 
-	require.NoError(t, SetAstroBuild(dir, nil, build332))
+	_, err := SetAstroBuildOpts(dir, nil, build332, AstroBuildOptions{})
+	require.NoError(t, err)
 
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -140,7 +142,8 @@ func TestAZeroBuildTakesOutWhatABuildWrote(t *testing.T) {
 	path := filepath.Join(dir, manifest.Marker)
 	require.NoError(t, os.WriteFile(path, []byte(out), 0o600))
 
-	require.NoError(t, SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}))
+	_, err := SetAstroBuildOpts(dir, nil, runtimeversions.AstroBuild{}, AstroBuildOptions{})
+	require.NoError(t, err)
 
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -197,7 +200,7 @@ func TestSetAstroBuildLeavesTheUsersOwnIndexAndSources(t *testing.T) {
 			src := astroHead + "\n" + uv
 			require.NoError(t, os.WriteFile(path, []byte(src), 0o600))
 
-			err := SetAstroBuild(dir, nil, build332)
+			_, err := SetAstroBuildOpts(dir, nil, build332, AstroBuildOptions{})
 
 			require.ErrorIs(t, err, ErrNotAstrosToWrite)
 			data, rerr := os.ReadFile(path)
