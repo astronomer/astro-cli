@@ -61,6 +61,26 @@ func TestNewAirflowCacheForVersion(t *testing.T) {
 		assert.Contains(t, fileName, "3.1.7")
 		assert.NotContains(t, fileName, "astro")
 	})
+
+	t.Run("a dev version", func(t *testing.T) {
+		cache, err := NewAirflowCacheForVersion("3.1.0.dev0")
+		require.NoError(t, err)
+		assert.Contains(t, filepath.Base(cache.cachePath), "3.1.0")
+	})
+
+	// The version is the remote Airflow's word, and it names a file: one
+	// that would name a path elsewhere is refused before anything is fetched.
+	for _, v := range []string{
+		"3.0.0.dev0/../../../evil",
+		"3.0.0.dev0/x",
+		"3.0.0.dev0" + string(filepath.Separator) + "x",
+		"3.0.0/../x",
+	} {
+		t.Run("a version that names a path: "+v, func(t *testing.T) {
+			_, err := NewAirflowCacheForVersion(v)
+			require.Error(t, err)
+		})
+	}
 }
 
 func TestCloudCacheFileNameForDomain(t *testing.T) {
@@ -185,6 +205,30 @@ func TestCacheReadWriteRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Test API", reader.doc.Info.Title)
 	assert.False(t, reader.fetchedAt.IsZero())
+}
+
+// The cache file is replaced, not written through: a symlink already at its
+// path is swapped for the file, and what it pointed at is left alone.
+func TestSaveCacheReplacesASymlink(t *testing.T) {
+	tmpDir := t.TempDir()
+	outside := filepath.Join(tmpDir, "outside.json")
+	require.NoError(t, os.WriteFile(outside, []byte("keep"), 0o600))
+	cachePath := filepath.Join(tmpDir, "cache.json")
+	if err := os.Symlink(outside, cachePath); err != nil {
+		t.Skipf("cannot create a symlink here: %v", err)
+	}
+
+	rawSpec := minimalSpecJSON("Test API", map[string]map[string]map[string]any{
+		"/test": {"get": {"operationId": "getTest"}},
+	})
+	require.NoError(t, (&Cache{cachePath: cachePath, rawSpec: rawSpec, fetchedAt: time.Now()}).saveCache())
+
+	got, err := os.ReadFile(outside)
+	require.NoError(t, err)
+	assert.Equal(t, "keep", string(got), "the symlink's target was written through")
+	info, err := os.Lstat(cachePath)
+	require.NoError(t, err)
+	assert.True(t, info.Mode().IsRegular(), "the cache is a file of its own, not a link")
 }
 
 func TestReadCache_FileNotFound(t *testing.T) {
