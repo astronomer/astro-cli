@@ -17,6 +17,7 @@ import (
 	v3high "github.com/pb33f/libopenapi/datamodel/high/v3"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
 const (
@@ -180,7 +181,15 @@ func NewAirflowCacheForVersion(version string) (*Cache, error) {
 		return nil, fmt.Errorf("building spec URL for version %s: %w", version, err)
 	}
 
-	cachePath := filepath.Join(config.HomeConfigPath, AirflowCacheFileNameForVersion(version))
+	// The version is what the Airflow being called reported at /version, and
+	// it names the cache file: one that would name a path rather than a file
+	// in the config directory (a separator, a .. segment) is no Airflow
+	// version, so nothing is fetched or written for it.
+	name := AirflowCacheFileNameForVersion(version)
+	if !filepath.IsLocal(name) || filepath.Base(name) != name {
+		return nil, fmt.Errorf("airflow version %q cannot name a spec cache file", version)
+	}
+	cachePath := filepath.Join(config.HomeConfigPath, name)
 
 	// Determine the API prefix to strip based on major version
 	prefix := "/api/v2"
@@ -364,7 +373,9 @@ func (c *Cache) saveCache() error {
 		return err
 	}
 
-	return os.WriteFile(c.cachePath, data, filePermissions)
+	// A temp file and a rename: a symlink already at the path is replaced
+	// rather than written through, and a reader never sees half a spec.
+	return fsatomic.WriteFile(c.cachePath, data, filePermissions)
 }
 
 // isExpired returns true if the cached spec has expired.
