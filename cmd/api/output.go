@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"text/template"
@@ -63,6 +64,7 @@ func evaluateJQ(body []byte, out io.Writer, expr string, colorize bool) error {
 		return fmt.Errorf("parsing JSON: %w", err)
 	}
 
+	terminal := isTerminal(out)
 	iter := query.Run(data)
 	for {
 		v, ok := iter.Next()
@@ -70,19 +72,14 @@ func evaluateJQ(body []byte, out io.Writer, expr string, colorize bool) error {
 			break
 		}
 		if err, isErr := v.(error); isErr {
-			return fmt.Errorf("jq error: %w", err)
-		}
-
-		// A string result is printed as it is, so on a terminal it is
-		// printed without the escapes a response can carry (forTerminal).
-		// Anything else is re-encoded as JSON, which escapes them itself.
-		if s, isString := v.(string); isString {
-			fmt.Fprintln(out, forTerminal(out, s))
-			continue
+			// A jq error can carry response text (error(.message)), and it is
+			// printed to stderr as a message: without what a terminal would
+			// act on.
+			return fmt.Errorf("jq error: %s", input.Lines(err.Error()))
 		}
 
 		// Format output
-		output, err := formatValue(v, colorize)
+		output, err := formatValue(v, colorize, terminal)
 		if err != nil {
 			return err
 		}
@@ -92,10 +89,16 @@ func evaluateJQ(body []byte, out io.Writer, expr string, colorize bool) error {
 	return nil
 }
 
-// formatValue formats a single value for output.
-func formatValue(v interface{}, colorize bool) (string, error) {
+// formatValue formats a single value for output. A string is printed as it
+// is, so for a terminal it is printed without the escapes a response can
+// carry (input.Lines); anything else is re-encoded as JSON, which escapes them
+// itself.
+func formatValue(v interface{}, colorize, terminal bool) (string, error) {
 	switch val := v.(type) {
 	case string:
+		if terminal {
+			return input.Lines(val), nil
+		}
 		return val, nil
 	case nil:
 		if colorize {
@@ -190,11 +193,7 @@ func writeColorizedJSON(w io.Writer, data []byte, colorize bool, indent string) 
 	if err := json.Unmarshal(data, &v); err != nil {
 		// If we can't parse it, write it as it came and bail: on a terminal,
 		// without the escapes it may carry (forTerminal).
-		if isTerminal(w) {
-			_, writeErr := io.WriteString(w, input.Lines(string(data)))
-			return writeErr
-		}
-		_, writeErr := w.Write(data)
+		_, writeErr := io.WriteString(w, forTerminal(w, string(data)))
 		return writeErr
 	}
 
@@ -238,8 +237,26 @@ func forTerminal(w io.Writer, s string) string {
 	return s
 }
 
-// linesIn is a decoded JSON value with input.Lines applied to every string in
-// it, keys included, for a template writing to a terminal.
+// headForTerminal is a response's status line and headers as -i and -v print
+// them to w: on a terminal, each one line (input.Plain) and without what the
+// terminal would act on; anywhere else, as they came.
+func headForTerminal(w io.Writer, status string, headers http.Header) (string, http.Header) {
+	if !isTerminal(w) {
+		return status, headers
+	}
+	plain := make(http.Header, len(headers))
+	for name, values := range headers {
+		for _, v := range values {
+			plain[name] = append(plain[name], input.Plain(v))
+		}
+	}
+	return input.Plain(status), plain
+}
+
+// linesIn is a decoded JSON value with input.Lines applied to every string
+// value in it, for a template writing to a terminal. Keys are left as they
+// are: cleaning them could make two keys one, and which value survived would
+// depend on map order.
 func linesIn(v interface{}) interface{} {
 	switch val := v.(type) {
 	case string:
@@ -253,7 +270,7 @@ func linesIn(v interface{}) interface{} {
 	case map[string]interface{}:
 		out := make(map[string]interface{}, len(val))
 		for k, item := range val {
-			out[input.Lines(k)] = linesIn(item)
+			out[k] = linesIn(item)
 		}
 		return out
 	default:

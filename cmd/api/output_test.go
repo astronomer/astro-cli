@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -413,4 +414,46 @@ func TestTemplateColorsSurviveOnATerminal(t *testing.T) {
 	require.NoError(t, evaluateTemplate([]byte(`{"name":"ok\u001b[2J"}`), &buf, `{{color "red" .name}}`))
 	assert.Contains(t, buf.String(), "\x1b[31mok", "the template's own color was stripped")
 	assert.NotContains(t, buf.String(), "\x1b[2J", "the response's escape reached the terminal")
+}
+
+// A refused response whose body is nothing but escapes prints nothing on a
+// terminal, as an empty body does: it is cleaned before it is trimmed.
+func TestRefusedResponseOfEscapesAlonePrintsNothing(t *testing.T) {
+	standInTerminal(t)
+	var errOut bytes.Buffer
+	_ = refusedResponse(io.Discard, &errOut, 502, []byte("\x1b[2J\x1b]0;x\x07"))
+	assert.Empty(t, errOut.String())
+}
+
+// The status line and headers -i and -v print reach a terminal one line each
+// and without escapes, and anywhere else as they came.
+func TestResponseHeadForTerminal(t *testing.T) {
+	headers := http.Header{"X-Note": {"hi\x1b]52;c;aGk=\x07\nthere"}}
+	resp := &http.Response{Proto: "HTTP/1.1", Status: "200 OK\x1b[2J", StatusCode: 200, Header: headers}
+
+	t.Run("to a terminal", func(t *testing.T) {
+		standInTerminal(t)
+		status, plain := headForTerminal(io.Discard, "HTTP/1.1 200 OK\x1b[2J", headers)
+		assert.Equal(t, "HTTP/1.1 200 OK", status)
+		assert.Equal(t, "hi there", plain.Get("X-Note"))
+
+		var buf bytes.Buffer
+		printResponseHeaders(&buf, resp)
+		assert.NotContains(t, buf.String(), "\x1b]")
+		assert.NotContains(t, buf.String(), "\x1b[2J")
+	})
+	t.Run("to a pipe", func(t *testing.T) {
+		status, same := headForTerminal(io.Discard, "HTTP/1.1 200 OK\x1b[2J", headers)
+		assert.Equal(t, "HTTP/1.1 200 OK\x1b[2J", status)
+		assert.Equal(t, headers.Get("X-Note"), same.Get("X-Note"))
+	})
+}
+
+// A jq error built from the response (error(.message)) is printed as a
+// message, without what a terminal would act on.
+func TestJQErrorCarriesNoEscapes(t *testing.T) {
+	err := evaluateJQ([]byte(`{"message":"boom\u001b[2J"}`), io.Discard, ".message|error", false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "boom")
+	assert.NotContains(t, err.Error(), "\x1b")
 }
