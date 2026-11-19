@@ -1,7 +1,9 @@
 package apc
 
 import (
+	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -9,7 +11,6 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/apc/teams"
-	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 func newTeamCmd(out io.Writer) *cobra.Command {
@@ -117,7 +118,7 @@ func listTeam(out io.Writer, paginated bool, pageSize int) error {
 		}
 
 		if !(pageSize > 0 && pageSize <= teams.ListTeamLimit) {
-			logger.Warnf("Page size cannot be more than %d, reducing the page size to %d", teams.ListTeamLimit, teams.ListTeamLimit)
+			cliout.Warn(os.Stderr, fmt.Sprintf("page size can be at most %d; using %d", teams.ListTeamLimit, teams.ListTeamLimit))
 			pageSize = teams.ListTeamLimit
 		}
 
