@@ -308,7 +308,12 @@ func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, 
 		return nil, err
 	}
 
-	filePerms := 0o644
+	// An export is the Organization's member activity: the exporter's alone
+	// until they choose to share it. The mode is applied as given by the
+	// default-name write (fsatomic sets it on the file, whatever the umask),
+	// and by os.WriteFile to an --output-file it creates; one that already
+	// exists keeps the mode its owner gave it.
+	filePerms := 0o600
 	if defaultName {
 		err = fsatomic.WriteFile(filePath, body, os.FileMode(filePerms))
 	} else {

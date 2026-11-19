@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -526,6 +527,9 @@ func (s *Suite) TestExportAuditLogs() {
 		info, err := os.Stat(export.OutputFile)
 		s.NoError(err)
 		s.Equal(int(info.Size()), export.Bytes)
+		if runtime.GOOS != "windows" {
+			s.Equal(os.FileMode(0o600), info.Mode().Perm(), "an export is readable by its owner only")
+		}
 		mockV1Client.AssertExpectations(s.T())
 	})
 	// The name the CLI makes up is written as a new file: a symlink already
@@ -569,6 +573,11 @@ func (s *Suite) TestExportAuditLogs() {
 		written, err := os.ReadFile(filePath)
 		s.NoError(err)
 		s.Equal(&AuditLogExport{OutputFile: filePath, OrganizationID: "org1", Days: 1, Bytes: len(written)}, export)
+		if runtime.GOOS != "windows" {
+			info, err := os.Stat(filePath)
+			s.Require().NoError(err)
+			s.Equal(os.FileMode(0o600), info.Mode().Perm(), "a new --output-file is readable by its owner only")
+		}
 		// File must be a real gzip stream, not raw JSON (the AI-978 regression).
 		s.Equal(byte(0x1f), written[0])
 		s.Equal(byte(0x8b), written[1])
