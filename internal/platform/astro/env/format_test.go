@@ -3,6 +3,7 @@ package env
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -104,6 +105,26 @@ func (s *Suite) TestWriteVarDotenv() {
 		s.Contains(out, "FOO=bar")
 		s.Contains(out, "SECRET_KEY=shh")
 	})
+}
+
+// A key that cannot be a dotenv key fails the write before any line is
+// written; a key that is not a shell name but reads back as dotenv is written.
+func (s *Suite) TestWriteVarDotenvRefusesAKeyNoParserCanRead() {
+	val := func(k string) astrov1.EnvironmentObject {
+		return astrov1.EnvironmentObject{ObjectKey: k, EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "v"}}
+	}
+	for _, key := range []string{"A\nB=$(id)", "A\rB", "A B", "A=B", "A#B", `A"B`, "A'B", ""} {
+		s.Run(fmt.Sprintf("%q", key), func() {
+			var buf bytes.Buffer
+			err := WriteVarDotenv([]astrov1.EnvironmentObject{val("FIRST"), val(key)}, true, &buf)
+			s.Error(err)
+			s.Empty(buf.String(), "nothing is written when any key is refused")
+		})
+	}
+
+	var buf bytes.Buffer
+	s.NoError(WriteVarDotenv([]astrov1.EnvironmentObject{val("my-var.name"), val("_X1")}, true, &buf))
+	s.Equal("my-var.name=v\n_X1=v\n", buf.String())
 }
 
 func (s *Suite) TestWriteVarDotenvEscapesSpecialChars() {

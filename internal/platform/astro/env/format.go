@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/output"
@@ -208,7 +209,19 @@ func writeVarTable(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out
 // WriteVarDotenv writes ENVIRONMENT_VARIABLE objects as a .env file, the -o
 // dotenv that `astro env variable list` and `get` offer. A secret's value is
 // left blank, with a comment, unless includeSecrets.
+//
+// Keys are written as they are, so one that cannot be a dotenv key fails the
+// whole write before anything is written (dotenvKeyProblem).
 func WriteVarDotenv(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out io.Writer) error {
+	for i := range envObjs {
+		o := &envObjs[i]
+		if o.EnvironmentVariable == nil {
+			continue
+		}
+		if problem := dotenvKeyProblem(o.ObjectKey); problem != "" {
+			return fmt.Errorf("cannot write %q as a dotenv line: %s; use -o json for this scope", o.ObjectKey, problem)
+		}
+	}
 	for i := range envObjs {
 		o := &envObjs[i]
 		if o.EnvironmentVariable == nil {
@@ -223,6 +236,27 @@ func WriteVarDotenv(envObjs []astrov1.EnvironmentObject, includeSecrets bool, ou
 		}
 	}
 	return nil
+}
+
+// dotenvKeyProblem says why key cannot start a dotenv line, or "" when it
+// can. Only what no dotenv parser could read back is refused: a key with a
+// '-' or a '.' (an Airflow variable's, say) is not a shell name, but it
+// round-trips through godotenv and python-dotenv, so it is written as before.
+func dotenvKeyProblem(key string) string {
+	if key == "" {
+		return "the key is empty"
+	}
+	for _, r := range key {
+		switch {
+		case unicode.IsControl(r):
+			return "the key has a control character, such as a newline"
+		case unicode.IsSpace(r):
+			return "the key has whitespace"
+		case strings.ContainsRune(`="'#`, r):
+			return fmt.Sprintf("the key has %q", r)
+		}
+	}
+	return ""
 }
 
 // dotenvEscaper escapes characters that are special inside a double-quoted
