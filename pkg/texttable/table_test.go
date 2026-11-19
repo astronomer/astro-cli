@@ -76,3 +76,13 @@ func TestTableAlignsByCharacter(t *testing.T) {
 	assert.Equal(t, col(lines[0], "S"), col(lines[1], "x"))
 	assert.Equal(t, col(lines[0], "S"), col(lines[2], "y"))
 }
+
+// A cell from somewhere else reaches the table without what a terminal would
+// act on, and keeps its own spacing.
+func TestTableCellsCarryNoEscapes(t *testing.T) {
+	tab := &Table{Header: []string{"NAME"}}
+	tab.AddRow("prod\x1b]52;c;aGk=\x07\x1b[2J  two")
+	out := render(t, tab)
+	assert.NotContains(t, out, "\x1b")
+	assert.Contains(t, out, "prod  two")
+}

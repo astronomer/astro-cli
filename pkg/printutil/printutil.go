@@ -3,6 +3,8 @@ package printutil
 import (
 	"fmt"
 	"io"
+
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // Table represents a table to be printed.
@@ -51,8 +53,18 @@ type Row struct {
 	Colored  bool
 }
 
-// AddRow is the preferred interface for adding a row to a table
+// AddRow is the preferred interface for adding a row to a table. Each value
+// goes in as input.Cell has it: most are an API's (a Deployment's name, a
+// token's description) and a terminal would act on an escape in one, and a
+// line break would end the row. Cleaned here, before the padding is measured,
+// so the columns line up on what is printed. The row's color (ColorRowCode)
+// is the table's own and wraps the row after.
 func (t *Table) AddRow(values []string, color bool) {
+	cells := make([]string, len(values))
+	for i, v := range values {
+		cells[i] = input.Cell(v)
+	}
+	values = cells
 	if t.DynamicPadding {
 		t.dynamicPadding(Row{Raw: values, Colored: color})
 	} else {

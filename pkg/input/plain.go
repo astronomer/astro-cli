@@ -35,6 +35,19 @@ func Plain(s string) string {
 // print.
 func Clean(s string) string { return strip(s, false) }
 
+// Cell is text as one table cell shows it: a line break, a tab, a vertical
+// tab or a form feed becomes a space (each of them would end the cell or the
+// row), a carriage return goes, and then escapes, control characters and
+// misleadingRune characters go, as Clean removes them. Unlike Plain it keeps
+// the text's own spacing: a name with two spaces in it still shows two. It is
+// for a value from somewhere else (an API's name or description) in a table.
+func Cell(s string) string {
+	return strip(cellSpace.Replace(s), false)
+}
+
+// cellSpace is the white space Cell turns into a space before it strips.
+var cellSpace = strings.NewReplacer("\r\n", " ", "\n", " ", "\t", " ", "\v", " ", "\f", " ", "\r", "")
+
 // Lines is text as a multi-line value shows it: without escapes, control
 // characters or misleadingRune characters, but with its line breaks and tabs,
 // so a pretty-printed JSON value still reads as one. A CRLF line break becomes
