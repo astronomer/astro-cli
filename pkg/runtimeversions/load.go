@@ -36,10 +36,13 @@ const (
 
 	// maxBytes caps the read. The document is under 100 KB.
 	maxBytes = 8 << 20
-	// The cache is world-readable: the content is public release data, not
-	// anything of the user's.
+	// A cached file is the user's own. From Astronomer's endpoints it is public
+	// release data, but an index page fetched through ASTRO_AIRFLOW_INDEX_URL
+	// comes from whatever mirror that names, and a private mirror's page can
+	// carry signed download links. The only readers are this user's CLI and
+	// Astro Desktop, so nobody needs more.
 	cacheDirPerm  = 0o755
-	cacheFilePerm = 0o644
+	cacheFilePerm = 0o600
 )
 
 // Options configure a Load.

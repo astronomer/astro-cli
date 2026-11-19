@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -278,5 +279,22 @@ func TestCachePathIsKeyedByAddress(t *testing.T) {
 	}
 	if CachePath("") != "" {
 		t.Error("no cache directory still named a file")
+	}
+}
+
+// A cache file is written readable by its owner only, whatever the umask: an
+// index page from a private mirror can carry signed links.
+func TestCacheFilesAreTheOwnersOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not keep Unix permission bits")
+	}
+	path := filepath.Join(t.TempDir(), "nested", CacheFile)
+	writeCache(path, []byte("{}"))
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("cache file mode %v, want -rw-------", perm)
 	}
 }
