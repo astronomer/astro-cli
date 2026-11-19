@@ -239,6 +239,7 @@ func (p *authParser) value(field string, raw any) string {
 		p.addField(CodeEmptyString, field, "must not be empty")
 		return ""
 	}
+	p.checkControl(p.key+"."+field, s)
 	if strings.HasSuffix(field, "-env") && !envNameRe.MatchString(s) {
 		p.addField(CodeAuthEnvNameInvalid, field, fmt.Sprintf("%q is not an env-var name (letters, digits, _; no leading digit) — this field names the variable holding the value, not the value", s))
 		return ""
@@ -270,6 +271,7 @@ func (p *authParser) command(raw any) []string {
 			p.add(CodeEmptyString, fmt.Sprintf("%s.%s[%d]", p.key, commandField, i), "expected a non-empty string")
 			continue
 		}
+		p.checkControl(fmt.Sprintf("%s.%s[%d]", p.key, commandField, i), s)
 		out = append(out, s)
 	}
 	return out
