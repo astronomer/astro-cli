@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -30,6 +31,9 @@ const fakePID = 4242
 // uv.
 type fakeUV struct {
 	err error
+	// onSync, when set, runs during EnsureSynced: something that happens
+	// while the environment syncs.
+	onSync func()
 	// pipInstalled records what a hot install asked for, when a test cares.
 	pipInstalled *[]string
 	pipErr       error
@@ -38,6 +42,9 @@ type fakeUV struct {
 func (f fakeUV) EnsureSynced(_ context.Context, project, _ string, _ uv.Stdio) error {
 	if f.err != nil {
 		return f.err
+	}
+	if f.onSync != nil {
+		f.onSync()
 	}
 	binDir := filepath.Join(project, ".venv", "bin")
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
@@ -229,6 +236,33 @@ func TestStartLaunchesSupervisedAirflow(t *testing.T) {
 	st, err = af.Status()
 	require.NoError(t, err)
 	assert.Equal(t, rt.StateStopped, st.State)
+}
+
+// A port taken while the environment syncs is not the one the start uses:
+// the port is chosen after the sync, just before the launch. Chosen before
+// it, the start would launch onto a port another project had meanwhile
+// taken, and route this project's URL to that one.
+func TestStartChoosesThePortAfterTheSync(t *testing.T) {
+	e, _, _ := testEngine(t)
+	p := testPlan(t)
+
+	var taken sync.Map
+	e.portFree = func(port string) bool { _, busy := taken.Load(port); return !busy }
+	e.allocPort = func() (string, error) { return "9123", nil }
+	e.uv = func(context.Context, func(rt.LogLine)) (venvSyncer, error) {
+		return fakeUV{onSync: func() { taken.Store("8081", true) }}, nil
+	}
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+
+	rec, err := localstate.Load(p.ProjectPath)
+	require.NoError(t, err)
+	assert.Equal(t, 9123, rec.Port, "the start used the port taken during the sync")
+	routes, err := e.routes.ReadRoutes()
+	require.NoError(t, err)
+	require.Len(t, routes, 1)
+	assert.Equal(t, "9123", routes[0].Port)
 }
 
 func TestStartSessionTiedArmsParentWatch(t *testing.T) {

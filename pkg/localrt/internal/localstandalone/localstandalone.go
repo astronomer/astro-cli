@@ -223,11 +223,6 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	if err := os.MkdirAll(stateDir, stateDirPerm); err != nil {
 		return nil, fmt.Errorf("creating %s: %w", stateDir, err)
 	}
-	port, err := localshared.ChoosePort(p.RequestedPort, defaultAPIServerPort, e.portFree, e.allocPort)
-	if err != nil {
-		return nil, err
-	}
-
 	if err := e.syncVenv(ctx, projectPath, p.PythonVersion, cb); err != nil {
 		return nil, err
 	}
@@ -267,6 +262,19 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	// the opposite of what an interrupt during provisioning promises.
 	if ctx.Err() != nil {
 		return nil, &startInterrupted{err: ctx.Err(), left: "Airflow was not started"}
+	}
+
+	// The port is chosen here, just before the launch, and not before the
+	// sync: the sync can take minutes on a cold cache, and a port that was
+	// free when it began could be taken by then, by another project starting
+	// beside this one, which picked the same default. This Airflow would
+	// fail to bind it while the health check below was answered by the
+	// other, and this project's URL would be routed to the wrong Airflow.
+	// ChoosePort never fails over a busy port (it allocates another), so
+	// choosing first bought no early error.
+	port, err := localshared.ChoosePort(p.RequestedPort, defaultAPIServerPort, e.portFree, e.allocPort)
+	if err != nil {
+		return nil, err
 	}
 
 	env := e.buildEnv(p, projectPath, stateDir, airflowHome, port)
