@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -25,6 +26,53 @@ func mustMkdir(t *testing.T, root, relPath string) {
 	full := filepath.Join(root, relPath)
 	if err := os.MkdirAll(full, DefaultDirPerm); err != nil {
 		t.Fatalf("mkdir %s: %v", full, err)
+	}
+}
+
+// Per-machine files stay out of an export, under .astro/ and with no
+// .gitignore to say so, while the rest of .astro/ still goes.
+func TestCreateArchiveLeavesOutPerMachineFiles(t *testing.T) {
+	root := t.TempDir()
+	kept := []string{
+		".astro/config.yaml",
+		".astro/memory/notes.md",
+		".astro/otto/permissions.json",
+		".astro/otto/extensions.json",
+		"plugins/my_plugin.py",
+	}
+	left := []string{
+		".astro/standalone/airflow.db",
+		".astro/standalone/standalone_admin_password.txt",
+		".astro/standalone/logs/scheduler/latest.log",
+		".astro/worktrees/feature/dags/main.py",
+		".astro/config.local.yaml",
+		".astro/config.local.lock",
+		".astro/otto/permissions.local.json",
+		".astro/otto/mcp.json",
+		"plugins/fix_local_executor_pickle.py",
+	}
+	for _, rel := range append(slices.Clone(kept), left...) {
+		writeFile(t, root, filepath.FromSlash(rel), "x\n")
+	}
+
+	archivePath := filepath.Join(t.TempDir(), "project.tar.gz")
+	if _, err := createTarGzArchive(root, archivePath, io.Discard); err != nil {
+		t.Fatalf("createTarGzArchive error: %v", err)
+	}
+	outDir := t.TempDir()
+	if _, err := extractAt(t.Context(), archivePath, outDir); err != nil {
+		t.Fatalf("extract error: %v", err)
+	}
+
+	for _, rel := range kept {
+		if _, err := os.Stat(filepath.Join(outDir, filepath.FromSlash(rel))); err != nil {
+			t.Errorf("expected %s in the export: %v", rel, err)
+		}
+	}
+	for _, rel := range left {
+		if _, err := os.Stat(filepath.Join(outDir, filepath.FromSlash(rel))); !os.IsNotExist(err) {
+			t.Errorf("expected %s left out of the export, got err=%v", rel, err)
+		}
 	}
 }
 

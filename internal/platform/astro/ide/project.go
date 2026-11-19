@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/picker"
@@ -505,10 +506,34 @@ func gitignoreMatcher(root string, notes io.Writer) gitignore.Matcher {
 	return gitignore.NewMatcher(patterns)
 }
 
+// localFiles matches the per-machine files Astro tools write into a project
+// (airflowrt.LocalFileRules): a standalone Airflow's database, logs and admin
+// password, local instance files, Desktop's MCP token. They are true of this
+// machine only, so an export leaves them out whatever the project's own
+// .gitignore says, as a generated image does.
+var localFiles = localFileMatcher()
+
+func localFileMatcher() gitignore.Matcher {
+	rules := airflowrt.LocalFileRules()
+	patterns := make([]gitignore.Pattern, 0, len(rules))
+	for _, rule := range rules {
+		patterns = append(patterns, gitignore.ParsePattern(rule, nil))
+	}
+	return gitignore.NewMatcher(patterns)
+}
+
 // shouldSkipArchiveEntry determines whether a path should be skipped.
 func shouldSkipArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.Matcher) bool {
 	// Always skip the .git directory
 	if relPath == ".git" || strings.HasPrefix(relPath, ".git"+string(filepath.Separator)) {
+		return true
+	}
+
+	pathParts := strings.Split(relPath, string(filepath.Separator))
+
+	// Never a per-machine file, even under .astro, which is otherwise exported
+	// whatever the .gitignore says
+	if localFiles.Match(pathParts, info.IsDir()) {
 		return true
 	}
 
@@ -525,7 +550,6 @@ func shouldSkipArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.
 	}
 
 	// Respect .gitignore for everything else
-	pathParts := strings.Split(relPath, string(filepath.Separator))
 	return matcher.Match(pathParts, info.IsDir())
 }
 
