@@ -40,6 +40,7 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
+	"unicode"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
@@ -502,6 +503,11 @@ const (
 	CodeExpectedStringArray ProblemCode = "expected_string_array"
 	CodeEmptyString         ProblemCode = "empty_string"
 	CodeUnknownKey          ProblemCode = "unknown_key"
+	// CodeControlCharacter is a string holding a control character other
+	// than a tab or a line break (an escape, a bell, a lone carriage
+	// return). The CLI prints manifest values in its messages, and a
+	// terminal acts on those characters instead of showing them.
+	CodeControlCharacter ProblemCode = "control_character"
 
 	// The project and the [tool.astro] block.
 	CodeProjectNameInvalid       ProblemCode = "project_name_invalid"
@@ -647,7 +653,7 @@ const (
 // instead of keeping a second copy that a new code could be left out of.
 var problemCodes = []ProblemCode{
 	CodeRequired, CodeExpectedString, CodeExpectedBool, CodeExpectedInteger, CodeExpectedTable,
-	CodeExpectedStringArray, CodeEmptyString, CodeUnknownKey,
+	CodeExpectedStringArray, CodeEmptyString, CodeUnknownKey, CodeControlCharacter,
 
 	CodeProjectNameInvalid,
 	CodeDockerfileSeparators, CodeDockerfileOutsideProject, CodeBuildSecretInvalid,
@@ -1467,7 +1473,33 @@ func (p *parser) str(key string, v any) string {
 		p.add(CodeEmptyString, key, "must not be empty")
 		return ""
 	}
+	p.checkControl(key, s)
 	return s
+}
+
+// checkControl records CodeControlCharacter when s holds a control character
+// other than a tab, a newline, or the carriage return of a CRLF line break.
+// The value is still returned by the caller as written: the problem fails the
+// parse on its own, and an emptied value would add a second, misleading one
+// (a domain "required" that the file does set).
+func (p *parser) checkControl(key, s string) {
+	if r, ok := controlCharacter(s); ok {
+		p.add(CodeControlCharacter, key, fmt.Sprintf("holds the control character %U, which a terminal would act on when the CLI prints the value", r))
+	}
+}
+
+// controlCharacter returns the first control character in s that is not a tab,
+// a newline, or a carriage return ending a CRLF line break.
+func controlCharacter(s string) (rune, bool) {
+	for i, r := range s {
+		switch {
+		case r == '\t' || r == '\n':
+		case r == '\r' && strings.HasPrefix(s[i+1:], "\n"):
+		case unicode.IsControl(r):
+			return r, true
+		}
+	}
+	return 0, false
 }
 
 func (p *parser) boolean(key string, v any) bool {

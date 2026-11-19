@@ -647,6 +647,57 @@ target = "astro"
 		},
 	},
 	{
+		// The CLI prints the domain in its messages; an escape in it would be
+		// acted on by the terminal rather than shown.
+		name:      "a domain with a control character",
+		wantCodes: []ProblemCode{CodeControlCharacter},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+workspace = "ws"
+domain = "astronomer.io\u001b[2J"
+`,
+		wantKeys: []string{"tool.astro.domain"},
+	},
+	{
+		name:      "an apc link domain with a control character",
+		wantCodes: []ProblemCode{CodeControlCharacter},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+workspace = "ws-astro"
+
+[tool.astro.deployments.prod-apc]
+target = "apc"
+domain = "astro.example.com\u0007"
+workspace = "ckws-apc"
+deployment = "ckdep-apc"
+`,
+		wantKeys: []string{"tool.astro.deployments.prod-apc.domain"},
+	},
+	{
+		name:      "an exec command argument with a control character",
+		wantCodes: []ProblemCode{CodeControlCharacter},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+
+[tool.astro.deployments.prod]
+url = "https://airflow.example.com"
+auth = { method = "exec", command = ["acme-airflow-token", "--profile\u001b]0;x\u0007"] }
+`,
+		wantKeys: []string{"tool.astro.deployments.prod.auth.command[1]"},
+	},
+	{
 		name:      "domain without a workspace",
 		wantCodes: []ProblemCode{CodeDomainWithoutWorkspace},
 		content: `
@@ -1684,5 +1735,20 @@ func TestLoadIgnoresAUVTableOfTheWrongShape(t *testing.T) {
 	}
 	if m.UV.ConstraintDependencies != nil {
 		t.Errorf("a string is not a constraint list, got %#v", m.UV.ConstraintDependencies)
+	}
+}
+
+// A tab, a newline and a CRLF line break are text a multi-line value carries,
+// and stay allowed; anything else unicode calls a control character is refused.
+func TestControlCharacter(t *testing.T) {
+	for _, ok := range []string{"astronomer.io", "line one\nline two", "a\tb", "one\r\ntwo", "café — 日本"} {
+		if r, bad := controlCharacter(ok); bad {
+			t.Errorf("controlCharacter(%q) = %U, want none", ok, r)
+		}
+	}
+	for _, bad := range []string{"a\x1b[2J", "bell\a", "back\bspace", "lone\rreturn", "end\r", "nul\x00", "del\x7f", "c1\u009b"} {
+		if _, isBad := controlCharacter(bad); !isBad {
+			t.Errorf("controlCharacter(%q) found none, want one", bad)
+		}
 	}
 }
