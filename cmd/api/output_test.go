@@ -2,6 +2,8 @@ package api
 
 import (
 	"bytes"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -352,4 +354,106 @@ func TestProcessOutputColorEnabled(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "name")
 	assert.Contains(t, buf.String(), "\x1b[") // ANSI escapes present
+}
+
+// standInTerminal makes isTerminal report true for the test's buffers.
+func standInTerminal(t *testing.T) {
+	t.Helper()
+	orig := isTerminal
+	t.Cleanup(func() { isTerminal = orig })
+	isTerminal = func(io.Writer) bool { return true }
+}
+
+// What a response carries that a terminal would act on (a clipboard write, a
+// screen clear) is not printed to one, on every path that prints response
+// text as it came, and is printed byte for byte anywhere else.
+func TestResponseTextReachesATerminalWithoutEscapes(t *testing.T) {
+	const payload = "\x1b]52;c;aGk=\x07\x1b[2J"
+	jsonBody := []byte(`{"name":"ok` + `\u001b]52;c;aGk=\u0007\u001b[2J` + `","items":["a"]}`)
+	notJSON := []byte("<html>bad gateway" + payload + "</html>")
+
+	paths := map[string]func(w *bytes.Buffer) error{
+		"a body that is not JSON": func(w *bytes.Buffer) error {
+			return writeColorizedJSON(w, notJSON, false, "  ")
+		},
+		"a jq string result": func(w *bytes.Buffer) error {
+			return evaluateJQ(jsonBody, w, ".name", false)
+		},
+		"a template": func(w *bytes.Buffer) error {
+			return evaluateTemplate(jsonBody, w, `{{.name}}`)
+		},
+		"a refused response's body": func(w *bytes.Buffer) error {
+			_ = refusedResponse(io.Discard, w, 502, notJSON)
+			return nil
+		},
+	}
+	for name, write := range paths {
+		t.Run(name+", to a terminal", func(t *testing.T) {
+			standInTerminal(t)
+			var buf bytes.Buffer
+			require.NoError(t, write(&buf))
+			assert.NotContains(t, buf.String(), "\x1b")
+			assert.NotContains(t, buf.String(), "\x07")
+		})
+		t.Run(name+", to a pipe", func(t *testing.T) {
+			var buf bytes.Buffer
+			require.NoError(t, write(&buf))
+			assert.Contains(t, buf.String(), payload, "piped output must be byte for byte")
+		})
+	}
+}
+
+// A template's own color calls still color on a terminal: only the response's
+// strings are cleaned, not what the template adds.
+func TestTemplateColorsSurviveOnATerminal(t *testing.T) {
+	standInTerminal(t)
+	origNoColor := color.NoColor
+	t.Cleanup(func() { color.NoColor = origNoColor })
+	color.NoColor = false
+	var buf bytes.Buffer
+	require.NoError(t, evaluateTemplate([]byte(`{"name":"ok\u001b[2J"}`), &buf, `{{color "red" .name}}`))
+	assert.Contains(t, buf.String(), "\x1b[31mok", "the template's own color was stripped")
+	assert.NotContains(t, buf.String(), "\x1b[2J", "the response's escape reached the terminal")
+}
+
+// A refused response whose body is nothing but escapes prints nothing on a
+// terminal, as an empty body does: it is cleaned before it is trimmed.
+func TestRefusedResponseOfEscapesAlonePrintsNothing(t *testing.T) {
+	standInTerminal(t)
+	var errOut bytes.Buffer
+	_ = refusedResponse(io.Discard, &errOut, 502, []byte("\x1b[2J\x1b]0;x\x07"))
+	assert.Empty(t, errOut.String())
+}
+
+// The status line and headers -i and -v print reach a terminal one line each
+// and without escapes, and anywhere else as they came.
+func TestResponseHeadForTerminal(t *testing.T) {
+	headers := http.Header{"X-Note": {"hi\x1b]52;c;aGk=\x07\nthere"}}
+	resp := &http.Response{Proto: "HTTP/1.1", Status: "200 OK\x1b[2J", StatusCode: 200, Header: headers}
+
+	t.Run("to a terminal", func(t *testing.T) {
+		standInTerminal(t)
+		status, plain := headForTerminal(io.Discard, "HTTP/1.1 200 OK\x1b[2J", headers)
+		assert.Equal(t, "HTTP/1.1 200 OK", status)
+		assert.Equal(t, "hi there", plain.Get("X-Note"))
+
+		var buf bytes.Buffer
+		printResponseHeaders(&buf, resp)
+		assert.NotContains(t, buf.String(), "\x1b]")
+		assert.NotContains(t, buf.String(), "\x1b[2J")
+	})
+	t.Run("to a pipe", func(t *testing.T) {
+		status, same := headForTerminal(io.Discard, "HTTP/1.1 200 OK\x1b[2J", headers)
+		assert.Equal(t, "HTTP/1.1 200 OK\x1b[2J", status)
+		assert.Equal(t, headers.Get("X-Note"), same.Get("X-Note"))
+	})
+}
+
+// A jq error built from the response (error(.message)) is printed as a
+// message, without what a terminal would act on.
+func TestJQErrorCarriesNoEscapes(t *testing.T) {
+	err := evaluateJQ([]byte(`{"message":"boom\u001b[2J"}`), io.Discard, ".message|error", false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "boom")
+	assert.NotContains(t, err.Error(), "\x1b")
 }

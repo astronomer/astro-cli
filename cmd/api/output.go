@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"text/template"
@@ -13,6 +14,8 @@ import (
 	"github.com/itchyny/gojq"
 	"github.com/mattn/go-isatty"
 	jsoncolor "github.com/neilotoole/jsoncolor"
+
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // newColor creates a color.Color that is force-enabled for output.
@@ -50,17 +53,18 @@ func processOutput(body []byte, out io.Writer, opts OutputOptions) error {
 }
 
 // evaluateJQ evaluates a jq expression against the input JSON.
-func evaluateJQ(input []byte, out io.Writer, expr string, colorize bool) error {
+func evaluateJQ(body []byte, out io.Writer, expr string, colorize bool) error {
 	query, err := gojq.Parse(expr)
 	if err != nil {
 		return fmt.Errorf("parsing jq expression: %w", err)
 	}
 
 	var data interface{}
-	if err := json.Unmarshal(input, &data); err != nil {
+	if err := json.Unmarshal(body, &data); err != nil {
 		return fmt.Errorf("parsing JSON: %w", err)
 	}
 
+	terminal := isTerminal(out)
 	iter := query.Run(data)
 	for {
 		v, ok := iter.Next()
@@ -68,11 +72,14 @@ func evaluateJQ(input []byte, out io.Writer, expr string, colorize bool) error {
 			break
 		}
 		if err, isErr := v.(error); isErr {
-			return fmt.Errorf("jq error: %w", err)
+			// A jq error can carry response text (error(.message)), and it is
+			// printed to stderr as a message: without what a terminal would
+			// act on.
+			return fmt.Errorf("jq error: %s", input.Lines(err.Error()))
 		}
 
 		// Format output
-		output, err := formatValue(v, colorize)
+		output, err := formatValue(v, colorize, terminal)
 		if err != nil {
 			return err
 		}
@@ -82,10 +89,16 @@ func evaluateJQ(input []byte, out io.Writer, expr string, colorize bool) error {
 	return nil
 }
 
-// formatValue formats a single value for output.
-func formatValue(v interface{}, colorize bool) (string, error) {
+// formatValue formats a single value for output. A string is printed as it
+// is, so for a terminal it is printed without the escapes a response can
+// carry (input.Lines); anything else is re-encoded as JSON, which escapes them
+// itself.
+func formatValue(v interface{}, colorize, terminal bool) (string, error) {
 	switch val := v.(type) {
 	case string:
+		if terminal {
+			return input.Lines(val), nil
+		}
 		return val, nil
 	case nil:
 		if colorize {
@@ -112,9 +125,9 @@ func mustMarshal(v interface{}) []byte {
 }
 
 // evaluateTemplate evaluates a Go template against the input JSON.
-func evaluateTemplate(input []byte, out io.Writer, tmplStr string) error {
+func evaluateTemplate(body []byte, out io.Writer, tmplStr string) error {
 	var data interface{}
-	if err := json.Unmarshal(input, &data); err != nil {
+	if err := json.Unmarshal(body, &data); err != nil {
 		return fmt.Errorf("parsing JSON: %w", err)
 	}
 
@@ -123,6 +136,11 @@ func evaluateTemplate(input []byte, out io.Writer, tmplStr string) error {
 		return fmt.Errorf("parsing template: %w", err)
 	}
 
+	// The response's strings, not the template's output, are what get
+	// cleaned for a terminal: the template's own color calls are escapes too.
+	if isTerminal(out) {
+		data = linesIn(data)
+	}
 	return tmpl.Execute(out, data)
 }
 
@@ -173,8 +191,9 @@ func writeColorizedJSON(w io.Writer, data []byte, colorize bool, indent string) 
 	// Parse the raw JSON into a generic value so the encoder can re-emit it.
 	var v interface{}
 	if err := json.Unmarshal(data, &v); err != nil {
-		// If we can't parse it, write raw and bail.
-		_, writeErr := w.Write(data)
+		// If we can't parse it, write it as it came and bail: on a terminal,
+		// without the escapes it may carry (forTerminal).
+		_, writeErr := io.WriteString(w, forTerminal(w, string(data)))
 		return writeErr
 	}
 
@@ -195,8 +214,66 @@ func isColorEnabled(out io.Writer) bool {
 	if color.NoColor {
 		return false
 	}
-	if f, ok := out.(*os.File); ok {
+	return isTerminal(out)
+}
+
+// isTerminal reports whether w is a terminal. A variable so tests can stand
+// one in for a buffer.
+var isTerminal = func(w io.Writer) bool {
+	if f, ok := w.(*os.File); ok {
 		return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
 	}
 	return false
+}
+
+// forTerminal is s as it is written to w. A response's text, printed as it
+// came, reaches a terminal without its escape sequences and other control
+// characters (input.Lines), since the terminal would act on them rather than
+// show them; written to a file or a pipe it is left byte for byte.
+func forTerminal(w io.Writer, s string) string {
+	if isTerminal(w) {
+		return input.Lines(s)
+	}
+	return s
+}
+
+// headForTerminal is a response's status line and headers as -i and -v print
+// them to w: on a terminal, each one line (input.Plain) and without what the
+// terminal would act on; anywhere else, as they came.
+func headForTerminal(w io.Writer, status string, headers http.Header) (string, http.Header) {
+	if !isTerminal(w) {
+		return status, headers
+	}
+	plain := make(http.Header, len(headers))
+	for name, values := range headers {
+		for _, v := range values {
+			plain[name] = append(plain[name], input.Plain(v))
+		}
+	}
+	return input.Plain(status), plain
+}
+
+// linesIn is a decoded JSON value with input.Lines applied to every string
+// value in it, for a template writing to a terminal. Keys are left as they
+// are: cleaning them could make two keys one, and which value survived would
+// depend on map order.
+func linesIn(v interface{}) interface{} {
+	switch val := v.(type) {
+	case string:
+		return input.Lines(val)
+	case []interface{}:
+		out := make([]interface{}, len(val))
+		for i, item := range val {
+			out[i] = linesIn(item)
+		}
+		return out
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(val))
+		for k, item := range val {
+			out[k] = linesIn(item)
+		}
+		return out
+	default:
+		return v
+	}
 }

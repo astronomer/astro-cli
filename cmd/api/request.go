@@ -72,7 +72,9 @@ func refusedResponse(out, errOut io.Writer, status int, body []byte) error {
 		_ = writeColorizedJSON(out, body, isColorEnabled(out), "  ") //nolint:errcheck // the request already failed; a write error changes nothing
 		return &SilentError{StatusCode: status}
 	}
-	if text := bytes.TrimSpace(body); len(text) > 0 {
+	// Cleaned before it is trimmed: a body of escapes alone is empty once
+	// they are gone, and prints nothing.
+	if text := strings.TrimSpace(forTerminal(errOut, string(body))); text != "" {
 		fmt.Fprintf(errOut, "%s\n", text)
 	}
 	return &RequestError{StatusCode: status}
@@ -287,7 +289,8 @@ func executeSingleRequest(opts *RequestOptions, method, requestURL, token string
 
 	// Print response headers if requested (skip if verbose already printed them)
 	if opts.ShowResponseHeaders && !opts.Verbose {
-		apirequest.WriteHead(opts.Out, result.Proto+" "+result.Status, result.Header, isColorEnabled(opts.Out))
+		status, headers := headForTerminal(opts.Out, result.Proto+" "+result.Status, result.Header)
+		apirequest.WriteHead(opts.Out, status, headers, isColorEnabled(opts.Out))
 	}
 
 	if result.StatusCode >= httpStatusError {
@@ -704,17 +707,18 @@ func printResponseHeaders(out io.Writer, resp *http.Response) {
 		statusColor = color.YellowString
 	}
 
-	fmt.Fprintf(out, "%s %s\n", color.CyanString("<"), statusColor("%s %s", resp.Proto, resp.Status))
+	status, headers := headForTerminal(out, resp.Proto+" "+resp.Status, resp.Header)
+	fmt.Fprintf(out, "%s %s\n", color.CyanString("<"), statusColor("%s", status))
 
 	// Print headers
-	keys := make([]string, 0, len(resp.Header))
-	for k := range resp.Header {
+	keys := make([]string, 0, len(headers))
+	for k := range headers {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 
 	for _, k := range keys {
-		fmt.Fprintf(out, "%s %s: %s\n", color.CyanString("<"), k, strings.Join(resp.Header[k], ", "))
+		fmt.Fprintf(out, "%s %s: %s\n", color.CyanString("<"), k, strings.Join(headers[k], ", "))
 	}
 	fmt.Fprintln(out, color.CyanString("<"))
 	fmt.Fprintln(out)
