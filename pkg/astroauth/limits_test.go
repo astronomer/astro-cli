@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,9 +35,9 @@ func TestRefreshTokenRejectsAnOversizedResponse(t *testing.T) {
 func TestRefreshTokenDoesNotFollowARedirect(t *testing.T) {
 	for _, code := range []int{http.StatusFound, http.StatusTemporaryRedirect, http.StatusPermanentRedirect} {
 		t.Run(http.StatusText(code), func(t *testing.T) {
-			reached := false
+			var reached atomic.Bool
 			target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				reached = true
+				reached.Store(true)
 				_, _ = w.Write([]byte(`{"access_token":"x"}`))
 			}))
 			defer target.Close()
@@ -48,8 +49,8 @@ func TestRefreshTokenDoesNotFollowARedirect(t *testing.T) {
 			client := srv.Client()
 			cfg := AuthConfig{ClientID: "c", DomainURL: srv.URL + "/"}
 			_, err := RefreshToken(cfg, "old-refresh", WithHTTPClient(client))
-			require.ErrorIs(t, err, errTokenRedirect)
-			assert.False(t, reached, "the redirect target was sent the request")
+			require.ErrorIs(t, err, errAuthRedirect)
+			assert.False(t, reached.Load(), "the redirect target was sent the request")
 			assert.Nil(t, client.CheckRedirect, "the caller's client was changed")
 		})
 	}
@@ -63,5 +64,16 @@ func TestExchangeCodeDoesNotFollowARedirect(t *testing.T) {
 
 	cfg := AuthConfig{ClientID: "c", DomainURL: srv.URL + "/"}
 	_, err := ExchangeCode(cfg, "v", "code", WithHTTPClient(srv.Client()))
-	require.ErrorIs(t, err, errTokenRedirect)
+	require.ErrorIs(t, err, errAuthRedirect)
+}
+
+func TestFetchUserInfoDoesNotFollowARedirect(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://127.0.0.1:1/userinfo", http.StatusFound)
+	}))
+	defer srv.Close()
+
+	cfg := AuthConfig{ClientID: "c", DomainURL: srv.URL + "/"}
+	_, err := FetchUserInfo(cfg, "access", WithHTTPClient(srv.Client()))
+	require.ErrorIs(t, err, errAuthRedirect)
 }

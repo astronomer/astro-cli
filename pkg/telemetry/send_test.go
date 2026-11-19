@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -98,9 +99,9 @@ func TestAddOSVersion(t *testing.T) {
 // An https telemetry API that redirects to plain http is not followed, so a
 // token never goes out unencrypted; an https-to-https redirect still is.
 func TestSendDoesNotFollowADowngrade(t *testing.T) {
-	plainReached := false
+	var plainReached atomic.Bool
 	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		plainReached = true
+		plainReached.Store(true)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer plain.Close()
@@ -119,13 +120,17 @@ func TestSendDoesNotFollowADowngrade(t *testing.T) {
 	}))
 	defer tlsSrv.Close()
 
+	// The production client with only its Transport swapped for one that
+	// trusts the test server, so its own redirect policy is what runs.
 	orig := sendClient
 	t.Cleanup(func() { sendClient = orig })
-	sendClient = &http.Client{Transport: tlsSrv.Client().Transport, CheckRedirect: refuseDowngrade}
+	withTLS := *orig
+	withTLS.Transport = tlsSrv.Client().Transport
+	sendClient = &withTLS
 
 	_, err := SendWithToken(testPayload(), tlsSrv.URL+"/downgrade", "tok-abc")
 	require.ErrorIs(t, err, errDowngradeRedirect)
-	assert.False(t, plainReached, "the plain-http target was sent the request")
+	assert.False(t, plainReached.Load(), "the plain-http target was sent the request")
 
 	status, err := SendWithToken(testPayload(), tlsSrv.URL+"/moved", "tok-abc")
 	require.NoError(t, err)

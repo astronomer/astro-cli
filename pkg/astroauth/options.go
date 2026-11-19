@@ -21,11 +21,11 @@ const maxResponseBytes = 1 << 20
 
 var errResponseTooLarge = fmt.Errorf("response is larger than %d bytes", maxResponseBytes)
 
-// errTokenRedirect is a token endpoint answering with a redirect. An OAuth
-// token endpoint answers a POST itself; one that redirects is misconfigured,
-// and following it would send the form (the code, or the refresh token) on to
-// wherever it points.
-var errTokenRedirect = errors.New("token endpoint redirected; not following it")
+// errAuthRedirect is a token or userinfo endpoint answering with a redirect.
+// Both answer for themselves; one that redirects is misconfigured, and
+// following it would send what the request carries (the code, the refresh
+// token, the access token) on to wherever it points.
+var errAuthRedirect = errors.New("auth endpoint redirected; not following it")
 
 // defaultHTTPClient is the client a request uses when the caller gives none.
 // It names no Transport, so it reads http.DefaultTransport per request, as
@@ -67,11 +67,11 @@ func decodeJSON(body io.Reader, v any) error {
 }
 
 // withoutRedirects is a copy of c that refuses to follow a redirect, for the
-// token requests: what they post is a credential, meant for the endpoint
-// they name and no other. The copy keeps c's Transport and Timeout, and c
+// requests that carry a credential (the token exchange and refresh, and
+// userinfo's bearer token), meant for the endpoint they name and no other. The copy keeps c's Transport and Timeout, and c
 // itself is left as it was.
 func withoutRedirects(c *http.Client) *http.Client {
 	cc := *c
-	cc.CheckRedirect = func(*http.Request, []*http.Request) error { return errTokenRedirect }
+	cc.CheckRedirect = func(*http.Request, []*http.Request) error { return errAuthRedirect }
 	return &cc
 }
