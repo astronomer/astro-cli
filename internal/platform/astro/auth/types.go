@@ -7,9 +7,11 @@ import (
 
 // higher order functions to facilate writing unit test cases
 type (
-	RequestToken             func(authConfig Config, verifier, code string) (Result, error)
-	RequestUserInfo          func(authConfig Config, accessToken string) (UserInfo, error)
-	AuthorizeCallbackHandler func() (string, error)
+	RequestToken    func(authConfig Config, verifier, code string) (Result, error)
+	RequestUserInfo func(authConfig Config, accessToken string) (UserInfo, error)
+	// AuthorizeCallbackHandler waits for the browser's answer to the authorize
+	// request that carried state, and returns its authorization code.
+	AuthorizeCallbackHandler func(state string) (string, error)
 )
 
 type Authenticator struct {
