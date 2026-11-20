@@ -276,7 +276,7 @@ func TestEnvLinkRefusesAnythingButAGlobalVaultEntry(t *testing.T) {
 }
 
 // An undeclared global linked elsewhere is not part of this project, so list
-// leaves it out; --all shows it, marked not linked here with the command that
+// leaves it out; --all shows it, marked not linked to this project with the command that
 // links it. A declared name it would have supplied lists as absent, exactly
 // as if no global existed, and --all marks that row too. get explains the
 // absence the same way the start gate does.
@@ -292,7 +292,7 @@ func TestEnvListMarksNotLinkedHere(t *testing.T) {
 	if strings.Contains(out, "warehouse") {
 		t.Errorf("list showed a global that does not reach this project:\n%s", out)
 	}
-	if strings.Contains(out, "not linked here") || !strings.Contains(out, "declared_db") {
+	if strings.Contains(out, "not linked") || !strings.Contains(out, "declared_db") {
 		t.Errorf("list should show declared_db absent and unmarked:\n%s", out)
 	}
 	out, _ = mustRun(t, dir, "connection", "list", "--output", "json")
@@ -323,7 +323,7 @@ func TestEnvListMarksNotLinkedHere(t *testing.T) {
 	}
 
 	out, _ = mustRun(t, dir, "connection", "list", "--all")
-	if !regexp.MustCompile(`(?m)^connection +warehouse +vault \(global\) +not linked here$`).MatchString(out) {
+	if !regexp.MustCompile(`(?m)^connection +warehouse +vault \(global\) +not linked to this project$`).MatchString(out) {
 		t.Errorf("text list:\n%s", out)
 	}
 	if _, errOut := mustRun(t, dir, "connection", "list", "--all"); !strings.Contains(errOut,
@@ -415,7 +415,7 @@ func TestEnvLinkRefusesAnUnusableIndex(t *testing.T) {
 				t.Errorf("reach = %+v, want the index error", v.Reach)
 			}
 			out, _ := mustRun(t, dir, "connection", "list", "--all")
-			if !strings.Contains(out, "not linked here (link index") {
+			if !strings.Contains(out, "not linked to this project (link index") {
 				t.Errorf("list:\n%s", out)
 			}
 		})
@@ -510,7 +510,7 @@ func TestEnvSetGlobalCreatesItUnlinked(t *testing.T) {
 	if out, _ := mustRun(t, dir, "connection", "list"); strings.Contains(out, "warehouse") {
 		t.Errorf("list showed an unlinked global:\n%s", out)
 	}
-	if out, _ := mustRun(t, dir, "connection", "list", "--all"); !strings.Contains(out, "not linked here") {
+	if out, _ := mustRun(t, dir, "connection", "list", "--all"); !strings.Contains(out, "not linked to this project") {
 		t.Errorf("list --all:\n%s", out)
 	}
 	if _, _, err := run(t, dir, "connection", "get", "warehouse"); err == nil {

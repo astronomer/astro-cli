@@ -131,12 +131,12 @@ The text table's STATUS column holds one short state per row, or nothing when th
 | `declared but missing` | declared required and nothing supplies it, so a start refuses | `set` |
 | `declared but not set (optional)` | declared optional and nothing supplies it | none |
 | `not declared` | a value in a store that no declaration names | `declare` |
-| `not linked here` | a global that does not reach this project (`--all` only) | `link` |
+| `not linked to this project` | a global linked only to other projects (`--all` only; outside a project, `linked to other projects`, with no step) | `link` |
 | `invalid key` | an Airflow Variable key an older build stored, which no longer resolves | `delete` |
 
 In JSON a row carries the same commands as hint fields: `set_hint` and `undeclare_hint` for a declared name nothing supplies; `declare_hint` and `remove_hint` for a value no declaration names, which is an orphan of its tier (`"orphan": true`). An orphan that reaches this project's Airflow also has `"applied": true`. A global the project's own copy shadows does not. Outside a project nothing is declared, so no row is marked `not declared`.
 
-`--project` and `--global` narrow the list to that scope's stores. `--all` also lists every project `.env` the CLI can find, and globals that do not reach this project, marked `not linked here` with the `link` command (`"not_linked_here": true`, `link_hint`), or with the index problem (`links_down`).
+`--project` and `--global` narrow the list to that scope's stores. `--all` also lists every project `.env` the CLI can find, and globals that do not reach this project, marked `not linked to this project` with the `link` command (`"not_linked_here": true`, `link_hint`), or with the index problem (`links_down`).
 
 `list` is built from the schema and source metadata, never from decoded values, so its JSON is value-free and safe for agents. With `--output json` it prints one object with the rows under `entries` (`{"entries": [...]}`, `[]` when there are none); `variable list` and `connection list` print the same shape, narrowed to their kind.
 

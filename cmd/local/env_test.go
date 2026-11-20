@@ -388,7 +388,7 @@ func TestEnvListNotes(t *testing.T) {
 		"KIND      NAME        SOURCE          STATUS\n" +
 		"variable  API_URL                     declared but missing\n" +
 		"variable  LOG_LEVEL                   declared but not set (optional)\n" +
-		"variable  TOKEN                       not linked here\n" +
+		"variable  TOKEN                       not linked to this project\n" +
 		"variable  DECLARED    project         \n" +
 		"variable  ELSEWHERE   project         not declared (in /projects/other)\n" +
 		"variable  GLOBALONLY  vault (global)  not declared\n" +
@@ -405,7 +405,7 @@ func TestEnvListNotes(t *testing.T) {
 		"KIND      NAME        SOURCE          STATUS                             REQUIRED  SECRET  DESCRIPTION\n" +
 		"variable  API_URL                     declared but missing               yes       yes     Where the API lives\n" +
 		"variable  LOG_LEVEL                   declared but not set (optional)                      \n" +
-		"variable  TOKEN                       not linked here                                      \n" +
+		"variable  TOKEN                       not linked to this project                           \n" +
 		"variable  DECLARED    project                                            yes               \n" +
 		"variable  ELSEWHERE   project         not declared (in /projects/other)                    \n" +
 		"variable  GLOBALONLY  vault (global)  not declared                                         \n" +
@@ -430,16 +430,28 @@ func TestEnvListNotes(t *testing.T) {
 		t.Errorf("next steps =\n%s\nwant\n%s", out.String(), want)
 	}
 
-	// Outside a project nothing is declared, so no row is marked not declared.
+	// Outside a project nothing is declared, so no row is marked not
+	// declared, and a global linked elsewhere has no "this project" to miss
+	// and nothing to link it to.
 	out.Reset()
-	if err := renderEnvList(&out, items[3:4], "", false, false); err != nil {
+	outside := []localenv.ListItem{items[3], {
+		Kind: localenv.KindEnv, Name: "TOKEN", Source: "vault (global)", Orphan: true, NotLinkedHere: true,
+		LinkHint: "astro local env variable link TOKEN",
+	}}
+	if err := renderEnvList(&out, outside, "", false, false); err != nil {
 		t.Fatal(err)
 	}
 	want = "" +
 		"KIND      NAME        SOURCE          STATUS\n" +
+		"variable  TOKEN       vault (global)  linked to other projects\n" +
 		"variable  GLOBALONLY  vault (global)  \n"
 	if out.String() != want {
 		t.Errorf("list outside a project =\n%s\nwant\n%s", out.String(), want)
+	}
+	out.Reset()
+	cliout.PrintNextSteps(&out, envListNextSteps(outside, false))
+	if out.String() != "" {
+		t.Errorf("outside a project there is nothing to link to, so no next steps: %q", out.String())
 	}
 }
 

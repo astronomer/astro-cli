@@ -570,7 +570,7 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			"value a start passes to this project that is not declared. Airflow gets both. " +
 			"Declaring a name makes every copy of the project require it, and linking limits which " +
 			"projects a global reaches. Declared values come first. The STATUS column marks rows that need attention: declared but " +
-			"missing, declared but not set (optional), not declared, not linked here, or invalid key. " +
+			"missing, declared but not set (optional), not declared, not linked to this project, or invalid key. " +
 			"SOURCE is blank for a value nothing sets. On a terminal, the commands " +
 			"that settle them follow the table as next steps (ASTRO_GUIDANCE_DISABLED=1 turns them " +
 			"off). -o wide adds whether each value is required and secret, and its description. " +
@@ -1419,10 +1419,13 @@ func statusFor(it *localenv.ListItem, inProject bool) rowStatus {
 			step: cliout.NextStep{Why: "Delete " + it.Name + ", whose key is no longer valid", Command: it.RemoveHint},
 		}
 	case it.NotLinkedHere && it.LinksDown != "":
-		n = rowStatus{kind: statusNotLinked, state: "not linked here (" + it.LinksDown + ")"}
+		n = rowStatus{kind: statusNotLinked, state: notLinkedState(inProject) + " (" + it.LinksDown + ")"}
+	case it.NotLinkedHere && !inProject:
+		// Outside a project there is nothing to link it to, so no step.
+		n = rowStatus{kind: statusNotLinked, state: notLinkedState(false)}
 	case it.NotLinkedHere:
 		n = rowStatus{
-			kind: statusNotLinked, state: "not linked here",
+			kind: statusNotLinked, state: notLinkedState(true),
 			step: cliout.NextStep{Why: "Link " + it.Name + " so this project gets it", Command: it.LinkHint},
 		}
 	case it.SetHint != "" && it.UndeclareHint != "" && it.Required:
@@ -1453,9 +1456,19 @@ func statusFor(it *localenv.ListItem, inProject bool) rowStatus {
 	return n
 }
 
+// notLinkedState is the STATUS of a global that does not reach the current
+// checkout: one linked to other projects, or behind a link index that cannot
+// be read. Outside a project there is no "this project" for it to miss.
+func notLinkedState(inProject bool) string {
+	if inProject {
+		return "not linked to this project"
+	}
+	return "linked to other projects"
+}
+
 // declaredRow reports whether a list row is one the project declares: one
 // something supplies (Resolved), one nothing does (it has the set and
-// undeclare hints), or a declared global not linked here. An orphan, and an
+// undeclare hints), or a declared global not linked to this project. An orphan, and an
 // Airflow setting the workspace passes, are not.
 func declaredRow(it *localenv.ListItem) bool {
 	return it.Resolved || it.SetHint != "" || (it.NotLinkedHere && !it.Orphan)
