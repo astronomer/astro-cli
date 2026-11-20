@@ -1,10 +1,16 @@
 package localenv
 
 import (
+	"encoding/json"
+	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/astronomer/astro-cli/internal/envresolve"
+	"github.com/astronomer/astro-cli/pkg/airflowenv"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 )
 
@@ -71,6 +77,8 @@ type Sources struct {
 	shell      map[string]string
 	project    map[string]string // nil when running outside a project
 	hasProject bool
+	// projectProblems are the .env lines the parser skipped.
+	projectProblems []airflowrt.DotenvProblem
 }
 
 // LoadSources reads the shell environment and the project's .env (when
@@ -80,14 +88,64 @@ type Sources struct {
 func LoadSources(environ []string, projectDir string) (Sources, error) {
 	s := Sources{shell: environMap(environ)}
 	if projectDir != "" {
-		m, err := readMap(ProjectEnvPath(projectDir))
+		m, problems, err := readMapProblems(ProjectEnvPath(projectDir))
 		if err != nil {
 			return Sources{}, err
 		}
 		s.project = m
+		s.projectProblems = problems
 		s.hasProject = true
 	}
 	return s, nil
+}
+
+// SectionDotenv is the section a DotenvWarnings finding about the file itself
+// carries, a line it could not read, keyed "line N".
+const SectionDotenv envschema.Section = "dotenv"
+
+// DotenvWarnings are the project .env's problems a start runs past, as the
+// warnings a start prints and `astro local check` reports:
+//
+//   - each problem the parser found: a line it could not read, which nothing
+//     passes to Airflow, or an assignment it kept but whose value is likely
+//     not what was meant;
+//   - each connection the file sets as JSON that does not parse, and that
+//     schema does not declare (the resolver already warns about a declared
+//     one). Airflow reports a connection whose value it cannot parse as not
+//     defined at all, and logs why only at debug level, so this is the one
+//     place the real reason shows.
+func (s Sources) DotenvWarnings(schema *envschema.Schema) []envschema.Violation {
+	var out []envschema.Violation
+	for _, p := range s.projectProblems {
+		reason := p.Reason
+		if p.Skipped {
+			reason += ", so it is not passed to Airflow"
+		}
+		out = append(out, envschema.Violation{
+			Kind:    envschema.ViolationWrongType,
+			Section: SectionDotenv,
+			Key:     fmt.Sprintf("line %d", p.Line),
+			Reason:  reason,
+		})
+	}
+	declared := declaredKeySet(schema)
+	for _, key := range slices.Sorted(maps.Keys(s.project)) {
+		if declared[key] || !airflowenv.IsConnEnvKey(key) {
+			continue
+		}
+		v := strings.TrimSpace(s.project[key])
+		if !strings.HasPrefix(v, "{") || json.Valid([]byte(v)) {
+			continue
+		}
+		out = append(out, envschema.Violation{
+			Kind:    envschema.ViolationWrongType,
+			Section: envschema.SectionConnection,
+			Key:     airflowenv.ConnIDForEnvKey(key),
+			Reason: "its value in .env (" + key + ") is not valid JSON, " +
+				"so Airflow will report the connection as not defined",
+		})
+	}
+	return out
 }
 
 // Providers is the ordered resolution chain:

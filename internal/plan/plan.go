@@ -560,7 +560,7 @@ func resolveEnv(m *manifest.Manifest, proj *project.Project, opts Options) (reso
 		env:            inj,
 		secretEnv:      secretInj,
 		passthrough:    withShellWon(passthroughKeys(res.Resolved, inj), shellWon, inj, secretInj),
-		warnings:       valueWarnings(res.Violations),
+		warnings:       append(valueWarnings(res.Violations), src.DotenvWarnings(schema)...),
 		startedWithout: startedWithout,
 		workspaceNote:  wsNote,
 
