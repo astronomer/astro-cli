@@ -1,6 +1,10 @@
 package ide
 
 import (
+	"archive/tar"
+	"compress/gzip"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -101,5 +105,46 @@ func TestCreateAndExtractArchive_RespectsGitignoreAndAllowlist(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(outDir, ".test")); !os.IsNotExist(err) {
 		t.Errorf("expected .test to be excluded, got err=%v", err)
+	}
+}
+
+func TestCreateTarGzArchive_UsesForwardSlashNames(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "dags/example.py", "print('hello')\n")
+	writeFile(t, root, "include/custom_functions/helpers.py", "x = 1\n")
+
+	archivePath := filepath.Join(t.TempDir(), "project.tar.gz")
+	if err := createTarGzArchive(root, archivePath); err != nil {
+		t.Fatalf("createTarGzArchive error: %v", err)
+	}
+
+	f, err := os.Open(archivePath)
+	if err != nil {
+		t.Fatalf("open archive: %v", err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	defer gz.Close()
+
+	names := map[string]bool{}
+	tr := tar.NewReader(gz)
+	for {
+		h, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatalf("read tar: %v", err)
+		}
+		names[h.Name] = true
+	}
+
+	for _, want := range []string{"dags", "dags/example.py", "include/custom_functions", "include/custom_functions/helpers.py"} {
+		if !names[want] {
+			t.Errorf("expected tar entry %q, got %v", want, names)
+		}
 	}
 }
