@@ -141,13 +141,23 @@ func TestProjectHomeRejectsACraftedPointer(t *testing.T) {
 	writeFile(t, filepath.Join(admin2, "gitdir"), filepath.Join(victim, ".git")+"\n")
 	writeFile(t, filepath.Join(wrongBack, ".git"), "gitdir: "+filepath.ToSlash(admin2)+"\n")
 
-	for _, dir := range []string{crafted, wrongBack} {
+	// A back-link that does name this checkout, from an admin directory that
+	// is not under the commondir's worktrees: git keeps every one of a
+	// repository's at <commondir>/worktrees/<name>, so this one names a
+	// commondir that is not its own.
+	forgedBack := filepath.Join(root, "crafted-forged-back")
+	admin3 := filepath.Join(root, "z")
+	writeFile(t, filepath.Join(admin3, "commondir"), filepath.Join(victim, ".git")+"\n")
+	writeFile(t, filepath.Join(admin3, "gitdir"), filepath.Join(forgedBack, ".git")+"\n")
+	writeFile(t, filepath.Join(forgedBack, ".git"), "gitdir: "+filepath.ToSlash(admin3)+"\n")
+
+	for _, dir := range []string{crafted, wrongBack, forgedBack} {
 		got, err := ProjectHome(dir)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if got != dir {
-			t.Errorf("ProjectHome(%s) = %s, want its own path: the pointer has no back-link to it", dir, got)
+			t.Errorf("ProjectHome(%s) = %s, want its own path: the pointer is not a worktree of the repository it names", dir, got)
 		}
 	}
 }
