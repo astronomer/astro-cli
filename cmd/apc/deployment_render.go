@@ -11,7 +11,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
-	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -353,13 +352,7 @@ func emitVersionChange(r cliout.Renderer, kind versionChangeKind, c *deployment.
 // it is followed by its component, as Astro's logs are by their source.
 func emitLogEntry(r cliout.Renderer, component string, l houston.DeploymentLog, follow, named bool) error {
 	return r.EmitEvent(logEntryJSON{Component: component, Timestamp: l.CreatedAt, Message: l.Log}, func(w io.Writer) error {
-		// A log line is whatever the Deployment's code wrote, so to a terminal
-		// it goes without what the terminal would act on (input.Lines); to a
-		// file or a pipe, as it came.
 		line := l.Log
-		if logsToTerminal(r.Out) {
-			line = input.Lines(line)
-		}
 		switch {
 		case follow:
 			_, err := fmt.Fprint(w, line)
@@ -372,10 +365,6 @@ func emitLogEntry(r cliout.Renderer, component string, l houston.DeploymentLog, 
 		return err
 	})
 }
-
-// logsToTerminal reports whether deployment logs write to a terminal. A
-// variable so a test can stand one in for a buffer.
-var logsToTerminal = cliout.IsTerminal
 
 // deploymentHibernationJSON is what astro deployment hibernate and wake-up
 // left: the override now on the Deployment's hibernation schedule, or null
