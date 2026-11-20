@@ -27,7 +27,7 @@ func TestDagsErrorsListsImportErrorsOnBothGenerations(t *testing.T) {
 			if err != nil {
 				t.Fatalf("dags errors: %v", err)
 			}
-			// The standalone af's shape, which Otto's DAG validation reads:
+			// The shape Otto's DAG validation reads:
 			// total_import_errors and import_errors in one object.
 			rows, envelope := decodeList(t, out, "import_errors")
 			if len(rows) != 1 {

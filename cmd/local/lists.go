@@ -15,13 +15,14 @@ import (
 // list is finished before it is printed, and one object is what `jq '.dags[]'`
 // and a JSON parser expect.
 //
-// The keys are the standalone `af` CLI's (astro-airflow-mcp), and so is the
-// envelope around them where it has one: `total_<key>` is how many the
-// collection holds, `returned_count` how many this page carries. `astro af`
-// stands in for that `af`, and the skills and agents written against it
-// (`af runs list | jq '.dag_runs[]'`, Otto reading `af dags errors` as
-// total_import_errors and import_errors) then read this one unchanged. A list
-// with no af counterpart takes a plain snake_case plural.
+// A paged `astro af` list carries an envelope: `total_<key>` is how many the
+// collection holds, `returned_count` how many this page carries. Those names
+// and the af keys (`dag_runs`, `import_errors`, ...) began as the standalone
+// `af` CLI's, so the skills and agents written against it worked from day
+// one, but they are this CLI's own now and need not follow that one. Skills
+// and Otto read them (`jq '.dag_runs[]'`, `total_import_errors`), so they
+// change only as any `--output json` shape does. A new list takes a plain
+// snake_case plural.
 //
 // One named type per list rather than one generic type with a computed key:
 // the key is then a struct tag, a golden in testdata/schema pins each
@@ -92,8 +93,8 @@ type runList struct {
 
 func newRunList(rows []runRow, total int) runList { return runList{total, len(rows), rows} }
 
-// taskInstanceList is `astro af runs tasks`. af has no such command; the key
-// is the one Airflow's own task-instance listing uses, in af's envelope.
+// taskInstanceList is `astro af runs tasks`. The key is the one Airflow's own
+// task-instance listing uses, in the envelope the other af lists carry.
 type taskInstanceList struct {
 	Total         int               `json:"total_task_instances"`
 	Returned      int               `json:"returned_count"`
@@ -227,7 +228,7 @@ type localRemoved struct {
 func newLocalRemoved(rows []listRow, _ int) localRemoved { return localRemoved{rows} }
 
 // envList is `astro local env list` and its per-kind `env var list` and `env
-// conn list`. No af counterpart. A row is a name of either kind, declared or
+// conn list`. A row is a name of either kind, declared or
 // found in a file, with where it resolves from and never its value, so the
 // list is "entries" rather than "variables" or "values".
 type envList struct {

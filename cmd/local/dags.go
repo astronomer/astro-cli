@@ -275,8 +275,8 @@ func newDagsStatsCmd(q *query) *cobra.Command {
 	return cmd
 }
 
-// dagStatRow is one DAG's run counts, in Airflow's own dagStats shape, which
-// the standalone af passes through: a list of {state, count} in the order
+// dagStatRow is one DAG's run counts, in Airflow's own dagStats shape, passed
+// through: a list of {state, count} in the order
 // Airflow sent them. The states are entries rather than fixed fields because
 // Airflow's set of run states is its own to change, and a reader asking for
 // counts wants whatever this instance actually has.
