@@ -24,6 +24,8 @@ import (
 	jsoncolor "github.com/neilotoole/jsoncolor"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // Format selects how a command renders its results.
@@ -305,6 +307,11 @@ func StyleFor(w io.Writer) Style {
 // one a command makes before it cleans text from elsewhere (input.Lines) that a
 // terminal would act on, leaving what goes to a file or a pipe as it came.
 func IsTerminal(w io.Writer) bool {
+	// A text renderer writes to the guard Renderer puts in front of a
+	// terminal; asked about it, the answer is the terminal's.
+	if tw, ok := w.(*input.TerminalWriter); ok {
+		w = tw.W
+	}
 	f, ok := w.(*os.File)
 	return ok && (isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd()))
 }
@@ -420,8 +427,27 @@ func (r Renderer) text(text func(w io.Writer) error) error {
 			"branch on r.Format == FormatJSON around a streaming Emit is what " +
 			"prevents it.")
 	}
-	return text(r.Out)
+	if !textToTerminal(r.Out) {
+		return text(r.Out)
+	}
+	// To a terminal, the rendering goes through input.TerminalWriter: its SGR
+	// styling (the CLI's own colors and bold) is kept, and anything else a
+	// terminal would act on rather than show is dropped. A rendering carries
+	// text from elsewhere (an API's names, a Deployment's logs, a spec's
+	// summaries), and this is the one door every command's result goes
+	// through, so no command has to remember. To a file or a pipe the bytes
+	// are left exactly as rendered.
+	tw := &input.TerminalWriter{W: r.Out}
+	err := text(tw)
+	if ferr := tw.Flush(); err == nil {
+		err = ferr
+	}
+	return err
 }
+
+// textToTerminal reports whether a text rendering goes to a terminal. A
+// variable so a test can stand one in for a buffer.
+var textToTerminal = IsTerminal
 
 // EmitObserver, when set, is handed every value Emit or EmitEvent publishes. It is nil in
 // production and is a test door, exported only because the tests that arm it
