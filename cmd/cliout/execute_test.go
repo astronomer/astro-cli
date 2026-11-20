@@ -710,3 +710,23 @@ func TestErrorTextForATerminal(t *testing.T) {
 	stderrIsTerminal = func(io.Writer) bool { return true }
 	assert.Equal(t, "bad gateway\nretry", errorText(io.Discard, err))
 }
+
+// Every text rendering that goes to a terminal keeps its SGR styling and loses
+// anything else a terminal would act on, whatever the command wrote; one that
+// goes to a file or a pipe is left as rendered.
+func TestTextRenderingToATerminalIsGuarded(t *testing.T) {
+	render := func(w io.Writer) error {
+		_, err := io.WriteString(w, "\x1b[1mname\x1b[0m: ops\x1b]52;c;aGk=\x07\x1b[2J\n")
+		return err
+	}
+	var piped bytes.Buffer
+	require.NoError(t, Renderer{Format: FormatText, Out: &piped}.Emit("v", render))
+	assert.Equal(t, "\x1b[1mname\x1b[0m: ops\x1b]52;c;aGk=\x07\x1b[2J\n", piped.String(), "a pipe gets the rendering as it is")
+
+	orig := textToTerminal
+	t.Cleanup(func() { textToTerminal = orig })
+	textToTerminal = func(io.Writer) bool { return true }
+	var term bytes.Buffer
+	require.NoError(t, Renderer{Format: FormatText, Out: &term}.Emit("v", render))
+	assert.Equal(t, "\x1b[1mname\x1b[0m: ops\n", term.String())
+}
