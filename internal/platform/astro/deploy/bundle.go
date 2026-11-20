@@ -275,8 +275,10 @@ func ValidateBundleSymlinks(bundlePath string) error {
 				return nil
 			}
 
-			// Check if the absolute target path is outside the absolute bundle path directory
-			if !strings.HasPrefix(absTarget, absBundlePath) {
+			// Check if the absolute target path is outside the absolute bundle
+			// path directory. By path, not by text: a sibling whose name
+			// starts with the bundle's (dags2 beside dags) is outside it.
+			if rel, relErr := filepath.Rel(absBundlePath, absTarget); relErr != nil || !filepath.IsLocal(rel) && rel != "." {
 				return fmt.Errorf("symlink %s points to %s which is outside the bundle directory %s", path, target, absBundlePath)
 			}
 		}
