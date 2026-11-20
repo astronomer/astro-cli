@@ -397,6 +397,27 @@ func TestMaterializeAllDedupsAndSplits(t *testing.T) {
 	}
 }
 
+// Ids that differ only in case or punctuation name the same variables: the
+// first keeps them and the later is skipped, rather than its values replacing
+// the first's under the first's warehouse.
+func TestMaterializeAllSkipsAnIDWhoseVariablesAreTaken(t *testing.T) {
+	pg := func(id, host string) connmodel.Connection {
+		return connmodel.Connection{ConnID: id, ConnType: "postgres", ConnHost: host, ConnLogin: "u", ConnPassword: "p", ConnSchema: "db"}
+	}
+	for _, later := range []string{"foo", "-foo-"} {
+		live, skipped := MaterializeAll([]connmodel.Connection{pg("FOO", "first.example.com"), pg(later, "later.example.com")})
+		if len(live) != 1 || live[0].ConnID != "FOO" {
+			t.Fatalf("%s: live = %+v, want FOO alone", later, live)
+		}
+		if live[0].Env["AIRFLOW_FOO_HOST"] != "first.example.com" {
+			t.Errorf("%s: FOO's host = %q", later, live[0].Env["AIRFLOW_FOO_HOST"])
+		}
+		if len(skipped) != 1 || skipped[0].ConnID != later || !strings.Contains(skipped[0].Reason, "FOO") {
+			t.Errorf("%s: skipped = %+v, want %s skipped naming FOO", later, skipped, later)
+		}
+	}
+}
+
 func TestEnvVarSanitization(t *testing.T) {
 	for in, want := range map[string]string{
 		"snow_prod": "AIRFLOW_SNOW_PROD_PASSWORD",

@@ -106,15 +106,32 @@ func Materialize(c connmodel.Connection) (Materialized, Skip, bool) { //nolint:g
 // MaterializeAll maps a set of connections, returning the queryable warehouses
 // and the skipped ones (deduped by conn id, first occurrence wins — callers
 // should pass connections highest-precedence-scope first).
+//
+// Two ids that differ only in case or punctuation ("FOO" and "foo",
+// "snow-prod" and "snow_prod") name the same variables (envID), so the later
+// one's values would replace the earlier's under both warehouses. The first
+// keeps them, as it would for the same id, and the later is skipped and says
+// which connection it gave way to.
 func MaterializeAll(conns []connmodel.Connection) ([]Materialized, []Skip) {
 	var out []Materialized
 	var skipped []Skip
-	seen := make(map[string]bool, len(conns))
+	claimed := make(map[string]string, len(conns))
 	for _, c := range conns {
-		if c.ConnID == "" || seen[c.ConnID] {
+		if c.ConnID == "" {
 			continue
 		}
-		seen[c.ConnID] = true
+		key := envID(c.ConnID)
+		if first, ok := claimed[key]; ok {
+			if first != c.ConnID {
+				skipped = append(skipped, Skip{
+					ConnID:   c.ConnID,
+					ConnType: c.ConnType,
+					Reason:   fmt.Sprintf("its variables would be connection %s's; rename one to query both", first),
+				})
+			}
+			continue
+		}
+		claimed[key] = c.ConnID
 		if m, s, ok := Materialize(c); ok {
 			out = append(out, m)
 		} else {
@@ -302,9 +319,14 @@ var envSanitize = regexp.MustCompile(`[^A-Z0-9]+`)
 // envVar builds the environment variable name for a connection's field, e.g.
 // envVar("snow-prod", "PASSWORD") -> "AIRFLOW_SNOW_PROD_PASSWORD".
 func envVar(connID, field string) string {
+	return "AIRFLOW_" + envID(connID) + "_" + field
+}
+
+// envID is the part of a connection's variable names its id becomes: upper
+// case, each run of other characters one underscore, none at either end.
+func envID(connID string) string {
 	id := envSanitize.ReplaceAllString(strings.ToUpper(connID), "_")
-	id = strings.Trim(id, "_")
-	return "AIRFLOW_" + id + "_" + field
+	return strings.Trim(id, "_")
 }
 
 func ref(envVar string) string { return "${" + envVar + "}" }
