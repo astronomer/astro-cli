@@ -271,6 +271,12 @@ func (p *plan) check(h *tar.Header) error {
 		return fmt.Errorf("the archive entry %q is outside the directory being imported into", h.Name)
 	}
 	rel := filepath.Clean(filepath.FromSlash(h.Name))
+	if p.inGitMetadata(rel) {
+		// An export never holds it (shouldSkipArchiveEntry; git archive
+		// leaves it out too), and the checkout's own is not the project's
+		// to replace.
+		return fmt.Errorf("the archive entry %q is Git metadata (.git), which an import does not write", h.Name)
+	}
 	isDir := h.Typeflag == tar.TypeDir
 	if !isDir && isImportTemp(filepath.Base(rel)) {
 		// Written, it would be dropped by the export and swept by a later
@@ -295,6 +301,18 @@ func (p *plan) check(h *tar.Header) error {
 		p.fileDirs[filepath.Dir(rel)] = true
 	}
 	return nil
+}
+
+// inGitMetadata reports whether rel is a .git directory or file, or under one,
+// at any depth, comparing names as this filesystem does (.GIT is .git on
+// macOS, and .git. too on Windows).
+func (p *plan) inGitMetadata(rel string) bool {
+	for _, part := range strings.Split(p.fold(rel), string(filepath.Separator)) {
+		if part == ".git" {
+			return true
+		}
+	}
+	return false
 }
 
 // parents lists the directories rel sits under, outermost first, "." left out.

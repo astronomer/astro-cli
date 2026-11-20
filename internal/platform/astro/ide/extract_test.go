@@ -181,6 +181,46 @@ func TestExtractRefusesEntriesItDoesNotWrite(t *testing.T) {
 	}
 }
 
+// Git metadata is not the project's: an export never holds it, and an import
+// that wrote it would replace the checkout's own, its config and hooks among
+// it. An archive holding any fails the import before anything is written.
+func TestExtractRefusesGitMetadata(t *testing.T) {
+	for _, e := range []entry{
+		file(".git/config", "[core]\n"),
+		file(".git/hooks/pre-commit", "#!/bin/sh\n"),
+		file(".git", "gitdir: /elsewhere\n"),
+		dirEntry(".git"),
+		file("dags/vendored/.git/config", "[core]\n"),
+	} {
+		t.Run(e.name, func(t *testing.T) {
+			refused(t, t.TempDir(), "is Git metadata (.git), which an import does not write", file("dags/ok.py", "ok\n"), e)
+		})
+	}
+}
+
+func TestPlanFindsGitMetadataAsTheFilesystemNamesIt(t *testing.T) {
+	sep := string(filepath.Separator)
+	for _, tc := range []struct {
+		goos, rel string
+		want      bool
+	}{
+		{"linux", ".git" + sep + "config", true},
+		{"linux", ".GIT" + sep + "config", false},
+		{"linux", "dags" + sep + ".gitignore", false},
+		{"linux", ".github" + sep + "workflows" + sep + "ci.yml", false},
+		{"darwin", ".GIT" + sep + "config", true},
+		{"windows", ".Git." + sep + "config", true},
+		{"windows", "dags" + sep + ".git " + sep + "HEAD", true},
+	} {
+		t.Run(tc.goos+" "+tc.rel, func(t *testing.T) {
+			p := newPlan(nil, foldFor(tc.goos))
+			if got := p.inGitMetadata(tc.rel); got != tc.want {
+				t.Errorf("inGitMetadata(%q) = %v, want %v", tc.rel, got, tc.want)
+			}
+		})
+	}
+}
+
 // What the first pass refuses from the archive alone, before any write.
 func TestExtractRefusesAnArchiveThatClashesWithItself(t *testing.T) {
 	for _, tc := range []struct {
