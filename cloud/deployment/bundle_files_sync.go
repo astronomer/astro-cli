@@ -36,6 +36,7 @@ type BundleSyncOptions struct {
 	// Force deletes local files in a sync from a bundle without asking first.
 	Force           bool
 	DryRun          bool
+	Watch           bool
 	Version         string
 	ExpectedVersion string
 	Filter          BundleFilterOptions
@@ -132,10 +133,14 @@ func (p *bundleSyncPlan) summary() string {
 }
 
 // SyncBundleFiles makes DST match SRC, one a local directory and the other a bundle directory, transferring only the files that differ.
+// With opts.Watch, it then syncs again each time files under SRC change, until ctx is done or the process is interrupted.
 func SyncBundleFiles(ctx httpContext.Context, src, dst string, opts *BundleSyncOptions, wsID, deploymentID string, out io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient, astroV1Alpha1StreamClient astrov1alpha1.ClientInterface) error {
 	srcInBundle, dstInBundle := isBundlePath(src), isBundlePath(dst)
 	if srcInBundle == dstInBundle || src == "-" || dst == "-" {
 		return errSyncNoBundle
+	}
+	if opts.Watch && opts.DryRun {
+		return errSyncWatchDryRun
 	}
 	if dstInBundle {
 		if opts.Version != "" {
@@ -148,10 +153,13 @@ func SyncBundleFiles(ctx httpContext.Context, src, dst string, opts *BundleSyncO
 		if err != nil {
 			return err
 		}
-		return syncToBundle(src, target, opts, wsID, deploymentID, out, astroV1Client, astroV1Alpha1Client, astroV1Alpha1StreamClient)
+		return syncToBundle(ctx, src, target, opts, wsID, deploymentID, out, astroV1Client, astroV1Alpha1Client, astroV1Alpha1StreamClient)
 	}
 	if opts.ExpectedVersion != "" {
 		return errSyncExpectedVersion
+	}
+	if opts.Watch {
+		return errSyncWatch
 	}
 	source, err := ParseBundlePath(src)
 	if err != nil {
@@ -160,7 +168,7 @@ func SyncBundleFiles(ctx httpContext.Context, src, dst string, opts *BundleSyncO
 	return syncFromBundle(source, dst, opts, wsID, deploymentID, out, astroV1Client, astroV1Alpha1Client, astroV1Alpha1StreamClient)
 }
 
-func syncToBundle(src string, dst BundlePath, opts *BundleSyncOptions, wsID, deploymentID string, out io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient, astroV1Alpha1StreamClient astrov1alpha1.ClientInterface) error {
+func syncToBundle(ctx httpContext.Context, src string, dst BundlePath, opts *BundleSyncOptions, wsID, deploymentID string, out io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient, astroV1Alpha1StreamClient astrov1alpha1.ClientInterface) error {
 	src, err := followLocalDir(src)
 	if err != nil {
 		return err
@@ -176,6 +184,14 @@ func syncToBundle(src string, dst BundlePath, opts *BundleSyncOptions, wsID, dep
 	if err != nil {
 		return err
 	}
+	if opts.Watch {
+		target, err := openSyncTarget(dst, opts.ExpectedVersion, filter, wsID, deploymentID, astroV1Client, astroV1Alpha1Client)
+		if err != nil {
+			return err
+		}
+		return target.watch(ctx, src, opts.Filter, filter, !opts.NoDelete, out, astroV1Alpha1StreamClient)
+	}
+
 	files, skipped, err := localFiles(src, filter)
 	if err != nil {
 		return err

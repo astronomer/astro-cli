@@ -848,15 +848,15 @@ func putBundleDirectory(pack func(io.Writer) error, params *astrov1alpha1.WriteB
 		return "", packErr
 	}
 	if err != nil {
-		return "", err
+		return "", &bundleWriteError{err: err}
 	}
 	parsed, err := astrov1alpha1.ParseWriteBundleDirectoryResponse(resp)
 	if err != nil {
-		return "", err
+		return "", &bundleWriteError{err: err}
 	}
 	err = astrov1alpha1.NormalizeAPIError(parsed.HTTPResponse, parsed.Body)
 	if err != nil {
-		return "", err
+		return "", &bundleWriteError{status: parsed.StatusCode(), err: err}
 	}
 	return parsed.JSON200.Version, nil
 }

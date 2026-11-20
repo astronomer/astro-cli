@@ -1031,6 +1031,8 @@ func (s *Suite) TestUploadBundleDirectory() {
 
 		_, err := uploadBundleDirectory(s.T().TempDir(), &bundleSyncPlan{added: []string{"missing.py"}}, &astrov1alpha1.WriteBundleDirectoryParams{}, bundleRef{bundleID: "bundle-1"}, mockStreamClient)
 		s.ErrorContains(err, "failed to read missing.py")
+		var writeErr *bundleWriteError
+		s.NotErrorAs(err, &writeErr)
 	})
 
 	s.Run("packs the archive again for each write the rate limits refuse", func() {
