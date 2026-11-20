@@ -106,7 +106,9 @@ const SectionDotenv envschema.Section = "dotenv"
 // DotenvWarnings are the project .env's problems a start runs past, as the
 // warnings a start prints and `astro local check` reports:
 //
-//   - each line the parser could not read, which nothing passes to Airflow;
+//   - each problem the parser found: a line it could not read, which nothing
+//     passes to Airflow, or an assignment it kept but whose value is likely
+//     not what was meant;
 //   - each connection the file sets as JSON that does not parse, and that
 //     schema does not declare (the resolver already warns about a declared
 //     one). Airflow reports a connection whose value it cannot parse as not
@@ -115,11 +117,15 @@ const SectionDotenv envschema.Section = "dotenv"
 func (s Sources) DotenvWarnings(schema *envschema.Schema) []envschema.Violation {
 	var out []envschema.Violation
 	for _, p := range s.projectProblems {
+		reason := p.Reason
+		if p.Skipped {
+			reason += ", so it is not passed to Airflow"
+		}
 		out = append(out, envschema.Violation{
 			Kind:    envschema.ViolationWrongType,
 			Section: SectionDotenv,
 			Key:     fmt.Sprintf("line %d", p.Line),
-			Reason:  p.Reason + ", so it is not passed to Airflow",
+			Reason:  reason,
 		})
 	}
 	declared := declaredKeySet(schema)

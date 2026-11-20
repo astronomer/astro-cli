@@ -3,6 +3,7 @@ package localenv
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/pkg/envschema"
@@ -115,5 +116,46 @@ func TestDotenvWarnings(t *testing.T) {
 	}
 	if got[1].Section != envschema.SectionConnection || got[1].Key != "broken" {
 		t.Errorf("second warning = %+v, want connection broken", got[1])
+	}
+}
+
+// A set whose assignment an earlier open quote would take in is refused, and
+// the file is left as it was, rather than reported done and never read back.
+func TestMergeSetRefusesWhatWouldNotReadBack(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".env")
+	original := "A=\"oops\n"
+	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := &Store{Path: path, Scope: ScopeProject}
+	if _, err := s.Set(KindEnv, "B", `{"a":1}`); err == nil {
+		t.Fatalf("set should be refused; file now %q", readFile(t, path))
+	}
+	if got := readFile(t, path); got != original {
+		t.Fatalf("a refused set changed the file: %q", got)
+	}
+}
+
+// A line the parser kept, minus text after its closing quote, is not reported
+// as one Airflow never gets.
+func TestDotenvWarningsSayNotPassedOnlyForSkippedLines(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, EnvFileName), []byte("K=\"v\" extra\njunk\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	src, err := LoadSources(nil, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := src.DotenvWarnings(nil)
+	if len(got) != 2 {
+		t.Fatalf("want 2 warnings, got %+v", got)
+	}
+	if strings.Contains(got[0].Reason, "not passed") {
+		t.Errorf("kept line 1 reported as not passed: %q", got[0].Reason)
+	}
+	if !strings.Contains(got[1].Reason, "not passed") {
+		t.Errorf("skipped line 2 should say it is not passed: %q", got[1].Reason)
 	}
 }

@@ -2,6 +2,7 @@ package localenv
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,9 +12,11 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
-// ErrMultilineValue reports a value with a newline, which a dotenv line
-// cannot hold. Rejecting it up front keeps a set from corrupting the file.
-var ErrMultilineValue = errors.New("value contains a newline, which a .env file cannot store")
+// ErrMultilineValue reports a value with a newline, which a set does not
+// write. The file can hold one, as a quoted value over several lines, written
+// by hand; a set keeps every assignment on one line.
+var ErrMultilineValue = errors.New("value contains a newline, which astro local env set does not write; " +
+	"put it in .env by hand as a quoted value over several lines")
 
 // readMap parses a dotenv file into key -> value, decoding exactly the way
 // the runtime does: airflowrt.ParseDotenv, Docker Compose's rules. A missing
@@ -70,9 +73,17 @@ func mergeSet(path, key, value string) error {
 	}
 	if last == nil {
 		lines = append(lines, assignment)
-		return writeLines(path, lines, true)
+		trailingNewline = true
+	} else {
+		lines = append(lines[:last.StartLine:last.StartLine], append([]string{assignment}, lines[last.EndLine+1:]...)...)
 	}
-	lines = append(lines[:last.StartLine:last.StartLine], append([]string{assignment}, lines[last.EndLine+1:]...)...)
+	// A quote left open earlier in the file can close on the new
+	// assignment's, taking it into that value. Refuse rather than report a
+	// set that a read, and a start, would not see.
+	if got, _ := airflowrt.ParseDotenvMap([]byte(strings.Join(lines, "\n"))); got[key] != value {
+		return fmt.Errorf("%s would not read back as set: a quote left open earlier in %s takes it in; "+
+			"close that quote and set it again", key, filepath.Base(path))
+	}
 	return writeLines(path, lines, trailingNewline)
 }
 

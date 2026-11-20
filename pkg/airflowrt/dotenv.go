@@ -19,12 +19,14 @@ type DotenvEntry struct {
 	EndLine   int
 }
 
-// DotenvProblem is a line ParseDotenv could not read as an assignment. The
-// line is 1-based, as an editor shows it. The entry is skipped, and parsing
-// resumes on the next line, so one bad line costs only itself.
+// DotenvProblem is something ParseDotenv found wrong with a line. The line is
+// 1-based, as an editor shows it. Skipped says the line was dropped (parsing
+// resumes on the next one, so a bad line costs only itself); otherwise the
+// assignment was kept and the problem is with what it holds.
 type DotenvProblem struct {
-	Line   int
-	Reason string
+	Line    int
+	Reason  string
+	Skipped bool
 }
 
 func (p DotenvProblem) String() string { return fmt.Sprintf("line %d: %s", p.Line, p.Reason) }
@@ -58,11 +60,11 @@ func ParseDotenv(data []byte) ([]DotenvEntry, []DotenvProblem) {
 		}
 		key, rest, ok := splitAssignment(t)
 		if !ok {
-			problems = append(problems, DotenvProblem{Line: i + 1, Reason: "not a KEY=value assignment"})
+			problems = append(problems, DotenvProblem{Line: i + 1, Reason: "not a KEY=value assignment", Skipped: true})
 			continue
 		}
 		if key == "" || strings.ContainsFunc(key, unicode.IsSpace) {
-			problems = append(problems, DotenvProblem{Line: i + 1, Reason: fmt.Sprintf("%q is not a variable name", key)})
+			problems = append(problems, DotenvProblem{Line: i + 1, Reason: fmt.Sprintf("%q is not a variable name", key), Skipped: true})
 			continue
 		}
 		rest = strings.TrimLeftFunc(rest, unicode.IsSpace)
@@ -73,15 +75,30 @@ func ParseDotenv(data []byte) ([]DotenvEntry, []DotenvProblem) {
 		value, end, trailing, closed := quotedValue(rest, lines, i)
 		if !closed {
 			problems = append(problems, DotenvProblem{
-				Line:   i + 1,
-				Reason: fmt.Sprintf("%s's value opens a %c quote that is never closed", key, rest[0]),
+				Line:    i + 1,
+				Reason:  fmt.Sprintf("%s's value opens a %c quote that is never closed", key, rest[0]),
+				Skipped: true,
 			})
 			continue
+		}
+		// A quote closes at the next one of its kind however far on, as
+		// Compose reads it, so a stray opening quote takes in the lines after
+		// it. That is kept, for 1.x's sake, but an assignment taken in that
+		// way is almost never meant, and it vanishes silently: say so.
+		for ln := i + 1; ln <= end; ln++ {
+			if looksLikeAssignment(lines[ln]) {
+				problems = append(problems, DotenvProblem{
+					Line: i + 1,
+					Reason: fmt.Sprintf("%s's %c-quoted value runs on to line %d, taking in line %d as part of it; "+
+						"close the quote on line %d if that is not meant", key, rest[0], end+1, ln+1, i+1),
+				})
+				break
+			}
 		}
 		if trailing = strings.TrimSpace(trailing); trailing != "" && !strings.HasPrefix(trailing, "#") {
 			problems = append(problems, DotenvProblem{
 				Line:   end + 1,
-				Reason: fmt.Sprintf("%s's value has %q after its closing quote, which is ignored", key, trailing),
+				Reason: fmt.Sprintf("%s's value has %q after its closing quote, which is dropped from the value", key, trailing),
 			})
 		}
 		entries = append(entries, DotenvEntry{Key: key, Value: value, StartLine: i, EndLine: end})
@@ -109,6 +126,12 @@ func splitAssignment(t string) (key, rest string, ok bool) {
 	key, rest, ok = strings.Cut(t, "=")
 	return strings.TrimSpace(key), rest, ok
 }
+
+var assignmentLine = regexp.MustCompile(`^\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_.-]*\s*=`)
+
+// looksLikeAssignment reports whether a line, read on its own, would be a
+// KEY=value assignment.
+func looksLikeAssignment(line string) bool { return assignmentLine.MatchString(line) }
 
 // unquotedValue drops an inline comment (" #", Compose's rule: a '#' with no
 // space before it is part of the value) and trims.
