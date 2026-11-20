@@ -3,6 +3,8 @@ package auth
 import (
 	"cmp"
 	http_context "context"
+	"crypto/rand"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -185,7 +187,23 @@ func authorizeError(errorCode, errorDescription []string) error {
 // browser's authorization code, with its warnings (a callback server that
 // would not shut down) going to errOut.
 func authorizeCallbackHandlerTo(errOut io.Writer) AuthorizeCallbackHandler {
-	return func() (string, error) { return authorizeCallback(errOut) }
+	return func(state string) (string, error) { return authorizeCallback(errOut, state) }
+}
+
+// loginStateBytes is how much randomness a login's OAuth state carries, as
+// much as its PKCE verifier.
+const loginStateBytes = 32
+
+// newLoginState is a login's OAuth state: random, sent with the authorize
+// request and returned by the identity provider on its redirect to the
+// callback, success or error alike, so the callback can tell that redirect
+// from any other request that reaches it.
+func newLoginState() (string, error) {
+	b := make([]byte, loginStateBytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("cannot generate the login state: %w", err)
+	}
+	return astroauth.Base64URLEncode(b), nil
 }
 
 // callbackMux serves the login callback. The first result goes to results and
@@ -194,7 +212,12 @@ func authorizeCallbackHandlerTo(errOut io.Writer) AuthorizeCallbackHandler {
 // neither a code nor an error (a prefetch, a probe, a manual visit) is not a
 // result: it must not take the slot the real one needs, and it must not be
 // told the login succeeded.
-func callbackMux(results chan<- CallbackMessage) *http.ServeMux {
+//
+// Nor is one whose state is not this login's: only the identity provider's
+// redirect carries it. Any page the browser loads can request the callback,
+// and without the check a ?error= from one ended the login waiting for the
+// real answer. It is refused and left out, and the login goes on waiting.
+func callbackMux(results chan<- CallbackMessage, state string) *http.ServeMux {
 	send := func(msg CallbackMessage) {
 		select {
 		case results <- msg:
@@ -206,6 +229,10 @@ func callbackMux(results chan<- CallbackMessage) *http.ServeMux {
 		defer req.Body.Close()
 		if _, hasError := req.URL.Query()["error"]; !hasError && req.URL.Query().Get("code") == "" {
 			http.Error(w, "No authorization code was received. Return to the terminal and sign in again.", http.StatusBadRequest)
+			return
+		}
+		if subtle.ConstantTimeCompare([]byte(req.URL.Query().Get("state")), []byte(state)) != 1 {
+			http.Error(w, "This is not the answer to the login waiting in the terminal, which goes on waiting. Finish signing in from the link the terminal printed.", http.StatusBadRequest)
 			return
 		}
 		if errorCode, ok := req.URL.Query()["error"]; ok {
@@ -221,12 +248,12 @@ func callbackMux(results chan<- CallbackMessage) *http.ServeMux {
 	return m
 }
 
-func authorizeCallback(errOut io.Writer) (string, error) {
+func authorizeCallback(errOut io.Writer, state string) (string, error) {
 	// One channel per login, so a result left over from an earlier attempt
 	// can't answer this one.
 	results := make(chan CallbackMessage, 1)
 	fresh := &freshConns{conns: map[net.Conn]struct{}{}}
-	s := http.Server{Handler: callbackMux(results), ReadHeaderTimeout: 0, ConnState: fresh.track}
+	s := http.Server{Handler: callbackMux(results, state), ReadHeaderTimeout: 0, ConnState: fresh.track}
 	// Shutdown counts a connection that has sent nothing yet, such as a
 	// browser's preconnect, as busy for several seconds. Drop those once the
 	// listener is closed (so no new one can slip in) rather than wait on them.
@@ -342,6 +369,10 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	if err != nil {
 		return Result{}, err
 	}
+	state, err := newLoginState()
+	if err != nil {
+		return Result{}, err
+	}
 	spinnerMessage := "Waiting for login to complete in browser"
 	var res Result
 
@@ -355,6 +386,8 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	)
 
 	authorizeURL = strings.Replace(authorizeURL, " ", "%20", -1)
+	// base64url, so it needs no escaping.
+	authorizeURL += "&state=" + state
 
 	if force || signup {
 		authorizeURL += "&prompt=login"
@@ -390,7 +423,7 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 			fmt.Fprintln(os.Stderr)
 		}
 		err = ansi.Spinner(spinnerMessage, func() error {
-			authorizationCode, err := a.callbackHandler()
+			authorizationCode, err := a.callbackHandler(state)
 			if err != nil {
 				return err
 			}
@@ -402,7 +435,7 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 		}
 	} else {
 		fmt.Fprintln(os.Stderr, "Open this link on a device with a browser: "+authorizeURL)
-		authorizationCode, err := a.callbackHandler()
+		authorizationCode, err := a.callbackHandler(state)
 		if err != nil {
 			return Result{}, err
 		}

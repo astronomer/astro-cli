@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"slices"
 	"strings"
@@ -433,7 +434,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 				}
 				opts := &httputil.DoOptions{
 					Method: http.MethodGet,
-					Path:   fmt.Sprintf("http://%s/callback?%s", addr, query),
+					Path:   fmt.Sprintf("http://%s/callback?%s&state=%s", addr, query, testState),
 				}
 				res, cbErr := client.Do(opts)
 				if assert.NoError(t, cbErr) {
@@ -458,7 +459,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 
 	t.Run("success", func(t *testing.T) {
 		wait := callbackAt(t, "code=test", "https://auth.astronomer.io/device/success", false)
-		code, err := authorizeCallback(io.Discard)
+		code, err := authorizeCallback(io.Discard, testState)
 		assert.Equal(t, "test", code)
 		assert.NoError(t, err)
 		wait()
@@ -472,7 +473,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 		setup(t)
 		callbackServer = held.Addr().String()
 
-		code, err := authorizeCallback(io.Discard)
+		code, err := authorizeCallback(io.Discard, testState)
 		assert.Empty(t, code)
 		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), "cannot open the login callback on "+held.Addr().String())
@@ -482,7 +483,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 
 	t.Run("error", func(t *testing.T) {
 		wait := callbackAt(t, "error=error&error_description=fatal_error", "https://auth.astronomer.io/device/denied", false)
-		_, err := authorizeCallback(io.Discard)
+		_, err := authorizeCallback(io.Discard, testState)
 		assert.ErrorContains(t, err, "fatal_error")
 		wait()
 		requirePortFree(t)
@@ -492,7 +493,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 		setup(t)
 		callbackListening = func(addr net.Addr) { bound = addr.String() }
 		callbackTimeout = 5 * time.Millisecond
-		_, err := authorizeCallback(io.Discard)
+		_, err := authorizeCallback(io.Discard, testState)
 		assert.ErrorContains(t, err, "the login timed out")
 		requirePortFree(t)
 	})
@@ -510,7 +511,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 			callbackShutdownTimeout = 5 * time.Second
 			var out bytes.Buffer
 			start := time.Now()
-			code, err := authorizeCallback(&out)
+			code, err := authorizeCallback(&out, testState)
 			elapsed := time.Since(start)
 			if tc.wantErr == "" {
 				assert.Equal(t, "test", code)
@@ -528,7 +529,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 	t.Run("a login does not see the result of an earlier one", func(t *testing.T) {
 		for _, code := range []string{"first", "second"} {
 			wait := callbackAt(t, "code="+code, "https://auth.astronomer.io/device/success", false)
-			got, err := authorizeCallback(io.Discard)
+			got, err := authorizeCallback(io.Discard, testState)
 			assert.NoError(t, err)
 			assert.Equal(t, code, got)
 			wait()
@@ -537,9 +538,12 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 	})
 }
 
+// testState is the OAuth state the callback tests' logins wait for.
+const testState = "login-state"
+
 func TestCallbackMuxKeepsTheFirstResult(t *testing.T) {
 	results := make(chan CallbackMessage, 1)
-	mux := callbackMux(results)
+	mux := callbackMux(results, testState)
 	// A hit with no code and no error leaves the slot free for the real result,
 	// and is not told the login succeeded.
 	for _, target := range []string{"/callback", "/callback?code="} {
@@ -550,7 +554,7 @@ func TestCallbackMuxKeepsTheFirstResult(t *testing.T) {
 		assert.Empty(t, results, target)
 	}
 
-	for _, target := range []string{"/callback?code=first", "/callback?code=second", "/callback?error=denied", "/callback?code=third"} {
+	for _, target := range []string{"/callback?code=first&state=" + testState, "/callback?code=second&state=" + testState, "/callback?error=denied&state=" + testState, "/callback?code=third&state=" + testState} {
 		done := make(chan *httptest.ResponseRecorder, 1)
 		go func() {
 			rec := httptest.NewRecorder()
@@ -566,6 +570,65 @@ func TestCallbackMuxKeepsTheFirstResult(t *testing.T) {
 	}
 	assert.Equal(t, "first", (<-results).authorizationCode)
 	assert.Empty(t, results)
+}
+
+// Only the identity provider's redirect carries the login's state. A request
+// to the callback without it, from any page the browser loads, is refused and
+// left out, an error as much as a code, and the real answer still ends the
+// login.
+func TestCallbackMuxRefusesAnAnswerWithoutTheLoginsState(t *testing.T) {
+	results := make(chan CallbackMessage, 1)
+	mux := callbackMux(results, testState)
+	for _, target := range []string{
+		"/callback?error=access_denied",
+		"/callback?error=access_denied&state=other",
+		"/callback?code=forged",
+		"/callback?code=forged&state=" + testState + "x",
+		"/callback?code=forged&state=",
+	} {
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, http.NoBody))
+		assert.Equal(t, http.StatusBadRequest, rec.Code, target)
+		assert.Empty(t, rec.Header().Get("Location"), target)
+		assert.Empty(t, results, "%s took the result slot", target)
+	}
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/callback?code=real&state="+testState, http.NoBody))
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, "real", (<-results).authorizationCode)
+}
+
+// Each login sends a fresh, unguessable state with its authorize request and
+// waits for the answer that carries that same state.
+func TestAuthDeviceLoginSendsAndWaitsForItsState(t *testing.T) {
+	stubStdinIsTerminal(t, false)
+	stubStdin(t, "")
+	var states []string
+	for range 2 {
+		var waitedFor string
+		auth := Authenticator{
+			callbackHandler: func(state string) (string, error) { waitedFor = state; return "code", nil },
+			tokenRequester:  func(Config, string, string) (Result, error) { return Result{}, nil },
+		}
+		out := captureStderr(t, func() {
+			_, err := auth.authDeviceLogin(Config{DomainURL: "https://auth.example.invalid/"}, true, false, false)
+			assert.NoError(t, err)
+		})
+		_, link, ok := strings.Cut(out, "Open this link on a device with a browser: ")
+		if !assert.True(t, ok, "no login link in %q", out) {
+			return
+		}
+		u, err := url.Parse(strings.TrimSpace(link))
+		if !assert.NoError(t, err) {
+			return
+		}
+		sent := u.Query().Get("state")
+		assert.Len(t, sent, 43, "32 random bytes, base64url")
+		assert.Equal(t, sent, waitedFor, "the login waits for the state it sent")
+		states = append(states, sent)
+	}
+	assert.NotEqual(t, states[0], states[1], "each login has its own state")
 }
 
 func TestShouldSignup(t *testing.T) {
@@ -634,7 +697,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 	stubStdinIsTerminal(t, true)
 	t.Run("success without login link", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
@@ -655,7 +718,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			authorizeURL = url
 			return nil
 		}
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
@@ -682,7 +745,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		}
 		mockAuthenticator := Authenticator{
 			tokenRequester:  func(Config, string, string) (Result, error) { return Result{}, nil },
-			callbackHandler: func() (string, error) { return "test-code", nil },
+			callbackHandler: func(string) (string, error) { return "test-code", nil },
 		}
 
 		_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
@@ -702,7 +765,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		openURL = func(url string) error {
 			return nil
 		}
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
@@ -729,7 +792,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		openURL = func(url string) error {
 			return errMock
 		}
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
@@ -738,7 +801,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 	})
 
 	t.Run("token requester failure", func(t *testing.T) {
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
@@ -754,7 +817,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 
 	t.Run("success with login link", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
@@ -767,7 +830,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 	})
 
 	t.Run("callback failure with login link", func(t *testing.T) {
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "", errMock
 		}
 		mockAuthenticator := Authenticator{callbackHandler: callbackHandler}
@@ -776,7 +839,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 	})
 
 	t.Run("token requester failure with login link", func(t *testing.T) {
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
@@ -795,7 +858,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			browserOpened = true
 			return nil
 		}
-		callbackHandler := func() (string, error) { return "test-code", nil }
+		callbackHandler := func(string) (string, error) { return "test-code", nil }
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
 			return Result{}, nil
 		}
@@ -819,7 +882,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 			return nil
 		}
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
-		callbackHandler := func() (string, error) { return "test-code", nil }
+		callbackHandler := func(string) (string, error) { return "test-code", nil }
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
 			return mockResponse, nil
 		}
@@ -1404,7 +1467,7 @@ func TestLoginRefusedWhenTheRunMayNotAsk(t *testing.T) {
 	previous := authenticator
 	t.Cleanup(func() { authenticator = previous })
 	authenticator = Authenticator{
-		callbackHandler: func() (string, error) {
+		callbackHandler: func(string) (string, error) {
 			t.Error("the browser login started")
 			return "", errMock
 		},
@@ -1439,7 +1502,7 @@ func TestLoginStartsNoneOnceInterrupted(t *testing.T) {
 	previous := authenticator
 	t.Cleanup(func() { authenticator = previous })
 	authenticator = Authenticator{
-		callbackHandler: func() (string, error) {
+		callbackHandler: func(string) (string, error) {
 			t.Error("the browser login started")
 			return "", errMock
 		},
@@ -1459,7 +1522,7 @@ func TestLogin(t *testing.T) {
 		stubAuthConfig(t, testAuthConfig)
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
 		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
@@ -1500,7 +1563,7 @@ func TestLogin(t *testing.T) {
 		})
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
 		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
@@ -1526,7 +1589,7 @@ func TestLogin(t *testing.T) {
 	t.Run("oauth token success", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
 		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
@@ -1558,7 +1621,7 @@ func TestLogin(t *testing.T) {
 
 	t.Run("auth failure", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "", errMock
 		}
 		authenticator = Authenticator{callbackHandler: callbackHandler}
@@ -1569,7 +1632,7 @@ func TestLogin(t *testing.T) {
 	t.Run("check token failure", func(t *testing.T) {
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
 		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
-		callbackHandler := func() (string, error) {
+		callbackHandler := func(string) (string, error) {
 			return "test-code", nil
 		}
 		tokenRequester := func(authConfig Config, verifier, code string) (Result, error) {
@@ -1605,7 +1668,7 @@ func TestLogin(t *testing.T) {
 		}
 		authenticator = Authenticator{
 			userInfoRequester: userInfoRequester,
-			callbackHandler:   func() (string, error) { return "authorizationCode", nil },
+			callbackHandler:   func(string) (string, error) { return "authorizationCode", nil },
 			tokenRequester: func(authConfig Config, verifier, code string) (Result, error) {
 				return Result{
 					RefreshToken: "refresh_token",
@@ -1637,7 +1700,7 @@ func TestLogin(t *testing.T) {
 		}
 		authenticator = Authenticator{
 			userInfoRequester: userInfoRequester,
-			callbackHandler:   func() (string, error) { return "authorizationCode", nil },
+			callbackHandler:   func(string) (string, error) { return "authorizationCode", nil },
 			tokenRequester: func(authConfig Config, verifier, code string) (Result, error) {
 				return Result{
 					RefreshToken: "refresh_token",
@@ -1724,7 +1787,7 @@ func browserAuthenticator(t *testing.T, rejected ...string) *int {
 		tokenRequester: func(Config, string, string) (Result, error) {
 			return Result{AccessToken: "browser-token", RefreshToken: "browser-refresh", ExpiresIn: 3600}, nil
 		},
-		callbackHandler: func() (string, error) {
+		callbackHandler: func(string) (string, error) {
 			*browserLogins++
 			return "test-code", nil
 		},
@@ -2297,7 +2360,7 @@ func TestExplicitLoginWorksWhenTheRunMayNotAsk(t *testing.T) {
 			openURL = func(string) error { opened++; return nil }
 			reached := false
 			authenticator = Authenticator{
-				callbackHandler: func() (string, error) {
+				callbackHandler: func(string) (string, error) {
 					reached = true
 					return "", errMock
 				},
