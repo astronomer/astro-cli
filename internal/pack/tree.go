@@ -323,8 +323,9 @@ func envChecklist(project string, env map[string]any, intro, note string) (strin
 // DeploymentValue is one value [tool.astro.env] declares that the Deployment
 // must supply, since the astro image carries none of them: it is built from
 // the dependencies and OS packages alone. Kind is the noun of the command
-// that manages it (variable, airflow-variable or connection); Status is where the value comes from
-// (valueStatus): "required", "optional", "has a default" or "from workspace".
+// that manages it (variable, airflow-variable or connection); Status is where
+// the value comes from (valueStatus): "required", "optional", "has a default"
+// or "from workspace".
 type DeploymentValue struct {
 	Kind   string `json:"kind"`
 	Name   string `json:"name"`

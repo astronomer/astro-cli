@@ -99,5 +99,8 @@ func SetCommand(m *envresolve.Missing) string {
 
 // sectionLabel is the human word for a schema section.
 func sectionLabel(s envschema.Section) string {
-	return localenv.Noun(localenv.KindForSection(s))
+	if noun := localenv.Noun(localenv.KindForSection(s)); noun != "" {
+		return noun
+	}
+	return string(s)
 }

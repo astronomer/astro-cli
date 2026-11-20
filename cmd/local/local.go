@@ -654,7 +654,10 @@ func warnWorkspaceUnread(r cliout.Renderer, note string) {
 // are snake_case and these strings are read by one. The machine-readable form
 // travels in the event's own Section field, so rewording these is safe.
 func sectionLabel(s envschema.Section) string {
-	return localenv.Noun(localenv.KindForSection(s))
+	if noun := localenv.Noun(localenv.KindForSection(s)); noun != "" {
+		return noun
+	}
+	return string(s)
 }
 
 // emitWarning is the one definition of what a warning looks like on the wire,

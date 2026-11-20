@@ -779,7 +779,7 @@ func (c *cli) runLinkDefault(name string) error {
 		case name == "" && changed:
 			_, werr = fmt.Fprintf(w, "Cleared the default link in %s\n", path)
 		case name == "":
-			_, werr = fmt.Fprintf(w, "no link is marked default in %s\n", path)
+			_, werr = fmt.Fprintf(w, "No link is marked default in %s\n", path)
 		case changed:
 			_, werr = fmt.Fprintf(w, "Set link %s as the default in %s\n", name, path)
 		default:

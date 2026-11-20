@@ -245,8 +245,9 @@ func renderImageResult(w io.Writer, res pack.Result) error {
 	return renderDeploymentEnv(w, res.DeploymentEnv)
 }
 
-// renderDeploymentEnv lists the values the Deployment must supply because the image carries none of them, one aligned
-// row each. Nothing when the project declares none.
+// renderDeploymentEnv lists the values the Deployment must supply because the
+// image carries none of them, one aligned row each. Nothing when the project
+// declares none.
 func renderDeploymentEnv(w io.Writer, values []pack.DeploymentValue) error {
 	if len(values) == 0 {
 		return nil

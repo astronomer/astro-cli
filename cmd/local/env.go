@@ -1350,18 +1350,15 @@ func (c *cli) listOptions(projectDir string, m *manifest.Manifest) localenv.List
 // columns a plain list leaves out.
 const formatWide cliout.Format = "wide"
 
-// renderEnvList prints the table, or nothing for no rows (envListEmpty says
-// so on stderr). inProject is false outside a project, where nothing is declared, so no row
-// is marked "not declared". wide adds REQUIRED and SECRET, and DESCRIPTION,
+// renderEnvList prints the table; the caller says so on stderr when there are
+// no rows (envListEmpty). inProject is false outside a project, where nothing
+// is declared, so no row is marked "not declared". wide adds REQUIRED and SECRET, and DESCRIPTION,
 // and gives an invalid key's rule in its STATUS. The commands that settle the
 // statuses are next steps, printed on stderr after the table.
 //
 // Rows are in listOrder, so the declared values come first and the ones that
 // need attention lead each group. The JSON keeps the listing's own order.
 func renderEnvList(w io.Writer, items []localenv.ListItem, inProject, wide bool) error {
-	if len(items) == 0 {
-		return nil
-	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	// The KIND cell names the subcommand that manages the value, the same as
 	// every other user-facing string in this tree. The JSON `kind` field keeps
