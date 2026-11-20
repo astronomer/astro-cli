@@ -99,30 +99,33 @@ func userSetting(overrides map[string]string, key string) string {
 	return os.Getenv(key)
 }
 
-// LoadEnvFile reads a .env file and returns key=value pairs.
-// Values wrapped in matching single or double quotes are unquoted to match
-// the behavior of Docker Compose's .env loader.
+// LoadEnvFile reads a .env file and returns its assignments as key=value
+// pairs, in file order, decoded by ParseDotenv (Docker Compose's rules). A
+// line ParseDotenv cannot read is skipped; LoadDotenvFile reports them.
 func LoadEnvFile(path string) ([]string, error) {
-	data, err := os.ReadFile(path)
+	entries, _, err := LoadDotenvFile(path)
 	if err != nil {
 		return nil, err
 	}
-	var envVars []string
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if idx := strings.IndexByte(line, '='); idx >= 0 {
-			key := line[:idx]
-			val := StripQuotes(line[idx+1:])
-			envVars = append(envVars, key+"="+val)
-		}
+	envVars := make([]string, 0, len(entries))
+	for _, e := range entries {
+		envVars = append(envVars, e.Key+"="+e.Value)
 	}
 	return envVars, nil
 }
 
-// StripQuotes removes matching surrounding single or double quotes from a value.
+// LoadDotenvFile reads and parses the .env file at path.
+func LoadDotenvFile(path string) ([]DotenvEntry, []DotenvProblem, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	entries, problems := ParseDotenv(data)
+	return entries, problems, nil
+}
+
+// StripQuotes removes matching surrounding single or double quotes from a
+// value. It does not decode escapes; ParseDotenv is the .env reader.
 func StripQuotes(s string) string {
 	if len(s) >= 2 && ((s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'')) {
 		return s[1 : len(s)-1]

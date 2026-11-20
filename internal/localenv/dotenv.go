@@ -16,36 +16,42 @@ import (
 var ErrMultilineValue = errors.New("value contains a newline, which a .env file cannot store")
 
 // readMap parses a dotenv file into key -> value, decoding exactly the way
-// the runtime does (airflowrt.LoadEnvFile: skip blanks and #-comments, split
-// on the first '=', strip matching surrounding quotes). A missing file is an
-// empty map, not an error — an unset value is simply absent. On a duplicate
-// key the last line wins, matching dotenv loaders.
+// the runtime does: airflowrt.ParseDotenv, Docker Compose's rules. A missing
+// file is an empty map, not an error — an unset value is simply absent. On a
+// duplicate key the last assignment wins, matching dotenv loaders.
 func readMap(path string) (map[string]string, error) {
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return map[string]string{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	out := map[string]string{}
-	for _, line := range strings.Split(string(data), "\n") {
-		t := strings.TrimSpace(line)
-		if t == "" || strings.HasPrefix(t, "#") {
-			continue
-		}
-		if i := strings.IndexByte(t, '='); i >= 0 {
-			out[strings.TrimSpace(t[:i])] = airflowrt.StripQuotes(strings.TrimSpace(t[i+1:]))
-		}
-	}
-	return out, nil
+	m, _, err := readMapProblems(path)
+	return m, err
 }
 
-// mergeSet writes key=value into the dotenv file at path, replacing an
-// existing assignment in place and appending a new key at the end. Every
-// other line — comments, blanks, hand-typed entries — is preserved verbatim:
-// the file is edited, never rewritten from a model, so a hand-edited .env
-// survives a set. The file is created 0600 and written atomically.
+// readMapProblems is readMap plus the lines the parser could not read, which
+// the runtime skips just the same.
+func readMapProblems(path string) (map[string]string, []airflowrt.DotenvProblem, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return map[string]string{}, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	m, problems := airflowrt.ParseDotenvMap(data)
+	return m, problems, nil
+}
+
+// entriesOf parses lines as the file they came from, so each entry's line
+// span indexes into them.
+func entriesOf(lines []string) []airflowrt.DotenvEntry {
+	entries, _ := airflowrt.ParseDotenv([]byte(strings.Join(lines, "\n")))
+	return entries
+}
+
+// mergeSet writes key=value into the dotenv file at path, replacing the
+// assignment that wins (the last, as readMap reads it) in place and
+// appending a new key at the end. Every other line — comments, blanks,
+// hand-typed entries — is preserved verbatim: the file is edited, never
+// rewritten from a model, so a hand-edited .env survives a set. An
+// assignment whose quoted value spans several lines is replaced whole. The
+// file is created 0600 and written atomically.
 func mergeSet(path, key, value string) error {
 	if strings.ContainsAny(value, "\r\n") {
 		return ErrMultilineValue
@@ -55,37 +61,46 @@ func mergeSet(path, key, value string) error {
 		return err
 	}
 	assignment := key + "=" + formatValue(value)
-	found := false
-	for i, line := range lines {
-		if lineKey(line) == key {
-			lines[i] = assignment
-			found = true
-			break
+	var last *airflowrt.DotenvEntry
+	entries := entriesOf(lines)
+	for i := range entries {
+		if entries[i].Key == key {
+			last = &entries[i]
 		}
 	}
-	if !found {
+	if last == nil {
 		lines = append(lines, assignment)
+		return writeLines(path, lines, true)
 	}
-	return writeLines(path, lines, trailingNewline || !found)
+	lines = append(lines[:last.StartLine:last.StartLine], append([]string{assignment}, lines[last.EndLine+1:]...)...)
+	return writeLines(path, lines, trailingNewline)
 }
 
-// mergeDelete removes every assignment of key from the file, preserving all
-// other lines. ok is false when the file held no such key.
+// mergeDelete removes every assignment of key from the file, each one whole,
+// preserving all other lines. ok is false when the file held no such key.
 func mergeDelete(path, key string) (ok bool, err error) {
 	lines, trailingNewline, err := readLines(path)
 	if err != nil {
 		return false, err
 	}
-	kept := lines[:0:0]
-	for _, line := range lines {
-		if lineKey(line) == key {
-			ok = true
+	drop := make(map[int]bool)
+	for _, e := range entriesOf(lines) {
+		if e.Key != key {
 			continue
 		}
-		kept = append(kept, line)
+		ok = true
+		for ln := e.StartLine; ln <= e.EndLine; ln++ {
+			drop[ln] = true
+		}
 	}
 	if !ok {
 		return false, nil
+	}
+	kept := lines[:0:0]
+	for i, line := range lines {
+		if !drop[i] {
+			kept = append(kept, line)
+		}
 	}
 	if len(kept) == 0 {
 		// The file is now empty of content; leave an empty file rather than
@@ -135,40 +150,20 @@ func writeLines(path string, lines []string, addTrailingNewline bool) error {
 	return fsatomic.WriteFile(path, []byte(b.String()), filePerm)
 }
 
-// lineKey returns the assignment key a line declares, or "" for a blank line,
-// a comment, or a line with no '='. Leading and trailing space around the key
-// is ignored, matching readMap.
-func lineKey(line string) string {
-	t := strings.TrimSpace(line)
-	if t == "" || strings.HasPrefix(t, "#") {
-		return ""
-	}
-	i := strings.IndexByte(t, '=')
-	if i < 0 {
-		return ""
-	}
-	return strings.TrimSpace(t[:i])
-}
-
 // formatValue renders a value as the right-hand side of a dotenv line so
-// readMap (and airflowrt.LoadEnvFile) decode it back unchanged. A value that
-// would otherwise be ambiguous — whitespace, a '#', a surrounding quote — is
-// wrapped in single quotes, which the loader strips without unescaping; a
-// value already holding a single quote falls back to double quotes.
+// airflowrt.ParseDotenv decodes it back unchanged. A value that would
+// otherwise be ambiguous — whitespace, a '#', a quote — is wrapped in single
+// quotes, which hold everything literally except a single quote, and a
+// backslash right before the closing one. A value with either of those is
+// double-quoted instead, with its backslashes and double quotes escaped.
 func formatValue(v string) string {
 	if v == "" || !needsQuoting(v) {
 		return v
 	}
-	if !strings.Contains(v, "'") {
+	if !strings.Contains(v, "'") && !strings.HasSuffix(v, `\`) {
 		return "'" + v + "'"
 	}
-	if !strings.Contains(v, `"`) {
-		return `"` + v + `"`
-	}
-	// Both quote kinds present (rare for a connection JSON or token): single
-	// quotes still bound the value; an interior single quote is a documented
-	// MVP limit, not a corruption of neighboring lines.
-	return "'" + v + "'"
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(v) + `"`
 }
 
 func needsQuoting(v string) bool {
