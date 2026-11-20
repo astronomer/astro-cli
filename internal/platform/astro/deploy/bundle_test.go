@@ -427,6 +427,25 @@ func (s *BundleSuite) TestValidateBundleSymlinks() {
 		assert.Contains(t, err.Error(), "points to")
 		assert.Contains(t, err.Error(), "which is outside the bundle directory")
 	})
+
+	// Case 9: Invalid - Symlink to a sibling whose name starts with the bundle's
+	t.Run("Invalid - Symlink To A Sibling Sharing The Bundle's Name", func(t *testing.T) {
+		bundlePath := setup(t, nil, nil)
+		sibling := bundlePath + "2"
+		require.NoError(t, os.MkdirAll(sibling, 0o755))
+		t.Cleanup(func() { os.RemoveAll(sibling) })
+		require.NoError(t, os.Symlink(filepath.Join("..", filepath.Base(sibling), "file"), filepath.Join(bundlePath, "link_sibling")))
+
+		err := ValidateBundleSymlinks(bundlePath)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "which is outside the bundle directory")
+	})
+
+	// Case 10: Valid - Symlink to the bundle directory itself
+	t.Run("Valid - Symlink To The Bundle Itself", func(t *testing.T) {
+		bundlePath := setup(t, nil, map[string]string{"subdir/link_root": ".."})
+		assert.NoError(t, ValidateBundleSymlinks(bundlePath))
+	})
 }
 
 func mockCreateDeploy(client *astrov1_mocks.ClientWithResponsesInterface, bundleUploadURL string, expectedDeploy *astrov1.CreateDeployRequest) {
