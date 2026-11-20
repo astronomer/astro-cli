@@ -526,7 +526,7 @@ func TestDeploymentLogsJSON(t *testing.T) {
 		prev := subscribeLogs
 		t.Cleanup(func() { subscribeLogs = prev })
 		subscribeLogs = func(_, component, _ string, _ time.Duration, notes io.Writer, onLog func(houston.DeploymentLog) error) error {
-			fmt.Fprintln(notes, "Waiting for logs...")
+			fmt.Fprintln(notes, "Waiting for logs…")
 			for _, l := range []string{"a", "b"} {
 				if err := onLog(houston.DeploymentLog{CreatedAt: "t", Log: l}); err != nil {
 					return err
@@ -544,20 +544,20 @@ func TestDeploymentLogsJSON(t *testing.T) {
 		var got errorObject
 		require.NoError(t, json.Unmarshal([]byte(lines[2]), &got))
 		assert.Contains(t, got.Error, "log stream was closed")
-		assert.Contains(t, run.stderr, "Waiting for logs...")
+		assert.Contains(t, run.stderr, "Waiting for logs…")
 	})
 
 	t.Run("follow in text is the records as they come", func(t *testing.T) {
 		prev := subscribeLogs
 		t.Cleanup(func() { subscribeLogs = prev })
 		subscribeLogs = func(_, _, _ string, _ time.Duration, notes io.Writer, onLog func(houston.DeploymentLog) error) error {
-			fmt.Fprintln(notes, "Waiting for logs...")
+			fmt.Fprintln(notes, "Waiting for logs…")
 			return onLog(houston.DeploymentLog{Log: "a line\n"})
 		}
 
 		run := runAPC(t, newAPCClient(), "", "deployment", "logs", "webserver", "dep-ac", "--follow")
 		require.Equal(t, 0, run.code)
-		assert.Equal(t, "Waiting for logs...\na line\n", run.stdout)
+		assert.Equal(t, "Waiting for logs…\na line\n", run.stdout)
 	})
 }
 

@@ -159,7 +159,7 @@ func TestDeployManifestShowsAWarningBeforeAQuestionOnce(t *testing.T) {
 	out, err := execDeployOneStream("\n")
 	require.NoError(t, err)
 	requireInOrder(t, out, "Warning: could not list the Deployments", "Deploy to which deployment?",
-		"Building your project image", "Warning: found after the build", "to prod (Deployment clx-dep).")
+		"Building the project image", "Warning: found after the build", "to prod (Deployment clx-dep).")
 	assert.Equal(t, 1, strings.Count(out, "could not list the Deployments"), out)
 	assert.Equal(t, 1, strings.Count(out, "found after the build"), out)
 }
@@ -174,7 +174,7 @@ func TestDeployManifestShowsWarningsOnceAfterTheBuild(t *testing.T) {
 	})
 	out, err := execDeployOneStream("", "prod")
 	require.NoError(t, err)
-	requireInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after,
+	requireInOrder(t, out, "Building the project image", "Warning: "+before, "Warning: "+after,
 		"Deployed image (tag tag-1)")
 	assert.Equal(t, 1, strings.Count(out, before), out)
 	assert.Equal(t, 1, strings.Count(out, after), out)
@@ -183,7 +183,7 @@ func TestDeployManifestShowsWarningsOnceAfterTheBuild(t *testing.T) {
 	setupManifestDeploy(t, &fakeCmdDeployer{imgErr: boom, warnBeforeBuild: before, warn: after})
 	out, err = execDeployOneStream("", "prod")
 	require.ErrorIs(t, err, boom)
-	requireInOrder(t, out, "Building your project image", "Warning: "+before, "Warning: "+after)
+	requireInOrder(t, out, "Building the project image", "Warning: "+before, "Warning: "+after)
 	assert.Equal(t, 1, strings.Count(out, before), out)
 
 	// Under json a warning prints once, as it is given.
@@ -427,7 +427,7 @@ func TestDeployManifestTextUnchanged(t *testing.T) {
 
 	// stdout is this command's own output: the progress line, the summary, the
 	// URL — and nothing else.
-	want := "Building your project image, this can take a few minutes...\n" +
+	want := "Building the project image. This can take a few minutes…\n" +
 		"Deployed image (tag deploy-2026-07-23T18-40) and Dags (version 3-1690000000) to prod (Deployment clx-dep).\n" +
 		"Deployment: https://cloud.astronomer.io/deployments/clx-dep\n"
 	assert.Equal(t, want, out)
@@ -522,7 +522,7 @@ func TestDeployManifestAnnouncesBeforeItBuilds(t *testing.T) {
 	// The prompt comes first, the announce line after it — nothing is claimed
 	// about a target before there is one.
 	assert.Less(t, strings.Index(errOut, "Deploy to which deployment?"), strings.Index(errOut, "→ prod"))
-	assert.Contains(t, out, "Building your project image")
+	assert.Contains(t, out, "Building the project image")
 }
 
 // A deployment named by id has no link name to show, so the line carries the id
@@ -916,7 +916,7 @@ func TestDeployManifestAbortedPromptSaysNothingAboutBuilding(t *testing.T) {
 	// Closed stdin: nobody answered.
 	out, _, err := execDeployIO("")
 	require.Error(t, err)
-	assert.NotContains(t, out, "Building your project image")
+	assert.NotContains(t, out, "Building the project image")
 	assert.Nil(t, fake.imgInput)
 	assert.Nil(t, fake.dagInput)
 }
@@ -928,7 +928,7 @@ func TestDeployManifestRefusedBeforeTheBuildSaysNothingAboutBuilding(t *testing.
 
 	out, err := execDeployCapture("--deployment", "prod")
 	require.ErrorContains(t, err, "cannot deploy Astro Runtime 3.2")
-	assert.NotContains(t, out, "Building your project image")
+	assert.NotContains(t, out, "Building the project image")
 }
 
 func TestDeployManifestNonInteractiveMustNameTheTarget(t *testing.T) {
@@ -940,7 +940,7 @@ func TestDeployManifestNonInteractiveMustNameTheTarget(t *testing.T) {
 	assert.Contains(t, err.Error(), "a deploy must name the deployment it ships to")
 	assert.Contains(t, err.Error(), "ASTRO_DEPLOYMENT")
 	assert.Contains(t, err.Error(), "dev, prod")
-	assert.NotContains(t, out, "Building your project image")
+	assert.NotContains(t, out, "Building the project image")
 }
 
 // A deploy that names nothing, under an ASTRO_API_TOKEN scoped to one

@@ -65,6 +65,10 @@ Delete the Deployment? (after a line that says all its data, including the datab
 - The first sentence of `Long` says what the command does. Add more paragraphs only for what a user needs in order to use it: inputs, defaults, side effects, and caveats.
 - Don't defend the design ("this is the answer to…", "on purpose", "by design", "never…"). State the behavior.
 
+## Progress lines
+
+A line that announces work in progress ends with a single `…` character, not three periods: `Building the project image…`. `ansi.Spinner` adds the `…` itself, so text passed to it has none.
+
 ## Words and patterns to avoid
 
 These show up in machine-written prose and make output read as padded or evasive:

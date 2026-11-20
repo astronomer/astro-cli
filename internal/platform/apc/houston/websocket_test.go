@@ -92,7 +92,7 @@ func (s *Suite) TestSubscribe() {
 		err := Subscribe("test-token", wsURL(srv), `{}`, notes, c.onLog)
 		s.NoError(err)
 		s.Equal([]string{"a", "b"}, c.records())
-		s.Equal("Waiting for logs...\n", notes.String())
+		s.Equal("Waiting for logs…\n", notes.String())
 	})
 
 	// A GraphQL execution error inside a subscription arrives in a data

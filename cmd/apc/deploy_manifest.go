@@ -145,7 +145,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 			announceDeploy(target, errOut, progress)
 		},
 		OnBuild: func() {
-			fmt.Fprintln(progress, "Building your project image, this can take a few minutes...")
+			fmt.Fprintln(progress, "Building the project image. This can take a few minutes…")
 		},
 	}, manifestdeploy.BeforeAsking(&apcManifestDeployer{client: houstonClient, in: cmd.InOrStdin(), errOut: errOut, progress: progress, warn: warnf}, recap.Flush))
 	recap.Flush()
@@ -383,6 +383,6 @@ func announceDeploy(target manifestdeploy.Target, errOut, progress io.Writer) {
 		fmt.Fprintf(errOut, "→ %s (apc deployment %s)\n", target.LinkName, target.DeploymentID)
 	}
 	if !isDagOnlyDeploy && imageName != "" {
-		fmt.Fprintf(progress, "Deploying prebuilt image %s...\n", imageName)
+		fmt.Fprintf(progress, "Deploying prebuilt image %s…\n", imageName)
 	}
 }

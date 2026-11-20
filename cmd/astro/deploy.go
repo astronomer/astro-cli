@@ -380,12 +380,12 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 			}
 			announceDeployTarget(errOut, target)
 			if !dags && imageName != "" {
-				fmt.Fprintf(out, "Deploying prebuilt image %s...\n", imageName)
+				fmt.Fprintf(out, "Deploying prebuilt image %s…\n", imageName)
 			}
 		},
 		OnBuild: func() {
 			if format == cliout.FormatText {
-				fmt.Fprintln(out, "Building your project image, this can take a few minutes...")
+				fmt.Fprintln(out, "Building the project image. This can take a few minutes…")
 			}
 		},
 	}, manifestdeploy.BeforeAsking(newManifestDeployer(&login, cmd.InOrStdin(), errOut), recap.Flush))
