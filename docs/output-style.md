@@ -51,7 +51,7 @@ Next:
 - **One step per thing to do.** Give each step a reason (a fragment saying what running it gets the reader) and its exact command. The command goes on a line of its own, so it is never wrapped into prose. A single step with no reason stays on the `Next:` line.
 - **Put the step that unblocks something first.** Where there are two ways out, suggest the likelier one; the JSON carries both.
 - **Five at most.** Past five, the helper counts the rest ("and 3 more"). Set `More` to say where they are, or to give the command that lists them all.
-- **Optional unless the run cannot be finished without it.** An optional step prints only when stderr is a terminal, and `ASTRO_GUIDANCE_DISABLED=1` turns it off. Mark a step `Required` only when skipping it leaves something broken, as turning on Dag-only deploys does until the Dags are deployed. A required step always prints. Recovery from a failure belongs in the error itself, not in a next step.
+- **Optional unless the run cannot be finished without it.** An optional step prints only when stderr is a terminal, and `ASTRO_GUIDANCE_DISABLED=1` turns it off. Mark a step `Required` only when skipping it leaves something broken, as turning on Dag-only deploys does until the Dags are deployed, or as `astro package` does with an artifact nobody knows how to ship. A required step always prints. Recovery from a failure belongs in the error itself, not in a next step.
 - **Only for a state that applies now.** Suggest a command only when the run's own result calls for it. Never "try again" with nothing to run.
 
 ## Success lines

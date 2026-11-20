@@ -146,7 +146,7 @@ func TestResettingAStoppedDockerProjectStillFindsItsVolume(t *testing.T) {
 	// from what Clean derived. It also separates the two ways this can go wrong
 	// — a name derived wrongly from no engine having answered, which exits 0
 	// and says so instead of naming a project.
-	if want := "removed compose project " + project; !strings.Contains(reset.Stdout, want) {
+	if want := "Removed compose project " + project; !strings.Contains(reset.Stdout, want) {
 		t.Errorf("reset did not report acting on %s, so it did not derive the name from the path:\n%s",
 			project, reset.output())
 	}

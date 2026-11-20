@@ -65,8 +65,9 @@ func TestPackageMWAAWritesTheBucketLayout(t *testing.T) {
 		t.Errorf("artifact tree = %v, want %v", got, want)
 	}
 	// The upload command is the whole point of the output: without it a user
-	// has an artifact and no idea what to do with it.
-	if !strings.Contains(r.Stdout, "aws s3 sync") {
+	// has an artifact and no idea what to do with it. It is a required next
+	// step, on stderr, so it prints here where stderr is no terminal.
+	if !strings.Contains(r.Stderr, "aws s3 sync") {
 		t.Errorf("expected the S3 upload command\n%s", r.output())
 	}
 	// The manifest pins an Airflow MWAA does not offer, so the run says so and
@@ -98,7 +99,7 @@ func TestPackageComposerWritesItsOwnLayout(t *testing.T) {
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("artifact tree = %v, want %v", got, want)
 	}
-	if !strings.Contains(r.Stdout, "gcloud composer") {
+	if !strings.Contains(r.Stderr, "gcloud composer") {
 		t.Errorf("expected the gcloud upload command\n%s", r.output())
 	}
 }

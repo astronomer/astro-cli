@@ -266,7 +266,9 @@ func renderDeploymentEnv(w io.Writer, values []pack.DeploymentValue) error {
 
 // packageNextSteps are the commands that hand an artifact off, which the
 // package cannot run itself: deploy an image, upload a tree, or build a
-// context with either engine.
+// context with either engine. They are required: an artifact nobody knows how
+// to ship is not finished, so they print in CI and under
+// ASTRO_GUIDANCE_DISABLED too.
 func packageNextSteps(res pack.Result, links map[string]manifest.Link) cliout.NextSteps {
 	var steps []cliout.NextStep
 	switch res.Kind {
@@ -284,7 +286,7 @@ func packageNextSteps(res pack.Result, links map[string]manifest.Link) cliout.Ne
 	case pack.KindBundle:
 		// A bundle is the deploy input itself; nothing hands it off.
 	}
-	return cliout.NextSteps{Steps: steps}
+	return cliout.NextSteps{Steps: steps, Required: true}
 }
 
 // deployImageStep is the deploy command for an image. Deploy refuses to pick a
