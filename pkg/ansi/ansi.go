@@ -4,6 +4,8 @@ import (
 	"os"
 
 	"github.com/logrusorgru/aurora"
+
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // ForceColors forces the use of colors and other ANSI sequences.
@@ -17,9 +19,15 @@ var color = Color()
 
 const cliColorForce = "CLICOLOR_FORCE"
 
-// Bold returns bolded text if the writer supports colors
+// Bold returns bolded text if the writer supports colors.
+//
+// Every styling function here takes text as text, not a format (a name with
+// a % in it prints as written), and styles it as input.Lines has it: what is
+// styled is most often a name from an API, and an escape sequence in it would
+// be acted on by the terminal, inside a question about that very name. Line
+// breaks are kept, since a prompt may start on a fresh line.
 func Bold(text string) string {
-	return color.Sprintf(color.Bold(text))
+	return color.Bold(input.Lines(text)).String()
 }
 
 // Color returns an aurora.Aurora instance with colors enabled or disabled
@@ -30,12 +38,12 @@ func Color() aurora.Aurora {
 
 // Green returns text colored green
 func Green(text string) string {
-	return color.Sprintf(color.Green(text))
+	return color.Green(input.Lines(text)).String()
 }
 
 // Cyan returns text colored blue
 func Cyan(text string) string {
-	return color.Sprintf(color.Cyan(text))
+	return color.Cyan(input.Lines(text)).String()
 }
 
 func shouldUseColors() bool {
@@ -80,16 +88,16 @@ func ForStderr() Palette {
 }
 
 // Bold returns text bolded for the palette's stream.
-func (p Palette) Bold(text string) string { return p.a.Sprintf(p.a.Bold(text)) }
+func (p Palette) Bold(text string) string { return p.a.Bold(input.Lines(text)).String() }
 
 // Red returns text colored red for the palette's stream.
-func (p Palette) Red(text string) string { return p.a.Sprintf(p.a.Red(text)) }
+func (p Palette) Red(text string) string { return p.a.Red(input.Lines(text)).String() }
 
 // Green returns text colored green for the palette's stream.
-func (p Palette) Green(text string) string { return p.a.Sprintf(p.a.Green(text)) }
+func (p Palette) Green(text string) string { return p.a.Green(input.Lines(text)).String() }
 
 // Cyan returns text colored cyan for the palette's stream.
-func (p Palette) Cyan(text string) string { return p.a.Sprintf(p.a.Cyan(text)) }
+func (p Palette) Cyan(text string) string { return p.a.Cyan(input.Lines(text)).String() }
 
 // Yellow returns text colored yellow for the palette's stream.
-func (p Palette) Yellow(text string) string { return p.a.Sprintf(p.a.Yellow(text)) }
+func (p Palette) Yellow(text string) string { return p.a.Yellow(input.Lines(text)).String() }
