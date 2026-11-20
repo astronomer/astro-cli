@@ -270,6 +270,11 @@ type verdict struct {
 // mapping each to the project path git is asked about (locate). A symlink
 // listed as itself, which only a declared build carries, ships as a link and
 // is never a credential.
+//
+// A file a generated build reaches through a link is judged a credential by
+// its carried path or by the path it resolves to, as one through a link out of
+// the project is (Check): the build copies what the link leads to, so
+// settings -> .env ships .env's contents under a name that looks like neither.
 func (r *Report) checkGit(root string, files []string, inProject map[string]string) {
 	verdicts := askProject(root, inProject, &r.Unanswered)
 	for _, f := range files {
@@ -277,7 +282,7 @@ func (r *Report) checkGit(root string, files []string, inProject map[string]stri
 		if !ok {
 			continue // outside the project, looked at in Check
 		}
-		secret := LooksSecret(f) && !isLink(root, f, inProject[f])
+		secret := (LooksSecret(f) || LooksSecret(inProject[f])) && !isLink(root, f, inProject[f])
 		if v.unanswered {
 			if secret {
 				r.Unchecked = append(r.Unchecked, f)
