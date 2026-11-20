@@ -399,6 +399,9 @@ func TestProvisionerKeyIsStableAndSpecific(t *testing.T) {
 		{Airflow: "3.1.8", Python: "3.12", Reqs: []string{"apache-airflow==3.0.6", "pandas"}},
 		{Airflow: "3.0.6", Python: "3.11", Reqs: []string{"apache-airflow==3.0.6", "pandas"}},
 		{Airflow: "3.0.6", Python: "3.12", Reqs: []string{"apache-airflow==3.0.6", "pandas"}, Constraints: []string{"sqlalchemy<2.1"}},
+		// The same requirements from a project's own index pages install other
+		// files than from the default index, or than from another project's.
+		{Airflow: "3.0.6", Python: "3.12", Reqs: []string{"apache-airflow==3.0.6", "pandas"}, FindLinks: []string{"https://pkgs.example/a/pandas/"}},
 	}
 	for _, spec := range changed {
 		if p.key(spec) == k1 {
@@ -412,6 +415,14 @@ func TestProvisionerKeyIsStableAndSpecific(t *testing.T) {
 	asConstraint := checks.VenvSpec{Airflow: "3.0.6", Python: "3.12", Reqs: []string{"apache-airflow==3.0.6"}, Constraints: []string{"sqlalchemy<2.1"}}
 	if p.key(asReq) == p.key(asConstraint) {
 		t.Error("a constraint and a requirement with the same text must not share a key")
+	}
+
+	// Two projects with the same requirements and different index pages do
+	// not share a venv.
+	fromA := checks.VenvSpec{Airflow: "3.0.6", Python: "3.12", Reqs: []string{"apache-airflow==3.0.6", "internal-lib"}, FindLinks: []string{"https://pkgs.example/a/internal-lib/"}}
+	fromB := checks.VenvSpec{Airflow: "3.0.6", Python: "3.12", Reqs: []string{"apache-airflow==3.0.6", "internal-lib"}, FindLinks: []string{"https://pkgs.example/b/internal-lib/"}}
+	if p.key(fromA) == p.key(fromB) {
+		t.Error("the same requirements from different index pages must not share a key")
 	}
 }
 
