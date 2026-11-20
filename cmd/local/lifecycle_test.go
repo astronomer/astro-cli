@@ -226,7 +226,7 @@ func TestRunOfflineNamesSkippedWorkspaceValuesOnOneLine(t *testing.T) {
 			if err := execute(t, d, cmd...); err != nil {
 				t.Fatalf("offline %s: %v", cmd[1], err)
 			}
-			want := "Warning: running without env var API_TOKEN, env var DATA_WAREHOUSE_URI: declared source = \"workspace\"; pass --with-workspace to fetch them\n"
+			want := "Warning: running without env var API_TOKEN, env var DATA_WAREHOUSE_URI, declared to come from the Workspace; pass --with-workspace to fetch them\n"
 			if got := stderr.String(); got != want {
 				t.Errorf("stderr = %q, want %q", got, want)
 			}

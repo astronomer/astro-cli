@@ -30,6 +30,15 @@ var (
 	// DangerLabel is the red "WARNING:" that leads a confirmation of something
 	// that cannot be undone.
 	DangerLabel = ansi.DangerLabel
+	// PrintNextSteps writes the commands a run suggests after it, under
+	// Next:, to stderr. See ansi.PrintNextSteps for when they print.
+	PrintNextSteps = ansi.PrintNextSteps
+)
+
+// NextStep and NextSteps are ansi's, for PrintNextSteps.
+type (
+	NextStep  = ansi.NextStep
+	NextSteps = ansi.NextSteps
 )
 
 // errorPrefix is cobra's own error prefix, which a command that sets none

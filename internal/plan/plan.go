@@ -285,7 +285,7 @@ func UndeclaredWarning(values []localenv.UndeclaredValue) string {
 	anyDeclare := slices.ContainsFunc(values, func(v localenv.UndeclaredValue) bool { return v.DeclareHint != "" })
 	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	for _, v := range sortedUndeclared(values) {
-		cells := []string{"  " + undeclaredLabel(v), v.Source}
+		cells := []string{"  " + undeclaredLabel(v), vaultenv.SourceLabel(v.Source)}
 		if anyDeclare {
 			declare := ""
 			if v.DeclareHint != "" {
@@ -308,9 +308,9 @@ func UndeclaredWarning(values []localenv.UndeclaredValue) string {
 
 func undeclaredHead(n int) string {
 	if n == 1 {
-		return "1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it"
+		return "1 value is not declared and reaches this project only from this machine, so a Deployment or a teammate's clone won't get it"
 	}
-	return fmt.Sprintf("%d values reach this project only from this machine, so a Deployment or a teammate's clone won't get them", n)
+	return fmt.Sprintf("%d values are not declared and reach this project only from this machine, so a Deployment or a teammate's clone won't get them", n)
 }
 
 // undeclaredLabel is how a value is named: its kind as the commands spell it,

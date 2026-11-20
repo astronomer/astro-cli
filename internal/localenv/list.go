@@ -70,6 +70,10 @@ type ListItem struct {
 	// cannot say so: a workspace-sourced name the workspace did not supply
 	// still carries the workspace label.
 	Resolved bool `json:"-"`
+	// Declared is true for a row the project's schema declares, supplied or
+	// not. Orphan cannot say so alone: an Airflow setting the vault or the
+	// workspace passes is neither declared nor an orphan.
+	Declared bool `json:"-"`
 }
 
 // ListOptions selects which files list reports over.
@@ -329,6 +333,7 @@ func declaredItem(rn envresolve.ResolvedName, schema *envschema.Schema) ListItem
 		Secret:      spec.Secret,
 		Description: spec.Description,
 		Resolved:    rn.Found,
+		Declared:    true,
 	}
 	// A resolved name carries its winning source; a workspace-source name that
 	// did not resolve still carries the "workspace" label (with any

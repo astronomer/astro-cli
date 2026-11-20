@@ -13,6 +13,7 @@ import (
 
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -153,6 +154,9 @@ func TestEnvListOfflineWorkspaceNote(t *testing.T) {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, errors.New("dial tcp: no route to host"))
+	// The note alone: the next steps the list prints after it are another
+	// test's.
+	t.Setenv(ansi.GuidanceDisabledEnv, "1")
 	d, out, stderr := envDeps(t, dir, "")
 	d.WorkspaceClients = workspaceClients(mc)
 	if err := execute(t, d, "local", "env", "list"); err != nil {

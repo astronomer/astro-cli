@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/tabwriter"
 
@@ -118,7 +119,7 @@ type valueStore interface {
 type fileStore struct{ *localenv.Store }
 
 func (f fileStore) ScopeName() localenv.Scope { return f.Scope }
-func (f fileStore) Where() string             { return fmt.Sprintf("%s (%s)", f.Scope, f.Path) }
+func (f fileStore) Where() string             { return f.Path }
 func (f fileStore) DotenvPath() string        { return f.Path }
 
 func (f fileStore) Has(kind localenv.Kind, name string) (bool, error) {
@@ -565,11 +566,15 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		cmdLine = "astro local env " + localenv.Noun(only) + " list"
 	}
 	if only == "" {
-		long = "List every declared value and where it resolves from, and every undeclared " +
-			"value a start passes to this project anyway. Whatever reaches a project goes " +
-			"to its Airflow, declared or not. Declaring a name makes it a requirement, and " +
-			"linking limits which projects a global reaches. Values are not shown; use the get " +
-			"command to see one."
+		long = "List every value declared in pyproject.toml and where it resolves from, and every " +
+			"value a start passes to this project that is not declared. Airflow gets both. " +
+			"Declaring a name makes every copy of the project require it, and linking limits which " +
+			"projects a global reaches. Declared values come first. The STATUS column marks rows that need attention: declared but " +
+			"missing, declared but not set (optional), not declared, not linked to this project, or invalid key. " +
+			"SOURCE is blank for a value nothing sets, except one declared to come from the cloud vault, which names it. On a terminal, the commands " +
+			"that settle them follow the table as next steps (ASTRO_GUIDANCE_DISABLED=1 turns them " +
+			"off). -o wide adds whether each value is required and secret, and its description. " +
+			"Values are not shown; use the get command to see one."
 	}
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -578,6 +583,8 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		Long:    long,
 		Example: "  # " + short + "\n" +
 			"  " + cmdLine + "\n\n" +
+			"  # Also whether each value is required and secret, and its description\n" +
+			"  " + cmdLine + " -o wide\n\n" +
 			"  # Also every known project's .env, and globals not linked to this project\n" +
 			"  " + cmdLine + " --all",
 		Args: cobra.NoArgs,
@@ -585,6 +592,9 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			return c.runEnvList(scope, all, only)
 		},
 	}
+	// The family's --output, with wide added for this command; it shadows the
+	// one the local root registers and writes the same field.
+	cliout.AddOutputFlag(cmd, &c.output, formatWide)
 	cmd.Flags().BoolVarP(&all, "all", "a", false, "Also include every known project's .env, and vault globals not linked to this project")
 	return cmd
 }
@@ -849,8 +859,8 @@ func (c *cli) noteUndeclaredGlobal(kind localenv.Kind, name string) {
 	if _, ok := declaredSpec(schema, kind, name); ok {
 		return
 	}
-	cliout.Note(c.d.Stderr, fmt.Sprintf("this project does not declare %s. It gets the global value wherever the value reaches, "+
-		"but declare it to make it a requirement: %s", name, localenv.DeclareHint(kind, name)))
+	cliout.Note(c.d.Stderr, fmt.Sprintf("This project does not declare %s, so it gets the global value on this machine only. "+
+		"Declare it so every copy of the project requires it: %s", name, localenv.DeclareHint(kind, name)))
 }
 
 func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) error {
@@ -1214,17 +1224,17 @@ func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 	var err error
 	switch {
 	case res.Undeclared:
-		_, err = fmt.Fprintf(w, "undeclared %s %s in %s\n", noun, res.Name, res.Manifest)
+		_, err = fmt.Fprintf(w, "removed the declaration of %s %s from %s\n", noun, res.Name, res.Manifest)
 	case res.Remainder == envschema.RemainderAbsent:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, so astro local env list shows it as absent. Remove the declaration with %s.\n",
+		_, err = fmt.Fprintf(w, "%s is still declared in %s and now has no value. To remove the declaration: %s\n",
 			res.Name, res.Manifest, res.UndeclareHint)
 	case res.Remainder == envschema.RemainderRequired:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, and required: the next astro local start refuses until a value is set with %s. Remove the declaration with %s.\n",
+		_, err = fmt.Fprintf(w, "%s is still declared in %s as required and is now missing, so astro local start refuses. Set it with %s, or remove the declaration with %s\n",
 			res.Name, res.Manifest, res.SetHint, res.UndeclareHint)
 	case res.Remainder == envschema.RemainderSupplied && res.Source == envresolve.SourceDefault:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, and its declared default now applies.\n", res.Name, res.Manifest)
+		_, err = fmt.Fprintf(w, "%s is still declared in %s and now uses its declared default.\n", res.Name, res.Manifest)
 	case res.Remainder == envschema.RemainderSupplied:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, and now resolves from %s.\n", res.Name, res.Manifest, res.Source)
+		_, err = fmt.Fprintf(w, "%s is still declared in %s and now resolves from the %s.\n", res.Name, res.Manifest, vaultenv.SourceLabel(res.Source))
 	}
 	if err == nil && res.Workspace != "" {
 		_, err = fmt.Fprintf(w, "It may still come from workspace %s, which a delete does not read.\n", res.Workspace)
@@ -1237,6 +1247,12 @@ func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 // so a narrowed list reports exactly what the full one would have for that
 // kind, resolution order and all.
 func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error {
+	// wide is text with more columns. The output field goes back to text
+	// before anything builds a Renderer, which renders text and json only.
+	wide := c.output == formatWide
+	if wide {
+		c.output = cliout.FormatText
+	}
 	r := c.renderer()
 	projectDir, _ := c.discoverProject() //nolint:errcheck // outside a project, list still shows the global vault
 	m, schema, err := c.loadManifestSchema(projectDir)
@@ -1284,7 +1300,11 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 		items = kept
 	}
 	return emitRows(r, items, len(items), newEnvList, func(w io.Writer, items []localenv.ListItem) error {
-		return renderEnvList(w, items, only)
+		if err := renderEnvList(w, items, only, projectDir != "", wide); err != nil {
+			return err
+		}
+		cliout.PrintNextSteps(c.d.Stderr, envListNextSteps(items, projectDir != ""))
+		return nil
 	})
 }
 
@@ -1309,27 +1329,27 @@ func (c *cli) listOptions(projectDir string, m *manifest.Manifest) localenv.List
 	return opts
 }
 
+// formatWide is env list's extra --output format: the text table with the
+// columns a plain list leaves out.
+const formatWide cliout.Format = "wide"
+
 // renderEnvList prints the table. only names the kind the rows were narrowed
-// to, or is empty for the cross-kind view; it exists for the empty case, where
-// the cross-kind wording ("no entries in any .env") is simply false when the
-// project holds values of the other kinds.
-func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) error {
+// to, or is empty for the cross-kind view; it exists for the empty case.
+// inProject is false outside a project, where nothing is declared, so no row
+// is marked "not declared". wide adds REQUIRED and SECRET, and DESCRIPTION,
+// and gives an invalid key's rule in its STATUS. The commands that settle the
+// statuses are next steps, printed on stderr after the table.
+//
+// Rows are in listOrder, so the declared values come first and the ones that
+// need attention lead each group. The JSON keeps the listing's own order.
+func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, inProject, wide bool) error {
 	if len(items) == 0 {
 		if only != "" {
-			_, err := fmt.Fprintf(w, "No %ss declared, and none in any .env.\n", localenv.Noun(only))
+			_, err := fmt.Fprintf(w, "No %ss declared or set.\n", localenv.Noun(only))
 			return err
 		}
-		_, err := fmt.Fprintln(w, "No declared env values and no entries in any .env.")
+		_, err := fmt.Fprintln(w, "No values declared or set.")
 		return err
-	}
-	// DESCRIPTION is a column only when some row has one, so a project that
-	// writes no descriptions keeps the four-column table.
-	described := false
-	for i := range items {
-		if items[i].Description != "" {
-			described = true
-			break
-		}
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	// The KIND cell names the subcommand that manages the value, the same as
@@ -1337,68 +1357,163 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 	// env/conn/var, because that one is a wire contract; this one is a table a
 	// person reads, and printing `var` for an Airflow Variable contradicts the
 	// grammar, where `var` is an alias for a plain environment variable.
-	header := "KIND\tNAME\tSOURCE\tNOTE"
-	if described {
-		header += "\tDESCRIPTION"
+	header := "KIND\tNAME\tSOURCE\tSTATUS"
+	if wide {
+		header += "\tREQUIRED\tSECRET\tDESCRIPTION"
 	}
 	fmt.Fprintln(tw, header)
-	for i := range items {
-		it := &items[i]
-		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, listNote(it))
-		if described {
-			// Collapsed to one line: a TOML multi-line string would otherwise
-			// break the row out of the table.
-			row += "\t" + strings.Join(strings.Fields(it.Description), " ")
+	for _, r := range listOrder(items, inProject) {
+		it, n := r.item, r.status
+		// The store's text label; the JSON row keeps the source as it is.
+		source := vaultenv.SourceLabel(it.Source)
+		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, source, n.state)
+		if wide {
+			// The description is collapsed to one line: a TOML multi-line
+			// string would otherwise break the row out of the table.
+			row = fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, source, n.wideState,
+				yesOrBlank(it.Required), yesOrBlank(it.Secret), strings.Join(strings.Fields(it.Description), " "))
 		}
 		fmt.Fprintln(tw, row)
 	}
 	return tw.Flush()
 }
 
-// listNote is a list row's NOTE cell.
-func listNote(it *localenv.ListItem) string {
-	note := ""
+// statusKind is what a list row's STATUS says about it.
+type statusKind int
+
+const (
+	statusNone statusKind = iota
+	statusMissing
+	statusNotSet
+	statusNotLinked
+	statusNotDeclared
+	statusInvalid
+)
+
+// rowStatus is what a list row's STATUS says: the short state a plain list
+// prints, the longer one a wide list prints in its place (an invalid key's
+// rule), and the next step that settles it, if the row has one.
+type rowStatus struct {
+	kind             statusKind
+	state, wideState string
+	step             cliout.NextStep
+}
+
+// statusFor decides a row's status in one place, so a state and its next step
+// cannot disagree. A row that needs no attention gets the zero rowStatus, and
+// an optional value nothing sets gets a state but no step. Where a status has
+// two ways out the step names the first; the JSON rows carry both as hint
+// fields. An orphan in another project, which only --all reaches, gets no
+// step: delete acts on the working directory's project, so ListItem leaves
+// its hints empty rather than name a command that edits the wrong file.
+func statusFor(it *localenv.ListItem, inProject bool) rowStatus {
+	var n rowStatus
 	switch {
 	case it.Invalid != "":
-		note = it.Invalid
-		if it.Project != "" {
-			note += " (in " + it.Project + ")"
-		} else if it.RemoveHint != "" {
-			note += " (remove: " + it.RemoveHint + ")"
+		n = rowStatus{
+			kind: statusInvalid, state: "invalid key", wideState: it.Invalid,
+			step: cliout.NextStep{Why: "Delete " + it.Name + ", whose key is no longer valid", Command: it.RemoveHint},
 		}
 	case it.NotLinkedHere && it.LinksDown != "":
-		note = "not linked here: " + it.LinksDown
+		n = rowStatus{kind: statusNotLinked, state: notLinkedState(inProject) + " (" + it.LinksDown + ")"}
+	case it.NotLinkedHere && !inProject:
+		// Outside a project there is nothing to link it to, so no step.
+		n = rowStatus{kind: statusNotLinked, state: notLinkedState(false)}
 	case it.NotLinkedHere:
-		note = "not linked here (link: " + it.LinkHint + ")"
+		n = rowStatus{
+			kind: statusNotLinked, state: notLinkedState(true),
+			step: cliout.NextStep{Why: "Link " + it.Name + " so this project gets it", Command: it.LinkHint},
+		}
+	case it.SetHint != "" && it.UndeclareHint != "" && it.Required:
+		n = rowStatus{
+			kind: statusMissing, state: "declared but missing",
+			step: cliout.NextStep{Why: "Set " + it.Name + " so astro local start can run", Command: it.SetHint},
+		}
 	case it.SetHint != "" && it.UndeclareHint != "":
-		note = "declared, no value; set: " + it.SetHint + "; or remove the declaration: " + it.UndeclareHint
-	case it.Orphan && it.Applied != nil && *it.Applied && it.DeclareHint != "":
-		// The value reaches Airflow already, so declaring it only makes it
-		// a requirement the project states.
-		note = "not declared (declare it to make it a requirement: " + it.DeclareHint + ")"
-		if it.RemoveHint != "" {
-			note += "; remove: " + it.RemoveHint
+		n = rowStatus{kind: statusNotSet, state: "declared but not set (optional)"}
+	case it.Orphan && inProject:
+		n = rowStatus{
+			kind: statusNotDeclared, state: "not declared",
+			step: cliout.NextStep{Why: "Declare " + it.Name + " so every copy of the project requires it", Command: it.DeclareHint},
 		}
-	case it.Orphan:
-		note = "undeclared"
-		// An orphan found under --all lives in another project's file, and
-		// says which. There is no command to offer for one: delete acts on
-		// the working directory's project, so a hint would name a command
-		// that edits the wrong file, which is why ListItem leaves
-		// RemoveHint empty for these. The label follows the hint rather
-		// than being printed regardless, or the row reads "remove: " with
-		// nothing after it.
-		if it.Project != "" {
-			note += " in " + it.Project
-		}
-		switch {
-		case it.DeclareHint != "" && it.RemoveHint != "":
-			note += "; declare: " + it.DeclareHint + " (or remove: " + it.RemoveHint + ")"
-		case it.RemoveHint != "":
-			note += "; remove: " + it.RemoveHint
+	default:
+		return rowStatus{}
+	}
+	if n.wideState == "" {
+		n.wideState = n.state
+	}
+	if it.Project != "" {
+		n.state += " (in " + it.Project + ")"
+		n.wideState += " (in " + it.Project + ")"
+	}
+	if n.step.Command == "" {
+		n.step = cliout.NextStep{}
+	}
+	return n
+}
+
+// notLinkedState is the STATUS of a global that does not reach the current
+// checkout: one linked to other projects, or behind a link index that cannot
+// be read. Outside a project there is no "this project" for it to miss.
+func notLinkedState(inProject bool) string {
+	if inProject {
+		return "not linked to this project"
+	}
+	return "linked to other projects"
+}
+
+// The order of a text list's rows: the declared values first, those needing
+// attention before those that do not, then the values nothing declares, the
+// ones a start passes before the ones it cannot use. Rows of one rank keep
+// the listing's order, kind then name.
+var (
+	declaredOrder   = map[statusKind]int{statusMissing: 0, statusNotSet: 1, statusNotLinked: 2, statusNone: 3}
+	undeclaredOrder = map[statusKind]int{statusNotDeclared: 4, statusNotLinked: 5, statusInvalid: 6, statusNone: 7}
+)
+
+// orderedRow is a list row with its status, in the order the table prints.
+type orderedRow struct {
+	item   *localenv.ListItem
+	status rowStatus
+}
+
+// listOrder is items with their statuses, in the order the text table and its
+// next steps use.
+func listOrder(items []localenv.ListItem, inProject bool) []orderedRow {
+	rows := make([]orderedRow, len(items))
+	rank := make(map[*localenv.ListItem]int, len(items))
+	for i := range items {
+		it := &items[i]
+		s := statusFor(it, inProject)
+		rows[i] = orderedRow{it, s}
+		if it.Declared {
+			rank[it] = declaredOrder[s.kind]
+		} else {
+			rank[it] = undeclaredOrder[s.kind]
 		}
 	}
-	return note
+	slices.SortStableFunc(rows, func(a, b orderedRow) int { return rank[a.item] - rank[b.item] })
+	return rows
+}
+
+// envListNextSteps are the next steps under a text list: one per row that has
+// one, in the table's order, so a missing declared value comes first.
+func envListNextSteps(items []localenv.ListItem, inProject bool) cliout.NextSteps {
+	out := cliout.NextSteps{More: cliout.NextStep{Why: "marked in the STATUS column above"}}
+	for _, r := range listOrder(items, inProject) {
+		if r.status.step.Command != "" {
+			out.Steps = append(out.Steps, r.status.step)
+		}
+	}
+	return out
+}
+
+// yesOrBlank is a wide list's REQUIRED or SECRET cell.
+func yesOrBlank(b bool) string {
+	if b {
+		return "yes"
+	}
+	return ""
 }
 
 // envStore resolves the flags to the one store a set/get/delete acts on,

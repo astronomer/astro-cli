@@ -54,7 +54,7 @@ const (
 
 const noSyncHelp = "With nothing running, use the project's virtualenv as it is instead of building or updating it first (also set by UV_NO_SYNC)"
 
-const withWorkspaceHelp = "With Airflow stopped, fetch the values declared source = \"workspace\" from the Environment Manager, as a start does (needs network and astro login)"
+const withWorkspaceHelp = "With Airflow stopped, fetch the values declared to come from the Workspace from the Environment Manager, as a start does (needs network and astro login)"
 
 // cli carries one command family's invocation state: the deps and the value
 // of its --output flag. Built per family in the constructors below, never
@@ -1301,7 +1301,7 @@ func warnWorkspaceSkipped(r cliout.Renderer, missing []envresolve.Missing) {
 	}
 	emitWarning(r, event{
 		Event: "warning",
-		Text:  fmt.Sprintf("running without %s: declared source = \"workspace\"; pass --%s to fetch %s", strings.Join(names, ", "), flagWithWorkspace, pronoun),
+		Text:  fmt.Sprintf("running without %s, declared to come from the Workspace; pass --%s to fetch %s", strings.Join(names, ", "), flagWithWorkspace, pronoun),
 	})
 }
 

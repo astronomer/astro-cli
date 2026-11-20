@@ -43,7 +43,7 @@ Everything that reaches the project is injected, declared or not:
 
 A name more than one source holds goes to the highest in the chain. To keep a global out of a project, narrow its links; a declaration does not filter.
 
-**Declarations are requirements.** A declared name no source supplies refuses `astro local start` (`--allow-missing` starts without it). Types, enums and `conn_type` are validated and reported as warnings. `astro local env list` shows each undeclared value the project gets, and `astro local check` warns about the local ones, since they will not follow the project to a Deployment or a teammate's clone: a line per value with its source and the two commands `astro local env list` offers for it, one that declares it if the project needs it and one that deletes it if not.
+**Declarations are requirements.** A declared name no source supplies refuses `astro local start` (`--allow-missing` starts without it). Types, enums and `conn_type` are validated and reported as warnings. `astro local env list` shows each undeclared value the project gets, and `astro local check` warns about the local ones, since they will not follow the project to a Deployment or a teammate's clone: a line per value with its source and two commands, one that declares it if the project needs it and one that deletes it if not. `astro local env list` suggests the first as a next step, and its JSON rows carry both (`declare_hint`, `remove_hint`).
 
 **Vault and workspace values stay off disk.** In Docker mode they are passed to the containers through the environment of the compose process, never written into the compose file the CLI generates and never put on a command line. Plain `.env` values are written into that file, as docker-compose would read them anyway. As with any container, `docker inspect` can show a running container's environment.
 
@@ -111,22 +111,34 @@ Prints the value on stdout, the one deliberate reveal. With no scope flag it res
 
 ### `list`
 
-Shows every declared name with the source it resolves from, plus `required`, `secret` and `description`; values are never printed. The sources are:
+Shows every declared name with the source it resolves from, plus `required`, `secret` and `description`; values are never printed. Text names each store for what it is; `--output json` carries the `source` value:
 
-| source | meaning |
-| --- | --- |
-| `project` | the project `.env` |
-| `shell` | an exported variable |
-| `vault` | the project vault |
-| `vault (global)` | the global vault |
-| `workspace (<id>)` | the linked workspace |
-| `workspace (unavailable: <reason>)` | the workspace could not be read |
-| `default` | the declaration's default |
-| `absent` | nothing supplies it |
+| text | JSON `source` | meaning |
+| --- | --- | --- |
+| `.env` | `project` | the project `.env` |
+| `shell` | `shell` | an exported variable |
+| `project vault` | `vault` | the project vault |
+| `global vault` | `vault (global)` | the global vault |
+| `cloud vault` | `workspace (<id>)` | the linked workspace's Environment Manager |
+| `cloud vault (unavailable: <reason>)` | `workspace (unavailable: <reason>)` | the workspace could not be read |
+| `default` | `default` | the declaration's default |
+| *(blank)* | `absent` | nothing supplies it |
 
-A declared name nothing supplies is noted with the `set` and `undeclare` commands to run (`set_hint`, `undeclare_hint` in JSON). A value present in a store that no declaration names is listed too, as an orphan of its tier (`"orphan": true`), with the command that removes it (`remove_hint`). When it reaches this project's Airflow it is noted `not declared (declare it to make it a requirement: …)`, with `"applied": true` and a `declare_hint`, since it is injected already and a declaration would only make the project require it. A global that reaches the project but is shadowed by a project copy carries no mark.
+The `set`, `delete` and `check` messages name stores the same way: `set variable A in project vault`, `deleted variable B from global vault`, and the `.env` by its path.
 
-`--project` and `--global` narrow the list to that scope's stores. `--all` also lists every project `.env` the CLI can find, and globals that do not reach this project, marked `not linked here` with the `link` command (`"not_linked_here": true`, `link_hint`), or with the index problem (`links_down`).
+The text table's STATUS column holds one short state per row, or nothing when the row needs no attention. The declared values come first, those needing attention before the rest, then the values nothing declares; the JSON keeps the listing's order (kind, then name). `-o wide` adds REQUIRED, SECRET and DESCRIPTION columns, and gives an invalid key's rule in its STATUS. On a terminal the commands that settle the statuses follow the table on stderr, as next steps in the table's order (see [Output style](output-style.md#next-steps)):
+
+| status | meaning | next step |
+| --- | --- | --- |
+| `declared but missing` | declared required and nothing supplies it, so a start refuses | `set` |
+| `declared but not set (optional)` | declared optional and nothing supplies it | none |
+| `not declared` | a value in a store that no declaration names | `declare` |
+| `not linked to this project` | a global linked only to other projects (`--all` only; outside a project, `linked to other projects`, with no step) | `link` |
+| `invalid key` | an Airflow Variable key an older build stored, which no longer resolves | `delete` |
+
+In JSON a row carries the same commands as hint fields: `set_hint` and `undeclare_hint` for a declared name nothing supplies; `declare_hint` and `remove_hint` for a value no declaration names, which is an orphan of its tier (`"orphan": true`). An orphan that reaches this project's Airflow also has `"applied": true`. A global the project's own copy shadows does not. Outside a project nothing is declared, so no row is marked `not declared`.
+
+`--project` and `--global` narrow the list to that scope's stores. `--all` also lists every project `.env` the CLI can find, and globals that do not reach this project, marked `not linked to this project` with the `link` command (`"not_linked_here": true`, `link_hint`), or with the index problem (`links_down`).
 
 `list` is built from the schema and source metadata, never from decoded values, so its JSON is value-free and safe for agents. With `--output json` it prints one object with the rows under `entries` (`{"entries": [...]}`, `[]` when there are none); `variable list` and `connection list` print the same shape, narrowed to their kind.
 

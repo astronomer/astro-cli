@@ -180,11 +180,11 @@ func TestSetAndDeleteNameTheStore(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"set", "A", "--value", "x", "--project"}, "set variable A in vault\n"},
-		{[]string{"set", "B", "--value", "x", "--global"}, "set variable B in vault (global)\n"},
-		{[]string{"set", "C", "--value", "x", "--global", "--plain"}, "set variable C in vault (global, unencrypted)\n"},
-		{[]string{"set", "D", "--value", "x", "--plain"}, "set variable D in project (" + filepath.Join(dir, ".env") + ")\n"},
-		{[]string{"delete", "B", "--global", "--plain"}, "deleted variable B from vault (global)\n"},
+		{[]string{"set", "A", "--value", "x", "--project"}, "set variable A in project vault\n"},
+		{[]string{"set", "B", "--value", "x", "--global"}, "set variable B in global vault\n"},
+		{[]string{"set", "C", "--value", "x", "--global", "--plain"}, "set variable C in global vault (unencrypted)\n"},
+		{[]string{"set", "D", "--value", "x", "--plain"}, "set variable D in " + filepath.Join(dir, ".env") + "\n"},
+		{[]string{"delete", "B", "--global", "--plain"}, "deleted variable B from global vault\n"},
 	} {
 		if got := run(tc.args...); !strings.HasPrefix(got, tc.want) {
 			t.Errorf("%v printed %q, want it to start %q", tc.args, got, tc.want)

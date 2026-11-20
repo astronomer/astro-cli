@@ -259,10 +259,10 @@ func TestCheckNotesUndeclaredLocalValues(t *testing.T) {
 	if err := execute(t, d, "local", "check", "--strict"); err != nil {
 		t.Fatalf("an undeclared local value must not fail the check: %v", err)
 	}
-	if !strings.Contains(out.String(), "Warning: 1 value reaches this project only from this machine") {
+	if !strings.Contains(out.String(), "Warning: 1 value is not declared and reaches this project only from this machine") {
 		t.Errorf("want a warning about the undeclared value, got:\n%s", out.String())
 	}
-	line, ok := lineContaining(out.String(), "  connection local_db  project  ")
+	line, ok := lineContaining(out.String(), "  connection local_db  .env  ")
 	if !ok || !strings.Contains(line, "if needed: astro local env connection declare local_db") ||
 		!strings.Contains(line, "if not: astro local env connection delete local_db --project") {
 		t.Errorf("want a row for local_db with its commands, got:\n%s", out.String())

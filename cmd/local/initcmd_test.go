@@ -29,6 +29,8 @@ func initDeps(t *testing.T) (d Deps, dir string, stdout *strings.Builder) {
 
 func TestInitScaffoldsTheWorkingDir(t *testing.T) {
 	d, dir, stdout := initDeps(t)
+	stderr := &strings.Builder{}
+	d.Stderr = stderr
 	if err := execute(t, d, "init"); err != nil {
 		t.Fatalf("astro init: %v", err)
 	}
@@ -38,15 +40,20 @@ func TestInitScaffoldsTheWorkingDir(t *testing.T) {
 		}
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "Created Astro project") || !strings.HasSuffix(out, "Next: "+replaceStart+"\n") {
+	if !strings.Contains(out, "Created Astro project") || strings.Contains(out, "Next:") {
 		t.Errorf("text output incomplete:\n%s", out)
+	}
+	if got := stderr.String(); !strings.HasSuffix(got, "\nNext: "+replaceStart+"\n") {
+		t.Errorf("want the start suggested on stderr:\n%s", got)
 	}
 }
 
 // A kept Dockerfile is built only in Docker mode, so that is the start to
 // suggest: a plain start runs standalone and leaves the file out.
 func TestInitSuggestsDockerForAKeptDockerfile(t *testing.T) {
-	d, dir, stdout := initDeps(t)
+	d, dir, _ := initDeps(t)
+	stderr := &strings.Builder{}
+	d.Stderr = stderr
 	dockerfile := "FROM astrocrpublic.azurecr.io/runtime:3.1-1\nRUN apt-get update && apt-get install -y libpq-dev\n"
 	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(dockerfile), 0o600); err != nil {
 		t.Fatal(err)
@@ -61,22 +68,24 @@ func TestInitSuggestsDockerForAKeptDockerfile(t *testing.T) {
 	if !strings.Contains(string(written), "dockerfile") {
 		t.Fatalf("the case needs init to keep and declare the Dockerfile:\n%s", written)
 	}
-	if out := stdout.String(); !strings.HasSuffix(out, "Next: "+replaceStart+" --docker\n") {
-		t.Errorf("want the Docker-mode start suggested:\n%s", out)
+	if got := stderr.String(); !strings.HasSuffix(got, "Next: "+replaceStart+" --docker\n") {
+		t.Errorf("want the Docker-mode start suggested:\n%s", got)
 	}
 }
 
 // OS packages are the other thing only Docker mode applies.
 func TestInitSuggestsDockerForOSPackages(t *testing.T) {
-	d, dir, stdout := initDeps(t)
+	d, dir, _ := initDeps(t)
+	stderr := &strings.Builder{}
+	d.Stderr = stderr
 	if err := os.WriteFile(filepath.Join(dir, "packages.txt"), []byte("libpq-dev\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := execute(t, d, "init"); err != nil {
 		t.Fatalf("astro init: %v", err)
 	}
-	if out := stdout.String(); !strings.HasSuffix(out, "Next: "+replaceStart+" --docker\n") {
-		t.Errorf("want the Docker-mode start suggested:\n%s", out)
+	if got := stderr.String(); !strings.HasSuffix(got, "Next: "+replaceStart+" --docker\n") {
+		t.Errorf("want the Docker-mode start suggested:\n%s", got)
 	}
 }
 
@@ -628,7 +637,7 @@ func TestRenderInitGroupsTheFileList(t *testing.T) {
 		},
 	}
 	var b strings.Builder
-	if err := renderInit(&b, res, "astro local start"); err != nil {
+	if err := renderInit(&b, res); err != nil {
 		t.Fatal(err)
 	}
 	want := "Adopted Astro project p (Airflow 3.3) in /p\n" +
@@ -643,8 +652,7 @@ func TestRenderInitGroupsTheFileList(t *testing.T) {
 		"  Dockerfile: a pip step installs x. For standalone mode too, run: uv add 'x'\n" +
 		"  Link the Deployments .astro/config.yaml lists:\n" +
 		"    astro link add a --deployment d1 --workspace <workspace-id>\n" +
-		"    astro link add b --deployment d2 --workspace <workspace-id>\n" +
-		"\nNext: astro local start\n"
+		"    astro link add b --deployment d2 --workspace <workspace-id>\n"
 	if got := b.String(); got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}

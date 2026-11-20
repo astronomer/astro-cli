@@ -1002,7 +1002,8 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		fmt.Fprintln(pw)
 		ansi.Note(pw, "Dag-only deploys are now on for this Deployment. Running tasks continue, but no new tasks are scheduled "+
 			"until you deploy its Dags. The Airflow UI can take a few minutes to update")
-		fmt.Fprintf(pw, "%s astro deploy --dags\n\n", ansi.NextLabel(pw))
+		ansi.PrintNextSteps(pw, ansi.NextSteps{Steps: []ansi.NextStep{{Command: "astro deploy --dags"}}, Required: true})
+		fmt.Fprintln(pw)
 		dagDeployEnabled = true
 	case disable:
 		if !currentDeployment.IsDagDeployEnabled {

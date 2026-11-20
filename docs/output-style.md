@@ -32,6 +32,28 @@ no Deployment named "etl" in Workspace analytics; run astro deployment list to s
 
 Use `cliout.Warn` / `cliout.Note` (`ansi.Warn` / `ansi.Note` outside `cmd/`). They add the label, so the message doesn't repeat it. Write one or two short sentences, starting with a capital letter.
 
+## Next steps
+
+A command that suggests what to run after it prints the suggestion through `cliout.PrintNextSteps` (`ansi.PrintNextSteps` outside `cmd/`). Don't write a `Next:` line or a "Run it with:" heading by hand.
+
+```
+Next: astro local start
+
+Next:
+  Set API_URL so astro local start can run:
+    astro local env variable set API_URL
+  Declare GLOBAL_SECRET so every copy of the project requires it:
+    astro local env variable declare GLOBAL_SECRET --secret
+  and 3 more, marked in the STATUS column above.
+```
+
+- **Stderr.** A next step is not the result, so stdout stays exactly the result. Under `--output json` print none, and put the commands in the JSON (a `*_hint` or `next_steps` field) instead.
+- **One step per thing to do.** Give each step a reason (a fragment saying what running it gets the reader) and its exact command. The command goes on a line of its own, so it is never wrapped into prose. A single step with no reason stays on the `Next:` line.
+- **Put the step that unblocks something first.** Where there are two ways out, suggest the likelier one; the JSON carries both.
+- **Five at most.** Past five, the helper counts the rest ("and 3 more"). Set `More` to say where they are, or to give the command that lists them all.
+- **Optional unless the run cannot be finished without it.** An optional step prints only when stderr is a terminal, and `ASTRO_GUIDANCE_DISABLED=1` turns it off. Mark a step `Required` only when skipping it leaves something broken, as turning on Dag-only deploys does until the Dags are deployed. A required step always prints. Recovery from a failure belongs in the error itself, not in a next step.
+- **Only for a state that applies now.** Suggest a command only when the run's own result calls for it. Never "try again" with nothing to run.
+
 ## Success lines
 
 Use the past tense, the object, then its name. Don't add "Successfully" or "was successfully".
