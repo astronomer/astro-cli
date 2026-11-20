@@ -73,14 +73,39 @@ func WriteDarwinForkSafetyPatch(venvPath string) error {
 			continue
 		}
 
-		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.py"), darwinForkSafetyPy, FilePermissions); err != nil {
+		if err := writeFresh(filepath.Join(sitePackages, "_fix_setproctitle.py"), darwinForkSafetyPy); err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Join(sitePackages, "_fix_setproctitle.pth"), darwinForkSafetyPth, FilePermissions); err != nil {
+		if err := writeFresh(filepath.Join(sitePackages, "_fix_setproctitle.pth"), darwinForkSafetyPth); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// writeFresh writes data to name as a new file of its own, with
+// FilePermissions. Whatever is already there that is not a directory is
+// removed first, a symlink included (the link goes, not what it points at),
+// and the file is then created with O_EXCL, so the write never goes through
+// a link to somewhere outside the venv. The names are the CLI's, not the
+// project's, as fileutil's archives are.
+func writeFresh(name string, data []byte) (err error) {
+	if info, lerr := os.Lstat(name); lerr == nil && !info.IsDir() {
+		if err := os.Remove(name); err != nil {
+			return err
+		}
+	}
+	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, FilePermissions)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}()
+	_, err = f.Write(data)
+	return err
 }
 
 // RemoveDarwinForkSafetyPatch undoes WriteDarwinForkSafetyPatch. A venv that
