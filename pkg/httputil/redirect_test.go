@@ -1,8 +1,10 @@
 package httputil
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -132,4 +134,66 @@ func TestRefuseDowngradesStopsAClientWithTheDefaultPolicy(t *testing.T) {
 	require.NoError(t, err)
 	resp.Body.Close()
 	assert.Equal(t, "/new", resp.Request.URL.Path)
+}
+
+// recordingTransport answers every request it is sent with 200, and counts
+// them.
+type recordingTransport struct{ sent int }
+
+func (r *recordingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	r.sent++
+	return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Request: req}, nil
+}
+
+// closeTracker is a request body that remembers being closed.
+type closeTracker struct {
+	io.Reader
+	closed bool
+}
+
+func (c *closeTracker) Close() error { c.closed = true; return nil }
+
+// The guard judges each hop by the one before it: a hop that leaves https is
+// refused wherever it falls in a chain (the last of http, https, http too),
+// unsent and with its body closed. A request that is not a redirect's, or
+// whose redirect names no request, goes on as it is.
+func TestRefuseDowngradesJudgesEachHop(t *testing.T) {
+	hop := func(scheme string) *http.Request {
+		return &http.Request{URL: &url.URL{Scheme: scheme, Host: "airflow.invalid", Path: "/"}}
+	}
+	redirectFrom := func(prev *http.Request) *http.Response {
+		return &http.Response{StatusCode: http.StatusTemporaryRedirect, Request: prev}
+	}
+	for _, tc := range []struct {
+		name    string
+		from    *http.Response
+		scheme  string
+		refused bool
+	}{
+		{"https to http", redirectFrom(hop("https")), "http", true},
+		{"http, https, then http", redirectFrom(&http.Request{URL: hop("https").URL, Response: redirectFrom(hop("http"))}), "http", true},
+		{"https to https", redirectFrom(hop("https")), "https", false},
+		{"http to http", redirectFrom(hop("http")), "http", false},
+		{"a redirect that names no request", &http.Response{StatusCode: http.StatusFound}, "http", false},
+		{"not a redirect's request", nil, "http", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			next := &recordingTransport{}
+			body := &closeTracker{Reader: strings.NewReader("password=pw")}
+			req := hop(tc.scheme)
+			req.Method, req.Header, req.Body, req.Response = http.MethodPost, http.Header{}, body, tc.from
+
+			resp, err := RefuseDowngrades(next).RoundTrip(req)
+			if tc.refused {
+				require.ErrorIs(t, err, ErrDowngradeRedirect)
+				assert.Nil(t, resp)
+				assert.Zero(t, next.sent, "the refused request was sent")
+				assert.True(t, body.closed, "the refused request's body was left open")
+				return
+			}
+			require.NoError(t, err)
+			resp.Body.Close()
+			assert.Equal(t, 1, next.sent)
+		})
+	}
 }

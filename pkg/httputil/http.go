@@ -77,6 +77,13 @@ func RefuseDowngradeRedirect(req *http.Request, via []*http.Request) error {
 // http.Client) cannot follow such a redirect with it. A transport sees a
 // redirect's request by its Response, the redirect that caused it, which
 // net/http sets only while following one.
+//
+// It judges each hop by the one before it, so it refuses any hop that leaves
+// https, wherever in the chain: http to https to http too, which
+// RefuseDowngradeRedirect, judging by the first request, follows. A request
+// that reached an https hop carries what it carried there, and plain http is
+// no place to send it on to. Loopback is no exception: a local https endpoint
+// that redirects to its http twin is refused too.
 func RefuseDowngrades(next http.RoundTripper) http.RoundTripper {
 	return downgradeGuard{next: next}
 }
