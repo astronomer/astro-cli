@@ -326,9 +326,9 @@ func TestEnvListMarksNotLinkedHere(t *testing.T) {
 	if !regexp.MustCompile(`(?m)^connection +warehouse +vault \(global\) +not linked here$`).MatchString(out) {
 		t.Errorf("text list:\n%s", out)
 	}
-	out, _ = mustRun(t, dir, "connection", "list", "--all", "-o", "wide")
-	if !regexp.MustCompile(`(?m)^connection +warehouse +vault \(global\) +not linked here: astro local env connection link warehouse$`).MatchString(out) {
-		t.Errorf("text list:\n%s", out)
+	if _, errOut := mustRun(t, dir, "connection", "list", "--all"); !strings.Contains(errOut,
+		"  Link warehouse so this project gets it:\n    astro local env connection link warehouse\n") {
+		t.Errorf("next steps:\n%s", errOut)
 	}
 
 	_, _, err := run(t, dir, "connection", "get", "warehouse")

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/zalando/go-keyring"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 )
@@ -336,9 +337,9 @@ func TestStartMissingEnvHint(t *testing.T) {
 }
 
 // The NOTE cell is one short state, and the list prints nothing under the
-// table. -o wide adds REQUIRED, SECRET and DESCRIPTION, and moves NOTE last
-// with the commands that settle it. An orphan in another project (which only
-// --all reaches) gets no command: `astro
+// table. -o wide adds REQUIRED, SECRET and DESCRIPTION, and the commands
+// that settle the notes are next steps. An orphan in another project (which
+// only --all reaches) gets no command: `astro
 // local env <noun> delete` acts on the working directory's project, so any
 // command offered for it would edit the wrong file.
 func TestEnvListNotes(t *testing.T) {
@@ -397,16 +398,32 @@ func TestEnvListNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	want = "" +
-		"KIND      NAME        SOURCE          REQUIRED  SECRET  DESCRIPTION          NOTE\n" +
-		"variable  API_URL     absent          yes       yes     Where the API lives  missing: astro local env variable set API_URL, or astro local env variable undeclare API_URL\n" +
-		"variable  DECLARED    project         yes                                    \n" +
-		"variable  ELSEWHERE   project                                                not declared (in /projects/other)\n" +
-		"variable  GLOBALONLY  vault (global)                                         not declared: astro local env variable delete GLOBALONLY --global\n" +
-		"variable  LEFTOVER    project                                                not declared: astro local env variable declare LEFTOVER, or astro local env variable delete LEFTOVER --project\n" +
-		"variable  LOG_LEVEL   absent                                                 no value: astro local env variable set LOG_LEVEL, or astro local env variable undeclare LOG_LEVEL\n" +
-		"variable  TOKEN       absent                                                 not linked here: astro local env variable link TOKEN\n"
+		"KIND      NAME        SOURCE          NOTE                               REQUIRED  SECRET  DESCRIPTION\n" +
+		"variable  API_URL     absent          missing                            yes       yes     Where the API lives\n" +
+		"variable  DECLARED    project                                            yes               \n" +
+		"variable  ELSEWHERE   project         not declared (in /projects/other)                    \n" +
+		"variable  GLOBALONLY  vault (global)  not declared                                         \n" +
+		"variable  LEFTOVER    project         not declared                                         \n" +
+		"variable  LOG_LEVEL   absent          no value                                             \n" +
+		"variable  TOKEN       absent          not linked here                                      \n"
 	if out.String() != want {
 		t.Errorf("list -o wide =\n%s\nwant\n%s", out.String(), want)
+	}
+
+	// The next steps: one per row with a command, the one that unblocks a
+	// start first. An optional value nothing sets (LOG_LEVEL) gets none, and
+	// neither does a row with no command to offer (ELSEWHERE, GLOBALONLY).
+	out.Reset()
+	cliout.PrintNextSteps(&out, envListNextSteps(items, true))
+	want = "\nNext:\n" +
+		"  Set API_URL so astro local start can run:\n" +
+		"    astro local env variable set API_URL\n" +
+		"  Link TOKEN so this project gets it:\n" +
+		"    astro local env variable link TOKEN\n" +
+		"  Declare LEFTOVER so every copy of the project requires it:\n" +
+		"    astro local env variable declare LEFTOVER\n"
+	if out.String() != want {
+		t.Errorf("next steps =\n%s\nwant\n%s", out.String(), want)
 	}
 
 	// Outside a project nothing is declared, so no row is marked not declared.

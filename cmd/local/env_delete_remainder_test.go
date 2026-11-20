@@ -275,13 +275,11 @@ func TestDeleteRemainderDoesNotReadTheWorkspace(t *testing.T) {
 func TestListNotesAnUnsuppliedWorkspaceName(t *testing.T) {
 	dir := envProject(t, "\n[tool.astro.env]\nAPI_URL = { source = 'workspace', optional = true }\n")
 
-	d, out, _ := envDeps(t, dir, "")
+	d, out, stderr := envDeps(t, dir, "")
 	require.NoError(t, execute(t, d, "local", "env", "list"))
 	assert.Regexp(t, `(?m)^variable +API_URL +workspace +no value$`, out.String())
-
-	d, out, _ = envDeps(t, dir, "")
-	require.NoError(t, execute(t, d, "local", "env", "list", "-o", "wide"))
-	assert.Regexp(t, `(?m)^variable +API_URL +workspace +no value: astro local env variable set API_URL, or astro local env variable undeclare API_URL$`, out.String())
+	// An optional value nothing sets needs no step.
+	assert.NotContains(t, stderr.String(), "Next:")
 }
 
 func TestDeleteUndeclareJSON(t *testing.T) {

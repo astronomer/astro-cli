@@ -570,8 +570,9 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			"value a start passes to this project that is not declared. Airflow gets both. " +
 			"Declaring a name makes every copy of the project require it, and linking limits which " +
 			"projects a global reaches. The NOTE column marks rows that need attention: missing, " +
-			"no value, not declared, not linked here, or invalid key. -o wide adds whether each is " +
-			"required and secret, its description, and the commands that settle its note. " +
+			"no value, not declared, not linked here, or invalid key. On a terminal, the commands " +
+			"that settle them follow the table as next steps (ASTRO_GUIDANCE_DISABLED=1 turns them " +
+			"off). -o wide adds whether each value is required and secret, and its description. " +
 			"Values are not shown; use the get command to see one."
 	}
 	cmd := &cobra.Command{
@@ -581,7 +582,7 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		Long:    long,
 		Example: "  # " + short + "\n" +
 			"  " + cmdLine + "\n\n" +
-			"  # With each declaration's description, and the commands that settle each note\n" +
+			"  # Also whether each value is required and secret, and its description\n" +
 			"  " + cmdLine + " -o wide\n\n" +
 			"  # Also every known project's .env, and globals not linked to this project\n" +
 			"  " + cmdLine + " --all",
@@ -1298,7 +1299,11 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 		items = kept
 	}
 	return emitRows(r, items, len(items), newEnvList, func(w io.Writer, items []localenv.ListItem) error {
-		return renderEnvList(w, items, only, projectDir != "", wide)
+		if err := renderEnvList(w, items, only, projectDir != "", wide); err != nil {
+			return err
+		}
+		cliout.PrintNextSteps(c.d.Stderr, envListNextSteps(items, projectDir != ""))
+		return nil
 	})
 }
 
@@ -1330,8 +1335,9 @@ const formatWide cliout.Format = "wide"
 // renderEnvList prints the table. only names the kind the rows were narrowed
 // to, or is empty for the cross-kind view; it exists for the empty case.
 // inProject is false outside a project, where nothing is declared, so no row
-// is marked "not declared". wide adds REQUIRED, SECRET and DESCRIPTION,
-// and the commands that settle each note.
+// is marked "not declared". wide adds REQUIRED and SECRET, and
+// DESCRIPTION, and gives an invalid key's rule in its NOTE. The commands that
+// settle the notes are next steps, printed on stderr after the table.
 func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, inProject, wide bool) error {
 	if len(items) == 0 {
 		if only != "" {
@@ -1351,54 +1357,79 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, i
 	// out of view.
 	header := "KIND\tNAME\tSOURCE\tNOTE"
 	if wide {
-		header = "KIND\tNAME\tSOURCE\tREQUIRED\tSECRET\tDESCRIPTION\tNOTE"
+		header += "\tREQUIRED\tSECRET\tDESCRIPTION"
 	}
 	fmt.Fprintln(tw, header)
 	for i := range items {
 		it := &items[i]
-		row := fmt.Sprintf("%s\t%s\t%s\t", localenv.Noun(it.Kind), it.Name, it.Source)
+		n := noteFor(it, inProject)
+		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, n.state)
 		if wide {
 			// The description is collapsed to one line: a TOML multi-line
 			// string would otherwise break the row out of the table.
-			row += fmt.Sprintf("%s\t%s\t%s\t%s", yesOrBlank(it.Required), yesOrBlank(it.Secret),
-				strings.Join(strings.Fields(it.Description), " "), wideNote(it, inProject))
-		} else {
-			row += listNote(it, inProject)
+			row = fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, n.wideState,
+				yesOrBlank(it.Required), yesOrBlank(it.Secret), strings.Join(strings.Fields(it.Description), " "))
 		}
 		fmt.Fprintln(tw, row)
 	}
 	return tw.Flush()
 }
 
-// rowNote is what a list row's NOTE says: the short state the plain list
+// noteRank orders a list's next steps: the one that unblocks a start first.
+type noteRank int
+
+const (
+	rankNone noteRank = iota
+	rankMissing
+	rankInvalid
+	rankNotLinked
+	rankNotDeclared
+	rankNoValue
+)
+
+// rowNote is what a list row's NOTE says: the short state a plain list
 // prints, the longer one a wide list prints in its place (an invalid key's
-// rule), and the commands a wide list adds after it.
+// rule), and the next step that settles it, if the row has one.
 type rowNote struct {
+	rank             noteRank
 	state, wideState string
-	commands         []string
+	step             cliout.NextStep
 }
 
-// noteFor decides a row's note in one place, so a state and its commands
-// cannot disagree. A row that needs no attention gets the zero rowNote. An
-// orphan in another project, which only --all reaches, gets no command:
-// delete acts on the working directory's project, so ListItem leaves its
-// hints empty rather than name a command that edits the wrong file.
+// noteFor decides a row's note in one place, so a state and its next step
+// cannot disagree. A row that needs no attention gets the zero rowNote, and
+// an optional value nothing sets gets a note but no step. Where a note has
+// two ways out the step names the first; the JSON rows carry both as hint
+// fields. An orphan in another project, which only --all reaches, gets no
+// step: delete acts on the working directory's project, so ListItem leaves
+// its hints empty rather than name a command that edits the wrong file.
 func noteFor(it *localenv.ListItem, inProject bool) rowNote {
 	var n rowNote
 	switch {
 	case it.Invalid != "":
-		n = rowNote{state: "invalid key", wideState: it.Invalid, commands: []string{it.RemoveHint}}
-	case it.NotLinkedHere && it.LinksDown != "":
-		n = rowNote{state: "not linked here (" + it.LinksDown + ")"}
-	case it.NotLinkedHere:
-		n = rowNote{state: "not linked here", commands: []string{it.LinkHint}}
-	case it.SetHint != "" && it.UndeclareHint != "":
-		n = rowNote{state: "no value", commands: []string{it.SetHint, it.UndeclareHint}}
-		if it.Required {
-			n.state = "missing"
+		n = rowNote{
+			rank: rankInvalid, state: "invalid key", wideState: it.Invalid,
+			step: cliout.NextStep{Why: "Delete " + it.Name + ", whose key is no longer valid", Command: it.RemoveHint},
 		}
+	case it.NotLinkedHere && it.LinksDown != "":
+		n = rowNote{rank: rankNotLinked, state: "not linked here (" + it.LinksDown + ")"}
+	case it.NotLinkedHere:
+		n = rowNote{
+			rank: rankNotLinked, state: "not linked here",
+			step: cliout.NextStep{Why: "Link " + it.Name + " so this project gets it", Command: it.LinkHint},
+		}
+	case it.SetHint != "" && it.UndeclareHint != "" && it.Required:
+		n = rowNote{
+			rank: rankMissing, state: "missing",
+			step: cliout.NextStep{Why: "Set " + it.Name + " so astro local start can run", Command: it.SetHint},
+		}
+	case it.SetHint != "" && it.UndeclareHint != "":
+		n = rowNote{rank: rankNoValue, state: "no value"}
 	case it.Orphan && inProject:
-		n = rowNote{state: "not declared", commands: []string{it.DeclareHint, it.RemoveHint}}
+		n = rowNote{
+			rank: rankNotDeclared, state: "not declared",
+			step: cliout.NextStep{Why: "Declare " + it.Name + " so every copy of the project requires it", Command: it.DeclareHint},
+		}
 	default:
 		return rowNote{}
 	}
@@ -1409,23 +1440,31 @@ func noteFor(it *localenv.ListItem, inProject bool) rowNote {
 		n.state += " (in " + it.Project + ")"
 		n.wideState += " (in " + it.Project + ")"
 	}
-	n.commands = slices.DeleteFunc(n.commands, func(c string) bool { return c == "" })
+	if n.step.Command == "" {
+		n.step = cliout.NextStep{}
+	}
 	return n
 }
 
-// listNote is a plain list's NOTE cell: one short state, or nothing.
-func listNote(it *localenv.ListItem, inProject bool) string {
-	return noteFor(it, inProject).state
-}
-
-// wideNote is a wide list's NOTE cell: the state, then the commands that
-// settle it, as "missing: <set>, or <undeclare>".
-func wideNote(it *localenv.ListItem, inProject bool) string {
-	n := noteFor(it, inProject)
-	if len(n.commands) == 0 {
-		return n.wideState
+// envListNextSteps are the next steps under a text list: one per row that has
+// one, the steps that unblock a start first, each in row order.
+func envListNextSteps(items []localenv.ListItem, inProject bool) cliout.NextSteps {
+	type ranked struct {
+		rank noteRank
+		step cliout.NextStep
 	}
-	return n.wideState + ": " + strings.Join(n.commands, ", or ")
+	var all []ranked
+	for i := range items {
+		if n := noteFor(&items[i], inProject); n.step.Command != "" {
+			all = append(all, ranked{n.rank, n.step})
+		}
+	}
+	slices.SortStableFunc(all, func(a, b ranked) int { return int(a.rank) - int(b.rank) })
+	out := cliout.NextSteps{More: cliout.NextStep{Why: "marked in the NOTE column above"}}
+	for _, r := range all {
+		out.Steps = append(out.Steps, r.step)
+	}
+	return out
 }
 
 // yesOrBlank is a wide list's REQUIRED or SECRET cell.
