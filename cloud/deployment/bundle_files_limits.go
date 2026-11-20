@@ -128,8 +128,12 @@ func isBundlePathRune(r rune) bool {
 	return false
 }
 
-// bundleDeletePrefix begins the name of a tar entry that deletes the path after it rather than writing a file.
-const bundleDeletePrefix = "__DEL__"
+// Each of these begins the name of a tar entry that edits the path after it rather than writing a file.
+const (
+	bundleDeletePrefix = "__DEL__"
+	bundleMovePrefix   = "__MV__"
+	bundleCopyPrefix   = "__CP__"
+)
 
 // bundleEditPrefixes are the prefixes a directory write reserves at the start of every path segment.
-var bundleEditPrefixes = []string{bundleDeletePrefix}
+var bundleEditPrefixes = []string{bundleDeletePrefix, bundleMovePrefix, bundleCopyPrefix}

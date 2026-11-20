@@ -16,17 +16,18 @@ import (
 func (s *Suite) TestBundleLimits() {
 	s.Run("a copy names every file that breaks a limit, before making any request", func() {
 		fromDir := s.T().TempDir()
-		writeLocalFiles(s, fromDir, map[string]string{"ok.py": "ok", "my report.sql": "x", "__DEL__x.py": ""})
+		writeLocalFiles(s, fromDir, map[string]string{"ok.py": "ok", "my report.sql": "x", "__DEL__x.py": "", "lib/__MV__y.py": ""})
 		s.NoError(os.WriteFile(filepath.Join(fromDir, "big.bin"), make([]byte, maxBundleFileBytes+1), 0o600))
 
 		err := CopyBundleFiles(fromDir, "my-files:dags", &BundleCopyOptions{Recursive: true}, ws, testBundleDeploymentID, &bytes.Buffer{}, mockV1Client, new(astrov1alpha1_mocks.ClientWithResponsesInterface), s.streamClient())
 		var limitErr *bundleLimitError
 		s.ErrorAs(err, &limitErr)
-		s.Len(limitErr.faults, 3)
+		s.Len(limitErr.faults, 4)
 		s.ErrorContains(err, "nothing was written, because these break the bundle limits:\n")
 		s.ErrorContains(err, filepath.Join(fromDir, "big.bin")+" is 1048577 bytes, past the 1048576 a bundle file may hold")
 		s.ErrorContains(err, filepath.Join(fromDir, "my report.sql")+": its bundle path dags/my report.sql may hold only ASCII letters, digits, '/', '.', '_' and '-'")
 		s.ErrorContains(err, `its bundle path dags/__DEL__x.py has a segment beginning "__DEL__", which a directory write reserves`)
+		s.ErrorContains(err, `its bundle path dags/lib/__MV__y.py has a segment beginning "__MV__", which a directory write reserves`)
 	})
 
 	s.Run("counts the bundle directory in a path's length", func() {
