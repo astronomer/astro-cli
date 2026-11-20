@@ -124,9 +124,9 @@ Shows every declared name with the source it resolves from, plus `required`, `se
 | `default` | the declaration's default |
 | `absent` | nothing supplies it (blank in the text table) |
 
-The text table's NOTE column holds one short state per row, or nothing when the row needs no attention. `-o wide` adds REQUIRED, SECRET and DESCRIPTION columns, and gives an invalid key's rule in its NOTE. On a terminal the commands that settle the notes follow the table on stderr, as next steps (see [Output style](output-style.md#next-steps)), the missing values first:
+The text table's STATUS column holds one short state per row, or nothing when the row needs no attention. The declared values come first, those needing attention before the rest, then the values nothing declares; the JSON keeps the listing's order (kind, then name). `-o wide` adds REQUIRED, SECRET and DESCRIPTION columns, and gives an invalid key's rule in its STATUS. On a terminal the commands that settle the statuses follow the table on stderr, as next steps in the table's order (see [Output style](output-style.md#next-steps)):
 
-| note | meaning | next step |
+| status | meaning | next step |
 | --- | --- | --- |
 | `declared but missing` | declared required and nothing supplies it, so a start refuses | `set` |
 | `declared but not set (optional)` | declared optional and nothing supplies it | none |

@@ -45,14 +45,14 @@ func TestPrintNextStepsLayout(t *testing.T) {
 		},
 		{
 			"past the cap the rest are counted, and More says where they are",
-			NextSteps{Steps: steps(7), More: NextStep{Why: "marked in the NOTE column above"}},
+			NextSteps{Steps: steps(7), More: NextStep{Why: "marked in the STATUS column above"}},
 			"\nNext:\n" +
 				"  Set V0 so astro local start can run:\n    astro local env variable set V0\n" +
 				"  Set V1 so astro local start can run:\n    astro local env variable set V1\n" +
 				"  Set V2 so astro local start can run:\n    astro local env variable set V2\n" +
 				"  Set V3 so astro local start can run:\n    astro local env variable set V3\n" +
 				"  Set V4 so astro local start can run:\n    astro local env variable set V4\n" +
-				"  and 2 more, marked in the NOTE column above.\n",
+				"  and 2 more, marked in the STATUS column above.\n",
 		},
 		{
 			"More can name the command that lists them all",

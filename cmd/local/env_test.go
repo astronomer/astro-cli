@@ -336,12 +336,16 @@ func TestStartMissingEnvHint(t *testing.T) {
 	}
 }
 
-// The NOTE cell is one short state, and the list prints nothing under the
+// The STATUS cell is one short state, and the list prints nothing under the
 // table. -o wide adds REQUIRED, SECRET and DESCRIPTION, and the commands
 // that settle the notes are next steps. An orphan in another project (which
 // only --all reaches) gets no command: `astro
 // local env <noun> delete` acts on the working directory's project, so any
 // command offered for it would edit the wrong file.
+//
+// The declared values come first, those needing attention before the one
+// that does not, then the values nothing declares. The next steps follow the
+// same order.
 func TestEnvListNotes(t *testing.T) {
 	items := []localenv.ListItem{
 		{
@@ -381,14 +385,14 @@ func TestEnvListNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "" +
-		"KIND      NAME        SOURCE          NOTE\n" +
+		"KIND      NAME        SOURCE          STATUS\n" +
 		"variable  API_URL                     declared but missing\n" +
+		"variable  LOG_LEVEL                   declared but not set (optional)\n" +
+		"variable  TOKEN                       not linked here\n" +
 		"variable  DECLARED    project         \n" +
 		"variable  ELSEWHERE   project         not declared (in /projects/other)\n" +
 		"variable  GLOBALONLY  vault (global)  not declared\n" +
-		"variable  LEFTOVER    project         not declared\n" +
-		"variable  LOG_LEVEL                   declared but not set (optional)\n" +
-		"variable  TOKEN                       not linked here\n"
+		"variable  LEFTOVER    project         not declared\n"
 	if out.String() != want {
 		t.Errorf("list =\n%s\nwant\n%s", out.String(), want)
 	}
@@ -398,14 +402,14 @@ func TestEnvListNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	want = "" +
-		"KIND      NAME        SOURCE          NOTE                               REQUIRED  SECRET  DESCRIPTION\n" +
+		"KIND      NAME        SOURCE          STATUS                             REQUIRED  SECRET  DESCRIPTION\n" +
 		"variable  API_URL                     declared but missing               yes       yes     Where the API lives\n" +
+		"variable  LOG_LEVEL                   declared but not set (optional)                      \n" +
+		"variable  TOKEN                       not linked here                                      \n" +
 		"variable  DECLARED    project                                            yes               \n" +
 		"variable  ELSEWHERE   project         not declared (in /projects/other)                    \n" +
 		"variable  GLOBALONLY  vault (global)  not declared                                         \n" +
-		"variable  LEFTOVER    project         not declared                                         \n" +
-		"variable  LOG_LEVEL                   declared but not set (optional)                      \n" +
-		"variable  TOKEN                       not linked here                                      \n"
+		"variable  LEFTOVER    project         not declared                                         \n"
 	if out.String() != want {
 		t.Errorf("list -o wide =\n%s\nwant\n%s", out.String(), want)
 	}
@@ -432,7 +436,7 @@ func TestEnvListNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	want = "" +
-		"KIND      NAME        SOURCE          NOTE\n" +
+		"KIND      NAME        SOURCE          STATUS\n" +
 		"variable  GLOBALONLY  vault (global)  \n"
 	if out.String() != want {
 		t.Errorf("list outside a project =\n%s\nwant\n%s", out.String(), want)

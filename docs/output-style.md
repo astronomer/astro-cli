@@ -44,7 +44,7 @@ Next:
     astro local env variable set API_URL
   Declare GLOBAL_SECRET so every copy of the project requires it:
     astro local env variable declare GLOBAL_SECRET --secret
-  and 3 more, marked in the NOTE column above.
+  and 3 more, marked in the STATUS column above.
 ```
 
 - **Stderr.** A next step is not the result, so stdout stays exactly the result. Under `--output json` print none, and put the commands in the JSON (a `*_hint` or `next_steps` field) instead.

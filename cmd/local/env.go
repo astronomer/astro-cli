@@ -569,7 +569,7 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		long = "List every value declared in pyproject.toml and where it resolves from, and every " +
 			"value a start passes to this project that is not declared. Airflow gets both. " +
 			"Declaring a name makes every copy of the project require it, and linking limits which " +
-			"projects a global reaches. The NOTE column marks rows that need attention: declared but " +
+			"projects a global reaches. Declared values come first. The STATUS column marks rows that need attention: declared but " +
 			"missing, declared but not set (optional), not declared, not linked here, or invalid key. " +
 			"SOURCE is blank for a value nothing sets. On a terminal, the commands " +
 			"that settle them follow the table as next steps (ASTRO_GUIDANCE_DISABLED=1 turns them " +
@@ -1336,9 +1336,12 @@ const formatWide cliout.Format = "wide"
 // renderEnvList prints the table. only names the kind the rows were narrowed
 // to, or is empty for the cross-kind view; it exists for the empty case.
 // inProject is false outside a project, where nothing is declared, so no row
-// is marked "not declared". wide adds REQUIRED and SECRET, and
-// DESCRIPTION, and gives an invalid key's rule in its NOTE. The commands that
-// settle the notes are next steps, printed on stderr after the table.
+// is marked "not declared". wide adds REQUIRED and SECRET, and DESCRIPTION,
+// and gives an invalid key's rule in its STATUS. The commands that settle the
+// statuses are next steps, printed on stderr after the table.
+//
+// Rows are in listOrder, so the declared values come first and the ones that
+// need attention lead each group. The JSON keeps the listing's own order.
 func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, inProject, wide bool) error {
 	if len(items) == 0 {
 		if only != "" {
@@ -1354,17 +1357,14 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, i
 	// env/conn/var, because that one is a wire contract; this one is a table a
 	// person reads, and printing `var` for an Airflow Variable contradicts the
 	// grammar, where `var` is an alias for a plain environment variable.
-	// wide puts NOTE last, where its commands do not push the short columns
-	// out of view.
-	header := "KIND\tNAME\tSOURCE\tNOTE"
+	header := "KIND\tNAME\tSOURCE\tSTATUS"
 	if wide {
 		header += "\tREQUIRED\tSECRET\tDESCRIPTION"
 	}
 	fmt.Fprintln(tw, header)
-	for i := range items {
-		it := &items[i]
-		n := noteFor(it, inProject)
-		// A value nothing supplies has no source to name, and the NOTE says
+	for _, r := range listOrder(items, inProject) {
+		it, n := r.item, r.status
+		// A value nothing supplies has no source to name, and the STATUS says
 		// so; the JSON row keeps "absent".
 		source := it.Source
 		if source == localenv.SourceAbsent {
@@ -1382,63 +1382,63 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, i
 	return tw.Flush()
 }
 
-// noteRank orders a list's next steps: the one that unblocks a start first.
-type noteRank int
+// statusKind is what a list row's STATUS says about it.
+type statusKind int
 
 const (
-	rankNone noteRank = iota
-	rankMissing
-	rankInvalid
-	rankNotLinked
-	rankNotDeclared
-	rankNoValue
+	statusNone statusKind = iota
+	statusMissing
+	statusNotSet
+	statusNotLinked
+	statusNotDeclared
+	statusInvalid
 )
 
-// rowNote is what a list row's NOTE says: the short state a plain list
+// rowStatus is what a list row's STATUS says: the short state a plain list
 // prints, the longer one a wide list prints in its place (an invalid key's
 // rule), and the next step that settles it, if the row has one.
-type rowNote struct {
-	rank             noteRank
+type rowStatus struct {
+	kind             statusKind
 	state, wideState string
 	step             cliout.NextStep
 }
 
-// noteFor decides a row's note in one place, so a state and its next step
-// cannot disagree. A row that needs no attention gets the zero rowNote, and
-// an optional value nothing sets gets a note but no step. Where a note has
+// statusFor decides a row's status in one place, so a state and its next step
+// cannot disagree. A row that needs no attention gets the zero rowStatus, and
+// an optional value nothing sets gets a state but no step. Where a status has
 // two ways out the step names the first; the JSON rows carry both as hint
 // fields. An orphan in another project, which only --all reaches, gets no
 // step: delete acts on the working directory's project, so ListItem leaves
 // its hints empty rather than name a command that edits the wrong file.
-func noteFor(it *localenv.ListItem, inProject bool) rowNote {
-	var n rowNote
+func statusFor(it *localenv.ListItem, inProject bool) rowStatus {
+	var n rowStatus
 	switch {
 	case it.Invalid != "":
-		n = rowNote{
-			rank: rankInvalid, state: "invalid key", wideState: it.Invalid,
+		n = rowStatus{
+			kind: statusInvalid, state: "invalid key", wideState: it.Invalid,
 			step: cliout.NextStep{Why: "Delete " + it.Name + ", whose key is no longer valid", Command: it.RemoveHint},
 		}
 	case it.NotLinkedHere && it.LinksDown != "":
-		n = rowNote{rank: rankNotLinked, state: "not linked here (" + it.LinksDown + ")"}
+		n = rowStatus{kind: statusNotLinked, state: "not linked here (" + it.LinksDown + ")"}
 	case it.NotLinkedHere:
-		n = rowNote{
-			rank: rankNotLinked, state: "not linked here",
+		n = rowStatus{
+			kind: statusNotLinked, state: "not linked here",
 			step: cliout.NextStep{Why: "Link " + it.Name + " so this project gets it", Command: it.LinkHint},
 		}
 	case it.SetHint != "" && it.UndeclareHint != "" && it.Required:
-		n = rowNote{
-			rank: rankMissing, state: "declared but missing",
+		n = rowStatus{
+			kind: statusMissing, state: "declared but missing",
 			step: cliout.NextStep{Why: "Set " + it.Name + " so astro local start can run", Command: it.SetHint},
 		}
 	case it.SetHint != "" && it.UndeclareHint != "":
-		n = rowNote{rank: rankNoValue, state: "declared but not set (optional)"}
+		n = rowStatus{kind: statusNotSet, state: "declared but not set (optional)"}
 	case it.Orphan && inProject:
-		n = rowNote{
-			rank: rankNotDeclared, state: "not declared",
+		n = rowStatus{
+			kind: statusNotDeclared, state: "not declared",
 			step: cliout.NextStep{Why: "Declare " + it.Name + " so every copy of the project requires it", Command: it.DeclareHint},
 		}
 	default:
-		return rowNote{}
+		return rowStatus{}
 	}
 	if n.wideState == "" {
 		n.wideState = n.state
@@ -1453,23 +1453,56 @@ func noteFor(it *localenv.ListItem, inProject bool) rowNote {
 	return n
 }
 
-// envListNextSteps are the next steps under a text list: one per row that has
-// one, the steps that unblock a start first, each in row order.
-func envListNextSteps(items []localenv.ListItem, inProject bool) cliout.NextSteps {
-	type ranked struct {
-		rank noteRank
-		step cliout.NextStep
-	}
-	var all []ranked
+// declaredRow reports whether a list row is one the project declares: one
+// something supplies (Resolved), one nothing does (it has the set and
+// undeclare hints), or a declared global not linked here. An orphan, and an
+// Airflow setting the workspace passes, are not.
+func declaredRow(it *localenv.ListItem) bool {
+	return it.Resolved || it.SetHint != "" || (it.NotLinkedHere && !it.Orphan)
+}
+
+// The order of a text list's rows: the declared values first, those needing
+// attention before those that do not, then the values nothing declares, the
+// ones a start passes before the ones it cannot use. Rows of one rank keep
+// the listing's order, kind then name.
+var (
+	declaredOrder   = map[statusKind]int{statusMissing: 0, statusNotSet: 1, statusNotLinked: 2, statusNone: 3}
+	undeclaredOrder = map[statusKind]int{statusNotDeclared: 4, statusNotLinked: 5, statusInvalid: 6, statusNone: 7}
+)
+
+// orderedRow is a list row with its status, in the order the table prints.
+type orderedRow struct {
+	item   *localenv.ListItem
+	status rowStatus
+}
+
+// listOrder is items with their statuses, in the order the text table and its
+// next steps use.
+func listOrder(items []localenv.ListItem, inProject bool) []orderedRow {
+	rows := make([]orderedRow, len(items))
+	rank := make(map[*localenv.ListItem]int, len(items))
 	for i := range items {
-		if n := noteFor(&items[i], inProject); n.step.Command != "" {
-			all = append(all, ranked{n.rank, n.step})
+		it := &items[i]
+		s := statusFor(it, inProject)
+		rows[i] = orderedRow{it, s}
+		if declaredRow(it) {
+			rank[it] = declaredOrder[s.kind]
+		} else {
+			rank[it] = undeclaredOrder[s.kind]
 		}
 	}
-	slices.SortStableFunc(all, func(a, b ranked) int { return int(a.rank) - int(b.rank) })
-	out := cliout.NextSteps{More: cliout.NextStep{Why: "marked in the NOTE column above"}}
-	for _, r := range all {
-		out.Steps = append(out.Steps, r.step)
+	slices.SortStableFunc(rows, func(a, b orderedRow) int { return rank[a.item] - rank[b.item] })
+	return rows
+}
+
+// envListNextSteps are the next steps under a text list: one per row that has
+// one, in the table's order, so a missing declared value comes first.
+func envListNextSteps(items []localenv.ListItem, inProject bool) cliout.NextSteps {
+	out := cliout.NextSteps{More: cliout.NextStep{Why: "marked in the STATUS column above"}}
+	for _, r := range listOrder(items, inProject) {
+		if r.status.step.Command != "" {
+			out.Steps = append(out.Steps, r.status.step)
+		}
 	}
 	return out
 }

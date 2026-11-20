@@ -35,7 +35,7 @@ type NextSteps struct {
 	// first.
 	Steps []NextStep
 	// More says where the steps past MaxNextSteps are, after "and N more":
-	// Why alone ("marked in the NOTE column above"), or with the Command
+	// Why alone ("marked in the STATUS column above"), or with the Command
 	// that lists them all.
 	More NextStep
 	// Required is for a step the run cannot be finished without, such as
@@ -71,7 +71,7 @@ func GuidanceDisabled() bool {
 //	Next:
 //	  Set API_URL so astro local start can run:
 //	    astro local env variable set API_URL
-//	  and 3 more, marked in the NOTE column above.
+//	  and 3 more, marked in the STATUS column above.
 func PrintNextSteps(w io.Writer, n NextSteps) {
 	if len(n.Steps) == 0 {
 		return
