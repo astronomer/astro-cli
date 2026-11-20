@@ -86,8 +86,8 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List service accounts inside a deployment",
-		Long:    "List service accounts inside a deployment",
+		Short:   "List service accounts inside a Deployment",
+		Long:    "List service accounts inside a Deployment",
 		Example: deploymentSaListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaList(out)
@@ -104,7 +104,7 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete <SERVICE_ACCOUNT_ID>",
 		Aliases: []string{"rm"},
 		Short:   "Delete a service account in the APC platform",
-		Long:    "Delete a service account in the APC platform. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
+		Long:    "Delete a service account in the APC platform. This cannot be undone; it asks for confirmation unless --yes is given.",
 		Example: deploymentSaDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -121,7 +121,7 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 // serviceAccountDeleteQuestion is what a service-account delete asks before
 // it deletes id.
 func serviceAccountDeleteQuestion(id string) string {
-	return fmt.Sprintf("\nAre you sure you want to delete service account %s? This cannot be undone.", id)
+	return fmt.Sprintf("\nDelete service account %s? This cannot be undone.", id)
 }
 
 func deploymentSaCreate(out io.Writer) error {
@@ -130,7 +130,7 @@ func deploymentSaCreate(out io.Writer) error {
 		return errServiceAccountNameEmpty
 	}
 	if err := validateDeploymentRole(deploymentSACreateRole); err != nil {
-		return fmt.Errorf("failed to find a valid role: %w", err)
+		return fmt.Errorf("could not find a valid role: %w", err)
 	}
 	created, err := sa.CreateUsingDeploymentUUID(deploymentID, deploymentSACreateName, deploymentSACreateCategory, deploymentSACreateRole, houstonClient)
 	if err != nil {

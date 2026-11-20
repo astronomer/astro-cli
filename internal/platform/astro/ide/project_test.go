@@ -206,7 +206,7 @@ func TestOpenInBrowser(t *testing.T) {
 	if len(opened) != 1 || opened[0] != "https://ide.example/p" {
 		t.Errorf("opened %v", opened)
 	}
-	if want := "Unable to open the Astro IDE project URL, please visit the following link: https://ide.example/p\n"; out.String() != want {
+	if want := "Could not open the browser. Open this link: https://ide.example/p\n"; out.String() != want {
 		t.Errorf("said %q, want %q", out.String(), want)
 	}
 }

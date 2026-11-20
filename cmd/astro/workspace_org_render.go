@@ -36,7 +36,7 @@ func emitWorkspace(r cliout.Renderer, ws *workspace.WorkspaceInfo, line string) 
 // emitWorkspaceRemoval publishes a delete.
 func emitWorkspaceRemoval(r cliout.Renderer, removal *workspace.Removal) error {
 	return r.Emit(removal, cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintf(b, "Astro Workspace %s was successfully deleted\n", removal.Name)
+		fmt.Fprintf(b, "Deleted Workspace %s\n", removal.Name)
 	}))
 }
 
@@ -56,7 +56,7 @@ func emitWorkspaceSwitch(r cliout.Renderer, ws *workspace.WorkspaceInfo) error {
 // switchedLine is what text says about the Organization a switch left.
 func switchedLine(changed bool) string {
 	if changed {
-		return "\nSuccessfully switched organization"
+		return "\nSwitched Organization"
 	}
 	return "You selected the same organization as the current one. No switch was made"
 }

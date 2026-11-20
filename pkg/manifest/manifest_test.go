@@ -1349,7 +1349,7 @@ target = "astro"
 	for _, want := range []string{
 		"2 problems",
 		"tool.astro.deployments.prod.deployment: required on an astro link",
-		"tool.astro.deployments.prod.workspace: no workspace",
+		"tool.astro.deployments.prod.workspace: no Workspace",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("error text %q should contain %q", got, want)

@@ -30,7 +30,7 @@ func (e *hibernatingError) Error() string {
 	if e.name != "" {
 		named = fmt.Sprintf("%s (%q)", e.deploymentID, e.name)
 	}
-	hint := fmt.Sprintf("Astro Deployment %s is hibernating, so it cannot take a deploy — %s, then deploy again",
+	hint := fmt.Sprintf("Astro Deployment %s is hibernating and cannot take a deploy; %s, then deploy again",
 		named, instancelocate.WakeUpStep(e.deploymentID))
 	if e.certain() {
 		return hint

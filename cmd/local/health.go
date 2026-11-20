@@ -22,12 +22,10 @@ func newHealthCmd(d Deps, t target) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "health",
 		Short: "Report an Airflow's version, import errors, Dag warnings, and run counts",
-		Long: "Read the four things that answer \"is this Airflow in good shape\" on " + t.which() + ": what " +
-			"version it runs, which Dag files failed to parse, what the scheduler is warning about, and how its " +
-			"runs are distributed across states.\n\nEach part is read on its own and a part that fails is reported " +
-			"as failed rather than ending the command, so an Airflow that serves three of the four still gives " +
-			"you three. The command itself succeeds whenever it could produce a report; overall_status is the " +
-			"verdict.\n\nEach part is also a command of its own, for when one of them is the question: " +
+		Long: "Report on " + t.which() + " in four parts: the version it runs, the Dag files that failed to parse, " +
+			"the scheduler's warnings, and its run counts by state.\n\nEach part is read separately. A part that " +
+			"fails is reported as failed and the command continues. The command succeeds whenever it could " +
+			"produce a report; overall_status holds the verdict.\n\nEach part is also its own command: " +
 			t.suggest("version") + ", " + t.suggest("dags errors") + ", " + t.suggest("dags warnings") + ", and " +
 			t.suggest("dags stats") + ". The configuration it runs with is " + t.suggest("config") + ".",
 		Args: cobra.NoArgs,
@@ -420,7 +418,7 @@ func renderHealth(w io.Writer, report healthReport) error {
 	if err := renderHealthDAGStats(w, report.DAGStats); err != nil {
 		return err
 	}
-	_, err := fmt.Fprintf(w, "\nstatus: %s — %s\n", report.OverallStatus, report.StatusReason)
+	_, err := fmt.Fprintf(w, "\nstatus: %s (%s)\n", report.OverallStatus, report.StatusReason)
 	return err
 }
 

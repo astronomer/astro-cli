@@ -60,7 +60,7 @@ func TestGoogleRefreshHookNamesTheLongAccount(t *testing.T) {
 		Account: func(context.Context) string { return long },
 	})
 	err := refresh(context.Background())
-	if err == nil || !strings.Contains(err.Error(), "numeric account id") {
+	if err == nil || !strings.Contains(err.Error(), "numeric account ID") {
 		t.Fatalf("err = %v, want the pre-registration fix", err)
 	}
 
@@ -87,7 +87,7 @@ func TestGoogleAccountAdviceOnlyFiresOnALongAccount(t *testing.T) {
 	}
 	long := strings.Repeat("o", 40) + "@acme-data.iam.gserviceaccount.com"
 	advice := AccountAdvice(long)
-	for _, want := range []string{long, "numeric account id", "pre-register"} {
+	for _, want := range []string{long, "numeric account ID", "pre-register"} {
 		if !strings.Contains(advice, want) {
 			t.Errorf("advice does not name %s: %s", want, advice)
 		}

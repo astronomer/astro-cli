@@ -69,9 +69,8 @@ func newProvidersCmd(d Deps, t target) *cobra.Command {
 		return &cobra.Command{
 			Use:   "providers",
 			Short: "List the provider packages an Airflow has installed",
-			Long: "List every provider distribution installed on " + t.which() + ", with its version. It is what " +
-				"that Airflow actually has, which is the thing to check when a Dag imports a provider that the " +
-				"project pins one version of and the Airflow runs another.",
+			Long: "List every provider distribution installed on " + t.which() + ", with its version. Use it " +
+				"when a Dag imports a provider and the Airflow runs a different version than the project pins.",
 			Args: cobra.NoArgs,
 			Example: afExample(t,
 				"List the installed providers and their versions", "providers",
@@ -126,7 +125,7 @@ func newPluginsCmd(d Deps, t target) *cobra.Command {
 		cmd := &cobra.Command{
 			Use:   "plugins",
 			Short: "List the plugins an Airflow loaded, and what each contributes",
-			Long: "List the plugins " + t.which() + " loaded: where each came from, and what it adds — macros, " +
+			Long: "List the plugins " + t.which() + " loaded: where each came from, and what it adds: macros, " +
 				"listeners, timetables, UI views and apps. A plugin missing here did not load.",
 			Args: cobra.NoArgs,
 			Example: afExample(t,
@@ -186,13 +185,13 @@ func newConfigCmd(d Deps, t target) *cobra.Command {
 			Use:   "config",
 			Short: "Show the configuration an Airflow runs with",
 			Long: "Show the configuration " + t.which() + " runs with, one option per line under its section, as " +
-				"Airflow resolved it from airflow.cfg, the environment, and its defaults. Airflow masks the " +
-				"sensitive values itself.\n\nAirflow shows this only when it is told to expose it: [api] " +
-				"expose_config on Airflow 3, [webserver] expose_config on Airflow 2. Both default to off, and " +
-				"then this command is refused.",
+				"Airflow resolved it from airflow.cfg, the environment, and its defaults. Airflow masks " +
+				"sensitive values.\n\nAirflow serves its configuration only when [api] " +
+				"expose_config (Airflow 3) or [webserver] expose_config (Airflow 2) is on. Both default to off, and " +
+				"the command is refused until one is on.",
 			Args: cobra.NoArgs,
 			Example: afExample(t,
-				"Show the whole configuration", "config",
+				"Show the configuration", "config",
 				"Only the scheduler section", "config --section scheduler",
 			),
 			RunE: func(cmd *cobra.Command, _ []string) error {

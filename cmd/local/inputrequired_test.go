@@ -105,7 +105,7 @@ func TestAJSONAmbiguousDeploymentIsInputRequired(t *testing.T) {
 	if !strings.Contains(msg, "several deployments are linked") {
 		t.Errorf("the refusal should keep the resolver's words: %q", msg)
 	}
-	if strings.Contains(errOut.String(), "Which deployment") {
+	if strings.Contains(errOut.String(), "Which Deployment") {
 		t.Errorf("a json run prompted: %q", errOut)
 	}
 }

@@ -45,7 +45,7 @@ func TestDeploymentIDListRefusalNamesTheWorkspacesSource(t *testing.T) {
 	l := finder(&fakeDeployments{t: t, listStatus: http.StatusForbidden})
 	l.workspace = func() (string, astrosession.Source) { return "ws-claim", astrosession.SourceToken }
 	_, err := l.DeploymentID(context.Background(), "etl", "", "")
-	want := "you do not have access to workspace ws-claim (from ASTRO_API_TOKEN) — ask a workspace admin to grant it"
+	want := "you do not have access to workspace ws-claim (from ASTRO_API_TOKEN); ask a Workspace admin to grant it"
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}

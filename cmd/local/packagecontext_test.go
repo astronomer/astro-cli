@@ -15,7 +15,7 @@ func TestPackageRefusesAContextDirItCannotUse(t *testing.T) {
 		want string
 	}{
 		{name: "bucket target", args: []string{"package", "mwaa"}, want: "--context-dir writes an image's build context, and the mwaa target builds no image"},
-		{name: "with --save", args: []string{"package", "--save", "image.tar"}, want: "nothing for --save to write"},
+		{name: "with --save", args: []string{"package", "--save", "image.tar"}, want: "--save has nothing to write"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d, _ := testDeps(t)

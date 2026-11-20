@@ -148,7 +148,7 @@ func (l *locator) listDeployments(ctx context.Context, token, org, ws string, sr
 			return nil, 0, &astrosession.WorkspaceError{
 				Workspace: ws, Source: src, Err: err,
 				Before: "could not reach Astro to list the Deployments in ",
-				After:  " — check your connection: " + err.Error(),
+				After:  " (check your connection): " + err.Error(),
 			}
 		}
 		if resp.JSON200 == nil {
@@ -177,7 +177,7 @@ func listOutage(domain, ws string, src astrosession.Source, resp *astrov1.ListDe
 		return &astrosession.WorkspaceError{
 			Workspace: ws, Source: src,
 			Before: "you do not have access to ",
-			After:  " — ask a workspace admin to grant it",
+			After:  "; ask a Workspace admin to grant it",
 		}
 	}
 	detail := ""

@@ -20,11 +20,11 @@ func (s *Suite) TestRuntimeVersionsCompareAsHoustonComparesThem() {
 
 	s.NoError(meetsRuntimeUpgradeReqs("12.1.1", "3.0-1"))
 	s.EqualError(meetsRuntimeUpgradeReqs("3.0-1", "3.0-1"),
-		"You tried to set --desired-runtime-version to 3.0-1, but this Runtime Deployment is already running 3.0-1. Please indicate a higher version of Runtime and try again.")
+		"--desired-runtime-version 3.0-1 is not higher than the version this Deployment runs (3.0-1); pass a higher Runtime version")
 	// The message names each as given: what was asked for, and what the
 	// Deployment runs, as v2 did.
 	s.EqualError(meetsRuntimeUpgradeReqs("4.2.4", "v4.2.4"),
-		"You tried to set --desired-runtime-version to v4.2.4, but this Runtime Deployment is already running 4.2.4. Please indicate a higher version of Runtime and try again.")
+		"--desired-runtime-version v4.2.4 is not higher than the version this Deployment runs (4.2.4); pass a higher Runtime version")
 
 	// The picker offers a 3.x Runtime to a Deployment on 12.x. Houston 1.0.x
 	// returns the newest Runtime per Airflow line.

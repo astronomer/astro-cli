@@ -52,7 +52,7 @@ func TestEnvVarLinkCreate(t *testing.T) {
 
 	out, err := execEnvCmd("var", "link", "set", "--variable-key", "FOO", "--workspace-id", cuid.New(), "--deployment-id", depID)
 	assert.NoError(t, err)
-	assert.Contains(t, out, "Linked FOO to deployment "+depID)
+	assert.Contains(t, out, "Linked FOO to Deployment "+depID)
 	assert.Contains(t, out, deploymentPickupNote)
 	mc.AssertExpectations(t)
 }
@@ -78,7 +78,7 @@ func TestEnvVarLinkDeleteSaysWhenDeploymentsSeeIt(t *testing.T) {
 
 	out, err := execEnvCmd("var", "link", "delete", "--variable-key", "FOO", "--workspace-id", cuid.New(), "--deployment-id", depID)
 	assert.NoError(t, err)
-	assert.Contains(t, out, "Unlinked FOO from deployment "+depID)
+	assert.Contains(t, out, "Unlinked FOO from Deployment "+depID)
 	assert.Contains(t, out, deploymentPickupNote)
 	mc.AssertExpectations(t)
 }

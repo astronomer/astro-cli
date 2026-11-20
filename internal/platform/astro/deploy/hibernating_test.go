@@ -22,7 +22,7 @@ import (
 
 const blockedByHibernation = `{"message":"Deploy is blocked because Deployment is in HIBERNATING state","statusCode":400}`
 
-const wakeUpHint = "Astro Deployment test-deployment-id (\"test-deployment\") is hibernating, so it cannot take a deploy — wake it with astro deployment wake-up test-deployment-id --wait"
+const wakeUpHint = "Astro Deployment test-deployment-id (\"test-deployment\") is hibernating and cannot take a deploy; wake it with astro deployment wake-up test-deployment-id --wait"
 
 func refuse(status int, body string) error {
 	return httputil.NormalizeAPIError(&http.Response{StatusCode: status}, []byte(body))
@@ -134,7 +134,7 @@ func TestDeleteBundle_HibernatingSaysHowToWakeIt(t *testing.T) {
 			name: "a Deployment named by id",
 			dep:  nil,
 			body: blockedByHibernation,
-			hint: "Astro Deployment test-deployment-id is hibernating, so it cannot take a deploy — wake it with astro deployment wake-up test-deployment-id --wait",
+			hint: "Astro Deployment test-deployment-id is hibernating and cannot take a deploy; wake it with astro deployment wake-up test-deployment-id --wait",
 		},
 	}
 	for _, tc := range cases {
@@ -244,7 +244,7 @@ func TestDeployManifestImage_HibernatingComesAfterCiCdEnforcement(t *testing.T) 
 		DeploymentID: "test-deployment-id",
 	}, client)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "ci/cd enforcement")
+	assert.Contains(t, err.Error(), "CI/CD enforcement")
 	assert.NotErrorIs(t, err, instancelocate.ErrDeploymentHibernating)
 	client.AssertExpectations(t)
 }

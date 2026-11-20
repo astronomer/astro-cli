@@ -367,7 +367,7 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 				s.NoError(json.Unmarshal(out.Bytes(), &got))
 				s.Equal("bundle-3", got.ID)
 			} else {
-				s.Equal("Created bundle bundle-3 on deployment test-id-1\n", out.String())
+				s.Equal("Created bundle bundle-3 on Deployment test-id-1\n", out.String())
 			}
 		})
 
@@ -388,7 +388,7 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 				s.NoError(json.Unmarshal(out.Bytes(), &got))
 				s.Equal(&name, got.Name)
 			} else {
-				s.Equal("Updated bundle bundle-1 on deployment test-id-1\n", out.String())
+				s.Equal("Updated bundle bundle-1 on Deployment test-id-1\n", out.String())
 			}
 		})
 	}
@@ -406,7 +406,7 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 			err := CreateBundle(name, "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{JSON: asJSON, Out: out}, errOut, mockV1Client, mockV1Alpha1Client)
 			s.NoError(err)
 			if !asJSON {
-				s.Equal("Created bundle my-dags on deployment test-id-1\n", out.String(), "the warning stays out of the result's text")
+				s.Equal("Created bundle my-dags on Deployment test-id-1\n", out.String(), "the warning stays out of the result's text")
 				s.Equal("Warning: the bundle was created, but it could not be read back: no Dag bundle named \"my-dags\" on deployment test-id-1\n", errOut.String())
 				return
 			}
@@ -431,7 +431,7 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 			err := UpdateBundle("bundle-1", "", "", "d", nil, ws, testBundleDeploymentID, testUtil.Renderer{JSON: asJSON, Out: out}, errOut, mockV1Client, mockV1Alpha1Client)
 			s.NoError(err)
 			if !asJSON {
-				s.Equal("Updated bundle bundle-1 on deployment test-id-1\n", out.String(), "the warning stays out of the result's text")
+				s.Equal("Updated bundle bundle-1 on Deployment test-id-1\n", out.String(), "the warning stays out of the result's text")
 				s.Equal("Warning: the bundle was updated, but it could not be read back: the API returned no bundle\n", errOut.String())
 				return
 			}
@@ -460,7 +460,7 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 
 		err := CreateBundle(name, "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
-		s.Equal("Created bundle new on deployment test-id-1\n", out.String())
+		s.Equal("Created bundle new on Deployment test-id-1\n", out.String())
 	})
 
 	s.Run("create takes the newest of two that match", func() {
@@ -475,7 +475,7 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 
 		err := CreateBundle(name, "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
-		s.Equal("Created bundle newer on deployment test-id-1\n", out.String())
+		s.Equal("Created bundle newer on Deployment test-id-1\n", out.String())
 	})
 }
 

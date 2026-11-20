@@ -247,7 +247,7 @@ func DeleteBundle(input *DeleteBundleInput) (BundleDelete, error) {
 func ValidateBundleSymlinks(bundlePath string) error {
 	absBundlePath, err := filepath.Abs(bundlePath)
 	if err != nil {
-		return fmt.Errorf("failed to get absolute path for bundle directory: %w", err)
+		return fmt.Errorf("could not get absolute path for bundle directory: %w", err)
 	}
 
 	err = filepath.WalkDir(bundlePath, func(path string, d os.DirEntry, err error) error {
@@ -324,8 +324,8 @@ func UploadBundle(bundlePath, uploadURL string, opts BundleUpload) (string, erro
 	}
 	defer func() {
 		if err := os.RemoveAll(tarDir); err != nil {
-			fmt.Println("\nFailed to delete archived file: ", err.Error())
-			fmt.Println("\nPlease delete the archived file manually from path: " + tarDir)
+			fmt.Println("\nCould not delete archived file: ", err.Error())
+			fmt.Println("\nDelete the archived file manually: " + tarDir)
 		}
 	}()
 	tarGzFilePath := filepath.Join(tarDir, "bundle.tar.gz")

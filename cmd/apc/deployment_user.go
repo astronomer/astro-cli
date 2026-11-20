@@ -108,8 +108,8 @@ func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update <EMAIL>",
-		Short:   "Update a user's role for a deployment",
-		Long:    "Update a user's role for a deployment",
+		Short:   "Update a user's role for a Deployment",
+		Long:    "Update a user's role for a Deployment",
 		Args:    cobra.ExactArgs(1),
 		Example: deploymentUserUpdateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -136,7 +136,7 @@ func deploymentUserList(out io.Writer) error {
 func deploymentUserAdd(out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
-		return fmt.Errorf("failed to find a valid role: %w", err)
+		return fmt.Errorf("could not find a valid role: %w", err)
 	}
 
 	u, err := deployment.Add(deploymentID, deploymentUserEmail, deploymentUserRole, houstonClient)
@@ -158,7 +158,7 @@ func deploymentUserRemove(out io.Writer, args []string) error {
 func deploymentUserUpdate(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
-		return fmt.Errorf("failed to find a valid role: %w", err)
+		return fmt.Errorf("could not find a valid role: %w", err)
 	}
 
 	u, err := deployment.UpdateUser(deploymentID, args[0], deploymentUserRole, houstonClient)

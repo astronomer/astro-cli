@@ -37,7 +37,7 @@ type ErrNoTagAvailable struct {
 }
 
 func (e ErrNoTagAvailable) Error() string {
-	return fmt.Sprintf("there is no tag available for provided airflow version: %s, you might want to try a different airflow version.", e.airflowVersion)
+	return fmt.Sprintf("no tag is available for Airflow version %s; try a different version", e.airflowVersion)
 }
 
 // ImageTagInfo holds parsed information from an image tag

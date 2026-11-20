@@ -30,7 +30,7 @@ func (s *Suite) TestDeploymentTeamAddCommand() {
 	expectedOut := ` DEPLOYMENT ID                 TEAM ID                       ROLE                  
  cknz133ra49758zr9w34b87ua     cl0evnxfl0120dxxu1s4nbnk7     DEPLOYMENT_VIEWER     
 
-Successfully added team cl0evnxfl0120dxxu1s4nbnk7 to deployment cknz133ra49758zr9w34b87ua as a DEPLOYMENT_VIEWER
+Added team cl0evnxfl0120dxxu1s4nbnk7 to Deployment cknz133ra49758zr9w34b87ua as a DEPLOYMENT_VIEWER
 `
 
 	api := new(mocks.ClientInterface)
@@ -55,7 +55,7 @@ func (s *Suite) TestDeploymentTeamRm() {
 	expectedOut := ` DEPLOYMENT ID                 TEAM ID                       
  cknz133ra49758zr9w34b87ua     cl0evnxfl0120dxxu1s4nbnk7     
 
- Successfully removed team cl0evnxfl0120dxxu1s4nbnk7 from deployment cknz133ra49758zr9w34b87ua
+ Removed team cl0evnxfl0120dxxu1s4nbnk7 from Deployment cknz133ra49758zr9w34b87ua
 `
 
 	api := new(mocks.ClientInterface)

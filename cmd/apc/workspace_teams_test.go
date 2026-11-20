@@ -35,7 +35,7 @@ func (s *Suite) TestWorkspaceTeamAddCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedOut := ` NAME        WORKSPACE ID                  TEAM ID                       ROLE                 
  airflow     ck05r3bor07h40d02y2hw4n4v     cl0evnxfl0120dxxu1s4nbnk7     WORKSPACE_VIEWER     
-Successfully added cl0evnxfl0120dxxu1s4nbnk7 to airflow
+Added cl0evnxfl0120dxxu1s4nbnk7 to airflow
 `
 
 	api := new(mocks.ClientInterface)
@@ -67,7 +67,7 @@ func (s *Suite) TestWorkspaceTeamRm() {
 
 	expected := ` NAME                          WORKSPACE ID                                      TEAM ID                                           
  airflow                       ck05r3bor07h40d02y2hw4n4v                         ckc0eir8e01gj07608ajmvia1                         
-Successfully removed team from workspace
+Removed team from Workspace
 `
 
 	buf := new(bytes.Buffer)

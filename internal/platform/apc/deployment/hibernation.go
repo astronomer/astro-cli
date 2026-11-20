@@ -14,8 +14,8 @@ const HibernationSince = houston.HibernationOverrideSince
 
 var (
 	errHibernationNotServed = errors.New("hibernating or waking up a Deployment needs Astro Private Cloud " + HibernationSince + " or later")
-	errHibernationDisabled  = errors.New("hibernation is not enabled for this Deployment. " +
-		"A platform admin turns it on with deployments.hibernation.enabled, for the platform, or for the Deployment's cluster, Workspace or the Deployment itself")
+	errHibernationDisabled  = errors.New("hibernation is not enabled for this Deployment; " +
+		"a platform admin can turn it on with deployments.hibernation.enabled for the platform, the Deployment's cluster, the Workspace, or the Deployment")
 )
 
 // CheckHibernation reports whether the Deployment can take a hibernation
@@ -38,7 +38,7 @@ func CheckHibernation(id string, client houston.ClientInterface) error {
 		DeploymentUUID: id,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to get app config: %w", err)
+		return fmt.Errorf("could not get the app config: %w", err)
 	}
 	if cfg == nil {
 		return nil

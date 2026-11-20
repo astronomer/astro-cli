@@ -951,7 +951,7 @@ func TestLinkCreateIsATombstoneNamingTheLinkForm(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "was removed in Astro CLI v2")
 	assert.Contains(t, err.Error(), "astro env variable link set --variable-key")
-	assert.Contains(t, err.Error(), "CLEARS")
+	assert.Contains(t, err.Error(), "clears")
 	mc.AssertExpectations(t)
 }
 
@@ -1154,7 +1154,7 @@ func TestEnvListRefusesDotenv(t *testing.T) {
 
 	_, err := execEnvCmd("list", "--workspace", "ws-test", "-o", "dotenv")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "has none of")
+	assert.Contains(t, err.Error(), "has none")
 }
 
 // --extra and --value now reach the same parser, so an account id above 2^53
@@ -1234,7 +1234,7 @@ func TestEnvDeleteAndSetRefuseAWorkspaceObjectsIDUnderDeploymentID(t *testing.T)
 
 			_, err := execEnvCmd(tc.args(id, depID)...)
 			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "belongs to workspace "+wsID)
+			assert.Contains(t, err.Error(), "belongs to Workspace "+wsID)
 			assert.Contains(t, err.Error(), "--workspace "+wsID)
 			mc.AssertExpectations(t)
 		})

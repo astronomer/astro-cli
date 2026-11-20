@@ -79,7 +79,7 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List all Astro Workspaces in your organization",
+		Short:   "List all Astro Workspaces in your Organization",
 		Long:    "List all Astro Workspaces you have access to in your current Organization. Use 'astro organization switch' to change Organizations.",
 		Example: `  astro workspace list
   astro workspace list -o json`,
@@ -139,7 +139,7 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 	cliout.AddOutputFlag(cmd, &workspaceLifecycleOutput)
 	cmd.Flags().StringVarP(&workspaceName, "name", "n", "", "The Workspace's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVar(&workspaceDescription, "description", "", "Description of the Workspace. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVar(&enforceCD, "enforce-cicd", "OFF", "Provide this flag either ON/OFF. ON means deploys to deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
+	cmd.Flags().StringVar(&enforceCD, "enforce-cicd", "OFF", "Provide this flag either ON/OFF. ON means deploys to Deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
 	return cmd
 }
 
@@ -168,7 +168,7 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&workspaceName, "name", "n", "", "The Workspace's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVar(&workspaceDescription, "description", "", "Description of the Workspace. If the description contains a space, specify the entire description in quotes \"\"")
 	// No default: an update that does not name the setting keeps it.
-	cmd.Flags().StringVar(&workspaceUpdateEnforceCD, "enforce-cicd", "", "Provide this flag either ON/OFF. ON means deploys to deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD (default: unchanged)")
+	cmd.Flags().StringVar(&workspaceUpdateEnforceCD, "enforce-cicd", "", "Provide this flag either ON/OFF. ON means deploys to Deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD (default: unchanged)")
 	return cmd
 }
 
@@ -177,7 +177,7 @@ func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete [WORKSPACE_ID]",
 		Aliases: []string{"rm"},
 		Short:   "Delete an Astro Workspace",
-		Long:    "Permanently delete a Workspace. The Workspace must have zero Deployments — delete or transfer all Deployments first. Deletion also removes all Workspace-scoped API tokens and revokes Workspace-level roles from Organization tokens that had access. This action cannot be undone, so the command asks for confirmation first unless --yes is given.",
+		Long:    "Permanently delete a Workspace. The Workspace must have no Deployments; delete or transfer them first. Deletion also removes all Workspace-scoped API tokens and revokes Workspace-level roles from Organization tokens that had access. This cannot be undone. The command asks for confirmation unless --yes is given.",
 		Args:    cobra.MaximumNArgs(1),
 		Example: `
   # Delete a Workspace by its ID, after confirming
@@ -520,8 +520,8 @@ func newWorkspaceTokenAddOrgTokenCmd(out io.Writer) *cobra.Command {
 func newWorkspaceOrgTokenManageCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "organization-token",
-		Short: "Manage organization tokens in a workspace",
-		Long:  "Manage organization tokens in a workspace",
+		Short: "Manage organization tokens in a Workspace",
+		Long:  "Manage organization tokens in a Workspace",
 	}
 	cmd.SetOut(out)
 	cmd.AddCommand(
@@ -593,8 +593,8 @@ func newRemoveOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
 func newListOrganizationTokensInWorkspace(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all Organization API tokens in a workspace",
-		Long:  "List all Organization API tokens in a workspace",
+		Short: "List all Organization API tokens in a Workspace",
+		Long:  "List all Organization API tokens in a Workspace",
 		Example: `  # List the Organization tokens in the current Workspace
   astro workspace token organization-token list
 
@@ -652,7 +652,7 @@ func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceTeamOutput, out, &r, fmt.Sprintf("Astro Team %s was successfully removed from workspace %s", r.Name, r.WorkspaceID))
+	return renderLines(workspaceTeamOutput, out, &r, fmt.Sprintf("Removed team %s from Workspace %s", r.Name, r.WorkspaceID))
 }
 
 func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
@@ -697,7 +697,7 @@ func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceTeamOutput, out, &t, fmt.Sprintf("The team %s was successfully added to the workspace with the role %s", teamLabel(&t), t.WorkspaceRole))
+	return renderLines(workspaceTeamOutput, out, &t, fmt.Sprintf("Added team %s to the Workspace with role %s", teamLabel(&t), t.WorkspaceRole))
 }
 
 func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -752,7 +752,7 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceTeamOutput, out, &t, fmt.Sprintf("The workspace team %s role was successfully updated to %s", teamLabel(&t), t.WorkspaceRole))
+	return renderLines(workspaceTeamOutput, out, &t, fmt.Sprintf("Updated Workspace team %s to %s", teamLabel(&t), t.WorkspaceRole))
 }
 
 func workspaceList(out io.Writer) error {
@@ -777,7 +777,7 @@ func workspaceCreate(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, ws, fmt.Sprintf("Astro Workspace %s was successfully created", ws.Name))
+	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, ws, fmt.Sprintf("Created Workspace %s", ws.Name))
 }
 
 func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -800,7 +800,7 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 		return err
 	}
 	// The line names the Workspace as it was called before the update.
-	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, &res.Workspace, fmt.Sprintf("Astro Workspace %s was successfully updated", res.PreviousName))
+	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, &res.Workspace, fmt.Sprintf("Updated Workspace %s", res.PreviousName))
 }
 
 func workspaceDelete(out io.Writer, args []string) error {
@@ -838,7 +838,7 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceUserOutput, out, &u, fmt.Sprintf("The user %s was successfully added to the workspace with the role %s", u.Email, u.WorkspaceRole))
+	return renderLines(workspaceUserOutput, out, &u, fmt.Sprintf("Added user %s to the Workspace with role %s", u.Email, u.WorkspaceRole))
 }
 
 func listWorkspaceUser(out io.Writer) error {
@@ -876,7 +876,7 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceUserOutput, out, &u, fmt.Sprintf("The workspace user %s role was successfully updated to %s", u.Email, u.WorkspaceRole))
+	return renderLines(workspaceUserOutput, out, &u, fmt.Sprintf("Updated Workspace user %s to %s", u.Email, u.WorkspaceRole))
 }
 
 func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -901,7 +901,7 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceUserOutput, out, &r, fmt.Sprintf("The user %s was successfully removed from the workspace", r.Email))
+	return renderLines(workspaceUserOutput, out, &r, fmt.Sprintf("Removed user %s from the Workspace", r.Email))
 }
 
 // workspaceTarget is the run's Workspace for cmd, from the one resolver
@@ -970,7 +970,7 @@ func coalesceFrom(t astrosession.Target) (string, error) { //nolint:gocritic // 
 		return "", err
 	}
 	if err != nil {
-		return "", wrapWorkspaceErr(err, "failed to get current Workspace")
+		return "", wrapWorkspaceErr(err, "could not get the current Workspace")
 	}
 	return ws, nil
 }

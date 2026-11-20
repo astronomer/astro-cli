@@ -35,12 +35,11 @@ func newInitCmd(c *cli) *cobra.Command {
 		Use:   "init [DIRECTORY]",
 		Short: "Make a directory an Astro project",
 		Long: "Create a pyproject.toml-based Astro project in the given directory (default: the current one).\n\n" +
-			"Run it in the Airflow repo you already have: a directory with no pyproject.toml is scaffolded, and one that has a pyproject.toml gains a [tool.astro] section, leaving the rest of the file alone.\n\n" +
-			"Run in an Astro CLI 1.x project, it converts it in place: requirements.txt and packages.txt are carried into pyproject.toml, what airflow_settings.yaml declares is carried over, " +
-			"and a Dockerfile that only picks a runtime is removed, its runtime version and Python recorded in pyproject.toml. Any other Dockerfile is kept as the project's build, as written. " +
-			"A 1.x file is removed once everything it said is in pyproject.toml, " +
-			"except requirements.txt and packages.txt when a kept Dockerfile still installs them, and other files already there are kept. " +
-			"What init could not carry over, such as a requirements.txt line that is not a plain requirement, is listed at the end, to move across by hand.",
+			"A directory with no pyproject.toml is scaffolded. In a directory that has one, init adds a [tool.astro] section and leaves the rest of the file alone. Use this in an existing Airflow repo.\n\n" +
+			"In an Astro CLI 1.x project, init converts the project in place. It moves requirements.txt, packages.txt and what airflow_settings.yaml declares into pyproject.toml. " +
+			"A Dockerfile that only picks a runtime is removed, and its runtime version and Python version are recorded in pyproject.toml. Any other Dockerfile is kept as is and remains the project's build. " +
+			"Each 1.x file is removed once pyproject.toml holds everything it said. requirements.txt and packages.txt stay if a kept Dockerfile still installs them. Other existing files are kept.\n\n" +
+			"Anything init could not carry over, such as a requirements.txt line that is not a plain requirement, is listed at the end for you to move by hand.",
 		Example: "  # Make the current directory an Astro project\n" +
 			"  astro init\n\n" +
 			"  # Create a new project in its own directory, pinned to Airflow 3.1\n" +

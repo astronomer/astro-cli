@@ -199,7 +199,7 @@ func TestSetupFailuresAreOneJSONDocument(t *testing.T) {
 		{"a login that expired and could not be renewed", fmt.Errorf("%w, run 'astro login' to log in again: refused", astroCmd.ErrLoginRenewal), KindUnauthenticated, 1, "could not renew your Astro login"},
 		{"no context", config.ErrGetHomeString, KindUnauthenticated, 1, "no context set"},
 		{"a config file that did not parse", fmt.Errorf("%w: /h/config.yaml did not parse", astroCmd.ErrConfigUnreadable), KindUnauthenticated, 1, "/h/config.yaml did not parse"},
-		{"an organization lookup that never got an answer", fmt.Errorf("%w: %w", astroCmd.ErrAPITokenOrganization, transport), KindAPIUnavailable, 1, "cannot look up the organization"},
+		{"an organization lookup that never got an answer", fmt.Errorf("%w: %w", astroCmd.ErrAPITokenOrganization, transport), KindAPIUnavailable, 1, "cannot look up the Organization"},
 		{"an interrupt", input.ErrInterrupted, "", 130, "interrupted"},
 	}
 	for _, tc := range cases {

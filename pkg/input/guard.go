@@ -119,7 +119,7 @@ func (e *RequiredError) Error() string {
 	if reason == "" {
 		reason = "this run cannot ask"
 	}
-	return fmt.Sprintf("this command needs to ask %s; %s — %s", asked, reason, answer)
+	return fmt.Sprintf("this command needs to ask %s; %s; %s", asked, reason, answer)
 }
 
 func (e *RequiredError) Unwrap() error { return e.err }

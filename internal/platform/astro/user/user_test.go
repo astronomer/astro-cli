@@ -763,7 +763,7 @@ func TestUpdateDeploymentUserRole(t *testing.T) {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(t)
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(p *astrov1.ListUsersParams) bool { return p != nil && p.DeploymentId != nil })).Return(&ListDeploymentUsersResponseOK, nil).Once()
 		_, err := UpdateDeploymentUserRole("notfound@1.com", "DEPLOYMENT_ADMIN", deploymentID, mockClient)
-		assert.EqualError(t, err, "no user was found for the email you provided")
+		assert.EqualError(t, err, "no user found with that email")
 	})
 }
 

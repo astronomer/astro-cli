@@ -44,7 +44,7 @@ func newRemovedVerbCmd(verb, noun string) *cobra.Command {
 	if alias := removedVerbs[verb]; alias != "" {
 		aliases = []string{alias}
 	}
-	return removedCmdStub(verb, aliases, "Removed in v2 — use the set command, which creates or updates", func(args []string) string {
+	return removedCmdStub(verb, aliases, "Removed in v2; use the set command (creates or updates)", func(args []string) string {
 		return removedVerbGuidance(verb, noun, args)
 	})
 }
@@ -83,7 +83,7 @@ func removedVerbGuidance(verb, noun string, args []string) string {
 	if verb == "create" {
 		body += "The set command creates the object when it does not exist and updates it when it does, " +
 			"so it replaces both create and update. The key is now the positional argument " +
-			"rather than --key. Pass --no-create to fail instead of creating."
+			"instead of --key. Pass --no-create to fail instead of creating."
 	} else {
 		body += "The set command is the same operation and also creates the object when it does not exist. " +
 			"Pass --no-create for the old behavior of failing on a key that is not there."

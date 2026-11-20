@@ -397,7 +397,7 @@ func buildArgDockerfileNote(ref string, pinOnly bool, present []string) string {
 			"as the build, replace the build argument in FROM with a literal Astro Runtime image"
 	}
 	note += "It was declared as this project's build (dockerfile under [tool.astro] in " + manifest.Marker +
-		"); make sure its base is one, because a base that is not fails when the containers start"
+		"); its base must be one, or the containers fail to start"
 	if clause := keptListsClause(present); clause != "" {
 		note += ". If it is, " + clause
 	}
@@ -407,8 +407,8 @@ func buildArgDockerfileNote(ref string, pinOnly bool, present []string) string {
 // foreignDockerfileNote tells the user a Dockerfile was found and not made the
 // project's build, and how to make one that would be. ref is its base.
 func foreignDockerfileNote(ref string) string {
-	return "Dockerfile: left as it is and not declared as this project's build, because its final stage " +
-		"builds on " + ref + ", which is not an Astro Runtime image, and Docker mode builds only on one: " +
+	return "Dockerfile: left as it is and not declared as this project's build. Its final stage " +
+		"builds on " + ref + ", which is not an Astro Runtime image, and Docker mode needs one: " +
 		"one of Astronomer's published Runtime images (astrocrpublic.azurecr.io/runtime, " +
 		"quay.io/astronomer/astro-runtime), or a mirror whose repository is named runtime or astro-runtime " +
 		"and whose tag is a Runtime version, such as 3.1-12 or 12.1.0. " +

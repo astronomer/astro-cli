@@ -123,7 +123,7 @@ func TestDeployRegistryImageOnAPlatformWithTheMutationOff(t *testing.T) {
 			var warnings []string
 			_, err := DeployManifestImage(client, registryImage(t, "3.1-5", &warnings))
 			require.ErrorIs(t, err, houstonSays)
-			assert.Contains(t, err.Error(), "A platform admin turns it on by setting "+tc.setting+" to true under astronomer.houston.config")
+			assert.Contains(t, err.Error(), "A platform admin can turn it on by setting "+tc.setting+" to true under astronomer.houston.config")
 			assert.Contains(t, err.Error(), "astro deploy --image-name <image>, without --remote")
 		})
 	}
@@ -166,8 +166,8 @@ func TestDeployRegistryImageWithAnUnreadClusterConfig(t *testing.T) {
 		alone bool
 		want  string
 	}{
-		{"from a project's root", false, "Dags were NOT updated: whether this Deployment takes Dag uploads could not be read"},
-		{"from outside any project", true, "this deploy ran outside a pyproject.toml project, so it shipped the image alone. If this Deployment takes Dag uploads"},
+		{"from a project's root", false, "Dags were not updated: could not read whether this Deployment takes Dag uploads"},
+		{"from outside any project", true, "this deploy ran outside a pyproject.toml project and shipped the image alone. If this Deployment takes Dag uploads"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			withManifestEngine(t, "never read")
@@ -229,6 +229,6 @@ func TestDeployRegistryImageRefusesADeploymentOutsideTheWorkspace(t *testing.T) 
 	in.DeploymentID = "elsewhere"
 	_, err := DeployManifestImage(client, in)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no Deployment elsewhere in workspace ws")
+	assert.Contains(t, err.Error(), "no Deployment elsewhere in Workspace ws")
 	client.AssertNotCalled(t, "UpdateDeploymentImage", mock.Anything)
 }

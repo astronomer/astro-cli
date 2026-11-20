@@ -33,11 +33,11 @@ const (
 )
 
 var (
-	errDeploymentTokenNotFound    = errors.New("no Deployment API token was found for the API token name you provided")
+	errDeploymentTokenNotFound    = errors.New("no Deployment API token has that name")
 	errWorkspaceTokenInDeployment = errors.New("this Workspace API token has already been added to the Deployment with that role")
 	errOrgTokenInDeployment       = errors.New("this Organization API token has already been added to the Deployment with that role")
 	errDeploymentTokenRoleSet     = errors.New("this Deployment API token already has that role on the Deployment")
-	errWrongTokenTypeSelected     = errors.New("the token selected is not of the type you are trying to modify")
+	errWrongTokenTypeSelected     = errors.New("the selected token is not the right type for this command")
 	errDeploymentScopedAdd        = errors.New("this is a Deployment API token, which has its role on its own Deployment already: update changes it")
 	errRoleRequired               = errors.New("a role is required: DEPLOYMENT_ADMIN or a custom role name")
 	errNotDeploymentScoped        = errors.New("only a Deployment API token is deleted from a Deployment")
@@ -56,7 +56,7 @@ const deploymentEntity = "DEPLOYMENT"
 const (
 	// The plain choice has no heading here: the picker asks it in words
 	// that suit the command, which this package does not know.
-	pickSharedNameHead = "\nThere are more than one API tokens with name %s. Please select an API token:"
+	pickSharedNameHead = "\nSeveral API tokens are named %s. Select an API token:"
 )
 
 // deploymentRoleOf returns the token's role on deploymentID, or "".

@@ -117,7 +117,7 @@ func TestDeployBundleTypes(t *testing.T) {
 		assert.Nil(t, in.Deployment, "named by id, so not read")
 		assert.Nil(t, in.Login, "the current context")
 		assert.Contains(t, r.stderr, "mount path /usr/local/airflow/dbt/jaffle_shop: the default for a dbt bundle")
-		assert.Equal(t, "Successfully uploaded bundle with version v1 to Astro.\n", r.stdout)
+		assert.Equal(t, "Uploaded bundle version v1 to Astro\n", r.stdout)
 	})
 	t.Run("dbt, the working directory and a mount path given", func(t *testing.T) {
 		project := dbtProject(t)
@@ -222,7 +222,7 @@ func TestDeployBundleDelete(t *testing.T) {
 		assert.Equal(t, "dbt", in.BundleType)
 		assert.Equal(t, bundleTestID, in.DeploymentID)
 		assert.Nil(t, in.Login)
-		assert.Equal(t, "Successfully requested bundle delete for mount path /usr/local/airflow/dbt/jaffle_shop from Astro.\n", r.stdout)
+		assert.Equal(t, "Requested bundle delete for mount path /usr/local/airflow/dbt/jaffle_shop from Astro\n", r.stdout)
 	})
 	t.Run("a mount path needs no bundle here", func(t *testing.T) {
 		plainBundle(t)
@@ -459,7 +459,7 @@ func TestDeployBundleUsesTheManifestDomainsLogin(t *testing.T) {
 		noBundleTransport(t)
 		_, err := execDeployCapture("bundle", t.TempDir(), "--mount-path", "/x")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "the deployment picker lists only the current context's Deployments")
+		assert.Contains(t, err.Error(), "the Deployment picker lists only the current context's Deployments")
 		assert.Contains(t, err.Error(), "astro context switch astronomer.io")
 	})
 
@@ -542,7 +542,7 @@ func TestDeployBundleWait(t *testing.T) {
 			require.NoError(t, r.err, "stderr:\n%s", r.stderr)
 			assert.Equal(t, []string{dbtTestDeploymentID}, *waited)
 			assert.Equal(t, without.stdout, r.stdout)
-			assert.Contains(t, r.stderr, "Waiting for the deployment to become healthy…")
+			assert.Contains(t, r.stderr, "Waiting for the Deployment to become healthy…")
 		})
 		t.Run(name+" json, the wait failing", func(t *testing.T) {
 			stubBundleWait(t, errors.New("timed out"))

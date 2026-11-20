@@ -79,22 +79,22 @@ func (c Cause) TextFor(r Read) string {
 	case CauseSessionExpired:
 		return fmt.Sprintf("your %s session expired. Log in again with astro login %s", domain, domain)
 	case CauseNoAccess:
-		return fmt.Sprintf("you don't have access to this workspace on %s. Check your current organization (astro organization switch), or ask an org admin", domain)
+		return fmt.Sprintf("you don't have access to this Workspace on %s. Check your current Organization (astro organization switch), or ask an Organization admin", domain)
 	case CauseNotFound:
-		return fmt.Sprintf("workspace %s was not found on %s. Check the workspace and domain keys in pyproject.toml, and your current organization", r.Workspace, domain)
+		return fmt.Sprintf("Workspace %s was not found on %s. Check the workspace and domain keys in pyproject.toml, and your current Organization", r.Workspace, domain)
 	case CauseSecretsWithheld:
 		if r.Organization != "" {
-			return fmt.Sprintf("organization %s disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally", r.Organization)
+			return fmt.Sprintf("Organization %s disables Environment Secrets Fetching. Ask an Organization admin to enable it, or set the value locally", r.Organization)
 		}
-		return "your org disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally"
+		return "your Organization disables Environment Secrets Fetching. Ask an Organization admin to enable it, or set the value locally"
 	case CauseNoValue:
-		return "the workspace holds no value for it"
+		return "the Workspace holds no value for it"
 	case CauseOffline:
 		return fmt.Sprintf("could not reach %s. Check your connection, or set the value locally", domain)
 	case CauseNoWorkspace:
-		return "the manifest sets no workspace key. Link a workspace to the project in Astro Desktop, or set the value locally"
+		return "the manifest sets no workspace key. Link a Workspace to the project in Astro Desktop, or set the value locally"
 	case CauseNoOrganizationAccess:
-		return fmt.Sprintf("could not read workspace %s in organization %s on %s, which pyproject.toml names. "+
+		return fmt.Sprintf("could not read Workspace %s in Organization %s on %s, which pyproject.toml names. "+
 			"Check that you belong to it with astro organization list, and the organization and workspace keys under [tool.astro]",
 			r.Workspace, r.Organization, domain)
 	}

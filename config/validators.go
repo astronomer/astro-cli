@@ -43,11 +43,11 @@ func ValidateRegistryEndpoint(endpoint string) error {
 	_, digested := ref.(reference.Digested)
 	switch {
 	case tagged && digested:
-		return fmt.Errorf("registry endpoint must not include an image tag or digest -- got %q, use 'registry[:port]/repository/path' without the ':tag@sha256:...' (the CLI appends its own deploy tag automatically)", endpoint)
+		return fmt.Errorf("registry endpoint must not include an image tag or digest, got %q; use 'registry[:port]/repository/path' without ':tag@sha256:...'", endpoint)
 	case digested:
-		return fmt.Errorf("registry endpoint must not include an image digest -- got %q, use 'registry[:port]/repository/path' without '@sha256:...' (the CLI appends its own deploy tag automatically)", endpoint)
+		return fmt.Errorf("registry endpoint must not include an image digest, got %q; use 'registry[:port]/repository/path' without '@sha256:...'", endpoint)
 	case tagged:
-		return fmt.Errorf("registry endpoint must not include an image tag -- got %q, use 'registry[:port]/repository/path' without a trailing ':tag' (the CLI appends its own deploy tag automatically)", endpoint)
+		return fmt.Errorf("registry endpoint must not include an image tag, got %q; use 'registry[:port]/repository/path' without a trailing ':tag'", endpoint)
 	}
 
 	return nil

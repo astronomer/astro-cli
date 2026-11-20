@@ -223,6 +223,6 @@ func TestDeploymentBundleJSON(t *testing.T) {
 
 		stdout, stderr, err := execUnboundRootWith(t, astroV1Client, alpha, "deployment", "bundle", "delete", "bundle-1", "--deployment-id", "test-id-1", "--yes")
 		require.NoError(t, err, "stderr:\n%s", stderr)
-		assert.Equal(t, "Requested deletion of bundle bundle-1 from deployment test-id-1\n", stdout)
+		assert.Equal(t, "Requested deletion of bundle bundle-1 from Deployment test-id-1\n", stdout)
 	})
 }

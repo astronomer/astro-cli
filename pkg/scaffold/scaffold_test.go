@@ -786,7 +786,7 @@ func TestAgentsMdHoldsOnlyStableFacts(t *testing.T) {
 		"`astro --help`",
 		"`astro local --help`",
 		"`astro local af`",
-		"never suggest an `astro dev` command; running one prints its replacement",
+		"Do not suggest `astro dev` commands",
 	} {
 		assert.Contains(t, content, want)
 	}

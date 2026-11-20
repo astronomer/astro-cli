@@ -38,7 +38,7 @@ func listOrganizationTokenRoles(args []string, out io.Writer) error {
 	}
 	tokenArg(args, &tokenID)
 	// roles takes no --name: only the token ID answers its picker.
-	roles, err := organization.ListTokenRoles(tokenID, organizationTokenPicker("", "Please select the Organization API token whose roles you would like to list:"), astroV1Client)
+	roles, err := organization.ListTokenRoles(tokenID, organizationTokenPicker("", "Select the Organization API token to list roles for:"), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func createOrganizationToken(out io.Writer) error {
 		if err := mayPickRole(); err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stderr, "select a Organization Role for the new API token:")
+		fmt.Fprintln(os.Stderr, "Select an Organization Role for the new API token:")
 		// no role was provided so ask the user for it
 		var err error
 		tokenRole, err = selectOrganizationRole()
@@ -78,7 +78,7 @@ func createOrganizationToken(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(organizationTokenOutput, out, &created, "Organization", "created", tokenName, cleanTokenOutput)
+	return renderTokenSecret(organizationTokenOutput, out, &created, "Organization", "Created", tokenName, cleanTokenOutput)
 }
 
 func updateOrganizationToken(args []string, out io.Writer) error {
@@ -87,11 +87,11 @@ func updateOrganizationToken(args []string, out io.Writer) error {
 	}
 	tokenArg(args, &tokenID)
 	res, err := organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole,
-		organizationTokenPicker("--name", "Please select the Organization API token you would like to update:"), astroV1Client)
+		organizationTokenPicker("--name", "Select the Organization API token to update:"), astroV1Client)
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(organizationTokenOutput, out, res.Token, fmt.Sprintf("Astro Organization API token %s was successfully updated", res.PreviousName))
+	return renderTokenLine(organizationTokenOutput, out, res.Token, fmt.Sprintf("Updated Organization API token %s", res.PreviousName))
 }
 
 func rotateOrganizationToken(args []string, out io.Writer) error {
@@ -99,7 +99,7 @@ func rotateOrganizationToken(args []string, out io.Writer) error {
 		return err
 	}
 	tokenArg(args, &tokenID)
-	pick := organizationTokenPicker("--name", "Please select the Organization API token you would like to rotate:")
+	pick := organizationTokenPicker("--name", "Select the Organization API token to rotate:")
 	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)
 	if err != nil {
 		return err
@@ -107,7 +107,7 @@ func rotateOrganizationToken(args []string, out io.Writer) error {
 	if !forceRotate {
 		if err := confirmTokenChange(
 			"API Token rotation will invalidate the current token and cannot be undone.",
-			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name))); err != nil {
+			fmt.Sprintf("\nRotate API token %s?", ansi.Bold(token.Name))); err != nil {
 			return err
 		}
 	}
@@ -116,7 +116,7 @@ func rotateOrganizationToken(args []string, out io.Writer) error {
 		return err
 	}
 	// Named as found, which a rotate by ID knows only after the lookup.
-	return renderTokenSecret(organizationTokenOutput, out, &rotated, "Organization", "rotated", token.Name, cleanTokenOutput)
+	return renderTokenSecret(organizationTokenOutput, out, &rotated, "Organization", "Rotated", token.Name, cleanTokenOutput)
 }
 
 func deleteOrganizationToken(args []string, out io.Writer) error {
@@ -124,14 +124,14 @@ func deleteOrganizationToken(args []string, out io.Writer) error {
 		return err
 	}
 	tokenArg(args, &tokenID)
-	pick := organizationTokenPicker("--name", "Please select the Organization API token you would like to delete:")
+	pick := organizationTokenPicker("--name", "Select the Organization API token to delete:")
 	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
 	if !forceDelete {
 		if err := confirmTokenChange("API token deletion cannot be undone.",
-			fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name))); err != nil {
+			fmt.Sprintf("\nDelete API token %s?", ansi.Bold(token.Name))); err != nil {
 			return err
 		}
 	}
@@ -139,5 +139,5 @@ func deleteOrganizationToken(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(organizationTokenOutput, out, removal, fmt.Sprintf("Astro Organization API token %s was successfully deleted", removal.Name))
+	return renderTokenLine(organizationTokenOutput, out, removal, fmt.Sprintf("Deleted Organization API token %s", removal.Name))
 }

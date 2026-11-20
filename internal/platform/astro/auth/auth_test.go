@@ -361,14 +361,14 @@ func TestAuthorizeError(t *testing.T) {
 	t.Run("any other denial keeps the device message", func(t *testing.T) {
 		err := authorizeError([]string{"access_denied"}, []string{"user is blocked"})
 		assert.NotErrorIs(t, err, ErrEmailVerificationPending)
-		assert.Contains(t, err.Error(), "Could not authorize your device")
+		assert.Contains(t, err.Error(), "could not authorize your device")
 		assert.Contains(t, err.Error(), "user is blocked")
 	})
 
 	t.Run("another error code keeps the device message", func(t *testing.T) {
 		err := authorizeError([]string{"invalid_request"}, []string{"please verify your email address"})
 		assert.NotErrorIs(t, err, ErrEmailVerificationPending)
-		assert.Contains(t, err.Error(), "Could not authorize your device")
+		assert.Contains(t, err.Error(), "could not authorize your device")
 	})
 }
 
@@ -493,7 +493,7 @@ func TestAuthorizeCallbackHandler(t *testing.T) { //nolint:gocognit // subtests 
 		callbackListening = func(addr net.Addr) { bound = addr.String() }
 		callbackTimeout = 5 * time.Millisecond
 		_, err := authorizeCallback(io.Discard)
-		assert.ErrorContains(t, err, "the operation has timed out")
+		assert.ErrorContains(t, err, "the login timed out")
 		requirePortFree(t)
 	})
 
@@ -832,7 +832,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, mockResponse, resp)
-		assert.Contains(t, out, "Please visit the following link")
+		assert.Contains(t, out, "Open this link on a device with a browser")
 		assert.NotContains(t, out, "to open the browser to log in")
 		// Nothing consumed stdin, so the line is still there to read.
 		assert.Equal(t, "unread\n", readAll(t, stdin))
@@ -1075,7 +1075,7 @@ func TestCheckUserSession(t *testing.T) {
 		// organization: input_required, naming the flag that answers it.
 		err := CheckUserSession(&ctx, mockV1Client, buf)
 		assert.True(t, input.IsRequired(err), "%v", err)
-		assert.Contains(t, err.Error(), "Create or join an Organization")
+		assert.Contains(t, err.Error(), "create or join one in the Astro UI")
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -1325,7 +1325,7 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := checkUserSession(&ctx, mockV1Client, buf, true)
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Creating your organization")
+		assert.Contains(t, buf.String(), "Creating your Organization")
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -1343,7 +1343,7 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := checkUserSession(&ctx, mockV1Client, buf, false)
 		assert.NoError(t, err)
-		assert.Contains(t, buf.String(), "Creating your organization")
+		assert.Contains(t, buf.String(), "Creating your Organization")
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -1358,7 +1358,7 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 		buf := new(bytes.Buffer)
 		err := checkUserSession(&ctx, mockV1Client, buf, false)
 		assert.ErrorIs(t, err, ErrorNoOrganization)
-		assert.NotContains(t, buf.String(), "Creating your organization")
+		assert.NotContains(t, buf.String(), "Creating your Organization")
 		mockV1Client.AssertExpectations(t)
 	})
 	// The question can come from the login inside any command, and only a
@@ -1373,7 +1373,7 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 		ctx := config.Context{Domain: "test-domain"}
 		err := checkUserSession(&ctx, mockV1Client, new(bytes.Buffer), false)
 		assert.True(t, input.IsRequired(err), "err: %v", err)
-		assert.ErrorContains(t, err, "Create or join an Organization in the Astro UI")
+		assert.ErrorContains(t, err, "create or join one in the Astro UI")
 		mockV1Client.AssertExpectations(t)
 	})
 
@@ -1422,7 +1422,7 @@ func TestLoginRefusedWhenTheRunMayNotAsk(t *testing.T) {
 
 	assert.ErrorIs(t, err, ErrLoginNeeded)
 	assert.False(t, input.IsRequired(err), "no flag answers a login, so it is not input_required")
-	assert.ErrorContains(t, err, "with --output json it cannot — set ASTRO_API_TOKEN (astro login prints a link")
+	assert.ErrorContains(t, err, "with --output json it cannot; set ASTRO_API_TOKEN, or run astro login in a terminal")
 	assert.NotContains(t, err.Error(), "run astro login first", "the refusal must not send the person to a command it also refuses")
 	assert.Empty(t, string(printed), "nothing reaches stdout")
 }
@@ -1553,7 +1553,7 @@ func TestLogin(t *testing.T) {
 	t.Run("invalid domain", func(t *testing.T) {
 		err := Login("fail.astronomer.io", "", nil, os.Stdout, false, false, false)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Invalid domain.")
+		assert.Contains(t, err.Error(), "invalid domain")
 	})
 
 	t.Run("auth failure", func(t *testing.T) {
@@ -1775,7 +1775,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		assert.Contains(t, errOut, "Using your saved login for astronomer.io")
 		assert.Contains(t, errOut, "Logging in as")
 		assert.Contains(t, errOut, "test@astronomer.test")
-		assert.Contains(t, errOut, "Successfully authenticated to Astronomer")
+		assert.Contains(t, errOut, "Authenticated to Astronomer")
 		assert.Empty(t, out, "a reused login prints nothing on stdout")
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
@@ -1857,7 +1857,7 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 			if terminal {
 				assert.Contains(t, errOut, "Press Enter")
 			} else {
-				assert.Contains(t, errOut, "Please visit the following link")
+				assert.Contains(t, errOut, "Open this link on a device with a browser")
 			}
 			assert.Contains(t, errOut, "Logging in as")
 			restoreTerminals()
@@ -2031,7 +2031,7 @@ func TestLogout(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		buf := new(bytes.Buffer)
 		assert.NoError(t, Logout("localhost", buf))
-		assert.Equal(t, "Successfully logged out of Astronomer\n", buf.String())
+		assert.Equal(t, "Logged out of Astronomer\n", buf.String())
 	})
 
 	t.Run("clears every credential, the expiry included", func(t *testing.T) {
@@ -2137,7 +2137,7 @@ func TestLogout(t *testing.T) {
 	t.Run("an unknown domain is reported as the user typed it", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		err := Logout("cloud.never-logged-in.io", io.Discard)
-		assert.ErrorContains(t, err, "failed to find a login for cloud.never-logged-in.io")
+		assert.ErrorContains(t, err, "could not find a login for cloud.never-logged-in.io")
 	})
 
 	t.Run("an unknown domain fails without reporting success", func(t *testing.T) {
@@ -2238,7 +2238,7 @@ func TestNoOrganizationPrompt(t *testing.T) {
 	t.Run("offers a free organization on a real Astro host", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		prompt := noOrganizationPrompt("astronomer.io", out)
-		assert.Equal(t, "No organization found. Create your own free organization now", prompt)
+		assert.Equal(t, "No Organization found. Create a free Organization now", prompt)
 		assert.Empty(t, out.String())
 	})
 
@@ -2249,7 +2249,7 @@ func TestNoOrganizationPrompt(t *testing.T) {
 		assert.Contains(t, out.String(), "astro login pr41517 --force")
 		assert.Contains(t, out.String(), "the account it was set up with")
 		assert.NotContains(t, out.String(), "@", "the message names no account")
-		assert.Contains(t, prompt, "temporary organization in pr41517")
+		assert.Contains(t, prompt, "temporary Organization in pr41517")
 	})
 }
 
@@ -2311,7 +2311,7 @@ func TestExplicitLoginWorksWhenTheRunMayNotAsk(t *testing.T) {
 			assert.ErrorIs(t, err, errMock, "the login reached the browser callback, not a refusal")
 			assert.NotErrorIs(t, err, ErrLoginNeeded)
 			assert.True(t, reached, "the callback was waited on")
-			assert.Contains(t, printed, "Please visit the following link", "the link is printed")
+			assert.Contains(t, printed, "Open this link on a device with a browser", "the link is printed")
 			assert.NotContains(t, printed, "Press Enter", "no pause for Enter in a run that may not ask")
 
 			// --login-link is not refused either.
@@ -2338,6 +2338,6 @@ func TestNoOrganizationRefusalNamesWhatResolvesIt(t *testing.T) {
 	t.Cleanup(input.SetGuard(func() string { return "with CI set it cannot" }))
 	_, err := askToCreateOrganization("astronomer.io", io.Discard)
 	assert.True(t, input.IsRequired(err), "%v", err)
-	assert.ErrorContains(t, err, "Create or join an Organization in the Astro UI")
+	assert.ErrorContains(t, err, "create or join one in the Astro UI")
 	assert.NotContains(t, err.Error(), "--signup")
 }

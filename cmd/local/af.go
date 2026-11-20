@@ -34,8 +34,8 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 		// The Short says "Airflow" in both registrations, because a reader
 		// scanning `astro --help` for the Airflow commands is the reader this
 		// group was added for. Which Airflow is the Long's job.
-		Short: "Talk to an Airflow: dags, runs, tasks, and more",
-		Long: "Query and control an Airflow: its dags, runs, tasks, assets, connections, variables, pools, and health, " +
+		Short: "Talk to an Airflow: Dags, runs, tasks, and more",
+		Long: "Query and control an Airflow: its Dags, runs, tasks, assets, connections, variables, pools, and health, " +
 			"and its version, providers, plugins, and configuration.\n\n" +
 			"These commands act on " + newTarget().which() + ".",
 		Args: cobra.ArbitraryArgs,

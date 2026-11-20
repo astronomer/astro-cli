@@ -17,8 +17,8 @@ func newAssetsCmd(d Deps, t target) *cobra.Command {
 		Use:   "assets",
 		Short: "List the data assets an Airflow tracks, and their updates",
 		Long: "Read the data assets on " + t.which() + ", the events that update " +
-			"them, and the events that started a given run. Airflow 2 calls the same thing a dataset; both " +
-			"answer here.",
+			"them, and the events that started a given run.\n\n" +
+			"Airflow 2 calls an asset a dataset. Both words work here.",
 	},
 		newAssetsListCmd,
 		newAssetsEventsCmd,
@@ -117,8 +117,8 @@ func newAssetsEventsCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "events",
 		Short: "List asset updates and the runs they started",
-		Long: "List the events that updated an asset. An event is what a task wrote, and it is what starts the " +
-			"Dags scheduled on that asset — so this is the answer to why a data-aware Dag ran.",
+		Long: "List the events that updated an asset. An event is written by a task and starts the " +
+			"Dags scheduled on that asset. Use it to see why a data-aware Dag ran.",
 		Args: cobra.NoArgs,
 		Example: afExample(q.t,
 			"List the latest asset updates", "assets events",

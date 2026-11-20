@@ -8,7 +8,7 @@ import (
 
 // ErrNoDeploymentUsers is UserList's answer when Houston lists no user for
 // the Deployment at all.
-var ErrNoDeploymentUsers = errors.New("no users were found for this deployment")
+var ErrNoDeploymentUsers = errors.New("no users found for this Deployment")
 
 // UserRole is a user and the role they hold on a Deployment. ID is empty
 // when Houston's answer did not name them.

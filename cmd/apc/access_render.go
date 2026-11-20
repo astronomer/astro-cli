@@ -112,7 +112,7 @@ func renderServiceAccountCreated(r cliout.Renderer, s *sa.ServiceAccount) error 
 	return r.Emit(out, func(w io.Writer) error {
 		tab := serviceAccountTable()
 		tab.AddRow([]string{s.Label, s.Category, s.ID, s.APIKey}, false)
-		tab.SuccessMsg = "\n Service account successfully created."
+		tab.SuccessMsg = "\n Created service account"
 		return tab.Print(w)
 	})
 }
@@ -133,7 +133,7 @@ func renderServiceAccountList(r cliout.Renderer, sas []sa.ServiceAccount) error 
 
 func serviceAccountDeletedText(s *sa.ServiceAccount) func(io.Writer) error {
 	return cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintf(b, "Service Account %s (%s) successfully deleted\n", s.Label, s.ID)
+		fmt.Fprintf(b, "Deleted Service Account %s (%s)\n", s.Label, s.ID)
 	})
 }
 
@@ -214,7 +214,7 @@ func renderDeploymentUserList(r cliout.Renderer, users []deployment.UserRole) er
 // list, and in text the sentence the command has always printed.
 func renderNoDeploymentUsers(r cliout.Renderer) error {
 	return r.Emit(userListJSON{Users: []userJSON{}}, cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintln(b, "No users were found for this deployment.  Check the deploymentId and try again.")
+		fmt.Fprintln(b, "No users found for this Deployment. Check the Deployment ID and try again.")
 	}))
 }
 
@@ -226,10 +226,10 @@ func renderDeploymentUserChange(r cliout.Renderer, deploymentID, email string, u
 		tab := deploymentUserTable()
 		if added {
 			tab.AddRow([]string{deploymentID, email, u.Role}, false)
-			tab.SuccessMsg = fmt.Sprintf("\n Successfully added %s as a %s", email, u.Role)
+			tab.SuccessMsg = fmt.Sprintf("\n Added %s as a %s", email, u.Role)
 		} else {
 			tab.AddRow([]string{deploymentID, u.Username, u.Role}, false)
-			tab.SuccessMsg = fmt.Sprintf("\n Successfully updated %s to a %s", email, u.Role)
+			tab.SuccessMsg = fmt.Sprintf("\n Updated %s to a %s", email, u.Role)
 		}
 		return tab.Print(w)
 	})
@@ -242,7 +242,7 @@ func renderDeploymentUserRemoval(r cliout.Renderer, deploymentID, email string, 
 	return r.Emit(out, func(w io.Writer) error {
 		tab := deploymentUserTable()
 		tab.AddRow([]string{deploymentID, email, role}, false)
-		tab.SuccessMsg = fmt.Sprintf("\n Successfully removed the %s role for %s from deployment %s", role, email, deploymentID)
+		tab.SuccessMsg = fmt.Sprintf("\n Removed the %s role for %s from Deployment %s", role, email, deploymentID)
 		return tab.Print(w)
 	})
 }
@@ -275,14 +275,14 @@ func renderWorkspaceUserAdded(r cliout.Renderer, w *houston.Workspace, email str
 			Header:         []string{"NAME", "WORKSPACE ID", "EMAIL", "ROLE"},
 		}
 		tab.AddRow([]string{w.Label, w.ID, email, u.Role}, false)
-		tab.SuccessMsg = fmt.Sprintf("Successfully added %s to %s", email, w.Label)
+		tab.SuccessMsg = fmt.Sprintf("Added %s to %s", email, w.Label)
 		return tab.Print(out)
 	})
 }
 
 func renderWorkspaceUserUpdated(r cliout.Renderer, email string, c *workspace.UserRoleChange) error {
 	return r.Emit(newWorkspaceUserJSON(&c.User), cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintf(b, "Role has been changed from %s to %s for user %s", c.Previous, c.User.Role, email)
+		fmt.Fprintf(b, "Changed role from %s to %s for user %s", c.Previous, c.User.Role, email)
 	}))
 }
 
@@ -297,7 +297,7 @@ func renderWorkspaceUserRemoved(r cliout.Renderer, w *houston.Workspace, u *work
 			Header:  []string{"NAME", "WORKSPACE ID", "USER_ID"},
 		}
 		tab.AddRow([]string{w.Label, w.ID, userID}, false)
-		tab.SuccessMsg = "Successfully removed user from workspace"
+		tab.SuccessMsg = "Removed user from Workspace"
 		return tab.Print(o)
 	})
 }
@@ -316,11 +316,11 @@ type createdUserJSON struct {
 func renderUserCreated(r cliout.Renderer, c *user.Created) error {
 	out := createdUserJSON{ID: orNull(c.ID), Username: orNull(c.Username), Status: orNull(c.Status)}
 	return r.Emit(out, cliout.Text(func(b *bufio.Writer) {
-		loginMsg := "You may now login to the platform."
+		loginMsg := "You can now log in to the platform."
 		if c.Status == "pending" {
-			loginMsg = "Check your email for a verification."
+			loginMsg = "Check your email to verify the account."
 		}
-		fmt.Fprintf(b, "Successfully created user %s. %s\n", c.Email, loginMsg)
+		fmt.Fprintf(b, "Created user %s. %s\n", c.Email, loginMsg)
 	}))
 }
 
@@ -441,9 +441,9 @@ func renderDeploymentTeamChange(r cliout.Renderer, deploymentID, teamID, role st
 		}
 		tab.AddRow([]string{deploymentID, teamID, role}, false)
 		if added {
-			tab.SuccessMsg = fmt.Sprintf("\nSuccessfully added team %s to deployment %s as a %s", teamID, deploymentID, role)
+			tab.SuccessMsg = fmt.Sprintf("\nAdded team %s to Deployment %s as a %s", teamID, deploymentID, role)
 		} else {
-			tab.SuccessMsg = fmt.Sprintf("\n Successfully updated team %s to a %s", teamID, role)
+			tab.SuccessMsg = fmt.Sprintf("\n Updated team %s to a %s", teamID, role)
 		}
 		return tab.Print(w)
 	})
@@ -458,7 +458,7 @@ func renderDeploymentTeamRemoval(r cliout.Renderer, deploymentID, teamID string)
 			Header:         []string{"DEPLOYMENT ID", "TEAM ID"},
 		}
 		tab.AddRow([]string{deploymentID, teamID}, false)
-		tab.SuccessMsg = fmt.Sprintf("\n Successfully removed team %s from deployment %s", teamID, deploymentID)
+		tab.SuccessMsg = fmt.Sprintf("\n Removed team %s from Deployment %s", teamID, deploymentID)
 		return tab.Print(w)
 	})
 }
@@ -481,7 +481,7 @@ func renderWorkspaceTeamAdded(r cliout.Renderer, w *houston.Workspace, teamID, r
 			Header:         []string{"NAME", "WORKSPACE ID", "TEAM ID", "ROLE"},
 		}
 		tab.AddRow([]string{w.Label, w.ID, teamID, role}, false)
-		tab.SuccessMsg = fmt.Sprintf("Successfully added %s to %s", teamID, w.Label)
+		tab.SuccessMsg = fmt.Sprintf("Added %s to %s", teamID, w.Label)
 		return tab.Print(out)
 	})
 }
@@ -489,7 +489,7 @@ func renderWorkspaceTeamAdded(r cliout.Renderer, w *houston.Workspace, teamID, r
 func renderWorkspaceTeamUpdated(r cliout.Renderer, c *workspace.TeamRoleChange) error {
 	out := teamJSON{ID: c.Team.ID, Name: orNull(c.Team.Name), WorkspaceRole: orNull(c.Team.Role)}
 	return r.Emit(out, cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintf(b, "Role has been changed from %s to %s for team %s\n", c.Previous, c.Team.Role, c.Team.ID)
+		fmt.Fprintf(b, "Changed role from %s to %s for team %s\n", c.Previous, c.Team.Role, c.Team.ID)
 	}))
 }
 
@@ -507,7 +507,7 @@ func renderWorkspaceTeamRemoved(r cliout.Renderer, notes io.Writer, removal *wor
 			Header:  []string{"NAME", "WORKSPACE ID", "TEAM ID"},
 		}
 		tab.AddRow([]string{w.Label, w.ID, teamID}, false)
-		tab.SuccessMsg = "Successfully removed team from workspace"
+		tab.SuccessMsg = "Removed team from Workspace"
 		return tab.Print(o)
 	})
 }
@@ -539,11 +539,11 @@ func renderTeamUpdated(r cliout.Renderer, c *teams.RoleChange) error {
 	return r.Emit(teamJSON{ID: c.TeamID, SystemRole: orNull(c.Role)}, cliout.Text(func(b *bufio.Writer) {
 		switch {
 		case !c.Changed:
-			fmt.Fprintf(b, "Role for the team %s already set to None, nothing to update\n", c.TeamID)
+			fmt.Fprintf(b, "Role for team %s is already None; nothing to update\n", c.TeamID)
 		case c.Previous != "":
-			fmt.Fprintf(b, "Role has been changed from %s to %s for team %s\n\n", c.Previous, c.Role, c.TeamID)
+			fmt.Fprintf(b, "Changed role from %s to %s for team %s\n\n", c.Previous, c.Role, c.TeamID)
 		default:
-			fmt.Fprintf(b, "Role has been changed to %s for team %s\n\n", c.Role, c.TeamID)
+			fmt.Fprintf(b, "Changed role to %s for team %s\n\n", c.Role, c.TeamID)
 		}
 	}))
 }

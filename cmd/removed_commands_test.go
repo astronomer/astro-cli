@@ -395,7 +395,7 @@ func TestRemovedAliasStubsNeverRunTheirCommand(t *testing.T) {
 				}
 				// The run named the stub's command in its Short too, as its
 				// help shows it.
-				assert.Equal(t, "Removed in v2 — use "+target.CommandPath()+", or its alias rm", stub.Short, stub.CommandPath())
+				assert.Equal(t, "Removed in v2; use "+target.CommandPath()+", or its alias rm", stub.Short, stub.CommandPath())
 			}
 		})
 	}

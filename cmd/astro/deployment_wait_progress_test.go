@@ -44,7 +44,7 @@ func TestDeploymentWaitProgressGoesToStderr(t *testing.T) {
 			args: createArgs,
 			progress: []string{
 				"Current Workspace: test-workspace",
-				"Waiting for the deployment to become healthy…", "This may take a few minutes",
+				"Waiting for the Deployment to become healthy…", "This may take a few minutes",
 				"Deployment etl-prod is now healthy",
 			},
 		},
@@ -53,7 +53,7 @@ func TestDeploymentWaitProgressGoesToStderr(t *testing.T) {
 			client: func(t *testing.T) *astrov1_mocks.ClientWithResponsesInterface { return cloneMock(t, nil, made) },
 			args:   []string{"create", "--clone", cloneSourceID, "--name", "etl-preview"},
 			progress: []string{
-				"Waiting for the deployment to become healthy…", "This may take a few minutes",
+				"Waiting for the Deployment to become healthy…", "This may take a few minutes",
 				"Deployment etl-preview is now healthy",
 			},
 		},
@@ -113,14 +113,14 @@ func TestDeploymentUpdateWarningsGoToStderr(t *testing.T) {
 			dep:       dagDeployOff,
 			dagDeploy: "enable",
 			warnings:  []string{"You enabled Dag-only deploys for this Deployment."},
-			stdout:    []string{"Successfully updated Deployment"},
+			stdout:    []string{"Updated Deployment"},
 		},
 		{
 			name:      "disable DAG deploys",
 			dep:       coreDeployment(),
 			dagDeploy: "disable",
 			warnings:  []string{"Warning: This command will disable Dag-only deploys for this Deployment."},
-			stdout:    []string{"Are you sure you want to update the", "Successfully updated Deployment"},
+			stdout:    []string{"Update Deployment", "Updated Deployment"},
 		},
 	}
 	for _, tc := range cases {

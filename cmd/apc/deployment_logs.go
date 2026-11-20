@@ -80,8 +80,8 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs [DEPLOYMENT_ID]",
 		Aliases: []string{"log", "l"},
-		Short:   "Show an Airflow Deployment's logs",
-		Long:    "Show an Airflow Deployment's logs, from every component unless flags such as --scheduler or --component pick some, for the Deployment named by its id or with --deployment, which takes a link name from the project's manifest too. --follow streams one component's logs as they come.",
+		Short:   "Show a Deployment's logs",
+		Long:    "Show a Deployment's logs from every component, or only from those picked with flags such as --scheduler or --component. Name the Deployment by its ID or with --deployment, which also takes a link name from the project's manifest.\n\n--follow streams the logs of one component as they arrive.",
 		Example: `  # Show a Deployment's logs from every component, today
   astro deployment logs <DEPLOYMENT_ID>
 
@@ -110,7 +110,7 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 	if triggerer {
 		cmd.Flags().BoolVar(&logsTriggerer, "triggerer", false, "Show logs from the triggerer")
 	}
-	cmd.Flags().StringSliceVar(&logsComponents, "component", nil, "Show logs from a component by name ("+logComponentNamesProse(triggerer)+"), repeatable or comma-separated, instead of a flag such as --scheduler")
+	cmd.Flags().StringSliceVar(&logsComponents, "component", nil, "Show logs from a component by name ("+logComponentNamesProse(triggerer)+"); repeat the flag or separate names with commas")
 
 	cmd.AddCommand(
 		newComponentLogsCmd(out, "webserver", []string{"web", "w"}, logWebserver),
@@ -157,8 +157,8 @@ func addLogsFlags(cmd *cobra.Command, oneX bool) {
 	if oneX {
 		utils.AddAlias(cmd.Flags(), "search", "keyword")
 	}
-	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Stream the logs as they come, of one component")
-	cmd.Flags().DurationVar(&since, "since", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only logs from the moment it starts")
+	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Stream the logs of one component as they arrive")
+	cmd.Flags().DurationVar(&since, "since", 0, "Only show logs newer than this duration, such as 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only new logs")
 	cliout.AddOutputFlag(cmd, &logsOutput)
 }
 

@@ -144,7 +144,7 @@ type tokenRun struct {
 func noTokenQuestionOnStdout(t *testing.T, stdout string) {
 	t.Helper()
 	for _, line := range strings.Split(stdout, "\n") {
-		if strings.Contains(line, "Please select the") && strings.Contains(line, "API token") {
+		if strings.Contains(line, "Select the") && strings.Contains(line, "API token") {
 			t.Errorf("a token picker's question went to stdout: %q", line)
 		}
 	}
@@ -321,10 +321,10 @@ func TestDeploymentTokenText(t *testing.T) {
 	secretShown := func(verb string) func(t *testing.T, out string) {
 		return func(t *testing.T, out string) {
 			requireInOrder(t, out,
-				"Astro Deployment API token ci-deploy was successfully "+verb,
-				"Copy and paste this API token for your records.",
+				verb+" Deployment API token ci-deploy",
+				"Copy this API token for your records.",
 				tokSecret,
-				"You will not be shown this API token value again.")
+				"This API token value is not shown again.")
 			requireLine(t, out, tokSecret)
 		}
 	}
@@ -381,7 +381,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "create", d, "--name", "ci-deploy", "--role", "DEPLOYMENT_ADMIN"},
-			check: secretShown("created"),
+			check: secretShown("Created"),
 		},
 		{
 			name: "create --clean-output",
@@ -404,7 +404,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "update", "tok-dep", d, "--new-name", "ci-deploy-2", "--role", "DEPLOYMENT_MEMBER"},
-			check: says("Astro Deployment API token ci-deploy was successfully updated"),
+			check: says("Updated Deployment API token ci-deploy"),
 		},
 		{
 			name: "update through the picker",
@@ -418,8 +418,8 @@ func TestDeploymentTokenText(t *testing.T) {
 			args:    []string{"token", "update", d, "--role", "DEPLOYMENT_MEMBER"},
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out,
-					"Please select the Deployment API token:",
-					"> Astro Deployment API token ci-deploy was successfully updated")
+					"Select the Deployment API token:",
+					"> Updated Deployment API token ci-deploy")
 				picker := map[string]string{"#": "1"}
 				for k, v := range depRow {
 					picker[k] = v
@@ -436,7 +436,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "update", "tok-dep", d, "--description", "new words"},
-			check: says("Astro Deployment API token ci-deploy was successfully updated"),
+			check: says("Updated Deployment API token ci-deploy"),
 		},
 		{
 			// That nothing is sent: TestDeploymentTokenUpdateRefusesBeforeChanging.
@@ -455,7 +455,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "rotate", "tok-dep", d, "--yes"},
-			check: secretShown("rotated"),
+			check: secretShown("Rotated"),
 		},
 		{
 			name: "rotate confirmed by name",
@@ -469,9 +469,9 @@ func TestDeploymentTokenText(t *testing.T) {
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out,
 					"WARNING: API Token rotation will invalidate the current token and cannot be undone.",
-					"Are you sure you want to rotate the ci-deploy API token? (y/n)",
-					"Astro Deployment API token ci-deploy was successfully rotated")
-				secretShown("rotated")(t, out)
+					"Rotate API token ci-deploy? (y/n)",
+					"Rotated Deployment API token ci-deploy")
+				secretShown("Rotated")(t, out)
 			},
 		},
 		{
@@ -493,7 +493,7 @@ func TestDeploymentTokenText(t *testing.T) {
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out,
 					"WARNING: API Token rotation will invalidate the current token and cannot be undone.",
-					"Are you sure you want to rotate the ci-deploy API token? (y/n)")
+					"Rotate API token ci-deploy? (y/n)")
 				assert.NotContains(t, out, tokSecret)
 			},
 			wantErr: "aborted",
@@ -507,7 +507,7 @@ func TestDeploymentTokenText(t *testing.T) {
 			},
 			args: []string{"token", "delete", "tok-dep", d, "--yes"},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Astro Deployment API token ci-deploy was successfully deleted")
+				requireInOrder(t, out, "Deleted Deployment API token ci-deploy")
 				assert.NotContains(t, out, "Are you sure", "--yes answers the question")
 			},
 		},
@@ -522,8 +522,8 @@ func TestDeploymentTokenText(t *testing.T) {
 			args:    []string{"token", "delete", "tok-dep", d},
 			check: says(
 				"WARNING: API token deletion cannot be undone.",
-				"Are you sure you want to delete the ci-deploy API token? (y/n)",
-				"Astro Deployment API token ci-deploy was successfully deleted"),
+				"Delete API token ci-deploy? (y/n)",
+				"Deleted Deployment API token ci-deploy"),
 		},
 		{
 			name:    "delete declined",
@@ -532,7 +532,7 @@ func TestDeploymentTokenText(t *testing.T) {
 			args:    []string{"token", "delete", "tok-dep", d},
 			check: says(
 				"WARNING: API token deletion cannot be undone.",
-				"Are you sure you want to delete the ci-deploy API token? (y/n)"),
+				"Delete API token ci-deploy? (y/n)"),
 			wantErr: "aborted",
 		},
 		{
@@ -575,8 +575,8 @@ func TestDeploymentTokenText(t *testing.T) {
 			args:    []string{"token", "remove", "tok-ws", d},
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out,
-					"Are you sure you want to remove the ws-token API token from the Deployment? (y/n)",
-					"Astro Workspace API token ws-token was successfully removed from the Deployment")
+					"Remove API token ws-token from the Deployment? (y/n)",
+					"Removed Workspace API token ws-token from the Deployment")
 				assert.NotContains(t, out, "WARNING", "a removal can be undone")
 			},
 		},
@@ -586,7 +586,7 @@ func TestDeploymentTokenText(t *testing.T) {
 			answers: "n\n",
 			args:    []string{"token", "remove", "tok-ws", d},
 			check: says(
-				"Are you sure you want to remove the ws-token API token from the Deployment? (y/n)"),
+				"Remove API token ws-token from the Deployment? (y/n)"),
 			wantErr: "aborted",
 		},
 		{
@@ -599,7 +599,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "organization-token", "add", "tok-org", d, "--role", "DEPLOYMENT_ADMIN"},
-			check: says("Astro Organization API token org-token was successfully added/updated to the Deployment"),
+			check: says("Set the Deployment role for Organization API token org-token"),
 		},
 		{
 			name: "organization-token update",
@@ -609,7 +609,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "organization-token", "update", "tok-org", d, "--role", "DEPLOYMENT_MEMBER"},
-			check: says("Astro Organization API token org-token was successfully added/updated to the Deployment"),
+			check: says("Set the Deployment role for Organization API token org-token"),
 		},
 		{
 			name: "organization-token remove",
@@ -619,7 +619,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "organization-token", "remove", "tok-org", d},
-			check: says("Astro Organization API token org-token was successfully removed from the Deployment"),
+			check: says("Removed Organization API token org-token from the Deployment"),
 		},
 		{
 			name: "workspace-token add",
@@ -631,7 +631,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "workspace-token", "add", "tok-ws", d, "--role", "DEPLOYMENT_MEMBER"},
-			check: says("Astro Workspace API token ws-token was successfully added/updated to the Deployment"),
+			check: says("Set the Deployment role for Workspace API token ws-token"),
 		},
 		{
 			name: "workspace-token update",
@@ -641,7 +641,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "workspace-token", "update", "tok-ws", d, "--role", "DEPLOYMENT_ADMIN"},
-			check: says("Astro Workspace API token ws-token was successfully added/updated to the Deployment"),
+			check: says("Set the Deployment role for Workspace API token ws-token"),
 		},
 		{
 			name: "workspace-token remove",
@@ -651,7 +651,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "workspace-token", "remove", "tok-ws", d},
-			check: says("Astro Workspace API token ws-token was successfully removed from the Deployment"),
+			check: says("Removed Workspace API token ws-token from the Deployment"),
 		},
 	}
 	for _, tc := range cases {

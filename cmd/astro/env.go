@@ -19,7 +19,7 @@ const includeSecretsWarning = "--include-secrets returns secret values in the re
 // At workspace scope, this toggles the platform's "auto-link to all
 // deployments" flag on the object. Has no effect at deployment scope.
 func addAutoLinkFlag(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&envAutoLink, "auto-link", false, "Link to every deployment in the workspace, including future ones (workspace scope only)")
+	cmd.Flags().BoolVar(&envAutoLink, "auto-link", false, "Link to every Deployment in the Workspace, including future ones (workspace scope only)")
 }
 
 // autoLinkPtr returns nil when --auto-link was not explicitly set (so the
@@ -43,7 +43,7 @@ const formatDotenv cliout.Format = "dotenv"
 // which the four nouns and env list word alike.
 const (
 	envWorkspaceUsage  = "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)"
-	envDeploymentUsage = "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml"
+	envDeploymentUsage = "Deployment to use instead of a Workspace: an id, or a link name inside a project with a pyproject.toml"
 )
 
 // addScopePersistentFlags wires the workspace/deployment scope flags onto a
@@ -68,7 +68,7 @@ func envScope(cmd *cobra.Command) (env.Scope, error) {
 			return env.Scope{}, err
 		}
 		if err != nil {
-			return env.Scope{}, fmt.Errorf("%w (and falling back to workspace context: %w)", env.ErrScopeNotSpecified, err)
+			return env.Scope{}, fmt.Errorf("%w (and falling back to Workspace context: %w)", env.ErrScopeNotSpecified, err)
 		}
 		return env.Scope{WorkspaceID: ws, Source: t.WorkspaceSource}, nil
 	}

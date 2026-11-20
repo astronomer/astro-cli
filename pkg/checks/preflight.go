@@ -202,7 +202,7 @@ func Preflight(ctx context.Context, target string, in PreflightInput, prov Provi
 	// so) and is checked by Run instead, so reporting it as unknown would send
 	// a caller looking for a typo that is not there.
 	if target == TargetAstro {
-		return TargetReport{Target: target, OpError: fmt.Sprintf("target %q is checked by Run, not Preflight: it has no platform version table to check a pin against", target)}
+		return TargetReport{Target: target, OpError: fmt.Sprintf("target %q is checked by Run, not Preflight, because it has no platform version table to check a pin against", target)}
 	}
 	supported, ok := supportedVersions(target)
 	if !ok {
@@ -224,7 +224,7 @@ func Preflight(ctx context.Context, target string, in PreflightInput, prov Provi
 	if downgraded {
 		rep.MappedFrom = in.Pin
 		rep.Notes = append(rep.Notes, fmt.Sprintf(
-			"%s does not offer Airflow %s; checking against %s, the closest version it runs — a %s-only feature would break there",
+			"%s does not offer Airflow %s; checking against %s, the closest version it runs. A %s-only feature would break there",
 			target, in.Pin, match.Airflow, in.Pin))
 	}
 

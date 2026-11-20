@@ -20,11 +20,11 @@ import (
 )
 
 var (
-	ErrInvalidName               = errors.New("no name provided for the organization token. Retry with a valid name")
-	errOrganizationTokenNotFound = errors.New("organization token specified was not found")
-	errOrgTokenInWorkspace       = errors.New("this Organization API token has already been added to the Workspace with that role")
-	errOrgTokenRoleSet           = errors.New("this Organization API token already has that role on the Organization")
-	errWrongTokenTypeSelected    = errors.New("the token selected is not of the type you are trying to modify")
+	ErrInvalidName               = errors.New("no name provided for the Organization API token")
+	errOrganizationTokenNotFound = errors.New("no Organization API token found with that name or ID")
+	errOrgTokenInWorkspace       = errors.New("this Organization API token is already in the Workspace with that role")
+	errOrgTokenRoleSet           = errors.New("this Organization API token already has that role")
+	errWrongTokenTypeSelected    = errors.New("the selected token is not the right type for this command")
 )
 
 const (
@@ -33,7 +33,7 @@ const (
 
 	// The plain choice has no heading here: the picker asks it in words
 	// that suit the command, which this package does not know.
-	pickSharedNameHead = "\nThere are more than one API tokens with name %s. Please select an API token:"
+	pickSharedNameHead = "\nSeveral API tokens are named %s. Select an API token:"
 )
 
 // orgRoleOf returns the token's Organization role, if present.

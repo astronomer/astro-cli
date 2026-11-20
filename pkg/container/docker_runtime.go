@@ -10,8 +10,8 @@ const (
 	tickNum               = 500
 	open                  = "open"
 	timeoutErrMsg         = "timed out waiting for docker"
-	dockerOpenNotice      = "We couldn't start the docker engine automatically. Please start it manually and try again."
-	initMessage           = "Astro uses containers to run your project. Please wait while we get started…"
+	dockerOpenNotice      = "Could not start the Docker engine automatically. Start it manually and try again."
+	initMessage           = "Astro uses containers to run your project. Starting up…"
 )
 
 // DockerEngine abstracts the two Docker operations the runtime needs so tests

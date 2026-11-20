@@ -131,7 +131,7 @@ type composerCoordinates struct {
 // [tool.astro.targets.composer] section on a link that has none.
 func ComposerBaseURL(ctx context.Context, i instances.Instance, o Options) (string, error) {
 	if i.Kind != instances.KindComposer {
-		return "", fmt.Errorf("%q is a %s deployment, not a Composer environment: only a Composer link has an address to look up here", i.Name, i.Kind)
+		return "", fmt.Errorf("%q is a %s deployment, not a Composer environment; only a Composer link has an address to look up here", i.Name, i.Kind)
 	}
 	at, err := composerCoordinatesOf(i)
 	if err != nil {
@@ -153,7 +153,7 @@ func ComposerBaseURL(ctx context.Context, i instances.Instance, o Options) (stri
 
 	resp, err := o.client().Do(req)
 	if err != nil {
-		return "", fmt.Errorf("could not reach the Composer API to look up %q — check your connection: %w", i.Name, err)
+		return "", fmt.Errorf("could not reach the Composer API to look up %q (check your connection): %w", i.Name, err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxComposerBody))
@@ -169,7 +169,7 @@ func ComposerBaseURL(ctx context.Context, i instances.Instance, o Options) (stri
 		return "", fmt.Errorf("decode the Composer environment %s: %w", at.environment, err)
 	}
 	if env.Config.AirflowURI == "" {
-		return "", fmt.Errorf("Composer environment %s in %s reports no Airflow URI yet — it may still be starting", at.environment, at.location)
+		return "", fmt.Errorf("Composer environment %s in %s reports no Airflow URI yet; it may still be starting", at.environment, at.location)
 	}
 	return env.Config.AirflowURI, nil
 }
@@ -213,9 +213,9 @@ func composerCoordinatesOf(i instances.Instance) (composerCoordinates, error) {
 func composerOutage(ctx context.Context, o Options, name string, at composerCoordinates, status int, body []byte) error {
 	switch status {
 	case http.StatusUnauthorized:
-		return fmt.Errorf("Google rejected the credentials for %q — refresh them with gcloud auth application-default login", name)
+		return fmt.Errorf("Google rejected the credentials for %q; run gcloud auth application-default login to refresh them", name)
 	case http.StatusForbidden:
-		msg := fmt.Sprintf("not allowed to read Composer environment %s in project %s — the account needs roles/composer.user",
+		msg := fmt.Sprintf("not allowed to read Composer environment %s in project %s; the account needs roles/composer.user",
 			at.environment, at.project)
 		// A sentence, not a laid-out line. This module answers a GUI as well
 		// as a CLI, and a hard-wrapped indent is presentation the caller owns.
@@ -224,7 +224,7 @@ func composerOutage(ctx context.Context, o Options, name string, at composerCoor
 		}
 		return errors.New(msg)
 	case http.StatusNotFound:
-		return fmt.Errorf("Composer environment %s does not exist in project %s, location %s — check the link's environment and [tool.astro.targets.composer] in pyproject.toml",
+		return fmt.Errorf("Composer environment %s does not exist in project %s, location %s; check the environment and [tool.astro.targets.composer] in pyproject.toml",
 			at.environment, at.project, at.location)
 	}
 	return fmt.Errorf("the Composer API answered %d %s looking up %q: %s",

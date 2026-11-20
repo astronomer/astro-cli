@@ -36,15 +36,15 @@ const (
 
 var (
 	errWorkspaceTokenRoleSet  = errors.New("this Workspace API token already has that role on the Workspace")
-	ErrWorkspaceTokenNotFound = errors.New("no Workspace API token was found for the API token name you provided")
-	errOrgTokenInWorkspace    = errors.New("this Organization API token has already been added to the Workspace with that role")
-	errWrongTokenTypeSelected = errors.New("the token selected is not of the type you are trying to modify")
-	errNotWorkspaceScoped     = errors.New("only a Workspace API token is deleted from a Workspace")
-	errWorkspaceScoped        = errors.New("a Workspace API token is not removed from its own Workspace, only deleted")
+	ErrWorkspaceTokenNotFound = errors.New("no Workspace API token found with that name or ID")
+	errOrgTokenInWorkspace    = errors.New("this Organization API token is already in the Workspace with that role")
+	errWrongTokenTypeSelected = errors.New("the selected token is not the right type for this command")
+	errNotWorkspaceScoped     = errors.New("only a Workspace API token can be deleted from a Workspace")
+	errWorkspaceScoped        = errors.New("a Workspace API token cannot be removed from its own Workspace; delete it instead")
 	// ErrOrgTokenNotRenamed: an Organization token's name and description are
 	// the Organization's to change, so an update of one from a Workspace
 	// changes its role here and nothing else.
-	ErrOrgTokenNotRenamed = errors.New("an Organization API token has its name and description changed in the Organization, not in a Workspace")
+	ErrOrgTokenNotRenamed = errors.New("an Organization API token's name and description change in the Organization; use astro organization token update")
 )
 
 const (
@@ -52,7 +52,7 @@ const (
 
 	// The plain choice has no heading here: the picker asks it in words
 	// that suit the command, which this package does not know.
-	pickSharedNameHead = "\nThere are more than one API tokens with name %s. Please select an API token:"
+	pickSharedNameHead = "\nSeveral API tokens are named %s. Select an API token:"
 )
 
 // workspaceRoleOf returns the token's role on workspaceID, or "".
@@ -498,7 +498,7 @@ func FindTokenIn(id, name, workspaceID, organizationID string, tokenTypes []Toke
 		return token, err
 	}
 	if workspaceRoleOf(&token, workspaceID) == "" {
-		return token, usageerr.NoHelp(fmt.Errorf("the API token %s has no role in this Workspace: only a Workspace's own tokens, and Organization tokens with a role in it, are found here; to give an Organization token a role in it, use astro workspace token add", id))
+		return token, usageerr.NoHelp(fmt.Errorf("the API token %s has no role in this Workspace; to give an Organization token a role here, use astro workspace token add", id))
 	}
 	if len(tokenTypes) > 0 && !slices.Contains(tokenTypes, TokenType(token.Scope)) {
 		return token, errWrongTokenTypeSelected

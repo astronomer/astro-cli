@@ -77,7 +77,7 @@ func (s *CmdSuite) TestLogin() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	apcDomain = "software.astronomer.io"
 	login([]string{apcDomain}, nil, buf)
-	s.Contains(buf.String(), "To login to APC follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
+	s.Contains(buf.String(), "Follow the instructions below to log in to APC. To log in to Astro instead, cancel and run astro login.\n\n")
 }
 
 func (s *CmdSuite) TestLoginSignup() {
@@ -323,7 +323,7 @@ func (s *CmdSuite) TestLogout() {
 	// no domain, no current context set
 	config.ResetCurrentContext()
 	err = logout([]string{}, os.Stdout)
-	s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
+	s.EqualError(err, "no context set; run astro login and try again")
 }
 
 func (s *CmdSuite) TestLogoutExpandsShortNames() {
@@ -373,7 +373,7 @@ func (s *CmdSuite) TestAuthToken() {
 	s.NoError(err)
 
 	err = printAuthToken("", false, textTo(buf))
-	s.EqualError(err, "no token found. Please run 'astro login' to authenticate")
+	s.EqualError(err, "no token found; run astro login")
 
 	// Test with no current context set
 	buf.Reset()

@@ -38,12 +38,12 @@ func (s *Suite) TestValidateDagDeploymentArgsErrors() {
 		expectedOutput                             string
 		expectedError                              string
 	}{
-		{dagDeploymentType: houston.VolumeDeploymentType, expectedError: "please specify the nfs location via --nfs-location flag"},
+		{dagDeploymentType: houston.VolumeDeploymentType, expectedError: "set the NFS location with --nfs-location"},
 		{dagDeploymentType: "unknown", expectedError: ErrInvalidDAGDeploymentType.Error()},
 		{dagDeploymentType: houston.ImageDeploymentType, expectedError: ""},
-		{dagDeploymentType: houston.GitSyncDeploymentType, expectedError: "please specify a valid git repository URL via --git-repository-url"},
-		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "/tmp/test/local-repo.git", expectedError: "please specify a valid git repository URL via --git-repository-url"},
-		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "http://192.168.0.%31:8080/", expectedError: "please specify a valid git repository URL via --git-repository-url"},
+		{dagDeploymentType: houston.GitSyncDeploymentType, expectedError: "set a valid git repository URL with --git-repository-url"},
+		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "/tmp/test/local-repo.git", expectedError: "set a valid git repository URL with --git-repository-url"},
+		{dagDeploymentType: houston.GitSyncDeploymentType, gitRepoURL: "http://192.168.0.%31:8080/", expectedError: "set a valid git repository URL with --git-repository-url"},
 	}
 
 	for _, tt := range myTests {
@@ -223,7 +223,7 @@ func (s *Suite) TestValidateDeploymentModeArg() {
 		{
 			name:        "invalid mode",
 			mode:        "invalid",
-			expectedErr: "please specify a valid deployment mode, one of: helm, operator",
+			expectedErr: "invalid Deployment mode: use helm or operator",
 		},
 	}
 

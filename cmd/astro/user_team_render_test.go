@@ -18,7 +18,7 @@ func TestTeamUpdateLinesCarryNoEscapes(t *testing.T) {
 
 	var buf bytes.Buffer
 	require.NoError(t, renderTeamUpdate(cliout.FormatText, &buf, upd, nil))
-	assert.Equal(t, "Astro Team ops was successfully updated\n", buf.String())
+	assert.Equal(t, "Updated team ops\n", buf.String())
 
 	buf.Reset()
 	require.NoError(t, renderTeamUpdate(cliout.FormatJSON, &buf, upd, nil))

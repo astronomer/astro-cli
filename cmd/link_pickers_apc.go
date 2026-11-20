@@ -79,7 +79,7 @@ func pickAPCDeployment(client houston.ClientInterface, ws string, linked map[str
 		return local.PickedDeployment{}, err
 	}
 	if len(all) == 0 {
-		return local.PickedDeployment{}, fmt.Errorf("no Deployments in workspace %s to link", ws)
+		return local.PickedDeployment{}, fmt.Errorf("no Deployments in Workspace %s to link", ws)
 	}
 	var offered []houston.Deployment
 	for i := range all {

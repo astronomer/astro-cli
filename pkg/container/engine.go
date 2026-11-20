@@ -16,9 +16,8 @@ const (
 	orbstack = "orbstack"
 	orbctl   = "orbctl"
 
-	notFoundMsg = "Failed to find a container runtime. " +
-		"See the Astro CLI prerequisites for more information. " +
-		"https://www.astronomer.io/docs/astro/cli/install-cli"
+	notFoundMsg = "Could not find a container runtime. " +
+		"See the Astro CLI prerequisites: https://www.astronomer.io/docs/astro/cli/install-cli"
 )
 
 // Engine is the resolved container runtime.

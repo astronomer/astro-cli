@@ -36,7 +36,7 @@ func (s *Suite) TestCoalesceWorkspaceReadsTheFlagFirst() {
 
 	workspaceID = ""
 	_, err = coalesceWorkspace()
-	s.ErrorContains(err, "failed to get current workspace")
+	s.ErrorContains(err, "could not get the current Workspace")
 }
 
 // --all lists every workspace's Deployments, so a context with no workspace
@@ -54,7 +54,7 @@ func (s *Suite) TestDeploymentListAllNeedsNoWorkspace() {
 	api.AssertExpectations(s.T())
 
 	_, err = execDeploymentCmd("list")
-	s.ErrorContains(err, "failed to find a valid workspace")
+	s.ErrorContains(err, "could not find a valid Workspace")
 }
 
 // --workspace is on the commands that read it, create, list and adopt, with

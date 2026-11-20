@@ -79,7 +79,7 @@ func TestRotateAndDeleteAWorkspaceTokenByIDNeedNoWorkspace(t *testing.T) {
 				return deleteWorkspaceToken(cmd, []string{"token-id"}, out)
 			},
 			endpoint: "DeleteApiTokenWithResponse",
-			want:     "successfully deleted",
+			want:     "Deleted Workspace API token",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

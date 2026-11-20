@@ -237,7 +237,7 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 				// an author can write one. An empty source and an empty
 				// conn_type are both refused; this is the same typo. Check
 				// cannot see the difference, since both arrive as "".
-				p.add(CodeEmptyType, fieldKey, "expected a type, not an empty string — omit the key for a plain string")
+				p.add(CodeEmptyType, fieldKey, "type is empty; omit the key for a plain string")
 				failed["type"] = true
 			default:
 				// An unknown type is Check's rule, not this loop's.
@@ -254,7 +254,7 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 				// stored a non-nil empty slice, which is not DeepEqual to the
 				// nil an undeclared enum leaves — so two specs that mean the
 				// same thing compared unequal.
-				p.add(CodeEmptyEnum, fieldKey, "expected at least one value — omit the key if there is no fixed set")
+				p.add(CodeEmptyEnum, fieldKey, "enum is empty; omit the key if there is no fixed set of values")
 				failed["enum"] = true
 			default:
 				spec.Enum = e
@@ -269,7 +269,7 @@ func (p *schemaParser) decodeSpecTable(key string, table map[string]any, section
 			case !ok:
 				failed["conn_type"] = true
 			case ct == "":
-				p.add(CodeEmptyConnType, fieldKey, "expected a connection type, not an empty string")
+				p.add(CodeEmptyConnType, fieldKey, "conn_type is empty")
 				failed["conn_type"] = true
 			default:
 				spec.ConnType = ct

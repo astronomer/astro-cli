@@ -160,7 +160,7 @@ func stopAndWait(ws *websocket.Conn, notes io.Writer, done <-chan error) error {
 		err = ws.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 	}
 	if err != nil {
-		fmt.Fprintln(notes, "Close connection...")
+		fmt.Fprintln(notes, "Closing connection...")
 	}
 	select {
 	case <-done:
@@ -220,7 +220,7 @@ func handleFrame(message []byte, onLog func(DeploymentLog) error) error {
 	case "connection_error":
 		// Houston refused the token when the connection opened: its onConnect
 		// found no user for it, an unknown or expired one, and returned false.
-		return fmt.Errorf("the log stream refused your login (%s); it may have expired: log in again with astro login", frameMessage(frame.Payload))
+		return fmt.Errorf("the log stream refused your login (%s); it may have expired. Run astro login again", frameMessage(frame.Payload))
 	case "error":
 		return fmt.Errorf("the log subscription failed: %s", frameMessage(frame.Payload))
 	case "complete":

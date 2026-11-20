@@ -331,7 +331,7 @@ func (s *Suite) TestUpdateWorkspaceTeamRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
 		_, err := UpdateWorkspaceTeamRole("", "WORKSPACE_MEMBER", "", mockClient)
-		s.EqualError(err, "no teams found in your workspace")
+		s.EqualError(err, "no teams found in your Workspace")
 	})
 
 	s.Run("error path when GetTeamWithResponse return network error", func() {
@@ -619,7 +619,7 @@ func (s *Suite) TestDelete() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
 		_, err := Delete("", false, mockClient)
-		s.EqualError(err, "no teams found in your organization")
+		s.EqualError(err, "no teams found in your Organization")
 	})
 
 	s.Run("error path when GetTeamWithResponse return network error", func() {
@@ -711,7 +711,7 @@ func (s *Suite) TestUpdate() {
 		role := "WORKSPACE_VIEWER"
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		_, err := UpdateTeam(team1.Id, "name", "description", role, false, mockClient)
-		s.EqualError(err, "requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+		s.EqualError(err, "invalid role; use ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, or ORGANIZATION_OWNER")
 		s.Empty(mockClient.Calls, "neither the lookup nor the rename is sent")
 	})
 
@@ -748,7 +748,7 @@ func (s *Suite) TestUpdate() {
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseError, nil).Once()
 		got, err := UpdateTeam(team1.Id, "name", "", role, false, mockClient)
-		s.EqualError(err, "the team's role was updated to ORGANIZATION_OWNER, but updating its name and description failed: failed to update team")
+		s.EqualError(err, "updated the team's role to ORGANIZATION_OWNER, but updating its name and description failed: failed to update team")
 		s.Require().NotNil(got, "the team as it now is")
 		s.True(got.RoleChanged)
 		s.Equal(role, got.Team.OrgRole)
@@ -824,7 +824,7 @@ func (s *Suite) TestUpdate() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
 		_, err := UpdateTeam("", "name", "description", "", false, mockClient)
-		s.EqualError(err, "no teams found in your organization")
+		s.EqualError(err, "no teams found in your Organization")
 	})
 
 	s.Run("error path when GetTeamWithResponse return network error", func() {
@@ -933,14 +933,14 @@ func (s *Suite) TestCreate() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		defer testUtil.MockUserInput(s.T(), "\n")()
 		_, err := CreateTeam("", *team1.Description, "ORGANIZATION_MEMBER", mockClient)
-		s.EqualError(err, "you must give your Team a name")
+		s.EqualError(err, "a team name is required")
 	})
 
 	s.Run("error path invalid org role", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		_, err := CreateTeam("", *team1.Description, "WORKSPACE_OWNER", mockClient)
-		s.EqualError(err, "requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+		s.EqualError(err, "invalid role; use ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, or ORGANIZATION_OWNER")
 	})
 }
 
@@ -999,7 +999,7 @@ func (s *Suite) TestAddUser() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
 		_, err := AddUser("", user1.Id, false, mockClient)
-		s.EqualError(err, "no teams found in your organization")
+		s.EqualError(err, "no teams found in your Organization")
 	})
 
 	s.Run("error path when AddTeamMembersWithResponse return network error", func() {
@@ -1130,7 +1130,7 @@ func (s *Suite) TestAddUser() {
 		os.Stdin = r
 
 		_, err = AddUser(team1.Id, "", false, mockClient)
-		s.EqualError(err, "no users found in your organization")
+		s.EqualError(err, "no users found in your Organization")
 	})
 }
 
@@ -1198,7 +1198,7 @@ func (s *Suite) TestRemoveUser() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
 		_, err := RemoveUser("", user1.Id, false, mockClient)
-		s.EqualError(err, "no teams found in your organization")
+		s.EqualError(err, "no teams found in your Organization")
 	})
 
 	s.Run("error path no team members found", func() {
@@ -1438,7 +1438,7 @@ func (s *Suite) TestUpdateDeploymentTeamRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
 		_, err := UpdateDeploymentTeamRole("", "DEPLOYMENT_ADMIN", deploymentID, mockClient)
-		s.EqualError(err, "no teams found in your deployment")
+		s.EqualError(err, "no teams found in your Deployment")
 	})
 
 	s.Run("error path when GetTeamWithResponse return network error", func() {

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Notes for coding agents working in this repository. Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup and [docs/architecture.md](docs/architecture.md) for where new code goes.
+Notes for coding agents working in this repository. Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, [docs/architecture.md](docs/architecture.md) for where new code goes, and [docs/output-style.md](docs/output-style.md) before writing any message, prompt, or help text the user will read.
 
 ## How to test and lint
 

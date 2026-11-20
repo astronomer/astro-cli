@@ -161,8 +161,8 @@ func newEnvLinkRootCmd(out io.Writer, n *linkNoun) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "link",
 		Aliases: []string{"links"},
-		Short:   fmt.Sprintf("Manage which deployments a workspace %s reaches", n.what),
-		Long: fmt.Sprintf("Control which deployments a workspace %s reaches, and give a deployment "+
+		Short:   fmt.Sprintf("Manage which Deployments a Workspace %s reaches", n.what),
+		Long: fmt.Sprintf("Control which Deployments a Workspace %s reaches, and give a Deployment "+
 			"its own values. Identify the %s with --%s-key or --%s-id.", n.what, n.what, n.noun, n.noun),
 		Example: n.examples,
 		Args:    cobra.ArbitraryArgs,
@@ -196,8 +196,8 @@ func deprecatedLinkDelete(cmd *cobra.Command) *cobra.Command {
 // addLinkObjectFlags wires the identifier flags for the linked object:
 // exactly one of --<noun>-id / --<noun>-key is required.
 func addLinkObjectFlags(cmd *cobra.Command, n *linkNoun, f *linkFlags) {
-	cmd.Flags().StringVar(&f.objectID, n.noun+"-id", "", "ID of the workspace "+n.what)
-	cmd.Flags().StringVar(&f.objectKey, n.noun+"-key", "", "Key of the workspace "+n.what)
+	cmd.Flags().StringVar(&f.objectID, n.noun+"-id", "", "ID of the Workspace "+n.what)
+	cmd.Flags().StringVar(&f.objectKey, n.noun+"-key", "", "Key of the Workspace "+n.what)
 	cmd.MarkFlagsMutuallyExclusive(n.noun+"-id", n.noun+"-key")
 	cmd.MarkFlagsOneRequired(n.noun+"-id", n.noun+"-key")
 }
@@ -217,10 +217,10 @@ func (f *linkFlags) idOrKey(n *linkNoun) (string, error) {
 func newEnvLinkSetCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set",
-		Short: fmt.Sprintf("Link %s to a deployment", article(n.what)),
-		Long: fmt.Sprintf("Link a workspace %s to a deployment. The override flags give that deployment "+
-			"its own values and describe the whole override: a value the link had that "+
-			"they leave out is cleared. --exclude opts the deployment out of an auto-linked "+
+		Short: fmt.Sprintf("Link %s to a Deployment", article(n.what)),
+		Long: fmt.Sprintf("Link a Workspace %s to a Deployment. The override flags give that Deployment "+
+			"its own values and describe the full override: a value the link had that "+
+			"they leave out is cleared. --exclude opts the Deployment out of an auto-linked "+
 			"%s instead. Pass --no-create to fail if it is not already linked.", n.what, n.what),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvLinkSet(cmd, out, n, f)
@@ -234,8 +234,8 @@ func newEnvLinkSetCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command {
 	}
 	addLinkObjectFlags(cmd, n, f)
 	addDeploymentFlag(cmd.Flags(), "Deployment to link: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &f.deploymentID}, oneXDeploymentID)
-	cmd.Flags().BoolVar(&f.exclude, "exclude", false, "Opt the deployment out of an auto-linked "+n.what+" instead")
-	cmd.Flags().BoolVar(&f.noCreate, "no-create", false, "Fail if the deployment is not already linked")
+	cmd.Flags().BoolVar(&f.exclude, "exclude", false, "Opt the Deployment out of an auto-linked "+n.what+" instead")
+	cmd.Flags().BoolVar(&f.noCreate, "no-create", false, "Fail if the Deployment is not already linked")
 	// --exclude takes a different path entirely (the platform's exclude-linking
 	// endpoint), which has no create/update distinction for --no-create to
 	// govern. Accepting the pair would have silently ignored the guard.
@@ -299,7 +299,7 @@ func runEnvLinkSet(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags)
 		if err != nil {
 			return err
 		}
-		return linkChanged(cmd, r, report, fmt.Sprintf("Excluded %s from deployment %s", idOrKey, f.deploymentID))
+		return linkChanged(cmd, r, report, fmt.Sprintf("Excluded %s from Deployment %s", idOrKey, f.deploymentID))
 	}
 	override, err := n.override(cmd, f)
 	if err != nil {
@@ -309,9 +309,9 @@ func runEnvLinkSet(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags)
 	if err != nil {
 		return err
 	}
-	line := fmt.Sprintf("Linked %s to deployment %s (no override)", idOrKey, f.deploymentID)
+	line := fmt.Sprintf("Linked %s to Deployment %s (no override)", idOrKey, f.deploymentID)
 	if override != nil {
-		line = fmt.Sprintf("Linked %s to deployment %s (override applied)", idOrKey, f.deploymentID)
+		line = fmt.Sprintf("Linked %s to Deployment %s (override applied)", idOrKey, f.deploymentID)
 	}
 	return linkChanged(cmd, r, report, line)
 }
@@ -332,13 +332,13 @@ func runEnvLinkRemove(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFla
 		if err != nil {
 			return err
 		}
-		return linkChanged(cmd, r, report, fmt.Sprintf("Removed exclude on %s for deployment %s", idOrKey, f.deploymentID))
+		return linkChanged(cmd, r, report, fmt.Sprintf("Removed exclude on %s for Deployment %s", idOrKey, f.deploymentID))
 	}
 	report, err := env.Unlink(n.kind, idOrKey, scope, f.deploymentID, astroV1Client)
 	if err != nil {
 		return err
 	}
-	return linkChanged(cmd, r, report, fmt.Sprintf("Unlinked %s from deployment %s", idOrKey, f.deploymentID))
+	return linkChanged(cmd, r, report, fmt.Sprintf("Unlinked %s from Deployment %s", idOrKey, f.deploymentID))
 }
 
 func runEnvLinkList(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags) error {

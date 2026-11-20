@@ -85,7 +85,7 @@ func TestAstroLinkNamesEveryOutage(t *testing.T) {
 		want   []string
 	}{
 		{http.StatusUnauthorized, []string{"session expired", "astro login"}},
-		{http.StatusForbidden, []string{"do not have access", "workspace admin"}},
+		{http.StatusForbidden, []string{"do not have access", "Workspace admin"}},
 		{http.StatusNotFound, []string{"does not exist", "pyproject.toml"}},
 	}
 	for _, tc := range cases {
@@ -180,7 +180,7 @@ func TestAstroLinkNeedsASession(t *testing.T) {
 		return nil, nil
 	})
 	l.session = func(context.Context) (string, error) {
-		return "", errors.New("your session expired — log in with astro login")
+		return "", errors.New("your session expired; log in with astro login")
 	}
 	_, err := l.BaseURL(context.Background(), astroInstance())
 	if err == nil || !strings.Contains(err.Error(), "session expired") {

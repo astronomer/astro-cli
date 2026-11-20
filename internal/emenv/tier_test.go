@@ -111,6 +111,6 @@ func TestSkippedKeysAreNamed(t *testing.T) {
 	require.Equal(t, []string{"GOOD"}, envresolve.Keys(p))
 	require.Equal(t, []string{"bad-key"}, envresolve.SkippedKeys(p))
 	note := envresolve.SkippedNote(p, testWorkspace)
-	require.Contains(t, note, "workspace "+testWorkspace+" holds bad-key,")
+	require.Contains(t, note, "Workspace "+testWorkspace+" holds bad-key,")
 	require.NotContains(t, note, "hidden-value")
 }

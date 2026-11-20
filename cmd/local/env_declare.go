@@ -94,17 +94,17 @@ func newEnvDeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	in := &declareInput{}
 	long := "Declare " + k.article + " " + k.label + " in the project's pyproject.toml, or change how it is " +
 		"declared. A declared name is required at start unless it is optional.\n\n" +
-		"Only the annotations you pass change; the rest of the declaration, and any " +
-		"comments around it, stay as they are. No value is stored: use set for that."
+		"Only the annotations you pass change. The rest of the declaration and any " +
+		"comments around it stay as they are. No value is stored; use set for that."
 	if k.kind == localenv.KindConn {
-		long += "\n\nA connection is always secret and takes no default, type or enum; --type " +
+		long += "\n\nA connection is always secret and takes no default or enum. --type " +
 			"is the connection type, as it is for set."
 	} else {
 		long += "\n\n--secret keeps the value out of plain files: set stores it only in the " +
 			"vault. A secret name cannot have a default."
 	}
-	long += "\n\n--source workspace resolves the name from the workspace's Environment Manager " +
-		"when no local file sets it. A name with a default cannot resolve from the workspace."
+	long += "\n\n--source workspace resolves the name from the Workspace's Environment Manager " +
+		"when no local file sets it. A name with a default cannot resolve from the Workspace."
 	cmdLine := "astro local env " + localenv.Noun(k.kind) + " declare " + exampleName(k.kind)
 	example := "  # Require it at start, with a note for whoever supplies it\n" +
 		"  " + cmdLine + " --description 'Ask the data team for it'\n\n"
@@ -115,7 +115,7 @@ func newEnvDeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		example += "  # Keep its value only in the vault\n" +
 			"  " + cmdLine + " --secret\n\n"
 	}
-	example += "  # Resolve it from the workspace when no local file sets it\n" +
+	example += "  # Resolve it from the Workspace when no local file sets it\n" +
 		"  " + cmdLine + " --source workspace"
 	cmd := &cobra.Command{
 		Use:     "declare " + k.arg,

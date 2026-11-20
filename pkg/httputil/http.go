@@ -94,7 +94,7 @@ func (c *HTTPClient) Do(doOptions *DoOptions) (*http.Response, error) {
 
 	resp, err := ctxhttp.Do(doCtx, c.HTTPClient, req)
 	if err != nil {
-		return nil, errors.Wrap(chooseError(doCtx, err), "HTTP DO Failed")
+		return nil, errors.Wrap(chooseError(doCtx, err), "HTTP request failed")
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		return nil, newError(resp)

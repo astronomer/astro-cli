@@ -111,7 +111,7 @@ type FormattedDeployment struct {
 var (
 	yamlMarshal    = yaml.Marshal
 	decodeToStruct = mapstructure.Decode
-	errKeyNotFound = errors.New("not found in deployment")
+	errKeyNotFound = errors.New("not found in Deployment")
 )
 
 const notApplicable = "N/A"

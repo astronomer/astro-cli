@@ -367,7 +367,7 @@ func TestDeploymentVariableCreateJSON(t *testing.T) {
 		fields := decodeOne(t, run.stdout, &got)
 		assert.JSONEq(t, `[]`, string(fields["outcomes"]), "outcomes is an empty array, not null")
 		assert.JSONEq(t, `[]`, string(fields["variables"]), "variables is an empty array, not null")
-		assert.Contains(t, run.stderr, "Successfully updated Deployment")
+		assert.Contains(t, run.stderr, "Updated Deployment")
 		m.AssertExpectations(t)
 	})
 }

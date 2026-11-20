@@ -51,7 +51,7 @@ func runDeploymentTokenCreate(format cliout.Format, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(format, out, &created, "Deployment", "created", tokenName, cleanTokenOutput)
+	return renderTokenSecret(format, out, &created, "Deployment", "Created", tokenName, cleanTokenOutput)
 }
 
 func runDeploymentTokenUpdate(format cliout.Format, out io.Writer) error {
@@ -59,9 +59,9 @@ func runDeploymentTokenUpdate(format cliout.Format, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	line := fmt.Sprintf("Astro Deployment API token %s was successfully updated", res.PreviousName)
+	line := fmt.Sprintf("Updated Deployment API token %s", res.PreviousName)
 	if res.Token.Scope != string(deployment.DeploymentTokenTypeDEPLOYMENT) {
-		line = fmt.Sprintf("Astro %s API token %s was successfully updated in the Deployment", scopeNoun(astrov1.ApiTokenScope(res.Token.Scope)), res.PreviousName)
+		line = fmt.Sprintf("Updated %s API token %s in the Deployment", scopeNoun(astrov1.ApiTokenScope(res.Token.Scope)), res.PreviousName)
 	}
 	return renderTokenLine(format, out, res.Token, line)
 }
@@ -75,7 +75,7 @@ func runDeploymentTokenRotate(format cliout.Format, out io.Writer) error {
 	if !forceRotate {
 		if err := confirmTokenChange(
 			"API Token rotation will invalidate the current token and cannot be undone.",
-			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name))); err != nil {
+			fmt.Sprintf("\nRotate API token %s?", ansi.Bold(token.Name))); err != nil {
 			return err
 		}
 	}
@@ -83,7 +83,7 @@ func runDeploymentTokenRotate(format cliout.Format, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(format, out, &rotated, "Deployment", "rotated", token.Name, cleanTokenOutput)
+	return renderTokenSecret(format, out, &rotated, "Deployment", "Rotated", token.Name, cleanTokenOutput)
 }
 
 // offeredDeploymentTokens is the scopes a delete or a remove looks among: the
@@ -111,7 +111,7 @@ func runDeploymentTokenDelete(cmd *cobra.Command, format cliout.Format, out io.W
 	}
 	if !forceDelete {
 		if err := confirmTokenChange("API token deletion cannot be undone.",
-			fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name))); err != nil {
+			fmt.Sprintf("\nDelete API token %s?", ansi.Bold(token.Name))); err != nil {
 			return err
 		}
 	}
@@ -119,7 +119,7 @@ func runDeploymentTokenDelete(cmd *cobra.Command, format cliout.Format, out io.W
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(format, out, removal, fmt.Sprintf("Astro Deployment API token %s was successfully deleted", removal.Name))
+	return renderTokenLine(format, out, removal, fmt.Sprintf("Deleted Deployment API token %s", removal.Name))
 }
 
 // runDeploymentTokenRemoveRole runs `deployment token remove`: it takes the
@@ -136,7 +136,7 @@ func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out 
 		return refuseRemoveOfOwn(cmd, &token, "Deployment")
 	}
 	if !forceDelete {
-		if err := confirmTokenChange("", fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Deployment?", ansi.Bold(token.Name))); err != nil {
+		if err := confirmTokenChange("", fmt.Sprintf("\nRemove API token %s from the Deployment?", ansi.Bold(token.Name))); err != nil {
 			return err
 		}
 	}
@@ -144,7 +144,7 @@ func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out 
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(format, out, removal, fmt.Sprintf("Astro %s API token %s was successfully removed from the Deployment", scopeNoun(astrov1.ApiTokenScope(removal.Scope)), removal.Name))
+	return renderTokenLine(format, out, removal, fmt.Sprintf("Removed %s API token %s from the Deployment", scopeNoun(astrov1.ApiTokenScope(removal.Scope)), removal.Name))
 }
 
 // runDeploymentTokenAdd runs `deployment token add`: it gives a Workspace or
@@ -177,7 +177,7 @@ func runDeploymentTokenAdd(args []string, out io.Writer) error {
 		}
 		tokenRole = answer
 	}
-	pick := newTokenPicker(tokenHeader(deploymentRoleHeader), tokenRow, errInvalidDeploymentTokenKey, "--name", "Please select the Workspace or Organization API token you would like to add to the Deployment:")
+	pick := newTokenPicker(tokenHeader(deploymentRoleHeader), tokenRow, errInvalidDeploymentTokenKey, "--name", "Select the Workspace or Organization API token to add to the Deployment:")
 	token, err := deployment.AddToken(id, name, tokenRole, ws, deploymentID, nil, pick, astroV1Client)
 	if err != nil {
 		if wsErr != nil && errors.Is(err, deployment.ErrTokenNotFound) {
@@ -185,7 +185,7 @@ func runDeploymentTokenAdd(args []string, out io.Writer) error {
 		}
 		return err
 	}
-	return renderTokenLine(deploymentTokenOutput, out, token, fmt.Sprintf("Astro %s API token %s was successfully added to the Deployment", scopeNoun(astrov1.ApiTokenScope(token.Scope)), token.Name))
+	return renderTokenLine(deploymentTokenOutput, out, token, fmt.Sprintf("Added %s API token %s to the Deployment", scopeNoun(astrov1.ApiTokenScope(token.Scope)), token.Name))
 }
 
 // The kinds of token whose role on a Deployment the workspace-token and
@@ -253,20 +253,20 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 		// reads a workspace.
 		pick := deploymentTokenPicker()
 		if operation == tokenRoleAdd {
-			pick = workspaceTokenPicker("Please select the Workspace API token you would like to add to the Deployment:")
+			pick = workspaceTokenPicker("Select the Workspace API token to add to the Deployment:")
 		}
 		token, err = deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, name, tokenRole, ws, deploymentID, operation, pick, astroV1Client)
 	} else {
 		pick := deploymentTokenPicker()
 		if operation == tokenRoleAdd {
-			pick = organizationTokenPicker("--name", "Please select the Organization API token you would like to add to the Deployment:")
+			pick = organizationTokenPicker("--name", "Select the Organization API token to add to the Deployment:")
 		}
 		token, err = deployment.UpsertOrgTokenDeploymentRole(orgTokenID, name, tokenRole, deploymentID, operation, pick, astroV1Client)
 	}
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(format, out, token, fmt.Sprintf("Astro %s API token %s was successfully added/updated to the Deployment", kind, token.Name))
+	return renderTokenLine(format, out, token, fmt.Sprintf("Set the Deployment role for %s API token %s", kind, token.Name))
 }
 
 // tokenSearchWorkspace is the Workspace an add looks for a Workspace token
@@ -313,7 +313,7 @@ func workspaceTokenWorkspace(cmd *cobra.Command, id string) (string, error) {
 		if errors.Is(err, astrosession.ErrOrgTokenNoWorkspace) {
 			return "", err
 		}
-		return "", fmt.Errorf("failed to find a valid workspace to find the Workspace token in; pass --workspace, or the token's ID: %w", err)
+		return "", fmt.Errorf("could not find a valid Workspace to look up the token in; pass --workspace or the token's ID: %w", err)
 	}
 	return ws, nil
 }
@@ -326,7 +326,7 @@ func runDeploymentTokenRemove(cmd *cobra.Command, format cliout.Format, out io.W
 		err     error
 	)
 	if kind == tokenKindWorkspace {
-		pick := workspaceTokenPicker("Please select the Workspace API token you would like to remove from the Deployment:")
+		pick := workspaceTokenPicker("Select the Workspace API token to remove from the Deployment:")
 		ws, wsErr := workspaceTokenWorkspace(cmd, workspaceTokenID)
 		if wsErr != nil {
 			return wsErr
@@ -339,5 +339,5 @@ func runDeploymentTokenRemove(cmd *cobra.Command, format cliout.Format, out io.W
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(format, out, removal, fmt.Sprintf("Astro %s API token %s was successfully removed from the Deployment", kind, removal.Name))
+	return renderTokenLine(format, out, removal, fmt.Sprintf("Removed %s API token %s from the Deployment", kind, removal.Name))
 }

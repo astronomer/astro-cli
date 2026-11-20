@@ -38,7 +38,7 @@ func TestASavedDeployTargetUnderAPCBecomesAnAPCLink(t *testing.T) {
 			assert.Empty(t, m.Astro.Workspace)
 			assert.Empty(t, m.Astro.Domain)
 			assert.Contains(t, res.Advisories, ".astro/config.yaml: linked Deployment "+deploymentID1x+
-				" as \"default\" in pyproject.toml (Astro Private Cloud astro.corp.example, workspace "+workspaceID1x+")")
+				" as \"default\" in pyproject.toml (Astro Private Cloud astro.corp.example, Workspace "+workspaceID1x+")")
 		})
 	}
 }
@@ -146,8 +146,8 @@ func TestASavedDeploymentTakesTheAPCContextsWorkspace(t *testing.T) {
 		Auth: manifest.Auth{Method: manifest.AuthAPC}, Default: true,
 	}, m.Astro.Deployments[Link1xName])
 	assert.Contains(t, res.Advisories, ".astro/config.yaml: linked Deployment "+deploymentID1x+
-		" as \"default\" in pyproject.toml (Astro Private Cloud astro.corp.example, workspace "+workspaceID1x+
-		"). It saved no workspace, so this uses your current one. If the Deployment is in another workspace, "+
+		" as \"default\" in pyproject.toml (Astro Private Cloud astro.corp.example, Workspace "+workspaceID1x+
+		"). It saved no Workspace, so this uses your current one. If the Deployment is in another Workspace, "+
 		"relink it with: astro link add default --deployment "+deploymentID1x+" --workspace <workspace-id> --replace")
 	assert.NotContains(t, strings.Join(res.Notes, "\n"), "saved deploy target")
 

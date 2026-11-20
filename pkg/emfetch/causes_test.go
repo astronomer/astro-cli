@@ -18,12 +18,12 @@ func TestCauseText(t *testing.T) {
 	}{
 		{CauseNotLoggedIn, "not logged in to astronomer-dev.io. Log in with astro login astronomer-dev.io"},
 		{CauseSessionExpired, "your astronomer-dev.io session expired. Log in again with astro login astronomer-dev.io"},
-		{CauseNoAccess, "you don't have access to this workspace on astronomer-dev.io. Check your current organization (astro organization switch), or ask an org admin"},
-		{CauseNotFound, "workspace cmws123 was not found on astronomer-dev.io. Check the workspace and domain keys in pyproject.toml, and your current organization"},
-		{CauseSecretsWithheld, "your org disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally"},
-		{CauseNoValue, "the workspace holds no value for it"},
+		{CauseNoAccess, "you don't have access to this Workspace on astronomer-dev.io. Check your current Organization (astro organization switch), or ask an Organization admin"},
+		{CauseNotFound, "Workspace cmws123 was not found on astronomer-dev.io. Check the workspace and domain keys in pyproject.toml, and your current Organization"},
+		{CauseSecretsWithheld, "your Organization disables Environment Secrets Fetching. Ask an Organization admin to enable it, or set the value locally"},
+		{CauseNoValue, "the Workspace holds no value for it"},
 		{CauseOffline, "could not reach astronomer-dev.io. Check your connection, or set the value locally"},
-		{CauseNoWorkspace, "the manifest sets no workspace key. Link a workspace to the project in Astro Desktop, or set the value locally"},
+		{CauseNoWorkspace, "the manifest sets no workspace key. Link a Workspace to the project in Astro Desktop, or set the value locally"},
 	}
 	for _, tc := range cases {
 		if got := tc.cause.Text(domain, workspace); got != tc.want {
@@ -49,8 +49,8 @@ func TestStatusTextFor(t *testing.T) {
 		want   string
 	}{
 		{"401 is the session", http.StatusUnauthorized, "your astronomer.io session expired. Log in again with astro login astronomer.io"},
-		{"403 is access", http.StatusForbidden, "you don't have access to this workspace on astronomer.io. Check your current organization (astro organization switch), or ask an org admin"},
-		{"404 is not found", http.StatusNotFound, "workspace cmws123 was not found on astronomer.io. Check the workspace and domain keys in pyproject.toml, and your current organization"},
+		{"403 is access", http.StatusForbidden, "you don't have access to this Workspace on astronomer.io. Check your current Organization (astro organization switch), or ask an Organization admin"},
+		{"404 is not found", http.StatusNotFound, "Workspace cmws123 was not found on astronomer.io. Check the workspace and domain keys in pyproject.toml, and your current Organization"},
 		{"any other status carries the platform's error", http.StatusInternalServerError, "astronomer.io returned an error: internal error"},
 	}
 	for _, tc := range cases {
@@ -73,10 +73,10 @@ func TestCauseTextForNamesTheOrganization(t *testing.T) {
 		cause Cause
 		want  string
 	}{
-		{CauseSecretsWithheld, "organization clorg disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally"},
-		{CauseNoOrganizationAccess, "could not read workspace cmws123 in organization clorg on astronomer-dev.io, which pyproject.toml names. " +
+		{CauseSecretsWithheld, "Organization clorg disables Environment Secrets Fetching. Ask an Organization admin to enable it, or set the value locally"},
+		{CauseNoOrganizationAccess, "could not read Workspace cmws123 in Organization clorg on astronomer-dev.io, which pyproject.toml names. " +
 			"Check that you belong to it with astro organization list, and the organization and workspace keys under [tool.astro]"},
-		{CauseNotFound, "workspace cmws123 was not found on astronomer-dev.io. Check the workspace and domain keys in pyproject.toml, and your current organization"},
+		{CauseNotFound, "Workspace cmws123 was not found on astronomer-dev.io. Check the workspace and domain keys in pyproject.toml, and your current Organization"},
 		{CauseOffline, "could not reach astronomer-dev.io. Check your connection, or set the value locally"},
 	}
 	for _, tc := range cases {

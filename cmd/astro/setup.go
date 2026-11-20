@@ -41,7 +41,7 @@ var (
 	// ErrAPITokenOrganization is returned when the organization of an accepted
 	// API token can't be looked up, which leaves the context
 	// without one.
-	ErrAPITokenOrganization = errors.New("cannot look up the organization of the Astro credentials in the environment")
+	ErrAPITokenOrganization = errors.New("cannot look up the Organization of the Astro credentials in the environment")
 	// ErrLoginRenewal is a saved login whose access token has expired and
 	// could not be renewed. FreshLogin and the login check both return it.
 	ErrLoginRenewal = errors.New("could not renew your Astro login")

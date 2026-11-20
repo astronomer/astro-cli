@@ -163,12 +163,12 @@ func TestLinkAddUnderAPCFollowsAnMWAAOrComposerProjectTarget(t *testing.T) {
 func TestLinkAddUnderAPCReportsAWorkspaceReadError(t *testing.T) {
 	dir, _ := linkTestProject(t, linkManifest)
 	d, _ := apcDeps(t, dir, "", PickedDeployment{})
-	broken := errors.New("no context set, have you authenticated to Astro or APC?")
+	broken := errors.New("no context set; run astro login and try again")
 	d.APC.CurrentWorkspace = func() (string, error) { return "", broken }
 	err := execute(t, d, "link", "add", "prod-apc", "--deployment", "ckdep-1")
 	require.ErrorIs(t, err, broken)
 	require.ErrorIs(t, err, ErrAPCWorkspaceUnreadable)
-	assert.Equal(t, "reading the current Astro Private Cloud workspace: "+broken.Error()+"; pass --workspace", err.Error())
+	assert.Equal(t, "reading the current Astro Private Cloud Workspace: "+broken.Error()+"; pass --workspace", err.Error())
 	assert.Equal(t, linkManifest, readManifest(t, dir))
 
 	// Already said by the reader, it is not said twice.

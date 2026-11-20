@@ -417,7 +417,7 @@ func (s *Suite) TestCreate() {
 		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", createAction, "test-instance-type-1", 0, 0, 0, false, mockV1Client, out)
 
 		s.ErrorIs(err, errNotSupported)
-		s.ErrorContains(err, "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
+		s.ErrorContains(err, "KubernetesExecutor does not support a non-default worker queue in the request; rename the queue to default")
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("returns an error when requested input is not valid", func() {
@@ -429,7 +429,7 @@ func (s *Suite) TestCreate() {
 
 		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", createAction, "test-instance-type-1", 0, 0, 0, false, mockV1Client, out)
 		s.ErrorIs(err, errNotSupported)
-		s.ErrorContains(err, "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
+		s.ErrorContains(err, "KubernetesExecutor does not support a non-default worker queue in the request; rename the queue to default")
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("returns a queue already exists error when request is to create a new queue", func() {
@@ -714,7 +714,7 @@ func (s *Suite) TestUpdate() {
 
 		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", updateAction, "test-instance-type-1", -1, 0, 0, false, mockV1Client, out)
 		s.ErrorIs(err, errNotSupported)
-		s.ErrorContains(err, "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
+		s.ErrorContains(err, "KubernetesExecutor does not support a non-default worker queue in the request; rename the queue to default")
 		mockV1Client.AssertExpectations(s.T())
 	})
 }
@@ -1091,7 +1091,7 @@ func (s *Suite) TestIsKubernetesWorkerQueueInputValid() {
 		}()
 		err := isKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		s.ErrorIs(err, errNotSupported)
-		s.Contains(err.Error(), "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
+		s.Contains(err.Error(), "KubernetesExecutor does not support a non-default worker queue in the request; rename the queue to default")
 	})
 	s.Run("returns an error when max_worker_count is in input", func() {
 		requestedWorkerQueue.MaxWorkerCount = 25

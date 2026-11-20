@@ -316,7 +316,7 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 		if s.Type != "" {
 			// Instead of, not as well as, "not a known type": one mistake, and
 			// it is not the spelling.
-			add(CodeTypeOnConnection, "type", "type describes an env var or an Airflow variable, so it means nothing on a connection — conn_type is how a connection declares its kind")
+			add(CodeTypeOnConnection, "type", "type applies to env vars and Airflow variables, not connections; use conn_type to set a connection kind")
 		}
 		if len(s.Enum) > 0 {
 			add(CodeEnumOnConnection, "enum", "enum needs type = \"enum\", which a connection cannot declare", "enum", "type")
@@ -358,7 +358,7 @@ func (s ValueSpec) Check(section Section) []SpecProblem {
 	case !s.Secret:
 		add(CodeConnectionNotSecret, "secret", "a connection always holds a credential, so it cannot be declared not secret")
 	case s.HasSecret:
-		add(CodeConnectionSecretRedundant, "secret", "a connection is always secret, so secret = true adds nothing — remove it; the vault is chosen by the section, not by this flag")
+		add(CodeConnectionSecretRedundant, "secret", "a connection is always secret, so secret = true has no effect; remove it")
 	}
 
 	// A secret value may not carry a default. A default is committed to the

@@ -34,7 +34,7 @@ func newIDEProjectCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "project",
 		Short: "Manage Astro IDE projects",
-		Long:  "Create and manage Astro IDE projects in your workspace.",
+		Long:  "Create and manage Astro IDE projects in your Workspace.",
 	}
 	cmd.AddCommand(
 		newIDEListProjectCmd(out),
@@ -50,8 +50,8 @@ func newIDEListProjectCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List all Astro IDE projects in your workspace",
-		Long:    "List all Astro IDE projects in your workspace and optionally select one for future commands.",
+		Short:   "List all Astro IDE projects in your Workspace",
+		Long:    "List all Astro IDE projects in your Workspace and optionally select one for future commands.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listIDEProjects(out)
 		},
@@ -164,12 +164,12 @@ func exportProject(cmd *cobra.Command, out io.Writer) error {
 func validateWorkspaceAndOrgID(ctx *config.Context) (orgID, wsID string, err error) {
 	orgID = ctx.Organization
 	if orgID == "" {
-		return "", "", errors.New("no organization ID provided and no organization set in context. Please set context or provide organization ID")
+		return "", "", errors.New("no Organization ID provided and none set in context; set a context or pass the Organization ID")
 	}
 
 	t := astrosession.Resolve(astrosession.Request{
 		Login:   ctx,
-		NoSaved: errors.New("no workspace ID provided and no workspace set in context. Please set context or provide workspace ID"),
+		NoSaved: errors.New("no Workspace ID provided and none set in context; set a context or pass the Workspace ID"),
 	})
 	if err := t.Require(); err != nil {
 		return "", "", err

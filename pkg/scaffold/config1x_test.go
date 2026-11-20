@@ -63,7 +63,7 @@ func TestEachSettingIn1xConfigIsNamedAndTheFileGoes(t *testing.T) {
 		"show_warnings: default\n"+
 		"unknown:\n  thing: 1\n", fakeSettings)
 
-	assert.Equal(t, []string{config1xRelPath + ": container.binary is a CLI setting, which Astro CLI v2 keeps per machine rather than per project. " +
+	assert.Equal(t, []string{config1xRelPath + ": container.binary is a CLI setting; Astro CLI v2 keeps it per machine, not per project. " +
 		"To keep it on this machine, run: astro config set --global container.binary podman"}, notesAbout(res, "container.binary"))
 	assert.Empty(t, notesAbout(res, "remote.client_registry"), "a deploy setting is carried, not named")
 	assert.Contains(t, res.Advisories, config1xRelPath+": carried remote.client_registry into [tool.astro.deploy] client-registry in pyproject.toml")

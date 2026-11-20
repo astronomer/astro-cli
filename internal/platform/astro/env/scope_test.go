@@ -124,7 +124,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 
 			_, err := k.del(id, Scope{DeploymentID: depID}, mc)
 			s.ErrorIs(err, ErrOutOfScope)
-			s.Contains(err.Error(), "belongs to workspace "+wsID+", not deployment "+depID)
+			s.Contains(err.Error(), "belongs to Workspace "+wsID+", not Deployment "+depID)
 			s.Contains(err.Error(), "--workspace "+wsID)
 			if k.name == "metrics-export" {
 				// Metrics exports have no link commands to suggest.
@@ -253,7 +253,7 @@ func (s *Suite) TestLinkByIDOfADeploymentObjectExplainsLinkingIsWorkspaceOnly() 
 
 	_, err := Link(LinkVariable, id, Scope{WorkspaceID: wsID}, target, nil, false, mc)
 	s.Error(err)
-	s.Contains(err.Error(), "only workspace-scoped objects can be linked")
+	s.Contains(err.Error(), "only Workspace-scoped objects can be linked")
 	s.NotContains(err.Error(), "pass --deployment")
 	mc.AssertNotCalled(s.T(), "UpdateEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }

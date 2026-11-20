@@ -102,13 +102,13 @@ domain, and `<org>` the organization the read asked under: the manifest's
 |---|---|---|
 | not logged in | no login stored for `<domain>` | not logged in to `<domain>`. Log in with `astro login <domain>` |
 | session expired | the platform answers 401 | your `<domain>` session expired. Log in again with `astro login <domain>` |
-| no access | 403, the manifest names no `organization` | you don't have access to this workspace on `<domain>`. Check your current organization (`astro organization switch`), or ask an org admin |
-| not found | 404, the manifest names no `organization` | workspace `<id>` was not found on `<domain>`. Check `workspace` and `domain` in pyproject.toml, and your current organization |
-| no access to the organization | 403 or 404, the manifest names `organization` | could not read workspace `<id>` in organization `<org>` on `<domain>`, which pyproject.toml names. Check that you belong to it with `astro organization list`, and `organization` and `workspace` under [tool.astro] |
-| secrets withheld | the org disables secret fetching (a 405 or 403 refusal of `showSecrets`) and the value is a secret | organization `<org>` disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally |
-| no value | the workspace holds the object with no value | the workspace holds no value for it |
+| no access | 403, the manifest names no `organization` | you don't have access to this Workspace on `<domain>`. Check your current Organization (`astro organization switch`), or ask an Organization admin |
+| not found | 404, the manifest names no `organization` | Workspace `<id>` was not found on `<domain>`. Check the workspace and domain keys in pyproject.toml, and your current Organization |
+| no access to the organization | 403 or 404, the manifest names `organization` | could not read Workspace `<id>` in Organization `<org>` on `<domain>`, which pyproject.toml names. Check that you belong to it with `astro organization list`, and the organization and workspace keys under [tool.astro] |
+| secrets withheld | the org disables secret fetching (a 405 or 403 refusal of `showSecrets`) and the value is a secret | Organization `<org>` disables Environment Secrets Fetching. Ask an Organization admin to enable it, or set the value locally |
+| no value | the workspace holds the object with no value | the Workspace holds no value for it |
 | offline | no response | could not reach `<domain>`. Check your connection, or set the value locally |
-| no workspace | the manifest sets no `workspace` for a `source = "workspace"` name to read | the manifest sets no `workspace`. Link a workspace to the project in Astro Desktop, or set the value locally |
+| no workspace | the manifest sets no `workspace` for a `source = "workspace"` name to read | the manifest sets no workspace key. Link a Workspace to the project in Astro Desktop, or set the value locally |
 
 "No access" and "not found" point at the current organization because, with no
 `organization` in the manifest, the read asks under it. With one, a 403 or 404

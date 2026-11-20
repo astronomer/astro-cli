@@ -119,7 +119,7 @@ func TestExecMethodNamesEveryWayItCanFail(t *testing.T) {
 		{"fail", []string{`deployment "bespoke"`, "exit status 3", "no SSO session"}},
 		{"empty", []string{"printed no token"}},
 		{"whitespace", []string{"printed no token"}},
-		{"multiline", []string{"printed 2 lines", "a token is one"}},
+		{"multiline", []string{"printed 2 lines", "exactly one"}},
 	}
 	for _, tc := range cases {
 		i := execInstance(t, tc.behavior)

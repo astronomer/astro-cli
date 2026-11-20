@@ -159,7 +159,7 @@ func TestDeployManifestShowsAWarningBeforeAQuestionOnce(t *testing.T) {
 	out, err := execDeployOneStream("\n")
 	require.NoError(t, err)
 	requireInOrder(t, out, "Warning: could not list the Deployments", "Deploy to which deployment?",
-		"Building your project image", "Warning: found after the build", "to prod (deployment clx-dep).")
+		"Building your project image", "Warning: found after the build", "to prod (Deployment clx-dep).")
 	assert.Equal(t, 1, strings.Count(out, "could not list the Deployments"), out)
 	assert.Equal(t, 1, strings.Count(out, "found after the build"), out)
 }
@@ -428,7 +428,7 @@ func TestDeployManifestTextUnchanged(t *testing.T) {
 	// stdout is this command's own output: the progress line, the summary, the
 	// URL — and nothing else.
 	want := "Building your project image, this can take a few minutes...\n" +
-		"Deployed image (tag deploy-2026-07-23T18-40) and Dags (version 3-1690000000) to prod (deployment clx-dep).\n" +
+		"Deployed image (tag deploy-2026-07-23T18-40) and Dags (version 3-1690000000) to prod (Deployment clx-dep).\n" +
 		"Deployment: https://cloud.astronomer.io/deployments/clx-dep\n"
 	assert.Equal(t, want, out)
 	// The target goes on stderr, the way every resolving command announces one.
@@ -447,7 +447,7 @@ func TestDeployManifestSaysTheDagsAreInsideTheImage(t *testing.T) {
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
 	out, _, err := execDeployIO("", "prod")
 	require.NoError(t, err)
-	assert.Contains(t, out, "Deployed image (tag deploy-2026-07-23T18-40) to prod (deployment clx-dep), with the Dags inside the image: its Dag deploys are off, so no Dags were uploaded.\n")
+	assert.Contains(t, out, "Deployed image (tag deploy-2026-07-23T18-40) to prod (Deployment clx-dep), with the Dags inside the image: its Dag deploys are off, so no Dags were uploaded.\n")
 	assert.NotContains(t, out, "Dags (version")
 
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
@@ -463,7 +463,7 @@ func TestDeployManifestSaysTheDagsAreInsideTheImage(t *testing.T) {
 // here the transport's warning for a prebuilt image deployed to a Deployment
 // with DAG deploys off (#2306).
 func TestDeployManifestJSONCarriesTheTransportsWarnings(t *testing.T) {
-	const w = "astro deployment clx-dep has Dag deploys off, so it will run the Dags inside img:1; no Dags are uploaded"
+	const w = "Deployment clx-dep has Dag deploys off and runs the Dags inside img:1; no Dags are uploaded"
 	img := manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "img-1", DagsInImage: true}
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img, warn: w})
 	out, errOut, err := execDeployIO("", "prod", "--image-name", "img:1", "--output", "json")
@@ -501,7 +501,7 @@ func TestDeployManifestSaysNoDagsWentToARemoteExecutionDeployment(t *testing.T) 
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
 	out, _, err := execDeployIO("", "prod")
 	require.NoError(t, err)
-	assert.Contains(t, out, "Deployed image (tag deploy-2026) to prod (deployment clx-dep). It runs remote execution with Dag deploys off, so no Dags were uploaded.\n")
+	assert.Contains(t, out, "Deployed image (tag deploy-2026) to prod (Deployment clx-dep). It runs remote execution with Dag deploys off, so no Dags were uploaded.\n")
 
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
 	out, err = execDeployCapture("prod", "--output", "json")
@@ -533,7 +533,7 @@ func TestDeployManifestAnnouncesAnIDWithNoLinkName(t *testing.T) {
 	out, errOut, err := execDeployIO("", "--deployment", "clx-not-a-link")
 	require.NoError(t, err)
 	assert.Equal(t, "→ clx-not-a-link\n", errOut)
-	assert.Contains(t, out, "to deployment clx-not-a-link.")
+	assert.Contains(t, out, "to Deployment clx-not-a-link.")
 }
 
 // A declined prompt exits non-zero and says nothing: the user was asked and
@@ -644,7 +644,7 @@ func TestDeployManifestPromptIgnoresTheShellsSelection(t *testing.T) {
 	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep", "linked,", "default"}, pickerRow(t, errOut, "prod"))
 	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev", "linked"}, pickerRow(t, errOut, "dev"))
 	assert.Contains(t, errOut, "\n> [1] ")
-	assert.Contains(t, out, "to prod (deployment clx-dep).")
+	assert.Contains(t, out, "to prod (Deployment clx-dep).")
 	// The variable once moved the cursor, so its being ignored is said once,
 	// before the prompt, and never as a row's mark.
 	assert.Contains(t, errOut, "Note: ASTRO_DEPLOYMENT=dev chooses what the query commands read; astro deploy asks, with the project's default, prod, preselected")
@@ -704,7 +704,7 @@ deployment = "clx-prod"
 	// number would ship to prod.
 	out, _, err := execDeployIO("2\n")
 	require.NoError(t, err)
-	assert.Contains(t, out, "to 2 (deployment clx-two).")
+	assert.Contains(t, out, "to 2 (Deployment clx-two).")
 }
 
 // promptDeployer answers nothing itself; the prompt under test is the real
@@ -748,7 +748,7 @@ func TestDeployManifestPromptPreselectsDefaultAndAsksAnyway(t *testing.T) {
 	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep", "linked,", "default"}, pickerRow(t, errOut, "prod"))
 	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev", "linked"}, pickerRow(t, errOut, "dev"))
 	assert.Contains(t, errOut, "\n> [1] ")
-	assert.Contains(t, out, "to prod (deployment clx-dep).")
+	assert.Contains(t, out, "to prod (Deployment clx-dep).")
 }
 
 // pickerRow returns the fields of the deploy picker's row for name, its
@@ -883,7 +883,7 @@ func TestDeployManifestPromptLinksAnUnlinkedDeployment(t *testing.T) {
 	assert.Contains(t, errOut, "linked orders-staging to astro deployment clx-new in pyproject.toml")
 	assert.Contains(t, errOut, "→ orders-staging (astro deployment clx-new)")
 	assert.Equal(t, "clx-new", fake.imgInput.DeploymentID)
-	assert.Contains(t, out, "to orders-staging (deployment clx-new).")
+	assert.Contains(t, out, "to orders-staging (Deployment clx-new).")
 
 	saved, err := os.ReadFile(filepath.Join(config.WorkingPath, "pyproject.toml"))
 	require.NoError(t, err)
@@ -896,7 +896,7 @@ func TestDeployManifestPromptTakesTheOtherLink(t *testing.T) {
 
 	out, _, err := execDeployIO("dev\n")
 	require.NoError(t, err)
-	assert.Contains(t, out, "to dev (deployment clx-dev).")
+	assert.Contains(t, out, "to dev (Deployment clx-dev).")
 }
 
 // The known ordering wart this issue names: the build line used to print before
@@ -1414,7 +1414,7 @@ func TestDeployManifestNamedIsNotAsked(t *testing.T) {
 		out, errOut, err := execDeployIO("dev\n", args...)
 		require.NoError(t, err, "%v", args)
 		assert.NotContains(t, errOut, "Deploy to which deployment?", "%v", args)
-		assert.Contains(t, out, "to prod (deployment clx-dep).", "%v", args)
+		assert.Contains(t, out, "to prod (Deployment clx-dep).", "%v", args)
 	}
 }
 

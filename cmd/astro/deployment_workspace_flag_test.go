@@ -233,7 +233,7 @@ func TestWorkspaceTokenAddSearchesTheDeploymentsWorkspaceAndRemoveTheOneItIsPoin
 		astroV1Client = new(astrov1_mocks.ClientWithResponsesInterface) // asked nothing
 		_, err := execDeploymentCmd("token", "workspace-token", "remove", "--name", wsTok.Name, "--deployment", otherDep)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to find a valid workspace to find the Workspace token in; pass --workspace, or the token's ID: ")
+		assert.Contains(t, err.Error(), "could not find a valid Workspace to look up the token in; pass --workspace or the token's ID: ")
 	})
 	t.Run("a token given by id needs no workspace", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -310,5 +310,5 @@ func TestDeploymentListAllNeedsNoWorkspace(t *testing.T) {
 	mc.AssertExpectations(t)
 
 	_, err = execDeploymentCmd("list")
-	require.ErrorContains(t, err, "failed to find a valid workspace")
+	require.ErrorContains(t, err, "could not find a valid Workspace")
 }

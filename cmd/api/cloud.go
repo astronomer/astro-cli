@@ -88,7 +88,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   astro api cloud /organizations/{organizationId}/deployments \
     --template '{{range .}}{{.name}} ({{.status}}){{"\n"}}{{end}}'
 
-  # Generate curl command instead of executing
+  # Print a curl command instead of sending the request
   astro api cloud /organizations/{organizationId}/deployments --generate
 
   # Include response headers
@@ -115,24 +115,24 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 	}
 
 	// Request flags
-	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "The HTTP method for the request")
+	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "HTTP method for the request")
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a typed parameter in key=value format")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in key=value format")
-	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in key:value format")
-	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request (use \"-\" for stdin)")
+	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add an HTTP request header in key:value format")
+	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "File to use as the request body (use \"-\" for stdin)")
 	cmd.Flags().StringArrayVarP(&opts.PathParams, "path-param", "p", nil, "Path parameter in key=value format (for use with operation IDs)")
 
 	// Output flags
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
-	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
-	cmd.Flags().BoolVar(&opts.Slurp, "slurp", false, "Use with --paginate to return an array of all pages")
+	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Request every page of results")
+	cmd.Flags().BoolVar(&opts.Slurp, "slurp", false, "With --paginate, return one array of all pages")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template")
-	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
+	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Select values from the response with a jq query")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
 
 	// Other flags
-	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Output a curl command instead of executing the request")
+	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Print a curl command instead of sending the request")
 	cmd.PersistentFlags().BoolVar(&opts.Labs, "labs", false, "Use the Labs API, which adds experimental endpoints to the Cloud API")
 	cmd.PersistentFlags().StringVar(&opts.SpecURL, "spec-url", "", "OpenAPI spec URL or file path (overrides default Cloud API spec)")
 	cmd.PersistentFlags().StringVar(&opts.SpecTokenEnvVar, "spec-token-env-var", "", "Environment variable containing auth token for fetching the spec")
@@ -153,7 +153,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 func runCloud(opts *CloudOptions) error {
 	// Check if we're in a cloud context
 	if !context.IsCloudContext() {
-		return fmt.Errorf("the 'astro api cloud' command is only available in cloud context. Run 'astro login' to connect to Astro Cloud")
+		return fmt.Errorf("astro api cloud needs an Astro context; run astro login")
 	}
 
 	// Get current context for auth and placeholders
@@ -164,7 +164,7 @@ func runCloud(opts *CloudOptions) error {
 
 	// Check for token
 	if ctx.Token == "" {
-		return fmt.Errorf("not authenticated. Run 'astro login' to authenticate")
+		return fmt.Errorf("not logged in; run astro login")
 	}
 
 	// Initialize the spec cache for this domain
@@ -209,7 +209,7 @@ func runCloud(opts *CloudOptions) error {
 
 	// Check for any remaining unfilled path parameters
 	if missing := findMissingPathParams(requestPath); len(missing) > 0 {
-		return fmt.Errorf("missing path parameter(s): %s. Use -p/--path-param to provide them (e.g., -p %s=value)",
+		return fmt.Errorf("missing path parameter(s): %s; pass them with -p/--path-param, for example -p %s=value",
 			strings.Join(missing, ", "), missing[0])
 	}
 
@@ -314,7 +314,7 @@ func applyPathParams(path string, pathParams []string) (string, error) {
 func runCloudInteractive(opts *CloudOptions) error {
 	// Check if we're in a cloud context
 	if !context.IsCloudContext() {
-		return fmt.Errorf("the 'astro api cloud' command is only available in cloud context. Run 'astro login' to connect to Astro Cloud")
+		return fmt.Errorf("astro api cloud needs an Astro context; run astro login")
 	}
 
 	// Get current context for cache initialization
@@ -462,7 +462,7 @@ func initCloudSpecCache(opts *CloudOptions, ctx *config.Context) error {
 	}
 	specURL := ctx.GetPublicRESTAPIURL(specPath)
 	if specURL == "" {
-		return fmt.Errorf("could not determine API spec URL for domain %q. Check your login context", ctx.Domain)
+		return fmt.Errorf("could not determine the API spec URL for domain %q; check your login context", ctx.Domain)
 	}
 	cacheFile := openapi.CloudCacheFileNameForDomain(domainutil.FormatDomain(ctx.Domain))
 	if opts.Labs {
@@ -505,7 +505,7 @@ You can optionally provide a filter to search for specific endpoints. The filter
 			}
 
 			if !context.IsCloudContext() {
-				return fmt.Errorf("the 'astro api cloud' command is only available in cloud context. Run 'astro login' to connect to Astro Cloud")
+				return fmt.Errorf("astro api cloud needs an Astro context; run astro login")
 			}
 
 			ctx, err := context.GetCurrentContext()
@@ -530,7 +530,7 @@ You can optionally provide a filter to search for specific endpoints. The filter
 	}
 
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
-	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")
 	cliout.AddOutputFlag(cmd, &format)
 
 	return cmd
@@ -564,7 +564,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !context.IsCloudContext() {
-				return fmt.Errorf("the 'astro api cloud' command is only available in cloud context. Run 'astro login' to connect to Astro Cloud")
+				return fmt.Errorf("astro api cloud needs an Astro context; run astro login")
 			}
 
 			ctx, err := context.GetCurrentContext()
@@ -590,7 +590,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 	}
 
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
-	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
 	cliout.AddOutputFlag(cmd, &format)
 

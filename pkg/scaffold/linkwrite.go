@@ -713,7 +713,7 @@ func (l *Link) validate() error {
 		// Refused here, and never quoted: the parser's own messages quote
 		// the url, which would print the password.
 		if urlHasUserinfo(l.URL) {
-			return invalidLink("a url must not carry a username or password. Credentials are never saved: name the env vars that hold them with the basic auth method")
+			return invalidLink("a url must not carry a username or password. Name env vars that hold them with the basic auth method instead")
 		}
 		if l.Auth.Method == "" {
 			return invalidLink("a url link needs an auth method: nothing about a url says how its Airflow checks callers")

@@ -296,7 +296,7 @@ func TestOrganizationAuditLogsExportOutput(t *testing.T) {
 		m := auditLogsMock(t, body)
 		r := execAstroCmd(t, m, "", newOrganizationCmd, append(args, "--output-file", path)...)
 		require.NoError(t, r.err)
-		assert.Equal(t, "This may take some time depending on how many days are being exported.\nFinished exporting logs to local GZIP file\n", r.stdout)
+		assert.Equal(t, "Exports that cover many days can take a while.\nFinished exporting logs to local GZIP file\n", r.stdout)
 		assert.FileExists(t, path)
 		m.AssertExpectations(t)
 	})
@@ -309,7 +309,7 @@ func TestOrganizationAuditLogsExportOutput(t *testing.T) {
 		info, err := os.Stat(path)
 		require.NoError(t, err)
 		jsonIs(map[string]any{"output_file": path, "organization_id": "test-org-id", "days": float64(7), "bytes": float64(info.Size())})(t, r.stdout)
-		assert.Equal(t, "This may take some time depending on how many days are being exported.\n", r.stderr)
+		assert.Equal(t, "Exports that cover many days can take a while.\n", r.stderr)
 		m.AssertExpectations(t)
 	})
 

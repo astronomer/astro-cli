@@ -95,7 +95,7 @@ func (s *Suite) TestWorkspaceDelete() {
 	defer func() { skipPrompt = false }()
 	err := workspaceDelete(buf, []string{wsID})
 	s.NoError(err)
-	s.Contains(buf.String(), "Successfully deleted workspace")
+	s.Contains(buf.String(), "Deleted Workspace")
 
 	houstonMock.AssertExpectations(s.T())
 }

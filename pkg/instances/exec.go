@@ -168,7 +168,7 @@ func (h *execHelper) run(parent context.Context) (string, error) {
 		// A helper that prints a token plus a log line, or a whole JSON
 		// document, is a helper being asked for the wrong thing. Sending the
 		// first line and hoping would produce a 401 nobody could explain.
-		return "", fmt.Errorf("the auth command for deployment %q printed %d lines, and a token is one: %s",
+		return "", fmt.Errorf("the auth command for deployment %q printed %d lines; it must print exactly one: %s",
 			h.deployment, len(strings.Split(token, "\n")), h.quoted())
 	}
 	return token, nil

@@ -126,7 +126,7 @@ func (r Response) Decode(v any) error {
 		return nil
 	}
 	if !looksLikeJSON(r.Header, body) {
-		return fmt.Errorf("airflow answered with %s, not the JSON its API returns — check what is in front of it", describeBody(r.Header, body))
+		return fmt.Errorf("Airflow answered with %s instead of JSON; check what is in front of it", describeBody(r.Header, body))
 	}
 	if err := json.Unmarshal(body, v); err != nil {
 		return fmt.Errorf("decode airflow response: %w", err)

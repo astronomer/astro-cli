@@ -52,10 +52,10 @@ func newPackageCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "package [TARGET]",
 		Short: "Build a platform's deployable artifact without shipping it",
-		Long: "Build the artifact a given Airflow platform consumes — for CI, or to hand a " +
-			"prebuilt image to astro deploy --image-name. TARGET is astro (the default), " +
-			"mwaa, composer, or oss. astro builds an image; mwaa and composer build a " +
-			"bucket-shaped directory; only oss is not built yet.",
+		Long: "Build the artifact that an Airflow platform consumes, for CI or to give a " +
+			"prebuilt image to astro deploy --image-name.\n\n" +
+			"TARGET is astro (the default), mwaa, composer, or oss. astro builds an image. mwaa and " +
+			"composer build a bucket-shaped directory. oss is not built yet.",
 		Example: "  # Build the image Astro runs\n" +
 			"  astro package\n\n" +
 			"  # Build the bucket layout MWAA reads, and also write it to a zip\n" +
@@ -82,7 +82,7 @@ func newPackageCmd(c *cli) *cobra.Command {
 	cmd.Flags().StringVar(&opts.tag, "tag", "", "Image reference for image targets (default astro-package/<name>:<runtime>-<hash>)")
 	cmd.Flags().StringVar(&opts.platform, "platform", defaultPackagePlatform, "Build platform for image targets")
 	cmd.Flags().StringVar(&opts.outDir, "out-dir", "", "Artifact directory for bucket targets (default dist/<target>)")
-	cmd.Flags().StringVar(&opts.contextDir, "context-dir", "", "Write the astro image's build context to this new or empty directory instead of building it, and print the docker and podman commands that build it")
+	cmd.Flags().StringVar(&opts.contextDir, "context-dir", "", "Write the astro image's build context to this new or empty directory and print the docker and podman commands that build it, without building")
 	addBuildSecretFlag(cmd, &opts.buildSecrets)
 	return cmd
 }
@@ -121,7 +121,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		case target.Name() != pack.TargetAstro:
 			return fmt.Errorf("--context-dir writes an image's build context, and the %s target builds no image", target.Name())
 		case opts.save != "":
-			return errors.New("--context-dir builds nothing, so there is nothing for --save to write; build the context, then save the image with docker save")
+			return errors.New("--context-dir builds nothing, so --save has nothing to write; build the context, then save the image with docker save")
 		}
 	}
 	if len(opts.buildSecrets) > 0 {

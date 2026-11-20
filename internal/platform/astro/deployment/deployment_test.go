@@ -850,7 +850,7 @@ func (s *Suite) TestGetDeploymentByID() {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 
 		_, err := GetDeploymentByID("", deploymentID, mockV1Client)
-		s.ErrorContains(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
+		s.ErrorContains(err, "no context set; run astro login and try again")
 	})
 
 	s.Run("error in api response", func() {
@@ -1014,7 +1014,7 @@ func (s *Suite) TestSelectRegion() {
 
 		_, err := selectRegion("gcp", "test-invalid-region", mockV1Client)
 		s.Error(err)
-		s.Contains(err.Error(), "unable to find specified Region")
+		s.Contains(err.Error(), "could not find the specified Region")
 	})
 }
 
@@ -1481,9 +1481,9 @@ func (s *Suite) TestCreate() {
 		stdout, _ := io.ReadAll(outR)
 		stderr, _ := io.ReadAll(errR)
 
-		s.EqualError(createErr, "you must give your Deployment a name")
+		s.EqualError(createErr, "the Deployment needs a name")
 		s.Empty(string(stdout))
-		s.Contains(string(stderr), "Please specify a name for your Deployment")
+		s.Contains(string(stderr), "Specify a name for the Deployment")
 		s.Contains(string(stderr), "Deployment name: ")
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -1887,7 +1887,7 @@ func (s *Suite) TestSelectCluster() {
 
 		_, err := selectCluster("test-invalid-id", mockOrgID, mockV1Client)
 		s.Error(err)
-		s.Contains(err.Error(), "unable to find specified Cluster")
+		s.Contains(err.Error(), "could not find the specified Cluster")
 		s.Contains(err.Error(), `"test-invalid-id"`)
 		s.Contains(err.Error(), "astro organization cluster list")
 	})
@@ -2370,7 +2370,7 @@ func (s *Suite) TestUpdate() {
 		var notes bytes.Buffer
 		_, err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "enable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, &notes)
 		s.ErrorIs(err, input.ErrAborted)
-		s.Contains(notes.String(), "Warning: You are trying to update the dag deploy setting with ci-cd enforcement enabled.")
+		s.Contains(notes.String(), "Warning: You are updating the Dag deploy setting while CI/CD enforcement is enabled.")
 	})
 
 	s.Run("do not update deployment to disable dag deploy if already disabled", func() {

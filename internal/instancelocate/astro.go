@@ -20,7 +20,7 @@ func (l *locator) astroBaseURL(ctx context.Context, i instances.Instance) (strin
 	}
 	url := deployment.WebServerAirflowApiUrl
 	if url == "" {
-		return "", fmt.Errorf("Astro Deployment %s (%q) has no Airflow API URL yet — it may still be starting", i.Link.Deployment, i.Name)
+		return "", fmt.Errorf("Astro Deployment %s (%q) has no Airflow API URL yet; it may still be starting", i.Link.Deployment, i.Name)
 	}
 	return url, nil
 }
@@ -45,7 +45,7 @@ func (l *locator) astroDeployment(ctx context.Context, i instances.Instance) (*a
 	if err != nil {
 		// The request never reached an answer, which on this path means the
 		// machine could not get to Astro at all.
-		return nil, fmt.Errorf("could not reach Astro to look up %q — check your connection: %w", i.Name, err)
+		return nil, fmt.Errorf("could not reach Astro to look up %q (check your connection): %w", i.Name, err)
 	}
 	if resp.JSON200 == nil {
 		return nil, deploymentOutage(l.domain, i, deploymentID, resp)
@@ -135,16 +135,16 @@ func (e *UnavailableError) Unwrap() error { return e.State }
 func (e *UnavailableError) Error() string {
 	switch e.State {
 	case ErrDeploymentHibernating:
-		return fmt.Sprintf("Astro Deployment %s (%q) is hibernating, so its Airflow is not answering — %s",
+		return fmt.Sprintf("Astro Deployment %s (%q) is hibernating, so its Airflow is not answering; %s",
 			e.DeploymentID, e.Name, WakeUpStep(e.DeploymentID))
 	case ErrDeploymentDeploying:
-		return fmt.Sprintf("Astro Deployment %s (%q) is still deploying, so its Airflow is not answering yet — try again in a minute or two",
+		return fmt.Sprintf("Astro Deployment %s (%q) is still deploying, so its Airflow is not answering yet; try again in a minute or two",
 			e.DeploymentID, e.Name)
 	case ErrAirflowUnavailable:
-		return fmt.Sprintf("Astro Deployment %s (%q) reports healthy, but its Airflow is not answering yet — it may still be starting after a wake-up or deploy, so try again in a minute",
+		return fmt.Sprintf("Astro Deployment %s (%q) reports healthy, but its Airflow is not answering yet; it may still be starting after a wake-up or deploy, so try again in a minute",
 			e.DeploymentID, e.Name)
 	}
-	return fmt.Sprintf("Astro reports Deployment %s (%q) as unhealthy, so its Airflow is not answering — see astro deployment inspect %s",
+	return fmt.Sprintf("Astro reports Deployment %s (%q) as unhealthy, so its Airflow is not answering; run astro deployment inspect %s",
 		e.DeploymentID, e.Name, e.DeploymentID)
 }
 
@@ -184,12 +184,12 @@ func deploymentOutage(domain string, i instances.Instance, deploymentID string, 
 	case http.StatusUnauthorized:
 		return fmt.Errorf("%w (looking up %q)", astrosession.Rejected(domain), name)
 	case http.StatusForbidden:
-		return fmt.Errorf("you do not have access to Astro Deployment %s (%q) — ask a workspace admin to grant it", deploymentID, name)
+		return fmt.Errorf("you do not have access to Astro Deployment %s (%q); ask a Workspace admin to grant it", deploymentID, name)
 	case http.StatusNotFound:
 		if i.Source == instances.SourceDeploymentID {
 			return fmt.Errorf("Astro Deployment %s does not exist", deploymentID)
 		}
-		return fmt.Errorf("Astro Deployment %s (%q) does not exist — check the deployment on this link in pyproject.toml", deploymentID, name)
+		return fmt.Errorf("Astro Deployment %s (%q) does not exist; check the Deployment on this link in pyproject.toml", deploymentID, name)
 	}
 	detail := ""
 	if resp.HTTPResponse != nil {

@@ -66,7 +66,7 @@ func roleThenRenameCases() []roleThenRename {
 		}
 	}
 	tokenPartial := func(role string) string {
-		return "the token's role was updated to " + role + ", but updating its name and description failed: name taken"
+		return "updated the token's role to " + role + ", but updating its name and description failed: name taken"
 	}
 	return []roleThenRename{
 		{
@@ -83,7 +83,7 @@ func roleThenRenameCases() []roleThenRename {
 			renameOK: func(m *astrov1_mocks.ClientWithResponsesInterface) {
 				m.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, "team-eng", mock.Anything).Return(&astrov1.UpdateTeamResponse{HTTPResponse: ok200(), JSON200: &eng}, nil).Maybe()
 			},
-			partial: "the team's role was updated to ORGANIZATION_OWNER, but updating its name and description failed: name taken",
+			partial: "updated the team's role to ORGANIZATION_OWNER, but updating its name and description failed: name taken",
 		},
 		{
 			name: "deployment token", root: newDeploymentRootCmd, update: []string{"deployment", "token", "update", "tok-dep", "--deployment=" + tokDeploymentID}, role: "custom-role",
@@ -139,7 +139,7 @@ func TestUpdateSendsTheRoleThenTheRename(t *testing.T) {
 				r := execAstroCmd(t, m, "", c.root, append(c.update, "--description", "new words", "-o", format)...)
 				require.Error(t, r.err)
 				assert.Contains(t, r.err.Error(), "name taken")
-				assert.NotContains(t, r.err.Error(), "role was updated", "no role was changed")
+				assert.NotContains(t, r.err.Error(), "updated the token's role", "no role was changed")
 				m.AssertNotCalled(t, c.roleCall, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			})
 		}

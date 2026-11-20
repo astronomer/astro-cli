@@ -189,7 +189,7 @@ func TestDeploymentCloneText(t *testing.T) {
 	require.NoError(t, r.err)
 	assert.Equal(t, []map[string]string{deploymentRow("etl-preview")}, tableRows(t, r.stdout, "NAME"))
 	requireInOrder(t, r.stdout,
-		"Successfully created Deployment: ", "etl-preview",
+		"Created Deployment ", "etl-preview",
 		"Deployment can be accessed at the following URLs",
 		"Deployment Dashboard: ", coreDeploymentID,
 		"Airflow Dashboard: ", "etl-prod.astronomer.run/d1234")

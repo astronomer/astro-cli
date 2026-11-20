@@ -33,8 +33,8 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "team",
 		Aliases: []string{"te", "teams"},
-		Short:   "Manage deployment team resources",
-		Long:    "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
+		Short:   "Manage Deployment team resources",
+		Long:    "A Team is a group of users imported from your Identity Provider. Add a Team to or remove it from a Deployment to manage access for the whole group.",
 	}
 	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose teams to manage: a link name from the project's manifest, or a Deployment id", "d", true)
 	// Every team command needs it. Marked before the flag was defined, as it
@@ -53,8 +53,8 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the Workspace twin differs in its flags and its role
 	cmd := &cobra.Command{
 		Use:     "add [TEAM_ID]",
-		Short:   "Add a team to a deployment",
-		Long:    "Add a team to a deployment, named by its id as the argument or with --team-id",
+		Short:   "Add a team to a Deployment",
+		Long:    "Add a team to a Deployment, named by its id as the argument or with --team-id",
 		Args:    argOrFlag("team-id", "team"),
 		Example: deploymentTeamAddExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,8 +75,8 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "remove <TEAM_ID>",
 		Aliases: []string{"rm"},
-		Short:   "Remove a team from a deployment",
-		Long:    "Remove a team from a deployment",
+		Short:   "Remove a team from a Deployment",
+		Long:    "Remove a team from a Deployment",
 		Args:    cobra.ExactArgs(1),
 		Example: deploymentTeamRemoveExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -90,8 +90,8 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update <TEAM_ID>",
-		Short:   "Update a team's role for a deployment",
-		Long:    "Update a team's role for a deployment",
+		Short:   "Update a team's role for a Deployment",
+		Long:    "Update a team's role for a Deployment",
 		Args:    cobra.ExactArgs(1),
 		Example: deploymentTeamUpdateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -137,7 +137,7 @@ func deploymentTeamsList(out io.Writer, _ []string) error {
 func deploymentTeamAdd(out io.Writer, _ []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentRole); err != nil {
-		return fmt.Errorf("failed to find a valid role: %w", err)
+		return fmt.Errorf("could not find a valid role: %w", err)
 	}
 
 	role, err := deployment.AddTeam(deploymentID, teamID, deploymentRole, houstonClient)
@@ -158,7 +158,7 @@ func deploymentTeamRemove(out io.Writer, args []string) error {
 func deploymentTeamUpdate(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentRole); err != nil {
-		return fmt.Errorf("failed to find a valid role: %w", err)
+		return fmt.Errorf("could not find a valid role: %w", err)
 	}
 
 	role, err := deployment.UpdateTeamRole(deploymentID, args[0], deploymentRole, houstonClient)

@@ -72,7 +72,7 @@ func TestWorkspaceDeployments(t *testing.T) {
 // a link name resolves only from the project's directory. An id-shaped one,
 // and any from a project, is told only that the workspace does not hold it.
 func TestALinkNameOutsideAProjectIsHinted(t *testing.T) {
-	const hint = "outside a pyproject.toml project there are no links, so a link name resolves only when the deploy runs from the project's directory"
+	const hint = "a link name resolves only from a pyproject.toml project directory"
 	for _, tc := range []struct {
 		name  string
 		id    string
@@ -98,7 +98,7 @@ func TestALinkNameOutsideAProjectIsHinted(t *testing.T) {
 				}
 				_, err := DeployManifestImage(client, in)
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), "no Deployment "+tc.id+" in workspace ws", "remote=%v", remote)
+				assert.Contains(t, err.Error(), "no Deployment "+tc.id+" in Workspace ws", "remote=%v", remote)
 				if tc.hint {
 					assert.Contains(t, err.Error(), hint, "remote=%v", remote)
 				} else {

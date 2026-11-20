@@ -279,7 +279,7 @@ func TestLinkAddLeavesOutLinkedDeployments(t *testing.T) {
 	run.pickErr = ErrAllDeploymentsLinked
 	err := execute(t, d, "link", "add")
 	require.Error(t, err)
-	assert.Equal(t, "every Deployment in workspace ws_A is already linked, as dev, stage. To relink one, run astro link add NAME --deployment <id> --replace", err.Error())
+	assert.Equal(t, "every Deployment in Workspace ws_A is already linked, as dev, stage. To relink one, run astro link add NAME --deployment <id> --replace", err.Error())
 	assert.Equal(t, body, readManifest(t, dir))
 }
 

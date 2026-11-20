@@ -68,81 +68,81 @@ func deploymentUserTeamTextCases() []tokenCase {
 		userPickRow("1", "Ada Lovelace", "ada@example.com", "user-ada", "DEPLOYMENT ROLE", "DEPLOYMENT_ADMIN"),
 		userPickRow("2", "Bob Builder", "bob@example.com", "user-bob", "DEPLOYMENT ROLE", ""),
 	}
-	addAda := "The user ada@example.com was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n"
+	addAda := "Added user ada@example.com to the Deployment with role DEPLOYMENT_ADMIN\n"
 
 	return []tokenCase{
-		{name: "user add", root: dep, client: with(all, setsUserRoles("user-bob")), args: []string{"deployment", "user", "add", "bob@example.com", "--role", "DEPLOYMENT_AUTHOR", d}, check: exactly("The user bob@example.com was successfully added to the deployment with the role DEPLOYMENT_AUTHOR\n")},
+		{name: "user add", root: dep, client: with(all, setsUserRoles("user-bob")), args: []string{"deployment", "user", "add", "bob@example.com", "--role", "DEPLOYMENT_AUTHOR", d}, check: exactly("Added user bob@example.com to the Deployment with role DEPLOYMENT_AUTHOR\n")},
 		{name: "user add with the default role", root: dep, client: with(all, setsUserRoles("user-ada")), args: []string{"deployment", "user", "add", "Ada@Example.com", d}, check: exactly(addAda)},
 		{name: "user add with --deployment-id", root: dep, client: with(all, setsUserRoles("user-ada")), args: []string{"deployment", "user", "add", "ada@example.com", "--deployment-id", tokDeploymentID}, check: exactly(addAda)},
 		{
 			name: "user add through the picker", root: dep, client: with(all, setsUserRoles("user-bob")), answers: "2\n",
 			args: []string{"deployment", "user", "add", d},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Please select the user:", "> The user bob@example.com was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n")
+				requireInOrder(t, out, "Select the user:", "> Added user bob@example.com to the Deployment with role DEPLOYMENT_ADMIN\n")
 				assert.Equal(t, []map[string]string{adaOrgPickRow, bobOrgPickRow}, tableRows(t, out, "#"))
 			},
 		},
-		{name: "user add through the picker, a bad choice", root: dep, client: with(all), answers: "9\n", args: []string{"deployment", "user", "add", d}, check: says("Please select the user:", "> "), wantErr: "invalid User selected"},
-		{name: "user add of nobody", root: dep, client: with(all), args: []string{"deployment", "user", "add", "nobody@example.com", d}, check: empty, wantErr: "no user was found for the email you provided"},
+		{name: "user add through the picker, a bad choice", root: dep, client: with(all), answers: "9\n", args: []string{"deployment", "user", "add", d}, check: says("Select the user:", "> "), wantErr: "invalid user selected"},
+		{name: "user add of nobody", root: dep, client: with(all), args: []string{"deployment", "user", "add", "nobody@example.com", d}, check: empty, wantErr: "no user found with that email"},
 		{name: "user add the API refuses", root: dep, client: with(all, refusesUserRoles), args: []string{"deployment", "user", "add", "ada@example.com", d}, check: empty, wantErr: "you may not grant that role"},
-		{name: "user update", root: dep, client: with(all, setsUserRoles("user-ada")), args: []string{"deployment", "user", "update", "ada@example.com", "--role", "custom-role", d}, check: exactly("The deployment user ada@example.com role was successfully updated to custom-role\n")},
-		{name: "user update with the role asked", root: dep, client: with(all, setsUserRoles("user-ada")), answers: "custom-role\n", args: []string{"deployment", "user", "update", "ada@example.com", d}, check: exactly("Enter a user Deployment role or custom role name to update user: The deployment user ada@example.com role was successfully updated to custom-role\n")},
+		{name: "user update", root: dep, client: with(all, setsUserRoles("user-ada")), args: []string{"deployment", "user", "update", "ada@example.com", "--role", "custom-role", d}, check: exactly("Updated Deployment user ada@example.com to custom-role\n")},
+		{name: "user update with the role asked", root: dep, client: with(all, setsUserRoles("user-ada")), answers: "custom-role\n", args: []string{"deployment", "user", "update", "ada@example.com", d}, check: exactly("Enter a user Deployment role or custom role name to update user: Updated Deployment user ada@example.com to custom-role\n")},
 		{
 			name: "user update through the picker", root: dep, client: with(all, setsUserRoles("user-ada")), answers: "1\n",
 			args: []string{"deployment", "user", "update", "--role", "custom-role", d},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Please select the user:", "> The deployment user ada@example.com role was successfully updated to custom-role\n")
+				requireInOrder(t, out, "Select the user:", "> Updated Deployment user ada@example.com to custom-role\n")
 				assert.Equal(t, depPickRows, tableRows(t, out, "#"))
 			},
 		},
-		{name: "user update of nobody", root: dep, client: with(all), args: []string{"deployment", "user", "update", "nobody@example.com", "--role", "custom-role", d}, check: empty, wantErr: "no user was found for the email you provided"},
-		{name: "user remove", root: dep, client: with(all, setsUserRoles("user-ada")), args: []string{"deployment", "user", "remove", "ada@example.com", d}, check: exactly("The user ada@example.com was successfully removed from the deployment\n")},
+		{name: "user update of nobody", root: dep, client: with(all), args: []string{"deployment", "user", "update", "nobody@example.com", "--role", "custom-role", d}, check: empty, wantErr: "no user found with that email"},
+		{name: "user remove", root: dep, client: with(all, setsUserRoles("user-ada")), args: []string{"deployment", "user", "remove", "ada@example.com", d}, check: exactly("Removed user ada@example.com from the Deployment\n")},
 		{
 			name: "user remove through the picker", root: dep, client: with(all, setsUserRoles("user-ada")), answers: "1\n",
 			args: []string{"deployment", "user", "remove", d},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Please select the user:", "> The user ada@example.com was successfully removed from the deployment\n")
+				requireInOrder(t, out, "Select the user:", "> Removed user ada@example.com from the Deployment\n")
 				assert.Equal(t, depPickRows, tableRows(t, out, "#"))
 			},
 		},
-		{name: "user remove of nobody", root: dep, client: with(all), args: []string{"deployment", "user", "remove", "nobody@example.com", d}, check: empty, wantErr: "no user was found for the email you provided"},
+		{name: "user remove of nobody", root: dep, client: with(all), args: []string{"deployment", "user", "remove", "nobody@example.com", d}, check: empty, wantErr: "no user found with that email"},
 		{name: "user remove the API refuses", root: dep, client: with(all, refusesUserRoles), args: []string{"deployment", "user", "remove", "ada@example.com", d}, check: empty, wantErr: "you may not grant that role"},
 
 		// The team add and update lines name the team by ID, and remove by
 		// name, as the workspace team commands once did.
-		{name: "team add", root: dep, client: with(all, setsTeamRoles("team-eng")), args: []string{"deployment", "team", "add", "team-eng", "--role", "custom-role", d}, check: exactly("The team team-eng was successfully added to the deployment with the role custom-role\n")},
-		{name: "team add with the default role", root: dep, client: with(all, setsTeamRoles("team-idp")), args: []string{"deployment", "team", "add", "team-idp", d}, check: exactly("The team team-idp was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n")},
-		{name: "team add with --deployment-id", root: dep, client: with(all, setsTeamRoles("team-idp")), args: []string{"deployment", "team", "add", "team-idp", "--deployment-id", tokDeploymentID}, check: exactly("The team team-idp was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n")},
+		{name: "team add", root: dep, client: with(all, setsTeamRoles("team-eng")), args: []string{"deployment", "team", "add", "team-eng", "--role", "custom-role", d}, check: exactly("Added team team-eng to the Deployment with role custom-role\n")},
+		{name: "team add with the default role", root: dep, client: with(all, setsTeamRoles("team-idp")), args: []string{"deployment", "team", "add", "team-idp", d}, check: exactly("Added team team-idp to the Deployment with role DEPLOYMENT_ADMIN\n")},
+		{name: "team add with --deployment-id", root: dep, client: with(all, setsTeamRoles("team-idp")), args: []string{"deployment", "team", "add", "team-idp", "--deployment-id", tokDeploymentID}, check: exactly("Added team team-idp to the Deployment with role DEPLOYMENT_ADMIN\n")},
 		{
 			name: "team add through the picker", root: dep, client: with(all, setsTeamRoles("team-idp")), answers: "2\n",
 			args: []string{"deployment", "team", "add", d},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Please select a team:", "> The team team-idp was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n")
+				requireInOrder(t, out, "Select a team:", "> Added team team-idp to the Deployment with role DEPLOYMENT_ADMIN\n")
 				assert.Equal(t, teamPickRows, tableRows(t, out, "#"))
 			},
 		},
-		{name: "team add through the picker, a bad choice", root: dep, client: with(all), answers: "9\n", args: []string{"deployment", "team", "add", d}, check: says("Please select a team:", "> "), wantErr: "invalid team selection"},
-		{name: "team add with no teams", root: dep, client: with(none), args: []string{"deployment", "team", "add", d}, check: empty, wantErr: "no teams found in your organization"},
+		{name: "team add through the picker, a bad choice", root: dep, client: with(all), answers: "9\n", args: []string{"deployment", "team", "add", d}, check: says("Select a team:", "> "), wantErr: "invalid team selection"},
+		{name: "team add with no teams", root: dep, client: with(none), args: []string{"deployment", "team", "add", d}, check: empty, wantErr: "no teams found in your Organization"},
 		{name: "team add the API refuses", root: dep, client: with(all, refusesTeamRoles), args: []string{"deployment", "team", "add", "team-eng", d}, check: empty, wantErr: "you may not grant that role"},
-		{name: "team update", root: dep, client: with(all, setsTeamRoles("team-eng")), args: []string{"deployment", "team", "update", "team-eng", "--role", "custom-role", d}, check: exactly("The deployment team team-eng role was successfully updated to custom-role\n")},
-		{name: "team update with the role asked", root: dep, client: with(all, setsTeamRoles("team-eng")), answers: "custom-role\n", args: []string{"deployment", "team", "update", "team-eng", d}, check: exactly("Enter a Deployment role or custom role name to update team: The deployment team team-eng role was successfully updated to custom-role\n")},
+		{name: "team update", root: dep, client: with(all, setsTeamRoles("team-eng")), args: []string{"deployment", "team", "update", "team-eng", "--role", "custom-role", d}, check: exactly("Updated Deployment team team-eng to custom-role\n")},
+		{name: "team update with the role asked", root: dep, client: with(all, setsTeamRoles("team-eng")), answers: "custom-role\n", args: []string{"deployment", "team", "update", "team-eng", d}, check: exactly("Enter a Deployment role or custom role name to update team: Updated Deployment team team-eng to custom-role\n")},
 		{
 			name: "team update through the picker", root: dep, client: with(all, setsTeamRoles("team-eng")), answers: "1\n",
 			args: []string{"deployment", "team", "update", "--role", "custom-role", d},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Please select a team:", "> The deployment team team-eng role was successfully updated to custom-role\n")
+				requireInOrder(t, out, "Select a team:", "> Updated Deployment team team-eng to custom-role\n")
 				assert.Equal(t, teamPickRows, tableRows(t, out, "#"))
 			},
 		},
-		{name: "team update through the picker, a bad choice", root: dep, client: with(all), answers: "9\n", args: []string{"deployment", "team", "update", "--role", "custom-role", d}, check: says("Please select a team:", "> "), wantErr: "invalid team selection"},
-		{name: "team update with no teams", root: dep, client: with(none), args: []string{"deployment", "team", "update", "--role", "custom-role", d}, check: empty, wantErr: "no teams found in your deployment"},
-		{name: "team remove", root: dep, client: with(all, setsTeamRoles("team-eng")), args: []string{"deployment", "team", "remove", "team-eng", d}, check: exactly("Astro Team Engineering was successfully removed from deployment " + tokDeploymentID + "\n")},
+		{name: "team update through the picker, a bad choice", root: dep, client: with(all), answers: "9\n", args: []string{"deployment", "team", "update", "--role", "custom-role", d}, check: says("Select a team:", "> "), wantErr: "invalid team selection"},
+		{name: "team update with no teams", root: dep, client: with(none), args: []string{"deployment", "team", "update", "--role", "custom-role", d}, check: empty, wantErr: "no teams found in your Deployment"},
+		{name: "team remove", root: dep, client: with(all, setsTeamRoles("team-eng")), args: []string{"deployment", "team", "remove", "team-eng", d}, check: exactly("Removed team Engineering from Deployment " + tokDeploymentID + "\n")},
 		{
 			name: "team remove through the picker", root: dep, client: with(all, setsTeamRoles("team-eng")), answers: "1\n",
 			args:  []string{"deployment", "team", "remove", d},
-			check: says("Please select a team:", "> Astro Team Engineering was successfully removed from deployment "+tokDeploymentID+"\n"),
+			check: says("Select a team:", "> Removed team Engineering from Deployment "+tokDeploymentID+"\n"),
 		},
-		{name: "team remove with no teams", root: dep, client: with(none), args: []string{"deployment", "team", "remove", d}, check: empty, wantErr: "no teams found in your deployment"},
+		{name: "team remove with no teams", root: dep, client: with(none), args: []string{"deployment", "team", "remove", d}, check: empty, wantErr: "no teams found in your Deployment"},
 		{name: "user add naming no Deployment", root: dep, client: with(all), args: []string{"deployment", "user", "add", "ada@example.com"}, check: empty, wantErr: "required flag --deployment not set. To find valid values, run: astro deployment list"},
 		{name: "team remove naming no Deployment", root: dep, client: with(all), args: []string{"deployment", "team", "remove", "team-eng"}, check: empty, wantErr: "required flag --deployment not set. To find valid values, run: astro deployment list"},
 		{name: "team remove the API refuses", root: dep, client: with(all, refusesTeamRoles), args: []string{"deployment", "team", "remove", "team-eng", d}, check: empty, wantErr: "you may not grant that role"},
@@ -199,7 +199,7 @@ func TestDeploymentUserTeamJSONFailures(t *testing.T) {
 		want   string
 		code   int
 	}{
-		{"user add of nobody", with(all), []string{"deployment", "user", "add", "nobody@example.com", d}, "no user was found for the email you provided", cliout.ExitFailure},
+		{"user add of nobody", with(all), []string{"deployment", "user", "add", "nobody@example.com", d}, "no user found with that email", cliout.ExitFailure},
 		{"user update the API refuses", with(all, refusesUserRoles), []string{"deployment", "user", "update", "ada@example.com", "--role", "custom-role", d}, "you may not grant that role", cliout.ExitFailure},
 		{"team remove the API refuses", with(all, refusesTeamRoles), []string{"deployment", "team", "remove", "team-eng", d}, "you may not grant that role", cliout.ExitFailure},
 		{"team add naming no Deployment", with(all), []string{"deployment", "team", "add", "team-eng"}, "required flag --deployment not set", cliout.ExitUsage},

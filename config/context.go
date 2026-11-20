@@ -18,8 +18,8 @@ var (
 	// including when there is no config at all.
 	ErrContextNotExist = errors.New("context does not exist")
 
-	ErrGetHomeString = errors.New("no context set, have you authenticated to Astro or APC? Run astro login and try again")
-	ErrNotConnected  = errors.New("not connected, have you authenticated to Astro? Run astro login and try again")
+	ErrGetHomeString = errors.New("no context set; run astro login and try again")
+	ErrNotConnected  = errors.New("not connected to Astro; run astro login and try again")
 	errNotLoginField = errors.New("only a login field is shared across a tenant")
 )
 
@@ -274,7 +274,7 @@ func (c *Context) SetSharedLogin(token, refreshToken string, expiresIn int64, us
 // organization switch) made under ASTRO_API_TOKEN, on a host with no saved
 // context, was not saved. A var so a test reads it.
 var unsavedSelectionNote = func(cKey, field string) {
-	fmt.Fprintf(os.Stderr, "%s the %s selected in this ASTRO_API_TOKEN run was not saved: there is no saved login for %s, and a token run never changes saved logins.\n", ansi.NoteLabel(os.Stderr), strings.ReplaceAll(field, "_", " "), strings.ReplaceAll(cKey, "_", "."))
+	fmt.Fprintf(os.Stderr, "%s the %s selected in this ASTRO_API_TOKEN run was not saved: there is no saved login for %s, and runs with a token do not change saved logins.\n", ansi.NoteLabel(os.Stderr), strings.ReplaceAll(field, "_", " "), strings.ReplaceAll(cKey, "_", "."))
 }
 
 // existsOnlyForEnvironmentLogin reports whether the context under cKey exists

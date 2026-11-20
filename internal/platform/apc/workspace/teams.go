@@ -8,7 +8,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 )
 
-var errTeamNotInWorkspace = errors.New("the team you are trying to change is not part of this workspace")
+var errTeamNotInWorkspace = errors.New("the team is not part of this Workspace")
 
 // TeamRole is a team and the role it holds on a Workspace. Name is empty
 // when Houston's answer did not give it.

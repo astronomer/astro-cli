@@ -249,7 +249,7 @@ func removeDeploymentTeam(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(deploymentTeamOutput, out, &r, fmt.Sprintf("Astro Team %s was successfully removed from deployment %s", r.Name, r.DeploymentID))
+	return renderLines(deploymentTeamOutput, out, &r, fmt.Sprintf("Removed team %s from Deployment %s", r.Name, r.DeploymentID))
 }
 
 func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
@@ -290,7 +290,7 @@ func addDeploymentTeam(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(deploymentTeamOutput, out, &t, fmt.Sprintf("The team %s was successfully added to the deployment with the role %s", t.ID, t.DeploymentRole))
+	return renderLines(deploymentTeamOutput, out, &t, fmt.Sprintf("Added team %s to the Deployment with role %s", t.ID, t.DeploymentRole))
 }
 
 func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -338,7 +338,7 @@ func updateDeploymentTeam(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(deploymentTeamOutput, out, &t, fmt.Sprintf("The deployment team %s role was successfully updated to %s", t.ID, t.DeploymentRole))
+	return renderLines(deploymentTeamOutput, out, &t, fmt.Sprintf("Updated Deployment team %s to %s", t.ID, t.DeploymentRole))
 }
 
 func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
@@ -494,7 +494,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create a new Astro Deployment",
-		Long:    "Create a new Deployment — an Airflow environment running on Astro. Configurable options include the executor type (Celery, Kubernetes, Astro), runtime version, worker queues, cloud provider, and region. On hosted Astro, a Deployment can be standard (shared infrastructure) or dedicated (isolated cluster). Use --clone to copy an existing Deployment. Use --wait to block until the Deployment is healthy.",
+		Long:    "Create a Deployment, an Airflow environment running on Astro. Options include the executor type (Celery, Kubernetes, Astro), runtime version, worker queues, cloud provider, and region. On hosted Astro, a Deployment can be standard (shared infrastructure) or dedicated (isolated cluster). Use --clone to copy an existing Deployment. Use --wait to block until the Deployment is healthy.",
 		Example: deploymentCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentCreate(cmd, args, out)
@@ -504,9 +504,9 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace to create the Deployment in", oneXWorkspaceID)
 	cmd.Flags().StringVar(&description, "description", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVar(&runtimeVersion, "runtime-version", "", "Runtime version for the Deployment")
-	cmd.Flags().StringVar(&dagDeploy, "dag-deploy", "", "Enables Dag-only deploys for the Deployment")
+	cmd.Flags().StringVar(&dagDeploy, "dag-deploy", "", "Enable or disable Dag-only deploys for the Deployment")
 	cmd.Flags().StringVar(&executor, "executor", "CeleryExecutor", "The executor to use for the Deployment: CeleryExecutor, KubernetesExecutor or AstroExecutor")
-	cmd.Flags().StringVar(&cicdEnforcement, "cicd-enforcement", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable")
+	cmd.Flags().StringVar(&cicdEnforcement, "cicd-enforcement", "", "When enabled CI/CD Enforcement where deploys to Deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable")
 	cmd.Flags().StringVar(&cloneSource, "clone", "", cloneFlagUsage)
 	cmd.Flags().BoolVar(&waitForStatus, "wait", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
@@ -559,7 +559,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&forceUpdate, "yes", "y", false, "Don't ask for confirmation, including after a warning about the Deployment's CI/CD enforcement")
 	cmd.Flags().StringVar(&cicdEnforcement, "cicd-enforcement", "", "Whether deploys to the Deployment must use an API key or token, which forces them through CI/CD: enable or disable")
 	addDeploymentFlag(cmd.Flags(), "Deployment to update: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName, withhold: true}, oneXDeploymentName)
-	cmd.Flags().StringVar(&dagDeploy, "dag-deploy", "", "Enables Dag-only deploys for the deployment")
+	cmd.Flags().StringVar(&dagDeploy, "dag-deploy", "", "Enable or disable Dag-only deploys for the Deployment")
 	cmd.Flags().BoolVar(&cleanOutput, "clean-output", false, "Print only the Deployment's YAML or JSON, with no other output")
 	cmd.Flags().StringVar(&workloadIdentity, "workload-identity", "", "The Workload Identity to use for the Deployment")
 	if organization.IsOrgHosted() {
@@ -782,7 +782,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	if !allDeployments {
 		var err error
 		if ws, err = coalesceWorkspace(cmd); err != nil {
-			return wrapWorkspaceErr(err, "failed to find a valid workspace")
+			return wrapWorkspaceErr(err, "could not find a valid Workspace")
 		}
 	}
 
@@ -795,7 +795,7 @@ func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
 		deploymentID = args[0]
 	}
 
-	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid Workspace")
+	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "could not find a valid Workspace")
 	if err != nil {
 		return err
 	}
@@ -822,7 +822,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Find Workspace ID
 	ws, err := coalesceWorkspace(cmd)
 	if err != nil {
-		return wrapWorkspaceErr(err, "failed to find a valid Workspace")
+		return wrapWorkspaceErr(err, "could not find a valid Workspace")
 	}
 	workspaceID = ws
 
@@ -853,16 +853,16 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
-		return errors.New("Invalid --high-availability value")
+		return errors.New("invalid --high-availability value")
 	}
 	if developmentMode != "" && !(developmentMode == enable || developmentMode == disable) {
-		return errors.New("Invalid --development-mode value")
+		return errors.New("invalid --development-mode value")
 	}
 	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated || deploymentType == hostedStandard || deploymentType == hostedShared || deploymentType == hostedDedicated) {
-		return errors.New("Invalid --type value")
+		return errors.New("invalid --type value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --cicd-enforcement value")
+		return errors.New("invalid --cicd-enforcement value")
 	}
 	if organization.IsOrgHosted() && clusterID != "" && (deploymentType == standard || deploymentType == hostedStandard || deploymentType == hostedShared) {
 		return errors.New("flag --cluster-id cannot be used to create a standard deployment. If you want to create a dedicated deployment, use --type dedicated along with --cluster-id")
@@ -902,7 +902,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		coreDeploymentType = astrov1.DeploymentTypeHYBRID
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
-		return errors.New("Invalid --dag-deploy value)")
+		return errors.New("invalid --dag-deploy value")
 	}
 	if dagDeploy == "" {
 		if organization.IsOrgHosted() && !flagRemoteExecutionEnabled {
@@ -942,7 +942,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		return err
 	}
 	// Find Workspace ID
-	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid Workspace")
+	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "could not find a valid Workspace")
 	if err != nil {
 		return err
 	}
@@ -955,17 +955,17 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
-		return errors.New("Invalid --dag-deploy value")
+		return errors.New("invalid --dag-deploy value")
 	}
 
 	if highAvailability != "" && !(highAvailability == enable || highAvailability == disable) {
-		return errors.New("Invalid --high-availability value")
+		return errors.New("invalid --high-availability value")
 	}
 	if developmentMode != "" && !(developmentMode == enable || developmentMode == disable) {
-		return errors.New("Invalid --development-mode value")
+		return errors.New("invalid --development-mode value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
-		return errors.New("Invalid --cicd-enforcement value")
+		return errors.New("invalid --cicd-enforcement value")
 	}
 	if cmd.Flags().Changed("allowed-ip-address-ranges") {
 		allowedIPAddressRanges = fromCsv(flagAllowedIPAddressRanges)
@@ -1007,7 +1007,7 @@ func normalizeSchedulerSizeFlag() error {
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 	defer strayStdoutToStderr(deploymentOutput)()
-	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid Workspace")
+	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "could not find a valid Workspace")
 	if err != nil {
 		return err
 	}
@@ -1027,7 +1027,7 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error {
 	defer strayStdoutToStderr(deploymentVariableOutput)()
 
-	ws, client, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
+	ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
 	if err != nil {
 		return err
 	}
@@ -1040,11 +1040,11 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 }
 
 func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) error {
-	return deploymentVariableModify(cmd, args, out, false, "failed to find a valid Workspace")
+	return deploymentVariableModify(cmd, args, out, false, "could not find a valid Workspace")
 }
 
 func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
-	return deploymentVariableModify(cmd, args, out, true, "failed to find a valid workspace")
+	return deploymentVariableModify(cmd, args, out, true, "could not find a valid Workspace")
 }
 
 // deploymentVariableModify is create and update, which differ only in whether
@@ -1070,7 +1070,7 @@ func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, 
 var openDeploymentUI = deployment.OpenInBrowser
 
 func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
-	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid workspace")
+	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "could not find a valid Workspace")
 	if err != nil {
 		return err
 	}
@@ -1093,7 +1093,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 	// The --wait prints its progress to bare stdout; under json that is a
 	// note, not the result.
 	defer strayStdoutToStderr(format)()
-	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "failed to find a valid workspace")
+	ws, client, err := deploymentWorkspace(cmd, argOrID(args), "could not find a valid Workspace")
 	if err != nil {
 		return err
 	}
@@ -1166,7 +1166,7 @@ func addDeploymentUser(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(deploymentUserOutput, out, &u, fmt.Sprintf("The user %s was successfully added to the deployment with the role %s", u.Email, u.DeploymentRole))
+	return renderLines(deploymentUserOutput, out, &u, fmt.Sprintf("Added user %s to the Deployment with role %s", u.Email, u.DeploymentRole))
 }
 
 func listDeploymentUser(out io.Writer) error {
@@ -1207,7 +1207,7 @@ func updateDeploymentUser(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(deploymentUserOutput, out, &u, fmt.Sprintf("The deployment user %s role was successfully updated to %s", u.Email, u.DeploymentRole))
+	return renderLines(deploymentUserOutput, out, &u, fmt.Sprintf("Updated Deployment user %s to %s", u.Email, u.DeploymentRole))
 }
 
 func removeDeploymentUser(args []string, out io.Writer) error {
@@ -1231,7 +1231,7 @@ func removeDeploymentUser(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(deploymentUserOutput, out, &r, fmt.Sprintf("The user %s was successfully removed from the deployment", r.Email))
+	return renderLines(deploymentUserOutput, out, &r, fmt.Sprintf("Removed user %s from the Deployment", r.Email))
 }
 
 func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
@@ -1281,7 +1281,7 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create an API token in an Astro Deployment",
-		Long:    "Create a Deployment-scoped API token. The token value is displayed only once at creation and cannot be retrieved later — store it securely. Use --clean-output to print only the raw token value for scripts. Use --expiration to set a TTL in days (default: no expiration).",
+		Long:    "Create a Deployment-scoped API token. The token value is displayed only once at creation and cannot be retrieved later; store it securely. Use --clean-output to print only the raw token value for scripts. Use --expiration to set a TTL in days (default: no expiration).",
 		Example: `  # Create an admin token for a Deployment
   astro deployment token create --name my-token --role DEPLOYMENT_ADMIN --deployment <DEPLOYMENT_ID>
 
@@ -1341,7 +1341,7 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
 		Use:     "rotate [TOKEN_ID]",
 		Aliases: []string{"ro"},
 		Short:   "Rotate a Deployment API token",
-		Long:    "Rotate a Deployment API token, generating a new token value and invalidating the old one. The new value is displayed only once. You can only rotate Deployment-scoped tokens from this command — use the workspace or organization token rotate commands for tokens at other scopes.",
+		Long:    "Rotate a Deployment API token, generating a new token value and invalidating the old one. The new value is displayed only once. You can only rotate Deployment-scoped tokens from this command. Use the Workspace or Organization token rotate commands for other scopes.",
 		Example: `  # Rotate a token
   astro deployment token rotate <TOKEN_ID> --deployment <DEPLOYMENT_ID>
 
@@ -1446,8 +1446,8 @@ func removeDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 func newOrgTokenManageCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "organization-token",
-		Short: "Manage organization tokens in a deployment",
-		Long:  "Manage organization tokens in a deployment",
+		Short: "Manage organization tokens in a Deployment",
+		Long:  "Manage organization tokens in a Deployment",
 	}
 	cmd.SetOut(out)
 	cmd.AddCommand(
@@ -1463,8 +1463,8 @@ func newOrgTokenManageCmd(out io.Writer) *cobra.Command {
 func newWorkspaceTokenManageCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "workspace-token",
-		Short: "Manage workspace tokens in a deployment",
-		Long:  "Manage workspace tokens in a deployment",
+		Short: "Manage workspace tokens in a Deployment",
+		Long:  "Manage workspace tokens in a Deployment",
 	}
 	cmd.SetOut(out)
 	cmd.AddCommand(
@@ -1658,8 +1658,8 @@ func removeWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out i
 func newListOrganizationTokensInDeployment(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all Organization API tokens in a deployment",
-		Long:  "List all Organization API tokens in a deployment",
+		Short: "List all Organization API tokens in a Deployment",
+		Long:  "List all Organization API tokens in a Deployment",
 		Example: `  # List the Organization tokens with a role in a Deployment
   astro deployment token organization-token list --deployment <DEPLOYMENT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -1672,8 +1672,8 @@ func newListOrganizationTokensInDeployment(out io.Writer) *cobra.Command {
 func newListWorkspaceTokensInDeployment(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all Workspace API tokens in a deployment",
-		Long:  "List all Workspace API tokens in a deployment",
+		Short: "List all Workspace API tokens in a Deployment",
+		Long:  "List all Workspace API tokens in a Deployment",
 		Example: `  # List the Workspace tokens with a role in a Deployment
   astro deployment token workspace-token list --deployment <DEPLOYMENT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {

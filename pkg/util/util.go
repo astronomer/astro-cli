@@ -42,7 +42,7 @@ func ParseAPIToken(astroAPIToken string) (*CustomClaims, error) {
 	}
 	claims, ok := parsedToken.Claims.(*CustomClaims)
 	if !ok {
-		return nil, errors.Wrap(err, "failed to parse auth token")
+		return nil, errors.Wrap(err, "parsing auth token")
 	}
 	return claims, nil
 }

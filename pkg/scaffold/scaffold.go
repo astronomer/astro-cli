@@ -1260,10 +1260,10 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 			base+", and this project's pin is Airflow "+version+"; delete it if the pin is right")
 	}
 	checks := []struct{ file, note string }{
-		{"docker-compose.yml", "not read — astro local start replaces it"},
-		{"docker-compose.yaml", "not read — astro local start replaces it"},
+		{"docker-compose.yml", "not read; astro local start replaces it"},
+		{"docker-compose.yaml", "not read; astro local start replaces it"},
 		{composeOverrideFile, composeOverrideNote},
-		{"docker-compose.override.yaml", "not read — Docker mode merges docker-compose.override.yml, so rename it to use it there"},
+		{"docker-compose.override.yaml", "not read; Docker mode merges docker-compose.override.yml, so rename it to use it there"},
 	}
 	for _, c := range checks {
 		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(c.file))); err != nil {
@@ -1288,8 +1288,8 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	}
 	if facts.loosePython {
 		out = append([]string{"[project] requires-python admits a Python that Airflow " + version +
-			" cannot run: it needs " + requiresPython(version) + ", and yours has no upper bound — " +
-			"uv will build the environment on the newest interpreter it allows"}, out...)
+			" cannot run: it needs " + requiresPython(version) + ", and yours has no upper bound. " +
+			"uv builds the environment on the newest interpreter it allows"}, out...)
 	}
 	if deployNote == "" && len(linkNotes) == 0 && len(settingNotes) == 0 {
 		return out, out

@@ -17,8 +17,8 @@ func newVersionCommand() *cobra.Command {
 	var output cliout.Format
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "List running version of the Astro CLI",
-		Long:  `The astro semantic version.`,
+		Short: "Print the Astro CLI version",
+		Long:  `Print the Astro CLI version.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cliout.Renderer{Format: output, Out: cmd.OutOrStdout()}.Emit(
 				versionOutput{Version: version.Current()},

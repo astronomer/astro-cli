@@ -100,7 +100,7 @@ func stubBundleWait(t *testing.T, err error) *[]string {
 	prev := waitForBundle
 	waitForBundle = func(progress io.Writer, deploymentID string, _ time.Duration, _ astrov1.APIClient) error {
 		waited = append(waited, deploymentID)
-		fmt.Fprintln(progress, "Waiting for the deployment to become healthy…")
+		fmt.Fprintln(progress, "Waiting for the Deployment to become healthy…")
 		return err
 	}
 	t.Cleanup(func() { waitForBundle = prev })
@@ -134,16 +134,16 @@ func TestPublishThenWaitReportsBothFailures(t *testing.T) {
 	require.ErrorIs(t, err, writeFailed)
 	require.ErrorIs(t, err, timedOut)
 	assert.Empty(t, stdout.String(), "the write to stdout failed, so no error object is written there after it")
-	assert.Equal(t, "Waiting for the deployment to become healthy…\nError: broken pipe\ntimed out\n", stderr.String(), "after the wait's progress, the write's failure first, then the wait's")
+	assert.Equal(t, "Waiting for the Deployment to become healthy…\nError: broken pipe\ntimed out\n", stderr.String(), "after the wait's progress, the write's failure first, then the wait's")
 	assert.Equal(t, cliout.ExitFailure, cliout.ExitCode(context.Background(), err))
 }
 
 // remote deploy's closing lines, as v2 printed them when the push succeeded.
-const remoteDeployTail = "Successfully pushed client image to registry.example.com/agents/client:deploy-2026-10-07T14-53\n" +
+const remoteDeployTail = "Pushed client image to registry.example.com/agents/client:deploy-2026-10-07T14-53\n" +
 	"\n--------------------------------\n" +
-	"The client image has been pushed to your private registry.\n" +
-	"Your next step would be to update the agent component to use the new client image.\n" +
-	"For that you would either need to update the helm chart values.yaml file or update your CI/CD pipeline to use the new client image.\n" +
+	"The client image is in your private registry.\n" +
+	"Next, update the agent component to use the new client image.\n" +
+	"Update the helm chart values.yaml or your CI/CD pipeline to use it.\n" +
 	"If you are using Astronomer provided Agent Helm chart, you would need to update the image field for each of the workers, dagProcessor, and triggerer component sections to the new image: registry.example.com/agents/client:deploy-2026-10-07T14-53\n" +
 	"Once you have updated the helm chart values.yaml file, you can run 'helm upgrade' or update via your CI/CD pipeline to update the agent components\n"
 

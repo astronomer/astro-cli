@@ -153,7 +153,7 @@ func (s *Suite) TestGetDeploymentRegistryURLFailure() {
 		{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
 	}
 	_, err := getDeploymentRegistryURL(mockURLs)
-	s.EqualError(err, "no valid registry url found failed to push")
+	s.EqualError(err, "could not push: no valid registry URL found")
 }
 
 func (s *Suite) TestGetAirflowUILinkFailure() {
@@ -243,7 +243,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 			s.houstonMock.On("GetAppConfig", mock.Anything).Return(enabled, nil).Once()
 			got, err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, parent, &uploadURL, true, description, Options{})
 			s.ErrorIs(err, ErrNoDagsDirectory, parent)
-			s.ErrorContains(err, filepath.Join(parent, "dags")+" is not a directory. Nothing was uploaded, and the Deployment keeps the Dags it had")
+			s.ErrorContains(err, filepath.Join(parent, "dags")+" is not a directory; nothing was uploaded and the Deployment keeps its Dags")
 			s.Equal(deploymentID, got)
 		}
 		s.Zero(uploads)
@@ -408,7 +408,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		}
 		s.houstonMock.On("GetDeployment", deploymentID).Return(nil, errMockHouston).Once()
 		_, err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description, Options{})
-		s.ErrorContains(err, "failed to get deployment info: some houston error")
+		s.ErrorContains(err, "could not get the Deployment info: some houston error")
 	})
 
 	s.Run("When config flag is set to true but it is disabled at the deployment level", func() {
@@ -457,7 +457,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 
 		s.houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil).Once()
 		_, err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description, Options{})
-		s.EqualError(err, "could not get current context! Error: no context set, have you authenticated to Astro or APC? Run astro login and try again")
+		s.EqualError(err, "could not get the current context: no context set; run astro login and try again")
 		context.Switch("localhost")
 	})
 
@@ -572,7 +572,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		s.NoError(err)
 		s.Equal("picked-id", got)
 		s.Contains(progress.String(), "upload successful")
-		s.Equal([]string{"no Dags found in the dags folder: the upload replaces the Deployment's Dags with none"}, warned)
+		s.Equal([]string{"No Dags found in the dags folder. The upload replaces the Deployment's Dags with none."}, warned)
 	})
 
 	s.Run("Valid Houston config. Valid Houston deployment. The Dags folder is non-empty. Tar creation throws an error", func() {

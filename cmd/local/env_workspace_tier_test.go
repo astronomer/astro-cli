@@ -137,7 +137,7 @@ func TestEnvListNamesSkippedWorkspaceKeys(t *testing.T) {
 	if err := execute(t, d, "local", "env", "list"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stderr.String(), "workspace cmws holds bad-key,") {
+	if !strings.Contains(stderr.String(), "cmws holds bad-key,") {
 		t.Errorf("stderr = %q, want the skipped key named", stderr.String())
 	}
 	if strings.Contains(out.String()+stderr.String(), "SECRET") {

@@ -153,7 +153,7 @@ func listsContext(ws string) func(t *testing.T, out string) {
 
 // deleteProdQuestion is the confirmation a delete of Production asks, as
 // plain reads it.
-const deleteProdQuestion = "\nAre you sure you want to delete the Production Workspace (ws-prod)? This cannot be undone. (y/n) "
+const deleteProdQuestion = "\nDelete Workspace Production (ws-prod)? This cannot be undone. (y/n) "
 
 // plain runs check on out with its colors taken out: the name in a question
 // is bold on a terminal.
@@ -190,46 +190,46 @@ func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
 	}
 
 	runTokenCases(t, []tokenCase{
-		{name: "workspace create", root: ws, client: workspacesMock(nil, createsWorkspace(staging)), args: []string{"workspace", "create", "--name", "Staging"}, check: says("Astro Workspace Staging was successfully created\n")},
-		{name: "workspace create with no name", root: ws, client: workspacesMock(nil), args: []string{"workspace", "create"}, check: says(""), wantErr: "no name provided for the workspace. Retry with a valid name"},
-		{name: "workspace create with a bad --enforce-cicd", root: ws, client: workspacesMock(nil), args: []string{"workspace", "create", "--name", "Staging", "--enforce-cicd", "on"}, check: says(""), wantErr: "the input to the --enforce-cicd flag"},
+		{name: "workspace create", root: ws, client: workspacesMock(nil, createsWorkspace(staging)), args: []string{"workspace", "create", "--name", "Staging"}, check: says("Created Workspace Staging\n")},
+		{name: "workspace create with no name", root: ws, client: workspacesMock(nil), args: []string{"workspace", "create"}, check: says(""), wantErr: "no name provided for the Workspace"},
+		{name: "workspace create with a bad --enforce-cicd", root: ws, client: workspacesMock(nil), args: []string{"workspace", "create", "--name", "Staging", "--enforce-cicd", "on"}, check: says(""), wantErr: "--enforce-cicd must be ON or OFF"},
 		// The line names the Workspace as it was called before the update.
-		{name: "workspace update", root: ws, client: workspacesMock(both, updatesWorkspace("ws-prod", renamed)), args: []string{"workspace", "update", "ws-prod", "--name", "Prod"}, check: says("Astro Workspace Production was successfully updated\n")},
+		{name: "workspace update", root: ws, client: workspacesMock(both, updatesWorkspace("ws-prod", renamed)), args: []string{"workspace", "update", "ws-prod", "--name", "Prod"}, check: says("Updated Workspace Production\n")},
 		{
 			name: "workspace update through the picker", root: ws, client: workspacesMock(both, updatesWorkspace("ws-prod", renamed)), answers: "1\n",
 			args:  []string{"workspace", "update", "--name", "Prod"},
-			check: then(pickRows, says("Please select the workspace you would like to update:", "> ", "Astro Workspace Production was successfully updated\n")),
+			check: then(pickRows, says("Select the Workspace to update:", "> ", "Updated Workspace Production\n")),
 		},
 		{
 			name: "workspace update of the only Workspace", root: ws, client: workspacesMock([]astrov1.Workspace{prod}, updatesWorkspace("ws-prod", renamed)),
 			args: []string{"workspace", "update", "--name", "Prod"},
-			check: says("Only one Workspace was found. Using the following Workspace by default: \n",
+			check: says("Only one Workspace found. Using it by default:\n",
 				"Workspace Name: ", "Production", "Workspace ID: ", "ws-prod",
-				"Astro Workspace Production was successfully updated\n"),
+				"Updated Workspace Production\n"),
 		},
-		{name: "workspace update of an unknown id", root: ws, client: workspacesMock(both), args: []string{"workspace", "update", "ws-nope", "--name", "Prod"}, check: says(""), wantErr: "no workspace was found for the ID you provided"},
-		{name: "workspace update with no Workspaces", root: ws, client: workspacesMock(nil), args: []string{"workspace", "update", "--name", "Prod"}, check: says(""), wantErr: "no workspace was found in your organization"},
+		{name: "workspace update of an unknown id", root: ws, client: workspacesMock(both), args: []string{"workspace", "update", "ws-nope", "--name", "Prod"}, check: says(""), wantErr: "no Workspace found with that ID"},
+		{name: "workspace update with no Workspaces", root: ws, client: workspacesMock(nil), args: []string{"workspace", "update", "--name", "Prod"}, check: says(""), wantErr: "no Workspace found in your Organization"},
 		{
 			name: "workspace delete, confirmed", root: ws, client: workspacesMock(both, deletesWorkspace("ws-prod")), answers: "y\n",
 			args:  []string{"workspace", "delete", "ws-prod"},
-			check: plain(says(deleteProdQuestion, "Astro Workspace Production was successfully deleted\n")),
+			check: plain(says(deleteProdQuestion, "Deleted Workspace Production\n")),
 		},
 		// Declined, nothing is deleted (the client mocks no delete) and the
 		// run fails aborted, exit 1, with nothing on stdout.
 		{
 			name: "workspace delete, declined", root: ws, client: workspacesMock(both), answers: "n\n",
 			args:  []string{"workspace", "delete", "ws-prod"},
-			check: then(plain(says(deleteProdQuestion)), lacks("successfully deleted")), wantErr: "aborted",
+			check: then(plain(says(deleteProdQuestion)), lacks("Deleted Workspace")), wantErr: "aborted",
 		},
 		{
 			name: "workspace delete --yes", root: ws, client: workspacesMock(both, deletesWorkspace("ws-prod")),
 			args:  []string{"workspace", "delete", "ws-prod", "--yes"},
-			check: then(says("Astro Workspace Production was successfully deleted\n"), lacks("Are you sure")),
+			check: then(says("Deleted Workspace Production\n"), lacks("Are you sure")),
 		},
 		{
 			name: "workspace delete through the picker", root: ws, client: workspacesMock(both, deletesWorkspace(curWorkspaceID)), answers: "2\n",
 			args:  []string{"workspace", "delete", "-y"},
-			check: then(pickRows, says("Please select the workspace you would like to delete:", "> ", "Astro Workspace Development was successfully deleted\n")),
+			check: then(pickRows, says("Select the Workspace to delete:", "> ", "Deleted Workspace Development\n")),
 		},
 		// The pick and the confirmation answered from one pipe, as a script
 		// answers them: the confirmation gets the "y" the picker read ahead.
@@ -237,26 +237,26 @@ func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
 			name: "workspace delete through the picker, confirmed", root: ws, client: workspacesMock(both, deletesWorkspace(curWorkspaceID)), answers: "2\ny\n",
 			args: []string{"workspace", "delete"},
 			// The menu and then the question, both on stderr, in the order asked.
-			check: then(pickRows, plain(says("Please select the workspace you would like to delete:", "> ", "\nAre you sure you want to delete the Development Workspace ("+curWorkspaceID+")? This cannot be undone. (y/n) ", "Astro Workspace Development was successfully deleted\n"))),
+			check: then(pickRows, plain(says("Select the Workspace to delete:", "> ", "\nDelete Workspace Development ("+curWorkspaceID+")? This cannot be undone. (y/n) ", "Deleted Workspace Development\n"))),
 		},
 		{
 			name: "workspace delete through the picker, declined", root: ws, client: workspacesMock(both), answers: "2\nn\n",
 			args:  []string{"workspace", "delete"},
-			check: then(pickRows, lacks("successfully deleted")), wantErr: "aborted",
+			check: then(pickRows, lacks("Deleted Workspace")), wantErr: "aborted",
 		},
 		// The only Workspace is found, not named, and still asked about.
 		{
 			name: "workspace delete of the only Workspace", root: ws, client: workspacesMock([]astrov1.Workspace{prod}, deletesWorkspace("ws-prod")), answers: "y\n",
 			args: []string{"workspace", "delete"},
-			check: plain(says("Only one Workspace was found. Using the following Workspace by default: \n", deleteProdQuestion,
-				"Astro Workspace Production was successfully deleted\n")),
+			check: plain(says("Only one Workspace found. Using it by default:\n", deleteProdQuestion,
+				"Deleted Workspace Production\n")),
 		},
 		{
 			name: "workspace delete of the only Workspace, declined", root: ws, client: workspacesMock([]astrov1.Workspace{prod}), answers: "n\n",
 			args:  []string{"workspace", "delete"},
-			check: plain(says("Only one Workspace was found.", deleteProdQuestion)), wantErr: "aborted",
+			check: plain(says("Only one Workspace found.", deleteProdQuestion)), wantErr: "aborted",
 		},
-		{name: "workspace delete of an unknown id", root: ws, client: workspacesMock(both), args: []string{"workspace", "delete", "ws-nope"}, check: says(""), wantErr: "no workspace was found for the ID you provided"},
+		{name: "workspace delete of an unknown id", root: ws, client: workspacesMock(both), args: []string{"workspace", "delete", "ws-nope"}, check: says(""), wantErr: "no Workspace found with that ID"},
 		{name: "workspace switch by name", root: ws, client: workspacesMock(both), args: []string{"workspace", "switch", "Production"}, check: listsContext("ws-prod")},
 		{name: "workspace switch by id", root: ws, client: workspacesMock(both), args: []string{"workspace", "switch", curWorkspaceID}, check: listsContext(curWorkspaceID)},
 		{
@@ -273,8 +273,8 @@ func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
 					listsContext("ws-prod")(t, strings.Replace(out, "\n> ", "\n", 1))
 				}),
 		},
-		{name: "workspace switch to an unknown Workspace", root: ws, client: workspacesMock(both), args: []string{"workspace", "switch", "nope"}, check: says(""), wantErr: "workspace id/name could not be found"},
-		{name: "organization switch", root: org, client: orgSwitchMock([]astrov1.Workspace{prod}), args: []string{"organization", "switch", "Other Org"}, check: says("\nSuccessfully switched organization\n")},
+		{name: "workspace switch to an unknown Workspace", root: ws, client: workspacesMock(both), args: []string{"workspace", "switch", "nope"}, check: says(""), wantErr: "no Workspace found with that name or ID"},
+		{name: "organization switch", root: org, client: orgSwitchMock([]astrov1.Workspace{prod}), args: []string{"organization", "switch", "Other Org"}, check: says("\nSwitched Organization\n")},
 		{name: "organization switch to the current one", root: org, client: orgSwitchMock(nil), args: []string{"organization", "switch", "Test Org"}, check: says("You selected the same organization as the current one. No switch was made\n")},
 		{
 			name: "organization switch through the picker", root: org, client: orgSwitchMock([]astrov1.Workspace{prod}), answers: "2\n",
@@ -283,14 +283,14 @@ func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
 				picks(
 					map[string]string{"#": "1", "NAME": "Test Org", "ID": "test-org-id"},
 					map[string]string{"#": "2", "NAME": "Other Org", "ID": otherOrgID}),
-				says("Successfully switched organization\n")),
+				says("Switched Organization\n")),
 		},
 		{
 			name: "organization switch with --workspace", root: org, client: orgSwitchMock(both),
 			args:  []string{"organization", "switch", "Other Org", "--workspace", "ws-prod"},
-			check: then(says("\nSuccessfully switched organization\n", "CONTROLPLANE"), listsContext("ws-prod")),
+			check: then(says("\nSwitched Organization\n", "CONTROLPLANE"), listsContext("ws-prod")),
 		},
-		{name: "organization switch to an unknown Organization", root: org, client: orgSwitchMock(nil), args: []string{"organization", "switch", "Nope"}, check: says(""), wantErr: "invalid organization name"},
+		{name: "organization switch to an unknown Organization", root: org, client: orgSwitchMock(nil), args: []string{"organization", "switch", "Nope"}, check: says(""), wantErr: "invalid Organization name"},
 		{
 			name: "organization role list", root: org, client: rolesMock,
 			args:  []string{"organization", "role", "list"},
@@ -398,7 +398,7 @@ func TestWorkspaceOnlyOneNoteGoesToStderrUnderJSON(t *testing.T) {
 			r := execAstroCmd(t, run.client(t), "", newWorkspaceCmd, run.args...)
 			require.NoError(t, r.err)
 			jsonIs(run.want)(t, r.stdout)
-			assert.Contains(t, r.asked, "Only one Workspace was found. Using the following Workspace by default:")
+			assert.Contains(t, r.asked, "Only one Workspace found. Using it by default:")
 		})
 	}
 }
@@ -457,16 +457,16 @@ func TestOrganizationSwitchToAnUnknownWorkspace(t *testing.T) {
 	args := []string{"organization", "switch", "Other Org", "--workspace", "nope"}
 
 	r := execAstroCmd(t, orgSwitchMock([]astrov1.Workspace{prod})(t), "", newOrganizationCmd, args...)
-	require.EqualError(t, r.err, "workspace id/name could not be found")
+	require.EqualError(t, r.err, "no Workspace found with that name or ID")
 	assert.Equal(t, cliout.ExitFailure, r.code)
-	assert.Equal(t, "\nSuccessfully switched organization\n", r.stdout)
+	assert.Equal(t, "\nSwitched Organization\n", r.stdout)
 
 	r = execAstroCmd(t, orgSwitchMock([]astrov1.Workspace{prod})(t), "", newOrganizationCmd, append(args, "-o", "json")...)
 	require.Error(t, r.err)
 	assert.Equal(t, cliout.ExitFailure, r.code)
 	var got errorJSON
 	decodeOne(t, r.stdout, &got)
-	assert.Equal(t, "workspace id/name could not be found", got.Error)
+	assert.Equal(t, "no Workspace found with that name or ID", got.Error)
 }
 
 // Under --output json a command that would ask which Workspace or
@@ -483,13 +483,13 @@ func TestWorkspaceOrganizationLifecycleJSONNeverAsks(t *testing.T) {
 		args     []string
 		answered string
 	}{
-		{"workspace update naming no Workspace", newWorkspaceCmd, workspacesMock(both), []string{"workspace", "update", "--name", "Prod"}, "pass the workspace ID as an argument"},
-		{"workspace delete naming no Workspace", newWorkspaceCmd, workspacesMock(both), []string{"workspace", "delete", "--yes"}, "pass the workspace ID as an argument"},
+		{"workspace update naming no Workspace", newWorkspaceCmd, workspacesMock(both), []string{"workspace", "update", "--name", "Prod"}, "pass the Workspace ID as an argument"},
+		{"workspace delete naming no Workspace", newWorkspaceCmd, workspacesMock(both), []string{"workspace", "delete", "--yes"}, "pass the Workspace ID as an argument"},
 		// A delete asks before it deletes, and only --yes answers that.
-		{"workspace delete without --yes", newWorkspaceCmd, workspacesMock(both), []string{"workspace", "delete", "ws-prod"}, "confirmation to delete the Workspace; with --output json it cannot — pass --yes"},
+		{"workspace delete without --yes", newWorkspaceCmd, workspacesMock(both), []string{"workspace", "delete", "ws-prod"}, "confirmation to delete the Workspace; with --output json it cannot; pass --yes"},
 		{"workspace delete of the only Workspace without --yes", newWorkspaceCmd, workspacesMock([]astrov1.Workspace{prod}), []string{"workspace", "delete"}, "pass --yes"},
-		{"workspace switch naming no Workspace", newWorkspaceCmd, workspacesMock(both), []string{"workspace", "switch"}, "pass the workspace name or ID as an argument"},
-		{"organization switch naming no Organization", newOrganizationCmd, orgSwitchMock(both), []string{"organization", "switch"}, "pass the organization name or ID as an argument"},
+		{"workspace switch naming no Workspace", newWorkspaceCmd, workspacesMock(both), []string{"workspace", "switch"}, "pass the Workspace name or ID as an argument"},
+		{"organization switch naming no Organization", newOrganizationCmd, orgSwitchMock(both), []string{"organization", "switch"}, "pass the Organization name or ID as an argument"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

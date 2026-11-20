@@ -65,14 +65,14 @@ const RuntimeImageRepo = "astrocrpublic.azurecr.io/runtime"
 func RuntimeImage(airflowVersion string) (string, error) {
 	v := strings.TrimSpace(airflowVersion)
 	if v == "" {
-		return "", errors.New("no Airflow version was given; one is needed to pick a runtime image")
+		return "", errors.New("no Airflow version given; one is needed to pick a runtime image")
 	}
 	if major, _, _ := strings.Cut(v, "."); major != "3" {
 		return "", fmt.Errorf("only Airflow 3 is supported in this release, not %q", v)
 	}
 	series, ok := AirflowSeries(v)
 	if !ok {
-		return "", fmt.Errorf("the Airflow pin %q in pyproject.toml names no minor version, so there is no runtime image to build from. Pin the apache-airflow requirement in [project] dependencies to a series such as apache-airflow==3.3.*", v)
+		return "", fmt.Errorf("the Airflow pin %q in pyproject.toml names no minor version, so no runtime image matches. Pin the apache-airflow requirement in [project] dependencies to a series such as apache-airflow==3.3.*", v)
 	}
 	return RuntimeImageRepo + ":" + series, nil
 }
@@ -477,7 +477,7 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 	} else if dc, ok := b.cmd.(DirCommander); ok {
 		err = dc.RunIn(ctx, req.Dir, req.Env, stdio, req.Bin, args...)
 	} else {
-		return "", fmt.Errorf("the build has to run in %s, and its runner cannot set a working directory", req.Dir)
+		return "", fmt.Errorf("the build must run in %s, and its runner cannot set a working directory", req.Dir)
 	}
 	w.Flush()
 	if err != nil {

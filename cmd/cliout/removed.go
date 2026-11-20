@@ -107,7 +107,7 @@ func RemovedAliasTarget(stub *cobra.Command) *cobra.Command {
 // built tree.
 func nameRemovedAlias(c *cobra.Command) {
 	if target := RemovedAliasTarget(c); target != nil {
-		c.Short = "Removed in v2 — use " + useInstead(target)
+		c.Short = "Removed in v2; use " + useInstead(target)
 	}
 }
 

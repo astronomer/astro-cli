@@ -112,12 +112,12 @@ func newLinkAddCmd(c *cli) *cobra.Command {
 		Use:   "add [NAME] [-- COMMAND...]",
 		Short: "Link a Deployment to this project",
 		Long: "Link a Deployment to this project as NAME. With no --deployment, it asks " +
-			"which Astro Deployment to link and, with no NAME, names the link after it: lowercased, with " +
-			"each run of spaces and punctuation turned into one dash.\n\n" +
-			"Under an Astro Private Cloud context it links that platform's Deployments instead, on the " +
-			"context's domain, in --workspace or the context's workspace.\n\n" +
-			"MWAA, Composer and other Airflows are linked with flags. Credentials are never saved: the " +
-			"*-env flags name the environment variables they are read from.",
+			"which Astro Deployment to link. With no NAME, the link is named after the Deployment: lowercased, with " +
+			"each run of spaces and punctuation replaced by one dash.\n\n" +
+			"Under an Astro Private Cloud context, it links Deployments on that context's domain, " +
+			"in --workspace or the context's Workspace.\n\n" +
+			"Link MWAA, Composer and other Airflows with flags. Credentials are not saved. The " +
+			"*-env flags name the environment variables to read them from.",
 		Example: "  astro link add\n" +
 			"  astro link add prod --deployment clx123abc\n" +
 			"  astro link add orders --target mwaa --environment orders-prod --region eu-west-1\n" +
@@ -169,7 +169,7 @@ func newLinkRemoveCmd(c *cli) *cobra.Command {
 		Use:     "remove [NAME]",
 		Aliases: []string{"rm"},
 		Short:   "Unlink a Deployment from this project",
-		Long:    "Unlink a Deployment from this project. With no NAME, it asks which one; where it may not ask (no terminal, CI, --non-interactive or --output json) it fails instead.",
+		Long:    "Unlink a Deployment from this project. With no NAME, it asks which one. Without a terminal (or in CI, or with --non-interactive or --output json), it fails instead.",
 		Example: "  astro link remove prod",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -190,8 +190,8 @@ func newLinkDefaultCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "default [NAME]",
 		Short: "Choose the Deployment commands use by default",
-		Long: "Choose the linked Deployment commands use when you don't name one. astro deploy still " +
-			"asks, with it preselected. With no NAME, it asks which one; where it may not ask (no terminal, CI, --non-interactive or --output json) it fails instead.",
+		Long: "Choose the linked Deployment that commands use when you don't name one. astro deploy still " +
+			"asks, with it preselected. With no NAME, this command asks which one. Without a terminal (or in CI, or with --non-interactive or --output json), it fails instead.",
 		Example: "  astro link default prod\n" +
 			"  astro link default --unset",
 		Args: cobra.MaximumNArgs(1),
@@ -386,7 +386,7 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 		}
 	}
 	if name == "" {
-		return errors.New("add needs a NAME for the link: pass one, or --deployment to name it after the Deployment. Where it may ask (at a terminal, not in CI, without --non-interactive or --output json) it asks for a Deployment instead")
+		return errors.New("add needs a NAME for the link: pass one, or pass --deployment to name it after the Deployment. At a terminal, add asks for a Deployment instead")
 	}
 	link.Name = name
 	if err := refuseExisting(m, name, in.replace); err != nil {
@@ -423,7 +423,7 @@ func keptDefaultNote(w io.Writer, kept string) error {
 	if kept == "" {
 		return nil
 	}
-	_, err := fmt.Fprintf(w, "marked %s default = true: it was the project's only link, so its default, and stays so now there are two (change it with astro link default)\n", kept)
+	_, err := fmt.Fprintf(w, "marked %s default = true: it was the project's only link, and stays the default now there are two (change it with astro link default)\n", kept)
 	return err
 }
 
@@ -458,7 +458,7 @@ func (c *cli) pickAstroDeployment(link *scaffold.Link, m *manifest.Manifest, nam
 	}
 	if ws == "" {
 		if c.d.PickWorkspace == nil {
-			return "", fmt.Errorf("no workspace to list Deployments from: pass --%s", flagLinkWorkspace)
+			return "", fmt.Errorf("no Workspace to list Deployments from: pass --%s", flagLinkWorkspace)
 		}
 		picked, err := c.d.PickWorkspace()
 		if err != nil {
@@ -563,7 +563,7 @@ func (c *cli) apcContextWorkspace() (string, error) {
 
 // errNoAPCWorkspace is an apc link with no workspace to name: none given and
 // none current. [tool.astro] workspace does not count, being Astro's.
-var errNoAPCWorkspace = fmt.Errorf("no Astro Private Cloud workspace to link from: pass --%s, or choose one with astro workspace switch", flagLinkWorkspace)
+var errNoAPCWorkspace = fmt.Errorf("no Astro Private Cloud Workspace to link from: pass --%s, or choose one with astro workspace switch", flagLinkWorkspace)
 
 // allLinked says every Deployment in workspace ws is already linked, names the
 // links that point into it, and says how to point one somewhere else.
@@ -576,7 +576,7 @@ func allLinked(m *manifest.Manifest, ws string) error {
 		}
 	}
 	slices.Sort(names)
-	return fmt.Errorf("every Deployment in workspace %s is already linked, as %s. To relink one, run astro link add NAME --%s <id> --%s",
+	return fmt.Errorf("every Deployment in Workspace %s is already linked, as %s. To relink one, run astro link add NAME --%s <id> --%s",
 		ws, strings.Join(names, ", "), flagLinkDeployment, flagLinkReplace)
 }
 

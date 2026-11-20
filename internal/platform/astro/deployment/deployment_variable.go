@@ -37,7 +37,7 @@ func VariableList(deploymentID, variableKey, ws, envFile, deploymentName string,
 
 	if useEnvFile {
 		if err := writeVarToFile(objs, envFile); err != nil {
-			return nil, errors.Wrapf(err, "unable to write environment variables to %s", envFile)
+			return nil, errors.Wrapf(err, "could not write environment variables to %s", envFile)
 		}
 	}
 

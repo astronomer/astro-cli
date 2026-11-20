@@ -120,7 +120,7 @@ func TestDeployPrebuiltImageToAnImageDeploymentWarns(t *testing.T) {
 				assert.Empty(t, warnings)
 				return
 			}
-			assert.Equal(t, []string{"this Deployment runs the Dags inside the image my-image:v7; the dags folder is not uploaded. An image astro package built without a dockerfile declared under [tool.astro] contains none."}, warnings)
+			assert.Equal(t, []string{"this Deployment runs the Dags inside the image my-image:v7, so the dags folder is not uploaded. An image astro package built without a Dockerfile declared under [tool.astro] contains none."}, warnings)
 		})
 	}
 }
@@ -230,10 +230,10 @@ func TestDeployPrebuiltImageAlone(t *testing.T) {
 		show          bool
 		want          []string
 	}{
-		{name: "an image Deployment", dagType: houston.ImageDeploymentType, show: true, want: []string{"this Deployment runs the Dags inside the image my-image:v7; the dags folder is not uploaded. An image astro package built without a dockerfile declared under [tool.astro] contains none."}},
+		{name: "an image Deployment", dagType: houston.ImageDeploymentType, show: true, want: []string{"this Deployment runs the Dags inside the image my-image:v7, so the dags folder is not uploaded. An image astro package built without a Dockerfile declared under [tool.astro] contains none."}},
 		{name: "an image Deployment, warnings off", dagType: houston.ImageDeploymentType},
-		{name: "a dag_deploy Deployment, warnings off", dagType: houston.DagOnlyDeploymentType, want: []string{"Dags were not updated: this deploy ran outside a pyproject.toml project, so it shipped the image alone, and the Deployment keeps the Dags it had. To upload them, run astro deploy dep --dags from the project directory."}},
-		{name: "a Deployment not placed", dagType: "nfs", show: true, want: []string{"this deploy ran outside a pyproject.toml project, so it shipped the image alone. If this Deployment takes Dag uploads, it keeps the Dags it had: to upload them, run astro deploy dep --dags from the project directory."}},
+		{name: "a dag_deploy Deployment, warnings off", dagType: houston.DagOnlyDeploymentType, want: []string{"Dags were not updated: this deploy ran outside a pyproject.toml project and shipped the image alone. To upload Dags, run astro deploy dep --dags from the project directory."}},
+		{name: "a Deployment not placed", dagType: "nfs", show: true, want: []string{"this deploy ran outside a pyproject.toml project and shipped the image alone. If this Deployment takes Dag uploads, it keeps its Dags; to upload them, run astro deploy dep --dags from the project directory."}},
 		{name: "a git-sync Deployment", dagType: houston.GitSyncDeploymentType, show: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -278,5 +278,5 @@ func TestDeployPrebuiltImageToABYORegistryWithTheMutationOff(t *testing.T) {
 	_, err := DeployManifestImage(client, prebuiltFor(t, "my-image:v7", &warnings))
 	require.ErrorIs(t, err, houstonSays)
 	assert.Contains(t, err.Error(), "setting deployments.deploymentImagesRegistry.updateDeploymentImageEndpoint.enabled to true")
-	assert.Contains(t, err.Error(), "a registry of the customer's own takes every image through it")
+	assert.Contains(t, err.Error(), "its own registry takes every image through that registry")
 }

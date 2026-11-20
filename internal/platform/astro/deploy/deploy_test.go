@@ -219,7 +219,7 @@ func TestDeployClientImage(t *testing.T) {
 
 		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: "/test/path"}, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to authenticate with registry images.astronomer.cloud")
+		assert.Contains(t, err.Error(), "could not authenticate with registry images.astronomer.cloud")
 		assert.Contains(t, err.Error(), "login failed")
 		assert.False(t, hasImageCall(cmd.calls, " build "), "nothing is built: %v", cmd.calls)
 	})
@@ -267,7 +267,7 @@ func TestDeployClientImage(t *testing.T) {
 
 		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to build client image")
+		assert.Contains(t, err.Error(), "could not build client image")
 		assert.False(t, hasImageCall(cmd.calls, " push "), "nothing is pushed: %v", cmd.calls)
 	})
 
@@ -278,7 +278,7 @@ func TestDeployClientImage(t *testing.T) {
 
 		_, err := DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to push client image")
+		assert.Contains(t, err.Error(), "could not push client image")
 		assert.Contains(t, err.Error(), "push failed")
 	})
 
@@ -294,8 +294,8 @@ func TestDeployClientImage(t *testing.T) {
 			_, err = DeployClientImage(InputClientDeploy{Registry: testClientRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		})
 		require.ErrorIs(t, err, imagebuild.ErrPushForbidden)
-		assert.Contains(t, err.Error(), "failed to push client image: failed to push image due to authentication error (403 Forbidden)")
-		assert.Contains(t, out, "Please ensure that you have logged in to test-registry.io/acme/client-image via docker login and try again")
+		assert.Contains(t, err.Error(), "could not push client image: failed to push image due to authentication error (403 Forbidden)")
+		assert.Contains(t, out, "Run docker login test-registry.io/acme/client-image, then try again")
 	})
 
 	t.Run("deploy with custom image name", func(t *testing.T) {
@@ -422,7 +422,7 @@ func TestPrepareClientBuildContext(t *testing.T) {
 		buildContext, err := prepareClientBuildContext(tempDir)
 		assert.Error(t, err)
 		assert.NotNil(t, buildContext) // Now returns buildContext even on error (for cleanup)
-		assert.Contains(t, err.Error(), "failed to setup client dependency files")
+		assert.Contains(t, err.Error(), "could not set up client dependency files")
 		// Cleanup the temporary directory since function returns buildContext on error
 		defer buildContext.CleanupFunc()
 	})
@@ -466,7 +466,7 @@ func TestPrepareClientBuildContext(t *testing.T) {
 		buildContext, err := prepareClientBuildContext(tempDir)
 		assert.Error(t, err)
 		assert.NotNil(t, buildContext) // Now returns buildContext even on error (for cleanup)
-		assert.Contains(t, err.Error(), "failed to setup client dependency files")
+		assert.Contains(t, err.Error(), "could not set up client dependency files")
 		// Cleanup the temporary directory since function returns buildContext on error
 		defer buildContext.CleanupFunc()
 
@@ -691,8 +691,8 @@ func TestSetupClientDependencyFiles(t *testing.T) {
 		// Due to map iteration being non-deterministic, the error could mention either client file
 		errorMsg := err.Error()
 		assert.True(t,
-			strings.Contains(errorMsg, "failed to copy requirements-client.txt") ||
-				strings.Contains(errorMsg, "failed to copy packages-client.txt"),
+			strings.Contains(errorMsg, "could not copy requirements-client.txt") ||
+				strings.Contains(errorMsg, "could not copy packages-client.txt"),
 			"error should mention one of the missing client files, got: %s", errorMsg)
 	})
 
@@ -810,7 +810,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 
 		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to get current context")
+		assert.Contains(t, err.Error(), "could not get current context")
 	})
 
 	t.Run("error when getting deployment information fails", func(t *testing.T) {
@@ -832,7 +832,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 
 		_, err := validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to get deployment information")
+		assert.Contains(t, err.Error(), "could not get Deployment information")
 	})
 
 	t.Run("error when Dockerfile.client doesn't exist", func(t *testing.T) {
@@ -899,7 +899,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 
 		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to parse Dockerfile.client")
+		assert.Contains(t, err.Error(), "could not parse Dockerfile.client")
 	})
 
 	t.Run("error when no base image found in Dockerfile.client", func(t *testing.T) {
@@ -934,7 +934,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 
 		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to find base image in Dockerfile.client")
+		assert.Contains(t, err.Error(), "no base image found in Dockerfile.client")
 	})
 
 	t.Run("error when runtime version extraction fails", func(t *testing.T) {
@@ -971,7 +971,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		// Should error when version extraction fails
 		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to extract runtime version from client image")
+		assert.Contains(t, err.Error(), "could not extract runtime version from client image")
 	})
 
 	t.Run("error when client runtime version is newer than deployment version", func(t *testing.T) {

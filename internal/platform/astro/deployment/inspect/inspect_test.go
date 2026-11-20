@@ -345,7 +345,7 @@ func TestInspect(t *testing.T) {
 		assert.ErrorIs(t, err, errGetDeployment)
 		mockV1Client.AssertExpectations(t)
 	})
-	t.Run("returns an error if requested field is not found in deployment", func(t *testing.T) {
+	t.Run("returns an error if requested field is not found in Deployment", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
@@ -374,7 +374,7 @@ func TestInspect(t *testing.T) {
 		out := new(bytes.Buffer)
 
 		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false)
-		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
+		assert.ErrorContains(t, err, "no context set; run astro login and try again")
 		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("Display Cluster Region and hide Release Name if an org is hosted", func(t *testing.T) {
@@ -542,7 +542,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 		expectedDeploymentMetadata := deploymentMetadata{}
 		rawDeploymentInfo, err := getDeploymentInfo(mockCoreDeploymentResponse[0])
-		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
+		assert.ErrorContains(t, err, "no context set; run astro login and try again")
 		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentMeta)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentMeta)
@@ -1218,7 +1218,7 @@ func TestGetSpecificField(t *testing.T) {
 	t.Run("returns error if no value is found", func(t *testing.T) {
 		requestedField := "does-not-exist"
 		actual, err := getSpecificField(printableDeployment, requestedField)
-		assert.ErrorContains(t, err, "requested key "+requestedField+" not found in deployment")
+		assert.ErrorContains(t, err, "requested key "+requestedField+" not found in Deployment")
 		assert.Equal(t, nil, actual)
 	})
 	t.Run("returns error if incorrect field is requested", func(t *testing.T) {

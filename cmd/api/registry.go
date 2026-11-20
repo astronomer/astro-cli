@@ -73,7 +73,7 @@ Use "astro api registry ls" to discover all available endpoints and operation ID
   astro api registry listProviders \
     --template '{{range .providers}}{{.id}}{{"\n"}}{{end}}'
 
-  # Generate curl command instead of executing
+  # Print a curl command instead of sending the request
   astro api registry /providers.json --generate
 
   # Verbose mode showing full request/response
@@ -102,22 +102,22 @@ Use "astro api registry ls" to discover all available endpoints and operation ID
 	cmd.PersistentFlags().StringVar(&opts.RegistryURL, "registry-url", "", "Override the registry base URL (env: ASTRO_REGISTRY_URL)")
 
 	// Request flags
-	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "The HTTP method for the request")
+	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "HTTP method for the request")
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a typed parameter in key=value format")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in key=value format")
-	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in key:value format")
-	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request (use \"-\" for stdin)")
+	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add an HTTP request header in key:value format")
+	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "File to use as the request body (use \"-\" for stdin)")
 	cmd.Flags().StringArrayVarP(&opts.PathParams, "path-param", "p", nil, "Path parameter in key=value format (for use with operation IDs)")
 
 	// Output flags
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template")
-	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
+	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Select values from the response with a jq query")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
 
 	// Other flags
-	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Output a curl command instead of executing the request")
+	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Print a curl command instead of sending the request")
 
 	// Subcommands
 	cmd.AddCommand(NewRegistryListCmd(out, opts))
@@ -159,7 +159,7 @@ func runRegistry(opts *RegistryOptions) error {
 
 	// Check for any remaining unfilled path parameters
 	if missing := findMissingPathParams(requestPath); len(missing) > 0 {
-		return fmt.Errorf("missing path parameter(s): %s. Use -p/--path-param to provide them (e.g., -p %s=value)",
+		return fmt.Errorf("missing path parameter(s): %s; pass them with -p/--path-param, for example -p %s=value",
 			strings.Join(missing, ", "), missing[0])
 	}
 
@@ -253,7 +253,7 @@ You can optionally provide a filter to search for specific endpoints. The filter
 	}
 
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
-	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")
 	cliout.AddOutputFlag(cmd, &format)
 
 	return cmd
@@ -297,7 +297,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 	}
 
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET)")
-	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
 	cliout.AddOutputFlag(cmd, &format)
 

@@ -113,5 +113,5 @@ func TestAPCLinkPickerWithNothingToOffer(t *testing.T) {
 	_, err := d.APC.PickDeployment("ckws-1", map[string]string{"ckdep-linked": "old"})
 	require.ErrorIs(t, err, local.ErrAllDeploymentsLinked)
 	_, err = d.APC.PickDeployment("ckws-1", nil)
-	require.EqualError(t, err, "no Deployments in workspace ckws-1 to link")
+	require.EqualError(t, err, "no Deployments in Workspace ckws-1 to link")
 }

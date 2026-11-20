@@ -20,7 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/version"
 )
 
-var ErrorRequest = errors.New("failed to perform request")
+var ErrorRequest = errors.New("request failed")
 
 type apiError struct {
 	Message string `json:"message"`

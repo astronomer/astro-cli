@@ -97,35 +97,35 @@ func apcConfirmCases() []apcConfirmCase {
 		{
 			name: "deployment hibernate", version: "2.2.1",
 			args:     []string{"deployment", "hibernate", "dep-hb"},
-			question: "Are you sure you want to hibernate this Deployment?",
+			question: "Hibernate this Deployment?",
 			client:   func() *mocks.ClientInterface { return newHibernationClient(withOverride(true, nil)) },
 			mutates:  "HibernateOverrideDeployment",
 		},
 		{
 			name: "deployment wake-up", version: "2.2.1",
 			args:     []string{"deployment", "wake-up", "dep-hb"},
-			question: "Are you sure you want to wake up this Deployment?",
+			question: "Wake up this Deployment?",
 			client:   func() *mocks.ClientInterface { return newHibernationClient(withOverride(false, nil)) },
 			mutates:  "HibernateOverrideDeployment",
 		},
 		{
 			name: "deployment wake-up --remove-override", version: "2.2.1",
 			args:     []string{"deployment", "wake-up", "dep-hb", "--remove-override"},
-			question: "Are you sure you want to remove the hibernation override on this Deployment?",
+			question: "Remove the hibernation override on this Deployment?",
 			client:   func() *mocks.ClientInterface { return newHibernationClient(withOverride(false, nil)) },
 			mutates:  "HibernateOverrideDeployment",
 		},
 		{
 			name: "deployment hibernate --remove-override", version: "2.2.1",
 			args:     []string{"deployment", "hibernate", "dep-hb", "--remove-override"},
-			question: "Are you sure you want to remove the hibernation override on this Deployment?",
+			question: "Remove the hibernation override on this Deployment?",
 			client:   func() *mocks.ClientInterface { return newHibernationClient(withOverride(true, nil)) },
 			mutates:  "HibernateOverrideDeployment",
 		},
 		{
 			name: "deployment create as dag_deploy", version: "2.1.0",
 			args:     []string{"deployment", "create", "--cluster-id", "cl-1", "--name", "alpha", "--dag-deployment-type", "dag_deploy"},
-			question: "this is an experimental feature",
+			question: "Dag-only deploys are experimental",
 			client: func() *mocks.ClientInterface {
 				api := apcAt("2.1.0")
 				api.On("CreateDeployment", mock.Anything).Return(&runtimeDep, nil).Maybe()
@@ -136,7 +136,7 @@ func apcConfirmCases() []apcConfirmCase {
 		{
 			name: "deployment update onto dag_deploy", version: "2.1.0",
 			args:     []string{"deployment", "update", "dep-1", "--dag-deployment-type", "dag_deploy"},
-			question: "Changing to a Dag-only Deployment will erase all of the currently deployed Dags",
+			question: "Changing to a Dag-only Deployment erases all currently deployed Dags",
 			client: func() *mocks.ClientInterface {
 				api := apcAt("2.1.0")
 				api.On("GetDeployment", "dep-1").Return(dagImage, nil)
@@ -148,7 +148,7 @@ func apcConfirmCases() []apcConfirmCase {
 		{
 			name: "deployment update off dag_deploy", version: "2.1.0",
 			args:     []string{"deployment", "update", "dep-1", "--dag-deployment-type", "image"},
-			question: "changing from a Dag-only deployment will erase all of the currently deployed Dags",
+			question: "Changing from a Dag-only Deployment erases all currently deployed Dags",
 			client: func() *mocks.ClientInterface {
 				api := apcAt("2.1.0")
 				api.On("GetDeployment", "dep-1").Return(dagOnly, nil)
@@ -320,7 +320,7 @@ func TestUpdateWithoutATypeAsksNothingOnDagDeploy(t *testing.T) {
 
 	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 	assert.False(t, run.stdinRead)
-	assert.NotContains(t, run.stderr, "erase all of the currently deployed Dags")
+	assert.NotContains(t, run.stderr, "erases all currently deployed Dags")
 	api.AssertCalled(t, "UpdateDeployment", mock.Anything)
 }
 
@@ -336,7 +336,7 @@ func TestDagDeployQuestionFollowsValidation(t *testing.T) {
 		assert.Equal(t, 1, run.code)
 		require.ErrorIs(t, run.err, errInvalidExecutorType)
 		assert.False(t, run.stdinRead)
-		assert.NotContains(t, run.stderr, "experimental feature")
+		assert.NotContains(t, run.stderr, "experimental")
 		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
 	})
 	t.Run("update to git_sync with an ssh key that is not there", func(t *testing.T) {
@@ -350,7 +350,7 @@ func TestDagDeployQuestionFollowsValidation(t *testing.T) {
 		require.Error(t, run.err)
 		assert.NotErrorIs(t, run.err, input.ErrAborted)
 		assert.False(t, run.stdinRead, "asked before the key was read")
-		assert.NotContains(t, run.stderr, "erase all of the currently deployed Dags")
+		assert.NotContains(t, run.stderr, "erases all currently deployed Dags")
 		api.AssertNotCalled(t, "UpdateDeployment", mock.Anything)
 	})
 	t.Run("update to volume with no mount", func(t *testing.T) {

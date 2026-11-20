@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	errUpdateWorkspaceInvalidArgs  = cliout.Usage(errors.New("must specify at least one attribute to update (--name or --description)"))
-	errCreateWorkspaceMissingLabel = errors.New("must specify a name for your workspace")
+	errUpdateWorkspaceInvalidArgs  = cliout.Usage(errors.New("set at least one of --name or --description to update"))
+	errCreateWorkspaceMissingLabel = errors.New("a Workspace needs a name; set --name")
 )
 
 var (
@@ -42,7 +42,7 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 		Use:     "workspace",
 		Aliases: []string{"wo"},
 		Short:   "Manage APC Workspaces",
-		Long:    "Workspaces contain a group of Airflow Cluster Deployments. The creator of the workspace can invite other users into it",
+		Long:    "A Workspace groups Deployments. The creator of a Workspace can invite other users to it.",
 	}
 	deleteCmd := newWorkspaceDeleteCmd(out)
 	cmd.AddCommand(
@@ -87,9 +87,9 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 			return workspaceCreate(out)
 		},
 	}
-	cmd.Flags().StringVarP(&workspaceCreateLabel, "name", "n", "", "Name for your new workspace")
+	cmd.Flags().StringVarP(&workspaceCreateLabel, "name", "n", "", "Name of the new Workspace")
 	utils.AddAlias(cmd.Flags(), "label", "name")
-	cmd.Flags().StringVar(&workspaceCreateDescription, "description", "", "Description for your new workspace")
+	cmd.Flags().StringVar(&workspaceCreateDescription, "description", "", "Description of the new Workspace")
 	_ = cmd.MarkFlagRequired("name") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 
@@ -101,7 +101,7 @@ func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete <WORKSPACE_ID>",
 		Aliases: []string{"rm"},
 		Short:   "Delete an APC Workspace",
-		Long:    "Delete an APC Workspace. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
+		Long:    "Delete an APC Workspace. This cannot be undone; it asks for confirmation unless --yes is given.",
 		Example: workspaceDeleteExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -118,7 +118,7 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 		Use:     "switch [WORKSPACE_ID]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different APC Workspace",
-		Long:    "Switch to a different APC Workspace. If you do not provide the workspace ID, you choose one from a list.",
+		Long:    "Switch to a different APC Workspace. Without a Workspace ID, it shows a list to choose from.",
 		Example: `  # Switch to a Workspace by its ID
   astro workspace switch <WORKSPACE_ID>
 
@@ -131,8 +131,8 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 	}
 
 	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
-		cmd.Flags().BoolVar(&workspacePaginated, "paginated", false, "Paginated workspace list")
-		cmd.Flags().IntVar(&workspacePageSize, "page-size", 0, "Page size of the workspace list if paginated is set to true")
+		cmd.Flags().BoolVar(&workspacePaginated, "paginated", false, "Page through the Workspace list")
+		cmd.Flags().IntVar(&workspacePageSize, "page-size", 0, "Page size of the Workspace list with --paginated")
 	}
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 	return cmd
@@ -143,7 +143,7 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update <WORKSPACE_ID>",
 		Aliases: []string{"up"},
 		Short:   "Update an APC Workspace",
-		Long:    "Update a Workspace name, as well as users and roles assigned to a Workspace",
+		Long:    "Update a Workspace's name or description.",
 		Example: `  # Change a Workspace's name and description
   astro workspace update <WORKSPACE_ID> --name my-new-name --description "My new description"`,
 		Args: cobra.ExactArgs(1),
@@ -152,9 +152,9 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&workspaceUpdateLabel, "name", "n", "", "The new name you want to give to your workspace")
+	cmd.Flags().StringVarP(&workspaceUpdateLabel, "name", "n", "", "New name for the Workspace")
 	utils.AddAlias(cmd.Flags(), "label", "name")
-	cmd.Flags().StringVar(&workspaceUpdateDescription, "description", "", "The new description you want to give to your workspace")
+	cmd.Flags().StringVar(&workspaceUpdateDescription, "description", "", "New description for the Workspace")
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 
 	return cmd
@@ -174,7 +174,7 @@ func workspaceCreate(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return emitWorkspace(r, w, "\n Successfully created workspace")
+	return emitWorkspace(r, w, "\n Created Workspace")
 }
 
 func workspaceList(out io.Writer) error {
@@ -195,7 +195,7 @@ func workspaceList(out io.Writer) error {
 func workspaceDelete(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 
-	if err := confirm(fmt.Sprintf("\nAre you sure you want to delete Workspace %s? This cannot be undone.", args[0])); err != nil {
+	if err := confirm(fmt.Sprintf("\nDelete Workspace %s? This cannot be undone.", args[0])); err != nil {
 		return err
 	}
 	w, err := workspace.Delete(args[0], houstonClient)
@@ -223,7 +223,7 @@ func workspaceUpdate(out io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
-	return emitWorkspace(r, w, "\n Successfully updated workspace")
+	return emitWorkspace(r, w, "\n Updated Workspace")
 }
 
 func workspaceSwitch(out io.Writer, args []string) error {

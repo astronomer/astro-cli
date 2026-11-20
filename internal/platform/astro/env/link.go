@@ -23,7 +23,7 @@ func validateDeploymentID(depID string) error {
 		return usageerr.Usage(errors.New("--deployment cannot be empty"))
 	}
 	if !util.IsCUID(depID) {
-		return fmt.Errorf("%q is not a valid deployment ID (expected a CUID)", depID)
+		return fmt.Errorf("%q is not a valid Deployment ID (expected a CUID)", depID)
 	}
 	return nil
 }
@@ -356,12 +356,12 @@ func link(kind LinkKind, idOrKey string, scope Scope, depID string, override *Li
 		return nil, err
 	}
 	if excludeExists(current.ExcludeLinks, depID) {
-		return nil, fmt.Errorf("%s %q has deployment %s in its exclude list; remove the exclude first", k.noun, current.ObjectKey, depID)
+		return nil, fmt.Errorf("%s %q has Deployment %s in its exclude list; remove the exclude first", k.noun, current.ObjectKey, depID)
 	}
 
 	links, found := upsertLinkInUpdateList(kind, current.Links, depID, override)
 	if !found && noCreate {
-		return nil, fmt.Errorf("%s %q is not linked to deployment %s and --no-create was passed",
+		return nil, fmt.Errorf("%s %q is not linked to Deployment %s and --no-create was passed",
 			k.noun, current.ObjectKey, depID)
 	}
 	return patchLinks(k, *current.Id, current, &links, nil, astroV1Client)
@@ -378,7 +378,7 @@ func unlink(kind LinkKind, idOrKey string, scope Scope, depID string, astroV1Cli
 		return nil, err
 	}
 	if !linkExists(current.Links, depID) {
-		return nil, fmt.Errorf("%s %q is not linked to deployment %s", k.noun, current.ObjectKey, depID)
+		return nil, fmt.Errorf("%s %q is not linked to Deployment %s", k.noun, current.ObjectKey, depID)
 	}
 	links := buildUpdateLinksExcluding(k, current.Links, depID)
 	return patchLinks(k, *current.Id, current, &links, nil, astroV1Client)
@@ -403,7 +403,7 @@ func exclude(kind LinkKind, idOrKey string, scope Scope, depID string, warn io.W
 		return nil, err
 	}
 	if linkExists(current.Links, depID) {
-		return nil, fmt.Errorf("%s %q is explicitly linked to deployment %s; delete the link first to exclude", k.noun, current.ObjectKey, depID)
+		return nil, fmt.Errorf("%s %q is explicitly linked to Deployment %s; delete the link first to exclude", k.noun, current.ObjectKey, depID)
 	}
 	if excludeExists(current.ExcludeLinks, depID) {
 		// Already excluded; desired state matches actual, no-op success.
@@ -428,7 +428,7 @@ func exclude(kind LinkKind, idOrKey string, scope Scope, depID string, warn io.W
 	if err == nil {
 		return after, nil
 	}
-	fmt.Fprintf(warn, "Excluded deployment %s, but reading %s %q back failed (%s); showing it as it was read before, with the exclude added.\n",
+	fmt.Fprintf(warn, "Excluded Deployment %s, but reading %s %q back failed (%s). Showing it as it was read before, with the exclude added.\n",
 		depID, k.noun, current.ObjectKey, err)
 	excludes := append(derefSlice(current.ExcludeLinks), astrov1.EnvironmentObjectExcludeLink{
 		Scope:         astrov1.EnvironmentObjectExcludeLinkScopeDEPLOYMENT,
@@ -450,7 +450,7 @@ func unexclude(kind LinkKind, idOrKey string, scope Scope, depID string, astroV1
 		return nil, err
 	}
 	if !excludeExists(current.ExcludeLinks, depID) {
-		return nil, fmt.Errorf("%s %q does not have deployment %s in its exclude list", k.noun, current.ObjectKey, depID)
+		return nil, fmt.Errorf("%s %q does not have Deployment %s in its exclude list", k.noun, current.ObjectKey, depID)
 	}
 	excludes := buildUpdateExcludesExcluding(current.ExcludeLinks, depID)
 	return patchLinks(k, *current.Id, current, nil, &excludes, astroV1Client)
@@ -589,7 +589,7 @@ func overrideMap(o *astrov1.UpdateEnvironmentObjectOverridesRequest) (map[string
 // the platform refuses links on any other scope with a 400).
 func resolveWorkspaceObject(k linkKind, idOrKey string, scope Scope, includeSecrets bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	if scope.WorkspaceID == "" {
-		return nil, errors.New("linking commands require --workspace; deployment-scoped objects cannot be linked")
+		return nil, errors.New("linking commands require --workspace; Deployment-scoped objects cannot be linked")
 	}
 	obj, err := getObject(idOrKey, scope, k.objectType, includeSecrets, astroV1Client)
 	var outOfScope *outOfScopeError
@@ -600,7 +600,7 @@ func resolveWorkspaceObject(k linkKind, idOrKey string, scope Scope, includeSecr
 		return nil, err
 	}
 	if obj.Scope != astrov1.EnvironmentObjectScope(astrov1.CreateEnvironmentObjectRequestScopeWORKSPACE) {
-		return nil, fmt.Errorf("%s %q is %s-scoped; only workspace-scoped objects can be linked", k.noun, obj.ObjectKey, obj.Scope)
+		return nil, fmt.Errorf("%s %q is %s-scoped; only Workspace-scoped objects can be linked", k.noun, obj.ObjectKey, obj.Scope)
 	}
 	if _, err := objectID(obj, idOrKey); err != nil {
 		return nil, err

@@ -34,7 +34,7 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 		Use:     "team",
 		Aliases: []string{"te", "teams"},
 		Short:   "Manage Workspace Team resources",
-		Long:    "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
+		Long:    "A Team is a group of users imported from your Identity Provider. Add a Team to or remove it from a Deployment to manage access for the whole group.",
 	}
 	addWorkspaceFlag(cmd.PersistentFlags(), "Workspace whose teams to manage (default: the current context's)", "w")
 	cmd.AddCommand(
@@ -57,7 +57,7 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the
 			return workspaceTeamAdd(out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team ID to be assigned to workspace")
+	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team ID to be assigned to Workspace")
 	// A persistent flag is not among the command's own flags, where
 	// MarkFlagRequired looks, so marking it so failed, unseen, and a run
 	// without one asked Houston about the team "".
@@ -70,8 +70,8 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the
 func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update <TEAM_ID>",
-		Short:   "Update a Team inside a workspace",
-		Long:    "Update a Team inside a workspace",
+		Short:   "Update a Team inside a Workspace",
+		Long:    "Update a Team inside a Workspace",
 		Example: workspaceTeamUpdateExample,
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -118,11 +118,11 @@ func workspaceTeamAdd(out io.Writer, _ []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
+		return fmt.Errorf("could not find a valid Workspace: %w", err)
 	}
 
 	if err := validateWorkspaceRole(workspaceTeamRole); err != nil {
-		return fmt.Errorf("failed to find a valid role: %w", err)
+		return fmt.Errorf("could not find a valid role: %w", err)
 	}
 
 	w, err := workspace.AddTeam(ws, teamID, workspaceTeamRole, houstonClient)
@@ -136,11 +136,11 @@ func workspaceTeamUpdate(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
+		return fmt.Errorf("could not find a valid Workspace: %w", err)
 	}
 
 	if err := validateWorkspaceRole(workspaceTeamRole); err != nil {
-		return fmt.Errorf("failed to find a valid role: %w", err)
+		return fmt.Errorf("could not find a valid role: %w", err)
 	}
 
 	change, err := workspace.UpdateTeamRole(ws, args[0], workspaceTeamRole, houstonClient)
@@ -154,7 +154,7 @@ func workspaceTeamRm(cmd *cobra.Command, out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
+		return fmt.Errorf("could not find a valid Workspace: %w", err)
 	}
 
 	removal, err := workspace.RemoveTeam(ws, args[0], houstonClient)
@@ -168,7 +168,7 @@ func workspaceTeamsList(out io.Writer, _ []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
+		return fmt.Errorf("could not find a valid Workspace: %w", err)
 	}
 
 	ts, err := workspace.ListTeamRoles(ws, houstonClient)

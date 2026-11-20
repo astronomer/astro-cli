@@ -60,7 +60,7 @@ func (s *Suite) TestWorkspaceSaCreate() {
 	workspaceSARole = "invalid-role"
 	err = workspaceSaCreate(buf)
 	s.Error(err)
-	s.Contains(err.Error(), "failed to find a valid role")
+	s.Contains(err.Error(), "could not find a valid role")
 
 	houstonMock.AssertExpectations(s.T())
 }

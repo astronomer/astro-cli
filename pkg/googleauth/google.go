@@ -45,7 +45,7 @@ const googleScope = "https://www.googleapis.com/auth/cloud-platform"
 // metadata server. One fix covers the laptop case, which is the case a person
 // is in when they read this. It is exported so the Composer URL lookup, which
 // needs the same credentials, reports the same outage.
-var ErrNoCredentials = errors.New("no Google credentials — run gcloud auth application-default login")
+var ErrNoCredentials = errors.New("no Google credentials; run gcloud auth application-default login")
 
 // maxComposerAccountLength is the longest service-account email an Airflow that
 // registers Google callers on its own can store. The token carries the full
@@ -73,8 +73,8 @@ func AccountAdvice(account string) string {
 	if len(account) <= maxComposerAccountLength {
 		return ""
 	}
-	return fmt.Sprintf("the service account %s is longer than %d characters, which is more than Airflow can store as a username — "+
-		"pre-register it as an Airflow user under its numeric account id, or use a shorter service account",
+	return fmt.Sprintf("the service account %s is longer than %d characters, the most Airflow can store as a username; "+
+		"pre-register it as an Airflow user under its numeric account ID, or use a shorter service account",
 		account, maxComposerAccountLength)
 }
 

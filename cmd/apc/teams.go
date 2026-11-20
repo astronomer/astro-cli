@@ -72,8 +72,8 @@ func newTeamListCmd(out io.Writer) *cobra.Command {
 			return listTeam(out, paginated, pageSize)
 		},
 	}
-	cmd.Flags().BoolVar(&paginated, "paginated", false, "Paginated team list")
-	cmd.Flags().IntVar(&pageSize, "page-size", 0, "Page size of the team list if paginated is set to true")
+	cmd.Flags().BoolVar(&paginated, "paginated", false, "Page through the team list")
+	cmd.Flags().IntVar(&pageSize, "page-size", 0, "Page size of the team list with --paginated")
 	addAccessOutputFlag(cmd)
 	return cmd
 }

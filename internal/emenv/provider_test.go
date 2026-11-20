@@ -129,7 +129,7 @@ func TestLookupMissForUnknownKey(t *testing.T) {
 	_, ok := p.Lookup("UNKNOWN")
 	require.False(t, ok)
 	require.Equal(t, "workspace", p.Label())
-	require.Equal(t, "the workspace holds no value for it", p.(envresolve.Diagnoser).Diagnose("UNKNOWN"))
+	require.Equal(t, "the Workspace holds no value for it", p.(envresolve.Diagnoser).Diagnose("UNKNOWN"))
 }
 
 // One fetch serves every name in a run: repeated Lookups make one fetch (a call
@@ -206,7 +206,7 @@ func TestNoWorkspaceUnavailable(t *testing.T) {
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	require.Contains(t, p.Label(), "unavailable: the manifest sets no workspace")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("X"), "Link a workspace to the project in Astro Desktop")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("X"), "Link a Workspace to the project in Astro Desktop")
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
 
@@ -277,8 +277,8 @@ func TestFailureModeMessages(t *testing.T) {
 		wantCause string
 	}{
 		{"expired", http.StatusUnauthorized, "token expired", "workspace (unavailable: session expired)", "your localhost session expired. Log in again with astro login localhost"},
-		{"revoked", http.StatusForbidden, "forbidden", "workspace (unavailable: no access)", "you don't have access to this workspace on localhost. Check your current organization (astro organization switch), or ask an org admin"},
-		{"deleted", http.StatusNotFound, "not found", "workspace (unavailable: workspace not found)", "workspace cmws123 was not found on localhost. Check the workspace and domain keys in pyproject.toml, and your current organization"},
+		{"revoked", http.StatusForbidden, "forbidden", "workspace (unavailable: no access)", "you don't have access to this Workspace on localhost. Check your current Organization (astro organization switch), or ask an Organization admin"},
+		{"deleted", http.StatusNotFound, "not found", "workspace (unavailable: workspace not found)", "Workspace cmws123 was not found on localhost. Check the workspace and domain keys in pyproject.toml, and your current Organization"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -360,7 +360,7 @@ func TestSecretsDisabledHardMiss(t *testing.T) {
 
 	_, ok = p.Lookup("SECRET_TOKEN")
 	require.False(t, ok, "a withheld secret is a hard miss")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "organization test-org-id disables Environment Secrets Fetching")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "Organization test-org-id disables Environment Secrets Fetching")
 
 	require.Equal(t, "workspace", p.Label())
 	// The first typed call is refused; the retry re-fetches every type without
@@ -399,7 +399,7 @@ func TestSecretsDisabledConnectionHardMiss(t *testing.T) {
 	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 	_, ok := p.Lookup("AIRFLOW_CONN_DB_MAIN")
 	require.False(t, ok, "a connection read without secrets is a hard miss")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("AIRFLOW_CONN_DB_MAIN"), "organization test-org-id disables Environment Secrets Fetching")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("AIRFLOW_CONN_DB_MAIN"), "Organization test-org-id disables Environment Secrets Fetching")
 }
 
 // Presence mode (list) still reports such a connection as held by the
@@ -470,7 +470,7 @@ func TestSecretsDisabledWhenTheRefusalIsNotAnEnvelope(t *testing.T) {
 	require.True(t, ok, "the fallback ran, so non-secret values still resolve")
 	require.Equal(t, "visible", v)
 	require.Equal(t, "workspace", p.Label(), "the workspace is available, not unreachable")
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "organization test-org-id disables Environment Secrets Fetching")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "Organization test-org-id disables Environment Secrets Fetching")
 }
 
 // A secret the organization allowed but the platform returned empty is not the
@@ -485,7 +485,7 @@ func TestSecretWithNoValueWhenSecretsWereAllowed(t *testing.T) {
 
 	cause := p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN")
 	require.NotContains(t, cause, "disables Environment Secrets Fetching")
-	require.Contains(t, cause, "the workspace holds no value for it")
+	require.Contains(t, cause, "the Workspace holds no value for it")
 }
 
 // A workspace larger than one window needs the offset to reach the request, or

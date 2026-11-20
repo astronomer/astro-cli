@@ -55,7 +55,7 @@ func TestAnUnsupportedMethodIsRefusedBeforeAnyLookup(t *testing.T) {
 			if asked {
 				t.Error("asked the locator before refusing")
 			}
-			for _, want := range []string{i.Name, string(tc.method), "does not carry", "astro use"} {
+			for _, want := range []string{i.Name, string(tc.method), "does not support", "astro use"} {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("err = %v, want it to mention %q", err, want)
 				}

@@ -231,7 +231,7 @@ func (s *Suite) TestUpdate() {
 
 	s.Run("invalid role", func() {
 		_, err := Update("test-id", "invalid-role-string", nil)
-		s.ErrorContains(err, "invalid role: invalid-role-string")
+		s.ErrorContains(err, "invalid role invalid-role-string")
 	})
 
 	s.Run("CreateTeamSystemRoleBinding error", func() {

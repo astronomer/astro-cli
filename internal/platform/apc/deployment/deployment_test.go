@@ -305,9 +305,9 @@ func (s *Suite) TestCreate() {
 			{repoURL: "https://github.com/bote795/public-ariflow-dags-test.git", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", syncInterval: 100, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 			{repoURL: "https://github.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../../../../cmd/apc/testfiles/ssh_key", knownHosts: "../../../../cmd/apc/testfiles/known_hosts", syncInterval: 100, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 			{repoURL: "https://github.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../../../../cmd/apc/testfiles/ssh_key", syncInterval: 100, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-			{repoURL: "https://github.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../../../../cmd/apc/testfiles/wrong_ssh_key", knownHosts: "../../../../cmd/apc/testfiles/known_hosts", syncInterval: 100, expectedOutput: "", expectedError: "wrong path specified, no file exists for ssh key"},
-			{repoURL: "https://github.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../../../../cmd/apc/testfiles/ssh_key", knownHosts: "../../../../cmd/apc/testfiles/wrong_known_hosts", syncInterval: 100, expectedOutput: "", expectedError: "wrong path specified, no file exists for known hosts"},
-			{repoURL: "https://gitlab.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../../../../cmd/apc/testfiles/ssh_key", knownHosts: "../../../../cmd/apc/testfiles/known_hosts", syncInterval: 100, expectedOutput: "", expectedError: "git repository host not present in known hosts file"},
+			{repoURL: "https://github.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../../../../cmd/apc/testfiles/wrong_ssh_key", knownHosts: "../../../../cmd/apc/testfiles/known_hosts", syncInterval: 100, expectedOutput: "", expectedError: "no file exists at the SSH key path"},
+			{repoURL: "https://github.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../../../../cmd/apc/testfiles/ssh_key", knownHosts: "../../../../cmd/apc/testfiles/wrong_known_hosts", syncInterval: 100, expectedOutput: "", expectedError: "no file exists at the known hosts path"},
+			{repoURL: "https://gitlab.com/neel-astro/private-airflow-dags-test", revision: "304e0ff3e4dde9063204ff52ce39b8aa01b5b682", dagDirectoryLocation: "dagscopy/", branchName: "main", sshKey: "../../../../cmd/apc/testfiles/ssh_key", knownHosts: "../../../../cmd/apc/testfiles/known_hosts", syncInterval: 100, expectedOutput: "", expectedError: "the Git repository host is not in the known hosts file"},
 		}
 
 		for _, tt := range myTests {
@@ -440,7 +440,7 @@ func (s *Suite) TestCreate() {
 		os.Stdin = r
 
 		_, err = Create(req, api, mockAppConfig)
-		s.EqualError(err, "no kubernetes namespaces specified")
+		s.EqualError(err, "no Kubernetes namespaces specified")
 	})
 }
 
@@ -907,14 +907,13 @@ func (s *Suite) Test_meetsAirflowUpgradeReqs() {
 	desiredAirflowVersion := "2.0.0"
 	err := meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
 	s.Error(err)
-	s.EqualError(err, "Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to 1.10.14 "+
+	s.EqualError(err, "Airflow 2.0 has breaking changes. Upgrade to 1.10.14 "+
 		"first and make sure your Dags and configs are 2.0 compatible")
 
 	airflowVersion = "2.0.0"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
 	s.Error(err)
-	s.EqualError(err, "You tried to set --desired-airflow-version to 2.0.0, but this Airflow Deployment "+
-		"is already running 2.0.0. Please indicate a higher version of Airflow and try again.")
+	s.EqualError(err, "--desired-airflow-version 2.0.0 is not higher than the version this Deployment runs (2.0.0); pass a higher Airflow version")
 
 	airflowVersion = "1.10.14"
 	err = meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion)
@@ -996,7 +995,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		name, err := getDeploymentSelectionNamespaces(api, "testClusterID", "")
 		expected := ``
 		s.Equal(expected, name)
-		s.EqualError(err, "no kubernetes namespaces are available")
+		s.EqualError(err, "no Kubernetes namespaces are available")
 		api.AssertExpectations(s.T())
 	})
 
@@ -1064,7 +1063,7 @@ func (s *Suite) TestGetDeploymentNamespaceNameError() {
 
 	name, err := getDeploymentNamespaceName("")
 	s.Equal("", name)
-	s.EqualError(err, "no kubernetes namespaces specified")
+	s.EqualError(err, "no Kubernetes namespaces specified")
 }
 
 func (s *Suite) TestAddDagDeploymentArgs() {

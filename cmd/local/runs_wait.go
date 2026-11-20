@@ -58,13 +58,13 @@ func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 		Short: "Start a run of a Dag and wait for it to finish",
 		Long: "Start a run of a Dag, as " + q.t.suggest("runs trigger") + " does, then check on it every --poll-interval until it " +
 			"succeeds, fails, or --timeout passes. A failed run is reported with the task instances that failed " +
-			"or never ran because something upstream did.\n\n" +
+			"or never ran because an upstream task failed.\n\n" +
 			"--timeout and --poll-interval take a number of seconds (300) or a duration (5m, 1h30m).\n\n" +
 			"Exit status: 0 when the run succeeded, " + strconv.Itoa(exitRunFailed) + " when it failed (or the " +
 			"command itself did), " + strconv.Itoa(exitWaitTimeout) + " when the wait timed out with the run " +
-			"still going. The run is reported in every case, and a timeout leaves it running: stopping the wait " +
-			"does not stop the run.\n\n" +
-			"A paused Dag is unpaused first, as " + q.t.suggest("runs trigger") + " does, or the wait would last until the timeout " +
+			"still going. The run is reported in every case. A timeout leaves the run going; " +
+			"it does not stop it.\n\n" +
+			"A paused Dag is unpaused first, as " + q.t.suggest("runs trigger") + " does. Otherwise the wait would last until the timeout " +
 			"for a run that is never scheduled.",
 		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
@@ -263,7 +263,7 @@ func (q *query) awaitRun(ctx context.Context, client *airflowapi.Client, run air
 
 func (q *query) renderWaitedRun(w io.Writer, result waitedRun) error {
 	if result.TimedOut {
-		_, err := fmt.Fprintf(w, "%s run %s is still %s after %s; stopped waiting, and the run carries on\n"+
+		_, err := fmt.Fprintf(w, "%s run %s is still %s after %s; stopped waiting, and the run is still going\n"+
 			"check on it with %s\n",
 			result.DAGID, result.RunID, result.State, formatDuration(result.ElapsedSeconds),
 			q.t.suggest("runs get "+result.DAGID+" "+result.RunID))
@@ -368,12 +368,12 @@ func newRunsWaitCmd(q *query) *cobra.Command {
 		Use:   "wait <DAG_ID> <RUN_ID>",
 		Short: "Wait for a run already going to finish",
 		Long: "Check on a run every --poll-interval until it succeeds, fails, or --timeout passes, and report it " +
-			"as " + q.t.suggest("runs trigger-wait") + " does. It waits on a run that is already going, such as a " +
-			"scheduled one. To wait on one task of a run instead, see " + q.t.suggest("tasks wait") + ".\n\n" +
+			"as " + q.t.suggest("runs trigger-wait") + " does. Use it for a run that is already going, such as a " +
+			"scheduled one. To wait on one task of a run, see " + q.t.suggest("tasks wait") + ".\n\n" +
 			"--timeout and --poll-interval take a number of seconds (300) or a duration (5m, 1h30m).\n\n" +
 			"Exit status: 0 when the run succeeded, " + strconv.Itoa(exitRunFailed) + " when it failed (or the " +
 			"command itself did), " + strconv.Itoa(exitWaitTimeout) + " when the wait timed out. Stopping the " +
-			"wait never stops the run.",
+			"wait does not stop the run.",
 		Args: cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"Wait for a run to finish", "runs wait <DAG_ID> <RUN_ID>",

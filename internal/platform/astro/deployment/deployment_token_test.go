@@ -441,7 +441,7 @@ func (s *Suite) TestUpdateToken() {
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil)
 
 		_, err := UpdateToken("token1", "", "", "", "", "", ownTokens, pickSecond, mockClient)
-		s.ErrorContains(err, "the token selected is not of the type you are trying to modify")
+		s.ErrorContains(err, "the selected token is not the right type for this command")
 	})
 }
 
@@ -936,7 +936,7 @@ func (s *Suite) TestUpsertOrgTokenDeploymentRole() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 		_, err = UpsertOrgTokenDeploymentRole("token-id", "", "", deploymentID, "create", pickSecond, mockClient)
-		s.ErrorContains(err, "the token selected is not of the type you are trying to modify")
+		s.ErrorContains(err, "the selected token is not the right type for this command")
 	})
 }
 
@@ -1090,6 +1090,6 @@ func (s *Suite) TestUpsertWorkspaceTokenDeploymentRole() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 		_, err = UpsertWorkspaceTokenDeploymentRole("token-id", "", "", "", deploymentID, "create", pickSecond, mockClient)
-		s.ErrorContains(err, "the token selected is not of the type you are trying to modify")
+		s.ErrorContains(err, "the selected token is not the right type for this command")
 	})
 }

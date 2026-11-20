@@ -47,14 +47,14 @@ type Selection struct {
 // ErrMutuallyExclusive reports --deployment and --url together: one names
 // something the project declares, the other deliberately declares nothing, and
 // obeying both is impossible.
-var ErrMutuallyExclusive = errors.New("--deployment and --url cannot be used together: --deployment names a deployment this project links, --url targets an Airflow with no name at all")
+var ErrMutuallyExclusive = errors.New("--deployment and --url cannot be used together; --deployment picks a deployment this project links and --url targets an Airflow directly")
 
 // localSpelling closes the failures a project with no links can reach. The
 // whole point of the split is that the machine is spelled differently rather
 // than waiting quietly at the bottom of the rule, so a run that finds no
 // deployment must not leave the reader thinking there is nothing to talk to.
 // The command layer adds the family's own `astro local` form on top.
-const localSpelling = "The Airflow on this machine is not a deployment and never resolves here; it has its own commands, under astro local."
+const localSpelling = "The Airflow on this machine is not a deployment. Use astro local to manage it."
 
 // ErrNone reports a project with no deployment to act on.
 var ErrNone = errors.New("no deployment to act on: this project links none ([tool.astro.deployments] in pyproject.toml). " +
@@ -64,8 +64,8 @@ var ErrNone = errors.New("no deployment to act on: this project links none ([too
 // a flag, the env var, or a pin left by an older release. The name is reserved
 // rather than unknown, so the message says where the machine went instead of
 // listing deployments it is not one of.
-var ErrLocalNotADeployment = errors.New("the name " + LocalName + " is reserved for this machine and is not a deployment: " +
-	"this machine has its own commands — astro local start runs it, astro local af dags list and astro local af health read it. " +
+var ErrLocalNotADeployment = errors.New("the name " + LocalName + " is reserved for this machine and is not a deployment. " +
+	"Run astro local start to start it, and astro local af dags list or astro local af health to read it. " +
 	"astro use selects among deployments only")
 
 // UnknownError reports a name no link declares.
@@ -88,7 +88,7 @@ func (e *UnknownError) Error() string {
 	case LayerFlag, LayerURL, LayerDefault:
 	}
 	if len(e.Known) == 0 {
-		b.WriteString("; this project links none — declare one under [tool.astro.deployments] in pyproject.toml. " + localSpelling)
+		b.WriteString("; this project links none. Declare one under [tool.astro.deployments] in pyproject.toml. " + localSpelling)
 		return b.String()
 	}
 	b.WriteString("; known deployments: " + strings.Join(e.Known, ", "))

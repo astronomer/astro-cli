@@ -183,14 +183,14 @@ func TestWorkspaceTextIsUnchanged(t *testing.T) {
 		}, []string{"workspace", "ls"}, " NAME     ID     \n"},
 		{"create", func(a *mocks.ClientInterface) {
 			a.On("CreateWorkspace", houston.CreateWorkspaceRequest{Label: "new", Description: "N/A"}).Return(&houston.Workspace{ID: "cknew", Label: "new", Description: new("N/A")}, nil)
-		}, []string{"workspace", "create", "--label", "new"}, " NAME     ID        \n new      cknew     \n\n Successfully created workspace\n"},
+		}, []string{"workspace", "create", "--label", "new"}, " NAME     ID        \n new      cknew     \n\n Created Workspace\n"},
 		{"update", func(a *mocks.ClientInterface) {
 			a.On("UpdateWorkspace", houston.UpdateWorkspaceRequest{WorkspaceID: wsOther.ID, Args: map[string]string{"label": "renamed"}}).
 				Return(&houston.Workspace{ID: wsOther.ID, Label: "renamed", Description: new("desc b")}, nil)
-		}, []string{"workspace", "update", wsOther.ID, "--label", "renamed"}, " NAME        ID                            \n renamed     ckbv8pwbq00wk0760us7ktcgd     \n\n Successfully updated workspace\n"},
+		}, []string{"workspace", "update", wsOther.ID, "--label", "renamed"}, " NAME        ID                            \n renamed     ckbv8pwbq00wk0760us7ktcgd     \n\n Updated Workspace\n"},
 		{"delete", func(a *mocks.ClientInterface) {
 			a.On("DeleteWorkspace", wsOther.ID).Return(&wsOther, nil)
-		}, []string{"workspace", "delete", wsOther.ID, "--yes"}, "\n Successfully deleted workspace\n"},
+		}, []string{"workspace", "delete", wsOther.ID, "--yes"}, "\n Deleted Workspace\n"},
 		{"switch shows the context it left", func(a *mocks.ClientInterface) {
 			a.On("ValidateWorkspaceID", wsOther.ID).Return(&wsOther, nil)
 		}, []string{"workspace", "switch", wsOther.ID}, contextTable},
@@ -348,7 +348,7 @@ func TestWorkspaceSwitchJSON(t *testing.T) {
 		assert.Equal(t, 1, got.code)
 		var e wsErrorObject
 		decodeWorkspaceOutput(t, got.stdout, &e)
-		assert.Contains(t, e.Error, "workspace id is not valid")
+		assert.Contains(t, e.Error, "Workspace ID is not valid")
 		assert.Equal(t, currentWS, currentContextWorkspace(t))
 	})
 	// Without an ID the switch asks, paged or not; under json it refuses,
@@ -368,7 +368,7 @@ func TestWorkspaceSwitchJSON(t *testing.T) {
 			decodeWorkspaceOutput(t, got.stdout, &e)
 			require.NotNil(t, e.Kind)
 			assert.Equal(t, "input_required", *e.Kind)
-			assert.Contains(t, e.Error, "the workspace ID as an argument")
+			assert.Contains(t, e.Error, "the Workspace ID as an argument")
 			assert.False(t, got.stdinRead, "a refused question reads nothing")
 			assert.Empty(t, got.stderr, "nor draws the table")
 			api.AssertNotCalled(t, "ListWorkspaces", mock.Anything)

@@ -225,7 +225,7 @@ func emitCreated(r cliout.Renderer, d *houston.Deployment, executor string) erro
 				flowerURL = url.URL
 			}
 		}
-		tab.SuccessMsg = fmt.Sprintf("\n Successfully created deployment with %s executor", splitted[0]) +
+		tab.SuccessMsg = fmt.Sprintf("\n Created Deployment with %s executor", splitted[0]) +
 			". Deployment can be accessed at the following URLs \n" +
 			fmt.Sprintf("\n Airflow Dashboard: %s", airflowURL)
 		// The Flower URL is specific to CeleryExecutor only
@@ -242,7 +242,7 @@ func emitUpdated(r cliout.Renderer, d *houston.Deployment) error {
 	return r.Emit(newDeploymentJSON(d), func(w io.Writer) error {
 		tab := deploymentTable()
 		tab.AddRow([]string{d.Label, d.ReleaseName, d.Version, d.ID, tagOrUnknown(d), image(d, false).Label()}, false)
-		tab.SuccessMsg = "\n Successfully updated deployment"
+		tab.SuccessMsg = "\n Updated Deployment"
 		tab.Print(w) //nolint:errcheck // best-effort render to the terminal, as it always was
 		return nil
 	})
@@ -257,7 +257,7 @@ func emitAdopted(r cliout.Renderer, d *houston.Deployment) error {
 			Header:         []string{"NAME", "DEPLOYMENT NAME", "NAMESPACE", "CLUSTER ID", "DEPLOYMENT ID"},
 		}
 		tab.AddRow([]string{d.Label, d.ReleaseName, d.Namespace, d.ClusterID, d.ID}, false)
-		tab.SuccessMsg = "\n Successfully adopted deployment"
+		tab.SuccessMsg = "\n Adopted Deployment"
 		tab.Print(w) //nolint:errcheck // best-effort render to the terminal, as it always was
 		return nil
 	})
@@ -300,19 +300,19 @@ func emitVersionChange(r cliout.Renderer, kind versionChangeKind, c *deployment.
 			switch kind {
 			case airflowUpgrade:
 				tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, c.Desired.Label()}, false)
-				tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Airflow %s to %s has been started. ", c.Current.Version, desired) +
-					fmt.Sprintf("To complete this process, add an Airflow %s image to your Dockerfile and deploy to APC.\n", desired) +
+				tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Airflow %s to %s started. ", c.Current.Version, desired) +
+					fmt.Sprintf("To finish, add an Airflow %s image to your Dockerfile and deploy to APC.\n", desired) +
 					"To cancel, run: \n $ astro deployment airflow upgrade --cancel\n"
 			case runtimeUpgrade:
 				shown := deployment.ImageVersion{Image: deployment.ImageRuntime, Version: d.DesiredRuntimeVersion}
 				tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, shown.Label()}, false)
-				tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Runtime %s to %s has been started. ", c.Current.Version, desired) +
-					fmt.Sprintf("To complete this process, add an Runtime %s image to your Dockerfile and deploy to APC.\n", desired) +
+				tab.SuccessMsg = fmt.Sprintf("\nThe upgrade from Runtime %s to %s started. ", c.Current.Version, desired) +
+					fmt.Sprintf("To finish, add a Runtime %s image to your Dockerfile and deploy to APC.\n", desired) +
 					"To cancel, run: \n $ astro deployment runtime upgrade --cancel\n"
 			case runtimeMigrate:
 				tab.AddRow([]string{d.Label, d.ReleaseName, "v" + d.Version, d.ID, c.Desired.Label()}, false)
-				tab.SuccessMsg = fmt.Sprintf("\nThe migration from Airflow %s image to Runtime %s has been started. ", c.Current.Version, desired) +
-					fmt.Sprintf("To complete this process, add an Runtime %s image to your Dockerfile and deploy to APC.\n", desired) +
+				tab.SuccessMsg = fmt.Sprintf("\nThe migration from Airflow %s image to Runtime %s started. ", c.Current.Version, desired) +
+					fmt.Sprintf("To finish, add a Runtime %s image to your Dockerfile and deploy to APC.\n", desired) +
 					"To cancel, run: \n $ astro deployment runtime migrate --cancel\n"
 			}
 			tab.Print(w) //nolint:errcheck // best-effort render to the terminal, as it always was
@@ -329,19 +329,19 @@ func emitVersionChange(r cliout.Renderer, kind versionChangeKind, c *deployment.
 			}
 			switch {
 			case kind == airflowUpgrade && canceled:
-				fmt.Fprintf(b, "\nAirflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running %s.\n", running)
+				fmt.Fprintf(b, "\nCanceled the Airflow upgrade. Your Deployment was not interrupted and is still running %s.\n", running)
 			case kind == airflowUpgrade:
-				fmt.Fprintf(b, "\nNothing to cancel. You are currently running %s and you have not indicated that you want to upgrade.", running)
+				fmt.Fprintf(b, "\nNothing to cancel. This Deployment is running %s and no upgrade was started.", running)
 			case kind == runtimeUpgrade && canceled:
-				fmt.Fprintf(b, "\nRuntime upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running %s.\n", running)
+				fmt.Fprintf(b, "\nCanceled the Runtime upgrade. Your Deployment was not interrupted and is still running %s.\n", running)
 			case kind == runtimeUpgrade:
-				fmt.Fprintf(b, "\nNothing to cancel. You are currently running %s and you have not indicated that you want to upgrade.", running)
+				fmt.Fprintf(b, "\nNothing to cancel. This Deployment is running %s and no upgrade was started.", running)
 			case canceled:
-				fmt.Fprintf(b, "\nRuntime migrate process has been successfully canceled. Your Deployment was not interrupted and you are still running %s.\n", running)
+				fmt.Fprintf(b, "\nCanceled the Runtime migration. Your Deployment was not interrupted and is still running %s.\n", running)
 			case c.Current.Image == deployment.ImageRuntime:
-				fmt.Fprintf(b, "\nNothing to cancel. You are already running %s and you have either not indicated that you want to migrate or migration has been completed.", running)
+				fmt.Fprintf(b, "\nNothing to cancel. This Deployment is running %s and no migration is in progress.", running)
 			default:
-				fmt.Fprintf(b, "\nNothing to cancel. You are running %s and you have not indicated that you want to migrate to Runtime.", running)
+				fmt.Fprintf(b, "\nNothing to cancel. This Deployment is running %s and no migration to Runtime was started.", running)
 			}
 		})
 	})
@@ -427,15 +427,15 @@ func emitHibernation(r cliout.Renderer, h deploymentHibernationJSON, verb string
 		o := h.HibernationOverride
 		switch {
 		case removed:
-			fmt.Fprintf(b, "\nSuccessfully removed the hibernation override on deployment %s. Its hibernation schedule, if it has one, resumes now.\n", name)
+			fmt.Fprintf(b, "\nRemoved the hibernation override on Deployment %s. Its hibernation schedule, if it has one, resumes now.\n", name)
 			return
 		case o == nil:
-			fmt.Fprintf(b, "\nSent the request to %s deployment %s, but Houston returned no hibernation override for it, so the CLI cannot confirm that the override is set.\n", verb, name)
+			fmt.Fprintf(b, "\nSent the request to %s Deployment %s, but Houston returned no hibernation override, so the CLI cannot confirm it is set.\n", verb, name)
 			return
 		}
-		state := "Successfully woke up deployment " + name
+		state := "Woke up Deployment " + name
 		if verb == "hibernate" {
-			state = "Successfully set deployment " + name + " to hibernate"
+			state = "Set Deployment " + name + " to hibernate"
 		}
 		if o.OverrideUntil == nil {
 			fmt.Fprintf(b, "\n%s until you remove the override.\n", state)

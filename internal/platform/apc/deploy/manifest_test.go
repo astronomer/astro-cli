@@ -294,7 +294,7 @@ func TestDeployManifestImageToAGitSyncDeployment(t *testing.T) {
 	res, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings))
 	require.NoError(t, err)
 	assert.True(t, res.DagsNotShipped)
-	assert.Equal(t, []string{"Deployment dep takes its Dags from a git repository (git-sync), so this deploy shipped the image alone and the Dags are as they were"}, warnings)
+	assert.Equal(t, []string{"Deployment dep takes its Dags from a git repository (git-sync), so this deploy shipped the image alone and left the Dags as they were"}, warnings)
 }
 
 // --image to an image Deployment would leave it no DAGs: refused before the
@@ -347,7 +347,7 @@ func TestDeployManifestImageRefusesADeploymentOutsideTheWorkspace(t *testing.T) 
 	in := manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings)
 	in.DeploymentID = "elsewhere"
 	_, err := DeployManifestImage(client, in)
-	require.EqualError(t, err, "no Deployment elsewhere in workspace ws: name a Deployment of the workspace, or the workspace it is in with --workspace")
+	require.EqualError(t, err, "no Deployment elsewhere in Workspace ws; pass the Workspace the Deployment is in with --workspace")
 }
 
 // The base a generated build starts FROM: the manifest's runtime, else the
@@ -503,7 +503,7 @@ func TestDeployManifestImageSaysWhyNoDagsShipped(t *testing.T) {
 		res, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1"}, &warnings))
 		require.NoError(t, err)
 		assert.True(t, res.DagsNotShipped)
-		assert.Equal(t, []string{"no Dags were uploaded: there is no dags directory in " + dir + ", and the Deployment keeps the Dags it had"}, warnings)
+		assert.Equal(t, []string{"no Dags were uploaded: there is no dags directory in " + dir + ""}, warnings)
 	})
 }
 
@@ -521,7 +521,7 @@ func TestDeployManifestImageDagUploadFailureNamesTheRetry(t *testing.T) {
 	var after *DagsAfterImageError
 	require.ErrorAs(t, err, &after)
 	assert.Equal(t, "registry.example.com/my-release/airflow:deploy-7", after.Image)
-	assert.Contains(t, err.Error(), "the image registry.example.com/my-release/airflow:deploy-7 was pushed to Deployment dep")
+	assert.Contains(t, err.Error(), "pushed the image registry.example.com/my-release/airflow:deploy-7 to Deployment dep")
 	assert.Contains(t, err.Error(), "run astro deploy dep --dags")
 }
 

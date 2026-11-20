@@ -159,7 +159,7 @@ func showFirstRunNotice() {
 	}
 	fmt.Fprintln(os.Stderr,
 		"The Astro CLI collects usage data to help us prioritize and invest in CLI features.\n"+
-			"Command and flag names, OS, and CLI version are tracked — never argument or flag values.\n"+
+			"Command and flag names, OS, and CLI version are tracked. Argument and flag values are not.\n"+
 			"While you are logged in, events are linked to your Astro organization.\n"+
 			"Opt out anytime: astro telemetry disable or ASTRO_TELEMETRY_DISABLED=1")
 	_ = config.CFG.TelemetryNoticeShown.SetHomeString(noticeVersion) //nolint:errcheck // best-effort telemetry write
@@ -378,7 +378,7 @@ func spawnTelemetrySender(payload sharedtel.TelemetryPayload, apiURL, token stri
 
 	if err := cmd.Start(); err != nil {
 		if isDebugMode() {
-			fmt.Fprintf(os.Stderr, "[telemetry] failed to spawn sender: %v\n", err)
+			fmt.Fprintf(os.Stderr, "[telemetry] could not start the sender: %v\n", err)
 		}
 		return
 	}

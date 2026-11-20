@@ -22,24 +22,24 @@ import (
 )
 
 var (
-	ErrKubernetesNamespaceNotAvailable = errors.New("no kubernetes namespaces are available")
+	ErrKubernetesNamespaceNotAvailable = errors.New("no Kubernetes namespaces are available")
 	ErrNumberOutOfRange                = errors.New("number is out of available range")
-	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. To upgrade to Airflow 2.0, upgrade to %s first and make sure your Dags and configs are 2.0 compatible", minAirflowVersion)
-	ErrKubernetesNamespaceNotSpecified = errors.New("no kubernetes namespaces specified")
-	errInvalidSSHKeyPath               = errors.New("wrong path specified, no file exists for ssh key")
-	errInvalidKnownHostsPath           = errors.New("wrong path specified, no file exists for known hosts")
-	errHostNotPresent                  = errors.New("git repository host not present in known hosts file")
+	ErrMajorAirflowVersionUpgrade      = fmt.Errorf("Airflow 2.0 has breaking changes. Upgrade to %s first and make sure your Dags and configs are 2.0 compatible", minAirflowVersion)
+	ErrKubernetesNamespaceNotSpecified = errors.New("no Kubernetes namespaces specified")
+	errInvalidSSHKeyPath               = errors.New("no file exists at the SSH key path")
+	errInvalidKnownHostsPath           = errors.New("no file exists at the known hosts path")
+	errHostNotPresent                  = errors.New("the Git repository host is not in the known hosts file")
 
 	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
 
 	errInvalidAirflowVersionSelection = errors.New("invalid Airflow version selection")
 	errInvalidRuntimeVersionSelection = errors.New("invalid Runtime version selection")
 
-	errDeploymentNotOnRuntime     = errors.New("deployment is not using Runtime image, please migrate to Runtime image via astro deployment runtime migrate before trying to upgrade Runtime version")
-	errDeploymentNotOnAirflow     = errors.New("deployment is not using Airflow image, please make sure deployment is using Airflow image before trying to upgrade Airflow version")
-	errDeploymentAlreadyOnRuntime = errors.New("deployment is already using runtime image")
-	errRuntimeUpdateFailed        = errors.New("failed to update the deployment runtime version")
-	errInvalidAirflowVersion      = errors.New("invalid Airflow version to migrate the deployment to Runtime, please upgrade the deployment to 2.2.4 Airflow version before trying to migrate to Runtime image")
+	errDeploymentNotOnRuntime     = errors.New("this Deployment is not using a Runtime image; run astro deployment runtime migrate before upgrading the Runtime version")
+	errDeploymentNotOnAirflow     = errors.New("this Deployment is not using an Airflow image; use an Airflow image before upgrading the Airflow version")
+	errDeploymentAlreadyOnRuntime = errors.New("this Deployment is already using a Runtime image")
+	errRuntimeUpdateFailed        = errors.New("could not update the Deployment's Runtime version")
+	errInvalidAirflowVersion      = errors.New("invalid Airflow version to migrate to Runtime; upgrade the Deployment to Airflow 2.2.4 first")
 )
 
 const (
@@ -63,8 +63,8 @@ type ErrInvalidAirflowVersion struct {
 }
 
 func (e ErrInvalidAirflowVersion) Error() string {
-	return fmt.Sprintf("You tried to set --desired-airflow-version to %s, but this Airflow Deployment "+
-		"is already running %s. Please indicate a higher version of Airflow and try again.", e.desiredVersion, e.currentVersion)
+	return fmt.Sprintf("--desired-airflow-version %s is not higher than the version this Deployment runs (%s); "+
+		"pass a higher Airflow version", e.desiredVersion, e.currentVersion)
 }
 
 type ErrInvalidRuntimeVersion struct {
@@ -75,8 +75,8 @@ type ErrInvalidRuntimeVersion struct {
 }
 
 func (e ErrInvalidRuntimeVersion) Error() string {
-	return fmt.Sprintf("You tried to set --desired-runtime-version to %s, but this Runtime Deployment "+
-		"is already running %s. Please indicate a higher version of Runtime and try again.", e.desiredVersion, e.currentVersion)
+	return fmt.Sprintf("--desired-runtime-version %s is not higher than the version this Deployment runs (%s); "+
+		"pass a higher Runtime version", e.desiredVersion, e.currentVersion)
 }
 
 func addTriggererReplicasArg(vars map[string]interface{}, appConfig *houston.AppConfig, triggererReplicas int) {
@@ -793,7 +793,7 @@ func readKnownHostsFile(filePath, repoHost string) (string, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("error reading known hosts file: %w", err)
+		return "", fmt.Errorf("could not read the known hosts file: %w", err)
 	}
 
 	return "", errHostNotPresent
@@ -828,7 +828,7 @@ var SelectDeployment = func(deployments []houston.Deployment, message string) (h
 	}
 
 	if len(deployments) == 1 {
-		fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
+		fmt.Println("Only one Deployment found. Using it by default:\n" +
 			fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label)) +
 			fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].ID)))
 
@@ -842,7 +842,7 @@ var SelectDeployment = func(deployments []houston.Deployment, message string) (h
 	list := picker.List{
 		Title:   message,
 		Header:  []string{"DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID"},
-		Ask:     []input.Option{input.About("a deployment")},
+		Ask:     []input.Option{input.About("a Deployment")},
 		Invalid: ErrInvalidDeploymentKey,
 	}
 	for i := range deployments {

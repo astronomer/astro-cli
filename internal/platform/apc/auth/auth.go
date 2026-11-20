@@ -20,19 +20,19 @@ import (
 )
 
 const (
-	houstonOAuthRedirect     = "Please visit the following URL, authenticate and paste token in next prompt\n"
+	houstonOAuthRedirect     = "Open this URL, authenticate, and paste the token at the next prompt\n"
 	inputOAuthToken          = "oAuth Token: " //nolint:gosec // false positive
 	inputUsername            = "Username (leave blank for oAuth): "
 	inputPassword            = "Password: "
-	cliChooseWorkspace       = "Please choose a workspace:"
-	cliSetWorkspaceExample   = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
-	houstonBasicAuthDisabled = "Basic authentication is disabled, conact administrator or defer back to oAuth"
+	cliChooseWorkspace       = "Choose a Workspace:"
+	cliSetWorkspaceExample   = "\nNo default Workspace set. List Workspaces with\n\tastro workspace list\nand set the default with\n\tastro workspace switch [WORKSPACEID]\n\n"
+	houstonBasicAuthDisabled = "Basic authentication is disabled. Contact your administrator or log in with OAuth"
 
-	configSetDefaultWorkspace = "\n\"%s\" Workspace found. This is your default Workspace.\n"
+	configSetDefaultWorkspace = "\nDefault Workspace is %q\n"
 
-	registryAuthSuccessMsg      = "\nSuccessfully authenticated to %s\n"
-	defaultRegistryLoginFailMsg = "\nNot able to login to the private registry, please use docker login %s to manually login to the registry\n"
-	registryAuthFailMsg         = "\nFailed to authenticate to the registry. Do you have Docker running?\nYou will not be able to push new images to your Airflow Deployment unless Docker is running.\nIf Docker is running and you are seeing this message, the registry is down or cannot be reached.\n"
+	registryAuthSuccessMsg      = "\nAuthenticated to %s\n"
+	defaultRegistryLoginFailMsg = "\nCould not log in to the private registry. Run docker login %s to log in manually\n"
+	registryAuthFailMsg         = "\nCould not authenticate to the registry. Is Docker running?\nYou cannot push images to your Airflow Deployment unless Docker is running.\nIf Docker is running, the registry is down or unreachable.\n"
 
 	localhostDomain      = "localhost"
 	houstonDomain        = "houston"
@@ -42,7 +42,7 @@ const (
 )
 
 var (
-	errOAuthDisabled = errors.New("cannot authenticate, oauth is disabled")
+	errOAuthDisabled = errors.New("cannot authenticate: OAuth is disabled")
 	errEmptyToken    = errors.New("--token-login was given no token")
 	errNoToken       = errors.New("cannot authenticate: the login returned no token")
 
@@ -75,7 +75,7 @@ func basicAuth(username, password string, ctx *config.Context, client houston.Cl
 		if input.IsRequired(err) {
 			// No flag takes this password, so say where it can come from
 			// rather than naming one.
-			return "", input.Required(errors.New("this login needs a password typed at a terminal, and this run cannot ask for one: log in with the browser (astro login) instead"))
+			return "", input.Required(errors.New("this login needs a password typed at a terminal and this run cannot ask for one; run astro login to log in with the browser"))
 		}
 		if input.Unanswered(err) {
 			return "", err
@@ -306,16 +306,16 @@ func switchWorkspace(pageSize int, houstonVersion string, client houston.ClientI
 func Logout(domain string) error {
 	c, err := context.GetContext(domain)
 	if err != nil {
-		return fmt.Errorf("failed to find a login for %s: %w", domain, err)
+		return fmt.Errorf("could not find a login for %s: %w", domain, err)
 	}
 
 	if err := c.SignOut(); err != nil {
-		return fmt.Errorf("failed to clear the credentials for %s: %w", domain, err)
+		return fmt.Errorf("could not clear the credentials for %s: %w", domain, err)
 	}
 
 	// Logging out of another domain leaves the current one selected
 	if err := config.ResetCurrentContextFor(domain); err != nil {
-		return fmt.Errorf("failed to reset the current context: %w", err)
+		return fmt.Errorf("could not reset the current context: %w", err)
 	}
 	return nil
 }
@@ -396,7 +396,7 @@ func getAuthToken(username, password string, authConfig *houston.AuthConfig, ctx
 		if authConfig.LocalEnabled {
 			token, err = basicAuth(username, password, ctx, client)
 			if err != nil {
-				return "", fmt.Errorf("local auth login failed: %w", err)
+				return "", fmt.Errorf("local login failed: %w", err)
 			}
 		} else {
 			fmt.Fprintln(os.Stderr, houstonBasicAuthDisabled)

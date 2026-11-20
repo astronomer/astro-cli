@@ -409,7 +409,7 @@ func (e *startInterrupted) Unwrap() error { return e.err }
 // answers as soon as Airflow finishes its own startup.
 func leftRunning(port int) string {
 	return fmt.Sprintf(
-		"Airflow is still starting on port %d — astro local status shows it, astro local stop ends it",
+		"Airflow is still starting on port %d; astro local status shows it, astro local stop ends it",
 		port)
 }
 
@@ -1004,7 +1004,7 @@ func (a *airflow) Shell(ctx context.Context, s rt.Stdio) error {
 func uvCacheDir(opts UVOptions) (string, error) {
 	if opts.CacheDir != "" {
 		if !filepath.IsAbs(opts.CacheDir) {
-			return "", fmt.Errorf("the uv cache directory %q is relative; uv runs from the project directory, so it has to be absolute", opts.CacheDir)
+			return "", fmt.Errorf("the uv cache directory %q is relative; use an absolute path", opts.CacheDir)
 		}
 		return opts.CacheDir, nil
 	}

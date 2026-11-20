@@ -97,8 +97,8 @@ func TestADeclaredOrganizationsRefusalNamesIt(t *testing.T) {
 			mc := orgClient(errResp(status, "nope"), &asked)
 			p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain, Organization: "clother"}, clientsOf(mc), true)
 			cause := p.(envresolve.Diagnoser).Diagnose("X")
-			require.Contains(t, cause, "organization clother")
-			require.Contains(t, cause, "workspace "+testWorkspace)
+			require.Contains(t, cause, "Organization clother")
+			require.Contains(t, cause, "Workspace "+testWorkspace)
 			require.Contains(t, cause, "astro organization list")
 			short, _ := envresolve.Outage(p)
 			require.Equal(t, "no access to organization", short)
@@ -108,7 +108,7 @@ func TestADeclaredOrganizationsRefusalNamesIt(t *testing.T) {
 			p = NewProvider(Workspace{ID: testWorkspace, Domain: testDomain}, clientsOf(mc), true)
 			cause = p.(envresolve.Diagnoser).Diagnose("X")
 			require.NotContains(t, cause, "astro organization list")
-			require.Contains(t, cause, "current organization")
+			require.Contains(t, cause, "current Organization")
 		})
 	}
 }
@@ -127,5 +127,5 @@ func TestSecretsRefusalNamesTheDeclaredOrganization(t *testing.T) {
 	p := NewProvider(Workspace{ID: testWorkspace, Domain: testDomain, Organization: "clother"}, clientsOf(mc), true)
 	_, ok := p.Lookup("SECRET_TOKEN")
 	require.False(t, ok)
-	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "organization clother disables Environment Secrets Fetching")
+	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("SECRET_TOKEN"), "Organization clother disables Environment Secrets Fetching")
 }

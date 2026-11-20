@@ -109,7 +109,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   # Or by name, in the project's workspace (else the context's)
   astro api airflow -d etl-prod /dags
 
-  # Generate curl command instead of executing
+  # Print a curl command instead of sending the request
   astro api airflow -d prod /dags --generate
 
   # List the endpoints of a specific Airflow version (no target needed)
@@ -136,7 +136,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, else an Astro Deployment id or name")
 	utils.RefuseEmpty(cmd.PersistentFlags().Lookup("deployment"))
 	cmd.PersistentFlags().StringVar(&opts.URL, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
-	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override organization ID for deployment lookup")
+	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override Organization ID for Deployment lookup")
 	// 1.x declared --workspace-id (-W) and never read it: -d is looked up in
 	// the project's or the context's workspace. It stays, hidden and read by
 	// nothing, so a 1.x script passing it keeps working.
@@ -146,24 +146,24 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 	cmd.PersistentFlags().StringVar(&opts.AirflowVersion, "airflow-version", "", "Override Airflow version for API spec (auto-detected by default)")
 
 	// Request flags
-	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "The HTTP method for the request")
+	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "HTTP method for the request")
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a typed parameter in key=value format")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in key=value format")
-	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in key:value format")
-	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The file to use as body for the HTTP request (use \"-\" for stdin)")
+	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add an HTTP request header in key:value format")
+	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "File to use as the request body (use \"-\" for stdin)")
 	cmd.Flags().StringArrayVarP(&opts.PathParams, "path-param", "p", nil, "Path parameter in key=value format (for use with operation IDs)")
 
 	// Output flags
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
-	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
-	cmd.Flags().BoolVar(&opts.Slurp, "slurp", false, "Use with --paginate to return an array of all pages")
+	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Request every page of results")
+	cmd.Flags().BoolVar(&opts.Slurp, "slurp", false, "With --paginate, return one array of all pages")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template")
-	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
+	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Select values from the response with a jq query")
 	cmd.Flags().BoolVar(&opts.Verbose, "verbose", false, "Include full HTTP request and response in the output")
 
 	// Other flags
-	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Output a curl command instead of executing the request")
+	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Print a curl command instead of sending the request")
 
 	// Add list and describe subcommands
 	// Note: These need to create their own spec cache since version is determined at runtime
@@ -228,7 +228,7 @@ func runAirflow(opts *AirflowOptions) error {
 
 	// Check for any remaining unfilled path parameters
 	if missing := findMissingPathParams(requestPath); len(missing) > 0 {
-		return fmt.Errorf("missing path parameter(s): %s. Use -p/--path-param to provide them (e.g., -p %s=value)",
+		return fmt.Errorf("missing path parameter(s): %s; pass them with -p/--path-param, for example -p %s=value",
 			strings.Join(missing, ", "), missing[0])
 	}
 
@@ -328,12 +328,12 @@ func airflowConnectionError(requestURL string) error {
 	host := airflowHostRoot(requestURL)
 	if isLocalhostURL(host) {
 		return fmt.Errorf("could not connect to Airflow at %s\n\n"+
-			"Is Airflow running? For this project's local Airflow, try one of:\n"+
+			"For this project's local Airflow, try one of:\n"+
 			"  astro local start            Start it\n"+
 			"  astro local api <endpoint>   Reach it on whatever port it runs on", host)
 	}
 	return fmt.Errorf("could not connect to Airflow at %s\n\n"+
-		"Check that the URL is correct and the server is running", host)
+		"Check the URL and that the server is running", host)
 }
 
 // apiPrefixForVersion returns "/api/v1" for Airflow 2.x, "/api/v2" for 3.x+.
@@ -403,7 +403,7 @@ func initAirflowSpecCache(ctx stdctx.Context, opts *AirflowOptions, target *airf
 			// A deployment resolves through a control plane that says it
 			// exists, so failing to read its version is a failure rather than a
 			// fallback.
-			return "", fmt.Errorf("could not detect Airflow version from %s: %w. Use --airflow-version to specify manually", target.name, err)
+			return "", fmt.Errorf("could not detect Airflow version from %s: %w; use --airflow-version to set it", target.name, err)
 		default:
 			// A bare --url may simply not be running. Warn and fall back —
 			// except on a connection failure, which the request itself is
@@ -506,7 +506,7 @@ You can optionally provide a filter to search for specific endpoints, as an argu
 
 	cmd.Flags().StringVar(&filterFlag, "filter", "", "Only list endpoints matching this, the same as the positional filter")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
-	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")
 	cliout.AddOutputFlag(cmd, &format)
 
 	return cmd
@@ -548,7 +548,7 @@ It is the document ls and describe work from: the published specification for th
 			return err
 		},
 	}
-	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")
 	return cmd
 }
 
@@ -598,7 +598,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 	}
 
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
-	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
+	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
 	cliout.AddOutputFlag(cmd, &format)
 

@@ -17,13 +17,13 @@ import (
 )
 
 var (
-	ErrInvalidRole             = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
-	ErrInvalidWorkspaceRole    = errors.New("requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER ")
-	ErrInvalidOrganizationRole = errors.New("requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
-	ErrInvalidEmail            = errors.New("no email provided for the invite. Retry with a valid email address")
-	ErrInvalidUserKey          = errors.New("invalid User selected")
+	ErrInvalidRole             = errors.New("invalid role; use ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, or ORGANIZATION_OWNER")
+	ErrInvalidWorkspaceRole    = errors.New("invalid role; use WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR, or WORKSPACE_OWNER")
+	ErrInvalidOrganizationRole = errors.New("invalid role; use ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, or ORGANIZATION_OWNER")
+	ErrInvalidEmail            = errors.New("no email address provided for the invite")
+	ErrInvalidUserKey          = errors.New("invalid user selected")
 	userPaginationLimit        = 100
-	ErrUserNotFound            = errors.New("no user was found for the email you provided")
+	ErrUserNotFound            = errors.New("no user found with that email")
 )
 
 // roleEntityDeployment is the roleEntity that names a user's role on a
@@ -189,7 +189,7 @@ func SelectUser(users []astrov1.User, roleEntity, scopeID string) (astrov1.User,
 	}
 
 	list := picker.List{
-		Title:   "\nPlease select the user:",
+		Title:   "\nSelect the user:",
 		Header:  []string{"FULLNAME", "EMAIL", "ID", roleColumn, "CREATE DATE"},
 		Ask:     []input.Option{input.About("a user")},
 		Invalid: ErrInvalidUserKey,

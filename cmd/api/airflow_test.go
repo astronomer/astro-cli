@@ -332,7 +332,7 @@ func TestErrNoTarget_OutsideAProject(t *testing.T) {
 	t.Cleanup(func() { config.WorkingPath = orig })
 
 	msg := errNoTarget("get_dags").Error()
-	assert.Contains(t, msg, "a deployment this project links, or an Astro Deployment id")
+	assert.Contains(t, msg, "a Deployment this project links, or an Astro Deployment ID")
 	assert.Contains(t, msg, "astro local api <endpoint>", "an operation id is not a path astro local api can take")
 }
 
@@ -834,7 +834,7 @@ func TestAirflowConnectionError_RemoteHost(t *testing.T) {
 	assert.Contains(t, err.Error(), "could not connect to Airflow")
 	assert.Contains(t, err.Error(), "airflow.example.com")
 	assert.NotContains(t, err.Error(), "astro local start")
-	assert.Contains(t, err.Error(), "Check that the URL is correct")
+	assert.Contains(t, err.Error(), "Check the URL")
 }
 
 // --- runAirflow connection error handling ------------------------------------

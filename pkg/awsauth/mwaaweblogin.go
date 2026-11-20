@@ -155,7 +155,7 @@ func (s *webSession) exchange(ctx context.Context, baseURL, token string) error 
 		return err
 	}
 	if len(s.client.Jar.Cookies(apiURL)) == 0 {
-		return fmt.Errorf("%s accepted the web login token but its session cookie does not reach the Airflow API — it may be scoped to %s",
+		return fmt.Errorf("%s accepted the web login token but its session cookie does not reach the Airflow API; the cookie may be scoped to %s",
 			loginURL, mwaaLoginPath)
 	}
 	return nil

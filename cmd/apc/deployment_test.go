@@ -109,8 +109,8 @@ func (s *Suite) TestDeploymentCreateCommandNfsMountDisabled() {
 	}{
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: "unknown flag: --dag-deployment-type"},
 		// test default executor is celery if --executor flag is not provided
-		{cmdArgs: []string{"create", "--label=new-deployment-name"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -138,7 +138,7 @@ func (s *Suite) TestDeploymentCreateCommandTriggererDisabled() {
 		expectedError  string
 	}{
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}, expectedOutput: "", expectedError: "unknown flag: --triggerer-replicas"},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -169,7 +169,7 @@ func (s *Suite) TestDeploymentCreateCommandTriggererEnabled() {
 		expectedOutput string
 		expectedError  string
 	}{
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -201,8 +201,8 @@ func (s *Suite) TestDeploymentCreateCommandNfsMountEnabled() {
 		expectedOutput string
 		expectedError  string
 	}{
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
@@ -234,11 +234,11 @@ func (s *Suite) TestDeploymentCreateCommandGitSyncEnabled() {
 		expectedOutput string
 		expectedError  string
 	}{
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=local", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "Successfully created deployment with Local executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:bote795/private-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=local", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "Created Deployment with Local executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:bote795/private-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
@@ -270,7 +270,7 @@ func (s *Suite) TestDeploymentCreateCommandDagOnlyDeployEnabled() {
 		expectedOutput string
 		expectedError  string
 	}{
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--yes"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--yes"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy", "--yes"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
@@ -301,7 +301,7 @@ func (s *Suite) TestDeploymentCreateCommandGitSyncDisabled() {
 		expectedError  string
 	}{
 		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "", expectedError: "unknown flag: --dag-deployment-type"},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery"}, expectedOutput: "Created Deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -353,7 +353,7 @@ func (s *Suite) TestDeploymentCreateCommandAppConfigLookupFails() {
 
 	houstonClient = api
 	_, err := execDeploymentCmd("create", "--label=new-deployment-name", "--executor=celery", "--cluster-id=cluster-test-id")
-	s.EqualError(err, "failed to get app config: "+errMockHouston.Error())
+	s.EqualError(err, "could not get the platform config: "+errMockHouston.Error())
 	api.AssertNotCalled(s.T(), "CreateDeployment", mock.Anything)
 }
 
@@ -384,7 +384,7 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--triggerer-replicas=1"}
-		expectedOutput := "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs"
+		expectedOutput := "Created Deployment with Celery executor. Deployment can be accessed at the following URLs"
 		houstonClient = api
 		output, err := execDeploymentCmd(cmdArgs...)
 		s.NoError(err)
@@ -405,7 +405,7 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1", "--yes"}
-		expectedOutput := "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs"
+		expectedOutput := "Created Deployment with Celery executor. Deployment can be accessed at the following URLs"
 		houstonClient = api
 		output, err := execDeploymentCmd(cmdArgs...)
 		s.NoError(err)
@@ -486,7 +486,7 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		houstonClient = api
 		output, err := execDeploymentCmd(cmdArgs...)
 		s.NoError(err)
-		s.Contains(output, "Successfully updated deployment")
+		s.Contains(output, "Updated Deployment")
 	})
 
 	s.Run("GetDeployment throws an error", func() {
@@ -505,7 +505,7 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		cmdArgs := []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy"}
 		houstonClient = api
 		_, err := execDeploymentCmd(cmdArgs...)
-		s.EqualError(err, "failed to get deployment info: "+getDeploymentError.Error())
+		s.EqualError(err, "could not get Deployment info: "+getDeploymentError.Error())
 	})
 
 	s.Run("user should not be prompted if new deployment type is dag_deploy and current deployment type is also dag_deploy", func() {
@@ -530,7 +530,7 @@ func (s *Suite) TestDeploymentUpdateWithTypeDagDeploy() {
 		houstonClient = api
 		output, err := execDeploymentCmd(cmdArgs...)
 		s.NoError(err)
-		s.Contains(output, "Successfully updated deployment")
+		s.Contains(output, "Updated Deployment")
 	})
 
 	s.Run("user should be prompted if new deployment type is dag_deploy and current deployment type is not dag_deploy. User rejects.", func() {
@@ -707,15 +707,15 @@ func (s *Suite) TestDeploymentUpdateCommand() {
 		expectedOutput string
 		expectedError  string
 	}{
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:bote795/private-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Updated Deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "Updated Deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "Updated Deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:bote795/private-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Updated Deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Updated Deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=git@github.com:neel-astro/private-airflow-dags-test.git", "--ssh-key=./testfiles/ssh_key", "--known-hosts=./testfiles/known_hosts"}, expectedOutput: "Updated Deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=wrong", "--nfs-location=test:/test"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--executor=local"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--cloud-role=arn:aws:iam::1234567890:role/test_role4c2301381e"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--executor=local"}, expectedOutput: "Updated Deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--cloud-role=arn:aws:iam::1234567890:role/test_role4c2301381e"}, expectedOutput: "Updated Deployment", expectedError: ""},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -751,8 +751,8 @@ func (s *Suite) TestDeploymentUpdateTriggererEnabledCommand() {
 		expectedOutput string
 		expectedError  string
 	}{
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--triggerer-replicas=1"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--triggerer-replicas=1"}, expectedOutput: "Updated Deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222"}, expectedOutput: "Updated Deployment", expectedError: ""},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -791,7 +791,7 @@ func (s *Suite) TestDeploymentUpdateCommandGitSyncDisabled() {
 		expectedOutput string
 		expectedError  string
 	}{
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=volume", "--nfs-location=test:/test"}, expectedOutput: "Updated Deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=git_sync", "--git-repository-url=https://github.com/bote795/public-ariflow-dags-test.git", "--dag-directory-path=dagscopy/", "--git-branch-name=main", "--sync-interval=200"}, expectedOutput: "", expectedError: "unknown flag: --git-repository-url"},
 	}
 	for _, tt := range myTests {
@@ -829,7 +829,7 @@ func (s *Suite) TestDeploymentUpdateCommandDagOnlyDeployEnabled() {
 		expectedOutput string
 		expectedError  string
 	}{
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy", "--yes"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy", "--yes"}, expectedOutput: "Updated Deployment", expectedError: ""},
 		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=invalid", "--yes"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
@@ -845,7 +845,7 @@ func (s *Suite) TestDeploymentUpdateCommandDagOnlyDeployEnabled() {
 }
 
 func (s *Suite) TestDeploymentAirflowUpgradeCommand() {
-	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to APC.`
+	expectedOut := `The upgrade from Airflow 1.10.5 to 1.10.10 started. To finish, add an Airflow 1.10.10 image to your Dockerfile and deploy to APC.`
 
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = "1.10.5"
@@ -873,7 +873,7 @@ func (s *Suite) TestDeploymentAirflowUpgradeCommand() {
 }
 
 func (s *Suite) TestDeploymentAirflowUpgradeCancelCommand() {
-	expectedOut := `Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.`
+	expectedOut := `Canceled the Airflow upgrade. Your Deployment was not interrupted and is still running Airflow 1.10.5.`
 
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = "1.10.5"
@@ -904,7 +904,7 @@ func (s *Suite) TestDeploymentAirflowUpgradeCancelCommand() {
 }
 
 func (s *Suite) TestDeploymentDelete() {
-	expectedOut := `Successfully deleted deployment`
+	expectedOut := `Deleted Deployment`
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
@@ -930,7 +930,7 @@ func (s *Suite) TestDeploymentDelete() {
 }
 
 func (s *Suite) TestDeploymentAdopt() {
-	expectedOut := `Successfully adopted deployment`
+	expectedOut := `Adopted Deployment`
 	mockAdoptedDeployment := &houston.Deployment{
 		ID:          "cknz133ra49758zr9w34b87ua",
 		Label:       "prod-airflow-4",
@@ -1023,7 +1023,7 @@ func (s *Suite) TestDeploymentAdopt() {
 }
 
 func (s *Suite) TestDeploymentUnadopt() {
-	expectedOut := `Successfully unadopted deployment`
+	expectedOut := `Unadopted Deployment`
 	mockUnadoptedDeployment := &houston.Deployment{
 		ID:          mockDeployment.ID,
 		Label:       mockDeployment.Label,
@@ -1131,7 +1131,7 @@ func (s *Suite) TestDeploymentDeleteHardResponseNo() {
 }
 
 func (s *Suite) TestDeploymentDeleteHardResponseYes() {
-	expectedOut := `Successfully deleted deployment`
+	expectedOut := `Deleted Deployment`
 	appConfig = &houston.AppConfig{
 		HardDeleteDeployment: true,
 		Flags: houston.FeatureFlags{
@@ -1168,7 +1168,7 @@ func (s *Suite) TestDeploymentRuntimeUpgradeCommand() {
 		},
 	}
 
-	expectedOut := `The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to APC.`
+	expectedOut := `The upgrade from Runtime 4.2.4 to 4.2.5 started. To finish, add a Runtime 4.2.5 image to your Dockerfile and deploy to APC.`
 
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = ""
@@ -1204,7 +1204,7 @@ func (s *Suite) TestDeploymentRuntimeUpgradeCancelCommand() {
 		},
 	}
 
-	expectedOut := `Runtime upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Runtime 4.2.4.`
+	expectedOut := `Canceled the Runtime upgrade. Your Deployment was not interrupted and is still running Runtime 4.2.4.`
 
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = ""
@@ -1243,7 +1243,7 @@ func (s *Suite) TestDeploymentRuntimeMigrateCommand() {
 		},
 	}
 
-	expectedOut := `The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to APC.`
+	expectedOut := `The migration from Airflow 2.2.4 image to Runtime 4.2.4 started. To finish, add a Runtime 4.2.4 image to your Dockerfile and deploy to APC.`
 
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = "2.2.4"
@@ -1282,7 +1282,7 @@ func (s *Suite) TestDeploymentRuntimeMigrateCommandFor1_0_0() {
 		},
 	}
 
-	expectedOut := `The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to APC.`
+	expectedOut := `The migration from Airflow 2.2.4 image to Runtime 4.2.4 started. To finish, add a Runtime 4.2.4 image to your Dockerfile and deploy to APC.`
 
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = "2.2.4"
@@ -1322,7 +1322,7 @@ func (s *Suite) TestDeploymentRuntimeMigrateCancelCommand() {
 		},
 	}
 
-	expectedOut := `Runtime migrate process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 2.2.4.`
+	expectedOut := `Canceled the Runtime migration. Your Deployment was not interrupted and is still running Airflow 2.2.4.`
 
 	mockDeploymentResponse := *mockDeployment
 	mockDeploymentResponse.AirflowVersion = "2.2.4"
