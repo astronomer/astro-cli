@@ -335,6 +335,22 @@ func backLinked(gitdir, dotGit string) bool {
 	return err == nil && got == want
 }
 
+// adminDirOf reports whether gitdir is one of commonDir's worktree admin
+// directories: git keeps every one at <commondir>/worktrees/<name>, and a
+// gitdir anywhere else names a commondir that is not its own. Without it, an
+// admin directory written by hand, back-link and all, could name another
+// repository's .git as its commondir, and the checkout would take that
+// repository's main worktree as its home. Both sides are canonicalized
+// before comparing.
+func adminDirOf(commonDir, gitdir string) bool {
+	worktrees, err := CanonicalPath(filepath.Join(commonDir, "worktrees"))
+	if err != nil {
+		return false
+	}
+	admin, err := CanonicalPath(gitdir)
+	return err == nil && filepath.Dir(admin) == worktrees
+}
+
 // mainWorktreeRoot is the canonical root of the main worktree when top is a
 // linked worktree, and false for anything else.
 func mainWorktreeRoot(top string) (string, bool) {
@@ -378,6 +394,9 @@ func mainWorktreeRoot(top string) (string, bool) {
 		return "", false // a bare repository, or a submodule's worktree: no main checkout to name
 	}
 	if info, err := os.Stat(commonDir); err != nil || !info.IsDir() {
+		return "", false
+	}
+	if !adminDirOf(commonDir, gitdir) {
 		return "", false
 	}
 	main, err := CanonicalPath(filepath.Dir(commonDir))
