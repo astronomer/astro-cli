@@ -155,11 +155,14 @@ func HostnameDiscriminator(projectPath string) string {
 // what it pruned, so consulting that store did not merely answer wrongly, it
 // deleted a live project's route on the way. The count here comes from this
 // store, which carries the record-aware predicate, and costs no second pass.
-func RemoveRoute(s *proxy.Store, hostname string, d rt.ProxyDaemon) error {
+//
+// Only the route projectPath owns goes (proxy.Store.RemoveProjectRoute): the
+// hostname may by now be another project's.
+func RemoveRoute(s *proxy.Store, hostname, projectPath string, d rt.ProxyDaemon) error {
 	if hostname == "" {
 		return nil
 	}
-	remaining, err := s.RemoveRoute(hostname)
+	remaining, err := s.RemoveProjectRoute(hostname, projectPath)
 	if err != nil {
 		return fmt.Errorf("removing proxy route %s: %w", hostname, err)
 	}
