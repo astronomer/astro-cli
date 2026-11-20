@@ -801,7 +801,7 @@ func writeBundleDirectory(src string, dst BundlePath, opts *BundleCopyOptions, w
 	if err != nil {
 		return err
 	}
-	version, err := uploadBundleDirectory(src, files, bundleDirectoryParams(dst.Path, opts.IfExists, opts.ExpectedVersion), b, astroV1Alpha1StreamClient)
+	version, err := uploadBundleDirectory(src, &bundleSyncPlan{added: files}, bundleDirectoryParams(dst.Path, opts.IfExists, opts.ExpectedVersion), b, astroV1Alpha1StreamClient)
 	if err != nil {
 		return err
 	}
@@ -894,12 +894,11 @@ func (b *pipedBody) Close() error {
 	return b.wait()
 }
 
-// uploadBundleDirectory writes files, by slash-separated paths relative to
-// localDir, to a bundle directory as a gzipped tar, and returns the version the
-// write created.
-func uploadBundleDirectory(localDir string, files []string, params *astrov1alpha1.WriteBundleDirectoryParams, b bundleRef, astroV1Alpha1StreamClient astrov1alpha1.ClientInterface) (string, error) {
+// uploadBundleDirectory applies plan from the files under localDir to a bundle
+// directory as a gzipped tar, and returns the version the write created.
+func uploadBundleDirectory(localDir string, plan *bundleSyncPlan, params *astrov1alpha1.WriteBundleDirectoryParams, b bundleRef, astroV1Alpha1StreamClient astrov1alpha1.ClientInterface) (string, error) {
 	pack := func(w io.Writer) error {
-		return packBundleDirectory(w, localDir, files)
+		return packBundleDirectory(w, localDir, plan)
 	}
 	return putBundleDirectory(pack, params, b, astroV1Alpha1StreamClient)
 }
@@ -987,12 +986,20 @@ func findBundleID(bundles []astrov1alpha1.DeploymentBundle, target BundlePath, d
 	return "", errors.New(notFound)
 }
 
-// packBundleDirectory writes to archive a gzipped tar of files, by slash-separated
-// paths relative to localDir.
-func packBundleDirectory(archive io.Writer, localDir string, files []string) error {
+// packBundleDirectory writes to archive a gzipped tar that applies plan, by
+// slash-separated paths relative to localDir: it deletes, then writes the files
+// added and updated. The deletes come first, so a file can take the place of a
+// directory.
+func packBundleDirectory(archive io.Writer, localDir string, plan *bundleSyncPlan) error {
 	gzipWriter := gzip.NewWriter(archive)
 	tarWriter := tar.NewWriter(gzipWriter)
-	for _, relPath := range files {
+	for _, relPath := range plan.deleted {
+		err := tarWriter.WriteHeader(&tar.Header{Name: bundleDeletePrefix + relPath, Mode: 0o644, Typeflag: tar.TypeReg})
+		if err != nil {
+			return err
+		}
+	}
+	for _, relPath := range slices.Concat(plan.added, plan.updated) {
 		file, err := os.Open(filepath.Join(localDir, filepath.FromSlash(relPath)))
 		if err != nil {
 			return errors.Wrapf(err, "failed to read %s", relPath)

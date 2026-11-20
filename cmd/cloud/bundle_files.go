@@ -15,6 +15,8 @@ import (
 var (
 	filesRecursive       bool
 	filesForce           bool
+	filesNoDelete        bool
+	filesDryRun          bool
 	filesFilter          deployment.BundleFilterOptions
 	filesIfExists        string
 	filesVersion         string
@@ -28,12 +30,13 @@ func newBundleFilesRootCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"file"},
 		Hidden:  true,
 		Short:   "Manage the files in file bundles",
-		Long:    "List, read, copy, move and remove the files in file bundles. A path in a bundle is written BUNDLE:PATH, where BUNDLE is the bundle's name or ID, and a trailing slash names a directory. DEPLOYMENT_ID:BUNDLE:PATH names a bundle on another Deployment than --deployment-id. Every write creates a new version of the bundle.\n\nA bundle holds at most 10,000 files of at most 1 MiB each and 100 MiB in all, at paths of at most 192 bytes made of ASCII letters, digits, '/', '.', '_' and '-'. A copy from local files checks them first, and names every file that breaks these limits before sending anything.",
+		Long:    "List, read, copy, sync, move and remove the files in file bundles. A path in a bundle is written BUNDLE:PATH, where BUNDLE is the bundle's name or ID, and a trailing slash names a directory. DEPLOYMENT_ID:BUNDLE:PATH names a bundle on another Deployment than --deployment-id. Every write creates a new version of the bundle.\n\nA bundle holds at most 10,000 files of at most 1 MiB each and 100 MiB in all, at paths of at most 192 bytes made of ASCII letters, digits, '/', '.', '_' and '-'. A copy or sync from local files checks them first, and names every file that breaks these limits before sending anything.",
 	}
 	cmd.AddCommand(
 		newBundleFilesListCmd(out),
 		newBundleFilesCatCmd(out),
 		newBundleFilesCopyCmd(out),
+		newBundleFilesSyncCmd(out),
 		newBundleFilesMoveCmd(out),
 		newBundleFilesRemoveCmd(out),
 	)
@@ -157,6 +160,54 @@ A copy into a bundle creates one new bundle version and prints it.`,
 	cmd.Flags().StringVar(&filesIfExists, "if-exists", "", "What to do when something is already at DST in the bundle: fail, the default; replace it; or, for a directory, merge into it")
 	cmd.Flags().StringVar(&filesVersion, "version", "", "Copy from an earlier version of the SRC bundle instead of its current one")
 	cmd.Flags().StringVar(&filesExpectedVersion, "expected-version", "", "Copy into the DST bundle only if it is still at this version")
+	addBundleFilesFilterFlags(cmd)
+	return cmd
+}
+
+func newBundleFilesSyncCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "sync SRC DST",
+		Short: "Make a local directory and a file bundle directory match",
+		Long: `Make DST match SRC, where one is a local directory and the other a bundle directory, written BUNDLE:PATH or BUNDLE: for the whole bundle. Only the files whose content differs are transferred, and the files only DST holds are deleted unless --no-delete is set. The changes are printed, and --dry-run prints them without making them.
+
+A sync into a bundle creates one new bundle version, and fails if the bundle changes between the sync reading it and writing it. A sync from a bundle asks before it deletes local files, unless -f, and fails if the bundle path holds no files.
+
+A sync skips version control, OS, Python, Node and editor files and .env files, and whatever .gitignore files ignore, and never deletes them. --include, --exclude, --no-default-excludes and --no-gitignore change that. A symbolic link under the local directory that is not skipped fails the sync.`,
+		Example: `  # Upload what changed, deleting the files you removed locally
+  astro bundle files sync ./dags my-files:dags --deployment-id <id>
+
+  # Upload what changed, keeping the files only the bundle holds
+  astro bundle files sync ./dags my-files:dags --no-delete --deployment-id <id>
+
+  # Check what a sync would change, then apply exactly that
+  astro bundle files sync ./dags my-files:dags --dry-run --deployment-id <id>
+  astro bundle files sync ./dags my-files:dags --expected-version <version> --deployment-id <id>
+
+  # Download the whole bundle as it was at an earlier version
+  astro bundle files sync my-files: ./my-files --version <version> --deployment-id <id>`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws, err := coalesceWorkspace()
+			if err != nil {
+				return errors.Wrap(err, "failed to find a valid workspace")
+			}
+			cmd.SilenceUsage = true
+			opts := &deployment.BundleSyncOptions{
+				NoDelete:        filesNoDelete,
+				Force:           filesForce,
+				DryRun:          filesDryRun,
+				Version:         filesVersion,
+				ExpectedVersion: filesExpectedVersion,
+				Filter:          filesFilter,
+			}
+			return deployment.SyncBundleFiles(cmd.Context(), args[0], args[1], opts, ws, deploymentID, out, astroV1Client, astroV1Alpha1Client, astroV1Alpha1StreamClient)
+		},
+	}
+	cmd.Flags().BoolVar(&filesNoDelete, "no-delete", false, "Keep the files only DST holds instead of deleting them")
+	cmd.Flags().BoolVarP(&filesForce, "force", "f", false, "Delete local files without confirmation, in a sync from a bundle")
+	cmd.Flags().BoolVar(&filesDryRun, "dry-run", false, "Print the changes without making them")
+	cmd.Flags().StringVar(&filesVersion, "version", "", "Sync from an earlier version of the bundle instead of its current one")
+	cmd.Flags().StringVar(&filesExpectedVersion, "expected-version", "", "Sync into the bundle only if it is still at this version")
 	addBundleFilesFilterFlags(cmd)
 	return cmd
 }
