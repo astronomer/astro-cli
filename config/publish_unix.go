@@ -19,7 +19,7 @@ import (
 // true.
 var (
 	geteuid   = os.Geteuid
-	chownFile = os.Chown
+	chownFile = func(f *os.File, uid, gid int) error { return f.Chown(uid, gid) }
 	ownerOf   = statOwner
 )
 
@@ -81,7 +81,7 @@ func publishConfig(path string, data []byte, perm iofs.FileMode, existing iofs.F
 	if !ok {
 		return fsatomic.WriteFile(path, data, perm)
 	}
-	err := replaceConfigFile(afero.NewOsFs(), path, data, perm, func(tmp string) error {
+	err := replaceConfigFile(afero.NewOsFs(), path, data, perm, func(tmp afero.File) error {
 		return keepOwner(tmp, want)
 	})
 	if errors.Is(err, errOwnerNotKept) {
@@ -90,9 +90,16 @@ func publishConfig(path string, data []byte, perm iofs.FileMode, existing iofs.F
 	return err
 }
 
-// keepOwner gives tmp the owner want, when it does not have it already.
-func keepOwner(tmp string, want owner) error {
-	info, err := os.Stat(tmp)
+// keepOwner gives the open temp file tmp the owner want, when it does not
+// have it already. It reads the owner and changes it through the handle, never
+// by name (see replaceConfigFile): as root, a chown by a name swapped for a
+// symlink would hand whatever it points at to want.
+func keepOwner(tmp afero.File, want owner) error {
+	f, ok := tmp.(*os.File)
+	if !ok {
+		return errOwnerNotKept
+	}
+	info, err := f.Stat()
 	if err != nil {
 		return err
 	}
@@ -102,7 +109,7 @@ func keepOwner(tmp string, want owner) error {
 	if geteuid() != 0 {
 		return errOwnerNotKept
 	}
-	if err := chownFile(tmp, want.uid, want.gid); err != nil {
+	if err := chownFile(f, want.uid, want.gid); err != nil {
 		return fmt.Errorf("%w: %w", errOwnerNotKept, err)
 	}
 	return nil

@@ -37,8 +37,8 @@ func (s *Suite) asRoot(chownErr error) *[]chownCall {
 	s.T().Cleanup(func() { geteuid, chownFile = origEuid, origChown })
 	calls := &[]chownCall{}
 	geteuid = func() int { return 0 }
-	chownFile = func(name string, uid, gid int) error {
-		*calls = append(*calls, chownCall{name, owner{uid, gid}})
+	chownFile = func(f *os.File, uid, gid int) error {
+		*calls = append(*calls, chownCall{f.Name(), owner{uid, gid}})
 		return chownErr
 	}
 	return calls
@@ -153,4 +153,45 @@ func (s *Suite) TestANonRootSaveOfAnotherUsersConfigWritesInPlace() {
 	s.Require().NoError(saveConfig(v, file))
 	s.Empty(*calls, "only root can give a file away")
 	s.assertSaved(file, before, false)
+}
+
+// keepOwner works on the temp file it was handed, not on its name: a name
+// swapped for a symlink mid-save, as another process able to change the
+// directory could, must not turn root's chown, or the owner it reads, onto
+// what the link points at.
+func (s *Suite) TestKeepOwnerActsOnTheOpenFileNotItsName() {
+	dir := s.T().TempDir()
+	victim := filepath.Join(dir, "victim")
+	s.Require().NoError(os.WriteFile(victim, []byte("x"), 0o644))
+	victimBefore, err := os.Stat(victim)
+	s.Require().NoError(err)
+
+	tmp, err := os.CreateTemp(dir, ".config.yaml.*")
+	s.Require().NoError(err)
+	defer tmp.Close()
+	created, err := tmp.Stat()
+	s.Require().NoError(err)
+	s.Require().NoError(os.Remove(tmp.Name()))
+	s.Require().NoError(os.Symlink(victim, tmp.Name()))
+
+	origEuid, origChown := geteuid, chownFile
+	s.T().Cleanup(func() { geteuid, chownFile = origEuid, origChown })
+	geteuid = func() int { return 0 }
+	var chowned []os.FileInfo
+	chownFile = func(f *os.File, uid, gid int) error {
+		info, err := f.Stat()
+		s.Require().NoError(err)
+		chowned = append(chowned, info)
+		return nil
+	}
+
+	s.Require().NoError(keepOwner(tmp, someoneElse))
+	s.Require().Len(chowned, 1, "the temp file is someone else's to be")
+	s.True(os.SameFile(created, chowned[0]), "the chown went to the file the save created")
+	s.False(os.SameFile(victimBefore, chowned[0]), "the chown followed the swapped-in link")
+
+	victimAfter, err := os.Stat(victim)
+	s.Require().NoError(err)
+	s.Equal(victimBefore.Mode(), victimAfter.Mode())
+	s.Equal(victimBefore.Sys().(*syscall.Stat_t).Uid, victimAfter.Sys().(*syscall.Stat_t).Uid)
 }
