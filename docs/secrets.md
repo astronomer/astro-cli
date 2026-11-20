@@ -124,15 +124,15 @@ Shows every declared name with the source it resolves from, plus `required`, `se
 | `default` | the declaration's default |
 | `absent` | nothing supplies it |
 
-The text table's NOTE column holds one short state per row, or nothing when the row needs no attention. `-o wide` adds REQUIRED, SECRET, NEXT (the command that settles the note) and DESCRIPTION columns:
+The text table's NOTE column holds one short state per row, or nothing when the row needs no attention. `-o wide` adds REQUIRED, SECRET and DESCRIPTION columns and moves NOTE last, where it also gives the commands that settle it (`missing: astro local env variable set API_URL, or astro local env variable undeclare API_URL`):
 
-| note | meaning | NEXT | JSON also offers |
-| --- | --- | --- | --- |
-| `missing` | declared required and nothing supplies it, so a start refuses | `set` | `undeclare` |
-| `no value` | declared optional and nothing supplies it | `set` | `undeclare` |
-| `not declared` | a value in a store that no declaration names | `declare`, or `delete` when there is nothing to declare it in | `delete` |
-| `not linked here` | a global that does not reach this project (`--all` only) | `link` | |
-| `invalid key` | an Airflow Variable key an older build stored, which no longer resolves | `delete` | |
+| note | meaning | commands in `-o wide` |
+| --- | --- | --- |
+| `missing` | declared required and nothing supplies it, so a start refuses | `set`, or `undeclare` |
+| `no value` | declared optional and nothing supplies it | `set`, or `undeclare` |
+| `not declared` | a value in a store that no declaration names | `declare`, or `delete` |
+| `not linked here` | a global that does not reach this project (`--all` only) | `link` |
+| `invalid key` | an Airflow Variable key an older build stored, which no longer resolves (wide gives the rule) | `delete` |
 
 In JSON a row carries the same commands as hint fields: `set_hint` and `undeclare_hint` for a declared name nothing supplies; `declare_hint` and `remove_hint` for a value no declaration names, which is an orphan of its tier (`"orphan": true`). An orphan that reaches this project's Airflow also has `"applied": true`. A global the project's own copy shadows does not. Outside a project nothing is declared, so no row is marked `not declared`.
 

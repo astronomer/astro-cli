@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/tabwriter"
 
@@ -570,7 +571,7 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			"Declaring a name makes every copy of the project require it, and linking limits which " +
 			"projects a global reaches. The NOTE column marks rows that need attention: missing, " +
 			"no value, not declared, not linked here, or invalid key. -o wide adds whether each is " +
-			"required and secret, the command that settles its note, and its description. " +
+			"required and secret, its description, and the commands that settle its note. " +
 			"Values are not shown; use the get command to see one."
 	}
 	cmd := &cobra.Command{
@@ -580,7 +581,7 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		Long:    long,
 		Example: "  # " + short + "\n" +
 			"  " + cmdLine + "\n\n" +
-			"  # With the command that settles each note, and each declaration's description\n" +
+			"  # With each declaration's description, and the commands that settle each note\n" +
 			"  " + cmdLine + " -o wide\n\n" +
 			"  # Also every known project's .env, and globals not linked to this project\n" +
 			"  " + cmdLine + " --all",
@@ -1329,8 +1330,8 @@ const formatWide cliout.Format = "wide"
 // renderEnvList prints the table. only names the kind the rows were narrowed
 // to, or is empty for the cross-kind view; it exists for the empty case.
 // inProject is false outside a project, where nothing is declared, so no row
-// is marked "not declared". wide adds REQUIRED, SECRET, NEXT (the command
-// that settles a row's note) and DESCRIPTION.
+// is marked "not declared". wide adds REQUIRED, SECRET and DESCRIPTION,
+// and the commands that settle each note.
 func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, inProject, wide bool) error {
 	if len(items) == 0 {
 		if only != "" {
@@ -1346,19 +1347,23 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, i
 	// env/conn/var, because that one is a wire contract; this one is a table a
 	// person reads, and printing `var` for an Airflow Variable contradicts the
 	// grammar, where `var` is an alias for a plain environment variable.
+	// wide puts NOTE last, where its commands do not push the short columns
+	// out of view.
 	header := "KIND\tNAME\tSOURCE\tNOTE"
 	if wide {
-		header += "\tREQUIRED\tSECRET\tNEXT\tDESCRIPTION"
+		header = "KIND\tNAME\tSOURCE\tREQUIRED\tSECRET\tDESCRIPTION\tNOTE"
 	}
 	fmt.Fprintln(tw, header)
 	for i := range items {
 		it := &items[i]
-		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, listNote(it, inProject))
+		row := fmt.Sprintf("%s\t%s\t%s\t", localenv.Noun(it.Kind), it.Name, it.Source)
 		if wide {
 			// The description is collapsed to one line: a TOML multi-line
 			// string would otherwise break the row out of the table.
-			row += fmt.Sprintf("\t%s\t%s\t%s\t%s", yesOrBlank(it.Required), yesOrBlank(it.Secret),
-				nextCommand(it, inProject), strings.Join(strings.Fields(it.Description), " "))
+			row += fmt.Sprintf("%s\t%s\t%s\t%s", yesOrBlank(it.Required), yesOrBlank(it.Secret),
+				strings.Join(strings.Fields(it.Description), " "), wideNote(it, inProject))
+		} else {
+			row += listNote(it, inProject)
 		}
 		fmt.Fprintln(tw, row)
 	}
@@ -1395,26 +1400,34 @@ func inProjectSuffix(it *localenv.ListItem) string {
 	return " (in " + it.Project + ")"
 }
 
-// nextCommand is a wide list's NEXT cell: the command that settles the row's
-// note, or nothing. Where a note has two ways out it names the first; the JSON
-// rows carry both as hint fields. An orphan in another project, which only
-// --all reaches, gets none: delete acts on the working directory's project,
-// so ListItem leaves its hints empty rather than name a command that edits
-// the wrong file.
-func nextCommand(it *localenv.ListItem, inProject bool) string {
+// wideNote is a wide list's NOTE cell: the short state, then the commands
+// that settle it, as "missing: <set>, or <undeclare>". An invalid key gives
+// its reason in place of the state. An orphan in another project, which only
+// --all reaches, gets no command: delete acts on the working directory's
+// project, so ListItem leaves its hints empty rather than name a command that
+// edits the wrong file.
+func wideNote(it *localenv.ListItem, inProject bool) string {
+	note := listNote(it, inProject)
+	if note == "" {
+		return ""
+	}
+	var commands []string
 	switch {
 	case it.Invalid != "":
-		return it.RemoveHint
+		note = it.Invalid + inProjectSuffix(it)
+		commands = []string{it.RemoveHint}
 	case it.NotLinkedHere:
-		return it.LinkHint
+		commands = []string{it.LinkHint}
 	case it.SetHint != "":
-		return it.SetHint
-	case it.Orphan && inProject && it.DeclareHint != "":
-		return it.DeclareHint
+		commands = []string{it.SetHint, it.UndeclareHint}
 	case it.Orphan:
-		return it.RemoveHint
+		commands = []string{it.DeclareHint, it.RemoveHint}
 	}
-	return ""
+	commands = slices.DeleteFunc(commands, func(c string) bool { return c == "" })
+	if len(commands) == 0 {
+		return note
+	}
+	return note + ": " + strings.Join(commands, ", or ")
 }
 
 // yesOrBlank is a wide list's REQUIRED or SECRET cell.

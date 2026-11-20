@@ -336,8 +336,9 @@ func TestStartMissingEnvHint(t *testing.T) {
 }
 
 // The NOTE cell is one short state, and the list prints nothing under the
-// table. -o wide adds REQUIRED, SECRET, NEXT and DESCRIPTION. An orphan in
-// another project (which only --all reaches) gets no NEXT command: `astro
+// table. -o wide adds REQUIRED, SECRET and DESCRIPTION, and moves NOTE last
+// with the commands that settle it. An orphan in another project (which only
+// --all reaches) gets no command: `astro
 // local env <noun> delete` acts on the working directory's project, so any
 // command offered for it would edit the wrong file.
 func TestEnvListNotes(t *testing.T) {
@@ -396,14 +397,14 @@ func TestEnvListNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	want = "" +
-		"KIND      NAME        SOURCE          NOTE                               REQUIRED  SECRET  NEXT                                                 DESCRIPTION\n" +
-		"variable  API_URL     absent          missing                            yes       yes     astro local env variable set API_URL                 Where the API lives\n" +
-		"variable  DECLARED    project                                            yes                                                                    \n" +
-		"variable  ELSEWHERE   project         not declared (in /projects/other)                                                                         \n" +
-		"variable  GLOBALONLY  vault (global)  not declared                                         astro local env variable delete GLOBALONLY --global  \n" +
-		"variable  LEFTOVER    project         not declared                                         astro local env variable declare LEFTOVER            \n" +
-		"variable  LOG_LEVEL   absent          no value                                             astro local env variable set LOG_LEVEL               \n" +
-		"variable  TOKEN       absent          not linked here                                      astro local env variable link TOKEN                  \n"
+		"KIND      NAME        SOURCE          REQUIRED  SECRET  DESCRIPTION          NOTE\n" +
+		"variable  API_URL     absent          yes       yes     Where the API lives  missing: astro local env variable set API_URL, or astro local env variable undeclare API_URL\n" +
+		"variable  DECLARED    project         yes                                    \n" +
+		"variable  ELSEWHERE   project                                                not declared (in /projects/other)\n" +
+		"variable  GLOBALONLY  vault (global)                                         not declared: astro local env variable delete GLOBALONLY --global\n" +
+		"variable  LEFTOVER    project                                                not declared: astro local env variable declare LEFTOVER, or astro local env variable delete LEFTOVER --project\n" +
+		"variable  LOG_LEVEL   absent                                                 no value: astro local env variable set LOG_LEVEL, or astro local env variable undeclare LOG_LEVEL\n" +
+		"variable  TOKEN       absent                                                 not linked here: astro local env variable link TOKEN\n"
 	if out.String() != want {
 		t.Errorf("list -o wide =\n%s\nwant\n%s", out.String(), want)
 	}

@@ -281,7 +281,7 @@ func TestListNotesAnUnsuppliedWorkspaceName(t *testing.T) {
 
 	d, out, _ = envDeps(t, dir, "")
 	require.NoError(t, execute(t, d, "local", "env", "list", "-o", "wide"))
-	assert.Regexp(t, `(?m)^variable +API_URL +workspace +no value +astro local env variable set API_URL +$`, out.String())
+	assert.Regexp(t, `(?m)^variable +API_URL +workspace +no value: astro local env variable set API_URL, or astro local env variable undeclare API_URL$`, out.String())
 }
 
 func TestDeleteUndeclareJSON(t *testing.T) {
