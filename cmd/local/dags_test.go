@@ -141,7 +141,7 @@ func TestDagsStatsCountsRunsByState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dags stats -o json: %v", err)
 	}
-	// The standalone af passes Airflow's dagStats response through, so each
+	// Airflow's dagStats response passes through, so each
 	// row's stats are a list of {state, count} in the order Airflow sent them,
 	// not a map keyed by state.
 	var got struct {

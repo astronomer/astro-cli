@@ -74,7 +74,7 @@ type runRow struct {
 }
 
 // runs lists every run on the project's Airflow: one object, the runs under
-// dag_runs, the standalone af's key.
+// dag_runs.
 func (p *project) runs() []runRow {
 	p.t.Helper()
 	var list struct {
