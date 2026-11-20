@@ -119,7 +119,7 @@ type valueStore interface {
 type fileStore struct{ *localenv.Store }
 
 func (f fileStore) ScopeName() localenv.Scope { return f.Scope }
-func (f fileStore) Where() string             { return fmt.Sprintf("%s (%s)", f.Scope, f.Path) }
+func (f fileStore) Where() string             { return f.Path }
 func (f fileStore) DotenvPath() string        { return f.Path }
 
 func (f fileStore) Has(kind localenv.Kind, name string) (bool, error) {
@@ -1234,7 +1234,7 @@ func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 	case res.Remainder == envschema.RemainderSupplied && res.Source == envresolve.SourceDefault:
 		_, err = fmt.Fprintf(w, "%s is still declared in %s and now uses its declared default.\n", res.Name, res.Manifest)
 	case res.Remainder == envschema.RemainderSupplied:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s and now resolves from %s.\n", res.Name, res.Manifest, res.Source)
+		_, err = fmt.Fprintf(w, "%s is still declared in %s and now resolves from the %s.\n", res.Name, res.Manifest, vaultenv.SourceLabel(res.Source))
 	}
 	if err == nil && res.Workspace != "" {
 		_, err = fmt.Fprintf(w, "It may still come from workspace %s, which a delete does not read.\n", res.Workspace)
@@ -1364,12 +1364,8 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, i
 	fmt.Fprintln(tw, header)
 	for _, r := range listOrder(items, inProject) {
 		it, n := r.item, r.status
-		// A value nothing supplies has no source to name, and the STATUS says
-		// so; the JSON row keeps "absent".
-		source := it.Source
-		if source == localenv.SourceAbsent {
-			source = ""
-		}
+		// The store's text label; the JSON row keeps the source as it is.
+		source := vaultenv.SourceLabel(it.Source)
 		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, source, n.state)
 		if wide {
 			// The description is collapsed to one line: a TOML multi-line

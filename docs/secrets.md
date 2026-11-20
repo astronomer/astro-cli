@@ -111,18 +111,20 @@ Prints the value on stdout, the one deliberate reveal. With no scope flag it res
 
 ### `list`
 
-Shows every declared name with the source it resolves from, plus `required`, `secret` and `description`; values are never printed. The sources are:
+Shows every declared name with the source it resolves from, plus `required`, `secret` and `description`; values are never printed. Text names each store for what it is; `--output json` carries the `source` value:
 
-| source | meaning |
-| --- | --- |
-| `project` | the project `.env` |
-| `shell` | an exported variable |
-| `vault` | the project vault |
-| `vault (global)` | the global vault |
-| `workspace (<id>)` | the linked workspace |
-| `workspace (unavailable: <reason>)` | the workspace could not be read |
-| `default` | the declaration's default |
-| `absent` | nothing supplies it (blank in the text table) |
+| text | JSON `source` | meaning |
+| --- | --- | --- |
+| `.env` | `project` | the project `.env` |
+| `shell` | `shell` | an exported variable |
+| `project vault` | `vault` | the project vault |
+| `global vault` | `vault (global)` | the global vault |
+| `cloud vault` | `workspace (<id>)` | the linked workspace's Environment Manager |
+| `cloud vault (unavailable: <reason>)` | `workspace (unavailable: <reason>)` | the workspace could not be read |
+| `default` | `default` | the declaration's default |
+| *(blank)* | `absent` | nothing supplies it |
+
+The `set`, `delete` and `check` messages name stores the same way: `set variable A in project vault`, `deleted variable B from global vault`, and the `.env` by its path.
 
 The text table's STATUS column holds one short state per row, or nothing when the row needs no attention. The declared values come first, those needing attention before the rest, then the values nothing declares; the JSON keeps the listing's order (kind, then name). `-o wide` adds REQUIRED, SECRET and DESCRIPTION columns, and gives an invalid key's rule in its STATUS. On a terminal the commands that settle the statuses follow the table on stderr, as next steps in the table's order (see [Output style](output-style.md#next-steps)):
 

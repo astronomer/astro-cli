@@ -74,7 +74,7 @@ func TestPlainDeleteThatFailsAtTheFileSaysTheVaultCopyWent(t *testing.T) {
 	if err == nil {
 		t.Fatal("want the file failure reported")
 	}
-	if msg := err.Error(); !strings.Contains(msg, "deleted variable TOKEN from vault") || !strings.Contains(msg, "could not be removed") {
+	if msg := err.Error(); !strings.Contains(msg, "deleted variable TOKEN from project vault") || !strings.Contains(msg, "could not be removed") {
 		t.Errorf("the error should say the vault copy was deleted and the plaintext one was not: %v", err)
 	}
 	if n := len(vaultFiles(t)); n != 0 {

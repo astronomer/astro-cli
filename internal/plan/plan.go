@@ -285,7 +285,7 @@ func UndeclaredWarning(values []localenv.UndeclaredValue) string {
 	anyDeclare := slices.ContainsFunc(values, func(v localenv.UndeclaredValue) bool { return v.DeclareHint != "" })
 	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	for _, v := range sortedUndeclared(values) {
-		cells := []string{"  " + undeclaredLabel(v), v.Source}
+		cells := []string{"  " + undeclaredLabel(v), vaultenv.SourceLabel(v.Source)}
 		if anyDeclare {
 			declare := ""
 			if v.DeclareHint != "" {

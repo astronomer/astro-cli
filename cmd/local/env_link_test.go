@@ -323,7 +323,7 @@ func TestEnvListMarksNotLinkedHere(t *testing.T) {
 	}
 
 	out, _ = mustRun(t, dir, "connection", "list", "--all")
-	if !regexp.MustCompile(`(?m)^connection +warehouse +vault \(global\) +not linked to this project$`).MatchString(out) {
+	if !regexp.MustCompile(`(?m)^connection +warehouse +global vault +not linked to this project$`).MatchString(out) {
 		t.Errorf("text list:\n%s", out)
 	}
 	if _, errOut := mustRun(t, dir, "connection", "list", "--all"); !strings.Contains(errOut,

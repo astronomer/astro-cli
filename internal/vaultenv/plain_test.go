@@ -57,17 +57,17 @@ func TestWhereFollowsThePlainWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := (&Writer{label: SourceProject}).Where(); got != "vault" {
-		t.Errorf("project Where = %q, want %q", got, "vault")
+	if got := (&Writer{label: SourceProject}).Where(); got != "project vault" {
+		t.Errorf("project Where = %q, want %q", got, "project vault")
 	}
 	w := &Writer{store: store, scope: secrets.GlobalScope, label: SourceGlobal, dir: dir, Plain: true}
-	if got := w.Where(); got != "vault (global)" {
-		t.Errorf("plain Where before any write = %q, want %q", got, "vault (global)")
+	if got := w.Where(); got != "global vault" {
+		t.Errorf("plain Where before any write = %q, want %q", got, "global vault")
 	}
 	if _, err := w.Set(localenv.KindEnv, "REGION", "us-east-1"); err != nil {
 		t.Fatal(err)
 	}
-	if got := w.Where(); got != "vault (global, unencrypted)" {
-		t.Errorf("plain Where after a set = %q, want %q", got, "vault (global, unencrypted)")
+	if got := w.Where(); got != "global vault (unencrypted)" {
+		t.Errorf("plain Where after a set = %q, want %q", got, "global vault (unencrypted)")
 	}
 }

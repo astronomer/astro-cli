@@ -48,7 +48,7 @@ func TestDeleteOfAnOptionalDeclaredNameSaysItIsAbsent(t *testing.T) {
 
 	out := deleteText(t, dir, "variable", "delete", "DEMO_VAR2")
 	manifestPath := filepath.Join(dir, "pyproject.toml")
-	assert.Contains(t, out, "deleted variable DEMO_VAR2 from project")
+	assert.Contains(t, out, "deleted variable DEMO_VAR2 from "+filepath.Join(dir, ".env"))
 	assert.Contains(t, out, "DEMO_VAR2 is still declared in "+manifestPath+" and now has no value. "+
 		"To remove the declaration: astro local env variable undeclare DEMO_VAR2\n")
 	assert.NotContains(t, out, "next astro local start")
@@ -149,7 +149,7 @@ func TestDeleteOfANameAnotherTierSuppliesNamesThatTier(t *testing.T) {
 	writeEnvFile(t, dir, "API_URL=project-s3cr3t\n")
 
 	out := deleteText(t, dir, "variable", "delete", "API_URL")
-	assert.Contains(t, out, "API_URL is still declared in "+filepath.Join(dir, "pyproject.toml")+" and now resolves from "+vaultenv.SourceGlobal+".")
+	assert.Contains(t, out, "API_URL is still declared in "+filepath.Join(dir, "pyproject.toml")+" and now resolves from the global vault.")
 	assert.NotContains(t, out, "s3cr3t")
 	assert.NotContains(t, out, "undeclare")
 
@@ -198,7 +198,7 @@ func TestDeleteUndeclareRemovesTheDeclarationToo(t *testing.T) {
 
 	out := deleteText(t, dir, "variable", "delete", "DEMO_VAR2", "--undeclare")
 	manifestPath := filepath.Join(dir, "pyproject.toml")
-	assert.Contains(t, out, "deleted variable DEMO_VAR2 from project")
+	assert.Contains(t, out, "deleted variable DEMO_VAR2 from "+filepath.Join(dir, ".env"))
 	assert.Contains(t, out, "removed the declaration of variable DEMO_VAR2 from "+manifestPath)
 	assert.NotContains(t, out, "still declared")
 	s := declared(t, dir)
@@ -277,7 +277,7 @@ func TestListNotesAnUnsuppliedWorkspaceName(t *testing.T) {
 
 	d, out, stderr := envDeps(t, dir, "")
 	require.NoError(t, execute(t, d, "local", "env", "list"))
-	assert.Regexp(t, `(?m)^variable +API_URL +workspace +declared but not set \(optional\)$`, out.String())
+	assert.Regexp(t, `(?m)^variable +API_URL +cloud vault +declared but not set \(optional\)$`, out.String())
 	// An optional value nothing sets needs no step.
 	assert.NotContains(t, stderr.String(), "Next:")
 }
@@ -317,7 +317,7 @@ func TestDeleteUndeclareGlobalEditsOnlyTheCurrentProject(t *testing.T) {
 	writeEnvFile(t, dir, "API_URL=project-value\n")
 
 	out := deleteText(t, dir, "variable", "delete", "API_URL", "--global", "--undeclare")
-	assert.Contains(t, out, "deleted variable API_URL from "+vaultenv.SourceGlobal)
+	assert.Contains(t, out, "deleted variable API_URL from global vault")
 	assert.Contains(t, out, "removed the declaration of variable API_URL from "+filepath.Join(dir, "pyproject.toml"))
 	assert.NotContains(t, declared(t, dir).EnvVars, "API_URL")
 	b, err := os.ReadFile(filepath.Join(other, "pyproject.toml"))
