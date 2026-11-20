@@ -490,7 +490,7 @@ func TestEnvPlainSetOfAPinnedGlobalKeepsThePin(t *testing.T) {
 	if got := reachOf(t, "env:global:TOKEN"); got.Everywhere || len(got.Projects) != 1 {
 		t.Errorf("reach = %+v, want the pin kept", got)
 	}
-	if v := linkGetJSON(t, dir, "variable", "get", "TOKEN"); v.Value != "y" || v.Source != vaultenv.SourceGlobal {
+	if v := linkGetJSON(t, dir, "variable", "get", "TOKEN"); v.Value != "y" || v.Source != "global vault" {
 		t.Errorf("get = %+v, want the plain global where it is linked", v)
 	}
 }
@@ -518,7 +518,7 @@ func TestEnvSetGlobalCreatesItUnlinked(t *testing.T) {
 	}
 
 	mustRun(t, dir, "connection", "link", "warehouse")
-	if v := linkGetJSON(t, dir, "connection", "get", "warehouse"); v.Source != vaultenv.SourceGlobal {
+	if v := linkGetJSON(t, dir, "connection", "get", "warehouse"); v.Source != "global vault" {
 		t.Errorf("after link, get = %+v", v)
 	}
 	if out, _ := mustRun(t, dir, "connection", "list"); !strings.Contains(out, "warehouse") {

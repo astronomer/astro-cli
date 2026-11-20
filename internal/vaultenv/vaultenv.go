@@ -67,43 +67,13 @@ import (
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
-// Source labels — the values the `source` field carries in list/get output.
-// Distinct per tier because "which one held it" is the question a user asks
-// when a project value shadows a global one.
+// Source labels: which vault tier a value resolved from. Distinct per tier
+// because "which one held it" is the question a user asks when a project
+// value shadows a global one. Output names them through localenv.SourceName.
 const (
-	SourceProject = "vault"
-	SourceGlobal  = "vault (global)"
+	SourceProject = localenv.SourceVault
+	SourceGlobal  = localenv.SourceGlobalVault
 )
-
-// SourceLabel is how text output names where a value resolves from. The
-// source labels above, localenv's and the workspace's are what --output json
-// carries, and they stay as they are; text names each store for what it is,
-// the three vaults alike: .env, project vault, global vault and cloud vault
-// (the linked workspace's Environment Manager), with shell and default as
-// they are. absent, a value nothing supplies, is blank.
-func SourceLabel(source string) string {
-	switch source {
-	case localenv.SourceProject:
-		return ".env"
-	case SourceProject:
-		return "project vault"
-	case SourceGlobal:
-		return "global vault"
-	case localenv.SourceAbsent:
-		return ""
-	case "workspace":
-		return "cloud vault"
-	}
-	// workspace (<id>), or workspace (unavailable: <reason>): the reason
-	// is worth keeping, the id is not.
-	if rest, ok := strings.CutPrefix(source, "workspace ("); ok {
-		if reason, ok := strings.CutPrefix(rest, "unavailable: "); ok {
-			return "cloud vault (unavailable: " + reason
-		}
-		return "cloud vault"
-	}
-	return source
-}
 
 // IsVaultSource reports whether a resolved source label names one of these
 // tiers. Callers deciding precedence between the vault and a file need this, and

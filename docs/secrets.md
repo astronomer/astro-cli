@@ -81,7 +81,7 @@ Every command takes `--output json`. The nouns and their aliases:
 | `connection` | `conn`, `connections` | an Airflow connection |
 | `airflow-variable` | `airflow-var`, `airflow-vars`, `airflow-variables` | an Airflow Variable |
 
-`list` has alias `ls` and `delete` alias `rm`. There is no default kind, so no name collides with a subcommand: `astro local env variable set conn` sets an env var called `conn`.
+`list` has alias `ls` and `delete` alias `rm`. There is no default kind, so no name collides with a subcommand: `astro local env variable set conn` sets an environment variable called `conn`.
 
 **Scope.** Inside a project the default scope is the project, elsewhere global. `--project` and `--global` force one. On `get`, no scope flag resolves the whole chain and reports the winning source; a scope flag reads only that scope's stores.
 
@@ -111,20 +111,20 @@ Prints the value on stdout, the one deliberate reveal. With no scope flag it res
 
 ### `list`
 
-Shows every declared name with the source it resolves from, plus `required`, `secret` and `description`; values are never printed. Text names each store for what it is; `--output json` carries the `source` value:
+Shows every declared name with the source it resolves from, plus `required`, `secret` and `description`; values are never printed. The SOURCE column and the JSON `source` field name each store for what it is:
 
-| text | JSON `source` | meaning |
-| --- | --- | --- |
-| `.env` | `project` | the project `.env` |
-| `shell` | `shell` | an exported variable |
-| `project vault` | `vault` | the project vault |
-| `global vault` | `vault (global)` | the global vault |
-| `cloud vault` | `workspace (<id>)` | the linked workspace's Environment Manager |
-| `cloud vault (unavailable: <reason>)` | `workspace (unavailable: <reason>)` | the workspace could not be read |
-| `default` | `default` | the declaration's default |
-| *(blank)* | `absent` | nothing supplies it |
+| source | meaning |
+| --- | --- |
+| `.env` | the project `.env` |
+| `shell` | an exported variable |
+| `project vault` | the project vault |
+| `global vault` | the global vault |
+| `cloud vault` | the linked workspace's Environment Manager |
+| `cloud vault (unavailable: <reason>)` | the workspace could not be read |
+| `default` | the declaration's default |
+| `absent` | nothing supplies it (blank in the text table) |
 
-The `set`, `delete` and `check` messages name stores the same way: `set variable A in project vault`, `deleted variable B from global vault`, and the `.env` by its path.
+`get` and `delete` name stores the same way in their `source` fields, and the `set`, `delete` and `check` messages do too: `Set variable A in project vault`, `Deleted variable B from global vault`, and a `.env` by its path. A list with no rows prints nothing on stdout; `No values declared or set.` goes to stderr.
 
 The text table's STATUS column holds one short state per row, or nothing when the row needs no attention. The declared values come first, those needing attention before the rest, then the values nothing declares; the JSON keeps the listing's order (kind, then name). `-o wide` adds REQUIRED, SECRET and DESCRIPTION columns, and gives an invalid key's rule in its STATUS. On a terminal the commands that settle the statuses follow the table on stderr, as next steps in the table's order (see [Output style](output-style.md#next-steps)):
 
@@ -173,18 +173,18 @@ astro local env connection unlink warehouse /Users/me/old-etl   # drop a project
 
 ```
 # list (never includes values)
-[{"kind":"env","name":"API_URL","required":true,"secret":false,"source":"project"}]
+[{"kind":"env","name":"API_URL","required":true,"secret":false,"source":".env"}]
 
 # get
-{"kind":"env","name":"API_URL","source":"project","value":"https://..."}
-{"kind":"conn","name":"warehouse","source":"vault (global)","value":"...",
+{"kind":"env","name":"API_URL","source":".env","value":"https://..."}
+{"kind":"conn","name":"warehouse","source":"global vault","value":"...",
  "reach":{"auto_link":false,"projects":[{"path":"/Users/me/etl","exists":true}]}}
 
 # set
-{"kind":"env","name":"API_URL","scope":"project","status":"set"}
+{"kind":"env","name":"API_URL","scope":".env","status":"set"}
 
 # delete
-{"kind":"env","name":"API_URL","scope":"project","status":"deleted","remainder":"required",
+{"kind":"env","name":"API_URL","scope":".env","status":"deleted","remainder":"required",
  "set_hint":"astro local env variable set API_URL",
  "undeclare_hint":"astro local env variable undeclare API_URL","manifest":"/path/to/pyproject.toml"}
 

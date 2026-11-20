@@ -133,7 +133,7 @@ func TestRunsTriggerSendsConfAndLogicalDate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runs trigger: %v", err)
 	}
-	if !strings.Contains(out, "triggered orders_etl run manual__x (queued)") {
+	if !strings.Contains(out, "Triggered orders_etl run manual__x (queued)") {
 		t.Errorf("stdout = %q", out)
 	}
 	body := stub.request(http.MethodPost, "/api/v2/dags/orders_etl/dagRuns").Body
@@ -179,7 +179,7 @@ func TestRunsTriggerUnpausesAPausedDAG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runs trigger: %v", err)
 	}
-	if !strings.Contains(errOut, "unpaused orders_etl") {
+	if !strings.Contains(errOut, "Unpaused orders_etl") {
 		t.Errorf("the unpause was not announced: %q", errOut)
 	}
 	if v := decodeJSON(t, out); v["unpaused"] != true {

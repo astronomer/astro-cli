@@ -880,7 +880,7 @@ func TestDeployManifestPromptLinksAnUnlinkedDeployment(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"3", "orders-staging", "astro", "deployment", "clx-new"}, pickerRow(t, errOut, "orders-staging"), "an unlinked row is unmarked")
-	assert.Contains(t, errOut, "linked orders-staging to astro deployment clx-new in pyproject.toml")
+	assert.Contains(t, errOut, "Linked orders-staging to Astro Deployment clx-new in pyproject.toml")
 	assert.Contains(t, errOut, "→ orders-staging (astro deployment clx-new)")
 	assert.Equal(t, "clx-new", fake.imgInput.DeploymentID)
 	assert.Contains(t, out, "to orders-staging (Deployment clx-new).")

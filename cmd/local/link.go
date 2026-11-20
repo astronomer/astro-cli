@@ -742,7 +742,7 @@ func (c *cli) runLinkRemove(name string) error {
 	}
 	res := linkResult{Name: name, Kind: kind, Status: linkStatusRemoved, Manifest: path}
 	return r.Emit(res, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "removed link %s from %s\n", name, path)
+		_, werr := fmt.Fprintf(w, "Removed link %s from %s\n", name, path)
 		return werr
 	})
 }
@@ -777,11 +777,11 @@ func (c *cli) runLinkDefault(name string) error {
 		var werr error
 		switch {
 		case name == "" && changed:
-			_, werr = fmt.Fprintf(w, "cleared the default link in %s\n", path)
+			_, werr = fmt.Fprintf(w, "Cleared the default link in %s\n", path)
 		case name == "":
-			_, werr = fmt.Fprintf(w, "no link is marked default in %s\n", path)
+			_, werr = fmt.Fprintf(w, "No link is marked default in %s\n", path)
 		case changed:
-			_, werr = fmt.Fprintf(w, "set link %s as the default in %s\n", name, path)
+			_, werr = fmt.Fprintf(w, "Set link %s as the default in %s\n", name, path)
 		default:
 			_, werr = fmt.Fprintf(w, "%s is already the default link in %s\n", name, path)
 		}

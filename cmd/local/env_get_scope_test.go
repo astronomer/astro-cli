@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/internal/localenv"
-	"github.com/astronomer/astro-cli/internal/vaultenv"
 )
 
 // getScopedJSON runs `<noun> get <name> <flags> --output json` and decodes it.
@@ -33,9 +32,9 @@ func TestGetWithTheSetsScopeFlagFindsTheValue(t *testing.T) {
 		noun, name, value string
 		project, global   string // the source get should report at each scope
 	}{
-		{"connection", "db_main", "postgres://u:p@h:5432/db", vaultenv.SourceProject, vaultenv.SourceGlobal},
-		{"airflow-variable", "region", "us-east-1", vaultenv.SourceProject, vaultenv.SourceGlobal},
-		{"variable", "LOG_LEVEL", "info", vaultenv.SourceProject, vaultenv.SourceGlobal},
+		{"connection", "db_main", "postgres://u:p@h:5432/db", "project vault", "global vault"},
+		{"airflow-variable", "region", "us-east-1", "project vault", "global vault"},
+		{"variable", "LOG_LEVEL", "info", "project vault", "global vault"},
 	}
 	for _, tc := range cases {
 		for _, flag := range []string{"--project", "--global"} {
@@ -77,7 +76,7 @@ func TestGetSecretFlagPicksOneStore(t *testing.T) {
 	if _, err := getScopedJSON(t, dir, "connection", "db_main", "--project", "--plain"); err == nil {
 		t.Error("get --plain found a value that is only in the vault")
 	}
-	if got, err := getScopedJSON(t, dir, "connection", "db_main"); err != nil || got.Source != vaultenv.SourceProject {
+	if got, err := getScopedJSON(t, dir, "connection", "db_main"); err != nil || got.Source != "project vault" {
 		t.Errorf("get = %q, %v; want the project vault", got.Source, err)
 	}
 
@@ -85,7 +84,7 @@ func TestGetSecretFlagPicksOneStore(t *testing.T) {
 	if err := execute(t, d, "local", "env", "variable", "set", "LOG_LEVEL", "--value", "info", "--plain"); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := getScopedJSON(t, dir, "variable", "LOG_LEVEL", "--plain"); err != nil || got.Source != string(localenv.ScopeProject) {
+	if got, err := getScopedJSON(t, dir, "variable", "LOG_LEVEL", "--plain"); err != nil || got.Source != localenv.SourceName(string(localenv.ScopeProject)) {
 		t.Errorf("get --plain = %q, %v; want the plain file", got.Source, err)
 	}
 }
@@ -110,7 +109,7 @@ func TestGetWithBothCopiesPicksTheChainsWinner(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Source != string(localenv.ScopeProject) {
+	if got.Source != localenv.SourceName(string(localenv.ScopeProject)) {
 		t.Errorf("project scope: source = %q, want the .env, which outranks the project vault", got.Source)
 	}
 	if !strings.Contains(stderr.String(), "also set in") {

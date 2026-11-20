@@ -64,7 +64,7 @@ func TestCheckFailsOnAMissingRequiredValue(t *testing.T) {
 				t.Fatalf("want exit %d, got %d\n%s", checks.ExitChecksFailed, code, out.String())
 			}
 			for _, want := range []string{
-				"env var ASTRO_TEST_REQUIRED",
+				"variable ASTRO_TEST_REQUIRED",
 				"astro local env variable set ASTRO_TEST_REQUIRED --project",
 				"connection warehouse",
 				"astro local env connection set warehouse --project",
@@ -112,7 +112,7 @@ func TestCheckWarnsOnAValueOfTheWrongType(t *testing.T) {
 			if code := checkExit(t, execute(t, d, args...)); code != want {
 				t.Fatalf("want exit %d, got %d\n%s", want, code, out.String())
 			}
-			if !strings.Contains(out.String(), "env var ASTRO_TEST_PORT") {
+			if !strings.Contains(out.String(), "variable ASTRO_TEST_PORT") {
 				t.Errorf("the warning should name the declaration:\n%s", out.String())
 			}
 		})

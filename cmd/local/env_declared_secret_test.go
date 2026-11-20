@@ -9,8 +9,6 @@ import (
 	"testing"
 
 	"github.com/zalando/go-keyring"
-
-	"github.com/astronomer/astro-cli/internal/vaultenv"
 )
 
 // dotenvKeys returns the keys a dotenv file holds, never the values, so a
@@ -62,7 +60,7 @@ func TestSetVaultsADeclaredSecretName(t *testing.T) {
 	if n := len(vaultFiles(t)); n != 1 {
 		t.Errorf("vault holds %d entries, want exactly one", n)
 	}
-	if got := getJSON(t, dir, "API_TOKEN"); got.Source != vaultenv.SourceProject || got.Value != "s3cr3t" {
+	if got := getJSON(t, dir, "API_TOKEN"); got.Source != "project vault" || got.Value != "s3cr3t" {
 		t.Errorf("get resolved source %q (value matches: %t), want the project vault", got.Source, got.Value == "s3cr3t")
 	}
 }
@@ -195,10 +193,10 @@ func TestSetRemovesThePlaintextCopyOfAPromotedName(t *testing.T) {
 	if !hasKey(keys, "KEEP") {
 		t.Errorf("removing the copy took an unrelated entry with it (keys: %v)", keys)
 	}
-	if got := getJSON(t, dir, "API_TOKEN"); got.Source != vaultenv.SourceProject {
+	if got := getJSON(t, dir, "API_TOKEN"); got.Source != "project vault" {
 		t.Errorf("get resolved from %q, want the project vault", got.Source)
 	}
-	if !strings.Contains(stderr.String(), "removed the other copy") {
+	if !strings.Contains(stderr.String(), "Removed the other copy") {
 		t.Errorf("set should say it removed the plaintext copy; stderr: %q", stderr.String())
 	}
 }
@@ -257,7 +255,7 @@ func TestPlainSetNeedsNoKeyring(t *testing.T) {
 	if err := execute(t, d, "local", "env", "variable", "set", "REGION", "--plain", "--global", "--auto-link"); err != nil {
 		t.Fatalf("a plain global must not depend on the keyring: %v", err)
 	}
-	if got := getJSON(t, dir, "REGION", "--global"); got.Value != "g" || got.Source != vaultenv.SourceGlobal {
+	if got := getJSON(t, dir, "REGION", "--global"); got.Value != "g" || got.Source != "global vault" {
 		t.Errorf("get --global = %+v, want the plain global read without a keyring", got)
 	}
 	if got := getJSON(t, dir, "REGION"); got.Value != "g" {

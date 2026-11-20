@@ -224,7 +224,7 @@ func (c *cli) runEnvLink(scope *scopeFlags, kind localenv.Kind, name string, dir
 		case before.Everywhere:
 			msg = fmt.Sprintf("%s %s was auto-linked to every project; it now reaches only %s\n", localenv.Noun(kind), name, reach.text())
 		default:
-			msg = fmt.Sprintf("linked %s %s to %s\nReach: %s\n", localenv.Noun(kind), name, strings.Join(paths, ", "), reach.text())
+			msg = fmt.Sprintf("Linked %s %s to %s\nReach: %s\n", localenv.Noun(kind), name, strings.Join(paths, ", "), reach.text())
 		}
 		_, werr := io.WriteString(out, msg)
 		return werr
@@ -271,7 +271,7 @@ func (c *cli) runEnvUnlink(scope *scopeFlags, kind localenv.Kind, name string, d
 	reach := newReachJSON(after)
 	res := envLinkResult{Kind: kind, Name: name, Status: envLinkStatusUnlinked, Reach: *reach}
 	return r.Emit(res, func(out io.Writer) error {
-		_, werr := fmt.Fprintf(out, "unlinked %s %s from %s\nReach: %s\n", localenv.Noun(kind), name, strings.Join(removed, ", "), reach.text())
+		_, werr := fmt.Fprintf(out, "Unlinked %s %s from %s\nReach: %s\n", localenv.Noun(kind), name, strings.Join(removed, ", "), reach.text())
 		return werr
 	})
 }

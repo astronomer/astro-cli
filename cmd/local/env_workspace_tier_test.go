@@ -103,13 +103,13 @@ func TestEnvListShowsUndeclaredWorkspaceObjects(t *testing.T) {
 			if !ok {
 				t.Fatalf("all=%v: no row for %s in %v", all, key, rows)
 			}
-			if r.Source != "workspace (cmws)" || !r.Orphan || r.Applied == nil || !*r.Applied || r.DeclareHint == "" {
+			if r.Source != "cloud vault" || !r.Orphan || r.Applied == nil || !*r.Applied || r.DeclareHint == "" {
 				t.Errorf("all=%v: %s = %+v, want an applied undeclared workspace row with a declare hint", all, key, r)
 			}
 		}
 		var shadowed *envTierRow
 		for _, r := range rows {
-			if r.Kind == "var" && r.Source == "workspace (cmws)" {
+			if r.Kind == "var" && r.Source == "cloud vault" {
 				shadowed = &r
 			}
 		}
@@ -165,7 +165,7 @@ func TestEnvListOfflineWorkspaceNote(t *testing.T) {
 	if got, want := stderr.String(), "workspace cmws not read (offline): its values are not listed\n"; got != want {
 		t.Errorf("stderr = %q, want %q", got, want)
 	}
-	if strings.Contains(out.String(), "workspace (cmws)") {
+	if strings.Count(out.String(), "cloud vault") != strings.Count(out.String(), "cloud vault (unavailable") {
 		t.Errorf("an offline listing sourced a row to the workspace:\n%s", out.String())
 	}
 }

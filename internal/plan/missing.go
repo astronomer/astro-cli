@@ -74,7 +74,7 @@ func (e *MissingEnvError) Payload() any {
 		out = append(out, MissingValue{Missing: e.Missing[i], SetCommand: setHint(&e.Missing[i])})
 	}
 	return MissingPayload{
-		Error:   "required environment values are not set on this machine",
+		Error:   "this project is missing values that pyproject.toml requires and this machine does not set",
 		Project: e.Project,
 		Missing: out,
 	}
@@ -99,14 +99,8 @@ func SetCommand(m *envresolve.Missing) string {
 
 // sectionLabel is the human word for a schema section.
 func sectionLabel(s envschema.Section) string {
-	switch s {
-	case envschema.SectionEnvVar:
-		return "env var"
-	case envschema.SectionAirflowVariable:
-		return "airflow variable"
-	case envschema.SectionConnection:
-		return "connection"
-	default:
-		return string(s)
+	if noun := localenv.Noun(localenv.KindForSection(s)); noun != "" {
+		return noun
 	}
+	return string(s)
 }

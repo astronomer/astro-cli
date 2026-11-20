@@ -30,10 +30,10 @@ func TestAstroBuildListsTheDeclaredEnvironmentForTheDeployment(t *testing.T) {
 	// The required ones first, then by kind and name.
 	assert.Equal(t, []DeploymentValue{
 		{Kind: "connection", Name: "main", Status: "required"},
-		{Kind: "env var", Name: "API_KEY", Status: "required"},
+		{Kind: "variable", Name: "API_KEY", Status: "required"},
 		{Kind: "connection", Name: "archive", Status: "optional"},
 		{Kind: "connection", Name: "warehouse", Status: "from workspace"},
-		{Kind: "env var", Name: "LOG_LEVEL", Status: "has a default"},
+		{Kind: "variable", Name: "LOG_LEVEL", Status: "has a default"},
 	}, res.DeploymentEnv)
 	// A list for the Deployment, not a warning: the image never carries them.
 	for _, w := range res.Warnings {

@@ -91,7 +91,7 @@ func TestUsePinsAndUnsets(t *testing.T) {
 	if state.Instance != "" {
 		t.Fatalf("pin = %q after --unset", state.Instance)
 	}
-	if !strings.Contains(out.String(), "cleared") {
+	if !strings.Contains(out.String(), "Cleared your Deployment selection") {
 		t.Fatalf("stdout = %q", out)
 	}
 }

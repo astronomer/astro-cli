@@ -220,9 +220,9 @@ func (c *cli) runEnvDeclare(cmd *cobra.Command, scope *scopeFlags, in *declareIn
 	return r.Emit(res, func(w io.Writer) error {
 		var werr error
 		if changed {
-			_, werr = fmt.Fprintf(w, "declared %s %s in %s\n", localenv.Noun(kind), res.Name, res.Manifest)
+			_, werr = fmt.Fprintf(w, "Declared %s %s in %s\n", localenv.Noun(kind), res.Name, res.Manifest)
 		} else {
-			_, werr = fmt.Fprintf(w, "%s %s is already declared that way in %s\n", localenv.Noun(kind), res.Name, res.Manifest)
+			_, werr = fmt.Fprintf(w, "%s %s is already declared that way in %s\n", upperFirst(localenv.Noun(kind)), res.Name, res.Manifest)
 		}
 		return werr
 	})
@@ -241,9 +241,9 @@ func (c *cli) runEnvUndeclare(scope *scopeFlags, kind localenv.Kind, name string
 	return r.Emit(res, func(w io.Writer) error {
 		var werr error
 		if changed {
-			_, werr = fmt.Fprintf(w, "removed the declaration of %s %s from %s; any value set for it is kept\n", localenv.Noun(kind), res.Name, res.Manifest)
+			_, werr = fmt.Fprintf(w, "Removed the declaration of %s %s from %s; any value set for it is kept\n", localenv.Noun(kind), res.Name, res.Manifest)
 		} else {
-			_, werr = fmt.Fprintf(w, "%s %s is not declared in %s\n", localenv.Noun(kind), res.Name, res.Manifest)
+			_, werr = fmt.Fprintf(w, "%s %s is not declared in %s\n", upperFirst(localenv.Noun(kind)), res.Name, res.Manifest)
 		}
 		return werr
 	})
@@ -311,7 +311,7 @@ func (c *cli) deleteRemainder(res *envResult, dir string) {
 	res.Manifest = filepath.Join(dir, project.Marker)
 	switch res.Remainder {
 	case envschema.RemainderSupplied:
-		res.Source = source
+		res.Source = localenv.SourceName(source)
 	case envschema.RemainderAbsent, envschema.RemainderRequired:
 		res.SetHint = localenv.SetHint(res.Kind, key)
 		res.UndeclareHint = localenv.UndeclareHint(res.Kind, key)

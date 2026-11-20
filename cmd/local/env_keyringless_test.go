@@ -10,7 +10,6 @@ import (
 	"github.com/zalando/go-keyring"
 
 	"github.com/astronomer/astro-cli/internal/plan"
-	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -47,7 +46,7 @@ func TestAFreshMachineWithNoKeyringStoresAPlainGlobal(t *testing.T) {
 		t.Fatalf("vault holds %d entries, want the one plain global", n)
 	}
 
-	if got := getJSON(t, dir, "REGION", "--global"); got.Value != "us-east-1" || got.Source != vaultenv.SourceGlobal {
+	if got := getJSON(t, dir, "REGION", "--global"); got.Value != "us-east-1" || got.Source != "global vault" {
 		t.Errorf("get --global = %+v, want the plain global", got)
 	}
 

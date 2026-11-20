@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
@@ -83,9 +82,9 @@ func TestSetStoresEveryKindInTheVaultByDefault(t *testing.T) {
 				if err := execute(t, d, "local", "env", tc.noun, "set", tc.name, "--value", tc.value, scope, "--output", "json"); err != nil {
 					t.Fatal(err)
 				}
-				want := vaultenv.SourceProject
+				want := "project vault"
 				if scope == "--global" {
-					want = vaultenv.SourceGlobal
+					want = "global vault"
 				}
 				assertOneEncryptedSet(t, dir, out.Bytes(), tc.envKey, want)
 			})
@@ -149,7 +148,7 @@ func TestPlainGlobalSetGoesToTheVaultMarkedPlain(t *testing.T) {
 	if _, err := os.Stat(legacyGlobalPath(t)); !os.IsNotExist(err) {
 		t.Errorf("a plain global wrote ~/.astro/env (stat: %v)", err)
 	}
-	if got := getJSON(t, dir, "LOG_LEVEL", "--global"); got.Value != "debug" || got.Source != vaultenv.SourceGlobal {
+	if got := getJSON(t, dir, "LOG_LEVEL", "--global"); got.Value != "debug" || got.Source != "global vault" {
 		t.Errorf("get --global = %+v, want the plain global", got)
 	}
 	// A default set of the same name re-encrypts it in place: one entry.
@@ -180,11 +179,11 @@ func TestSetAndDeleteNameTheStore(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"set", "A", "--value", "x", "--project"}, "set variable A in project vault\n"},
-		{[]string{"set", "B", "--value", "x", "--global"}, "set variable B in global vault\n"},
-		{[]string{"set", "C", "--value", "x", "--global", "--plain"}, "set variable C in global vault (unencrypted)\n"},
-		{[]string{"set", "D", "--value", "x", "--plain"}, "set variable D in " + filepath.Join(dir, ".env") + "\n"},
-		{[]string{"delete", "B", "--global", "--plain"}, "deleted variable B from global vault\n"},
+		{[]string{"set", "A", "--value", "x", "--project"}, "Set variable A in project vault\n"},
+		{[]string{"set", "B", "--value", "x", "--global"}, "Set variable B in global vault\n"},
+		{[]string{"set", "C", "--value", "x", "--global", "--plain"}, "Set variable C in global vault (unencrypted)\n"},
+		{[]string{"set", "D", "--value", "x", "--plain"}, "Set variable D in " + filepath.Join(dir, ".env") + "\n"},
+		{[]string{"delete", "B", "--global", "--plain"}, "Deleted variable B from global vault\n"},
 	} {
 		if got := run(tc.args...); !strings.HasPrefix(got, tc.want) {
 			t.Errorf("%v printed %q, want it to start %q", tc.args, got, tc.want)

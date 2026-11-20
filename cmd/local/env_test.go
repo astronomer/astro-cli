@@ -14,7 +14,6 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/localenv"
-	"github.com/astronomer/astro-cli/internal/vaultenv"
 )
 
 // envProject writes a project with the given [tool.astro.env] body and isolates
@@ -121,7 +120,7 @@ func TestEnvGetJSONShape(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatalf("json: %v\n%s", err, out.String())
 	}
-	if got.Kind != "env" || got.Name != "API_URL" || got.Source != "project" || got.Value != "http://api" {
+	if got.Kind != "env" || got.Name != "API_URL" || got.Source != ".env" || got.Value != "http://api" {
 		t.Fatalf("get json = %+v", got)
 	}
 }
@@ -176,7 +175,7 @@ func TestEnvListJSONShapeAndOrphan(t *testing.T) {
 	// One object, the rows under "entries".
 	var declared, orphan bool
 	for _, it := range decodeEnvList(t, out.String()) {
-		if it.Name == "API_URL" && it.Source == "project" && !it.Orphan {
+		if it.Name == "API_URL" && it.Source == ".env" && !it.Orphan {
 			declared = true
 		}
 		if it.Name == "LEFTOVER" && it.Orphan {
@@ -229,7 +228,7 @@ func TestEnvGlobalScope(t *testing.T) {
 		t.Fatalf("vault holds %d entries, want the one global", n)
 	}
 	got := getJSON(t, dir, "SHARED", "--global")
-	if got.Source != vaultenv.SourceGlobal || got.Value != "globalval" {
+	if got.Source != "global vault" || got.Value != "globalval" {
 		t.Fatalf("get --global = %+v, want the global vault's value", got)
 	}
 }
@@ -355,18 +354,18 @@ func TestEnvListNotes(t *testing.T) {
 			UndeclareHint: "astro local env variable undeclare API_URL",
 		},
 		{
-			Kind: localenv.KindEnv, Name: "DECLARED", Source: "project", Required: true, Resolved: true, Declared: true,
+			Kind: localenv.KindEnv, Name: "DECLARED", Source: ".env", Required: true, Resolved: true, Declared: true,
 		},
 		{
-			Kind: localenv.KindEnv, Name: "ELSEWHERE", Source: "project",
+			Kind: localenv.KindEnv, Name: "ELSEWHERE", Source: ".env",
 			Orphan: true, Project: "/projects/other",
 		},
 		{
-			Kind: localenv.KindEnv, Name: "GLOBALONLY", Source: "vault (global)",
+			Kind: localenv.KindEnv, Name: "GLOBALONLY", Source: "global vault",
 			Orphan: true, RemoveHint: "astro local env variable delete GLOBALONLY --global",
 		},
 		{
-			Kind: localenv.KindEnv, Name: "LEFTOVER", Source: "project",
+			Kind: localenv.KindEnv, Name: "LEFTOVER", Source: ".env",
 			Orphan: true, RemoveHint: "astro local env variable delete LEFTOVER --project",
 			DeclareHint: "astro local env variable declare LEFTOVER",
 		},
@@ -382,12 +381,12 @@ func TestEnvListNotes(t *testing.T) {
 		// An Airflow setting a global holds, linked elsewhere: neither declared
 		// nor an orphan, so it lists with the values nothing declares.
 		{
-			Kind: localenv.KindEnv, Name: "AIRFLOW__CORE__PARALLELISM", Source: "vault (global)", NotLinkedHere: true,
+			Kind: localenv.KindEnv, Name: "AIRFLOW__CORE__PARALLELISM", Source: "global vault", NotLinkedHere: true,
 			LinkHint: "astro local env variable link AIRFLOW__CORE__PARALLELISM",
 		},
 	}
 	var out strings.Builder
-	if err := renderEnvList(&out, items, "", true, false); err != nil {
+	if err := renderEnvList(&out, items, true, false); err != nil {
 		t.Fatal(err)
 	}
 	want := "" +
@@ -405,7 +404,7 @@ func TestEnvListNotes(t *testing.T) {
 	}
 
 	out.Reset()
-	if err := renderEnvList(&out, items, "", true, true); err != nil {
+	if err := renderEnvList(&out, items, true, true); err != nil {
 		t.Fatal(err)
 	}
 	want = "" +
@@ -445,10 +444,10 @@ func TestEnvListNotes(t *testing.T) {
 	// and nothing to link it to.
 	out.Reset()
 	outside := []localenv.ListItem{items[3], {
-		Kind: localenv.KindEnv, Name: "TOKEN", Source: "vault (global)", Orphan: true, NotLinkedHere: true,
+		Kind: localenv.KindEnv, Name: "TOKEN", Source: "global vault", Orphan: true, NotLinkedHere: true,
 		LinkHint: "astro local env variable link TOKEN",
 	}}
-	if err := renderEnvList(&out, outside, "", false, false); err != nil {
+	if err := renderEnvList(&out, outside, false, false); err != nil {
 		t.Fatal(err)
 	}
 	want = "" +
@@ -913,11 +912,14 @@ func TestNarrowedListSaysWhichKindIsEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d, out, _ := envDeps(t, dir, "")
+	d, out, errOut := envDeps(t, dir, "")
 	if err := execute(t, d, "local", "env", "connection", "list"); err != nil {
 		t.Fatal(err)
 	}
-	got := out.String()
+	if out.Len() != 0 {
+		t.Errorf("an empty list should print nothing on stdout, got:\n%s", out.String())
+	}
+	got := errOut.String()
 	if !strings.Contains(got, "No connections declared") {
 		t.Errorf("narrowed empty list should name the kind, got:\n%s", got)
 	}
@@ -935,7 +937,7 @@ func TestMessagesNameTheNounNotTheWireToken(t *testing.T) {
 	if err := execute(t, d, "local", "env", "airflow-variable", "set", "region", "--value", "x"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "set airflow-variable region") {
+	if !strings.Contains(out.String(), "Set airflow-variable region") {
 		t.Errorf("set message should name the noun, got: %s", out.String())
 	}
 
