@@ -308,9 +308,9 @@ func UndeclaredWarning(values []localenv.UndeclaredValue) string {
 
 func undeclaredHead(n int) string {
 	if n == 1 {
-		return "1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it"
+		return "1 value is not declared and reaches this project only from this machine, so a Deployment or a teammate's clone won't get it"
 	}
-	return fmt.Sprintf("%d values reach this project only from this machine, so a Deployment or a teammate's clone won't get them", n)
+	return fmt.Sprintf("%d values are not declared and reach this project only from this machine, so a Deployment or a teammate's clone won't get them", n)
 }
 
 // undeclaredLabel is how a value is named: its kind as the commands spell it,

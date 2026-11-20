@@ -49,8 +49,8 @@ func TestDeleteOfAnOptionalDeclaredNameSaysItIsAbsent(t *testing.T) {
 	out := deleteText(t, dir, "variable", "delete", "DEMO_VAR2")
 	manifestPath := filepath.Join(dir, "pyproject.toml")
 	assert.Contains(t, out, "deleted variable DEMO_VAR2 from project")
-	assert.Contains(t, out, "DEMO_VAR2 is still declared in "+manifestPath+", so astro local env list shows it as absent. "+
-		"Remove the declaration with astro local env variable undeclare DEMO_VAR2.")
+	assert.Contains(t, out, "DEMO_VAR2 is still declared in "+manifestPath+" and now has no value. "+
+		"To remove the declaration: astro local env variable undeclare DEMO_VAR2\n")
 	assert.NotContains(t, out, "next astro local start")
 	assert.Contains(t, declared(t, dir).EnvVars, "DEMO_VAR2", "delete removed the declaration")
 
@@ -71,8 +71,8 @@ func TestDeleteOfARequiredDeclaredNameSaysStartRefuses(t *testing.T) {
 
 	out := deleteText(t, dir, "variable", "delete", "API_URL")
 	assert.Contains(t, out, "API_URL is still declared in "+filepath.Join(dir, "pyproject.toml")+
-		", and required: the next astro local start refuses until a value is set with astro local env variable set API_URL. "+
-		"Remove the declaration with astro local env variable undeclare API_URL.")
+		" as required and is now missing, so astro local start refuses. "+
+		"Set it with astro local env variable set API_URL, or remove the declaration with astro local env variable undeclare API_URL\n")
 	assert.NotContains(t, out, "s3cr3t-url")
 
 	writeEnvFile(t, dir, "API_URL=s3cr3t-url\n")
@@ -124,7 +124,7 @@ func TestDeleteRemainderLooksOnlyAtItsOwnKind(t *testing.T) {
 func TestUndeclareTextSaysWhetherItChanged(t *testing.T) {
 	dir := envProject(t, "\n[tool.astro.env]\nAPI_URL = {}\n")
 	manifestPath := filepath.Join(dir, "pyproject.toml")
-	assert.Equal(t, "undeclared variable API_URL in "+manifestPath+"; any value set for it is kept\n",
+	assert.Equal(t, "removed the declaration of variable API_URL from "+manifestPath+"; any value set for it is kept\n",
 		deleteText(t, dir, "variable", "undeclare", "API_URL"))
 	assert.Equal(t, "variable API_URL is not declared in "+manifestPath+"\n",
 		deleteText(t, dir, "variable", "undeclare", "API_URL"))
@@ -149,7 +149,7 @@ func TestDeleteOfANameAnotherTierSuppliesNamesThatTier(t *testing.T) {
 	writeEnvFile(t, dir, "API_URL=project-s3cr3t\n")
 
 	out := deleteText(t, dir, "variable", "delete", "API_URL")
-	assert.Contains(t, out, "API_URL is still declared in "+filepath.Join(dir, "pyproject.toml")+", and now resolves from "+vaultenv.SourceGlobal+".")
+	assert.Contains(t, out, "API_URL is still declared in "+filepath.Join(dir, "pyproject.toml")+" and now resolves from "+vaultenv.SourceGlobal+".")
 	assert.NotContains(t, out, "s3cr3t")
 	assert.NotContains(t, out, "undeclare")
 
@@ -166,7 +166,7 @@ func TestDeleteOfANameWithADefaultSaysTheDefaultApplies(t *testing.T) {
 	writeEnvFile(t, dir, "LOG_LEVEL=debug\n")
 
 	out := deleteText(t, dir, "variable", "delete", "LOG_LEVEL")
-	assert.Contains(t, out, "LOG_LEVEL is still declared in "+filepath.Join(dir, "pyproject.toml")+", and its declared default now applies.")
+	assert.Contains(t, out, "LOG_LEVEL is still declared in "+filepath.Join(dir, "pyproject.toml")+" and now uses its declared default.")
 	assert.NotContains(t, out, "now resolves from")
 }
 
@@ -199,7 +199,7 @@ func TestDeleteUndeclareRemovesTheDeclarationToo(t *testing.T) {
 	out := deleteText(t, dir, "variable", "delete", "DEMO_VAR2", "--undeclare")
 	manifestPath := filepath.Join(dir, "pyproject.toml")
 	assert.Contains(t, out, "deleted variable DEMO_VAR2 from project")
-	assert.Contains(t, out, "undeclared variable DEMO_VAR2 in "+manifestPath)
+	assert.Contains(t, out, "removed the declaration of variable DEMO_VAR2 from "+manifestPath)
 	assert.NotContains(t, out, "still declared")
 	s := declared(t, dir)
 	assert.NotContains(t, s.EnvVars, "DEMO_VAR2")
@@ -261,7 +261,7 @@ func TestDeleteRemainderDoesNotReadTheWorkspace(t *testing.T) {
 	d.WorkspaceClients = workspaceClients(mc)
 	require.NoError(t, execute(t, d, "local", "env", "variable", "delete", "DEMO_VAR2"))
 	assert.Contains(t, out.String(), "DEMO_VAR2 is still declared in")
-	assert.Contains(t, out.String(), "shows it as absent")
+	assert.Contains(t, out.String(), "now has no value")
 	assert.Contains(t, out.String(), "It may still come from workspace cmws, which a delete does not read.")
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything)
 
@@ -277,8 +277,10 @@ func TestListNotesAnUnsuppliedWorkspaceName(t *testing.T) {
 
 	d, out, _ := envDeps(t, dir, "")
 	require.NoError(t, execute(t, d, "local", "env", "list"))
-	assert.Contains(t, out.String(), "declared, no value; set: astro local env variable set API_URL; "+
-		"or remove the declaration: astro local env variable undeclare API_URL")
+	assert.Regexp(t, `(?m)^variable +API_URL +workspace +no value$`, out.String())
+	assert.Contains(t, out.String(), "Set it or remove the declaration:\n"+
+		"  astro local env variable set API_URL\n"+
+		"  astro local env variable undeclare API_URL\n")
 }
 
 func TestDeleteUndeclareJSON(t *testing.T) {
@@ -317,7 +319,7 @@ func TestDeleteUndeclareGlobalEditsOnlyTheCurrentProject(t *testing.T) {
 
 	out := deleteText(t, dir, "variable", "delete", "API_URL", "--global", "--undeclare")
 	assert.Contains(t, out, "deleted variable API_URL from "+vaultenv.SourceGlobal)
-	assert.Contains(t, out, "undeclared variable API_URL in "+filepath.Join(dir, "pyproject.toml"))
+	assert.Contains(t, out, "removed the declaration of variable API_URL from "+filepath.Join(dir, "pyproject.toml"))
 	assert.NotContains(t, declared(t, dir).EnvVars, "API_URL")
 	b, err := os.ReadFile(filepath.Join(other, "pyproject.toml"))
 	require.NoError(t, err)
@@ -355,7 +357,7 @@ func TestListNotesBothWaysOutOfAnAbsentName(t *testing.T) {
 	d, out, _ := envDeps(t, dir, "")
 	require.NoError(t, execute(t, d, "local", "env", "list"))
 	var demo, present string
-	for _, line := range strings.Split(out.String(), "\n") {
+	for _, line := range strings.Split(listTable(out.String()), "\n") {
 		switch {
 		case strings.Contains(line, "DEMO_VAR2"):
 			demo = line
@@ -363,9 +365,10 @@ func TestListNotesBothWaysOutOfAnAbsentName(t *testing.T) {
 			present = line
 		}
 	}
-	assert.Contains(t, demo, "declared, no value; set: astro local env variable set DEMO_VAR2; "+
-		"or remove the declaration: astro local env variable undeclare DEMO_VAR2")
-	assert.NotContains(t, present, "declared, no value")
+	assert.Regexp(t, `no value$`, demo)
+	assert.NotContains(t, present, "no value")
+	assert.Contains(t, out.String(), "  astro local env variable set DEMO_VAR2\n"+
+		"  astro local env variable undeclare DEMO_VAR2\n")
 
 	d, out, _ = envDeps(t, dir, "")
 	require.NoError(t, execute(t, d, "local", "env", "list", "--output", "json"))

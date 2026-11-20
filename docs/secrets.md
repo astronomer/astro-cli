@@ -124,7 +124,17 @@ Shows every declared name with the source it resolves from, plus `required`, `se
 | `default` | the declaration's default |
 | `absent` | nothing supplies it |
 
-A declared name nothing supplies is noted with the `set` and `undeclare` commands to run (`set_hint`, `undeclare_hint` in JSON). A value present in a store that no declaration names is listed too, as an orphan of its tier (`"orphan": true`), with the command that removes it (`remove_hint`). When it reaches this project's Airflow it is noted `not declared (declare it to make it a requirement: …)`, with `"applied": true` and a `declare_hint`, since it is injected already and a declaration would only make the project require it. A global that reaches the project but is shadowed by a project copy carries no mark.
+The text table's NOTE column holds one short state per row, and the lines under the table say once what each note means, followed by the commands for the rows that carry it:
+
+| note | meaning | commands |
+| --- | --- | --- |
+| `missing` | declared required and nothing supplies it, so a start refuses | `set`, `undeclare` |
+| `no value` | declared optional and nothing supplies it | `set`, `undeclare` |
+| `not declared` | a value in a store that no declaration names | `declare`, `delete` |
+| `not linked here` | a global that does not reach this project (`--all` only) | `link` |
+| `invalid key` | an Airflow Variable key an older build stored, which no longer resolves | `delete` |
+
+In JSON a row carries the same commands as hint fields: `set_hint` and `undeclare_hint` for a declared name nothing supplies; `declare_hint` and `remove_hint` for a value no declaration names, which is an orphan of its tier (`"orphan": true`). An orphan that reaches this project's Airflow also has `"applied": true`. A global the project's own copy shadows does not. Outside a project nothing is declared, so no row is marked `not declared`.
 
 `--project` and `--global` narrow the list to that scope's stores. `--all` also lists every project `.env` the CLI can find, and globals that do not reach this project, marked `not linked here` with the `link` command (`"not_linked_here": true`, `link_hint`), or with the index problem (`links_down`).
 

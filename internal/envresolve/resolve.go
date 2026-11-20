@@ -275,7 +275,7 @@ func (r *resolver) resolveWorkspace(section envschema.Section, name, key string)
 		// No workspace resolution wired for this run. Report the name
 		// unresolved with a plain note rather than resolving it elsewhere; a
 		// required one then gates as missing.
-		r.notes[nameRef{section, name}] = "declared source = \"workspace\", but workspace resolution is not available here"
+		r.notes[nameRef{section, name}] = "declared to come from the Workspace, which is not read here"
 		return "", string(envschema.SourceWorkspace), false
 	}
 	if v, ok := wp.Lookup(key); ok {

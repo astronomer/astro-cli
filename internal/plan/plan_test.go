@@ -534,7 +534,7 @@ func TestUndeclaredLocal(t *testing.T) {
 	if want := []string{"AIRFLOW_VAR_REGION", "FROM_DOTENV"}; !slices.Equal(keys, want) {
 		t.Errorf("UndeclaredLocal = %v, want %v", keys, want)
 	}
-	want := "2 values reach this project only from this machine, so a Deployment or a teammate's clone won't get them:\n" +
+	want := "2 values are not declared and reach this project only from this machine, so a Deployment or a teammate's clone won't get them:\n" +
 		"  airflow-variable region  vault (global)  if needed: astro local env airflow-variable declare region --secret  " +
 		"if not: astro local env airflow-variable delete region --global\n" +
 		"  variable FROM_DOTENV     project         if needed: astro local env variable declare FROM_DOTENV              " +
@@ -549,7 +549,7 @@ func TestUndeclaredWarning(t *testing.T) {
 		t.Error("no values must give no warning")
 	}
 	one := []localenv.UndeclaredValue{{Kind: localenv.KindEnv, Name: "X", Source: "project", RemoveHint: "rm X"}}
-	want := "1 value reaches this project only from this machine, so a Deployment or a teammate's clone won't get it:\n" +
+	want := "1 value is not declared and reaches this project only from this machine, so a Deployment or a teammate's clone won't get it:\n" +
 		"  variable X  project  if not: rm X"
 	if got := UndeclaredWarning(one); got != want {
 		t.Errorf("UndeclaredWarning =\n%s\nwant\n%s", got, want)

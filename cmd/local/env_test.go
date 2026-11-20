@@ -243,8 +243,8 @@ func TestEnvGlobalSetNotesAnUndeclaredName(t *testing.T) {
 	if err := execute(t, d, "local", "env", "variable", "set", "STRAY", "--global"); err != nil {
 		t.Fatal(err)
 	}
-	want := "this project does not declare STRAY. It gets the global value wherever the value reaches, " +
-		"but declare it to make it a requirement: astro local env variable declare STRAY"
+	want := "This project does not declare STRAY, so it gets the global value on this machine only. " +
+		"Declare it so every copy of the project requires it: astro local env variable declare STRAY"
 	if !strings.Contains(stderr.String(), want) {
 		t.Errorf("stderr = %q, want it to contain %q", stderr.String(), want)
 	}
@@ -275,10 +275,10 @@ func TestEnvListMarksUndeclaredGlobalApplied(t *testing.T) {
 	if err := execute(t, d, "local", "env", "list"); err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(out.String(), "\n") {
+	for _, line := range strings.Split(listTable(out.String()), "\n") {
 		switch {
 		case strings.Contains(line, "STRAY"):
-			if !strings.Contains(line, "not declared (declare it to make it a requirement: astro local env variable declare STRAY --secret)") {
+			if !strings.HasSuffix(strings.TrimSpace(line), "not declared") {
 				t.Errorf("STRAY row = %q, want the not-declared note", line)
 			}
 		case strings.Contains(line, "DECLARED"):
@@ -335,62 +335,85 @@ func TestStartMissingEnvHint(t *testing.T) {
 	}
 }
 
-// The NOTE column for the three shapes of orphan row.
-//
-// An orphan in another project (which only --all reaches) carries no remove
-// command on purpose: `astro local env <noun> delete` acts on the working directory's
-// project, so any command offered here would edit the wrong file. The note
-// printed the label anyway, so the row read "orphan in /path; remove: " and
-// trailed off — an instruction with nothing to follow.
-func TestEnvListOrphanNote(t *testing.T) {
-	var out strings.Builder
-	err := renderEnvList(&out, []localenv.ListItem{
+// The NOTE cell is one short state, and the commands that settle each row are
+// listed once under the table, grouped under a line that says what the note
+// means. An orphan in another project (which only --all reaches) carries no
+// command: `astro local env <noun> delete` acts on the working directory's
+// project, so any command offered for it would edit the wrong file.
+func TestEnvListNotes(t *testing.T) {
+	items := []localenv.ListItem{
+		{
+			Kind: localenv.KindEnv, Name: "API_URL", Source: "absent", Required: true,
+			SetHint:       "astro local env variable set API_URL",
+			UndeclareHint: "astro local env variable undeclare API_URL",
+		},
+		{
+			Kind: localenv.KindEnv, Name: "DECLARED", Source: "project", Required: true,
+		},
+		{
+			Kind: localenv.KindEnv, Name: "ELSEWHERE", Source: "project",
+			Orphan: true, Project: "/projects/other",
+		},
+		{
+			Kind: localenv.KindEnv, Name: "GLOBALONLY", Source: "vault (global)",
+			Orphan: true, RemoveHint: "astro local env variable delete GLOBALONLY --global",
+		},
 		{
 			Kind: localenv.KindEnv, Name: "LEFTOVER", Source: "project",
 			Orphan: true, RemoveHint: "astro local env variable delete LEFTOVER --project",
 			DeclareHint: "astro local env variable declare LEFTOVER",
 		},
 		{
-			Kind: localenv.KindEnv, Name: "GLOBALONLY", Source: "global",
-			Orphan: true, RemoveHint: "astro local env variable delete GLOBALONLY --global",
+			Kind: localenv.KindEnv, Name: "LOG_LEVEL", Source: "absent",
+			SetHint:       "astro local env variable set LOG_LEVEL",
+			UndeclareHint: "astro local env variable undeclare LOG_LEVEL",
 		},
 		{
-			Kind: localenv.KindEnv, Name: "ELSEWHERE", Source: "project",
-			Orphan: true, Project: "/projects/other",
+			Kind: localenv.KindEnv, Name: "TOKEN", Source: "absent", NotLinkedHere: true,
+			LinkHint: "astro local env variable link TOKEN",
 		},
-		{Kind: localenv.KindEnv, Name: "DECLARED", Source: "project"},
-	}, "")
-	if err != nil {
+	}
+	var out strings.Builder
+	if err := renderEnvList(&out, items, "", true); err != nil {
 		t.Fatal(err)
 	}
-	lines := map[string]string{}
-	for _, line := range strings.Split(out.String(), "\n") {
-		for _, name := range []string{"LEFTOVER", "GLOBALONLY", "ELSEWHERE", "DECLARED"} {
-			if strings.Contains(line, name) {
-				lines[name] = line
-			}
-		}
+	want := "" +
+		"KIND      NAME        SOURCE          NOTE\n" +
+		"variable  API_URL     absent          missing\n" +
+		"variable  DECLARED    project         \n" +
+		"variable  ELSEWHERE   project         not declared (in /projects/other)\n" +
+		"variable  GLOBALONLY  vault (global)  not declared\n" +
+		"variable  LEFTOVER    project         not declared\n" +
+		"variable  LOG_LEVEL   absent          no value\n" +
+		"variable  TOKEN       absent          not linked here\n" +
+		"\n" +
+		"missing: pyproject.toml requires it and nothing sets it, so astro local start refuses. Set it or remove the declaration:\n" +
+		"  astro local env variable set API_URL\n" +
+		"  astro local env variable undeclare API_URL\n" +
+		"no value: pyproject.toml declares it optional and nothing sets it. Set it or remove the declaration:\n" +
+		"  astro local env variable set LOG_LEVEL\n" +
+		"  astro local env variable undeclare LOG_LEVEL\n" +
+		"not declared: pyproject.toml does not list it. Declare it so every copy of the project requires it, or delete it:\n" +
+		"  astro local env variable delete GLOBALONLY --global\n" +
+		"  astro local env variable declare LEFTOVER\n" +
+		"  astro local env variable delete LEFTOVER --project\n" +
+		"not linked here: this project does not get it from the global vault. Link it to this one:\n" +
+		"  astro local env variable link TOKEN\n"
+	if out.String() != want {
+		t.Errorf("list =\n%s\nwant\n%s", out.String(), want)
 	}
 
-	if !strings.Contains(lines["LEFTOVER"], "undeclared; declare: astro local env variable declare LEFTOVER "+
-		"(or remove: astro local env variable delete LEFTOVER --project)") {
-		t.Errorf("an orphan in this project should offer declaring it first: %q", lines["LEFTOVER"])
+	// Outside a project nothing is declared, so no row is marked not declared
+	// and there is nothing to explain under the table.
+	out.Reset()
+	if err := renderEnvList(&out, items[3:4], "", false); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(lines["GLOBALONLY"], "undeclared; remove: astro local env variable delete GLOBALONLY --global") {
-		t.Errorf("an orphan with no declare command should offer removal: %q", lines["GLOBALONLY"])
-	}
-
-	if !strings.Contains(lines["ELSEWHERE"], "undeclared in /projects/other") {
-		t.Errorf("an orphan elsewhere should name the project: %q", lines["ELSEWHERE"])
-	}
-	if strings.Contains(lines["ELSEWHERE"], "remove:") {
-		t.Errorf("an orphan elsewhere must not offer a command that would edit "+
-			"the wrong project's file: %q", lines["ELSEWHERE"])
-	}
-
-	// A declared value is not an orphan, so its note stays empty.
-	if strings.Contains(lines["DECLARED"], "orphan") {
-		t.Errorf("a declared value should carry no note: %q", lines["DECLARED"])
+	want = "" +
+		"KIND      NAME        SOURCE          NOTE\n" +
+		"variable  GLOBALONLY  vault (global)  \n"
+	if out.String() != want {
+		t.Errorf("list outside a project =\n%s\nwant\n%s", out.String(), want)
 	}
 }
 
@@ -410,7 +433,7 @@ func TestEnvListShowsTheDescription(t *testing.T) {
 		t.Errorf("the header should name the DESCRIPTION column:\n%s", text)
 	}
 	var tokenRow string
-	for _, line := range strings.Split(text, "\n") {
+	for _, line := range strings.Split(listTable(text), "\n") {
 		if strings.Contains(line, "API_TOKEN") {
 			tokenRow = line
 		}
@@ -1095,4 +1118,12 @@ func TestListKindColumnNamesTheNounButJSONKeepsTheWireToken(t *testing.T) {
 			t.Errorf("JSON should keep the wire token %s:\n%s", want, out.String())
 		}
 	}
+}
+
+// listTable is the table part of a text env list: the lines above the blank
+// line that starts the notes under it, which name the rows again in their
+// commands.
+func listTable(out string) string {
+	table, _, _ := strings.Cut(out, "\n\n")
+	return table
 }

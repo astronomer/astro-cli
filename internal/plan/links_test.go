@@ -39,7 +39,7 @@ func TestNoLinkIndexLeavesTheStartGateUnchanged(t *testing.T) {
 	if !errors.As(err, &missing) {
 		t.Fatalf("want a missing-value error, got %v", err)
 	}
-	const wantMsg = "this project needs 1 environment value that is not set on this machine:\n" +
+	const wantMsg = "this project is missing 1 value that pyproject.toml requires and this machine does not set:\n" +
 		"  - env var ABSENT\n" +
 		"      provide it:  astro local env variable set ABSENT --project\n" +
 		"provide them and run astro local start again, or run astro local start --allow-missing to start without them"

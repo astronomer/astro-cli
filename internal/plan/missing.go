@@ -25,11 +25,11 @@ type MissingEnvError struct {
 
 func (e *MissingEnvError) Error() string {
 	var b strings.Builder
-	values := "environment values that are"
+	values := "values"
 	if len(e.Missing) == 1 {
-		values = "environment value that is"
+		values = "value"
 	}
-	fmt.Fprintf(&b, "this project needs %d %s not set on this machine:\n", len(e.Missing), values)
+	fmt.Fprintf(&b, "this project is missing %d %s that pyproject.toml requires and this machine does not set:\n", len(e.Missing), values)
 	for _, m := range e.Missing {
 		fmt.Fprintf(&b, "  - %s %s\n", sectionLabel(m.Section), m.Name)
 		if m.SourceNote != "" {

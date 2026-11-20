@@ -565,10 +565,11 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		cmdLine = "astro local env " + localenv.Noun(only) + " list"
 	}
 	if only == "" {
-		long = "List every declared value and where it resolves from, and every undeclared " +
-			"value a start passes to this project anyway. Whatever reaches a project goes " +
-			"to its Airflow, declared or not. Declaring a name makes it a requirement, and " +
-			"linking limits which projects a global reaches. Values are not shown; use the get " +
+		long = "List every value declared in pyproject.toml and where it resolves from, and every " +
+			"value a start passes to this project that is not declared. Airflow gets both. " +
+			"Declaring a name makes every copy of the project require it, and linking limits which " +
+			"projects a global reaches. The NOTE column marks rows that need attention, and the " +
+			"lines under the table give the commands for them. Values are not shown; use the get " +
 			"command to see one."
 	}
 	cmd := &cobra.Command{
@@ -849,8 +850,8 @@ func (c *cli) noteUndeclaredGlobal(kind localenv.Kind, name string) {
 	if _, ok := declaredSpec(schema, kind, name); ok {
 		return
 	}
-	cliout.Note(c.d.Stderr, fmt.Sprintf("this project does not declare %s. It gets the global value wherever the value reaches, "+
-		"but declare it to make it a requirement: %s", name, localenv.DeclareHint(kind, name)))
+	cliout.Note(c.d.Stderr, fmt.Sprintf("This project does not declare %s, so it gets the global value on this machine only. "+
+		"Declare it so every copy of the project requires it: %s", name, localenv.DeclareHint(kind, name)))
 }
 
 func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) error {
@@ -1214,17 +1215,17 @@ func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 	var err error
 	switch {
 	case res.Undeclared:
-		_, err = fmt.Fprintf(w, "undeclared %s %s in %s\n", noun, res.Name, res.Manifest)
+		_, err = fmt.Fprintf(w, "removed the declaration of %s %s from %s\n", noun, res.Name, res.Manifest)
 	case res.Remainder == envschema.RemainderAbsent:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, so astro local env list shows it as absent. Remove the declaration with %s.\n",
+		_, err = fmt.Fprintf(w, "%s is still declared in %s and now has no value. To remove the declaration: %s\n",
 			res.Name, res.Manifest, res.UndeclareHint)
 	case res.Remainder == envschema.RemainderRequired:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, and required: the next astro local start refuses until a value is set with %s. Remove the declaration with %s.\n",
+		_, err = fmt.Fprintf(w, "%s is still declared in %s as required and is now missing, so astro local start refuses. Set it with %s, or remove the declaration with %s\n",
 			res.Name, res.Manifest, res.SetHint, res.UndeclareHint)
 	case res.Remainder == envschema.RemainderSupplied && res.Source == envresolve.SourceDefault:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, and its declared default now applies.\n", res.Name, res.Manifest)
+		_, err = fmt.Fprintf(w, "%s is still declared in %s and now uses its declared default.\n", res.Name, res.Manifest)
 	case res.Remainder == envschema.RemainderSupplied:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, and now resolves from %s.\n", res.Name, res.Manifest, res.Source)
+		_, err = fmt.Fprintf(w, "%s is still declared in %s and now resolves from %s.\n", res.Name, res.Manifest, res.Source)
 	}
 	if err == nil && res.Workspace != "" {
 		_, err = fmt.Fprintf(w, "It may still come from workspace %s, which a delete does not read.\n", res.Workspace)
@@ -1284,7 +1285,7 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 		items = kept
 	}
 	return emitRows(r, items, len(items), newEnvList, func(w io.Writer, items []localenv.ListItem) error {
-		return renderEnvList(w, items, only)
+		return renderEnvList(w, items, only, projectDir != "")
 	})
 }
 
@@ -1309,17 +1310,18 @@ func (c *cli) listOptions(projectDir string, m *manifest.Manifest) localenv.List
 	return opts
 }
 
-// renderEnvList prints the table. only names the kind the rows were narrowed
-// to, or is empty for the cross-kind view; it exists for the empty case, where
-// the cross-kind wording ("no entries in any .env") is simply false when the
-// project holds values of the other kinds.
-func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) error {
+// renderEnvList prints the table, then, under it, what each NOTE means and the
+// commands that settle those rows. only names the kind the rows were narrowed
+// to, or is empty for the cross-kind view; it exists for the empty case.
+// inProject is false outside a project, where nothing is declared, so no row
+// is marked "not declared".
+func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, inProject bool) error {
 	if len(items) == 0 {
 		if only != "" {
-			_, err := fmt.Fprintf(w, "No %ss declared, and none in any .env.\n", localenv.Noun(only))
+			_, err := fmt.Fprintf(w, "No %ss declared or set.\n", localenv.Noun(only))
 			return err
 		}
-		_, err := fmt.Fprintln(w, "No declared env values and no entries in any .env.")
+		_, err := fmt.Fprintln(w, "No values declared or set.")
 		return err
 	}
 	// DESCRIPTION is a column only when some row has one, so a project that
@@ -1342,9 +1344,12 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 		header += "\tDESCRIPTION"
 	}
 	fmt.Fprintln(tw, header)
+	var groups noteGroups
 	for i := range items {
 		it := &items[i]
-		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, listNote(it))
+		n := listNote(it, inProject)
+		groups.add(n)
+		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, n.cell)
 		if described {
 			// Collapsed to one line: a TOML multi-line string would otherwise
 			// break the row out of the table.
@@ -1352,53 +1357,130 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind) e
 		}
 		fmt.Fprintln(tw, row)
 	}
-	return tw.Flush()
+	if err := tw.Flush(); err != nil {
+		return err
+	}
+	return groups.render(w)
 }
 
-// listNote is a list row's NOTE cell.
-func listNote(it *localenv.ListItem) string {
-	note := ""
+// noteKind is what a row's NOTE says about it. The footer explains each kind
+// that appears, once and in this order, with the commands for its rows.
+type noteKind int
+
+const (
+	noteNone noteKind = iota
+	noteMissing
+	noteNoValue
+	noteNotDeclared
+	noteNotLinked
+	noteInvalid
+	noteKinds
+)
+
+// rowNote is one row's NOTE cell and the commands the footer lists for it.
+type rowNote struct {
+	kind     noteKind
+	cell     string
+	commands []string
+}
+
+// listNote is a list row's NOTE: one short state for the cell, and the
+// commands that settle it, which the footer prints under the table. The JSON
+// rows carry the same commands as hint fields.
+func listNote(it *localenv.ListItem, inProject bool) rowNote {
 	switch {
 	case it.Invalid != "":
-		note = it.Invalid
+		n := rowNote{kind: noteInvalid, cell: "invalid key"}
 		if it.Project != "" {
-			note += " (in " + it.Project + ")"
-		} else if it.RemoveHint != "" {
-			note += " (remove: " + it.RemoveHint + ")"
+			n.cell += " (in " + it.Project + ")"
 		}
+		return n.with(it.RemoveHint)
 	case it.NotLinkedHere && it.LinksDown != "":
-		note = "not linked here: " + it.LinksDown
+		return rowNote{kind: noteNotLinked, cell: "not linked here (" + it.LinksDown + ")"}
 	case it.NotLinkedHere:
-		note = "not linked here (link: " + it.LinkHint + ")"
+		return rowNote{kind: noteNotLinked, cell: "not linked here"}.with(it.LinkHint)
 	case it.SetHint != "" && it.UndeclareHint != "":
-		note = "declared, no value; set: " + it.SetHint + "; or remove the declaration: " + it.UndeclareHint
-	case it.Orphan && it.Applied != nil && *it.Applied && it.DeclareHint != "":
-		// The value reaches Airflow already, so declaring it only makes it
-		// a requirement the project states.
-		note = "not declared (declare it to make it a requirement: " + it.DeclareHint + ")"
-		if it.RemoveHint != "" {
-			note += "; remove: " + it.RemoveHint
+		if it.Required {
+			return rowNote{kind: noteMissing, cell: "missing"}.with(it.SetHint, it.UndeclareHint)
 		}
-	case it.Orphan:
-		note = "undeclared"
+		return rowNote{kind: noteNoValue, cell: "no value"}.with(it.SetHint, it.UndeclareHint)
+	case it.Orphan && inProject:
 		// An orphan found under --all lives in another project's file, and
-		// says which. There is no command to offer for one: delete acts on
-		// the working directory's project, so a hint would name a command
-		// that edits the wrong file, which is why ListItem leaves
-		// RemoveHint empty for these. The label follows the hint rather
-		// than being printed regardless, or the row reads "remove: " with
-		// nothing after it.
+		// says which. It offers no command: delete acts on the working
+		// directory's project, so ListItem leaves RemoveHint and DeclareHint
+		// empty for these rather than name a command that edits the wrong
+		// file.
+		n := rowNote{kind: noteNotDeclared, cell: "not declared"}
 		if it.Project != "" {
-			note += " in " + it.Project
+			n.cell += " (in " + it.Project + ")"
 		}
-		switch {
-		case it.DeclareHint != "" && it.RemoveHint != "":
-			note += "; declare: " + it.DeclareHint + " (or remove: " + it.RemoveHint + ")"
-		case it.RemoveHint != "":
-			note += "; remove: " + it.RemoveHint
+		return n.with(it.DeclareHint, it.RemoveHint)
+	}
+	return rowNote{}
+}
+
+// with adds the non-empty commands to n.
+func (n rowNote) with(commands ...string) rowNote {
+	for _, c := range commands {
+		if c != "" {
+			n.commands = append(n.commands, c)
 		}
 	}
-	return note
+	return n
+}
+
+// noteGroups collects the rows' notes by kind for the footer.
+type noteGroups struct {
+	seen     [noteKinds]bool
+	commands [noteKinds][]string
+}
+
+func (g *noteGroups) add(n rowNote) {
+	if n.kind == noteNone {
+		return
+	}
+	g.seen[n.kind] = true
+	g.commands[n.kind] = append(g.commands[n.kind], n.commands...)
+}
+
+// noteLegends is what each NOTE means, printed once under the table when some
+// row carries that note, and what to do about it, added when the footer has
+// commands to list under it.
+var noteLegends = [noteKinds]struct{ meaning, action string }{
+	noteMissing:     {"missing: pyproject.toml requires it and nothing sets it, so astro local start refuses", "Set it or remove the declaration"},
+	noteNoValue:     {"no value: pyproject.toml declares it optional and nothing sets it", "Set it or remove the declaration"},
+	noteNotDeclared: {"not declared: pyproject.toml does not list it", "Declare it so every copy of the project requires it, or delete it"},
+	noteNotLinked:   {"not linked here: this project does not get it from the global vault", "Link it to this one"},
+	noteInvalid:     {"invalid key: " + localenv.InvalidStoredReason(localenv.KindVar, "1st"), ""},
+}
+
+// render prints the footer: a blank line, then each note that appeared, with
+// its rows' commands indented under it.
+func (g *noteGroups) render(w io.Writer) error {
+	var b strings.Builder
+	for k := noteMissing; k < noteKinds; k++ {
+		if !g.seen[k] {
+			continue
+		}
+		legend := noteLegends[k]
+		b.WriteString(legend.meaning)
+		if len(g.commands[k]) == 0 {
+			b.WriteString(".\n")
+			continue
+		}
+		if legend.action != "" {
+			b.WriteString(". " + legend.action)
+		}
+		b.WriteString(":\n")
+		for _, c := range g.commands[k] {
+			b.WriteString("  " + c + "\n")
+		}
+	}
+	if b.Len() == 0 {
+		return nil
+	}
+	_, err := fmt.Fprint(w, "\n"+b.String())
+	return err
 }
 
 // envStore resolves the flags to the one store a set/get/delete acts on,

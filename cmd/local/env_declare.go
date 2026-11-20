@@ -241,7 +241,7 @@ func (c *cli) runEnvUndeclare(scope *scopeFlags, kind localenv.Kind, name string
 	return r.Emit(res, func(w io.Writer) error {
 		var werr error
 		if changed {
-			_, werr = fmt.Fprintf(w, "undeclared %s %s in %s; any value set for it is kept\n", localenv.Noun(kind), res.Name, res.Manifest)
+			_, werr = fmt.Fprintf(w, "removed the declaration of %s %s from %s; any value set for it is kept\n", localenv.Noun(kind), res.Name, res.Manifest)
 		} else {
 			_, werr = fmt.Fprintf(w, "%s %s is not declared in %s\n", localenv.Noun(kind), res.Name, res.Manifest)
 		}

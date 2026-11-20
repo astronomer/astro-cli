@@ -259,7 +259,7 @@ func TestCheckNotesUndeclaredLocalValues(t *testing.T) {
 	if err := execute(t, d, "local", "check", "--strict"); err != nil {
 		t.Fatalf("an undeclared local value must not fail the check: %v", err)
 	}
-	if !strings.Contains(out.String(), "Warning: 1 value reaches this project only from this machine") {
+	if !strings.Contains(out.String(), "Warning: 1 value is not declared and reaches this project only from this machine") {
 		t.Errorf("want a warning about the undeclared value, got:\n%s", out.String())
 	}
 	line, ok := lineContaining(out.String(), "  connection local_db  project  ")
