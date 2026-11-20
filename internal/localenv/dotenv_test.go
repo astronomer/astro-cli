@@ -174,6 +174,10 @@ func TestSetQuotesADollar(t *testing.T) {
 		`ends $here\`: `K="ends \$here\\"`,
 		"no dollar":   `K='no dollar'`,
 		"plain":       `K=plain`,
+		"$":           `K='$'`,
+		`a\$b`:        `K='a\$b'`,
+		`say "hi" $x`: `K='say "hi" $x'`,
+		`it's a\$b`:   `K="it's a\\\$b"`,
 	} {
 		if _, err := s.Set(KindEnv, "K", v); err != nil {
 			t.Fatalf("set %q: %v", v, err)

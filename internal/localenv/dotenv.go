@@ -170,9 +170,11 @@ func writeLines(path string, lines []string, addTrailingNewline bool) error {
 // escaped.
 //
 // The '$' is quoted although ParseDotenv does no ${VAR} interpolation, because
-// every other dotenv reader does (Docker Compose, python-dotenv), and so would
-// this one if it ever gained it: a value written bare as pa$word would then
-// quietly read as "pa". Quoted, it means the same thing to all of them.
+// other dotenv readers do (Docker Compose, python-dotenv), and so would this
+// one if it ever gained it: a value written bare as pa$word would then quietly
+// read as "pa". In quotes none of them interpolates it. (Backslashes inside
+// single quotes are another matter: Compose and ParseDotenv keep them as
+// written, python-dotenv decodes \\ and \'.)
 func formatValue(v string) string {
 	if v == "" || !needsQuoting(v) {
 		return v
