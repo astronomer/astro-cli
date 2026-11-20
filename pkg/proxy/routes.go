@@ -470,6 +470,17 @@ func sameEntrySpelling(dir string, entries []os.DirEntry, want string) string {
 
 // RemoveRoute deregisters a route by hostname. Returns the number of remaining routes.
 func (s *Store) RemoveRoute(hostname string) (int, error) {
+	return s.RemoveProjectRoute(hostname, "")
+}
+
+// RemoveProjectRoute deregisters the route for hostname that projectDir owns,
+// and returns the number of routes that remain. A hostname is not a project's
+// for good: when one project's runtime ends without a stop, AddRoute prunes
+// its route and a project whose directory derives the same name can take it,
+// so removing by hostname alone, for the first project's stale record, took
+// the second's live route away. A route of another project is left. An empty
+// projectDir, or a route that records none, matches by hostname alone.
+func (s *Store) RemoveProjectRoute(hostname, projectDir string) (int, error) {
 	lockFile, err := s.AcquireLock()
 	if err != nil {
 		return 0, fmt.Errorf("acquiring routes lock: %w", err)
@@ -483,9 +494,15 @@ func (s *Store) RemoveRoute(hostname string) (int, error) {
 
 	routes = s.pruneStale(routes)
 
+	owner := ""
+	if projectDir != "" {
+		owner = canonicalDir(projectDir)
+	}
 	filtered := make([]Route, 0, len(routes))
 	for _, r := range routes {
-		if r.Hostname != hostname {
+		ours := r.Hostname == hostname &&
+			(owner == "" || r.ProjectDir == "" || canonicalDir(r.ProjectDir) == owner)
+		if !ours {
 			filtered = append(filtered, r)
 		}
 	}

@@ -146,3 +146,27 @@ func TestCleanLeavesTheProxyWhileARouteRemains(t *testing.T) {
 		"a route is still registered; stopping the proxy would strand the project it serves")
 	assert.Zero(t, daemon.ensured, "--clean has no reason to start a proxy")
 }
+
+// --clean removes a stale record's own route, not the route of a live project
+// that has since taken the same hostname (two projects in directories of the
+// same name derive it).
+func TestCleanLeavesAnotherProjectsRouteOnTheSameHostname(t *testing.T) {
+	rtime, _ := runtimeWatchingItsProxy(t)
+	rtime.containersGone = func(_ context.Context, paths []string) (map[string]bool, error) {
+		return allGone(paths), nil
+	}
+	require.NoError(t, rtime.routes.AddRoute(&proxy.Route{
+		Hostname: "airflow.localhost", Port: "8080", ProjectDir: "/p/live/airflow", Mode: proxy.RouteModeDocker,
+	}))
+
+	removed, err := rtime.pruneAll([]Status{
+		{ProjectPath: "/p/stale/airflow", Mode: ModeDocker, State: StateStopped, Hostname: "airflow.localhost"},
+	})
+	require.NoError(t, err)
+	require.Len(t, removed, 1, "the stale record goes")
+
+	routes, err := rtime.routes.ReadRoutes()
+	require.NoError(t, err)
+	require.Len(t, routes, 1, "the live project's route was removed with the stale record")
+	assert.Equal(t, "/p/live/airflow", routes[0].ProjectDir)
+}

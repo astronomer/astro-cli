@@ -713,7 +713,7 @@ func (r *Runtime) pruneAll(statuses []Status) ([]Status, error) {
 			// One leaked per run of the e2e suite, which has a single --clean
 			// case; twenty-six had accumulated on one machine before anybody
 			// looked at a process list.
-			if rerr := localshared.RemoveRoute(r.routes, st.Hostname, r.daemon); rerr != nil {
+			if rerr := localshared.RemoveRoute(r.routes, st.Hostname, st.ProjectPath, r.daemon); rerr != nil {
 				errs = append(errs, rerr)
 			}
 		}
