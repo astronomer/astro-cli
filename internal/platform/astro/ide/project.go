@@ -148,7 +148,7 @@ func createNewProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient
 	if err != nil {
 		workspaceName = workspaceID
 	}
-	fmt.Fprintf(notes, "Successfully created project '%s' in workspace '%s'\n", name, workspaceName)
+	fmt.Fprintf(notes, "Successfully created project '%s' in workspace '%s'\n", input.Cell(name), input.Cell(workspaceName))
 	return resp.JSON200.Id, nil
 }
 
