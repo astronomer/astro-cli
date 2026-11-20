@@ -323,8 +323,11 @@ func TestEnvListMarksNotLinkedHere(t *testing.T) {
 	}
 
 	out, _ = mustRun(t, dir, "connection", "list", "--all")
-	if !regexp.MustCompile(`(?m)^connection +warehouse +vault \(global\) +not linked here$`).MatchString(out) ||
-		!strings.Contains(out, "Link it to this one:\n  astro local env connection link declared_db\n  astro local env connection link warehouse\n") {
+	if !regexp.MustCompile(`(?m)^connection +warehouse +vault \(global\) +not linked here$`).MatchString(out) {
+		t.Errorf("text list:\n%s", out)
+	}
+	out, _ = mustRun(t, dir, "connection", "list", "--all", "-o", "wide")
+	if !regexp.MustCompile(`(?m)^connection +warehouse +vault \(global\) +not linked here +astro local env connection link warehouse +$`).MatchString(out) {
 		t.Errorf("text list:\n%s", out)
 	}
 
@@ -412,7 +415,7 @@ func TestEnvLinkRefusesAnUnusableIndex(t *testing.T) {
 				t.Errorf("reach = %+v, want the index error", v.Reach)
 			}
 			out, _ := mustRun(t, dir, "connection", "list", "--all")
-			if !strings.Contains(out, "not linked here (link index") || strings.Contains(out, "Link it to this one") {
+			if !strings.Contains(out, "not linked here (link index") {
 				t.Errorf("list:\n%s", out)
 			}
 		})

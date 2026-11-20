@@ -275,7 +275,7 @@ func TestEnvListMarksUndeclaredGlobalApplied(t *testing.T) {
 	if err := execute(t, d, "local", "env", "list"); err != nil {
 		t.Fatal(err)
 	}
-	for _, line := range strings.Split(listTable(out.String()), "\n") {
+	for _, line := range strings.Split(out.String(), "\n") {
 		switch {
 		case strings.Contains(line, "STRAY"):
 			if !strings.HasSuffix(strings.TrimSpace(line), "not declared") {
@@ -335,20 +335,21 @@ func TestStartMissingEnvHint(t *testing.T) {
 	}
 }
 
-// The NOTE cell is one short state, and the commands that settle each row are
-// listed once under the table, grouped under a line that says what the note
-// means. An orphan in another project (which only --all reaches) carries no
-// command: `astro local env <noun> delete` acts on the working directory's
-// project, so any command offered for it would edit the wrong file.
+// The NOTE cell is one short state, and the list prints nothing under the
+// table. -o wide adds REQUIRED, SECRET, NEXT and DESCRIPTION. An orphan in
+// another project (which only --all reaches) gets no NEXT command: `astro
+// local env <noun> delete` acts on the working directory's project, so any
+// command offered for it would edit the wrong file.
 func TestEnvListNotes(t *testing.T) {
 	items := []localenv.ListItem{
 		{
-			Kind: localenv.KindEnv, Name: "API_URL", Source: "absent", Required: true,
+			Kind: localenv.KindEnv, Name: "API_URL", Source: "absent", Required: true, Secret: true,
+			Description:   "Where the\n  API lives",
 			SetHint:       "astro local env variable set API_URL",
 			UndeclareHint: "astro local env variable undeclare API_URL",
 		},
 		{
-			Kind: localenv.KindEnv, Name: "DECLARED", Source: "project", Required: true,
+			Kind: localenv.KindEnv, Name: "DECLARED", Source: "project", Required: true, Resolved: true,
 		},
 		{
 			Kind: localenv.KindEnv, Name: "ELSEWHERE", Source: "project",
@@ -374,7 +375,7 @@ func TestEnvListNotes(t *testing.T) {
 		},
 	}
 	var out strings.Builder
-	if err := renderEnvList(&out, items, "", true); err != nil {
+	if err := renderEnvList(&out, items, "", true, false); err != nil {
 		t.Fatal(err)
 	}
 	want := "" +
@@ -385,28 +386,31 @@ func TestEnvListNotes(t *testing.T) {
 		"variable  GLOBALONLY  vault (global)  not declared\n" +
 		"variable  LEFTOVER    project         not declared\n" +
 		"variable  LOG_LEVEL   absent          no value\n" +
-		"variable  TOKEN       absent          not linked here\n" +
-		"\n" +
-		"missing: pyproject.toml requires it and nothing sets it, so astro local start refuses. Set it or remove the declaration:\n" +
-		"  astro local env variable set API_URL\n" +
-		"  astro local env variable undeclare API_URL\n" +
-		"no value: pyproject.toml declares it optional and nothing sets it. Set it or remove the declaration:\n" +
-		"  astro local env variable set LOG_LEVEL\n" +
-		"  astro local env variable undeclare LOG_LEVEL\n" +
-		"not declared: pyproject.toml does not list it. Declare it so every copy of the project requires it, or delete it:\n" +
-		"  astro local env variable delete GLOBALONLY --global\n" +
-		"  astro local env variable declare LEFTOVER\n" +
-		"  astro local env variable delete LEFTOVER --project\n" +
-		"not linked here: this project does not get it from the global vault. Link it to this one:\n" +
-		"  astro local env variable link TOKEN\n"
+		"variable  TOKEN       absent          not linked here\n"
 	if out.String() != want {
 		t.Errorf("list =\n%s\nwant\n%s", out.String(), want)
 	}
 
-	// Outside a project nothing is declared, so no row is marked not declared
-	// and there is nothing to explain under the table.
 	out.Reset()
-	if err := renderEnvList(&out, items[3:4], "", false); err != nil {
+	if err := renderEnvList(&out, items, "", true, true); err != nil {
+		t.Fatal(err)
+	}
+	want = "" +
+		"KIND      NAME        SOURCE          NOTE                               REQUIRED  SECRET  NEXT                                                 DESCRIPTION\n" +
+		"variable  API_URL     absent          missing                            yes       yes     astro local env variable set API_URL                 Where the API lives\n" +
+		"variable  DECLARED    project                                            yes                                                                    \n" +
+		"variable  ELSEWHERE   project         not declared (in /projects/other)                                                                         \n" +
+		"variable  GLOBALONLY  vault (global)  not declared                                         astro local env variable delete GLOBALONLY --global  \n" +
+		"variable  LEFTOVER    project         not declared                                         astro local env variable declare LEFTOVER            \n" +
+		"variable  LOG_LEVEL   absent          no value                                             astro local env variable set LOG_LEVEL               \n" +
+		"variable  TOKEN       absent          not linked here                                      astro local env variable link TOKEN                  \n"
+	if out.String() != want {
+		t.Errorf("list -o wide =\n%s\nwant\n%s", out.String(), want)
+	}
+
+	// Outside a project nothing is declared, so no row is marked not declared.
+	out.Reset()
+	if err := renderEnvList(&out, items[3:4], "", false, false); err != nil {
 		t.Fatal(err)
 	}
 	want = "" +
@@ -417,8 +421,8 @@ func TestEnvListNotes(t *testing.T) {
 	}
 }
 
-// A declaration's description shows in the text list, and the JSON rows carry
-// it with the required and secret flags.
+// A declaration's description shows in the wide text list, not the plain one,
+// and the JSON rows carry it with the required and secret flags.
 func TestEnvListShowsTheDescription(t *testing.T) {
 	dir := envProject(t, "[tool.astro.env]\n"+
 		"API_TOKEN = { secret = true, description = '''Token for\nthe API''' }\n"+
@@ -428,12 +432,20 @@ func TestEnvListShowsTheDescription(t *testing.T) {
 	if err := execute(t, d, "local", "env", "list"); err != nil {
 		t.Fatal(err)
 	}
+	if strings.Contains(out.String(), "DESCRIPTION") || strings.Contains(out.String(), "Token for") {
+		t.Errorf("a plain list should leave the description to -o wide:\n%s", out.String())
+	}
+
+	d, out, _ = envDeps(t, dir, "")
+	if err := execute(t, d, "local", "env", "list", "-o", "wide"); err != nil {
+		t.Fatal(err)
+	}
 	text := out.String()
 	if !strings.Contains(strings.SplitN(text, "\n", 2)[0], "DESCRIPTION") {
 		t.Errorf("the header should name the DESCRIPTION column:\n%s", text)
 	}
 	var tokenRow string
-	for _, line := range strings.Split(listTable(text), "\n") {
+	for _, line := range strings.Split(text, "\n") {
 		if strings.Contains(line, "API_TOKEN") {
 			tokenRow = line
 		}
@@ -1118,12 +1130,4 @@ func TestListKindColumnNamesTheNounButJSONKeepsTheWireToken(t *testing.T) {
 			t.Errorf("JSON should keep the wire token %s:\n%s", want, out.String())
 		}
 	}
-}
-
-// listTable is the table part of a text env list: the lines above the blank
-// line that starts the notes under it, which name the rows again in their
-// commands.
-func listTable(out string) string {
-	table, _, _ := strings.Cut(out, "\n\n")
-	return table
 }

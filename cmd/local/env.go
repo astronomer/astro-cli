@@ -568,9 +568,10 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		long = "List every value declared in pyproject.toml and where it resolves from, and every " +
 			"value a start passes to this project that is not declared. Airflow gets both. " +
 			"Declaring a name makes every copy of the project require it, and linking limits which " +
-			"projects a global reaches. The NOTE column marks rows that need attention, and the " +
-			"lines under the table give the commands for them. Values are not shown; use the get " +
-			"command to see one."
+			"projects a global reaches. The NOTE column marks rows that need attention: missing, " +
+			"no value, not declared, not linked here, or invalid key. -o wide adds whether each is " +
+			"required and secret, the command that settles its note, and its description. " +
+			"Values are not shown; use the get command to see one."
 	}
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -579,6 +580,8 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		Long:    long,
 		Example: "  # " + short + "\n" +
 			"  " + cmdLine + "\n\n" +
+			"  # With the command that settles each note, and each declaration's description\n" +
+			"  " + cmdLine + " -o wide\n\n" +
 			"  # Also every known project's .env, and globals not linked to this project\n" +
 			"  " + cmdLine + " --all",
 		Args: cobra.NoArgs,
@@ -586,6 +589,9 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			return c.runEnvList(scope, all, only)
 		},
 	}
+	// The family's --output, with wide added for this command; it shadows the
+	// one the local root registers and writes the same field.
+	cliout.AddOutputFlag(cmd, &c.output, formatWide)
 	cmd.Flags().BoolVarP(&all, "all", "a", false, "Also include every known project's .env, and vault globals not linked to this project")
 	return cmd
 }
@@ -1239,6 +1245,12 @@ func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 // kind, resolution order and all.
 func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error {
 	r := c.renderer()
+	// wide is text with more columns, so the Renderer, which renders text and
+	// json only, gets text.
+	wide := r.Format == formatWide
+	if wide {
+		r.Format = cliout.FormatText
+	}
 	projectDir, _ := c.discoverProject() //nolint:errcheck // outside a project, list still shows the global vault
 	m, schema, err := c.loadManifestSchema(projectDir)
 	if err != nil {
@@ -1285,7 +1297,7 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 		items = kept
 	}
 	return emitRows(r, items, len(items), newEnvList, func(w io.Writer, items []localenv.ListItem) error {
-		return renderEnvList(w, items, only, projectDir != "")
+		return renderEnvList(w, items, only, projectDir != "", wide)
 	})
 }
 
@@ -1310,12 +1322,16 @@ func (c *cli) listOptions(projectDir string, m *manifest.Manifest) localenv.List
 	return opts
 }
 
-// renderEnvList prints the table, then, under it, what each NOTE means and the
-// commands that settle those rows. only names the kind the rows were narrowed
+// formatWide is env list's extra --output format: the text table with the
+// columns a plain list leaves out.
+const formatWide cliout.Format = "wide"
+
+// renderEnvList prints the table. only names the kind the rows were narrowed
 // to, or is empty for the cross-kind view; it exists for the empty case.
 // inProject is false outside a project, where nothing is declared, so no row
-// is marked "not declared".
-func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, inProject bool) error {
+// is marked "not declared". wide adds REQUIRED, SECRET, NEXT (the command
+// that settles a row's note) and DESCRIPTION.
+func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, inProject, wide bool) error {
 	if len(items) == 0 {
 		if only != "" {
 			_, err := fmt.Fprintf(w, "No %ss declared or set.\n", localenv.Noun(only))
@@ -1324,15 +1340,6 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, i
 		_, err := fmt.Fprintln(w, "No values declared or set.")
 		return err
 	}
-	// DESCRIPTION is a column only when some row has one, so a project that
-	// writes no descriptions keeps the four-column table.
-	described := false
-	for i := range items {
-		if items[i].Description != "" {
-			described = true
-			break
-		}
-	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	// The KIND cell names the subcommand that manages the value, the same as
 	// every other user-facing string in this tree. The JSON `kind` field keeps
@@ -1340,147 +1347,82 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, i
 	// person reads, and printing `var` for an Airflow Variable contradicts the
 	// grammar, where `var` is an alias for a plain environment variable.
 	header := "KIND\tNAME\tSOURCE\tNOTE"
-	if described {
-		header += "\tDESCRIPTION"
+	if wide {
+		header += "\tREQUIRED\tSECRET\tNEXT\tDESCRIPTION"
 	}
 	fmt.Fprintln(tw, header)
-	var groups noteGroups
 	for i := range items {
 		it := &items[i]
-		n := listNote(it, inProject)
-		groups.add(n)
-		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, n.cell)
-		if described {
-			// Collapsed to one line: a TOML multi-line string would otherwise
-			// break the row out of the table.
-			row += "\t" + strings.Join(strings.Fields(it.Description), " ")
+		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, listNote(it, inProject))
+		if wide {
+			// The description is collapsed to one line: a TOML multi-line
+			// string would otherwise break the row out of the table.
+			row += fmt.Sprintf("\t%s\t%s\t%s\t%s", yesOrBlank(it.Required), yesOrBlank(it.Secret),
+				nextCommand(it, inProject), strings.Join(strings.Fields(it.Description), " "))
 		}
 		fmt.Fprintln(tw, row)
 	}
-	if err := tw.Flush(); err != nil {
-		return err
-	}
-	return groups.render(w)
+	return tw.Flush()
 }
 
-// noteKind is what a row's NOTE says about it. The footer explains each kind
-// that appears, once and in this order, with the commands for its rows.
-type noteKind int
-
-const (
-	noteNone noteKind = iota
-	noteMissing
-	noteNoValue
-	noteNotDeclared
-	noteNotLinked
-	noteInvalid
-	noteKinds
-)
-
-// rowNote is one row's NOTE cell and the commands the footer lists for it.
-type rowNote struct {
-	kind     noteKind
-	cell     string
-	commands []string
-}
-
-// listNote is a list row's NOTE: one short state for the cell, and the
-// commands that settle it, which the footer prints under the table. The JSON
-// rows carry the same commands as hint fields.
-func listNote(it *localenv.ListItem, inProject bool) rowNote {
+// listNote is a list row's NOTE cell: one short state, or nothing for a row
+// that needs no attention.
+func listNote(it *localenv.ListItem, inProject bool) string {
 	switch {
 	case it.Invalid != "":
-		n := rowNote{kind: noteInvalid, cell: "invalid key"}
-		if it.Project != "" {
-			n.cell += " (in " + it.Project + ")"
-		}
-		return n.with(it.RemoveHint)
+		return "invalid key" + inProjectSuffix(it)
 	case it.NotLinkedHere && it.LinksDown != "":
-		return rowNote{kind: noteNotLinked, cell: "not linked here (" + it.LinksDown + ")"}
+		return "not linked here (" + it.LinksDown + ")"
 	case it.NotLinkedHere:
-		return rowNote{kind: noteNotLinked, cell: "not linked here"}.with(it.LinkHint)
+		return "not linked here"
 	case it.SetHint != "" && it.UndeclareHint != "":
 		if it.Required {
-			return rowNote{kind: noteMissing, cell: "missing"}.with(it.SetHint, it.UndeclareHint)
+			return "missing"
 		}
-		return rowNote{kind: noteNoValue, cell: "no value"}.with(it.SetHint, it.UndeclareHint)
+		return "no value"
 	case it.Orphan && inProject:
-		// An orphan found under --all lives in another project's file, and
-		// says which. It offers no command: delete acts on the working
-		// directory's project, so ListItem leaves RemoveHint and DeclareHint
-		// empty for these rather than name a command that edits the wrong
-		// file.
-		n := rowNote{kind: noteNotDeclared, cell: "not declared"}
-		if it.Project != "" {
-			n.cell += " (in " + it.Project + ")"
-		}
-		return n.with(it.DeclareHint, it.RemoveHint)
+		return "not declared" + inProjectSuffix(it)
 	}
-	return rowNote{}
+	return ""
 }
 
-// with adds the non-empty commands to n.
-func (n rowNote) with(commands ...string) rowNote {
-	for _, c := range commands {
-		if c != "" {
-			n.commands = append(n.commands, c)
-		}
+// inProjectSuffix names the project an --all row came from, when it is not
+// the current one.
+func inProjectSuffix(it *localenv.ListItem) string {
+	if it.Project == "" {
+		return ""
 	}
-	return n
+	return " (in " + it.Project + ")"
 }
 
-// noteGroups collects the rows' notes by kind for the footer.
-type noteGroups struct {
-	seen     [noteKinds]bool
-	commands [noteKinds][]string
+// nextCommand is a wide list's NEXT cell: the command that settles the row's
+// note, or nothing. Where a note has two ways out it names the first; the JSON
+// rows carry both as hint fields. An orphan in another project, which only
+// --all reaches, gets none: delete acts on the working directory's project,
+// so ListItem leaves its hints empty rather than name a command that edits
+// the wrong file.
+func nextCommand(it *localenv.ListItem, inProject bool) string {
+	switch {
+	case it.Invalid != "":
+		return it.RemoveHint
+	case it.NotLinkedHere:
+		return it.LinkHint
+	case it.SetHint != "":
+		return it.SetHint
+	case it.Orphan && inProject && it.DeclareHint != "":
+		return it.DeclareHint
+	case it.Orphan:
+		return it.RemoveHint
+	}
+	return ""
 }
 
-func (g *noteGroups) add(n rowNote) {
-	if n.kind == noteNone {
-		return
+// yesOrBlank is a wide list's REQUIRED or SECRET cell.
+func yesOrBlank(b bool) string {
+	if b {
+		return "yes"
 	}
-	g.seen[n.kind] = true
-	g.commands[n.kind] = append(g.commands[n.kind], n.commands...)
-}
-
-// noteLegends is what each NOTE means, printed once under the table when some
-// row carries that note, and what to do about it, added when the footer has
-// commands to list under it.
-var noteLegends = [noteKinds]struct{ meaning, action string }{
-	noteMissing:     {"missing: pyproject.toml requires it and nothing sets it, so astro local start refuses", "Set it or remove the declaration"},
-	noteNoValue:     {"no value: pyproject.toml declares it optional and nothing sets it", "Set it or remove the declaration"},
-	noteNotDeclared: {"not declared: pyproject.toml does not list it", "Declare it so every copy of the project requires it, or delete it"},
-	noteNotLinked:   {"not linked here: this project does not get it from the global vault", "Link it to this one"},
-	noteInvalid:     {"invalid key: " + localenv.InvalidStoredReason(localenv.KindVar, "1st"), ""},
-}
-
-// render prints the footer: a blank line, then each note that appeared, with
-// its rows' commands indented under it.
-func (g *noteGroups) render(w io.Writer) error {
-	var b strings.Builder
-	for k := noteMissing; k < noteKinds; k++ {
-		if !g.seen[k] {
-			continue
-		}
-		legend := noteLegends[k]
-		b.WriteString(legend.meaning)
-		if len(g.commands[k]) == 0 {
-			b.WriteString(".\n")
-			continue
-		}
-		if legend.action != "" {
-			b.WriteString(". " + legend.action)
-		}
-		b.WriteString(":\n")
-		for _, c := range g.commands[k] {
-			b.WriteString("  " + c + "\n")
-		}
-	}
-	if b.Len() == 0 {
-		return nil
-	}
-	_, err := fmt.Fprint(w, "\n"+b.String())
-	return err
+	return ""
 }
 
 // envStore resolves the flags to the one store a set/get/delete acts on,

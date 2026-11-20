@@ -278,9 +278,10 @@ func TestListNotesAnUnsuppliedWorkspaceName(t *testing.T) {
 	d, out, _ := envDeps(t, dir, "")
 	require.NoError(t, execute(t, d, "local", "env", "list"))
 	assert.Regexp(t, `(?m)^variable +API_URL +workspace +no value$`, out.String())
-	assert.Contains(t, out.String(), "Set it or remove the declaration:\n"+
-		"  astro local env variable set API_URL\n"+
-		"  astro local env variable undeclare API_URL\n")
+
+	d, out, _ = envDeps(t, dir, "")
+	require.NoError(t, execute(t, d, "local", "env", "list", "-o", "wide"))
+	assert.Regexp(t, `(?m)^variable +API_URL +workspace +no value +astro local env variable set API_URL +$`, out.String())
 }
 
 func TestDeleteUndeclareJSON(t *testing.T) {
@@ -357,7 +358,7 @@ func TestListNotesBothWaysOutOfAnAbsentName(t *testing.T) {
 	d, out, _ := envDeps(t, dir, "")
 	require.NoError(t, execute(t, d, "local", "env", "list"))
 	var demo, present string
-	for _, line := range strings.Split(listTable(out.String()), "\n") {
+	for _, line := range strings.Split(out.String(), "\n") {
 		switch {
 		case strings.Contains(line, "DEMO_VAR2"):
 			demo = line
@@ -367,8 +368,7 @@ func TestListNotesBothWaysOutOfAnAbsentName(t *testing.T) {
 	}
 	assert.Regexp(t, `no value$`, demo)
 	assert.NotContains(t, present, "no value")
-	assert.Contains(t, out.String(), "  astro local env variable set DEMO_VAR2\n"+
-		"  astro local env variable undeclare DEMO_VAR2\n")
+	assert.NotContains(t, out.String(), "astro local env variable set DEMO_VAR2", "a plain list prints no commands")
 
 	d, out, _ = envDeps(t, dir, "")
 	require.NoError(t, execute(t, d, "local", "env", "list", "--output", "json"))
