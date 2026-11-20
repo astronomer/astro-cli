@@ -206,6 +206,31 @@ func TestCheckAsksAboutAnInProjectLinkAtItsRealPath(t *testing.T) {
 		"judged by the real path: the committed ca.pem is not refused through the link either")
 }
 
+// A generated build copies what an in-project link leads to, so a link whose
+// own name looks like nothing in particular, to a git-ignored .env, is refused
+// for what it leads to. A link to a tracked file that is no credential ships.
+func TestCheckRefusesAnInProjectLinkToACredential(t *testing.T) {
+	needsGit(t)
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q")
+	writeFiles(t, dir, map[string]string{
+		".gitignore": ".env\n",
+		".env":       "TOKEN=x\n",
+		"README.md":  "readme",
+	})
+	gitRun(t, dir, "add", ".gitignore", "README.md")
+	for link, target := range map[string]string{"settings": ".env", "docs": "README.md"} {
+		if err := os.Symlink(target, filepath.Join(dir, link)); err != nil {
+			t.Skipf("symlinks unavailable here: %v", err)
+		}
+	}
+
+	r := check(t, dir, "")
+	assert.Empty(t, r.Unanswered)
+	assert.Contains(t, r.Secrets, "settings", "the link to .env ships .env's contents")
+	assert.NotContains(t, r.Secrets, "docs", "a link to a tracked file that is no credential ships")
+}
+
 // A file a generated build reaches through a link out of the project is not
 // asked of git: one that looks like a credential, by its path in the project
 // or where the link leads, is refused. That includes a credential committed in
