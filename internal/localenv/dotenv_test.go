@@ -159,3 +159,34 @@ func TestDotenvWarningsSayNotPassedOnlyForSkippedLines(t *testing.T) {
 		t.Errorf("skipped line 2 should say it is not passed: %q", got[1].Reason)
 	}
 }
+
+// A value holding a '$' is never written bare, where a reader that
+// interpolates (Compose, python-dotenv) would expand it: single-quoted, or
+// with the dollar escaped when it has to be double-quoted. Either way it reads
+// back unchanged.
+func TestSetQuotesADollar(t *testing.T) {
+	dir := t.TempDir()
+	s := &Store{Path: filepath.Join(dir, ".env"), Scope: ScopeProject}
+	for v, line := range map[string]string{
+		"pa$word":     `K='pa$word'`,
+		"${HOME}":     `K='${HOME}'`,
+		"it's $5":     `K="it's \$5"`,
+		`ends $here\`: `K="ends \$here\\"`,
+		"no dollar":   `K='no dollar'`,
+		"plain":       `K=plain`,
+		"$":           `K='$'`,
+		`a\$b`:        `K='a\$b'`,
+		`say "hi" $x`: `K='say "hi" $x'`,
+		`it's a\$b`:   `K="it's a\\\$b"`,
+	} {
+		if _, err := s.Set(KindEnv, "K", v); err != nil {
+			t.Fatalf("set %q: %v", v, err)
+		}
+		if got := strings.TrimSuffix(readFile(t, s.Path), "\n"); got != line {
+			t.Errorf("set %q wrote %s, want %s", v, got, line)
+		}
+		if got, _, err := s.Get(KindEnv, "K"); err != nil || got != v {
+			t.Errorf("set %q read back %q (err %v)", v, got, err)
+		}
+	}
+}

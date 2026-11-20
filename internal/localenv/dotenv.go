@@ -163,10 +163,18 @@ func writeLines(path string, lines []string, addTrailingNewline bool) error {
 
 // formatValue renders a value as the right-hand side of a dotenv line so
 // airflowrt.ParseDotenv decodes it back unchanged. A value that would
-// otherwise be ambiguous — whitespace, a '#', a quote — is wrapped in single
-// quotes, which hold everything literally except a single quote, and a
+// otherwise be ambiguous — whitespace, a '#', a quote, a '$' — is wrapped in
+// single quotes, which hold everything literally except a single quote, and a
 // backslash right before the closing one. A value with either of those is
-// double-quoted instead, with its backslashes and double quotes escaped.
+// double-quoted instead, with its backslashes, double quotes and dollars
+// escaped.
+//
+// The '$' is quoted although ParseDotenv does no ${VAR} interpolation, because
+// other dotenv readers do (Docker Compose, python-dotenv), and so would this
+// one if it ever gained it: a value written bare as pa$word would then quietly
+// read as "pa". In quotes none of them interpolates it. (Backslashes inside
+// single quotes are another matter: Compose and ParseDotenv keep them as
+// written, python-dotenv decodes \\ and \'.)
 func formatValue(v string) string {
 	if v == "" || !needsQuoting(v) {
 		return v
@@ -174,14 +182,14 @@ func formatValue(v string) string {
 	if !strings.Contains(v, "'") && !strings.HasSuffix(v, `\`) {
 		return "'" + v + "'"
 	}
-	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(v) + `"`
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`, `$`, `\$`).Replace(v) + `"`
 }
 
 func needsQuoting(v string) bool {
 	if v != strings.TrimSpace(v) {
 		return true
 	}
-	return strings.ContainsAny(v, " \t\"'#")
+	return strings.ContainsAny(v, " \t\"'#$")
 }
 
 // EnvKeyFor maps a kind and name to the Airflow env-var name the value is
