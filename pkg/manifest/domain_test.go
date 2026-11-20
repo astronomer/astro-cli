@@ -108,3 +108,42 @@ func TestWorkspaceOrganization(t *testing.T) {
 		}
 	}
 }
+
+// A domain is a host name and nothing else, read as NormalizeAPCDomain reads
+// it: a copied URL and any case pass, and anything that would put another
+// host, a port, a path, a query or a fragment into the API's URL does not.
+func TestCheckDomain(t *testing.T) {
+	for _, d := range []string{
+		"astronomer.io",
+		"https://cloud.astronomer-dev.io/",
+		"Astro.Example.COM",
+		"localhost",
+		"10.0.0.5",
+		"pr12345.astronomer-dev.io",
+		"airflow_internal.corp.example",
+		" astro.example.com ",
+	} {
+		if err := CheckDomain(d); err != nil {
+			t.Errorf("CheckDomain(%q) = %v, want nil", d, err)
+		}
+	}
+	for _, d := range []string{
+		"astro.example.com@other.example",
+		"user:pw@astro.example.com",
+		"astro.example.com:8443",
+		"other.example/astro.example.com",
+		"astro.example.com?x=",
+		"astro.example.com#x",
+		"astro example.com",
+		"astro..example.com",
+		"-astro.example.com",
+		"astro-.example.com",
+		".",
+		"",
+		"https://",
+	} {
+		if err := CheckDomain(d); err == nil {
+			t.Errorf("CheckDomain(%q) = nil, want it refused", d)
+		}
+	}
+}

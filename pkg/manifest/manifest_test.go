@@ -663,6 +663,60 @@ domain = "astronomer.io\u001b[2J"
 		wantKeys: []string{"tool.astro.domain"},
 	},
 	{
+		// A user in front of the host: spliced into the API's URL, the host
+		// would be the part after the @.
+		name:      "a domain that names another host",
+		wantCodes: []ProblemCode{CodeDomainNotAHost},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+workspace = "ws"
+domain = "astronomer.io@other.example"
+`,
+		wantKeys: []string{"tool.astro.domain"},
+	},
+	{
+		name:      "an apc link domain with a port",
+		wantCodes: []ProblemCode{CodeDomainNotAHost},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+workspace = "ws-astro"
+
+[tool.astro.deployments.prod-apc]
+target = "apc"
+domain = "astro.example.com:8443"
+workspace = "ckws-apc"
+deployment = "ckdep-apc"
+`,
+		wantKeys: []string{"tool.astro.deployments.prod-apc.domain"},
+	},
+	{
+		name:      "an apc link domain with a path",
+		wantCodes: []ProblemCode{CodeDomainNotAHost},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+workspace = "ws-astro"
+
+[tool.astro.deployments.prod-apc]
+target = "apc"
+domain = "other.example/astro.example.com"
+workspace = "ckws-apc"
+deployment = "ckdep-apc"
+`,
+		wantKeys: []string{"tool.astro.deployments.prod-apc.domain"},
+	},
+	{
 		name:      "an apc link domain with a control character",
 		wantCodes: []ProblemCode{CodeControlCharacter},
 		content: `

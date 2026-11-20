@@ -527,6 +527,11 @@ const (
 	// no link that uses the Astro login: a host for nothing, most likely a
 	// workspace line deleted and its domain left behind.
 	CodeDomainWithoutWorkspace ProblemCode = "domain_without_workspace"
+	// CodeDomainNotAHost is a domain, [tool.astro] domain or an apc link's,
+	// that is not a host name alone (CheckDomain): one carrying a user, a
+	// port, a path or a query names a different host once it is spliced into
+	// the API's URL than the one it reads as.
+	CodeDomainNotAHost ProblemCode = "domain_not_a_host"
 	// CodeOrganizationWithoutWorkspace is [tool.astro] organization with no
 	// workspace: it names the organization of the linked workspace, and there
 	// is none.
@@ -658,7 +663,7 @@ var problemCodes = []ProblemCode{
 	CodeProjectNameInvalid,
 	CodeDockerfileSeparators, CodeDockerfileOutsideProject, CodeBuildSecretInvalid,
 	CodeBuildSecretsWithoutDockerfile, CodeTargetNotAName, CodeDomainWithoutWorkspace,
-	CodeOrganizationWithoutWorkspace,
+	CodeDomainNotAHost, CodeOrganizationWithoutWorkspace,
 
 	CodeAirflowMissing, CodeAirflowUnpinned, CodeAirflowAmbiguous,
 	CodeAirflowCoreBeforeThree, CodeDependenciesDynamic, CodeAirflowRemoved,
@@ -995,6 +1000,17 @@ func (p *parser) add(code ProblemCode, key, reason string) {
 	p.problems = append(p.problems, Problem{Code: code, Key: key, Reason: reason})
 }
 
+// reported reports whether key already has a problem, so a later check on the
+// same value does not report it a second time.
+func (p *parser) reported(key string) bool {
+	for i := range p.problems {
+		if p.problems[i].Key == key {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *parser) warn(code ProblemCode, key, reason string) {
 	p.warnings = append(p.warnings, Problem{Code: code, Key: key, Reason: reason})
 }
@@ -1026,6 +1042,12 @@ func (p *parser) astro(raw map[string]any) Astro {
 		Deploy:       p.deploy(raw["deploy"]),
 	}
 	a.Deployments = p.links(raw["deployments"], &a)
+	if a.Domain != "" && !p.reported(astroRoot+".domain") {
+		if err := CheckDomain(a.Domain); err != nil {
+			p.add(CodeDomainNotAHost, astroRoot+".domain", err.Error())
+			a.Domain = ""
+		}
+	}
 	if a.Domain != "" && a.Workspace == "" && !usesAstroLogin(a.Deployments) {
 		p.add(CodeDomainWithoutWorkspace, astroRoot+".domain", "names the Astro host for a Workspace or an astro-auth Deployment link, and the project has neither")
 	}
@@ -1101,6 +1123,28 @@ func NormalizeAPCDomain(d string) string {
 	d = strings.TrimPrefix(d, "https://")
 	d = strings.TrimPrefix(d, "http://")
 	return strings.TrimRight(d, "/")
+}
+
+// domainHost is a host name as CheckDomain takes one, after NormalizeAPCDomain:
+// dot-separated labels of letters, digits, hyphens and underscores, none empty
+// and none starting or ending with a hyphen. An IPv4 address is one.
+var domainHost = regexp.MustCompile(`^[a-z0-9_]([a-z0-9_-]*[a-z0-9_])?(\.[a-z0-9_]([a-z0-9_-]*[a-z0-9_])?)*$`)
+
+// CheckDomain is nil when d names a host and nothing else: a domain as
+// `astro login` takes it, an Astro Private Cloud base domain, a manifest's
+// domain. It is read as NormalizeAPCDomain reads it, so a copied URL
+// ("https://cloud.astronomer-dev.io/") and any case pass.
+//
+// A domain is spliced into the API's URL as its host (houston.<domain>,
+// api.<domain>), so anything else in it moves the requests, and the token on
+// them, to another host than the one it reads as: astro.example.com@other.example
+// is a user and the host other.example, and a port, a path, a query or a
+// fragment changes the URL around it. They are refused rather than escaped.
+func CheckDomain(d string) error {
+	if h := NormalizeAPCDomain(d); h != "" && domainHost.MatchString(h) {
+		return nil
+	}
+	return fmt.Errorf("%q is not a domain: write the host name alone, as astro.example.com, with no user, port or path", strings.TrimSpace(d))
 }
 
 // NormalizeDomain reduces an Astro host as someone might write it — a copied
@@ -1264,6 +1308,11 @@ func (p *parser) domain(key string, kind LinkKind, raw any) string {
 	d := NormalizeAPCDomain(written)
 	if d == "" {
 		p.add(CodeDomainRequired, key+".domain", required)
+		return ""
+	}
+	if err := CheckDomain(d); err != nil && !p.reported(key+".domain") {
+		p.add(CodeDomainNotAHost, key+".domain", err.Error())
+		return ""
 	}
 	return d
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -139,6 +140,12 @@ func runLogin(args []string, astroV1Client astrov1.APIClient, out io.Writer) err
 	}
 	if len(args) == 1 {
 		domain := domainutil.ExpandShortName(args[0])
+		// Before anything is sent, the APC platform-version probe included: the
+		// domain becomes the API's host, and one carrying a user, a port or a
+		// path would send the login, token and all, to another host.
+		if err := manifest.CheckDomain(domain); err != nil {
+			return cliout.UsageNoHelp(err)
+		}
 		// check if user provided a valid cloud domain
 		if !context.IsCloudDomain(domain) {
 			// get the domain from context as an extra check
@@ -152,6 +159,11 @@ func runLogin(args []string, astroV1Client astrov1.APIClient, out io.Writer) err
 	}
 	// Log back into the current context in case no domain is passed
 	ctx, err := context.GetCurrentContext()
+	if err == nil && ctx.Domain != "" {
+		if err := manifest.CheckDomain(ctx.Domain); err != nil {
+			return fmt.Errorf("the current context's domain: %w; log in to it again with astro login <domain>", err)
+		}
+	}
 	if err != nil || ctx.Domain == "" {
 		// Default case when no domain is passed, and error getting current context
 		return cloudLogin(domainutil.DefaultDomain, token, astroV1Client, out, shouldDisplayLoginLink, signupForDomain(domainutil.DefaultDomain), forceLogin)

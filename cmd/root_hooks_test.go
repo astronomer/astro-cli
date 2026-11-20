@@ -23,6 +23,27 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
+// ASTRO_DOMAIN that is not a host alone stops the run before setup, or
+// anything else, sends a request; a host, as a copied URL too, goes on.
+func TestRootPersistentPreRunERefusesAnAstroDomainThatIsNotAHost(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	require.NoError(t, config.CFG.UpgradeMessage.SetHomeString("false"))
+	origSetup := astroSetup
+	t.Cleanup(func() { astroSetup = origSetup })
+	setupRan := false
+	astroSetup = func(*cobra.Command, astrov1.APIClient) error { setupRan = true; return nil }
+
+	t.Setenv("ASTRO_DOMAIN", "astronomer.io@other.invalid")
+	err := CreateRootPersistentPreRunE(nil)(&cobra.Command{Use: "list"}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ASTRO_DOMAIN")
+	assert.False(t, setupRan, "setup ran with ASTRO_DOMAIN refused")
+
+	t.Setenv("ASTRO_DOMAIN", "https://cloud.astronomer-dev.io/")
+	require.NoError(t, CreateRootPersistentPreRunE(nil)(&cobra.Command{Use: "list"}, nil))
+	assert.True(t, setupRan)
+}
+
 // The hook fails closed: whatever Astro's setup returns stops the command,
 // as it was returned, so its kind and message reach the person. What is soft is
 // decided inside setup (a token renewal that failed while the access token

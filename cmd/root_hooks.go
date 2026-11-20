@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/version"
 )
 
@@ -37,6 +40,16 @@ func CreateRootPersistentPreRunE(astroV1Client astrov1.APIClient) func(cmd *cobr
 	return func(cmd *cobra.Command, args []string) error {
 		if astroCmd.IsCompletion(cmd) {
 			return nil
+		}
+		// ASTRO_DOMAIN names the host every API call of the run goes to (the
+		// current domain, a token run's host), so one that is not a host
+		// alone stops the run before anything is sent: carrying a user, a
+		// port or a path, it would move the requests, and the token on them,
+		// to another host.
+		if d := os.Getenv("ASTRO_DOMAIN"); d != "" {
+			if err := manifest.CheckDomain(d); err != nil {
+				return fmt.Errorf("ASTRO_DOMAIN: %w", err)
+			}
 		}
 		// Check for latest version
 		if config.CFG.UpgradeMessage.GetBool() {
