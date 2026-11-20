@@ -85,7 +85,7 @@ func TestAHealthTimeoutIsToldHowToWaitLonger(t *testing.T) {
 		// As either engine reports it: the sentinel wrapped in that engine's
 		// own words. Matching is on the sentinel, so the words are free to
 		// differ and this test does not pin them.
-		engineErr := fmt.Errorf("%w after 5m0s — Airflow may still be starting", localrt.ErrHealthTimeout)
+		engineErr := fmt.Errorf("%w after 5m0s; Airflow may still be starting", localrt.ErrHealthTimeout)
 
 		err := adviseHealthTimeout(engineErr)
 		if !strings.Contains(err.Error(), healthTimeoutEnv) {
@@ -124,7 +124,7 @@ func TestAHealthTimeoutIsToldHowToWaitLonger(t *testing.T) {
 type timingOutRuntime struct{ fakeRuntime }
 
 func (timingOutRuntime) Start(context.Context, localrt.Plan, localrt.Callbacks) (localrt.Airflow, error) {
-	return nil, fmt.Errorf("%w after 5m0s — Airflow may still be starting", localrt.ErrHealthTimeout)
+	return nil, fmt.Errorf("%w after 5m0s; Airflow may still be starting", localrt.ErrHealthTimeout)
 }
 
 // restartTimingOut is the same, reachable through restart: runRestart reads the

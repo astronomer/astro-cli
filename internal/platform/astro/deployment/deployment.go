@@ -41,7 +41,7 @@ var (
 	errAirflowNotAnswering       = errors.New("timed out waiting for the Deployment's Airflow API to answer, though Astro reports the Deployment healthy")
 	errInvalidResourceRequest    = errors.New("invalid resource request")
 	errNotADevelopmentDeployment = errors.New("the Deployment specified is not a development Deployment")
-	errInvalidTokenName          = errors.New("no name provided for the deployment token. Retry with a valid name")
+	errInvalidTokenName          = errors.New("a name is required for the Deployment token")
 
 	// Monkey patched to write unit tests
 	canCiCdDeploy = CanCiCdDeploy
@@ -55,7 +55,7 @@ var (
 
 // deploymentNotFoundFmt is errInvalidDeployment's message, with the Workspace
 // looked in where %s is.
-const deploymentNotFoundFmt = "the Deployment specified was not found in %s. Your account or API Key may not have access to the deployment specified"
+const deploymentNotFoundFmt = "the Deployment specified was not found in %s. Your account or API token may not have access to it"
 
 const (
 	NoDeploymentInWSMsg = "no Deployments found in workspace"
@@ -153,7 +153,7 @@ func CanCiCdDeploy(bearerToken string) bool {
 	claims, err := parseToken(token)
 	if err != nil {
 		// A warning, so stderr: stdout is the command's result.
-		fmt.Fprintln(os.Stderr, "Unable to Parse Token")
+		fmt.Fprintln(os.Stderr, "Could not parse token")
 		return false
 	}
 
@@ -415,13 +415,13 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 
 	// name input
 	if name == "" {
-		fmt.Fprintln(os.Stderr, "Please specify a name for your Deployment")
+		fmt.Fprintln(os.Stderr, "Specify a name for the Deployment")
 		name, err = input.Text(ansi.ForStderr().Bold("\nDeployment name: "), input.AnsweredBy("--name"))
 		if err != nil {
 			return astrov1.Deployment{}, err
 		}
 		if name == "" {
-			return astrov1.Deployment{}, errors.New("you must give your Deployment a name")
+			return astrov1.Deployment{}, errors.New("the Deployment needs a name")
 		}
 	}
 
@@ -659,7 +659,7 @@ func WriteCreated(w io.Writer, workspaceID string, d *astrov1.Deployment) error 
 	if err != nil {
 		return err
 	}
-	tab.SuccessMsg = fmt.Sprintf("\n Successfully created Deployment: %s", ansi.Bold(d.Name)) +
+	tab.SuccessMsg = fmt.Sprintf("\n Created Deployment %s", ansi.Bold(d.Name)) +
 		"\n Deployment can be accessed at the following URLs \n" +
 		fmt.Sprintf("\n Deployment Dashboard: %s", ansi.Bold(deploymentURL)) +
 		fmt.Sprintf("\n Airflow Dashboard: %s", ansi.Bold(d.WebServerUrl))
@@ -671,7 +671,7 @@ func WriteCreated(w io.Writer, workspaceID string, d *astrov1.Deployment) error 
 func WriteUpdated(w io.Writer, d *astrov1.Deployment) error {
 	tab := newTableOut()
 	deploymentToTableRow(tab, d, false)
-	tab.SuccessMsg = "\n Successfully updated Deployment"
+	tab.SuccessMsg = "\n Updated Deployment"
 	return tab.Print(w)
 }
 
@@ -721,11 +721,11 @@ const (
 
 func validateHybridResources(schedulerAU, schedulerReplicas int, _ astrov1.DeploymentOptions) bool { //nolint:gocritic // intentional in this shell code
 	if schedulerAU > hybridSchedulerAuMax || schedulerAU < hybridSchedulerAuMin {
-		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs\n", hybridSchedulerAuMin, hybridSchedulerAuMax)
+		fmt.Printf("\nScheduler AUs must be between %d and %d\n", hybridSchedulerAuMin, hybridSchedulerAuMax)
 		return false
 	}
 	if schedulerReplicas > hybridSchedulerReplicasMax || schedulerReplicas < hybridSchedulerReplicasMin {
-		fmt.Printf("\nScheduler Replicas must be between a min of %d and a max of %d Replicas\n", hybridSchedulerReplicasMin, hybridSchedulerReplicasMax)
+		fmt.Printf("\nScheduler Replicas must be between %d and %d\n", hybridSchedulerReplicasMin, hybridSchedulerReplicasMax)
 		return false
 	}
 	return true
@@ -773,7 +773,7 @@ func selectRegion(cloudProvider, region string, astroV1Client astrov1.APIClient)
 
 	if region == "" {
 		list := picker.List{
-			Title:   "\nPlease select a Region for your Deployment:",
+			Title:   "\nSelect a Region for the Deployment:",
 			Header:  []string{"REGION"},
 			Ask:     []input.Option{input.About("a Region"), input.AnsweredBy("--region")},
 			Invalid: errInvalidRegionKey,
@@ -796,7 +796,7 @@ func selectRegion(cloudProvider, region string, astroV1Client astrov1.APIClient)
 		}
 	}
 	if reg == "" {
-		return "", errors.New("unable to find specified Region")
+		return "", errors.New("could not find the specified Region")
 	}
 	return region, nil
 }
@@ -809,7 +809,7 @@ func selectCluster(clusterID, organizationID string, astroV1Client astrov1.APICl
 	// select cluster
 	if clusterID == "" {
 		list := picker.List{
-			Title:   "\nPlease select a Cluster for your Deployment:",
+			Title:   "\nSelect a Cluster for the Deployment:",
 			Header:  []string{"CLUSTER NAME", "CLOUD PROVIDER", "CLUSTER ID"},
 			Ask:     []input.Option{input.About("a Cluster"), input.AnsweredBy("--cluster-id")},
 			Invalid: errInvalidClusterKey,
@@ -832,7 +832,7 @@ func selectCluster(clusterID, organizationID string, astroV1Client astrov1.APICl
 		}
 	}
 	if csID == "" {
-		return "", fmt.Errorf("unable to find specified Cluster %q in this Organization. Run \"astro organization cluster list\" to see its clusters", clusterID)
+		return "", fmt.Errorf("could not find the specified Cluster %q in this Organization. Run \"astro organization cluster list\" to see its clusters", clusterID)
 	}
 	return clusterID, nil
 }
@@ -858,7 +858,7 @@ func HealthPoll(progress io.Writer, deploymentID string, sleepTime, tickNum, tim
 // answers. An empty orgID or token is the current context's.
 func HealthPollIn(progress io.Writer, orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
 	progress = progressTo(progress)
-	fmt.Fprintf(progress, "\nWaiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
+	fmt.Fprintf(progress, "\nWaiting for the Deployment to become healthy…\n\nThis may take a few minutes\n")
 	// considering hibernating as healthy state, since hibernation can only happen when the deployment is healthy.
 	// This covers for the case when the deployment is created and straight away goes into hibernation.
 	d, err := pollStatus(orgID, token, deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client, ErrTimedOut,
@@ -975,15 +975,15 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if !canCiCdDeploy(c.Token) {
 			// Refused before the warning that leads up to the question, so a
 			// run that cannot ask prints nothing about it.
-			if err := input.MayAsk("Are you sure you want to continue?", input.AnsweredBy("--yes")); err != nil {
+			if err := input.MayAsk("Change the Dag deploy setting?", input.AnsweredBy("--yes")); err != nil {
 				return UpdateResult{}, err
 			}
 			pw := progressTo(notes)
 			fmt.Fprintln(pw)
-			ansi.Warn(pw, "CI/CD enforcement is on for this Deployment, so once the Dag deploy setting changes, "+
-				"its Dags cannot be deployed from the CLI. Until they are deployed again, they do not show in the Airflow UI "+
-				"and no new tasks start. Deploy them through CI/CD or with an API token, or turn CI/CD enforcement off first")
-			if err := input.ConfirmOrAbort("\nAre you sure you want to continue?", input.AnsweredBy("--yes")); err != nil {
+			ansi.Warn(pw, "CI/CD enforcement is on for this Deployment. After the Dag deploy setting changes, you cannot deploy its Dags "+
+				"from the CLI, and until they are deployed again they do not show in the Airflow UI and no new tasks start. "+
+				"Deploy them through CI/CD or with an API token, or turn off CI/CD enforcement first")
+			if err := input.ConfirmOrAbort("\nChange the Dag deploy setting?", input.AnsweredBy("--yes")); err != nil {
 				return UpdateResult{}, err
 			}
 		}
@@ -994,27 +994,28 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if currentDeployment.IsDagDeployEnabled {
 			pw := progressTo(notes)
 			fmt.Fprintln(pw)
-			ansi.Note(pw, "Dag-only deploys are already on for this Deployment, so nothing changes, and its Dags keep running as scheduled")
+			ansi.Note(pw, "Dag-only deploys are already on for this Deployment; nothing to change")
 			return UpdateResult{Deployment: currentDeployment}, nil
 		}
 
 		pw := progressTo(notes)
 		fmt.Fprintln(pw)
-		ansi.Note(pw, "Dag-only deploys are now on for this Deployment. Running tasks carry on, but no new tasks are scheduled until its Dags are deployed")
-		fmt.Fprintf(pw, "%s astro deploy --dags, to deploy the Dags and resume them. The Airflow UI can take a few minutes to catch up.\n\n", ansi.NextLabel(pw))
+		ansi.Note(pw, "Dag-only deploys are now on for this Deployment. Running tasks continue, but no new tasks are scheduled "+
+			"until you deploy its Dags. The Airflow UI can take a few minutes to update")
+		fmt.Fprintf(pw, "%s astro deploy --dags\n\n", ansi.NextLabel(pw))
 		dagDeployEnabled = true
 	case disable:
 		if !currentDeployment.IsDagDeployEnabled {
 			pw := progressTo(notes)
 			fmt.Fprintln(pw)
-			ansi.Note(pw, "Dag-only deploys are already off for this Deployment, so nothing changes")
+			ansi.Note(pw, "Dag-only deploys are already off for this Deployment; nothing to change")
 			return UpdateResult{Deployment: currentDeployment}, nil
 		}
 		if config.CFG.ShowWarnings.GetBool() {
 			pw := progressTo(notes)
 			fmt.Fprintln(pw)
-			ansi.Warn(pw, "this turns Dag-only deploys off for this Deployment. Running tasks carry on, but no new tasks are scheduled "+
-				"until you run astro deploy, which deploys the Dags with the image. The Airflow UI can take a few minutes to catch up")
+			ansi.Warn(pw, "This turns off Dag-only deploys for this Deployment. Running tasks continue, but no new tasks are scheduled "+
+				"until you run astro deploy, which deploys the Dags with the image. The Airflow UI can take a few minutes to update")
 			confirmWithUser = true
 		}
 		dagDeployEnabled = false
@@ -1103,7 +1104,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		case disable:
 			highAvailabilityValue = false
 		default:
-			return UpdateResult{}, errors.New("Invalid --high-availability value")
+			return UpdateResult{}, errors.New("invalid --high-availability value")
 		}
 		var developmentModeValue bool
 		switch developmentMode {
@@ -1114,7 +1115,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		case disable:
 			developmentModeValue = false
 		default:
-			return UpdateResult{}, errors.New("Invalid --development-mode value")
+			return UpdateResult{}, errors.New("invalid --development-mode value")
 		}
 		defaultTaskPodCPUPtr := updateDefaultTaskPodCPU(defaultTaskPodCpu, &currentDeployment, &configOption)
 		defaultTaskPodMemoryPtr := updateDefaultTaskPodMemory(defaultTaskPodMemory, &currentDeployment, &configOption)
@@ -1399,7 +1400,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	if !force {
 		if confirmWithUser {
 			if err := input.ConfirmOrAbort(
-				fmt.Sprintf("\nAre you sure you want to update the %s Deployment?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+				fmt.Sprintf("\nUpdate Deployment %s?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
 				return UpdateResult{}, err
 			}
 		}
@@ -1412,7 +1413,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	if d.Id == "" {
 		// An update the API answered without a Deployment changed nothing
 		// anyone can see, so it is a failure, not a success with no table.
-		return UpdateResult{}, fmt.Errorf("something went wrong: Deployment %s was not updated", currentDeployment.Name)
+		return UpdateResult{}, fmt.Errorf("could not update Deployment %s", currentDeployment.Name)
 	}
 	return UpdateResult{Deployment: d, Updated: true}, nil
 }
@@ -1565,7 +1566,7 @@ func updateResourceQuotaMemory(resourceQuotaMemory string, deployment *astrov1.D
 var (
 	// errDeleteNeedsTarget is a delete with no Deployment named and nobody to
 	// pick one. --yes answers the confirmation, never which Deployment.
-	errDeleteNeedsTarget = errors.New("astro deployment delete needs the Deployment to delete, and this run cannot ask which one: pass --deployment, or the Deployment id as the argument. --yes skips the confirmation and never chooses the Deployment")
+	errDeleteNeedsTarget = errors.New("astro deployment delete needs a Deployment and cannot ask which one in this run: pass --deployment, or the Deployment id as the argument. --yes skips the confirmation but does not choose a Deployment")
 	// errDeleteNotConfirmed is a confirmation answered with anything but the
 	// Deployment's name: declined, as every declined confirmation is
 	// (input.ErrAborted), saying why.
@@ -1640,7 +1641,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		if err := input.ConfirmOrAbort(
-			fmt.Sprintf("\nAre you sure you want to override to %s for %s Deployment?", ansi.ForStderr().Bold(action), ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+			fmt.Sprintf("\nOverride to %s for Deployment %s?", ansi.ForStderr().Bold(action), ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
 			return nil, err
 		}
 	}
@@ -1705,7 +1706,7 @@ func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		if err := input.ConfirmOrAbort(
-			fmt.Sprintf("\nAre you sure you want to remove the hibernation override and resume schedule for %s Deployment?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+			fmt.Sprintf("\nRemove the hibernation override for Deployment %s and resume its schedule?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
 			return nil, err
 		}
 	}
@@ -2242,7 +2243,7 @@ func deploymentSelectionProcess(ws string, src astrosession.Source, deployments 
 	if len(deployments) == 1 && mayAutoSelect() {
 		if use == ToRead {
 			if !CleanOutput {
-				fmt.Fprintf(os.Stderr, "Only one Deployment was found. Using the following Deployment by default: \n\n Deployment Name: %s\n Deployment ID: %s\n",
+				fmt.Fprintf(os.Stderr, "Using the only Deployment found:\n\n Deployment Name: %s\n Deployment ID: %s\n",
 					ansi.ForStderr().Bold(deployments[0].Name), ansi.ForStderr().Bold(deployments[0].Id))
 			}
 			return deployments[0], nil
@@ -2250,7 +2251,7 @@ func deploymentSelectionProcess(ws string, src astrosession.Source, deployments 
 		// 1.x took it here for every command. A change waits for someone to
 		// pick it, and a run with nobody to ask is told to name it.
 		if !mayAsk() {
-			return astrov1.Deployment{}, input.Required(fmt.Errorf("%s (%s) is the only Deployment in %s this command can act on, but a command that changes a Deployment does not choose one by itself: pass --deployment", deployments[0].Name, deployments[0].Id, astrosession.DescribeWorkspace(ws, src)))
+			return astrov1.Deployment{}, input.Required(fmt.Errorf("%s (%s) is the only Deployment in %s, but this command changes a Deployment and needs one named: pass --deployment", deployments[0].Name, deployments[0].Id, astrosession.DescribeWorkspace(ws, src)))
 		}
 	}
 	return SelectDeployment(deployments, "Select a Deployment")

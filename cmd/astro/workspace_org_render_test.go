@@ -19,10 +19,10 @@ func TestWorkspaceLinesCarryNoEscapes(t *testing.T) {
 	r := func(buf *bytes.Buffer) cliout.Renderer { return cliout.Renderer{Format: cliout.FormatText, Out: buf} }
 
 	var buf bytes.Buffer
-	require.NoError(t, emitWorkspace(r(&buf), &workspace.WorkspaceInfo{Name: name}, "Astro Workspace "+name+" was successfully created"))
-	assert.Equal(t, "Astro Workspace ops was successfully created\n", buf.String())
+	require.NoError(t, emitWorkspace(r(&buf), &workspace.WorkspaceInfo{Name: name}, "Created Workspace "+name))
+	assert.Equal(t, "Created Workspace ops\n", buf.String())
 
 	buf.Reset()
 	require.NoError(t, emitWorkspaceRemoval(r(&buf), &workspace.Removal{Name: name}))
-	assert.Equal(t, "Astro Workspace ops was successfully deleted\n", buf.String())
+	assert.Equal(t, "Deleted Workspace ops\n", buf.String())
 }

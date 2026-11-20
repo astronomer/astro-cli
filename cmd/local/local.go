@@ -186,20 +186,19 @@ func newStartCmd(c *cli) *cobra.Command {
 		Long: "Start local Airflow for this project.\n\n" +
 			"A start waits up to five minutes for Airflow to answer. Set " +
 			"ASTRO_LOCAL_HEALTH_TIMEOUT to a Go duration (10m, 90s) to change that.\n\n" +
-			"With --watch, start stays in the foreground and keeps Airflow in step " +
-			"with edits to pyproject.toml and .env: a package added to the " +
-			"dependencies is installed into the running Airflow, and any other " +
-			"change Airflow only reads at start (a re-pinned package, the Airflow " +
-			"version, [tool.uv], the env) restarts it. A save that leaves " +
-			"pyproject.toml unreadable is reported and Airflow keeps running. " +
+			"With --watch, start stays in the foreground and applies edits to pyproject.toml and .env. " +
+			"A package added to the dependencies is installed into the running Airflow. " +
+			"Any other change that Airflow reads only at start (a re-pinned package, the Airflow " +
+			"version, [tool.uv], the env) restarts it. If a save leaves " +
+			"pyproject.toml unreadable, the error is reported and Airflow keeps running. " +
 			"Ctrl-C stops Airflow and exits.",
 		Example: "  # Start Airflow for this project\n" +
 			"  astro local start\n\n" +
 			"  # Keep it in step with edits to pyproject.toml and .env\n" +
 			"  astro local start --watch\n\n" +
-			"  # In Docker rather than the default standalone mode\n" +
+			"  # In Docker instead of the default standalone mode\n" +
 			"  astro local start --docker\n\n" +
-			"  # On a port of your choosing\n" +
+			"  # On another port\n" +
 			"  astro local start --port 8081\n\n" +
 			"  # Wait up to ten minutes for Airflow, on a slow machine\n" +
 			"  ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro local start",
@@ -1079,7 +1078,7 @@ func renderRemovedRows(w io.Writer, rows []listRow) error {
 		_, err := fmt.Fprintln(w, "No stale local Airflow records to remove.")
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "Removed %d stale record(s):\n", len(rows)); err != nil {
+	if _, err := fmt.Fprintf(w, "Removed %s:\n", plural(len(rows), "stale record", "stale records")); err != nil {
 		return err
 	}
 	for _, row := range rows {
@@ -1257,7 +1256,7 @@ func (c *cli) environment(ctx context.Context, withWorkspace, noSync bool) (loca
 		return nil, c.reportBuildError(r, &plan.MissingEnvError{
 			Project: built.Project.Dir,
 			Missing: workspace,
-			Next:    "provide them, then run the command again — or run it without them: leave off --" + flagWithWorkspace + ".",
+			Next:    "provide them and run the command again, or run it without --" + flagWithWorkspace + ".",
 		})
 	}
 	// On stderr: stdout belongs to the command being run.
@@ -1477,7 +1476,7 @@ func renderReset(w io.Writer, report localrt.ResetReport) error {
 		// database in a volume, so "wiped" would be a lie if the engine that
 		// holds it never answered.
 		_, err := fmt.Fprintln(w, cliout.NoteLabel(w),
-			"no container engine answered, so any docker-mode volume for this project is still there — start the engine and run this again to remove it")
+			"no container engine answered, so any docker-mode volume for this project is still there. Start the engine and run this again to remove it")
 		return err
 	}
 	return nil

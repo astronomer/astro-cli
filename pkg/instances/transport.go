@@ -162,7 +162,7 @@ func (i Instance) httpTransport(ctx context.Context, d Deps) (airflowapi.Transpo
 // given to a command that queries an Airflow. Such a link is listed, pinned
 // and resolved like any other, but reaching its Airflow is not supported yet,
 // so it is refused before any lookup rather than sent somewhere it is not.
-var ErrAPCUnsupported = errors.New("apc links are not supported by commands that query an Airflow yet")
+var ErrAPCUnsupported = errors.New("APC links are not supported by commands that query an Airflow yet")
 
 // apcUnsupported is ErrAPCUnsupported for the link called name.
 func apcUnsupported(name string) error {
@@ -182,7 +182,7 @@ type HTTPDoor struct {
 // MWAA under InvokeRestApi is the case: the request travels inside a signed AWS
 // API call, and there is no URL to point an HTTP client at. Reach it through
 // Transport.
-var ErrNotHTTP = errors.New("this deployment is not reached over HTTP: its requests travel inside a signed AWS API call, so there is no Airflow URL to address")
+var ErrNotHTTP = errors.New("this deployment is not reached over HTTP; its requests go through signed AWS API calls and it has no Airflow URL")
 
 // HTTPDoorFor resolves an instance to a base URL and an Authorization header
 // value, running the credential source once.

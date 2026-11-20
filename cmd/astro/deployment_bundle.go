@@ -56,7 +56,7 @@ func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
   astro deployment bundle create --deployment <id> --name my-dags -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, client, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
+			ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
 			if err != nil {
 				return err
 			}
@@ -81,7 +81,7 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
   astro deployment bundle list --deployment <id> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, client, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
+			ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
 			if err != nil {
 				return err
 			}
@@ -111,7 +111,7 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, client, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
+			ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
 			if err != nil {
 				return err
 			}
@@ -149,7 +149,7 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
-			ws, client, err := deploymentWorkspace(cmd, deploymentID, "failed to find a valid workspace")
+			ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
 			if err != nil {
 				return err
 			}

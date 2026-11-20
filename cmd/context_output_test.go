@@ -162,7 +162,7 @@ func (s *CmdSuite) TestContextDeleteOutput() {
 		s.savedContexts()
 		stdout, _, err := runContextCmd("delete", "astronomer-dev.io")
 		s.NoError(err)
-		s.Equal("Successfully deleted context: astronomer-dev.io\n", stdout)
+		s.Equal("Deleted context: astronomer-dev.io\n", stdout)
 	})
 
 	s.Run("json refuses to confirm deleting the current context, naming --yes", func() {
@@ -194,7 +194,7 @@ func (s *CmdSuite) TestContextDeleteOutput() {
 		defer testUtil.MockUserInput(s.T(), "Y\n")()
 		stdout, _, err := runContextCmd("delete", "astronomer.io")
 		s.NoError(err)
-		s.Equal("Successfully deleted context: astronomer.io\n", stdout)
+		s.Equal("Deleted context: astronomer.io\n", stdout)
 	})
 
 	s.Run("json deletes the current context with --yes", func() {

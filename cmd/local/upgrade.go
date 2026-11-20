@@ -117,7 +117,7 @@ func (c *cli) refreshAfterUpgrade(ctx context.Context, dir string) pinRefresh {
 	switch {
 	case errors.Is(w.lookupErr, runtimeversions.ErrNoAstroBuild):
 		out.Warnings = append(out.Warnings, fmt.Sprintf(
-			"Airflow %s comes from PyPI: Astronomer's index has no build of it, so the environment may differ from a deployment's", w.pin))
+			"Airflow %s comes from PyPI: Astronomer's index has no build of it, so the environment may differ from a Deployment's", w.pin))
 	case w.lookupErr != nil && w.changed:
 		out.Warnings = append(out.Warnings, fmt.Sprintf(
 			"Airflow %s comes from PyPI for now: Astronomer's index could not be read for the new build: %v", w.pin, w.lookupErr))
@@ -208,15 +208,16 @@ func newUpgradeRuntimeCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "runtime [VERSION]",
 		Short: "Move this project to an Astro Runtime version",
-		Long: "Set this project's Astro Runtime version in pyproject.toml ([tool.astro] runtime), and move the " +
-			"apache-airflow requirement too when that version ships an Airflow it does not cover. Older versions " +
+		Long: "Set this project's Astro Runtime version in pyproject.toml ([tool.astro] runtime). If that version ships an Airflow that the " +
+			"apache-airflow requirement does not cover, the requirement moves too. Older versions " +
 			"are allowed, to match what a Deployment runs.\n\n" +
-			"With no version, a project with a runtime line moves it to the newest runtime version for its Airflow series in the " +
-			"runtime catalog, or for its exact Airflow when the requirement pins one (it says when a newer Airflow " +
-			"patch is out). A project with no runtime line already follows the newest runtime version for its series, so it " +
-			"keeps doing so: nothing is pinned, and the command says which version that is.\n\n" +
-			"--python picks the Python the image and the standalone environment run, through requires-python. " +
-			"Without it, requires-python stays: a project pinned to one Python keeps it, and is refused on a runtime version that doesn't ship it; otherwise the runtime version's default Python is used.\n\n" +
+			"With no version, a project with a runtime line moves to the newest runtime version for its Airflow series in the " +
+			"runtime catalog, or for its exact Airflow if the requirement pins one. The command says when a newer Airflow " +
+			"patch is out. A project with no runtime line already follows the newest runtime version for its series. " +
+			"Nothing is pinned, and the command says which version that is.\n\n" +
+			"--python sets the Python that the image and the standalone environment run, through requires-python. " +
+			"Without it, requires-python stays as it is. A project pinned to one Python keeps it, and the command refuses a runtime version that doesn't ship it. " +
+			"Otherwise the runtime version's default Python is used.\n\n" +
 			"Afterwards the runtime's constraints in [tool.uv] are refreshed and uv.lock is relocked, so a deploy " +
 			"or astro package sees the new runtime version without a local start. If Airflow is running, restart it.",
 		Example: "  # Move to the newest runtime version for the project's Airflow\n" +
@@ -469,9 +470,9 @@ func newUpgradeAirflowCmd(c *cli) *cobra.Command {
 		Use:   "airflow [VERSION]",
 		Short: "Move this project to a new Airflow version",
 		Long: "Set this project's Airflow version in pyproject.toml: the apache-airflow requirement, " +
-			"plus requires-python and the runtime pin when they have to move. With no version, use the " +
-			"newest Airflow the runtime catalog offers in the project's own Airflow generation. It never " +
-			"moves an Airflow 2 project to Airflow 3. It says when Airflow 3 is available.\n\n" +
+			"plus requires-python and the runtime pin if they have to move. With no version, use the " +
+			"newest Airflow the runtime catalog offers in the project's own Airflow generation. An Airflow 2 " +
+			"project stays on Airflow 2, and the command says when Airflow 3 is available.\n\n" +
 			"Dag code, providers and a declared Dockerfile are not changed. If Airflow is running, " +
 			"restart it afterwards.",
 		Example: "  # Move to the newest Airflow in the project's generation\n" +

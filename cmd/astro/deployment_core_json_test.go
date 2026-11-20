@@ -183,7 +183,7 @@ func TestDeploymentCoreText(t *testing.T) {
 			},
 			args: createArgs,
 			check: tableThen("etl-prod",
-				"Successfully created Deployment: ", "etl-prod",
+				"Created Deployment ", "etl-prod",
 				"Deployment can be accessed at the following URLs",
 				"Deployment Dashboard: ", coreDeploymentID,
 				"Airflow Dashboard: ", "etl-prod.astronomer.run/d1234"),
@@ -198,14 +198,14 @@ func TestDeploymentCoreText(t *testing.T) {
 				return m
 			},
 			args:  []string{"update", coreDeploymentID, "--name", "etl-prod-2"},
-			check: tableThen("etl-prod-2", "Successfully updated Deployment"),
+			check: tableThen("etl-prod-2", "Updated Deployment"),
 		},
 		{
 			name:   "update to dag deploys it already has",
 			client: func(t *testing.T) astrov1.APIClient { return coreMock(t, coreDeployment()) },
 			args:   []string{"update", coreDeploymentID, "--dag-deploy", "enable"},
 			check:  func(t *testing.T, stdout string) { assert.NotContains(t, stdout, "already on") },
-			stderr: says("Note: Dag-only deploys are already on for this Deployment, so nothing changes"),
+			stderr: says("Note: Dag-only deploys are already on for this Deployment; nothing to change"),
 		},
 		{
 			name: "update, declining an executor change",
@@ -216,7 +216,7 @@ func TestDeploymentCoreText(t *testing.T) {
 			},
 			answers: "n\n",
 			args:    []string{"update", coreDeploymentID, "--executor", "KubernetesExecutor"},
-			check:   says("Are you sure you want to update the", "etl-prod", "Deployment?"),
+			check:   says("Update Deployment", "etl-prod", "?"),
 			wantErr: "aborted",
 		},
 		{
@@ -227,7 +227,7 @@ func TestDeploymentCoreText(t *testing.T) {
 				return m
 			},
 			args:  []string{"delete", coreDeploymentID, "--yes"},
-			check: says("Successfully deleted deployment ", "etl-prod"),
+			check: says("Deleted Deployment ", "etl-prod"),
 		},
 		{
 			name: "delete, confirmed",
@@ -238,7 +238,7 @@ func TestDeploymentCoreText(t *testing.T) {
 			},
 			answers: "etl-prod\n",
 			args:    []string{"delete", coreDeploymentID},
-			check:   says(`To confirm, type the Deployment name "etl-prod"`, "Successfully deleted deployment ", "etl-prod"),
+			check:   says(`To confirm, type the Deployment name "etl-prod"`, "Deleted Deployment ", "etl-prod"),
 		},
 		{
 			// A y, as 1.x asked for, is not the name: nothing is deleted,
@@ -257,7 +257,7 @@ func TestDeploymentCoreText(t *testing.T) {
 				return m
 			},
 			args: []string{"hibernate", coreDeploymentID, "--yes"},
-			check: says("Successfully overrode to ", "hibernate", " until further notice",
+			check: says("Overrode to ", "hibernate", " until further notice",
 				"Any configured hibernation schedules will not resume until override is removed."),
 		},
 		{
@@ -268,7 +268,7 @@ func TestDeploymentCoreText(t *testing.T) {
 				return m
 			},
 			args: []string{"wake-up", coreDeploymentID, "--until", until.Format(time.RFC3339), "--yes"},
-			check: says("Successfully overrode to ", "wake up", " until ", until.Format(time.RFC3339),
+			check: says("Overrode to ", "wake up", " until ", until.Format(time.RFC3339),
 				"If set, hibernation schedule will resume in "),
 		},
 		{
@@ -280,14 +280,14 @@ func TestDeploymentCoreText(t *testing.T) {
 			},
 			answers: "y\n",
 			args:    []string{"hibernate", coreDeploymentID},
-			check:   says("Are you sure you want to override to", "hibernate", "etl-dev", "Successfully overrode to "),
+			check:   says("Override to", "hibernate", "etl-dev", "Overrode to "),
 		},
 		{
 			name:    "wake-up, declined",
 			client:  func(t *testing.T) astrov1.APIClient { return coreMock(t, devDeployment()) },
 			answers: "n\n",
 			args:    []string{"wake-up", coreDeploymentID},
-			check:   says("Are you sure you want to override to", "wake up", "etl-dev"),
+			check:   says("Override to", "wake up", "etl-dev"),
 			wantErr: "aborted",
 		},
 		{
@@ -298,14 +298,14 @@ func TestDeploymentCoreText(t *testing.T) {
 				return m
 			},
 			args:  []string{"hibernate", coreDeploymentID, "--remove-override", "--yes"},
-			check: says("Successfully removed hibernation override", "If set, hibernation schedule will resume immediately."),
+			check: says("Removed hibernation override", "If set, hibernation schedule will resume immediately."),
 		},
 		{
 			name:    "wake-up --remove-override, declined",
 			client:  func(t *testing.T) astrov1.APIClient { return coreMock(t, devDeployment()) },
 			answers: "n\n",
 			args:    []string{"wake-up", coreDeploymentID, "--remove-override"},
-			check:   says("Are you sure you want to remove the hibernation override", "etl-dev"),
+			check:   says("Remove the hibernation override for Deployment", "etl-dev"),
 			wantErr: "aborted",
 		},
 		{
@@ -542,7 +542,7 @@ func TestDeploymentCoreWaitThatRunsOut(t *testing.T) {
 			assert.Equal(t, cliout.ExitFailure, r.code)
 			assert.ErrorIs(t, r.err, deployment.ErrTimedOutHibernating)
 			if format == "text" {
-				requireInOrder(t, r.stdout, "Successfully overrode to ")
+				requireInOrder(t, r.stdout, "Overrode to ")
 				requireInOrder(t, r.stderr, "Waiting for the Deployment to hibernate")
 				return
 			}

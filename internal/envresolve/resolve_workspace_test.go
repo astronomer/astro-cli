@@ -78,7 +78,7 @@ func TestUnavailableWorkspaceMissingNote(t *testing.T) {
 	wp := fakeWorkspace{
 		label: "workspace (unavailable: logged out)",
 		vals:  map[string]string{},
-		diag:  "you are not logged in — log in with 'astro login'",
+		diag:  "you are not logged in; log in with 'astro login'",
 	}
 	res, err := Resolve(Inputs{
 		Schema:            workspaceSchema(),
@@ -94,7 +94,7 @@ func TestUnavailableWorkspaceMissingNote(t *testing.T) {
 	if len(res.Missing) != 1 {
 		t.Fatalf("Missing count = %d, want 1", len(res.Missing))
 	}
-	want := `source "workspace": you are not logged in — log in with 'astro login'`
+	want := `source "workspace": you are not logged in; log in with 'astro login'`
 	if res.Missing[0].SourceNote != want {
 		t.Fatalf("SourceNote = %q, want %q", res.Missing[0].SourceNote, want)
 	}

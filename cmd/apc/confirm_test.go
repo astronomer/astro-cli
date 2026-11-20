@@ -28,19 +28,19 @@ func TestRemovalsAskFirst(t *testing.T) {
 			"workspace delete",
 			[]string{"workspace", "delete", "ws-1"},
 			"DeleteWorkspace", &houston.Workspace{ID: "ws-1", Label: "alpha"},
-			"Are you sure you want to delete Workspace ws-1?",
+			"Delete Workspace ws-1?",
 		},
 		{
 			"workspace service-account delete",
 			[]string{"workspace", "service-account", "delete", "sa-1", "--workspace", "ws-1"},
 			"DeleteWorkspaceServiceAccount", &houston.ServiceAccount{ID: "sa-1", Label: "ci"},
-			"Are you sure you want to delete service account sa-1?",
+			"Delete service account sa-1?",
 		},
 		{
 			"deployment service-account delete",
 			[]string{"deployment", "service-account", "delete", "sa-1", "--deployment", "dep-1"},
 			"DeleteDeploymentServiceAccount", &houston.ServiceAccount{ID: "sa-1", Label: "ci"},
-			"Are you sure you want to delete service account sa-1?",
+			"Delete service account sa-1?",
 		},
 	} {
 		client := func() *mocks.ClientInterface {

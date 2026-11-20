@@ -181,7 +181,7 @@ func (t *airflowTheme) addShade(name string, raw json.RawMessage) (string, error
 		}
 	}
 	if !validOklch(v) {
-		return "", fmt.Errorf("color %s in the Airflow theme is %q, not an oklch() color Airflow takes", name, v)
+		return "", fmt.Errorf("color %s in the Airflow theme is %q, which is not an oklch() color Airflow takes", name, v)
 	}
 	t.colors = append(t.colors, cssVar{"--chakra-colors-" + name, v})
 	return v, nil

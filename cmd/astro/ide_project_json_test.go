@@ -73,7 +73,7 @@ func importedNothing(t *testing.T, dir string) {
 }
 
 // The picker's question and its rows.
-const idePickTitle = "\nPlease select the project from the list below:\n"
+const idePickTitle = "\nSelect a project:\n"
 
 var idePickRows = picks(
 	map[string]string{"#": "1", "PROJECT NAME": "ETL", "ID": "proj-etl"},
@@ -105,83 +105,83 @@ func ideTextCases() []ideCase {
 		// The success line of an import has always said "exported".
 		{
 			name: "import by id", projects: both, more: []ideMockOpt{opensSession(ro)}, args: []string{"project", "import", "--project-id", "proj-etl"},
-			check: says("Successfully exported project from ETL\n"), after: imported,
+			check: says("Exported project from ETL\n"), after: imported,
 		},
 		{
 			name: "import from a session", projects: both, args: []string{"project", "import", "--project-id", "proj-etl", "--session-id", "sess-x"},
-			check: says("Successfully exported project from ETL\n"), after: imported,
+			check: says("Exported project from ETL\n"), after: imported,
 		},
 		{
 			name: "import into a directory that is not empty, confirmed", projects: both, more: []ideMockOpt{opensSession(ro)},
 			files: map[string]string{"README.md": "hi\n"}, answers: "y\n", args: []string{"project", "import", "--project-id", "proj-etl"},
-			check: says("Current directory is not empty. Do you want to import the project here? ", " (y/n) ", "Successfully exported project from ETL\n"), after: imported,
+			check: says("Current directory is not empty. Import the project here? ", " (y/n) ", "Exported project from ETL\n"), after: imported,
 		},
 		{
 			name: "import into a directory that is not empty, declined", projects: both,
 			files: map[string]string{"README.md": "hi\n"}, answers: "n\n", args: []string{"project", "import", "--project-id", "proj-etl"},
-			check: then(says("Current directory is not empty.", " (y/n) "), lacks("Successfully")), wantErr: "aborted", after: importedNothing,
+			check: then(says("Current directory is not empty.", " (y/n) "), lacks("Exported project")), wantErr: "aborted", after: importedNothing,
 		},
 		{
 			name: "import into a directory that is not empty --yes", projects: both, more: []ideMockOpt{opensSession(ro)},
 			files: map[string]string{"README.md": "hi\n"}, args: []string{"project", "import", "--project-id", "proj-etl", "--yes"},
-			check: then(says("Successfully exported project from ETL\n"), lacks("Current directory is not empty")), after: imported,
+			check: then(says("Exported project from ETL\n"), lacks("Current directory is not empty")), after: imported,
 		},
 		{
 			name: "import through the picker", projects: both, more: []ideMockOpt{opensSession(ro)}, answers: "2\n", args: []string{"project", "import"},
-			check: then(idePickRows, says(idePickTitle, "\n> ", "Successfully exported project from ML\n")), after: imported,
+			check: then(idePickRows, says(idePickTitle, "\n> ", "Exported project from ML\n")), after: imported,
 		},
 		{
 			name: "import through the picker, answered with no row", projects: both, answers: "9\n", args: []string{"project", "import"},
-			check: then(idePickRows, says(idePickTitle, "\n> "), lacks("Successfully")), wantErr: "invalid project selection", after: importedNothing,
+			check: then(idePickRows, says(idePickTitle, "\n> "), lacks("Exported project")), wantErr: "invalid project selection", after: importedNothing,
 		},
 		{
 			name: "import of the only project", projects: []astrov1alpha1.AstroIdeProject{etl}, more: []ideMockOpt{opensSession(ro)}, args: []string{"project", "import"},
-			check: plain(says("Only one Project was found. Using the following Project by default: \n", "\n Project Name: ETL", "\n Project ID: proj-etl\n", "Successfully exported project from ETL\n")),
+			check: plain(says("Only one project found. Using it by default:\n", "\n Project Name: ETL", "\n Project ID: proj-etl\n", "Exported project from ETL\n")),
 			after: imported,
 		},
-		{name: "import with no projects", args: []string{"project", "import"}, check: says(""), wantErr: "no Astro IDE projects found in workspace", after: importedNothing},
+		{name: "import with no projects", args: []string{"project", "import"}, check: says(""), wantErr: "no Astro IDE projects found in the Workspace", after: importedNothing},
 		{
 			name: "export by id", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload}, files: exportSource,
-			args: []string{"project", "export", "--project-id", "proj-etl"}, check: says("Successfully exported project to ETL\n"),
+			args: []string{"project", "export", "--project-id", "proj-etl"}, check: says("Exported project to ETL\n"),
 		},
 		// A project that cannot be read back afterwards is named by its ID.
 		{
 			name: "export to a project that cannot be read back", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload, cannotRead("proj-gone")}, files: exportSource,
-			args: []string{"project", "export", "--project-id", "proj-gone"}, check: says("Successfully exported project to proj-gone\n"),
+			args: []string{"project", "export", "--project-id", "proj-gone"}, check: says("Exported project to proj-gone\n"),
 		},
 		{
 			name: "export to a locked project", projects: []astrov1alpha1.AstroIdeProject{lockedETL(), ml}, more: []ideMockOpt{opensSession(ro)}, files: exportSource,
 			args: []string{"project", "export", "--project-id", "proj-etl"}, check: says(""),
-			wantErr: "project is locked by user Ada Lovelace and last edited at January 2, 2026 at 3:04 PM. Use --force flag to overwrite the existing project lock",
+			wantErr: "project is locked by user Ada Lovelace, last edited at January 2, 2026 at 3:04 PM; use --force to overwrite the lock",
 		},
 		{
 			name: "export to a locked project --force", projects: []astrov1alpha1.AstroIdeProject{lockedETL(), ml}, more: []ideMockOpt{opensSession(ro), acceptsUpload}, files: exportSource,
-			args: []string{"project", "export", "--project-id", "proj-etl", "--force"}, check: says("Successfully exported project to ETL\n"),
+			args: []string{"project", "export", "--project-id", "proj-etl", "--force"}, check: says("Exported project to ETL\n"),
 		},
 		{
 			name: "export to a project picked", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload}, files: exportSource,
 			answers: "n\n2\n", args: []string{"project", "export"},
-			check: then(idePickRows, says("Do you want to create a new project? (y/n)\n", "\n> ", idePickTitle, "\n> ", "Successfully exported project to ML\n")),
+			check: then(idePickRows, says("Create a new project? (y/n)\n", "\n> ", idePickTitle, "\n> ", "Exported project to ML\n")),
 		},
 		{
 			name: "export to a new project", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload, createsProject(fresh)}, files: exportSource,
 			answers: "y\nFresh\n", args: []string{"project", "export"},
-			check: says("Do you want to create a new project? (y/n)\n", "\n> ", "Enter project name:\n", "\n> ",
-				"Successfully created project 'Fresh' in workspace 'Development'\n", "Successfully exported project to Fresh\n"),
+			check: says("Create a new project? (y/n)\n", "\n> ", "Enter project name:\n", "\n> ",
+				"Created project Fresh in Workspace Development\n", "Exported project to Fresh\n"),
 		},
 		// A project the run created outlives the failure after it, and the
 		// error names it.
 		{
 			name: "export to a new project, the upload failing", projects: both, more: []ideMockOpt{opensSession(rw), failsUpload, createsProject(fresh)}, files: exportSource,
 			answers: "y\nFresh\n", args: []string{"project", "export"},
-			check:   then(says("Successfully created project 'Fresh' in workspace 'Development'\n"), lacks("Successfully exported")),
+			check:   then(says("Created project Fresh in Workspace Development\n"), lacks("Exported project")),
 			wantErr: "created the Astro IDE project proj-new, but the export to it failed: upload broke",
 		},
 		{
 			name: "export to a new project the API does not return", projects: both, more: []ideMockOpt{createsNothing}, files: exportSource,
 			answers: "y\nFresh\n", args: []string{"project", "export"},
-			check:   then(says("Enter project name:\n"), lacks("Successfully")),
-			wantErr: "failed to create project: the API did not return the project",
+			check:   then(says("Enter project name:\n"), lacks("Exported project")),
+			wantErr: "could not create the project: the API did not return it",
 		},
 		{
 			name: "import, the export failing", projects: both, more: []ideMockOpt{opensSession(ro), failsDownload}, args: []string{"project", "import", "--project-id", "proj-etl"},
@@ -190,7 +190,7 @@ func ideTextCases() []ideCase {
 		{
 			name: "export --force to a project picked", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload}, files: exportSource,
 			answers: "1\n", args: []string{"project", "export", "--force"},
-			check: then(idePickRows, says(idePickTitle, "\n> ", "Successfully exported project to ETL\n"), lacks("create a new project")),
+			check: then(idePickRows, says(idePickTitle, "\n> ", "Exported project to ETL\n"), lacks("create a new project")),
 		},
 	}
 }
@@ -322,7 +322,7 @@ func TestIDEProjectJSON(t *testing.T) {
 		{
 			ideCase: ideCase{name: "import of the only project", projects: []astrov1alpha1.AstroIdeProject{etl}, more: []ideMockOpt{opensSession(ro)}, args: []string{"project", "import"}, after: imported},
 			check:   movedJSON(importedETL),
-			stderr:  []string{"Only one Project was found.", "Project ID: ", "proj-etl"},
+			stderr:  []string{"Only one project found.", "Project ID: ", "proj-etl"},
 		},
 		{
 			ideCase: ideCase{name: "export by id", projects: both, more: []ideMockOpt{opensSession(rw), acceptsUpload}, files: exportSource, args: []string{"project", "export", "--project-id", "proj-etl"}},
@@ -367,7 +367,7 @@ func TestIDEProjectJSONFailures(t *testing.T) {
 	ro := astrov1alpha1.CreateAstroIdeSessionPermissionREADONLY
 	for _, tc := range []ideCase{
 		{name: "list refused by the API", more: []ideMockOpt{failsList(403)}, args: []string{"project", "list"}, wantErr: "no IDE for you"},
-		{name: "import with no projects", args: []string{"project", "import"}, wantErr: "no Astro IDE projects found in workspace", after: importedNothing},
+		{name: "import with no projects", args: []string{"project", "import"}, wantErr: "no Astro IDE projects found in the Workspace", after: importedNothing},
 		{
 			name: "export to a locked project", projects: []astrov1alpha1.AstroIdeProject{lockedETL(), ml}, more: []ideMockOpt{opensSession(ro)}, files: exportSource,
 			args: []string{"project", "export", "--project-id", "proj-etl"}, wantErr: "project is locked by user Ada Lovelace",
@@ -430,7 +430,7 @@ func TestIDEProjectImportConfirmationNamesTheDirectory(t *testing.T) {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 	sameDir(t, dir, cwd)
-	assert.Contains(t, r.asked, "Do you want to import the project here? "+cwd+" (y/n) ")
+	assert.Contains(t, r.asked, "Import the project here? "+cwd+" (y/n) ")
 	assert.NotContains(t, r.stdout, "Do you want to import", "the question is on stderr")
 }
 

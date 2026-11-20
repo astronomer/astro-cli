@@ -403,7 +403,7 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 		got, err := FindToken("", "same", deploymentID, nil, pick, resultClient(t, a, b))
 		require.NoError(t, err)
 		assert.Equal(t, "t1", got.Id)
-		assert.Equal(t, "\nThere are more than one API tokens with name same. Please select an API token:", heading)
+		assert.Equal(t, "\nSeveral API tokens are named same. Select an API token:", heading)
 	})
 
 	t.Run("a picker's refusal is the error", func(t *testing.T) {

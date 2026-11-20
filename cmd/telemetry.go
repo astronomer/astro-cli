@@ -104,14 +104,14 @@ func runTelemetry(out io.Writer, run func() (string, error)) error {
 
 func telemetryEnable() (string, error) {
 	if err := config.CFG.TelemetryEnabled.SetHomeString("true"); err != nil {
-		return "", fmt.Errorf("failed to enable telemetry: %w", err)
+		return "", fmt.Errorf("could not enable telemetry: %w", err)
 	}
 	return "Telemetry enabled", nil
 }
 
 func telemetryDisable() (string, error) {
 	if err := config.CFG.TelemetryEnabled.SetHomeString("false"); err != nil {
-		return "", fmt.Errorf("failed to disable telemetry: %w", err)
+		return "", fmt.Errorf("could not disable telemetry: %w", err)
 	}
 	return "Telemetry disabled", nil
 }

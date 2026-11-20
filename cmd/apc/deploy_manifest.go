@@ -133,7 +133,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 			fmt.Fprintf(errOut, "linked %s to apc deployment %s in %s\n", l.Name, l.Deployment, project.Marker)
 			if after, err := manifest.Load(filepath.Join(config.WorkingPath, project.Marker)); err == nil {
 				if kept := scaffold.NewlyDefault(m, after); kept != "" {
-					fmt.Fprintf(errOut, "marked %s default = true: it was the project's only link, so its default, and stays so now there are two\n", kept)
+					fmt.Fprintf(errOut, "marked %s as the default link (it was the project's only link)\n", kept)
 				}
 			}
 			return nil
@@ -145,7 +145,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 			announceDeploy(target, errOut, progress)
 		},
 		OnBuild: func() {
-			fmt.Fprintln(progress, "Building your project image, this can take a few minutes...")
+			fmt.Fprintln(progress, "Building the project image. This can take a few minutes…")
 		},
 	}, manifestdeploy.BeforeAsking(&apcManifestDeployer{client: houstonClient, in: cmd.InOrStdin(), errOut: errOut, progress: progress, warn: warnf}, recap.Flush))
 	recap.Flush()
@@ -282,7 +282,7 @@ func (d *apcManifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeplo
 		return manifestdeploy.Deployment{}, err
 	}
 	if len(deps) == 0 {
-		return manifestdeploy.Deployment{}, fmt.Errorf("no Deployments in workspace %s to deploy to", workspaceID)
+		return manifestdeploy.Deployment{}, fmt.Errorf("no Deployments in Workspace %s to deploy to", workspaceID)
 	}
 	for i := range deps {
 		list.AddRow(false, deps[i].Label, deps[i].ReleaseName, deps[i].ID)
@@ -383,6 +383,6 @@ func announceDeploy(target manifestdeploy.Target, errOut, progress io.Writer) {
 		fmt.Fprintf(errOut, "→ %s (apc deployment %s)\n", target.LinkName, target.DeploymentID)
 	}
 	if !isDagOnlyDeploy && imageName != "" {
-		fmt.Fprintf(progress, "Deploying prebuilt image %s...\n", imageName)
+		fmt.Fprintf(progress, "Deploying prebuilt image %s…\n", imageName)
 	}
 }

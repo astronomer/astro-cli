@@ -36,8 +36,8 @@ const EnvAPIToken = "ASTRO_API_TOKEN" //nolint:gosec // the name of a variable, 
 // sentence: a machine with no login should not get one answer from the
 // credential path and a different one from the coordinate lookup.
 var (
-	ErrLoggedOut = errors.New("you are not logged in — log in with astro login, or set " + EnvAPIToken)
-	errExpired   = errors.New("your session expired — log in with astro login, or set " + EnvAPIToken)
+	ErrLoggedOut = errors.New("you are not logged in; run astro login or set " + EnvAPIToken)
+	errExpired   = errors.New("your session expired; run astro login or set " + EnvAPIToken)
 )
 
 // ErrSessionExpired is a stored login whose access token has expired and could

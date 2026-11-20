@@ -67,14 +67,14 @@ func credentials(ctx context.Context, i Instance, baseURL string, d Deps) (airfl
 		// here: Transport dispatches on the method before a credential is
 		// built. Kept as a refusal rather than a fallthrough so the two paths
 		// cannot quietly disagree about which door a method uses.
-		return nil, nil, fmt.Errorf("deployment %q proves itself to the AWS API rather than to an Airflow URL", i.Name)
+		return nil, nil, fmt.Errorf("deployment %q authenticates to the AWS API and has no Airflow URL", i.Name)
 	}
 	return nil, nil, fmt.Errorf("deployment %q declares no auth method", i.Name)
 }
 
 // errLoggedOut reports a machine with neither a session nor the CI token. Both
 // ways of having no session say the same thing, because the fix is the same.
-var errLoggedOut = errors.New("you are not logged in — log in with astro login, or set " + EnvAPIToken)
+var errLoggedOut = errors.New("you are not logged in; run astro login or set " + EnvAPIToken)
 
 // astroCredentials proves the caller with the Astro session. ASTRO_API_TOKEN
 // wins when it is set, because that is how CI supplies an identity with no

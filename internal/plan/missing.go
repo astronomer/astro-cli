@@ -25,7 +25,11 @@ type MissingEnvError struct {
 
 func (e *MissingEnvError) Error() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "this project needs %d environment value(s) that are not set on this machine:\n", len(e.Missing))
+	values := "environment values that are"
+	if len(e.Missing) == 1 {
+		values = "environment value that is"
+	}
+	fmt.Fprintf(&b, "this project needs %d %s not set on this machine:\n", len(e.Missing), values)
 	for _, m := range e.Missing {
 		fmt.Fprintf(&b, "  - %s %s\n", sectionLabel(m.Section), m.Name)
 		if m.SourceNote != "" {
@@ -34,7 +38,7 @@ func (e *MissingEnvError) Error() string {
 		fmt.Fprintf(&b, "      provide it:  %s\n", setHint(&m))
 	}
 	if e.Next == "" {
-		b.WriteString("provide them, then run astro local start again — or start without them: astro local start --allow-missing.")
+		b.WriteString("provide them and run astro local start again, or run astro local start --allow-missing to start without them")
 	} else {
 		b.WriteString(e.Next)
 	}

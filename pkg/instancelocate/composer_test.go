@@ -147,7 +147,7 @@ func TestComposerAddsTheLongServiceAccountFixToA403(t *testing.T) {
 	o := composerOptions(server.URL)
 	o.Google.Account = func(context.Context) string { return long }
 	_, err := lookup(o, composerInstance(t))
-	for _, want := range []string{long, "numeric account id", "pre-register"} {
+	for _, want := range []string{long, "numeric account ID", "pre-register"} {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Fatalf("err = %v, want the pre-registration fix naming %q", err, want)
 		}
@@ -157,7 +157,7 @@ func TestComposerAddsTheLongServiceAccountFixToA403(t *testing.T) {
 	for _, fine := range []string{"short@acme-data.iam.gserviceaccount.com", ""} {
 		o.Google.Account = func(context.Context) string { return fine }
 		_, err = lookup(o, composerInstance(t))
-		if err == nil || strings.Contains(err.Error(), "numeric account id") {
+		if err == nil || strings.Contains(err.Error(), "numeric account ID") {
 			t.Fatalf("%q: err = %v, want no advice about a length that is fine", fine, err)
 		}
 	}

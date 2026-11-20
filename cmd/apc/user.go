@@ -35,7 +35,7 @@ func newUserCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create a user in the APC platform",
-		Long:    "Create a user in the APC platform, user will receive an invite at the email address provided",
+		Long:    "Create a user in the APC platform. The user receives an invite at the email address.",
 		Example: createUserExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r := cliout.Renderer{Format: accessOutput, Out: out}
@@ -46,8 +46,8 @@ func newUserCreateCmd(out io.Writer) *cobra.Command {
 			return renderUserCreated(r, &created)
 		},
 	}
-	cmd.Flags().StringVar(&userEmail, "email", "", "Email of the user to create on the platform. If not specified, you will be prompted to enter this value")
-	cmd.Flags().StringVar(&userPassword, "password", "", "Password to be set for the new user. If not specified, you will be prompted to enter this value")
+	cmd.Flags().StringVar(&userEmail, "email", "", "Email of the user to create. Prompted for if not set")
+	cmd.Flags().StringVar(&userPassword, "password", "", "Password for the new user. Prompted for if not set")
 	addAccessOutputFlag(cmd)
 	return cmd
 }

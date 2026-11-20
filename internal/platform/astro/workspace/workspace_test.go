@@ -229,7 +229,7 @@ func (s *Suite) TestGetWorkspaceSelection() {
 
 		buf := new(bytes.Buffer)
 		_, err = GetWorkspaceSelection(mockV1Client, buf)
-		s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
+		s.EqualError(err, "no context set; run astro login and try again")
 		mockV1Client.AssertExpectations(s.T())
 	})
 }
@@ -336,7 +336,7 @@ func (s *Suite) TestSwitch() {
 
 		buf := new(bytes.Buffer)
 		err = switchAndPrint("test-id-1", mockV1Client, buf)
-		s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
+		s.EqualError(err, "no context set; run astro login and try again")
 		mockV1Client.AssertExpectations(s.T())
 	})
 }
@@ -354,11 +354,11 @@ func (s *Suite) TestGetCurrentWorkspace() {
 	s.NoError(err)
 
 	_, err = GetCurrentWorkspace()
-	s.EqualError(err, "current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+	s.EqualError(err, "no current Workspace set; switch to one with\n\tastro workspace switch WORKSPACEID")
 
 	config.ResetCurrentContext()
 	_, err = GetCurrentWorkspace()
-	s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
+	s.EqualError(err, "no context set; run astro login and try again")
 }
 
 var (
@@ -398,7 +398,7 @@ func (s *Suite) TestCreate() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.CreateWorkspaceResponse{HTTPResponse: &http.Response{StatusCode: 200}}, nil).Once()
 		_, err := Create("workspace-test", "a test workspace", "ON", mockClient)
-		s.EqualError(err, "something went wrong: the API did not return the Workspace workspace-test it created")
+		s.EqualError(err, "the API did not return the Workspace workspace-test it created")
 	})
 
 	s.Run("error path when CreateWorkspaceWithResponse return network error", func() {
@@ -575,7 +575,7 @@ func (s *Suite) TestUpdate() {
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.UpdateWorkspaceResponse{HTTPResponse: &http.Response{StatusCode: 200}}, nil).Once()
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		_, err := Update("workspace-id", "", "", "", new(bytes.Buffer), mockClient)
-		s.EqualError(err, "something went wrong: the API did not return the Workspace test-workspace it updated")
+		s.EqualError(err, "the API did not return the Workspace test-workspace it updated")
 	})
 
 	s.Run("print message if no workpaces found", func() {
@@ -617,7 +617,7 @@ func (s *Suite) TestUpdate() {
 		out := new(bytes.Buffer)
 		_, err := Update("", "", "", "", out, mockClient)
 		s.True(pkginput.IsRequired(err), "refused, not %v", err)
-		s.ErrorContains(err, "pass the workspace ID as an argument")
+		s.ErrorContains(err, "pass the Workspace ID as an argument")
 		s.Empty(out.String())
 	})
 

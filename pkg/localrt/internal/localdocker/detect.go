@@ -348,7 +348,11 @@ func (e *Engine) ContainersGoneAll(ctx context.Context, paths []string) (map[str
 	}
 	found, reached := e.runningProjects(ctx, paths)
 	if !reached {
-		return nil, fmt.Errorf("no container engine reachable to confirm %d project(s) are stopped", len(paths))
+		stopped := "projects are"
+		if len(paths) == 1 {
+			stopped = "project is"
+		}
+		return nil, fmt.Errorf("no container engine reachable to confirm %d %s stopped", len(paths), stopped)
 	}
 	for _, p := range paths {
 		gone[p] = len(found[p]) == 0

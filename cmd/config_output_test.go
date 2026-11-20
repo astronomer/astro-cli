@@ -75,7 +75,7 @@ func (s *CmdSuite) TestConfigSetOutput() {
 		s.initConfigFiles("page_size: 50\n", "")
 		stdout, _, err := runConfigCmd("set", "apc.page_size", "60", "--global")
 		s.NoError(err)
-		s.Equal("Setting apc.page_size to 60 successfully\n\n", stdout)
+		s.Equal("Set apc.page_size to 60\n\n", stdout)
 	})
 
 	s.Run("json publishes the setting as set", func() {

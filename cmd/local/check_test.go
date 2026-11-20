@@ -910,10 +910,10 @@ func TestCheckCapsTheTracebackDump(t *testing.T) {
 	}
 	// "traceback(s)", not "import error(s)": every import error is still listed
 	// in the table, and only the frames were suppressed.
-	if !strings.Contains(got, "3 more traceback(s) not shown") {
+	if !strings.Contains(got, "3 more tracebacks not shown") {
 		t.Errorf("nothing said how many tracebacks were suppressed: %q", got)
 	}
-	if strings.Contains(got, "import error(s) not shown") {
+	if strings.Contains(got, "import errors not shown") {
 		t.Errorf("suppression line claims findings are missing from the table: %q", got)
 	}
 	// Every finding is still in the table, capped frames or not.
@@ -947,7 +947,7 @@ func TestCheckTracebackBudgetIsSharedAcrossTargets(t *testing.T) {
 	if n := strings.Count(got, "Traceback (most recent call last)"); n != maxTracebacks {
 		t.Errorf("printed %d frame blocks across both targets, want %d", n, maxTracebacks)
 	}
-	if n := strings.Count(got, "traceback(s) not shown"); n != 1 {
+	if n := strings.Count(got, "not shown; --output json includes all of them"); n != 1 {
 		t.Errorf("printed %d suppression lines, want 1", n)
 	}
 }

@@ -160,5 +160,5 @@ func TestTheComposeOverrideNotesNameDockerMode(t *testing.T) {
 
 	assert.Contains(t, res.Info, "docker-compose.override.yml: applies to astro local start --docker only")
 	assert.NotContains(t, res.Notes, "docker-compose.override.yml: applies to astro local start --docker only")
-	assert.Contains(t, res.Notes, "docker-compose.override.yaml: not read — Docker mode merges docker-compose.override.yml, so rename it to use it there")
+	assert.Contains(t, res.Notes, "docker-compose.override.yaml: not read; Docker mode merges docker-compose.override.yml, so rename it to use it there")
 }

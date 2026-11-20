@@ -37,7 +37,7 @@ func newContextCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Comman
 		Short:   "Manage Astro & APC contexts",
 		// Saved contexts are this machine's own; switch never opens a browser.
 		Annotations: map[string]string{astroCmd.NoLoginAnnotation: "true"},
-		Long:        "Context represent a connection to Astro or APC in the form of a Domain URL. If your context is set to astronomer.io, for example, you are connected to Astro",
+		Long:        "A context is a connection to Astro or APC, identified by a domain URL. If your context is astronomer.io, for example, you are connected to Astro.",
 	}
 	deleteCmd := newContextDeleteCmd()
 	cmd.AddCommand(
@@ -55,7 +55,7 @@ func newContextListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all contexts",
-		Long:    "List all Astro and APC contexts or domains that you've authenticated to on this machine",
+		Long:    "List the Astro and APC contexts saved on this machine.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			list, err := context.List()
 			if err != nil {
@@ -92,7 +92,7 @@ func newContextSwitchCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 		Use:     "switch [DOMAIN]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different context",
-		Long:    "Switch to a different context. With no domain, pick one from the contexts saved on this machine. For Astro, the saved login for the domain is refreshed if it can be; the command never opens a browser.",
+		Long:    "Switch to a different context. With no domain, pick one from the contexts saved on this machine. For Astro, the saved login for the domain is refreshed when possible. It does not open a browser.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return switchContext(cmd, args, astroV1Client, cliout.Renderer{Format: output, Out: out})
 		},
@@ -180,7 +180,7 @@ func pickContext(in io.Reader, out io.Writer) (string, error) {
 		emails[domain] = contexts.Contexts[key].UserEmail
 	}
 	if len(domains) == 0 {
-		return "", errors.New("no contexts are saved on this machine. Run astro login <domain> to add one")
+		return "", errors.New("no contexts are saved on this machine; run astro login <domain> to add one")
 	}
 	slices.Sort(domains)
 
@@ -231,7 +231,7 @@ func newContextDeleteCmd() *cobra.Command {
 		Use:     "delete <DOMAIN>",
 		Aliases: []string{"rm"},
 		Short:   "Delete a context",
-		Long:    "Delete a locally stored context to Astro or APC",
+		Long:    "Delete a context saved on this machine.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
 			removal, err := context.Delete(domainutil.ExpandShortName(args[0]), noPrompt)
@@ -239,7 +239,7 @@ func newContextDeleteCmd() *cobra.Command {
 				return err
 			}
 			return cliout.Renderer{Format: output, Out: out}.Emit(removal, cliout.Text(func(b *bufio.Writer) {
-				fmt.Fprintf(b, "Successfully deleted context: %s\n", removal.Domain)
+				fmt.Fprintf(b, "Deleted context: %s\n", removal.Domain)
 			}))
 		},
 		Args: cobra.ExactArgs(1),

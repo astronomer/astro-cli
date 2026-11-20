@@ -337,11 +337,11 @@ func newDigestFile() (string, error) {
 func (e Engine) repoDigest(ctx context.Context, image string) (string, error) {
 	var out, stderr bytes.Buffer
 	if err := e.Cmd.Run(ctx, e.Env, rt.Stdio{Out: &out, Err: &stderr}, e.Bin, "image", "inspect", "--format", "{{json .RepoDigests}}", image); err != nil {
-		return "", fmt.Errorf("failed to get digests for image %s: %w", image, commandError(e.Bin+" image inspect "+image, err, stderr.String()))
+		return "", fmt.Errorf("could not read digests for image %s: %w", image, commandError(e.Bin+" image inspect "+image, err, stderr.String()))
 	}
 	var digests []string
 	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &digests); err != nil {
-		return "", fmt.Errorf("failed to parse digests for image %s: %w", image, err)
+		return "", fmt.Errorf("could not parse digests for image %s: %w", image, err)
 	}
 	repo := repository(image)
 	for _, d := range digests {

@@ -41,7 +41,7 @@ func PromptPaginatedOption(previousCursorID, nextCursorID string, take, totalRec
 			gotoOptionMessage = paginationWithNextQuitOptions
 		}
 
-		in, err := input.Text("\n\nPlease select one of the following options\n"+gotoOptionMessage, input.About("which page to show next"))
+		in, err := input.Text("\n\nSelect an option\n"+gotoOptionMessage, input.About("which page to show next"))
 		if err != nil {
 			return PaginationOptions{}, err
 		}

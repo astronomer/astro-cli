@@ -13,7 +13,7 @@ const ListTeamLimit = 20
 
 var (
 	errMissingTeamID = errors.New("missing team ID")
-	errTeamNotFound  = errors.New("no team was found with this ID")
+	errTeamNotFound  = errors.New("no team found with that ID")
 
 	// monkey patched to write tests
 	promptPaginatedOption = utils.PromptPaginatedOption
@@ -130,7 +130,7 @@ type RoleChange struct {
 // Update sets the system role of a team. NONE removes the role it holds.
 func Update(teamID, role string, client houston.ClientInterface) (RoleChange, error) {
 	if !isValidSystemLevelRole(role) {
-		return RoleChange{}, fmt.Errorf("invalid role: %s, should be one of: %s, %s, %s or %s", role, houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneRole)
+		return RoleChange{}, fmt.Errorf("invalid role %s; use %s, %s, %s, or %s", role, houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneRole)
 	}
 
 	if role == houston.NoneRole {

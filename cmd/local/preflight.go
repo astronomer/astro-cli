@@ -208,12 +208,13 @@ func sweepCheckVenvs(progress func(string)) {
 	}
 	switch {
 	case unused > 0 && wreckage > 0:
-		progress(fmt.Sprintf("removed %d check environment(s) unused for %d days or more, and %d abandoned partial build(s)",
-			unused, venvUnusedDays, wreckage))
+		progress(fmt.Sprintf("removed %s unused for %d days or more, and %s",
+			plural(unused, "check environment", "check environments"), venvUnusedDays,
+			plural(wreckage, "abandoned partial build", "abandoned partial builds")))
 	case unused > 0:
-		progress(fmt.Sprintf("removed %d check environment(s) unused for %d days or more", unused, venvUnusedDays))
+		progress(fmt.Sprintf("removed %s unused for %d days or more", plural(unused, "check environment", "check environments"), venvUnusedDays))
 	case wreckage > 0:
-		progress(fmt.Sprintf("removed %d abandoned partial check-environment build(s)", wreckage))
+		progress("removed " + plural(wreckage, "abandoned partial check-environment build", "abandoned partial check-environment builds"))
 	}
 }
 

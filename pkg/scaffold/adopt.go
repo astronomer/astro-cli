@@ -80,8 +80,8 @@ func adopt(dir string, data []byte, opts *Options, from1x *project1x, res *Resul
 	// the default is resolved, so the refusal makes no catalog request.
 	if slices.Contains(asStrings(mustGet(ed, "project", "dynamic")), "dependencies") {
 		example := pickAirflowVersion(opts.AirflowVersion, deps, from1x, nil).version
-		return nil, nil, pin, fmt.Errorf("%s declares its dependencies dynamic, and an Astro project states its Airflow version "+
-			"as the requirement in [project] dependencies: list the dependencies there, starting with %s, and drop "+
+		return nil, nil, pin, fmt.Errorf("%s declares its dependencies dynamic, but an Astro project states its Airflow version "+
+			"in [project] dependencies. List them there, starting with %s, and drop "+
 			"dependencies from [project] dynamic", path, airflowRequirement(example))
 	}
 	pick := pickAirflowVersion(opts.AirflowVersion, deps, from1x, opts.Default)

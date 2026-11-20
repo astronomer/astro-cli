@@ -140,7 +140,7 @@ func TestDeploymentWorkerQueueAndLogsText(t *testing.T) {
 			client:   func(t *testing.T) astrov1.APIClient { return wqMock(t) },
 			answers:  "n\n",
 			args:     wqArgs("worker-queue", "update", "--name", "etl-queue", "--max-count", "8"),
-			says:     []string{"Are you sure you want to update the", "etl-queue"},
+			says:     []string{"Update worker queue", "etl-queue"},
 			declined: true,
 		},
 		{
@@ -158,7 +158,7 @@ func TestDeploymentWorkerQueueAndLogsText(t *testing.T) {
 			client:   func(t *testing.T) astrov1.APIClient { return wqMock(t) },
 			answers:  "n\n",
 			args:     wqArgs("worker-queue", "delete", "--name", "etl-queue"),
-			says:     []string{"Are you sure you want to delete the", "etl-queue"},
+			says:     []string{"Delete worker queue", "etl-queue"},
 			declined: true,
 		},
 		{

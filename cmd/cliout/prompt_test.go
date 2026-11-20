@@ -86,17 +86,17 @@ func TestAJSONRunNeverPrompts(t *testing.T) {
 		{
 			"a confirmation",
 			[]string{"delete", "-o", "json"},
-			`this command needs to ask "Delete prod?"; with --output json it cannot — pass --force`,
+			`this command needs to ask "Delete prod?"; with --output json it cannot; pass --force`,
 		},
 		{
 			"free text, wrapped by its command",
 			[]string{"create", "--output=json"},
-			`creating: this command needs to ask "Name"; with --output json it cannot — pass the answer as a flag`,
+			`creating: this command needs to ask "Name"; with --output json it cannot; pass the answer as a flag`,
 		},
 		{
 			"the flag before the command",
 			[]string{"-ojson", "create"},
-			`creating: this command needs to ask "Name"; with --output json it cannot — pass the answer as a flag`,
+			`creating: this command needs to ask "Name"; with --output json it cannot; pass the answer as a flag`,
 		},
 	}
 	for _, tc := range cases {

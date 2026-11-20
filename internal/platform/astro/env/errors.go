@@ -2,13 +2,8 @@ package env
 
 // SecretsFetchingNotAllowedErrMsg is shown when the organization disallows
 // reading secret values via the env-object API.
-const SecretsFetchingNotAllowedErrMsg = `environment secrets fetching is not enabled for this organization.
+const SecretsFetchingNotAllowedErrMsg = `environment secrets fetching is not enabled for this Organization.
 
-To resolve this issue:
-• Ask an organization administrator to enable "Environment Secrets Fetching" in organization settings
-• Navigate to Organization Settings > General > Environment Secrets Fetching
-• Toggle the setting to "Enabled"
+To enable it, an Organization admin can turn on Environment Secrets Fetching under Organization Settings > General.
 
-This setting controls whether deployments can access organization environment secrets during local development.
-
-Without this setting enabled, local development still resolves non-secret workspace values; only secret values are withheld.`
+Until then, local development still resolves non-secret Workspace values and withholds secret values.`

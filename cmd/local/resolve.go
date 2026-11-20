@@ -222,7 +222,7 @@ func (c *cli) clientFor(ctx context.Context, i instances.Instance, domain string
 // fix is to start Airflow, never to point somewhere else — that is what the
 // top-level spelling is for.
 var errNoLocalAirflow = fmt.Errorf(
-	"%w — start one with astro local start", localrt.ErrNotRunning)
+	"%w; start one with astro local start", localrt.ErrNotRunning)
 
 // machineInstance is the Airflow every `astro local` query command acts on: the
 // one this project has running right now. It reads the project's own runtime
@@ -338,7 +338,7 @@ func (c *cli) pickAndPin(projectDir string, set instances.Set, choices []string)
 	if err := savePin(projectDir, name); err != nil {
 		return instances.Selection{}, err
 	}
-	fmt.Fprintf(c.d.Stderr, "picked %s — this project uses it from now on, for you only (astro use --unset to clear)\n", name)
+	fmt.Fprintf(c.d.Stderr, "picked %s; this project uses it from now on, for you only (astro use --unset to clear)\n", name)
 	return set.Select(instances.Request{Pin: name})
 }
 
@@ -365,9 +365,9 @@ func (c *cli) announceInstance(i instances.Instance) {
 func (c *cli) promptForDeployment(choices []string) (string, error) {
 	ambiguous := &instances.AmbiguousError{Choices: choices}
 	l := picker.List{
-		Title:  "Which deployment should this project use?",
+		Title:  "Which Deployment should this project use?",
 		Header: []string{"NAME"},
-		Ask:    []input.Option{input.About("the deployment this project uses"), input.AnsweredBy("--deployment")},
+		Ask:    []input.Option{input.About("the Deployment this project uses"), input.AnsweredBy("--deployment")},
 		// Out of tries: the message naming every way to decide.
 		// It asks picker.DefaultAttempts times, so a stdin that answers
 		// but never usefully ends with the message naming the flags.

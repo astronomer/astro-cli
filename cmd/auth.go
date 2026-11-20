@@ -42,7 +42,7 @@ var (
 // newLoginCommand is a top-level alias for "astro auth login" kept for backward compatibility.
 func newLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
 	cmd := newAuthLoginCommand(astroV1Client, out)
-	cmd.Long += " This is an alias for 'astro auth login'."
+	cmd.Long += " Alias for astro auth login."
 	cmd.Example = `  # Log in to Astro
   astro login`
 	return cmd
@@ -51,7 +51,7 @@ func newLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Comm
 // newLogoutCommand is a top-level alias for "astro auth logout" kept for backward compatibility.
 func newLogoutCommand(out io.Writer) *cobra.Command {
 	cmd := newAuthLogoutCommand(out)
-	cmd.Long = "Log out of Astronomer. This is an alias for 'astro auth logout'."
+	cmd.Long = "Log out of Astronomer. Alias for astro auth logout."
 	cmd.Example = `  # Log out of the current context
   astro logout`
 	return cmd
@@ -144,7 +144,7 @@ func runLogin(args []string, astroV1Client astrov1.APIClient, out io.Writer) err
 			// get the domain from context as an extra check
 			ctx, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this shell code
 			if context.IsCloudDomain(ctx.Domain) {
-				fmt.Fprintf(out, "To login to APC follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
+				fmt.Fprintf(out, "Follow the instructions below to log in to APC. To log in to Astro instead, cancel and run astro login.\n\n")
 			}
 			return apcLogin(domain, oAuth, "", "", token, apcPlatformVersion(domain), houstonClient, out)
 		}
@@ -255,7 +255,7 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "token",
 		Short: "Print the authentication token",
-		Long:  "Print the current authentication token to standard output. This is useful for using the token in scripts or CI/CD pipelines.",
+		Long:  "Print the current authentication token to standard output, for use in scripts and CI/CD pipelines.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return printAuthToken(tokenDomain, forceRenew, cliout.Renderer{Format: output, Out: out})
@@ -276,7 +276,7 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
 }
 
 // errNoAuthToken is `astro auth token` finding a context with no login in it.
-var errNoAuthToken = errors.New("no token found. Please run 'astro login' to authenticate")
+var errNoAuthToken = errors.New("no token found; run astro login")
 
 // authToken is what `astro auth token -o json` publishes: the token, without
 // its "Bearer " prefix, the domain it is for, and when it expires, which is

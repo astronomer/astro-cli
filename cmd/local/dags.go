@@ -140,7 +140,7 @@ func newDagsListCmd(q *query) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.onlyActive, "only-active", false,
 		"Keep only Dags whose file the scheduler still sees (Airflow's default)")
 	cmd.Flags().BoolVar(&opts.includeInactive, "include-inactive", false,
-		"Also list Dags whose file is gone, which Airflow otherwise leaves out")
+		"Also list Dags whose file is gone (Airflow leaves them out by default)")
 	cmd.MarkFlagsMutuallyExclusive("only-active", "include-inactive")
 	return cmd
 }
@@ -221,8 +221,8 @@ func newDagsSourceCmd(q *query) *cobra.Command {
 	return &cobra.Command{
 		Use:   "source <DAG_ID>",
 		Short: "Print a Dag's source file",
-		Long: "Print the Python source Airflow parsed for this Dag. It comes from that Airflow, not from your " +
-			"checkout, so it is what is actually running there.",
+		Long: "Print the Python source Airflow parsed for this Dag. The source comes from Airflow, so it can " +
+			"differ from your checkout.",
 		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Print the source Airflow parsed for a Dag", "dags source <DAG_ID>",
@@ -260,9 +260,8 @@ func newDagsStatsCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stats [DAG_ID]...",
 		Short: "Count each Dag's runs by state",
-		Long: "Count the runs of each Dag by state, for the Dags named as arguments or with --dag-id. With none " +
-			"named it covers every Dag, which on Airflow 2 means listing the Dags first because that generation " +
-			"refuses the endpoint without ids.",
+		Long: "Count the runs of each Dag by state, for the Dags given as arguments or with --dag-id. With none " +
+			"given, count every Dag. On Airflow 2 this lists the Dags first, because its endpoint needs ids.",
 		Args: cobra.ArbitraryArgs,
 		Example: afExample(q.t,
 			"Count every Dag's runs by state", "dags stats",

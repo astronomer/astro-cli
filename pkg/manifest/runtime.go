@@ -141,8 +141,8 @@ func (p *parser) runtime(m *Manifest) {
 	}
 	if m.Astro.Dockerfile != "" {
 		p.add(CodeRuntimeWithDockerfile, runtimeKey, fmt.Sprintf(
-			"picks a runtime build, and the declared dockerfile %s names its own base image in its FROM line, so this would pick nothing. "+
-				"Delete the runtime line, or change the FROM line", m.Astro.Dockerfile))
+			"picks a runtime build, but the declared dockerfile %s sets its own base image in its FROM line. "+
+				"Delete the runtime line or change the FROM line", m.Astro.Dockerfile))
 		return
 	}
 	t, ok := ParseRuntimeTag(tag)
@@ -153,7 +153,7 @@ func (p *parser) runtime(m *Manifest) {
 		return
 	case !t.Build:
 		p.add(CodeRuntimeInvalid, runtimeKey, fmt.Sprintf(
-			"%q names whatever the registry serves under that tag, not one build, and the requirement already builds from the newest one. "+
+			"%q is a moving tag, and the requirement already builds from the newest build. "+
 				"Name one build, like %s, or delete the line", tag, exampleBuild(t)))
 		return
 	}

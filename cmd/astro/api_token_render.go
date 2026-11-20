@@ -23,7 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
-var errCleanOutputWithJSON = errors.New("--clean-output prints the bare token for a script, and --output json the whole token with it in a \"token\" field; use one")
+var errCleanOutputWithJSON = errors.New("--clean-output prints only the token and --output json prints it in a \"token\" field; use one")
 
 // The role column of each family's tables.
 const (
@@ -77,12 +77,12 @@ func renderTokenSecret(format cliout.Format, out io.Writer, t *apitoken.Token, k
 			}
 			return
 		}
-		fmt.Fprintf(b, "\nAstro %s API token %s was successfully %s\n", kind, name, verb)
-		fmt.Fprintln(b, "Copy and paste this API token for your records.")
+		fmt.Fprintf(b, "\n%s %s API token %s\n", verb, kind, name)
+		fmt.Fprintln(b, "Copy this API token for your records.")
 		if t.Token != "" {
 			fmt.Fprintln(b, "\n"+t.Token)
 		}
-		fmt.Fprintln(b, "\nYou will not be shown this API token value again.")
+		fmt.Fprintln(b, "\nThis API token value is not shown again.")
 	}))
 }
 
@@ -134,7 +134,7 @@ var (
 // it. Its question names no action; it has always been the same for every
 // command that asks it.
 func deploymentTokenPicker() apitoken.Picker {
-	return newTokenPicker(tokenHeader(deploymentRoleHeader), tokenRow, errInvalidDeploymentTokenKey, "--name", "Please select the Deployment API token:")
+	return newTokenPicker(tokenHeader(deploymentRoleHeader), tokenRow, errInvalidDeploymentTokenKey, "--name", "Select the Deployment API token:")
 }
 
 // workspaceTokenPicker picks among a Workspace's tokens, by their role on it,

@@ -103,7 +103,7 @@ type Update struct {
 // token now holds role, and says so, rather than reporting only the failure.
 // It wraps err, so the failure's kind is kept.
 func RenameFailedAfterRole(role string, err error) error {
-	return fmt.Errorf("the token's role was updated to %s, but updating its name and description failed: %w", role, err)
+	return fmt.Errorf("updated the token's role to %s, but updating its name and description failed: %w", role, err)
 }
 
 // Role is one role a token holds, on one object.

@@ -10,7 +10,7 @@ type ErrAPINotImplemented struct {
 }
 
 func (e ErrAPINotImplemented) Error() string {
-	return fmt.Sprintf("%s GraphQL API not implemented for the given Houston version", e.APIName)
+	return fmt.Sprintf("%s GraphQL API is not implemented in this Houston version", e.APIName)
 }
 
 type ErrFieldsNotAvailable struct {
@@ -18,7 +18,7 @@ type ErrFieldsNotAvailable struct {
 }
 
 func (e ErrFieldsNotAvailable) Error() string {
-	msg := "Some fields requested by the CLI are not available in the server schema."
+	msg := "Some fields the CLI requests are not in the server schema"
 	if e.BaseError != nil {
 		return msg + ": " + e.BaseError.Error()
 	}
@@ -40,5 +40,5 @@ type ErrWorkspaceNotFound struct {
 }
 
 func (e ErrWorkspaceNotFound) Error() string {
-	return fmt.Sprintf("no workspaces with id (%s) found", e.workspaceID)
+	return fmt.Sprintf("no Workspace found with ID %s", e.workspaceID)
 }

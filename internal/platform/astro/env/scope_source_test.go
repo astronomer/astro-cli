@@ -31,7 +31,7 @@ func (s *Suite) TestOutOfScopeNamesTheWorkspacesSource() {
 		}
 		err := checkInScope(obj, id, Scope{WorkspaceID: wsID, Source: tt.source}, objectTypeVar)
 		s.ErrorIs(err, ErrOutOfScope)
-		s.Contains(err.Error(), "belongs to deployment "+depID+", not "+fmt.Sprintf(tt.named, wsID)+".")
+		s.Contains(err.Error(), "belongs to Deployment "+depID+", not "+fmt.Sprintf(tt.named, wsID)+";")
 	}
 
 	// A workspace-owned object looked up at deployment scope: the owner is not labeled.
@@ -42,7 +42,7 @@ func (s *Suite) TestOutOfScopeNamesTheWorkspacesSource() {
 	}
 	err := checkInScope(obj, id, Scope{DeploymentID: depID, Source: astrosession.SourceFlag}, objectTypeVar)
 	s.ErrorIs(err, ErrOutOfScope)
-	s.Contains(err.Error(), "belongs to workspace "+wsID+", not deployment "+depID)
+	s.Contains(err.Error(), "belongs to Workspace "+wsID+", not Deployment "+depID)
 	s.NotContains(err.Error(), "(from ")
 }
 
@@ -56,7 +56,7 @@ func (s *Suite) TestOutOfScopeWithNoWorkspaceNamesNone() {
 	}
 	err := checkInScope(obj, id, Scope{DeploymentID: depID, Source: astrosession.SourceNone}, objectTypeVar)
 	s.ErrorIs(err, ErrOutOfScope)
-	s.Contains(err.Error(), "belongs to deployment "+otherDep+", not deployment "+depID)
+	s.Contains(err.Error(), "belongs to Deployment "+otherDep+", not Deployment "+depID)
 	s.NotContains(err.Error(), "(from ")
 	s.NotContains(err.Error(), "workspace  ")
 }

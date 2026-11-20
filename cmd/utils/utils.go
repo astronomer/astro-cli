@@ -48,7 +48,7 @@ func in(dir string) string {
 // The no-project advice: the home directory, where astro init would make
 // every file under ~ part of a project, and anywhere else.
 const (
-	homeDirRefusal   = "this is your home directory, not an Astro project directory. Change to an Astro project directory"
+	homeDirRefusal   = "this is your home directory. Change to an Astro project directory"
 	notProjectAdvice = "this is not an Astro project directory. Change to an Astro project directory, or run astro init to make this one an Astro project"
 )
 

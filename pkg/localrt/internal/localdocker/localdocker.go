@@ -164,9 +164,8 @@ func refuseUnsupportedBase(declared string, base airflowrt.DeclaredBase) error {
 	if !base.Known || airflowrt.IsAstroRuntimeRef(base.Image, base.Tag) {
 		return nil
 	}
-	return fmt.Errorf("%w: %s builds on %s. The generated compose file runs Airflow as the "+
-		"astro user and takes its service set from the runtime tag, so another base cannot start. "+
-		"Base the final stage on one of Astronomer's published Runtime images "+
+	return fmt.Errorf("%w: %s builds on %s. Docker mode needs an "+
+		"Astronomer Runtime base. Base the final stage on one of the published Runtime images "+
 		"(astrocrpublic.azurecr.io/runtime, quay.io/astronomer/astro-runtime), or on a mirror whose "+
 		"repository is named runtime or astro-runtime and whose tag is a Runtime version, such as 3.1-12 or 12.1.0",
 		airflowrt.ErrUnsupportedBase, declared, base.Ref())
@@ -445,7 +444,7 @@ func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, 
 // databaseNewerError reports a metadata database the project's Airflow cannot
 // run on, because a newer Airflow already upgraded it to revision.
 func databaseNewerError(revision string) error {
-	return fmt.Errorf("%w: it is at migration %s, which this Airflow does not know, and Airflow cannot migrate a database backwards",
+	return fmt.Errorf("%w: it is at migration %s, which this Airflow does not know; Airflow cannot migrate a database backwards",
 		airflowrt.ErrDatabaseNewerThanAirflow, revision)
 }
 

@@ -34,7 +34,7 @@ func newEnvConnRootCmd(out io.Writer) *cobra.Command {
 		Use:     "connection",
 		Aliases: []string{"conn", "connections"},
 		Short:   "Manage connections",
-		Long:    "Manage connections on Astro, scoped to a workspace or a deployment.",
+		Long:    "Manage connections on Astro, scoped to a Workspace or a Deployment.",
 		Example: envConnExamples,
 		Args:    cobra.ArbitraryArgs,
 		RunE:    cliout.GroupHelp,
@@ -91,7 +91,7 @@ func newEnvConnSetCmd(out io.Writer) *cobra.Command {
 		Use:   "set <ID_OR_KEY>",
 		Short: "Set a connection",
 		Long: "Set a connection, creating it if it does not exist. Pass --no-create to fail " +
-			"instead. Give it whole with --value, as a URI or JSON, or field by field with " +
+			"if it does not exist. Give the full connection with --value, as a URI or JSON, or field by field with " +
 			"--type, --host and the rest.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -144,7 +144,7 @@ func newEnvConnDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func connFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&envConnValue, "value", "", "The whole connection as a URI or JSON. Replaces it, where the field flags patch; a stored port or password is kept unless given")
+	cmd.Flags().StringVar(&envConnValue, "value", "", "Connection as a URI or JSON; replaces it, where the field flags patch. A stored port or password is kept unless given")
 	cmd.Flags().StringVar(&envConnType, "type", "", "Connection type (e.g. postgres, http)")
 	cmd.Flags().StringVar(&envConnHost, "host", "", "Connection host")
 	cmd.Flags().StringVar(&envConnLogin, "login", "", "Connection login or username")

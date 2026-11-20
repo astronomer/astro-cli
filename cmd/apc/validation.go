@@ -14,13 +14,13 @@ import (
 )
 
 var (
-	ErrInvalidDAGDeploymentType = errors.New("please specify the correct Dag deployment type, one of the following: image, volume, git_sync(if enabled in platform config), dag_deploy(if enabled in platform config)")
-	errNFSLocationNotFound      = cliout.Usage(errors.New("please specify the nfs location via --nfs-location flag"))
-	errGitRepoNotFound          = cliout.Usage(errors.New("please specify a valid git repository URL via --git-repository-url"))
-	errInvalidExecutorType      = errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s, or Astro's spellings LocalExecutor, CeleryExecutor, KubernetesExecutor")
-	errAstroExecutorOnAPC       = errors.New("AstroExecutor is an Astro executor, and Astro Private Cloud has no equivalent: specify one of local, celery, kubernetes (or LocalExecutor, CeleryExecutor, KubernetesExecutor)")
-	errNoWorkspaceFound         = errors.New("no valid workspace source found")
-	errInvalidDeploymentMode    = errors.New("please specify a valid deployment mode, one of: helm, operator")
+	ErrInvalidDAGDeploymentType = errors.New("invalid Dag deployment type: use image, volume, git_sync (if enabled in the platform config), or dag_deploy (if enabled in the platform config)")
+	errNFSLocationNotFound      = cliout.Usage(errors.New("set the NFS location with --nfs-location"))
+	errGitRepoNotFound          = cliout.Usage(errors.New("set a valid git repository URL with --git-repository-url"))
+	errInvalidExecutorType      = errors.New("invalid executor: use local, celery, kubernetes, k8s, LocalExecutor, CeleryExecutor, or KubernetesExecutor")
+	errAstroExecutorOnAPC       = errors.New("AstroExecutor is not available on Astro Private Cloud; use local, celery, kubernetes, LocalExecutor, CeleryExecutor, or KubernetesExecutor")
+	errNoWorkspaceFound         = errors.New("no valid Workspace source found")
+	errInvalidDeploymentMode    = errors.New("invalid Deployment mode: use helm or operator")
 )
 
 var validGitScheme = map[string]struct{}{
@@ -40,7 +40,7 @@ func coalesceWorkspace() (string, error) {
 
 	wsCfg, err := workspace.GetCurrentWorkspace()
 	if err != nil {
-		return "", fmt.Errorf("failed to get current workspace: %w", err)
+		return "", fmt.Errorf("could not get the current Workspace: %w", err)
 	}
 
 	if wsCfg != "" {
@@ -58,7 +58,7 @@ func validateWorkspaceRole(role string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
+	return fmt.Errorf("use one of: %s", strings.Join(validRoles, ", "))
 }
 
 func validateDeploymentRole(role string) error {
@@ -69,7 +69,7 @@ func validateDeploymentRole(role string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("please use one of: %s", strings.Join(validRoles, ", "))
+	return fmt.Errorf("use one of: %s", strings.Join(validRoles, ", "))
 }
 
 func validateDagDeploymentArgs(dagDeploymentType, nfsLocation, gitRepoURL string, acceptEmptyArgs bool) error {

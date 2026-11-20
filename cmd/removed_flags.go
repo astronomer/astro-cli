@@ -36,7 +36,7 @@ const (
 
 	// astro deployment team, user and token took a --workspace in v2 before
 	// it moved to the commands that read it; none of these ever read it.
-	errDeploymentByIDWorkspaceRemoved = "astro deployment team, user and token act on the Deployment you name, which carries its workspace, so drop it"
+	errDeploymentByIDWorkspaceRemoved = "astro deployment team, user and token act on the Deployment you name, which already determines the Workspace; drop it"
 
 	errDeploymentFileRemoved = "to manage Deployments as code, use the Astro Terraform provider: " + terraformProviderURL + ". " +
 		"To copy a Deployment, use astro deployment create --clone <deployment> --name <new name>"
@@ -83,14 +83,12 @@ const (
 	// The flags 1.x marked deprecated, hidden but accepted, which v2 dropped.
 	errEnforceCICDRemoved      = "use --cicd-enforcement enable, or --cicd-enforcement disable"
 	errClusterTypeRemoved      = "use --type, which takes the same standard or dedicated"
-	errForceUpgradeToAF3Remove = "a deploy that moves a Deployment from Airflow 2 to Airflow 3 needs no flag, " +
-		"as it needed none in 1.x, which ignored this one, so drop it"
-	errHardDeleteRemoved = "deleting a Deployment always removes all of its infrastructure and records, " +
-		"as it did in 1.x, which ignored --hard, so drop it"
+	errForceUpgradeToAF3Remove = "a deploy that moves a Deployment from Airflow 2 to Airflow 3 needs no flag; drop it"
+	errHardDeleteRemoved       = "deleting a Deployment removes its infrastructure and records; drop --hard"
 
 	// astro dev init's flags, on astro init.
-	errInitForceRemoved    = "astro init asks nothing before it writes, in an empty directory or not, so drop it"
-	errInitTemplateRemoved = "there are no templates to choose from, and astro init writes one starter project, with an example Dag in dags/"
+	errInitForceRemoved    = "astro init does not ask before it writes; drop it"
+	errInitTemplateRemoved = "astro init has no templates; it writes one starter project with an example Dag in dags/"
 	errInitRuntimeRemoved  = "a project pins Airflow, with --airflow-version or the apache-airflow requirement in pyproject.toml, " +
 		"and Docker mode builds on the newest Astro Runtime for it. To pin one Runtime build, set runtime = \"<version>\" under [tool.astro] in pyproject.toml"
 	errInitRemoteExecRemoved = "astro init writes no client image files. " +
@@ -100,21 +98,21 @@ const (
 	errInitACRemoved = "a project runs Apache Airflow, on Astro Runtime in Docker mode, " +
 		"and there is no Astronomer Certified image to choose. Pin Airflow with --airflow-version"
 	errInitDockerRemoved     = "astro init makes one project for both modes. Choose Docker when you start it, with astro local start --docker"
-	errInitStandaloneRemoved = "astro init makes one project for both modes, and astro local start runs it standalone by default, so drop it"
+	errInitStandaloneRemoved = "astro init makes one project for both modes, and astro local start runs it standalone by default; drop it"
 
 	// astro dev start's and restart's flags, on astro local start and
 	// restart (and the root's astro start).
-	errStartStandaloneRemoved  = "standalone is the default mode, so drop it"
+	errStartStandaloneRemoved  = "standalone is the default mode; drop it"
 	errStartComposeFileRemoved = "Docker mode writes its own compose file, and merges a docker-compose.override.yml " +
 		"at the project root over it. Put your changes there"
 	errStartDeploymentIDRemoved = "a start reads no Deployment's values. " +
-		"It reads the Environment Manager of the workspace pyproject.toml names, with workspace = \"<workspace id>\" under [tool.astro]"
-	errStartWorkspaceIDRemoved = "a start reads the Environment Manager of the workspace pyproject.toml names, " +
+		"It reads the Environment Manager of the Workspace that pyproject.toml names, with workspace = \"<workspace id>\" under [tool.astro]"
+	errStartWorkspaceIDRemoved = "a start reads the Environment Manager of the Workspace that pyproject.toml names, " +
 		"with workspace = \"<workspace id>\" under [tool.astro]"
 	errStartImageNameRemoved = "Docker mode builds the project's image itself, from pyproject.toml, " +
 		"or from the Dockerfile that dockerfile = \"<path>\" under [tool.astro] names"
-	errStartNoBrowserRemoved = "a start opens no browser, so drop it. To open the Airflow UI, use astro local open"
-	errStartNoProxyRemoved   = "Airflow always answers on its own port on localhost too, the URL astro local status shows as direct. " +
+	errStartNoBrowserRemoved = "a start opens no browser; to open the Airflow UI, use astro local open"
+	errStartNoProxyRemoved   = "Airflow also answers on its own port on localhost, the URL astro local status shows as direct. " +
 		"To choose that port, use astro local start --port"
 	errStartSettingsRemoved = "a start sets the connections, variables and pools pyproject.toml declares, " +
 		"in [tool.astro.env] and [tool.astro.pools]. astro init carries an airflow_settings.yaml into them"

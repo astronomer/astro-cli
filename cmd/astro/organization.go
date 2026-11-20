@@ -296,7 +296,7 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 }
 
 func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
-	fmt.Fprintln(cliout.NotesTo(cmd, auditLogsOutput, out), "This may take some time depending on how many days are being exported.")
+	fmt.Fprintln(cliout.NotesTo(cmd, auditLogsOutput, out), "Exports that cover many days can take a while.")
 	export, err := orgExportAuditLogs(astroV1Client,
 		orgName, auditLogsOutputFilePath, auditLogsEarliestParam)
 	if err != nil {
@@ -359,7 +359,7 @@ func userUpdate(args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(organizationUserOutput, out, &u, fmt.Sprintf("The user %s role was successfully updated to %s", u.Email, u.OrgRole))
+	return renderLines(organizationUserOutput, out, &u, fmt.Sprintf("Updated user %s to %s", u.Email, u.OrgRole))
 }
 
 func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
@@ -447,7 +447,7 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create an Astro Team",
-		Long:    "Create a team in your Organization. Teams let you assign Workspace and Deployment roles to groups of users at once. If your Organization uses an external identity provider (SCIM) for team sync, team creation through the CLI is blocked — manage teams in the IDP instead.",
+		Long:    "Create a team in your Organization. Teams let you assign Workspace and Deployment roles to groups of users at once. If your Organization uses an external identity provider (SCIM) for team sync, team creation through the CLI is blocked; manage teams in the IDP.",
 		Example: `
   # Create a team, choosing its name and role when prompted
   astro organization team create
@@ -474,7 +474,7 @@ func teamCreate(out io.Writer) error {
 		if err := mayPickRole(); err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stderr, "select a Organization Role for the new team:")
+		fmt.Fprintln(os.Stderr, "Select an Organization Role for the new team:")
 		// no role was provided so ask the user for it
 		var err error
 		teamOrgRole, err = selectOrganizationRole()
@@ -486,7 +486,7 @@ func teamCreate(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(organizationTeamOutput, out, &t, fmt.Sprintf("Astro Team %s was successfully created", t.Name))
+	return renderLines(organizationTeamOutput, out, &t, fmt.Sprintf("Created team %s", t.Name))
 }
 
 func newTeamDeleteCmd(out io.Writer) *cobra.Command {
@@ -527,7 +527,7 @@ func teamDelete(out io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(organizationTeamOutput, out, r, fmt.Sprintf("Astro Team %s was successfully deleted", r.Name))
+	return renderLines(organizationTeamOutput, out, r, fmt.Sprintf("Deleted team %s", r.Name))
 }
 
 func newOrganizationTeamUserRootCmd(out io.Writer) *cobra.Command {
@@ -702,8 +702,8 @@ func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
 func newOrganizationTokenListRolesCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "roles [TOKEN_ID]",
-		Short: "List roles for an organization API token",
-		Long:  "List roles for an organization API token",
+		Short: "List roles for an Organization API token",
+		Long:  "List roles for an Organization API token",
 		Example: `
   astro organization token roles <TOKEN_ID>
 `,
@@ -719,7 +719,7 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create an API token in an Astro Organization",
-		Long:    "Create an Organization-scoped API token. The token value is displayed only once at creation and cannot be retrieved later — store it securely. Use --clean-output to print only the raw token value for scripts. Use --expiration to set a TTL in days (default: no expiration).",
+		Long:    "Create an Organization-scoped API token. The token value is displayed only once at creation and cannot be retrieved later; store it securely. Use --clean-output to print only the raw token value for scripts. Use --expiration to set a TTL in days (default: no expiration).",
 		Example: `
   # Create a token, choosing its name and role when prompted
   astro organization token create
@@ -797,7 +797,7 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete [TOKEN_ID]",
 		Aliases: []string{"rm"},
 		Short:   "Delete an Organization API token",
-		Long:    "Permanently revoke an Organization API token. All access the token grants — including any Workspace and Deployment roles — is immediately revoked.",
+		Long:    "Permanently revoke an Organization API token. All access the token grants, including any Workspace and Deployment roles, is revoked immediately.",
 		Example: `
   # Delete a token by its ID
   astro organization token delete <TOKEN_ID>

@@ -110,16 +110,16 @@ func newEnvLinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Use:   "link " + k.arg + " [DIR...]",
 		Short: "Limit a global " + k.label + " in the vault to specific projects",
 		Long: "Link a global " + k.label + " in the encrypted vault to projects, so it reaches " +
-			"those projects and no others. With no link it is auto-linked to every project.\n\n" +
+			"those projects and no others. With no link, it reaches every project.\n\n" +
 			"Each DIR is a project directory; the default is the current project. A link " +
 			"to a project also reaches its git worktrees. --this-checkout links the " +
-			"checkout itself instead, so a worktree gets the value and its main project " +
-			"does not. --auto-link removes the links, and the value is auto-linked to every project " +
+			"checkout itself, so a worktree gets the value and its main project " +
+			"does not. --auto-link removes the links, and the value reaches every project " +
 			"again.\n\n" +
-			"Only global vault entries have links: a project secret already reaches only " +
+			"Only global vault entries have links. A project secret reaches only " +
 			"its own project.\n\n" +
-			"Whatever reaches a project is passed to its Airflow at start, declared or not, " +
-			"so linking is how to keep a global out of the projects that should not get " +
+			"Whatever reaches a project is passed to its Airflow at start, declared or not. " +
+			"Use links to keep a global out of projects that should not get " +
 			"it. Astro Desktop reads the same links.",
 		Example: `
   # limit it to the current project (and its worktrees)
@@ -138,7 +138,7 @@ func newEnvLinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			return c.runEnvLink(scope, k.kind, args[0], args[1:], thisCheckout, everywhere)
 		},
 	}
-	cmd.Flags().BoolVar(&thisCheckout, "this-checkout", false, "Link each checkout's own path rather than its project, so a worktree does not share it with its main project")
+	cmd.Flags().BoolVar(&thisCheckout, "this-checkout", false, "Link each checkout's own path instead of its project, so a worktree does not share the value with its main project")
 	cmd.Flags().BoolVar(&everywhere, "auto-link", false, "Remove the links, so it is auto-linked to every project")
 	cmd.MarkFlagsMutuallyExclusive("this-checkout", "auto-link")
 	return cmd
@@ -151,10 +151,10 @@ func newEnvUnlinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Short: "Stop a global " + k.label + " in the vault reaching specific projects",
 		Long: "Unlink a global " + k.label + " in the encrypted vault from projects. Each DIR " +
 			"is a project directory, or a linked path that no longer exists; the default " +
-			"is the current project. Afterwards the checkout is not reached, whether it " +
+			"is the current project. Afterwards the checkout no longer gets the value, whether it " +
 			"was linked as a project or on its own.\n\n" +
-			"An entry with no links is auto-linked to every project, so there is nothing to unlink " +
-			"it from: link it to the projects it should reach instead. Unlinking the last " +
+			"An entry with no links reaches every project, so there is nothing to unlink. " +
+			"Link it to the projects it should reach instead. Unlinking the last " +
 			"project leaves it reaching no project.",
 		Example: `
   # stop it reaching the current project

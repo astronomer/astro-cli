@@ -46,29 +46,27 @@ func newAPICmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "api <ENDPOINT>",
 		Short: "Make one request to this machine's Airflow API",
-		Long: "Send a request to the Airflow running on this machine and print what it sent back, unchanged.\n\n" +
-			"The endpoint is a path relative to the API base, so /dags (or dags) reaches /api/v2/dags on " +
-			"Airflow 3 and /api/v1/dags on Airflow 2 — the generation is detected, not assumed. A query string " +
-			"typed onto the path is sent as one. --root (or --raw) addresses the server below the version prefix, " +
-			"for the few paths Airflow serves unversioned.\n\n" +
-			"-F/--field adds a typed field: true, false and null are themselves, a number is a number, and @file " +
-			"reads a file (@- reads stdin). --raw-field adds a field that is always a string (af spells it -f, which is --follow elsewhere in this tree). key[sub]=v nests " +
-			"an object and key[]=v builds an array. Fields go in the query string on a GET, or when --body or --input carries " +
-			"the payload, and become the JSON body otherwise. The method stays GET unless -X says otherwise.\n\n" +
-			"The body is printed whatever the status, and a non-2xx status also fails the command, so a script can " +
-			"branch on the exit code without parsing anything. -i puts the status line and headers in front of it; " +
-			"with --output json it prints one {status_code, headers, body} object instead. Otherwise the output is " +
-			"Airflow's own, and --output governs how a failure is reported.\n\n" +
-			"The ls command lists the endpoints this Airflow serves and spec prints its OpenAPI document, both read from " +
-			"the Airflow itself. For a deployment, astro api airflow is the same idea with the published API spec " +
-			"behind it.",
+		Long: "Send a request to the Airflow running on this machine and print the response unchanged.\n\n" +
+			"The endpoint is a path relative to the API base: /dags (or dags) reaches /api/v2/dags on " +
+			"Airflow 3 and /api/v1/dags on Airflow 2. A query string in the path is sent as one. --root (or --raw) " +
+			"addresses the server below the version prefix, for the few paths Airflow serves unversioned.\n\n" +
+			"-F/--field adds a typed field. true, false and null are sent as themselves, numbers as numbers, " +
+			"@file reads a file, and @- reads stdin. --raw-field adds a field that is always a string (the short " +
+			"form -f is taken by --follow elsewhere in this tree). key[sub]=v nests an object and key[]=v builds " +
+			"an array. Fields go in the query string on a GET, or when --body or --input carries the payload. " +
+			"Otherwise they become the JSON body. The method is GET unless -X sets another.\n\n" +
+			"The body is printed whatever the status. A non-2xx status also fails the command, so a script can " +
+			"branch on the exit code. -i prints the status line and headers before the body. With --output json, " +
+			"the command prints one {status_code, headers, body} object instead.\n\n" +
+			"astro local api ls lists the endpoints this Airflow serves, and astro local api spec prints its " +
+			"OpenAPI document. For a Deployment, astro api airflow does the same against the published API spec.",
 		Example: "  # Every Dag, as Airflow itself reports them\n" +
 			"  astro local api /dags\n\n" +
 			"  # Typed fields become the query string on a GET\n" +
 			"  astro local api dags -F limit=10 -F only_active=true\n\n" +
 			"  # Create a variable: fields become the body on a POST\n" +
 			"  astro local api variables -X POST -F key=my_var --raw-field value=8080\n\n" +
-			"  # Trigger a run with a whole body\n" +
+			"  # Trigger a run with a JSON body\n" +
 			"  astro local api /dags/etl/dagRuns -X POST --body '{\"logical_date\": null}'\n\n" +
 			"  # The same, with the body in a file\n" +
 			"  astro local api /dags/etl/dagRuns -X POST --input run.json\n\n" +
@@ -76,7 +74,7 @@ func newAPICmd(c *cli) *cobra.Command {
 			"  astro local api dags -i\n\n" +
 			"  # A path below the version prefix\n" +
 			"  astro local api --root /health\n\n" +
-			"  # Which endpoints mention variables, and the whole spec\n" +
+			"  # List endpoints that mention variables, and print the spec\n" +
 			"  astro local api ls --filter variable\n" +
 			"  astro local api spec | jq '.paths | keys'",
 		Args: cobra.ExactArgs(1),
@@ -248,11 +246,11 @@ func newAPIListCmd(c *cli) *cobra.Command {
 		Use:     "ls [FILTER]",
 		Aliases: []string{"list"},
 		Short:   "List the endpoints this machine's Airflow serves",
-		Long: "List the API endpoints the Airflow running on this machine serves, read from its own OpenAPI " +
+		Long: "List the API endpoints the Airflow running on this machine serves, read from its OpenAPI " +
 			"specification.\n\n" +
-			"A filter, as an argument or with --filter, keeps the endpoints whose path, method, operation id, " +
-			"summary or tag contains it, ignoring case. Paths are shown relative to the API base, the form " +
-			"astro local api takes them in. --output json prints one object, its endpoints under an endpoints key.",
+			"A filter, given as an argument or with --filter, keeps the endpoints whose path, method, operation id, " +
+			"summary or tag contains it (case-insensitive). Paths are relative to the API base, as astro local api " +
+			"takes them. With --output json, the endpoints are under an endpoints key.",
 		Example: "  astro local api ls\n" +
 			"  astro local api ls --filter variable\n" +
 			"  astro local api ls dagRun --verbose",
@@ -287,8 +285,8 @@ func newAPISpecCmd(c *cli) *cobra.Command {
 		Use:   "spec",
 		Short: "Print the OpenAPI specification this machine's Airflow serves",
 		Long: "Print the OpenAPI specification the Airflow running on this machine serves, as JSON.\n\n" +
-			"Airflow 3 serves it as JSON at /openapi.json; Airflow 2 serves YAML at /api/v1/openapi.yaml, which " +
-			"is printed as JSON all the same, so a script piping it into jq does not have to know which it reached.",
+			"Airflow 3 serves it as JSON at /openapi.json. Airflow 2 serves YAML at /api/v1/openapi.yaml, which " +
+			"is converted and printed as JSON, so the output pipes into jq either way.",
 		Example: "  astro local api spec\n" +
 			"  astro local api spec | jq '.paths | keys'",
 		Args: cobra.NoArgs,

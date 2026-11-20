@@ -254,14 +254,14 @@ func TestDeploymentCommandsKeepTheirNoWorkspacePrefix(t *testing.T) {
 		args   []string
 		prefix string
 	}{
-		"delete":        {[]string{"delete", "--deployment-name", "etl", "--yes"}, "failed to find a valid Workspace: "},
-		"logs":          {[]string{"logs", "--deployment-name", "etl", "--warn"}, "failed to find a valid Workspace: "},
-		"update":        {[]string{"update", "--deployment-name", "etl", "--yes"}, "failed to find a valid Workspace: "},
-		"variable list": {[]string{"variable", "list", "--deployment-name", "etl"}, "failed to find a valid workspace: "},
-		"open":          {[]string{"open", "--deployment-name", "etl"}, "failed to find a valid workspace: "},
-		"hibernate":     {[]string{"hibernate", "--deployment-name", "etl", "--yes"}, "failed to find a valid workspace: "},
-		"list":          {[]string{"list"}, "failed to find a valid workspace: "},
-		"create":        {[]string{"create", "--name", "etl"}, "failed to find a valid Workspace: "},
+		"delete":        {[]string{"delete", "--deployment-name", "etl", "--yes"}, "could not find a valid Workspace: "},
+		"logs":          {[]string{"logs", "--deployment-name", "etl", "--warn"}, "could not find a valid Workspace: "},
+		"update":        {[]string{"update", "--deployment-name", "etl", "--yes"}, "could not find a valid Workspace: "},
+		"variable list": {[]string{"variable", "list", "--deployment-name", "etl"}, "could not find a valid Workspace: "},
+		"open":          {[]string{"open", "--deployment-name", "etl"}, "could not find a valid Workspace: "},
+		"hibernate":     {[]string{"hibernate", "--deployment-name", "etl", "--yes"}, "could not find a valid Workspace: "},
+		"list":          {[]string{"list"}, "could not find a valid Workspace: "},
+		"create":        {[]string{"create", "--name", "etl"}, "could not find a valid Workspace: "},
 	} {
 		t.Run(name, func(t *testing.T) {
 			orgTokenNoWorkspace(t)

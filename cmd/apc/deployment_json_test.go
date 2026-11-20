@@ -204,7 +204,7 @@ func TestDeploymentCreateUpdateAdoptJSON(t *testing.T) {
 		assert.Equal(t, "dep-rt", got.DeploymentID)
 		assert.Equal(t, strp("cl-1"), got.ClusterID)
 		assert.Equal(t, []deploymentURLJSON{{Type: "airflow", URL: "https://airflow"}}, got.URLs)
-		assert.NotContains(t, run.stdout, "Successfully created")
+		assert.NotContains(t, run.stdout, "Created")
 	})
 
 	// Where the platform asks for a namespace, --namespace answers it, and
@@ -258,7 +258,7 @@ func TestDeploymentCreateUpdateAdoptJSON(t *testing.T) {
 		assert.Equal(t, 1, run.code)
 		var got errorObject
 		decodeOne(t, run.stdout, &got)
-		assert.Equal(t, "failed to get app config: Insufficient permissions.", got.Error)
+		assert.Equal(t, "could not get the platform config: Insufficient permissions.", got.Error)
 		api.AssertNotCalled(t, "CreateDeployment", mock.Anything)
 	})
 
@@ -337,8 +337,8 @@ func TestDeploymentRemovalJSON(t *testing.T) {
 
 		run := runAPC(t, api, "", "deployment", "delete", "dep-ac", "--yes")
 		require.Equal(t, 0, run.code)
-		assert.Equal(t, "\n Successfully deleted deployment\n", run.stdout)
-		assert.NotContains(t, run.stderr, "Proceed with delete?")
+		assert.Equal(t, "\n Deleted Deployment\n", run.stdout)
+		assert.NotContains(t, run.stderr, "Delete the Deployment?")
 	})
 
 	// Houston may answer with no record; the id given is what is known.
@@ -348,7 +348,7 @@ func TestDeploymentRemovalJSON(t *testing.T) {
 
 		run := runAPC(t, api, "", "deployment", "unadopt", "--deployment-id", "dep-ac", "--yes")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-		assert.Equal(t, "\n Successfully unadopted deployment dep-ac\n", run.stdout)
+		assert.Equal(t, "\n Unadopted Deployment dep-ac\n", run.stdout)
 
 		run = runAPC(t, api, "", "deployment", "unadopt", "--deployment-id", "dep-ac", "--yes", "-o", "json")
 		require.Equal(t, 0, run.code)
@@ -448,7 +448,7 @@ func TestDeploymentVersionChangeJSON(t *testing.T) {
 
 		run := runAPC(t, api, "", "deployment", "runtime", "migrate", "--deployment-id", "dep-ac", "--cancel")
 		require.Equal(t, 0, run.code)
-		assert.Equal(t, "\nNothing to cancel. You are running Airflow 2.2.4 and you have not indicated that you want to migrate to Runtime.", run.stdout)
+		assert.Equal(t, "\nNothing to cancel. This Deployment is running Airflow 2.2.4 and no migration to Runtime was started.", run.stdout)
 
 		run = runAPC(t, api, "", "deployment", "airflow", "upgrade", "--deployment-id", "dep-rt", "--cancel", "-o", "json")
 		require.Equal(t, 0, run.code)
@@ -526,7 +526,7 @@ func TestDeploymentLogsJSON(t *testing.T) {
 		prev := subscribeLogs
 		t.Cleanup(func() { subscribeLogs = prev })
 		subscribeLogs = func(_, component, _ string, _ time.Duration, notes io.Writer, onLog func(houston.DeploymentLog) error) error {
-			fmt.Fprintln(notes, "Waiting for logs...")
+			fmt.Fprintln(notes, "Waiting for logs…")
 			for _, l := range []string{"a", "b"} {
 				if err := onLog(houston.DeploymentLog{CreatedAt: "t", Log: l}); err != nil {
 					return err
@@ -544,20 +544,20 @@ func TestDeploymentLogsJSON(t *testing.T) {
 		var got errorObject
 		require.NoError(t, json.Unmarshal([]byte(lines[2]), &got))
 		assert.Contains(t, got.Error, "log stream was closed")
-		assert.Contains(t, run.stderr, "Waiting for logs...")
+		assert.Contains(t, run.stderr, "Waiting for logs…")
 	})
 
 	t.Run("follow in text is the records as they come", func(t *testing.T) {
 		prev := subscribeLogs
 		t.Cleanup(func() { subscribeLogs = prev })
 		subscribeLogs = func(_, _, _ string, _ time.Duration, notes io.Writer, onLog func(houston.DeploymentLog) error) error {
-			fmt.Fprintln(notes, "Waiting for logs...")
+			fmt.Fprintln(notes, "Waiting for logs…")
 			return onLog(houston.DeploymentLog{Log: "a line\n"})
 		}
 
 		run := runAPC(t, newAPCClient(), "", "deployment", "logs", "webserver", "dep-ac", "--follow")
 		require.Equal(t, 0, run.code)
-		assert.Equal(t, "Waiting for logs...\na line\n", run.stdout)
+		assert.Equal(t, "Waiting for logs…\na line\n", run.stdout)
 	})
 }
 

@@ -32,7 +32,7 @@ const (
 // 1.x flags reach the guidance for what was typed rather than dying on a
 // flag.
 func newDbtRemovedCmd() *cobra.Command {
-	return removedCmdStub("dbt", nil, "Removed in v2 — use astro deploy bundle", dbtRemovedGuidance)
+	return removedCmdStub("dbt", nil, "Removed in v2; use astro deploy bundle", dbtRemovedGuidance)
 }
 
 // dbtRemovedGuidance names the replacement for the subcommand typed, the

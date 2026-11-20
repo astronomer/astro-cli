@@ -19,16 +19,16 @@ type workspaceSelection struct {
 	err  error
 }
 
-var errInvalidWorkspaceKey = errors.New("invalid workspace selection")
+var errInvalidWorkspaceKey = errors.New("invalid Workspace selection")
 
-var ErrWorkspaceContextNotSet = errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+var ErrWorkspaceContextNotSet = errors.New("no current Workspace set; switch to one with\n\tastro workspace switch WORKSPACEID")
 
 // errNoWorkspace is a mutation answered with no workspace and no error. Houston
 // answers createWorkspace and updateWorkspace with the record Prisma wrote,
 // and an update of a workspace that does not exist throws rather than
 // answering null. So this is what is left if that ever changes: an error,
 // where it used to panic printing a nil workspace.
-var errNoWorkspace = errors.New("the platform answered with no workspace")
+var errNoWorkspace = errors.New("the platform answered with no Workspace")
 
 // Create creates a workspace, and returns it as Houston stored it.
 func Create(label, desc string, client houston.ClientInterface) (*houston.Workspace, error) {
@@ -75,13 +75,13 @@ func GetCurrentWorkspace() (string, error) {
 // so the refusal a run that may not ask gets before anything is fetched is
 // the one asking would give.
 func switchList(paged bool) picker.List {
-	about := "a workspace"
+	about := "a Workspace"
 	if paged {
-		about = "a workspace, or which page to show next"
+		about = "a Workspace, or which page to show next"
 	}
 	return picker.List{
 		Header:  []string{"NAME", "ID"},
-		Ask:     []input.Option{input.About(about), input.AnsweredBy("the workspace ID as an argument")},
+		Ask:     []input.Option{input.About(about), input.AnsweredBy("the Workspace ID as an argument")},
 		Invalid: errInvalidWorkspaceKey,
 	}
 }
@@ -102,7 +102,7 @@ func pageKeys(pageSize, pageNumber, rows int) (keys []string, hint string) {
 	}
 	keys = append(keys, "q")
 	names = append(names, "q. quit")
-	return keys, "Please select one of the following options or enter index to select the row.\n" + strings.Join(names, " ")
+	return keys, "Select an option, or enter a row number.\n" + strings.Join(names, " ")
 }
 
 // getWorkspaceSelection asks which workspace to switch to: from a numbered
@@ -215,7 +215,7 @@ func Switch(id string, pageSize int, houstonVersion string, client houston.Clien
 	// validate workspace
 	w, err = houston.Call(client.ValidateWorkspaceID)(id)
 	if err != nil {
-		return nil, false, fmt.Errorf("workspace id is not valid: %w", err)
+		return nil, false, fmt.Errorf("Workspace ID is not valid: %w", err)
 	}
 	// The client turns Houston's null into ErrWorkspaceNotFound; a nil with
 	// no error is no workspace to switch to, so the context stays as it was.

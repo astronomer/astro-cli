@@ -20,11 +20,11 @@ import (
 var (
 	HoustonClient ClientInterface
 
-	HoustonConnectionErrMsg = "cannot connect to APC. Try to log in with astro login or check your internet connection and user permissions.\n\nDetails: %w"
+	HoustonConnectionErrMsg = "cannot connect to APC; run astro login, then check your network connection and permissions.\n\nDetails: %w"
 
 	errInaptPermissionsMsg       = "You do not have the appropriate permissions for that"
 	errAuthTokenRefreshFailedMsg = "AUTH_TOKEN_REFRESH_FAILED" //nolint:gosec // reviewed; not a new risk in this shell code
-	ErrVerboseInaptPermissions   = errors.New("you do not have the appropriate permissions for that: Your token has expired. Please log in again")
+	ErrVerboseInaptPermissions   = errors.New("you do not have permission for that, or your token has expired; run astro login again")
 )
 
 // ClientInterface - Interface that defines methods exposed by the Houston API
@@ -207,7 +207,7 @@ func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) 
 	decode := Response{}
 	err = json.NewDecoder(strings.NewReader(response.Body)).Decode(&decode)
 	if err != nil {
-		return nil, fmt.Errorf("failed to JSON decode Houston response: %w", err)
+		return nil, fmt.Errorf("could not decode the Houston response: %w", err)
 	}
 	// Houston Specific Errors
 	if decode.Errors != nil {

@@ -64,9 +64,9 @@ func renderTeamUpdate(format cliout.Format, out io.Writer, upd *team.Update, err
 	if err != nil {
 		return err
 	}
-	lines := []string{fmt.Sprintf("Astro Team %s was successfully updated", upd.Team.Name)}
+	lines := []string{fmt.Sprintf("Updated team %s", upd.Team.Name)}
 	if upd.RoleChanged {
-		lines = append(lines, fmt.Sprintf("Astro Team %s role was successfully updated to %s", upd.Team.Name, upd.Team.OrgRole))
+		lines = append(lines, fmt.Sprintf("Updated team %s to %s", upd.Team.Name, upd.Team.OrgRole))
 	}
 	return renderLines(format, out, &upd.Team, lines...)
 }
@@ -74,15 +74,17 @@ func renderTeamUpdate(format cliout.Format, out io.Writer, upd *team.Update, err
 // renderMembership renders a team user add or remove, naming the user by
 // email, or by ID when it has none.
 func renderMembership(format cliout.Format, out io.Writer, m *team.Membership) error {
-	verb := "added to"
+	verb := "Added"
+	prep := "to"
 	if m.Action == team.Removed {
-		verb = "removed from"
+		verb = "Removed"
+		prep = "from"
 	}
 	who := m.Email
 	if who == "" {
 		who = m.UserID
 	}
-	return renderLines(format, out, m, fmt.Sprintf("Astro User %s was successfully %s team %s", who, verb, m.TeamName))
+	return renderLines(format, out, m, fmt.Sprintf("%s user %s %s team %s", verb, who, prep, m.TeamName))
 }
 
 // teamLabel is how the text of a workspace team command names t: by name, or

@@ -79,7 +79,7 @@ const subscriptionID = "1"
 var ErrLogStreamClosed = errors.New("the log stream was closed")
 
 // Subscribe follows a Deployment's logs over a websocket until the person
-// interrupts it, handing each record to onLog. Notes ("Waiting for logs...")
+// interrupts it, handing each record to onLog. Notes ("Waiting for logs…")
 // go to notes. It returns the failure that ended the stream: a connection
 // that could not be made or set up, a record it could not read, the server
 // closing it (ErrLogStreamClosed), or onLog's own error. An interrupt ends it
@@ -110,7 +110,7 @@ func Subscribe(jwtToken, url, queryMessage string, notes io.Writer, onLog func(D
 		return fmt.Errorf("could not subscribe to logs: %w", err)
 	}
 
-	fmt.Fprintln(notes, "Waiting for logs...")
+	fmt.Fprintln(notes, "Waiting for logs…")
 	done := make(chan error, 1)
 	// stopped is set on an interrupt: what the reader has buffered by then
 	// is not delivered.
@@ -161,7 +161,7 @@ func stopAndWait(ws *websocket.Conn, notes io.Writer, done <-chan error) error {
 		err = ws.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 	}
 	if err != nil {
-		fmt.Fprintln(notes, "Close connection...")
+		fmt.Fprintln(notes, "Closing connection…")
 	}
 	select {
 	case <-done:
@@ -221,7 +221,7 @@ func handleFrame(message []byte, onLog func(DeploymentLog) error) error {
 	case "connection_error":
 		// Houston refused the token when the connection opened: its onConnect
 		// found no user for it, an unknown or expired one, and returned false.
-		return fmt.Errorf("the log stream refused your login (%s); it may have expired: log in again with astro login", frameMessage(frame.Payload))
+		return fmt.Errorf("the log stream refused your login (%s); it may have expired. Run astro login again", frameMessage(frame.Payload))
 	case "error":
 		return fmt.Errorf("the log subscription failed: %s", frameMessage(frame.Payload))
 	case "complete":

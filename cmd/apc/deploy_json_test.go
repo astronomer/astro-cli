@@ -173,7 +173,7 @@ func quietFromTheStart(t *testing.T, api *mocks.ClientInterface) {
 
 // inImageWarning is the warning for the prebuilt image img:1, which is all
 // an image Deployment's DAGs.
-const inImageWarning = "this Deployment runs the Dags inside the image img:1; the dags folder is not uploaded. An image astro package built without a dockerfile declared under [tool.astro] contains none."
+const inImageWarning = "this Deployment runs the Dags inside the image img:1, so the dags folder is not uploaded. An image astro package built without a Dockerfile declared under [tool.astro] contains none."
 
 // deployPushed is what the image deploy reports in these tests.
 var deployPushed = deploy.ManifestImageResult{RuntimeVersion: "12.1.1", Image: "registry/rel-ac/airflow:deploy-2", URL: "https://airflow"}
@@ -220,7 +220,7 @@ func TestDeployJSON(t *testing.T) {
 
 		run = runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-		assert.Equal(t, "Deploying prebuilt image img:1...\nDeploying: rel-ac\n"+
+		assert.Equal(t, "Deploying prebuilt image img:1…\nDeploying: rel-ac\n"+
 			"Deployed image registry/rel-ac/airflow:deploy-2 to Deployment dep-ac, with the Dags inside the image.\nDeployment: https://airflow\n", run.stdout)
 		assert.Equal(t, 1, strings.Count(run.stderr, "Warning: "+inImageWarning+"\n"), run.stderr)
 	})
@@ -317,7 +317,7 @@ func TestDeployDagsNoDagsDirectoryJSON(t *testing.T) {
 		run := runAPC(t, dagsAPI(dagsDeployment(houston.DagOnlyDeploymentType, true), cfgOf(takesDagUploads)), "", args...)
 		assert.NotEqual(t, 0, run.code, "%v", args)
 		require.ErrorIs(t, run.err, deploy.ErrNoDagsDirectory, "%v", args)
-		assert.ErrorContains(t, run.err, filepath.Join(dir, "dags")+" is not a directory. Nothing was uploaded, and the Deployment keeps the Dags it had", "%v", args)
+		assert.ErrorContains(t, run.err, filepath.Join(dir, "dags")+" is not a directory; nothing was uploaded and the Deployment keeps its Dags", "%v", args)
 		assert.NotContains(t, run.stdout, `"deployment"`, "%v: no result for a deploy that did not happen", args)
 	}
 
@@ -343,7 +343,7 @@ func TestDeployDagsNoDagsDirectoryJSON(t *testing.T) {
 // the mutation is sent, and the DAGs follow as a pushed image's do.
 func TestDeployRemoteDagsJSON(t *testing.T) {
 	down := errors.New("houston is down")
-	undecided := fmt.Sprintf("Dags were NOT updated: whether this Deployment takes Dag uploads could not be read (%s). The image was deployed, and the Deployment keeps the Dags it had. To upload them, run astro deploy dep-ac --dags from the project directory.", "failed to get app config: houston is down")
+	undecided := fmt.Sprintf("Dags were not updated: could not read whether this Deployment takes Dag uploads (%s). The image was deployed. To upload Dags, run astro deploy dep-ac --dags from the project directory.", "could not get the app config: houston is down")
 	noUpload := "Deployment dep-ac takes no Dag upload ("
 	for _, tc := range []struct {
 		name string
@@ -385,7 +385,7 @@ func TestDeployRemoteDagsJSON(t *testing.T) {
 				run := runAPC(t, api, "", "deploy", "dep-ac", "--image-name", "img:1", "--remote", "--runtime-version", "12.1.1", "-o", "json")
 				require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 				api.AssertCalled(t, "UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{ReleaseName: "rel-ac", Image: "img:1", RuntimeVersion: "12.1.1", DeployRevisionDescription: "Deployed via <astro deploy>"})
-				assert.Contains(t, run.stderr, "Image successfully updated")
+				assert.Contains(t, run.stderr, "Updated the image")
 				var got deployJSON
 				decodeOne(t, run.stdout, &got)
 				assert.Equal(t, tc.kind, got.Type)
@@ -415,8 +415,8 @@ func TestDeployRemoteOutsideAProjectShipsTheImageAlone(t *testing.T) {
 		cfg  func() (*houston.AppConfig, error)
 		want string
 	}{
-		{"a Deployment that takes DAG uploads", dagsDeployment(houston.DagOnlyDeploymentType, true), cfgOf(takesDagUploads), "Dags were not updated: this deploy ran outside a pyproject.toml project, so it shipped the image alone, and the Deployment keeps the Dags it had. To upload them, run astro deploy dep-ac --dags from the project directory."},
-		{"a Deployment not placed", dagsDeployment(houston.DagOnlyDeploymentType, true), cfgFails(errors.New("houston is down")), "this deploy ran outside a pyproject.toml project, so it shipped the image alone. If this Deployment takes Dag uploads, it keeps the Dags it had: to upload them, run astro deploy dep-ac --dags from the project directory."},
+		{"a Deployment that takes DAG uploads", dagsDeployment(houston.DagOnlyDeploymentType, true), cfgOf(takesDagUploads), "Dags were not updated: this deploy ran outside a pyproject.toml project and shipped the image alone. To upload Dags, run astro deploy dep-ac --dags from the project directory."},
+		{"a Deployment not placed", dagsDeployment(houston.DagOnlyDeploymentType, true), cfgFails(errors.New("houston is down")), "this deploy ran outside a pyproject.toml project and shipped the image alone. If this Deployment takes Dag uploads, it keeps its Dags; to upload them, run astro deploy dep-ac --dags from the project directory."},
 	} {
 		for _, quiet := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s quiet=%v", tc.name, quiet), func(t *testing.T) {

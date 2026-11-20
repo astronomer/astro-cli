@@ -269,7 +269,7 @@ func TestWorkspaceUserJSON(t *testing.T) {
 		require.Equal(t, 1, run.code)
 		var got accessError
 		decodeAccess(t, run.stdout, &got)
-		assert.Contains(t, got.Error, "not part of this workspace")
+		assert.Contains(t, got.Error, "not part of this Workspace")
 		api.AssertNotCalled(t, "DeleteWorkspaceUser", mock.Anything)
 	})
 }
@@ -506,7 +506,7 @@ func TestWorkspaceAndDeploymentTeamJSON(t *testing.T) {
 		for _, format := range [][]string{nil, {"-o", "json"}} {
 			run := runAccess(t, api, "", append([]string{"workspace", "team", "remove", "team-1", "--workspace-id", accessWorkspaceID}, format...)...)
 			assert.Equal(t, 1, run.code, "%v", format)
-			assert.NotContains(t, run.stdout, "Successfully removed")
+			assert.NotContains(t, run.stdout, "Removed")
 		}
 		api.AssertNotCalled(t, "DeleteWorkspaceTeam", mock.Anything)
 	})
@@ -531,7 +531,7 @@ func TestWorkspaceAndDeploymentTeamJSON(t *testing.T) {
 		run = runAccess(t, api, "", "workspace", "team", "remove", "team-1", "--workspace-id", accessWorkspaceID)
 		require.Equal(t, 0, run.code)
 		assert.Contains(t, run.stdout, "Could not confirm that team team-1")
-		assert.Contains(t, run.stdout, "Successfully removed team from workspace")
+		assert.Contains(t, run.stdout, "Removed team from Workspace")
 	})
 
 	t.Run("workspace remove when the lookup fails otherwise sends nothing", func(t *testing.T) {

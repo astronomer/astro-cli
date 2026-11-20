@@ -241,7 +241,7 @@ func TestBuildClientImageFailurePrintsTheBuildOutput(t *testing.T) {
 	var err error
 	out := captureStdout(t, func() { err = buildClientImage(project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t)) })
 	require.ErrorIs(t, err, errClientBuild)
-	assert.Equal(t, "an error was encountered while building the image, see the build logs for details", err.Error())
+	assert.Equal(t, "could not build the image; see the build logs for details", err.Error())
 	assert.Contains(t, out, "#5 RUN pip install\n\n#5 ERROR: pip install failed\n")
 }
 
@@ -273,10 +273,10 @@ func TestBuildClientImageNeedsDockerfileClient(t *testing.T) {
 		setup func(t *testing.T, ctx string)
 		want  string
 	}{
-		{"missing", func(*testing.T, string) {}, "has no Dockerfile.client, which the client image is built from"},
+		{"missing", func(*testing.T, string) {}, "has no Dockerfile.client"},
 		{"a directory", func(t *testing.T, ctx string) {
 			require.NoError(t, os.Mkdir(filepath.Join(ctx, clientDockerfile), 0o700))
-		}, "the Dockerfile.client in the project at %s, which the client image is built from, is not a file"},
+		}, "the Dockerfile.client in the project at %s is not a file"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -303,7 +303,7 @@ func TestClientDockerfileError(t *testing.T) {
 	df := filepath.Join(t.TempDir(), clientDockerfile)
 	denied := fmt.Errorf("the Dockerfile this project declares (%s) could not be read: %w", df, &fs.PathError{Op: "stat", Path: df, Err: fs.ErrPermission})
 	err := clientDockerfileError(denied, "/the/project", df)
-	assert.Equal(t, "the Dockerfile.client in the project at /the/project, which the client image is built from, could not be read: permission denied", err.Error())
+	assert.Equal(t, "the Dockerfile.client in the project at /the/project could not be read: permission denied", err.Error())
 	require.ErrorIs(t, err, fs.ErrPermission)
 
 	other := errors.New("no container engine")

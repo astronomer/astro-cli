@@ -18,7 +18,7 @@ func newRunsCmd(d Deps, t target) *cobra.Command {
 		Use:   "runs",
 		Short: "List, trigger, and clear Dag runs on an Airflow",
 		Long: "Work with the runs on " + t.which() + ": list them, read one, see what its " +
-			"tasks did, start one and optionally wait for it to finish, wait on one already going, diagnose a " +
+			"tasks did, start one (and optionally wait for it to finish), wait on one that is running, diagnose a " +
 			"failed one, and delete or clear one.",
 	},
 		newRunsListCmd,
@@ -290,10 +290,10 @@ type triggerFlags struct {
 
 func (f *triggerFlags) register(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&f.conf, "conf", "c", "", "Run configuration as a JSON object")
-	cmd.Flags().StringVar(&f.runID, "run-id", "", "Name the run instead of letting Airflow generate one")
+	cmd.Flags().StringVar(&f.runID, "run-id", "", "Run ID to use (default: Airflow generates one)")
 	cmd.Flags().StringVar(&f.logicalDate, "logical-date", "", "The run's logical date, as RFC 3339")
 	cmd.Flags().StringVar(&f.note, "note", "", "A note to attach to the run")
-	cmd.Flags().BoolVar(&f.noAutoUnpause, "no-auto-unpause", false, "Fail if the Dag is paused instead of unpausing it first")
+	cmd.Flags().BoolVar(&f.noAutoUnpause, "no-auto-unpause", false, "Fail if the Dag is paused, without unpausing it")
 }
 
 // options validates the flags into a trigger, before anything reaches Airflow.
@@ -320,9 +320,9 @@ func newRunsTriggerCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "trigger <DAG_ID>",
 		Short: "Start a run of a Dag",
-		Long: "Start a run of a Dag. Airflow names the run and dates it unless --run-id or --logical-date say " +
-			"otherwise.\n\nA paused Dag is unpaused first, because a run triggered on a paused Dag is never " +
-			"scheduled and the command would look like it worked. The unpause is announced on stderr; pass " +
+		Long: "Start a run of a Dag. Airflow names and dates the run unless you pass --run-id or --logical-date.\n\n" +
+			"A paused Dag is unpaused first, because a run triggered on a paused Dag is never " +
+			"scheduled. The unpause is announced on stderr. Pass " +
 			"--no-auto-unpause to fail instead.",
 		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
@@ -519,7 +519,7 @@ func (q *query) runRunsClear(ctx context.Context, dagID, runID string, dryRun, y
 
 func renderClearedRun(w io.Writer, cleared clearedRun) error {
 	if cleared.DryRun {
-		if _, err := fmt.Fprintf(w, "would clear %d task instance(s) of run %s:\n", len(cleared.Tasks), cleared.RunID); err != nil {
+		if _, err := fmt.Fprintf(w, "would clear %s of run %s:\n", plural(len(cleared.Tasks), "task instance", "task instances"), cleared.RunID); err != nil {
 			return err
 		}
 		return renderTaskInstanceTable(w, cleared.Tasks)

@@ -245,7 +245,7 @@ func refuseImageOnly(in *ManifestImage, t *manifestTarget) error {
 	if in.IncludeDags || in.ImageAlone || t.dags != DagsFromImage {
 		return nil
 	}
-	return fmt.Errorf("%w: Deployment %s runs the Dags inside its image, so an image without them would leave it none. Run astro deploy without --image to deploy the image with the project's Dags inside it", ErrDeploymentTypeIncorrectForImageOnly, in.DeploymentID)
+	return fmt.Errorf("%w: Deployment %s runs the Dags inside its image, so an image without them would leave it none; run astro deploy without --image to include the project's Dags", ErrDeploymentTypeIncorrectForImageOnly, in.DeploymentID)
 }
 
 // manifestDeployImage is the local image a deploy pushes, and the runtime
@@ -313,18 +313,18 @@ const (
 	// from the project, if there is one. The image may well carry DAGs (one
 	// built from a Dockerfile that copies them does); one astro package
 	// generated the build for does not.
-	warningPrebuiltDagsInImage = "this Deployment runs the Dags inside the image %s; the dags folder is not uploaded. An image astro package built without a dockerfile declared under [tool.astro] contains none."
+	warningPrebuiltDagsInImage = "this Deployment runs the Dags inside the image %s, so the dags folder is not uploaded. An image astro package built without a Dockerfile declared under [tool.astro] contains none."
 	// noticeImageAlone: an image deployed from outside any project ships
 	// alone, to a Deployment that takes DAG uploads, so its DAGs are as they
 	// were.
-	noticeImageAlone = "Dags were not updated: this deploy ran outside a pyproject.toml project, so it shipped the image alone, and the Deployment keeps the Dags it had. To upload them, run astro deploy %s --dags from the project directory."
+	noticeImageAlone = "Dags were not updated: this deploy ran outside a pyproject.toml project and shipped the image alone. To upload Dags, run astro deploy %s --dags from the project directory."
 	// noticeImageAloneUnplaced: the same, to a Deployment whose DAG source
 	// could not be read.
-	noticeImageAloneUnplaced = "this deploy ran outside a pyproject.toml project, so it shipped the image alone. If this Deployment takes Dag uploads, it keeps the Dags it had: to upload them, run astro deploy %s --dags from the project directory."
+	noticeImageAloneUnplaced = "this deploy ran outside a pyproject.toml project and shipped the image alone. If this Deployment takes Dag uploads, it keeps its Dags; to upload them, run astro deploy %s --dags from the project directory."
 	// noticeDagsUndecided: the image was deployed, and the cluster config
 	// that says whether the Deployment takes DAG uploads could not be read,
 	// so an upload that may have been due did not happen.
-	noticeDagsUndecided = "Dags were NOT updated: whether this Deployment takes Dag uploads could not be read (%v). The image was deployed, and the Deployment keeps the Dags it had. To upload them, run astro deploy %s --dags from the project directory."
+	noticeDagsUndecided = "Dags were not updated: could not read whether this Deployment takes Dag uploads (%v). The image was deployed. To upload Dags, run astro deploy %s --dags from the project directory."
 )
 
 // warnImageAlone says what an image deployed from outside any project leaves
@@ -366,7 +366,7 @@ func deliverDags(client houston.ClientInterface, in *ManifestImage, t *manifestT
 		return nil
 	case DagsFromElsewhere:
 		res.DagsNotShipped = true
-		warn(fmt.Sprintf("Deployment %s takes its Dags from %s, so this deploy shipped the image alone and the Dags are as they were", in.DeploymentID, dagsSource(t.info, t.appConfig)))
+		warn(fmt.Sprintf("Deployment %s takes its Dags from %s, so this deploy shipped the image alone and left the Dags as they were", in.DeploymentID, dagsSource(t.info, t.appConfig)))
 		return nil
 	case DagsFromUpload, DagsFromUnknown:
 	}
@@ -379,11 +379,11 @@ func deliverDags(client houston.ClientInterface, in *ManifestImage, t *manifestT
 		// A Deployment whose DAG source could not be read, which turns out
 		// to take no upload: the image shipped alone.
 		res.DagsNotShipped = true
-		warn(fmt.Sprintf("Deployment %s takes no Dag upload (%v), so this deploy shipped the image alone and the Dags are the ones it runs from elsewhere", in.DeploymentID, err))
+		warn(fmt.Sprintf("Deployment %s takes no Dag upload (%v), so this deploy shipped the image alone", in.DeploymentID, err))
 		return nil
 	case errors.Is(err, ErrNoDagsDirectory):
 		res.DagsNotShipped = true
-		warn(fmt.Sprintf("no Dags were uploaded: there is no dags directory in %s, and the Deployment keeps the Dags it had", in.Build.ProjectDir))
+		warn(fmt.Sprintf("no Dags were uploaded: there is no dags directory in %s", in.Build.ProjectDir))
 		return nil
 	case t.dags == DagsFromUnknown && errors.Is(err, ErrAppConfigUnread):
 		// Whether the Deployment takes uploads at all could not be read,
@@ -406,7 +406,7 @@ type DagsAfterImageError struct {
 }
 
 func (e *DagsAfterImageError) Error() string {
-	return fmt.Sprintf("the image %s was pushed to Deployment %s, but uploading the Dags failed: %v. The Deployment runs the new image with the Dags it had; to upload them, run astro deploy %s --dags",
+	return fmt.Sprintf("pushed the image %s to Deployment %s, but uploading the Dags failed: %v. The Deployment runs the new image with its previous Dags; to retry the upload, run astro deploy %s --dags",
 		e.Image, e.DeploymentID, e.Err, e.DeploymentID)
 }
 
@@ -456,7 +456,7 @@ func lookUpManifestTarget(client houston.ClientInterface, wsID, deploymentID str
 type notInWorkspaceError struct{ deployment, workspace string }
 
 func (e *notInWorkspaceError) Error() string {
-	return fmt.Sprintf("no Deployment %s in workspace %s: name a Deployment of the workspace, or the workspace it is in with --workspace", e.deployment, e.workspace)
+	return fmt.Sprintf("no Deployment %s in Workspace %s; pass the Workspace the Deployment is in with --workspace", e.deployment, e.workspace)
 }
 
 // houstonID is the shape of a Houston id: a cuid, "c" and 24 more lowercase
@@ -472,7 +472,7 @@ func hintLinkOutsideAProject(in *ManifestImage, err error) error {
 	if !in.ImageAlone || !errors.As(err, &notIn) || houstonID.MatchString(in.DeploymentID) {
 		return err
 	}
-	return fmt.Errorf("%w. %q is not shaped like a Deployment id: outside a pyproject.toml project there are no links, so a link name resolves only when the deploy runs from the project's directory", err, in.DeploymentID)
+	return fmt.Errorf("%w. %q is not a Deployment ID, and a link name resolves only from a pyproject.toml project directory", err, in.DeploymentID)
 }
 
 // lookUpDeployment reads what every image deploy needs of its Deployment:
@@ -497,7 +497,7 @@ func lookUpDeployment(client houston.ClientInterface, wsID, deploymentID string)
 	}
 	t.info, err = houston.Call(client.GetDeployment)(deploymentID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get deployment info: %w", err)
+		return nil, fmt.Errorf("could not get the Deployment info: %w", err)
 	}
 	t.workspace = resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, t.info)
 	return t, nil
@@ -627,11 +627,11 @@ func checkDagsInImage(in *ManifestImage, req *imagebuild.Request, podman func() 
 		return nil
 	}
 	if req.FromDeclaredDockerfile() {
-		warn(fmt.Sprintf("Deployment %s runs only the Dags inside its image, and the ignore file %s's build reads leaves out every Dag file under dags/. The Deployment will run whatever Dags %s itself puts in the image",
+		warn(fmt.Sprintf("Deployment %s runs only the Dags inside its image, but the ignore file for %s leaves out every Dag file under dags/. Only Dags that %s adds to the image will run",
 			in.DeploymentID, in.Build.Dockerfile, in.Build.Dockerfile))
 		return nil
 	}
-	return fmt.Errorf("Deployment %s runs the Dags inside its image, but the project's .dockerignore leaves out every Dag file under dags/. Remove the rule that drops them", in.DeploymentID)
+	return fmt.Errorf("Deployment %s runs the Dags inside its image, but the project's .dockerignore leaves out every Dag file under dags/; remove the rule that excludes them", in.DeploymentID)
 }
 
 // pushManifestImage pushes localImage to the registry the Deployment takes

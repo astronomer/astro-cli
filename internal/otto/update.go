@@ -66,7 +66,7 @@ func autoUpdate(w io.Writer, download func() error) {
 	if !isVersionNewer(state.LatestKnown, installed) {
 		return
 	}
-	fmt.Fprintf(w, "Updating Otto %s → %s...\n", installed, state.LatestKnown)
+	fmt.Fprintf(w, "Updating Otto %s → %s…\n", installed, state.LatestKnown)
 	if err := download(); err != nil {
 		fmt.Fprintf(w, "Otto update failed (%v); continuing with %s\n", err, installed)
 	}

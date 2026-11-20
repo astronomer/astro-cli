@@ -47,13 +47,13 @@ func ideProjectLabel(id, name string) string {
 // "exported", for the export the IDE makes of the project.
 func emitIDEImport(r cliout.Renderer, res *ide.Import) error {
 	return r.Emit(res, cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintf(b, "Successfully exported project from %s\n", ideProjectLabel(res.ProjectID, res.ProjectName))
+		fmt.Fprintf(b, "Exported project from %s\n", ideProjectLabel(res.ProjectID, res.ProjectName))
 	}))
 }
 
 // emitIDEExport publishes an export.
 func emitIDEExport(r cliout.Renderer, res *ide.Export) error {
 	return r.Emit(res, cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintf(b, "Successfully exported project to %s\n", ideProjectLabel(res.ProjectID, res.ProjectName))
+		fmt.Fprintf(b, "Exported project to %s\n", ideProjectLabel(res.ProjectID, res.ProjectName))
 	}))
 }

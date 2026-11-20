@@ -72,8 +72,8 @@ func SkippedNote(p Provider, workspace string) string {
 	if len(keys) == 0 {
 		return ""
 	}
-	return "workspace " + workspace + " holds " + strings.Join(keys, ", ") +
-		", which cannot be environment variable names, so Airflow does not get them. Rename them in the workspace to use them."
+	return "Workspace " + workspace + " holds " + strings.Join(keys, ", ") +
+		", which cannot be environment variable names, so Airflow does not get them. Rename them in the Workspace to use them."
 }
 
 // Outager is an optional Provider capability: why the provider as a whole

@@ -37,7 +37,7 @@ const (
 // AddFlag registers the global --non-interactive flag on fs, the root's
 // persistent flags, so every command at every depth accepts it.
 func AddFlag(fs *pflag.FlagSet) {
-	fs.Bool(NonInteractiveFlag, false, "Never ask a question: a command that needs an answer fails and names the flag that gives it. Always on with CI set, --output json, or stdin or stderr not a terminal; --non-interactive=false asks even with CI set, at a terminal")
+	fs.Bool(NonInteractiveFlag, false, "Never prompt; a command that needs an answer fails and names the flag that supplies it. On when CI is set, with --output json, or when stdin or stderr is not a terminal. --non-interactive=false prompts even with CI set")
 }
 
 // Refusal is the one place a run's interaction mode is decided. It returns why

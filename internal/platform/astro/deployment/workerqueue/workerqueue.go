@@ -30,14 +30,14 @@ var (
 	errCannotUpdateExistingQueue = errors.New("worker queue already exists")
 	errCannotCreateNewQueue      = errors.New("worker queue does not exist")
 	errInvalidNodePool           = errors.New("node pool selection failed")
-	errInvalidAstroMachine       = errors.New("invalid astro machine selection failed")
+	errInvalidAstroMachine       = errors.New("invalid Astro machine selection")
 	errQueueDoesNotExist         = errors.New("worker queue does not exist")
 	errInvalidQueue              = errors.New("worker queue selection failed")
-	errCannotDeleteDefaultQueue  = errors.New("default queue can not be deleted")
+	errCannotDeleteDefaultQueue  = errors.New("the default queue cannot be deleted")
 	errNotSupported              = errors.New("does not support")
 	errNoUseWorkerQueues         = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
-	errNoWorkerQueues            = errors.New("no worker queues found for this deployment")
-	errNoWorkerTypes             = errors.New("no worker types are available for this deployment")
+	errNoWorkerQueues            = errors.New("no worker queues found for this Deployment")
+	errNoWorkerTypes             = errors.New("no worker types are available for this Deployment")
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
@@ -206,7 +206,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		if queueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
 			if !force {
 				if err := input.ConfirmOrAbort(
-					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your Dags assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.ForStderr().Bold(name)), input.AnsweredBy("--yes")); err != nil {
+					fmt.Sprintf("\nUpdate worker queue %s? Tasks assigned to it can get stuck in the queued state and fail to run", ansi.ForStderr().Bold(name)), input.AnsweredBy("--yes")); err != nil {
 					return nil, err
 				}
 			}
@@ -353,7 +353,7 @@ func isKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid astrov1.Hybri
 	var errorMessage string
 
 	if queueToCreateOrUpdateHybrid.Name != defaultQueueName {
-		errorMessage = "a non default worker queue in the request. Rename the queue to default"
+		errorMessage = "a non-default worker queue in the request; rename the queue to default"
 		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, errNotSupported, errorMessage)
 	}
 	if queueToCreateOrUpdateHybrid.MaxWorkerCount != 0 {
@@ -529,7 +529,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 	if queueExists(existingQueues, queueToDelete, queueToDeleteHybrid) {
 		if !force {
 			if err := input.ConfirmOrAbort(
-				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your Dags assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.ForStderr().Bold(queueToDelete.Name)), input.AnsweredBy("--yes")); err != nil {
+				fmt.Sprintf("\nDelete worker queue %s? Tasks assigned to it can get stuck in the queued state and fail to run", ansi.ForStderr().Bold(queueToDelete.Name)), input.AnsweredBy("--yes")); err != nil {
 				return nil, err
 			}
 		}

@@ -291,7 +291,7 @@ func (s *Suite) TestLinkVarRejectsDeploymentScope() {
 func (s *Suite) TestLinkVarRejectsBadDeploymentID() {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	s.ErrorContains(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, "", nil, false, mc)), "cannot be empty")
-	s.ErrorContains(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, "not-a-cuid", nil, false, mc)), "valid deployment ID")
+	s.ErrorContains(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, "not-a-cuid", nil, false, mc)), "valid Deployment ID")
 }
 
 func (s *Suite) TestUnlinkVar() {

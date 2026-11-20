@@ -357,8 +357,8 @@ func (p *parser) airflow(m *Manifest) {
 	}
 	if p.dynamicDeps {
 		p.add(CodeDependenciesDynamic, "project.dynamic",
-			"lists dependencies, and an Astro project states its Airflow version as the requirement in [project] dependencies: "+
-				"list the dependencies there, starting with the apache-airflow requirement, and drop dependencies from [project] dynamic")
+			"lists dependencies, but an Astro project states its Airflow version in [project] dependencies. "+
+				"List them there, starting with the apache-airflow requirement, and drop dependencies from [project] dynamic")
 	}
 	switch {
 	case named == 0:
@@ -366,7 +366,7 @@ func (p *parser) airflow(m *Manifest) {
 			"names no Airflow. Add one, like "+AirflowRequirement(exampleSeries))
 	case len(dists) > 1:
 		p.add(CodeAirflowAmbiguous, dependenciesKey,
-			"lists both apache-airflow and apache-airflow-core, and the Airflow version comes from one requirement. Keep one of them")
+			"lists both apache-airflow and apache-airflow-core. Keep one of them")
 	case len(pins) > 1:
 		p.add(CodeAirflowAmbiguous, dependenciesKey,
 			fmt.Sprintf("pins Airflow more than once, to different versions (%s). Pin it once", strings.Join(pins, ", ")))

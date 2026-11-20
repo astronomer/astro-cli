@@ -212,7 +212,7 @@ func Organization(domain string) (string, error) {
 			return "", fmt.Errorf("no Astro organization on this machine, and reaching a Deployment needs one: run astro login, or set ASTRO_DOMAIN and log in once so the organization is on disk")
 		}
 		if ctx.Organization == "" {
-			return "", fmt.Errorf("your login is not scoped to an organization — pick one with astro organization switch")
+			return "", fmt.Errorf("your login is not scoped to an Organization; run astro organization switch to pick one")
 		}
 		return ctx.Organization, nil
 	}
@@ -222,7 +222,7 @@ func Organization(domain string) (string, error) {
 		return "", fmt.Errorf("no Astro organization for %s on this machine, and reaching a Deployment needs one: run astro login %s once so the organization is on disk", domain, domain)
 	}
 	if ctx.Organization == "" {
-		return "", fmt.Errorf("your %s login is not scoped to an organization — log in with astro login %s and pick one", domain, domain)
+		return "", fmt.Errorf("your %s login is not scoped to an Organization; run astro login %s and pick one", domain, domain)
 	}
 	return ctx.Organization, nil
 }

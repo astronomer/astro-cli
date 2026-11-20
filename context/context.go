@@ -16,7 +16,7 @@ import (
 var (
 	// CloudDomainRegex is used to differentiate cloud domain from software domain
 	CloudDomainRegex     = regexp.MustCompile(`(?:https:\/\/|^)(?:(pr\d{4,6})\.|)(?:cloud\.|)astronomer(?:-(dev|stage|perf))?\.io(?:\/|)$`)
-	contextDeleteWarnMsg = "Are you sure you want to delete currently used context: %s"
+	contextDeleteWarnMsg = "Delete the current context %s?"
 )
 
 // ContextExists checks to see if context exist in config

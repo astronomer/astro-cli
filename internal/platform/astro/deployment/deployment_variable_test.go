@@ -83,7 +83,7 @@ func TestVariableList(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
 		_, err := VariableList("test-id-1", "test-key-1", ws, "\000x", "", true, mockV1Client)
-		assert.ErrorContains(t, err, "unable to write environment variables to")
+		assert.ErrorContains(t, err, "could not write environment variables to")
 	})
 }
 

@@ -29,17 +29,17 @@ func newTasksWaitCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "wait <DAG_ID> <RUN_ID> <TASK_ID>",
 		Short: "Wait for a task instance to reach a state",
-		Long: "Check on one task instance every --poll-interval until it reaches the state --until names, " +
-			"success unless told otherwise, or --timeout passes. The wait ends early when the instance settles " +
-			"in another state it will not leave by itself (success, failed, upstream_failed, skipped, removed), " +
-			"or when its run finishes without it. An instance that does not exist yet, such as an expansion " +
-			"of a mapped task not yet mapped, is waited for.\n\n" +
+		Long: "Check on one task instance every --poll-interval until it reaches the state --until names " +
+			"(success by default), or --timeout passes. The wait ends early if the instance settles " +
+			"in a final state (success, failed, upstream_failed, skipped, removed) that is not the one you asked for, " +
+			"or if its run finishes without it. If the instance does not exist yet, such as an expansion " +
+			"of a mapped task that is not mapped yet, the command waits for it.\n\n" +
 			"A human-in-the-loop task waits for its answer in awaiting_input on Airflow 3.3 and later. On " +
 			"3.1 and 3.2 it is deferred, like any other task waiting on a trigger.\n\n" +
 			"--timeout and --poll-interval take a number of seconds (300) or a duration (5m, 1h30m).\n\n" +
 			"Exit status: 0 when the task reached the state, " + strconv.Itoa(exitRunFailed) + " when it cannot " +
 			"reach it (or the command itself failed), " + strconv.Itoa(exitWaitTimeout) + " when the wait timed " +
-			"out. Stopping the wait never stops the task.",
+			"out. Stopping the wait does not stop the task.",
 		Args: cobra.ExactArgs(taskInstanceArgs),
 		Example: afExample(q.t,
 			"Wait for a task to succeed", "tasks wait <DAG_ID> <RUN_ID> <TASK_ID>",
@@ -226,7 +226,7 @@ func (q *query) renderWaitedTask(w io.Writer, result waitedTask) error {
 	case result.Reached:
 		_, err = fmt.Fprintf(w, "%s in %s run %s: %s%s\n", name, result.DAGID, result.RunID, result.State, afterElapsed(result.ElapsedSeconds))
 	case result.TimedOut:
-		_, err = fmt.Fprintf(w, "%s in %s run %s is still %s after %s, not %s; stopped waiting, and the run carries on\n",
+		_, err = fmt.Fprintf(w, "%s in %s run %s is still %s after %s (waiting for %s); stopped waiting, and the run is still going\n",
 			name, result.DAGID, result.RunID, orDash(result.State), formatDuration(result.ElapsedSeconds), result.Until)
 	case taskSettled(result.State) && taskSettled(result.Until):
 		_, err = fmt.Fprintf(w, "%s in %s run %s ended %s, so it will not reach %s\n",

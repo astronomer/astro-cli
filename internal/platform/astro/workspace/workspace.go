@@ -21,12 +21,12 @@ import (
 )
 
 var (
-	errInvalidWorkspaceKey = errors.New("invalid workspace selection")
-	ErrInvalidName         = errors.New("no name provided for the workspace. Retry with a valid name")
-	ErrInvalidTokenName    = errors.New("no name provided for the workspace token. Retry with a valid name")
-	ErrWorkspaceNotFound   = errors.New("no workspace was found for the ID you provided")
-	ErrNoWorkspaceExists   = errors.New("no workspace was found in your organization")
-	ErrWrongEnforceInput   = errors.New("the input to the --enforce-cicd flag")
+	errInvalidWorkspaceKey = errors.New("invalid Workspace selection")
+	ErrInvalidName         = errors.New("no name provided for the Workspace")
+	ErrInvalidTokenName    = errors.New("no name provided for the Workspace API token")
+	ErrWorkspaceNotFound   = errors.New("no Workspace found with that ID")
+	ErrNoWorkspaceExists   = errors.New("no Workspace found in your Organization")
+	ErrWrongEnforceInput   = errors.New("--enforce-cicd must be ON or OFF")
 )
 
 var workspaceTableConfig = output.BuildTableConfig(
@@ -40,7 +40,7 @@ var workspaceTableConfig = output.BuildTableConfig(
 )
 
 // ErrCurrentNotSet is what a saved login with no current Workspace says.
-var ErrCurrentNotSet = errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+var ErrCurrentNotSet = errors.New("no current Workspace set; switch to one with\n\tastro workspace switch WORKSPACEID")
 
 // GetCurrentWorkspace gets the current workspace set in context config
 // Returns a string representing the current workspace and an error if it doesn't exist
@@ -103,7 +103,7 @@ func pickWorkspace(client astrov1.APIClient, out io.Writer, opts ...input.Option
 	// prints nothing it would then have to explain.
 	list := picker.List{
 		Header:  []string{"NAME", "ID"},
-		Ask:     append([]input.Option{input.About("a workspace")}, opts...),
+		Ask:     append([]input.Option{input.About("a Workspace")}, opts...),
 		Invalid: errInvalidWorkspaceKey,
 	}
 	if err := input.MayAsk("\n> ", list.Ask...); err != nil {
@@ -133,7 +133,7 @@ func pickWorkspace(client astrov1.APIClient, out io.Writer, opts ...input.Option
 
 // NameOrIDAnswer is what answers the question a switch naming no Workspace
 // asks.
-const NameOrIDAnswer = "the workspace name or ID as an argument"
+const NameOrIDAnswer = "the Workspace name or ID as an argument"
 
 // SwitchTo makes the Workspace named, by name or id, current, and returns it.
 // With no name it asks which, drawing the menu on out.
@@ -157,7 +157,7 @@ func SwitchTo(workspaceNameOrID string, client astrov1.APIClient, out io.Writer)
 		}
 
 		if picked == nil {
-			return nil, errors.New("workspace id/name could not be found")
+			return nil, errors.New("no Workspace found with that name or ID")
 		}
 	}
 
@@ -257,7 +257,7 @@ func Create(name, description, enforceCD string, client astrov1.APIClient) (*Wor
 		return nil, err
 	}
 	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("something went wrong: the API did not return the Workspace %s it created", name)
+		return nil, fmt.Errorf("the API did not return the Workspace %s it created", name)
 	}
 	created, err := info(resp.JSON200)
 	if err != nil {
@@ -273,7 +273,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	if err != nil {
 		return nil, err
 	}
-	workspace, err := findWorkspace(id, "the workspace you would like to update", out, client)
+	workspace, err := findWorkspace(id, "the Workspace to update", out, client)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 		return nil, err
 	}
 	if resp.JSON200 == nil {
-		return nil, fmt.Errorf("something went wrong: the API did not return the Workspace %s it updated", workspace.Name)
+		return nil, fmt.Errorf("the API did not return the Workspace %s it updated", workspace.Name)
 	}
 	updated, err := info(resp.JSON200)
 	if err != nil {
@@ -336,13 +336,13 @@ func Delete(id string, yes bool, out io.Writer, client astrov1.APIClient) (*Remo
 			return nil, err
 		}
 	}
-	workspace, err := findWorkspace(id, "the workspace you would like to delete", out, client)
+	workspace, err := findWorkspace(id, "the Workspace to delete", out, client)
 	if err != nil {
 		return nil, err
 	}
 	if !yes {
 		if err := input.ConfirmOrAbort(
-			fmt.Sprintf("\nAre you sure you want to delete the %s Workspace (%s)? This cannot be undone.", ansi.Bold(workspace.Name), workspace.Id),
+			fmt.Sprintf("\nDelete Workspace %s (%s)? This cannot be undone.", ansi.Bold(workspace.Name), workspace.Id),
 			input.AnsweredBy("--yes")); err != nil {
 			return nil, err
 		}
@@ -360,7 +360,7 @@ func Delete(id string, yes bool, out io.Writer, client astrov1.APIClient) (*Remo
 
 // IDAnswer is what answers the question an update or a delete naming no
 // Workspace asks.
-const IDAnswer = "the workspace ID as an argument"
+const IDAnswer = "the Workspace ID as an argument"
 
 // findWorkspace returns the Workspace id names, or, with no id, the one picked
 // from a menu drawn on out; about says what the menu asks for.
@@ -395,7 +395,7 @@ func selectWorkspace(workspaces []astrov1.Workspace, about string, out io.Writer
 	}
 
 	if len(workspaces) == 1 {
-		fmt.Fprintln(out, "Only one Workspace was found. Using the following Workspace by default: \n"+
+		fmt.Fprintln(out, "Only one Workspace found. Using it by default:\n"+
 			fmt.Sprintf("\n Workspace Name: %s", ansi.Bold(workspaces[0].Name))+
 			fmt.Sprintf("\n Workspace ID: %s\n", ansi.Bold(workspaces[0].Id)))
 
@@ -403,7 +403,7 @@ func selectWorkspace(workspaces []astrov1.Workspace, about string, out io.Writer
 	}
 
 	list := picker.List{
-		Title:   "\nPlease select " + about + ":",
+		Title:   "\nSelect " + about + ":",
 		Header:  []string{"WORKSPACENAME", "ID", "CICD ENFORCEMENT"},
 		Ask:     []input.Option{input.About(about), input.AnsweredBy(IDAnswer)},
 		Invalid: errInvalidWorkspaceKey,

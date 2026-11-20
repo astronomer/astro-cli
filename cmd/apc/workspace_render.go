@@ -130,7 +130,7 @@ func emitWorkspaceRemoval(r cliout.Renderer, id string, w *houston.Workspace) er
 		removal.Label = workspaceValue(w.Label)
 	}
 	return r.Emit(removal, cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintln(b, "\n Successfully deleted workspace")
+		fmt.Fprintln(b, "\n Deleted Workspace")
 	}))
 }
 

@@ -47,7 +47,7 @@ func newUseCmd(c *cli) *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 			switch {
 			case unset && len(args) > 0:
-				return errors.New("--unset takes no deployment name: it clears your selection")
+				return errors.New("--unset takes no Deployment name; it clears your selection")
 			case unset:
 				return c.runUseUnset()
 			case len(args) == 1:
@@ -112,7 +112,7 @@ func (c *cli) runUseUnset() error {
 		return err
 	}
 	return r.Emit(useResult{Status: "unpinned"}, func(w io.Writer) error {
-		_, werr := fmt.Fprintln(w, "cleared your deployment selection for this project")
+		_, werr := fmt.Fprintln(w, "cleared your Deployment selection for this project")
 		return werr
 	})
 }

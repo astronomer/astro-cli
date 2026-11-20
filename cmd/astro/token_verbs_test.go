@@ -89,7 +89,7 @@ func TestAVerbThatDoesNotFitTheTokenIsRefusedAsUsage(t *testing.T) {
 		{
 			"workspace rename of an organization token", newWorkspaceCmd, fakeTokens(wsOrg),
 			[]string{"workspace", "token", "update", "tok-org", "--new-name", "renamed"},
-			"an Organization API token has its name and description changed in the Organization, not in a Workspace",
+			"an Organization API token's name and description change in the Organization; use astro organization token update",
 		},
 		{
 			"deployment rename of a workspace token", newDeploymentRootCmd, func(t *testing.T) astrov1.APIClient { return tokenMock(t, ws) },
@@ -191,10 +191,10 @@ func TestDeploymentTokenAddUpdateRemoveWorkOutTheScope(t *testing.T) {
 	t.Run("text says which it found", func(t *testing.T) {
 		r := execTokenCmd(t, addScopeClient(t, ws, org), "", "token", "add", "tok-org", d, "--role", "DEPLOYMENT_ADMIN")
 		require.NoError(t, r.err)
-		assert.Contains(t, r.stdout, "Astro Organization API token org-token was successfully added to the Deployment")
+		assert.Contains(t, r.stdout, "Added Organization API token org-token to the Deployment")
 		r = execTokenCmd(t, addScopeClient(t, ws, org), "", "token", "add", "tok-ws", d, "--role", "DEPLOYMENT_ADMIN")
 		require.NoError(t, r.err)
-		assert.Contains(t, r.stdout, "Astro Workspace API token ws-token was successfully added to the Deployment")
+		assert.Contains(t, r.stdout, "Added Workspace API token ws-token to the Deployment")
 	})
 
 	t.Run("update and remove find the token among the Deployment's, of either scope", func(t *testing.T) {
@@ -239,7 +239,7 @@ func TestATokenGivenByIDMustHaveARoleInTheScope(t *testing.T) {
 	otherOrg.Roles = &[]astrov1.ApiTokenRole{{EntityType: astrov1.ApiTokenRoleEntityTypeORGANIZATION, EntityId: "test-org-id", Role: "ORGANIZATION_MEMBER"}}
 	d := "--deployment=" + tokDeploymentID
 	depWant := "the API token %s has no role on this Deployment: only a Deployment's own tokens, and Workspace and Organization tokens with a role on it, are found here; to give a token a role on it, use astro deployment token add"
-	wsWant := "the API token %s has no role in this Workspace: only a Workspace's own tokens, and Organization tokens with a role in it, are found here; to give an Organization token a role in it, use astro workspace token add"
+	wsWant := "the API token %s has no role in this Workspace; to give an Organization token a role here, use astro workspace token add"
 
 	for _, tc := range []struct {
 		name string

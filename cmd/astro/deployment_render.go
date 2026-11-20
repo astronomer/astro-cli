@@ -81,7 +81,7 @@ func failedAfterResult(cmd *cobra.Command, format cliout.Format, err error) erro
 // emitRemoval publishes a delete: in text, the line it always printed.
 func emitRemoval(r cliout.Renderer, removal *deployment.Removal) error {
 	return r.Emit(removal, cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintln(b, "\nSuccessfully deleted deployment "+ansi.Bold(removal.Name))
+		fmt.Fprintln(b, "\nDeleted Deployment "+ansi.Bold(removal.Name))
 	}))
 }
 
@@ -96,7 +96,7 @@ func emitDeploymentUI(r cliout.Renderer, res *deployment.UIResult, opened bool) 
 			fmt.Fprintf(b, "Opened the Airflow UI for Deployment %s: %s\n", ansi.Bold(res.Name), res.URL)
 			return
 		}
-		fmt.Fprintf(b, "Unable to open the Airflow UI, please visit the following link: %s\n", res.URL)
+		fmt.Fprintf(b, "Could not open the Airflow UI; open this link: %s\n", res.URL)
 	}))
 }
 
@@ -104,14 +104,14 @@ func emitHibernation(r cliout.Renderer, res *deployment.HibernationResult, actio
 	return r.Emit(res, cliout.Text(func(b *bufio.Writer) {
 		switch {
 		case res.Override == nil:
-			fmt.Fprintln(b, "\nSuccessfully removed hibernation override")
+			fmt.Fprintln(b, "\nRemoved hibernation override")
 			fmt.Fprintln(b, "If set, hibernation schedule will resume immediately.")
 		case res.Override.OverrideUntil != nil:
 			until := *res.Override.OverrideUntil
-			fmt.Fprintf(b, "\nSuccessfully overrode to %s until %s\n", ansi.Bold(action), ansi.Bold(until.Format(time.RFC3339)))
+			fmt.Fprintf(b, "\nOverrode to %s until %s\n", ansi.Bold(action), ansi.Bold(until.Format(time.RFC3339)))
 			fmt.Fprintf(b, "If set, hibernation schedule will resume in %s.\n", ansi.Bold(time.Until(until).Round(time.Second).String()))
 		default:
-			fmt.Fprintf(b, "\nSuccessfully overrode to %s until further notice\n", ansi.Bold(action))
+			fmt.Fprintf(b, "\nOverrode to %s until further notice\n", ansi.Bold(action))
 			fmt.Fprintln(b, "Any configured hibernation schedules will not resume until override is removed.")
 		}
 	}))

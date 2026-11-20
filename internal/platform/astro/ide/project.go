@@ -27,13 +27,13 @@ import (
 )
 
 var (
-	errNoWorkspace             = errors.New("no workspace set in context: switch to one with astro workspace switch")
+	errNoWorkspace             = errors.New("no Workspace set in context; switch to one with astro workspace switch")
 	ErrInvalidProjectSelection = errors.New("invalid project selection")
-	ErrNoProjectsFound         = errors.New("no Astro IDE projects found in workspace")
+	ErrNoProjectsFound         = errors.New("no Astro IDE projects found in the Workspace")
 	// DefaultDirPerm is the default permission for directories
 	DefaultDirPerm           os.FileMode = 0o755
 	openURL                              = browser.OpenURL
-	gitignoreParseWarningMsg             = "could not parse .gitignore (%v); continuing without its filtering"
+	gitignoreParseWarningMsg             = "Could not parse .gitignore (%v); continuing without its filtering"
 )
 
 // The functions here that note something along the way take notes, the
@@ -93,7 +93,7 @@ func selectIDEProject(projects []astrov1alpha1.AstroIdeProject, notes io.Writer)
 	}
 
 	if len(projects) == 1 {
-		fmt.Fprintln(notes, "Only one Project was found. Using the following Project by default: \n"+
+		fmt.Fprintln(notes, "Only one project found. Using it by default:\n"+
 			fmt.Sprintf("\n Project Name: %s", ansi.Bold(projects[0].Name))+
 			fmt.Sprintf("\n Project ID: %s\n", ansi.Bold(projects[0].Id)))
 
@@ -101,7 +101,7 @@ func selectIDEProject(projects []astrov1alpha1.AstroIdeProject, notes io.Writer)
 	}
 
 	list := picker.List{
-		Title:   "\nPlease select the project from the list below:",
+		Title:   "\nSelect a project:",
 		Header:  []string{"PROJECT NAME", "ID"},
 		Ask:     []input.Option{input.About("a project"), input.AnsweredBy("--project-id")},
 		Invalid: ErrInvalidProjectSelection,
@@ -134,21 +134,21 @@ func createNewProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient
 
 	resp, err := client.CreateAstroIdeProjectWithResponse(httpContext.Background(), organizationID, workspaceID, req)
 	if err != nil {
-		return "", fmt.Errorf("failed to create project: %w", err)
+		return "", fmt.Errorf("could not create the project: %w", err)
 	}
 
 	if err := astrov1alpha1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return "", err
 	}
 	if resp.JSON200 == nil {
-		return "", errors.New("failed to create project: the API did not return the project")
+		return "", errors.New("could not create the project: the API did not return it")
 	}
 
 	workspaceName, err := getWorkspaceName(v1Client, organizationID, workspaceID)
 	if err != nil {
 		workspaceName = workspaceID
 	}
-	fmt.Fprintf(notes, "Successfully created project '%s' in workspace '%s'\n", input.Cell(name), input.Cell(workspaceName))
+	fmt.Fprintf(notes, "Created project %s in Workspace %s\n", input.Cell(name), input.Cell(workspaceName))
 	return resp.JSON200.Id, nil
 }
 
@@ -266,7 +266,7 @@ func OpenInBrowser(url string, out io.Writer) {
 		return
 	}
 	if err := openURL(url); err != nil {
-		fmt.Fprintf(out, "Unable to open the Astro IDE project URL, please visit the following link: %s\n", url)
+		fmt.Fprintf(out, "Could not open the browser. Open this link: %s\n", url)
 	}
 }
 
@@ -279,7 +279,7 @@ func resolveProjectID(client astrov1alpha1.APIClient, v1Client astrov1.APIClient
 		if err := input.MayAsk("\n> ", ask...); err != nil {
 			return "", false, err
 		}
-		fmt.Fprintln(os.Stderr, "Do you want to create a new project? (y/n)")
+		fmt.Fprintln(os.Stderr, "Create a new project? (y/n)")
 		choice, err := input.Text("\n> ", ask...)
 		if err != nil {
 			return "", false, err
@@ -316,7 +316,7 @@ func handleProjectLock(client astrov1alpha1.APIClient, sessionResp *astrov1alpha
 		// Get project details to show who owns the lock
 		projectResp, err := getProject(client, organizationID, workspaceID, projectID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get project details: %w", err)
+			return nil, fmt.Errorf("could not get the project details: %w", err)
 		}
 
 		// Show project lock information and instructions
@@ -325,9 +325,9 @@ func handleProjectLock(client astrov1alpha1.APIClient, sessionResp *astrov1alpha
 			if parsedTime, err := time.Parse(time.RFC3339, lastEditedAt); err == nil {
 				lastEditedAt = parsedTime.Format("January 2, 2006 at 3:04 PM")
 			}
-			return nil, fmt.Errorf("project is locked by user %s and last edited at %s. Use --force flag to overwrite the existing project lock", *projectResp.JSON200.Lock.Subject.FullName, lastEditedAt)
+			return nil, fmt.Errorf("project is locked by user %s, last edited at %s; use --force to overwrite the lock", *projectResp.JSON200.Lock.Subject.FullName, lastEditedAt)
 		}
-		return nil, fmt.Errorf("project is locked. Use --force flag to overwrite the existing project lock")
+		return nil, fmt.Errorf("project is locked; use --force to overwrite the lock")
 	}
 
 	// Create a new session with READWRITE permission
@@ -340,7 +340,7 @@ func handleProjectLock(client astrov1alpha1.APIClient, sessionResp *astrov1alpha
 func ExportProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, projectID, organizationID, workspaceID string, force bool, notes io.Writer) (res *Export, err error) {
 	dir, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("failed to read current directory: %w", err)
+		return nil, fmt.Errorf("could not read the current directory: %w", err)
 	}
 
 	// Archive the directory first: a local failure then leaves nothing
@@ -559,15 +559,15 @@ func shouldSkipArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.
 func ImportProject(ctx httpContext.Context, client astrov1alpha1.APIClient, exporter SessionExporter, projectID, sessionID, organizationID, workspaceID string, yes bool, notes io.Writer) (*Import, error) {
 	dir, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("failed to read current directory: %w", err)
+		return nil, fmt.Errorf("could not read the current directory: %w", err)
 	}
 	// Validate current directory is empty
 	entries, err := os.ReadDir(".")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read current directory: %w", err)
+		return nil, fmt.Errorf("could not read the current directory: %w", err)
 	}
 	if len(entries) > 0 && !yes {
-		if err := input.ConfirmOrAbort(fmt.Sprintf("Current directory is not empty. Do you want to import the project here? %s", dir), input.AnsweredBy("--yes")); err != nil {
+		if err := input.ConfirmOrAbort(fmt.Sprintf("Current directory is not empty. Import the project here? %s", dir), input.AnsweredBy("--yes")); err != nil {
 			return nil, err
 		}
 	}
@@ -597,7 +597,7 @@ func ImportProject(ctx httpContext.Context, client astrov1alpha1.APIClient, expo
 	// Create a temporary file for the archive
 	tempFile, err := os.CreateTemp("", "astro-export-*.tar.gz")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temporary file: %w", err)
+		return nil, fmt.Errorf("could not create a temporary file: %w", err)
 	}
 	defer os.Remove(tempFile.Name()) //nolint:errcheck // best-effort cleanup
 	defer tempFile.Close()
@@ -611,7 +611,7 @@ func ImportProject(ctx httpContext.Context, client astrov1alpha1.APIClient, expo
 	// what is written are read from the one file this run wrote.
 	stats, err := extractTarGzArchive(ctx, tempFile, ".")
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract archive: %w", err)
+		return nil, fmt.Errorf("could not extract the archive: %w", err)
 	}
 
 	res := &Import{

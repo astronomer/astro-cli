@@ -73,7 +73,7 @@ type devContext struct {
 // exits 2.
 func NewDevCmd(d Deps) *cobra.Command {
 	c := &cli{d: d}
-	return cliout.RemovedCommand(nameDev, []string{"d"}, "Removed in v2 — local Airflow lives under astro local", func(cmd *cobra.Command, args []string) error {
+	return cliout.RemovedCommand(nameDev, []string{"d"}, "Removed in v2; use astro local", func(cmd *cobra.Command, args []string) error {
 		return c.runDevRemoved(cmd, args)
 	})
 }

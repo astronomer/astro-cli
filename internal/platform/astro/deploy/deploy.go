@@ -29,9 +29,9 @@ import (
 
 const (
 	registryUsername         = "cli"
-	enableDagDeployMsg       = "Dag-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable Dag-only deploys"
+	enableDagDeployMsg       = "Dag-only deploys are not enabled for this Deployment; run 'astro deployment update %s --dag-deploy enable'"
 	dagDeployDisabled        = "dag deploy is not enabled for deployment"
-	errCiCdEnforcementUpdate = "cannot deploy since ci/cd enforcement is enabled for the deployment %s. Please use API Tokens instead"
+	errCiCdEnforcementUpdate = "cannot deploy: CI/CD enforcement is enabled for Deployment %s; use an API token instead"
 )
 
 var (
@@ -218,7 +218,7 @@ func prepareClientBuildContext(sourcePath string) (*ClientBuildContext, error) {
 	// Create a temporary directory for the build context
 	tempBuildDir, err := os.MkdirTemp("", "astro-client-build-*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temporary build directory: %w", err)
+		return nil, fmt.Errorf("could not create temporary build directory: %w", err)
 	}
 
 	// Cleanup function to be called by the caller
@@ -234,7 +234,7 @@ func prepareClientBuildContext(sourcePath string) (*ClientBuildContext, error) {
 
 	// Check if source directory exists first
 	if exists, err := fileutil.Exists(sourcePath, nil); err != nil {
-		return buildContext, fmt.Errorf("failed to check if source directory exists: %w", err)
+		return buildContext, fmt.Errorf("could not check source directory: %w", err)
 	} else if !exists {
 		return buildContext, fmt.Errorf("source directory does not exist: %s", sourcePath)
 	}
@@ -246,19 +246,19 @@ func prepareClientBuildContext(sourcePath string) (*ClientBuildContext, error) {
 	// must honor .dockerignore itself.
 	skip, err := dockerignoreSkipFunc(sourcePath)
 	if err != nil {
-		return buildContext, fmt.Errorf("failed to read .dockerignore: %w", err)
+		return buildContext, fmt.Errorf("could not read .dockerignore: %w", err)
 	}
 
 	// Copy all project files to the temporary directory
 	err = fileutil.CopyDirectoryFiltered(sourcePath, tempBuildDir, skip)
 	if err != nil {
-		return buildContext, fmt.Errorf("failed to copy project files to temporary directory: %w", err)
+		return buildContext, fmt.Errorf("could not copy project files to temporary directory: %w", err)
 	}
 
 	// Process client dependency files
 	err = setupClientDependencyFiles(tempBuildDir)
 	if err != nil {
-		return buildContext, fmt.Errorf("failed to setup client dependency files: %w", err)
+		return buildContext, fmt.Errorf("could not set up client dependency files: %w", err)
 	}
 
 	return buildContext, nil
@@ -335,11 +335,11 @@ func setupClientDependencyFiles(buildDir string) error {
 		// the file a symlink points at (a monorepo's shared requirements.txt,
 		// say), which the client deps would otherwise overwrite.
 		if err := os.Remove(regularPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to replace %s in build context: %w", regularFile, err)
+			return fmt.Errorf("could not replace %s in build context: %w", regularFile, err)
 		}
 		// Copy client file content to the regular file location (requires client file to exist)
 		if err := fileutil.CopyFile(clientPath, regularPath); err != nil {
-			return fmt.Errorf("failed to copy %s to %s in build context: %w", clientFile, regularFile, err)
+			return fmt.Errorf("could not copy %s to %s in build context: %w", clientFile, regularFile, err)
 		}
 	}
 
@@ -377,7 +377,7 @@ type ClientRuntimeCheck struct {
 func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) (ClientDeploy, error) { //nolint:gocritic // intentional in this shell code
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return ClientDeploy{}, errors.Wrap(err, "failed to get current context")
+		return ClientDeploy{}, errors.Wrap(err, "could not get current context")
 	}
 
 	// The registry is checked before anything calls the API, so a value with
@@ -420,7 +420,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		fmt.Println("Using provided image:", deployInput.ImageName)
 		err := engine.Tag(ctx, deployInput.ImageName, remoteImage)
 		if err != nil {
-			return ClientDeploy{}, fmt.Errorf("failed to tag local image: %w", err)
+			return ClientDeploy{}, fmt.Errorf("could not tag local image: %w", err)
 		}
 	} else {
 		// Authenticate with the base image registry before building
@@ -448,10 +448,10 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)
 			err := loginBaseImageRegistry(ctx, engine, baseImageRegistry, c.Token)
 			if err != nil {
-				fmt.Println("Failed to authenticate with Astronomer registry that contains the base agent image used in the Dockerfile.client file.")
-				fmt.Println("This could be because either your token has expired or you don't have permission to pull the base agent image.")
-				fmt.Println("Please re-login via astro login to refresh the credentials or validate that ASTRO_API_TOKEN environment variable is set with the correct token and try again")
-				return ClientDeploy{}, fmt.Errorf("failed to authenticate with registry %s: %w", baseImageRegistry, err)
+				fmt.Println("Could not authenticate with the Astronomer registry for the base agent image in Dockerfile.client.")
+				fmt.Println("Your token may have expired, or you may lack permission to pull the base agent image.")
+				fmt.Println("Run astro login to refresh your credentials, or check that ASTRO_API_TOKEN holds a valid token, then try again.")
+				return ClientDeploy{}, fmt.Errorf("could not authenticate with registry %s: %w", baseImageRegistry, err)
 			}
 		}
 
@@ -475,13 +475,13 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			defer buildContext.CleanupFunc()
 		}
 		if err != nil {
-			return ClientDeploy{}, fmt.Errorf("failed to prepare client build context: %w", err)
+			return ClientDeploy{}, fmt.Errorf("could not prepare client build context: %w", err)
 		}
 
 		// Build the image from the prepared context, tagged as it is pushed
 		err = buildClientImage(deployInput.Path, buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets, engine)
 		if err != nil {
-			return ClientDeploy{}, fmt.Errorf("failed to build client image: %w", err)
+			return ClientDeploy{}, fmt.Errorf("could not build client image: %w", err)
 		}
 	}
 
@@ -491,11 +491,11 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 	if err != nil {
 		if errors.Is(err, imagebuild.ErrPushForbidden) {
 			fmt.Printf("\n--------------------------------\n")
-			fmt.Printf("Failed to push client image to %s\n", registryEndpoint)
-			fmt.Println("It could be due to either your registry token has expired or you don't have permission to push the client image")
-			fmt.Printf("Please ensure that you have logged in to %s via docker login and try again\n\n", registryEndpoint)
+			fmt.Printf("Could not push client image to %s\n", registryEndpoint)
+			fmt.Println("Your registry token may have expired, or you may lack permission to push the client image.")
+			fmt.Printf("Run docker login %s, then try again\n\n", registryEndpoint)
 		}
-		return ClientDeploy{}, fmt.Errorf("failed to push client image: %w", deploybuild.ExplainPush(err))
+		return ClientDeploy{}, fmt.Errorf("could not push client image: %w", deploybuild.ExplainPush(err))
 	}
 
 	return ClientDeploy{
@@ -519,13 +519,13 @@ func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Cli
 	// Get current context for organization info
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get current context")
+		return nil, errors.Wrap(err, "could not get current context")
 	}
 
 	// Get deployment information
 	deployInfo, err := fetchDeploymentDetails(deployInput.DeploymentID, c.Organization, astroV1Client)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get deployment information")
+		return nil, errors.Wrap(err, "could not get Deployment information")
 	}
 
 	// Parse Dockerfile.client to get client image runtime version
@@ -536,35 +536,29 @@ func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Cli
 
 	cmds, err := docker.ParseFile(dockerfileClientPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse Dockerfile.client: %s", dockerfileClientPath)
+		return nil, errors.Wrapf(err, "could not parse Dockerfile.client: %s", dockerfileClientPath)
 	}
 
 	baseImage := docker.GetImageFromParsedFile(cmds)
 	if baseImage == "" {
-		return nil, errors.New("failed to find base image in Dockerfile.client")
+		return nil, errors.New("no base image found in Dockerfile.client")
 	}
 
 	// Extract runtime version from the base image tag
 	clientRuntimeVersion, err := extractRuntimeVersionFromImage(baseImage)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to extract runtime version from client image %s", baseImage)
+		return nil, errors.Wrapf(err, "could not extract runtime version from client image %s", baseImage)
 	}
 
 	// Compare versions
 	if airflowversions.CompareRuntimeVersions(clientRuntimeVersion, deployInfo.currentVersion) > 0 {
-		return nil, fmt.Errorf(`client image runtime version validation failed:
+		return nil, fmt.Errorf(`client image runtime version validation failed: the client image is based on Astro Runtime %s, which is newer than the Deployment's runtime version %s
 
-The client image is based on Astro Runtime version %s, which is newer than the deployment's runtime version %s.
-
-To fix this issue, you can either:
-1. Downgrade the client image version by updating the base image in Dockerfile.client to use runtime version %s or earlier
-2. Upgrade the deployment's runtime version to %s or higher
-
-This validation ensures compatibility between your client image and the deployment environment`,
+Either set the base image in Dockerfile.client to runtime version %s or earlier, or upgrade the Deployment to runtime version %s or later`,
 			clientRuntimeVersion, deployInfo.currentVersion, deployInfo.currentVersion, clientRuntimeVersion)
 	}
 
-	fmt.Printf("✓ Client image runtime version %s is compatible with deployment runtime version %s\n",
+	fmt.Printf("Client image runtime version %s is compatible with Deployment runtime version %s\n",
 		clientRuntimeVersion, deployInfo.currentVersion)
 
 	return &ClientRuntimeCheck{
@@ -589,7 +583,7 @@ func extractRuntimeVersionFromImage(imageName string) (string, error) {
 	// Use the existing ParseImageTag function from airflow_versions package
 	tagInfo, err := airflowversions.ParseImageTag(imageTag)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to parse image tag: %s", imageTag)
+		return "", errors.Wrapf(err, "could not parse image tag: %s", imageTag)
 	}
 
 	return tagInfo.RuntimeVersion, nil

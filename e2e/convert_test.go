@@ -497,7 +497,7 @@ func cases1x() []case1x {
 			manifestHas: []string{
 				"[tool.astro.deployments]\ndefault = {deployment = 'cm1ordersdeployment000001', workspace = 'cm1ordersworkspace0000001', default = true}",
 			},
-			advisories: []string{`linked Deployment cm1ordersdeployment000001 as "default" in pyproject.toml (workspace cm1ordersworkspace0000001)`},
+			advisories: []string{`linked Deployment cm1ordersdeployment000001 as "default" in pyproject.toml (Workspace cm1ordersworkspace0000001)`},
 		},
 		{
 			// The `instances:` list an early v2 build wrote, which keeps each
@@ -781,7 +781,7 @@ func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 			t.Errorf("pyproject.toml lacks %q:\n%s", want, manifest)
 		}
 	}
-	if !reports(res.Advisory, "(Astro Private Cloud localhost, workspace "+workspace+")") {
+	if !reports(res.Advisory, "(Astro Private Cloud localhost, Workspace "+workspace+")") {
 		t.Errorf("the advisories do not say the saved target is an APC link: %q", res.Advisory)
 	}
 	if reports(res.Notes, "Private Cloud") || strings.Contains(r.Stderr, "Private Cloud") {
@@ -803,7 +803,7 @@ func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 		!strings.Contains(m, "target = 'apc'") {
 		t.Errorf("the saved Deployment is not linked in the context's workspace:\n%s", m)
 	}
-	if !reports(savedRes.Advisory, "It saved no workspace, so this uses your current one") {
+	if !reports(savedRes.Advisory, "It saved no Workspace, so this uses your current one") {
 		t.Errorf("the advisory does not say where the workspace came from: %q", savedRes.Advisory)
 	}
 	checkVaultUntouched(t, saved)

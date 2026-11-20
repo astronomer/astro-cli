@@ -58,7 +58,7 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&workspaceUserWsRole, "role", houston.WorkspaceViewerRole, "Role assigned to user")
-	cmd.Flags().StringVar(&workspaceUserCreateEmail, "email", "", "Email of the user you wish to add to this workspace")
+	cmd.Flags().StringVar(&workspaceUserCreateEmail, "email", "", "Email of the user to add to this Workspace")
 	_ = cmd.MarkFlagRequired("email") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
@@ -114,8 +114,8 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
-		cmd.Flags().BoolVar(&paginated, "paginated", false, "Paginated workspace user list")
-		cmd.Flags().IntVar(&pageSize, "page-size", 0, "Page size of the workspace user list if paginated is set to true")
+		cmd.Flags().BoolVar(&paginated, "paginated", false, "Page through the Workspace user list")
+		cmd.Flags().IntVar(&pageSize, "page-size", 0, "Page size of the Workspace user list with --paginated")
 	}
 	addAccessOutputFlag(cmd)
 	return cmd
@@ -125,11 +125,11 @@ func workspaceUserAdd(out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
+		return fmt.Errorf("could not find a valid Workspace: %w", err)
 	}
 
 	if err := validateWorkspaceRole(workspaceUserWsRole); err != nil {
-		return fmt.Errorf("failed to find a valid role: %w", err)
+		return fmt.Errorf("could not find a valid role: %w", err)
 	}
 
 	w, added, err := workspace.Add(ws, workspaceUserCreateEmail, workspaceUserWsRole, houstonClient)
@@ -143,11 +143,11 @@ func workspaceUserUpdate(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
+		return fmt.Errorf("could not find a valid Workspace: %w", err)
 	}
 
 	if err := validateWorkspaceRole(workspaceUserWsRole); err != nil {
-		return fmt.Errorf("failed to find a valid role: %w", err)
+		return fmt.Errorf("could not find a valid role: %w", err)
 	}
 
 	change, err := workspace.UpdateRole(ws, args[0], workspaceUserWsRole, houstonClient)
@@ -161,7 +161,7 @@ func workspaceUserRemove(out io.Writer, args []string) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
+		return fmt.Errorf("could not find a valid Workspace: %w", err)
 	}
 
 	// A user with no Workspace role there is refused before anything is
@@ -181,7 +181,7 @@ func workspaceUserRemove(out io.Writer, args []string) error {
 
 // errListPaginatedUnderJSON refuses --paginated under --output json: it pages
 // through a list by asking which page to show next, and json asks nothing.
-var errListPaginatedUnderJSON = errors.New("--paginated pages through the list by asking which page to show next, so it cannot be used with --output json; leave it out to publish the whole list")
+var errListPaginatedUnderJSON = errors.New("--paginated asks which page to show next and cannot be used with --output json; leave it out to print the full list")
 
 func workspaceUserList(out io.Writer) error {
 	r := cliout.Renderer{Format: accessOutput, Out: out}
@@ -190,7 +190,7 @@ func workspaceUserList(out io.Writer) error {
 	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
+		return fmt.Errorf("could not find a valid Workspace: %w", err)
 	}
 	configPageSize := config.CFG.PageSize.GetInt()
 

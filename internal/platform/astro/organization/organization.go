@@ -24,12 +24,12 @@ import (
 )
 
 const (
-	AstronomerConnectionErrMsg = "cannot connect to Astronomer. Try to log in with astro login or check your internet connection and user permissions. If you are using an API Key or Token make sure your context is correct.\n\nDetails"
+	AstronomerConnectionErrMsg = "cannot connect to Astronomer; run astro login, then check your network connection and permissions. With an API token, check that your context is correct.\n\nDetails: "
 )
 
 var (
-	errInvalidOrganizationKey  = errors.New("invalid organization selection")
-	errInvalidOrganizationName = errors.New("invalid organization name")
+	errInvalidOrganizationKey  = errors.New("invalid Organization selection")
+	errInvalidOrganizationName = errors.New("invalid Organization name")
 	Login                      = auth.Login
 	CheckUserSession           = auth.CheckUserSession
 	FetchDomainAuthConfig      = auth.FetchDomainAuthConfig
@@ -131,7 +131,7 @@ func getOrganizationSelection(out io.Writer, astroV1Client astrov1.APIClient) (*
 	// for the list.
 	list := picker.List{
 		Header:  []string{"NAME", "ID"},
-		Ask:     []input.Option{input.About("an organization"), input.AnsweredBy(NameOrIDAnswer)},
+		Ask:     []input.Option{input.About("an Organization"), input.AnsweredBy(NameOrIDAnswer)},
 		Invalid: errInvalidOrganizationKey,
 	}
 	if err := input.MayAsk("\n> ", list.Ask...); err != nil {
@@ -187,7 +187,7 @@ func SwitchWithContext(domain string, targetOrg *astrov1.Organization, astroV1Cl
 
 // NameOrIDAnswer is what answers the question a switch naming no
 // Organization asks.
-const NameOrIDAnswer = "the organization name or ID as an argument"
+const NameOrIDAnswer = "the Organization name or ID as an argument"
 
 // Switch makes the Organization named, by name or id, current, or, with no
 // name, the one picked from a menu drawn on out. The login check that follows

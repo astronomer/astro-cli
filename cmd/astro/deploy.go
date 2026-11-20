@@ -181,7 +181,7 @@ func refuseFlagCombinations(cmd *cobra.Command, inProject bool) error {
 // errPickerOtherHost is the workspace picker refused on a login other than
 // the current context's: it lists only the current context's Deployments.
 func errPickerOtherHost(domain string) error {
-	return fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run astro context switch %[1]s", domain)
+	return fmt.Errorf("this project deploys to %[1]s, and the Deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run astro context switch %[1]s", domain)
 }
 
 // manifestHere is the manifest of the pyproject.toml project the working
@@ -380,12 +380,12 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 			}
 			announceDeployTarget(errOut, target)
 			if !dags && imageName != "" {
-				fmt.Fprintf(out, "Deploying prebuilt image %s...\n", imageName)
+				fmt.Fprintf(out, "Deploying prebuilt image %s…\n", imageName)
 			}
 		},
 		OnBuild: func() {
 			if format == cliout.FormatText {
-				fmt.Fprintln(out, "Building your project image, this can take a few minutes...")
+				fmt.Fprintln(out, "Building the project image. This can take a few minutes…")
 			}
 		},
 	}, manifestdeploy.BeforeAsking(newManifestDeployer(&login, cmd.InOrStdin(), errOut), recap.Flush))
@@ -606,9 +606,9 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 // nobody recognizes at a glance.
 func deployTargetName(res *manifestdeploy.Result) string {
 	if res.LinkName == "" {
-		return "deployment " + res.DeploymentID
+		return "Deployment " + res.DeploymentID
 	}
-	return fmt.Sprintf("%s (deployment %s)", res.LinkName, res.DeploymentID)
+	return fmt.Sprintf("%s (Deployment %s)", res.LinkName, res.DeploymentID)
 }
 
 // manifestDeployErr returns a manifest deploy failure for the root to report: the

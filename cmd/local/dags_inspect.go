@@ -24,9 +24,9 @@ func newDagsErrorsCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "errors",
 		Short: "List the Dag files that failed to parse, with their tracebacks",
-		Long: "List the import errors on this Airflow: every Dag file the Dag processor could not parse, and the " +
-			"traceback it raised. A Dag missing from dags list is nearly always here.\n\nThe command succeeds " +
-			"whether or not there are errors; an empty listing is the good news.",
+		Long: "List the import errors on this Airflow: each Dag file the Dag processor could not parse, with the " +
+			"traceback it raised. A Dag missing from dags list is usually here.\n\nThe command succeeds " +
+			"whether or not there are errors.",
 		Args: cobra.NoArgs,
 		Example: afExample(q.t,
 			"List the Dag files that failed to parse", "dags errors",
@@ -130,10 +130,10 @@ func newDagsExploreCmd(q *query) *cobra.Command {
 	return &cobra.Command{
 		Use:   "explore <DAG_ID>",
 		Short: "Show one Dag's definition, its tasks, and its source together",
-		Long: "Read everything there is to know about one Dag in one go: what " + q.t.suggest("dags get") + " shows, the tasks it " +
-			"defines as " + q.t.suggest("tasks list") + " shows them, and the source Airflow parsed.\n\nEach part is read on its own, " +
-			"and one that fails is reported in its place rather than ending the command. It fails only when none " +
-			"of the three could be read, which is what a Dag id Airflow does not know looks like.",
+		Long: "Read one Dag in a single command: what " + q.t.suggest("dags get") + " shows, the tasks as " +
+			q.t.suggest("tasks list") + " shows them, and the source Airflow parsed.\n\nEach part is read separately. " +
+			"A part that fails is reported in its place and the command continues. The command fails only when none " +
+			"of the three could be read, as happens with a Dag id Airflow does not know.",
 		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Read a Dag's definition, tasks, and source in one go", "dags explore <DAG_ID>",

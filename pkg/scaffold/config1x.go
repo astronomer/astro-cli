@@ -101,7 +101,7 @@ func (from1x *project1x) settingNotes() []string {
 			if plainSettingValue(s.value) && !credentialKey(s.key) {
 				value = ShellQuote(s.value)
 			}
-			notes = append(notes, head+" is a CLI setting, which Astro CLI v2 keeps per machine rather than per project. "+
+			notes = append(notes, head+" is a CLI setting; Astro CLI v2 keeps it per machine, not per project. "+
 				"To keep it on this machine, run: astro config set --global "+fate.Global+" "+value)
 		case fate.Removed != "":
 			notes = append(notes, head+" is an Astro CLI 1.x setting v2 does not have. "+fate.Removed)

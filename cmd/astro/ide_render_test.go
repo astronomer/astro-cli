@@ -20,9 +20,9 @@ func TestIDEProjectLinesCarryNoEscapes(t *testing.T) {
 
 	var buf bytes.Buffer
 	require.NoError(t, emitIDEImport(r(&buf), &ide.Import{ProjectID: "p1", ProjectName: name}))
-	assert.Equal(t, "Successfully exported project from etl\n", buf.String())
+	assert.Equal(t, "Exported project from etl\n", buf.String())
 
 	buf.Reset()
 	require.NoError(t, emitIDEExport(r(&buf), &ide.Export{ProjectID: "p1", ProjectName: name}))
-	assert.Equal(t, "Successfully exported project to etl\n", buf.String())
+	assert.Equal(t, "Exported project to etl\n", buf.String())
 }

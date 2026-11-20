@@ -196,7 +196,7 @@ func (s *Suite) TestGetCurrentWorkspaceError() {
 	_ = afero.WriteFile(fs, config.HomeConfigFileForTesting(), []byte(""), 0o777)
 	config.InitConfig(fs)
 	_, err := GetCurrentWorkspace()
-	s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
+	s.EqualError(err, "no context set; run astro login and try again")
 }
 
 func (s *Suite) TestGetCurrentWorkspaceErrorNoCurrentContext() {
@@ -217,7 +217,7 @@ contexts:
 	_ = afero.WriteFile(fs, config.HomeConfigFileForTesting(), configRaw, 0o777)
 	config.InitConfig(fs)
 	_, err := GetCurrentWorkspace()
-	s.EqualError(err, "current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+	s.EqualError(err, "no current Workspace set; switch to one with\n\tastro workspace switch WORKSPACEID")
 }
 
 func (s *Suite) TestGetWorkspaceSelectionError() {
@@ -301,7 +301,7 @@ contexts:
 	s.True(quit, "a quit is told apart from a switch")
 	// The paged table and its prompt are the question, both on stderr.
 	s.Contains(asked, mockWorkspace.ID)
-	s.Contains(asked, "Please select one of the following options")
+	s.Contains(asked, "Select an option")
 	s.Nil(w, "quitting switches to nothing")
 	c, err := config.GetCurrentContext()
 	s.NoError(err)
@@ -387,7 +387,7 @@ contexts:
 	api.On("ValidateWorkspaceID", wsID).Return(nil, errMock)
 
 	_, _, err := Switch(wsID, 0, "", api)
-	s.EqualError(err, "workspace id is not valid: api error")
+	s.EqualError(err, "Workspace ID is not valid: api error")
 	api.AssertExpectations(s.T())
 }
 
@@ -475,7 +475,7 @@ func (s *Suite) TestGetWorkspaceSelection() {
 		out := new(bytes.Buffer)
 		sel := getWorkspaceSelection(0, 0, "", api, out)
 
-		s.Contains(sel.err.Error(), "no context set, have you authenticated to Astro or APC? Run astro login and try again")
+		s.Contains(sel.err.Error(), "no context set; run astro login and try again")
 		s.Equal("", sel.id)
 	})
 
@@ -542,7 +542,7 @@ func (s *Suite) TestGetWorkspaceSelectionPaged() {
 		got, out := ask(3, "x\n0\n2\n")
 		s.NoError(got.err)
 		s.Equal(mockWorkspaceList[1].ID, got.id)
-		s.Equal(2, strings.Count(out, told+"\nPlease select one of the following options or enter index to select the row.\nn. next q. quit\n> "), out)
+		s.Equal(2, strings.Count(out, told+"\nSelect an option, or enter a row number.\nn. next q. quit\n> "), out)
 	})
 
 	s.Run("a page letter after a typo, then a row of the next page", func() {

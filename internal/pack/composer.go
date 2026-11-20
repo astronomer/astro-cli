@@ -105,7 +105,7 @@ func (t *ComposerTarget) Build(_ context.Context, req Request, cb localrt.Callba
 func composerRequirements(deps []string) string {
 	header := "" +
 		"# PyPI dependencies for the Composer environment. Composer installs these\n" +
-		"# on the environment, not from the bucket. Apply them with:\n" +
+		"# on the environment. Apply them with:\n" +
 		"#   gcloud composer environments update <env> --location <region> \\\n" +
 		"#     --update-pypi-packages-from-file " + composerDepsFile + "\n"
 	body := strings.Join(dropAirflow(deps), "\n")

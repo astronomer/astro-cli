@@ -49,8 +49,9 @@ func newCheckCmd(c *cli) *cobra.Command {
 		Use:   nameCheck,
 		Short: "Validate this project's Dags without starting Airflow",
 		Long: "Parse the project's Dags in its own environment and report import errors, duplicate Dag ids, and slow parses. Runs offline; starts no Airflow.\n\n" +
-			"It also checks [tool.astro.env] the way astro local start does: a required value with no source on this machine is an error, and a value that is not what its declaration says is a warning. A source = 'workspace' value nothing local holds is not checked, since the Environment Manager is not asked.\n\n" +
-			"With --target, check the project against the Airflow a managed platform actually runs, before you upload. mwaa and composer map the manifest's Airflow pin to the closest version that platform offers, build a scratch venv with that Airflow plus the project's dependencies, and parse the Dags inside it; mwaa also resolves the dependencies against MWAA's published constraints file (a conflict fails the check; the step needs the network and is skipped, not failed, offline). astro is the default check under a name, so --target astro is an alias for a plain check. The flag repeats and takes a comma list: --target mwaa --target composer or --target mwaa,composer.",
+			"It also checks [tool.astro.env] as astro local start does. A required value with no source on this machine is an error. A value that does not match its declaration is a warning. A source = 'workspace' value that nothing local holds is not checked, because the Environment Manager is not queried.\n\n" +
+			"With --target, check the project against the Airflow a managed platform runs, before you upload. For mwaa and composer, the CLI picks the closest Airflow version the platform offers to the manifest's pin, builds a scratch venv with that Airflow and the project's dependencies, and parses the Dags in it. For mwaa it also resolves the dependencies against MWAA's published constraints file. A conflict fails the check. The step needs the network and is skipped offline.\n\n" +
+			"--target astro is the same as a plain check. The flag repeats and takes a comma list: --target mwaa --target composer or --target mwaa,composer.",
 		Example: "  # Parse the project's Dags and check its environment values\n" +
 			"  astro local check\n\n" +
 			"  # Fail on warnings too\n" +
@@ -541,7 +542,7 @@ func renderTracebacks(w io.Writer, findings []checks.Finding, budget *int) error
 		// "traceback(s)", not "import error(s)": every one of them is still in
 		// the table above, and saying otherwise tells the reader the table they
 		// are looking at is incomplete.
-		if _, err := fmt.Fprintf(w, "\n%d more traceback(s) not shown; --output json carries every one\n", suppressed); err != nil {
+		if _, err := fmt.Fprintf(w, "\n%s not shown; --output json includes all of them\n", plural(suppressed, "more traceback", "more tracebacks")); err != nil {
 			return err
 		}
 	}
@@ -992,7 +993,7 @@ func renderConstraintOutcome(w io.Writer, c *checks.ConstraintOutcome) error {
 		_, err := fmt.Fprintln(w, "constraints: dependencies resolve against MWAA's constraints file")
 		return err
 	case c.Conflicted():
-		_, err := fmt.Fprintf(w, "constraints: conflict — %s\n", c.Conflict)
+		_, err := fmt.Fprintf(w, "constraints: conflict: %s\n", c.Conflict)
 		return err
 	default:
 		_, err := fmt.Fprintf(w, "constraints: %s\n", c.Skipped)

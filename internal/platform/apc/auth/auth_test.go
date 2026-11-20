@@ -322,7 +322,7 @@ func (s *Suite) TestRegistryAuthFailure() {
 
 		err := RegistryAuth(houstonMock, out, "", houston.GetAppConfigRequest{})
 		s.NoError(err)
-		s.Contains(out.String(), "please use docker login byo.example.com to manually login")
+		s.Contains(out.String(), "Run docker login byo.example.com to log in manually")
 
 		// The APC registry's refusal fails the login.
 		out.Reset()
@@ -330,7 +330,7 @@ func (s *Suite) TestRegistryAuthFailure() {
 
 		err = RegistryAuth(houstonMock, out, "", houston.GetAppConfigRequest{})
 		s.ErrorIs(err, errMockRegistry)
-		s.Contains(out.String(), "Failed to authenticate to the registry")
+		s.Contains(out.String(), "Could not authenticate to the registry")
 
 		s.Len(s.logins, 2)
 		houstonMock.AssertExpectations(s.T())
@@ -611,8 +611,8 @@ func (s *Suite) TestLoginFailure() {
 		if s.NoError(Login("test.astro.io", false, "test", "test", "", "0.30.0", houstonMock, out)) {
 			return
 		}
-		if gotOut := out.String(); !testUtil.StringContains([]string{"test.astro.io", "Failed to authenticate to the registry"}, gotOut) {
-			s.Fail("Login() = %v, want %v", gotOut, []string{"test.astro.io", "Failed to authenticate to the registry"})
+		if gotOut := out.String(); !testUtil.StringContains([]string{"test.astro.io", "Could not authenticate to the registry"}, gotOut) {
+			s.Fail("Login() = %v, want %v", gotOut, []string{"test.astro.io", "Could not authenticate to the registry"})
 		}
 		houstonMock.AssertExpectations(s.T())
 	})

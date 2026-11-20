@@ -115,7 +115,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 		Short: "Run Apache Airflow locally and interact with Astronomer",
 		// The ASCII banner above this is drawn by the help func (rootBanner),
 		// not kept here, because Long is wrapped and the art is not prose.
-		Long: "Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, APC, or Local Development.",
+		Long: "The Astro CLI is the command line interface for data orchestration. Use it with Astro, with APC, or to run Airflow locally.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// A removed command's stub only says what replaced it: it needs no
 			// login and checks no version, but it is logged and recorded.

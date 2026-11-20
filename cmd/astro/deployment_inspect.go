@@ -26,7 +26,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "inspect [DEPLOYMENT_ID]",
 		Aliases: []string{"in"},
-		Short:   "Inspect a deployment configuration",
+		Short:   "Inspect a Deployment configuration",
 		Long:    "Inspect an Astro Deployment configuration. This command returns the Deployment's configuration as YAML (the default) or JSON, which includes information about resources, such as cluster ID, region, and Airflow API URL, as well as scheduler and worker queue configurations.",
 		Example: `  # Show a Deployment's configuration as YAML
   astro deployment inspect <DEPLOYMENT_ID>
@@ -46,7 +46,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().Lookup("output").Usage += " (text prints the deployment as YAML, the same as yaml)"
 	cmd.Flags().StringVar(&requestedField, "key", "", "Print only this key of the configuration, such as configuration.cluster_id")
 	cmd.Flags().BoolVar(&cleanOutput, "clean-output", false, "Print only the Deployment's YAML or JSON, with no other output")
-	cmd.Flags().BoolVar(&showWorkloadIdentity, "show-workload-identity", false, "Include the workload identity configured for the deployment in the output")
+	cmd.Flags().BoolVar(&showWorkloadIdentity, "show-workload-identity", false, "Include the workload identity configured for the Deployment in the output")
 	return cmd
 }
 

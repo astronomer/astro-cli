@@ -31,7 +31,7 @@ import (
 // heuristic does not read a help string as a password.
 const (
 	plainSetHelp    = "Store the value unencrypted: in the project's .env, or for a global, in the vault without encryption"
-	plainNarrowHelp = "In a project, act on the plain .env only, not the vault"
+	plainNarrowHelp = "In a project, act on the plain .env only and leave the vault alone"
 	// legacyStoreFlagUse is what the deprecation warning says to type instead of
 	// --secret (cliout.WarnDeprecated).
 	legacyStoreFlagUse = "use --plain to opt out of the encrypted vault, which is the default (--secret=false still means --plain)"
@@ -157,9 +157,9 @@ func newEnvCmd(c *cli) *cobra.Command {
 			"every project. Pass --plain to store one unencrypted: in the project's .env, " +
 			"or for a global, in the vault without encryption.\n\n" +
 			"At start, each value comes from the first of: project .env, shell env, project " +
-			"vault, global vault, the linked workspace's Environment Manager, a declaration's " +
-			"default. Every source reaches Airflow whole, declared or not. " +
-			"A workspace that cannot be read is skipped with a note.",
+			"vault, global vault, the linked Workspace's Environment Manager, a declaration's " +
+			"default. Every source reaches Airflow, whether or not the project declares the value. " +
+			"A Workspace that cannot be read is skipped with a note.",
 		Args: cobra.ArbitraryArgs,
 		RunE: helpOrUnknownSubcommand,
 	}
@@ -347,15 +347,15 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	in := &setInput{}
 	fields := &connFields{}
 	long := "Set " + k.article + " " + k.label + ", creating it if it does not exist.\n\n" +
-		"The value comes from a prompt with echo off, --stdin, or --value; never a bare " +
-		"argument, which would land in shell history.\n\n" +
+		"The value comes from a prompt with echo off, --stdin, or --value. It is not " +
+		"taken as an argument, so it stays out of shell history.\n\n" +
 		"The value is stored in the encrypted vault, which needs an OS keyring. --plain " +
-		"stores it unencrypted instead and needs none: a project value in the project's " +
-		".env, a global in the vault, marked plain. --plain is refused for a name the " +
-		"project's pyproject.toml declares secret.\n\n" +
+		"stores it unencrypted and needs no keyring: a project value goes in the project's " +
+		".env, and a global goes in the vault, marked plain. --plain is refused for a name " +
+		"that the project's pyproject.toml declares secret.\n\n" +
 		"A new global reaches no project until you link it with " +
 		"astro local env " + localenv.Noun(k.kind) + " link, as in Astro Desktop. --auto-link creates it " +
-		"auto-linked to every project instead. Updating an existing global keeps its links. " +
+		"linked to every project. Updating an existing global keeps its links. " +
 		"A global goes to the Airflow of every project it reaches, whether or not the " +
 		"project declares it."
 	cmdLine, name := "astro local env "+localenv.Noun(k.kind)+" set", exampleName(k.kind)
@@ -368,7 +368,7 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
   # Create a global that reaches every project
   ` + cmdLine + ` ` + name + ` --global --auto-link`
 	if k.kind == localenv.KindConn {
-		long += "\n\nGive the connection whole, as a URI or JSON, or field by field with --type, " +
+		long += "\n\nGive the connection as a URI or JSON, or field by field with --type, " +
 			"--host and the rest."
 		example = `  # Set it from a URI
   ` + cmdLine + ` ` + name + ` --value 'postgres://admin@db.example.com:5432/warehouse'
@@ -506,7 +506,7 @@ func newEnvGetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Short: "Show " + k.article + " " + k.label + " and where it resolves from",
 		Example: "  # Show its value and where it resolves from\n" +
 			"  astro local env " + localenv.Noun(k.kind) + " get " + exampleName(k.kind) + "\n\n" +
-			"  # The global value, rather than the project's\n" +
+			"  # The global value\n" +
 			"  astro local env " + localenv.Noun(k.kind) + " get " + exampleName(k.kind) + " --global",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -528,11 +528,11 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Short:   "Delete " + k.article + " " + k.label,
 		Long: "Delete " + k.article + " " + k.label + "'s value.\n\n" +
 			"A declaration in the project's pyproject.toml is not a value, so delete leaves " +
-			"it in place and says what the name resolves to now: another source, nothing " +
-			"(list shows it as absent), or, for a required name, nothing the next start " +
-			"will accept. --undeclare also removes the declaration, as undeclare does. " +
-			"With --global it removes it only from the current project's pyproject.toml, " +
-			"and refuses outside a project.",
+			"it in place and reports what the name resolves to now: another source, or " +
+			"nothing (list shows it as absent). For a required name, the next start " +
+			"refuses until a value is set. --undeclare also removes the declaration, as undeclare does. " +
+			"With --global, it removes the declaration only from the current project's pyproject.toml, " +
+			"and it fails outside a project.",
 		Example: "  # Delete its value\n" +
 			"  astro local env " + localenv.Noun(k.kind) + " delete " + exampleName(k.kind) + "\n\n" +
 			"  # Also remove its declaration from pyproject.toml\n" +
@@ -567,8 +567,8 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 	if only == "" {
 		long = "List every declared value and where it resolves from, and every undeclared " +
 			"value a start passes to this project anyway. Whatever reaches a project goes " +
-			"to its Airflow, declared or not: declaring a name makes it a requirement, and " +
-			"linking narrows which projects a global reaches. Values are not shown; use the get " +
+			"to its Airflow, declared or not. Declaring a name makes it a requirement, and " +
+			"linking limits which projects a global reaches. Values are not shown; use the get " +
 			"command to see one."
 	}
 	cmd := &cobra.Command{
@@ -1006,7 +1006,7 @@ func (c *cli) getFromWorkspace(projectDir string, kind localenv.Kind, name, key 
 		// plain "not set anywhere".
 		return "", "", false, nil
 	}
-	return "", "", false, fmt.Errorf("%s %q resolves from the workspace but has no value: %s", localenv.Noun(kind), name, envresolve.Diagnose(wp, key))
+	return "", "", false, fmt.Errorf("%s %q resolves from the Workspace but has no value: %s", localenv.Noun(kind), name, envresolve.Diagnose(wp, key))
 }
 
 // declaredSource returns a declared name's source, so `get` knows to consult
@@ -1075,7 +1075,7 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string, u
 	r := c.renderer()
 	projectDir, perr := c.discoverProject()
 	if undeclare && perr != nil {
-		return fmt.Errorf("--undeclare removes a declaration from the current project's %s, and there is no project here, so nothing was deleted. It never edits another project's", project.Marker)
+		return fmt.Errorf("--undeclare removes a declaration from the current project's %s, and there is no project here, so nothing was deleted", project.Marker)
 	}
 	if undeclare {
 		if err := checkUndeclarable(projectDir, kind, name); err != nil {
@@ -1198,7 +1198,7 @@ func (c *cli) scopeStores(scope *scopeFlags) ([]valueStore, error) {
 func (c *cli) deleteKeepingRow(store valueStore, kind localenv.Kind, name string) (bool, error) {
 	ok, err := store.Delete(kind, name)
 	if errors.Is(err, vaultenv.ErrLinkRowKept) {
-		cliout.Warn(c.d.Stderr, fmt.Sprintf("deleted %s %s, but %v. A new global of this name would reach only the projects that row names; once the index is usable, clear it with: %s --auto-link", localenv.Noun(kind), name, err, localenv.LinkHint(kind, name)))
+		cliout.Warn(c.d.Stderr, fmt.Sprintf("deleted %s %s, but %v. A new global of this name would reach only the projects that row names. Once the index is usable, clear it with: %s --auto-link", localenv.Noun(kind), name, err, localenv.LinkHint(kind, name)))
 		return ok, nil
 	}
 	return ok, err
@@ -1578,5 +1578,5 @@ func (c *cli) warnUnignoredEnv(path string, scope localenv.Scope, projectDir str
 	if err != nil || ignored {
 		return
 	}
-	cliout.Warn(c.d.Stderr, fmt.Sprintf("%s is not covered by .gitignore; add a .env line to it so the file is never committed", path))
+	cliout.Warn(c.d.Stderr, fmt.Sprintf("%s is not covered by .gitignore; add a .env line to it so the file is not committed", path))
 }

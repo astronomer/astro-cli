@@ -391,31 +391,30 @@ func refusal(err error) error {
 		// The keyring may be fine; the directory is what is refused, and the
 		// error names why.
 		return fmt.Errorf("the encrypted vault's directory cannot be used: %w\n\n"+
-			"Nothing is read from or written to it until it is a real directory owned by you", err)
+			"Nothing is read from or written to it until it is a real directory that you own", err)
 	case errors.Is(err, secrets.ErrWrongMasterKey):
 		return fmt.Errorf("this value was encrypted under a different master key than this machine's: %w\n\n"+
 			"It cannot be decrypted here. Set it again to replace it", err)
 	case errors.Is(err, secrets.ErrTampered):
 		return fmt.Errorf("this value failed the vault's integrity check, so it was not used: %w\n\n"+
-			"It was damaged, or written by something other than astro or Astro Desktop. Set it again to replace it", err)
+			"It was damaged or written by something other than astro or Astro Desktop. Set it again to replace it", err)
 	case errors.Is(err, secrets.ErrVaultOrphaned):
 		// The keyring is fine and the values are intact; the key that decrypts
 		// them is gone. Unlocking anything will never help, and pkg/secrets
 		// refuses to mint a replacement precisely so this stays legible rather
 		// than becoming twenty authentication errors.
 		return fmt.Errorf("this machine has encrypted values but the master key that decrypts them is gone: %w\n\n"+
-			"A keychain reset, a new login keychain, or a recreated keyring does this. The values cannot be "+
-			"recovered. Deleting the vault directory (~/.astro/secrets) clears the condition and loses those "+
-			"secrets, which is why this tool will not do it for you", err)
+			"A keychain reset, a new login keychain, or a recreated keyring causes this. The values cannot be "+
+			"recovered. Deleting the vault directory (~/.astro/secrets) clears the condition and discards those "+
+			"secrets", err)
 	case errors.Is(err, secrets.ErrMasterKeyUnusable):
 		return fmt.Errorf("this machine's stored master key is not a usable key: %w\n\n"+
-			"Nothing about the machine is wrong, so there is no daemon to check. Recovering means accepting that "+
-			"anything encrypted under the real key is unreadable", err)
+			"Anything encrypted under the original key is unreadable", err)
 	case errors.Is(err, secrets.ErrKeyringUnavailable):
 		// The umbrella: no keyring to reach at all.
 		return fmt.Errorf("this machine's keyring is unreachable, so a secret cannot be stored or read here: %w\n\n"+
 			"On a headless machine or in CI there is no keyring to hold the master key. Supply the value in the "+
-			"environment instead, which the resolution chain reads first, or, for a name the project does not "+
+			"environment instead, or, for a name the project does not "+
 			"declare secret, set it with --plain, which needs no keyring", err)
 	default:
 		return err

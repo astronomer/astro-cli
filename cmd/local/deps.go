@@ -440,10 +440,10 @@ func adviseDatabaseNewer(err error) error {
 	if !errors.Is(err, localrt.ErrDatabaseNewerThanAirflow) {
 		return err
 	}
-	return fmt.Errorf("%w. To start over with an empty database, run astro local reset; "+
-		"it deletes the Dag runs, connections and variables stored there. "+
-		"To keep them, go back to the newer Airflow: the apache-airflow requirement in pyproject.toml, "+
-		"or the base image in your Dockerfile if the project declares one", err)
+	return fmt.Errorf("%w. To start over with an empty database, run astro local reset. "+
+		"This deletes the Dag runs, connections and variables stored there. "+
+		"To keep them, go back to the newer Airflow: set the apache-airflow requirement in pyproject.toml, "+
+		"or the base image in your Dockerfile if the project has one", err)
 }
 
 // adviseStart adds what the CLI can say about a failed start to the engine's
@@ -477,7 +477,7 @@ func healthTimeout() time.Duration {
 	}
 	d, err := time.ParseDuration(raw)
 	if err != nil || d <= 0 {
-		cliout.Warn(os.Stderr, fmt.Sprintf("ignoring %s=%q, which is not a positive duration — use a unit, like 10m or 90s", healthTimeoutEnv, raw))
+		cliout.Warn(os.Stderr, fmt.Sprintf("ignoring %s=%q, which is not a positive duration; use a unit, like 10m or 90s", healthTimeoutEnv, raw))
 		return 0
 	}
 	return d
@@ -564,7 +564,7 @@ func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb loca
 
 // ErrAllDeploymentsLinked reports a Deployment picker with nothing to offer
 // because the project already links every Deployment in the workspace.
-var ErrAllDeploymentsLinked = errors.New("every Deployment in the workspace is already linked")
+var ErrAllDeploymentsLinked = errors.New("every Deployment in the Workspace is already linked")
 
 // APCLinking is what `astro link add` needs to link an Astro Private Cloud
 // Deployment, wired by the root over the Houston client and the current
@@ -588,7 +588,7 @@ type APCLinking struct {
 
 // ErrAPCWorkspaceUnreadable is a current APC workspace that could not be read,
 // for a reason other than none being set.
-var ErrAPCWorkspaceUnreadable = errors.New("reading the current Astro Private Cloud workspace")
+var ErrAPCWorkspaceUnreadable = errors.New("reading the current Astro Private Cloud Workspace")
 
 // APCWorkspaceUnreadable says the current APC workspace could not be read, and
 // that --workspace answers it, around err. An error that already says so is

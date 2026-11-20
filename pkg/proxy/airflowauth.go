@@ -416,17 +416,17 @@ func fetchAirflowAuth(backendPort string) (string, error) {
 	loginURL := baseURL + "/login"
 	resp, err := af2Client.Get(loginURL) //nolint:noctx // af2Client's timeout bounds it
 	if err != nil {
-		return "", fmt.Errorf("airflow 2 GET /login: %w", err)
+		return "", fmt.Errorf("Airflow 2 GET /login: %w", err)
 	}
 	body, err := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
 	if err != nil {
-		return "", fmt.Errorf("airflow 2 GET /login: %w", err)
+		return "", fmt.Errorf("Airflow 2 GET /login: %w", err)
 	}
 
 	csrfToken := extractFormCSRF(string(body))
 	if csrfToken == "" {
-		return "", fmt.Errorf("airflow 2: no CSRF token on the login page")
+		return "", fmt.Errorf("Airflow 2: no CSRF token on the login page")
 	}
 
 	// Step 2: POST /login with the credentials and the CSRF token. Airflow 2's
@@ -446,11 +446,11 @@ func fetchAirflowAuth(backendPort string) (string, error) {
 	form.Set("csrf_token", csrfToken)
 	resp2, err := af2Client.PostForm(loginURL, form) //nolint:noctx // af2Client's timeout bounds it
 	if err != nil {
-		return "", fmt.Errorf("airflow 2 POST /login: %w", err)
+		return "", fmt.Errorf("Airflow 2 POST /login: %w", err)
 	}
 	_ = resp2.Body.Close()
 	if !isLoggedInRedirect(resp2) {
-		return "", fmt.Errorf("airflow 2: the local admin login was refused (status %d)", resp2.StatusCode)
+		return "", fmt.Errorf("Airflow 2: the local admin login was refused (status %d)", resp2.StatusCode)
 	}
 
 	// Step 3: Extract the session cookie from the jar, which keys cookies by
@@ -461,7 +461,7 @@ func fetchAirflowAuth(backendPort string) (string, error) {
 			return "Cookie " + airflowSessionCookie + "=" + c.Value, nil
 		}
 	}
-	return "", fmt.Errorf("airflow 2: no session cookie after login")
+	return "", fmt.Errorf("Airflow 2: no session cookie after login")
 }
 
 // isLoggedInRedirect reports whether FAB's answer to a login POST is a

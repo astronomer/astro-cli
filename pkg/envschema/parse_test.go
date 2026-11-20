@@ -547,7 +547,7 @@ func TestSecretUnderConnectionsIsRefusedEitherWay(t *testing.T) {
 		value any
 		want  string
 	}{
-		{"true adds nothing", true, "adds nothing"},
+		{"true has no effect", true, "has no effect"},
 		{"false contradicts what a connection is", false, "cannot be declared not secret"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

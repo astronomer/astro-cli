@@ -84,7 +84,7 @@ var ErrNoRuntimeForAirflow = errors.New("no Astro Runtime carries this Airflow v
 func LocalRuntimeImageWith(ctx context.Context, airflowVersion, runtime, requiresPython string, o runtimeversions.Options) (string, error) {
 	v := strings.TrimSpace(airflowVersion)
 	if v == "" {
-		return "", errors.New("no Airflow version was given; one is needed to pick a runtime image")
+		return "", errors.New("no Airflow version given; one is needed to pick a runtime image")
 	}
 	runtime = strings.TrimSpace(runtime)
 	switch major, _, _ := strings.Cut(v, "."); major {
@@ -129,7 +129,7 @@ func airflow2Image(pin, runtime string, load func() (*runtimeversions.Catalog, e
 			// The build is the manifest's [tool.astro] runtime, or one a
 			// platform lists for the pin, so the fix names both ways to a
 			// newer one rather than a line the project may not have.
-			return "", fmt.Errorf("an image needs Airflow 2.%d or later, and the base would be Astro Runtime %s, which carries an older Airflow 2: the metadata database is migrated with airflow db migrate, which does not exist before Airflow 2.%d. Build from Astro Runtime %d.0.0 or newer, naming it in pyproject.toml as [tool.astro] runtime, or on a platform that lists one",
+			return "", fmt.Errorf("an image needs Airflow 2.%d or later, and the base would be Astro Runtime %s, which carries an older Airflow 2 (airflow db migrate does not exist before Airflow 2.%d). Build from Astro Runtime %d.0.0 or newer: set [tool.astro] runtime in pyproject.toml, or use a platform that lists one",
 				minAirflow2Minor, runtime, minAirflow2Minor, minAirflow2Runtime)
 		}
 		return airflow2ImageRepo + ":" + runtime, nil
@@ -162,7 +162,7 @@ func checkAirflow2Floor(version string) error {
 	if err != nil || minor >= minAirflow2Minor {
 		return nil
 	}
-	return fmt.Errorf("an image needs Airflow 2.%d or later, and this project pins %s: the metadata database is migrated with airflow db migrate, which does not exist before Airflow 2.%d%s",
+	return fmt.Errorf("an image needs Airflow 2.%d or later, and this project pins %s (airflow db migrate does not exist before Airflow 2.%d)%s",
 		minAirflow2Minor, version, minAirflow2Minor, seriesHint(version))
 }
 
@@ -242,7 +242,7 @@ func RuntimeImageForPython(airflowVersion, runtime, requiresPython string, catal
 				c = catalog()
 			}
 			if c == nil {
-				return nil, fmt.Errorf("the Astro Runtime catalog could not be read, and Airflow 2 images are tagged by runtime version, so there is no base to build Airflow %s from. Try again when the catalog can be reached, or name the build in pyproject.toml's [tool.astro] runtime (runtime = '12.6.0', say)", v)
+				return nil, fmt.Errorf("the Astro Runtime catalog could not be read, and Airflow 2 images are tagged by runtime version, so there is no base for Airflow %s. Try again when the catalog is reachable, or name the build in pyproject.toml's [tool.astro] runtime (runtime = '12.6.0', say)", v)
 			}
 			return c, nil
 		})

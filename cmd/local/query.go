@@ -80,12 +80,12 @@ func (t *deploymentTarget) register(cmd *cobra.Command) {
 	addDeploymentFlags(cmd, &t.f)
 }
 
-func (t *deploymentTarget) which() string { return "whichever deployment this project resolves to" }
+func (t *deploymentTarget) which() string { return "whichever Deployment this project resolves to" }
 
 func (t *deploymentTarget) note() string {
-	return "Which deployment depends on -d/--deployment, then " + instances.EnvVar + ", then astro use, then the " +
-		"manifest's default link. --url reaches an Airflow no project declares. For the Airflow running on this " +
-		"machine, spell it " + t.localForm() + "."
+	return "The Deployment is chosen from -d/--deployment, then " + instances.EnvVar + ", then astro use, then the " +
+		"manifest's default link. --url reaches an Airflow that no project declares. For the Airflow running on this " +
+		"machine, use " + t.localForm() + "."
 }
 
 // suggest carries the selector forward. A run told which Airflow to act on
@@ -154,8 +154,8 @@ func (machineTarget) register(*cobra.Command) {}
 func (machineTarget) which() string { return "the Airflow running on this machine" }
 
 func (machineTarget) note() string {
-	return "This acts on the Airflow astro local start runs for this project, and only that one — there is no " +
-		"flag to point it elsewhere. Drop local from the command to act on a deployment instead."
+	return "This acts only on the Airflow that astro local start runs for this project. There is no " +
+		"flag to point it elsewhere. Drop local from the command to act on a Deployment instead."
 }
 
 func (machineTarget) suggest(command string) string { return "astro local " + afName + " " + command }

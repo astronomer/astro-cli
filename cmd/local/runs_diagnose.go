@@ -16,9 +16,9 @@ func newRunsDiagnoseCmd(q *query) *cobra.Command {
 		Use:   "diagnose <DAG_ID> <RUN_ID>",
 		Short: "Show a run, every task instance in it, and which of them failed",
 		Long: "Read one run and every task instance in it, count the instances by state, and pick out the ones " +
-			"that failed or never ran because something upstream failed — the first thing to read when a run " +
-			"did not succeed.\n\nThe run is the part the command cannot do without, so a run Airflow does not " +
-			"know fails the command. A task listing that fails is reported in its place, beside the run.",
+			"that failed or never ran because something upstream failed. Start here when a run " +
+			"did not succeed.\n\nThe command fails if Airflow does not know the run. If the task listing " +
+			"fails, the error is reported in its place beside the run.",
 		Args: cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"Find out why a run did not succeed", "runs diagnose <DAG_ID> <RUN_ID>",

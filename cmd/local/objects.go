@@ -58,9 +58,8 @@ func newConnectionsCmd(d Deps, t target) *cobra.Command {
 		Use:   "connections",
 		Short: "List and read the connections on an Airflow",
 		Long: "Read the connections on " + t.which() + ": which systems it can reach, " +
-			"and how.\n\nNo password is ever shown. The client this runs on does not decode the field at all, " +
-			"so a password cannot reach a table, a log, or a json stream by accident — not with --output json, " +
-			"not with get. Read one with " + rawAPIForm(t) + " if you genuinely need it.",
+			"and how.\n\nPasswords are never shown, including with --output json and with get. The client does not " +
+			"decode the password field. To read one, use " + rawAPIForm(t) + ".",
 	},
 		newConnectionsListCmd,
 		newConnectionsGetCmd,
@@ -189,9 +188,8 @@ func newVariablesCmd(d Deps, t target) *cobra.Command {
 		Use:   "variables",
 		Short: "List and read the Airflow Variables on an Airflow",
 		Long: "Read the Airflow Variables on " + t.which() + ".\n\n" +
-			"The list command shows keys and descriptions but no values: a Variable holds whatever someone put in it, " +
-			"and printing every value to answer \"what variables are there\" is how a secret ends up in a " +
-			"terminal scrollback. Read one deliberately with variables get <KEY>.",
+			"The list command shows keys and descriptions but no values, because a Variable can hold a secret. " +
+			"Read one value with variables get <KEY>.",
 	},
 		newVariablesListCmd,
 		newVariablesGetCmd,
@@ -259,7 +257,7 @@ func newVariablesGetCmd(q *query) *cobra.Command {
 		Use:   "get <KEY>",
 		Short: "Show one Variable and its value",
 		Long: "Print one Variable's value. Airflow masks the values of Variables whose keys look sensitive, and " +
-			"what comes back is whatever it sent.",
+			"the output shows what Airflow returns.",
 		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Print one Variable's value", "variables get <KEY>",

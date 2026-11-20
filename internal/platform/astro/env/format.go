@@ -559,7 +559,7 @@ func WriteInventory(items []InventoryItem, r output.Emitter) error {
 // before paying for the objects; WriteInventory has no dotenv to reach, since
 // only WriteVarDotenv writes one.
 var ErrInventoryHasNoValues = errors.New(
-	"-o dotenv writes values, which a cross-kind listing has none of; " +
+	"-o dotenv needs values, and a cross-kind listing has none; " +
 		"use it on a single kind, e.g. astro env variable export")
 
 func writeInventoryTable(items []InventoryItem, out io.Writer) error {

@@ -82,7 +82,7 @@ var CheckHealth = func(ctx context.Context, port string, timeout time.Duration, 
 			if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				return ctx.Err()
 			}
-			return fmt.Errorf("%w after %s — Airflow may still be starting", ErrHealthTimeout, timeout)
+			return fmt.Errorf("%w after %s; Airflow may still be starting", ErrHealthTimeout, timeout)
 		case <-ticker.C:
 			if healthy(ctx, client, baseURL, healthPaths, &last) {
 				return nil

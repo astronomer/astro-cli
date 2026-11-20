@@ -146,7 +146,7 @@ func bundleTableConfig() *output.TableConfig {
 	return output.BuildTableConfig(
 		columns,
 		func(d any) []BundleInfo { return d.(*BundleList).Bundles },
-		output.WithNoResultsMsg("No bundles found on this deployment"),
+		output.WithNoResultsMsg("No bundles found on this Deployment"),
 	)
 }
 
@@ -279,7 +279,7 @@ func emitBundleResult(r output.Emitter, errOut io.Writer, result *BundleResult, 
 		case result.NonDagMountPath != nil:
 			bundle = *result.NonDagMountPath
 		}
-		if _, err := fmt.Fprintf(w, "%s bundle %s on deployment %s\n", verb, bundle, result.DeploymentID); err != nil {
+		if _, err := fmt.Fprintf(w, "%s bundle %s on Deployment %s\n", verb, bundle, result.DeploymentID); err != nil {
 			return err
 		}
 		// Warnings go to the command's error writer, not the result's text:
@@ -463,7 +463,7 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 	removal := BundleRemoval{ID: bundleID, Name: bundleName, NonDagMountPath: bundleMountPath, DeploymentID: dep.Id}
 
 	if !force {
-		if err := input.ConfirmOrAbort(fmt.Sprintf("Are you sure you want to delete bundle %s from deployment %s?", bundleID, dep.Id), input.AnsweredBy("--yes")); err != nil {
+		if err := input.ConfirmOrAbort(fmt.Sprintf("Delete bundle %s from Deployment %s?", bundleID, dep.Id), input.AnsweredBy("--yes")); err != nil {
 			return err
 		}
 	}
@@ -479,7 +479,7 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 
 	removal.Action = bundleDeletionRequested
 	return r.Emit(removal, func(w io.Writer) error {
-		_, err := fmt.Fprintf(w, "Requested deletion of bundle %s from deployment %s\n", bundleID, dep.Id)
+		_, err := fmt.Fprintf(w, "Requested deletion of bundle %s from Deployment %s\n", bundleID, dep.Id)
 		return err
 	})
 }

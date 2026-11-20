@@ -40,7 +40,7 @@ func (s *Suite) TestWorkspaceUserRemove() {
 
 	expected := ` NAME                          WORKSPACE ID                                      USER_ID                                           
  airflow                       ck05r3bor07h40d02y2hw4n4v                         ckc0eir8e01gj07608ajmvia1                         
-Successfully removed user from workspace
+Removed user from Workspace
 `
 
 	buf := new(bytes.Buffer)
@@ -89,7 +89,7 @@ func (s *Suite) TestWorkspaceUserAdd() {
 	workspaceUserWsRole = "invalid-role"
 	err = workspaceUserAdd(buf)
 	s.Error(err)
-	s.Contains(err.Error(), "failed to find a valid role")
+	s.Contains(err.Error(), "could not find a valid role")
 
 	houstonMock.AssertExpectations(s.T())
 }
@@ -127,7 +127,7 @@ func (s *Suite) TestWorkspaceUserUpdate() {
 	workspaceUserWsRole = "invalid-role"
 	err = workspaceUserUpdate(buf, []string{mockEmail})
 	s.Error(err)
-	s.Contains(err.Error(), "failed to find a valid role")
+	s.Contains(err.Error(), "could not find a valid role")
 
 	houstonMock.AssertExpectations(s.T())
 }

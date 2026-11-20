@@ -265,7 +265,7 @@ func (s *Suite) TestAddOrgTokenToWorkspace() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil)
 		_, err := AddOrgTokenToWorkspace(selectedTokenID, "", role, workspace, s.noPicking(), mockClient)
-		s.ErrorContains(err, "the token selected is not of the type you are trying to modify")
+		s.ErrorContains(err, "the selected token is not the right type for this command")
 	})
 
 	s.Run("return error for failed to get organization token", func() {
@@ -515,7 +515,7 @@ func (s *Suite) TestUpdateToken() {
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOK, nil)
 		_, err := UpdateToken("token1", "", "renamed", "", "ORGANIZATION_MEMBER", s.noPicking(), mockClient)
 		s.Equal(errOrgTokenRoleSet, err)
-		s.Equal("this Organization API token already has that role on the Organization", err.Error())
+		s.Equal("this Organization API token already has that role", err.Error())
 	})
 
 	s.Run("applying an organization role reports it", func() {
@@ -546,7 +546,7 @@ func (s *Suite) TestUpdateToken() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil)
 		_, err := UpdateToken("token1", "", "", "", "", s.noPicking(), mockClient)
-		s.ErrorContains(err, "the token selected is not of the type you are trying to modify")
+		s.ErrorContains(err, "the selected token is not the right type for this command")
 	})
 }
 

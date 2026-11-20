@@ -285,7 +285,7 @@ func TestPromptPinsAndIsNeverAskedTwice(t *testing.T) {
 	if sel.Instance.Name != "prod" {
 		t.Fatalf("resolved to %s, want the answer", sel.Instance.Name)
 	}
-	if !strings.Contains(errOut.String(), "picked prod — this project uses it from now on") {
+	if !strings.Contains(errOut.String(), "picked prod; this project uses it from now on") {
 		t.Errorf("the pick was not announced: %q", errOut)
 	}
 	state, err := userstate.Load(dir)
@@ -412,7 +412,7 @@ func TestPromptIsTheSharedPickerAndReadsExactly(t *testing.T) {
 		t.Fatalf("err = %v, want the AmbiguousError after three tries", err)
 	}
 	lines := strings.Split(errOut.String(), "\n")
-	if len(lines) < 4 || lines[0] != "Which deployment should this project use?" ||
+	if len(lines) < 4 || lines[0] != "Which Deployment should this project use?" ||
 		strings.Join(strings.Fields(lines[1]), " ") != "# NAME" ||
 		strings.Join(strings.Fields(lines[2]), " ") != "1 dev" ||
 		strings.Join(strings.Fields(lines[3]), " ") != "2 prod" {

@@ -36,7 +36,7 @@ const (
 	// configUnwritableMsg is the refusal a write gets against a file this
 	// process could not read. viper's parse errors carry a line number and no
 	// filename, so both of these say which file.
-	configUnwritableMsg = "refusing to write %s: it could not be read at startup, and writing now would replace it with defaults — fix or remove the file"
+	configUnwritableMsg = "refusing to write %s: it could not be read at startup and writing now would replace it with defaults; fix or remove the file"
 )
 
 var (
@@ -332,7 +332,7 @@ func lockConfig(file string) (unlock func(), err error) {
 		return nil, fmt.Errorf("acquiring config lock %s: %w", lockFile, err)
 	}
 	if !locked {
-		return nil, fmt.Errorf("timed out after %s waiting for config lock %s — another astro process is holding it; wait for it to finish or kill it", lockTimeout, lockFile)
+		return nil, fmt.Errorf("timed out after %s waiting for config lock %s; another astro process is holding it", lockTimeout, lockFile)
 	}
 	return func() { _ = lock.Unlock() }, nil //nolint:errcheck // error deliberately ignored in this shell code
 }

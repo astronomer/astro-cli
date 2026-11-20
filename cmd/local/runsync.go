@@ -106,15 +106,15 @@ func (s *syncer) run(ctx context.Context, p localrt.Plan) error {
 	rep := &syncReporter{out: stderr}
 	switch venvStateOf(p.ProjectPath) {
 	case venvNone:
-		fmt.Fprintln(stderr, "Building this project's environment (the first run can take a few minutes)...")
+		fmt.Fprintln(stderr, "Building this project's environment (the first run can take a few minutes)…")
 		rep.show = true
 	case venvUnmarked:
 		// EnsureSynced wipes a venv astro did not mark complete, as a start
 		// does. Say so rather than do it quietly.
-		fmt.Fprintln(stderr, "Rebuilding this project's environment (it was not built by astro)...")
+		fmt.Fprintln(stderr, "Rebuilding this project's environment (it was not built by astro)…")
 		rep.show = true
 	case venvComplete:
-		rep.note = "Updating this project's environment..."
+		rep.note = "Updating this project's environment…"
 		stop := s.after(syncQuietFor, rep.slow)
 		defer stop()
 	}
@@ -137,7 +137,7 @@ func (s *syncer) run(ctx context.Context, p localrt.Plan) error {
 			return nil
 		}
 		if !waited {
-			fmt.Fprintln(stderr, "Waiting for another astro command to finish preparing this project's environment...")
+			fmt.Fprintln(stderr, "Waiting for another astro command to finish preparing this project's environment…")
 			waited = true
 		}
 		if time.Now().After(deadline) {

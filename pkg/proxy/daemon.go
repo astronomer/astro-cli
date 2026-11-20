@@ -267,7 +267,7 @@ func (d *Daemon) EnsureRunning(port string) (string, error) {
 	// starting at once both see "not running" and each spawn a daemon.
 	lockFile, err := d.Store.AcquireLock()
 	if err != nil {
-		return "", fmt.Errorf("error acquiring routes lock: %w", err)
+		return "", fmt.Errorf("acquiring routes lock: %w", err)
 	}
 	defer ReleaseLock(lockFile)
 
@@ -337,7 +337,7 @@ var startDaemon = func(d *Daemon, port string) (string, error) {
 		return "", errors.New("no executable to run the proxy daemon with")
 	}
 	if err := os.MkdirAll(d.Store.Dir(), DirPermRWX); err != nil {
-		return "", fmt.Errorf("error creating proxy directory: %w", err)
+		return "", fmt.Errorf("creating proxy directory: %w", err)
 	}
 
 	// Drop any port file from a previous daemon so the wait below can't
@@ -346,7 +346,7 @@ var startDaemon = func(d *Daemon, port string) (string, error) {
 
 	logFile, err := os.OpenFile(d.LogPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, FilePermRW)
 	if err != nil {
-		return "", fmt.Errorf("error opening proxy log file: %w", err)
+		return "", fmt.Errorf("opening proxy log file: %w", err)
 	}
 	defer logFile.Close()
 
@@ -360,7 +360,7 @@ var startDaemon = func(d *Daemon, port string) (string, error) {
 		return c
 	})
 	if err != nil {
-		return "", fmt.Errorf("error starting proxy daemon: %w", err)
+		return "", fmt.Errorf("starting proxy daemon: %w", err)
 	}
 	pid := cmd.Process.Pid
 
@@ -376,7 +376,7 @@ var startDaemon = func(d *Daemon, port string) (string, error) {
 			forgetStop(pid)
 		}
 		reapWhenItExits(cmd)
-		return "", fmt.Errorf("error writing proxy PID file: %w", err)
+		return "", fmt.Errorf("writing proxy PID file: %w", err)
 	}
 
 	reapWhenItExits(cmd)
@@ -434,13 +434,13 @@ func (d *Daemon) Serve(port string) error {
 	stop, release, err := stopRequests()
 	if err != nil {
 		p.Stop()
-		return fmt.Errorf("error listening for a stop request: %w", err)
+		return fmt.Errorf("listening for a stop request: %w", err)
 	}
 	defer release()
 
 	if err := os.WriteFile(d.portPath(), []byte(p.Port()), FilePermRW); err != nil {
 		p.Stop()
-		return fmt.Errorf("error writing proxy port file: %w", err)
+		return fmt.Errorf("writing proxy port file: %w", err)
 	}
 
 	d.logf("proxy serving on port %s", p.Port())

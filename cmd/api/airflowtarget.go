@@ -126,14 +126,14 @@ func (o *AirflowOptions) hasTarget() bool {
 // errNoTarget names the ways to pick an Airflow, with the links this project
 // declares when there is a project to read them from.
 func errNoTarget(endpoint string) error {
-	deployments := "a deployment this project links, or an Astro Deployment id or name"
+	deployments := "a Deployment this project links, or an Astro Deployment ID or name"
 	if links := projectLinkNames(); len(links) > 0 {
-		deployments = fmt.Sprintf("a deployment this project links (%s), or an Astro Deployment id or name", strings.Join(links, ", "))
+		deployments = fmt.Sprintf("a Deployment this project links (%s), or an Astro Deployment ID or name", strings.Join(links, ", "))
 	}
 	if !strings.HasPrefix(endpoint, "/") {
 		endpoint = "<endpoint>"
 	}
-	return fmt.Errorf("no Airflow to send this request to. Pass one of:\n"+
+	return fmt.Errorf("no Airflow to send this request to; pass one of:\n"+
 		"  -d <link>              %s\n"+
 		"  --url <airflow url>    any other Airflow\n"+
 		"or, for this project's local Airflow, run: astro local api %s", deployments, endpoint)
@@ -383,7 +383,7 @@ func (o *AirflowOptions) httpTarget(name, hostRoot, authorization string) (*airf
 // project), else the context's, through instancelocate.NamedDeployment.
 func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string, project *manifest.Astro) (baseURL, authToken, id string, err error) {
 	if !astrocontext.IsCloudContext() {
-		return "", "", "", fmt.Errorf("no deployment link %q, and reaching a Deployment by id or name requires cloud context. Run 'astro login' to connect to Astro Cloud", ref)
+		return "", "", "", fmt.Errorf("no Deployment link %q, and reaching a Deployment by ID or name needs an Astro context; run astro login", ref)
 	}
 
 	ctx, err := astrocontext.GetCurrentContext()
@@ -391,7 +391,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string, project *mani
 		return "", "", "", fmt.Errorf("getting current context: %w", err)
 	}
 	if ctx.Token == "" {
-		return "", "", "", errors.New("not authenticated. Run 'astro login' to authenticate")
+		return "", "", "", errors.New("not logged in; run astro login")
 	}
 
 	orgID := opts.OrganizationID
@@ -399,7 +399,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string, project *mani
 		orgID = ctx.Organization
 	}
 	if orgID == "" {
-		return "", "", "", errors.New("organization ID not set. Use --organization-id or run 'astro organization switch'")
+		return "", "", "", errors.New("Organization ID not set; use --organization-id or run astro organization switch")
 	}
 
 	dep, err := lookupDeployment(opts.OrganizationID, orgID, ref, project, &ctx, astrov1.NewV1Client(httputil.NewHTTPClient()))
@@ -407,7 +407,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string, project *mani
 		return "", "", "", err
 	}
 	if dep.WebServerAirflowApiUrl == "" {
-		return "", "", "", fmt.Errorf("deployment %s does not have an Airflow API URL configured", ref)
+		return "", "", "", fmt.Errorf("Deployment %s has no Airflow API URL configured", ref)
 	}
 
 	airflowURL := dep.WebServerAirflowApiUrl

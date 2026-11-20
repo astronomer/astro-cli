@@ -25,7 +25,7 @@ const clientDockerfile = "Dockerfile.client"
 
 // errClientBuild is a client image build that ran and failed; the build's
 // output is printed above it.
-var errClientBuild = errors.New("an error was encountered while building the image, see the build logs for details")
+var errClientBuild = errors.New("could not build the image; see the build logs for details")
 
 // clientBuildRequest is the build of the client image: Dockerfile.client run
 // against contextDir, the copy of the project prepareClientBuildContext made,
@@ -91,7 +91,7 @@ func buildClientImage(projectDir, contextDir, tag string, platforms, secrets []s
 	_, err = imagebuild.New(engine.Cmd, buildNow).Build(context.Background(), req, localrt.Callbacks{})
 	switch {
 	case err == nil:
-		spinner.StopWithCheckmark(s, "Project image has been updated")
+		spinner.StopWithCheckmark(s, "Updated project image")
 		return nil
 	case errors.Is(err, imagebuild.ErrDockerfileBuild):
 		logger.Debugf("client image build: %v", err)
@@ -108,18 +108,17 @@ func buildClientImage(projectDir, contextDir, tag string, platforms, secrets []s
 // its place in the project, rather than by its copy in the temporary context
 // that pkg/imagebuild's error names. Any other error is returned as it is.
 func clientDockerfileError(err error, projectDir, dockerfile string) error {
-	const builtFrom = "which the client image is built from"
 	if errors.Is(err, imagebuild.ErrDockerfileNotAFile) {
-		return fmt.Errorf("the %s in the project at %s, %s, is not a file", clientDockerfile, projectDir, builtFrom)
+		return fmt.Errorf("the %s in the project at %s is not a file", clientDockerfile, projectDir)
 	}
 	var pe *fs.PathError
 	if !errors.As(err, &pe) || pe.Path != dockerfile {
 		return err
 	}
 	if errors.Is(pe.Err, fs.ErrNotExist) {
-		return fmt.Errorf("the project at %s has no %s, %s", projectDir, clientDockerfile, builtFrom)
+		return fmt.Errorf("the project at %s has no %s", projectDir, clientDockerfile)
 	}
-	return fmt.Errorf("the %s in the project at %s, %s, could not be read: %w", clientDockerfile, projectDir, builtFrom, pe.Err)
+	return fmt.Errorf("the %s in the project at %s could not be read: %w", clientDockerfile, projectDir, pe.Err)
 }
 
 // clientImageEngine is the engine a client deploy builds, logs in and pushes

@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	errUserNotInWorkspace = errors.New("the user you are trying to change is not part of this workspace")
+	errUserNotInWorkspace = errors.New("the user is not part of this Workspace")
 
 	// monkey patched to write unit tests
 	promptPaginatedOption = utils.PromptPaginatedOption

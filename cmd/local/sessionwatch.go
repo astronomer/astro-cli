@@ -33,7 +33,7 @@ func newSessionWatchCmd(d Deps) *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&parentPID, "parent-pid", 0, "PID to watch; the project is stopped when it exits")
-	cmd.Flags().StringVar(&project, "project", "", "project path whose containers to stop")
+	cmd.Flags().StringVar(&project, "project", "", "Project path whose containers to stop")
 	markSkipPreRun(cmd)
 	return cmd
 }

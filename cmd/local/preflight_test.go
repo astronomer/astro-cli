@@ -94,7 +94,7 @@ func TestSweepDropsVenvsNothingHasUsed(t *testing.T) {
 	if !venvExists(t, fresh) {
 		t.Error("a venv used within the window must be kept")
 	}
-	if len(said) != 1 || !strings.Contains(said[0], "removed 1 check environment(s) unused for 14 days or more") {
+	if len(said) != 1 || !strings.Contains(said[0], "removed 1 check environment unused for 14 days or more") {
 		t.Errorf("a sweep that removed something should say so once: %q", said)
 	}
 }
@@ -321,7 +321,7 @@ func TestCheckSweepsTheVenvCacheWhenTheRunIsDone(t *testing.T) {
 	if venvExists(t, stale) {
 		t.Error("a finished check should have collected the environment nothing has used")
 	}
-	if !strings.Contains(out.String(), "check environment(s) unused") {
+	if !strings.Contains(out.String(), "unused for") {
 		t.Errorf("the removal should be reported to the person running it:\n%s", out.String())
 	}
 }
@@ -344,7 +344,7 @@ func TestCheckTargetSweepsTheVenvCacheWhenTheRunIsDone(t *testing.T) {
 	if venvExists(t, stale) {
 		t.Error("a finished target check should have collected the unused environment")
 	}
-	if !strings.Contains(out.String(), "check environment(s) unused") {
+	if !strings.Contains(out.String(), "unused for") {
 		t.Errorf("the removal should be reported:\n%s", out.String())
 	}
 }

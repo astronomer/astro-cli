@@ -583,18 +583,18 @@ func (p *provider) Diagnose(key string) string {
 			return fmt.Sprintf("the encrypted vault's directory cannot be used: %v", err)
 		case errors.Is(err, secrets.ErrWrongMasterKey):
 			return "the encrypted vault holds it but it was encrypted under a different master key than this " +
-				"machine's, so it cannot be decrypted here — set it again to replace it"
+				"machine's, so it cannot be decrypted here; set it again to replace it"
 		case errors.Is(err, secrets.ErrTampered):
-			return "the encrypted vault holds it but it failed the vault's integrity check, so it was not used — " +
+			return "the encrypted vault holds it but it failed the vault's integrity check, so it was not used; " +
 				"set it again to replace it"
 		case errors.Is(err, secrets.ErrVaultOrphaned):
 			return "the encrypted vault holds it but the master key that decrypts it is gone, so it cannot be " +
-				"recovered — a keychain reset or a new login keychain does this"
+				"recovered; a keychain reset or a new login keychain causes this"
 		case errors.Is(err, secrets.ErrMasterKeyUnusable):
 			return "the encrypted vault holds it but this machine's stored master key is not usable, so it cannot " +
 				"be decrypted"
 		case errors.Is(err, secrets.ErrKeyringUnavailable):
-			return "the encrypted vault holds it but this machine's keyring is unreachable, so it cannot be decrypted — " +
+			return "the encrypted vault holds it but this machine's keyring is unreachable, so it cannot be decrypted; " +
 				"unlock your keychain, or supply the value in the environment instead"
 		}
 		return fmt.Sprintf("the encrypted vault holds it but it could not be read: %v", err)

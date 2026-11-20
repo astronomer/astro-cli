@@ -1027,10 +1027,10 @@ func (p *parser) astro(raw map[string]any) Astro {
 	}
 	a.Deployments = p.links(raw["deployments"], &a)
 	if a.Domain != "" && a.Workspace == "" && !usesAstroLogin(a.Deployments) {
-		p.add(CodeDomainWithoutWorkspace, astroRoot+".domain", "names the Astro host for a workspace or an astro-auth deployment link, and the project has neither")
+		p.add(CodeDomainWithoutWorkspace, astroRoot+".domain", "names the Astro host for a Workspace or an astro-auth Deployment link, and the project has neither")
 	}
 	if a.Organization != "" && a.Workspace == "" {
-		p.add(CodeOrganizationWithoutWorkspace, astroRoot+".organization", "names the organization of the linked workspace, and the project links none")
+		p.add(CodeOrganizationWithoutWorkspace, astroRoot+".organization", "names the Organization of the linked Workspace, and the project links none")
 	}
 	return a
 }
@@ -1196,7 +1196,7 @@ func (p *parser) links(v any, a *Astro) map[string]Link {
 			p.add(CodeLinkNeedsName, key, "a link needs a name")
 			continue
 		case ReservedLinkName:
-			p.add(CodeLinkNameReserved, key+"."+name, "reserved: local always means the Airflow running on this machine — name the link something else")
+			p.add(CodeLinkNameReserved, key+"."+name, "reserved: local always means the Airflow running on this machine; name the link something else")
 			continue
 		}
 		linkKey := key + "." + name
@@ -1286,7 +1286,7 @@ func KindWithArticle(kind LinkKind) string {
 // badTarget says where the target came from, because the fix differs: the
 // link's own key, or the [tool.astro] default it inherited.
 func (p *parser) badTarget(key, target string, own bool) {
-	const supported = " — supported: astro, mwaa, composer, apc, in lower case"
+	const supported = "; supported: astro, mwaa, composer, apc, in lower case"
 	if own {
 		p.add(CodeTargetUnusable, key+".target", fmt.Sprintf("%q is not a target a link can use", target)+supported)
 		return
@@ -1308,13 +1308,13 @@ func (p *parser) coordinates(key string, kind LinkKind, link *Link) {
 	switch kind {
 	case KindEndpoint:
 		if link.Deployment != "" || link.Environment != "" {
-			p.add(CodeURLAndCoordinates, key, "sets both a url and coordinates: a link names either a url or deployment/environment coordinates, never both")
+			p.add(CodeURLAndCoordinates, key, "sets both a url and coordinates: a link takes either a url or Deployment/environment coordinates")
 			return
 		}
 		p.url(key+".url", link.URL)
 	case KindMWAA, KindComposer:
 		if link.Deployment != "" {
-			p.add(CodeDeploymentOnEnvironmentLink, key+".deployment", fmt.Sprintf("a %s link has no Astro deployment id: name the environment with environment = '<%s environment name>'", kind, kind))
+			p.add(CodeDeploymentOnEnvironmentLink, key+".deployment", fmt.Sprintf("a %s link has no Astro Deployment id: name the environment with environment = '<%s environment name>'", kind, kind))
 		}
 		if link.Environment == "" {
 			p.add(CodeEnvironmentRequired, key+".environment", fmt.Sprintf("required: the name of the %s environment", kind))
@@ -1324,7 +1324,7 @@ func (p *parser) coordinates(key string, kind LinkKind, link *Link) {
 			p.add(CodeEnvironmentOnAstroLink, key+".environment", "only an mwaa or composer link sets environment; this is an astro link")
 		}
 		if link.Deployment == "" {
-			p.add(CodeDeploymentRequired, key+".deployment", "required on an astro link: the Deployment id — or set target = 'mwaa' or target = 'composer' with an environment, or a url")
+			p.add(CodeDeploymentRequired, key+".deployment", "required on an astro link: the Deployment id, or set target = 'mwaa' or target = 'composer' with an environment, or a url")
 		}
 	case KindAPC:
 		// Checked by apcCoordinates, above.
@@ -1335,7 +1335,7 @@ func (p *parser) coordinates(key string, kind LinkKind, link *Link) {
 // environment nor a url: its Airflow is that Deployment's.
 func (p *parser) apcCoordinates(key string, link *Link) {
 	if link.URL != "" {
-		p.add(CodeURLOnAPCLink, key+".url", "an apc link names a Deployment, not a url: its Airflow is the Deployment's. For an Airflow no platform can look up, drop target for a plain url link")
+		p.add(CodeURLOnAPCLink, key+".url", "an apc link names a Deployment and takes no url. For an Airflow no platform can look up, drop target for a plain url link")
 	}
 	if link.Environment != "" {
 		p.add(CodeEnvironmentOnAPCLink, key+".environment", "only an mwaa or composer link sets environment; this is an apc link")
@@ -1373,18 +1373,18 @@ func (p *parser) workspace(key string, kind LinkKind, raw any, fallback string) 
 	case KindAstro:
 	case KindAPC:
 		if own == "" {
-			p.add(CodeWorkspaceRequired, key+".workspace", "required on an apc link: the Astro Private Cloud workspace id. [tool.astro] workspace names an Astro workspace, so an apc link never inherits it")
+			p.add(CodeWorkspaceRequired, key+".workspace", "required on an apc link: the Astro Private Cloud Workspace id. An apc link does not inherit [tool.astro] workspace, which names an Astro Workspace")
 		}
 		return own
 	case KindMWAA, KindComposer, KindEndpoint:
 		if own != "" {
-			p.add(CodeWorkspaceOnNonAstroLink, key+".workspace", fmt.Sprintf("only an astro or apc link has a workspace; this is %s link", KindWithArticle(kind)))
+			p.add(CodeWorkspaceOnNonAstroLink, key+".workspace", fmt.Sprintf("only an astro or apc link has a Workspace; this is %s link", KindWithArticle(kind)))
 		}
 		return ""
 	}
 	ws := firstNonEmpty(own, fallback)
 	if ws == "" {
-		p.add(CodeWorkspaceRequired, key+".workspace", "no workspace: set workspace on the link or a default with [tool.astro] workspace")
+		p.add(CodeWorkspaceRequired, key+".workspace", "no Workspace: set workspace on the link or a default with [tool.astro] workspace")
 	}
 	return ws
 }
@@ -1637,19 +1637,19 @@ func (p *parser) validate(m *Manifest) {
 		// on Windows too, so nothing is lost.
 		switch {
 		case strings.Contains(v, "\\"):
-			p.add(CodeDockerfileSeparators, astroRoot+".dockerfile", fmt.Sprintf("%q has to use forward slashes, which work on every platform", v))
+			p.add(CodeDockerfileSeparators, astroRoot+".dockerfile", fmt.Sprintf("%q must use forward slashes", v))
 		case !filepath.IsLocal(v):
 			// Lexical, and it says yes to "." — a consumer that joins this to
 			// the project directory has to check it is a file, not just that
 			// something is there. See pkg/localrt.
-			p.add(CodeDockerfileOutsideProject, astroRoot+".dockerfile", fmt.Sprintf("%q has to be a path inside the project", v))
+			p.add(CodeDockerfileOutsideProject, astroRoot+".dockerfile", fmt.Sprintf("%q must be a path inside the project", v))
 		}
 	}
 	if m.Astro.Dockerfile == "" {
 		for _, spec := range m.Astro.BuildSecrets {
 			if s, err := ParseBuildSecret(spec); err == nil && s.ID != "" && s.ID != RuntimeSecretID {
 				p.add(CodeBuildSecretsWithoutDockerfile, buildSecretsKey, fmt.Sprintf("names secret %q, which only a declared dockerfile can mount in a RUN step. "+
-					"A generated image installs your dependencies through the runtime image, which mounts only a secret with id %s", s.ID, RuntimeSecretID))
+					"A generated image mounts only a secret with id %s", s.ID, RuntimeSecretID))
 				break
 			}
 		}

@@ -36,7 +36,7 @@ type DescribeOptions struct {
 // runDescribe executes the describe command.
 func runDescribe(opts *DescribeOptions) error {
 	if opts.specCache == nil {
-		return fmt.Errorf("API specification not initialized. Ensure you are logged in and try again")
+		return fmt.Errorf("API specification not initialized; log in and try again")
 	}
 
 	if opts.Verbose && opts.Format != cliout.FormatJSON {

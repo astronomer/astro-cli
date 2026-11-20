@@ -33,12 +33,12 @@ import (
 )
 
 const (
-	cliChooseWorkspace     = "Please choose a workspace:"
-	cliSetWorkspaceExample = "\nNo default workspace detected, you can list workspaces with \n\tastro workspace list\nand set your default workspace with \n\tastro workspace switch [WORKSPACEID]\n\n"
+	cliChooseWorkspace     = "Choose a Workspace:"
+	cliSetWorkspaceExample = "\nNo default Workspace set. List Workspaces with\n\tastro workspace list\nand set the default with\n\tastro workspace switch [WORKSPACEID]\n\n"
 
-	configSetDefaultWorkspace = "\"%s\" Workspace found. This is your default Workspace.\n"
+	configSetDefaultWorkspace = "Default Workspace is %q\n"
 
-	registryAuthSuccessMsg = "Successfully authenticated to Astronomer"
+	registryAuthSuccessMsg = "Authenticated to Astronomer"
 
 	// AccessTokenRefreshMargin is how close to its expiry an access token is
 	// refreshed rather than used.
@@ -50,7 +50,7 @@ var (
 	openURL             = browser.OpenURL
 	refreshAccessToken  = astroauth.RefreshToken
 	exitOnInterrupt     = os.Exit
-	ErrorNoOrganization = errors.New("no organization found. Please contact your Astro Organization Owner to be invited to the organization")
+	ErrorNoOrganization = errors.New("no Organization found; ask an Astro Organization Owner to invite you")
 	errEmailNotFound    = errors.New("cannot retrieve email")
 
 	// ErrEmailVerificationPending reports a sign-up that worked but left the
@@ -178,7 +178,7 @@ func authorizeError(errorCode, errorDescription []string) error {
 	if slices.Contains(errorCode, "access_denied") && signupVerificationPattern.MatchString(strings.Join(errorDescription, " ")) {
 		return ErrEmailVerificationPending
 	}
-	return fmt.Errorf("Could not authorize your device. %s: %s", errorCode, errorDescription)
+	return fmt.Errorf("could not authorize your device: %s: %s", errorCode, errorDescription)
 }
 
 // authorizeCallbackHandlerTo is the login callback that waits for the
@@ -276,7 +276,7 @@ func authorizeCallback(errOut io.Writer) (string, error) {
 		}
 		return callbackMessage.authorizationCode, nil
 	case <-time.After(callbackTimeout):
-		return "", errors.New("the operation has timed out")
+		return "", errors.New("the login timed out")
 	}
 }
 
@@ -386,7 +386,7 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 		}
 		err = openURL(authorizeURL)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "\nUnable to open the URL, please visit the following link: "+authorizeURL)
+			fmt.Fprintln(os.Stderr, "\nCould not open the browser. Open this link: "+authorizeURL)
 			fmt.Fprintln(os.Stderr)
 		}
 		err = ansi.Spinner(spinnerMessage, func() error {
@@ -401,7 +401,7 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 			return Result{}, err
 		}
 	} else {
-		fmt.Fprintln(os.Stderr, "Please visit the following link on a device with a browser: "+authorizeURL)
+		fmt.Fprintln(os.Stderr, "Open this link on a device with a browser: "+authorizeURL)
 		authorizationCode, err := a.callbackHandler()
 		if err != nil {
 			return Result{}, err
@@ -424,7 +424,7 @@ func askToCreateOrganization(domain string, out io.Writer) (bool, error) {
 		// Nobody could answer. The answer is not a flag of this login: the
 		// account needs an organization, which it gets in the Astro UI or from
 		// an invitation.
-		return false, input.Required(errors.New("this login has no organization, and this run cannot ask whether to create one. Create or join an Organization in the Astro UI, or ask an Organization Owner to invite you, then log in again"))
+		return false, input.Required(errors.New("this account has no Organization and this run cannot ask to create one; create or join one in the Astro UI, or ask an Organization Owner to invite you, then run astro login again"))
 	}
 	if input.Unanswered(err) {
 		return false, err
@@ -438,11 +438,11 @@ func askToCreateOrganization(domain string, out io.Writer) (bool, error) {
 func noOrganizationPrompt(domain string, out io.Writer) string {
 	pr, _ := domainutil.GetPRSubDomain(domain)
 	if pr == "" {
-		return "No organization found. Create your own free organization now"
+		return "No Organization found. Create a free Organization now"
 	}
-	fmt.Fprintf(out, "This is a preview environment, and you have no organization in it. To use its existing data, run %s and sign in with the account it was set up with.\n",
+	fmt.Fprintf(out, "This is a preview environment and you have no Organization in it. To use its existing data, run %s and sign in with the account it was set up with.\n",
 		ansi.Cyan("astro login "+pr+" --force"))
-	return "Or create a temporary organization in " + pr + " now (it is removed with the environment)"
+	return "Or create a temporary Organization in " + pr + " now (removed with the environment)"
 }
 
 // bootstrapOrganization creates a brand-new account's first organization and
@@ -494,7 +494,7 @@ func bootstrapOrganization() error {
 	// answer 201, so accept every 2xx and reject the rest.
 	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
 		out, _ := io.ReadAll(res.Body) //nolint:errcheck // the status line already names the failure; the body is best-effort detail
-		return fmt.Errorf("creating your organization failed (HTTP %d): %s", res.StatusCode, string(out))
+		return fmt.Errorf("creating your Organization failed (HTTP %d): %s", res.StatusCode, string(out))
 	}
 	return nil
 }
@@ -594,7 +594,7 @@ func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 		if !create {
 			return err
 		}
-		fmt.Fprintln(out, "Creating your organization…")
+		fmt.Fprintln(out, "Creating your Organization…")
 		if bootstrapErr := bootstrapOrganization(); bootstrapErr != nil {
 			return bootstrapErr
 		}
@@ -723,7 +723,7 @@ func login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 		var refused *input.RequiredError
 		switch err := input.MayAsk("Log in to Astro"); {
 		case errors.As(err, &refused):
-			return fmt.Errorf("%w; %s — set ASTRO_API_TOKEN (astro login prints a link for a person to open, and waits for it)", ErrLoginNeeded, refused.Reason)
+			return fmt.Errorf("%w; %s; set ASTRO_API_TOKEN, or run astro login in a terminal", ErrLoginNeeded, refused.Reason)
 		case errors.Is(err, input.ErrInterrupted):
 			// An interrupted run starts no login: it is ending.
 			return err
@@ -731,7 +731,7 @@ func login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 	}
 
 	// Welcome User
-	fmt.Fprint(os.Stderr, "Welcome to the Astro CLI 🚀\n")
+	fmt.Fprint(os.Stderr, "Welcome to the Astro CLI\n")
 	fmt.Fprint(os.Stderr, "To learn more about Astro, go to https://www.astronomer.io/docs\n")
 
 	var res Result
@@ -741,7 +741,7 @@ func login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 			return err
 		}
 	} else {
-		fmt.Fprint(os.Stderr, "You are logging into Astro via an OAuth token\nThis token will expire in 1 hour and will not refresh\n")
+		fmt.Fprint(os.Stderr, "Logging in with an OAuth token. It expires in 1 hour and does not refresh.\n")
 		res = Result{
 			AccessToken: token,
 			ExpiresIn:   3600,
@@ -880,26 +880,25 @@ func Logout(domain string, out io.Writer) error {
 	domain = domainutil.FormatDomain(domain)
 	c, err := context.GetContext(domain)
 	if err != nil {
-		return fmt.Errorf("failed to find a login for %s: %w", given, err)
+		return fmt.Errorf("could not find a login for %s: %w", given, err)
 	}
 
 	if err := c.SignOut(); err != nil {
-		return fmt.Errorf("failed to clear the credentials for %s: %w", given, err)
+		return fmt.Errorf("could not clear the credentials for %s: %w", given, err)
 	}
 
 	// Logging out of another domain leaves the current one selected
 	if err := config.ResetCurrentContextFor(domain); err != nil {
-		return fmt.Errorf("failed to reset the current context: %w", err)
+		return fmt.Errorf("could not reset the current context: %w", err)
 	}
 
-	fmt.Fprintln(out, "Successfully logged out of Astronomer")
+	fmt.Fprintln(out, "Logged out of Astronomer")
 	return nil
 }
 
 func FetchDomainAuthConfig(domain string) (Config, error) {
 	if !context.IsCloudDomain(domain) {
-		return Config{}, errors.New("Error! Invalid domain. You are attempting to login into Astro. " +
-			"Are you trying to authenticate to APC? If so, please change your current context with 'astro context switch'")
+		return Config{}, errors.New("invalid domain for Astro login; to log in to APC, switch context with astro context switch")
 	}
 
 	addr := domainutil.GetURLToEndpoint("https", domain, astroauth.AuthConfigEndpoint)
@@ -921,7 +920,7 @@ func FetchDomainAuthConfig(domain string) (Config, error) {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return Config{}, errors.New("something went wrong! Try again or contact Astronomer Support")
+		return Config{}, errors.New("could not fetch the login configuration; try again or contact Astronomer Support")
 	}
 
 	var authConfig Config

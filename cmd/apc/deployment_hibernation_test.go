@@ -104,9 +104,9 @@ func TestDeploymentHibernationText(t *testing.T) {
 		left *houston.Deployment
 		want string
 	}{
-		{"hibernate until removed", []string{"hibernate", "dep-hb"}, withOverride(true, nil), "\nSuccessfully set deployment rel-hb to hibernate until you remove the override.\n"},
-		{"wake-up until a time", []string{"wake-up", "dep-hb", "--until", "2099-01-02T03:04:05Z"}, withOverride(false, &until), "\nSuccessfully woke up deployment rel-hb until 2099-01-02T03:04:05Z.\n"},
-		{"remove the override", []string{"hibernate", "dep-hb", "--remove-override"}, &hibernatingDep, "\nSuccessfully removed the hibernation override on deployment rel-hb. Its hibernation schedule, if it has one, resumes now.\n"},
+		{"hibernate until removed", []string{"hibernate", "dep-hb"}, withOverride(true, nil), "\nSet Deployment rel-hb to hibernate until you remove the override.\n"},
+		{"wake-up until a time", []string{"wake-up", "dep-hb", "--until", "2099-01-02T03:04:05Z"}, withOverride(false, &until), "\nWoke up Deployment rel-hb until 2099-01-02T03:04:05Z.\n"},
+		{"remove the override", []string{"hibernate", "dep-hb", "--remove-override"}, &hibernatingDep, "\nRemoved the hibernation override on Deployment rel-hb. Its hibernation schedule, if it has one, resumes now.\n"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			api := newHibernationClient(c.left)
@@ -124,7 +124,7 @@ func TestDeploymentHibernationText(t *testing.T) {
 
 		run := runAPC(t, api, "", "deployment", "hibernate", "dep-hb", "--yes")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-		assert.Equal(t, "\nSent the request to hibernate deployment rel-hb, but Houston returned no hibernation override for it, so the CLI cannot confirm that the override is set.\n", run.stdout)
+		assert.Equal(t, "\nSent the request to hibernate Deployment rel-hb, but Houston returned no hibernation override, so the CLI cannot confirm it is set.\n", run.stdout)
 		assert.NotContains(t, run.stdout, "removed")
 	})
 
@@ -133,7 +133,7 @@ func TestDeploymentHibernationText(t *testing.T) {
 
 		run := runAPC(t, api, "", "deployment", "wake-up", "dep-hb", "--remove-override", "--yes")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-		assert.Contains(t, run.stdout, "Successfully removed the hibernation override on deployment rel-hb")
+		assert.Contains(t, run.stdout, "Removed the hibernation override on Deployment rel-hb")
 	})
 }
 

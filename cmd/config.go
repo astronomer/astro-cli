@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	configSetSuccessMsg = "Setting %s to %s successfully\n"
+	configSetSuccessMsg = "Set %s to %s\n"
 	// The refusals of a get or set without --global. CLI settings are global, so --global
 	// is the only scope there is; it stays required because Astro CLI 1.x's
 	// `astro config set` without it wrote the project's .astro/config.yaml,
@@ -154,7 +154,7 @@ func newConfigGetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get <SETTING_NAME>",
 		Short:   "Get a CLI setting",
-		Long:    "List the value for a particular setting in your config.yaml file",
+		Long:    "Print the value of a CLI setting.",
 		Args:    cobra.ExactArgs(1),
 		Example: configGetExample,
 		RunE:    configGet,
@@ -166,7 +166,7 @@ func newConfigSetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "set <SETTING_NAME> <VALUE>",
 		Short:   "Set a CLI setting",
-		Long:    "Update or override a particular setting in your config.yaml file",
+		Long:    "Set the value of a CLI setting.",
 		Example: configSetExample,
 		// Cobra checks Args before the group's PersistentPreRunE, so a wrong
 		// count is refused here, as a usage error, before ensureGlobalFlag or

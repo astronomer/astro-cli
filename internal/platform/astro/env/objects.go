@@ -202,7 +202,7 @@ func (e *outOfScopeError) Is(target error) bool { return target == ErrOutOfScope
 func checkInScope(obj *astrov1.EnvironmentObject, id string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType) error {
 	want := nounForListType(objectType)
 	if obj.ObjectType == "" || obj.Scope == "" || obj.ScopeEntityId == "" {
-		return &outOfScopeError{msg: fmt.Sprintf("the platform did not say what kind of object %s is or which workspace or deployment owns it", id)}
+		return &outOfScopeError{msg: fmt.Sprintf("the platform did not say what kind of object %s is or which Workspace or Deployment owns it", id)}
 	}
 	if obj.ObjectType != astrov1.EnvironmentObjectObjectType(objectType) {
 		return &outOfScopeError{msg: fmt.Sprintf("%s is a %s, not a %s", id, nounForObjectType(obj.ObjectType), want)}
@@ -217,15 +217,15 @@ func checkInScope(obj *astrov1.EnvironmentObject, id string, scope Scope, object
 	owner := strings.ToLower(string(obj.Scope))
 	// The Workspace the run looked in says where it came from; the owner is
 	// the object's own, not a Workspace the run chose, so it does not.
-	wanted := strings.ToLower(string(wantScope)) + " " + wantEntity
+	wanted := capitalize(strings.ToLower(string(wantScope))) + " " + wantEntity
 	if wantScope == astrov1.EnvironmentObjectScopeWORKSPACE {
 		wanted = astrosession.DescribeWorkspace(wantEntity, scope.Source)
 	}
-	msg := fmt.Sprintf("%s %s belongs to %s %s, not %s. To address it, pass --%s %s",
-		want, id, owner, obj.ScopeEntityId, wanted, owner, obj.ScopeEntityId)
+	msg := fmt.Sprintf("%s %s belongs to %s %s, not %s; pass --%s %s to address it",
+		want, id, capitalize(owner), obj.ScopeEntityId, wanted, owner, obj.ScopeEntityId)
 	if obj.Scope == astrov1.EnvironmentObjectScopeWORKSPACE && scope.DeploymentID != "" && objectType != objectTypeMetrics {
-		msg = fmt.Sprintf("%s %s belongs to workspace %s, not deployment %s. To change it everywhere, pass --workspace %s. "+
-			"To remove it from just this deployment, use astro env %s link remove (or link set --exclude if it is auto-linked)",
+		msg = fmt.Sprintf("%s %s belongs to Workspace %s, not Deployment %s. To change it everywhere, pass --workspace %s. "+
+			"To remove it from this Deployment only, run astro env %s link remove (or link set --exclude if it is auto-linked)",
 			want, id, obj.ScopeEntityId, wantEntity, obj.ScopeEntityId, want)
 	}
 	return &outOfScopeError{msg: msg, obj: obj}
@@ -252,7 +252,7 @@ func scopeRequest(scope Scope) (scopeType astrov1.CreateEnvironmentObjectRequest
 // object to all deployments while creating it at deployment scope. Auto-link
 // is a workspace-scope concept; deployment-scope objects are already pinned
 // to a single deployment.
-var ErrAutoLinkRequiresWorkspace = errors.New("--auto-link applies only to workspace-scoped objects")
+var ErrAutoLinkRequiresWorkspace = errors.New("--auto-link applies only to Workspace-scoped objects")
 
 // validateAutoLink rejects auto-link=true on a deployment-scoped object. nil
 // (flag unset) and false are no-ops.
@@ -294,4 +294,12 @@ func normalizeListErr(httpResp *http.Response, body []byte) error {
 		return errors.New(SecretsFetchingNotAllowedErrMsg)
 	}
 	return astrov1.NormalizeAPIError(httpResp, body)
+}
+
+// capitalize upper-cases the first letter of a resource word for display.
+func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }

@@ -194,7 +194,7 @@ func TestDeploymentNameFlag(t *testing.T) {
 			run := runAPC(t, api, "", append([]string{"deployment", "adopt", "--cluster-id", "cl-1", "--namespace", "ns"}, args...)...)
 			assert.Equal(t, 2, run.code, "%v", args)
 			require.Error(t, run.err, "%v", args)
-			assert.Contains(t, run.err.Error(), "name the custom resource with --cr-name: --name is the adopted Deployment's name in v2", "%v", args)
+			assert.Contains(t, run.err.Error(), "use --cr-name to name the custom resource; --name names the Deployment", "%v", args)
 			assert.NotContains(t, run.err.Error(), "disagree", "%v", args)
 			api.AssertNotCalled(t, "AdoptDeployment", mock.Anything)
 		}

@@ -13,7 +13,7 @@ func (s *Suite) TestDeploymentUserAddCommand() {
 	expectedOut := ` DEPLOYMENT ID                 USER                       ROLE                  
  ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.io     DEPLOYMENT_VIEWER     
 
- Successfully added somebody@astronomer.io as a DEPLOYMENT_VIEWER
+ Added somebody@astronomer.io as a DEPLOYMENT_VIEWER
 `
 	expectedAddUserRequest := houston.UpdateDeploymentUserRequest{
 		Email:        mockDeploymentUserRole.User.Username,
@@ -41,7 +41,7 @@ func (s *Suite) TestDeploymentUserDeleteCommand() {
 	expectedOut := ` DEPLOYMENT ID                 USER                       ROLE                  
  ckggvxkw112212kc9ebv8vu6p     somebody@astronomer.io     DEPLOYMENT_VIEWER     
 
- Successfully removed the DEPLOYMENT_VIEWER role for somebody@astronomer.io from deployment ckggvxkw112212kc9ebv8vu6p
+ Removed the DEPLOYMENT_VIEWER role for somebody@astronomer.io from Deployment ckggvxkw112212kc9ebv8vu6p
 `
 
 	api := new(mocks.ClientInterface)
@@ -84,7 +84,7 @@ func (s *Suite) TestDeploymentUserList() {
 func (s *Suite) TestDeploymentUserUpdateCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	expectedNewRole := houston.DeploymentAdminRole
-	expectedOut := `Successfully updated somebody@astronomer.io to a ` + expectedNewRole
+	expectedOut := `Updated somebody@astronomer.io to a ` + expectedNewRole
 	mockResponseUserRole := *mockDeploymentUserRole
 	mockResponseUserRole.Role = expectedNewRole
 

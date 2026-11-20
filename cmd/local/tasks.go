@@ -302,9 +302,8 @@ func newTasksLogsCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs <DAG_ID> <RUN_ID> <TASK_ID>",
 		Short: "Print one try's log for a task instance",
-		Long: "Print the whole log Airflow holds for one try of a task instance.\n\nThe content is rendered as " +
-			"Airflow sent it: Airflow 3 serves structured entries and Airflow 2 serves one string, and neither " +
-			"is reshaped here.",
+		Long: "Print the full log Airflow holds for one try of a task instance.\n\nThe content is printed as " +
+			"Airflow sent it. Airflow 3 serves structured entries and Airflow 2 serves one string.",
 		Args: cobra.ExactArgs(taskInstanceArgs),
 		Example: afExample(q.t,
 			"Print the log of a task's first try", "tasks logs <DAG_ID> <RUN_ID> <TASK_ID>",
@@ -378,9 +377,9 @@ func newTasksClearCmd(q *query) *cobra.Command {
 		Use:   "clear <DAG_ID> <RUN_ID> <TASK_ID>...",
 		Short: "Clear task instances so they run again",
 		Long: "Reset the named task instances in one run so the scheduler runs them again. Pass --dry-run to see " +
-			"what would be cleared without clearing it.\n\nThe affected runs go back into the queued state, " +
-			"which is what makes the scheduler pick the cleared tasks up; without it a run in a terminal state " +
-			"keeps it and the tasks never start. --no-reset-dagruns leaves the run's state alone.",
+			"what would be cleared without clearing it.\n\nThe affected runs go back to the queued state so the scheduler " +
+			"picks the cleared tasks up. A run left in a final state would never start them. " +
+			"--no-reset-dagruns leaves the run's state alone.",
 		Args: cobra.MinimumNArgs(taskInstanceArgs),
 		Example: afExample(q.t,
 			"See what clearing a task would reset, and change nothing", "tasks clear <DAG_ID> <RUN_ID> <TASK_ID> --dry-run",
@@ -444,7 +443,7 @@ func renderClearedTasks(w io.Writer, cleared clearedTasks) error {
 	if cleared.DryRun {
 		verb = "would clear"
 	}
-	if _, err := fmt.Fprintf(w, "%s %d task instance(s) in run %s:\n", verb, len(cleared.Tasks), cleared.RunID); err != nil {
+	if _, err := fmt.Fprintf(w, "%s %s in run %s:\n", verb, plural(len(cleared.Tasks), "task instance", "task instances"), cleared.RunID); err != nil {
 		return err
 	}
 	return renderTaskInstanceTable(w, cleared.Tasks)

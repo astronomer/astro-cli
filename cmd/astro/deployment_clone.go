@@ -65,7 +65,7 @@ func deploymentClone(cmd *cobra.Command, out io.Writer, format cliout.Format) er
 		return err
 	}
 	if err != nil && !util.IsCUID(cloneSource) {
-		return fmt.Errorf("failed to find a valid Workspace: %w", err)
+		return fmt.Errorf("could not find a valid Workspace: %w", err)
 	}
 	src, err := deployment.CloneSource(cloneSource, ws, deployment.WithWorkspaceSource(astroV1Client, ws, t.WorkspaceSource))
 	if err != nil {

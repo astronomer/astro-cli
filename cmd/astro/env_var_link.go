@@ -39,8 +39,8 @@ func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "link",
 		Aliases: []string{"links"},
-		Short:   "Manage which deployments a workspace variable reaches",
-		Long: "Control which deployments a workspace variable reaches, and give a deployment " +
+		Short:   "Manage which Deployments a Workspace variable reaches",
+		Long: "Control which Deployments a Workspace variable reaches, and give a Deployment " +
 			"its own value. Identify the variable with --variable-key or --variable-id.",
 		Example: envVarLinkExamples,
 
@@ -60,8 +60,8 @@ func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 // addLinkVariableFlags wires the parent-variable identifier flags onto a link
 // subcommand: exactly one of --variable-id / --variable-key is required.
 func addLinkVariableFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&envLinkVariableID, "variable-id", "", "ID of the workspace variable")
-	cmd.Flags().StringVar(&envLinkVariableKey, "variable-key", "", "Key of the workspace variable")
+	cmd.Flags().StringVar(&envLinkVariableID, "variable-id", "", "ID of the Workspace variable")
+	cmd.Flags().StringVar(&envLinkVariableKey, "variable-key", "", "Key of the Workspace variable")
 	cmd.MarkFlagsMutuallyExclusive("variable-id", "variable-key")
 	cmd.MarkFlagsOneRequired("variable-id", "variable-key")
 }
@@ -83,12 +83,12 @@ func linkVariableIDOrKey() (string, error) {
 // cannot serve here: its guidance names `set <id-or-key>`, and a link is
 // addressed by two flags rather than a positional.
 func newRemovedLinkCreateCmd() *cobra.Command {
-	return removedCmdStub("create", []string{"cr"}, "Removed in v2 — use the set command, which creates or updates", func([]string) string {
+	return removedCmdStub("create", []string{"cr"}, "Removed in v2; use the set command (creates or updates)", func([]string) string {
 		return "astro env variable link create was removed in Astro CLI v2.\n" +
 			"  use:  astro env variable link set --variable-key <key> --deployment <id>\n" +
-			"The set command links the deployment when it is not linked and updates the link when it is. " +
-			"It also treats --value as the whole override, so omitting it now CLEARS an existing " +
-			"override rather than leaving it in place — which is how one is removed. " +
+			"The set command links the Deployment when it is not linked and updates the link when it is. " +
+			"It also treats --value as the full override: omitting it now clears an existing " +
+			"override instead of leaving it in place. " +
 			"Pass --no-create to fail instead of linking."
 	})
 }
@@ -96,9 +96,9 @@ func newRemovedLinkCreateCmd() *cobra.Command {
 func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set",
-		Short: "Link a variable to a deployment",
-		Long: "Link a workspace variable to a deployment. --value gives that deployment its " +
-			"own value; leaving it out clears any it had. --exclude opts the deployment out " +
+		Short: "Link a variable to a Deployment",
+		Long: "Link a Workspace variable to a Deployment. --value gives that Deployment its " +
+			"own value; leaving it out clears any it had. --exclude opts the Deployment out " +
 			"of an auto-linked variable instead. Pass --no-create to fail if it is not " +
 			"already linked.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -114,8 +114,8 @@ func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
 	addLinkVariableFlags(cmd)
 	addDeploymentFlag(cmd.Flags(), "Deployment to link: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &envLinkDeploymentID}, oneXDeploymentID)
 	cmd.Flags().StringVar(&envLinkValue, "value", "", "The deployment's own value; omit it to clear any it had")
-	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Opt the deployment out of an auto-linked variable instead")
-	cmd.Flags().BoolVar(&envLinkNoCreate, "no-create", false, "Fail if the deployment is not already linked")
+	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Opt the Deployment out of an auto-linked variable instead")
+	cmd.Flags().BoolVar(&envLinkNoCreate, "no-create", false, "Fail if the Deployment is not already linked")
 	// --exclude takes a different path entirely (the platform's exclude-linking
 	// endpoint), which has no create/update distinction for --no-create to
 	// govern. Accepting the pair would have silently ignored the guard.
@@ -178,7 +178,7 @@ func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		return linkChanged(cmd, r, report, fmt.Sprintf("Excluded %s from deployment %s", idOrKey, envLinkDeploymentID))
+		return linkChanged(cmd, r, report, fmt.Sprintf("Excluded %s from Deployment %s", idOrKey, envLinkDeploymentID))
 	}
 	var override *string
 	if cmd.Flags().Changed("value") {
@@ -188,9 +188,9 @@ func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	line := fmt.Sprintf("Linked %s to deployment %s (no override)", idOrKey, envLinkDeploymentID)
+	line := fmt.Sprintf("Linked %s to Deployment %s (no override)", idOrKey, envLinkDeploymentID)
 	if override != nil {
-		line = fmt.Sprintf("Linked %s to deployment %s (override value applied)", idOrKey, envLinkDeploymentID)
+		line = fmt.Sprintf("Linked %s to Deployment %s (override value applied)", idOrKey, envLinkDeploymentID)
 	}
 	return linkChanged(cmd, r, report, line)
 }
@@ -211,13 +211,13 @@ func runEnvVarLinkRemove(cmd *cobra.Command, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		return linkChanged(cmd, r, report, fmt.Sprintf("Removed exclude on %s for deployment %s", idOrKey, envLinkDeploymentID))
+		return linkChanged(cmd, r, report, fmt.Sprintf("Removed exclude on %s for Deployment %s", idOrKey, envLinkDeploymentID))
 	}
 	report, err := env.UnlinkVar(idOrKey, scope, envLinkDeploymentID, astroV1Client)
 	if err != nil {
 		return err
 	}
-	return linkChanged(cmd, r, report, fmt.Sprintf("Unlinked %s from deployment %s", idOrKey, envLinkDeploymentID))
+	return linkChanged(cmd, r, report, fmt.Sprintf("Unlinked %s from Deployment %s", idOrKey, envLinkDeploymentID))
 }
 
 func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {

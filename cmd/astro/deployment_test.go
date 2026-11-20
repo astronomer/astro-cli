@@ -711,12 +711,12 @@ func TestDeploymentCreate(t *testing.T) {
 	t.Run("returns an error if dag-deploy flag has an incorrect value", func(t *testing.T) {
 		newCreateUpdateMock(t)
 		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value")
-		assert.ErrorContains(t, err, "Invalid --dag-deploy value")
+		assert.ErrorContains(t, err, "invalid --dag-deploy value")
 	})
 	t.Run("returns an error if cicd-enforcement flag has an incorrect value", func(t *testing.T) {
 		newCreateUpdateMock(t)
 		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--cicd-enforcement", "some-value")
-		assert.ErrorContains(t, err, "Invalid --cicd-enforcement value")
+		assert.ErrorContains(t, err, "invalid --cicd-enforcement value")
 	})
 	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
 		newCreateUpdateMock(t)
@@ -768,14 +768,14 @@ func TestDeploymentCreate(t *testing.T) {
 		newCreateUpdateMock(t)
 		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
 			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--high-availability", "some-value")
-		assert.ErrorContains(t, err, "Invalid --high-availability value")
+		assert.ErrorContains(t, err, "invalid --high-availability value")
 	})
 	t.Run("returns an error with incorrect development-mode value", func(t *testing.T) {
 		setHostedOrg(t, ws)
 		newCreateUpdateMock(t)
 		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
 			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--development-mode", "some-value")
-		assert.ErrorContains(t, err, "Invalid --development-mode value")
+		assert.ErrorContains(t, err, "invalid --development-mode value")
 	})
 	t.Run("returns an error if cloud provider is not valid", func(t *testing.T) {
 		setHostedOrg(t, ws)
@@ -837,7 +837,7 @@ func TestDeploymentCreate(t *testing.T) {
 		setHostedOrg(t, ws)
 		newCreateUpdateMock(t)
 		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--type", "wrong-value")
-		assert.ErrorContains(t, err, "Invalid --type value")
+		assert.ErrorContains(t, err, "invalid --type value")
 	})
 	t.Run("creates an extra large deployment", func(t *testing.T) {
 		setHostedOrg(t, ws)
@@ -963,12 +963,12 @@ func TestDeploymentUpdate(t *testing.T) {
 	t.Run("returns an error if ci-cd enforcement has an incorrect value", func(t *testing.T) {
 		newCreateUpdateMock(t)
 		_, err := execDeploymentCmd("update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--cicd-enforcement", "some-value")
-		assert.ErrorContains(t, err, "Invalid --cicd-enforcement value")
+		assert.ErrorContains(t, err, "invalid --cicd-enforcement value")
 	})
 	t.Run("returns an error if dag-deploy has an incorrect value", func(t *testing.T) {
 		newCreateUpdateMock(t)
 		_, err := execDeploymentCmd("update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--dag-deploy", "some-value")
-		assert.ErrorContains(t, err, "Invalid --dag-deploy value")
+		assert.ErrorContains(t, err, "invalid --dag-deploy value")
 	})
 	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
 		newCreateUpdateMock(t)
@@ -984,7 +984,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		require.NoError(t, ctx.SetContext())
 		defer testUtil.InitTestConfig(testUtil.LocalPlatform)
 		_, err = execDeploymentCmd("update", "--deployment-name", "doesnotexist")
-		assert.ErrorContains(t, err, "failed to find a valid Workspace")
+		assert.ErrorContains(t, err, "could not find a valid Workspace")
 	})
 	t.Run("updates a deployment with small scheduler size", func(t *testing.T) {
 		setHostedOrg(t, ws)
@@ -1000,13 +1000,13 @@ func TestDeploymentUpdate(t *testing.T) {
 		setHostedOrg(t, ws)
 		newCreateUpdateMock(t)
 		_, err := execDeploymentCmd("update", "test-id", "--name", "test-name", "--workspace-id", ws, "--high-availability", "some-value", "--yes")
-		assert.ErrorContains(t, err, "Invalid --high-availability value")
+		assert.ErrorContains(t, err, "invalid --high-availability value")
 	})
 	t.Run("returns an error with incorrect development-mode value", func(t *testing.T) {
 		setHostedOrg(t, ws)
 		newCreateUpdateMock(t)
 		_, err := execDeploymentCmd("update", "test-id", "--name", "test-name", "--workspace-id", ws, "--development-mode", "some-value", "--yes")
-		assert.ErrorContains(t, err, "Invalid --development-mode value")
+		assert.ErrorContains(t, err, "invalid --development-mode value")
 	})
 	t.Run("updates a deployment with extra large scheduler size", func(t *testing.T) {
 		setHostedOrg(t, ws)
@@ -1366,7 +1366,7 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			defer testUtil.InitTestConfig(testUtil.LocalPlatform)
 			cmdArgs := []string{tt.command, "--deployment-name", "doesnotexist"}
 			_, err = execDeploymentCmd(cmdArgs...)
-			assert.ErrorContains(t, err, "failed to find a valid workspace")
+			assert.ErrorContains(t, err, "could not find a valid Workspace")
 		})
 	}
 }
@@ -1455,7 +1455,7 @@ func TestDeploymentOpen(t *testing.T) {
 		output string
 	}{
 		{name: "opens the Airflow UI", opens: true, output: "Opened the Airflow UI for Deployment"},
-		{name: "prints the link when the browser cannot be opened", opens: false, output: "Unable to open the Airflow UI, please visit the following link: https://test-url"},
+		{name: "prints the link when the browser cannot be opened", opens: false, output: "Could not open the Airflow UI; open this link: https://test-url"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var opened string

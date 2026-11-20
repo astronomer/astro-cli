@@ -8,7 +8,7 @@ import (
 
 // ErrNoDeploymentTeams is ListTeamRoles' answer when Houston lists no team
 // for the Deployment at all.
-var ErrNoDeploymentTeams = errors.New("no teams were found for this deployment. Check the deploymentId and try again")
+var ErrNoDeploymentTeams = errors.New("no teams found for this Deployment")
 
 // TeamRole is a team and the role it holds on a Deployment.
 type TeamRole struct {

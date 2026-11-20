@@ -19,17 +19,17 @@ import (
 )
 
 var (
-	ErrInvalidTeamID            = errors.New("team could not be found with selected or passed in id")
+	ErrInvalidTeamID            = errors.New("no team found with that ID")
 	ErrInvalidTeamKey           = errors.New("invalid team selection")
 	ErrInvalidTeamMemberKey     = errors.New("invalid team member selection")
-	ErrInvalidName              = errors.New("no name provided for the team. Retry with a valid name")
-	ErrTeamNotFound             = errors.New("no team was found for the ID you provided")
-	ErrNoTeamsFoundInOrg        = errors.New("no teams found in your organization")
-	ErrNoTeamsFoundInWorkspace  = errors.New("no teams found in your workspace")
-	ErrNoTeamsFoundInDeployment = errors.New("no teams found in your deployment")
+	ErrInvalidName              = errors.New("no name provided for the team")
+	ErrTeamNotFound             = errors.New("no team found with that ID")
+	ErrNoTeamsFoundInOrg        = errors.New("no teams found in your Organization")
+	ErrNoTeamsFoundInWorkspace  = errors.New("no teams found in your Workspace")
+	ErrNoTeamsFoundInDeployment = errors.New("no teams found in your Deployment")
 	ErrNoTeamMembersFoundInTeam = errors.New("no team members found in team")
-	ErrNoUsersFoundInOrg        = errors.New("no users found in your organization")
-	ErrNoTeamNameProvided       = errors.New("you must give your Team a name")
+	ErrNoUsersFoundInOrg        = errors.New("no users found in your Organization")
+	ErrNoTeamNameProvided       = errors.New("a team name is required")
 	teamPaginationLimit         = 100
 )
 
@@ -40,7 +40,7 @@ func confirmOperation(force bool) error {
 	if force {
 		return nil
 	}
-	return input.ConfirmOrAbort("This is an IDP-managed team. Are you sure you want to continue the operation?", input.AnsweredBy("--yes"))
+	return input.ConfirmOrAbort("This is an IDP-managed team. Change it anyway?", input.AnsweredBy("--yes"))
 }
 
 // Info is t as a team command reports it, with no role: the caller sets the
@@ -65,7 +65,7 @@ func CreateTeam(name, description, role string, client astrov1.APIClient) (TeamI
 		if err := input.MayAsk(prompt, input.About("a Team name"), input.AnsweredBy("--name")); err != nil {
 			return TeamInfo{}, err
 		}
-		fmt.Fprintln(os.Stderr, "Please specify a name for your Team")
+		fmt.Fprintln(os.Stderr, "A team name is required")
 		name, err = input.Text(prompt, input.About("a Team name"), input.AnsweredBy("--name"))
 		if err != nil {
 			return TeamInfo{}, err
@@ -314,7 +314,7 @@ func UpdateTeam(id, name, description, role string, force bool, client astrov1.A
 			// The role went through: say so, with the team as it now is.
 			upd := &Update{Team: Info(&team), RoleChanged: true}
 			upd.Team.OrgRole = role
-			return upd, fmt.Errorf("the team's role was updated to %s, but updating its name and description failed: %w", role, err)
+			return upd, fmt.Errorf("updated the team's role to %s, but updating its name and description failed: %w", role, err)
 		}
 	}
 	upd := &Update{Team: Info(&after)}
@@ -400,7 +400,7 @@ func RemoveWorkspaceTeam(id, workspaceID string, client astrov1.APIClient) (Work
 
 func selectTeam(teams []astrov1.Team) (astrov1.Team, error) {
 	list := picker.List{
-		Title:   "\nPlease select a team:",
+		Title:   "\nSelect a team:",
 		Header:  []string{"TEAMNAME", "ID"},
 		Ask:     []input.Option{input.About("a team")},
 		Invalid: ErrInvalidTeamKey,
@@ -565,7 +565,7 @@ func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemov
 	// Every team is asked about, as a Workspace is: a deleted team cannot
 	// be brought back, and an IdP-managed one says so too.
 	if !force {
-		question := fmt.Sprintf("\nAre you sure you want to delete the %s team? This cannot be undone.", ansi.Bold(team.Name))
+		question := fmt.Sprintf("\nDelete team %s? This cannot be undone.", ansi.Bold(team.Name))
 		if team.IsIdpManaged {
 			question = "\nThis is an IDP-managed team." + question
 		}
@@ -770,7 +770,7 @@ func AddUser(teamID, userID string, force bool, client astrov1.APIClient) (*Memb
 
 func selectTeamMember(teamMembers []astrov1.TeamMember) (astrov1.TeamMember, error) {
 	list := picker.List{
-		Title:   "\nPlease select the team member you would like to remove from the team:",
+		Title:   "\nSelect the team member to remove from the team:",
 		Header:  []string{"FULLNAME", "EMAIL", "ID"},
 		Ask:     []input.Option{input.About("a team member"), input.AnsweredBy("--user-id")},
 		Invalid: ErrInvalidTeamMemberKey,

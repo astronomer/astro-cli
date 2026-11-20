@@ -32,7 +32,7 @@ func newWorkspaceSaRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "service-account",
 		Aliases: []string{"sa"},
-		Short:   "Manage APC workspace service accounts",
+		Short:   "Manage APC Workspace service accounts",
 		Long:    "Service accounts represent revocable tokens with access to the APC platform",
 	}
 	deleteCmd := newWorkspaceSaDeleteCmd(out)
@@ -58,7 +58,7 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
-	cmd.Flags().StringVar(&workspaceSAUserID, "user-id", "", "ID of the user you want to link this service account to")
+	cmd.Flags().StringVar(&workspaceSAUserID, "user-id", "", "ID of the user to link this service account to")
 	cmd.Flags().StringVar(&workspaceSACategory, "category", "default", "Category of the new service account")
 	// --name, as an Astro API token's; 1.x's --label, -l, is its alias.
 	cmd.Flags().StringVarP(&workspaceSAName, "name", "n", "", "Name of the new service account")
@@ -73,8 +73,8 @@ func newWorkspaceSaListCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List service accounts inside a workspace",
-		Long:    "List service accounts inside a workspace",
+		Short:   "List service accounts inside a Workspace",
+		Long:    "List service accounts inside a Workspace",
 		Example: workspaceSaListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaList(out)
@@ -90,7 +90,7 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete <SERVICE_ACCOUNT_ID>",
 		Aliases: []string{"rm"},
 		Short:   "Delete a service account in the APC platform",
-		Long:    "Delete a service account in the APC platform. This cannot be undone, so the command asks for confirmation first unless --yes is given.",
+		Long:    "Delete a service account in the APC platform. This cannot be undone; it asks for confirmation unless --yes is given.",
 		Args:    cobra.ExactArgs(1),
 		Example: `  # Delete a service account from the current Workspace, after you confirm
   astro workspace service-account delete <SERVICE_ACCOUNT_ID>
@@ -118,7 +118,7 @@ func workspaceSaCreate(out io.Writer) error {
 	}
 
 	if err := validateWorkspaceRole(workspaceSARole); err != nil {
-		return fmt.Errorf("failed to find a valid role: %w", err)
+		return fmt.Errorf("could not find a valid role: %w", err)
 	}
 	created, err := sa.CreateUsingWorkspaceUUID(ws, workspaceSAName, workspaceSACategory, workspaceSARole, houstonClient)
 	if err != nil {

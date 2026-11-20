@@ -90,14 +90,14 @@ func (from1x *project1x) deployLinkAdvisory() string {
 	if !ok {
 		return ""
 	}
-	where := "workspace " + l.Workspace
+	where := "Workspace " + l.Workspace
 	if l.Kind == manifest.KindAPC {
 		where = "Astro Private Cloud " + l.Domain + ", " + where
 	}
 	out := config1xRelPath + ": linked Deployment " + l.Deployment + " as \"" + l.Name + "\" in " + manifest.Marker +
 		" (" + where + ")"
 	if from1x.workspaceFromContext {
-		out += ". It saved no workspace, so this uses your current one. If the Deployment is in another workspace, " +
+		out += ". It saved no Workspace, so this uses your current one. If the Deployment is in another Workspace, " +
 			"relink it with: astro link add " + l.Name + " --deployment " + l.Deployment + " --workspace <workspace-id> --replace"
 	}
 	return out

@@ -61,7 +61,7 @@ func TestEnvConnLinkSetSendsTheFieldOverrides(t *testing.T) {
 	out, err := execEnvCmd("connection", "link", "set", "--connection-key", "db", "--workspace-id", cuid.New(),
 		"--deployment-id", depID, "--host", "db.prod", "--port", "6432")
 	assert.NoError(t, err)
-	assert.Contains(t, out, "Linked db to deployment "+depID+" (override applied)")
+	assert.Contains(t, out, "Linked db to Deployment "+depID+" (override applied)")
 	assert.Contains(t, out, deploymentPickupNote)
 	mc.AssertExpectations(t)
 }
@@ -111,7 +111,7 @@ func TestEnvAirflowVarLinkSetAndList(t *testing.T) {
 		out, err := execEnvCmd("airflow-var", "link", "set", "--airflow-variable-key", "region", "--workspace-id", cuid.New(),
 			"--deployment-id", depID, "--value", "eu-west-1")
 		assert.NoError(t, err)
-		assert.Contains(t, out, "Linked region to deployment "+depID+" (override applied)")
+		assert.Contains(t, out, "Linked region to Deployment "+depID+" (override applied)")
 		mc.AssertExpectations(t)
 	})
 

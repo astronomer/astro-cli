@@ -127,7 +127,7 @@ func (p *parser) auth(key string, raw any, kind LinkKind) Auth {
 	case nil:
 		method := defaultAuthMethod[kind]
 		if method == "" {
-			p.add(CodeAuthRequired, key, "required on a url link: nothing about a url says how its Airflow checks callers — add an auth table naming one of: "+methodList())
+			p.add(CodeAuthRequired, key, "required on a url link: nothing about a url says how its Airflow checks callers; add an auth table naming one of: "+methodList())
 			return Auth{}
 		}
 		return Auth{Method: method}
@@ -210,7 +210,7 @@ func (p *authParser) addField(code ProblemCode, field, reason string) {
 // carry: the rest of the table means nothing until the method is known.
 func (p *authParser) method(raw any) (AuthMethod, bool) {
 	if raw == nil {
-		p.addField(CodeAuthMethodRequired, "method", "required — name one of: "+methodList())
+		p.addField(CodeAuthMethodRequired, "method", "required: name one of: "+methodList())
 		return "", false
 	}
 	s, ok := raw.(string)
@@ -220,7 +220,7 @@ func (p *authParser) method(raw any) (AuthMethod, bool) {
 	}
 	m := AuthMethod(s)
 	if !slices.Contains(authMethods, m) {
-		p.addField(CodeAuthMethodUnknown, "method", fmt.Sprintf("%q is not an auth method — name one of: %s", s, methodList()))
+		p.addField(CodeAuthMethodUnknown, "method", fmt.Sprintf("%q is not an auth method; name one of: %s", s, methodList()))
 		return "", false
 	}
 	return m, true
@@ -241,7 +241,7 @@ func (p *authParser) value(field string, raw any) string {
 	}
 	p.checkControl(p.key+"."+field, s)
 	if strings.HasSuffix(field, "-env") && !envNameRe.MatchString(s) {
-		p.addField(CodeAuthEnvNameInvalid, field, fmt.Sprintf("%q is not an env-var name (letters, digits, _; no leading digit) — this field names the variable holding the value, not the value", s))
+		p.addField(CodeAuthEnvNameInvalid, field, fmt.Sprintf("%q is not an env-var name (letters, digits, _; no leading digit); this field names the variable that holds the value", s))
 		return ""
 	}
 	return s

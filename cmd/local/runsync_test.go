@@ -206,7 +206,7 @@ func TestSyncArmsAndStopsTheTimer(t *testing.T) {
 	if !stopped {
 		t.Error("timer not stopped when the sync ended")
 	}
-	requireInOrder(t, stderrOf(d), "Updating this project's environment...", "Resolved")
+	requireInOrder(t, stderrOf(d), "Updating this project's environment…", "Resolved")
 }
 
 func withSeams(t *testing.T, s syncer) {

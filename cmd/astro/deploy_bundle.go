@@ -64,7 +64,7 @@ func newDeployBundleCmd() *cobra.Command {
 			"A dbt project (a directory holding dbt_project.yml) mounts at " + astrodeploy.DbtDefaultMountPathPrefix + "<project name> unless --mount-path says otherwise. " +
 			"Any other --type is recorded as a label, with no defaults, so it needs --mount-path. " +
 			"With --delete and no bundle at PATH, a mount path below a type's default directory says the type.\n\n" +
-			"--deployment takes a link name of the project in the current directory, a Deployment id, or the name of a Deployment in the workspace. " +
+			"--deployment takes a link name of the project in the current directory, a Deployment id, or the name of a Deployment in the Workspace. " +
 			"This deploys the bundle's files; astro deploy deploys the project and its Dags. " +
 			"To list or change the bundles a Deployment has registered, use astro deployment bundle. " +
 			"A project link called bundle is not reachable as astro deploy bundle: deploy the project to it with astro deploy --deployment bundle.",
@@ -134,7 +134,7 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 		if os.IsNotExist(err) {
 			return fmt.Errorf("bundle path %s does not exist", path)
 		}
-		return fmt.Errorf("failed to access bundle path %s: %w", path, err)
+		return fmt.Errorf("could not access bundle path %s: %w", path, err)
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("bundle path %s is not a directory", path)
@@ -374,7 +374,7 @@ func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Form
 			if isWorkspaceRefusal(err) {
 				return "", nil, login, err
 			}
-			return "", nil, login, fmt.Errorf("failed to find a valid workspace: %w", err)
+			return "", nil, login, fmt.Errorf("could not find a valid Workspace: %w", err)
 		}
 		src = t.WorkspaceSource
 	}
@@ -400,7 +400,7 @@ func deploymentNamed(name, ws string, src astrosession.Source, login *deployLogi
 	case 0:
 		// Named wrong, as a link name that is not one would be: a usage
 		// mistake, not a failure of the deploy.
-		return nil, cliout.UsageNoHelp(fmt.Errorf("no Deployment named %s in %s: pass a Deployment id, a link name of the project here, or the name of a Deployment in that workspace", name, astrosession.DescribeWorkspace(ws, src)))
+		return nil, cliout.UsageNoHelp(fmt.Errorf("no Deployment named %s in %s: pass a Deployment id, a link name of the project here, or the name of a Deployment in that Workspace", name, astrosession.DescribeWorkspace(ws, src)))
 	case 1:
 		return &found[0], nil
 	}
@@ -500,13 +500,13 @@ func bundleGitJSON(g *astrodeploy.BundleGit) *deployGitJSON {
 // printed.
 func renderBundleUploaded(version string) func(io.Writer) error {
 	return cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintf(b, "Successfully uploaded bundle with version %s to Astro.\n", version)
+		fmt.Fprintf(b, "Uploaded bundle version %s to Astro\n", version)
 	})
 }
 
 func renderBundleDeleted(mountPath string) func(io.Writer) error {
 	return cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintf(b, "Successfully requested bundle delete for mount path %s from Astro.\n", mountPath)
+		fmt.Fprintf(b, "Requested bundle delete for mount path %s from Astro\n", mountPath)
 	})
 }
 

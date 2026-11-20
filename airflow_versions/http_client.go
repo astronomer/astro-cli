@@ -67,7 +67,7 @@ func (c *Client) Do(doOpts *httputil.DoOptions) (*Response, error) {
 	decode := Response{}
 	err = json.NewDecoder(httpResponse.Body).Decode(&decode)
 	if err != nil {
-		return nil, fmt.Errorf("failed to JSON decode %s response: %w", doOpts.Path, err)
+		return nil, fmt.Errorf("could not decode the %s response as JSON: %w", doOpts.Path, err)
 	}
 
 	return &decode, nil

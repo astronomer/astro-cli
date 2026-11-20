@@ -28,14 +28,14 @@ var (
 )
 
 var (
-	ErrNoWorkspaceID       = errors.New("no workspace id provided")
-	errNoDomainSet         = errors.New("no domain set, re-authenticate")
-	errInvalidDeploymentID = errors.New("please specify a valid deployment ID")
+	ErrNoWorkspaceID       = errors.New("no Workspace ID provided")
+	errNoDomainSet         = errors.New("no domain set; run astro login")
+	errInvalidDeploymentID = errors.New("a valid Deployment ID is required")
 	// ErrDagOnlyDeployDisabledInConfigLegacy is returned for Houston before 2.0.0 (flat feature-flag paths).
-	ErrDagOnlyDeployDisabledInConfigLegacy = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your APC cluster")
+	ErrDagOnlyDeployDisabledInConfigLegacy = errors.New("set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your APC cluster to do this")
 	// ErrDagOnlyDeployDisabledInConfig is returned for Houston 2.0.0+ (deployMechanisms.*.enabled under merged deployments config).
-	ErrDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your APC cluster")
-	ErrDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
+	ErrDagOnlyDeployDisabledInConfig        = errors.New("set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your APC cluster to do this")
+	ErrDagOnlyDeployNotEnabledForDeployment = errors.New("set the Deployment type to 'dag_deploy' in the UI, the API, or the CLI first")
 	// ErrNoDagsDirectory is DagsOnlyDeploy's refusal when there is no dags
 	// directory to upload, to a Deployment that takes uploads (the refusals
 	// come first). An upload of nothing would replace the Deployment's DAGs
@@ -43,7 +43,7 @@ var (
 	ErrNoDagsDirectory = errors.New("no dags directory to upload")
 	// ErrAppConfigUnread is DagsOnlyDeploy failing to read the cluster
 	// config its refusals are decided by.
-	ErrAppConfigUnread = errors.New("failed to get app config")
+	ErrAppConfigUnread = errors.New("could not get the app config")
 	// ErrDagsDirHoldsProject is DagsOnlyDeploy refusing a dags directory
 	// that resolves to the directory its tarball is written to, or above it.
 	ErrDagsDirHoldsProject = errors.New("the dags directory is the project directory or one above it")
@@ -52,8 +52,8 @@ var (
 	ErrNoDagUploadURL = errors.New("cannot tell where to upload the Dags")
 	// Houston reads the host from its registry.protectedCustomRegistry.updateRegistry.host,
 	// under astronomer.houston.config in the platform's values.
-	ErrBYORegistryDomainNotSet             = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.registry.protectedCustomRegistry.updateRegistry.host")
-	ErrDeploymentTypeIncorrectForImageOnly = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
+	ErrBYORegistryDomainNotSet             = errors.New("custom registry host is not set in config; set astronomer.houston.config.registry.protectedCustomRegistry.updateRegistry.host")
+	ErrDeploymentTypeIncorrectForImageOnly = errors.New("--image only works for Dag-only, Git-sync, and NFS Deployments")
 )
 
 const (
@@ -209,7 +209,7 @@ func getDeploymentRegistryURL(deploymentURLs []houston.DeploymentURL) (string, e
 			return url.URL, nil
 		}
 	}
-	return "", errors.New("no valid registry url found failed to push")
+	return "", errors.New("could not push: no valid registry URL found")
 }
 
 // workspaceDeployments lists the Deployments of workspace wsID, which must
@@ -290,7 +290,7 @@ func isDagOnlyDeploymentEnabledForDeployment(deploymentInfo *houston.Deployment)
 func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) error {
 	_, err := config.GetCurrentContext()
 	if err != nil {
-		return fmt.Errorf("could not get current context! Error: %w", err)
+		return fmt.Errorf("could not get the current context: %w", err)
 	}
 	if deploymentInfo == nil || deploymentInfo.ReleaseName == "" {
 		return errInvalidDeploymentID
@@ -318,7 +318,7 @@ func resolveDagsDir(dagsPath string) (string, error) {
 		return "", fmt.Errorf("reading the dags directory: %w", err)
 	}
 	if err == nil || errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
-		return "", fmt.Errorf("%w: %s is not a directory. Nothing was uploaded, and the Deployment keeps the Dags it had", ErrNoDagsDirectory, dagsPath)
+		return "", fmt.Errorf("%w: %s is not a directory; nothing was uploaded and the Deployment keeps its Dags", ErrNoDagsDirectory, dagsPath)
 	}
 	return "", fmt.Errorf("reading the dags directory: %w", err)
 }
@@ -349,7 +349,7 @@ func refuseDagsHoldingTarball(dagsDir, dagsPath, tarballDir string) error {
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return nil
 	}
-	return fmt.Errorf("%w: %s resolves to %s, so the upload would archive the project into itself. Nothing was uploaded, and the Deployment keeps the Dags it had", ErrDagsDirHoldsProject, dagsDir, dagsPath)
+	return fmt.Errorf("%w: %s resolves to %s, so the upload would archive the project into itself; nothing was uploaded and the Deployment keeps its Dags", ErrDagsDirHoldsProject, dagsDir, dagsPath)
 }
 
 func getDagDeployURL(deploymentInfo *houston.Deployment) string {
@@ -403,7 +403,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	// Throw error if the feature is disabled at Deployment level
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
-		return deploymentID, fmt.Errorf("failed to get deployment info: %w", err)
+		return deploymentID, fmt.Errorf("could not get the Deployment info: %w", err)
 	}
 	appCfgWs := resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, deploymentInfo)
 	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: appCfgWs, DeploymentUUID: deploymentID})
@@ -447,7 +447,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 
 	// Alert the user if dags folder is empty
 	if len(dagFiles) == 0 && opts.WarnEmptyDags != nil {
-		opts.WarnEmptyDags("no Dags found in the dags folder: the upload replaces the Deployment's Dags with none")
+		opts.WarnEmptyDags("No Dags found in the dags folder. The upload replaces the Deployment's Dags with none.")
 	}
 
 	// Generate the dags tar, its paths under dags/ as the upload expects,
@@ -497,7 +497,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 		MaxTries:            8,
 		InitialDelayInMS:    1 * 1000,
 		BackoffFactor:       2,
-		RetryDisplayMessage: "please wait, attempting to upload the dags",
+		RetryDisplayMessage: "Uploading the Dags",
 		Out:                 opts.progress(),
 	}
 	return deploymentID, fileutil.UploadFile(&uploadFileArgs)

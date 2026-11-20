@@ -92,7 +92,7 @@ func (s *Suite) TestSubscribe() {
 		err := Subscribe("test-token", wsURL(srv), `{}`, notes, c.onLog)
 		s.NoError(err)
 		s.Equal([]string{"a", "b"}, c.records())
-		s.Equal("Waiting for logs...\n", notes.String())
+		s.Equal("Waiting for logs…\n", notes.String())
 	})
 
 	// A GraphQL execution error inside a subscription arrives in a data
@@ -125,7 +125,7 @@ func (s *Suite) TestSubscribe() {
 		defer srv.Close()
 
 		err := Subscribe("test-token", wsURL(srv), `{}`, io.Discard, func(DeploymentLog) error { return nil })
-		s.EqualError(err, "the log stream refused your login (Prohibited connection!); it may have expired: log in again with astro login")
+		s.EqualError(err, "the log stream refused your login (Prohibited connection!); it may have expired. Run astro login again")
 	})
 
 	s.Run("the start names its operation", func() {

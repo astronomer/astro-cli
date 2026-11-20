@@ -39,9 +39,9 @@ func newRemovedDeploymentObjectCmds() []*cobra.Command {
 // --deployment-id or --conn-id reaches the guidance instead of dying on the
 // flag. Its Short says in brief what the guidance says.
 func newRemovedDeploymentObjectCmd(o removedDeploymentObject) *cobra.Command {
-	short := "Removed in v2 — use the Airflow UI or the Airflow REST API"
+	short := "Removed in v2; use the Airflow UI or the Airflow REST API"
 	if o.envNoun != "" {
-		short = "Removed in v2 — use astro env " + o.envNoun
+		short = "Removed in v2; use astro env " + o.envNoun
 	}
 	return removedCmdStub(o.noun, o.aliases, short, func(args []string) string {
 		return removedDeploymentObjectGuidance(o, args)
@@ -71,10 +71,10 @@ func removedDeploymentObjectGuidance(o removedDeploymentObject, args []string) s
 	case "delete", "rm":
 		return head + fmt.Sprintf("  use:  %s delete <key> --deployment <deployment-id>", envCmd)
 	case "copy", "cp":
-		return head + fmt.Sprintf("There is no copy. To share one object between Deployments, set it once in the workspace:\n"+
+		return head + fmt.Sprintf("There is no copy. To share one object between Deployments, set it once in the Workspace:\n"+
 			"  use:  %s set <key> --workspace <workspace-id> --auto-link\n"+
 			"or set it on each Deployment with --deployment.", envCmd)
 	}
 	return head + fmt.Sprintf("  use:  %s --help\n"+
-		"The Environment Manager holds %ss at workspace or Deployment scope.", envCmd, o.noun)
+		"The Environment Manager holds %ss at Workspace or Deployment scope.", envCmd, o.noun)
 }

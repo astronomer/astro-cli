@@ -15,7 +15,7 @@ import (
 // ErrRuntimeVersionNotPassedForRemoteImage is --remote without
 // --runtime-version: Houston's updateDeploymentImage takes the image's
 // runtime, and an image in a registry has no label here to read it from.
-var ErrRuntimeVersionNotPassedForRemoteImage = errors.New("if --image-name and --remote is passed, it's mandatory to pass --runtime-version")
+var ErrRuntimeVersionNotPassedForRemoteImage = errors.New("--runtime-version is required with --image-name and --remote")
 
 // houstonUpdateImageDisabled is what Houston answers updateDeploymentImage
 // with on a platform that has not turned the mutation on (houston-api
@@ -66,12 +66,12 @@ func deployRegistryImage(client houston.ClientInterface, in *ManifestImage, prog
 	}
 
 	fmt.Fprintf(progress, houstonDeploymentPrompt, t.release)
-	fmt.Fprintf(progress, "Pointing the Deployment at %s, which is already in its registry: nothing is built or pushed\n", in.ImageName)
+	fmt.Fprintf(progress, "Pointing the Deployment at %s, already in its registry. Nothing is built or pushed.\n", in.ImageName)
 	req := houston.UpdateDeploymentImageRequest{ReleaseName: t.release, Image: in.ImageName, RuntimeVersion: in.RuntimeVersion, DeployRevisionDescription: in.Description}
 	if _, err := houston.Call(client.UpdateDeploymentImage)(req); err != nil {
 		return ManifestImageResult{}, explainUpdateImageErr(err, t.appConfig, true)
 	}
-	fmt.Fprintln(progress, "Image successfully updated")
+	fmt.Fprintln(progress, "Updated the image")
 
 	res := ManifestImageResult{
 		WorkspaceID:     in.WorkspaceID,
@@ -92,15 +92,15 @@ func explainUpdateImageErr(err error, appConfig *houston.AppConfig, remote bool)
 	if err == nil || !strings.Contains(err.Error(), houstonUpdateImageDisabled) {
 		return err
 	}
-	advice := "Until then, deploy an image on this machine with astro deploy --image-name <image>, without --remote"
+	advice := "Until then, deploy an image from this machine with astro deploy --image-name <image>, without --remote"
 	if !remote {
-		advice = "A Deployment on a cluster with a registry of the customer's own takes every image through it"
+		advice = "A Deployment on a cluster with its own registry takes every image through that registry"
 	}
 	setting := updateImageEndpointSettingLegacy
 	if appConfig != nil && isHoustonPlatformVersionGTE200(appConfig.Version) {
 		setting = updateImageEndpointSetting
 	}
-	return fmt.Errorf("this Astro Private Cloud platform does not let the CLI point a Deployment at an image in a registry: Houston's updateDeploymentImage is turned off. "+
-		"A platform admin turns it on by setting %s to true under astronomer.houston.config. "+
+	return fmt.Errorf("this Astro Private Cloud platform does not let the CLI point a Deployment at an image in a registry (Houston's updateDeploymentImage is off). "+
+		"A platform admin can turn it on by setting %s to true under astronomer.houston.config. "+
 		"%s: %w", setting, advice, err)
 }

@@ -56,7 +56,7 @@ func checkSocket(path string) error {
 		return nil
 	}
 	if uid := currentUID(); !ownerTrusted(int(st.Uid), uid) {
-		return fmt.Errorf("the socket is in the shared directory %s and owned by uid %d, not you (uid %d); refusing to send requests to it", dirPath, st.Uid, uid)
+		return fmt.Errorf("the socket is in the shared directory %s and owned by uid %d, not by you (uid %d); refusing to send requests to it", dirPath, st.Uid, uid)
 	}
 	return nil
 }

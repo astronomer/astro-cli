@@ -64,7 +64,7 @@ func (s *Suite) TestDeploymentSaDeleteRootCommand() {
 	houstonClient = api
 	output, err := execDeploymentCmd("service-account", "delete", mockDeploymentSA.ID, "--deployment-id=1234", "--yes")
 	s.NoError(err)
-	s.Contains(output, "Service Account my_label (q1w2e3r4t5y6u7i8o9p0) successfully deleted")
+	s.Contains(output, "Deleted Service Account my_label (q1w2e3r4t5y6u7i8o9p0)")
 }
 
 func (s *Suite) TestDeploymentSaCreateCommand() {
@@ -72,7 +72,7 @@ func (s *Suite) TestDeploymentSaCreateCommand() {
 	expectedOut := ` NAME         CATEGORY     ID                       APIKEY                       
  my_label     default      q1w2e3r4t5y6u7i8o9p0     000000000000000000000000     
 
- Service account successfully created.
+ Created service account
 `
 
 	// A create answers with no bindings loaded: entityType SYSTEM, no
