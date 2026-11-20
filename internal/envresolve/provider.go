@@ -41,6 +41,10 @@ type Diagnoser interface {
 // env), and the Environment Manager provider knows which of its objects the
 // Workspace marks secret. A value from such a source is never quoted back in a
 // type warning, though the manifest left out `secret = true`.
+//
+// It is asked only of a key Lookup just returned a value for, and its answer
+// means nothing for any other: a vault tier answers true for every key it
+// indexes, one it then cannot read among them.
 type Secrecy interface {
 	Secret(envKey string) bool
 }
