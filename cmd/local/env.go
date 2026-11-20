@@ -1245,13 +1245,13 @@ func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 // so a narrowed list reports exactly what the full one would have for that
 // kind, resolution order and all.
 func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error {
-	r := c.renderer()
-	// wide is text with more columns, so the Renderer, which renders text and
-	// json only, gets text.
-	wide := r.Format == formatWide
+	// wide is text with more columns. The output field goes back to text
+	// before anything builds a Renderer, which renders text and json only.
+	wide := c.output == formatWide
 	if wide {
-		r.Format = cliout.FormatText
+		c.output = cliout.FormatText
 	}
+	r := c.renderer()
 	projectDir, _ := c.discoverProject() //nolint:errcheck // outside a project, list still shows the global vault
 	m, schema, err := c.loadManifestSchema(projectDir)
 	if err != nil {
@@ -1370,64 +1370,62 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, i
 	return tw.Flush()
 }
 
-// listNote is a list row's NOTE cell: one short state, or nothing for a row
-// that needs no attention.
-func listNote(it *localenv.ListItem, inProject bool) string {
+// rowNote is what a list row's NOTE says: the short state the plain list
+// prints, the longer one a wide list prints in its place (an invalid key's
+// rule), and the commands a wide list adds after it.
+type rowNote struct {
+	state, wideState string
+	commands         []string
+}
+
+// noteFor decides a row's note in one place, so a state and its commands
+// cannot disagree. A row that needs no attention gets the zero rowNote. An
+// orphan in another project, which only --all reaches, gets no command:
+// delete acts on the working directory's project, so ListItem leaves its
+// hints empty rather than name a command that edits the wrong file.
+func noteFor(it *localenv.ListItem, inProject bool) rowNote {
+	var n rowNote
 	switch {
 	case it.Invalid != "":
-		return "invalid key" + inProjectSuffix(it)
+		n = rowNote{state: "invalid key", wideState: it.Invalid, commands: []string{it.RemoveHint}}
 	case it.NotLinkedHere && it.LinksDown != "":
-		return "not linked here (" + it.LinksDown + ")"
+		n = rowNote{state: "not linked here (" + it.LinksDown + ")"}
 	case it.NotLinkedHere:
-		return "not linked here"
+		n = rowNote{state: "not linked here", commands: []string{it.LinkHint}}
 	case it.SetHint != "" && it.UndeclareHint != "":
+		n = rowNote{state: "no value", commands: []string{it.SetHint, it.UndeclareHint}}
 		if it.Required {
-			return "missing"
+			n.state = "missing"
 		}
-		return "no value"
 	case it.Orphan && inProject:
-		return "not declared" + inProjectSuffix(it)
+		n = rowNote{state: "not declared", commands: []string{it.DeclareHint, it.RemoveHint}}
+	default:
+		return rowNote{}
 	}
-	return ""
+	if n.wideState == "" {
+		n.wideState = n.state
+	}
+	if it.Project != "" {
+		n.state += " (in " + it.Project + ")"
+		n.wideState += " (in " + it.Project + ")"
+	}
+	n.commands = slices.DeleteFunc(n.commands, func(c string) bool { return c == "" })
+	return n
 }
 
-// inProjectSuffix names the project an --all row came from, when it is not
-// the current one.
-func inProjectSuffix(it *localenv.ListItem) string {
-	if it.Project == "" {
-		return ""
-	}
-	return " (in " + it.Project + ")"
+// listNote is a plain list's NOTE cell: one short state, or nothing.
+func listNote(it *localenv.ListItem, inProject bool) string {
+	return noteFor(it, inProject).state
 }
 
-// wideNote is a wide list's NOTE cell: the short state, then the commands
-// that settle it, as "missing: <set>, or <undeclare>". An invalid key gives
-// its reason in place of the state. An orphan in another project, which only
-// --all reaches, gets no command: delete acts on the working directory's
-// project, so ListItem leaves its hints empty rather than name a command that
-// edits the wrong file.
+// wideNote is a wide list's NOTE cell: the state, then the commands that
+// settle it, as "missing: <set>, or <undeclare>".
 func wideNote(it *localenv.ListItem, inProject bool) string {
-	note := listNote(it, inProject)
-	if note == "" {
-		return ""
+	n := noteFor(it, inProject)
+	if len(n.commands) == 0 {
+		return n.wideState
 	}
-	var commands []string
-	switch {
-	case it.Invalid != "":
-		note = it.Invalid + inProjectSuffix(it)
-		commands = []string{it.RemoveHint}
-	case it.NotLinkedHere:
-		commands = []string{it.LinkHint}
-	case it.SetHint != "":
-		commands = []string{it.SetHint, it.UndeclareHint}
-	case it.Orphan:
-		commands = []string{it.DeclareHint, it.RemoveHint}
-	}
-	commands = slices.DeleteFunc(commands, func(c string) bool { return c == "" })
-	if len(commands) == 0 {
-		return note
-	}
-	return note + ": " + strings.Join(commands, ", or ")
+	return n.wideState + ": " + strings.Join(n.commands, ", or ")
 }
 
 // yesOrBlank is a wide list's REQUIRED or SECRET cell.
