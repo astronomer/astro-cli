@@ -41,6 +41,7 @@ func newBundleRootCmd(out io.Writer) *cobra.Command {
 		newBundleDeleteCmd(out),
 		newBundleRollbackCmd(out),
 		newBundleVersionsRootCmd(out),
+		newBundleFilesRootCmd(out),
 	)
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "The Deployment whose bundles you'd like to manage, unless a bundle path names one. Run 'astro deployment list' to find valid IDs")
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "The Workspace of the Deployment. Defaults to the current Workspace")
