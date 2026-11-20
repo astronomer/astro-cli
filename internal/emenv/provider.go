@@ -127,6 +127,15 @@ func (p *provider) Lookup(key string) (string, bool) {
 	return obj.value, true
 }
 
+// Secret reports whether the Workspace marks the object under key secret, so
+// a type warning never quotes its value back (envresolve.Secrecy). A native
+// connection counts too: its value is a whole connection, credentials and all.
+func (p *provider) Secret(key string) bool {
+	p.load()
+	obj, ok := p.objects[key]
+	return ok && obj.isSecret
+}
+
 // Label is "workspace", or "workspace (unavailable: <reason>)" when the
 // workspace could not be read.
 func (p *provider) Label() string {

@@ -13,6 +13,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
+// The provider says which of its values are secrets, so a type warning never
+// quotes one back; a rename here would drop that silently.
+var _ envresolve.Secrecy = (*provider)(nil)
+
 // Login is the stored login a read uses: the one for the manifest's domain,
 // whatever the CLI's current context names. Its own type, not config.Context,
 // so the core packages that wire the provider never import config/.
