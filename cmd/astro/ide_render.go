@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/ide"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -33,12 +34,13 @@ func emitIDEProjects(r cliout.Renderer, list *ide.ProjectList) error {
 }
 
 // ideProjectLabel is how text names a project: by name, or by ID when the
-// name could not be read back.
+// name could not be read back. The name is the API's, so it is printed as
+// input.Cell has it: one line, and nothing a terminal would act on.
 func ideProjectLabel(id, name string) string {
 	if name == "" {
 		return id
 	}
-	return name
+	return input.Cell(name)
 }
 
 // emitIDEImport publishes an import. Its text line has always said
