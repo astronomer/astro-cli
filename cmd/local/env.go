@@ -569,8 +569,9 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		long = "List every value declared in pyproject.toml and where it resolves from, and every " +
 			"value a start passes to this project that is not declared. Airflow gets both. " +
 			"Declaring a name makes every copy of the project require it, and linking limits which " +
-			"projects a global reaches. The NOTE column marks rows that need attention: missing, " +
-			"no value, not declared, not linked here, or invalid key. On a terminal, the commands " +
+			"projects a global reaches. The NOTE column marks rows that need attention: declared but " +
+			"missing, declared but not set (optional), not declared, not linked here, or invalid key. " +
+			"SOURCE is blank for a value nothing sets. On a terminal, the commands " +
 			"that settle them follow the table as next steps (ASTRO_GUIDANCE_DISABLED=1 turns them " +
 			"off). -o wide adds whether each value is required and secret, and its description. " +
 			"Values are not shown; use the get command to see one."
@@ -1363,11 +1364,17 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, i
 	for i := range items {
 		it := &items[i]
 		n := noteFor(it, inProject)
-		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, n.state)
+		// A value nothing supplies has no source to name, and the NOTE says
+		// so; the JSON row keeps "absent".
+		source := it.Source
+		if source == localenv.SourceAbsent {
+			source = ""
+		}
+		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, source, n.state)
 		if wide {
 			// The description is collapsed to one line: a TOML multi-line
 			// string would otherwise break the row out of the table.
-			row = fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, it.Source, n.wideState,
+			row = fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, source, n.wideState,
 				yesOrBlank(it.Required), yesOrBlank(it.Secret), strings.Join(strings.Fields(it.Description), " "))
 		}
 		fmt.Fprintln(tw, row)
@@ -1420,11 +1427,11 @@ func noteFor(it *localenv.ListItem, inProject bool) rowNote {
 		}
 	case it.SetHint != "" && it.UndeclareHint != "" && it.Required:
 		n = rowNote{
-			rank: rankMissing, state: "missing",
+			rank: rankMissing, state: "declared but missing",
 			step: cliout.NextStep{Why: "Set " + it.Name + " so astro local start can run", Command: it.SetHint},
 		}
 	case it.SetHint != "" && it.UndeclareHint != "":
-		n = rowNote{rank: rankNoValue, state: "no value"}
+		n = rowNote{rank: rankNoValue, state: "declared but not set (optional)"}
 	case it.Orphan && inProject:
 		n = rowNote{
 			rank: rankNotDeclared, state: "not declared",

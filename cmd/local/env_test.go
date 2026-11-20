@@ -382,13 +382,13 @@ func TestEnvListNotes(t *testing.T) {
 	}
 	want := "" +
 		"KIND      NAME        SOURCE          NOTE\n" +
-		"variable  API_URL     absent          missing\n" +
+		"variable  API_URL                     declared but missing\n" +
 		"variable  DECLARED    project         \n" +
 		"variable  ELSEWHERE   project         not declared (in /projects/other)\n" +
 		"variable  GLOBALONLY  vault (global)  not declared\n" +
 		"variable  LEFTOVER    project         not declared\n" +
-		"variable  LOG_LEVEL   absent          no value\n" +
-		"variable  TOKEN       absent          not linked here\n"
+		"variable  LOG_LEVEL                   declared but not set (optional)\n" +
+		"variable  TOKEN                       not linked here\n"
 	if out.String() != want {
 		t.Errorf("list =\n%s\nwant\n%s", out.String(), want)
 	}
@@ -399,13 +399,13 @@ func TestEnvListNotes(t *testing.T) {
 	}
 	want = "" +
 		"KIND      NAME        SOURCE          NOTE                               REQUIRED  SECRET  DESCRIPTION\n" +
-		"variable  API_URL     absent          missing                            yes       yes     Where the API lives\n" +
+		"variable  API_URL                     declared but missing               yes       yes     Where the API lives\n" +
 		"variable  DECLARED    project                                            yes               \n" +
 		"variable  ELSEWHERE   project         not declared (in /projects/other)                    \n" +
 		"variable  GLOBALONLY  vault (global)  not declared                                         \n" +
 		"variable  LEFTOVER    project         not declared                                         \n" +
-		"variable  LOG_LEVEL   absent          no value                                             \n" +
-		"variable  TOKEN       absent          not linked here                                      \n"
+		"variable  LOG_LEVEL                   declared but not set (optional)                      \n" +
+		"variable  TOKEN                       not linked here                                      \n"
 	if out.String() != want {
 		t.Errorf("list -o wide =\n%s\nwant\n%s", out.String(), want)
 	}

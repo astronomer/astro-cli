@@ -277,7 +277,7 @@ func TestListNotesAnUnsuppliedWorkspaceName(t *testing.T) {
 
 	d, out, stderr := envDeps(t, dir, "")
 	require.NoError(t, execute(t, d, "local", "env", "list"))
-	assert.Regexp(t, `(?m)^variable +API_URL +workspace +no value$`, out.String())
+	assert.Regexp(t, `(?m)^variable +API_URL +workspace +declared but not set \(optional\)$`, out.String())
 	// An optional value nothing sets needs no step.
 	assert.NotContains(t, stderr.String(), "Next:")
 }
@@ -364,8 +364,8 @@ func TestListNotesBothWaysOutOfAnAbsentName(t *testing.T) {
 			present = line
 		}
 	}
-	assert.Regexp(t, `no value$`, demo)
-	assert.NotContains(t, present, "no value")
+	assert.Regexp(t, `^variable +DEMO_VAR2 +declared but not set \(optional\)$`, demo)
+	assert.NotContains(t, present, "declared but")
 	assert.NotContains(t, out.String(), "astro local env variable set DEMO_VAR2", "a plain list prints no commands")
 
 	d, out, _ = envDeps(t, dir, "")

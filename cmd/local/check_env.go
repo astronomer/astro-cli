@@ -28,7 +28,7 @@ func envFindings(rep plan.EnvReport) []checks.Finding {
 			Severity: checks.SeverityError,
 			Section:  string(m.Section),
 			Key:      m.Name,
-			Message:  "missing: pyproject.toml requires it and nothing on this machine sets it; provide it: " + plan.SetCommand(m),
+			Message:  "declared but missing: nothing on this machine sets it; provide it: " + plan.SetCommand(m),
 		})
 	}
 	for _, v := range rep.Warnings {

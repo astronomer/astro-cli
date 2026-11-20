@@ -122,14 +122,14 @@ Shows every declared name with the source it resolves from, plus `required`, `se
 | `workspace (<id>)` | the linked workspace |
 | `workspace (unavailable: <reason>)` | the workspace could not be read |
 | `default` | the declaration's default |
-| `absent` | nothing supplies it |
+| `absent` | nothing supplies it (blank in the text table) |
 
 The text table's NOTE column holds one short state per row, or nothing when the row needs no attention. `-o wide` adds REQUIRED, SECRET and DESCRIPTION columns, and gives an invalid key's rule in its NOTE. On a terminal the commands that settle the notes follow the table on stderr, as next steps (see [Output style](output-style.md#next-steps)), the missing values first:
 
 | note | meaning | next step |
 | --- | --- | --- |
-| `missing` | declared required and nothing supplies it, so a start refuses | `set` |
-| `no value` | declared optional and nothing supplies it | none |
+| `declared but missing` | declared required and nothing supplies it, so a start refuses | `set` |
+| `declared but not set (optional)` | declared optional and nothing supplies it | none |
 | `not declared` | a value in a store that no declaration names | `declare` |
 | `not linked here` | a global that does not reach this project (`--all` only) | `link` |
 | `invalid key` | an Airflow Variable key an older build stored, which no longer resolves | `delete` |
