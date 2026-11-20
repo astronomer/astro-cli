@@ -440,7 +440,10 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 		if err != nil {
 			return err
 		}
-		header.Name = relPath
+		// Tar names use forward slashes on every platform; on Windows
+		// filepath.Rel returns backslashes, which the IDE would store as
+		// literal characters in a top-level file name.
+		header.Name = filepath.ToSlash(relPath)
 
 		// Write the header
 		if err := tarWriter.WriteHeader(header); err != nil {
