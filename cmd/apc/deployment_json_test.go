@@ -338,7 +338,7 @@ func TestDeploymentRemovalJSON(t *testing.T) {
 		run := runAPC(t, api, "", "deployment", "delete", "dep-ac", "--yes")
 		require.Equal(t, 0, run.code)
 		assert.Equal(t, "\n Deleted Deployment\n", run.stdout)
-		assert.NotContains(t, run.stderr, "Hard-delete the Deployment?")
+		assert.NotContains(t, run.stderr, "Delete the Deployment?")
 	})
 
 	// Houston may answer with no record; the id given is what is known.

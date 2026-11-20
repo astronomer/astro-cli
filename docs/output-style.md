@@ -51,7 +51,7 @@ A confirmation names the action, the exact object, and the consequence. Reuse th
 ```
 Select the Organization API token to add to the Workspace
 Delete Deployment etl? This cannot be undone. (y/N)
-Hard-delete the Deployment? (after a line that says all its data, including the database, is lost)
+Delete the Deployment? (after a line that says all its data, including the database, is lost)
 ```
 
 ## Counts and empty results

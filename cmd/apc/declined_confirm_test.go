@@ -53,7 +53,7 @@ func apcConfirmCases() []apcConfirmCase {
 		{
 			name: "deployment delete", version: "2.1.0",
 			args:     []string{"deployment", "delete", "dep-1"},
-			question: "Hard-delete the Deployment?",
+			question: "Delete the Deployment?",
 			client: func() *mocks.ClientInterface {
 				api := apcAt("2.1.0")
 				api.On("DeleteDeployment", mock.Anything).Return(removed, nil).Maybe()
@@ -64,7 +64,7 @@ func apcConfirmCases() []apcConfirmCase {
 		{
 			name: "deployment delete, on the oldest platform with the hard-delete question", version: "0.25.0",
 			args:     []string{"deployment", "delete", "dep-1"},
-			question: "Hard-delete the Deployment?",
+			question: "Delete the Deployment?",
 			client: func() *mocks.ClientInterface {
 				api := apcAt("0.25.0")
 				api.On("DeleteDeployment", mock.Anything).Return(removed, nil).Maybe()

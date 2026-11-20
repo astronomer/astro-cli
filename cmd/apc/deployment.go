@@ -22,7 +22,7 @@ const (
 	kubernetesExecutorArg = "kubernetes"
 	k8sExecutorArg        = "k8s"
 
-	cliDeploymentHardDeletePrompt              = "This permanently deletes all data in this Deployment, including the database. You cannot recover it. Hard-delete the Deployment?"
+	cliDeploymentHardDeletePrompt              = "This permanently deletes all data in this Deployment, including the database. You cannot recover it. Delete the Deployment?"
 	cliDeploymentUnadoptPrompt                 = "This removes the Deployment record from APC. The Airflow custom resource, its namespace, and its metadata database are left untouched. This cannot be undone from the CLI. Unadopt the Deployment?"
 	deploymentTypeCmdMessage                   = "Dag Deployment mechanism: image, volume, git_sync, dag_deploy"
 	CreateDeploymentWithTypeDagDeployPromptMsg = "\nDag-only deploys are experimental; use with caution. See the APC documentation at " + houston.DagDeployDocsLink + " for details. Create the Deployment?"
