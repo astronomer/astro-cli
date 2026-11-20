@@ -173,7 +173,7 @@ func TestFillInstallsGitAndURLSources(t *testing.T) {
 	require.NotNil(t, req.Install, "%v", warnings)
 	assert.Equal(t, []string{
 		"pyfiglet @ git+https://github.com/pwaller/pyfiglet@be130d640d520d4a9db2b4f8a86f9d838534f8d0",
-		"six @ https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl",
+		"six @ https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl#sha256=4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
 	}, req.Install.Requirements)
 	assert.NotContains(t, strings.Join(req.Install.Requirements, "\n"), "s3cret")
 	assert.Equal(t, []string{"the image build leaves out a URL's user and password: give the build a netrc secret instead"}, warnings)

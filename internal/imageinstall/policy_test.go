@@ -130,6 +130,38 @@ func TestStatesVersion(t *testing.T) {
 
 // A URL's credentials are left out, and said to be, except an ssh URL's user
 // with no password, which is the account ssh logs in as.
+// A package from a URL installs from that file, carrying the lock's hash, so
+// the image's installer refuses a file at that URL that is not the one the
+// lock recorded. The hash joins a fragment the URL already has, and the
+// marker follows it.
+func TestApplyInstallsAURLSourceAtTheLocksHash(t *testing.T) {
+	lists, _, err := apply(&policyInput{
+		pyproject: []byte("[project]\nname = 'p'\ndependencies = ['fast', 'sub', 'bare']\n"),
+		pylock: []byte(`
+[[packages]]
+name = "fast"
+version = "1.0"
+marker = "python_version >= '3.10'"
+archive = { url = "https://user:pw@acme.example/fast-1.0.tar.gz", hashes = { sha256 = "f0" } }
+[[packages]]
+name = "sub"
+version = "2.0"
+archive = { url = "https://acme.example/sub-2.0.zip#subdirectory=pkg", hashes = { sha256 = "s0" } }
+[[packages]]
+name = "bare"
+version = "3.0"
+archive = { url = "https://acme.example/bare-3.0.tar.gz", hashes = { sha512 = "b0" } }
+`),
+		baseInstalled: []string{},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{
+		"fast @ https://acme.example/fast-1.0.tar.gz#sha256=f0 ; python_version >= '3.10'",
+		"sub @ https://acme.example/sub-2.0.zip#subdirectory=pkg&sha256=s0",
+		"bare @ https://acme.example/bare-3.0.tar.gz",
+	}, lists.Requirements)
+}
+
 func TestURLCleaner(t *testing.T) {
 	for raw, tc := range map[string]struct {
 		want     string

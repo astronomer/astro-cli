@@ -30,7 +30,9 @@ import (
 //     and the install keeps whatever the image has that satisfies the
 //     requirements, as pip and uv do.
 //   - A package from git or a URL is a direct reference to the commit or file
-//     the lock recorded. One a [tool.uv.sources] entry routes to an index
+//     the lock recorded; a URL's carries the lock's hash, which pip and uv
+//     both check the file they download against. One a [tool.uv.sources]
+//     entry routes to an index
 //     installs before everything else, from the files the lock recorded for
 //     it alone (InstallLists.Routed): pip, in the image, picks the one its
 //     Python and platform take, and checks it against the lock's hash, so
@@ -343,7 +345,10 @@ func pinName(line string) string {
 
 // directRefs are the requirement lines that install pkg from where the lock
 // says it comes from, or none when it installs by name: a git commit or a
-// URL.
+// URL. A URL carries the lock's hash (withHash), as a fragment rather than a
+// --hash option: pip and uv both check a fragment on the file they download,
+// and pip would take a --hash on any line as --require-hashes for the whole
+// file, which the lines installed by name cannot meet.
 func directRefs(pkg *lockedPackage, urls *urlCleaner) []string {
 	switch {
 	case pkg.VCS != nil:
@@ -354,7 +359,8 @@ func directRefs(pkg *lockedPackage, urls *urlCleaner) []string {
 		}
 		return []string{withMarker(ref, pkg.Marker)}
 	case pkg.Archive != nil && pkg.Archive.URL != "":
-		return []string{withMarker(pkg.Name+" @ "+urls.clean(pkg.Archive.URL), pkg.Marker)}
+		url := withHash(urls.clean(pkg.Archive.URL), pkg.Archive.Hashes["sha256"])
+		return []string{withMarker(pkg.Name+" @ "+url, pkg.Marker)}
 	}
 	return nil
 }
@@ -377,13 +383,22 @@ func fileLinks(pkg *lockedPackage, urls *urlCleaner) []string {
 	}
 	links := make([]string, 0, len(files))
 	for _, f := range files {
-		link := urls.clean(f.URL)
-		if sha := f.Hashes["sha256"]; sha != "" {
-			link += "#sha256=" + sha
-		}
-		links = append(links, link)
+		links = append(links, withHash(urls.clean(f.URL), f.Hashes["sha256"]))
 	}
 	return links
+}
+
+// withHash is url with sha256=sha in its fragment, joined to one it already
+// has with &, as pip and uv both read it; url as it is for a sha of "".
+func withHash(url, sha string) string {
+	switch {
+	case sha == "":
+		return url
+	case strings.Contains(url, "#"):
+		return url + "&sha256=" + sha
+	default:
+		return url + "#sha256=" + sha
+	}
 }
 
 // urlCleaner leaves a URL's user and password out, and remembers that it did.
