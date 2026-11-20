@@ -1,7 +1,6 @@
 package local
 
 import (
-	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -227,19 +226,10 @@ func TestTasksClearResetsTheRunAndNeedsConsent(t *testing.T) {
 	}
 }
 
-// standInTerminal makes outputIsTerminal report true for the test's buffers.
-func standInTerminal(t *testing.T) {
-	t.Helper()
-	orig := outputIsTerminal
-	t.Cleanup(func() { outputIsTerminal = orig })
-	outputIsTerminal = func(io.Writer) bool { return true }
-}
-
-// A task's log and a string XCom are Airflow's text, which a task can put
-// anything in. To a terminal they go without what it would act on (here a
-// clipboard write and a screen clear), keeping their line breaks; to a pipe
-// they go byte for byte.
-func TestTaskOutputReachesATerminalWithoutEscapes(t *testing.T) {
+// A task's log and a string XCom go to a file or a pipe byte for byte, escapes
+// and all: a saved log is exact. (To a terminal, cliout.Renderer drops what
+// the terminal would act on; TestTextRenderingToATerminalIsGuarded.)
+func TestTaskOutputToAPipeIsExact(t *testing.T) {
 	const payload = "\x1b]52;c;aGk=\x07\x1b[2J"
 	run := func(t *testing.T, args ...string) string {
 		t.Helper()
@@ -258,16 +248,6 @@ func TestTaskOutputReachesATerminalWithoutEscapes(t *testing.T) {
 		"a log":   {"tasks", "logs", "orders_etl", "run_1", "load"},
 		"an xcom": {"tasks", "xcom", "orders_etl", "run_1", "load", "--key", "note"},
 	} {
-		t.Run(name+", to a terminal", func(t *testing.T) {
-			standInTerminal(t)
-			out := run(t, args...)
-			if strings.ContainsAny(out, "\x1b\x07") {
-				t.Errorf("a terminal escape reached the terminal: %q", out)
-			}
-			if !strings.Contains(out, "line one\nline two") {
-				t.Errorf("the line break was lost: %q", out)
-			}
-		})
 		t.Run(name+", to a pipe", func(t *testing.T) {
 			if out := run(t, args...); !strings.Contains(out, "line one\nline two"+payload) {
 				t.Errorf("piped output was changed: %q", out)
