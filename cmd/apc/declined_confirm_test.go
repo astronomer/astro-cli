@@ -53,7 +53,7 @@ func apcConfirmCases() []apcConfirmCase {
 		{
 			name: "deployment delete", version: "2.1.0",
 			args:     []string{"deployment", "delete", "dep-1"},
-			question: "Proceed with delete?",
+			question: "Hard-delete the Deployment?",
 			client: func() *mocks.ClientInterface {
 				api := apcAt("2.1.0")
 				api.On("DeleteDeployment", mock.Anything).Return(removed, nil).Maybe()
@@ -64,7 +64,7 @@ func apcConfirmCases() []apcConfirmCase {
 		{
 			name: "deployment delete, on the oldest platform with the hard-delete question", version: "0.25.0",
 			args:     []string{"deployment", "delete", "dep-1"},
-			question: "Proceed with delete?",
+			question: "Hard-delete the Deployment?",
 			client: func() *mocks.ClientInterface {
 				api := apcAt("0.25.0")
 				api.On("DeleteDeployment", mock.Anything).Return(removed, nil).Maybe()
@@ -75,7 +75,7 @@ func apcConfirmCases() []apcConfirmCase {
 		{
 			name: "deployment unadopt", version: "2.1.0",
 			args:     []string{"deployment", "unadopt", "--deployment", "dep-1"},
-			question: "Proceed with unadopt?",
+			question: "Unadopt the Deployment?",
 			client: func() *mocks.ClientInterface {
 				api := apcAt("2.1.0")
 				api.On("UnadoptDeployment", mock.Anything).Return(removed, nil).Maybe()
@@ -86,7 +86,7 @@ func apcConfirmCases() []apcConfirmCase {
 		{
 			name: "deployment unadopt, on a later platform", version: "2.2.1",
 			args:     []string{"deployment", "unadopt", "--deployment", "dep-1"},
-			question: "Proceed with unadopt?",
+			question: "Unadopt the Deployment?",
 			client: func() *mocks.ClientInterface {
 				api := apcAt("2.2.1")
 				api.On("UnadoptDeployment", mock.Anything).Return(removed, nil).Maybe()
@@ -266,7 +266,7 @@ func TestUnadoptBeforeItsVersionAsksNothing(t *testing.T) {
 	require.Error(t, run.err)
 	assert.Contains(t, run.err.Error(), "astro deployment unadopt needs Astro Private Cloud 2.1.0 or newer")
 	assert.NotErrorIs(t, run.err, input.ErrAborted)
-	assert.NotContains(t, run.stderr, "Proceed with unadopt?")
+	assert.NotContains(t, run.stderr, "Unadopt the Deployment?")
 	assert.False(t, run.stdinRead)
 	api.AssertNotCalled(t, "UnadoptDeployment", mock.Anything)
 }

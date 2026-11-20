@@ -277,9 +277,9 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 				assert.Equal(t, teamPickRows, tableRows(t, out, "#"))
 			},
 		},
-		{name: "update an IdP team confirmed", root: newOrganizationCmd, client: with(teams, updatesTeam("team-idp", &idp)), answers: "y\n", args: []string{"organization", "team", "update", "team-idp", "--description", "d"}, check: says("This is an IDP-managed team. Continue? (y/n)", "Updated team Okta Ops")},
+		{name: "update an IdP team confirmed", root: newOrganizationCmd, client: with(teams, updatesTeam("team-idp", &idp)), answers: "y\n", args: []string{"organization", "team", "update", "team-idp", "--description", "d"}, check: says("This is an IDP-managed team. Change it anyway? (y/n)", "Updated team Okta Ops")},
 		{name: "update an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "update", "team-idp", "--description", "d"}, check: func(t *testing.T, out string) {
-			assert.Equal(t, "This is an IDP-managed team. Continue? (y/n) ", out)
+			assert.Equal(t, "This is an IDP-managed team. Change it anyway? (y/n) ", out)
 		}, wantErr: "aborted"},
 		{name: "update an IdP team --yes", root: newOrganizationCmd, client: with(teams, updatesTeam("team-idp", &idp)), args: []string{"organization", "team", "update", "team-idp", "--description", "d", "--yes"}, check: says("Updated team Okta Ops")},
 		{
@@ -310,7 +310,7 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 			args:  []string{"organization", "team", "user", "add", "--user-id", "user-bob"},
 			check: says("Select a team:", "> Added user bob@example.com to team Engineering\n"),
 		},
-		{name: "user add to an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "user", "add", "--team-id", "team-idp", "--user-id", "user-bob"}, check: says("Continue? (y/n)"), wantErr: "aborted"},
+		{name: "user add to an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "user", "add", "--team-id", "team-idp", "--user-id", "user-bob"}, check: says("Change it anyway? (y/n)"), wantErr: "aborted"},
 		{name: "user remove", root: newOrganizationCmd, client: with(teams, removesMember("team-eng", "user-ada")), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-ada"}, check: func(t *testing.T, out string) {
 			assert.Equal(t, "Removed user ada@example.com from team Engineering\n", out)
 		}},
@@ -323,7 +323,7 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 			},
 		},
 		// The client mocks no removal, so going on would panic.
-		{name: "user remove from an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "user", "remove", "--team-id", "team-idp", "--user-id", "user-ada"}, check: says("Continue? (y/n)"), wantErr: "aborted"},
+		{name: "user remove from an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "user", "remove", "--team-id", "team-idp", "--user-id", "user-ada"}, check: says("Change it anyway? (y/n)"), wantErr: "aborted"},
 		{name: "user remove of a non-member", root: newOrganizationCmd, client: with(teams), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-bob"}, check: empty, wantErr: "user user-bob is not a member of team Engineering"},
 		{name: "user remove from a team with no members", root: newOrganizationCmd, client: with(noMembers), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-ada"}, check: empty, wantErr: "no team members found in team"},
 		{name: "user list", root: newOrganizationCmd, client: with(teams), args: []string{"organization", "team", "user", "list", "--team-id", "team-eng"}, check: listsRows("ID", adaMemberRow)},

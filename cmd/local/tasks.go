@@ -443,7 +443,7 @@ func renderClearedTasks(w io.Writer, cleared clearedTasks) error {
 	if cleared.DryRun {
 		verb = "would clear"
 	}
-	if _, err := fmt.Fprintf(w, "%s %d task instance(s) in run %s:\n", verb, len(cleared.Tasks), cleared.RunID); err != nil {
+	if _, err := fmt.Fprintf(w, "%s %s in run %s:\n", verb, plural(len(cleared.Tasks), "task instance", "task instances"), cleared.RunID); err != nil {
 		return err
 	}
 	return renderTaskInstanceTable(w, cleared.Tasks)

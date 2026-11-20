@@ -304,10 +304,10 @@ func (r healthReport) verdict() (status, reason string) {
 	switch {
 	case r.ImportErrors.Count > 0:
 		status = healthUnhealthy
-		reason = fmt.Sprintf("%d Dag file(s) failed to parse", r.ImportErrors.Count)
+		reason = plural(r.ImportErrors.Count, "Dag file", "Dag files") + " failed to parse"
 	case r.DAGWarnings.Count > 0:
 		status = healthWarning
-		reason = fmt.Sprintf("%d Dag warning(s)", r.DAGWarnings.Count)
+		reason = plural(r.DAGWarnings.Count, "Dag warning", "Dag warnings")
 	default:
 		status = healthHealthy
 		reason = "no import errors or Dag warnings"
@@ -476,5 +476,5 @@ func dagStatsDetail(section healthDAGStats) string {
 	}
 	// DAGsWithRuns rather than len(section.DAGs): see the field's comment for
 	// why the length is not reportable as either reading.
-	return fmt.Sprintf("%d Dag(s) with runs, %s", section.DAGsWithRuns, strings.Join(parts, " "))
+	return fmt.Sprintf("%s with runs, %s", plural(section.DAGsWithRuns, "Dag", "Dags"), strings.Join(parts, " "))
 }

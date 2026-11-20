@@ -400,7 +400,7 @@ func TestRunsClearDryRunAsksNothing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runs clear --dry-run: %v", err)
 	}
-	if !strings.Contains(out, "would clear 1 task instance(s)") || !strings.Contains(out, "load") {
+	if !strings.Contains(out, "would clear 1 task instance of run") || !strings.Contains(out, "load") {
 		t.Errorf("stdout = %q", out)
 	}
 	body := stub.request(http.MethodPost, "/api/v2/dags/orders_etl/dagRuns/run_1/clear").Body

@@ -205,7 +205,7 @@ func TestTasksClearResetsTheRunAndNeedsConsent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("tasks clear --yes: %v", err)
 	}
-	if !strings.Contains(out, "cleared 1 task instance(s)") {
+	if !strings.Contains(out, "cleared 1 task instance in run") {
 		t.Errorf("stdout = %q", out)
 	}
 	body := stub.request(http.MethodPost, "/api/v2/dags/orders_etl/clearTaskInstances").Body
@@ -221,7 +221,7 @@ func TestTasksClearResetsTheRunAndNeedsConsent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("tasks clear --dry-run: %v", err)
 	}
-	if !strings.Contains(out, "would clear 1 task instance(s)") {
+	if !strings.Contains(out, "would clear 1 task instance in run") {
 		t.Errorf("stdout = %q", out)
 	}
 }

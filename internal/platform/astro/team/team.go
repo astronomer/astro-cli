@@ -40,7 +40,7 @@ func confirmOperation(force bool) error {
 	if force {
 		return nil
 	}
-	return input.ConfirmOrAbort("This is an IDP-managed team. Continue?", input.AnsweredBy("--yes"))
+	return input.ConfirmOrAbort("This is an IDP-managed team. Change it anyway?", input.AnsweredBy("--yes"))
 }
 
 // Info is t as a team command reports it, with no role: the caller sets the

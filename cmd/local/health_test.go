@@ -48,25 +48,25 @@ func TestHealthDAGStatsIsTrueOnBothGenerations(t *testing.T) {
 			name: "airflow 2, one DAG, never run", af2: true,
 			dags:    `{"dags":[{"dag_id":"example_dag"}],"total_entries":1}`,
 			payload: af2NoRuns,
-			want:    "dag stats: no runs", absent: "Dag(s)",
+			want:    "dag stats: no runs", absent: "Dags with runs",
 		},
 		{
 			// Before: "4 DAG(s) with runs" — two of them never ran.
 			name: "airflow 2, four DAGs, two with runs", af2: true,
 			dags:    `{"dags":[{"dag_id":"a"},{"dag_id":"b"},{"dag_id":"c"},{"dag_id":"d"}],"total_entries":4}`,
 			payload: af2SomeRuns,
-			want:    "dag stats: 2 Dag(s) with runs, failed=1 success=5",
+			want:    "dag stats: 2 Dags with runs, failed=1 success=5",
 		},
 		{
 			name: "airflow 3, no DAG has runs", payload: `{"dags":[],"total_entries":0}`,
-			want: "dag stats: no runs", absent: "Dag(s)",
+			want: "dag stats: no runs", absent: "Dags with runs",
 		},
 		{
 			name: "airflow 3, two DAGs with runs",
 			payload: `{"dags":[
 				{"dag_id":"a","stats":[{"state":"success","count":2},{"state":"failed","count":0}]},
 				{"dag_id":"b","stats":[{"state":"success","count":0},{"state":"failed","count":1}]}],"total_entries":2}`,
-			want: "dag stats: 2 Dag(s) with runs, failed=1 success=2",
+			want: "dag stats: 2 Dags with runs, failed=1 success=2",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -158,7 +158,7 @@ func TestHealthComposesAndDegrades(t *testing.T) {
 	if report["overall_status"] != healthWarning {
 		t.Errorf("overall_status = %v, want %s", report["overall_status"], healthWarning)
 	}
-	if reason, _ := report["status_reason"].(string); !strings.Contains(reason, "1 Dag warning(s)") {
+	if reason, _ := report["status_reason"].(string); !strings.Contains(reason, "1 Dag warning") {
 		t.Errorf("status_reason = %v", report["status_reason"])
 	}
 	// The version section carries Airflow's own account of itself, so a reader
@@ -218,7 +218,7 @@ func TestHealthVerdicts(t *testing.T) {
 			importErrors: `{"import_errors":[{"filename":"dags/broken.py","stack_trace":"SyntaxError\n  line 3"}],"total_entries":1}`,
 			warnings:     `{"dag_warnings":[{"dag_id":"orders_etl","message":"m"}],"total_entries":1}`,
 			want:         healthUnhealthy,
-			reason:       "1 Dag file(s) failed to parse",
+			reason:       "1 Dag file failed to parse",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -261,7 +261,7 @@ func TestHealthCountsWhatTheInstanceHasNotWhatFitOnThePage(t *testing.T) {
 	if section["count"] != float64(250) {
 		t.Errorf("count = %v, want the instance's total of 250", section["count"])
 	}
-	if reason, _ := report["status_reason"].(string); !strings.Contains(reason, "250 Dag file(s)") {
+	if reason, _ := report["status_reason"].(string); !strings.Contains(reason, "250 Dag files") {
 		t.Errorf("status_reason = %v, want the real number", report["status_reason"])
 	}
 }

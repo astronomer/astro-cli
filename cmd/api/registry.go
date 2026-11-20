@@ -159,7 +159,7 @@ func runRegistry(opts *RegistryOptions) error {
 
 	// Check for any remaining unfilled path parameters
 	if missing := findMissingPathParams(requestPath); len(missing) > 0 {
-		return fmt.Errorf("missing path parameter(s): %s; pass them with -p/--path-param, for example -p %s=value",
+		return fmt.Errorf("missing path parameters: %s; pass them with -p/--path-param, for example -p %s=value",
 			strings.Join(missing, ", "), missing[0])
 	}
 

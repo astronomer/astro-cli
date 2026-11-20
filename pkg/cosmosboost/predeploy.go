@@ -138,7 +138,7 @@ func refuseToReplaceForeign(artifacts []precompute.Artifact) error {
 		}
 	}
 	if len(foreign) > 0 {
-		return fmt.Errorf("found Cosmos Boost file(s) from an unrecognized producer: %s; the deploy cannot prove they are fresh and will not ship them for the Cosmos Boost plugin to read. Remove them and retry", strings.Join(foreign, ", "))
+		return fmt.Errorf("found Cosmos Boost files from an unrecognized producer: %s; the deploy cannot prove they are fresh and will not ship them for the Cosmos Boost plugin to read. Remove them and retry", strings.Join(foreign, ", "))
 	}
 	return nil
 }
@@ -154,7 +154,11 @@ func preDeploy(path string) ([]precompute.Artifact, error) {
 	}
 	debugReport("pre-deploy", summary)
 	if failed := summary.CountFailed(); failed > 0 {
-		return summary.Artifacts(), fmt.Errorf("the Cosmos Boost pre-deploy step failed for %d unit(s) (re-run with --verbosity debug for details)", failed)
+		units := "units"
+		if failed == 1 {
+			units = "unit"
+		}
+		return summary.Artifacts(), fmt.Errorf("the Cosmos Boost pre-deploy step failed for %d %s (re-run with --verbosity debug for details)", failed, units)
 	}
 	return summary.Artifacts(), nil
 }

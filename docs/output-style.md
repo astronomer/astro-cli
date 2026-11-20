@@ -22,7 +22,10 @@ no Deployment named "etl" in Workspace analytics; run astro deployment list to s
 
 - Start lowercase with no trailing period. The CLI prints `Error:` in front, and Go wraps errors with `: `.
 - Use this order: what failed, then the cause if known, then the fix. Join the parts with `: ` or `;`, or start a new sentence.
-- Say "could not" or "cannot". Don't use "unable to", "failed to" (unless you're naming a failed step), "oops", or "sorry".
+- Name the exact object: `no Deployment named "etl" in Workspace analytics`, not `Deployment not found`.
+- State the rule rather than blaming the user: `names use lowercase letters, numbers, and hyphens`, not `you entered an invalid name`.
+- Say "cannot" for something blocked now and "could not" for an attempt that failed. Don't use "unable to", "failed to" (unless you're naming a failed step), "oops", "sorry", "an error occurred", or "something went wrong".
+- Never end on "try again" alone. Give the command to run, or the command that shows the state when the outcome is unknown.
 - Keep `%w` wrapping, sentinel errors, and anything code or tests match with `errors.Is` or `strings.Contains`.
 
 ## Warnings and notes
@@ -43,10 +46,18 @@ Updated team data-eng to WORKSPACE_MEMBER
 
 Ask directly with the imperative or a short question. Don't say "please" or "you would like to".
 
+A confirmation names the action, the exact object, and the consequence. Reuse that verb in the success line. Never ask a bare "Continue?", "Proceed?" or "Are you sure?".
+
 ```
 Select the Organization API token to add to the Workspace
 Delete Deployment etl? This cannot be undone. (y/N)
+Hard-delete the Deployment? (after a line that says all its data, including the database, is lost)
 ```
+
+## Counts and empty results
+
+- Count with the noun that fits: `1 Dag`, `3 Dags`. Never write `Dag(s)`; `plural` in `cmd/local` does this.
+- Zero is `No Deployments in Workspace analytics`, not `0 Deployments`. Follow it with the command that creates the first one when there is one.
 
 ## Help text
 
@@ -70,9 +81,11 @@ These show up in machine-written prose and make output read as padded or evasive
 | in order to | to |
 | Note that …, It's worth noting … | the fact itself, or `cliout.Note` |
 | emoji, decorative symbols | nothing |
+| "It's not X, it's Y", rhetorical questions, lists of three for rhythm | the plain statement |
 
 ## Terms
 
+- Use one name per concept and one verb per operation. Don't switch to a synonym for variety.
 - Capitalize **Deployment**, **Workspace**, and **Organization** when the text means the Astro or APC resource. Flag names keep their spelling (`--deployment`).
 - **Dag**, as Airflow 3 spells it. Keep **DAG** only where it quotes Airflow 1/2 or an API field.
 - Write **Airflow**, **Astro Runtime**, and **Astro CLI** with capitals. Write **pyproject.toml**, **uv**, and command lines as they are typed.

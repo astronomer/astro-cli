@@ -1078,7 +1078,7 @@ func renderRemovedRows(w io.Writer, rows []listRow) error {
 		_, err := fmt.Fprintln(w, "No stale local Airflow records to remove.")
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "Removed %d stale record(s):\n", len(rows)); err != nil {
+	if _, err := fmt.Fprintf(w, "Removed %s:\n", plural(len(rows), "stale record", "stale records")); err != nil {
 		return err
 	}
 	for _, row := range rows {

@@ -367,7 +367,7 @@ func TestBundleStepFailureIsAWarning(t *testing.T) {
 	overlay, err := BundleOverlay(dir, true, &progress, &warnings)
 	require.NoError(t, err)
 	require.Contains(t, warnings.String(), "Warning: the Cosmos Boost pre-deploy step failed")
-	require.Contains(t, warnings.String(), "pre-deploy step failed for 1 unit(s)")
+	require.Contains(t, warnings.String(), "pre-deploy step failed for 1 unit ")
 	require.NotContains(t, progress.String(), "pre-deploy step failed", "the warning goes to the warnings writer, not the progress one")
 	require.Equal(t, []string{"fine/" + sidecarRel}, keys(overlay.Extra))
 }

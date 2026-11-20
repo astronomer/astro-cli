@@ -519,7 +519,7 @@ func (q *query) runRunsClear(ctx context.Context, dagID, runID string, dryRun, y
 
 func renderClearedRun(w io.Writer, cleared clearedRun) error {
 	if cleared.DryRun {
-		if _, err := fmt.Fprintf(w, "would clear %d task instance(s) of run %s:\n", len(cleared.Tasks), cleared.RunID); err != nil {
+		if _, err := fmt.Fprintf(w, "would clear %s of run %s:\n", plural(len(cleared.Tasks), "task instance", "task instances"), cleared.RunID); err != nil {
 			return err
 		}
 		return renderTaskInstanceTable(w, cleared.Tasks)

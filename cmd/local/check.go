@@ -542,7 +542,7 @@ func renderTracebacks(w io.Writer, findings []checks.Finding, budget *int) error
 		// "traceback(s)", not "import error(s)": every one of them is still in
 		// the table above, and saying otherwise tells the reader the table they
 		// are looking at is incomplete.
-		if _, err := fmt.Fprintf(w, "\n%d more traceback(s) not shown; --output json carries every one\n", suppressed); err != nil {
+		if _, err := fmt.Fprintf(w, "\n%s not shown; --output json includes all of them\n", plural(suppressed, "more traceback", "more tracebacks")); err != nil {
 			return err
 		}
 	}
