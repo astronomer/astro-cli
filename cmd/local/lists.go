@@ -43,7 +43,7 @@ func emitRows[Row, Env any](r cliout.Renderer, rows []Row, total int,
 	return r.Emit(envelope(rows, total), func(w io.Writer) error { return text(w, rows) })
 }
 
-// dagList is `astro af dags list`, af's `dags list`.
+// dagList is `astro af dags list`.
 type dagList struct {
 	Total    int      `json:"total_dags"`
 	Returned int      `json:"returned_count"`
@@ -52,9 +52,9 @@ type dagList struct {
 
 func newDAGList(rows []dagRow, total int) dagList { return dagList{total, len(rows), rows} }
 
-// dagStatList is `astro af dags stats`. af prints Airflow's own dagStats
-// response, `{"dags": [...], "total_entries": n}`, so the key and the count
-// are Airflow's names, and so is a row's shape; see dagStatRow.
+// dagStatList is `astro af dags stats`: Airflow's own dagStats response,
+// `{"dags": [...], "total_entries": n}`, so the key and the count are
+// Airflow's names, and so is a row's shape; see dagStatRow.
 type dagStatList struct {
 	DAGs  []dagStatRow `json:"dags"`
 	Total int          `json:"total_entries"`
@@ -62,7 +62,7 @@ type dagStatList struct {
 
 func newDAGStatList(rows []dagStatRow, total int) dagStatList { return dagStatList{rows, total} }
 
-// importErrorList is `astro af dags errors`, af's `dags errors`.
+// importErrorList is `astro af dags errors`.
 type importErrorList struct {
 	Total        int              `json:"total_import_errors"`
 	Returned     int              `json:"returned_count"`
@@ -73,7 +73,7 @@ func newImportErrorList(rows []importErrorRow, total int) importErrorList {
 	return importErrorList{total, len(rows), rows}
 }
 
-// dagWarningList is `astro af dags warnings`, af's `dags warnings`.
+// dagWarningList is `astro af dags warnings`.
 type dagWarningList struct {
 	Total       int             `json:"total_dag_warnings"`
 	Returned    int             `json:"returned_count"`
@@ -84,7 +84,7 @@ func newDAGWarningList(rows []dagWarningRow, total int) dagWarningList {
 	return dagWarningList{total, len(rows), rows}
 }
 
-// runList is `astro af runs list`, af's `runs list`.
+// runList is `astro af runs list`.
 type runList struct {
 	Total    int      `json:"total_dag_runs"`
 	Returned int      `json:"returned_count"`
@@ -105,7 +105,7 @@ func newTaskInstanceList(rows []taskInstanceRow, total int) taskInstanceList {
 	return taskInstanceList{total, len(rows), rows}
 }
 
-// taskList is `astro af tasks list`, af's `tasks list`.
+// taskList is `astro af tasks list`.
 type taskList struct {
 	Total    int       `json:"total_tasks"`
 	Returned int       `json:"returned_count"`
@@ -114,7 +114,7 @@ type taskList struct {
 
 func newTaskList(rows []taskRow, total int) taskList { return taskList{total, len(rows), rows} }
 
-// assetList is `astro af assets list`, af's `assets list`.
+// assetList is `astro af assets list`.
 type assetList struct {
 	Total    int        `json:"total_assets"`
 	Returned int        `json:"returned_count"`
@@ -123,7 +123,7 @@ type assetList struct {
 
 func newAssetList(rows []assetRow, total int) assetList { return assetList{total, len(rows), rows} }
 
-// assetEventList is `astro af assets events`, af's `assets events`.
+// assetEventList is `astro af assets events`.
 type assetEventList struct {
 	Total       int             `json:"total_asset_events"`
 	Returned    int             `json:"returned_count"`
@@ -134,7 +134,7 @@ func newAssetEventList(rows []assetEventRow, total int) assetEventList {
 	return assetEventList{total, len(rows), rows}
 }
 
-// runTriggers is `astro af assets triggers`, in af's `assets triggers` shape:
+// runTriggers is `astro af assets triggers`:
 // the run it is about, and the events that started it.
 type runTriggers struct {
 	DAGID      string          `json:"dag_id"`
@@ -143,7 +143,7 @@ type runTriggers struct {
 	EventCount int             `json:"event_count"`
 }
 
-// connectionList is `astro af connections list`, af's `config connections`.
+// connectionList is `astro af connections list`.
 type connectionList struct {
 	Total       int                 `json:"total_connections"`
 	Returned    int                 `json:"returned_count"`
@@ -154,7 +154,7 @@ func newConnectionList(rows []connectionListRow, total int) connectionList {
 	return connectionList{total, len(rows), rows}
 }
 
-// variableList is `astro af variables list`, af's `config variables`.
+// variableList is `astro af variables list`.
 type variableList struct {
 	Total     int               `json:"total_variables"`
 	Returned  int               `json:"returned_count"`
@@ -165,7 +165,7 @@ func newVariableList(rows []variableListRow, total int) variableList {
 	return variableList{total, len(rows), rows}
 }
 
-// poolList is `astro af pools list`, af's `config pools`.
+// poolList is `astro af pools list`.
 type poolList struct {
 	Total    int       `json:"total_pools"`
 	Returned int       `json:"returned_count"`
@@ -174,7 +174,7 @@ type poolList struct {
 
 func newPoolList(rows []poolRow, total int) poolList { return poolList{total, len(rows), rows} }
 
-// providerList is `astro af providers`, af's `config providers`.
+// providerList is `astro af providers`.
 type providerList struct {
 	Total     int           `json:"total_providers"`
 	Returned  int           `json:"returned_count"`
@@ -185,7 +185,7 @@ func newProviderList(rows []providerRow, total int) providerList {
 	return providerList{total, len(rows), rows}
 }
 
-// pluginList is `astro af plugins`, af's `config plugins`.
+// pluginList is `astro af plugins`.
 type pluginList struct {
 	Total    int         `json:"total_plugins"`
 	Returned int         `json:"returned_count"`
@@ -194,9 +194,8 @@ type pluginList struct {
 
 func newPluginList(rows []pluginRow, total int) pluginList { return pluginList{total, len(rows), rows} }
 
-// configSectionList is `astro af config`, af's `config show`: Airflow's own
-// nesting, one entry per section with its options inside, and af's count of
-// the sections beside it.
+// configSectionList is `astro af config`: Airflow's own nesting, one entry per
+// section with its options inside, and the count of the sections beside it.
 type configSectionList struct {
 	Total    int                `json:"total_sections"`
 	Sections []configSectionRow `json:"sections"`
@@ -212,8 +211,8 @@ func newEndpointList(rows []apirequest.EndpointRow, _ int) apirequest.EndpointLi
 	return apirequest.NewEndpointList(rows)
 }
 
-// localList is `astro local list`: the local Airflows, one per project. No af
-// counterpart; each row is keyed by its project, so the list is "projects".
+// localList is `astro local list`: the local Airflows, one per project. Each
+// row is keyed by its project, so the list is "projects".
 type localList struct {
 	Projects []listRow `json:"projects"`
 }
