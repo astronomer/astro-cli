@@ -232,7 +232,7 @@ func callbackMux(results chan<- CallbackMessage, state string) *http.ServeMux {
 			return
 		}
 		if subtle.ConstantTimeCompare([]byte(req.URL.Query().Get("state")), []byte(state)) != 1 {
-			http.Error(w, "This is not the answer to the login waiting in the terminal, which goes on waiting. Finish signing in from the link the terminal printed.", http.StatusBadRequest)
+			http.Error(w, "This sign-in belongs to a different login attempt, such as an earlier astro login. Finish signing in from the link the terminal printed most recently.", http.StatusBadRequest)
 			return
 		}
 		if errorCode, ok := req.URL.Query()["error"]; ok {
