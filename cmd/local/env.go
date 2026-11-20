@@ -599,8 +599,14 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 	return cmd
 }
 
+// storeName is the store a set or delete acted on, named as every other
+// output names it (localenv.SourceName): .env, project vault or global vault.
+func storeName(store valueStore) localenv.Scope {
+	return localenv.Scope(localenv.SourceName(string(store.ScopeName())))
+}
+
 // envResult is the set/delete status object, rendered the same in text and
-// json.
+// json. Scope is the store it acted on (storeName).
 type envResult struct {
 	Kind   localenv.Kind  `json:"kind"`
 	Name   string         `json:"name"`
@@ -733,9 +739,9 @@ func (c *cli) runEnvSet(route *scopeFlags, kind localenv.Kind, name, value strin
 	case !created && everywhere:
 		cliout.Note(c.d.Stderr, fmt.Sprintf("%s already existed, so its links were kept; to auto-link it to every project run: %s --auto-link", name, localenv.LinkHint(kind, name)))
 	}
-	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "set"}
+	res := envResult{Kind: kind, Name: name, Scope: storeName(store), Status: "set"}
 	return r.Emit(res, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "set %s %s in %s\n", localenv.Noun(kind), name, store.Where())
+		_, werr := fmt.Fprintf(w, "Set %s %s in %s\n", localenv.Noun(kind), name, store.Where())
 		return werr
 	})
 }
@@ -806,7 +812,7 @@ func (c *cli) removeOtherCopy(scope *scopeFlags, kind localenv.Kind, name string
 			localenv.Noun(kind), name, other.Where(), err)
 	}
 	if removed {
-		cliout.Note(c.d.Stderr, fmt.Sprintf("removed the other copy of %s from %s", name, other.Where()))
+		cliout.Note(c.d.Stderr, fmt.Sprintf("Removed the other copy of %s from %s", name, other.Where()))
 	}
 	return nil
 }
@@ -1056,6 +1062,7 @@ func declaredSpec(schema *envschema.Schema, kind localenv.Kind, name string) (en
 // `$(astro local env ... get NAME)` keeps working; a global's reach goes to
 // stderr beside it.
 func (c *cli) emitValue(r cliout.Renderer, v envValue) error {
+	v.Source = localenv.SourceName(v.Source)
 	return r.Emit(v, func(w io.Writer) error {
 		if v.Reach != nil {
 			fmt.Fprintf(c.d.Stderr, "Reach: %s\n", v.Reach.text())
@@ -1099,7 +1106,7 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string, u
 		}
 		return err
 	}
-	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "deleted"}
+	res := envResult{Kind: kind, Name: name, Scope: storeName(store), Status: "deleted"}
 	switch {
 	case undeclare:
 		decl, changed, err := c.undeclareIn(projectDir, kind, name)
@@ -1208,7 +1215,7 @@ func (c *cli) scopeStores(scope *scopeFlags) ([]valueStore, error) {
 func (c *cli) deleteKeepingRow(store valueStore, kind localenv.Kind, name string) (bool, error) {
 	ok, err := store.Delete(kind, name)
 	if errors.Is(err, vaultenv.ErrLinkRowKept) {
-		cliout.Warn(c.d.Stderr, fmt.Sprintf("deleted %s %s, but %v. A new global of this name would reach only the projects that row names. Once the index is usable, clear it with: %s --auto-link", localenv.Noun(kind), name, err, localenv.LinkHint(kind, name)))
+		cliout.Warn(c.d.Stderr, fmt.Sprintf("Deleted %s %s, but %v. A new global of this name would reach only the projects that row names. Once the index is usable, clear it with: %s --auto-link", localenv.Noun(kind), name, err, localenv.LinkHint(kind, name)))
 		return ok, nil
 	}
 	return ok, err
@@ -1218,13 +1225,13 @@ func (c *cli) deleteKeepingRow(store valueStore, kind localenv.Kind, name string
 // declaration leaves, or what --undeclare did to it.
 func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 	noun := localenv.Noun(res.Kind)
-	if _, err := fmt.Fprintf(w, "deleted %s %s from %s\n", noun, res.Name, store.Where()); err != nil {
+	if _, err := fmt.Fprintf(w, "Deleted %s %s from %s\n", noun, res.Name, store.Where()); err != nil {
 		return err
 	}
 	var err error
 	switch {
 	case res.Undeclared:
-		_, err = fmt.Fprintf(w, "removed the declaration of %s %s from %s\n", noun, res.Name, res.Manifest)
+		_, err = fmt.Fprintf(w, "Removed the declaration of %s %s from %s\n", noun, res.Name, res.Manifest)
 	case res.Remainder == envschema.RemainderAbsent:
 		_, err = fmt.Fprintf(w, "%s is still declared in %s and now has no value. To remove the declaration: %s\n",
 			res.Name, res.Manifest, res.UndeclareHint)
@@ -1234,7 +1241,7 @@ func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 	case res.Remainder == envschema.RemainderSupplied && res.Source == envresolve.SourceDefault:
 		_, err = fmt.Fprintf(w, "%s is still declared in %s and now uses its declared default.\n", res.Name, res.Manifest)
 	case res.Remainder == envschema.RemainderSupplied:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s and now resolves from the %s.\n", res.Name, res.Manifest, vaultenv.SourceLabel(res.Source))
+		_, err = fmt.Fprintf(w, "%s is still declared in %s and now resolves from the %s.\n", res.Name, res.Manifest, res.Source)
 	}
 	if err == nil && res.Workspace != "" {
 		_, err = fmt.Fprintf(w, "It may still come from workspace %s, which a delete does not read.\n", res.Workspace)
@@ -1299,8 +1306,18 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 		}
 		items = kept
 	}
+	// Each row names its store the way output does, in text and json alike.
+	for i := range items {
+		items[i].Source = localenv.SourceName(items[i].Source)
+	}
 	return emitRows(r, items, len(items), newEnvList, func(w io.Writer, items []localenv.ListItem) error {
-		if err := renderEnvList(w, items, only, projectDir != "", wide); err != nil {
+		// An empty list prints nothing on stdout. What it means, and how to
+		// add the first value, is for whoever is reading, on stderr.
+		if len(items) == 0 {
+			envListEmpty(c.d.Stderr, only, projectDir != "")
+			return nil
+		}
+		if err := renderEnvList(w, items, projectDir != "", wide); err != nil {
 			return err
 		}
 		cliout.PrintNextSteps(c.d.Stderr, envListNextSteps(items, projectDir != ""))
@@ -1333,23 +1350,17 @@ func (c *cli) listOptions(projectDir string, m *manifest.Manifest) localenv.List
 // columns a plain list leaves out.
 const formatWide cliout.Format = "wide"
 
-// renderEnvList prints the table. only names the kind the rows were narrowed
-// to, or is empty for the cross-kind view; it exists for the empty case.
-// inProject is false outside a project, where nothing is declared, so no row
+// renderEnvList prints the table, or nothing for no rows (envListEmpty says
+// so on stderr). inProject is false outside a project, where nothing is declared, so no row
 // is marked "not declared". wide adds REQUIRED and SECRET, and DESCRIPTION,
 // and gives an invalid key's rule in its STATUS. The commands that settle the
 // statuses are next steps, printed on stderr after the table.
 //
 // Rows are in listOrder, so the declared values come first and the ones that
 // need attention lead each group. The JSON keeps the listing's own order.
-func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, inProject, wide bool) error {
+func renderEnvList(w io.Writer, items []localenv.ListItem, inProject, wide bool) error {
 	if len(items) == 0 {
-		if only != "" {
-			_, err := fmt.Fprintf(w, "No %ss declared or set.\n", localenv.Noun(only))
-			return err
-		}
-		_, err := fmt.Fprintln(w, "No values declared or set.")
-		return err
+		return nil
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	// The KIND cell names the subcommand that manages the value, the same as
@@ -1364,8 +1375,12 @@ func renderEnvList(w io.Writer, items []localenv.ListItem, only localenv.Kind, i
 	fmt.Fprintln(tw, header)
 	for _, r := range listOrder(items, inProject) {
 		it, n := r.item, r.status
-		// The store's text label; the JSON row keeps the source as it is.
-		source := vaultenv.SourceLabel(it.Source)
+		// A value nothing supplies has no store to name; the STATUS says so,
+		// and the JSON row says absent.
+		source := it.Source
+		if source == localenv.SourceAbsent {
+			source = ""
+		}
 		row := fmt.Sprintf("%s\t%s\t%s\t%s", localenv.Noun(it.Kind), it.Name, source, n.state)
 		if wide {
 			// The description is collapsed to one line: a TOML multi-line
@@ -1506,6 +1521,32 @@ func envListNextSteps(items []localenv.ListItem, inProject bool) cliout.NextStep
 		}
 	}
 	return out
+}
+
+// envListEmpty says on w, which is stderr, that a list has no rows, and in a
+// project suggests declaring the first value.
+func envListEmpty(w io.Writer, only localenv.Kind, inProject bool) {
+	noun, kind := "values", localenv.KindEnv
+	if only != "" {
+		noun, kind = localenv.Noun(only)+"s", only
+	}
+	fmt.Fprintf(w, "No %s declared or set.\n", noun)
+	if !inProject {
+		return
+	}
+	cliout.PrintNextSteps(w, cliout.NextSteps{Steps: []cliout.NextStep{{
+		Why:     "Declare one the project needs",
+		Command: "astro local env " + localenv.Noun(kind) + " declare <NAME>",
+	}}})
+}
+
+// upperFirst is s with its first letter capitalized, for a line that starts
+// with a lowercase word such as a command noun ("Variable X is not declared").
+func upperFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 // yesOrBlank is a wide list's REQUIRED or SECRET cell.

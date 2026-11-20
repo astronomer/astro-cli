@@ -183,7 +183,11 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	// An event rather than a result: an image build streamed its progress
 	// before it, and this ends that stream, so it is one line too.
 	return r.EmitEvent(res, func(w io.Writer) error {
-		return renderPackage(w, res, m.Astro.Deployments)
+		if err := renderPackage(w, res); err != nil {
+			return err
+		}
+		cliout.PrintNextSteps(c.d.Stderr, packageNextSteps(res, m.Astro.Deployments))
+		return nil
 	})
 }
 
@@ -202,15 +206,15 @@ func (c *cli) packageRegistry() *pack.Registry {
 
 // renderPackage renders a finished build as text. json mode serializes the
 // Result directly, so this runs only for text. Each artifact shape has its own
-// renderer. links are the project's deployment links, for the deploy command
-// an image hands off to.
-func renderPackage(w io.Writer, res pack.Result, links map[string]manifest.Link) error {
+// renderer. The commands that hand the artifact off are next steps
+// (packageNextSteps), on stderr.
+func renderPackage(w io.Writer, res pack.Result) error {
 	if _, err := fmt.Fprintf(w, "target: %s\n", res.Target); err != nil {
 		return err
 	}
 	switch res.Kind {
 	case pack.KindImage:
-		return renderImageResult(w, res, links)
+		return renderImageResult(w, res)
 	case pack.KindTree:
 		return renderTreeResult(w, res)
 	case pack.KindBundle:
@@ -222,9 +226,9 @@ func renderPackage(w io.Writer, res pack.Result, links map[string]manifest.Link)
 	return nil
 }
 
-// renderImageResult renders an image target's tag, version, and the deploy
-// command that consumes it, so the CI story is one copy-paste.
-func renderImageResult(w io.Writer, res pack.Result, links map[string]manifest.Link) error {
+// renderImageResult renders an image target's tag and version, and the
+// values the Deployment it is deployed to must supply.
+func renderImageResult(w io.Writer, res pack.Result) error {
 	if _, err := fmt.Fprintf(w, "image:  %s\n", res.Image); err != nil {
 		return err
 	}
@@ -238,20 +242,16 @@ func renderImageResult(w io.Writer, res pack.Result, links map[string]manifest.L
 			return err
 		}
 	}
-	if _, err := fmt.Fprintf(w, "\nDeploy it with:\n%s\n", deployImageHint(res.Image, links)); err != nil {
-		return err
-	}
 	return renderDeploymentEnv(w, res.DeploymentEnv)
 }
 
-// renderDeploymentEnv lists, under the deploy command, the values the
-// Deployment must supply because the image carries none of them, one aligned
+// renderDeploymentEnv lists the values the Deployment must supply because the image carries none of them, one aligned
 // row each. Nothing when the project declares none.
 func renderDeploymentEnv(w io.Writer, values []pack.DeploymentValue) error {
 	if len(values) == 0 {
 		return nil
 	}
-	if _, err := fmt.Fprintln(w, "and set these on the Deployment, as environment variables or linked Environment Manager objects:"); err != nil {
+	if _, err := fmt.Fprintln(w, "\nSet these on the Deployment, as environment variables or linked Environment Manager objects:"); err != nil {
 		return err
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
@@ -263,11 +263,34 @@ func renderDeploymentEnv(w io.Writer, values []pack.DeploymentValue) error {
 	return tw.Flush()
 }
 
-// deployImageHint is the deploy command for an image. Deploy refuses to pick a
+// packageNextSteps are the commands that hand an artifact off, which the
+// package cannot run itself: deploy an image, upload a tree, or build a
+// context with either engine.
+func packageNextSteps(res pack.Result, links map[string]manifest.Link) cliout.NextSteps {
+	var steps []cliout.NextStep
+	switch res.Kind {
+	case pack.KindImage:
+		steps = []cliout.NextStep{deployImageStep(res.Image, links)}
+	case pack.KindTree:
+		for _, cmd := range res.NextSteps {
+			steps = append(steps, cliout.NextStep{Command: cmd})
+		}
+	case pack.KindContext:
+		for _, cmd := range res.NextSteps {
+			engine, _, _ := strings.Cut(cmd, " ")
+			steps = append(steps, cliout.NextStep{Why: "Build it with " + engine, Command: cmd})
+		}
+	case pack.KindBundle:
+		// A bundle is the deploy input itself; nothing hands it off.
+	}
+	return cliout.NextSteps{Steps: steps}
+}
+
+// deployImageStep is the deploy command for an image. Deploy refuses to pick a
 // target when it cannot prompt, so the command names one: the default link, or
 // the only deployable one. With several and no default, it names a placeholder
 // and lists them the way deploy's own refusal does.
-func deployImageHint(image string, links map[string]manifest.Link) string {
+func deployImageStep(image string, links map[string]manifest.Link) cliout.NextStep {
 	deployable := deploy.DeployableLinks(links)
 	target := ""
 	if name, _, ok := manifest.DefaultLink(links); ok && slices.Contains(deployable, name) {
@@ -277,16 +300,19 @@ func deployImageHint(image string, links map[string]manifest.Link) string {
 	}
 	switch {
 	case target != "":
-		return fmt.Sprintf("  astro deploy %s --image-name %s", target, image)
+		return cliout.NextStep{Why: "Deploy it to " + target, Command: fmt.Sprintf("astro deploy %s --image-name %s", target, image)}
 	case len(deployable) > 1:
-		return fmt.Sprintf("  astro deploy <link> --image-name %s\nDeployable links: %s", image, strings.Join(deployable, ", "))
+		return cliout.NextStep{
+			Why:     "Deploy it to one of " + strings.Join(deployable, ", "),
+			Command: fmt.Sprintf("astro deploy <link> --image-name %s", image),
+		}
 	default:
-		return fmt.Sprintf("  astro deploy --image-name %s", image)
+		return cliout.NextStep{Why: "Deploy it", Command: "astro deploy --image-name " + image}
 	}
 }
 
-// renderTreeResult renders a bucket target's paths, any warnings, and the exact
-// upload commands — the hand-off the target cannot run itself.
+// renderTreeResult renders a bucket target's paths. The upload commands are
+// next steps (packageNextSteps).
 func renderTreeResult(w io.Writer, res pack.Result) error {
 	if _, err := fmt.Fprintf(w, "tree:   %s\n", res.TreePath); err != nil {
 		return err
@@ -301,37 +327,14 @@ func renderTreeResult(w io.Writer, res pack.Result) error {
 			return err
 		}
 	}
-	return renderNextSteps(w, res.NextSteps)
+	return nil
 }
 
-// renderContextResult renders a written build context and the commands that
-// build it.
+// renderContextResult renders a written build context. The commands that
+// build it are next steps (packageNextSteps).
 func renderContextResult(w io.Writer, res pack.Result) error {
-	if _, err := fmt.Fprintf(w, "context: %s\n\nBuild it with either of:\n", res.ContextDir); err != nil {
-		return err
-	}
-	for _, step := range res.NextSteps {
-		if _, err := fmt.Fprintf(w, "  %s\n", step); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// renderNextSteps prints the upload commands under a heading.
-func renderNextSteps(w io.Writer, steps []string) error {
-	if len(steps) == 0 {
-		return nil
-	}
-	if _, err := fmt.Fprintf(w, "\nUpload it with:\n"); err != nil {
-		return err
-	}
-	for _, step := range steps {
-		if _, err := fmt.Fprintf(w, "  %s\n", step); err != nil {
-			return err
-		}
-	}
-	return nil
+	_, err := fmt.Fprintf(w, "context: %s\n", res.ContextDir)
+	return err
 }
 
 // packageRecap shows the warnings a package finds. In text they are

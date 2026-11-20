@@ -8,12 +8,50 @@ import (
 	"github.com/astronomer/astro-cli/pkg/envschema"
 )
 
-// Source labels — the values the `source` field carries in list/get output.
+// Source labels: where the resolver says a value came from. These are the
+// labels code compares; output names each store through SourceName.
+// SourceVault and SourceGlobalVault are internal/vaultenv's tiers, here so
+// SourceName can name them.
 const (
-	SourceShell   = "shell"
-	SourceProject = "project"
-	SourceAbsent  = "absent"
+	SourceShell       = "shell"
+	SourceProject     = "project"
+	SourceAbsent      = "absent"
+	SourceVault       = "vault"
+	SourceGlobalVault = "vault (global)"
 )
+
+// SourceName is how output names where a value resolves from, in text and in
+// the `source` field of --output json alike: each store for what it is, the
+// three vaults alike. A source label maps to
+//
+//	project                            .env
+//	vault                              project vault
+//	vault (global)                     global vault
+//	workspace, workspace (<id>)        cloud vault
+//	workspace (unavailable: <reason>)  cloud vault (unavailable: <reason>)
+//
+// and shell, default and absent are their own names. The cloud vault is the
+// linked workspace's Environment Manager; its id is not part of the name. A
+// name passes through unchanged, so mapping twice is harmless.
+func SourceName(source string) string {
+	switch source {
+	case SourceProject:
+		return ".env"
+	case SourceVault:
+		return "project vault"
+	case SourceGlobalVault:
+		return "global vault"
+	case string(envschema.SourceWorkspace):
+		return "cloud vault"
+	}
+	if rest, ok := strings.CutPrefix(source, string(envschema.SourceWorkspace)+" ("); ok {
+		if reason, ok := strings.CutPrefix(rest, "unavailable: "); ok {
+			return "cloud vault (unavailable: " + reason
+		}
+		return "cloud vault"
+	}
+	return source
+}
 
 // mapProvider is a labeled bag of env-var keys implementing
 // envresolve.Provider. The shell and project sources are both one.

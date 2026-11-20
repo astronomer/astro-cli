@@ -408,7 +408,7 @@ func envWarningCases() []envWarningCase {
 				Key:     "PORT",
 				Reason:  `expected a port between 1 and 65535, got "99999"`,
 			}},
-			wantText: []string{`Warning: env var PORT: expected a port between 1 and 65535, got "99999"`},
+			wantText: []string{`Warning: variable PORT: expected a port between 1 and 65535, got "99999"`},
 		},
 		{
 			// The wire value is snake_case; a person reads this.
@@ -419,7 +419,7 @@ func envWarningCases() []envWarningCase {
 				Key:     "mode",
 				Reason:  `expected one of "a", "b", got "c"`,
 			}},
-			wantText: []string{`Warning: Airflow variable mode:`},
+			wantText: []string{`Warning: airflow-variable mode:`},
 		},
 		{
 			name: "a connection of the wrong kind",
@@ -438,7 +438,7 @@ func envWarningCases() []envWarningCase {
 				{Kind: envschema.ViolationWrongType, Section: envschema.SectionEnvVar, Key: "A", Reason: "one"},
 				{Kind: envschema.ViolationWrongType, Section: envschema.SectionEnvVar, Key: "B", Reason: "two"},
 			},
-			wantText: []string{"Warning: env var A: one", "Warning: env var B: two"},
+			wantText: []string{"Warning: variable A: one", "Warning: variable B: two"},
 		},
 	}
 }

@@ -519,7 +519,7 @@ A value that resolves to something its `type` did not promise is reported as a w
 start, and does **not** stop the start:
 
 ```
-Warning: env var PORT: expected a port between 1 and 65535, got "99999"
+Warning: variable PORT: expected a port between 1 and 65535, got "99999"
 Warning: connection warehouse: declared conn_type "snowflake" but resolved to "postgres"
 ```
 

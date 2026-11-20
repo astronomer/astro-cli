@@ -25,7 +25,7 @@ type event struct {
 	Error     string        `json:"error,omitempty"`
 	// Section, Key and Reason carry an env-schema warning in machine-readable
 	// form beside the prose in Text, so a consumer need not regex the human
-	// labels ("env var", "Airflow variable") back into a section. Empty for
+	// labels ("variable", "airflow-variable") back into a section. Empty for
 	// every other event.
 	Section string `json:"section,omitempty"`
 	Key     string `json:"key,omitempty"`

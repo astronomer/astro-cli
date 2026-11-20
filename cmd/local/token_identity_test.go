@@ -335,7 +335,7 @@ func TestLocalEnvListWorkspaceSourceUnderATokenUsesOnlyTheToken(t *testing.T) {
 				t.Fatal(err)
 			}
 			everyRequestUnder(t, f, token)
-			if !strings.Contains(stdout.String(), "workspace (cmws)") {
+			if !strings.Contains(stdout.String(), "cloud vault") {
 				t.Errorf("the name did not resolve from the workspace:\n%s", stdout.String())
 			}
 			for _, req := range f.requests() {
@@ -373,7 +373,7 @@ func TestLocalEnvListTakesTheTokensWorkspaceWhenTheManifestNamesNone(t *testing.
 				t.Fatal(err)
 			}
 			everyRequestUnder(t, f, token)
-			if !strings.Contains(stdout.String(), "workspace ("+tokenWS+")") {
+			if !strings.Contains(stdout.String(), "cloud vault") {
 				t.Errorf("the name did not resolve from the token's workspace:\n%s", stdout.String())
 			}
 			for _, req := range f.requests() {
@@ -501,7 +501,7 @@ func TestAnUnusableTokenFailsTheCoreTreeAndFallsBackToNothing(t *testing.T) {
 			if err := execute(t, d, "local", "env", "list", "--all", "--output", "json"); err != nil {
 				t.Fatal(err)
 			}
-			if out := d.Stdout.(interface{ String() string }).String(); !strings.Contains(out, "workspace (unavailable: unusable ASTRO_API_TOKEN)") {
+			if out := d.Stdout.(interface{ String() string }).String(); !strings.Contains(out, "cloud vault (unavailable: unusable ASTRO_API_TOKEN)") {
 				t.Errorf("the listing does not say the token is unusable:\n%s", out)
 			}
 			if reqs := f.requests(); len(reqs) != 0 {

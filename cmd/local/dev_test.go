@@ -510,7 +510,7 @@ ASTRO_TEST_PORT = { type = 'port', default = '99999' }
 	// The error is the fake runtime refusing to start, not a rejected project.
 	_ = execute(t, d, "local", "start")
 
-	if !strings.Contains(stderrOf(d), "Warning: env var ASTRO_TEST_PORT:") {
+	if !strings.Contains(stderrOf(d), "Warning: variable ASTRO_TEST_PORT:") {
 		t.Errorf("start did not report the value warning; stderr was %q", stderrOf(d))
 	}
 	if !strings.Contains(stderrOf(d), "99999") {
@@ -595,7 +595,7 @@ ASTRO_TEST_PORT = { type = 'port', default = '99999' }
 
 	_ = execute(t, d, "local", "restart")
 
-	if !strings.Contains(stderrOf(d), "Warning: env var ASTRO_TEST_PORT:") {
+	if !strings.Contains(stderrOf(d), "Warning: variable ASTRO_TEST_PORT:") {
 		t.Errorf("restart did not report the value warning; stderr was %q", stderrOf(d))
 	}
 }

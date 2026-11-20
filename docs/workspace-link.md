@@ -186,7 +186,7 @@ Which commands read it:
 - `astro local env list` and `get`. `list` reads names and metadata only, never
   secret values, and never blocks: a failed read prints
   `workspace <id> not read (<reason>): its values are not listed` on stderr,
-  and rows show `workspace (<id>)` or `workspace (unavailable: <reason>)`.
+  and rows show `cloud vault` or `cloud vault (unavailable: <reason>)`.
 - `astro otto`, which adds the workspace's connections to the analyzing-data
   skill's warehouses at the lowest precedence (a vault connection of the same
   id wins), with an 8-second bound; a failed read is logged and the launch

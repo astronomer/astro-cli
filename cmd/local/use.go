@@ -112,7 +112,7 @@ func (c *cli) runUseUnset() error {
 		return err
 	}
 	return r.Emit(useResult{Status: "unpinned"}, func(w io.Writer) error {
-		_, werr := fmt.Fprintln(w, "cleared your Deployment selection for this project")
+		_, werr := fmt.Fprintln(w, "Cleared your Deployment selection for this project")
 		return werr
 	})
 }

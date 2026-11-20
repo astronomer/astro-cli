@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/envresolve"
+	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/proxydaemon"
@@ -653,15 +654,7 @@ func warnWorkspaceUnread(r cliout.Renderer, note string) {
 // are snake_case and these strings are read by one. The machine-readable form
 // travels in the event's own Section field, so rewording these is safe.
 func sectionLabel(s envschema.Section) string {
-	switch s {
-	case envschema.SectionEnvVar:
-		return "env var"
-	case envschema.SectionAirflowVariable:
-		return "Airflow variable"
-	case envschema.SectionConnection:
-		return "connection"
-	}
-	return string(s)
+	return localenv.Noun(localenv.KindForSection(s))
 }
 
 // emitWarning is the one definition of what a warning looks like on the wire,
@@ -1467,7 +1460,7 @@ func renderReset(w io.Writer, report localrt.ResetReport) error {
 		return err
 	}
 	if report.ComposeProject != "" {
-		if _, err := fmt.Fprintf(w, "removed compose project %s and its volumes\n", report.ComposeProject); err != nil {
+		if _, err := fmt.Fprintf(w, "Removed compose project %s and its volumes\n", report.ComposeProject); err != nil {
 			return err
 		}
 	}

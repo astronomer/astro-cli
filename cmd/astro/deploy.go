@@ -353,7 +353,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 			if err := scaffold.SaveLink(config.WorkingPath, nil, l); err != nil {
 				return err
 			}
-			fmt.Fprintf(errOut, "linked %s to astro deployment %s in %s\n", l.Name, l.Deployment, project.Marker)
+			fmt.Fprintf(errOut, "Linked %s to Astro Deployment %s in %s\n", l.Name, l.Deployment, project.Marker)
 			// The save marks the project's former only link default = true;
 			// say so, since it is a line the user did not ask to change.
 			if after, err := manifest.Load(filepath.Join(config.WorkingPath, project.Marker)); err == nil {

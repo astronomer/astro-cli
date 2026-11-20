@@ -362,7 +362,7 @@ func (q *query) runRunsTrigger(ctx context.Context, dagID string, opts airflowap
 	}
 	result := triggeredRun{runRow: newRunRow(run), Unpaused: unpaused}
 	return r.Emit(result, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "triggered %s run %s (%s)\n", result.DAGID, result.RunID, result.State)
+		_, werr := fmt.Fprintf(w, "Triggered %s run %s (%s)\n", result.DAGID, result.RunID, result.State)
 		return werr
 	})
 }
@@ -404,7 +404,7 @@ func (q *query) ensureUnpaused(ctx context.Context, client *airflowapi.Client, d
 	if _, err := client.UnpauseDAG(ctx, dagID); err != nil {
 		return false, err
 	}
-	fmt.Fprintf(q.d.Stderr, "unpaused %s so the run can be scheduled\n", dagID)
+	fmt.Fprintf(q.d.Stderr, "Unpaused %s so the run can be scheduled\n", dagID)
 	return true, nil
 }
 
@@ -449,7 +449,7 @@ func (q *query) runRunsDelete(ctx context.Context, dagID, runID string, yes bool
 		return err
 	}
 	return r.Emit(deletedRun{DAGID: dagID, RunID: runID, Status: "deleted"}, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "deleted run %s of %s\n", runID, dagID)
+		_, werr := fmt.Fprintf(w, "Deleted run %s of %s\n", runID, dagID)
 		return werr
 	})
 }
@@ -528,6 +528,6 @@ func renderClearedRun(w io.Writer, cleared clearedRun) error {
 	if cleared.State != "" {
 		state = " (" + cleared.State + ")"
 	}
-	_, err := fmt.Fprintf(w, "cleared run %s of %s%s\n", cleared.RunID, cleared.DAGID, state)
+	_, err := fmt.Fprintf(w, "Cleared run %s of %s%s\n", cleared.RunID, cleared.DAGID, state)
 	return err
 }

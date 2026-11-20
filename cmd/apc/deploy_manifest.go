@@ -130,7 +130,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 			if err := scaffold.SaveLink(config.WorkingPath, nil, l); err != nil {
 				return err
 			}
-			fmt.Fprintf(errOut, "linked %s to apc deployment %s in %s\n", l.Name, l.Deployment, project.Marker)
+			fmt.Fprintf(errOut, "Linked %s to APC Deployment %s in %s\n", l.Name, l.Deployment, project.Marker)
 			if after, err := manifest.Load(filepath.Join(config.WorkingPath, project.Marker)); err == nil {
 				if kept := scaffold.NewlyDefault(m, after); kept != "" {
 					fmt.Fprintf(errOut, "marked %s as the default link (it was the project's only link)\n", kept)

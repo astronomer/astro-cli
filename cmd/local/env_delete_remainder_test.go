@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
-	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -48,7 +47,7 @@ func TestDeleteOfAnOptionalDeclaredNameSaysItIsAbsent(t *testing.T) {
 
 	out := deleteText(t, dir, "variable", "delete", "DEMO_VAR2")
 	manifestPath := filepath.Join(dir, "pyproject.toml")
-	assert.Contains(t, out, "deleted variable DEMO_VAR2 from "+filepath.Join(dir, ".env"))
+	assert.Contains(t, out, "Deleted variable DEMO_VAR2 from "+filepath.Join(dir, ".env"))
 	assert.Contains(t, out, "DEMO_VAR2 is still declared in "+manifestPath+" and now has no value. "+
 		"To remove the declaration: astro local env variable undeclare DEMO_VAR2\n")
 	assert.NotContains(t, out, "next astro local start")
@@ -124,9 +123,9 @@ func TestDeleteRemainderLooksOnlyAtItsOwnKind(t *testing.T) {
 func TestUndeclareTextSaysWhetherItChanged(t *testing.T) {
 	dir := envProject(t, "\n[tool.astro.env]\nAPI_URL = {}\n")
 	manifestPath := filepath.Join(dir, "pyproject.toml")
-	assert.Equal(t, "removed the declaration of variable API_URL from "+manifestPath+"; any value set for it is kept\n",
+	assert.Equal(t, "Removed the declaration of variable API_URL from "+manifestPath+"; any value set for it is kept\n",
 		deleteText(t, dir, "variable", "undeclare", "API_URL"))
-	assert.Equal(t, "variable API_URL is not declared in "+manifestPath+"\n",
+	assert.Equal(t, "Variable API_URL is not declared in "+manifestPath+"\n",
 		deleteText(t, dir, "variable", "undeclare", "API_URL"))
 }
 
@@ -156,7 +155,7 @@ func TestDeleteOfANameAnotherTierSuppliesNamesThatTier(t *testing.T) {
 	writeEnvFile(t, dir, "API_URL=project-s3cr3t\n")
 	res := deleteJSON(t, dir, "variable", "delete", "API_URL")
 	assert.Equal(t, envschema.RemainderSupplied, res.Remainder)
-	assert.Equal(t, vaultenv.SourceGlobal, res.Source)
+	assert.Equal(t, "global vault", res.Source)
 	assert.Empty(t, res.SetHint)
 	assert.Empty(t, res.UndeclareHint)
 }
@@ -198,8 +197,8 @@ func TestDeleteUndeclareRemovesTheDeclarationToo(t *testing.T) {
 
 	out := deleteText(t, dir, "variable", "delete", "DEMO_VAR2", "--undeclare")
 	manifestPath := filepath.Join(dir, "pyproject.toml")
-	assert.Contains(t, out, "deleted variable DEMO_VAR2 from "+filepath.Join(dir, ".env"))
-	assert.Contains(t, out, "removed the declaration of variable DEMO_VAR2 from "+manifestPath)
+	assert.Contains(t, out, "Deleted variable DEMO_VAR2 from "+filepath.Join(dir, ".env"))
+	assert.Contains(t, out, "Removed the declaration of variable DEMO_VAR2 from "+manifestPath)
 	assert.NotContains(t, out, "still declared")
 	s := declared(t, dir)
 	assert.NotContains(t, s.EnvVars, "DEMO_VAR2")
@@ -317,8 +316,8 @@ func TestDeleteUndeclareGlobalEditsOnlyTheCurrentProject(t *testing.T) {
 	writeEnvFile(t, dir, "API_URL=project-value\n")
 
 	out := deleteText(t, dir, "variable", "delete", "API_URL", "--global", "--undeclare")
-	assert.Contains(t, out, "deleted variable API_URL from global vault")
-	assert.Contains(t, out, "removed the declaration of variable API_URL from "+filepath.Join(dir, "pyproject.toml"))
+	assert.Contains(t, out, "Deleted variable API_URL from global vault")
+	assert.Contains(t, out, "Removed the declaration of variable API_URL from "+filepath.Join(dir, "pyproject.toml"))
 	assert.NotContains(t, declared(t, dir).EnvVars, "API_URL")
 	b, err := os.ReadFile(filepath.Join(other, "pyproject.toml"))
 	require.NoError(t, err)

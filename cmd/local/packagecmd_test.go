@@ -139,11 +139,18 @@ func TestPackageMWAABuildsTree(t *testing.T) {
 	if err := execute(t, d, "package", "mwaa", "--out-dir", outDir); err != nil {
 		t.Fatalf("package mwaa: %v", err)
 	}
-	// The command reports the tree and the upload hand-off in text.
-	for _, want := range []string{"tree:", outDir, "requirements.txt", "aws s3 sync"} {
+	// The command reports the tree on stdout; the upload hand-off is a next
+	// step on stderr.
+	for _, want := range []string{"tree:", outDir, "requirements.txt"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("text output missing %q:\n%s", want, out.String())
 		}
+	}
+	if strings.Contains(out.String(), "aws s3 sync") {
+		t.Errorf("the upload hand-off should be a next step on stderr, not in the result:\n%s", out.String())
+	}
+	if got := stderrOf(d); !strings.Contains(got, "Next:") || !strings.Contains(got, "aws s3 sync") {
+		t.Errorf("stderr missing the upload next step:\n%s", got)
 	}
 	if _, err := os.Stat(filepath.Join(outDir, "dags", "d.py")); err != nil {
 		t.Errorf("dag not copied into the artifact: %v", err)
@@ -182,32 +189,33 @@ func TestPackageSaysNothingAboutUndeclaredLocalValues(t *testing.T) {
 	}
 }
 
-// An image's result lists the values the manifest declares under the deploy
-// command, for the Deployment to set, the required ones first, aligned.
-func TestPackageListsTheDeploymentEnvUnderTheDeployCommand(t *testing.T) {
+// An image's result lists the values the manifest declares, for the
+// Deployment to set, the required ones first, aligned. The deploy command is a
+// next step (TestPackageNextSteps).
+func TestPackageListsTheDeploymentEnv(t *testing.T) {
 	var b strings.Builder
 	err := renderImageResult(&b, pack.Result{
 		Image: "astro-package/p:3.1-2-abc",
 		DeploymentEnv: []pack.DeploymentValue{
 			{Kind: "connection", Name: "llm_gateway", Status: "required"},
 			{Kind: "connection", Name: "github_default", Status: "optional"},
-			{Kind: "airflow variable", Name: "region", Status: "has a default"},
+			{Kind: "airflow-variable", Name: "region", Status: "has a default"},
 		},
-	}, nil)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "\nDeploy it with:\n  astro deploy --image-name astro-package/p:3.1-2-abc\n" +
-		"and set these on the Deployment, as environment variables or linked Environment Manager objects:\n" +
+	want := "image:  astro-package/p:3.1-2-abc\n" +
+		"\nSet these on the Deployment, as environment variables or linked Environment Manager objects:\n" +
 		"  connection llm_gateway     required\n" +
 		"  connection github_default  optional\n" +
-		"  airflow variable region    has a default\n"
+		"  airflow-variable region    has a default\n"
 	if !strings.HasSuffix(b.String(), want) {
 		t.Errorf("got:\n%s\nwant suffix:\n%s", b.String(), want)
 	}
 
 	b.Reset()
-	if err := renderImageResult(&b, pack.Result{Image: "i"}, nil); err != nil {
+	if err := renderImageResult(&b, pack.Result{Image: "i"}); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(b.String(), "set these") {
@@ -340,7 +348,7 @@ func TestRenderPackageImageText(t *testing.T) {
 		RuntimeVersion: "3.1-2",
 		SavedPath:      "image.tar",
 	}
-	if err := renderPackage(&buf, res, nil); err != nil {
+	if err := renderPackage(&buf, res); err != nil {
 		t.Fatal(err)
 	}
 	text := buf.String()
@@ -349,7 +357,6 @@ func TestRenderPackageImageText(t *testing.T) {
 		"image:  astro-package/demo:3.1-2-abc1234",
 		"runtime: 3.1-2",
 		"saved:  image.tar",
-		"astro deploy --image-name astro-package/demo:3.1-2-abc1234",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("text output missing %q:\n%s", want, text)
@@ -357,7 +364,7 @@ func TestRenderPackageImageText(t *testing.T) {
 	}
 }
 
-func TestDeployImageHintNamesATarget(t *testing.T) {
+func TestDeployImageStepNamesATarget(t *testing.T) {
 	const image = "astro-package/demo:3.1-2-abc1234"
 	astro := func(isDefault bool) manifest.Link {
 		return manifest.Link{Deployment: "clx123", Default: isDefault}
@@ -365,27 +372,64 @@ func TestDeployImageHintNamesATarget(t *testing.T) {
 	cases := []struct {
 		name  string
 		links map[string]manifest.Link
-		want  string
+		want  cliout.NextStep
 	}{
-		{name: "no links", want: "  astro deploy --image-name " + image},
-		{name: "the default", links: map[string]manifest.Link{"dev": astro(false), "prod": astro(true)}, want: "  astro deploy prod --image-name " + image},
-		{name: "the only one", links: map[string]manifest.Link{"prod": astro(false)}, want: "  astro deploy prod --image-name " + image},
+		{name: "no links", want: cliout.NextStep{Why: "Deploy it", Command: "astro deploy --image-name " + image}},
+		{
+			name: "the default", links: map[string]manifest.Link{"dev": astro(false), "prod": astro(true)},
+			want: cliout.NextStep{Why: "Deploy it to prod", Command: "astro deploy prod --image-name " + image},
+		},
+		{
+			name: "the only one", links: map[string]manifest.Link{"prod": astro(false)},
+			want: cliout.NextStep{Why: "Deploy it to prod", Command: "astro deploy prod --image-name " + image},
+		},
 		{
 			name:  "several and no default",
 			links: map[string]manifest.Link{"prod": astro(false), "dev": astro(false)},
-			want:  "  astro deploy <link> --image-name " + image + "\nDeployable links: dev, prod",
+			want:  cliout.NextStep{Why: "Deploy it to one of dev, prod", Command: "astro deploy <link> --image-name " + image},
 		},
 		{
 			name:  "a default that deploy cannot ship to",
 			links: map[string]manifest.Link{"prod": astro(false), "dev": astro(false), "mwaa": {Target: "mwaa", Environment: "e", Default: true}},
-			want:  "  astro deploy <link> --image-name " + image + "\nDeployable links: dev, prod",
+			want:  cliout.NextStep{Why: "Deploy it to one of dev, prod", Command: "astro deploy <link> --image-name " + image},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := deployImageHint(image, tc.links); got != tc.want {
+			if got := deployImageStep(image, tc.links); got != tc.want {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// The commands that hand an artifact off are next steps: a bucket tree's
+// uploads, one after another, and a build context's two engines, each named.
+func TestPackageNextSteps(t *testing.T) {
+	var b strings.Builder
+	cliout.PrintNextSteps(&b, packageNextSteps(pack.Result{
+		Kind: pack.KindTree, NextSteps: []string{"aws s3 sync a s3://b/dags", "aws s3 cp r s3://b/requirements.txt"},
+	}, nil))
+	if want := "\nNext:\n  aws s3 sync a s3://b/dags\n  aws s3 cp r s3://b/requirements.txt\n"; b.String() != want {
+		t.Errorf("tree next steps =\n%s\nwant\n%s", b.String(), want)
+	}
+
+	b.Reset()
+	cliout.PrintNextSteps(&b, packageNextSteps(pack.Result{
+		Kind: pack.KindContext, NextSteps: []string{"docker build -t t ctx", "podman build -t t ctx"},
+	}, nil))
+	want := "\nNext:\n" +
+		"  Build it with docker:\n    docker build -t t ctx\n" +
+		"  Build it with podman:\n    podman build -t t ctx\n"
+	if b.String() != want {
+		t.Errorf("context next steps =\n%s\nwant\n%s", b.String(), want)
+	}
+
+	b.Reset()
+	if err := renderPackage(&b, pack.Result{Target: "mwaa", Kind: pack.KindTree, TreePath: "out", NextSteps: []string{"aws s3 sync a b"}}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(b.String(), "aws s3") {
+		t.Errorf("the result on stdout carries a next step:\n%s", b.String())
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -321,8 +322,8 @@ func envChecklist(project string, env map[string]any, intro, note string) (strin
 
 // DeploymentValue is one value [tool.astro.env] declares that the Deployment
 // must supply, since the astro image carries none of them: it is built from
-// the dependencies and OS packages alone. Kind is "env var", "airflow
-// variable" or "connection"; Status is where the value comes from
+// the dependencies and OS packages alone. Kind is the noun of the command
+// that manages it (variable, airflow-variable or connection); Status is where the value comes from
 // (valueStatus): "required", "optional", "has a default" or "from workspace".
 type DeploymentValue struct {
 	Kind   string `json:"kind"`
@@ -352,9 +353,9 @@ func deploymentEnv(env map[string]any) ([]DeploymentValue, error) {
 		kind  string
 		specs map[string]envschema.ValueSpec
 	}{
-		{"env var", schema.EnvVars},
-		{"airflow variable", schema.AirflowVariables},
-		{"connection", schema.Connections},
+		{localenv.Noun(localenv.KindEnv), schema.EnvVars},
+		{localenv.Noun(localenv.KindVar), schema.AirflowVariables},
+		{localenv.Noun(localenv.KindConn), schema.Connections},
 	} {
 		for name, spec := range s.specs {
 			values = append(values, DeploymentValue{Kind: s.kind, Name: name, Status: valueStatus(spec)})

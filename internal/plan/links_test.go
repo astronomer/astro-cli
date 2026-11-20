@@ -40,7 +40,7 @@ func TestNoLinkIndexLeavesTheStartGateUnchanged(t *testing.T) {
 		t.Fatalf("want a missing-value error, got %v", err)
 	}
 	const wantMsg = "this project is missing 1 value that pyproject.toml requires and this machine does not set:\n" +
-		"  - env var ABSENT\n" +
+		"  - variable ABSENT\n" +
 		"      provide it:  astro local env variable set ABSENT --project\n" +
 		"provide them and run astro local start again, or run astro local start --allow-missing to start without them"
 	if got := missing.Error(); got != wantMsg {
@@ -50,7 +50,7 @@ func TestNoLinkIndexLeavesTheStartGateUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const wantPayload = `{"error":"required environment values are not set on this machine","project":"` + "%s" + `","missing":[{"section":"env_var","name":"ABSENT","env_key":"ABSENT","set_command":"astro local env variable set ABSENT --project"}]}`
+	const wantPayload = `{"error":"this project is missing values that pyproject.toml requires and this machine does not set","project":"` + "%s" + `","missing":[{"section":"env_var","name":"ABSENT","env_key":"ABSENT","set_command":"astro local env variable set ABSENT --project"}]}`
 	if got, want := string(payload), jsonf(wantPayload, dir); got != want {
 		t.Errorf("gate payload changed:\n got: %s\nwant: %s", got, want)
 	}

@@ -172,7 +172,7 @@ func (q *query) runRunsTriggerWait(ctx context.Context, dagID string, trigger ai
 	// `runs wait` does with its arguments.
 	run.DAGID = dagID
 	started := time.Now()
-	fmt.Fprintf(q.d.Stderr, "triggered %s run %s; waiting up to %s for it to finish\n", dagID, run.DAGRunID, formatDuration(wait.timeout.Seconds()))
+	fmt.Fprintf(q.d.Stderr, "Triggered %s run %s; waiting up to %s for it to finish\n", dagID, run.DAGRunID, formatDuration(wait.timeout.Seconds()))
 
 	run, timedOut, err := q.awaitRun(ctx, client, run, started.Add(wait.timeout), wait.poll)
 	if err != nil {

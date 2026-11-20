@@ -86,16 +86,16 @@ func (w *Writer) ScopeName() localenv.Scope { return localenv.Scope(w.label) }
 // plaintext file for a gitignore advisory to be about.
 func (w *Writer) DotenvPath() string { return "" }
 
-// Where names the scope for a message: its text label (SourceLabel), marked
+// Where names the scope for a message: its name (localenv.SourceName), marked
 // unencrypted after this writer stored a value plain. Encryption is the
 // default, so an encrypted value carries no mark. Not a file path: the vault holds one file per key under a
 // name derived from a hash, and pointing a user at it would invite
 // hand-editing something only the master key can read.
 func (w *Writer) Where() string {
 	if w.wrotePlain {
-		return SourceLabel(w.label) + " (unencrypted)"
+		return localenv.SourceName(w.label) + " (unencrypted)"
 	}
-	return SourceLabel(w.label)
+	return localenv.SourceName(w.label)
 }
 
 // Set stores value for the (kind, name) pair and returns the Airflow env-var

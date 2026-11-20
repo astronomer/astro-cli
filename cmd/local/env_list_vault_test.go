@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/internal/localenv"
-	"github.com/astronomer/astro-cli/internal/vaultenv"
 )
 
 // An undeclared value held only in the vault is listed, as an orphan of the
@@ -37,7 +36,7 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("db_main rows = %+v, want one", got)
 	}
-	if !got[0].Orphan || got[0].Source != vaultenv.SourceProject || got[0].Kind != localenv.KindConn {
+	if !got[0].Orphan || got[0].Source != "project vault" || got[0].Kind != localenv.KindConn {
 		t.Errorf("db_main row = %+v, want a conn orphan sourced from the project vault", got[0])
 	}
 	if got[0].RemoveHint != "astro local env connection delete db_main --project" {
@@ -59,7 +58,7 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 	if err := execute(t, d, "local", "env", "list", "--project", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), `"db_main"`) || !strings.Contains(out.String(), `"source":"vault"`) {
+	if !strings.Contains(out.String(), `"db_main"`) || !strings.Contains(out.String(), `"source":"project vault"`) {
 		t.Errorf("list --project left out the project vault:\n%s", out.String())
 	}
 	d, out, _ = envDeps(t, dir, "")
@@ -82,7 +81,7 @@ func TestListGlobalShowsTheGlobalVault(t *testing.T) {
 	if err := execute(t, d, "local", "env", "list", "--global", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), `"SHARED"`) || !strings.Contains(out.String(), `"source":"`+vaultenv.SourceGlobal+`"`) {
+	if !strings.Contains(out.String(), `"SHARED"`) || !strings.Contains(out.String(), `"source":"global vault"`) {
 		t.Errorf("list --global left out the global vault:\n%s", out.String())
 	}
 }
@@ -106,7 +105,7 @@ func TestListMarksUndeclaredGlobalVaultEntryApplied(t *testing.T) {
 			row = it
 		}
 	}
-	if row.Source != vaultenv.SourceGlobal || row.Applied == nil || !*row.Applied {
+	if row.Source != "global vault" || row.Applied == nil || !*row.Applied {
 		t.Errorf("shared_db row = %+v, want a global vault row marked applied", row)
 	}
 	if row.DeclareHint != "astro local env connection declare shared_db" {

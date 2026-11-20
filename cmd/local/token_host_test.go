@@ -88,7 +88,7 @@ func oneRun(t *testing.T, f fakeAstro, token, dir string) {
 	if len(f.requestsToPath("/v1/organizations/"+tokenOrg+"/environment-objects")) == 0 {
 		t.Error("the Environment Manager was not read on the manifest's host")
 	}
-	if !strings.Contains(stdout.String(), "workspace ("+tokenWS+")") {
+	if !strings.Contains(stdout.String(), "cloud vault") {
 		t.Errorf("the Environment Manager read was not of the token's Workspace:\n%s", stdout.String())
 	}
 	if !f.sawRequest(http.MethodGet, "/api/v2/pools") {

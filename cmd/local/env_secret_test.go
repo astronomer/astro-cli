@@ -141,7 +141,7 @@ func TestEnvSetSecretGlobalIsADistinctTier(t *testing.T) {
 	if got.Value != "shared-secret" {
 		t.Errorf("value = %q", got.Value)
 	}
-	if got.Source != vaultenv.SourceGlobal {
+	if got.Source != "global vault" {
 		t.Errorf("source = %q, want the global tier: a --global write must not be keyed to the project", got.Source)
 	}
 
@@ -151,7 +151,7 @@ func TestEnvSetSecretGlobalIsADistinctTier(t *testing.T) {
 		t.Fatal(err)
 	}
 	got = getJSON(t, dir, "SHARED")
-	if got.Value != "project-secret" || got.Source != vaultenv.SourceProject {
+	if got.Value != "project-secret" || got.Source != "project vault" {
 		t.Errorf("get = %+v, want the project tier to win", got)
 	}
 }
@@ -304,7 +304,7 @@ func TestSecretOperationsNameTheVault(t *testing.T) {
 	if !strings.Contains(out.String(), "vault") {
 		t.Errorf("set should report the vault, got %s", out.String())
 	}
-	if got := getJSON(t, dir, "TOKEN"); got.Source != vaultenv.SourceProject {
+	if got := getJSON(t, dir, "TOKEN"); got.Source != "project vault" {
 		t.Errorf("get source = %q, want %q", got.Source, vaultenv.SourceProject)
 	}
 }

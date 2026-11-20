@@ -14,7 +14,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/emenv"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
-	"github.com/astronomer/astro-cli/internal/vaultenv"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -86,7 +85,7 @@ func TestEnvListShowsWorkspaceSource(t *testing.T) {
 		t.Fatalf("want one entry:\n%s", out.String())
 	}
 	item := entries[0]
-	if item.Name != "DATA_WAREHOUSE_URI" || item.Source != "workspace (cmws)" {
+	if item.Name != "DATA_WAREHOUSE_URI" || item.Source != "cloud vault" {
 		t.Fatalf("list item = %+v, want workspace source", item)
 	}
 	if strings.Contains(out.String(), "postgres://cloud") {
@@ -110,7 +109,7 @@ func TestEnvGetFromWorkspace(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatalf("json: %v\n%s", err, out.String())
 	}
-	if got.Source != "workspace (cmws)" || got.Value != "postgres://cloud" {
+	if got.Source != "cloud vault" || got.Value != "postgres://cloud" {
 		t.Fatalf("get json = %+v, want workspace/postgres://cloud", got)
 	}
 }
@@ -134,7 +133,7 @@ func TestEnvListAndGetReadUnderTheManifestsOrganization(t *testing.T) {
 		if err := execute(t, d, args...); err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(out.String(), "workspace (cmws)") {
+		if !strings.Contains(out.String(), "cloud vault") {
 			t.Fatalf("%v did not resolve from the workspace:\n%s", args, out.String())
 		}
 		for _, call := range mc.Calls {
@@ -171,7 +170,7 @@ func TestEnvLocalSetOverridesWorkspace(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatalf("json: %v\n%s", err, out.String())
 	}
-	if got.Source != vaultenv.SourceProject || got.Value != "postgres://local" {
+	if got.Source != "project vault" || got.Value != "postgres://local" {
 		t.Fatalf("get json = %+v, want the local value to win", got)
 	}
 }
@@ -191,7 +190,7 @@ func TestEnvListLoggedOutUnavailable(t *testing.T) {
 		t.Fatalf("want one entry:\n%s", out.String())
 	}
 	item := entries[0]
-	if !strings.HasPrefix(item.Source, "workspace (unavailable:") {
+	if !strings.HasPrefix(item.Source, "cloud vault (unavailable:") {
 		t.Fatalf("source = %q, want an unavailable workspace label", item.Source)
 	}
 }
