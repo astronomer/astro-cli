@@ -157,6 +157,27 @@ func (s *CmdSuite) TestLoginShortNames() {
 	}
 }
 
+// A domain that is not a host alone is refused as a usage error before either
+// login runs, or the APC platform-version probe sends anything: spliced into
+// the API's URL, a user, a port or a path would move the login to another host.
+func (s *CmdSuite) TestLoginRefusesADomainThatIsNotAHost() {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
+		s.Fail("Astro login ran", domain)
+		return nil
+	}
+	apcLogin = func(domain string, oAuthOnly bool, username, password, token, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
+		s.Fail("APC login ran", domain)
+		return nil
+	}
+	for _, domain := range []string{"astro.example.com@other.invalid", "astro.example.invalid:8443", "other.invalid/astro.example.com"} {
+		err := login([]string{domain}, nil, new(bytes.Buffer))
+		s.Require().Error(err, domain)
+		s.Contains(err.Error(), "is not a domain", domain)
+		s.True(cliout.IsUsage(err), "%s: a usage error", domain)
+	}
+}
+
 func (s *CmdSuite) TestLoginForce() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	var got bool
