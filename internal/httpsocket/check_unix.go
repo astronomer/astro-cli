@@ -17,9 +17,16 @@ var currentUID = os.Getuid
 
 // checkSocket refuses a socket another user could have put in place: one in a
 // directory any user can write to without the sticky bit, where it could be
-// swapped, or one in a shared directory with the sticky bit (/tmp) that is
-// owned by someone other than this user or root. Symlinks are followed, and
-// the socket they lead to and its directory are what is checked.
+// swapped, or one in a shared directory that is owned by someone other than
+// this user or root. A shared directory is one any user can write to with the
+// sticky bit (/tmp), or one its group can write to: another member of the
+// group could have created the socket there. Symlinks are followed, and the
+// socket they lead to and its directory are what is checked.
+//
+// A directory its group can write to is not refused outright, as one anyone
+// can write to without the sticky bit is: with user private groups (umask
+// 002), a directory a user makes is group-writable, and the group is theirs
+// alone. Their own socket there passes.
 //
 // A socket in a directory nobody else can write to passes whoever owns it.
 // Nobody else could have created it there, and its owner is often not this
@@ -41,10 +48,11 @@ func checkSocket(path string) error {
 		return err
 	}
 	mode := dir.Mode()
-	if mode.Perm()&0o002 == 0 {
+	anyUser, group := mode.Perm()&0o002 != 0, mode.Perm()&0o020 != 0
+	if !anyUser && !group {
 		return nil
 	}
-	if mode&fs.ModeSticky == 0 {
+	if anyUser && mode&fs.ModeSticky == 0 {
 		return fmt.Errorf("the socket is in %s, which any user can write to; refusing to send requests to it", dirPath)
 	}
 	info, err := os.Stat(resolved)
