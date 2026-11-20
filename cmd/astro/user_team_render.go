@@ -47,11 +47,13 @@ func mayPick(what, answeredBy string) error {
 	return input.MayAsk("\n> ", input.About(what), input.AnsweredBy(answeredBy))
 }
 
-// renderLines renders v as lines of text, or as itself in json.
+// renderLines renders v as lines of text, or as itself in json. Each line is
+// printed as input.Lines has it: the lines name a team, a user or an email as
+// the API returned it, and a terminal would act on an escape in one.
 func renderLines(format cliout.Format, out io.Writer, v any, lines ...string) error {
 	return cliout.Renderer{Format: format, Out: out}.Emit(v, cliout.Text(func(b *bufio.Writer) {
 		for _, l := range lines {
-			fmt.Fprintln(b, l)
+			fmt.Fprintln(b, input.Lines(l))
 		}
 	}))
 }
