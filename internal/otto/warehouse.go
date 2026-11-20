@@ -65,7 +65,7 @@ func warehouseConnections(projectDir string, isProject bool) []connmodel.Connect
 	}
 	cloud, err := workspaceConnections(projectDir)
 	if err != nil {
-		logger.Warnf("otto: workspace connections left out of the warehouse config: %v", err)
+		logger.Warnf("otto: workspace connections left out of the warehouse config: %v", err) //nolint:forbidigo // otto's full-screen UI owns the terminal: this goes to otto's log file (redirectCLILogs)
 		return out
 	}
 	have := make(map[string]bool, len(out))
@@ -112,14 +112,14 @@ func writeWarehouses(cwd string) []connwarehouse.Materialized {
 	}
 	dir, err := warehouseDir()
 	if err != nil {
-		logger.Warnf("otto: warehouse config dir: %v", err)
+		logger.Warnf("otto: warehouse config dir: %v", err) //nolint:forbidigo // otto's full-screen UI owns the terminal: this goes to otto's log file (redirectCLILogs)
 		return nil
 	}
 	live, skipped := connwarehouse.MaterializeAll(warehouseConnections(projectDir, isProject))
 	if err := connwarehouse.Write(dir, live); err != nil {
-		logger.Warnf("otto: writing warehouse config: %v", err)
+		logger.Warnf("otto: writing warehouse config: %v", err) //nolint:forbidigo // otto's full-screen UI owns the terminal: this goes to otto's log file (redirectCLILogs)
 		return live
 	}
-	logger.Infof("otto: warehouse config written: %d queryable, %d skipped", len(live), len(skipped))
+	logger.Infof("otto: warehouse config written: %d queryable, %d skipped", len(live), len(skipped)) //nolint:forbidigo // otto's full-screen UI owns the terminal: this goes to otto's log file (redirectCLILogs)
 	return live
 }

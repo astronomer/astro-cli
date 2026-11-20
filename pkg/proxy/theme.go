@@ -307,7 +307,7 @@ func prePaintScript(dark, light string) string {
 var airflowThemeSnippet = sync.OnceValue(func() string {
 	theme, err := parseAirflowTheme([]byte(airflowrt.UITheme()))
 	if err != nil {
-		slog.Error("Airflow pages will not be themed", "error", err)
+		slog.Error("Airflow pages will not be themed", "error", err) //nolint:forbidigo // runs in the proxy daemon, which has no terminal: its log is the daemon's log file
 		return ""
 	}
 	return `<style id="` + themeTagID + `">` + theme.css() + scrollbarCSS + `</style>` +

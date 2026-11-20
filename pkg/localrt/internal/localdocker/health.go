@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -70,7 +72,8 @@ func waitHealthy(ctx context.Context, urls []string, timeout time.Duration) erro
 	// timeout shorter than the poll interval otherwise expires having issued
 	// no request, which was unreachable while the wait was a hardcoded five
 	// minutes and is not now that a caller can choose it.
-	if anyHealthy(ctx, client, urls) {
+	var last string
+	if anyHealthy(ctx, client, urls, &last) {
 		return nil
 	}
 
@@ -93,32 +96,45 @@ func waitHealthy(ctx context.Context, urls []string, timeout time.Duration) erro
 			// tell from it whether an Airflow was now running.
 			return &interrupted{err: ctx.Err()}
 		case <-ticker.C:
-			if anyHealthy(ctx, client, urls) {
+			if anyHealthy(ctx, client, urls, &last) {
 				return nil
 			}
 		}
 	}
 }
 
-func healthOK(ctx context.Context, client *http.Client, url string) bool {
+// healthOK reports whether url answers 200, and what it answered, for the
+// debug log: a status, or why there was none.
+func healthOK(ctx context.Context, client *http.Client, url string) (ok bool, answer string) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
-		return false
+		return false, err.Error()
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return false
+		return false, err.Error()
 	}
 	defer resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
+	return resp.StatusCode == http.StatusOK, resp.Status
 }
 
-// anyHealthy reports whether any of the urls answers.
-func anyHealthy(ctx context.Context, client *http.Client, urls []string) bool {
+// anyHealthy reports whether any of the urls answers. Each time the answers
+// differ from the last poll's it writes a debug line, so a wait reads as the
+// few steps it went through (refused, 503, 200) rather than one line a second.
+func anyHealthy(ctx context.Context, client *http.Client, urls []string, last *string) bool {
+	answers := make([]string, 0, len(urls))
+	healthy := false
 	for _, url := range urls {
-		if healthOK(ctx, client, url) {
-			return true
+		ok, answer := healthOK(ctx, client, url)
+		answers = append(answers, url+": "+answer)
+		if ok {
+			healthy = true
+			break
 		}
 	}
-	return false
+	if a := strings.Join(answers, "; "); a != *last {
+		*last = a
+		slog.DebugContext(ctx, "health check", "answers", a)
+	}
+	return healthy
 }

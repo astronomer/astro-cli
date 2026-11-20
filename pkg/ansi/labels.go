@@ -48,6 +48,17 @@ func NoteLabel(w io.Writer) string {
 	return labelFor(w, "Note:", Palette.Cyan)
 }
 
+// InfoLabel is the cyan "Info:" that leads an info line of the diagnostic log
+// (pkg/logger).
+func InfoLabel(w io.Writer) string {
+	return labelFor(w, "Info:", Palette.Cyan)
+}
+
+// DebugLabel is the "Debug:" that leads a debug line of the diagnostic log
+// (pkg/logger). It stays plain: debug lines come many at a time, and color
+// would draw the eye to every one. It takes w as the other labels do.
+func DebugLabel(io.Writer) string { return "Debug:" }
+
 // DangerLabel is the red "WARNING:" that leads a confirmation of something
 // that cannot be undone, since it marks a danger rather than a warning the
 // command goes ahead despite.

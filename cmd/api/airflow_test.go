@@ -569,7 +569,7 @@ func TestInitAirflowSpecCache_FallbackKeepsThePrefix(t *testing.T) {
 	base, err := initAirflowSpecCache(context.Background(), opts, target)
 	require.NoError(t, err)
 	assert.Equal(t, ts.URL+"/api/v2", base)
-	assert.Contains(t, errOut.String(), "Could not detect Airflow version")
+	assert.Contains(t, errOut.String(), "could not detect the Airflow version")
 }
 
 // The generated curl command carries a placeholder, never the credential this
@@ -865,7 +865,7 @@ func TestRunAirflow_ConnectionRefused(t *testing.T) {
 
 	// Should NOT print noisy warnings about auth or version detection
 	assert.NotContains(t, errOut.String(), "could not fetch auth token")
-	assert.NotContains(t, errOut.String(), "Could not detect Airflow version")
+	assert.NotContains(t, errOut.String(), "could not detect the Airflow version")
 }
 
 func TestRunAirflow_ConnectionRefused_OperationID(t *testing.T) {

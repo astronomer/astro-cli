@@ -45,6 +45,23 @@ linters:
         - pattern: '^fmt\.Print(f|ln)?$'
         - pattern: '^os\.Exit$'
         - pattern: '^log\.(Fatal|Fatalf|Fatalln|Panic|Panicf|Panicln)$'
+        # The diagnostic log stays at debug wherever someone reads the
+        # command's stderr: a line above debug is one --verbosity can hide.
+        # Something the person running a command should know is a warning,
+        # cliout.Warn (ansi.Warn below cmd/), which always prints. Code with
+        # nobody at its stderr (the proxy daemon, otto's full-screen UI) says
+        # so at the call: //nolint:forbidigo // <why>. docs/architecture.md,
+        # Logging.
+        - pattern: '^slog\.(Info|Warn|Error)(Context)?$'
+          msg: 'log at debug (slog.Debug), or warn the person with cliout.Warn: --verbosity can hide a log line above debug'
+        - pattern: '^slog\.Logger\.(Info|Warn|Error)(Context)?$'
+          pkg: '^log/slog$'
+          msg: 'log at debug (Debug), or warn the person with cliout.Warn: --verbosity can hide a log line above debug'
+        - pattern: '^logger\.(Infof|Warnf)$'
+          pkg: '^github\.com/astronomer/astro-cli/pkg/logger$'
+          msg: 'log at debug (logger.Debugf), or warn the person with cliout.Warn: --verbosity can hide a log line above debug'
+        - pattern: '^log\.Print(f|ln)?$'
+          msg: 'the standard log writes through slog at info, which --verbosity can hide: log at debug, or warn with cliout.Warn'
       analyze-types: true
     dupl:
       threshold: 100
@@ -118,8 +135,18 @@ linters:
       # so archlint (which walks the tree) is their only guard.
       # Keep this list in sync with coreBelowCmd and coreConfigReaders in
       # internal/archlint/archlint_test.go when a new internal/ core package lands.
+      #
+      # Only the print, exit and fatal patterns are scoped this way (text). The
+      # log-level patterns beside them hold everywhere, the shell and the
+      # sub-modules included: a log line above debug is one --verbosity hides,
+      # in the shell most of all.
       - linters: [forbidigo]
         path-except: ^internal/(apirequest|astrosession|containercfg|deploy|deploybuild|emenv|envresolve|httpsocket|imageinstall|instancelocate|localenv|pack|plan|platform/astro/apitoken|project|proxydaemon|usageerr|userstate|vaultenv)/
+        text: 'use of `(fmt\.Print|os\.Exit|log\.(Fatal|Panic))'
+      # pkg/logger is the log: it and its tests call every level by design.
+      - linters: [forbidigo]
+        path: ^pkg/logger/
+        text: 'verbosity can hide'
       - linters:
           - dupl
           - errcheck

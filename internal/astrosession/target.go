@@ -4,10 +4,9 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -372,7 +371,7 @@ func Resolve(r Request) Target { //nolint:gocritic // read once, as a value
 			t.Deployment, t.DeploymentSource = id, SourceToken
 		}
 	}
-	if logger.IsLevelEnabled(logrus.DebugLevel) {
+	if logger.Enabled(slog.LevelDebug) {
 		logger.Debugf("%s", t.trace())
 	}
 	return t

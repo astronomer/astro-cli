@@ -4,9 +4,11 @@ package localstandalone
 
 import (
 	"context"
+	"log/slog"
 	"os/exec"
 	"syscall"
 
+	"github.com/astronomer/astro-cli/pkg/localrt/internal/localshared"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
@@ -28,7 +30,12 @@ func (execCommander) Run(ctx context.Context, dir string, env []string, s rt.Std
 	cmd.Stdin = s.In
 	cmd.Stdout = s.Out
 	cmd.Stderr = s.Err
-	return cmd.Run()
+	// The environment is the whole of the project's, not an addition to the
+	// CLI's, so its names would say nothing a debug reader is after.
+	lg := localshared.StartCommand(ctx, nil, name, args...)
+	err := cmd.Run()
+	lg.End(err, nil)
+	return err
 }
 
 // launchDetached is the production launchFunc. Setpgid puts the child (the
@@ -42,8 +49,10 @@ func launchDetached(dir string, env []string, name string, args ...string) (int,
 	cmd.Env = env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := cmd.Start(); err != nil {
+		slog.Debug("launching detached failed", "cmd", localshared.CommandLine(name, args), "dir", dir, "err", err)
 		return 0, err
 	}
+	slog.Debug("launched detached", "cmd", localshared.CommandLine(name, args), "dir", dir, "pid", cmd.Process.Pid)
 	// Reap the child if it exits while the CLI is still alive; when the
 	// CLI exits first (the normal detached case), init adopts the child.
 	go func() { _ = cmd.Wait() }() //nolint:errcheck // reaper goroutine; the child's exit status is not our concern

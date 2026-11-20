@@ -475,7 +475,7 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 			// The provider answered and may have retired the old refresh token,
 			// and the answer could not be kept: say so once, since a later run
 			// that finds this token expired will ask for a login.
-			cliout.Warn(out, fmt.Sprintf("your Astro login was renewed but could not be saved to %s (%v). This command continues on the current access token; run 'astro login' if later commands ask you to log in again.", config.HomeConfigFile, err))
+			cliout.Warn(out, fmt.Sprintf("your Astro login was renewed but could not be saved to %s (%v). This command continues on the current access token; run astro login if later commands ask you to log in again.", config.HomeConfigFile, err))
 		} else {
 			logger.Debugf("could not renew the Astro login, which has not expired yet; continuing on the current access token: %v", err)
 		}

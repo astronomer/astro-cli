@@ -33,7 +33,7 @@ var (
 	// DefaultDirPerm is the default permission for directories
 	DefaultDirPerm           os.FileMode = 0o755
 	openURL                              = browser.OpenURL
-	gitignoreParseWarningMsg             = "failed to parse .gitignore: %v. Continuing without gitignore filtering."
+	gitignoreParseWarningMsg             = "could not parse .gitignore (%v); continuing without its filtering"
 )
 
 // The functions here that note something along the way take notes, the

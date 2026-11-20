@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -252,7 +252,7 @@ func TestBuildClientImageStreamsAtDebug(t *testing.T) {
 	cmd := withClientBuild(t, "docker")
 	cmd.buildOut = "to stdout\n"
 	prev := logger.GetLevel()
-	logger.SetLevel(logrus.DebugLevel)
+	logger.SetLevel(slog.LevelDebug)
 	t.Cleanup(func() { logger.SetLevel(prev) })
 
 	var err error

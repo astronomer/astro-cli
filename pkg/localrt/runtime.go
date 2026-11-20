@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -200,6 +201,8 @@ func (r *Runtime) Start(ctx context.Context, p Plan, cb Callbacks) (Airflow, err
 		// runtime (no --docker); standalone is the default.
 		p.Mode = ModeStandalone
 	}
+	slog.DebugContext(ctx, "starting", "project", p.ProjectPath, "mode", p.Mode,
+		"airflow", p.AirflowVersion, "runtime", p.Runtime, "python", p.PythonVersion)
 	// One project starts at a time. The lock stops two concurrent starts from
 	// both writing the record, where the loser's dying pid would orphan the
 	// winner's live Airflow; it is held across the liveness check and the

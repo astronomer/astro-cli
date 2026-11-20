@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -63,7 +65,8 @@ var CheckHealth = func(ctx context.Context, port string, timeout time.Duration, 
 	// reported that Airflow had not come up without ever asking it. At exactly
 	// one second the deadline and the tick are both ready and the choice
 	// between them is random, which is worse than either.
-	if healthy(ctx, client, baseURL, healthPaths) {
+	var last string
+	if healthy(ctx, client, baseURL, healthPaths, &last) {
 		return nil
 	}
 
@@ -81,28 +84,42 @@ var CheckHealth = func(ctx context.Context, port string, timeout time.Duration, 
 			}
 			return fmt.Errorf("%w after %s — Airflow may still be starting", ErrHealthTimeout, timeout)
 		case <-ticker.C:
-			if healthy(ctx, client, baseURL, healthPaths) {
+			if healthy(ctx, client, baseURL, healthPaths, &last) {
 				return nil
 			}
 		}
 	}
 }
 
-// healthy reports whether any of the paths answers 200.
-func healthy(ctx context.Context, client *http.Client, baseURL string, paths []string) bool {
+// healthy reports whether any of the paths answers 200. Each time the answers
+// differ from the last poll's (*last) it writes a debug line, so a wait reads
+// as the few steps it went through (refused, 503, 200) rather than ten lines
+// a second.
+func healthy(ctx context.Context, client *http.Client, baseURL string, paths []string, last *string) bool {
+	answers := make([]string, 0, len(paths))
+	ok := false
 	for _, path := range paths {
+		answer := ""
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+path, http.NoBody)
-		if err != nil {
-			continue
+		if err == nil {
+			var resp *http.Response
+			if resp, err = client.Do(req); err == nil {
+				resp.Body.Close()
+				answer = resp.Status
+				ok = resp.StatusCode == http.StatusOK
+			}
 		}
-		resp, err := client.Do(req)
 		if err != nil {
-			continue
+			answer = err.Error()
 		}
-		resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
-			return true
+		answers = append(answers, baseURL+path+": "+answer)
+		if ok {
+			break
 		}
 	}
-	return false
+	if a := strings.Join(answers, "; "); a != *last {
+		*last = a
+		slog.DebugContext(ctx, "health check", "answers", a)
+	}
+	return ok
 }
