@@ -173,7 +173,10 @@ func (q *query) runRunsTriggerWait(ctx context.Context, dagID string, trigger ai
 	// `runs wait` does with its arguments.
 	run.DAGID = dagID
 	started := time.Now()
-	fmt.Fprintf(q.d.Stderr, "Triggered %s run %s; waiting up to %s for it to finish\n", dagID, run.DAGRunID, formatDuration(wait.timeout.Seconds()))
+	// The run id is the one the trigger answered with, shown as text
+	// (input.Plain): this goes straight to stderr, past the renderer that
+	// cleans a command's output.
+	fmt.Fprintf(q.d.Stderr, "Triggered %s run %s; waiting up to %s for it to finish\n", dagID, input.Plain(run.DAGRunID), formatDuration(wait.timeout.Seconds()))
 
 	run, timedOut, err := q.awaitRun(ctx, client, run, started.Add(wait.timeout), wait.poll)
 	if err != nil {
@@ -290,7 +293,9 @@ func (q *query) renderWaitedRun(w io.Writer, result waitedRun) error {
 func (q *query) failedTasks(ctx context.Context, client *airflowapi.Client, dagID, runID string) []taskInstanceRow {
 	instances, err := allTaskInstances(ctx, client, dagID, runID, q.t.suggest("runs tasks "+dagID+" "+runID))
 	if err != nil {
-		fmt.Fprintf(q.d.Stderr, "could not list the run's task instances: %v\n", err)
+		// The error can carry Airflow's own message; shown as text
+		// (input.Lines), its line breaks kept.
+		fmt.Fprintf(q.d.Stderr, "could not list the run's task instances: %s\n", input.Lines(err.Error()))
 		return nil
 	}
 	return failedOnly(mapRows(instances, newTaskInstanceRow))
