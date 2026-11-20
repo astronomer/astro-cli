@@ -1,159 +1,26 @@
 package cloud
 
 import (
+	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-
-	"github.com/astronomer/astro-cli/cloud/deployment"
-	"github.com/astronomer/astro-cli/pkg/output"
 )
 
-var (
-	bundleName            string
-	bundleMountPath       string
-	bundleNonDagType      string
-	bundleDescription     string
-	bundleDagBundleIDs    []string
-	forceBundleDelete     bool
-	bundleListOutputFlags output.Flags
-)
-
+// newDeploymentBundleRootCmd keeps 'astro deployment bundle', the path of the
+// bundle commands before 'astro bundle', working as a hidden alias.
 func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "bundle",
-		Aliases: []string{"bundles"},
-		Short:   "Manage the Dag and non-Dag bundles on an Astro Deployment",
-		Long:    "Manage the bundles registered on an Astro Deployment. Dag bundles carry Dags and are targeted by 'astro deploy --dag-bundle-name'; non-Dag bundles mount other content (e.g. dbt projects) at a path.",
+		Use:        "bundle",
+		Aliases:    []string{"bundles"},
+		Short:      "Manage the Dag and non-Dag bundles on an Astro Deployment",
+		Hidden:     true,
+		Deprecated: "use 'astro bundle' instead",
 	}
-	cmd.SetOut(out)
-	cmd.AddCommand(
-		newDeploymentBundleCreateCmd(out),
-		newDeploymentBundleListCmd(out),
-		newDeploymentBundleUpdateCmd(out),
-		newDeploymentBundleDeleteCmd(out),
-	)
+	for _, sub := range []*cobra.Command{newBundleCreateCmd(out), newBundleListCmd(out), newBundleUpdateCmd(out), newBundleDeleteCmd(out)} {
+		sub.Deprecated = fmt.Sprintf("use 'astro bundle %s' instead", sub.Name())
+		cmd.AddCommand(sub)
+	}
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "The Deployment whose bundles you'd like to manage. Run 'astro deployment list' to find valid IDs")
-	return cmd
-}
-
-func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create a bundle on an Astro Deployment",
-		Long:  "Create a Dag bundle (with --name) or a non-Dag bundle (with --mount-path) on an Astro Deployment.",
-		Example: `  # Create a named Dag bundle
-  astro deployment bundle create --deployment-id <id> --name my-dags
-
-  # Create a non-Dag bundle mounted at a path
-  astro deployment bundle create --deployment-id <id> --mount-path /usr/local/airflow/dbt --bundle-type dbt`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			ws, err := coalesceWorkspace()
-			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
-			}
-			cmd.SilenceUsage = true
-			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, out, astroV1Client, astroV1Alpha1Client)
-		},
-	}
-	cmd.Flags().StringVar(&bundleName, "name", "", "Name of the Dag bundle to create. Mutually exclusive with --mount-path")
-	cmd.Flags().StringVar(&bundleMountPath, "mount-path", "", "Mount path for a non-Dag bundle. Mutually exclusive with --name")
-	cmd.Flags().StringVar(&bundleNonDagType, "bundle-type", "", "Type of a non-Dag bundle (e.g. dbt). Only valid with --mount-path")
-	cmd.Flags().StringVar(&bundleDescription, "description", "", "Description for the bundle")
-	cmd.Flags().StringSliceVar(&bundleDagBundleIDs, "dag-bundle-ids", nil, "Dag bundle IDs a non-Dag bundle is served alongside. Only valid with --mount-path")
-	return cmd
-}
-
-func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Short:   "List the bundles on an Astro Deployment",
-		Long:    "List every Dag and non-Dag bundle registered on an Astro Deployment.",
-		Example: `  astro deployment bundle list --deployment-id <id>
-  astro deployment bundle list --deployment-id <id> --json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			format, err := bundleListOutputFlags.Resolve()
-			if err != nil {
-				return err
-			}
-			ws, err := coalesceWorkspace()
-			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
-			}
-			cmd.SilenceUsage = true
-			return deployment.ListBundlesWithFormat(ws, deploymentID, format, bundleListOutputFlags.Template, out, astroV1Client, astroV1Alpha1Client)
-		},
-	}
-	bundleListOutputFlags.AddFlags(cmd)
-	return cmd
-}
-
-func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "update [BUNDLE-ID]",
-		Short: "Update a bundle on an Astro Deployment",
-		Long:  "Update a bundle's description or, for a non-Dag bundle, the Dag bundles it is served alongside. Identify the bundle by its ID argument, its Dag bundle --name, or its non-Dag --mount-path.",
-		Example: `  # Update a bundle's description, identified by ID
-  astro deployment bundle update <bundle-id> --deployment-id <id> --description "my bundle"
-
-  # Identify a Dag bundle by name instead of ID
-  astro deployment bundle update --deployment-id <id> --name my-dags --description "my bundle"
-
-  # Re-associate a non-Dag bundle (identified by mount path) with a different set of Dag bundles
-  astro deployment bundle update --deployment-id <id> --mount-path /usr/local/airflow/dbt --dag-bundle-ids <dag-bundle-id>`,
-		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			ws, err := coalesceWorkspace()
-			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
-			}
-			cmd.SilenceUsage = true
-			var bundleID string
-			if len(args) > 0 {
-				bundleID = args[0]
-			}
-			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, out, astroV1Client, astroV1Alpha1Client)
-		},
-	}
-	cmd.Flags().StringVar(&bundleName, "name", "", "Identify the Dag bundle to update by name, instead of by ID")
-	cmd.Flags().StringVar(&bundleMountPath, "mount-path", "", "Identify the non-Dag bundle to update by mount path, instead of by ID")
-	cmd.Flags().StringVar(&bundleDescription, "description", "", "New description for the bundle")
-	cmd.Flags().StringSliceVar(&bundleDagBundleIDs, "dag-bundle-ids", nil, "Dag bundle IDs a non-Dag bundle is served alongside. Replaces the existing set")
-	return cmd
-}
-
-func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete [BUNDLE-ID]",
-		Aliases: []string{"rm"},
-		Short:   "Delete a bundle from an Astro Deployment",
-		Long:    "Delete a Dag or non-Dag bundle from an Astro Deployment. Identify the bundle by its ID argument, its Dag bundle --name, or its non-Dag --mount-path.",
-		Example: `  # Delete a bundle identified by ID
-  astro deployment bundle delete <bundle-id> --deployment-id <id>
-
-  # Identify a Dag bundle by name
-  astro deployment bundle delete --deployment-id <id> --name my-dags
-
-  # Identify a non-Dag bundle by mount path
-  astro deployment bundle delete --deployment-id <id> --mount-path /usr/local/airflow/dbt`,
-		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			ws, err := coalesceWorkspace()
-			if err != nil {
-				return errors.Wrap(err, "failed to find a valid workspace")
-			}
-			cmd.SilenceUsage = true
-			var bundleID string
-			if len(args) > 0 {
-				bundleID = args[0]
-			}
-			return deployment.DeleteBundle(bundleID, bundleName, bundleMountPath, ws, deploymentID, forceBundleDelete, out, astroV1Client, astroV1Alpha1Client)
-		},
-	}
-	cmd.Flags().StringVar(&bundleName, "name", "", "Identify the Dag bundle to delete by name, instead of by ID")
-	cmd.Flags().StringVar(&bundleMountPath, "mount-path", "", "Identify the non-Dag bundle to delete by mount path, instead of by ID")
-	cmd.Flags().BoolVarP(&forceBundleDelete, "force", "f", false, "Delete the bundle without confirmation")
 	return cmd
 }
