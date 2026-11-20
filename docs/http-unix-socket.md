@@ -42,6 +42,7 @@ So put the socket in a directory only you can write to, such as one under your h
 | --- | --- |
 | writable only by its owner (`~/.run`, a directory mounted into a container) | accepts the socket, whoever owns it |
 | writable by any user, with the sticky bit (`/tmp`) | accepts it only if it is yours or root's, since another user could have created it first |
+| writable by its group, not by any user | accepts it only if it is yours or root's, since another member of the group could have created it. A directory you made under a `002` umask is one: its group is yours alone, and your own socket in it is accepted |
 | writable by any user, without the sticky bit | refuses it, since another user could replace it |
 
 A socket's owner only matters in a shared directory because a socket mounted into a container or a sandbox keeps the host's numeric owner, so inside it often belongs to another user or to `nobody`. Symlinks are followed, and the socket they lead to and its directory are what is checked. On Windows, access is governed by the directory's ACL and the CLI checks nothing.

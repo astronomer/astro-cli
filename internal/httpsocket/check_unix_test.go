@@ -77,6 +77,35 @@ func TestSocketInAWorldWritableDirectoryIsRefused(t *testing.T) {
 	assert.Contains(t, err.Error(), "any user can write to")
 }
 
+// A directory its group can write to is shared with the group's other members,
+// any of whom could have created the socket there, so the socket has to be
+// this user's or root's, as in /tmp. This user's own socket there passes: with
+// user private groups, a directory a user makes is group-writable.
+func TestSocketInAGroupWritableDirectoryMustBeThisUsers(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("run as root, the socket is root's, which is trusted in any directory")
+	}
+	path, got := listen(t)
+	require.NoError(t, os.Chmod(filepath.Dir(path), 0o770))
+
+	rt, err := NewRouter(path, DefaultHosts, &directRecorder{}, nil)
+	require.NoError(t, err)
+	require.NoError(t, do(t, rt, "https://api.astronomer.io/v1/x"), "this user's own socket in a group-writable directory")
+	<-got
+
+	playAnotherUser(t)
+	rt, err = NewRouter(path, DefaultHosts, &directRecorder{}, nil)
+	require.NoError(t, err)
+	err = do(t, rt, "https://api.astronomer.io/v1/x")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "owned by uid")
+	select {
+	case s := <-got:
+		t.Errorf("the socket saw a request for %s", s.host)
+	default:
+	}
+}
+
 // A symlink is judged by the socket it leads to and that socket's directory,
 // not by where the link itself lives.
 func TestSocketThroughASymlinkIsCheckedAtItsTarget(t *testing.T) {
