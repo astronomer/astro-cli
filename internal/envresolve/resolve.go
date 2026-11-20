@@ -98,7 +98,7 @@ func Resolve(in Inputs) (*Result, error) {
 		return res, nil
 	}
 
-	r := &resolver{in: in, injected: map[string]string{}, notes: map[nameRef]string{}, workspace: map[nameRef]bool{}}
+	r := &resolver{in: in, injected: map[string]string{}, notes: map[nameRef]string{}, workspace: map[nameRef]bool{}, secret: map[nameRef]bool{}}
 	res.Values.EnvVars = r.values(in.Schema.EnvVars, envschema.SectionEnvVar, func(name string) string { return name })
 	res.Values.AirflowVariables = r.values(in.Schema.AirflowVariables, envschema.SectionAirflowVariable, airflowenv.EnvKeyForVarKey)
 	res.Values.Connections = r.connTypes(in.Schema.Connections)
@@ -117,7 +117,7 @@ func Resolve(in Inputs) (*Result, error) {
 	// Concatenated rather than folded together because callers gate on
 	// different subsets — `astro local start` refuses on missing and reports
 	// the rest — which is why Missing is derived separately below.
-	res.Violations = append(envschema.Validate(in.Schema, res.Values), envschema.CheckValues(in.Schema, res.Values)...)
+	res.Violations = append(envschema.Validate(in.Schema, res.Values), envschema.CheckValues(r.checkSchema(), res.Values)...)
 	res.Violations = append(res.Violations, r.extraViolations...)
 	envschema.SortViolations(res.Violations)
 	res.Missing = r.missingReport(res.Violations)
@@ -144,7 +144,10 @@ type resolver struct {
 	notes map[nameRef]string
 	// workspace holds every workspace-source name that nothing local held.
 	workspace map[nameRef]bool
-	errs      []error
+	// secret holds every name whose value came from a source that says it is
+	// a secret (Secrecy), declared so or not.
+	secret map[nameRef]bool
+	errs   []error
 	// extraViolations holds findings the validator can't see, e.g. a stored
 	// connection whose value isn't valid connection JSON.
 	extraViolations []envschema.Violation
@@ -211,8 +214,9 @@ func (r *resolver) connTypes(specs map[string]envschema.ValueSpec) map[string]st
 func (r *resolver) resolveOne(spec envschema.ValueSpec, section envschema.Section, name, key string) (value, srcLabel string, found bool) {
 	switch spec.Source {
 	case "":
-		if v, src, ok := lookup(r.in.Providers, key); ok {
-			return v, src, true
+		if v, p, ok := lookup(r.in.Providers, key); ok {
+			r.noteSecret(section, name, p, key)
+			return v, p.Label(), true
 		}
 		// The linked workspace sits below every local source and above the
 		// default, for a declared name whatever its source says, as Astro
@@ -220,6 +224,7 @@ func (r *resolver) resolveOne(spec envschema.ValueSpec, section envschema.Sectio
 		if wp := r.in.WorkspaceProvider; wp != nil {
 			if v, ok := wp.Lookup(key); ok {
 				r.injected[key] = v
+				r.noteSecret(section, name, wp, key)
 				return v, wp.Label(), true
 			}
 		}
@@ -266,8 +271,9 @@ func (r *resolver) noteChainMiss(section envschema.Section, name, key string) {
 // off this path; only when nothing local answers does the workspace's
 // Environment Manager scope answer.
 func (r *resolver) resolveWorkspace(section envschema.Section, name, key string) (value, srcLabel string, found bool) {
-	if v, src, ok := lookup(r.in.Providers, key); ok {
-		return v, src, true
+	if v, p, ok := lookup(r.in.Providers, key); ok {
+		r.noteSecret(section, name, p, key)
+		return v, p.Label(), true
 	}
 	r.workspace[nameRef{section, name}] = true
 	wp := r.in.WorkspaceProvider
@@ -280,6 +286,7 @@ func (r *resolver) resolveWorkspace(section envschema.Section, name, key string)
 	}
 	if v, ok := wp.Lookup(key); ok {
 		r.injected[key] = v
+		r.noteSecret(section, name, wp, key)
 		return v, wp.Label(), true
 	}
 	// Nothing resolved it. The provider's label carries any "unavailable"
@@ -319,4 +326,48 @@ func sortResolved(rs []ResolvedName) {
 		}
 		return rs[i].Name < rs[j].Name
 	})
+}
+
+// noteSecret records name as a secret when the provider its value came from
+// says the value under key is one (Secrecy).
+func (r *resolver) noteSecret(section envschema.Section, name string, from Provider, key string) {
+	if secretIn(from, key) {
+		r.secret[nameRef{section, name}] = true
+	}
+}
+
+// checkSchema is the schema the resolved values are type-checked against: the
+// input's, with every name whose value came from a secret source declared
+// secret, so its value is never quoted back in a wrong-type reason. The
+// manifest's `secret = true` routes a value to the vault and keeps it out of
+// reasons; a declaration that leaves it out, for a value the vault or the
+// Workspace holds as a secret, would otherwise print that secret in a warning
+// that goes to the terminal, the JSON event stream and CI logs. The input
+// schema is not changed: Validate, and every other reader, sees it as written.
+func (r *resolver) checkSchema() *envschema.Schema {
+	if len(r.secret) == 0 {
+		return r.in.Schema
+	}
+	marked := func(section envschema.Section, specs map[string]envschema.ValueSpec) map[string]envschema.ValueSpec {
+		out, copied := specs, false
+		for name := range specs {
+			if !r.secret[nameRef{section, name}] || specs[name].Secret {
+				continue
+			}
+			if !copied {
+				out, copied = make(map[string]envschema.ValueSpec, len(specs)), true
+				for k := range specs {
+					out[k] = specs[k]
+				}
+			}
+			spec := out[name]
+			spec.Secret = true
+			out[name] = spec
+		}
+		return out
+	}
+	s := *r.in.Schema
+	s.EnvVars = marked(envschema.SectionEnvVar, s.EnvVars)
+	s.AirflowVariables = marked(envschema.SectionAirflowVariable, s.AirflowVariables)
+	return &s
 }

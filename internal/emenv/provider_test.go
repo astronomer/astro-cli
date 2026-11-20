@@ -424,6 +424,25 @@ func TestRevealedSecretValue(t *testing.T) {
 	require.Equal(t, "xoxb-real", v)
 }
 
+// The provider says which of its values the Workspace marks secret, an
+// environment variable or an Airflow Variable, so a type warning never quotes
+// one back; a plain value, or a key it does not hold, is not.
+func TestSecretFollowsTheWorkspacesMark(t *testing.T) {
+	mc := mockClient(okResp(
+		envVarObj("SECRET_TOKEN", "xoxb-real", true),
+		airflowVarObj("AIRFLOW_VAR_API_KEY", "k", true),
+		envVarObj("REGION", "us-east", false),
+	))
+	p := loggedInProvider(t, mc, true)
+
+	s, ok := p.(envresolve.Secrecy)
+	require.True(t, ok, "the workspace provider says which values are secrets")
+	require.True(t, s.Secret("SECRET_TOKEN"))
+	require.True(t, s.Secret("AIRFLOW_VAR_API_KEY"))
+	require.False(t, s.Secret("REGION"))
+	require.False(t, s.Secret("ABSENT"))
+}
+
 // In presence mode (list), a secret object resolves as a source without a
 // value: list is value-free and never pulls the secret.
 func TestPresenceModeSecretResolvesWithoutValue(t *testing.T) {

@@ -551,6 +551,10 @@ func (s *Source) SecretInjection() map[string]string {
 	return out
 }
 
+// A tier says its values are secrets, so a type warning never quotes one
+// back; a rename here would drop that silently.
+var _ envresolve.Secrecy = (*provider)(nil)
+
 // provider is one tier as the resolver sees it.
 type provider struct {
 	src    *Source
@@ -570,6 +574,15 @@ func (p *provider) Lookup(key string) (string, bool) {
 		return "", false
 	}
 	return p.src.read(vk)
+}
+
+// Secret reports whether this tier holds a value under key: every value a
+// tier holds is a secret, layered as secret env (SecretInjection), so a type
+// warning never quotes one back (envresolve.Secrecy).
+func (p *provider) Secret(key string) bool {
+	p.src.load()
+	_, ok := p.src.index(p.global)[key]
+	return ok
 }
 
 // Label names the tier.

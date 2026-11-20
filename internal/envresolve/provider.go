@@ -35,6 +35,28 @@ type Diagnoser interface {
 	Diagnose(envKey string) string
 }
 
+// Secrecy is an optional Provider capability: whether the value the provider
+// holds under envKey is a secret, whatever the declaration says. The vault
+// tiers hold values the CLI keeps out of files (every one is layered as secret
+// env), and the Environment Manager provider knows which of its objects the
+// Workspace marks secret. A value from such a source is never quoted back in a
+// type warning, though the manifest left out `secret = true`.
+//
+// It is asked only of a key Lookup just returned a value for, and its answer
+// means nothing for any other: a vault tier answers true for every key it
+// indexes, one it then cannot read among them.
+type Secrecy interface {
+	Secret(envKey string) bool
+}
+
+// secretIn reports whether p says the value it holds under envKey is a secret.
+// A provider without the capability (the shell, the project .env) holds plain
+// values.
+func secretIn(p Provider, envKey string) bool {
+	s, ok := p.(Secrecy)
+	return ok && s.Secret(envKey)
+}
+
 // Lister is an optional Provider capability: every env key the provider
 // supplies, so a caller can pass along the names no declaration mentions. The
 // Environment Manager provider implements it; the workspace tier reaches a
@@ -106,12 +128,12 @@ func Diagnose(p Provider, envKey string) string {
 }
 
 // lookup walks the chain and returns the first provider that holds envKey,
-// with its label. ok is false when no provider holds it.
-func lookup(providers []Provider, envKey string) (value, source string, ok bool) {
+// with the value. ok is false when no provider holds it.
+func lookup(providers []Provider, envKey string) (value string, from Provider, ok bool) {
 	for _, p := range providers {
 		if v, has := p.Lookup(envKey); has {
-			return v, p.Label(), true
+			return v, p, true
 		}
 	}
-	return "", "", false
+	return "", nil, false
 }
