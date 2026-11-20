@@ -349,13 +349,13 @@ func TestStartMissingEnvHint(t *testing.T) {
 func TestEnvListNotes(t *testing.T) {
 	items := []localenv.ListItem{
 		{
-			Kind: localenv.KindEnv, Name: "API_URL", Source: "absent", Required: true, Secret: true,
+			Kind: localenv.KindEnv, Name: "API_URL", Source: "absent", Required: true, Secret: true, Declared: true,
 			Description:   "Where the\n  API lives",
 			SetHint:       "astro local env variable set API_URL",
 			UndeclareHint: "astro local env variable undeclare API_URL",
 		},
 		{
-			Kind: localenv.KindEnv, Name: "DECLARED", Source: "project", Required: true, Resolved: true,
+			Kind: localenv.KindEnv, Name: "DECLARED", Source: "project", Required: true, Resolved: true, Declared: true,
 		},
 		{
 			Kind: localenv.KindEnv, Name: "ELSEWHERE", Source: "project",
@@ -371,13 +371,19 @@ func TestEnvListNotes(t *testing.T) {
 			DeclareHint: "astro local env variable declare LEFTOVER",
 		},
 		{
-			Kind: localenv.KindEnv, Name: "LOG_LEVEL", Source: "absent",
+			Kind: localenv.KindEnv, Name: "LOG_LEVEL", Source: "absent", Declared: true,
 			SetHint:       "astro local env variable set LOG_LEVEL",
 			UndeclareHint: "astro local env variable undeclare LOG_LEVEL",
 		},
 		{
-			Kind: localenv.KindEnv, Name: "TOKEN", Source: "absent", NotLinkedHere: true,
+			Kind: localenv.KindEnv, Name: "TOKEN", Source: "absent", NotLinkedHere: true, Declared: true,
 			LinkHint: "astro local env variable link TOKEN",
+		},
+		// An Airflow setting a global holds, linked elsewhere: neither declared
+		// nor an orphan, so it lists with the values nothing declares.
+		{
+			Kind: localenv.KindEnv, Name: "AIRFLOW__CORE__PARALLELISM", Source: "vault (global)", NotLinkedHere: true,
+			LinkHint: "astro local env variable link AIRFLOW__CORE__PARALLELISM",
 		},
 	}
 	var out strings.Builder
@@ -385,14 +391,15 @@ func TestEnvListNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "" +
-		"KIND      NAME        SOURCE        STATUS\n" +
-		"variable  API_URL                   declared but missing\n" +
-		"variable  LOG_LEVEL                 declared but not set (optional)\n" +
-		"variable  TOKEN                     not linked to this project\n" +
-		"variable  DECLARED    .env          \n" +
-		"variable  ELSEWHERE   .env          not declared (in /projects/other)\n" +
-		"variable  GLOBALONLY  global vault  not declared\n" +
-		"variable  LEFTOVER    .env          not declared\n"
+		"KIND      NAME                        SOURCE        STATUS\n" +
+		"variable  API_URL                                   declared but missing\n" +
+		"variable  LOG_LEVEL                                 declared but not set (optional)\n" +
+		"variable  TOKEN                                     not linked to this project\n" +
+		"variable  DECLARED                    .env          \n" +
+		"variable  ELSEWHERE                   .env          not declared (in /projects/other)\n" +
+		"variable  GLOBALONLY                  global vault  not declared\n" +
+		"variable  LEFTOVER                    .env          not declared\n" +
+		"variable  AIRFLOW__CORE__PARALLELISM  global vault  not linked to this project\n"
 	if out.String() != want {
 		t.Errorf("list =\n%s\nwant\n%s", out.String(), want)
 	}
@@ -402,14 +409,15 @@ func TestEnvListNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	want = "" +
-		"KIND      NAME        SOURCE        STATUS                             REQUIRED  SECRET  DESCRIPTION\n" +
-		"variable  API_URL                   declared but missing               yes       yes     Where the API lives\n" +
-		"variable  LOG_LEVEL                 declared but not set (optional)                      \n" +
-		"variable  TOKEN                     not linked to this project                           \n" +
-		"variable  DECLARED    .env                                             yes               \n" +
-		"variable  ELSEWHERE   .env          not declared (in /projects/other)                    \n" +
-		"variable  GLOBALONLY  global vault  not declared                                         \n" +
-		"variable  LEFTOVER    .env          not declared                                         \n"
+		"KIND      NAME                        SOURCE        STATUS                             REQUIRED  SECRET  DESCRIPTION\n" +
+		"variable  API_URL                                   declared but missing               yes       yes     Where the API lives\n" +
+		"variable  LOG_LEVEL                                 declared but not set (optional)                      \n" +
+		"variable  TOKEN                                     not linked to this project                           \n" +
+		"variable  DECLARED                    .env                                             yes               \n" +
+		"variable  ELSEWHERE                   .env          not declared (in /projects/other)                    \n" +
+		"variable  GLOBALONLY                  global vault  not declared                                         \n" +
+		"variable  LEFTOVER                    .env          not declared                                         \n" +
+		"variable  AIRFLOW__CORE__PARALLELISM  global vault  not linked to this project                           \n"
 	if out.String() != want {
 		t.Errorf("list -o wide =\n%s\nwant\n%s", out.String(), want)
 	}
@@ -425,7 +433,9 @@ func TestEnvListNotes(t *testing.T) {
 		"  Link TOKEN so this project gets it:\n" +
 		"    astro local env variable link TOKEN\n" +
 		"  Declare LEFTOVER so every copy of the project requires it:\n" +
-		"    astro local env variable declare LEFTOVER\n"
+		"    astro local env variable declare LEFTOVER\n" +
+		"  Link AIRFLOW__CORE__PARALLELISM so this project gets it:\n" +
+		"    astro local env variable link AIRFLOW__CORE__PARALLELISM\n"
 	if out.String() != want {
 		t.Errorf("next steps =\n%s\nwant\n%s", out.String(), want)
 	}

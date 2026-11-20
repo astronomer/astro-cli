@@ -56,8 +56,9 @@ func GuidanceDisabled() bool {
 // command's result, so stdout stays exactly that. A caller under
 // --output json prints none, and carries its commands in the JSON instead.
 //
-// Optional steps print only when stderr is a terminal and
-// ASTRO_GUIDANCE_DISABLED is not set, so a pipe, a script or an agent that
+// Optional steps print only when the process's stderr is a terminal and
+// ASTRO_GUIDANCE_DISABLED is not set; that is the question asked whatever w
+// is, since w stands for stderr, so a pipe, a script or an agent that
 // opted out never sees them. Required steps always print.
 //
 // The output is set off by a blank line and led by the Next: label. One step

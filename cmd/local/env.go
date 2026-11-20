@@ -571,7 +571,7 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			"Declaring a name makes every copy of the project require it, and linking limits which " +
 			"projects a global reaches. Declared values come first. The STATUS column marks rows that need attention: declared but " +
 			"missing, declared but not set (optional), not declared, not linked to this project, or invalid key. " +
-			"SOURCE is blank for a value nothing sets. On a terminal, the commands " +
+			"SOURCE is blank for a value nothing sets, except one declared to come from the cloud vault, which names it. On a terminal, the commands " +
 			"that settle them follow the table as next steps (ASTRO_GUIDANCE_DISABLED=1 turns them " +
 			"off). -o wide adds whether each value is required and secret, and its description. " +
 			"Values are not shown; use the get command to see one."
@@ -1462,14 +1462,6 @@ func notLinkedState(inProject bool) string {
 	return "linked to other projects"
 }
 
-// declaredRow reports whether a list row is one the project declares: one
-// something supplies (Resolved), one nothing does (it has the set and
-// undeclare hints), or a declared global not linked to this project. An orphan, and an
-// Airflow setting the workspace passes, are not.
-func declaredRow(it *localenv.ListItem) bool {
-	return it.Resolved || it.SetHint != "" || (it.NotLinkedHere && !it.Orphan)
-}
-
 // The order of a text list's rows: the declared values first, those needing
 // attention before those that do not, then the values nothing declares, the
 // ones a start passes before the ones it cannot use. Rows of one rank keep
@@ -1494,7 +1486,7 @@ func listOrder(items []localenv.ListItem, inProject bool) []orderedRow {
 		it := &items[i]
 		s := statusFor(it, inProject)
 		rows[i] = orderedRow{it, s}
-		if declaredRow(it) {
+		if it.Declared {
 			rank[it] = declaredOrder[s.kind]
 		} else {
 			rank[it] = undeclaredOrder[s.kind]
