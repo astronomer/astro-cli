@@ -98,23 +98,29 @@ func resolveConfigLink(file string) string {
 }
 
 // replaceConfigFile writes data to a temp file beside file, with mode perm,
-// and renames it over file. beforeRename, when not nil, runs on the temp
-// file's path once it is complete, and a failure from it abandons the write.
-func replaceConfigFile(fsys afero.Fs, file string, data []byte, perm iofs.FileMode, beforeRename func(tmp string) error) error {
+// and renames it over file. beforeRename, when not nil, runs on the temp file
+// once it is complete, still open, and a failure from it abandons the write.
+//
+// The temp file is changed through its handle, not its name, until it is
+// closed: the name is an entry in a directory another process may be able to
+// change, and one swapped for a symlink between two calls by name would have
+// the second land on whatever the link points at. A handle stays on the file
+// this created.
+func replaceConfigFile(fsys afero.Fs, file string, data []byte, perm iofs.FileMode, beforeRename func(tmp afero.File) error) error {
 	tmp, err := afero.TempFile(fsys, filepath.Dir(file), "."+filepath.Base(file)+".*")
 	if err != nil {
 		return fmt.Errorf("creating temp file for %s: %w", file, err)
 	}
 	tmpPath := tmp.Name()
 	_, werr := tmp.Write(data)
-	if cerr := tmp.Close(); werr == nil {
-		werr = cerr
-	}
 	if werr == nil {
-		werr = fsys.Chmod(tmpPath, perm)
+		werr = chmodOpen(fsys, tmp, perm)
 	}
 	if werr == nil && beforeRename != nil {
-		werr = beforeRename(tmpPath)
+		werr = beforeRename(tmp)
+	}
+	if cerr := tmp.Close(); werr == nil {
+		werr = cerr
 	}
 	if werr == nil {
 		werr = fsys.Rename(tmpPath, file)
@@ -124,6 +130,16 @@ func replaceConfigFile(fsys afero.Fs, file string, data []byte, perm iofs.FileMo
 		return fmt.Errorf("writing %s: %w", file, werr)
 	}
 	return nil
+}
+
+// chmodOpen gives the open file f mode perm, through its handle where it has
+// one (an *os.File), and by name otherwise, which only a test's in-memory
+// filesystem reaches.
+func chmodOpen(fsys afero.Fs, f afero.File, perm iofs.FileMode) error {
+	if c, ok := f.(interface{ Chmod(iofs.FileMode) error }); ok {
+		return c.Chmod(perm)
+	}
+	return fsys.Chmod(f.Name(), perm)
 }
 
 // readConfigFile reads the config file v is set to, from fsys.
