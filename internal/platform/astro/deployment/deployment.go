@@ -975,13 +975,15 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if !canCiCdDeploy(c.Token) {
 			// Refused before the warning that leads up to the question, so a
 			// run that cannot ask prints nothing about it.
-			if err := input.MayAsk("Continue?", input.AnsweredBy("--yes")); err != nil {
+			if err := input.MayAsk("Change the Dag deploy setting?", input.AnsweredBy("--yes")); err != nil {
 				return UpdateResult{}, err
 			}
 			pw := progressTo(notes)
-			fmt.Fprintf(pw, "\n%s You are updating the Dag deploy setting while CI/CD enforcement is enabled. After the update, you cannot deploy Dags with the CLI, and Dags will not appear in the UI and new tasks will not start until you deploy them."+
-				"\nDisable CI/CD enforcement and then deploy your Dags, or deploy them from CI/CD or with an API token.", ansi.WarningLabel(pw))
-			if err := input.ConfirmOrAbort("\n\nContinue?", input.AnsweredBy("--yes")); err != nil {
+			fmt.Fprintln(pw)
+			ansi.Warn(pw, "CI/CD enforcement is on for this Deployment. After the Dag deploy setting changes, you cannot deploy its Dags "+
+				"from the CLI, and until they are deployed again they do not show in the Airflow UI and no new tasks start. "+
+				"Deploy them through CI/CD or with an API token, or turn off CI/CD enforcement first")
+			if err := input.ConfirmOrAbort("\nChange the Dag deploy setting?", input.AnsweredBy("--yes")); err != nil {
 				return UpdateResult{}, err
 			}
 		}
@@ -990,22 +992,30 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	switch dagDeploy {
 	case enable:
 		if currentDeployment.IsDagDeployEnabled {
-			fmt.Println("\nDag deploys are already enabled for this Deployment. Your Dags will continue to run as scheduled.")
+			pw := progressTo(notes)
+			fmt.Fprintln(pw)
+			ansi.Note(pw, "Dag-only deploys are already on for this Deployment; nothing to change")
 			return UpdateResult{Deployment: currentDeployment}, nil
 		}
 
-		fmt.Fprintf(progressTo(notes), "\nYou enabled Dag-only deploys for this Deployment. Running tasks are not interrupted, but new tasks will not be scheduled."+
-			"\nRun astro deploy --dags to finish enabling it and resume your Dags. The Airflow UI can take a few minutes to update.\n\n")
+		pw := progressTo(notes)
+		fmt.Fprintln(pw)
+		ansi.Note(pw, "Dag-only deploys are now on for this Deployment. Running tasks continue, but no new tasks are scheduled "+
+			"until you deploy its Dags. The Airflow UI can take a few minutes to update")
+		fmt.Fprintf(pw, "%s astro deploy --dags\n\n", ansi.NextLabel(pw))
 		dagDeployEnabled = true
 	case disable:
 		if !currentDeployment.IsDagDeployEnabled {
-			fmt.Println("\nDag-only deploys are already disabled for this Deployment.")
+			pw := progressTo(notes)
+			fmt.Fprintln(pw)
+			ansi.Note(pw, "Dag-only deploys are already off for this Deployment; nothing to change")
 			return UpdateResult{Deployment: currentDeployment}, nil
 		}
 		if config.CFG.ShowWarnings.GetBool() {
 			pw := progressTo(notes)
-			fmt.Fprintf(pw, "\n%s This command will disable Dag-only deploys for this Deployment. Running tasks are not interrupted, but new tasks will not be scheduled."+
-				"\nRun astro deploy after this command to restart your Dags. The Airflow UI can take a few minutes to update.", ansi.WarningLabel(pw))
+			fmt.Fprintln(pw)
+			ansi.Warn(pw, "This turns off Dag-only deploys for this Deployment. Running tasks continue, but no new tasks are scheduled "+
+				"until you run astro deploy, which deploys the Dags with the image. The Airflow UI can take a few minutes to update")
 			confirmWithUser = true
 		}
 		dagDeployEnabled = false

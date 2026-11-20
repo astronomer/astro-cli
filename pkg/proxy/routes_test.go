@@ -401,3 +401,25 @@ func TestAddRoute_WithServices(t *testing.T) {
 	require.NotNil(t, got)
 	assert.Equal(t, "15432", got.Services["postgres"])
 }
+
+// A stale project's removal takes only its own route: the hostname it held
+// may since have gone to another project, whose live route stays.
+func TestRemoveProjectRouteLeavesAnotherProjectsRoute(t *testing.T) {
+	s := testStore(t)
+	live, stale := t.TempDir(), t.TempDir()
+	require.NoError(t, s.WriteRoutes([]Route{
+		{Hostname: "airflow.localhost", Port: "8080", ProjectDir: live, PID: os.Getpid()},
+	}))
+
+	remaining, err := s.RemoveProjectRoute("airflow.localhost", stale)
+	require.NoError(t, err)
+	assert.Equal(t, 1, remaining)
+	routes, err := s.ReadRoutes()
+	require.NoError(t, err)
+	require.Len(t, routes, 1)
+	assert.Equal(t, live, routes[0].ProjectDir)
+
+	remaining, err = s.RemoveProjectRoute("airflow.localhost", live)
+	require.NoError(t, err)
+	assert.Equal(t, 0, remaining, "the owner's removal takes it")
+}

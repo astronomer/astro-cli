@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/apc/workspace"
-	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 var (
@@ -264,7 +264,7 @@ func workspaceSwitch(out io.Writer, args []string) error {
 		}
 	}
 	if capped {
-		logger.Warnf("Page size cannot be more than %d, reducing the page size to %d", defaultPageSize, defaultPageSize)
+		cliout.Warn(os.Stderr, fmt.Sprintf("page size can be at most %d; using %d", defaultPageSize, defaultPageSize))
 	}
 
 	w, quit, err := workspace.Switch(id, workspacePageSize, houstonVersion, houstonClient)

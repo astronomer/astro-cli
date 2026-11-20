@@ -169,6 +169,9 @@ func TestDeploymentCoreText(t *testing.T) {
 		answers string
 		args    []string
 		check   func(t *testing.T, stdout string)
+		// stderr, when set, is checked against the command's own stderr: the
+		// notes a run writes beside its result.
+		stderr  func(t *testing.T, stderr string)
 		wantErr string
 	}{
 		{
@@ -201,7 +204,8 @@ func TestDeploymentCoreText(t *testing.T) {
 			name:   "update to dag deploys it already has",
 			client: func(t *testing.T) astrov1.APIClient { return coreMock(t, coreDeployment()) },
 			args:   []string{"update", coreDeploymentID, "--dag-deploy", "enable"},
-			check:  says("Dag deploys are already enabled for this Deployment. Your Dags will continue to run as scheduled."),
+			check:  func(t *testing.T, stdout string) { assert.NotContains(t, stdout, "already on") },
+			stderr: says("Note: Dag-only deploys are already on for this Deployment; nothing to change"),
 		},
 		{
 			name: "update, declining an executor change",
@@ -331,6 +335,9 @@ func TestDeploymentCoreText(t *testing.T) {
 			require.NoError(t, run.err, "stdout:\n%s", run.stdout)
 			assert.Equal(t, 0, run.code)
 			tc.check(t, run.terminal())
+			if tc.stderr != nil {
+				tc.stderr(t, run.stderr)
+			}
 			if m, ok := client.(*astrov1_mocks.ClientWithResponsesInterface); ok {
 				m.AssertExpectations(t)
 			}

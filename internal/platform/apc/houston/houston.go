@@ -11,11 +11,10 @@ import (
 	"strings"
 	"time"
 
-	newLogger "github.com/sirupsen/logrus"
-
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 var (
@@ -191,7 +190,7 @@ func (c *Client) DoWithContext(doOpts *httputil.DoOptions, ctx *config.Context) 
 	var response httputil.HTTPResponse
 	httpResponse, err := c.HTTPClient.Do(doOpts)
 	if err != nil {
-		newLogger.Debugf("HTTP request ERROR: %s", err.Error())
+		logger.Debugf("HTTP request ERROR: %s", err.Error())
 		return nil, err
 	}
 	defer httpResponse.Body.Close()

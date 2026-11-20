@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -412,17 +412,17 @@ func TestRemovedCommandStubsTakeVerbosity(t *testing.T) {
 
 	for _, tc := range []struct {
 		args []string
-		want logrus.Level
+		want slog.Level
 	}{
-		{[]string{"dev", "ps", "--verbosity=debug"}, logrus.DebugLevel},
-		{[]string{"dev", "ps", "--verbosity", "debug"}, logrus.DebugLevel},
-		{[]string{"--verbosity", "info", "dev", "ps"}, logrus.InfoLevel},
-		{[]string{"deployment", "pool", "list", "--verbosity=debug"}, logrus.DebugLevel},
-		{[]string{"dev", "ps", "--verbosity=info", "--verbosity=debug"}, logrus.DebugLevel},
-		{[]string{"dev", "ps", "--", "--verbosity", "debug"}, logrus.WarnLevel},
+		{[]string{"dev", "ps", "--verbosity=debug"}, slog.LevelDebug},
+		{[]string{"dev", "ps", "--verbosity", "debug"}, slog.LevelDebug},
+		{[]string{"--verbosity", "info", "dev", "ps"}, slog.LevelInfo},
+		{[]string{"deployment", "pool", "list", "--verbosity=debug"}, slog.LevelDebug},
+		{[]string{"dev", "ps", "--verbosity=info", "--verbosity=debug"}, slog.LevelDebug},
+		{[]string{"dev", "ps", "--", "--verbosity", "debug"}, slog.LevelWarn},
 	} {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
-			logger.SetLevel(logrus.PanicLevel)
+			logger.SetLevel(logger.LevelOff)
 			root := buildTree(t, astroTree).root
 			_, _, err := executeRoot(root, tc.args...)
 			require.ErrorContains(t, err, "was removed in Astro CLI v2")

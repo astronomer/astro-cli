@@ -409,7 +409,7 @@ func initAirflowSpecCache(ctx stdctx.Context, opts *AirflowOptions, target *airf
 			// except on a connection failure, which the request itself is
 			// about to report far better.
 			if !isConnectionError(err) {
-				cliout.Warn(opts.RequestOptions.GetErrOut(), fmt.Sprintf("Could not detect Airflow version (%v), using default %s. Use --airflow-version to override.", err, defaultAirflowVersion))
+				cliout.Warn(opts.RequestOptions.GetErrOut(), fmt.Sprintf("could not detect the Airflow version (%v); using %s. Pass --airflow-version to choose one", err, defaultAirflowVersion))
 			}
 			version = defaultAirflowVersion
 		}

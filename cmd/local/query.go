@@ -438,28 +438,12 @@ func renderTable[T any](w io.Writer, rows []T, empty string, headers []string, c
 	return tw.Flush()
 }
 
-// outputIsTerminal reports whether w is a terminal. A variable so a test can
-// stand one in for a buffer.
-var outputIsTerminal = cliout.IsTerminal
-
-// terminalText is s, text from Airflow (a task's log, an XCom string, a Dag's
-// source), as it is written to w. To a terminal it goes without escape
-// sequences and other control characters (input.Lines), which the terminal
-// would act on rather than show: a task can write anything into its log. To a
-// file or a pipe it goes byte for byte, so a saved log or Dag file is exact.
-func terminalText(w io.Writer, s string) string {
-	if outputIsTerminal(w) {
-		return input.Lines(s)
-	}
-	return s
-}
-
 // writeText writes a command's output verbatim, ending it with a newline it
 // may not carry. It backs the two commands whose text mode is the thing itself
 // rather than a rendering of it — a DAG's source and a task's log — because
-// both get piped into a file or a pager.
+// both get piped into a file or a pager. To a file or a pipe it is byte for
+// byte; to a terminal, cliout.Renderer drops what the terminal would act on.
 func writeText(w io.Writer, text string) error {
-	text = terminalText(w, text)
 	if text != "" && !strings.HasSuffix(text, "\n") {
 		text += "\n"
 	}

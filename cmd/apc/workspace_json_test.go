@@ -1,7 +1,6 @@
 package apc
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -459,36 +457,27 @@ func TestWorkspaceEmptyDescriptionIsNotNull(t *testing.T) {
 	assert.Nil(t, list.Workspaces[1].Description)
 }
 
-// A page size past the cap is noted on stderr in text, before the picker; a
-// run under json that will refuse to pick prints the refusal and nothing
-// else.
+// A page size past the cap is a warning on stderr in text, before the picker;
+// a run under json that will refuse to pick prints the refusal and nothing
+// else. It tells the person their value was changed, so it is not a log line:
+// a log level that writes nothing does not hide it.
 func TestWorkspaceSwitchPageSizeNote(t *testing.T) {
-	const note = "Page size cannot be more than 100"
-	// The note goes through the logger, which the root points at stderr;
-	// here it writes to logs.
-	logs := new(bytes.Buffer)
-	logger.SetOutput(logs)
+	const note = "Warning: page size can be at most 100; using 100"
 	level := logger.GetLevel()
-	logger.SetLevel(logrus.WarnLevel)
-	t.Cleanup(func() {
-		logger.SetOutput(os.Stderr)
-		logger.SetLevel(level)
-	})
+	logger.SetLevel(logger.LevelOff)
+	t.Cleanup(func() { logger.SetLevel(level) })
 	t.Run("text: noted", func(t *testing.T) {
-		logs.Reset()
 		api := wsClient()
 		api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 100, PageNumber: 0}).Return([]houston.Workspace{wsCurrent}, nil)
 		got := runWorkspaceTree(t, api, "q\n", true, "workspace", "switch", "--paginated", "--page-size", "500")
 		assert.Equal(t, 0, got.code)
-		assert.Contains(t, logs.String(), note)
+		assert.Contains(t, got.stderr, note)
 	})
 	t.Run("json: only the refusal", func(t *testing.T) {
-		logs.Reset()
 		api := wsClient()
 		got := runWorkspaceTree(t, api, "", true, "workspace", "switch", "--paginated", "--page-size", "500", "-o", "json")
 		assert.Equal(t, 1, got.code)
 		assert.Contains(t, got.stdout, "input_required")
-		assert.Empty(t, withoutDeprecations(got.stderr))
-		assert.Empty(t, logs.String(), "no note before the refusal")
+		assert.Empty(t, withoutDeprecations(got.stderr), "no note before the refusal")
 	})
 }

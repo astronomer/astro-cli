@@ -33,7 +33,7 @@ var (
 	// DefaultDirPerm is the default permission for directories
 	DefaultDirPerm           os.FileMode = 0o755
 	openURL                              = browser.OpenURL
-	gitignoreParseWarningMsg             = "Could not parse .gitignore: %v. Continuing without gitignore filtering."
+	gitignoreParseWarningMsg             = "Could not parse .gitignore (%v); continuing without its filtering"
 )
 
 // The functions here that note something along the way take notes, the
@@ -148,7 +148,7 @@ func createNewProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient
 	if err != nil {
 		workspaceName = workspaceID
 	}
-	fmt.Fprintf(notes, "Created project %s in Workspace %s\n", name, workspaceName)
+	fmt.Fprintf(notes, "Created project %s in Workspace %s\n", input.Cell(name), input.Cell(workspaceName))
 	return resp.JSON200.Id, nil
 }
 

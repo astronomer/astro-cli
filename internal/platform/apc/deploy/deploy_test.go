@@ -3,6 +3,7 @@ package deploy
 import (
 	"bytes"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -545,6 +546,29 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 	// An empty folder asks nothing, so it deploys under a guard that refuses
 	// every question; the Deployment is the one returned; the upload's notes
 	// go to Progress, and the warning to WarnEmptyDags.
+	s.Run("No URL to upload to: refused by name, not sent to an empty URL", func() {
+		workspaceDeploymentsVar = func(houston.ClientInterface, string, string) ([]houston.Deployment, error) {
+			return nil, nil
+		}
+		appConfig := &houston.AppConfig{Flags: houston.FeatureFlags{DagOnlyDeployment: true}}
+		deployment := &houston.Deployment{
+			ReleaseName:   "testReleaseName",
+			DagDeployment: houston.DagDeploymentConfig{Type: houston.DagOnlyDeploymentType},
+			ClusterID:     "test-cluster-id",
+			Urls:          []houston.DeploymentURL{{URL: "://not a url", Type: houston.AirflowURLType}},
+		}
+		s.houstonMock.On("GetDeployment", "picked-id").Return(deployment, nil).Once()
+		s.houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil).Once()
+		s.Require().NoError(os.Mkdir("dags", os.ModePerm))
+		defer os.RemoveAll("dags")
+		defer os.Remove("./dags.tar")
+		defer os.Remove("./dags.tar.gz")
+
+		_, err := DagsOnlyDeploy(s.houstonMock, wsID, "picked-id", ".", nil, false, description, Options{Progress: io.Discard, WarnEmptyDags: func(string) {}})
+		s.ErrorIs(err, ErrNoDagUploadURL)
+		s.ErrorContains(err, "testReleaseName")
+	})
+
 	s.Run("An empty folder asks nothing, and the Deployment is returned", func() {
 		workspaceDeploymentsVar = func(houston.ClientInterface, string, string) ([]houston.Deployment, error) {
 			return nil, nil

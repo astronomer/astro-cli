@@ -1207,5 +1207,5 @@ func (e *Engine) recordRegisteredHostname(rec *localstate.Record, registered str
 // removeRoute deregisters the project's proxy route, and the proxy with it
 // when no route is left.
 func (e *Engine) removeRoute(rec localstate.Record) error {
-	return localshared.RemoveRoute(e.routes, rec.Hostname, e.daemon)
+	return localshared.RemoveRoute(e.routes, rec.Hostname, rec.ProjectPath, e.daemon)
 }

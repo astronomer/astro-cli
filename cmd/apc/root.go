@@ -4,18 +4,17 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 var (
-	// init debug logs should be used only for logs produced during the CLI-initialization, before the SetUpLogs Method has been called
+	// InitDebugLogs holds debug lines from before the root's SetupLogging has
+	// set the log level, for PrintDebugLogs to write once it has.
 	InitDebugLogs = []string{}
 
 	houstonClient  houston.ClientInterface
@@ -100,21 +99,8 @@ func NeedsPlatform(words []string, rootFlags *pflag.FlagSet) bool {
 	return err == nil && found != probe && found != help && !cliout.IsRemovedCommand(found)
 }
 
-// SetUpLogs set the log output and the log level
-func SetUpLogs(out io.Writer, level string) error {
-	// if level is default means nothing was passed override with config setting
-	if level == "warning" {
-		level = config.CFG.Verbosity.GetString()
-	}
-	logger.SetOutput(out)
-	lvl, err := logrus.ParseLevel(level)
-	if err != nil {
-		return err
-	}
-	logger.SetLevel(lvl)
-	return nil
-}
-
+// PrintDebugLogs writes the lines InitDebugLogs held back until the log level
+// was known.
 func PrintDebugLogs() {
 	for _, log := range InitDebugLogs {
 		logger.Debug(log)

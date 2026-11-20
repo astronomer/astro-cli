@@ -281,7 +281,7 @@ func (t *authRetryTransport) RoundTrip(req *http.Request) (*http.Response, error
 	injectAirflowAuth(retry, fresh)
 
 	_ = resp.Body.Close()
-	slog.Info("proxy: replaying request with a refreshed Airflow session", "backendPort", t.backendPort)
+	slog.Info("proxy: replaying request with a refreshed Airflow session", "backendPort", t.backendPort) //nolint:forbidigo // runs in the proxy daemon, which has no terminal: its log is the daemon's log file
 	return t.inner.RoundTrip(retry)
 }
 

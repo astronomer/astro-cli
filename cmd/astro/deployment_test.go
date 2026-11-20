@@ -1496,9 +1496,9 @@ func TestDeploymentOpen(t *testing.T) {
 	})
 }
 
-// A Deployment's log line is whatever its code wrote: to a terminal it goes
-// without escapes, to a pipe as it came.
-func TestDeploymentLogsReachATerminalWithoutEscapes(t *testing.T) {
+// A Deployment's log line goes to a file or a pipe as its code wrote it. (To a
+// terminal, cliout.Renderer drops what the terminal would act on.)
+func TestDeploymentLogsToAPipeAreExact(t *testing.T) {
 	res := &deployment.LogsResult{DeploymentName: "d", Hours: 1, Entries: []deployment.LogEntry{
 		{Source: "scheduler", Message: "line\x1b]52;c;aGk=\x07\x1b[2J"},
 	}}
@@ -1509,11 +1509,4 @@ func TestDeploymentLogsReachATerminalWithoutEscapes(t *testing.T) {
 		return buf.String()
 	}
 	assert.Contains(t, run(), "line\x1b]52;c;aGk=\x07\x1b[2J", "a pipe gets the log as it came")
-
-	orig := logsToTerminal
-	t.Cleanup(func() { logsToTerminal = orig })
-	logsToTerminal = func(io.Writer) bool { return true }
-	out := run()
-	assert.NotContains(t, out, "\x1b")
-	assert.Contains(t, out, "line scheduler")
 }

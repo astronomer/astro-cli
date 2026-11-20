@@ -5,6 +5,8 @@ import (
 	"io"
 
 	"github.com/logrusorgru/aurora"
+
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // The labels that lead the CLI's warnings, errors, notes and next steps. They
@@ -22,15 +24,18 @@ import (
 const ErrorPrefix = "Error:"
 
 // Warn prints msg to w led by "Warning:", as the CLI's warnings are, so it is
-// not read as the command's output.
+// not read as the command's output. msg is written as the styling functions
+// write their text (input.Lines): its line breaks kept, without what a
+// terminal would act on, since a warning often carries a server's or a
+// catalog's words.
 func Warn(w io.Writer, msg string) {
-	fmt.Fprintln(w, WarningLabel(w), msg)
+	fmt.Fprintln(w, WarningLabel(w), input.Lines(msg))
 }
 
 // Note prints msg to w led by "Note:", for something worth knowing that is
-// neither a warning nor the command's output.
+// neither a warning nor the command's output, written as Warn writes its msg.
 func Note(w io.Writer, msg string) {
-	fmt.Fprintln(w, NoteLabel(w), msg)
+	fmt.Fprintln(w, NoteLabel(w), input.Lines(msg))
 }
 
 // WarningLabel is the yellow "Warning:" that leads a warning written to w.
@@ -47,6 +52,17 @@ func ErrorLabel(w io.Writer) string {
 func NoteLabel(w io.Writer) string {
 	return labelFor(w, "Note:", Palette.Cyan)
 }
+
+// InfoLabel is the cyan "Info:" that leads an info line of the diagnostic log
+// (pkg/logger).
+func InfoLabel(w io.Writer) string {
+	return labelFor(w, "Info:", Palette.Cyan)
+}
+
+// DebugLabel is the "Debug:" that leads a debug line of the diagnostic log
+// (pkg/logger). It stays plain: debug lines come many at a time, and color
+// would draw the eye to every one. It takes w as the other labels do.
+func DebugLabel(io.Writer) string { return "Debug:" }
 
 // DangerLabel is the red "WARNING:" that leads a confirmation of something
 // that cannot be undone, since it marks a danger rather than a warning the

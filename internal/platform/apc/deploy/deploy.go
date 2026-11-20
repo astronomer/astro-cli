@@ -47,6 +47,9 @@ var (
 	// ErrDagsDirHoldsProject is DagsOnlyDeploy refusing a dags directory
 	// that resolves to the directory its tarball is written to, or above it.
 	ErrDagsDirHoldsProject = errors.New("the dags directory is the project directory or one above it")
+	// ErrNoDagUploadURL is DagsOnlyDeploy finding nowhere to upload the Dags
+	// to: no Dag server URL, and no Airflow URL it can build one from.
+	ErrNoDagUploadURL = errors.New("cannot tell where to upload the Dags")
 	// Houston reads the host from its registry.protectedCustomRegistry.updateRegistry.host,
 	// under astronomer.houston.config in the platform's values.
 	ErrBYORegistryDomainNotSet             = errors.New("custom registry host is not set in config; set astronomer.houston.config.registry.protectedCustomRegistry.updateRegistry.host")
@@ -353,7 +356,7 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 	// Checks if dagserver URL exists and returns the URL
 	for _, url := range deploymentInfo.Urls {
 		if url.Type == houston.DagServerURLType {
-			logger.Infof("Using dag deploy URL from dagserver: %s", url.URL)
+			logger.Debugf("uploading Dags to the Dag server URL %s", url.URL)
 			return url.URL
 		}
 	}
@@ -366,13 +369,13 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 
 		parsedAirflowURL, err := neturl.Parse(url.URL)
 		if err != nil {
-			logger.Infof("Error parsing airflow URL: %v", err)
+			logger.Debugf("cannot build a Dag upload URL from the Airflow URL %q: %v", url.URL, err)
 			break
 		}
 
 		// Use URL scheme and host from the airflow URL
 		dagUploadURL := fmt.Sprintf("https://%s/%s/dags/upload", parsedAirflowURL.Host, deploymentInfo.ReleaseName)
-		logger.Infof("Generated Dag Upload URL from airflow base URL: %s", dagUploadURL)
+		logger.Debugf("uploading Dags to %s, built from the Airflow URL", dagUploadURL)
 		return dagUploadURL
 	}
 	return ""
@@ -469,6 +472,14 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	}
 	if cleanUpFiles {
 		defer os.Remove(dagsTarGzPath) //nolint:errcheck // best-effort cleanup
+	}
+
+	// Without a Dag server URL or an Airflow URL to build one from, the upload
+	// would go to "" and fail as a bare HTTP error. Checked after the dags are
+	// packed, so a problem with them on this machine is reported first;
+	// --verbosity debug shows why an Airflow URL did not serve.
+	if uploadURL == "" {
+		return deploymentID, fmt.Errorf("%w: Houston lists no Dag server URL for %s, and no Airflow URL to build one from", ErrNoDagUploadURL, deploymentInfo.ReleaseName)
 	}
 
 	c, _ := config.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this shell code

@@ -365,7 +365,7 @@ func (e *Engine) afterFailedHealth(ctx context.Context, p rt.Plan, rec localstat
 	// Leaving it would point the proxy at a port this engine has just killed,
 	// and the next project to take that port would answer for this hostname.
 	err := healthErr
-	if rmErr := errors.Join(localshared.RemoveRoute(e.routes, rec.Hostname, e.daemon), localstate.Remove(rec.ProjectPath)); rmErr != nil {
+	if rmErr := errors.Join(localshared.RemoveRoute(e.routes, rec.Hostname, rec.ProjectPath, e.daemon), localstate.Remove(rec.ProjectPath)); rmErr != nil {
 		err = errors.Join(err, rmErr)
 	}
 	// An interrupt that lands on a session-tied start is still an interrupt,
@@ -887,7 +887,7 @@ func (a *airflow) Stop(ctx context.Context, opts rt.StopOptions) error {
 	// RemoveRoute drops the daemon too when this was the last route, so the
 	// last project to stop leaves no orphan proxy behind.
 	errs := []error{
-		localshared.RemoveRoute(e.routes, a.rec.Hostname, e.daemon),
+		localshared.RemoveRoute(e.routes, a.rec.Hostname, a.rec.ProjectPath, e.daemon),
 		localstate.Remove(a.rec.ProjectPath),
 	}
 	if opts.Clean {

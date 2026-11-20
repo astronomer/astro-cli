@@ -6,7 +6,6 @@ import (
 	"os"
 	"sort"
 
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	apcCmd "github.com/astronomer/astro-cli/cmd/apc"
@@ -27,7 +26,6 @@ import (
 )
 
 var (
-	verboseLevel   string
 	houstonClient  houston.ClientInterface
 	houstonVersion string
 )
@@ -124,9 +122,13 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 			if cliout.IsRemovedCommand(cmd) {
 				return utils.ChainRunEs(readVerbosity, SetupLogging, trackRemovedCommand)(cmd, args)
 			}
-			// Skip heavy pre-run logic for commands that opt out via annotation
+			// A command that opts out of the pre-run (all of astro local, the
+			// proxy daemon, telemetry's sender) skips the login, the version
+			// check and tracking, but not logging: setting it up reads no
+			// network and writes nothing, and --verbosity means the same on
+			// every command.
 			if cmd.Annotations[telemetry.SkipPreRunAnnotation] == "true" {
-				return nil
+				return SetupLogging(cmd, args)
 			}
 			return utils.ChainRunEs(
 				SetupLogging,
@@ -138,7 +140,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// Defined ahead of the commands rather than with the rest of the root's
 	// setup below: apcCmd.NeedsPlatform reads the root's persistent flags to
 	// find which command a line runs.
-	rootCmd.PersistentFlags().StringVar(&verboseLevel, "verbosity", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
+	addVerbosityFlag(rootCmd.PersistentFlags())
 	input.AddFlag(rootCmd.PersistentFlags())
 
 	rootCmd.AddCommand(

@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/localrt/internal/localshared"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
@@ -44,8 +45,16 @@ func (execCommander) Output(ctx context.Context, extraEnv []string, name string,
 	cmd.WaitDelay = waitDelay
 	var out bytes.Buffer
 	cmd.Stdout = &out
+	// stderr is no part of the result, but it is why a probe failed, so the
+	// debug log keeps it.
+	lg := localshared.StartCommand(ctx, extraEnv, name, args...)
+	var stderr bytes.Buffer
 	cmd.Stderr = io.Discard
+	if lg.Debug() {
+		cmd.Stderr = &stderr
+	}
 	err := cmd.Run()
+	lg.End(err, stderr.Bytes())
 	return out.Bytes(), err
 }
 
@@ -72,5 +81,8 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, nam
 	cmd.Stdin = s.In
 	cmd.Stdout = s.Out
 	cmd.Stderr = s.Err
-	return cmd.Run()
+	lg := localshared.StartCommand(ctx, extraEnv, name, args...)
+	err := cmd.Run()
+	lg.End(err, nil)
+	return err
 }

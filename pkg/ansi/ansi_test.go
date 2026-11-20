@@ -1,6 +1,8 @@
 package ansi
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"testing"
 
@@ -107,5 +109,19 @@ func (s *Suite) TestStylingTakesTextAsText() {
 			s.Contains(style("\nTeam name: "), "\nTeam name: ", "%s (color %v) lost the line break", name, on)
 		}
 		color = orig
+	}
+}
+
+// A warning's or a note's message is text: what a terminal would act on is
+// dropped, its line breaks are kept.
+func (s *Suite) TestLabelMessagesTakeTextAsText() {
+	for name, label := range map[string]func(io.Writer, string){"Warn": Warn, "Note": Note} {
+		var b bytes.Buffer
+		label(&b, "build yanked\x1b]52;c;aGk=\x07\x1b[2J\nsee the notes")
+		got := b.String()
+		s.Contains(got, "build yanked", name)
+		s.Contains(got, "\nsee the notes", "%s lost the line break", name)
+		s.NotContains(got, "]52;", "%s let a clipboard write through", name)
+		s.NotContains(got, "\x1b[2J", "%s let a screen clear through", name)
 	}
 }

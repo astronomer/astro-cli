@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	roleClient "github.com/astronomer/astro-cli/internal/platform/astro/role"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -30,13 +31,15 @@ var (
 // emitWorkspace publishes the Workspace a create or an update left, as
 // `workspace list` shows one; in text, the line the command always printed.
 func emitWorkspace(r cliout.Renderer, ws *workspace.WorkspaceInfo, line string) error {
-	return r.Emit(ws, cliout.Text(func(b *bufio.Writer) { fmt.Fprintln(b, line) }))
+	// The line names the Workspace as the API returned it: printed as
+	// input.Lines has it, so a terminal cannot act on an escape in the name.
+	return r.Emit(ws, cliout.Text(func(b *bufio.Writer) { fmt.Fprintln(b, input.Lines(line)) }))
 }
 
 // emitWorkspaceRemoval publishes a delete.
 func emitWorkspaceRemoval(r cliout.Renderer, removal *workspace.Removal) error {
 	return r.Emit(removal, cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintf(b, "Deleted Workspace %s\n", removal.Name)
+		fmt.Fprintf(b, "Deleted Workspace %s\n", input.Lines(removal.Name))
 	}))
 }
 
