@@ -172,7 +172,7 @@ func newBundleFilesSyncCmd(out io.Writer) *cobra.Command {
 
 A sync into a bundle creates one new bundle version, and fails if the bundle changes between the sync reading it and writing it. A sync from a bundle asks before it deletes local files, unless -f, and fails if the bundle path holds no files.
 
-A sync skips version control, OS, Python, Node and editor files and .env files, and whatever .gitignore files ignore, and never deletes them. --include, --exclude, --no-default-excludes and --no-gitignore change that.`,
+A sync skips version control, OS, Python, Node and editor files and .env files, and whatever .gitignore files ignore, and never deletes them. --include, --exclude, --no-default-excludes and --no-gitignore change that. A symbolic link under the local directory that is not skipped fails the sync.`,
 		Example: `  # Upload what changed, deleting the files you removed locally
   astro bundle files sync ./dags my-files:dags --deployment-id <id>
 
