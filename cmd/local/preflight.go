@@ -317,6 +317,17 @@ func (p *uvProvisioner) key(spec checks.VenvSpec) string {
 			fmt.Fprintf(h, "%s\n", c)
 		}
 	}
+	// Where the packages come from is part of what the venv is: the same
+	// requirements from another project's index pages (its own build of an
+	// internal package, routed by [tool.uv.sources]) install other files, and
+	// a venv built from one must not answer for the other. Only when there are
+	// any, as constraints, so a spec without them keeps its key.
+	if len(spec.FindLinks) > 0 {
+		fmt.Fprintf(h, "\x00find-links\n")
+		for _, l := range spec.FindLinks {
+			fmt.Fprintf(h, "%s\n", l)
+		}
+	}
 	python := spec.Python
 	if python == "" {
 		python = "default"
