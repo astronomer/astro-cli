@@ -2370,7 +2370,7 @@ func (s *Suite) TestUpdate() {
 		var notes bytes.Buffer
 		_, err := Update("test-id-1", "", ws, "update", "", "enable", CeleryExecutor, "medium", "enable", "", "enable", "2CPU", "2Gi", "2CPU", "2Gi", "", 0, 0, workerQueueRequest, hybridQueueList, newEnvironmentVariables, nil, nil, nil, false, mockV1Client, &notes)
 		s.ErrorIs(err, input.ErrAborted)
-		s.Contains(notes.String(), "Warning: You are trying to update the dag deploy setting with ci-cd enforcement enabled.")
+		s.Contains(notes.String(), "Warning: CI/CD enforcement is on for this Deployment, so once the Dag deploy setting changes")
 	})
 
 	s.Run("do not update deployment to disable dag deploy if already disabled", func() {
