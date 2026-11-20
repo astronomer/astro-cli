@@ -13,6 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // defaultWaitState is what `tasks wait` waits for unless --until says
@@ -170,7 +171,10 @@ func (q *query) awaitTask(ctx context.Context, client *airflowapi.Client, dagID,
 		}
 		result.State, result.RunState = state, run.State
 		if state != last {
-			fmt.Fprintf(q.d.Stderr, "%s in %s run %s: %s\n", target.name(), dagID, runID, orDash(state))
+			// The state is Airflow's word, shown as text (input.Plain): it is
+			// written straight to stderr, past the renderer that cleans a
+			// command's output.
+			fmt.Fprintf(q.d.Stderr, "%s in %s run %s: %s\n", target.name(), dagID, runID, input.Plain(orDash(state)))
 			last = state
 		}
 		switch {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // The exit statuses of the waits — `runs trigger-wait`, `runs wait` and
@@ -254,7 +255,11 @@ func (q *query) awaitRun(ctx context.Context, client *airflowapi.Client, run air
 		next.DAGID, next.DAGRunID = run.DAGID, run.DAGRunID
 		run = next
 		if run.State != last {
-			fmt.Fprintf(q.d.Stderr, "%s run %s: %s\n", run.DAGID, run.DAGRunID, run.State)
+			// The ids are the ones the trigger answered with, and the state
+			// Airflow's word: all shown as text (input.Plain), since this goes
+			// straight to stderr, past the renderer that cleans a command's
+			// output.
+			fmt.Fprintf(q.d.Stderr, "%s run %s: %s\n", input.Plain(run.DAGID), input.Plain(run.DAGRunID), input.Plain(run.State))
 			last = run.State
 		}
 	}
@@ -403,7 +408,7 @@ func (q *query) runRunsWait(ctx context.Context, dagID, runID string, wait waitO
 	run.DAGID, run.DAGRunID = dagID, runID
 	started := time.Now()
 	if !runFinished(run.State) {
-		fmt.Fprintf(q.d.Stderr, "%s run %s is %s; waiting up to %s for it to finish\n", dagID, runID, run.State, formatDuration(wait.timeout.Seconds()))
+		fmt.Fprintf(q.d.Stderr, "%s run %s is %s; waiting up to %s for it to finish\n", dagID, runID, input.Plain(run.State), formatDuration(wait.timeout.Seconds()))
 	}
 	run, timedOut, err := q.awaitRun(ctx, client, run, started.Add(wait.timeout), wait.poll)
 	if err != nil {
