@@ -2,6 +2,7 @@ package local
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -23,6 +24,37 @@ func TestLocalAPIPrintsTheAnswerVerbatim(t *testing.T) {
 	}
 	if strings.TrimSpace(out) != `{"sections":[{"name":"core"}]}` {
 		t.Errorf("stdout = %q, want the body as it came", out)
+	}
+}
+
+// To a terminal the passthrough keeps the body's text and styling and drops
+// what a terminal would act on, as every rendering does; piped, it is the body
+// byte for byte, for the script reading it.
+func TestLocalAPIShowsTheBodyAsTextOnATerminal(t *testing.T) {
+	const body = "ok \x1b[32mgreen\x1b[0m\x1b]52;c;aGk=\x07\x1b[2J done"
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/config", body)
+
+	out, _, err := runLocalQuery(t, stub, "local", "api", "/config")
+	if err != nil {
+		t.Fatalf("local api /config: %v", err)
+	}
+	if out != body+"\n" {
+		t.Errorf("piped stdout = %q, want the body byte for byte", out)
+	}
+
+	orig := bodyToTerminal
+	t.Cleanup(func() { bodyToTerminal = orig })
+	bodyToTerminal = func(io.Writer) bool { return true }
+	out, _, err = runLocalQuery(t, stub, "local", "api", "/config")
+	if err != nil {
+		t.Fatalf("local api /config: %v", err)
+	}
+	if strings.Contains(out, "]52;") || strings.Contains(out, "\x1b[2J") || strings.ContainsRune(out, '\a') {
+		t.Errorf("terminal stdout = %q carries the body's terminal actions", out)
+	}
+	if !strings.Contains(out, "ok \x1b[32mgreen\x1b[0m") || !strings.Contains(out, " done") {
+		t.Errorf("terminal stdout = %q lost the body's text or styling", out)
 	}
 }
 

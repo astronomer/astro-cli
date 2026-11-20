@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
@@ -142,7 +143,7 @@ func (c *cli) runAPI(ctx context.Context, endpoint string, opts apiOptions) erro
 	if opts.include {
 		err = writeExchange(r, resp)
 	} else {
-		err = writeBody(r.Out, resp.Body)
+		err = writePassthrough(r.Out, resp.Body)
 	}
 	if err != nil {
 		return err
@@ -358,6 +359,29 @@ func (c *cli) machineSpec(ctx context.Context) ([]byte, airflowapi.Generation, e
 // writeBody writes Airflow's answer as it arrived, ending it with the newline
 // it may not carry. The bytes go straight out rather than through a string, so
 // a large listing is not copied to add one character.
+// bodyToTerminal reports whether a passthrough body goes to a terminal. A
+// variable so a test can stand in for one.
+var bodyToTerminal = cliout.IsTerminal
+
+// writePassthrough writes Airflow's response body to out as writeBody does.
+// Piped or redirected, it is the body byte for byte, which is what a script
+// reading the passthrough needs. To a terminal it goes through
+// input.TerminalWriter, as every rendering the CLI writes there does
+// (cliout.Renderer): styling is kept and nothing else a terminal would act on
+// (a screen clear, a clipboard write) gets through, since the body is
+// Airflow's and written past the renderer.
+func writePassthrough(out io.Writer, body []byte) error {
+	if !bodyToTerminal(out) {
+		return writeBody(out, body)
+	}
+	tw := &input.TerminalWriter{W: out}
+	err := writeBody(tw, body)
+	if ferr := tw.Flush(); err == nil {
+		err = ferr
+	}
+	return err
+}
+
 func writeBody(w io.Writer, body []byte) error {
 	if _, err := w.Write(body); err != nil {
 		return err
