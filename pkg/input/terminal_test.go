@@ -71,3 +71,27 @@ func TestTerminalWriterHoldsNothingForGood(t *testing.T) {
 	assert.NotContains(t, out.String(), "\x1b", "a sequence held past the cap is released without its ESC")
 	assert.Contains(t, out.String(), "]0;xxx")
 }
+
+// A string ended by ST (ESC \) that a write splits on the ST's ESC is held
+// from its start, so it still goes whole rather than printing its payload.
+func TestTerminalWriterHoldsAStringToItsTerminator(t *testing.T) {
+	assert.Equal(t, "xy", writeAll(t, "x\x1b]0;title\x1b", "\\y"))
+	assert.Equal(t, "xy", writeAll(t, "x\x1bPpayload\x1b", "\\y"), "a device control string")
+	assert.Equal(t, "a\x1b[1mb\x1b[0m", writeAll(t, "a\x1b[1mb\x1b[0m"), "complete sequences are not held")
+}
+
+// Colon-form SGR (truecolor, curly underline) is styling like any other.
+func TestTerminalKeepsColonSGR(t *testing.T) {
+	in := "\x1b[38:2::255:0:0mred\x1b[4:3mcurly\x1b[0m"
+	assert.Equal(t, in, Terminal(in))
+}
+
+// A rendering that leaves styling on is reset at Flush, so reverse video or
+// concealed text from elsewhere does not carry into what follows; one that
+// ends reset gets nothing added.
+func TestTerminalWriterResetsStylingLeftOn(t *testing.T) {
+	assert.Equal(t, "\x1b[7mrev\x1b[0m", writeAll(t, "\x1b[7mrev"))
+	assert.Equal(t, "\x1b[8mhidden\x1b[0m", writeAll(t, "\x1b[8m", "hidden"))
+	assert.Equal(t, "\x1b[1mb\x1b[0m", writeAll(t, "\x1b[1mb\x1b[0m"), "already reset")
+	assert.Equal(t, "plain", writeAll(t, "plain"), "never styled")
+}

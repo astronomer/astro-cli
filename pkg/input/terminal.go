@@ -1,6 +1,7 @@
 package input
 
 import (
+	"bytes"
 	"io"
 	"regexp"
 	"strings"
@@ -13,7 +14,11 @@ import (
 // highlighted row, colored json), and the one Terminal keeps. It changes how
 // text looks and nothing else: it cannot move the cursor, clear the screen,
 // set a title or the clipboard.
-var sgr = regexp.MustCompile("^\x1b\\[[0-9;]*m$")
+var sgr = regexp.MustCompile("^\x1b\\[[0-9;:]*m$")
+
+// sgrAny finds the SGR sequences in Terminal's output, for TerminalWriter to
+// know whether the stream ends styled.
+var sgrAny = regexp.MustCompile("\x1b\\[[0-9;:]*m")
 
 // ansiEscapeAtStart is ansiEscape anchored at the start of its input, for
 // TerminalWriter to tell a complete sequence from one a later write finishes.
@@ -79,17 +84,29 @@ const maxHeldEscape = 64 << 10
 type TerminalWriter struct {
 	W       io.Writer
 	pending []byte
+	// styled is whether the last SGR written left styling on, which Flush
+	// resets: SGR from elsewhere (reverse video, concealed text) must not
+	// outlast the rendering into the next command's output or the prompt.
+	styled bool
 }
 
 // Write filters p (with anything held from before) and writes the result to
 // W. It reports len(p) on success, as the bytes were all taken.
 func (t *TerminalWriter) Write(p []byte) (int, error) {
-	buf := make([]byte, 0, len(t.pending)+len(p))
-	buf = append(buf, t.pending...)
-	buf = append(buf, p...)
+	buf := p
+	if len(t.pending) > 0 {
+		buf = make([]byte, 0, len(t.pending)+len(p))
+		buf = append(buf, t.pending...)
+		buf = append(buf, p...)
+	}
 	cut := heldFrom(buf)
-	if _, err := io.WriteString(t.W, Terminal(string(buf[:cut]))); err != nil {
+	out := Terminal(string(buf[:cut]))
+	if _, err := io.WriteString(t.W, out); err != nil {
 		return 0, err
+	}
+	if seqs := sgrAny.FindAllString(out, -1); len(seqs) > 0 {
+		last := seqs[len(seqs)-1]
+		t.styled = last != "\x1b[m" && last != "\x1b[0m"
 	}
 	t.pending = append(t.pending[:0], buf[cut:]...)
 	return len(p), nil
@@ -98,13 +115,24 @@ func (t *TerminalWriter) Write(p []byte) (int, error) {
 // Flush ends the writing. What is still held is either an escape sequence no
 // write finished, which is dropped whole, or the start of a character no
 // write finished, which is removed.
+//
+// A rendering that left styling on is reset, so it does not carry into what
+// the terminal shows next.
 func (t *TerminalWriter) Flush() error {
 	held := t.pending
 	t.pending = t.pending[:0]
-	if len(held) == 0 || held[0] == esc {
+	var out string
+	if len(held) > 0 && held[0] != esc {
+		out = Terminal(strings.ToValidUTF8(string(held), ""))
+	}
+	if t.styled {
+		out += "\x1b[0m"
+		t.styled = false
+	}
+	if out == "" {
 		return nil
 	}
-	_, err := io.WriteString(t.W, Terminal(strings.ToValidUTF8(string(held), "")))
+	_, err := io.WriteString(t.W, out)
 	return err
 }
 
@@ -113,12 +141,27 @@ func (t *TerminalWriter) Flush() error {
 // character. All of buf is released when it holds neither.
 func heldFrom(buf []byte) int {
 	cut := len(buf)
-	// The last ESC, if what follows it is not yet a whole sequence. One whose
-	// sequence is complete, or that is too far back to be one, is not held.
-	if i := strings.LastIndexByte(string(buf), esc); i >= 0 && len(buf)-i <= maxHeldEscape {
-		if !ansiEscapeAtStart.Match(buf[i:]) && couldContinue(buf[i:]) {
-			cut = i
+	// The first ESC whose sequence is started but not finished. Not the last
+	// ESC: an OSC or a device control string ends with ESC \, so a write
+	// that stops on that ESC would otherwise release the string's start
+	// without its end, and its payload would print as text. Complete
+	// sequences are stepped over, and an ESC too far back to be one, or that
+	// starts no sequence, is left for Terminal to drop.
+	for i := 0; i < len(buf); {
+		j := bytes.IndexByte(buf[i:], esc)
+		if j < 0 {
+			break
 		}
+		j += i
+		if m := ansiEscapeAtStart.FindIndex(buf[j:]); m != nil {
+			i = j + m[1]
+			continue
+		}
+		if len(buf)-j <= maxHeldEscape && couldContinue(buf[j:]) {
+			cut = j
+			break
+		}
+		i = j + 1
 	}
 	// A UTF-8 character cut short at the end.
 	for k := cut - 1; k >= 0 && k >= cut-utf8.UTFMax; k-- {

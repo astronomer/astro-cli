@@ -10,7 +10,7 @@ import (
 // a name in, cursor controls with private parameters) or an OSC (a hyperlink,
 // a title), as pkg/localrt strips from logs, or a device control, privacy or
 // application string, whose payload would otherwise print as text.
-var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;?]*[\\x20-\\x2f]*[\\x40-\\x7e]|" +
+var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;:?]*[\\x20-\\x2f]*[\\x40-\\x7e]|" +
 	"\x1b\\][^\x07\x1b]*(?:\x07|\x1b\\\\)|" +
 	// A DCS, SOS, PM or APC string runs to its terminator, payload included.
 	"\x1b[PX^_][^\x1b]*\x1b\\\\")

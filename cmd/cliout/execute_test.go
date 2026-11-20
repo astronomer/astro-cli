@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -729,4 +730,26 @@ func TestTextRenderingToATerminalIsGuarded(t *testing.T) {
 	var term bytes.Buffer
 	require.NoError(t, Renderer{Format: FormatText, Out: &term}.Emit("v", render))
 	assert.Equal(t, "\x1b[1mname\x1b[0m: ops\n", term.String())
+}
+
+// The guard covers a streamed record too, and an escape the renderer's own
+// writes split; and IsTerminal, asked about the guard, answers for the stream
+// behind it.
+func TestTextGuardCoversEventsAndSplitWrites(t *testing.T) {
+	orig := textToTerminal
+	t.Cleanup(func() { textToTerminal = orig })
+	textToTerminal = func(io.Writer) bool { return true }
+
+	var out bytes.Buffer
+	split := func(w io.Writer) error {
+		if _, err := io.WriteString(w, "line\x1b]52;c;"); err != nil {
+			return err
+		}
+		_, err := io.WriteString(w, "aGk=\x07\n")
+		return err
+	}
+	require.NoError(t, Renderer{Format: FormatText, Out: &out}.EmitEvent("v", split))
+	assert.Equal(t, "line\n", out.String())
+
+	assert.Equal(t, IsTerminal(os.Stdout), IsTerminal(&input.TerminalWriter{W: os.Stdout}))
 }
