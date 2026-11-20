@@ -209,6 +209,14 @@ func (s *Suite) TestListBundleFilesWithFormat() {
 		s.ErrorContains(err, `no bundle with the ID or name "nope"`)
 		mockV1Alpha1Client.AssertNotCalled(s.T(), "ListBundleFilesWithResponse")
 	})
+
+	s.Run("suggests the Deployment form for a Deployment ID read as a bundle", func() {
+		out := &bytes.Buffer{}
+		mockV1Alpha1Client := s.mockBundleLookup()
+
+		err := ListBundleFilesWithFormat(BundlePath{Bundle: "cm2deploy0001x8kq0000000a", Path: "my-files"}, false, "", ws, testBundleDeploymentID, "table", "", out, mockV1Client, mockV1Alpha1Client)
+		s.ErrorContains(err, `did you mean "cm2deploy0001x8kq0000000a:my-files:"?`)
+	})
 }
 
 func (s *Suite) TestCatBundleFile() {
@@ -362,7 +370,7 @@ func (s *Suite) TestCopyBundleFilesToBundle() {
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 
 		err := CopyBundleFiles(fromDir, "my-files:", &BundleCopyOptions{Recursive: true}, ws, testBundleDeploymentID, out, mockV1Client, mockV1Alpha1Client, s.streamClient())
-		s.ErrorContains(err, "is not a regular file")
+		s.ErrorContains(err, "is a symbolic link: skip it with --exclude")
 	})
 
 	s.Run("fails when the local path is missing", func() {

@@ -313,6 +313,9 @@ func localFiles(localDir string, filter *localFileFilter) (files []string, skipp
 			skipped++
 			return nil
 		}
+		if entry.Type()&fs.ModeSymlink != 0 {
+			return fmt.Errorf("%s is a symbolic link: skip it with --exclude", filePath)
+		}
 		if !entry.Type().IsRegular() {
 			return fmt.Errorf("%s is not a regular file", filePath)
 		}

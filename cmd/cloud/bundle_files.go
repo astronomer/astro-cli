@@ -112,7 +112,7 @@ func newBundleFilesCopyCmd(out io.Writer) *cobra.Command {
 
 A copy of a directory, or of a file within one bundle, fails if something is already at DST, unless --if-exists says to replace it or merge into it. Any other file copied into a bundle always replaces the file at DST.
 
-A local directory copied into a bundle skips version control, OS, Python, Node and editor files and .env files, and whatever .gitignore files ignore. --include, --exclude, --no-default-excludes and --no-gitignore change that.
+A local directory copied into a bundle skips version control, OS, Python, Node and editor files and .env files, and whatever .gitignore files ignore. --include, --exclude, --no-default-excludes and --no-gitignore change that. A symbolic link under it that is not skipped fails the copy.
 
 A copy into a bundle creates one new bundle version and prints it.`,
 		Example: `  # Copy one file into the bundle, and back out

@@ -24,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 const (
@@ -922,7 +923,7 @@ func resolveBundle(target BundlePath, wsID, deploymentID string, astroV1Client a
 	if err != nil {
 		return bundleRef{}, err
 	}
-	bundleID, err := findBundleID(bundles, target.Bundle, dep.Id)
+	bundleID, err := findBundleID(bundles, target, dep.Id)
 	if err != nil {
 		return bundleRef{}, err
 	}
@@ -953,11 +954,11 @@ func resolveBundlePair(src, dst BundlePath, wsID, deploymentID string, astroV1Cl
 		}
 	}
 
-	srcBundleID, err := findBundleID(srcBundles, src.Bundle, srcDep.Id)
+	srcBundleID, err := findBundleID(srcBundles, src, srcDep.Id)
 	if err != nil {
 		return bundleRef{}, bundleRef{}, err
 	}
-	dstBundleID, err := findBundleID(dstBundles, dst.Bundle, dstDep.Id)
+	dstBundleID, err := findBundleID(dstBundles, dst, dstDep.Id)
 	if err != nil {
 		return bundleRef{}, bundleRef{}, err
 	}
@@ -966,8 +967,9 @@ func resolveBundlePair(src, dst BundlePath, wsID, deploymentID string, astroV1Cl
 	return source, target, nil
 }
 
-// findBundleID returns the ID of the bundle whose ID or, failing that, whose name is ref.
-func findBundleID(bundles []astrov1alpha1.DeploymentBundle, ref, deploymentID string) (string, error) {
+// findBundleID returns the ID of the bundle whose ID or, failing that, whose name is target's bundle.
+func findBundleID(bundles []astrov1alpha1.DeploymentBundle, target BundlePath, deploymentID string) (string, error) {
+	ref := target.Bundle
 	for i := range bundles {
 		if bundles[i].Id == ref {
 			return ref, nil
@@ -978,7 +980,11 @@ func findBundleID(bundles []astrov1alpha1.DeploymentBundle, ref, deploymentID st
 			return bundles[i].Id, nil
 		}
 	}
-	return "", fmt.Errorf("no bundle with the ID or name %q on deployment %s", ref, deploymentID)
+	notFound := fmt.Sprintf("no bundle with the ID or name %q on deployment %s", ref, deploymentID)
+	if target.Deployment == "" && util.IsCUID(ref) && target.Path != "" && !strings.Contains(target.Path, "/") {
+		return "", fmt.Errorf("%s: did you mean %q?", notFound, ref+":"+target.Path+":")
+	}
+	return "", errors.New(notFound)
 }
 
 // packBundleDirectory writes to archive a gzipped tar of files, by slash-separated
