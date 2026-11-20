@@ -123,7 +123,11 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 		c.lockAfterInit(ctx, res.Dir)
 	}
 	return r.Emit(res, func(w io.Writer) error {
-		return renderInit(w, res, nextStart(res.Dir))
+		if err := renderInit(w, res); err != nil {
+			return err
+		}
+		cliout.PrintNextSteps(c.d.Stderr, cliout.NextSteps{Steps: []cliout.NextStep{{Command: nextStart(res.Dir)}}})
+		return nil
 	})
 }
 
@@ -173,7 +177,7 @@ func (c *cli) resolveDir(dir string) (string, error) {
 	return filepath.Join(wd, dir), nil
 }
 
-func renderInit(w io.Writer, res *scaffold.Result, next string) error {
+func renderInit(w io.Writer, res *scaffold.Result) error {
 	// "Adopted" and "Created" are the two shapes Run has: a manifest that was
 	// already there and gained a section, or one this run wrote. Other files
 	// can be updated on either path, so the manifest's own fate decides.
@@ -194,11 +198,7 @@ func renderInit(w io.Writer, res *scaffold.Result, next string) error {
 	if err := renderInfo(w, res.Info); err != nil {
 		return err
 	}
-	if err := renderLeftToDo(w, res.Notes); err != nil {
-		return err
-	}
-	_, err := fmt.Fprintf(w, "\n%s %s\n", cliout.NextLabel(w), next)
-	return err
+	return renderLeftToDo(w, res.Notes)
 }
 
 type initRow struct{ name, what string }
