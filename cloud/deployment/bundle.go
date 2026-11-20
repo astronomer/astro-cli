@@ -20,9 +20,8 @@ import (
 // reaches v1.
 
 const (
-	bundleListLimit          = 1000
-	bundleVersionListLimit   = 1000
-	shortBundleVersionLength = 12
+	bundleListLimit        = 1000
+	bundleVersionListLimit = 1000
 )
 
 var (
@@ -82,7 +81,7 @@ func bundleVersionCell(b *astrov1alpha1.DeploymentBundle) string {
 		return notApplicable
 	}
 	if b.CurrentVersion != nil && *b.CurrentVersion != "" && *b.CurrentVersion != *b.DesiredVersion {
-		return fmt.Sprintf("%s → %s (rolling out)", shortBundleVersion(b.Type, *b.CurrentVersion), shortBundleVersion(b.Type, *b.DesiredVersion))
+		return fmt.Sprintf("%s → %s (rolling out)", *b.CurrentVersion, *b.DesiredVersion)
 	}
 	return *b.DesiredVersion
 }
@@ -116,14 +115,6 @@ func bundleVersionTableConfig() *output.TableConfig {
 		func(d any) []astrov1alpha1.BundleVersion { return d.(*BundleVersionList).Versions },
 		output.WithNoResultsMsg("No versions found for this bundle"),
 	)
-}
-
-// shortBundleVersion abbreviates a file bundle's version, which is a sha256 digest.
-func shortBundleVersion(bundleType astrov1alpha1.DeploymentBundleType, version string) string {
-	if bundleType == astrov1alpha1.DeploymentBundleTypeFILE && len(version) > shortBundleVersionLength {
-		return version[:shortBundleVersionLength]
-	}
-	return version
 }
 
 // CreateBundle registers a bundle on a deployment. A DAG bundle is created with a

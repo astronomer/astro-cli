@@ -17,9 +17,7 @@ func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
 		Hidden:     true,
 		Deprecated: "use 'astro bundle' instead",
 	}
-	deleteCmd := newBundleDeleteCmd(out)
-	deleteCmd.Aliases = []string{"rm"}
-	for _, sub := range []*cobra.Command{newBundleCreateCmd(out), newBundleListCmd(out), newBundleUpdateCmd(out), deleteCmd} {
+	for _, sub := range []*cobra.Command{newBundleCreateCmd(out), newBundleListCmd(out), newBundleUpdateCmd(out), newBundleDeleteCmd(out)} {
 		sub.Deprecated = fmt.Sprintf("use 'astro bundle %s' instead", sub.Name())
 		cmd.AddCommand(sub)
 	}

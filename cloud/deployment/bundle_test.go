@@ -365,7 +365,7 @@ func (s *Suite) TestBundleVersionCell() {
 		{"deletion pending", astrov1alpha1.DeploymentBundle{DeletionIsPending: &pending, DesiredVersion: &fileDigest}, "Deletion pending"},
 		{"running version unreported", astrov1alpha1.DeploymentBundle{Type: astrov1alpha1.DeploymentBundleTypeFILE, DesiredVersion: &fileDigest}, fileDigest},
 		{"settled", astrov1alpha1.DeploymentBundle{Type: astrov1alpha1.DeploymentBundleTypeFILE, DesiredVersion: &fileDigest, CurrentVersion: &fileDigest}, fileDigest},
-		{"file bundle rolling out", astrov1alpha1.DeploymentBundle{Type: astrov1alpha1.DeploymentBundleTypeFILE, DesiredVersion: &fileDigest, CurrentVersion: &olderDigest}, "4cd5070c1600 → bae1a0bfa8d5 (rolling out)"},
+		{"file bundle rolling out", astrov1alpha1.DeploymentBundle{Type: astrov1alpha1.DeploymentBundleTypeFILE, DesiredVersion: &fileDigest, CurrentVersion: &olderDigest}, olderDigest + " → " + fileDigest + " (rolling out)"},
 		{"deploy bundle rolling out", astrov1alpha1.DeploymentBundle{Type: astrov1alpha1.DeploymentBundleTypeDEPLOY, DesiredVersion: &deployVersion, CurrentVersion: &olderDeployVersion}, olderDeployVersion + " → " + deployVersion + " (rolling out)"},
 	}
 	for i := range cases {

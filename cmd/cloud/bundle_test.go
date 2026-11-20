@@ -146,7 +146,7 @@ func TestBundleDeleteCmd(t *testing.T) {
 			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 		}, nil).Once()
 
-		out, err := execBundleCmd("delete", "--deployment-id", "test-id-1", "--name", "my-dags", "--force")
+		out, err := execBundleCmd("rm", "--deployment-id", "test-id-1", "--name", "my-dags", "--force")
 		assert.NoError(t, err)
 		assert.Contains(t, out, "Deleted bundle bundle-1")
 		mockAlpha.AssertExpectations(t)
