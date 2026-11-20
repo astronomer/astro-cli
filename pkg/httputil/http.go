@@ -46,6 +46,9 @@ func NewHTTPClient() *HTTPClient {
 // replaces and so has to keep.
 const maxRedirects = 10
 
+// schemeHTTPS is the scheme a followed redirect may not leave.
+const schemeHTTPS = "https"
+
 // ErrDowngradeRedirect is a redirect from https to plain http, which
 // RefuseDowngradeRedirect will not follow.
 var ErrDowngradeRedirect = errors.New("redirected from https to http; not following it")
@@ -59,10 +62,37 @@ func RefuseDowngradeRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) >= maxRedirects {
 		return fmt.Errorf("stopped after %d redirects", maxRedirects)
 	}
-	if via[0].URL.Scheme == "https" && req.URL.Scheme != "https" {
+	if via[0].URL.Scheme == schemeHTTPS && req.URL.Scheme != schemeHTTPS {
 		return ErrDowngradeRedirect
 	}
 	return nil
+}
+
+// RefuseDowngrades wraps next so that a request a client makes by following a
+// redirect from https to plain http fails with ErrDowngradeRedirect, before
+// anything is sent, whatever the client's own redirect policy. It is
+// RefuseDowngradeRedirect for every client at once: main installs it over
+// http.DefaultTransport, which every client that names no transport of its
+// own reads, so one that sends a token (http.DefaultClient, a bare
+// http.Client) cannot follow such a redirect with it. A transport sees a
+// redirect's request by its Response, the redirect that caused it, which
+// net/http sets only while following one.
+func RefuseDowngrades(next http.RoundTripper) http.RoundTripper {
+	return downgradeGuard{next: next}
+}
+
+type downgradeGuard struct{ next http.RoundTripper }
+
+// RoundTrip implements http.RoundTripper.
+func (g downgradeGuard) RoundTrip(req *http.Request) (*http.Response, error) {
+	if from := req.Response; from != nil && from.Request != nil &&
+		from.Request.URL.Scheme == schemeHTTPS && req.URL.Scheme != schemeHTTPS {
+		if req.Body != nil {
+			req.Body.Close() // a RoundTripper closes the body, on an error too
+		}
+		return nil, ErrDowngradeRedirect
+	}
+	return g.next.RoundTrip(req)
 }
 
 // Do executes the given HTTP request and returns the HTTP Response

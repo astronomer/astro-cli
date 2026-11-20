@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -16,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/httpsocket"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
 //go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --version
@@ -34,7 +36,7 @@ func main() {
 	notice := func(socket string) {
 		ansi.Note(os.Stderr, fmt.Sprintf("requests to Astro go through %s (%s)", socket, httpsocket.SocketEnv))
 	}
-	if err := httpsocket.Install(os.Getenv, notice); err != nil {
+	if err := installTransport(os.Getenv, notice); err != nil {
 		fmt.Fprintln(os.Stderr, ansi.ErrorLabel(os.Stderr), err)
 		os.Exit(1)
 	}
@@ -58,6 +60,20 @@ func main() {
 	// this should run for all commands,
 	// for most of the architectures there's no requirements:
 	ansi.InitConsole()
+}
+
+// installTransport replaces http.DefaultTransport, which every client that
+// names no transport of its own reads: with the socket's router when
+// ASTRO_HTTP_UNIX_SOCKET is set (httpsocket.Install), and over it, in any
+// case, with httputil.RefuseDowngrades, so none of those clients follows a
+// redirect from https to plain http, which Go would send its Authorization
+// header along.
+func installTransport(getenv func(string) string, notice func(socket string)) error {
+	if err := httpsocket.Install(getenv, notice); err != nil {
+		return err
+	}
+	http.DefaultTransport = httputil.RefuseDowngrades(http.DefaultTransport)
+	return nil
 }
 
 // startupGCWindow is how long a command runs before the collector does. Most
