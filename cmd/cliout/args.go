@@ -1,6 +1,7 @@
 package cliout
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -23,17 +24,17 @@ import (
 // Arg is one positional argument of a command.
 type Arg struct {
 	// Name is the placeholder help shows, UPPER_SNAKE: DEPLOYMENT_ID.
-	Name string
+	Name string `json:"name"`
 	// Optional is whether the command runs without it. An optional argument
 	// follows every required one.
-	Optional bool
+	Optional bool `json:"optional,omitempty"`
 	// Repeated is whether it takes one or more words (any number when
 	// Optional). Nothing can follow a repeated argument but the words after --.
-	Repeated bool
+	Repeated bool `json:"repeated,omitempty"`
 	// AfterDash is whether it is what follows a "--" on the line, as the
 	// command `astro link add NAME -- COMMAND...` hands on. It is the last
 	// argument declared.
-	AfterDash bool
+	AfterDash bool `json:"after_dash,omitempty"`
 }
 
 // Required is a required argument named name.
@@ -68,7 +69,12 @@ func Args(cmd *cobra.Command, args ...Arg) *cobra.Command {
 	if cmd.Annotations == nil {
 		cmd.Annotations = map[string]string{}
 	}
-	cmd.Annotations[ArgsAnnotation] = encodeArgs(args)
+	//astro:non-output-json the declaration is stored in the command's annotation, read back by DeclaredArgs; it is never printed
+	encoded, err := json.Marshal(args)
+	if err != nil {
+		panic(fmt.Sprintf("cliout.Args: %s: %v", cmd.Use, err))
+	}
+	cmd.Annotations[ArgsAnnotation] = string(encoded)
 	cmd.Args = func(cmd *cobra.Command, words []string) error {
 		return validateArgs(cmd, args, words)
 	}
@@ -79,16 +85,10 @@ func Args(cmd *cobra.Command, args ...Arg) *cobra.Command {
 // check (a KEY=VALUE shape, a name that is not another word's alias). It runs
 // after the count is right, so it never has to wonder how many words there are.
 func CheckArgs(cmd *cobra.Command, check cobra.PositionalArgs) *cobra.Command {
-	counted := cmd.Args
-	if counted == nil {
+	if cmd.Args == nil {
 		panic("cliout.CheckArgs: " + cmd.Use + " declares no arguments; call Args first")
 	}
-	cmd.Args = func(cmd *cobra.Command, words []string) error {
-		if err := counted(cmd, words); err != nil {
-			return err
-		}
-		return check(cmd, words)
-	}
+	cmd.Args = cobra.MatchAll(cmd.Args, check)
 	return cmd
 }
 
@@ -98,16 +98,10 @@ func CheckArgs(cmd *cobra.Command, check cobra.PositionalArgs) *cobra.Command {
 // is told so, rather than called a stray argument. It runs on whatever
 // number of words the line has, none included.
 func CheckArgsBefore(cmd *cobra.Command, check cobra.PositionalArgs) *cobra.Command {
-	counted := cmd.Args
-	if counted == nil {
+	if cmd.Args == nil {
 		panic("cliout.CheckArgsBefore: " + cmd.Use + " declares no arguments; call Args first")
 	}
-	cmd.Args = func(cmd *cobra.Command, words []string) error {
-		if err := check(cmd, words); err != nil {
-			return err
-		}
-		return counted(cmd, words)
-	}
+	cmd.Args = cobra.MatchAll(check, cmd.Args)
 	return cmd
 }
 
@@ -132,56 +126,13 @@ func AnyWords(cmd *cobra.Command, why string) *cobra.Command {
 	return cmd
 }
 
-// Passthrough marks cmd, whose last declared argument and everything after it
-// belong to a program it runs (`astro local run pytest --version`), so nothing
-// after the first of them is the CLI's to read: not a flag, and not the
-// root's --version. Flags before it still are.
-func Passthrough(cmd *cobra.Command) *cobra.Command {
-	if cmd.Annotations == nil {
-		cmd.Annotations = map[string]string{}
-	}
-	cmd.Annotations[ArgvPassthroughAnnotation] = "true"
-	cmd.Flags().SetInterspersed(false)
-	return cmd
-}
-
 // DeclaredArgs is the positionals cmd declared with Args, in order, and none
-// for a command that declared none.
+// for a command that declared none. Args writes the annotation as JSON and
+// nothing else does, so one that does not decode means none were declared.
 func DeclaredArgs(cmd *cobra.Command) []Arg {
-	return decodeArgs(cmd.Annotations[ArgsAnnotation])
-}
-
-// encodeArgs writes a declaration as the annotation holds it: one word per
-// argument, NAME:flags, where flags are o (optional), r (repeated) and d
-// (after a dash). A name is UPPER_SNAKE (checkDeclaration), so holds no space or colon.
-func encodeArgs(args []Arg) string {
-	words := make([]string, 0, len(args))
-	for _, a := range args {
-		flags := ""
-		if a.Optional {
-			flags += "o"
-		}
-		if a.Repeated {
-			flags += "r"
-		}
-		if a.AfterDash {
-			flags += "d"
-		}
-		words = append(words, a.Name+":"+flags)
-	}
-	return strings.Join(words, " ")
-}
-
-func decodeArgs(encoded string) []Arg {
 	var args []Arg
-	for _, word := range strings.Fields(encoded) {
-		name, flags, _ := strings.Cut(word, ":")
-		args = append(args, Arg{
-			Name:      name,
-			Optional:  strings.Contains(flags, "o"),
-			Repeated:  strings.Contains(flags, "r"),
-			AfterDash: strings.Contains(flags, "d"),
-		})
+	if encoded := cmd.Annotations[ArgsAnnotation]; encoded != "" {
+		_ = json.Unmarshal([]byte(encoded), &args) //nolint:errcheck // see the doc comment
 	}
 	return args
 }

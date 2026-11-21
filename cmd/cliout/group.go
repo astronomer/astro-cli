@@ -197,6 +197,19 @@ func helpAsked(cmd *cobra.Command) bool {
 // root's --version.
 const ArgvPassthroughAnnotation = "argv-passthrough"
 
+// Passthrough marks cmd, whose last declared argument and everything after it
+// belong to a program it runs (`astro local run pytest --version`), so nothing
+// after the first of them is the CLI's to read: not a flag, and not the
+// root's --version. Flags before it still are.
+func Passthrough(cmd *cobra.Command) *cobra.Command {
+	if cmd.Annotations == nil {
+		cmd.Annotations = map[string]string{}
+	}
+	cmd.Annotations[ArgvPassthroughAnnotation] = "true"
+	cmd.Flags().SetInterspersed(false)
+	return cmd
+}
+
 // UndeclaredArgs is the check a command gets when it declares no positionals
 // (Args). Cobra's own default accepts any words, so a stray argument ran the
 // command anyway (and past a pre-run login that failed for an unrelated
