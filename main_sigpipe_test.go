@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"syscall"
 	"testing"
@@ -37,54 +38,40 @@ func breakStdout(t *testing.T) {
 	})
 }
 
-// A stdout whose reader went away cancels the run, with a cause that is not a
-// signal's: a ctx-aware wait or poll stops at once, and the exit is not 141.
-func TestClosedStdoutCancelsTheRunPromptly(t *testing.T) {
+// A stdout whose reader went away does not stop the run: SIGPIPE is recorded,
+// and nothing is canceled, so a deploy piped into `head -1` still finishes.
+// What ends a command is its own error, from the write that failed, and a
+// bare broken pipe is then read as stdout's.
+func TestClosedStdoutIsRecordedAndCancelsNothing(t *testing.T) {
 	ctx := signalContext()
+	bare := fmt.Errorf("render: %w", syscall.EPIPE)
+	if cliout.ClosedStdout(bare) {
+		t.Skip("SIGPIPE was already seen by an earlier test")
+	}
 
-	waited := make(chan error, 1)
-	go func() {
-		select { // stands in for a poll/wait loop that watches the context
-		case <-ctx.Done():
-			waited <- ctx.Err()
-		case <-time.After(30 * time.Second):
-			waited <- errors.New("kept waiting")
-		}
-	}()
 	breakStdout(t)
-	_, err := os.Stdout.WriteString("a line\n")
-	if !errors.Is(err, syscall.EPIPE) {
+	if _, err := os.Stdout.WriteString("a line\n"); !errors.Is(err, syscall.EPIPE) {
 		t.Fatalf("write to a closed stdout: %v, want EPIPE", err)
 	}
 
-	select {
-	case err := <-waited:
-		if !errors.Is(err, context.Canceled) {
-			t.Fatalf("wait ended with %v, want context.Canceled", err)
+	deadline := time.After(5 * time.Second)
+	for !cliout.ClosedStdout(bare) {
+		select {
+		case <-deadline:
+			t.Fatal("SIGPIPE was not recorded")
+		case <-time.After(10 * time.Millisecond):
 		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("a closed stdout did not cancel the context")
 	}
-	if cause := context.Cause(ctx); !errors.Is(cause, cliout.ErrClosedStdout) {
-		t.Fatalf("cause = %v, want ErrClosedStdout", cause)
-	}
-	if code := cliout.ExitCode(ctx, context.Canceled); code != 0 {
-		t.Fatalf("exit %d for a listing whose reader left, want 0", code)
-	}
-}
-
-// A SIGPIPE that is not stdout's (a closed stderr raises it too) cancels
-// nothing.
-func TestASIGPIPEThatIsNotStdoutsCancelsNothing(t *testing.T) {
-	prev := stdoutGone.Load()
-	stdoutGone.Store(func() bool { return false })
-	t.Cleanup(func() { stdoutGone.Store(prev) })
-	ctx := signalContext()
-	breakStdout(t) // the signal is real; the verdict is stubbed
-	_, _ = os.Stdout.WriteString("x")
 	select {
 	case <-ctx.Done():
-		t.Fatal("a SIGPIPE that is not stdout's canceled the run")
+		t.Fatalf("a closed stdout canceled the run: %v", context.Cause(ctx))
 	case <-time.After(300 * time.Millisecond):
+	}
+	// The command's own failure is not hidden by it.
+	if code := cliout.ExitCode(ctx, errors.New("deployment not found")); code != cliout.ExitFailure {
+		t.Fatalf("exit %d for a failed command, want %d", code, cliout.ExitFailure)
+	}
+	if code := cliout.ExitCode(ctx, bare); code != 0 {
+		t.Fatalf("exit %d for a write that failed on a closed stdout, want 0", code)
 	}
 }

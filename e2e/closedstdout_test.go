@@ -44,6 +44,17 @@ func TestAClosedStdoutEndsAListingWithZeroAndNoError(t *testing.T) {
 	}
 }
 
+// A closed stdout hides nothing else: a command that fails reports its error
+// on stderr and exits with its own code, whether or not anyone reads stdout.
+func TestAClosedStdoutDoesNotHideAFailure(t *testing.T) {
+	tier(t, 0)
+
+	code, stderr := newProject(t).runWithClosedStdout("config", "get", "no.such.key")
+	if code != 2 || !strings.Contains(stderr, `unknown setting: "no.such.key"`) {
+		t.Fatalf("exit %d, stderr %q; want the command's own exit 2 and its error", code, stderr)
+	}
+}
+
 // runWithClosedStdout runs the CLI with its stdout a pipe nobody reads, and
 // returns the exit code and what it wrote to stderr.
 func (p *project) runWithClosedStdout(args ...string) (code int, stderr string) {

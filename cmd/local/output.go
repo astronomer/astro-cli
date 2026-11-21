@@ -44,10 +44,17 @@ type event struct {
 	Reasons []localrt.Reason `json:"reasons,omitempty"`
 }
 
-// callbacks bridges localrt progress into the renderer. Write errors are
-// dropped: callbacks have no error channel, and a broken pipe surfaces on
-// the command's own final write.
+// callbacks bridges localrt progress into the renderer. A start's write errors
+// are dropped: callbacks have no error channel, a start is a change that
+// finishes whatever happens to its output, and a broken pipe surfaces on the
+// command's own final write.
 func (c *cli) callbacks(r cliout.Renderer) localrt.Callbacks {
+	return c.callbacksFailing(r, nil)
+}
+
+// callbacksFailing is callbacks for a loop that must end when its output
+// cannot be written (--watch): fail is called with the write error.
+func (c *cli) callbacksFailing(r cliout.Renderer, fail func(error)) localrt.Callbacks {
 	// In text the progress of a start goes to stderr, with the other notes: it
 	// comes before the work it reports on, and stdout carries the final status
 	// alone. In json the events are the stream on stdout.
@@ -58,8 +65,7 @@ func (c *cli) callbacks(r cliout.Renderer) localrt.Callbacks {
 			if err != nil {
 				e.Error = err.Error()
 			}
-			//nolint:errcheck // see the comment above
-			r.EmitEvent(e, func(io.Writer) error {
+			werr := r.EmitEvent(e, func(io.Writer) error {
 				if err != nil {
 					_, werr := fmt.Fprintf(progress, "airflow: %s (%s)\n", s, err)
 					return werr
@@ -67,12 +73,16 @@ func (c *cli) callbacks(r cliout.Renderer) localrt.Callbacks {
 				_, werr := fmt.Fprintf(progress, "airflow: %s\n", s)
 				return werr
 			})
+			if werr != nil && fail != nil {
+				fail(werr)
+			}
 		},
 		OnLine: func(l localrt.LogLine) {
-			//nolint:errcheck // see the comment above
-			r.EmitEvent(logEvent(l), func(io.Writer) error {
+			if werr := r.EmitEvent(logEvent(l), func(io.Writer) error {
 				return renderLogLine(progress, l)
-			})
+			}); werr != nil && fail != nil {
+				fail(werr)
+			}
 		},
 	}
 }

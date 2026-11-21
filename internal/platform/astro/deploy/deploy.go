@@ -98,6 +98,9 @@ type dagsUpload struct {
 	// CosmosBoost is [tool.astro.deploy] cosmos-boost: the upload carries
 	// Cosmos Boost files for the dbt projects among the Dags.
 	CosmosBoost bool
+	// ErrOut takes the upload's notes (the Cosmos Boost step's progress line and
+	// warnings); nil is where they always went.
+	ErrOut io.Writer
 }
 
 // monitoringDagPerm and monitoringDagDirPerm are the modes writeMonitoringDag
@@ -150,6 +153,7 @@ func uploadDags(ctx httpContext.Context, dagsPath, dagsUploadURL, currentRuntime
 		PrependBaseDir: !opts.NoDagsBaseDir,
 		CosmosBoost:    opts.CosmosBoost,
 		RuntimeVersion: currentRuntimeVersion,
+		ErrOut:         opts.ErrOut,
 	})
 	if err != nil {
 		return "", err

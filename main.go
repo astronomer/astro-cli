@@ -126,7 +126,7 @@ func signalContext() context.Context {
 		signals = append(signals, syscall.SIGHUP)
 	}
 	signal.Notify(sigs, signals...)
-	watchClosedStdout(cancel)
+	watchClosedStdout()
 	// No defer to stop listening: every failing path out of main ends in
 	// os.Exit, so it would not run. The only moment it is needed is after the
 	// first signal, which is where it happens.

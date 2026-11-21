@@ -124,7 +124,7 @@ func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClie
 		return ManifestDagDeployResult{}, explainHibernating(err, &dep)
 	}
 
-	tarballVersion, err := uploadDeployDags(ctx, &c, in.ProjectDir, in.DeploymentID, &dep, created, dagsUpload{NoDagsBaseDir: in.NoDagsBaseDir, CosmosBoost: in.CosmosBoost})
+	tarballVersion, err := uploadDeployDags(ctx, &c, in.ProjectDir, in.DeploymentID, &dep, created, dagsUpload{NoDagsBaseDir: in.NoDagsBaseDir, CosmosBoost: in.CosmosBoost, ErrOut: in.Progress})
 	if err != nil {
 		return ManifestDagDeployResult{}, err
 	}

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -270,7 +271,22 @@ func (c *cli) runWatch(ctx context.Context, built *plan.Built, allowMissing bool
 	if r.Format == cliout.FormatText {
 		fmt.Fprintf(c.d.Stderr, "Watching %s and %s for changes. Press Ctrl-C to stop Airflow and exit.\n", manifest.Marker, ".env")
 	}
-	err := c.d.Watch(ctx, localrt.WatchOptions{
+	// A watch line that cannot be written (the reader of stdout left) ends the
+	// watch, which would otherwise run on, writing to nobody. The write error
+	// is then the command's error, so the run ends as a closed stdout does.
+	wctx, stopWatch := context.WithCancel(ctx)
+	defer stopWatch()
+	var writeMu sync.Mutex
+	var writeErr error
+	fail := func(err error) {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		if writeErr == nil {
+			writeErr = err
+		}
+		stopWatch()
+	}
+	err := c.d.Watch(wctx, localrt.WatchOptions{
 		ProjectPath: built.Project.Dir,
 		Mode:        built.Plan.Mode,
 		Manifest:    built.Manifest,
@@ -289,8 +305,8 @@ func (c *cli) runWatch(ctx context.Context, built *plan.Built, allowMissing bool
 			// rewrite of the Astronomer build pin, not before it.
 			return started.Manifest, err
 		},
-		OnEvent:   func(e localrt.WatchEvent) { reportWatch(r, e) },
-		Callbacks: c.callbacks(r),
+		OnEvent:   func(e localrt.WatchEvent) { reportWatch(r, e, fail) },
+		Callbacks: c.callbacksFailing(r, fail),
 	})
 	// Interrupted, or the watch never began: stop what --watch started. The
 	// session tie would stop it once this process exits; stopping here says
@@ -298,13 +314,18 @@ func (c *cli) runWatch(ctx context.Context, built *plan.Built, allowMissing bool
 	if serr := c.runStop(context.WithoutCancel(ctx), localrt.StopOptions{}); err == nil {
 		err = serr
 	}
+	writeMu.Lock()
+	defer writeMu.Unlock()
+	if writeErr != nil {
+		return writeErr
+	}
 	return err
 }
 
 // reportWatch renders one thing a watch did. In json each is a "watch" event
 // carrying the localrt kind, files, requirements and reason codes; in text,
 // a line for each a person needs to see.
-func reportWatch(r cliout.Renderer, w localrt.WatchEvent) {
+func reportWatch(r cliout.Renderer, w localrt.WatchEvent, fail func(error)) {
 	e := event{
 		Event:   "watch",
 		Watch:   string(w.Kind),
@@ -317,14 +338,15 @@ func reportWatch(r cliout.Renderer, w localrt.WatchEvent) {
 		e.Error = w.Err.Error()
 	}
 	text := watchText(w)
-	//nolint:errcheck // a write failure surfaces on the command's own output
-	r.EmitEvent(e, func(out io.Writer) error {
+	if werr := r.EmitEvent(e, func(out io.Writer) error {
 		if text == "" {
 			return nil
 		}
 		_, werr := fmt.Fprintln(out, text)
 		return werr
-	})
+	}); werr != nil && fail != nil {
+		fail(werr)
+	}
 }
 
 // watchText is the terminal line for a watch event, "" for one a person need
@@ -1161,23 +1183,31 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 	if err != nil {
 		return err
 	}
+	// A line that cannot be written (the reader of stdout left) ends the
+	// stream: a follow would otherwise run on, writing to nobody.
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
 	var emitErr error
 	logErr := af.Logs(ctx, localrt.LogOptions{
 		Follow:     follow,
 		Components: components,
 		Tail:       tail,
 		OnLine: func(l localrt.LogLine) {
+			if emitErr != nil {
+				return
+			}
 			if err := r.EmitEvent(logEvent(l), func(w io.Writer) error {
 				return renderLogLine(w, l)
-			}); err != nil && emitErr == nil {
+			}); err != nil {
 				emitErr = err
+				stop()
 			}
 		},
 	})
-	if logErr != nil {
-		return logErr
+	if emitErr != nil {
+		return emitErr
 	}
-	return emitErr
+	return logErr
 }
 
 func newRunCmd(c *cli) *cobra.Command {

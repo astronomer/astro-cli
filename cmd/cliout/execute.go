@@ -52,13 +52,13 @@ const signalExitBase = 128
 // `docker compose` dying. If the context is done, the error is a consequence
 // of that.
 //
-// A run whose stdout reader went away (`| head -1`, SIGPIPE, ErrClosedStdout)
-// exits 0 when nothing could have been affected: a read or listing, or a
-// command whose work finished before the write failed. It exits 1, with the
-// error reported as usual, when the error carries an unknown outcome (a write
-// was in flight when the reader left), and it exits with the command's own
-// code when it carries one (ExitError). An interrupt stays 128+n, whatever
-// else happened.
+// A run ends 0, and reports nothing, when the error the command returned is
+// itself a failed write to a stdout whose reader has gone (`| head -1`:
+// ClosedStdout), and the context was not canceled: the reader has what it
+// wanted. Every other error is reported and exits as it normally would,
+// whether or not stdout is closed: a canceled context, an API error, an
+// unknown outcome, a setup failure. The command's own code (ExitError) and an
+// interrupt (128+n) are never replaced.
 func ExitCode(ctx context.Context, err error) int {
 	if err == nil {
 		return 0
@@ -69,16 +69,6 @@ func ExitCode(ctx context.Context, err error) int {
 		var sig *Signaled
 		if errors.As(context.Cause(ctx), &sig) && sig.Number > 0 {
 			return SignalExitCode(sig.Number)
-		}
-		if errors.Is(context.Cause(ctx), ErrClosedStdout) {
-			var exit *ExitError
-			switch {
-			case errors.As(err, &exit):
-				return exit.Code
-			case closedStdoutRun(ctx, err):
-				return 0
-			}
-			return ExitFailure
 		}
 		return ExitInterrupted
 	}
@@ -92,10 +82,9 @@ func ExitCode(ctx context.Context, err error) int {
 	if IsUsage(err) {
 		return ExitUsage
 	}
-	// The reader of stdout went away (`| head -1`): it has all it wanted, and
-	// whatever the command had sent before that finished as it did. Not when a
-	// write was in flight: that error is the outcome.
-	if closedStdoutRun(ctx, err) {
+	// The reader of stdout went away (`| head -1`): the command's work was
+	// done or was only a read, and it is the write that failed.
+	if ClosedStdout(err) {
 		return 0
 	}
 	return ExitFailure
@@ -167,7 +156,7 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	// Nowhere to report to: stdout is closed, and a message on stderr would
 	// be noise for a reader that stopped listening on purpose. ExitCode
 	// makes it 0.
-	if closedStdoutRun(ctx, err) {
+	if ctx.Err() == nil && ClosedStdout(err) {
 		return err
 	}
 	if wantsJSON(cmd, args, err) || unknownCommandAsksJSON(cmd, args, err) {

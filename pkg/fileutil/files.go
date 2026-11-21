@@ -499,6 +499,10 @@ func UploadFile(args *UploadFileArguments) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		// Every try sends the whole file, whatever the last one read of it.
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			return fmt.Errorf("error seeking file: %w", err)
+		}
 		body, contentType, err := multipartBody(args, file)
 		if err != nil {
 			return err
@@ -553,11 +557,6 @@ func UploadFile(args *UploadFileArguments) error {
 		}
 		if i < args.MaxTries {
 			retryDelayInMS = backOff(ctx, retryDelayInMS, args.BackoffFactor)
-		}
-		// Reset the file pointer to the beginning of the file
-		_, err = file.Seek(0, io.SeekStart)
-		if err != nil {
-			return fmt.Errorf("error seeking file: %w", err)
 		}
 	}
 	return currentUploadError
