@@ -123,7 +123,7 @@ func metricsCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&envMetricsEndpoint, "endpoint", "", "Remote endpoint to push metrics to")
 	cmd.Flags().StringVar(&envMetricsExporterType, "exporter-type", "", "Exporter type (e.g. PROMETHEUS)")
 	cmd.Flags().StringVar(&envMetricsAuthType, "auth-type", "", "Auth type: BASIC, AUTH_TOKEN, or SIGV4")
-	cmd.Flags().StringVar(&envMetricsBasicToken, "basic-token", "", "Bearer/auth token (for AUTH_TOKEN auth)")
+	cmd.Flags().StringVar(&envMetricsBasicToken, "basic-token", "", "Bearer/auth token (for AUTH_TOKEN auth); '-' reads it from stdin, which keeps it out of shell history")
 	cmd.Flags().StringVar(&envMetricsUsername, "username", "", "Username (for BASIC auth)")
 	cmd.Flags().StringVar(&envMetricsPassword, "password", "", "Password for BASIC auth; prefer piping it, since a flag lands in shell history. Empty keeps the stored one: the platform cannot clear a password")
 	cmd.Flags().StringVar(&envMetricsSigV4AssumeArn, "sigv4-assume-arn", "", "AWS IAM role to assume (for SIGV4 auth)")
@@ -224,7 +224,17 @@ func buildMetricsInput(cmd *cobra.Command) (*env.MetricsInput, error) {
 		AutoLinkDeployments: autoLinkPtr(cmd),
 	}
 	if cmd.Flags().Changed("basic-token") {
-		in.BasicToken = &envMetricsBasicToken
+		tok := envMetricsBasicToken
+		if tok == "-" {
+			if !hasPipedStdin() {
+				return nil, errors.New("--basic-token - reads the token from stdin, but stdin is a terminal: pipe it, e.g. printf %s \"$TOKEN\" | astro env metrics-export set ... --basic-token -")
+			}
+			var err error
+			if tok, err = readSecretValue("", "Token"); err != nil {
+				return nil, err
+			}
+		}
+		in.BasicToken = &tok
 	}
 	if cmd.Flags().Changed("username") {
 		in.Username = &envMetricsUsername

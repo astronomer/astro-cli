@@ -85,8 +85,12 @@ var cloudKinds = cliout.Kinds{
 			httputil.HasStatus(err, http.StatusUnauthorized)
 	}},
 	{Kind: KindForbidden, Match: status(http.StatusForbidden)},
-	{Kind: KindNotFound, Match: status(http.StatusNotFound)},
-	{Kind: KindConflict, Match: status(http.StatusConflict)},
+	{Kind: KindNotFound, Match: func(err error) bool {
+		return httputil.HasStatus(err, http.StatusNotFound) || local.IsNotFound(err)
+	}},
+	{Kind: KindConflict, Match: func(err error) bool {
+		return httputil.HasStatus(err, http.StatusConflict) || local.IsConflict(err)
+	}},
 	{Kind: KindAPIUnavailable, Match: func(err error) bool {
 		var se *httputil.StatusError
 		if errors.As(err, &se) && se.StatusCode >= http.StatusInternalServerError {

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -32,6 +33,8 @@ func (fakeRuntime) ReadStatus(string) (localrt.Status, error) {
 }
 func (fakeRuntime) List() ([]localrt.Status, error)       { return nil, localrt.ErrNotImplemented }
 func (fakeRuntime) PruneStale() ([]localrt.Status, error) { return nil, localrt.ErrNotImplemented }
+func (fakeRuntime) SetHealthTimeout(time.Duration)        {}
+
 func (fakeRuntime) Reset(context.Context, string) (localrt.ResetReport, error) {
 	return localrt.ResetReport{}, localrt.ErrNotImplemented
 }
@@ -266,7 +269,9 @@ func TestDevStubIgnoresFlagsWhenResolving(t *testing.T) {
 }
 
 func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
-	const waitNote = "--wait is now the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable, a Go duration: ASTRO_LOCAL_HEALTH_TIMEOUT="
+	waitNote := func(d, cmd string) string {
+		return "--wait is now --timeout, a Go duration: " + cmd + " --timeout " + d + " (or set ASTRO_LOCAL_HEALTH_TIMEOUT)"
+	}
 	const restartNote = "With nothing running, restart starts in standalone mode, which builds no image; then use astro local start --docker"
 	withDockerfile := devContext{dockerfile: true, buildSecret: true, packageBuildSecret: true}
 	cases := []struct {
@@ -282,7 +287,7 @@ func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
 			args:  []string{"start", "--build-secret", "id=netrc,env=NETRC_CONTENT", "--wait", "5m"},
 			dc:    withDockerfile,
 			want:  "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT",
-			notes: []string{waitNote + "5m astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT"},
+			notes: []string{waitNote("5m", "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT")},
 		},
 		{
 			name:  "restart keeps its mode and takes the old plural flag",
@@ -314,14 +319,14 @@ func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
 			args:  []string{"start", "--wait", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
 			dc:    withDockerfile,
 			want:  "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT",
-			notes: []string{waitNote + "10m astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT"},
+			notes: []string{waitNote("10m", "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT")},
 		},
 		{
 			name:  "a wait that is not a duration is not repeated",
 			args:  []string{"start", "--wait=soon"},
 			dc:    withDockerfile,
 			want:  "astro local start --docker",
-			notes: []string{waitNote + "10m astro local start --docker"},
+			notes: []string{waitNote("10m", "astro local start --docker")},
 		},
 		{
 			name:  "no Dockerfile, so no Docker mode and no build secret but netrc",
@@ -401,8 +406,8 @@ func TestDevStartReadsTheProjectAndTheTree(t *testing.T) {
 func TestDevStubRendersNotesOnTheirOwnLine(t *testing.T) {
 	p := buildDevRemoved("start", []string{"start", "--wait", "5m"}, devContext{})
 	text := renderDevRemoved(p)
-	if !strings.Contains(text, "instead.\n--wait is now the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable, a Go duration: "+
-		"ASTRO_LOCAL_HEALTH_TIMEOUT=5m astro local start\n") {
+	if !strings.Contains(text, "instead.\n--wait is now --timeout, a Go duration: "+
+		"astro local start --timeout 5m (or set ASTRO_LOCAL_HEALTH_TIMEOUT)\n") {
 		t.Errorf("text does not carry the --wait note:\n%s", text)
 	}
 }

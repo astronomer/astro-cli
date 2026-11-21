@@ -176,17 +176,17 @@ func newStartCmd(c *cli) *cobra.Command {
 		allowMissing    bool
 		watch           bool
 		buildSecrets    []string
+		timeout         time.Duration
 	}
 	cmd := &cobra.Command{
 		Use:   nameStart,
 		Short: "Start local Airflow for this project",
-		// The wait is the one thing about a start somebody needs to change and
-		// cannot from a flag, and until now the only way to find that out was
-		// to hit it. A slow link or a cold image pull outlasts five minutes
-		// with nothing wrong.
+		// A slow link or a cold image pull outlasts five minutes with nothing
+		// wrong, and until now the only way to find that out was to hit it.
 		Long: "Start local Airflow for this project.\n\n" +
-			"A start waits up to five minutes for Airflow to answer. Set " +
-			"ASTRO_LOCAL_HEALTH_TIMEOUT to a Go duration (10m, 90s) to change that.\n\n" +
+			"A start waits up to five minutes for Airflow to answer. Pass --timeout, or set " +
+			"ASTRO_LOCAL_HEALTH_TIMEOUT, to a Go duration (10m, 90s) to change that; the flag wins " +
+			"when both are given.\n\n" +
 			"With --watch, start stays in the foreground and applies edits to pyproject.toml and .env. " +
 			"A package added to the dependencies is installed into the running Airflow. " +
 			"Any other change that Airflow reads only at start (a re-pinned package, the Airflow " +
@@ -202,9 +202,12 @@ func newStartCmd(c *cli) *cobra.Command {
 			"  # On another port\n" +
 			"  astro local start --port 8081\n\n" +
 			"  # Wait up to ten minutes for Airflow, on a slow machine\n" +
-			"  ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro local start",
+			"  astro local start --timeout 10m",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if cmd.Flags().Changed("timeout") {
+				c.d.Runtime.SetHealthTimeout(opts.timeout)
+			}
 			mode := localrt.Mode("")
 			if opts.docker {
 				mode = localrt.ModeDocker
@@ -226,7 +229,10 @@ func newStartCmd(c *cli) *cobra.Command {
 	}
 	// Refused before anything starts, rather than after a start it would
 	// then have to undo.
-	cmd.PreRunE = func(*cobra.Command, []string) error {
+	cmd.PreRunE = func(cmd *cobra.Command, _ []string) error {
+		if cmd.Flags().Changed("timeout") && opts.timeout <= 0 {
+			return cliout.Usage(fmt.Errorf("--timeout must be a positive duration with a unit, like 10m or 90s; got %s", opts.timeout))
+		}
 		if opts.watch && c.d.Watch == nil {
 			return errWatchUnavailable
 		}
@@ -237,6 +243,7 @@ func newStartCmd(c *cli) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.stopWithSession, "stop-with-session", false, "Stop Airflow when this process exits instead of leaving it running")
 	cmd.Flags().BoolVar(&opts.allowMissing, "allow-missing", false, "Start even if required environment values have no source, warning about each")
 	cmd.Flags().BoolVar(&opts.watch, "watch", false, "Stay in the foreground, apply edits to pyproject.toml and .env to the running Airflow, and stop it on Ctrl-C")
+	cmd.Flags().DurationVar(&opts.timeout, "timeout", 0, "How long to wait for Airflow to answer, as a Go duration like 10m or 90s (default 5m, or "+healthTimeoutEnv+" when set)")
 	addBuildSecretFlag(cmd, &opts.buildSecrets)
 	return cmd
 }

@@ -561,6 +561,27 @@ func TestAnUnknownRootCommandPointsAtHelp(t *testing.T) {
 	assert.Equal(t, "Error: unknown command \"bogus\" for \"astro\"\nRun astro --help for usage.\n", r.stderr)
 }
 
+// A word that names no command has no parsed --output to read, so a json run
+// is recognized from the arguments, in every spelling pflag accepts.
+func TestAnUnknownRootCommandUnderJSONIsAnErrorObject(t *testing.T) {
+	for _, args := range [][]string{
+		{"bogus", "-o", "json"}, {"bogus", "--output", "json"}, {"bogus", "-ojson"}, {"--output=json", "bogus"},
+	} {
+		r := execTree(context.Background(), testTree(nil), args...)
+		require.Error(t, r.err, args)
+		obj := decodeOne(t, r.stdout)
+		assert.Equal(t, KindUsage, obj.Kind, args)
+		assert.Equal(t, ExitUsage, obj.Code, args)
+		assert.Empty(t, r.stderr, args)
+	}
+	// Text, or an argument after "--", stays prose with nothing on stdout.
+	for _, args := range [][]string{{"bogus"}, {"bogus", "-o", "text"}, {"bogus", "--", "-o", "json"}} {
+		r := execTree(context.Background(), testTree(nil), args...)
+		assert.Empty(t, r.stdout, args)
+		assert.Contains(t, r.stderr, "unknown command", args)
+	}
+}
+
 // The root failing itself points at the root's help, and Execute puts the
 // root's own SilenceUsage back after the run that forced it on.
 func TestARootUsageErrorPointsAtTheRootsHelp(t *testing.T) {

@@ -74,3 +74,27 @@ func TestFind(t *testing.T) {
 		assert.Nil(t, got)
 	})
 }
+
+func TestCollectUpTo(t *testing.T) {
+	t.Run("stops paging once the limit is reached and trims to it", func(t *testing.T) {
+		var offsets []int
+		got, err := CollectUpTo("ints", 3, pagedSource([]int{1, 2, 3, 4, 5}, &offsets))
+		assert.NoError(t, err)
+		assert.Equal(t, []int{1, 2, 3}, got)
+		assert.Equal(t, []int{0, 2}, offsets, "the third page is never asked for")
+	})
+
+	t.Run("a limit beyond the total returns everything", func(t *testing.T) {
+		var offsets []int
+		got, err := CollectUpTo("ints", 50, pagedSource([]int{1, 2, 3}, &offsets))
+		assert.NoError(t, err)
+		assert.Equal(t, []int{1, 2, 3}, got)
+	})
+
+	t.Run("no limit is every item", func(t *testing.T) {
+		var offsets []int
+		got, err := CollectUpTo("ints", 0, pagedSource([]int{1, 2, 3, 4, 5}, &offsets))
+		assert.NoError(t, err)
+		assert.Equal(t, []int{1, 2, 3, 4, 5}, got)
+	})
+}

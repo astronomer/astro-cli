@@ -42,6 +42,7 @@ var (
 	tokenExpiration            int
 	validWorkspaceRoles        []string
 	workspaceListOutput        cliout.Format
+	workspaceListLimit         int
 )
 
 const (
@@ -84,9 +85,13 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro workspace list
   astro workspace list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := checkListLimit(cmd, "limit", workspaceListLimit); err != nil {
+				return err
+			}
 			return workspaceList(out)
 		},
 	}
+	addListLimitFlag(cmd, &workspaceListLimit, "Workspaces")
 	cliout.AddOutputFlag(cmd, &workspaceListOutput)
 	return cmd
 }
@@ -756,7 +761,7 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 }
 
 func workspaceList(out io.Writer) error {
-	return workspace.ListWithFormat(astroV1Client, cliout.Renderer{Format: workspaceListOutput, Out: out})
+	return workspace.ListWithFormat(astroV1Client, workspaceListLimit, cliout.Renderer{Format: workspaceListOutput, Out: out})
 }
 
 func workspaceSwitch(out io.Writer, args []string) error {

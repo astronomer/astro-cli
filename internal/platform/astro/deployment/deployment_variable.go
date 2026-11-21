@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
 // VariableList returns a Deployment's environment variables, optionally
@@ -177,17 +179,15 @@ func readLines(path string) ([]string, error) {
 
 // writeVarToFile appends the variables to envFile, secrets by key only.
 //
-// A single failed write used to print to stderr and carry on, which left a
-// half-written file and a zero exit. It now stops at the first failure and
-// names the variable, so the caller can tell a complete file from a partial
-// one.
+// A regular file, or one that is not there yet, is rebuilt in memory and
+// published through a temp file and a rename, so a failure leaves it as it
+// was rather than half-appended. A new file is written 0600, since a .env
+// holds the value of every non-secret variable; an existing one keeps the mode
+// its owner gave it. A symlink or anything else that is not a regular file is
+// appended to in place, as before: a rename would replace the link with a file
+// of its own instead of writing where it points.
 func writeVarToFile(environmentVariablesObjects []astrov1.DeploymentEnvironmentVariable, envFile string) error {
-	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd // the value is clear from context
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
+	var add bytes.Buffer
 	for _, variable := range environmentVariablesObjects {
 		var value string
 		if variable.IsSecret {
@@ -195,11 +195,39 @@ func writeVarToFile(environmentVariablesObjects []astrov1.DeploymentEnvironmentV
 		} else if variable.Value != nil {
 			value = *variable.Value
 		}
-		if _, err := f.WriteString("\n" + variable.Key + "=" + value); err != nil {
-			return errors.Wrapf(err, "writing variable %s", variable.Key)
-		}
+		add.WriteString("\n" + variable.Key + "=" + value)
 	}
-	return nil
+
+	mode := os.FileMode(0o600) //nolint:mnd // owner-only for a file this run creates
+	info, err := os.Lstat(envFile)
+	switch {
+	case err == nil && !info.Mode().IsRegular():
+		return appendInPlace(envFile, add.Bytes())
+	case err == nil:
+		mode = info.Mode().Perm()
+	case !errors.Is(err, os.ErrNotExist):
+		return err
+	}
+
+	existing, err := fsatomic.ReadFile(envFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return fsatomic.WriteFile(envFile, append(existing, add.Bytes()...), mode)
+}
+
+// appendInPlace appends data to path, creating it 0600 when a dangling link
+// points at nothing.
+func appendInPlace(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd // owner-only
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // addVariable records one input against the Deployment's existing keys and

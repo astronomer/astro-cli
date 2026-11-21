@@ -210,8 +210,14 @@ func devStartReplacement(replacement string, args []string, dc devContext) (comm
 				example = waits[len(waits)-1]
 			}
 		}
-		notes = append(notes, fmt.Sprintf("--wait is now the %s environment variable, a Go duration: %s=%s %s",
-			healthTimeoutEnv, healthTimeoutEnv, example, strings.Join(cmd, " ")))
+		if replacement == replaceStart {
+			notes = append(notes, fmt.Sprintf("--wait is now --timeout, a Go duration: %s --timeout %s (or set %s)",
+				strings.Join(cmd, " "), example, healthTimeoutEnv))
+		} else {
+			// restart has no --timeout of its own: only the variable.
+			notes = append(notes, fmt.Sprintf("--wait is now the %s environment variable, a Go duration: %s=%s %s",
+				healthTimeoutEnv, healthTimeoutEnv, example, strings.Join(cmd, " ")))
+		}
 	}
 	return strings.Join(cmd, " "), notes
 }

@@ -53,13 +53,13 @@ func GetCurrentWorkspace() (string, error) {
 }
 
 // ListData returns workspace list data for structured output
-func ListData(client astrov1.APIClient) (*WorkspaceList, error) {
+func ListData(client astrov1.APIClient, limit int) (*WorkspaceList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
 
-	ws, err := GetWorkspaces(client)
+	ws, err := getWorkspacesUpTo(client, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -81,9 +81,9 @@ func ListData(client astrov1.APIClient) (*WorkspaceList, error) {
 }
 
 // ListWithFormat lists workspaces with the specified output format
-func ListWithFormat(client astrov1.APIClient, r output.Emitter) error {
+func ListWithFormat(client astrov1.APIClient, limit int, r output.Emitter) error {
 	return output.PrintData(
-		func() (*WorkspaceList, error) { return ListData(client) },
+		func() (*WorkspaceList, error) { return ListData(client, limit) },
 		workspaceTableConfig, r,
 	)
 }
@@ -421,14 +421,23 @@ func selectWorkspace(workspaces []astrov1.Workspace, about string, out io.Writer
 // GetWorkspaces returns every Workspace in the current Organization, paging
 // through the API as needed.
 func GetWorkspaces(client astrov1.APIClient) ([]astrov1.Workspace, error) {
+	return getWorkspacesUpTo(client, 0)
+}
+
+// getWorkspacesUpTo is GetWorkspaces that stops paging after limit Workspaces
+// (every one when limit is below 1), in name order.
+func getWorkspacesUpTo(client astrov1.APIClient, limit int) ([]astrov1.Workspace, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return []astrov1.Workspace{}, err
 	}
 
 	sorts := []astrov1.ListWorkspacesParamsSorts{"name:asc"}
-	return pagination.Collect("workspaces", func(offset int) ([]astrov1.Workspace, int, error) {
+	return pagination.CollectUpTo("workspaces", limit, func(offset int) ([]astrov1.Workspace, int, error) {
 		pageSize := 1000
+		if limit > 0 {
+			pageSize = min(pageSize, limit-offset)
+		}
 		params := &astrov1.ListWorkspacesParams{Limit: &pageSize, Offset: &offset, Sorts: &sorts}
 		resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.Organization, params)
 		if err != nil {

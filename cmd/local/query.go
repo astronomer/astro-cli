@@ -298,10 +298,28 @@ type listFlags struct {
 // sort a reader wants without asking — most recent first, where the endpoint
 // has a time to sort on — and "" leaves the order to Airflow.
 func addListFlags(cmd *cobra.Command, f *listFlags, defaultOrder string) {
-	cmd.Flags().IntVarP(&f.limit, "limit", "l", airflowapi.DefaultLimit, "Maximum rows to return")
+	f.limit = airflowapi.DefaultLimit
+	cmd.Flags().VarP((*limitValue)(&f.limit), "limit", "l", "Maximum rows to return")
 	cmd.Flags().IntVar(&f.offset, "offset", 0, "Row to start the page at")
 	cmd.Flags().StringVar(&f.orderBy, "order-by", defaultOrder, "Sort field; prefix with - for descending")
 }
+
+// limitValue is --limit's value: a whole number of one or more. Refused as
+// the flag parses, a usage error naming the flag, rather than turned into the
+// default later (airflowapi reads a non-positive limit as "unset"), which
+// would answer `--limit 0` with a page of rows nobody asked for.
+type limitValue int
+
+func (l *limitValue) Set(s string) error {
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 1 {
+		return fmt.Errorf("%q is not a whole number of 1 or more", s)
+	}
+	*l = limitValue(n)
+	return nil
+}
+func (l *limitValue) String() string { return strconv.Itoa(int(*l)) }
+func (*limitValue) Type() string     { return "int" }
 
 func (f listFlags) options() airflowapi.ListOptions {
 	return airflowapi.ListOptions{Limit: f.limit, Offset: f.offset, OrderBy: f.orderBy}

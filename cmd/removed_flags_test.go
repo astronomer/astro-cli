@@ -220,11 +220,11 @@ var removedFlagCases = []removedFlagCase{
 	{tree: astroTree, args: []string{"local", "start"}, flag: "settings-file", value: "settings.yaml", shorthand: "s", want: errStartSettingsRemoved},
 	{
 		tree: astroTree, args: []string{"local", "start"}, flag: "wait", value: "5m",
-		want: "set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable to a Go duration instead, as in ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro local start",
+		want: "pass --timeout, a Go duration, instead, as in astro local start --timeout 10m, or set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable",
 	},
 	{
 		tree: astroTree, args: []string{"start"}, flag: "wait", value: "5m",
-		want: "set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable to a Go duration instead, as in ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro start",
+		want: "pass --timeout, a Go duration, instead, as in astro start --timeout 10m, or set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable",
 	},
 	{
 		tree: astroTree, args: []string{"local", "start"}, flag: "env", value: ".env.local", shorthand: "e",

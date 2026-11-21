@@ -910,14 +910,14 @@ func (c *cli) getScoped(r cliout.Renderer, scope *scopeFlags, kind localenv.Kind
 		for i, st := range stores {
 			names[i] = string(st.ScopeName())
 		}
-		return fmt.Errorf("%s %q is not set in %s", localenv.Noun(kind), name, strings.Join(names, " or "))
+		return notFoundf("%s %q is not set in %s", localenv.Noun(kind), name, strings.Join(names, " or "))
 	}
 	value, ok, err := winner.Get(kind, name)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("%s %q is not set in %s", localenv.Noun(kind), name, winner.ScopeName())
+		return notFoundf("%s %q is not set in %s", localenv.Noun(kind), name, winner.ScopeName())
 	}
 	v := envValue{Kind: kind, Name: name, Source: string(winner.ScopeName()), Value: value}
 	if w, isVault := winner.(*vaultenv.Writer); isVault {
