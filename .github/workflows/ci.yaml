@@ -317,6 +317,30 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
+      # C: on the hosted Windows runner is small, and this job piles the Go
+      # build cache, the linker's temp output (-race binaries are large), the
+      # coverage dirs and the e2e binary onto it; runs have failed with "not
+      # enough space on the disk". D: is the runner's larger scratch drive, so
+      # the disposable directories go there: GOCACHE (restored below from the
+      # path `go env` reports, so caching follows) and TEMP/TMP, which is also where
+      # the go tool puts its link temp files. GOTMPDIR is left unset: tests that
+      # check their paths against TEMP reject a second temp root. An
+      # image without a D: keeps the defaults rather than failing.
+      - name: Move build scratch off the C drive
+        shell: pwsh
+        run: |
+          Get-PSDrive -PSProvider FileSystem | Format-Table Name, @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}, @{n='UsedGB';e={[math]::Round($_.Used/1GB,1)}}
+          if (Test-Path 'D:\') {
+            $root = 'D:\astro-ci'
+            foreach ($d in 'gocache','tmp') { New-Item -ItemType Directory -Force -Path "$root\$d" | Out-Null }
+            "GOCACHE=$root\gocache" >> $env:GITHUB_ENV
+            "TEMP=$root\tmp" >> $env:GITHUB_ENV
+            "TMP=$root\tmp" >> $env:GITHUB_ENV
+            Write-Host "build scratch on $root"
+          } else {
+            Write-Host "no D: drive; build scratch stays on C:"
+          }
+
       # cache: false and a cache of this job's own, for the reasons written out
       # in the `test` job above. setup-go's built-in cache has the same
       # write-once key problem, and here it was the only cache in the job.
@@ -391,6 +415,11 @@ jobs:
       - name: Run e2e tests (tier 0)
         shell: bash
         run: bash scripts/test-e2e.sh
+
+      - name: Report free disk space
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: Get-PSDrive -PSProvider FileSystem | Format-Table Name, @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}, @{n='UsedGB';e={[math]::Round($_.Used/1GB,1)}}
 
       # Last, so it holds the non-race objects the e2e binary needs alongside
       # the -race ones the tests above built. Runs after a failure too, for the
