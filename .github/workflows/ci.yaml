@@ -324,7 +324,7 @@ jobs:
       # the disposable directories go there: GOCACHE (restored below from the
       # path `go env` reports, so caching follows), GOTMPDIR and TEMP/TMP. An
       # image without a D: keeps the defaults rather than failing.
-      - name: Move build scratch off C:
+      - name: Move build scratch off the C drive
         shell: pwsh
         run: |
           Get-PSDrive -PSProvider FileSystem | Format-Table Name, @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}, @{n='UsedGB';e={[math]::Round($_.Used/1GB,1)}}
