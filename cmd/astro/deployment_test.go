@@ -422,20 +422,46 @@ func TestDeploymentRootCommand(t *testing.T) {
 	assert.Contains(t, buf.String(), "deployment")
 }
 
-// --clean-output changes nothing on create and update, whose stdout is already
-// only the result, so help hides it there; it still parses for 1.x scripts and
-// leaves inspect's setting alone. On inspect it stays listed.
-func TestCleanOutputIsHiddenWhereItDoesNothing(t *testing.T) {
+// --clean-output has nothing left to drop on any command that had it in 1.x:
+// each prints only its result on stdout. It stays on every one of them, hidden
+// and parsing, so a 1.x script that passes it keeps working, and no command
+// offers it in help.
+func TestCleanOutputIsAcceptedHiddenEverywhere(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	for _, c := range []*cobra.Command{newDeploymentCreateCmd(io.Discard), newDeploymentUpdateCmd(io.Discard)} {
+	for _, run := range []struct {
+		root func(io.Writer) *cobra.Command
+		path []string
+	}{
+		{newDeploymentRootCmd, []string{"create"}},
+		{newDeploymentRootCmd, []string{"update"}},
+		{newDeploymentRootCmd, []string{"inspect"}},
+		{newDeploymentRootCmd, []string{"token", "create"}},
+		{newDeploymentRootCmd, []string{"token", "rotate"}},
+		{newWorkspaceCmd, []string{"token", "create"}},
+		{newWorkspaceCmd, []string{"token", "rotate"}},
+		{newOrganizationCmd, []string{"token", "create"}},
+		{newOrganizationCmd, []string{"token", "rotate"}},
+	} {
+		c, _, err := run.root(io.Discard).Find(run.path)
+		require.NoError(t, err, run.path)
 		f := c.Flags().Lookup("clean-output")
-		require.NotNil(t, f, "%s keeps the 1.x flag", c.Name())
-		assert.True(t, f.Hidden, "%s hides it", c.Name())
-		require.NoError(t, c.Flags().Parse([]string{"--clean-output"}))
+		require.NotNil(t, f, "%s keeps the 1.x flag", c.CommandPath())
+		assert.True(t, f.Hidden, "%s hides it", c.CommandPath())
+		require.NoError(t, c.Flags().Parse([]string{"--clean-output"}), c.CommandPath())
 	}
-	assert.False(t, cleanOutput, "an inert flag doesn't set inspect's --clean-output")
-	inspect := newDeploymentInspectCmd(io.Discard)
-	assert.False(t, inspect.Flags().Lookup("clean-output").Hidden, "inspect lists it")
+
+	for _, root := range []func(io.Writer) *cobra.Command{newDeploymentRootCmd, newWorkspaceCmd, newOrganizationCmd} {
+		var walk func(*cobra.Command)
+		walk = func(c *cobra.Command) {
+			if f := c.Flags().Lookup("clean-output"); f != nil {
+				assert.True(t, f.Hidden, "%s must not offer --clean-output", c.CommandPath())
+			}
+			for _, sub := range c.Commands() {
+				walk(sub)
+			}
+		}
+		walk(root(io.Discard))
+	}
 }
 
 func TestDeploymentList(t *testing.T) {

@@ -6,14 +6,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
 )
 
 var (
 	outputFormat         cliout.Format
 	requestedField       string
-	cleanOutput          bool
 	showWorkloadIdentity bool
 )
 
@@ -45,7 +43,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 	cliout.AddOutputFlag(cmd, &outputFormat, formatYAML)
 	cmd.PersistentFlags().Lookup("output").Usage += " (text prints the deployment as YAML, the same as yaml)"
 	cmd.Flags().StringVar(&requestedField, "key", "", "Print only this key of the configuration, such as configuration.cluster_id")
-	cmd.Flags().BoolVar(&cleanOutput, "clean-output", false, "Don't say which Deployment was picked when the Workspace has only one. Stdout holds only the Deployment either way")
+	addInertCleanOutputFlag(cmd)
 	cmd.Flags().BoolVar(&showWorkloadIdentity, "show-workload-identity", false, "Include the workload identity configured for the Deployment in the output")
 	return cmd
 }
@@ -59,9 +57,6 @@ func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
 	if len(args) > 0 {
 		deploymentID = args[0]
 	}
-
-	// clean output
-	deployment.CleanOutput = cleanOutput
 
 	// json goes through the CLI's one encoder, so it is pretty on a terminal
 	// and compact when piped like every other result; yaml is text here, the

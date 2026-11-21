@@ -46,7 +46,6 @@ var (
 	// Monkey patched to write unit tests
 	canCiCdDeploy = CanCiCdDeploy
 	parseToken    = util.ParseAPIToken
-	CleanOutput   = false
 
 	// mayAsk reports whether this run may ask which Deployment to pick (input.CanAsk).
 	// A var so a test can answer either way.
@@ -2270,10 +2269,8 @@ func deploymentSelectionProcess(ws string, src astrosession.Source, deployments 
 	}
 	if len(deployments) == 1 && mayAutoSelect() {
 		if use == ToRead {
-			if !CleanOutput {
-				fmt.Fprintf(os.Stderr, "Using the only Deployment found:\n\n Deployment Name: %s\n Deployment ID: %s\n",
-					ansi.ForStderr().Bold(input.Plain(deployments[0].Name)), ansi.ForStderr().Bold(input.Plain(deployments[0].Id)))
-			}
+			fmt.Fprintf(os.Stderr, "Using the only Deployment found:\n\n Deployment Name: %s\n Deployment ID: %s\n",
+				ansi.ForStderr().Bold(input.Plain(deployments[0].Name)), ansi.ForStderr().Bold(input.Plain(deployments[0].Id)))
 			return deployments[0], nil
 		}
 		// 1.x took it here for every command. A change waits for someone to

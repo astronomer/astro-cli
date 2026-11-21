@@ -51,7 +51,7 @@ func runDeploymentTokenCreate(format cliout.Format, out, errOut io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(format, out, errOut, &created, "Deployment", "Created", tokenName, cleanTokenOutput)
+	return renderTokenSecret(format, out, errOut, &created, "Deployment", "Created", tokenName)
 }
 
 func runDeploymentTokenUpdate(format cliout.Format, out io.Writer) error {
@@ -83,7 +83,7 @@ func runDeploymentTokenRotate(format cliout.Format, out, errOut io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(format, out, errOut, &rotated, "Deployment", "Rotated", token.Name, cleanTokenOutput)
+	return renderTokenSecret(format, out, errOut, &rotated, "Deployment", "Rotated", token.Name)
 }
 
 // offeredDeploymentTokens is the scopes a delete or a remove looks among: the
@@ -151,9 +151,6 @@ func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out 
 // an Organization token a role on the Deployment, which of the two it is being
 // found out from the token (deployment.AddToken).
 func runDeploymentTokenAdd(args []string, out io.Writer) error {
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
-	}
 	id := ""
 	if len(args) > 0 {
 		id = strings.ToLower(args[0])
@@ -204,9 +201,6 @@ const (
 func setTokenDeploymentRole(args []string, out io.Writer, kind, operation string) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
 	}
 	// if an id was provided in the args we use it, lowercased
 	if len(args) > 0 {

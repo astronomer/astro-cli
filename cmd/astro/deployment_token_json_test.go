@@ -194,8 +194,6 @@ func execAstroCmd(t *testing.T, client astrov1.APIClient, answers string, newRoo
 	// what an earlier run left, and what this one leaves for the next test.
 	tokenID, orgTokenID, workspaceTokenID = "", "", ""
 	t.Cleanup(func() { tokenID, orgTokenID, workspaceTokenID = "", "", "" })
-	// --clean-output sets a package variable a later test reads without building the command.
-	t.Cleanup(func() { cleanTokenOutput = false })
 	// --workspace-id, and deploy when it resolves one, set the
 	// package's workspaceID, which coalesceWorkspace reads before the context.
 	// Clear what an earlier run left, and what this one leaves.
@@ -379,11 +377,6 @@ func TestDeploymentTokenText(t *testing.T) {
 			assert.Equal(t, append([]map[string]string{}, rows...), tableRows(t, out, "ID"))
 		}
 	}
-	// --clean-output exists to be captured whole as the token
-	// (`TOKEN=$(astro deployment token create ... --clean-output)`), so here
-	// the bytes are the contract: the secret and a newline, nothing else.
-	cleanOutput := func(t *testing.T, out string) { assert.Equal(t, tokSecret+"\n", out) }
-
 	cases := []struct {
 		name    string
 		client  func(t *testing.T) astrov1.APIClient
@@ -434,7 +427,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "create", d, "--name", "ci-deploy", "--role", "DEPLOYMENT_ADMIN", "--clean-output"},
-			check: cleanOutput,
+			check: secretShown("Created"),
 		},
 		{
 			name: "update",
@@ -525,7 +518,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "rotate", "tok-dep", d, "--yes", "--clean-output"},
-			check: cleanOutput,
+			check: secretShown("Rotated"),
 		},
 		{
 			// The client mocks no rotate, so going on after "n" would panic.
@@ -1135,15 +1128,13 @@ func TestDeploymentTokenJSONNeverAsks(t *testing.T) {
 	}
 }
 
-// --output takes text or json, and --clean-output is a text format of its own:
-// either mistake is a usage error, exit 2, before anything is asked or done.
+// --output takes text or json; anything else is a usage error, exit 2, before
+// anything is asked or done.
 func TestDeploymentTokenOutputUsage(t *testing.T) {
 	d := "--deployment=" + tokDeploymentID
 	for _, args := range [][]string{
 		{"token", "list", d, "-o", "yaml"},
 		{"token", "create", d, "-o", "yaml"},
-		{"token", "create", d, "--name", "n", "--role", "r", "--clean-output", "-o", "json"},
-		{"token", "rotate", "tok-dep", d, "--yes", "--clean-output", "-o", "json"},
 	} {
 		r := execTokenCmd(t, tokenMock(t), "", args...)
 		require.Error(t, r.err, args)

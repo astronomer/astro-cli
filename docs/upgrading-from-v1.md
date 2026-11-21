@@ -151,6 +151,7 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `--enforce-cicd` | `--cicd-enforcement enable`, or `disable` | `astro deployment create` / `update` |
 | `--cluster-type` | `--type` | `astro deployment create` |
 | `--force-upgrade-to-af3` | drop it: 1.x ignored it too | `astro deploy` |
+| `--clean-output` | drop it: accepted and does nothing, since stdout already holds only the token or the Deployment, so `$(...)` captures it as before | `astro deployment create` / `update` / `inspect`, and token `create` / `rotate` |
 | `--hard` | drop it: a delete always removes everything, as it did in 1.x | `astro deployment delete` on Astro Private Cloud |
 | `--runtime-version`, `-v` | `--airflow-version`, or the `apache-airflow` requirement in `pyproject.toml`; to pin one Astro Runtime build, `runtime` under `[tool.astro]` | `astro init` |
 | `--from-template`, `-t` | no replacement: `astro init` writes one starter project | `astro init` |

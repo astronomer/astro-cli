@@ -24,26 +24,12 @@ import (
 	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
-var errCleanOutputWithJSON = errors.New("--clean-output prints only the token and --output json prints it in a \"token\" field; use one")
-
 // The role column of each family's tables.
 const (
 	deploymentRoleHeader   = "DEPLOYMENT ROLE"
 	workspaceRoleHeader    = "WORKSPACE ROLE"
 	organizationRoleHeader = "ORGANIZATION ROLE"
 )
-
-// refuseCleanOutputWithJSON refuses --clean-output under a token family's
-// --output json. --clean-output (create and rotate) is a text format of its
-// own, so the two together are a usage error rather than one silently
-// winning. A command calls it before it asks anything, so the pair fails as
-// usage before a prompt.
-func refuseCleanOutputWithJSON(format cliout.Format) error {
-	if format == cliout.FormatJSON && cleanTokenOutput {
-		return cliout.Usage(errCleanOutputWithJSON)
-	}
-	return nil
-}
 
 // renderTokenList renders a token list, its role column headed roleHeader.
 func renderTokenList(format cliout.Format, out io.Writer, tokens []apitoken.Token, roleHeader string) error {
@@ -93,9 +79,8 @@ func tokenRowCreated(t *apitoken.Token, created string) []string {
 //
 // In text, stdout is the secret and a newline, so `$(astro ... create)` and a
 // pipe get exactly the value; the receipt and the warning that the value is
-// not shown again are for the person, on stderr. clean prints the bare
-// secret and no receipt at all, which is what --clean-output has always done.
-func renderTokenSecret(format cliout.Format, out, errOut io.Writer, t *apitoken.Token, kind, verb, name string, clean bool) error {
+// not shown again are for the person, on stderr.
+func renderTokenSecret(format cliout.Format, out, errOut io.Writer, t *apitoken.Token, kind, verb, name string) error {
 	if err := (cliout.Renderer{Format: format, Out: out}).Emit(t, cliout.Text(func(b *bufio.Writer) {
 		if t.Token != "" {
 			fmt.Fprintln(b, t.Token)
@@ -104,7 +89,7 @@ func renderTokenSecret(format cliout.Format, out, errOut io.Writer, t *apitoken.
 		return err
 	}
 	// The receipt follows the secret, and only when the secret was written.
-	if format != cliout.FormatJSON && !clean {
+	if format != cliout.FormatJSON {
 		fmt.Fprintf(errOut, "\n%s %s API token %s\n", verb, kind, name)
 		fmt.Fprintln(errOut, "Copy this API token for your records.")
 		fmt.Fprintln(errOut, "This API token value is not shown again.")

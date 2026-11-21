@@ -173,10 +173,6 @@ func secretShown(kind, verb, name string) func(t *testing.T, out string) {
 	}
 }
 
-// onlyTheSecret is --clean-output's contract: the secret and a newline, nothing
-// else (`TOKEN=$(astro workspace token create ... --clean-output)`).
-func onlyTheSecret(t *testing.T, out string) { assert.Equal(t, tokSecret+"\n", out) }
-
 // firstRow is row as the picker numbers the first of its choices.
 func firstRow(row map[string]string) map[string]string {
 	out := map[string]string{"#": "1"}
@@ -241,7 +237,7 @@ func TestWorkspaceTokenText(t *testing.T) {
 				secretShown("Workspace", "Created", "ws-token")(t, out)
 			},
 		},
-		{name: "create --clean-output", root: newWorkspaceCmd, client: fakeTokens(nil, createsToken(ws)), args: []string{"workspace", "token", "create", "--name", "ws-token", "--role", "WORKSPACE_MEMBER", "--clean-output"}, check: onlyTheSecret},
+		{name: "create --clean-output", root: newWorkspaceCmd, client: fakeTokens(nil, createsToken(ws)), args: []string{"workspace", "token", "create", "--name", "ws-token", "--role", "WORKSPACE_MEMBER", "--clean-output"}, check: secretShown("Workspace", "Created", "ws-token")},
 		{name: "update", root: newWorkspaceCmd, client: fakeTokens(both, updatesToken(ws, renamed)), args: []string{"workspace", "token", "update", "tok-ws", "--new-name", "ws-token-2", "--role", "WORKSPACE_OWNER"}, check: says("Updated Workspace API token ws-token")},
 		{
 			name: "update through the picker", root: newWorkspaceCmd, client: fakeTokens([]astrov1.ApiToken{ws}, updatesToken(ws, ws)), answers: "1\n",
@@ -290,7 +286,7 @@ func TestWorkspaceTokenText(t *testing.T) {
 			check:   says("WARNING: API Token rotation", "Rotate API token ws-token? (y/n)"),
 			wantErr: "aborted",
 		},
-		{name: "rotate --clean-output", root: newWorkspaceCmd, client: fakeTokens(both, rotatesToken(ws)), args: []string{"workspace", "token", "rotate", "tok-ws", "--yes", "--clean-output"}, check: onlyTheSecret},
+		{name: "rotate --clean-output", root: newWorkspaceCmd, client: fakeTokens(both, rotatesToken(ws)), args: []string{"workspace", "token", "rotate", "tok-ws", "--yes", "--clean-output"}, check: secretShown("Workspace", "Rotated", "ws-token")},
 		{
 			name: "delete --yes", root: newWorkspaceCmd, client: fakeTokens(both, deletesToken("tok-ws")),
 			args: []string{"workspace", "token", "delete", "tok-ws", "--yes"},
@@ -497,7 +493,7 @@ func TestOrganizationTokenText(t *testing.T) {
 				secretShown("Organization", "Created", "org-token")(t, out)
 			},
 		},
-		{name: "create --clean-output", root: newOrganizationCmd, client: fakeTokens(nil, createsToken(org)), args: []string{"organization", "token", "create", "--name", "org-token", "--role", "ORGANIZATION_MEMBER", "--clean-output"}, check: onlyTheSecret},
+		{name: "create --clean-output", root: newOrganizationCmd, client: fakeTokens(nil, createsToken(org)), args: []string{"organization", "token", "create", "--name", "org-token", "--role", "ORGANIZATION_MEMBER", "--clean-output"}, check: secretShown("Organization", "Created", "org-token")},
 		{name: "update", root: newOrganizationCmd, client: fakeTokens(orgs, updatesToken(org, renamed)), args: []string{"organization", "token", "update", "tok-org", "--new-name", "org-token-2", "--role", "ORGANIZATION_OWNER"}, check: says("Updated Organization API token org-token")},
 		{
 			name: "update through the picker", root: newOrganizationCmd, client: fakeTokens(orgs, updatesToken(org, org)), answers: "1\n",
@@ -540,7 +536,7 @@ func TestOrganizationTokenText(t *testing.T) {
 			check:   says("WARNING: API Token rotation", "Rotate API token org-token? (y/n)"),
 			wantErr: "aborted",
 		},
-		{name: "rotate --clean-output", root: newOrganizationCmd, client: fakeTokens(orgs, rotatesToken(org)), args: []string{"organization", "token", "rotate", "tok-org", "--yes", "--clean-output"}, check: onlyTheSecret},
+		{name: "rotate --clean-output", root: newOrganizationCmd, client: fakeTokens(orgs, rotatesToken(org)), args: []string{"organization", "token", "rotate", "tok-org", "--yes", "--clean-output"}, check: secretShown("Organization", "Rotated", "org-token")},
 		{name: "delete --yes", root: newOrganizationCmd, client: fakeTokens(orgs, deletesToken("tok-org")), args: []string{"organization", "token", "delete", "tok-org", "--yes"}, check: says("Deleted Organization API token org-token")},
 		{
 			name: "delete confirmed", root: newOrganizationCmd, client: fakeTokens(orgs, deletesToken("tok-org")), answers: "y\n",
@@ -848,8 +844,8 @@ func TestWorkspaceOrganizationTokenJSONNeverAsks(t *testing.T) {
 	}
 }
 
-// --output takes text or json, and --clean-output is a text format of its own:
-// either mistake is a usage error, exit 2, before anything is asked or done.
+// --output takes text or json; anything else is a usage error, exit 2, before
+// anything is asked or done.
 func TestWorkspaceOrganizationTokenOutputUsage(t *testing.T) {
 	for _, run := range []struct {
 		root func(io.Writer) *cobra.Command
@@ -857,11 +853,7 @@ func TestWorkspaceOrganizationTokenOutputUsage(t *testing.T) {
 	}{
 		{newWorkspaceCmd, []string{"workspace", "token", "list", "-o", "yaml"}},
 		{newWorkspaceCmd, []string{"workspace", "token", "create", "-o", "yaml"}},
-		{newWorkspaceCmd, []string{"workspace", "token", "create", "--name", "n", "--role", "WORKSPACE_MEMBER", "--clean-output", "-o", "json"}},
-		{newWorkspaceCmd, []string{"workspace", "token", "rotate", "tok-ws", "--yes", "--clean-output", "-o", "json"}},
 		{newOrganizationCmd, []string{"organization", "token", "roles", "tok-org", "-o", "yaml"}},
-		{newOrganizationCmd, []string{"organization", "token", "create", "--name", "n", "--role", "ORGANIZATION_MEMBER", "--clean-output", "-o", "json"}},
-		{newOrganizationCmd, []string{"organization", "token", "rotate", "tok-org", "--yes", "--clean-output", "-o", "json"}},
 	} {
 		r := execAstroCmd(t, tokenMock(t), "", run.root, run.args...)
 		require.Error(t, r.err, run.args)
