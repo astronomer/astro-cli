@@ -191,7 +191,7 @@ func (q *query) awaitTask(ctx context.Context, client *airflowapi.Client, dagID,
 		}
 		if !announced {
 			fmt.Fprintf(q.d.Stderr, "waiting up to %s for %s in %s run %s to be %s\n",
-				formatDuration(wait.timeout.Seconds()), target.name(), dagID, runID, target.state)
+				formatDuration(wait.timeout.Seconds()), target.name(), dagID, runID, input.Plain(target.state))
 			announced = true
 		}
 		timer := time.NewTimer(min(wait.poll, remaining))
