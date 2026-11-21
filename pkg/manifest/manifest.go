@@ -369,6 +369,13 @@ type Link struct {
 	// else [tool.astro.deploy] client-registry. Set on astro links only, the
 	// one kind with remote agents to pull it.
 	ClientRegistry string
+	// DagBundle is the named Dag bundle on this link's Deployment that
+	// `astro deploy` ships the project's Dags to, instead of the Deployment's
+	// default bundle. Set on astro links only, the one kind of Deployment with
+	// Dag bundles. A bundle belongs to one Deployment, so there is no
+	// project-wide value to inherit. `astro deploy --dag-bundle` overrides it
+	// for one run.
+	DagBundle string
 	// Default marks the link a command falls through to when nothing else
 	// picked one: the last layer of the query commands' resolution rule, and
 	// the entry `astro deploy` highlights in its prompt. It does not decide a
@@ -612,6 +619,10 @@ const (
 	// not an astro link. Only an Astro Deployment runs remote agents, which
 	// pull the client image `astro remote deploy` pushes there.
 	CodeClientRegistryOnNonAstroLink ProblemCode = "client_registry_on_non_astro_link"
+	// CodeDagBundleOnNonAstroLink is dag-bundle on a link that is not an
+	// astro link. Only an Astro Deployment has named Dag bundles for a deploy
+	// to target.
+	CodeDagBundleOnNonAstroLink ProblemCode = "dag_bundle_on_non_astro_link"
 	// CodeEnvironmentOnAPCLink is environment on an apc link, which names a
 	// Deployment instead.
 	CodeEnvironmentOnAPCLink ProblemCode = "environment_on_apc_link"
@@ -678,7 +689,7 @@ var problemCodes = []ProblemCode{
 	CodeWorkspaceOnNonAstroLink, CodeWorkspaceRequired, CodeMultipleDefaults,
 
 	CodeDomainRequired, CodeDomainOnNonAPCLink, CodeEnvironmentOnAPCLink, CodeURLOnAPCLink,
-	CodeClientRegistryOnNonAstroLink,
+	CodeClientRegistryOnNonAstroLink, CodeDagBundleOnNonAstroLink,
 
 	CodeURLInvalid, CodeURLNoScheme, CodeURLNotHTTP, CodeURLNoHost,
 	CodeURLHasCredentials,
@@ -941,7 +952,7 @@ const astroRoot = "tool.astro"
 // else in silence, while a key a newer reader defines must not stop this one.
 var (
 	astroKeys  = []string{"airflow", "build-secrets", "deploy", "deployments", "dockerfile", "domain", "env", "organization", "packages", "pools", "runtime", "target", "targets", "workspace"}
-	linkKeys   = []string{"auth", "client-registry", "default", "deployment", "domain", "environment", "target", "url", "workspace"}
+	linkKeys   = []string{"auth", "client-registry", "dag-bundle", "default", "deployment", "domain", "environment", "target", "url", "workspace"}
 	deployKeys = []string{"client-registry", "cosmos-boost", "git-metadata", "sha-as-tag"}
 )
 
@@ -1276,6 +1287,7 @@ func (p *parser) link(key string, table map[string]any, a *Astro) Link {
 	link.Workspace = p.workspace(key, kind, table["workspace"], a.Workspace)
 	link.Auth = p.auth(key+".auth", table["auth"], kind)
 	link.ClientRegistry = p.linkClientRegistry(key, kind, table["client-registry"], a.Deploy.ClientRegistry)
+	link.DagBundle = p.linkDagBundle(key, kind, table["dag-bundle"])
 	if link.Auth.Method == AuthAPC && kind != KindAPC {
 		p.add(CodeAuthAPCOnNonAPCLink, key+".auth.method", fmt.Sprintf("the apc method reads the Astro Private Cloud login for an apc link's domain; this is %s link", KindWithArticle(kind)))
 	}
@@ -1475,6 +1487,21 @@ func (p *parser) linkClientRegistry(key string, kind LinkKind, raw any, fallback
 		return ""
 	}
 	return firstNonEmpty(strings.TrimSpace(p.str(key+".client-registry", raw)), fallback)
+}
+
+// linkDagBundle is a link's dag-bundle: the named Dag bundle its deploys ship
+// the project's Dags to. Only an astro link has one; the key on any other
+// kind is a problem. Unlike client-registry there is no project-wide value to
+// fall back to, as a bundle belongs to one Deployment.
+func (p *parser) linkDagBundle(key string, kind LinkKind, raw any) string {
+	if kind != KindAstro {
+		if raw != nil {
+			p.add(CodeDagBundleOnNonAstroLink, key+".dag-bundle",
+				fmt.Sprintf("only an Astro Deployment has named Dag bundles for a deploy to target, and this is %s link", KindWithArticle(kind)))
+		}
+		return ""
+	}
+	return strings.TrimSpace(p.str(key+".dag-bundle", raw))
 }
 
 // unknownKeys reports every key the table does not define: a problem when it

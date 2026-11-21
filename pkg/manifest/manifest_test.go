@@ -1205,6 +1205,25 @@ client-registry = "quay.io/acme/client"
 		wantKeys: []string{"tool.astro.deployments.aws.client-registry"},
 	},
 	{
+		// Only an Astro Deployment has named Dag bundles for a deploy to
+		// target.
+		name:      "dag-bundle on an mwaa link",
+		wantCodes: []ProblemCode{CodeDagBundleOnNonAstroLink},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+
+[tool.astro.deployments.aws]
+target = "mwaa"
+environment = "orders-prod"
+dag-bundle = "nightly"
+`,
+		wantKeys: []string{"tool.astro.deployments.aws.dag-bundle"},
+	},
+	{
 		// An astro link's host is [tool.astro] domain. A domain on the link
 		// would look like it routes the link to another host, so it is
 		// refused, as any key a link does not take always was.
