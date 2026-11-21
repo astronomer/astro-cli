@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"testing"
 
@@ -35,7 +36,7 @@ func TestUpdateAWorkspaceTokenByIDUnderAnOrganizationToken(t *testing.T) {
 		t.Cleanup(func() { tokenName = "" })
 
 		var out bytes.Buffer
-		require.NoError(t, updateWorkspaceToken(nil, &out))
+		require.NoError(t, updateWorkspaceToken(nil, &out, io.Discard))
 		mc.AssertCalled(t, "UpdateApiTokenWithResponse", mock.Anything, "env-org", "token-id", mock.Anything)
 	})
 
@@ -46,7 +47,7 @@ func TestUpdateAWorkspaceTokenByIDUnderAnOrganizationToken(t *testing.T) {
 		t.Cleanup(func() { tokenRole = "" })
 
 		var err error
-		asked := captureStderr(t, func() { err = updateWorkspaceToken(nil, &bytes.Buffer{}) })
+		asked := captureStderr(t, func() { err = updateWorkspaceToken(nil, &bytes.Buffer{}, io.Discard) })
 		require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
 		assert.Empty(t, asked)
 	})

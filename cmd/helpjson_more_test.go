@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -111,7 +112,7 @@ func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("closed p
 
 func TestHelpJSONWriteFailureIsAnError(t *testing.T) {
 	root, _ := disarmedTree(t, astroTree)
-	shown, err := printHelpJSONIfAsked(t.Context(), root, []string{"deployment", "list", "--help", "-o", "json"}, failingWriter{})
+	shown, err := printHelpJSONIfAsked(t.Context(), root, []string{"deployment", "list", "--help", "-o", "json"}, failingWriter{}, io.Discard)
 	assert.True(t, shown)
 	require.Error(t, err)
 }

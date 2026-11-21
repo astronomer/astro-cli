@@ -158,7 +158,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		}
 		return err
 	}
-	return renderManifestDeploy(out, &res, warnings)
+	return renderManifestDeploy(out, cmd.ErrOrStderr(), &res, warnings)
 }
 
 // refuseBuildSecret refuses --build-secret where nothing reads it, as astro
@@ -197,7 +197,7 @@ func otherDomainThen(again string) func(link, domain string) error {
 // renderManifestDeploy writes a finished project deploy: the one json object
 // under json, and a summary line in text, after the progress the deploy
 // printed as it went.
-func renderManifestDeploy(out io.Writer, res *manifestdeploy.Result, warnings []string) error {
+func renderManifestDeploy(out, errOut io.Writer, res *manifestdeploy.Result, warnings []string) error {
 	obj := deployJSON{
 		Deployment:     res.DeploymentID,
 		Link:           res.LinkName,
@@ -209,7 +209,7 @@ func renderManifestDeploy(out io.Writer, res *manifestdeploy.Result, warnings []
 		URL:            res.URL,
 		Warnings:       warnings,
 	}
-	return cliout.Renderer{Format: deployOutput, Out: out}.Emit(obj, cliout.Text(func(b *bufio.Writer) {
+	return cliout.Renderer{Format: deployOutput, Out: out, Err: errOut}.Emit(obj, cliout.Text(func(b *bufio.Writer) {
 		target := "Deployment " + res.DeploymentID
 		if res.LinkName != "" {
 			target = fmt.Sprintf("%s (Deployment %s)", res.LinkName, res.DeploymentID)

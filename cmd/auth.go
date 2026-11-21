@@ -266,7 +266,7 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
 		Short: "Print the authentication token",
 		Long:  "Print the current authentication token to standard output, for use in scripts and CI/CD pipelines.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return printAuthToken(tokenDomain, forceRenew, cliout.Renderer{Format: output, Out: out})
+			return printAuthToken(tokenDomain, forceRenew, cliout.Renderer{Format: output, Out: out, Err: cmd.ErrOrStderr()})
 		},
 		Example: `  # Print the current context's token
   astro auth token

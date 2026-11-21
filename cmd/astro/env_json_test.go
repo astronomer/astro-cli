@@ -195,7 +195,7 @@ func TestEnvConnListJSONKeepsAbsentFieldsAbsent(t *testing.T) {
 			})
 			astroV1Client = mc
 
-			out, err := execEnvCmd(append([]string{"connection", "list", "--workspace-id", "ws-test", "-o", "json"}, c.flags...)...)
+			out, _, err := execEnvCmdStreams(append([]string{"connection", "list", "--workspace-id", "ws-test", "-o", "json"}, c.flags...)...)
 			require.NoError(t, err)
 			var list struct {
 				Connections []json.RawMessage `json:"connections"`

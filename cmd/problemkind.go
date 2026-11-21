@@ -155,7 +155,7 @@ func Execute(ctx context.Context) error {
 // run that asks for help or completions past a removed 1.x flag
 // (acceptRemovedFlags).
 func execute(ctx context.Context, root *cobra.Command, args []string, stdout io.Writer) error {
-	if shown, err := printVersionIfAsked(root, args, stdout); shown {
+	if shown, err := printVersionIfAsked(root, args, stdout, root.ErrOrStderr()); shown {
 		return err
 	}
 	// Cobra adds these two as it executes. Added first, a line that names
@@ -163,7 +163,7 @@ func execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	// subcommands (`completion bogus`) is refused like any other group's.
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
-	if shown, err := printHelpJSONIfAsked(ctx, root, args, stdout); shown {
+	if shown, err := printHelpJSONIfAsked(ctx, root, args, stdout, root.ErrOrStderr()); shown {
 		return err
 	}
 	acceptRemovedFlags(root, args)

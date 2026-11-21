@@ -424,7 +424,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		recap.Warn(w)
 	}
 	recap.Flush()
-	return renderManifestDeploy(out, format, &res, warnings)
+	return renderManifestDeploy(out, cmd.ErrOrStderr(), format, &res, warnings)
 }
 
 // deployNotes gives the notes a finished deploy has: no commit recorded, and a
@@ -608,7 +608,7 @@ type deployGitJSON struct {
 // stream record before it (build progress and warnings go to stderr, and json
 // mode drops the announce and progress lines), so it is laid out the way
 // every result is, pretty on a terminal and one line when piped.
-func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy.Result, warnings []string) error {
+func renderManifestDeploy(w, errOut io.Writer, format cliout.Format, res *manifestdeploy.Result, warnings []string) error {
 	obj := deployJSON{
 		Warnings:         warnings,
 		Deployment:       res.DeploymentID,
@@ -626,7 +626,7 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 	if c := res.Git.Commit; c != nil {
 		obj.Git = &deployGitJSON{CommitSHA: c.SHA, Branch: c.Branch, CommitURL: c.URL}
 	}
-	return cliout.Renderer{Format: format, Out: w}.Emit(obj, cliout.Text(func(b *bufio.Writer) {
+	return cliout.Renderer{Format: format, Out: w, Err: errOut}.Emit(obj, cliout.Text(func(b *bufio.Writer) {
 		target := deployTargetName(res)
 		switch res.Type {
 		case "dag-only":

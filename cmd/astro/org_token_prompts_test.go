@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -69,22 +70,22 @@ func TestAnOrganizationTokenIsRefusedBeforeAnyQuestion(t *testing.T) {
 	cmd := &cobra.Command{}
 	var out bytes.Buffer
 	for name, run := range map[string]func() error{
-		"workspace team update":     func() error { return updateWorkspaceTeam(cmd, nil, &out) },
-		"workspace user update":     func() error { return updateWorkspaceUser(cmd, nil, &out) },
-		"workspace team add":        func() error { return addWorkspaceTeam(cmd, nil, &out) },
-		"workspace team remove":     func() error { return removeWorkspaceTeam(cmd, nil, &out) },
-		"workspace user add":        func() error { return addWorkspaceUser(cmd, nil, &out) },
-		"workspace user remove":     func() error { return removeWorkspaceUser(cmd, nil, &out) },
-		"workspace token add":       func() error { return addOrgTokenToWorkspace(cmd, nil, &out) },
+		"workspace team update":     func() error { return updateWorkspaceTeam(cmd, nil, &out, io.Discard) },
+		"workspace user update":     func() error { return updateWorkspaceUser(cmd, nil, &out, io.Discard) },
+		"workspace team add":        func() error { return addWorkspaceTeam(cmd, nil, &out, io.Discard) },
+		"workspace team remove":     func() error { return removeWorkspaceTeam(cmd, nil, &out, io.Discard) },
+		"workspace user add":        func() error { return addWorkspaceUser(cmd, nil, &out, io.Discard) },
+		"workspace user remove":     func() error { return removeWorkspaceUser(cmd, nil, &out, io.Discard) },
+		"workspace token add":       func() error { return addOrgTokenToWorkspace(cmd, nil, &out, io.Discard) },
 		"workspace token create":    func() error { return createWorkspaceToken(cmd, &out) },
-		"workspace token update":    func() error { return updateWorkspaceToken(nil, &out) },
+		"workspace token update":    func() error { return updateWorkspaceToken(nil, &out, io.Discard) },
 		"organization-token add":    func() error { return addOrgTokenWorkspaceRole(cmd, nil, &out) },
 		"organization-token update": func() error { return updateOrgTokenWorkspaceRole(cmd, nil, &out) },
-		"organization-token remove": func() error { return removeOrganizationTokenWorkspaceRole(nil, &out) },
+		"organization-token remove": func() error { return removeOrganizationTokenWorkspaceRole(nil, &out, io.Discard) },
 		"workspace token remove of an Organization token by ID": func() error {
 			tokenID = "token-id"
 			defer func() { tokenID = "" }()
-			return removeWorkspaceToken(cmd, nil, &out)
+			return removeWorkspaceToken(cmd, nil, &out, io.Discard)
 		},
 	} {
 		var err error

@@ -2,6 +2,7 @@ package apc
 
 import (
 	"bytes"
+	"io"
 
 	"github.com/stretchr/testify/mock"
 
@@ -54,11 +55,11 @@ func (s *Suite) TestWorkspaceSaCreate() {
 	workspaceSARole = houston.WorkspaceAdminRole
 	houstonMock.On("CreateWorkspaceServiceAccount", mock.Anything).Return(&houston.WorkspaceServiceAccount{}, nil).Once()
 
-	err := workspaceSaCreate(buf)
+	err := workspaceSaCreate(buf, io.Discard)
 	s.NoError(err)
 
 	workspaceSARole = "invalid-role"
-	err = workspaceSaCreate(buf)
+	err = workspaceSaCreate(buf, io.Discard)
 	s.Error(err)
 	s.Contains(err.Error(), "could not find a valid role")
 
@@ -79,7 +80,7 @@ func (s *Suite) TestWorkspaceSaDelete() {
 	// As --yes does: the question is the command's, and tested there.
 	skipPrompt = true
 	defer func() { skipPrompt = false }()
-	err := workspaceSaDelete(buf, []string{saID})
+	err := workspaceSaDelete(buf, io.Discard, []string{saID})
 	s.NoError(err)
 
 	houstonMock.AssertExpectations(s.T())

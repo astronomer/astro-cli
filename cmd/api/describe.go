@@ -25,6 +25,7 @@ const (
 // DescribeOptions holds options for the describe command.
 type DescribeOptions struct {
 	Out       io.Writer
+	ErrOut    io.Writer // the command's stderr, where notices go; nil means os.Stderr
 	specCache *openapi.Cache
 	Endpoint  string
 	Method    string
@@ -100,7 +101,7 @@ func runDescribe(opts *DescribeOptions) error {
 
 	// The resolved schemas are built only under json: resolving every $ref is
 	// work the text, which prints from the spec as it goes, never needs.
-	r := cliout.Renderer{Format: opts.Format, Out: opts.Out}
+	r := cliout.Renderer{Format: opts.Format, Out: opts.Out, Err: opts.ErrOut}
 	return r.Emit(cliout.Lazy(func() any { return newDescribeOutput(matches, resolver) }), func(w io.Writer) error {
 		for i := range matches {
 			if i > 0 {

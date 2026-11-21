@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -161,7 +160,7 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 	if envIncludeSecrets {
-		cliout.Warn(os.Stderr, includeSecretsWarning)
+		cliout.Warn(cmd.ErrOrStderr(), includeSecretsWarning)
 	}
 	return env.WriteConnList(objs, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()})
 }

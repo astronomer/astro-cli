@@ -53,7 +53,7 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the
 		Long:    "Add a Team to a Workspace, named by its id as the argument or with --team-id",
 		Example: workspaceTeamAddExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceTeamAdd(out, args)
+			return workspaceTeamAdd(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Optional("TEAM_ID")), argOrFlag("team-id", "team"))
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team ID to be assigned to Workspace")
@@ -73,7 +73,7 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 		Long:    "Update a Team inside a Workspace",
 		Example: workspaceTeamUpdateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceTeamUpdate(out, args)
+			return workspaceTeamUpdate(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Required("TEAM_ID"))
 	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "Workspace role assigned to team")
@@ -104,15 +104,15 @@ func newWorkspaceTeamsListCmd(out io.Writer) *cobra.Command {
 		Long:    "List Teams inside an APC Workspace",
 		Example: workspaceTeamsListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceTeamsList(out, args)
+			return workspaceTeamsList(out, cmd.ErrOrStderr(), args)
 		},
 	}
 	addAccessOutputFlag(cmd)
 	return cmd
 }
 
-func workspaceTeamAdd(out io.Writer, _ []string) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func workspaceTeamAdd(out, errOut io.Writer, _ []string) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("could not find a valid Workspace: %w", err)
@@ -129,8 +129,8 @@ func workspaceTeamAdd(out io.Writer, _ []string) error {
 	return renderWorkspaceTeamAdded(r, w, teamID, workspaceTeamRole)
 }
 
-func workspaceTeamUpdate(out io.Writer, args []string) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func workspaceTeamUpdate(out, errOut io.Writer, args []string) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("could not find a valid Workspace: %w", err)
@@ -161,8 +161,8 @@ func workspaceTeamRm(cmd *cobra.Command, out io.Writer, args []string) error {
 	return renderWorkspaceTeamRemoved(r, cliout.NotesTo(cmd, r.Format, out), &removal, args[0])
 }
 
-func workspaceTeamsList(out io.Writer, _ []string) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func workspaceTeamsList(out, errOut io.Writer, _ []string) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("could not find a valid Workspace: %w", err)
