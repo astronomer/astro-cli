@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -21,7 +20,7 @@ func newHelpCommand() *cobra.Command {
 		Use:   helpName + " [command]",
 		Short: "Help about any command",
 		Long: `Help provides help for any command in the application.
-Simply type ` + "`astro help [path to command]`" + ` for full details.`,
+Simply type astro help [path to command] for full details.`,
 		Args: cobra.ArbitraryArgs,
 		// Help needs no login, version check or tracking.
 		Annotations: map[string]string{telemetry.SkipPreRunAnnotation: "true"},
@@ -45,8 +44,7 @@ Simply type ` + "`astro help [path to command]`" + ` for full details.`,
 			for _, word := range args {
 				next := childNamed(target, word)
 				if next == nil {
-					err := cliout.UnknownSubcommand(target, word)
-					return cliout.UsageNoHelp(fmt.Errorf("%s\n\nRun %s --help for usage.", err.Error(), target.CommandPath()))
+					return cliout.PointAtHelpOf(cliout.UnknownSubcommand(target, word), target)
 				}
 				target = next
 			}

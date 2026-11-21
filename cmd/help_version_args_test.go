@@ -197,6 +197,50 @@ func TestUnknownCommandSuggestsAtMostOne(t *testing.T) {
 	assert.Empty(t, cliout.SubcommandSuggestions(tied, "abc"))
 }
 
+// --version on the passthrough command itself is ours; after its operand it is
+// the wrapped program's. With -o json it prints what `astro version -o json`
+// does.
+func TestVersionFlagOnPassthroughAndJSON(t *testing.T) {
+	want := versionLine(t)
+	assert.Equal(t, want, runLine(t, "local", "run", "--version").stdout)
+	assert.NotEqual(t, want, runLine(t, "local", "run", "python", "--version").stdout)
+
+	json := runLine(t, "--version", "-o", "json").stdout
+	assert.JSONEq(t, `{"version":"`+version.Current()+`"}`, json)
+}
+
+// Use tokens that are not positionals do not make a leaf take arguments.
+func TestUndeclaredArgsIgnoresFlagTokens(t *testing.T) {
+	for _, use := range []string{"x [flags]", "x [--opt]", "x [command]", "x [options]"} {
+		assert.Error(t, cliout.UndeclaredArgs(&cobra.Command{Use: use}, []string{"a"}), use)
+	}
+	assert.NoError(t, cliout.UndeclaredArgs(&cobra.Command{Use: "x [NAME] [flags]"}, []string{"a"}))
+	assert.Error(t, cliout.UndeclaredArgs(&cobra.Command{Use: "x [NAME] [flags]"}, []string{"a", "b"}))
+}
+
+// A command that sets its own SuggestFor words is suggested for them even
+// when another is nearer.
+func TestSuggestForWinsOverDistance(t *testing.T) {
+	root := &cobra.Command{Use: "x"}
+	root.AddCommand(
+		&cobra.Command{Use: "remove", SuggestFor: []string{"delet"}, Run: func(*cobra.Command, []string) {}},
+		&cobra.Command{Use: "delete", Run: func(*cobra.Command, []string) {}},
+	)
+	assert.Equal(t, []string{"remove"}, cliout.SubcommandSuggestions(root, "delet"))
+}
+
+// An internal command (hidden) warns of a bad ASTRO_VERBOSITY and carries on:
+// nobody reads its stderr.
+func TestBadVerbosityEnvironmentSparesHiddenCommands(t *testing.T) {
+	keepLogger(t)
+	t.Setenv(verbosityEnv, "bogus")
+	root := &cobra.Command{Use: "astro"}
+	addVerbosityFlag(root.PersistentFlags())
+	hidden := &cobra.Command{Use: "internal", Hidden: true}
+	root.AddCommand(hidden)
+	require.NoError(t, SetupLogging(hidden, nil))
+}
+
 // A level set in ASTRO_VERBOSITY that is no level fails the run as --verbosity
 // does, naming the variable, before the login.
 func TestBadVerbosityEnvironmentIsAUsageError(t *testing.T) {

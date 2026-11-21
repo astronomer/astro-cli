@@ -121,8 +121,13 @@ func BeforeArgs(tree *cobra.Command, hook func(*cobra.Command, []string) error) 
 	if tree.Runnable() {
 		check := tree.Args
 		tree.Args = func(cmd *cobra.Command, args []string) error {
-			if err := hook(cmd, args); err != nil {
-				return err
+			// The hook reconciles flags as parsed; a check made before
+			// they are (a test of what the command accepts, a lint of its
+			// example) has none to reconcile, and must not record a run.
+			if cmd.Flags().Parsed() {
+				if err := hook(cmd, args); err != nil {
+					return err
+				}
 			}
 			if check == nil {
 				return cliout.UndeclaredArgs(cmd, args)

@@ -71,7 +71,10 @@ func SetupLogging(cmd *cobra.Command, _ []string) error {
 	}
 	level := logger.DefaultLevel
 	var bad []string
-	if raw := os.Getenv(verbosityEnv); raw != "" {
+	// A hidden command is an internal one (the telemetry sender, the proxy
+	// daemon), run in the background with nobody reading its stderr: it
+	// warns and carries on with the default, as a bad setting does.
+	if raw := os.Getenv(verbosityEnv); raw != "" && !isInternal(cmd) {
 		if _, err := logger.ParseLevel(raw); err != nil {
 			return cliout.Usage(fmt.Errorf("%s: %w", verbosityEnv, err))
 		}
@@ -98,6 +101,16 @@ func SetupLogging(cmd *cobra.Command, _ []string) error {
 		ansi.Warn(logOutput(), "ignoring "+b)
 	}
 	return nil
+}
+
+// isInternal reports whether cmd, or a command above it, is hidden.
+func isInternal(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.Hidden {
+			return true
+		}
+	}
+	return false
 }
 
 // readVerbosity sets --verbosity from a removed command's raw arguments. A

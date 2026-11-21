@@ -16,6 +16,7 @@ import (
 // positionals declares them (cobra.ExactArgs and friends); only a command that
 // hands its arguments on to something else belongs here.
 var argsExceptions = map[string]string{
+	"astro help":                              "takes the path of any command, and refuses a word that names none itself (newHelpCommand)",
 	"astro link add":                          "takes NAME and, after --, the command that mints a token: it validates both itself",
 	"astro local run":                         "everything after the first word is the wrapped command's own argv",
 	"astro deployment variable create":        "takes any number of KEY=VALUE pairs",
@@ -36,6 +37,8 @@ func TestEveryLeafRefusesAStrayArgument(t *testing.T) {
 	var accepting []string
 	seen := map[string]bool{}
 	for _, tree := range rootsUnderTest(t) {
+		// Cobra adds the help command as it executes; execute adds it first.
+		tree.root.InitDefaultHelpCmd()
 		walkCmd(tree.root, func(c *cobra.Command) {
 			if !c.Runnable() || c.HasSubCommands() || c.DisableFlagParsing {
 				return

@@ -147,7 +147,12 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	if flag := suggestFlag(cmd, err); flag != "" {
 		root.PrintErrf("Did you mean %s?\n", flag)
 	}
-	root.PrintErrf("Run %s --help for usage.\n", cmd.CommandPath())
+	pointAt := cmd
+	var u *usageError
+	if errors.As(err, &u) && u.pointAt != nil {
+		pointAt = u.pointAt
+	}
+	root.PrintErrf("Run %s --help for usage.\n", pointAt.CommandPath())
 	return err
 }
 

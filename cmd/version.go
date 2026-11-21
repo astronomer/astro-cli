@@ -59,11 +59,18 @@ func printVersionIfAsked(root *cobra.Command, args []string, out io.Writer) (boo
 	if isShellCompletion(args) || hasHelpFlag(args) {
 		return false, nil
 	}
-	target, _, err := root.Find(args)
-	if err != nil || target.DisableFlagParsing || !hasVersionFlag(target, args) {
+	// rest is the line without the words that named the command, so a
+	// passthrough command's own operand is the first word left.
+	target, rest, err := root.Find(args)
+	if err != nil || target.DisableFlagParsing || !hasVersionFlag(target, rest) {
 		return false, nil
 	}
-	return true, version.PrintVersion(out)
+	// The same shape `astro version -o json` prints.
+	format := cliout.FormatText
+	if cliout.ArgsAskForJSON(args, "o") {
+		format = cliout.FormatJSON
+	}
+	return true, cliout.Renderer{Format: format, Out: out}.Emit(versionOutput{Version: version.Current()}, version.PrintVersion)
 }
 
 func hasVersionFlag(cmd *cobra.Command, args []string) bool {
