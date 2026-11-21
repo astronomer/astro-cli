@@ -849,7 +849,7 @@ func (s *Suite) TestGetDeploymentByID() {
 	s.Run("success", func() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
-		deployment, err := GetDeploymentByID(org, deploymentID, mockV1Client)
+		deployment, err := GetDeploymentByID(stdcontext.Background(), org, deploymentID, mockV1Client)
 		s.NoError(err)
 		s.Equal(deploymentID, deployment.Id)
 		mockV1Client.AssertExpectations(s.T())
@@ -861,7 +861,7 @@ func (s *Suite) TestGetDeploymentByID() {
 		ctx.SetContextKey("organization_short_name", org)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
 
-		deployment, err := GetDeploymentByID("", deploymentID, mockV1Client)
+		deployment, err := GetDeploymentByID(stdcontext.Background(), "", deploymentID, mockV1Client)
 		s.NoError(err)
 		s.Equal(deploymentID, deployment.Id)
 		mockV1Client.AssertExpectations(s.T())
@@ -870,14 +870,14 @@ func (s *Suite) TestGetDeploymentByID() {
 	s.Run("context error", func() {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 
-		_, err := GetDeploymentByID("", deploymentID, mockV1Client)
+		_, err := GetDeploymentByID(stdcontext.Background(), "", deploymentID, mockV1Client)
 		s.ErrorContains(err, "no context set; run astro login and try again")
 	})
 
 	s.Run("error in api response", func() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, errMock).Once()
 
-		_, err := GetDeploymentByID(org, deploymentID, mockV1Client)
+		_, err := GetDeploymentByID(stdcontext.Background(), org, deploymentID, mockV1Client)
 		s.ErrorIs(err, errMock)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -2997,7 +2997,7 @@ func (s *Suite) TestWaitForHibernationOverridePrintsTheNamePlain() {
 	origTick, origGet := TickNum, GetDeploymentByID
 	TickNum = 1
 	s.T().Cleanup(func() { TickNum, GetDeploymentByID = origTick, origGet })
-	GetDeploymentByID = func(_, _ string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+	GetDeploymentByID = func(_ stdcontext.Context, _, _ string, _ astrov1.APIClient) (astrov1.Deployment, error) {
 		return astrov1.Deployment{Id: "test-id-1", Name: "prod\x1b[2J\x1b]0;title\x07\nfake line", Status: astrov1.DeploymentStatusHIBERNATING}, nil
 	}
 	var out bytes.Buffer
@@ -3016,7 +3016,7 @@ func (s *Suite) TestUpdateDeploymentHibernationOverrideWaits() {
 	// answer the wait, one per tick.
 	reports := func(statuses ...astrov1.DeploymentStatus) *int {
 		polls := 0
-		GetDeploymentByID = func(_, _ string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+		GetDeploymentByID = func(_ stdcontext.Context, _, _ string, _ astrov1.APIClient) (astrov1.Deployment, error) {
 			status := statuses[min(polls, len(statuses)-1)]
 			polls++
 			isDevelopmentMode := true

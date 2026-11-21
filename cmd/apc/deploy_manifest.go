@@ -106,6 +106,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 	}
 
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
+		Context:          cmd.Context(),
 		ProjectDir:       config.WorkingPath,
 		Manifest:         m,
 		LinkName:         linkName,
@@ -335,6 +336,7 @@ func (d *apcManifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manif
 		Progress:       d.progress,
 		Catalog:        runtimecatalog.Options(0),
 		ResolveInstall: imageinstall.Fill,
+		Context:        in.Context,
 	})
 	if err != nil {
 		return manifestdeploy.ImageResult{}, err

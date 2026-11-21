@@ -37,7 +37,7 @@ func CreateInvite(email, role string, client astrov1.APIClient) (Invite, error) 
 	var (
 		userInviteInput astrov1.CreateUserInviteRequest
 		err             error
-		ctx             config.Context
+		cfg             config.Context
 	)
 	if email == "" {
 		return Invite{}, ErrInvalidEmail
@@ -46,7 +46,7 @@ func CreateInvite(email, role string, client astrov1.APIClient) (Invite, error) 
 	if err != nil {
 		return Invite{}, err
 	}
-	ctx, err = context.GetCurrentContext()
+	cfg, err = context.GetCurrentContext()
 	if err != nil {
 		return Invite{}, err
 	}
@@ -54,7 +54,7 @@ func CreateInvite(email, role string, client astrov1.APIClient) (Invite, error) 
 		InviteeEmail: email,
 		Role:         astrov1.CreateUserInviteRequestRole(role),
 	}
-	resp, err := client.CreateUserInviteWithResponse(httpContext.Background(), ctx.Organization, userInviteInput)
+	resp, err := client.CreateUserInviteWithResponse(httpContext.Background(), cfg.Organization, userInviteInput)
 	if err != nil {
 		return Invite{}, err
 	}
@@ -62,7 +62,7 @@ func CreateInvite(email, role string, client astrov1.APIClient) (Invite, error) 
 	if err != nil {
 		return Invite{}, err
 	}
-	inv := Invite{Email: email, Role: role, OrganizationID: ctx.Organization}
+	inv := Invite{Email: email, Role: role, OrganizationID: cfg.Organization}
 	if got := resp.JSON200; got != nil {
 		inv.InviteID = got.InviteId
 		if got.OrganizationId != "" {
@@ -98,17 +98,17 @@ func orgRolePtr(user astrov1.User) *string { //nolint:gocritic // User is large;
 
 // UpdateUserRole sets the Organization role of the user with email, or of
 // the one picked when email is "", and returns the user with that role.
-func UpdateUserRole(email, role string, client astrov1.APIClient) (UserInfo, error) {
+func UpdateUserRole(ctx httpContext.Context, email, role string, client astrov1.APIClient) (UserInfo, error) {
 	err := IsRoleValid(role)
 	if err != nil {
 		return UserInfo{}, err
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return UserInfo{}, err
 	}
 	// Get all org users
-	users, err := GetOrgUsers(client)
+	users, err := GetOrgUsers(ctx, client)
 	if err != nil {
 		return UserInfo{}, err
 	}
@@ -119,7 +119,7 @@ func UpdateUserRole(email, role string, client astrov1.APIClient) (UserInfo, err
 	mutateUserInput := astrov1.UpdateUserRolesRequest{
 		OrganizationRole: &role,
 	}
-	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), ctx.Organization, user.Id, mutateUserInput)
+	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), cfg.Organization, user.Id, mutateUserInput)
 	if err != nil {
 		return UserInfo{}, err
 	}
@@ -212,10 +212,8 @@ func SelectUser(users []astrov1.User, roleEntity, scopeID string) (astrov1.User,
 }
 
 // GetOrgUsers returns a list of all organization users.
-//
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func GetOrgUsers(client astrov1.APIClient) ([]astrov1.User, error) {
-	return listUsers(httpContext.Background(), client, nil, nil, 0)
+func GetOrgUsers(ctx httpContext.Context, client astrov1.APIClient) ([]astrov1.User, error) {
+	return listUsers(ctx, client, nil, nil, 0)
 }
 
 // listUsers paginates through GET /users with optional workspaceId/deploymentId
@@ -300,12 +298,12 @@ func upsertDeploymentRole(existing *[]astrov1.DeploymentRole, deploymentID, role
 // AddWorkspaceUser gives the Organization user with email, or the one picked
 // when email is "", role on the Workspace (the current one when workspaceID
 // is ""), and returns the user with that role.
-func AddWorkspaceUser(email, role, workspaceID string, client astrov1.APIClient) (UserInfo, error) {
+func AddWorkspaceUser(ctx httpContext.Context, email, role, workspaceID string, client astrov1.APIClient) (UserInfo, error) {
 	err := IsWorkspaceRoleValid(role)
 	if err != nil {
 		return UserInfo{}, err
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return UserInfo{}, err
 	}
@@ -313,22 +311,22 @@ func AddWorkspaceUser(email, role, workspaceID string, client astrov1.APIClient)
 	if err != nil {
 		return UserInfo{}, err
 	}
-	users, err := GetOrgUsers(client)
+	users, err := GetOrgUsers(ctx, client)
 	if err != nil {
 		return UserInfo{}, err
 	}
-	return setWorkspaceRole(client, ctx.Organization, workspaceID, email, role, users, "organization")
+	return setWorkspaceRole(client, cfg.Organization, workspaceID, email, role, users, "organization")
 }
 
 // UpdateWorkspaceUserRole sets the role on the Workspace of its user with
 // email, or of the one picked when email is "", and returns the user with
 // that role.
-func UpdateWorkspaceUserRole(email, role, workspaceID string, client astrov1.APIClient) (UserInfo, error) {
+func UpdateWorkspaceUserRole(ctx httpContext.Context, email, role, workspaceID string, client astrov1.APIClient) (UserInfo, error) {
 	err := IsWorkspaceRoleValid(role)
 	if err != nil {
 		return UserInfo{}, err
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return UserInfo{}, err
 	}
@@ -336,11 +334,11 @@ func UpdateWorkspaceUserRole(email, role, workspaceID string, client astrov1.API
 	if err != nil {
 		return UserInfo{}, err
 	}
-	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
+	users, err := GetWorkspaceUsers(ctx, client, workspaceID, userPaginationLimit)
 	if err != nil {
 		return UserInfo{}, err
 	}
-	return setWorkspaceRole(client, ctx.Organization, workspaceID, email, role, users, "workspace")
+	return setWorkspaceRole(client, cfg.Organization, workspaceID, email, role, users, "workspace")
 }
 
 // setWorkspaceRole finds the user among users, by email or through the
@@ -400,22 +398,20 @@ func IsOrganizationRoleValid(role string) error {
 }
 
 // GetWorkspaceUsers returns users with a role in the given workspace.
-//
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func GetWorkspaceUsers(client astrov1.APIClient, workspaceID string, _ int) ([]astrov1.User, error) {
+func GetWorkspaceUsers(ctx httpContext.Context, client astrov1.APIClient, workspaceID string, _ int) ([]astrov1.User, error) {
 	workspaceID, err := astrosession.RequireWorkspace(workspaceID)
 	if err != nil {
 		return nil, err
 	}
 	wsID := workspaceID
-	return listUsers(httpContext.Background(), client, &wsID, nil, 0)
+	return listUsers(ctx, client, &wsID, nil, 0)
 }
 
 // RemoveWorkspaceUser removes the role on the Workspace of its user with
 // email, or of the one picked when email is "", and returns which user it
 // removed from which Workspace.
-func RemoveWorkspaceUser(email, workspaceID string, client astrov1.APIClient) (WorkspaceRemoval, error) {
-	ctx, err := context.GetCurrentContext()
+func RemoveWorkspaceUser(ctx httpContext.Context, email, workspaceID string, client astrov1.APIClient) (WorkspaceRemoval, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return WorkspaceRemoval{}, err
 	}
@@ -423,7 +419,7 @@ func RemoveWorkspaceUser(email, workspaceID string, client astrov1.APIClient) (W
 	if err != nil {
 		return WorkspaceRemoval{}, err
 	}
-	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
+	users, err := GetWorkspaceUsers(ctx, client, workspaceID, userPaginationLimit)
 	if err != nil {
 		return WorkspaceRemoval{}, err
 	}
@@ -440,7 +436,7 @@ func RemoveWorkspaceUser(email, workspaceID string, client astrov1.APIClient) (W
 		WorkspaceRoles:   upsertWorkspaceRole(current.WorkspaceRoles, workspaceID, ""),
 		DeploymentRoles:  current.DeploymentRoles,
 	}
-	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), ctx.Organization, found.Id, req)
+	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), cfg.Organization, found.Id, req)
 	if err != nil {
 		return WorkspaceRemoval{}, err
 	}
@@ -470,12 +466,12 @@ func findUser(email string, users []astrov1.User, roleEntity, scopeID string) (a
 }
 
 func GetUser(client astrov1.APIClient, userID string) (user astrov1.User, err error) {
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return user, err
 	}
 
-	resp, err := client.GetUserWithResponse(httpContext.Background(), ctx.Organization, userID)
+	resp, err := client.GetUserWithResponse(httpContext.Background(), cfg.Organization, userID)
 	if err != nil {
 		return user, err
 	}
@@ -489,46 +485,46 @@ func GetUser(client astrov1.APIClient, userID string) (user astrov1.User, err er
 // AddDeploymentUser gives the Organization user with email, or the one
 // picked when email is "", role on the Deployment with deploymentID, and
 // returns the user with that role.
-func AddDeploymentUser(email, role, deploymentID string, client astrov1.APIClient) (UserInfo, error) {
-	ctx, err := context.GetCurrentContext()
+func AddDeploymentUser(ctx httpContext.Context, email, role, deploymentID string, client astrov1.APIClient) (UserInfo, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return UserInfo{}, err
 	}
-	users, err := GetOrgUsers(client)
+	users, err := GetOrgUsers(ctx, client)
 	if err != nil {
 		return UserInfo{}, err
 	}
-	return setDeploymentRole(client, ctx.Organization, deploymentID, email, role, users, "organization")
+	return setDeploymentRole(client, cfg.Organization, deploymentID, email, role, users, "organization")
 }
 
 // UpdateDeploymentUserRole sets the role on the Deployment of its user with
 // email, or of the one picked when email is "", and returns the user with
 // that role.
-func UpdateDeploymentUserRole(email, role, deploymentID string, client astrov1.APIClient) (UserInfo, error) {
-	ctx, err := context.GetCurrentContext()
+func UpdateDeploymentUserRole(ctx httpContext.Context, email, role, deploymentID string, client astrov1.APIClient) (UserInfo, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return UserInfo{}, err
 	}
-	users, err := GetDeploymentUsers(client, deploymentID, userPaginationLimit)
+	users, err := GetDeploymentUsers(ctx, client, deploymentID, userPaginationLimit)
 	if err != nil {
 		return UserInfo{}, err
 	}
-	return setDeploymentRole(client, ctx.Organization, deploymentID, email, role, users, roleEntityDeployment)
+	return setDeploymentRole(client, cfg.Organization, deploymentID, email, role, users, roleEntityDeployment)
 }
 
 // RemoveDeploymentUser removes the role on the Deployment of its user with
 // email, or of the one picked when email is "", and returns which user it
 // removed from which Deployment.
-func RemoveDeploymentUser(email, deploymentID string, client astrov1.APIClient) (DeploymentRemoval, error) {
-	ctx, err := context.GetCurrentContext()
+func RemoveDeploymentUser(ctx httpContext.Context, email, deploymentID string, client astrov1.APIClient) (DeploymentRemoval, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return DeploymentRemoval{}, err
 	}
-	users, err := GetDeploymentUsers(client, deploymentID, userPaginationLimit)
+	users, err := GetDeploymentUsers(ctx, client, deploymentID, userPaginationLimit)
 	if err != nil {
 		return DeploymentRemoval{}, err
 	}
-	found, err := putDeploymentRole(client, ctx.Organization, deploymentID, email, "", users, roleEntityDeployment)
+	found, err := putDeploymentRole(client, cfg.Organization, deploymentID, email, "", users, roleEntityDeployment)
 	if err != nil {
 		return DeploymentRemoval{}, err
 	}
@@ -583,11 +579,9 @@ func putDeploymentRole(client astrov1.APIClient, orgID, deploymentID, email, rol
 }
 
 // GetDeploymentUsers returns users with a role in the given deployment.
-//
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func GetDeploymentUsers(client astrov1.APIClient, deploymentID string, _ int) ([]astrov1.User, error) {
+func GetDeploymentUsers(ctx httpContext.Context, client astrov1.APIClient, deploymentID string, _ int) ([]astrov1.User, error) {
 	dID := deploymentID
-	return listUsers(httpContext.Background(), client, nil, &dID, 0)
+	return listUsers(ctx, client, nil, &dID, 0)
 }
 
 // ListDeploymentUsersData returns deployment user list data for structured output

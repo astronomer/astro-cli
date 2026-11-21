@@ -3,6 +3,7 @@ package deployment
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"slices"
@@ -142,7 +143,7 @@ func VariableModify(
 			return nil, err
 		}
 	}
-	updated, err := GetDeploymentByID("", currentDeployment.Id, astroV1Client)
+	updated, err := GetDeploymentByID(context.Background(), "", currentDeployment.Id, astroV1Client)
 	if err != nil {
 		return nil, err
 	}

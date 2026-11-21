@@ -412,7 +412,7 @@ func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
   astro workspace token update --name "My Org Token" --role WORKSPACE_MEMBER
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateWorkspaceToken(args, out)
+			return updateWorkspaceToken(cmd.Context(), args, out)
 		},
 	}, cliout.Optional("TOKEN_ID"))
 	cmd.Flags().StringVar(&name, "name", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -438,7 +438,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
   astro workspace token rotate --name "My Token" --yes
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return rotateWorkspaceToken(args, out, cmd.ErrOrStderr())
+			return rotateWorkspaceToken(cmd.Context(), args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("TOKEN_ID"))
 	addInertCleanOutputFlag(cmd)
@@ -580,7 +580,7 @@ func newRemoveOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
   # Find the Organization token by its name
   astro workspace token organization-token remove --name "My Org Token"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return removeOrganizationTokenWorkspaceRole(args, out)
+			return removeOrganizationTokenWorkspaceRole(cmd.Context(), args, out)
 		},
 	}, cliout.Optional("ORG_TOKEN_ID"))
 	addTokenNameFlag(cmd, "The name of the Organization API token you want to remove from a Workspace. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
@@ -645,7 +645,7 @@ func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 			return err
 		}
 	}
-	r, err := team.RemoveWorkspaceTeam(id, ws, astroV1Client)
+	r, err := team.RemoveWorkspaceTeam(cmd.Context(), id, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -690,7 +690,7 @@ func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 			return err
 		}
 	}
-	t, err := team.AddWorkspaceTeam(id, addWorkspaceRole, ws, astroV1Client)
+	t, err := team.AddWorkspaceTeam(cmd.Context(), id, addWorkspaceRole, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -745,7 +745,7 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 			return err
 		}
 	}
-	t, err := team.UpdateWorkspaceTeamRole(id, updateWorkspaceRole, ws, astroV1Client)
+	t, err := team.UpdateWorkspaceTeamRole(cmd.Context(), id, updateWorkspaceRole, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -831,7 +831,7 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 			return err
 		}
 	}
-	u, err := user.AddWorkspaceUser(email, addWorkspaceRole, ws, astroV1Client)
+	u, err := user.AddWorkspaceUser(cmd.Context(), email, addWorkspaceRole, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -869,7 +869,7 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 			return err
 		}
 	}
-	u, err := user.UpdateWorkspaceUserRole(email, updateWorkspaceRole, ws, astroV1Client)
+	u, err := user.UpdateWorkspaceUserRole(cmd.Context(), email, updateWorkspaceRole, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -894,7 +894,7 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 			return err
 		}
 	}
-	r, err := user.RemoveWorkspaceUser(email, ws, astroV1Client)
+	r, err := user.RemoveWorkspaceUser(cmd.Context(), email, ws, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -1031,8 +1031,12 @@ func deploymentWorkspace(cmd *cobra.Command, id, msg string) (ws string, client 
 	// Only an id identifies a Deployment with no Workspace; a name that is not
 	// one goes on to say there is no Workspace to look it up in.
 	if !t.Found() && util.IsCUID(id) {
-		d, err := deployment.GetDeploymentByID("", id, astroV1Client)
+		d, err := deployment.GetDeploymentByID(cmd.Context(), "", id, astroV1Client)
 		if err != nil {
+			// An interrupt is not a failed lookup.
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return "", astroV1Client, err
+			}
 			return "", astroV1Client, fmt.Errorf("no Workspace is selected, so Deployment %s was fetched by its id, which failed (pass --workspace to look it up in a Workspace instead): %w", id, err)
 		}
 		return d.WorkspaceId, deployment.WithFetched(astroV1Client, d), nil

@@ -99,8 +99,8 @@ func GetOrganization(orgID string, astroV1Client astrov1.APIClient) (*astrov1.Or
 
 // findOrganizationByName pages through Organizations and returns as soon as it
 // finds a name match, so a match on an early page avoids fetching later pages.
-func findOrganizationByName(name string, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
-	return pagination.Find(http_context.Background(), "organizations", organizationPager(http_context.Background(), astroV1Client, 0), func(o astrov1.Organization) bool {
+func findOrganizationByName(ctx http_context.Context, name string, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
+	return pagination.Find(ctx, "organizations", organizationPager(ctx, astroV1Client, 0), func(o astrov1.Organization) bool {
 		return o.Name == name
 	})
 }
@@ -210,7 +210,7 @@ const NameOrIDAnswer = "the Organization name or ID as an argument"
 // Switch makes the Organization named, by name or id, current, or, with no
 // name, the one picked from a menu drawn on out. The login check that follows
 // a switch picks the Organization's Workspace, and may ask for one on out too.
-func Switch(orgNameOrID string, astroV1Client astrov1.APIClient, out io.Writer) (*Switched, error) {
+func Switch(ctx http_context.Context, orgNameOrID string, astroV1Client astrov1.APIClient, out io.Writer) (*Switched, error) {
 	// get current context
 	c, err := context.GetCurrentContext()
 	if err != nil {
@@ -233,7 +233,7 @@ func Switch(orgNameOrID string, astroV1Client astrov1.APIClient, out io.Writer) 
 		}
 	default:
 		// Input is a name — paginate through all orgs to find it
-		targetOrg, err = findOrganizationByName(orgNameOrID, astroV1Client)
+		targetOrg, err = findOrganizationByName(ctx, orgNameOrID, astroV1Client)
 		if err != nil {
 			return nil, err
 		}

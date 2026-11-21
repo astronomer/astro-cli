@@ -322,7 +322,7 @@ func (s *Suite) TestUpdateWorkspaceTeamRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
-		got, err := UpdateWorkspaceTeamRole(team1.Id, "WORKSPACE_MEMBER", "", mockClient)
+		got, err := UpdateWorkspaceTeamRole(context.Background(), team1.Id, "WORKSPACE_MEMBER", "", mockClient)
 		s.NoError(err)
 		s.Equal(team1.Id, got.ID)
 		s.Equal("WORKSPACE_MEMBER", got.WorkspaceRole)
@@ -331,14 +331,14 @@ func (s *Suite) TestUpdateWorkspaceTeamRole() {
 	s.Run("error path no workspace teams found", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
-		_, err := UpdateWorkspaceTeamRole("", "WORKSPACE_MEMBER", "", mockClient)
+		_, err := UpdateWorkspaceTeamRole(context.Background(), "", "WORKSPACE_MEMBER", "", mockClient)
 		s.EqualError(err, "no teams found in your Workspace")
 	})
 
 	s.Run("error path when GetTeamWithResponse return network error", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := UpdateWorkspaceTeamRole(team1.Id, "WORKSPACE_MEMBER", "", mockClient)
+		_, err := UpdateWorkspaceTeamRole(context.Background(), team1.Id, "WORKSPACE_MEMBER", "", mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -346,7 +346,7 @@ func (s *Suite) TestUpdateWorkspaceTeamRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := UpdateWorkspaceTeamRole(team1.Id, "WORKSPACE_MEMBER", "", mockClient)
+		_, err := UpdateWorkspaceTeamRole(context.Background(), team1.Id, "WORKSPACE_MEMBER", "", mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -354,19 +354,19 @@ func (s *Suite) TestUpdateWorkspaceTeamRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseError, nil).Once()
-		_, err := UpdateWorkspaceTeamRole(team1.Id, "WORKSPACE_MEMBER", "", mockClient)
+		_, err := UpdateWorkspaceTeamRole(context.Background(), team1.Id, "WORKSPACE_MEMBER", "", mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 	s.Run("error path when isValidRole returns an error", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := UpdateWorkspaceTeamRole(team1.Id, "test-role", "", mockClient)
+		_, err := UpdateWorkspaceTeamRole(context.Background(), team1.Id, "test-role", "", mockClient)
 		s.ErrorIs(err, user.ErrInvalidWorkspaceRole)
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := UpdateWorkspaceTeamRole(team1.Id, "WORKSPACE_MEMBER", "", mockClient)
+		_, err := UpdateWorkspaceTeamRole(context.Background(), team1.Id, "WORKSPACE_MEMBER", "", mockClient)
 		s.Error(err)
 	})
 
@@ -389,7 +389,7 @@ func (s *Suite) TestUpdateWorkspaceTeamRole() {
 
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
 
-		got, err := UpdateWorkspaceTeamRole("", "WORKSPACE_MEMBER", "", mockClient)
+		got, err := UpdateWorkspaceTeamRole(context.Background(), "", "WORKSPACE_MEMBER", "", mockClient)
 		s.NoError(err)
 		s.Equal(team1.Id, got.ID)
 		s.Equal("WORKSPACE_MEMBER", got.WorkspaceRole)
@@ -402,7 +402,7 @@ func (s *Suite) TestAddWorkspaceTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
-		got, err := AddWorkspaceTeam(team1.Id, "WORKSPACE_MEMBER", "", mockClient)
+		got, err := AddWorkspaceTeam(context.Background(), team1.Id, "WORKSPACE_MEMBER", "", mockClient)
 		s.NoError(err)
 		s.Equal(team1.Id, got.ID)
 		s.Equal("WORKSPACE_MEMBER", got.WorkspaceRole)
@@ -411,7 +411,7 @@ func (s *Suite) TestAddWorkspaceTeam() {
 	s.Run("error path when GetTeamWithResponse return network error", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := AddWorkspaceTeam(team1.Id, "WORKSPACE_MEMBER", "", mockClient)
+		_, err := AddWorkspaceTeam(context.Background(), team1.Id, "WORKSPACE_MEMBER", "", mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -419,7 +419,7 @@ func (s *Suite) TestAddWorkspaceTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := AddWorkspaceTeam(team1.Id, "WORKSPACE_MEMBER", "", mockClient)
+		_, err := AddWorkspaceTeam(context.Background(), team1.Id, "WORKSPACE_MEMBER", "", mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -427,19 +427,19 @@ func (s *Suite) TestAddWorkspaceTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseError, nil).Once()
-		_, err := AddWorkspaceTeam(team1.Id, "WORKSPACE_MEMBER", "", mockClient)
+		_, err := AddWorkspaceTeam(context.Background(), team1.Id, "WORKSPACE_MEMBER", "", mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 	s.Run("error path when isValidRole returns an error", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := AddWorkspaceTeam(team1.Id, "test-role", "", mockClient)
+		_, err := AddWorkspaceTeam(context.Background(), team1.Id, "test-role", "", mockClient)
 		s.ErrorIs(err, user.ErrInvalidWorkspaceRole)
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := AddWorkspaceTeam(team1.Id, "WORKSPACE_MEMBER", "", mockClient)
+		_, err := AddWorkspaceTeam(context.Background(), team1.Id, "WORKSPACE_MEMBER", "", mockClient)
 		s.Error(err)
 	})
 
@@ -462,7 +462,7 @@ func (s *Suite) TestAddWorkspaceTeam() {
 
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
 
-		got, err := AddWorkspaceTeam("", "WORKSPACE_MEMBER", "", mockClient)
+		got, err := AddWorkspaceTeam(context.Background(), "", "WORKSPACE_MEMBER", "", mockClient)
 		s.NoError(err)
 		s.Equal(team1.Id, got.ID)
 		s.Equal("WORKSPACE_MEMBER", got.WorkspaceRole)
@@ -475,7 +475,7 @@ func (s *Suite) TestRemoveWorkspaceTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
-		got, err := RemoveWorkspaceTeam(team1.Id, "", mockClient)
+		got, err := RemoveWorkspaceTeam(context.Background(), team1.Id, "", mockClient)
 		s.NoError(err)
 		s.Equal(WorkspaceRemoval{ID: team1.Id, Name: team1.Name, WorkspaceID: workspaceID, Action: Removed}, got)
 	})
@@ -483,7 +483,7 @@ func (s *Suite) TestRemoveWorkspaceTeam() {
 	s.Run("error path when GetTeamWithResponse return network error", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := RemoveWorkspaceTeam(team1.Id, "", mockClient)
+		_, err := RemoveWorkspaceTeam(context.Background(), team1.Id, "", mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -491,7 +491,7 @@ func (s *Suite) TestRemoveWorkspaceTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := RemoveWorkspaceTeam(team1.Id, "", mockClient)
+		_, err := RemoveWorkspaceTeam(context.Background(), team1.Id, "", mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -499,14 +499,14 @@ func (s *Suite) TestRemoveWorkspaceTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseError, nil).Once()
-		_, err := RemoveWorkspaceTeam(team1.Id, "", mockClient)
+		_, err := RemoveWorkspaceTeam(context.Background(), team1.Id, "", mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := RemoveWorkspaceTeam(team1.Id, "", mockClient)
+		_, err := RemoveWorkspaceTeam(context.Background(), team1.Id, "", mockClient)
 		s.Error(err)
 	})
 
@@ -529,7 +529,7 @@ func (s *Suite) TestRemoveWorkspaceTeam() {
 
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
 
-		got, err := RemoveWorkspaceTeam("", "", mockClient)
+		got, err := RemoveWorkspaceTeam(context.Background(), "", "", mockClient)
 		s.NoError(err)
 		s.Equal(WorkspaceRemoval{ID: team1.Id, Name: team1.Name, WorkspaceID: workspaceID, Action: Removed}, got)
 	})
@@ -542,7 +542,7 @@ func (s *Suite) TestDelete() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "y")()
-		got, err := Delete(team1.Id, false, mockClient)
+		got, err := Delete(context.Background(), team1.Id, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(team1.Id, got.ID)
@@ -555,7 +555,7 @@ func (s *Suite) TestDelete() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "y")()
-		got, err := Delete(team2.Id, false, mockClient)
+		got, err := Delete(context.Background(), team2.Id, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(team2.Id, got.ID)
@@ -567,7 +567,7 @@ func (s *Suite) TestDelete() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseOK, nil).Once()
-		got, err := Delete(team2.Id, true, mockClient)
+		got, err := Delete(context.Background(), team2.Id, true, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(team2.Id, got.ID)
@@ -579,7 +579,7 @@ func (s *Suite) TestDelete() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "n")()
-		got, err := Delete(team1.Id, false, mockClient)
+		got, err := Delete(context.Background(), team1.Id, false, mockClient)
 		s.ErrorIs(err, input.ErrAborted)
 		s.Nil(got, "declined, so nothing to report")
 	})
@@ -589,7 +589,7 @@ func (s *Suite) TestDelete() {
 		defer restore()
 		// Refused before the team is read: the mock expects nothing.
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		got, err := Delete(team1.Id, false, mockClient)
+		got, err := Delete(context.Background(), team1.Id, false, mockClient)
 		s.True(input.IsRequired(err), "got %v", err)
 		s.ErrorContains(err, "--yes")
 		s.Nil(got)
@@ -599,7 +599,7 @@ func (s *Suite) TestDelete() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "n")()
-		got, err := Delete(team2.Id, false, mockClient)
+		got, err := Delete(context.Background(), team2.Id, false, mockClient)
 		s.ErrorIs(err, input.ErrAborted)
 		s.Nil(got, "declined, so nothing to report")
 	})
@@ -611,7 +611,7 @@ func (s *Suite) TestDelete() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseOK, nil).Once()
 		// --yes, so the picker is what refuses, not the confirmation.
-		got, err := Delete("", true, mockClient)
+		got, err := Delete(context.Background(), "", true, mockClient)
 		s.True(input.IsRequired(err), "got %v", err)
 		s.Nil(got)
 	})
@@ -619,14 +619,14 @@ func (s *Suite) TestDelete() {
 	s.Run("error path no org teams found", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
-		_, err := Delete("", false, mockClient)
+		_, err := Delete(context.Background(), "", false, mockClient)
 		s.EqualError(err, "no teams found in your Organization")
 	})
 
 	s.Run("error path when GetTeamWithResponse return network error", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := Delete(team1.Id, false, mockClient)
+		_, err := Delete(context.Background(), team1.Id, false, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -634,7 +634,7 @@ func (s *Suite) TestDelete() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := Delete(team1.Id, true, mockClient)
+		_, err := Delete(context.Background(), team1.Id, true, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -642,14 +642,14 @@ func (s *Suite) TestDelete() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseError, nil).Once()
-		_, err := Delete(team1.Id, true, mockClient)
+		_, err := Delete(context.Background(), team1.Id, true, mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := Delete(team1.Id, false, mockClient)
+		_, err := Delete(context.Background(), team1.Id, false, mockClient)
 		s.Error(err)
 	})
 	s.Run("DeleteTeam no id passed", func() {
@@ -672,7 +672,7 @@ func (s *Suite) TestDelete() {
 		mockClient.On("DeleteTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteOrganizationTeamResponseOK, nil).Once()
 
 		// The picker is under test, not the question after it.
-		got, err := Delete("", true, mockClient)
+		got, err := Delete(context.Background(), "", true, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(team1.Id, got.ID)
@@ -687,7 +687,7 @@ func (s *Suite) TestUpdate() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
-		got, err := UpdateTeam(team1.Id, "name", "description", "", false, mockClient)
+		got, err := UpdateTeam(context.Background(), team1.Id, "name", "description", "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal("name", got.Team.Name, "the team as the update left it")
@@ -700,7 +700,7 @@ func (s *Suite) TestUpdate() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
-		got, err := UpdateTeam(team1.Id, "name", "description", role, false, mockClient)
+		got, err := UpdateTeam(context.Background(), team1.Id, "name", "description", role, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal("name", got.Team.Name)
@@ -711,7 +711,7 @@ func (s *Suite) TestUpdate() {
 	s.Run("unhappy path Update - with invalid role is refused before any request", func() {
 		role := "WORKSPACE_VIEWER"
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := UpdateTeam(team1.Id, "name", "description", role, false, mockClient)
+		_, err := UpdateTeam(context.Background(), team1.Id, "name", "description", role, false, mockClient)
 		s.EqualError(err, "invalid role; use ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN, or ORGANIZATION_OWNER")
 		s.Empty(mockClient.Calls, "neither the lookup nor the rename is sent")
 	})
@@ -722,7 +722,7 @@ func (s *Suite) TestUpdate() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Maybe()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseRoleError, nil).Once()
-		_, err := UpdateTeam(team1.Id, "name", "description", role, false, mockClient)
+		_, err := UpdateTeam(context.Background(), team1.Id, "name", "description", role, false, mockClient)
 		s.EqualError(err, "failed to update team role")
 		mockClient.AssertNotCalled(s.T(), "UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
@@ -733,7 +733,7 @@ func (s *Suite) TestUpdate() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Maybe()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
-		got, err := UpdateTeam(team1.Id, "", "", role, false, mockClient)
+		got, err := UpdateTeam(context.Background(), team1.Id, "", "", role, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.True(got.RoleChanged)
@@ -748,7 +748,7 @@ func (s *Suite) TestUpdate() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseError, nil).Once()
-		got, err := UpdateTeam(team1.Id, "name", "", role, false, mockClient)
+		got, err := UpdateTeam(context.Background(), team1.Id, "name", "", role, false, mockClient)
 		s.EqualError(err, "updated the team's role to ORGANIZATION_OWNER, but updating its name and description failed: failed to update team")
 		s.Require().NotNil(got, "the team as it now is")
 		s.True(got.RoleChanged)
@@ -762,7 +762,7 @@ func (s *Suite) TestUpdate() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Maybe()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := UpdateTeam(team1.Id, "name", "description", role, false, mockClient)
+		_, err := UpdateTeam(context.Background(), team1.Id, "name", "description", role, false, mockClient)
 		s.EqualError(err, "network error")
 		mockClient.AssertNotCalled(s.T(), "UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
@@ -772,7 +772,7 @@ func (s *Suite) TestUpdate() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "y")()
-		got, err := UpdateTeam(team2.Id, "name", "description", "", false, mockClient)
+		got, err := UpdateTeam(context.Background(), team2.Id, "name", "description", "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal("name", got.Team.Name)
@@ -783,7 +783,7 @@ func (s *Suite) TestUpdate() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
-		got, err := UpdateTeam(team2.Id, "name", "description", "", true, mockClient)
+		got, err := UpdateTeam(context.Background(), team2.Id, "name", "description", "", true, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal("name", got.Team.Name)
@@ -794,7 +794,7 @@ func (s *Suite) TestUpdate() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "n")()
-		got, err := UpdateTeam(team2.Id, "name", "description", "", false, mockClient)
+		got, err := UpdateTeam(context.Background(), team2.Id, "name", "description", "", false, mockClient)
 		s.ErrorIs(err, input.ErrAborted)
 		s.Nil(got, "declined, so nothing to report")
 	})
@@ -803,7 +803,7 @@ func (s *Suite) TestUpdate() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
-		got, err := UpdateTeam(team1.Id, "name", "", "", false, mockClient)
+		got, err := UpdateTeam(context.Background(), team1.Id, "name", "", "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal("name", got.Team.Name)
@@ -814,7 +814,7 @@ func (s *Suite) TestUpdate() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
-		got, err := UpdateTeam(team1.Id, "", "description", "", false, mockClient)
+		got, err := UpdateTeam(context.Background(), team1.Id, "", "description", "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(team1.Name, got.Team.Name, "no --name keeps the name")
@@ -824,14 +824,14 @@ func (s *Suite) TestUpdate() {
 	s.Run("error path no org teams found", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
-		_, err := UpdateTeam("", "name", "description", "", false, mockClient)
+		_, err := UpdateTeam(context.Background(), "", "name", "description", "", false, mockClient)
 		s.EqualError(err, "no teams found in your Organization")
 	})
 
 	s.Run("error path when GetTeamWithResponse return network error", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := UpdateTeam(team1.Id, "name", "description", "", false, mockClient)
+		_, err := UpdateTeam(context.Background(), team1.Id, "name", "description", "", false, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -839,7 +839,7 @@ func (s *Suite) TestUpdate() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := UpdateTeam(team1.Id, "name", "description", "", false, mockClient)
+		_, err := UpdateTeam(context.Background(), team1.Id, "name", "description", "", false, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -847,14 +847,14 @@ func (s *Suite) TestUpdate() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseError, nil).Once()
-		_, err := UpdateTeam(team1.Id, "name", "description", "", false, mockClient)
+		_, err := UpdateTeam(context.Background(), team1.Id, "name", "description", "", false, mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := UpdateTeam(team1.Id, "name", "description", "", false, mockClient)
+		_, err := UpdateTeam(context.Background(), team1.Id, "name", "description", "", false, mockClient)
 		s.Error(err)
 	})
 	s.Run("UpdateTeam no id passed", func() {
@@ -876,7 +876,7 @@ func (s *Suite) TestUpdate() {
 
 		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
 
-		got, err := UpdateTeam("", "name", "description", "", false, mockClient)
+		got, err := UpdateTeam(context.Background(), "", "name", "description", "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal("name", got.Team.Name)
@@ -952,7 +952,7 @@ func (s *Suite) TestAddUser() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Once()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
-		got, err := AddUser(team1.Id, user1.Id, false, mockClient)
+		got, err := AddUser(context.Background(), team1.Id, user1.Id, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(user1.Id, got.UserID)
@@ -966,7 +966,7 @@ func (s *Suite) TestAddUser() {
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Once()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "y")()
-		got, err := AddUser(team2.Id, user1.Id, false, mockClient)
+		got, err := AddUser(context.Background(), team2.Id, user1.Id, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(user1.Id, got.UserID)
@@ -979,7 +979,7 @@ func (s *Suite) TestAddUser() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Once()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
-		got, err := AddUser(team2.Id, user1.Id, true, mockClient)
+		got, err := AddUser(context.Background(), team2.Id, user1.Id, true, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(user1.Id, got.UserID)
@@ -991,7 +991,7 @@ func (s *Suite) TestAddUser() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "n")()
-		got, err := AddUser(team2.Id, user1.Id, false, mockClient)
+		got, err := AddUser(context.Background(), team2.Id, user1.Id, false, mockClient)
 		s.ErrorIs(err, input.ErrAborted)
 		s.Nil(got, "declined, so nothing to report")
 	})
@@ -999,7 +999,7 @@ func (s *Suite) TestAddUser() {
 	s.Run("error path no org teams found", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
-		_, err := AddUser("", user1.Id, false, mockClient)
+		_, err := AddUser(context.Background(), "", user1.Id, false, mockClient)
 		s.EqualError(err, "no teams found in your Organization")
 	})
 
@@ -1008,7 +1008,7 @@ func (s *Suite) TestAddUser() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Once()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := AddUser(team1.Id, user1.Id, false, mockClient)
+		_, err := AddUser(context.Background(), team1.Id, user1.Id, false, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -1017,14 +1017,14 @@ func (s *Suite) TestAddUser() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Once()
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseError, nil).Once()
-		_, err := AddUser(team1.Id, user1.Id, false, mockClient)
+		_, err := AddUser(context.Background(), team1.Id, user1.Id, false, mockClient)
 		s.EqualError(err, "failed to update team membership")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := AddUser(team1.Id, user1.Id, false, mockClient)
+		_, err := AddUser(context.Background(), team1.Id, user1.Id, false, mockClient)
 		s.Error(err)
 	})
 
@@ -1052,7 +1052,7 @@ func (s *Suite) TestAddUser() {
 
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 
-		got, err := AddUser("", user1.Id, false, mockClient)
+		got, err := AddUser(context.Background(), "", user1.Id, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(user1.Id, got.UserID)
@@ -1072,7 +1072,7 @@ func (s *Suite) TestAddUser() {
 		}, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "1")()
 
-		got, err := AddUser("", user1.Id, false, mockClient)
+		got, err := AddUser(context.Background(), "", user1.Id, false, mockClient)
 		s.ErrorIs(err, ErrInvalidTeamKey)
 		s.Nil(got)
 		mockClient.AssertNotCalled(s.T(), "AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -1101,7 +1101,7 @@ func (s *Suite) TestAddUser() {
 
 		mockClient.On("AddTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&AddTeamMemberResponseOK, nil).Once()
 
-		got, err := AddUser(team1.Id, "", false, mockClient)
+		got, err := AddUser(context.Background(), team1.Id, "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(user1.Id, got.UserID)
@@ -1130,7 +1130,7 @@ func (s *Suite) TestAddUser() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		_, err = AddUser(team1.Id, "", false, mockClient)
+		_, err = AddUser(context.Background(), team1.Id, "", false, mockClient)
 		s.EqualError(err, "no users found in your Organization")
 	})
 }
@@ -1142,7 +1142,7 @@ func (s *Suite) TestRemoveUser() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("ListTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamMembersResponseOK, nil).Once()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
-		got, err := RemoveUser(team1.Id, user1.Id, false, mockClient)
+		got, err := RemoveUser(context.Background(), team1.Id, user1.Id, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(user1.Id, got.UserID)
@@ -1154,7 +1154,7 @@ func (s *Suite) TestRemoveUser() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("ListTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamMembersResponseOK, nil).Once()
-		_, err := RemoveUser(team1.Id, "user-nobody", false, mockClient)
+		_, err := RemoveUser(context.Background(), team1.Id, "user-nobody", false, mockClient)
 		s.EqualError(err, "user user-nobody is not a member of team "+team1.Name)
 		mockClient.AssertNotCalled(s.T(), "RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
@@ -1165,7 +1165,7 @@ func (s *Suite) TestRemoveUser() {
 		mockClient.On("ListTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamMembersResponseOK, nil).Once()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "y")()
-		got, err := RemoveUser(team2.Id, user1.Id, false, mockClient)
+		got, err := RemoveUser(context.Background(), team2.Id, user1.Id, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(user1.Id, got.UserID)
@@ -1178,7 +1178,7 @@ func (s *Suite) TestRemoveUser() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		mockClient.On("ListTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamMembersResponseOK, nil).Once()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
-		got, err := RemoveUser(team2.Id, user1.Id, true, mockClient)
+		got, err := RemoveUser(context.Background(), team2.Id, user1.Id, true, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(user1.Id, got.UserID)
@@ -1190,7 +1190,7 @@ func (s *Suite) TestRemoveUser() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetIDPManagedTeamWithResponseOK, nil).Once()
 		defer testUtil.MockUserInput(s.T(), "n")()
-		got, err := RemoveUser(team2.Id, user1.Id, false, mockClient)
+		got, err := RemoveUser(context.Background(), team2.Id, user1.Id, false, mockClient)
 		s.ErrorIs(err, input.ErrAborted)
 		s.Nil(got, "declined, so nothing to report")
 	})
@@ -1198,7 +1198,7 @@ func (s *Suite) TestRemoveUser() {
 	s.Run("error path no org teams found", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
-		_, err := RemoveUser("", user1.Id, false, mockClient)
+		_, err := RemoveUser(context.Background(), "", user1.Id, false, mockClient)
 		s.EqualError(err, "no teams found in your Organization")
 	})
 
@@ -1206,7 +1206,7 @@ func (s *Suite) TestRemoveUser() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseEmptyMembership, nil).Once()
 		mockClient.On("ListTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamMembersResponseEmpty, nil).Once()
-		_, err := RemoveUser(team1.Id, user1.Id, false, mockClient)
+		_, err := RemoveUser(context.Background(), team1.Id, user1.Id, false, mockClient)
 		s.EqualError(err, "no team members found in team")
 	})
 
@@ -1215,7 +1215,7 @@ func (s *Suite) TestRemoveUser() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("ListTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamMembersResponseOK, nil).Once()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := RemoveUser(team1.Id, user1.Id, false, mockClient)
+		_, err := RemoveUser(context.Background(), team1.Id, user1.Id, false, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -1224,14 +1224,14 @@ func (s *Suite) TestRemoveUser() {
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("ListTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamMembersResponseOK, nil).Once()
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseError, nil).Once()
-		_, err := RemoveUser(team1.Id, user1.Id, false, mockClient)
+		_, err := RemoveUser(context.Background(), team1.Id, user1.Id, false, mockClient)
 		s.EqualError(err, "failed to update team membership")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := RemoveUser(team1.Id, user1.Id, false, mockClient)
+		_, err := RemoveUser(context.Background(), team1.Id, user1.Id, false, mockClient)
 		s.Error(err)
 	})
 
@@ -1259,7 +1259,7 @@ func (s *Suite) TestRemoveUser() {
 
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
 
-		got, err := RemoveUser("", user1.Id, false, mockClient)
+		got, err := RemoveUser(context.Background(), "", user1.Id, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(user1.Id, got.UserID)
@@ -1290,7 +1290,7 @@ func (s *Suite) TestRemoveUser() {
 
 		mockClient.On("RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&RemoveTeamMemberResponseOK, nil).Once()
 
-		got, err := RemoveUser(team1.Id, "", false, mockClient)
+		got, err := RemoveUser(context.Background(), team1.Id, "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
 		s.Equal(user1.Id, got.UserID)
@@ -1418,7 +1418,7 @@ func (s *Suite) TestGetWorkspaceTeams() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsWorkspaceResponseOK, nil).Once()
-		_, err := GetWorkspaceTeams(mockClient, "", 10)
+		_, err := GetWorkspaceTeams(context.Background(), mockClient, "", 10)
 		s.NoError(err)
 	})
 
@@ -1427,7 +1427,7 @@ func (s *Suite) TestGetWorkspaceTeams() {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := GetWorkspaceTeams(mockClient, "", 10)
+		_, err := GetWorkspaceTeams(context.Background(), mockClient, "", 10)
 		s.Error(err)
 		s.Equal(expectedOutMessage, out.String())
 	})
@@ -1439,7 +1439,7 @@ func (s *Suite) TestUpdateDeploymentTeamRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
-		got, err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		got, err := UpdateDeploymentTeamRole(context.Background(), team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.NoError(err)
 		s.Equal("team1-id", got.ID)
 		s.Equal("DEPLOYMENT_ADMIN", got.DeploymentRole)
@@ -1448,14 +1448,14 @@ func (s *Suite) TestUpdateDeploymentTeamRole() {
 	s.Run("error path no deployment teams found", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Once()
-		_, err := UpdateDeploymentTeamRole("", "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		_, err := UpdateDeploymentTeamRole(context.Background(), "", "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "no teams found in your Deployment")
 	})
 
 	s.Run("error path when GetTeamWithResponse return network error", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		_, err := UpdateDeploymentTeamRole(context.Background(), team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -1463,7 +1463,7 @@ func (s *Suite) TestUpdateDeploymentTeamRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		_, err := UpdateDeploymentTeamRole(context.Background(), team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -1471,14 +1471,14 @@ func (s *Suite) TestUpdateDeploymentTeamRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseError, nil).Once()
-		_, err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		_, err := UpdateDeploymentTeamRole(context.Background(), team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		_, err := UpdateDeploymentTeamRole(context.Background(), team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.Error(err)
 	})
 
@@ -1500,7 +1500,7 @@ func (s *Suite) TestUpdateDeploymentTeamRole() {
 
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
 
-		got, err := UpdateDeploymentTeamRole("", "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		got, err := UpdateDeploymentTeamRole(context.Background(), "", "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.NoError(err)
 		s.Equal("team1-id", got.ID)
 		s.Equal("DEPLOYMENT_ADMIN", got.DeploymentRole)
@@ -1513,7 +1513,7 @@ func (s *Suite) TestAddDeploymentTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
-		got, err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		got, err := AddDeploymentTeam(context.Background(), team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.NoError(err)
 		s.Equal("team1-id", got.ID)
 		s.Equal("DEPLOYMENT_ADMIN", got.DeploymentRole)
@@ -1522,7 +1522,7 @@ func (s *Suite) TestAddDeploymentTeam() {
 	s.Run("error path when GetTeamWithResponse return network error", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		_, err := AddDeploymentTeam(context.Background(), team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -1530,7 +1530,7 @@ func (s *Suite) TestAddDeploymentTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		_, err := AddDeploymentTeam(context.Background(), team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -1538,14 +1538,14 @@ func (s *Suite) TestAddDeploymentTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseError, nil).Once()
-		_, err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		_, err := AddDeploymentTeam(context.Background(), team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		_, err := AddDeploymentTeam(context.Background(), team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.Error(err)
 	})
 
@@ -1567,7 +1567,7 @@ func (s *Suite) TestAddDeploymentTeam() {
 
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
 
-		got, err := AddDeploymentTeam("", "DEPLOYMENT_ADMIN", deploymentID, mockClient)
+		got, err := AddDeploymentTeam(context.Background(), "", "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.NoError(err)
 		s.Equal("team1-id", got.ID)
 		s.Equal("DEPLOYMENT_ADMIN", got.DeploymentRole)
@@ -1580,7 +1580,7 @@ func (s *Suite) TestRemoveDeploymentTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
-		got, err := RemoveDeploymentTeam(team1.Id, deploymentID, mockClient)
+		got, err := RemoveDeploymentTeam(context.Background(), team1.Id, deploymentID, mockClient)
 		s.NoError(err)
 		s.Equal(DeploymentRemoval{ID: team1.Id, Name: team1.Name, DeploymentID: deploymentID, Action: Removed}, got)
 	})
@@ -1588,7 +1588,7 @@ func (s *Suite) TestRemoveDeploymentTeam() {
 	s.Run("error path when GetTeamWithResponse return network error", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := RemoveDeploymentTeam(team1.Id, deploymentID, mockClient)
+		_, err := RemoveDeploymentTeam(context.Background(), team1.Id, deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -1596,7 +1596,7 @@ func (s *Suite) TestRemoveDeploymentTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := RemoveDeploymentTeam(team1.Id, deploymentID, mockClient)
+		_, err := RemoveDeploymentTeam(context.Background(), team1.Id, deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -1604,14 +1604,14 @@ func (s *Suite) TestRemoveDeploymentTeam() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseError, nil).Once()
-		_, err := RemoveDeploymentTeam(team1.Id, deploymentID, mockClient)
+		_, err := RemoveDeploymentTeam(context.Background(), team1.Id, deploymentID, mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := RemoveDeploymentTeam(team1.Id, deploymentID, mockClient)
+		_, err := RemoveDeploymentTeam(context.Background(), team1.Id, deploymentID, mockClient)
 		s.Error(err)
 	})
 
@@ -1633,7 +1633,7 @@ func (s *Suite) TestRemoveDeploymentTeam() {
 
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
 
-		got, err := RemoveDeploymentTeam("", deploymentID, mockClient)
+		got, err := RemoveDeploymentTeam(context.Background(), "", deploymentID, mockClient)
 		s.NoError(err)
 		s.Equal(DeploymentRemoval{ID: team1.Id, Name: team1.Name, DeploymentID: deploymentID, Action: Removed}, got)
 	})
@@ -1644,7 +1644,7 @@ func (s *Suite) TestGetDeploymentTeams() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsWorkspaceResponseOK, nil).Once()
-		_, err := GetDeploymentTeams(mockClient, deploymentID, 10)
+		_, err := GetDeploymentTeams(context.Background(), mockClient, deploymentID, 10)
 		s.NoError(err)
 	})
 
@@ -1653,7 +1653,7 @@ func (s *Suite) TestGetDeploymentTeams() {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := GetDeploymentTeams(mockClient, deploymentID, 10)
+		_, err := GetDeploymentTeams(context.Background(), mockClient, deploymentID, 10)
 		s.Error(err)
 		s.Equal(expectedOutMessage, out.String())
 	})

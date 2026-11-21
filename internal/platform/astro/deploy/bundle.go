@@ -85,7 +85,7 @@ func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
 
 	// the deployment, to check the deploy is valid: as the caller read it, or
 	// read now when the caller knew only its id
-	currentDeployment, err := deploymentFor(c.Organization, input.DeploymentID, input.Deployment, input.AstroV1Client)
+	currentDeployment, err := deploymentFor(ctx, c.Organization, input.DeploymentID, input.Deployment, input.AstroV1Client)
 	if err != nil {
 		return BundleDeploy{}, err
 	}
@@ -162,11 +162,11 @@ func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
 
 // deploymentFor is read when the caller has it, and the Deployment with id
 // read from Astro otherwise.
-func deploymentFor(orgID, id string, read *astrov1.Deployment, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+func deploymentFor(ctx context.Context, orgID, id string, read *astrov1.Deployment, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
 	if read != nil {
 		return *read, nil
 	}
-	return deployment.GetDeploymentByID(orgID, id, astroV1Client)
+	return deployment.GetDeploymentByID(ctx, orgID, id, astroV1Client)
 }
 
 // WaitForBundle waits up to waitTime for the Deployment to become healthy

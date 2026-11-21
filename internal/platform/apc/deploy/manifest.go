@@ -50,6 +50,11 @@ var (
 // apc links): a pyproject.toml project's image, built from its manifest, or
 // a prebuilt one (ImageName).
 type ManifestImage struct {
+	// Context ends the deploy when the run is interrupted; nil is
+	// context.Background(). The build, the push and the DAG upload stop at
+	// once. The Houston calls take no context, so an interrupt is honored
+	// between them, at best effort: a call already sent runs to its end.
+	Context context.Context
 	// ResolveInstall resolves what a generated image installs from the
 	// project's lock, into req.Install (imageinstall.Fill), with its warnings
 	// through warn. nil installs the manifest's dependencies as written.
@@ -159,7 +164,13 @@ type manifestTarget struct {
 // otherwise deploys, with a warning. The image is built at linux/amd64, since
 // Houston drops an arm image.
 func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (ManifestImageResult, error) {
-	ctx := context.Background()
+	ctx := in.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return ManifestImageResult{}, err
+	}
 	progress := in.Progress
 	if progress == nil {
 		progress = os.Stderr
@@ -170,16 +181,19 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 	}
 
 	if in.InRegistry {
-		return deployRegistryImage(client, in, progress, warn)
+		return deployRegistryImage(ctx, client, in, progress, warn)
 	}
 
 	// The Deployment is read first: a deploy it refuses outright needs no
 	// container engine to be told so.
-	t, err := lookUpManifestTarget(client, in.WorkspaceID, in.DeploymentID)
+	t, err := lookUpManifestTarget(ctx, client, in.WorkspaceID, in.DeploymentID)
 	if err != nil {
 		return ManifestImageResult{}, hintLinkOutsideAProject(in, err)
 	}
 	if err := refuseImageOnly(in, t); err != nil {
+		return ManifestImageResult{}, err
+	}
+	if err := ctx.Err(); err != nil {
 		return ManifestImageResult{}, err
 	}
 
@@ -189,6 +203,9 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 		return ManifestImageResult{}, err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return ManifestImageResult{}, err
+	}
 	listed := listedRuntimes(client, t.info.ClusterID, t.workspace, in.DeploymentID)
 	// A prebuilt image is not built, so it has no request: its runtime is
 	// its label's, read below.
@@ -234,7 +251,7 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 		URL:             getAirflowUILink(in.DeploymentID, t.info.Urls),
 		Airflow3Upgrade: upgrade,
 	}
-	err = dagsAfterImage(client, in, t, &res, progress, warn)
+	err = dagsAfterImage(ctx, client, in, t, &res, progress, warn)
 	return res, err
 }
 
@@ -296,7 +313,7 @@ func checkRuntime(in *ManifestImage, planned *deploybuild.Plan, current, runtime
 // the project's, as deliverDags delivers them, for a deploy of the image and
 // the DAGs; none for --image; and none for an image deployed alone, which
 // says what that leaves the Deployment.
-func dagsAfterImage(client houston.ClientInterface, in *ManifestImage, t *manifestTarget, res *ManifestImageResult, progress io.Writer, warn func(string)) error {
+func dagsAfterImage(ctx context.Context, client houston.ClientInterface, in *ManifestImage, t *manifestTarget, res *ManifestImageResult, progress io.Writer, warn func(string)) error {
 	switch {
 	case in.ImageAlone:
 		warnImageAlone(in, t, warn)
@@ -304,7 +321,7 @@ func dagsAfterImage(client houston.ClientInterface, in *ManifestImage, t *manife
 	case !in.IncludeDags:
 		return nil
 	}
-	return deliverDags(client, in, t, res, progress, warn)
+	return deliverDags(ctx, client, in, t, res, progress, warn)
 }
 
 // The warnings a prebuilt image's deploy gives about the Deployment's DAGs.
@@ -355,7 +372,7 @@ func warnPrebuiltDagsInImage(in *ManifestImage, warn func(string)) {
 
 // deliverDags gets the project's DAGs to a Deployment whose image was just
 // pushed, the way it takes them, and records in res what it did.
-func deliverDags(client houston.ClientInterface, in *ManifestImage, t *manifestTarget, res *ManifestImageResult, progress io.Writer, warn func(string)) error {
+func deliverDags(ctx context.Context, client houston.ClientInterface, in *ManifestImage, t *manifestTarget, res *ManifestImageResult, progress io.Writer, warn func(string)) error {
 	switch t.dags {
 	case DagsFromImage:
 		res.DagsInImage = true
@@ -371,7 +388,7 @@ func deliverDags(client houston.ClientInterface, in *ManifestImage, t *manifestT
 		return nil
 	case DagsFromUpload, DagsFromUnknown:
 	}
-	_, err := DagsOnlyDeploy(client, in.WorkspaceID, in.DeploymentID, in.Build.ProjectDir, nil, true, in.Description, Options{Progress: progress, WarnEmptyDags: warn})
+	_, err := DagsOnlyDeploy(client, in.WorkspaceID, in.DeploymentID, in.Build.ProjectDir, nil, true, in.Description, Options{Context: ctx, Progress: progress, WarnEmptyDags: warn})
 	switch {
 	case err == nil:
 		res.DagsUploaded = true
@@ -432,9 +449,12 @@ func dagsSource(info *houston.Deployment, appConfig *houston.AppConfig) string {
 // lookUpManifestTarget reads the Deployment a manifest deploy ships to: that
 // it is in the workspace, its release name and next registry tag, its
 // cluster config, and where it takes its DAGs from.
-func lookUpManifestTarget(client houston.ClientInterface, wsID, deploymentID string) (*manifestTarget, error) {
-	t, err := lookUpDeployment(client, wsID, deploymentID)
+func lookUpManifestTarget(ctx context.Context, client houston.ClientInterface, wsID, deploymentID string) (*manifestTarget, error) {
+	t, err := lookUpDeployment(ctx, client, wsID, deploymentID)
 	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	t.appConfig, err = houston.Call(client.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: t.info.ClusterID, WorkspaceUUID: t.workspace, DeploymentUUID: deploymentID})
@@ -479,7 +499,7 @@ func hintLinkOutsideAProject(in *ManifestImage, err error) error {
 // lookUpDeployment reads what every image deploy needs of its Deployment:
 // that it is in the workspace, its release name and next registry tag, and
 // the Deployment itself, with the workspace Houston places it in.
-func lookUpDeployment(client houston.ClientInterface, wsID, deploymentID string) (*manifestTarget, error) {
+func lookUpDeployment(ctx context.Context, client houston.ClientInterface, wsID, deploymentID string) (*manifestTarget, error) {
 	if deploymentID == "" {
 		return nil, errInvalidDeploymentID
 	}
@@ -488,6 +508,9 @@ func lookUpDeployment(client houston.ClientInterface, wsID, deploymentID string)
 		return nil, &notInWorkspaceError{deployment: deploymentID, workspace: wsID}
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	t := &manifestTarget{}
@@ -669,6 +692,11 @@ func pushManifestImage(ctx context.Context, client houston.ClientInterface, c *c
 		push.Username, push.Secret = registryUser, c.Token
 	}
 	push.Image = remoteImage
+	// An interrupt after the build, and before anything is pushed, ends the
+	// deploy here: no registry sees the image.
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	fmt.Fprintln(progress, "Pushing image to configured registry")
 	sha, err := engine.Push(ctx, push)
 	if err != nil {

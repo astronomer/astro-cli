@@ -41,6 +41,8 @@ type fakeEngineCmd struct {
 	// pushAuth is the credential file the last push ran with, as it read
 	// while the push ran: "" when the push carried none.
 	pushAuth string
+	// onBuild runs as each build does; nil is nothing.
+	onBuild func()
 }
 
 func (f *fakeEngineCmd) Run(_ context.Context, env []string, stdio localrt.Stdio, name string, args ...string) error {
@@ -62,6 +64,9 @@ func (f *fakeEngineCmd) Run(_ context.Context, env []string, stdio localrt.Stdio
 		repo := image[:strings.LastIndex(image, ":")]
 		fmt.Fprintf(stdio.Out, "[%q]\n", repo+"@sha256:abc")
 	case len(args) > 0 && args[0] == "build":
+		if f.onBuild != nil {
+			f.onBuild()
+		}
 		if i := slices.Index(args, "--file"); i >= 0 {
 			data, err := os.ReadFile(args[i+1])
 			if err != nil {
@@ -615,4 +620,54 @@ func TestDeployManifestImageAsksTheDeploymentsOwnWorkspace(t *testing.T) {
 	_, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings))
 	require.NoError(t, err)
 	client.AssertExpectations(t)
+}
+
+// An interrupt that arrives before the deploy starts, or while the image
+// builds, ends the deploy with the cancellation: nothing is pushed, and
+// Houston is never told of an image.
+func TestDeployManifestImageStopsOnInterrupt(t *testing.T) {
+	t.Run("before it starts", func(t *testing.T) {
+		cmd := withManifestEngine(t, "3.1-5")
+		client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.0-9", listed: houstonLists, version: "1.0.0"}).client(t)
+		var warnings []string
+		in := manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		in.Context = ctx
+		_, err := DeployManifestImage(client, in)
+		require.ErrorIs(t, err, context.Canceled)
+		assert.Empty(t, cmd.calls, "no engine call is made")
+		client.AssertNotCalled(t, "GetDeployment", mock.Anything)
+	})
+
+	t.Run("while the image builds", func(t *testing.T) {
+		cmd := withManifestEngine(t, "3.1-5")
+		client := (&apcTarget{dagType: houston.DagOnlyDeploymentType, current: "3.0-9", listed: houstonLists, version: "1.0.0"}).client(t)
+		var warnings []string
+		in := manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings)
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		in.Context = ctx
+		cmd.onBuild = cancel
+		_, err := DeployManifestImage(client, in)
+		require.ErrorIs(t, err, context.Canceled)
+		assert.True(t, cmd.called(" build "), "the build had started: %v", cmd.calls)
+		assert.False(t, cmd.called(" push "), "nothing is pushed: %v", cmd.calls)
+		client.AssertNotCalled(t, "UpdateDeploymentImage", mock.Anything)
+	})
+}
+
+// A registry image is only pointed at, with no build or push; an interrupt
+// still ends the deploy before Houston is told to switch.
+func TestDeployRegistryImageStopsOnInterrupt(t *testing.T) {
+	client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.0-9", listed: houstonLists, version: "1.0.0"}).client(t)
+	var warnings []string
+	in := manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings)
+	in.InRegistry, in.ImageName, in.RuntimeVersion = true, "registry.example.com/my-release/airflow:abc", "3.1-5"
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	in.Context = ctx
+	_, err := DeployManifestImage(client, in)
+	require.ErrorIs(t, err, context.Canceled)
+	client.AssertNotCalled(t, "UpdateDeploymentImage", mock.Anything)
 }

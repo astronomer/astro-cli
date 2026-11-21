@@ -428,7 +428,7 @@ func resolveDeploymentAirflowURL(reqCtx context.Context, opts *AirflowOptions, r
 // so listing it there would answer from nowhere the caller meant.
 func lookupDeployment(reqCtx context.Context, override, orgID, ref string, project *manifest.Astro, ctx *config.Context, client astrov1.APIClient) (astrov1.Deployment, error) {
 	if util.IsCUID(ref) {
-		dep, err := deployment.GetDeploymentByID(orgID, ref, client)
+		dep, err := deployment.GetDeploymentByID(reqCtx, orgID, ref, client)
 		if err != nil {
 			return astrov1.Deployment{}, fmt.Errorf("fetching deployment: %w", err)
 		}
