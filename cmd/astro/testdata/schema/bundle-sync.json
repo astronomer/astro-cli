@@ -1,0 +1,18 @@
+{
+  "source": "x",
+  "destination": "x",
+  "direction": "x",
+  "dry_run": true,
+  "changed": true,
+  "version": "x",
+  "added": [
+    "x"
+  ],
+  "updated": [
+    "x"
+  ],
+  "deleted": [
+    "x"
+  ],
+  "skipped": -1
+}
