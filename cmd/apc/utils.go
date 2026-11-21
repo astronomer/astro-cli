@@ -43,9 +43,9 @@ func VersionMatchCmds(rootCmd *cobra.Command, parent []string) {
 // adds it, not that the word does not exist. The error names the command, what
 // it needs, and what is connected.
 func removeCmd(c *cobra.Command, cmdName string, r houston.VersionRestrictions) {
-	c.Hidden = true                                                                            // out of the help; the error below is the only way to meet it
-	cliout.AnyWords(c, "a missing positional must not error before the version refusal below") // clear any Args validator so it does not
-	c.Run = nil                                                                                // cobra prefers RunE over Run when both are set; this command has only the one below
+	c.Hidden = true // out of the help; the error below is the only way to meet it
+	cliout.AnyWords(c, "whatever it was given, the version refusal below is what it says")
+	c.Run = nil // cobra prefers RunE over Run when both are set; this command has only the one below
 	c.RunE = func(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%s needs Astro Private Cloud %s; this platform reports %s", cmdName, versionNeeded(r), houstonVersion)
 	}

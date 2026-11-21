@@ -184,6 +184,11 @@ func argOrFlag(flag, what string) cobra.PositionalArgs {
 			return nil
 		}
 		f := cmd.Flags().Lookup(flag)
+		if f == nil {
+			// A check made before the flags are known (a probe of the
+			// declaration, a lint of an example) has none to agree with.
+			return nil
+		}
 		if err := utils.RefuseDisagreeingArg(args, what, flag, f.Value.String()); err != nil {
 			return err
 		}

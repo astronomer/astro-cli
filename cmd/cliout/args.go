@@ -2,6 +2,7 @@ package cliout
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -21,7 +22,7 @@ import (
 
 // Arg is one positional argument of a command.
 type Arg struct {
-	// Name is the placeholder help shows: DEPLOYMENT_ID, KEY=VALUE.
+	// Name is the placeholder help shows, UPPER_SNAKE: DEPLOYMENT_ID.
 	Name string
 	// Optional is whether the command runs without it. An optional argument
 	// follows every required one.
@@ -152,7 +153,7 @@ func DeclaredArgs(cmd *cobra.Command) []Arg {
 
 // encodeArgs writes a declaration as the annotation holds it: one word per
 // argument, NAME:flags, where flags are o (optional), r (repeated) and d
-// (after a dash). A name holds no space or colon (checkDeclaration).
+// (after a dash). A name is UPPER_SNAKE (checkDeclaration), so holds no space or colon.
 func encodeArgs(args []Arg) string {
 	words := make([]string, 0, len(args))
 	for _, a := range args {
@@ -209,13 +210,17 @@ func useLine(args []Arg) string {
 	return strings.Join(words, " ")
 }
 
+// argName is how an argument is named: UPPER_SNAKE, so every page spells one
+// the same way (and no space, bracket, colon or dots to confuse the Use line).
+var argName = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$`)
+
 // checkDeclaration refuses a declaration no line could satisfy.
 func checkDeclaration(args []Arg) error {
 	seenOptional, seenRepeated := false, false
 	for i, a := range args {
 		switch {
-		case a.Name == "" || strings.ContainsAny(a.Name, " <>[]:") || strings.HasSuffix(a.Name, "..."):
-			return fmt.Errorf("argument %d has the name %q, which is not a bare placeholder", i+1, a.Name)
+		case !argName.MatchString(a.Name):
+			return fmt.Errorf("argument %d has the name %q, which is not UPPER_SNAKE", i+1, a.Name)
 		case a.AfterDash && i != len(args)-1:
 			return fmt.Errorf("%s follows --, so it is the last argument", a.Name)
 		case !a.AfterDash && seenRepeated:

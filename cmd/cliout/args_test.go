@@ -30,7 +30,7 @@ func TestArgsWritesTheUseLineFromTheDeclaration(t *testing.T) {
 }
 
 func TestArgsDeclarationReadsBack(t *testing.T) {
-	declared := []Arg{Required("A"), Optional("B"), {Name: "C", Optional: true, Repeated: true}, {Name: "KEY=VALUE", Repeated: true, AfterDash: true}}
+	declared := []Arg{Required("A"), Optional("B"), {Name: "C", Optional: true, Repeated: true}, {Name: "KEY_VALUE", Repeated: true, AfterDash: true}}
 	cmd := leafWith("x", declared...)
 	assert.Equal(t, declared, DeclaredArgs(cmd))
 	assert.Empty(t, DeclaredArgs(&cobra.Command{Use: "y"}))
@@ -43,6 +43,8 @@ func TestArgsRefusesWhatNoLineCouldSatisfy(t *testing.T) {
 		"anything after a repeated one":      func() { leafWith("x", Arg{Name: "A", Repeated: true}, Optional("B")) },
 		"a dash that is not last":            func() { leafWith("x", Arg{Name: "A", AfterDash: true}, Optional("B")) },
 		"a name that is not a placeholder":   func() { leafWith("x", Required("<A>")) },
+		"lower case":                         func() { leafWith("x", Required("name")) },
+		"dots":                               func() { leafWith("x", Required("NAME...")) },
 		"an empty name":                      func() { leafWith("x", Required("")) },
 		"a colon, which the annotation uses": func() { leafWith("x", Required("A:B")) },
 	} {
@@ -172,7 +174,7 @@ func TestDashMeansNothingToACommandWithoutADashArgument(t *testing.T) {
 
 func TestCheckArgsRunsAfterTheCount(t *testing.T) {
 	var seen [][]string
-	cmd := CheckArgs(leafWith("create", Arg{Name: "KEY=VALUE", Optional: true, Repeated: true}), func(_ *cobra.Command, args []string) error {
+	cmd := CheckArgs(leafWith("create", Arg{Name: "KEY_VALUE", Optional: true, Repeated: true}), func(_ *cobra.Command, args []string) error {
 		seen = append(seen, args)
 		if len(args) > 0 && args[0] == "bad" {
 			return Usage(errors.New("bad shape"))

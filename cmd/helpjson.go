@@ -54,6 +54,8 @@ type helpArg struct {
 	Name     string `json:"name"`
 	Required bool   `json:"required"`
 	Repeated bool   `json:"repeated"`
+	// AfterDash is whether it is what follows a "--" on the line.
+	AfterDash bool `json:"after_dash"`
 }
 
 // helpFlag is a visible flag. Group is the section the help page lists it
@@ -108,7 +110,7 @@ func describeCommand(c *cobra.Command) helpDocument {
 func helpArguments(c *cobra.Command) []helpArg {
 	args := []helpArg{}
 	for _, a := range cliout.DeclaredArgs(c) {
-		args = append(args, helpArg{Name: a.Name, Required: !a.Optional, Repeated: a.Repeated})
+		args = append(args, helpArg{Name: a.Name, Required: !a.Optional, Repeated: a.Repeated, AfterDash: a.AfterDash})
 	}
 	return args
 }

@@ -193,6 +193,7 @@ func newQueryCmd(d Deps, t target, cmd *cobra.Command, builders ...func(*query) 
 	// A bare family prints help and succeeds; a typo fails. Cobra returns help
 	// before it validates args on a non-runnable parent, so both cases are
 	// driven here — the same shape `astro local` uses.
+	cliout.AnyWords(cmd, "its RunE refuses a word that names no leaf, so plain cobra gets the same refusal as Execute")
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return cliout.GroupHelp(cmd, nil)

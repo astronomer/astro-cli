@@ -163,7 +163,7 @@ func TestHelpJSONArgumentsEqualTheDeclaration(t *testing.T) {
 		walkCmd(tree.root, func(c *cobra.Command) {
 			want := []helpArg{}
 			for _, a := range cliout.DeclaredArgs(c) {
-				want = append(want, helpArg{Name: a.Name, Required: !a.Optional, Repeated: a.Repeated})
+				want = append(want, helpArg{Name: a.Name, Required: !a.Optional, Repeated: a.Repeated, AfterDash: a.AfterDash})
 			}
 			assert.Equal(t, want, describeCommand(c).Arguments, "[%s] %s", tree.name, c.CommandPath())
 		})
@@ -188,7 +188,7 @@ func TestDeclaredCountsAreWhatTheCheckEnforces(t *testing.T) {
 				limit = minimum + 3
 			}
 			for n := 0; n <= limit; n++ {
-				err := probe(c, strings.Fields(strings.Repeat("a ", n)))
+				err := probe(t, c, strings.Fields(strings.Repeat("a ", n)))
 				var argsErr *cliout.ArgsError
 				inside := n >= minimum && (maximum < 0 || n <= maximum)
 				assert.Equal(t, !inside, errors.As(err, &argsErr), "[%s] %s with %d words: %v", tree.name, c.CommandPath(), n, err)
@@ -217,13 +217,13 @@ func wordsBeforeDash(declared []cliout.Arg) (minimum, maximum int) {
 	return minimum, maximum
 }
 
-// probe runs c's check on words, as a run would before any pre-run. A check
-// that reads flags a run has parsed is allowed to give up (the panic is its
-// own, not the count's).
-func probe(c *cobra.Command, words []string) (err error) {
+// probe runs c's check on words, as a run would before any pre-run. A panic
+// is the check's own and fails the test, naming the command.
+func probe(t *testing.T, c *cobra.Command, words []string) error {
+	t.Helper()
 	defer func() {
-		if recover() != nil {
-			err = nil
+		if r := recover(); r != nil {
+			t.Fatalf("%s: the check panicked on %d words: %v", c.CommandPath(), len(words), r)
 		}
 	}()
 	return c.Args(c, words)
