@@ -48,6 +48,7 @@ func newBundleRootCmd(out io.Writer) *cobra.Command {
 		newBundleDeleteCmd(out),
 		newBundleRollbackCmd(out),
 		newBundleVersionsRootCmd(out),
+		newBundleFilesRootCmd(out),
 	)
 	// astro bundle is new in v2, so it has no 1.x spellings to keep: --deployment
 	// and --workspace only.

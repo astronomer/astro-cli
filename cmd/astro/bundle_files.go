@@ -1,0 +1,261 @@
+package astro
+
+import (
+	"fmt"
+	"io"
+	"strings"
+
+	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+)
+
+var (
+	filesRecursive       bool
+	filesYes             bool
+	filesFilter          deployment.BundleFilterOptions
+	filesIfExists        string
+	filesVersion         string
+	filesExpectedVersion string
+)
+
+// filesBundleRootNote is how a bundle path is written in the help of cp.
+const filesBundleRootNote = "BUNDLE:PATH, where BUNDLE is the bundle's name or ID and a trailing slash names a directory"
+
+func newBundleFilesRootCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "files",
+		Aliases: []string{"file"},
+		Hidden:  true,
+		Short:   "Manage the files in file bundles",
+		Long:    "List, read, copy, move and remove the files in file bundles. A path in a bundle is written BUNDLE:PATH, where BUNDLE is the bundle's name or ID, and a trailing slash names a directory. DEPLOYMENT_ID:BUNDLE:PATH names a bundle on another Deployment than --deployment, by the Deployment's id. Every write creates a new version of the bundle.\n\nA bundle holds at most 10,000 files of at most 1 MiB each and 100 MiB in all, at paths of at most 192 bytes made of ASCII letters, digits, '/', '.', '_' and '-'. A copy from local files checks them first, and names every file that breaks these limits before sending anything.",
+	}
+	cmd.AddCommand(
+		newBundleFilesListCmd(out),
+		newBundleFilesCatCmd(out),
+		newBundleFilesCopyCmd(out),
+		newBundleFilesMoveCmd(out),
+		newBundleFilesRemoveCmd(out),
+	)
+	// The group is hidden, and so is each command in it: the help rules read a
+	// hidden command's own page as a visible one's, and its examples name
+	// the hidden group.
+	for _, sub := range cmd.Commands() {
+		sub.Hidden = true
+	}
+	return cmd
+}
+
+// bundleFilesScope is the Workspace the command's bundle paths are looked up
+// in, and the client to look them up with. A command whose every bundle path
+// names its own Deployment (DEPLOYMENT_ID:BUNDLE:PATH) looks no Workspace up;
+// the others resolve the one --deployment, --workspace, the project and the
+// run's token decide, as every Deployment command does.
+func bundleFilesScope(cmd *cobra.Command, paths ...string) (ws string, client astrov1.APIClient, err error) {
+	if !deployment.NeedsDeploymentScope(paths...) {
+		return "", astroV1Client, nil
+	}
+	return deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
+}
+
+// bundleFilesOutput is where a command that publishes a result writes: the
+// result through the group's Renderer, raw file content to stdout, and notes
+// to stderr.
+func bundleFilesOutput(cmd *cobra.Command, out io.Writer) deployment.BundleOutput {
+	return deployment.BundleOutput{
+		Result:  cliout.Renderer{Format: bundleOutput, Out: out, Err: cmd.ErrOrStderr()},
+		Content: out,
+		Notes:   cmd.ErrOrStderr(),
+	}
+}
+
+// refuseJSONContent refuses --output json on a command whose stdout is the
+// raw bytes of a file: stdout cannot hold both them and a document.
+func refuseJSONContent(what string) error {
+	if bundleOutput == cliout.FormatJSON {
+		return cliout.Usage(fmt.Errorf("%s writes a file's own bytes to stdout, so it has no --output json: leave --output off", what))
+	}
+	return nil
+}
+
+func newBundleFilesListCmd(out io.Writer) *cobra.Command {
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "ls",
+		Aliases: []string{"list"},
+		Short:   "List the files in a file bundle",
+		Long:    "List the files and directories in one directory of a file bundle, or every file under it with --recursive. Omit PATH to list the bundle root.",
+		Example: `  # List the bundle root
+  astro bundle files ls my-files --deployment <id>
+
+  # List every file under a directory
+  astro bundle files ls my-files:dags --recursive --deployment <id>
+
+  # List an earlier version of the bundle
+  astro bundle files ls my-files --version <version> --deployment <id> -o json`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target, err := deployment.ParseBundlePath(args[0])
+			if err != nil {
+				return err
+			}
+			ws, client, err := bundleFilesScope(cmd, args[0])
+			if err != nil {
+				return err
+			}
+			return deployment.ListBundleFilesWithFormat(cmd.Context(), target, filesRecursive, filesVersion, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out, Err: cmd.ErrOrStderr()}, client, astroV1Alpha1Client)
+		},
+	}, cliout.Required("BUNDLE_PATH"))
+	cmd.Flags().BoolVar(&filesRecursive, "recursive", false, "List every file under PATH instead of one directory level")
+	cmd.Flags().StringVar(&filesVersion, "version", "", "List an earlier version of the bundle instead of its current one")
+	return cmd
+}
+
+func newBundleFilesCatCmd(out io.Writer) *cobra.Command {
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "cat",
+		Short: "Print a file from a file bundle",
+		Long:  "Print the content of one file in a file bundle to stdout.",
+		Example: `  astro bundle files cat my-files:dags/etl.py --deployment <id>
+  astro bundle files cat my-files:dags/etl.py --version <version> --deployment <id> > etl_old.py`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := refuseJSONContent("astro bundle files cat"); err != nil {
+				return err
+			}
+			target, err := deployment.ParseBundlePath(args[0])
+			if err != nil {
+				return err
+			}
+			ws, client, err := bundleFilesScope(cmd, args[0])
+			if err != nil {
+				return err
+			}
+			return deployment.CatBundleFile(cmd.Context(), target, filesVersion, ws, deploymentID, bundleFilesOutput(cmd, out), client, astroV1Alpha1Client, astroV1Alpha1StreamClient)
+		},
+	}, cliout.Required("BUNDLE_PATH"))
+	cmd.Flags().StringVar(&filesVersion, "version", "", "Read the file from an earlier version of the bundle instead of its current one")
+	return cmd
+}
+
+func newBundleFilesCopyCmd(out io.Writer) *cobra.Command {
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "cp",
+		Aliases: []string{"copy"},
+		Short:   "Copy files to, from, within or between file bundles",
+		Long: `Copy a file, or a directory's contents with --recursive, between a local path and a file bundle, or between two bundle paths, in one bundle or in two, on one Deployment or two. A bundle path is written ` + filesBundleRootNote + `, and the whole bundle BUNDLE:, prefixed with DEPLOYMENT_ID: for a bundle on another Deployment; any other path is local, and '-' is stdin or stdout. A file copied to a DST ending in '/' keeps its name inside that directory. With --recursive, the contents of SRC go into DST. A download replaces a local file only once it has arrived whole.
+
+A copy of a directory, or of a file within one bundle, fails if something is already at DST, unless --if-exists says to replace it or merge into it. Any other file copied into a bundle always replaces the file at DST.
+
+A local directory copied into a bundle skips version control, OS, Python, Node and editor files and .env files, and whatever .gitignore files ignore. --include, --exclude, --no-default-excludes and --no-gitignore change that. A symbolic link under it that is not skipped fails the copy.
+
+A copy into a bundle creates one new bundle version and prints it.`,
+		Example: `  # Copy one file into the bundle, and back out
+  astro bundle files cp ./etl.py my-files:dags/ --deployment <id>
+  astro bundle files cp my-files:dags/etl.py ./ --deployment <id>
+
+  # Copy from stdin
+  generate_dag | astro bundle files cp - my-files:dags/generated.py --deployment <id>
+
+  # Copy a directory's contents into the bundle, replacing what was there
+  astro bundle files cp ./dags my-files:dags --recursive --if-exists replace --deployment <id>
+
+  # Copy a directory within the bundle
+  astro bundle files cp my-files:dags my-files:dags_backup --recursive --deployment <id>
+
+  # Copy a directory to a bundle on another Deployment
+  astro bundle files cp my-files:dags <other-id>:my-files:dags --recursive --deployment <id>
+
+  # Copy the whole bundle, as it was at an earlier version, to a local directory
+  astro bundle files cp my-files: ./my-files --recursive --version <version> --deployment <id>
+
+  # Copy only if nobody has written to the bundle since the version you last read
+  astro bundle files cp ./etl.py my-files:dags/etl.py --expected-version <version> \
+    --deployment <id>`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if args[1] == "-" {
+				if err := refuseJSONContent("astro bundle files cp with - as DST"); err != nil {
+					return err
+				}
+			}
+			ws, client, err := bundleFilesScope(cmd, args[0], args[1])
+			if err != nil {
+				return err
+			}
+			opts := &deployment.BundleCopyOptions{
+				Recursive:       filesRecursive,
+				IfExists:        filesIfExists,
+				Version:         filesVersion,
+				ExpectedVersion: filesExpectedVersion,
+				Filter:          filesFilter,
+			}
+			return deployment.CopyBundleFiles(cmd.Context(), args[0], args[1], opts, ws, deploymentID, bundleFilesOutput(cmd, out), client, astroV1Alpha1Client, astroV1Alpha1StreamClient)
+		},
+	}, cliout.Required("SRC"), cliout.Required("DST"))
+	cmd.Flags().BoolVar(&filesRecursive, "recursive", false, "Copy a directory's contents")
+	cmd.Flags().StringVar(&filesIfExists, "if-exists", "", "What to do when something is already at DST in the bundle: fail, the default; replace it; or, for a directory, merge into it")
+	cmd.Flags().StringVar(&filesVersion, "version", "", "Copy from an earlier version of the SRC bundle instead of its current one")
+	cmd.Flags().StringVar(&filesExpectedVersion, "expected-version", "", "Copy into the DST bundle only if it is still at this version")
+	addBundleFilesFilterFlags(cmd)
+	return cmd
+}
+
+func addBundleFilesFilterFlags(cmd *cobra.Command) {
+	cmd.Flags().StringArrayVar(&filesFilter.Excludes, "exclude", nil, "Skip local files matching this gitignore pattern. Repeatable")
+	cmd.Flags().StringArrayVar(&filesFilter.Includes, "include", nil, "Keep local files matching this gitignore pattern, even when they would be skipped. Inside a skipped directory, the pattern must name a path through it, such as node_modules/pkg/. Repeatable")
+	cmd.Flags().BoolVar(&filesFilter.NoDefaultExcludes, "no-default-excludes", false, "Keep version control, OS, Python, Node and editor files and .env files")
+	cmd.Flags().BoolVar(&filesFilter.NoGitignore, "no-gitignore", false, "Keep files that .gitignore files ignore")
+}
+
+func newBundleFilesMoveCmd(out io.Writer) *cobra.Command {
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "mv",
+		Aliases: []string{"move"},
+		Short:   "Move a file or a directory within a file bundle",
+		Long:    "Move a file or a directory to another path in the same file bundle, written BUNDLE:PATH, and print the bundle version the move created. SRC keeps its name inside a DST ending in '/'. The move fails if something is already at DST, unless --if-exists says to replace it or merge into it.",
+		Example: `  astro bundle files mv my-files:dags/etl.py my-files:dags/legacy/ --deployment <id>
+  astro bundle files mv my-files:staging my-files:dags --if-exists merge --deployment <id>`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ws, client, err := bundleFilesScope(cmd, args[0], args[1])
+			if err != nil {
+				return err
+			}
+			return deployment.MoveBundlePath(cmd.Context(), args[0], args[1], filesIfExists, filesExpectedVersion, ws, deploymentID, bundleFilesOutput(cmd, out), client, astroV1Alpha1Client)
+		},
+	}, cliout.Required("SRC"), cliout.Required("DST"))
+	cmd.Flags().StringVar(&filesIfExists, "if-exists", "", "What to do when something is already at DST: fail, the default; replace it; or, for a directory, merge into it")
+	cmd.Flags().StringVar(&filesExpectedVersion, "expected-version", "", "Move only if the bundle is still at this version")
+	return cmd
+}
+
+func newBundleFilesRemoveCmd(out io.Writer) *cobra.Command {
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "rm",
+		Aliases: []string{"delete"},
+		Short:   "Remove a file or a directory from a file bundle",
+		Long:    "Remove one file from a file bundle, or a directory and everything under it with --recursive, and print the bundle version the removal created. With --recursive, the bundle root removes every file in the bundle, and the removal asks for confirmation unless --yes. 'astro bundle rollback' undoes a removal.",
+		Example: `  astro bundle files rm my-files:dags/etl.py --deployment <id>
+  astro bundle files rm my-files:dags/etl.py --expected-version <version> --deployment <id>
+
+  # Remove a directory, or every file in the bundle
+  astro bundle files rm my-files:dags/legacy --recursive --deployment <id>
+  astro bundle files rm my-files: --recursive --yes --deployment <id>`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !strings.Contains(args[0], ":") {
+				return cliout.Usage(fmt.Errorf("%s names no path in a bundle: write BUNDLE:PATH, or BUNDLE: for every file in the bundle", args[0]))
+			}
+			target, err := deployment.ParseBundlePath(args[0])
+			if err != nil {
+				return err
+			}
+			ws, client, err := bundleFilesScope(cmd, args[0])
+			if err != nil {
+				return err
+			}
+			return deployment.RemoveBundlePath(cmd.Context(), target, filesRecursive, filesExpectedVersion, ws, deploymentID, filesYes, bundleFilesOutput(cmd, out), client, astroV1Alpha1Client)
+		},
+	}, cliout.Required("BUNDLE_PATH"))
+	cmd.Flags().BoolVar(&filesRecursive, "recursive", false, "Remove a directory and everything under it")
+	cmd.Flags().StringVar(&filesExpectedVersion, "expected-version", "", "Remove only if the bundle is still at this version")
+	cmd.Flags().BoolVarP(&filesYes, "yes", "y", false, "Don't ask for confirmation before removing a directory")
+	return cmd
+}
