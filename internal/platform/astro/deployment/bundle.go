@@ -4,10 +4,12 @@ import (
 	httpContext "context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 
+	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
@@ -22,15 +24,21 @@ import (
 // deployment ids) stays on v1. Collapse onto a single client once the bundle API
 // reaches v1.
 
-const bundleListLimit = 1000
+const (
+	bundleListLimit        = 1000
+	bundleVersionListLimit = 1000
+)
 
 var (
 	errCreateBundleTarget   = usageerr.Usage(errors.New("specify exactly one of --name (Dag bundle) or --mount-path (non-Dag bundle)"))
 	errDagBundleNonDagFlags = usageerr.Usage(errors.New("--bundle-type and --dag-bundle-ids are only valid for non-Dag bundles (--mount-path)"))
 	errUpdateBundleNoOp     = usageerr.Usage(errors.New("specify at least one of --description or --dag-bundle-ids"))
 	errBundleSelector       = usageerr.Usage(errors.New("specify exactly one bundle identifier: the BUNDLE-ID argument, --name (Dag bundle), or --mount-path (non-Dag bundle)"))
+	errFileBundleNonDag     = usageerr.Usage(errors.New("a file bundle is a Dag bundle: create it with --name, not --mount-path"))
+	errBundleVersionLimit   = usageerr.Usage(errors.New("--limit must be at least 1"))
 	errNoBundleInResponse   = errors.New("the API returned no bundle")
 	errNoBundleList         = errors.New("the API returned no bundle list")
+	errNoVersionList        = errors.New("the API returned no bundle version list")
 )
 
 // BundleList is the wire shape for `bundle list` output.
@@ -56,6 +64,42 @@ type BundleInfo struct {
 	DeletionIsPending *bool      `json:"deletion_is_pending,omitempty"`
 	CreatedAt         *time.Time `json:"created_at,omitempty"`
 	UpdatedAt         *time.Time `json:"updated_at,omitempty"`
+}
+
+// BundleVersionList is the wire shape for `bundle versions list` output.
+type BundleVersionList struct {
+	Versions []BundleVersionInfo `json:"versions"`
+}
+
+// BundleVersionInfo is one version of a bundle in `bundle versions list`
+// output: the API's BundleVersion field for field, under the CLI's snake_case
+// keys. A field the API left out stays out. The file count and total size are
+// a file bundle's, and the deploy id and description a deploy bundle's.
+type BundleVersionInfo struct {
+	ID              string    `json:"id"`
+	Version         string    `json:"version"`
+	PreviousVersion *string   `json:"previous_version,omitempty"`
+	Action          string    `json:"action"`
+	ActionPath      *string   `json:"action_path,omitempty"`
+	DeployID        *string   `json:"deploy_id,omitempty"`
+	Description     *string   `json:"description,omitempty"`
+	FileCount       *int      `json:"file_count,omitempty"`
+	TotalSize       *int      `json:"total_size,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	CreatedByID     *string   `json:"created_by_id,omitempty"`
+}
+
+// BundleRollback is what `astro bundle rollback` did, as it publishes it
+// under --output json: the bundle's id, the --name or --mount-path it was
+// picked by (absent when it was picked by id), the Deployment it is on, the
+// version it was returned to, and the action.
+type BundleRollback struct {
+	ID              string `json:"id"`
+	Name            string `json:"name,omitempty"`
+	NonDagMountPath string `json:"non_dag_mount_path,omitempty"`
+	DeploymentID    string `json:"deployment_id"`
+	Version         string `json:"version"`
+	Action          string `json:"action"`
 }
 
 // BundleResult is what `astro deployment bundle create` and `update` publish
@@ -93,6 +137,7 @@ type BundleRemoval struct {
 // The actions a BundleRemoval publishes.
 const (
 	bundleDeletionRequested = "deletion_requested"
+	bundleRolledBack        = "rolled_back"
 )
 
 func bundleToInfo(b *astrov1alpha1.DeploymentBundle) BundleInfo {
@@ -131,18 +176,7 @@ func bundleTableConfig() *output.TableConfig {
 			}
 			return orNA(*b.NonDagMountPath)
 		}},
-		{Header: "CURRENT VERSION", Value: func(b BundleInfo) string {
-			if b.CurrentVersion == nil {
-				return notApplicable
-			}
-			return orNA(*b.CurrentVersion)
-		}},
-		{Header: "DESIRED VERSION", Value: func(b BundleInfo) string {
-			if b.DesiredVersion == nil {
-				return notApplicable
-			}
-			return orNA(*b.DesiredVersion)
-		}},
+		{Header: "VERSION", Value: func(b BundleInfo) string { return bundleVersionCell(&b) }},
 	}
 	return output.BuildTableConfig(
 		columns,
@@ -151,16 +185,72 @@ func bundleTableConfig() *output.TableConfig {
 	)
 }
 
+// bundleVersionCell shows the version a bundle is set to, or the running version
+// and the one rolling out when both are known and differ. A missing running
+// version is not treated as a rollout, since it is often never reported.
+func bundleVersionCell(b *BundleInfo) string {
+	if b.DeletionIsPending != nil && *b.DeletionIsPending {
+		return "Deletion pending"
+	}
+	if b.DesiredVersion == nil || *b.DesiredVersion == "" {
+		return notApplicable
+	}
+	if b.CurrentVersion != nil && *b.CurrentVersion != "" && *b.CurrentVersion != *b.DesiredVersion {
+		return fmt.Sprintf("%s → %s (rolling out)", *b.CurrentVersion, *b.DesiredVersion)
+	}
+	return *b.DesiredVersion
+}
+
+func bundleVersionTableConfig() *output.TableConfig {
+	columns := []output.Column[BundleVersionInfo]{
+		{Header: "VERSION", Value: func(v BundleVersionInfo) string { return v.Version }},
+		{Header: "ACTION", Value: func(v BundleVersionInfo) string { return v.Action }},
+		{Header: "PATH", Value: func(v BundleVersionInfo) string {
+			if v.ActionPath == nil {
+				return notApplicable
+			}
+			return orNA(*v.ActionPath)
+		}},
+		{Header: "DEPLOY ID", Value: func(v BundleVersionInfo) string {
+			if v.DeployID == nil {
+				return notApplicable
+			}
+			return orNA(*v.DeployID)
+		}},
+		{Header: "CREATED", Value: func(v BundleVersionInfo) string { return apitoken.TimeAgo(v.CreatedAt) }},
+		{Header: "CREATED BY", Value: func(v BundleVersionInfo) string {
+			if v.CreatedByID == nil {
+				return notApplicable
+			}
+			return orNA(*v.CreatedByID)
+		}},
+	}
+	return output.BuildTableConfig(
+		columns,
+		func(d any) []BundleVersionInfo { return d.(*BundleVersionList).Versions },
+		output.WithNoResultsMsg("No versions found for this bundle"),
+	)
+}
+
 // CreateBundle registers a bundle on a deployment. A DAG bundle is created with a
 // name; a non-DAG bundle is created with a mount path (and optional bundle type
 // plus the DAG bundles it is served alongside). It publishes the bundle it
-// created, in the shape bundle list gives each one.
-func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, r output.Emitter, errOut io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+// created, in the shape bundle list gives each one. contentType is "deploy" for
+// a bundle written by deploys, or "file" for one whose files are written with
+// astro bundle files.
+func CreateBundle(name, mountPath, contentType, bundleType, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, r output.Emitter, errOut io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+	requestType := astrov1alpha1.CreateBundleRequestType(strings.ToUpper(contentType))
+	if !requestType.Valid() {
+		return usageerr.Usage(fmt.Errorf("invalid bundle --type %q: must be deploy or file", contentType))
+	}
 	if (name == "") == (mountPath == "") {
 		return errCreateBundleTarget
 	}
 	if name != "" && (bundleType != "" || len(dagBundleIDs) > 0) {
 		return errDagBundleNonDagFlags
+	}
+	if requestType == astrov1alpha1.CreateBundleRequestTypeFILE && mountPath != "" {
+		return errFileBundleNonDag
 	}
 
 	dep, err := GetDeployment(wsID, deploymentID, "", ToChange, nil, astroV1Client)
@@ -170,7 +260,7 @@ func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBund
 
 	isDagBundle := name != ""
 	request := astrov1alpha1.CreateBundleRequest{
-		Type:        astrov1alpha1.CreateBundleRequestTypeDEPLOY,
+		Type:        requestType,
 		IsDagBundle: &isDagBundle,
 	}
 	if name != "" {
@@ -203,7 +293,7 @@ func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBund
 	result := BundleResult{DeploymentID: dep.Id}
 	bundle := resp.JSON200
 	if bundle == nil {
-		bundle, err = findBundle(dep.OrganizationId, dep.Id, name, mountPath, astroV1Alpha1Client)
+		bundle, err = findBundle(httpContext.Background(), dep.OrganizationId, dep.Id, name, mountPath, astroV1Alpha1Client)
 	}
 	if bundle != nil {
 		result.BundleInfo = bundleToInfo(bundle)
@@ -230,7 +320,7 @@ func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription strin
 		return err
 	}
 
-	bundleID, err = resolveBundleID(dep.OrganizationId, dep.Id, bundleID, bundleName, bundleMountPath, astroV1Alpha1Client)
+	bundleID, err = resolveBundleID(httpContext.Background(), dep.OrganizationId, dep.Id, bundleID, bundleName, bundleMountPath, astroV1Alpha1Client)
 	if err != nil {
 		return err
 	}
@@ -322,8 +412,8 @@ func listBundlesData(ctx httpContext.Context, wsID, deploymentID string, limit i
 }
 
 // listAllBundles pages through every bundle on a deployment.
-func listAllBundles(orgID, deploymentID string, astroV1Alpha1Client astrov1alpha1.APIClient) ([]astrov1alpha1.DeploymentBundle, error) {
-	return listBundlesUpTo(httpContext.Background(), orgID, deploymentID, 0, astroV1Alpha1Client)
+func listAllBundles(ctx httpContext.Context, orgID, deploymentID string, astroV1Alpha1Client astrov1alpha1.APIClient) ([]astrov1alpha1.DeploymentBundle, error) {
+	return listBundlesUpTo(ctx, orgID, deploymentID, 0, astroV1Alpha1Client)
 }
 
 // listBundlesUpTo pages through the bundles on a deployment, in the order the
@@ -372,11 +462,11 @@ func validateBundleSelector(bundleID, bundleName, bundleMountPath string) error 
 // explicit id is returned as-is; a DAG bundle name or a non-DAG mount path is
 // resolved to its id by listing the deployment's bundles, both of which are
 // unique within a deployment.
-func resolveBundleID(orgID, deploymentID, bundleID, bundleName, bundleMountPath string, astroV1Alpha1Client astrov1alpha1.APIClient) (string, error) {
+func resolveBundleID(ctx httpContext.Context, orgID, deploymentID, bundleID, bundleName, bundleMountPath string, astroV1Alpha1Client astrov1alpha1.APIClient) (string, error) {
 	if bundleID != "" {
 		return bundleID, nil
 	}
-	bundle, err := findBundle(orgID, deploymentID, bundleName, bundleMountPath, astroV1Alpha1Client)
+	bundle, err := findBundle(ctx, orgID, deploymentID, bundleName, bundleMountPath, astroV1Alpha1Client)
 	if err != nil {
 		return "", err
 	}
@@ -391,8 +481,8 @@ func resolveBundleID(orgID, deploymentID, bundleID, bundleName, bundleMountPath 
 // both until the first is gone. The API keeps names and mount paths unique
 // among the rest, so one is left; were there more, the newest is taken, as
 // the one a create just made.
-func findBundle(orgID, deploymentID, bundleName, bundleMountPath string, astroV1Alpha1Client astrov1alpha1.APIClient) (*astrov1alpha1.DeploymentBundle, error) {
-	bundles, err := listAllBundles(orgID, deploymentID, astroV1Alpha1Client)
+func findBundle(ctx httpContext.Context, orgID, deploymentID, bundleName, bundleMountPath string, astroV1Alpha1Client astrov1alpha1.APIClient) (*astrov1alpha1.DeploymentBundle, error) {
+	bundles, err := listAllBundles(ctx, orgID, deploymentID, astroV1Alpha1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +549,7 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 		return err
 	}
 
-	bundleID, err = resolveBundleID(dep.OrganizationId, dep.Id, bundleID, bundleName, bundleMountPath, astroV1Alpha1Client)
+	bundleID, err = resolveBundleID(httpContext.Background(), dep.OrganizationId, dep.Id, bundleID, bundleName, bundleMountPath, astroV1Alpha1Client)
 	if err != nil {
 		return err
 	}
@@ -483,6 +573,121 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 	removal.Action = bundleDeletionRequested
 	return r.Emit(removal, func(w io.Writer) error {
 		_, err := fmt.Fprintf(w, "Requested deletion of bundle %s from Deployment %s\n", bundleID, dep.Id)
+		return err
+	})
+}
+
+// listBundleVersionsData fetches up to limit of a bundle's versions, newest
+// first. The bundle is identified by id, DAG bundle name, or non-DAG mount path.
+func listBundleVersionsData(ctx httpContext.Context, bundleID, bundleName, bundleMountPath string, limit int, wsID, deploymentID string, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) (*BundleVersionList, error) {
+	if err := validateBundleSelector(bundleID, bundleName, bundleMountPath); err != nil {
+		return nil, err
+	}
+	if limit < 1 {
+		return nil, errBundleVersionLimit
+	}
+
+	dep, err := GetDeploymentContext(ctx, wsID, deploymentID, "", ToRead, nil, astroV1Client)
+	if err != nil {
+		return nil, err
+	}
+
+	bundleID, err = resolveBundleID(ctx, dep.OrganizationId, dep.Id, bundleID, bundleName, bundleMountPath, astroV1Alpha1Client)
+	if err != nil {
+		return nil, err
+	}
+
+	versions, err := pagination.CollectUpTo(ctx, "bundle versions", limit, func(offset int) ([]astrov1alpha1.BundleVersion, int, error) {
+		pageSize := min(limit-offset, bundleVersionListLimit)
+		params := &astrov1alpha1.ListBundleVersionsParams{Limit: &pageSize, Offset: &offset}
+		resp, err := astroV1Alpha1Client.ListBundleVersionsWithResponse(pagination.Background(ctx), dep.OrganizationId, dep.Id, bundleID, params)
+		if err != nil {
+			return nil, 0, err
+		}
+		if err := astrov1alpha1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+			return nil, 0, err
+		}
+		if resp.JSON200 == nil {
+			return nil, 0, errNoVersionList
+		}
+		return resp.JSON200.Versions, resp.JSON200.TotalCount, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	infos := make([]BundleVersionInfo, 0, len(versions))
+	for i := range versions {
+		v := &versions[i]
+		infos = append(infos, BundleVersionInfo{
+			ID:              v.Id,
+			Version:         v.Version,
+			PreviousVersion: v.PreviousVersion,
+			Action:          string(v.Action),
+			ActionPath:      v.ActionPath,
+			DeployID:        v.DeployId,
+			Description:     v.Description,
+			FileCount:       v.FileCount,
+			TotalSize:       v.TotalSize,
+			CreatedAt:       v.CreatedAt,
+			CreatedByID:     v.CreatedById,
+		})
+	}
+	return &BundleVersionList{Versions: infos}, nil
+}
+
+// ListBundleVersionsWithFormat publishes up to limit of a bundle's versions,
+// newest first, in the shape the command's format asks for.
+func ListBundleVersionsWithFormat(ctx httpContext.Context, bundleID, bundleName, bundleMountPath string, limit int, wsID, deploymentID string, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+	return output.PrintData(
+		func() (*BundleVersionList, error) {
+			return listBundleVersionsData(ctx, bundleID, bundleName, bundleMountPath, limit, wsID, deploymentID, astroV1Client, astroV1Alpha1Client)
+		},
+		bundleVersionTableConfig(), r,
+	)
+}
+
+// RollbackBundle moves a bundle back to an earlier version, after asking
+// unless force. The bundle is identified by id, DAG bundle name, or non-DAG
+// mount path. It publishes the rollback (BundleRollback); a declined question
+// is input.ErrAborted.
+func RollbackBundle(ctx httpContext.Context, bundleID, bundleName, bundleMountPath, version, bundleDescription, wsID, deploymentID string, force bool, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+	if err := validateBundleSelector(bundleID, bundleName, bundleMountPath); err != nil {
+		return err
+	}
+
+	dep, err := GetDeploymentContext(ctx, wsID, deploymentID, "", ToChange, nil, astroV1Client)
+	if err != nil {
+		return err
+	}
+
+	bundleID, err = resolveBundleID(ctx, dep.OrganizationId, dep.Id, bundleID, bundleName, bundleMountPath, astroV1Alpha1Client)
+	if err != nil {
+		return err
+	}
+	rollback := BundleRollback{ID: bundleID, Name: bundleName, NonDagMountPath: bundleMountPath, DeploymentID: dep.Id, Version: version}
+
+	if !force {
+		if err := input.ConfirmOrAbort(fmt.Sprintf("Roll back bundle %s on Deployment %s to version %s?", bundleID, dep.Id, version), input.AnsweredBy("--yes")); err != nil {
+			return err
+		}
+	}
+
+	request := astrov1alpha1.RollbackBundleRequest{Version: version}
+	if bundleDescription != "" {
+		request.Description = &bundleDescription
+	}
+	resp, err := astroV1Alpha1Client.RollbackBundleWithResponse(pagination.Background(ctx), dep.OrganizationId, dep.Id, bundleID, request)
+	if err != nil {
+		return err
+	}
+	if err := astrov1alpha1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		return err
+	}
+
+	rollback.Action = bundleRolledBack
+	return r.Emit(rollback, func(w io.Writer) error {
+		_, err := fmt.Fprintf(w, "Rolled back bundle %s on Deployment %s to version %s\n", bundleID, dep.Id, version)
 		return err
 	})
 }

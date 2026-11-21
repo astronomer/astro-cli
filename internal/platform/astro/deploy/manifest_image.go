@@ -91,6 +91,10 @@ type ManifestImageDeployInput struct {
 	// Progress takes the image build's output and the Wait progress; nil is
 	// stderr.
 	Progress io.Writer
+	// DagBundle ships the Dags of a "both" deploy to a named Dag bundle on the
+	// Deployment rather than its default one. nil, or an empty name, is the
+	// default bundle. It is checked before the build, which can take minutes.
+	DagBundle *DagBundle
 }
 
 // ManifestImageDeployResult reports the outcome for cmd to render.
@@ -212,16 +216,16 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 		deployType = astrov1.CreateDeployRequestTypeIMAGEANDDAG
 	}
 	description := descriptionOrCommitMessage(in.Description, commitMessage)
-	created, err := createDeploy(ctx, dep.OrganizationId, dep.Id, astrov1.CreateDeployRequest{
+	created, err := createDeployFor(ctx, dep.OrganizationId, dep.Id, astrov1.CreateDeployRequest{
 		Description: &description,
 		Type:        deployType,
 		Git:         gitInfo.Commit,
-	}, astroV1Client)
+	}, in.DagBundle, astroV1Client)
 	if err != nil {
 		return ManifestImageDeployResult{}, explainHibernating(err, &dep)
 	}
-	if created.ImageRepository == "" || created.ImageTag == "" {
-		return ManifestImageDeployResult{}, errors.New("no image repository or tag received from Astro")
+	if err := checkCreatedImageDeploy(created, in.DagBundle, dags.upload); err != nil {
+		return ManifestImageDeployResult{}, err
 	}
 
 	// Push the built/adopted image under the returned repository:tag with the
@@ -304,6 +308,13 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 	// waking would not clear, so the wake-up step never hides them.
 	if dep.Status == astrov1.DeploymentStatusHIBERNATING {
 		return astrov1.Deployment{}, nil, &hibernatingError{deploymentID: dep.Id, name: dep.Name, refusal: instancelocate.ErrDeploymentHibernating}
+	}
+	// Before the build, with the other refusals: a named bundle that is not
+	// there, or not one a deploy writes, is known now and not after minutes.
+	if in.DagBundle != nil && in.DagBundle.Name != "" {
+		if err := checkDagBundle(ctx, &dep, *in.DagBundle); err != nil {
+			return astrov1.Deployment{}, nil, err
+		}
 	}
 	offer, err := offeredRuntimes(ctx, dep.OrganizationId, astroV1Client)
 	if err != nil {

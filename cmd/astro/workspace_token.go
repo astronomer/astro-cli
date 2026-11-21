@@ -104,7 +104,7 @@ func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	return renderTokenSecret(workspaceTokenOutput, out, cmd.ErrOrStderr(), &created, "Workspace", "Created", tokenName)
 }
 
-func updateWorkspaceToken(ctx context.Context, args []string, out io.Writer) error {
+func updateWorkspaceToken(ctx context.Context, args []string, out, errOut io.Writer) error {
 	tokenArg(args, &tokenID)
 	res, err := workspacetoken.UpdateToken(ctx, tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID, nil,
 		workspaceTokenPicker("Select the API token to update:"), astroV1Client)
@@ -115,7 +115,7 @@ func updateWorkspaceToken(ctx context.Context, args []string, out io.Writer) err
 	if res.Token.Scope != string(workspacetoken.TokenTypeWORKSPACE) {
 		line = fmt.Sprintf("Updated Organization API token %s in the Workspace", res.PreviousName)
 	}
-	return renderTokenLine(workspaceTokenOutput, out, res.Token, line)
+	return renderTokenLine(workspaceTokenOutput, out, errOut, res.Token, line)
 }
 
 func rotateWorkspaceToken(ctx context.Context, args []string, out, errOut io.Writer) error {
@@ -146,7 +146,7 @@ func rotateWorkspaceToken(ctx context.Context, args []string, out, errOut io.Wri
 	return renderTokenSecret(workspaceTokenOutput, out, errOut, &rotated, "Workspace", "Rotated", token.Name)
 }
 
-func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
+func deleteWorkspaceToken(cmd *cobra.Command, args []string, out, errOut io.Writer) error {
 	tokenArg(args, &tokenID)
 	target, org, err := workspacetoken.Scope(workspaceID)
 	if err != nil {
@@ -175,13 +175,13 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(workspaceTokenOutput, out, removal, fmt.Sprintf("Deleted Workspace API token %s", removal.Name))
+	return renderTokenLine(workspaceTokenOutput, out, errOut, removal, fmt.Sprintf("Deleted Workspace API token %s", removal.Name))
 }
 
 // removeWorkspaceToken runs `workspace token remove`: it takes the Workspace
 // role of a token of a broader scope, an Organization token, away. The
 // Workspace's own tokens have no role to take, and are refused with delete.
-func removeWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
+func removeWorkspaceToken(cmd *cobra.Command, args []string, out, errOut io.Writer) error {
 	tokenArg(args, &tokenID)
 	target, org, err := workspacetoken.Scope(workspaceID)
 	if err != nil {
@@ -210,13 +210,13 @@ func removeWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(workspaceTokenOutput, out, removal, fmt.Sprintf("Removed Organization API token %s from the Workspace", removal.Name))
+	return renderTokenLine(workspaceTokenOutput, out, errOut, removal, fmt.Sprintf("Removed Organization API token %s from the Workspace", removal.Name))
 }
 
 // addOrgTokenToWorkspace runs `workspace token add`, the older spelling of
 // `workspace token organization-token add`, which picks the role from a table
 // rather than asking for its name.
-func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) error {
+func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out, errOut io.Writer) error {
 	ws, err := requiredWorkspace(cmd, workspaceID)
 	if err != nil {
 		return err
@@ -239,16 +239,16 @@ func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) er
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(workspaceTokenOutput, out, token, fmt.Sprintf("Added Organization API token %s to the Workspace", token.Name))
+	return renderTokenLine(workspaceTokenOutput, out, errOut, token, fmt.Sprintf("Added Organization API token %s to the Workspace", token.Name))
 }
 
 func addOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer) error {
-	return upsertOrgTokenWorkspaceRole(cmd, args, out, tokenRoleAdd,
+	return upsertOrgTokenWorkspaceRole(cmd, args, out, cmd.ErrOrStderr(), tokenRoleAdd,
 		"Enter a role for the API token. Possible values are "+allowedWorkspaceRoleNamesProse+": ")
 }
 
 func updateOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer) error {
-	return upsertOrgTokenWorkspaceRole(cmd, args, out, tokenRoleUpdate,
+	return upsertOrgTokenWorkspaceRole(cmd, args, out, cmd.ErrOrStderr(), tokenRoleUpdate,
 		"Enter a role for the new Workspace API token. Possible values are "+allowedWorkspaceRoleNamesProse+": ")
 }
 
@@ -256,7 +256,7 @@ func updateOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 // and `update`: it gives an Organization token a role on the Workspace,
 // asking for the role with prompt when --role named none. An add picks among
 // the Organization's tokens, an update among the Workspace's.
-func upsertOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer, operation, prompt string) error {
+func upsertOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out, errOut io.Writer, operation, prompt string) error {
 	ws, err := requiredWorkspace(cmd, workspaceID)
 	if err != nil {
 		return err
@@ -279,15 +279,15 @@ func upsertOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(workspaceTokenOutput, out, token, fmt.Sprintf("Set the Workspace role for Organization API token %s", token.Name))
+	return renderTokenLine(workspaceTokenOutput, out, errOut, token, fmt.Sprintf("Set the Workspace role for Organization API token %s", token.Name))
 }
 
-func removeOrganizationTokenWorkspaceRole(ctx context.Context, args []string, out io.Writer) error {
+func removeOrganizationTokenWorkspaceRole(ctx context.Context, args []string, out, errOut io.Writer) error {
 	tokenArg(args, &orgTokenID)
 	pick := workspaceTokenPicker("Select the Organization API token to remove from the Workspace:")
 	removal, err := workspacetoken.RemoveOrgTokenWorkspaceRole(ctx, orgTokenID, name, workspaceID, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(workspaceTokenOutput, out, removal, fmt.Sprintf("Removed Organization API token %s from the Workspace", removal.Name))
+	return renderTokenLine(workspaceTokenOutput, out, errOut, removal, fmt.Sprintf("Removed Organization API token %s from the Workspace", removal.Name))
 }

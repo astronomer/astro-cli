@@ -21,6 +21,11 @@ type Renderer struct {
 	Out  io.Writer
 }
 
+// EmitEvent publishes v as one record of a stream, as Emit does.
+func (r Renderer) EmitEvent(v any, text func(io.Writer) error) error {
+	return r.Emit(v, text)
+}
+
 // Emit publishes v in json mode, or runs text in text mode.
 func (r Renderer) Emit(v any, text func(io.Writer) error) error {
 	if r.JSON {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"testing"
 
@@ -77,7 +78,7 @@ func TestRotateAndDeleteAWorkspaceTokenByIDNeedNoWorkspace(t *testing.T) {
 		},
 		"delete": {
 			run: func(cmd *cobra.Command, out *bytes.Buffer) error {
-				return deleteWorkspaceToken(cmd, []string{"token-id"}, out)
+				return deleteWorkspaceToken(cmd, []string{"token-id"}, out, io.Discard)
 			},
 			endpoint: "DeleteApiTokenWithResponse",
 			want:     "Deleted Workspace API token",
@@ -109,16 +110,16 @@ func TestMissingWorkspaceIsSaidBeforeAQuestionThatCannotBeAsked(t *testing.T) {
 	cmd := &cobra.Command{}
 	var out bytes.Buffer
 	commands := map[string]func() error{
-		"workspace team remove":     func() error { return removeWorkspaceTeam(cmd, nil, &out) },
-		"workspace team add":        func() error { return addWorkspaceTeam(cmd, nil, &out) },
-		"workspace team update":     func() error { return updateWorkspaceTeam(cmd, nil, &out) },
-		"workspace user add":        func() error { return addWorkspaceUser(cmd, nil, &out) },
-		"workspace user update":     func() error { return updateWorkspaceUser(cmd, nil, &out) },
-		"workspace user remove":     func() error { return removeWorkspaceUser(cmd, nil, &out) },
+		"workspace team remove":     func() error { return removeWorkspaceTeam(cmd, nil, &out, io.Discard) },
+		"workspace team add":        func() error { return addWorkspaceTeam(cmd, nil, &out, io.Discard) },
+		"workspace team update":     func() error { return updateWorkspaceTeam(cmd, nil, &out, io.Discard) },
+		"workspace user add":        func() error { return addWorkspaceUser(cmd, nil, &out, io.Discard) },
+		"workspace user update":     func() error { return updateWorkspaceUser(cmd, nil, &out, io.Discard) },
+		"workspace user remove":     func() error { return removeWorkspaceUser(cmd, nil, &out, io.Discard) },
 		"workspace token create":    func() error { return createWorkspaceToken(cmd, &out) },
-		"workspace token update":    func() error { return updateWorkspaceToken(context.Background(), nil, &out) },
-		"organization-token remove": func() error { return removeOrganizationTokenWorkspaceRole(context.Background(), nil, &out) },
-		"workspace token add":       func() error { return addOrgTokenToWorkspace(cmd, nil, &out) },
+		"workspace token update":    func() error { return updateWorkspaceToken(context.Background(), nil, &out, io.Discard) },
+		"organization-token remove": func() error { return removeOrganizationTokenWorkspaceRole(context.Background(), nil, &out, io.Discard) },
+		"workspace token add":       func() error { return addOrgTokenToWorkspace(cmd, nil, &out, io.Discard) },
 		"organization-token add":    func() error { return addOrgTokenWorkspaceRole(cmd, nil, &out) },
 		"organization-token update": func() error { return updateOrgTokenWorkspaceRole(cmd, nil, &out) },
 	}
@@ -163,7 +164,7 @@ func TestDeploymentTokenAddNeedsNoWorkspaceOfItsOwn(t *testing.T) {
 
 	var err error
 	asked := captureStderr(t, func() {
-		err = setTokenDeploymentRole(context.Background(), nil, &bytes.Buffer{}, tokenKindWorkspace, tokenRoleAdd)
+		err = setTokenDeploymentRole(context.Background(), nil, &bytes.Buffer{}, io.Discard, tokenKindWorkspace, tokenRoleAdd)
 	})
 	require.ErrorContains(t, err, "stop here")
 	require.NotErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)

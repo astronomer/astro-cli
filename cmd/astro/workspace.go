@@ -108,7 +108,7 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
   astro workspace switch my-workspace -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceSwitch(out, args)
+			return workspaceSwitch(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Optional("WORKSPACE_NAME_OR_ID"))
 	cliout.AddOutputFlag(cmd, &workspaceLifecycleOutput)
@@ -132,7 +132,7 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
   astro workspace create --name "My Workspace" -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceCreate(out)
+			return workspaceCreate(out, cmd.ErrOrStderr())
 		},
 	}
 	cliout.AddOutputFlag(cmd, &workspaceLifecycleOutput)
@@ -187,7 +187,7 @@ func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
   astro workspace delete <WORKSPACE_ID> --yes -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceDelete(out, args)
+			return workspaceDelete(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Optional("WORKSPACE_ID"))
 	cliout.AddOutputFlag(cmd, &workspaceLifecycleOutput)
@@ -228,7 +228,7 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
   astro workspace user add user@company.com --role WORKSPACE_OWNER --workspace <WORKSPACE_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addWorkspaceUser(cmd, args, out)
+			return addWorkspaceUser(cmd, args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("EMAIL"))
 	cmd.Flags().StringVar(&addWorkspaceRole, "role", "WORKSPACE_MEMBER", "The role for the "+
@@ -263,7 +263,7 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
   astro workspace user update user@company.com --role WORKSPACE_OPERATOR
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateWorkspaceUser(cmd, args, out)
+			return updateWorkspaceUser(cmd, args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("EMAIL"))
 	cmd.Flags().StringVar(&updateWorkspaceRole, "role", "", "The new role for the "+
@@ -282,7 +282,7 @@ func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
   astro workspace user remove user@company.com
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return removeWorkspaceUser(cmd, args, out)
+			return removeWorkspaceUser(cmd, args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("EMAIL"))
 	return cmd
@@ -412,7 +412,7 @@ func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
   astro workspace token update --name "My Org Token" --role WORKSPACE_MEMBER
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateWorkspaceToken(cmd.Context(), args, out)
+			return updateWorkspaceToken(cmd.Context(), args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("TOKEN_ID"))
 	cmd.Flags().StringVar(&name, "name", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -462,7 +462,7 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
   astro workspace token delete --name "My Token" --yes
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deleteWorkspaceToken(cmd, args, out)
+			return deleteWorkspaceToken(cmd, args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("TOKEN_ID"))
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -484,7 +484,7 @@ func newWorkspaceTokenRemoveCmd(out io.Writer) *cobra.Command {
   astro workspace token remove --name "My Org Token" --yes
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return removeWorkspaceToken(cmd, args, out)
+			return removeWorkspaceToken(cmd, args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("TOKEN_ID"))
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the Organization API token to be removed from the Workspace. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -505,7 +505,7 @@ func newWorkspaceTokenAddOrgTokenCmd(out io.Writer) *cobra.Command {
   astro workspace token add --name "My Org Token" --role WORKSPACE_OPERATOR
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addOrgTokenToWorkspace(cmd, args, out)
+			return addOrgTokenToWorkspace(cmd, args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("ORG_TOKEN_ID"))
 	addTokenNameFlag(cmd, "The name of the Organization API token you want to add to a Workspace. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
@@ -580,7 +580,7 @@ func newRemoveOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
   # Find the Organization token by its name
   astro workspace token organization-token remove --name "My Org Token"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return removeOrganizationTokenWorkspaceRole(cmd.Context(), args, out)
+			return removeOrganizationTokenWorkspaceRole(cmd.Context(), args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("ORG_TOKEN_ID"))
 	addTokenNameFlag(cmd, "The name of the Organization API token you want to remove from a Workspace. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
@@ -618,7 +618,7 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
   astro workspace team remove <TEAM_ID> --workspace <WORKSPACE_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return removeWorkspaceTeam(cmd, args, out)
+			return removeWorkspaceTeam(cmd, args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("TEAM_ID"))
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
@@ -629,7 +629,7 @@ func listWorkspaceTeam(ctx context.Context, out, errOut io.Writer, limit int) er
 	return team.ListWorkspaceTeamsWithFormat(ctx, astroV1Client, workspaceID, limit, cliout.Renderer{Format: workspaceTeamOutput, Out: out, Err: errOut})
 }
 
-func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+func removeWorkspaceTeam(cmd *cobra.Command, args []string, out, errOut io.Writer) error {
 	ws, err := requiredWorkspace(cmd, workspaceID)
 	if err != nil {
 		return err
@@ -649,7 +649,7 @@ func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceTeamOutput, out, &r, fmt.Sprintf("Removed team %s from Workspace %s", r.Name, r.WorkspaceID))
+	return renderLines(workspaceTeamOutput, out, errOut, &r, fmt.Sprintf("Removed team %s from Workspace %s", r.Name, r.WorkspaceID))
 }
 
 func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
@@ -665,7 +665,7 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
   astro workspace team add <TEAM_ID> --role WORKSPACE_OPERATOR --workspace <WORKSPACE_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addWorkspaceTeam(cmd, args, out)
+			return addWorkspaceTeam(cmd, args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("TEAM_ID"))
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier", oneXWorkspaceID)
@@ -674,7 +674,7 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+func addWorkspaceTeam(cmd *cobra.Command, args []string, out, errOut io.Writer) error {
 	ws, err := requiredWorkspace(cmd, workspaceID)
 	if err != nil {
 		return err
@@ -694,7 +694,7 @@ func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceTeamOutput, out, &t, fmt.Sprintf("Added team %s to the Workspace with role %s", teamLabel(&t), t.WorkspaceRole))
+	return renderLines(workspaceTeamOutput, out, errOut, &t, fmt.Sprintf("Added team %s to the Workspace with role %s", teamLabel(&t), t.WorkspaceRole))
 }
 
 func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -711,7 +711,7 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
   astro workspace team update <TEAM_ID> --role WORKSPACE_OWNER --workspace <WORKSPACE_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return updateWorkspaceTeam(cmd, args, out)
+			return updateWorkspaceTeam(cmd, args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("TEAM_ID"))
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
@@ -720,7 +720,7 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
+func updateWorkspaceTeam(cmd *cobra.Command, args []string, out, errOut io.Writer) error {
 	var id string
 
 	// if an id was provided in the args we use it
@@ -749,14 +749,14 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceTeamOutput, out, &t, fmt.Sprintf("Updated Workspace team %s to %s", teamLabel(&t), t.WorkspaceRole))
+	return renderLines(workspaceTeamOutput, out, errOut, &t, fmt.Sprintf("Updated Workspace team %s to %s", teamLabel(&t), t.WorkspaceRole))
 }
 
 func workspaceList(ctx context.Context, out, errOut io.Writer, limit int) error {
 	return workspace.ListWithFormat(ctx, astroV1Client, limit, cliout.Renderer{Format: workspaceListOutput, Out: out, Err: errOut})
 }
 
-func workspaceSwitch(out io.Writer, args []string) error {
+func workspaceSwitch(out, errOut io.Writer, args []string) error {
 	workspaceNameOrID := ""
 
 	if len(args) == 1 {
@@ -766,15 +766,15 @@ func workspaceSwitch(out io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
-	return emitWorkspaceSwitch(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, ws)
+	return emitWorkspaceSwitch(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out, Err: errOut}, ws)
 }
 
-func workspaceCreate(out io.Writer) error {
+func workspaceCreate(out, errOut io.Writer) error {
 	ws, err := workspace.Create(workspaceName, workspaceDescription, enforceCD, astroV1Client)
 	if err != nil {
 		return err
 	}
-	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, ws, fmt.Sprintf("Created Workspace %s", ws.Name))
+	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out, Err: errOut}, ws, fmt.Sprintf("Created Workspace %s", ws.Name))
 }
 
 func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -800,7 +800,7 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out, Err: cmd.ErrOrStderr()}, &res.Workspace, fmt.Sprintf("Updated Workspace %s", res.PreviousName))
 }
 
-func workspaceDelete(out io.Writer, args []string) error {
+func workspaceDelete(out, errOut io.Writer, args []string) error {
 	id := ""
 
 	if len(args) == 1 {
@@ -810,10 +810,10 @@ func workspaceDelete(out io.Writer, args []string) error {
 	if err != nil {
 		return err
 	}
-	return emitWorkspaceRemoval(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, removal)
+	return emitWorkspaceRemoval(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out, Err: errOut}, removal)
 }
 
-func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
+func addWorkspaceUser(cmd *cobra.Command, args []string, out, errOut io.Writer) error {
 	ws, err := requiredWorkspace(cmd, workspaceID)
 	if err != nil {
 		return err
@@ -835,14 +835,14 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceUserOutput, out, &u, fmt.Sprintf("Added user %s to the Workspace with role %s", u.Email, u.WorkspaceRole))
+	return renderLines(workspaceUserOutput, out, errOut, &u, fmt.Sprintf("Added user %s to the Workspace with role %s", u.Email, u.WorkspaceRole))
 }
 
 func listWorkspaceUser(ctx context.Context, out, errOut io.Writer, limit int) error {
 	return user.ListWorkspaceUsersWithFormat(ctx, astroV1Client, workspaceID, limit, cliout.Renderer{Format: workspaceUserOutput, Out: out, Err: errOut})
 }
 
-func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
+func updateWorkspaceUser(cmd *cobra.Command, args []string, out, errOut io.Writer) error {
 	var email string
 
 	// if an email was provided in the args we use it
@@ -873,10 +873,10 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceUserOutput, out, &u, fmt.Sprintf("Updated Workspace user %s to %s", u.Email, u.WorkspaceRole))
+	return renderLines(workspaceUserOutput, out, errOut, &u, fmt.Sprintf("Updated Workspace user %s to %s", u.Email, u.WorkspaceRole))
 }
 
-func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
+func removeWorkspaceUser(cmd *cobra.Command, args []string, out, errOut io.Writer) error {
 	ws, err := requiredWorkspace(cmd, workspaceID)
 	if err != nil {
 		return err
@@ -898,7 +898,7 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(workspaceUserOutput, out, &r, fmt.Sprintf("Removed user %s from the Workspace", r.Email))
+	return renderLines(workspaceUserOutput, out, errOut, &r, fmt.Sprintf("Removed user %s from the Workspace", r.Email))
 }
 
 // workspaceTarget is the run's Workspace for cmd, from the one resolver

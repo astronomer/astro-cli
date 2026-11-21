@@ -67,7 +67,7 @@ func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command {
 		Long:    "Create a service account in the APC platform",
 		Example: deploymentSaCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentSaCreate(out)
+			return deploymentSaCreate(out, cmd.ErrOrStderr())
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, "d", true)
@@ -90,7 +90,7 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 		Long:    "List service accounts inside a Deployment",
 		Example: deploymentSaListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentSaList(out)
+			return deploymentSaList(out, cmd.ErrOrStderr())
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, "d", true)
@@ -107,7 +107,7 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 		Long:    "Delete a service account in the APC platform. This cannot be undone; it asks for confirmation unless --yes is given.",
 		Example: deploymentSaDeleteExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentSaDelete(args, out)
+			return deploymentSaDelete(args, out, cmd.ErrOrStderr())
 		},
 	}, cliout.Required("SERVICE_ACCOUNT_ID"))
 	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, "d", true)
@@ -123,8 +123,8 @@ func serviceAccountDeleteQuestion(id string) string {
 	return fmt.Sprintf("\nDelete service account %s? This cannot be undone.", id)
 }
 
-func deploymentSaCreate(out io.Writer) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func deploymentSaCreate(out, errOut io.Writer) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	if deploymentSACreateName == "" {
 		return errServiceAccountNameEmpty
 	}
@@ -138,8 +138,8 @@ func deploymentSaCreate(out io.Writer) error {
 	return renderServiceAccountCreated(r, &created)
 }
 
-func deploymentSaList(out io.Writer) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func deploymentSaList(out, errOut io.Writer) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	sas, err := sa.GetDeploymentServiceAccounts(deploymentID, houstonClient)
 	if err != nil {
 		return err
@@ -147,8 +147,8 @@ func deploymentSaList(out io.Writer) error {
 	return renderServiceAccountList(r, sas)
 }
 
-func deploymentSaDelete(args []string, out io.Writer) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func deploymentSaDelete(args []string, out, errOut io.Writer) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	if err := confirm(serviceAccountDeleteQuestion(args[0])); err != nil {
 		return err
 	}

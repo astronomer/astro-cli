@@ -98,8 +98,8 @@ func renderTokenSecret(format cliout.Format, out, errOut io.Writer, t *apitoken.
 }
 
 // renderTokenLine renders v as one line of text, or as itself in json.
-func renderTokenLine(format cliout.Format, out io.Writer, v any, line string) error {
-	return cliout.Renderer{Format: format, Out: out}.Emit(v, cliout.Text(func(b *bufio.Writer) {
+func renderTokenLine(format cliout.Format, out, errOut io.Writer, v any, line string) error {
+	return cliout.Renderer{Format: format, Out: out, Err: errOut}.Emit(v, cliout.Text(func(b *bufio.Writer) {
 		fmt.Fprintln(b, line)
 	}))
 }

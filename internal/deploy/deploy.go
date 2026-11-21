@@ -95,6 +95,13 @@ type Request struct {
 	WaitTime time.Duration
 	// NoDagsBaseDir drops the dags/ prefix from the bundle (Airflow 3 layouts).
 	NoDagsBaseDir bool
+	// DagBundle is --dag-bundle: the named Dag bundle the deploy ships the
+	// project's Dags to, instead of the Deployment's default one. "" falls to
+	// the resolved link's dag-bundle (manifest.Link.DagBundle), then to the
+	// default bundle. It applies only to a deploy that ships Dags: --image and
+	// an image deployed with no project ship none, and cmd refuses the flag
+	// there.
+	DagBundle string
 	// Interactive reports whether the run may ask which deployment to ship to
 	// (stdin is a TTY, and the output is not json). A run that cannot be asked
 	// must name its target on the command line.
@@ -188,7 +195,10 @@ type Result struct {
 	// RemoteExecution reports an image-and-dag deploy to a remote-execution
 	// Deployment with DAG deploys off, to which no DAGs were uploaded.
 	RemoteExecution bool
-	URL             string
+	// DagBundle is the named Dag bundle the Dags were shipped to, "" for the
+	// Deployment's default one.
+	DagBundle string
+	URL       string
 	// LinkName is the manifest link the deploy resolved to, "" if unlinked.
 	LinkName string
 	Git      Git
@@ -238,6 +248,12 @@ type DagDeploy struct {
 	// CosmosBoost is [tool.astro.deploy] cosmos-boost: whether the Dags
 	// upload carries Cosmos Boost files for its dbt projects.
 	CosmosBoost bool
+	// DagBundle is the named Dag bundle to ship the Dags to, "" for the
+	// Deployment's default one. DagBundleLink is the manifest link it came
+	// from, "" when --dag-bundle named it, so a refusal can say where the
+	// name was set.
+	DagBundle     string
+	DagBundleLink string
 }
 
 // DagResult is what the transport reports after a dags-only deploy.
@@ -300,6 +316,10 @@ type ImageDeploy struct {
 	NoDagsBaseDir bool
 	Wait          bool
 	WaitTime      time.Duration
+	// DagBundle is the named Dag bundle a "both" deploy ships the Dags to,
+	// "" for the Deployment's default one. DagBundleLink is as on DagDeploy.
+	DagBundle     string
+	DagBundleLink string
 }
 
 // ImageResult is what the transport reports after an image deploy. A "both"
@@ -484,10 +504,49 @@ func deploySettings(m *manifest.Manifest) manifest.Deploy {
 	return m.Astro.Deploy
 }
 
+// dagBundleFor is the named Dag bundle a deploy to target ships its Dags to:
+// --dag-bundle, else the dag-bundle of the link the deploy resolved to, else
+// "" for the Deployment's default bundle. A deploy that ships no Dags has no
+// bundle, whatever a link says: --image leaves the running Dags alone, so
+// the setting that applies to the Dags has nothing to apply to.
+//
+// link is the link the name came from, "" when --dag-bundle gave it.
+func dagBundleFor(req Request, target Target) (bundle, link string) {
+	if req.Image || req.ImageAlone {
+		return "", ""
+	}
+	if req.DagBundle != "" {
+		return req.DagBundle, ""
+	}
+	if req.Manifest == nil || target.LinkName == "" {
+		return "", ""
+	}
+	if b := req.Manifest.Astro.Deployments[target.LinkName].DagBundle; b != "" {
+		return b, target.LinkName
+	}
+	return "", ""
+}
+
+// shippedBundle is the bundle a "both" deploy put its Dags in. A bundle is
+// only named for a deploy that ships Dags (dagBundleFor), and the transport
+// refuses one to a Deployment with Dag deploys off, so the Dags-in-image and
+// remote-execution cases cannot reach here with a bundle; DagsNotShipped is
+// the one way a deploy that named a bundle shipped none (an APC Deployment
+// that takes its Dags elsewhere).
+func shippedBundle(bundle string, shipped bool) string {
+	if shipped {
+		return bundle
+	}
+	return ""
+}
+
 // runDagsOnly ships just the dags/ directory through the transport.
 func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 	settings := deploySettings(req.Manifest)
+	bundle, bundleLink := dagBundleFor(req, target)
 	dag, err := d.DeployDags(&DagDeploy{
+		DagBundle:     bundle,
+		DagBundleLink: bundleLink,
 		Context:       req.Context,
 		DeploymentID:  target.DeploymentID,
 		WorkspaceID:   target.WorkspaceID,
@@ -508,6 +567,7 @@ func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 		Type:              "dag-only",
 		RuntimeVersion:    dag.RuntimeVersion,
 		DagTarballVersion: dag.DagTarballVersion,
+		DagBundle:         bundle,
 		URL:               dag.URL,
 		LinkName:          target.LinkName,
 		Git:               dag.Git,
@@ -530,7 +590,10 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 	// only the netrc secret, and checkImageSource has warned about the rest.
 	includeDags := !req.Image && !req.ImageAlone
 	settings := deploySettings(req.Manifest)
+	bundle, bundleLink := dagBundleFor(req, target)
 	img, err := d.DeployImage(&ImageDeploy{
+		DagBundle:       bundle,
+		DagBundleLink:   bundleLink,
 		Context:         req.Context,
 		DeploymentID:    target.DeploymentID,
 		WorkspaceID:     target.WorkspaceID,
@@ -569,6 +632,7 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 		DagTarballVersion:      img.DagTarballVersion,
 		DagsInImage:            img.DagsInImage,
 		RemoteExecution:        img.RemoteExecution,
+		DagBundle:              shippedBundle(bundle, !img.DagsNotShipped),
 		URL:                    img.URL,
 		LinkName:               target.LinkName,
 		Git:                    img.Git,

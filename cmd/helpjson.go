@@ -276,7 +276,7 @@ func writeListing(w io.Writer, rows []helpSearchResult) error {
 // the command they name, or with --all every command.
 func runHelp(c *cobra.Command, args []string, all bool, format cliout.Format) error {
 	root := c.Root()
-	render := cliout.Renderer{Format: format, Out: c.OutOrStdout()}
+	render := cliout.Renderer{Format: format, Out: c.OutOrStdout(), Err: c.ErrOrStderr()}
 
 	if all {
 		if len(args) > 0 {
@@ -327,7 +327,7 @@ func runHelp(c *cobra.Command, args []string, all bool, format cliout.Format) er
 // not run here (no login, a project that does not parse) still describes
 // itself. A line that names something that is not a command is left to the
 // usual failure.
-func printHelpJSONIfAsked(ctx context.Context, root *cobra.Command, args []string, out io.Writer) (bool, error) {
+func printHelpJSONIfAsked(ctx context.Context, root *cobra.Command, args []string, out, errOut io.Writer) (bool, error) {
 	if isShellCompletion(args) || !hasHelpFlag(args) || !cliout.ArgsAskForJSON(args, "o") {
 		return false, nil
 	}
@@ -340,7 +340,7 @@ func printHelpJSONIfAsked(ctx context.Context, root *cobra.Command, args []strin
 			return false, nil
 		}
 	}
-	err = cliout.Renderer{Format: cliout.FormatJSON, Out: out}.Emit(describeCommand(target), nil)
+	err = cliout.Renderer{Format: cliout.FormatJSON, Out: out, Err: errOut}.Emit(describeCommand(target), nil)
 	if err != nil {
 		// Reported as any command's failure is: the error object, and the
 		// exit status the error maps to.

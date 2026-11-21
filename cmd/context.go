@@ -61,7 +61,7 @@ func newContextListCmd(out io.Writer) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return emitContextList(cliout.Renderer{Format: output, Out: out}, &list)
+			return emitContextList(cliout.Renderer{Format: output, Out: out, Err: cmd.ErrOrStderr()}, &list)
 		},
 		Example: `  # List the contexts saved on this machine
   astro context list`,
@@ -94,7 +94,7 @@ func newContextSwitchCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 		Short:   "Switch to a different context",
 		Long:    "Switch to a different context. With no domain, pick one from the contexts saved on this machine. For Astro, the saved login for the domain is refreshed when possible. It does not open a browser.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return switchContext(cmd, args, astroV1Client, cliout.Renderer{Format: output, Out: out})
+			return switchContext(cmd, args, astroV1Client, cliout.Renderer{Format: output, Out: out, Err: cmd.ErrOrStderr()})
 		},
 		Example: `  # Pick a context from the ones saved on this machine
   astro context switch
@@ -237,7 +237,7 @@ func newContextDeleteCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return cliout.Renderer{Format: output, Out: out}.Emit(removal, cliout.Text(func(b *bufio.Writer) {
+			return cliout.Renderer{Format: output, Out: out, Err: cmd.ErrOrStderr()}.Emit(removal, cliout.Text(func(b *bufio.Writer) {
 				fmt.Fprintf(b, "Deleted context: %s\n", removal.Domain)
 			}))
 		},

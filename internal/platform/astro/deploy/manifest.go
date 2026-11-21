@@ -39,6 +39,9 @@ type ManifestDagDeployInput struct {
 	CosmosBoost bool
 	// Progress takes the Wait progress; nil is stderr.
 	Progress io.Writer
+	// DagBundle ships the Dags to a named Dag bundle on the Deployment rather
+	// than its default one. nil, or an empty name, is the default bundle.
+	DagBundle *DagBundle
 }
 
 // ManifestDagDeployResult reports the outcome for cmd to render.
@@ -113,13 +116,21 @@ func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClie
 		return ManifestDagDeployResult{}, fmt.Errorf(enableDagDeployMsg, in.DeploymentID)
 	}
 
+	// The bundle is checked before the deploy is created, so a name that is
+	// no Dag bundle, or a file bundle, fails with nothing started.
+	if in.DagBundle != nil && in.DagBundle.Name != "" {
+		if err := checkDagBundle(ctx, &dep, *in.DagBundle); err != nil {
+			return ManifestDagDeployResult{}, err
+		}
+	}
+
 	gitInfo, commitMessage := readManifestDeployGit(in.ProjectDir, in.GitMetadata)
 	description := descriptionOrCommitMessage(in.Description, commitMessage)
-	created, err := createDeploy(ctx, dep.OrganizationId, dep.Id, astrov1.CreateDeployRequest{
+	created, err := createDeployFor(ctx, dep.OrganizationId, dep.Id, astrov1.CreateDeployRequest{
 		Description: &description,
 		Type:        astrov1.CreateDeployRequestTypeDAGONLY,
 		Git:         gitInfo.Commit,
-	}, astroV1Client)
+	}, in.DagBundle, astroV1Client)
 	if err != nil {
 		return ManifestDagDeployResult{}, explainHibernating(err, &dep)
 	}

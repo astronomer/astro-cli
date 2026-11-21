@@ -160,7 +160,6 @@ var removedFlagCases = []removedFlagCase{
 	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "env", value: ".env.ci", shorthand: "e", want: errDeployEnvRemoved},
 	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "parse", want: errDeployParseRemoved},
 	{tree: astroTree, args: []string{"deploy", "dep-id", "--dags"}, flag: "dags-path", value: "./elsewhere", want: errDeployDagsPathRemoved},
-	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "dag-bundle-name", value: "nightly", want: errDeployBundleNameRemoved},
 	{tree: astroTree, args: []string{"deploy"}, flag: "deployment-name", value: "prod", shorthand: "n", want: errDeployNameRemoved},
 	{tree: apcTree, args: []string{"deploy", "dep-id"}, flag: "no-cache", want: errAPCDeployNoCache},
 	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "non-dags", want: errDeployNonDagsRemoved},

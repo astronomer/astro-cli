@@ -47,6 +47,11 @@ var deprecatedVerbs = func() map[string]deprecatedVerb {
 			m[g.old+verb] = d
 		}
 	}
+	// astro bundle took over the bundle commands, as on 1.x main, where
+	// astro deployment bundle stays as a hidden spelling of it.
+	for _, verb := range []string{"create", "list", "update", "delete"} {
+		m["deployment bundle "+verb] = deprecatedVerb{instead: "bundle " + verb}
+	}
 	for _, link := range []string{"variable", "connection", "airflow-variable"} {
 		m["env "+link+" link delete"] = deprecatedVerb{instead: "env " + link + " link remove"}
 	}

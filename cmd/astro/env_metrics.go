@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -139,7 +138,7 @@ func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 	if envIncludeSecrets {
-		cliout.Warn(os.Stderr, includeSecretsWarning)
+		cliout.Warn(cmd.ErrOrStderr(), includeSecretsWarning)
 	}
 	return env.WriteMetricsExportList(objs, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()})
 }

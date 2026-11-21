@@ -2,6 +2,7 @@ package apc
 
 import (
 	"bytes"
+	"io"
 
 	"github.com/stretchr/testify/mock"
 
@@ -60,7 +61,7 @@ func (s *Suite) TestWorkspaceCreate() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	buf := new(bytes.Buffer)
 
-	err := workspaceCreate(buf)
+	err := workspaceCreate(buf, io.Discard)
 	s.ErrorIs(err, errCreateWorkspaceMissingLabel)
 
 	houstonMock := new(mocks.ClientInterface)
@@ -70,7 +71,7 @@ func (s *Suite) TestWorkspaceCreate() {
 	workspaceCreateLabel = "test"
 
 	houstonMock.On("CreateWorkspace", houston.CreateWorkspaceRequest{Label: workspaceCreateLabel, Description: "N/A"}).Return(&houston.Workspace{ID: "test", Label: workspaceCreateLabel}, nil).Once()
-	err = workspaceCreate(buf)
+	err = workspaceCreate(buf, io.Discard)
 	s.NoError(err)
 	s.Contains(buf.String(), workspaceCreateLabel)
 
@@ -93,7 +94,7 @@ func (s *Suite) TestWorkspaceDelete() {
 	// As --yes does: the question is the command's, and tested there.
 	skipPrompt = true
 	defer func() { skipPrompt = false }()
-	err := workspaceDelete(buf, []string{wsID})
+	err := workspaceDelete(buf, io.Discard, []string{wsID})
 	s.NoError(err)
 	s.Contains(buf.String(), "Deleted Workspace")
 
@@ -105,7 +106,7 @@ func (s *Suite) TestWorkspaceUpdate() {
 	wsID := "test-id"
 	buf := new(bytes.Buffer)
 
-	err := workspaceUpdate(buf, []string{wsID})
+	err := workspaceUpdate(buf, io.Discard, []string{wsID})
 	s.ErrorIs(err, errUpdateWorkspaceInvalidArgs)
 
 	houstonMock := new(mocks.ClientInterface)
@@ -116,7 +117,7 @@ func (s *Suite) TestWorkspaceUpdate() {
 	workspaceUpdateDescription = "test"
 
 	houstonMock.On("UpdateWorkspace", houston.UpdateWorkspaceRequest{WorkspaceID: wsID, Args: map[string]string{"label": workspaceUpdateLabel, "description": workspaceUpdateDescription}}).Return(&houston.Workspace{ID: wsID, Label: workspaceUpdateLabel}, nil).Once()
-	err = workspaceUpdate(buf, []string{wsID})
+	err = workspaceUpdate(buf, io.Discard, []string{wsID})
 	s.NoError(err)
 	s.Contains(buf.String(), wsID)
 	s.Contains(buf.String(), workspaceUpdateLabel)
@@ -137,7 +138,7 @@ func (s *Suite) TestWorkspaceSwitch() {
 
 		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
-		err := workspaceSwitch(buf, []string{wsID})
+		err := workspaceSwitch(buf, io.Discard, []string{wsID})
 		s.NoError(err)
 		s.Contains(buf.String(), wsID)
 		houstonMock.AssertExpectations(s.T())
@@ -156,7 +157,7 @@ func (s *Suite) TestWorkspaceSwitch() {
 
 		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
-		err := workspaceSwitch(buf, []string{wsID})
+		err := workspaceSwitch(buf, io.Discard, []string{wsID})
 		s.NoError(err)
 		s.Contains(buf.String(), wsID)
 		houstonMock.AssertExpectations(s.T())
@@ -176,7 +177,7 @@ func (s *Suite) TestWorkspaceSwitch() {
 
 		houstonMock.On("ValidateWorkspaceID", wsID).Return(&houston.Workspace{}, nil).Once()
 
-		err := workspaceSwitch(buf, []string{wsID})
+		err := workspaceSwitch(buf, io.Discard, []string{wsID})
 		s.NoError(err)
 		s.Contains(buf.String(), wsID)
 		houstonMock.AssertExpectations(s.T())

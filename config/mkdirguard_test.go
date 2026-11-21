@@ -21,18 +21,19 @@ import (
 // goes through MkdirAllUnder; a file that needs to call os.MkdirAll itself
 // belongs here, with a reason, and not by quietly bypassing the helper.
 var directoryCreatorsOutsideHome = map[string]string{
-	"config/config.go":                         "MkdirAllUnder and the home config directory's own creation",
-	"config/config_test_utils.go":              "a project's .astro, in a test helper",
-	"config/login.go":                          "creates the home config directory itself, owner-only",
-	"cmd/cliout/cliouttest/schema.go":          "test golden files",
-	"cmd/local/preflight.go":                   "the uv cache (XDG cache), not the home config directory",
-	"internal/runtimecatalog/freeze.go":        "the runtime constraints cache (XDG cache)",
-	"internal/userstate/userstate.go":          "per-project state under the cache directory",
-	"internal/platform/astro/deploy/deploy.go": "a project's dags directory",
-	"internal/pack/tree.go":                    "the package output tree the user names",
-	"internal/localenv/dotenv.go":              "a project's .env",
-	"pkg/fileutil/files.go":                    "copies a tree to a destination the caller names",
-	"version/version.go":                       "the release-check cache; owner-only (0700), so it creates ~/.astro that way too",
+	"config/config.go":                                   "MkdirAllUnder and the home config directory's own creation",
+	"config/config_test_utils.go":                        "a project's .astro, in a test helper",
+	"config/login.go":                                    "creates the home config directory itself, owner-only",
+	"cmd/cliout/cliouttest/schema.go":                    "test golden files",
+	"cmd/local/preflight.go":                             "the uv cache (XDG cache), not the home config directory",
+	"internal/runtimecatalog/freeze.go":                  "the runtime constraints cache (XDG cache)",
+	"internal/userstate/userstate.go":                    "per-project state under the cache directory",
+	"internal/platform/astro/deploy/deploy.go":           "a project's dags directory",
+	"internal/pack/tree.go":                              "the package output tree the user names",
+	"internal/platform/astro/deployment/bundle_files.go": "the local directory the user names as the destination of a copy or sync out of a bundle",
+	"internal/localenv/dotenv.go":                        "a project's .env",
+	"pkg/fileutil/files.go":                              "copies a tree to a destination the caller names",
+	"version/version.go":                                 "the release-check cache; owner-only (0700), so it creates ~/.astro that way too",
 }
 
 // A new os.MkdirAll that can land under ~/.astro has to use MkdirAllUnder,

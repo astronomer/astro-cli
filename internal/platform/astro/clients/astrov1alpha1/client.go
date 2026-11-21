@@ -13,14 +13,39 @@ var NormalizeAPIError = httputil.NormalizeAPIError
 type APIClient = ClientWithResponsesInterface
 
 // NewV1Alpha1Client creates an API client for the Astro v1alpha1 public API.
-// v1alpha1 is retained only for endpoints that v1 does not yet cover (Astro IDE).
+// v1alpha1 is retained only for endpoints that v1 does not yet cover (Astro IDE,
+// bundles).
 func NewV1Alpha1Client(c *httputil.HTTPClient) *ClientWithResponses {
-	cl, _ := NewClientWithResponses("", WithHTTPClient(httputil.WithRateLimitRetries(c.HTTPClient)), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) { //nolint:errcheck // error deliberately ignored in this shell code
+	cl, _ := NewClientWithResponses("", WithHTTPClient(httputil.WithRateLimitRetries(c.HTTPClient)), WithRequestEditorFn(currentContextEditor())) //nolint:errcheck // error deliberately ignored in this shell code
+	return cl
+}
+
+// NewV1Alpha1StreamClient creates a v1alpha1 API client whose request and
+// response bodies stream. It does not retry, because WithRateLimitRetries reads
+// a request body whole; its callers retry with httputil.RetryRateLimited.
+func NewV1Alpha1StreamClient(c *httputil.HTTPClient) *Client {
+	cl, _ := NewClient("", WithHTTPClient(c.HTTPClient), WithRequestEditorFn(currentContextEditor())) //nolint:errcheck // error deliberately ignored in this shell code
+	return cl
+}
+
+// currentContextEditor sends a request to the current context's API, with its token.
+func currentContextEditor() RequestEditorFn {
+	return httputil.NewRequestEditorFn(func() (string, string, error) {
 		ctx, err := context.GetCurrentContext()
 		if err != nil {
 			return "", "", err
 		}
 		return ctx.Token, ctx.GetPublicRESTAPIURL("v1alpha1"), nil
+	})
+}
+
+// NewV1Alpha1ClientForLogin creates a v1alpha1 API client bound to one stored
+// login — its token and its host's v1alpha1 base URL — rather than to whichever
+// login the current-context pointer names at request time, as
+// astrov1.NewV1ClientForLogin does for v1.
+func NewV1Alpha1ClientForLogin(c *httputil.HTTPClient, token, baseURL string) *ClientWithResponses {
+	cl, _ := NewClientWithResponses("", WithHTTPClient(httputil.WithRateLimitRetries(c.HTTPClient)), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) { //nolint:errcheck // same construction as NewV1Alpha1Client, which cannot fail with a base URL supplied per request
+		return token, baseURL, nil
 	})))
 	return cl
 }

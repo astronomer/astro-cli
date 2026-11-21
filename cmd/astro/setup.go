@@ -126,7 +126,7 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	// is watching. Credentials in the environment still apply.
 	if isAuthTokenCmd(cmd) {
 		// Quietly: the command's output is the token alone.
-		_, err := ensureEnvCredentials(astroV1Client)
+		_, err := ensureEnvCredentials(astroV1Client, cmd.ErrOrStderr())
 		// An API token is saved before its organization is looked up, and
 		// printing it needs no organization, so a lookup that failed for want
 		// of the API (a rate limit, an outage) does not stop this command as it
@@ -139,7 +139,7 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 		return err
 	}
 
-	return ensureLogin(astroV1Client)
+	return ensureLogin(astroV1Client, cmd.ErrOrStderr())
 }
 
 // IsCompletion reports whether cmd is part of shell completion: the hidden
@@ -178,16 +178,16 @@ func isAuthTokenCmd(cmd *cobra.Command) bool {
 // all, the login flow). A command that skips the root's pre-run, as the core tree
 // does, calls this before its own API calls.
 func EnsureLogin(astroV1Client astrov1.APIClient) error {
-	return ensureLogin(astroV1Client)
+	return ensureLogin(astroV1Client, os.Stderr) // no command in hand
 }
 
 // ensureLogin is Setup's auth half, shared with EnsureLogin.
-func ensureLogin(astroV1Client astrov1.APIClient) error {
-	used, err := ensureEnvCredentials(astroV1Client)
+func ensureLogin(astroV1Client astrov1.APIClient, errOut io.Writer) error {
+	used, err := ensureEnvCredentials(astroV1Client, errOut)
 	if err != nil || used {
 		return err
 	}
-	return checkToken(astroV1Client, os.Stderr)
+	return checkToken(astroV1Client, errOut)
 }
 
 // ensureEnvCredentials sets up an API token from the environment, reporting
@@ -195,7 +195,7 @@ func ensureLogin(astroV1Client astrov1.APIClient) error {
 // both Deployment API key variables set, it fails here, before any request or
 // prompt, as 1.x would have used the keys. A lone variable was ignored by 1.x
 // and is here too, with a warning.
-func ensureEnvCredentials(astroV1Client astrov1.APIClient) (bool, error) {
+func ensureEnvCredentials(astroV1Client astrov1.APIClient, errOut io.Writer) (bool, error) {
 	apiToken, err := checkAPIToken(astroV1Client)
 	if err != nil {
 		return false, err
@@ -204,13 +204,13 @@ func ensureEnvCredentials(astroV1Client astrov1.APIClient) (bool, error) {
 	if apiToken {
 		// A token wins over the keys: a CI job that moves from keys to a
 		// token may keep both set for a while.
-		warnLegacyKeys(set)
+		warnLegacyKeys(errOut, set)
 		return true, nil
 	}
 	if len(set) == 2 {
 		return false, ErrLegacyAPIKeys
 	}
-	warnLegacyKeys(set)
+	warnLegacyKeys(errOut, set)
 	return false, nil
 }
 
@@ -238,7 +238,7 @@ func legacyKeysSet() []string {
 
 // warnLegacyKeys says once per run, on stderr, that the variables in set are
 // not used.
-func warnLegacyKeys(set []string) {
+func warnLegacyKeys(errOut io.Writer, set []string) {
 	if len(set) == 0 {
 		return
 	}
@@ -246,7 +246,7 @@ func warnLegacyKeys(set []string) {
 	if len(set) > 1 {
 		verb, pronoun = "are", "them"
 	}
-	cliout.WarnOnce(os.Stderr, "legacy-api-keys", fmt.Sprintf("%s %s set but no longer used (Deployment API keys are not supported); unset %s", strings.Join(set, " and "), verb, pronoun))
+	cliout.WarnOnce(errOut, "legacy-api-keys", fmt.Sprintf("%s %s set but no longer used (Deployment API keys are not supported); unset %s", strings.Join(set, " and "), verb, pronoun))
 }
 
 // FreshLogin returns the context for domain, or the current context when

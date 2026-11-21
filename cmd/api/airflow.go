@@ -491,6 +491,7 @@ You can optionally provide a filter to search for specific endpoints, as an argu
 			// Create list options
 			listOpts := &ListOptions{
 				Out:       out,
+				ErrOut:    cmd.ErrOrStderr(),
 				specCache: parentOpts.specCache,
 				Filter:    filter,
 				Verbose:   verbose,
@@ -581,6 +582,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 			// Create describe options
 			descOpts := &DescribeOptions{
 				Out:       out,
+				ErrOut:    cmd.ErrOrStderr(),
 				specCache: parentOpts.specCache,
 				Endpoint:  args[0],
 				Method:    method,
