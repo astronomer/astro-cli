@@ -643,10 +643,9 @@ func newDeploymentVariableListCmd(out io.Writer) *cobra.Command {
 //nolint:dupl // the duplication is acceptable here
 func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 	cmd := cliout.Args(&cobra.Command{
-		Use:   "create",
-		Short: "Create Deployment-level environment variables",
-		Long:  "Create Deployment-level environment variables by supplying either KEY=VALUE pairs or an environment file with a list of keys and values",
-		// Args:    cobra.NoArgs,
+		Use:     "create",
+		Short:   "Create Deployment-level environment variables",
+		Long:    "Create Deployment-level environment variables by supplying either KEY=VALUE pairs or an environment file with a list of keys and values",
 		Example: deploymentVariableCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentVariableCreate(cmd, args, out)
