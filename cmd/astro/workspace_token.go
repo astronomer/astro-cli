@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	workspacetoken "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -138,6 +139,9 @@ func rotateWorkspaceToken(ctx context.Context, args []string, out, errOut io.Wri
 			return err
 		}
 	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return err
+	}
 	rotated, err := workspacetoken.RotateToken(token, ws, astroV1Client)
 	if err != nil {
 		return err
@@ -170,6 +174,9 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out, errOut io.Writ
 			fmt.Sprintf("\nDelete API token %s?", ansi.Bold(token.Name))); err != nil {
 			return err
 		}
+	}
+	if err := pagination.Interrupted(cmd.Context()); err != nil {
+		return err
 	}
 	removal, err := workspacetoken.DeleteToken(token, ws, astroV1Client)
 	if err != nil {
@@ -205,6 +212,9 @@ func removeWorkspaceToken(cmd *cobra.Command, args []string, out, errOut io.Writ
 		if err := confirmTokenChange("", fmt.Sprintf("\nRemove API token %s from the Workspace?", ansi.Bold(token.Name))); err != nil {
 			return err
 		}
+	}
+	if err := pagination.Interrupted(cmd.Context()); err != nil {
+		return err
 	}
 	removal, err := workspacetoken.RemoveToken(token, ws, astroV1Client)
 	if err != nil {

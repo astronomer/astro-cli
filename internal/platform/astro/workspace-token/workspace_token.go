@@ -193,6 +193,10 @@ func UpdateToken(ctx httpContext.Context, id, name, newName, description, role, 
 		}
 		return apitoken.Update{}, errWorkspaceTokenRoleSet
 	}
+	// An interrupt after the lookup sends no change.
+	if err := pagination.Interrupted(ctx); err != nil {
+		return apitoken.Update{}, err
+	}
 	if role != "" {
 		if err := setWorkspaceRole(&token, workspaceID, role, organizationID, client); err != nil {
 			return apitoken.Update{}, err
@@ -483,6 +487,9 @@ func RemoveOrgTokenWorkspaceRole(ctx httpContext.Context, id, name, workspaceID 
 	if err != nil {
 		return apitoken.WorkspaceRemoval{}, err
 	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return apitoken.WorkspaceRemoval{}, err
+	}
 	if err := setWorkspaceRole(&token, workspaceID, "", organizationID, client); err != nil {
 		return apitoken.WorkspaceRemoval{}, err
 	}
@@ -513,6 +520,9 @@ func UpsertOrgTokenWorkspaceRole(ctx httpContext.Context, id, name, role, worksp
 	// Short-circuit: already has this role on the workspace.
 	if workspaceRoleOf(&token, workspaceID) == role {
 		return apitoken.Token{}, errOrgTokenInWorkspace
+	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return apitoken.Token{}, err
 	}
 	if err := setWorkspaceRole(&token, workspaceID, role, organizationID, client); err != nil {
 		return apitoken.Token{}, err

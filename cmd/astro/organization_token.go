@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
@@ -97,6 +98,9 @@ func rotateOrganizationToken(ctx context.Context, args []string, out, errOut io.
 			return err
 		}
 	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return err
+	}
 	rotated, err := organization.RotateToken(token, astroV1Client)
 	if err != nil {
 		return err
@@ -117,6 +121,9 @@ func deleteOrganizationToken(ctx context.Context, args []string, out, errOut io.
 			fmt.Sprintf("\nDelete API token %s?", ansi.Bold(token.Name))); err != nil {
 			return err
 		}
+	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return err
 	}
 	removal, err := organization.DeleteToken(token, astroV1Client)
 	if err != nil {

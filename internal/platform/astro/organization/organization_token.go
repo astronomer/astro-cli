@@ -73,6 +73,9 @@ func AddOrgTokenToWorkspace(ctx httpContext.Context, id, name, role, workspaceID
 	}
 
 	newRoles := apitoken.WithRole(apitoken.Roles(&token), astrov1.ApiTokenRoleEntityTypeWORKSPACE, workspaceID, role)
+	if err := pagination.Interrupted(ctx); err != nil {
+		return apitoken.Token{}, err
+	}
 	resp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), cfg.Organization, token.Id, astrov1.UpdateApiTokenRolesRequest{
 		Roles: newRoles,
 	})
@@ -288,6 +291,9 @@ func UpdateToken(ctx httpContext.Context, id, name, newName, description, role s
 	}
 	if role != "" {
 		newRoles := apitoken.WithRole(apitoken.Roles(&token), astrov1.ApiTokenRoleEntityTypeORGANIZATION, cfg.Organization, role)
+		if err := pagination.Interrupted(ctx); err != nil {
+			return apitoken.Update{}, err
+		}
 		rolesResp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), cfg.Organization, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
 		if err != nil {
 			return apitoken.Update{}, err
@@ -306,6 +312,9 @@ func UpdateToken(ctx httpContext.Context, id, name, newName, description, role s
 	// says that it did, with the token as it now is.
 	updated := token
 	if newName != "" || description != "" {
+		if err := pagination.Interrupted(ctx); err != nil {
+			return apitoken.Update{}, err
+		}
 		updated, err = updateNameAndDescription(&token, newName, description, cfg.Organization, client)
 		if err != nil {
 			if role != "" {

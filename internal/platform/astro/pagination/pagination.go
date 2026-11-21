@@ -89,3 +89,12 @@ func Find[T any](ctx context.Context, what string, fetch FetchPage[T], pred func
 	}
 	return nil, fmt.Errorf("aborted listing %s after %d pages", what, MaxListPages)
 }
+
+// Interrupted is the cancellation of ctx, nil while the run goes on and for a
+// nil ctx. A lookup asks it before the change it was made for.
+func Interrupted(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
+}

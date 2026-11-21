@@ -153,6 +153,9 @@ func UpdateToken(ctx httpContext.Context, id, name, newName, description, role, 
 		return apitoken.Update{}, errDeploymentTokenRoleSet
 	}
 	if role != "" {
+		if err := pagination.Interrupted(ctx); err != nil {
+			return apitoken.Update{}, err
+		}
 		if err := setDeploymentRole(&token, deploymentID, role, organizationID, client); err != nil {
 			return apitoken.Update{}, err
 		}
@@ -167,6 +170,9 @@ func UpdateToken(ctx httpContext.Context, id, name, newName, description, role, 
 	// says that it did, with the token as it now is.
 	updated := token
 	if newName != "" || description != "" {
+		if err := pagination.Interrupted(ctx); err != nil {
+			return apitoken.Update{}, err
+		}
 		updated, err = updateNameAndDescription(&token, newName, description, organizationID, client)
 		if err != nil {
 			if role != "" {
@@ -310,6 +316,9 @@ func AddToken(ctx httpContext.Context, id, name, role, workspaceID, deploymentID
 			return apitoken.Token{}, errWorkspaceTokenInDeployment
 		}
 		return apitoken.Token{}, errOrgTokenInDeployment
+	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return apitoken.Token{}, err
 	}
 	if err := setDeploymentRole(&token, deploymentID, role, cfg.Organization, client); err != nil {
 		return apitoken.Token{}, err
@@ -484,6 +493,9 @@ func RemoveOrgTokenDeploymentRole(ctx httpContext.Context, id, name, deploymentI
 	if err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return apitoken.DeploymentRemoval{}, err
+	}
 	if err := setDeploymentRole(&token, deploymentID, "", cfg.Organization, client); err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
@@ -502,6 +514,9 @@ func RemoveWorkspaceTokenDeploymentRole(ctx httpContext.Context, id, name, works
 	wsTypes := []workspaceService.TokenType{workspaceService.TokenTypeWORKSPACE}
 	token, err := workspaceService.FindToken(ctx, id, name, workspaceID, organizationID, wsTypes, pick, client)
 	if err != nil {
+		return apitoken.DeploymentRemoval{}, err
+	}
+	if err := pagination.Interrupted(ctx); err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
 	if err := setDeploymentRole(&token, deploymentID, "", organizationID, client); err != nil {
@@ -533,6 +548,9 @@ func UpsertWorkspaceTokenDeploymentRole(ctx httpContext.Context, id, name, role,
 	if deploymentRoleOf(&token, deploymentID) == role {
 		return apitoken.Token{}, errWorkspaceTokenInDeployment
 	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return apitoken.Token{}, err
+	}
 	if err := setDeploymentRole(&token, deploymentID, role, cfg.Organization, client); err != nil {
 		return apitoken.Token{}, err
 	}
@@ -560,6 +578,9 @@ func UpsertOrgTokenDeploymentRole(ctx httpContext.Context, id, name, role, deplo
 	// Short-circuit: already has this role on the deployment.
 	if deploymentRoleOf(&token, deploymentID) == role {
 		return apitoken.Token{}, errOrgTokenInDeployment
+	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return apitoken.Token{}, err
 	}
 	if err := setDeploymentRole(&token, deploymentID, role, cfg.Organization, client); err != nil {
 		return apitoken.Token{}, err

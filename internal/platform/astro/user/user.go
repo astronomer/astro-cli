@@ -119,6 +119,9 @@ func UpdateUserRole(ctx httpContext.Context, email, role string, client astrov1.
 	mutateUserInput := astrov1.UpdateUserRolesRequest{
 		OrganizationRole: &role,
 	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return UserInfo{}, err
+	}
 	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), cfg.Organization, user.Id, mutateUserInput)
 	if err != nil {
 		return UserInfo{}, err
@@ -357,6 +360,9 @@ func setWorkspaceRole(ctx httpContext.Context, client astrov1.APIClient, orgID, 
 		WorkspaceRoles:   upsertWorkspaceRole(current.WorkspaceRoles, workspaceID, role),
 		DeploymentRoles:  current.DeploymentRoles,
 	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return UserInfo{}, err
+	}
 	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), orgID, found.Id, req)
 	if err != nil {
 		return UserInfo{}, err
@@ -435,6 +441,9 @@ func RemoveWorkspaceUser(ctx httpContext.Context, email, workspaceID string, cli
 		OrganizationRole: orgRolePtr(current),
 		WorkspaceRoles:   upsertWorkspaceRole(current.WorkspaceRoles, workspaceID, ""),
 		DeploymentRoles:  current.DeploymentRoles,
+	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return WorkspaceRemoval{}, err
 	}
 	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), cfg.Organization, found.Id, req)
 	if err != nil {
@@ -567,6 +576,9 @@ func putDeploymentRole(ctx httpContext.Context, client astrov1.APIClient, orgID,
 		OrganizationRole: orgRolePtr(current),
 		WorkspaceRoles:   current.WorkspaceRoles,
 		DeploymentRoles:  upsertDeploymentRole(current.DeploymentRoles, deploymentID, role),
+	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return astrov1.User{}, err
 	}
 	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), orgID, found.Id, req)
 	if err != nil {

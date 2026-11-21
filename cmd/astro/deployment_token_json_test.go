@@ -181,6 +181,13 @@ func execTokenCmd(t *testing.T, client astrov1.APIClient, answers string, args .
 // any question with answers.
 func execAstroCmd(t *testing.T, client astrov1.APIClient, answers string, newRoot func(io.Writer) *cobra.Command, args ...string) tokenRun {
 	t.Helper()
+	return execAstroCmdCtx(t, context.Background(), client, answers, newRoot, args...)
+}
+
+// execAstroCmdCtx is execAstroCmd run under ctx, as main runs a command under
+// the context an interrupt cancels.
+func execAstroCmdCtx(t *testing.T, ctx context.Context, client astrov1.APIClient, answers string, newRoot func(io.Writer) *cobra.Command, args ...string) tokenRun {
+	t.Helper()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	if _, ok := os.LookupEnv("ASTRO_API_TOKEN"); ok {
 		testUtil.ApplyAPIToken(t)
@@ -228,7 +235,6 @@ func execAstroCmd(t *testing.T, client astrov1.APIClient, answers string, newRoo
 	root.AddCommand(newRoot(outW))
 	root.SetOut(outW)
 	root.SetErr(&errBuf)
-	ctx := context.Background()
 	runErr := cliout.Execute(ctx, root, args, outW, nil)
 
 	os.Stdout, os.Stderr, os.Stdin = prevOut, prevErr, prevIn

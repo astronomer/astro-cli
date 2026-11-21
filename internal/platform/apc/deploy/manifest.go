@@ -424,7 +424,7 @@ type DagsAfterImageError struct {
 }
 
 func (e *DagsAfterImageError) Error() string {
-	if errors.Is(e.Err, context.Canceled) {
+	if errors.Is(e.Err, context.Canceled) || errors.Is(e.Err, context.DeadlineExceeded) {
 		return fmt.Sprintf("interrupted after the image %s was deployed to Deployment %s: the Dags were not uploaded, and the Deployment runs the new image with its previous Dags; to upload them, run astro deploy %s --dags",
 			e.Image, e.DeploymentID, e.DeploymentID)
 	}

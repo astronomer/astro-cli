@@ -233,6 +233,9 @@ func UpdateWorkspaceTeamRole(ctx httpContext.Context, id, role, workspaceID stri
 		WorkspaceRoles:   upsertTeamWorkspaceRole(team.WorkspaceRoles, workspaceID, role),
 		DeploymentRoles:  team.DeploymentRoles,
 	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return TeamInfo{}, err
+	}
 	if err := updateTeamRoles(client, cfg.Organization, team.Id, req); err != nil {
 		return TeamInfo{}, err
 	}
@@ -303,6 +306,9 @@ func UpdateTeam(ctx httpContext.Context, id, name, description, role string, for
 			WorkspaceRoles:   team.WorkspaceRoles,
 			DeploymentRoles:  team.DeploymentRoles,
 		}
+		if err := pagination.Interrupted(ctx); err != nil {
+			return nil, err
+		}
 		if err := updateTeamRoles(client, cfg.Organization, teamID, req); err != nil {
 			return nil, err
 		}
@@ -312,6 +318,9 @@ func UpdateTeam(ctx httpContext.Context, id, name, description, role string, for
 	// role-only update is one call.
 	after := team
 	if name != "" || description != "" {
+		if err := pagination.Interrupted(ctx); err != nil {
+			return nil, err
+		}
 		after, err = renameTeam(&team, name, description, cfg.Organization, client)
 		if err != nil {
 			if role == "" {
@@ -397,6 +406,9 @@ func RemoveWorkspaceTeam(ctx httpContext.Context, id, workspaceID string, client
 		OrganizationRole: teamOrgRole(team),
 		WorkspaceRoles:   upsertTeamWorkspaceRole(team.WorkspaceRoles, workspaceID, ""),
 		DeploymentRoles:  team.DeploymentRoles,
+	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return WorkspaceRemoval{}, err
 	}
 	if err := updateTeamRoles(client, cfg.Organization, team.Id, req); err != nil {
 		return WorkspaceRemoval{}, err
@@ -511,6 +523,9 @@ func AddWorkspaceTeam(ctx httpContext.Context, id, role, workspaceID string, cli
 		WorkspaceRoles:   upsertTeamWorkspaceRole(team.WorkspaceRoles, workspaceID, role),
 		DeploymentRoles:  team.DeploymentRoles,
 	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return TeamInfo{}, err
+	}
 	if err := updateTeamRoles(client, cfg.Organization, team.Id, req); err != nil {
 		return TeamInfo{}, err
 	}
@@ -585,6 +600,9 @@ func Delete(ctx httpContext.Context, id string, force bool, client astrov1.APICl
 		}
 	}
 	teamID := team.Id
+	if err := pagination.Interrupted(ctx); err != nil {
+		return nil, err
+	}
 	resp, err := client.DeleteTeamWithResponse(httpContext.Background(), cfg.Organization, teamID)
 	if err != nil {
 		return nil, err
@@ -690,6 +708,9 @@ func RemoveUser(ctx httpContext.Context, teamID, teamMemberID string, force bool
 	}
 	userID := teamMemberSelection.UserId
 
+	if err := pagination.Interrupted(ctx); err != nil {
+		return nil, err
+	}
 	resp, err := client.RemoveTeamMemberWithResponse(httpContext.Background(), cfg.Organization, teamID, userID)
 	if err != nil {
 		return nil, err
@@ -773,6 +794,9 @@ func AddUser(ctx httpContext.Context, teamID, userID string, force bool, client 
 		MemberIds: []string{userID},
 	}
 
+	if err := pagination.Interrupted(ctx); err != nil {
+		return nil, err
+	}
 	resp, err := client.AddTeamMembersWithResponse(httpContext.Background(), cfg.Organization, teamID, addTeamMembersRequest)
 	if err != nil {
 		return nil, err

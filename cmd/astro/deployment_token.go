@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
@@ -80,6 +81,9 @@ func runDeploymentTokenRotate(ctx context.Context, format cliout.Format, out, er
 			return err
 		}
 	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return err
+	}
 	rotated, err := deployment.RotateToken(token, deploymentID, astroV1Client)
 	if err != nil {
 		return err
@@ -116,6 +120,9 @@ func runDeploymentTokenDelete(cmd *cobra.Command, format cliout.Format, out, err
 			return err
 		}
 	}
+	if err := pagination.Interrupted(cmd.Context()); err != nil {
+		return err
+	}
 	removal, err := deployment.DeleteToken(token, deploymentID, astroV1Client)
 	if err != nil {
 		return err
@@ -140,6 +147,9 @@ func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out,
 		if err := confirmTokenChange("", fmt.Sprintf("\nRemove API token %s from the Deployment?", ansi.Bold(token.Name))); err != nil {
 			return err
 		}
+	}
+	if err := pagination.Interrupted(cmd.Context()); err != nil {
+		return err
 	}
 	removal, err := deployment.RemoveToken(token, deploymentID, astroV1Client)
 	if err != nil {
@@ -288,6 +298,9 @@ func tokenSearchWorkspace(ctx context.Context, tokenID string) (string, error) {
 	}
 	d, err := deployment.GetDeploymentByID(ctx, "", deploymentID, astroV1Client)
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return "", err
+		}
 		return "", fmt.Errorf("could not read Deployment %s to find the Workspace its Workspace tokens are in; pass --workspace: %w", deploymentID, err)
 	}
 	return d.WorkspaceId, nil

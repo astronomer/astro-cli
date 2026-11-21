@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -662,4 +663,39 @@ func TestDeploymentCoreOutputUsage(t *testing.T) {
 		require.Error(t, r.err, args)
 		assert.Equal(t, cliout.ExitUsage, r.code, args)
 	}
+}
+
+// An interrupt during a create's --wait still publishes the Deployment that
+// was created: under json the one object a script reads to find or clean up
+// the new Deployment, with the interrupt as the error.
+func TestDeploymentCoreInterruptedWaitStillPublishes(t *testing.T) {
+	origSleep, origTick := deployment.SleepTime, deployment.TickNum
+	deployment.SleepTime, deployment.TickNum = 0, 1
+	t.Cleanup(func() { deployment.SleepTime, deployment.TickNum = origSleep, origTick })
+
+	deploying := coreDeployment()
+	deploying.Status = astrov1.DeploymentStatusDEPLOYING
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	m := new(astrov1_mocks.ClientWithResponsesInterface)
+	m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(listDeploymentsResp(deploying), nil).Maybe()
+	m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Maybe()
+	// The wait's first read is the interrupt; a read made under the
+	// canceled run fails as a real client's does.
+	m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, coreDeploymentID).Return(
+		func(c context.Context, _, _ string, _ ...astrov1.RequestEditorFn) (*astrov1.GetDeploymentResponse, error) {
+			if err := c.Err(); err != nil {
+				return nil, err
+			}
+			cancel()
+			return getDeploymentResp(deploying), nil
+		}).Maybe()
+	expectCreate(m, coreDeployment())
+
+	r := execAstroCmdCtx(t, ctx, m, "", newDeploymentRootCmd, append([]string{"deployment"}, append(createArgs, "--wait", "--wait-time", "1m", "-o", "json")...)...)
+	assert.ErrorIs(t, r.err, context.Canceled)
+	var got formattedJSON
+	decodeOne(t, r.stdout, &got)
+	assert.Equal(t, coreDeploymentID, got.Deployment.Metadata.DeploymentID)
 }

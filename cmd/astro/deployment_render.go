@@ -40,7 +40,10 @@ var deploymentOutput cliout.Format
 func emitDeployment(ctx context.Context, r cliout.Renderer, d *astrov1.Deployment, text func(io.Writer) error) error {
 	var published inspect.FormattedDeployment
 	if r.Format == cliout.FormatJSON {
-		current, err := deployment.GetDeploymentByID(ctx, "", d.Id, astroV1Client)
+		// The Deployment exists whether or not the run was interrupted while
+		// it waited, and a script needs it either way: this read is not
+		// canceled with the run.
+		current, err := deployment.GetDeploymentByID(context.WithoutCancel(ctx), "", d.Id, astroV1Client)
 		if err != nil {
 			return err
 		}
