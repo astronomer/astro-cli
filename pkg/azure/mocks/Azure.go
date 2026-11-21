@@ -3,6 +3,7 @@
 package azure_mocks
 
 import (
+	context "context"
 	io "io"
 
 	mock "github.com/stretchr/testify/mock"
@@ -13,9 +14,9 @@ type Azure struct {
 	mock.Mock
 }
 
-// Upload provides a mock function with given fields: sasLink, dagFileReader
-func (_m *Azure) Upload(sasLink string, dagFileReader io.Reader) (string, error) {
-	ret := _m.Called(sasLink, dagFileReader)
+// Upload provides a mock function with given fields: ctx, sasLink, dagFileReader
+func (_m *Azure) Upload(ctx context.Context, sasLink string, dagFileReader io.Reader) (string, error) {
+	ret := _m.Called(ctx, sasLink, dagFileReader)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Upload")
@@ -23,17 +24,17 @@ func (_m *Azure) Upload(sasLink string, dagFileReader io.Reader) (string, error)
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, io.Reader) (string, error)); ok {
-		return rf(sasLink, dagFileReader)
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader) (string, error)); ok {
+		return rf(ctx, sasLink, dagFileReader)
 	}
-	if rf, ok := ret.Get(0).(func(string, io.Reader) string); ok {
-		r0 = rf(sasLink, dagFileReader)
+	if rf, ok := ret.Get(0).(func(context.Context, string, io.Reader) string); ok {
+		r0 = rf(ctx, sasLink, dagFileReader)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(string, io.Reader) error); ok {
-		r1 = rf(sasLink, dagFileReader)
+	if rf, ok := ret.Get(1).(func(context.Context, string, io.Reader) error); ok {
+		r1 = rf(ctx, sasLink, dagFileReader)
 	} else {
 		r1 = ret.Error(1)
 	}

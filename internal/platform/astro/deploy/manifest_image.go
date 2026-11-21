@@ -212,7 +212,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 		deployType = astrov1.CreateDeployRequestTypeIMAGEANDDAG
 	}
 	description := descriptionOrCommitMessage(in.Description, commitMessage)
-	created, err := createDeploy(dep.OrganizationId, dep.Id, astrov1.CreateDeployRequest{
+	created, err := createDeploy(ctx, dep.OrganizationId, dep.Id, astrov1.CreateDeployRequest{
 		Description: &description,
 		Type:        deployType,
 		Git:         gitInfo.Commit,
@@ -248,13 +248,13 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	// pushed, unless the DAGs are inside the image.
 	var tarballVersion string
 	if dags.upload {
-		tarballVersion, err = uploadDeployDags(&c, in.Build.ProjectDir, in.DeploymentID, &dep, created, dagsUpload{NoDagsBaseDir: in.NoDagsBaseDir, CosmosBoost: in.CosmosBoost})
+		tarballVersion, err = uploadDeployDags(ctx, &c, in.Build.ProjectDir, in.DeploymentID, &dep, created, dagsUpload{NoDagsBaseDir: in.NoDagsBaseDir, CosmosBoost: in.CosmosBoost, ErrOut: in.Progress})
 		if err != nil {
 			return ManifestImageDeployResult{}, err
 		}
 	}
 
-	if err := finalizeManifestDeploy(dep.OrganizationId, dep.Id, created.Id, tarballVersion, astroV1Client); err != nil {
+	if err := finalizeManifestDeploy(ctx, dep.OrganizationId, dep.Id, created.Id, tarballVersion, astroV1Client); err != nil {
 		return ManifestImageDeployResult{}, err
 	}
 
@@ -384,7 +384,7 @@ func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request, pod
 // created deploy's upload URL and returns the tarball version. Both manifest paths use
 // it: the dags-only deploy and a "both" image deploy, which ships the tarball to
 // fit the image just pushed.
-func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *astrov1.Deployment, created *astrov1.Deploy, opts dagsUpload) (string, error) {
+func uploadDeployDags(ctx context.Context, c *config.Context, projectDir, deploymentID string, dep *astrov1.Deployment, created *astrov1.Deploy, opts dagsUpload) (string, error) {
 	uploadURL := ""
 	if created.DagsUploadUrl != nil {
 		uploadURL = *created.DagsUploadUrl
@@ -398,7 +398,7 @@ func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *a
 	}
 	dagsPath := filepath.Join(projectDir, "dags")
 	opts.MonitoringDag = includeMonitoringDag(c.OrganizationProduct == string(astrov1.OrganizationProductHOSTED), deploymentType)
-	tarballVersion, err := uploadDags(dagsPath, uploadURL, dep.AstroRuntimeVersion, opts)
+	tarballVersion, err := uploadDags(ctx, dagsPath, uploadURL, dep.AstroRuntimeVersion, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), dagDeployDisabled) {
 			return "", fmt.Errorf(enableDagDeployMsg, deploymentID)
@@ -560,12 +560,12 @@ func isAirflow2(pin string) bool {
 // only when one exists (a "both" or dags-only deploy), so an image-only deploy
 // finalizes with an empty request. It prints nothing, so the deploy renders in
 // cmd and stays ready for --output json.
-func finalizeManifestDeploy(organizationID, deploymentID, deployID, dagTarballVersion string, astroV1Client astrov1.APIClient) error {
+func finalizeManifestDeploy(ctx context.Context, organizationID, deploymentID, deployID, dagTarballVersion string, astroV1Client astrov1.APIClient) error {
 	req := astrov1.FinalizeDeployRequest{}
 	if dagTarballVersion != "" {
 		req.DagTarballVersion = &dagTarballVersion
 	}
-	resp, err := astroV1Client.FinalizeDeployWithResponse(context.Background(), organizationID, deploymentID, deployID, req)
+	resp, err := astroV1Client.FinalizeDeployWithResponse(ctx, organizationID, deploymentID, deployID, req)
 	if err != nil {
 		return err
 	}

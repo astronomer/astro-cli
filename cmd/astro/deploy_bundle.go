@@ -154,6 +154,7 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	}
 
 	in := &astrodeploy.DeployBundleInput{
+		Context:       cmd.Context(),
 		BundlePath:    path,
 		MountPath:     b.mountPath,
 		DeploymentID:  targetID,
@@ -200,6 +201,7 @@ func deleteBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	}
 
 	in := &astrodeploy.DeleteBundleInput{
+		Context:       cmd.Context(),
 		MountPath:     b.mountPath,
 		DeploymentID:  targetID,
 		Deployment:    target,

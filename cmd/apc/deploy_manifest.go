@@ -306,7 +306,7 @@ func (d *apcManifestDeployer) DagsSource(projectDir string, _ bool) fileutil.Tar
 // is warned about rather than asked about, as on Astro: the upload goes
 // ahead.
 func (d *apcManifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
-	opts := deploy.Options{Progress: d.progress, WarnEmptyDags: d.warn}
+	opts := deploy.Options{Context: in.Context, Progress: d.progress, WarnEmptyDags: d.warn}
 	if _, err := DagsOnlyDeploy(d.client, in.WorkspaceID, in.DeploymentID, in.ProjectDir, nil, true, in.Description, opts); err != nil {
 		return manifestdeploy.DagResult{}, err
 	}

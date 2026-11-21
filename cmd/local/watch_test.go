@@ -87,7 +87,7 @@ func TestReportWatchJSON(t *testing.T) {
 			Removed: []string{"requests"},
 			Reasons: []localrt.Reason{{Code: localrt.ReasonRepinned, Dist: "pandas"}},
 		},
-	})
+	}, nil)
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(out.Bytes(), &got))
 	require.Equal(t, map[string]any{

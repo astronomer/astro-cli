@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -23,6 +24,9 @@ import (
 )
 
 type DeployBundleInput struct {
+	// Context ends the upload and the deploy's requests when the run is
+	// interrupted; nil is context.Background().
+	Context      context.Context
 	BundlePath   string
 	MountPath    string
 	DeploymentID string
@@ -73,6 +77,7 @@ type BundleDeploy struct {
 // finalizes the deploy. It does not report the result: its caller renders the
 // BundleDeploy it returns.
 func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
+	ctx := cmp.Or(input.Context, context.Background())
 	c, err := loginOrCurrent(input.Login)
 	if err != nil {
 		return BundleDeploy{}, err
@@ -109,7 +114,7 @@ func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
 	}
 
 	// initialize the deploy
-	deploy, err := createBundleDeploy(c.Organization, input, deployGit, input.AstroV1Client)
+	deploy, err := createBundleDeploy(ctx, c.Organization, input, deployGit, input.AstroV1Client)
 	if err != nil {
 		return BundleDeploy{}, explainHibernating(err, &currentDeployment)
 	}
@@ -120,7 +125,7 @@ func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
 	}
 
 	// upload the bundle
-	tarballVersion, err := UploadBundle(input.BundlePath, *deploy.BundleUploadUrl, BundleUpload{
+	tarballVersion, err := UploadBundle(ctx, input.BundlePath, *deploy.BundleUploadUrl, BundleUpload{
 		CosmosBoost:    input.CosmosBoost,
 		RuntimeVersion: currentDeployment.AstroRuntimeVersion,
 		ErrOut:         input.ErrOut,
@@ -130,7 +135,7 @@ func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
 	}
 
 	// finalize the deploy
-	err = finalizeBundleDeploy(c.Organization, input.DeploymentID, deploy.Id, tarballVersion, input.AstroV1Client)
+	err = finalizeBundleDeploy(ctx, c.Organization, input.DeploymentID, deploy.Id, tarballVersion, input.AstroV1Client)
 	if err != nil {
 		return BundleDeploy{}, err
 	}
@@ -178,6 +183,9 @@ func WaitForBundleIn(ctx context.Context, progress io.Writer, login *config.Cont
 }
 
 type DeleteBundleInput struct {
+	// Context ends the delete's requests when the run is interrupted; nil is
+	// context.Background().
+	Context      context.Context
 	MountPath    string
 	DeploymentID string
 	// Deployment is the Deployment as the caller already read it (from the
@@ -208,6 +216,7 @@ type BundleDelete struct {
 // It does not report the result: its caller renders the BundleDelete it
 // returns.
 func DeleteBundle(input *DeleteBundleInput) (BundleDelete, error) {
+	ctx := cmp.Or(input.Context, context.Background())
 	c, err := loginOrCurrent(input.Login)
 	if err != nil {
 		return BundleDelete{}, err
@@ -220,7 +229,7 @@ func DeleteBundle(input *DeleteBundleInput) (BundleDelete, error) {
 		BundleType:   input.BundleType,
 		Description:  input.Description,
 	}
-	deploy, err := createBundleDeploy(c.Organization, createInput, nil, input.AstroV1Client)
+	deploy, err := createBundleDeploy(ctx, c.Organization, createInput, nil, input.AstroV1Client)
 	if err != nil {
 		known := input.Deployment
 		if known == nil {
@@ -230,7 +239,7 @@ func DeleteBundle(input *DeleteBundleInput) (BundleDelete, error) {
 	}
 
 	// immediately finalize with no version, which will delete the bundle from the deployment
-	err = finalizeBundleDeploy(c.Organization, input.DeploymentID, deploy.Id, "", input.AstroV1Client)
+	err = finalizeBundleDeploy(ctx, c.Organization, input.DeploymentID, deploy.Id, "", input.AstroV1Client)
 	if err != nil {
 		return BundleDelete{}, err
 	}
@@ -352,7 +361,7 @@ type BundleUpload struct {
 // UploadBundle tars and gzips the directory bundlePath and uploads it to
 // uploadURL. The tarball is written to a temporary directory of its own, never
 // under bundlePath, so it cannot end up inside itself.
-func UploadBundle(bundlePath, uploadURL string, opts BundleUpload) (string, error) {
+func UploadBundle(ctx context.Context, bundlePath, uploadURL string, opts BundleUpload) (string, error) {
 	// If Airflow 3.x, check for symlinks pointing outside the bundle directory
 	if airflowversions.AirflowMajorVersionForRuntimeVersion(opts.RuntimeVersion) == "3" {
 		err := ValidateBundleSymlinks(bundlePath)
@@ -377,7 +386,9 @@ func UploadBundle(bundlePath, uploadURL string, opts BundleUpload) (string, erro
 	// stale one must not ship), and with cosmosBoost on ([tool.astro.deploy]
 	// cosmos-boost for a project's Dags, --cosmos-boost for a bundle), fresh
 	// ones are generated into the bundle, best-effort (a missing one is safe).
-	overlay, err := cosmosboost.BundleOverlay(bundlePath, opts.CosmosBoost, nil, opts.ErrOut)
+	// Its progress line goes where the caller's notes do (ErrOut); with none,
+	// where it always went.
+	overlay, err := cosmosboost.BundleOverlay(bundlePath, opts.CosmosBoost, opts.ErrOut, opts.ErrOut)
 	if err != nil {
 		return "", err
 	}
@@ -394,7 +405,10 @@ func UploadBundle(bundlePath, uploadURL string, opts BundleUpload) (string, erro
 	}
 	defer tarGzFile.Close()
 
-	versionID, err := azureUploader(uploadURL, tarGzFile)
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	versionID, err := azureUploader(ctx, uploadURL, tarGzFile)
 	if err != nil {
 		return "", err
 	}
@@ -402,7 +416,7 @@ func UploadBundle(bundlePath, uploadURL string, opts BundleUpload) (string, erro
 	return versionID, nil
 }
 
-func createBundleDeploy(organizationID string, input *DeployBundleInput, deployGit *astrov1.CreateDeployGitRequest, astroV1Client astrov1.APIClient) (*astrov1.Deploy, error) {
+func createBundleDeploy(ctx context.Context, organizationID string, input *DeployBundleInput, deployGit *astrov1.CreateDeployGitRequest, astroV1Client astrov1.APIClient) (*astrov1.Deploy, error) {
 	request := astrov1.CreateDeployRequest{
 		Description:     &input.Description,
 		Type:            astrov1.CreateDeployRequestTypeBUNDLE,
@@ -410,7 +424,7 @@ func createBundleDeploy(organizationID string, input *DeployBundleInput, deployG
 		BundleType:      &input.BundleType,
 		Git:             deployGit,
 	}
-	resp, err := astroV1Client.CreateDeployWithResponse(context.Background(), organizationID, input.DeploymentID, request)
+	resp, err := astroV1Client.CreateDeployWithResponse(ctx, organizationID, input.DeploymentID, request)
 	if err != nil {
 		return nil, err
 	}
@@ -421,11 +435,11 @@ func createBundleDeploy(organizationID string, input *DeployBundleInput, deployG
 	return resp.JSON200, nil
 }
 
-func finalizeBundleDeploy(organizationID, deploymentID, deployID, tarballVersion string, astroV1Client astrov1.APIClient) error {
+func finalizeBundleDeploy(ctx context.Context, organizationID, deploymentID, deployID, tarballVersion string, astroV1Client astrov1.APIClient) error {
 	request := astrov1.FinalizeDeployRequest{
 		BundleTarballVersion: &tarballVersion,
 	}
-	resp, err := astroV1Client.FinalizeDeployWithResponse(context.Background(), organizationID, deploymentID, deployID, request)
+	resp, err := astroV1Client.FinalizeDeployWithResponse(ctx, organizationID, deploymentID, deployID, request)
 	if err != nil {
 		return err
 	}
