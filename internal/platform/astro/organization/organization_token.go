@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
@@ -49,11 +50,11 @@ func orgRoleOf(token *astrov1.ApiToken) string {
 // AddOrgTokenToWorkspace gives an Organization token role on the Workspace
 // ("" is the current one), and returns the token with that role. A token
 // named by neither id nor name is picked through pick.
-func AddOrgTokenToWorkspace(id, name, role, workspaceID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
+func AddOrgTokenToWorkspace(ctx httpContext.Context, id, name, role, workspaceID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
 	if err := user.IsWorkspaceRoleValid(role); err != nil {
 		return apitoken.Token{}, err
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.Token{}, err
 	}
@@ -61,7 +62,7 @@ func AddOrgTokenToWorkspace(id, name, role, workspaceID string, pick apitoken.Pi
 	if err != nil {
 		return apitoken.Token{}, err
 	}
-	token, err := FindToken(id, name, ctx.Organization, pick, client)
+	token, err := FindToken(ctx, id, name, cfg.Organization, pick, client)
 	if err != nil {
 		return apitoken.Token{}, err
 	}
@@ -72,7 +73,10 @@ func AddOrgTokenToWorkspace(id, name, role, workspaceID string, pick apitoken.Pi
 	}
 
 	newRoles := apitoken.WithRole(apitoken.Roles(&token), astrov1.ApiTokenRoleEntityTypeWORKSPACE, workspaceID, role)
-	resp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), ctx.Organization, token.Id, astrov1.UpdateApiTokenRolesRequest{
+	if err := pagination.Interrupted(ctx); err != nil {
+		return apitoken.Token{}, err
+	}
+	resp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), cfg.Organization, token.Id, astrov1.UpdateApiTokenRolesRequest{
 		Roles: newRoles,
 	})
 	if err != nil {
@@ -98,10 +102,8 @@ func listOrgScopedAPITokens(ctx httpContext.Context, client astrov1.APIClient, l
 
 // ScopedTokens lists the Organization-scoped API tokens, as the API has them,
 // for a command in another family that picks among them.
-//
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func ScopedTokens(client astrov1.APIClient) ([]astrov1.ApiToken, error) {
-	return listOrgScopedAPITokens(httpContext.Background(), client, 0)
+func ScopedTokens(ctx httpContext.Context, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
+	return listOrgScopedAPITokens(ctx, client, 0)
 }
 
 // getOrganizationToken picks the token id or name means from tokens, offering
@@ -160,8 +162,8 @@ func ListTokens(ctx httpContext.Context, client astrov1.APIClient, limit int) ([
 	return apitoken.AllFromAPI(apiTokens, orgRoleOf), nil
 }
 
-func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
-	resp, err := client.GetApiTokenWithResponse(httpContext.Background(), orgID, id)
+func getTokenByID(ctx httpContext.Context, id, orgID string, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
+	resp, err := client.GetApiTokenWithResponse(pagination.Background(ctx), orgID, id)
 	if err != nil {
 		return astrov1.ApiToken{}, err
 	}
@@ -175,11 +177,9 @@ func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.Api
 // FindToken finds the Organization token a command means: the one with id,
 // else the one named name, else the one a person picks through pick. A token
 // of another scope is refused.
-//
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func FindToken(id, name, organization string, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
+func FindToken(ctx httpContext.Context, id, name, organization string, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
 	if id == "" {
-		tokens, err := listOrgScopedAPITokens(httpContext.Background(), client, 0)
+		tokens, err := listOrgScopedAPITokens(ctx, client, 0)
 		if err != nil {
 			return token, err
 		}
@@ -187,12 +187,12 @@ func FindToken(id, name, organization string, pick apitoken.Picker, client astro
 		if err != nil {
 			return token, err
 		}
-		token, err = getTokenByID(tokenFromList.Id, organization, client)
+		token, err = getTokenByID(ctx, tokenFromList.Id, organization, client)
 		if err != nil {
 			return token, err
 		}
 	} else {
-		token, err = getTokenByID(id, organization, client)
+		token, err = getTokenByID(ctx, id, organization, client)
 		if err != nil {
 			return token, err
 		}
@@ -204,18 +204,18 @@ func FindToken(id, name, organization string, pick apitoken.Picker, client astro
 }
 
 // FindCurrentToken is FindToken in the current Organization.
-func FindCurrentToken(id, name string, pick apitoken.Picker, client astrov1.APIClient) (astrov1.ApiToken, error) {
-	ctx, err := context.GetCurrentContext()
+func FindCurrentToken(ctx httpContext.Context, id, name string, pick apitoken.Picker, client astrov1.APIClient) (astrov1.ApiToken, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return astrov1.ApiToken{}, err
 	}
-	return FindToken(id, name, ctx.Organization, pick, client)
+	return FindToken(ctx, id, name, cfg.Organization, pick, client)
 }
 
 // ListTokenRoles lists every role an Organization token holds, empty and
 // never nil when it holds none.
-func ListTokenRoles(id string, pick apitoken.Picker, client astrov1.APIClient) ([]apitoken.Role, error) {
-	apiToken, err := FindCurrentToken(id, "", pick, client)
+func ListTokenRoles(ctx httpContext.Context, id string, pick apitoken.Picker, client astrov1.APIClient) ([]apitoken.Role, error) {
+	apiToken, err := FindCurrentToken(ctx, id, "", pick, client)
 	if err != nil {
 		return nil, err
 	}
@@ -270,17 +270,17 @@ func CreateToken(name, description, role string, expiration int, client astrov1.
 // The role is changed before the name and description, so a role the API
 // refuses leaves the token as it was; the name and description are sent only
 // when one is given.
-func UpdateToken(id, name, newName, description, role string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
+func UpdateToken(ctx httpContext.Context, id, name, newName, description, role string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
 	if role != "" {
 		if err := user.IsOrganizationRoleValid(role); err != nil {
 			return apitoken.Update{}, err
 		}
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.Update{}, err
 	}
-	token, err := FindToken(id, name, ctx.Organization, pick, client)
+	token, err := FindToken(ctx, id, name, cfg.Organization, pick, client)
 	if err != nil {
 		return apitoken.Update{}, err
 	}
@@ -290,8 +290,11 @@ func UpdateToken(id, name, newName, description, role string, pick apitoken.Pick
 		return apitoken.Update{}, errOrgTokenRoleSet
 	}
 	if role != "" {
-		newRoles := apitoken.WithRole(apitoken.Roles(&token), astrov1.ApiTokenRoleEntityTypeORGANIZATION, ctx.Organization, role)
-		rolesResp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), ctx.Organization, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
+		newRoles := apitoken.WithRole(apitoken.Roles(&token), astrov1.ApiTokenRoleEntityTypeORGANIZATION, cfg.Organization, role)
+		if err := pagination.Interrupted(ctx); err != nil {
+			return apitoken.Update{}, err
+		}
+		rolesResp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), cfg.Organization, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
 		if err != nil {
 			return apitoken.Update{}, err
 		}
@@ -309,7 +312,7 @@ func UpdateToken(id, name, newName, description, role string, pick apitoken.Pick
 	// says that it did, with the token as it now is.
 	updated := token
 	if newName != "" || description != "" {
-		updated, err = updateNameAndDescription(&token, newName, description, ctx.Organization, client)
+		updated, err = updateNameAndDescription(ctx, &token, newName, description, cfg.Organization, client)
 		if err != nil {
 			if role != "" {
 				return apitoken.Update{Token: apitoken.FromAPI(&token, newRole), PreviousName: token.Name}, apitoken.RenameFailedAfterRole(role, err)
@@ -364,7 +367,12 @@ func DeleteToken(token astrov1.ApiToken, client astrov1.APIClient) (apitoken.Org
 // updateNameAndDescription sends token's new name and description, keeping
 // its own for whichever is "", and returns the token as the update left it:
 // the API's answer, or what was asked for when it gave none.
-func updateNameAndDescription(token *astrov1.ApiToken, newName, description, organizationID string, client astrov1.APIClient) (astrov1.ApiToken, error) {
+func updateNameAndDescription(ctx httpContext.Context, token *astrov1.ApiToken, newName, description, organizationID string, client astrov1.APIClient) (astrov1.ApiToken, error) {
+	// An interrupt after the role was written is an error the caller reports
+	// beside the role that changed.
+	if err := pagination.Interrupted(ctx); err != nil {
+		return astrov1.ApiToken{}, err
+	}
 	updateReq := astrov1.UpdateApiTokenJSONRequestBody{Name: token.Name}
 	if newName != "" {
 		updateReq.Name = newName

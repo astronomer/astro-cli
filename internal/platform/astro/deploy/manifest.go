@@ -104,7 +104,7 @@ func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClie
 
 	// Read the deployment's server-side facts: runtime version and type drive
 	// the dags transport, and the flags gate the deploy.
-	dep, err := deployment.GetDeploymentByID(c.Organization, in.DeploymentID, astroV1Client)
+	dep, err := deployment.GetDeploymentByID(ctx, c.Organization, in.DeploymentID, astroV1Client)
 	if err != nil {
 		return ManifestDagDeployResult{}, err
 	}

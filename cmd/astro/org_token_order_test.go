@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -70,7 +71,7 @@ func TestRotateAndDeleteAWorkspaceTokenByIDNeedNoWorkspace(t *testing.T) {
 	}{
 		"rotate": {
 			run: func(cmd *cobra.Command, out *bytes.Buffer) error {
-				return rotateWorkspaceToken([]string{"token-id"}, out, cmd.ErrOrStderr())
+				return rotateWorkspaceToken(context.Background(), []string{"token-id"}, out, cmd.ErrOrStderr())
 			},
 			endpoint: "RotateApiTokenWithResponse",
 			want:     "new-secret",
@@ -116,8 +117,8 @@ func TestMissingWorkspaceIsSaidBeforeAQuestionThatCannotBeAsked(t *testing.T) {
 		"workspace user update":     func() error { return updateWorkspaceUser(cmd, nil, &out, io.Discard) },
 		"workspace user remove":     func() error { return removeWorkspaceUser(cmd, nil, &out, io.Discard) },
 		"workspace token create":    func() error { return createWorkspaceToken(cmd, &out) },
-		"workspace token update":    func() error { return updateWorkspaceToken(nil, &out, io.Discard) },
-		"organization-token remove": func() error { return removeOrganizationTokenWorkspaceRole(nil, &out, io.Discard) },
+		"workspace token update":    func() error { return updateWorkspaceToken(context.Background(), nil, &out, io.Discard) },
+		"organization-token remove": func() error { return removeOrganizationTokenWorkspaceRole(context.Background(), nil, &out, io.Discard) },
 		"workspace token add":       func() error { return addOrgTokenToWorkspace(cmd, nil, &out, io.Discard) },
 		"organization-token add":    func() error { return addOrgTokenWorkspaceRole(cmd, nil, &out) },
 		"organization-token update": func() error { return updateOrgTokenWorkspaceRole(cmd, nil, &out) },
@@ -163,7 +164,7 @@ func TestDeploymentTokenAddNeedsNoWorkspaceOfItsOwn(t *testing.T) {
 
 	var err error
 	asked := captureStderr(t, func() {
-		err = setTokenDeploymentRole(nil, &bytes.Buffer{}, io.Discard, tokenKindWorkspace, tokenRoleAdd)
+		err = setTokenDeploymentRole(context.Background(), nil, &bytes.Buffer{}, io.Discard, tokenKindWorkspace, tokenRoleAdd)
 	})
 	require.ErrorContains(t, err, "stop here")
 	require.NotErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)

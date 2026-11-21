@@ -75,7 +75,7 @@ func CreateTeam(name, description, role string, client astrov1.APIClient) (TeamI
 			return TeamInfo{}, ErrNoTeamNameProvided
 		}
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return TeamInfo{}, err
 	}
@@ -85,7 +85,7 @@ func CreateTeam(name, description, role string, client astrov1.APIClient) (TeamI
 		Name:             name,
 		OrganizationRole: &typedRole,
 	}
-	resp, err := client.CreateTeamWithResponse(httpContext.Background(), ctx.Organization, teamCreateRequest)
+	resp, err := client.CreateTeamWithResponse(httpContext.Background(), cfg.Organization, teamCreateRequest)
 	if err != nil {
 		return TeamInfo{}, err
 	}
@@ -191,12 +191,12 @@ func updateTeamRoles(client astrov1.APIClient, orgID, teamID string, req astrov1
 // UpdateWorkspaceTeamRole sets the role on the Workspace of the team with
 // id, or of the Workspace's team picked when id is "", and returns the team
 // with that role.
-func UpdateWorkspaceTeamRole(id, role, workspaceID string, client astrov1.APIClient) (TeamInfo, error) {
+func UpdateWorkspaceTeamRole(ctx httpContext.Context, id, role, workspaceID string, client astrov1.APIClient) (TeamInfo, error) {
 	err := user.IsWorkspaceRoleValid(role)
 	if err != nil {
 		return TeamInfo{}, err
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return TeamInfo{}, err
 	}
@@ -207,7 +207,7 @@ func UpdateWorkspaceTeamRole(id, role, workspaceID string, client astrov1.APICli
 
 	var team astrov1.Team
 	if id == "" {
-		teams, err := GetWorkspaceTeams(client, workspaceID, teamPaginationLimit)
+		teams, err := GetWorkspaceTeams(ctx, client, workspaceID, teamPaginationLimit)
 		if err != nil {
 			return TeamInfo{}, err
 		}
@@ -233,7 +233,10 @@ func UpdateWorkspaceTeamRole(id, role, workspaceID string, client astrov1.APICli
 		WorkspaceRoles:   upsertTeamWorkspaceRole(team.WorkspaceRoles, workspaceID, role),
 		DeploymentRoles:  team.DeploymentRoles,
 	}
-	if err := updateTeamRoles(client, ctx.Organization, team.Id, req); err != nil {
+	if err := pagination.Interrupted(ctx); err != nil {
+		return TeamInfo{}, err
+	}
+	if err := updateTeamRoles(client, cfg.Organization, team.Id, req); err != nil {
 		return TeamInfo{}, err
 	}
 	info := Info(&team)
@@ -243,9 +246,9 @@ func UpdateWorkspaceTeamRole(id, role, workspaceID string, client astrov1.APICli
 
 // orgTeam returns the Organization's team with id, or the one picked when id
 // is "".
-func orgTeam(id string, client astrov1.APIClient) (astrov1.Team, error) {
+func orgTeam(ctx httpContext.Context, id string, client astrov1.APIClient) (astrov1.Team, error) {
 	if id == "" {
-		teams, err := GetOrgTeams(client)
+		teams, err := GetOrgTeams(ctx, client)
 		if err != nil {
 			return astrov1.Team{}, err
 		}
@@ -275,18 +278,18 @@ func orgTeam(id string, client astrov1.APIClient) (astrov1.Team, error) {
 // are sent only when one is given; if they fail after the role went through,
 // the error says the role changed, and the Update returned with it is the
 // team with that role.
-func UpdateTeam(id, name, description, role string, force bool, client astrov1.APIClient) (*Update, error) {
+func UpdateTeam(ctx httpContext.Context, id, name, description, role string, force bool, client astrov1.APIClient) (*Update, error) {
 	if role != "" {
 		if err := user.IsOrganizationRoleValid(role); err != nil {
 			return nil, err
 		}
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
 
-	team, err := orgTeam(id, client)
+	team, err := orgTeam(ctx, id, client)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +306,10 @@ func UpdateTeam(id, name, description, role string, force bool, client astrov1.A
 			WorkspaceRoles:   team.WorkspaceRoles,
 			DeploymentRoles:  team.DeploymentRoles,
 		}
-		if err := updateTeamRoles(client, ctx.Organization, teamID, req); err != nil {
+		if err := pagination.Interrupted(ctx); err != nil {
+			return nil, err
+		}
+		if err := updateTeamRoles(client, cfg.Organization, teamID, req); err != nil {
 			return nil, err
 		}
 	}
@@ -312,7 +318,7 @@ func UpdateTeam(id, name, description, role string, force bool, client astrov1.A
 	// role-only update is one call.
 	after := team
 	if name != "" || description != "" {
-		after, err = renameTeam(&team, name, description, ctx.Organization, client)
+		after, err = renameTeam(ctx, &team, name, description, cfg.Organization, client)
 		if err != nil {
 			if role == "" {
 				return nil, err
@@ -335,7 +341,12 @@ func UpdateTeam(id, name, description, role string, force bool, client astrov1.A
 // renameTeam sends team's new name and description, keeping its own for
 // whichever is "", and returns the team as the update left it: the API's
 // answer, or what was asked for when it gave none.
-func renameTeam(team *astrov1.Team, name, description, orgID string, client astrov1.APIClient) (astrov1.Team, error) {
+func renameTeam(ctx httpContext.Context, team *astrov1.Team, name, description, orgID string, client astrov1.APIClient) (astrov1.Team, error) {
+	// An interrupt after the role was written is an error the caller reports
+	// beside the role that changed.
+	if err := pagination.Interrupted(ctx); err != nil {
+		return astrov1.Team{}, err
+	}
 	req := astrov1.UpdateTeamJSONRequestBody{Name: team.Name, Description: team.Description}
 	if name != "" {
 		req.Name = name
@@ -361,8 +372,8 @@ func renameTeam(team *astrov1.Team, name, description, orgID string, client astr
 // RemoveWorkspaceTeam removes the role on the Workspace of the team with id,
 // or of the Workspace's team picked when id is "", and returns which team it
 // removed from which Workspace.
-func RemoveWorkspaceTeam(id, workspaceID string, client astrov1.APIClient) (WorkspaceRemoval, error) {
-	ctx, err := context.GetCurrentContext()
+func RemoveWorkspaceTeam(ctx httpContext.Context, id, workspaceID string, client astrov1.APIClient) (WorkspaceRemoval, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return WorkspaceRemoval{}, err
 	}
@@ -373,7 +384,7 @@ func RemoveWorkspaceTeam(id, workspaceID string, client astrov1.APIClient) (Work
 
 	var team astrov1.Team
 	if id == "" {
-		teams, err := GetWorkspaceTeams(client, workspaceID, teamPaginationLimit)
+		teams, err := GetWorkspaceTeams(ctx, client, workspaceID, teamPaginationLimit)
 		if err != nil {
 			return WorkspaceRemoval{}, err
 		}
@@ -398,7 +409,10 @@ func RemoveWorkspaceTeam(id, workspaceID string, client astrov1.APIClient) (Work
 		WorkspaceRoles:   upsertTeamWorkspaceRole(team.WorkspaceRoles, workspaceID, ""),
 		DeploymentRoles:  team.DeploymentRoles,
 	}
-	if err := updateTeamRoles(client, ctx.Organization, team.Id, req); err != nil {
+	if err := pagination.Interrupted(ctx); err != nil {
+		return WorkspaceRemoval{}, err
+	}
+	if err := updateTeamRoles(client, cfg.Organization, team.Id, req); err != nil {
 		return WorkspaceRemoval{}, err
 	}
 	return WorkspaceRemoval{ID: team.Id, Name: team.Name, WorkspaceID: workspaceID, Action: Removed}, nil
@@ -458,25 +472,24 @@ func listTeams(ctx httpContext.Context, client astrov1.APIClient, workspaceID, d
 	})
 }
 
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func GetWorkspaceTeams(client astrov1.APIClient, workspaceID string, _ int) ([]astrov1.Team, error) {
+func GetWorkspaceTeams(ctx httpContext.Context, client astrov1.APIClient, workspaceID string, _ int) ([]astrov1.Team, error) {
 	workspaceID, err := astrosession.RequireWorkspace(workspaceID)
 	if err != nil {
 		return nil, err
 	}
 	wsID := workspaceID
-	return listTeams(httpContext.Background(), client, &wsID, nil, 0)
+	return listTeams(ctx, client, &wsID, nil, 0)
 }
 
 // AddWorkspaceTeam gives the Organization's team with id, or the one picked
 // when id is "", role on the Workspace (the current one when workspaceID is
 // ""), and returns the team with that role.
-func AddWorkspaceTeam(id, role, workspaceID string, client astrov1.APIClient) (TeamInfo, error) {
+func AddWorkspaceTeam(ctx httpContext.Context, id, role, workspaceID string, client astrov1.APIClient) (TeamInfo, error) {
 	err := user.IsWorkspaceRoleValid(role)
 	if err != nil {
 		return TeamInfo{}, err
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return TeamInfo{}, err
 	}
@@ -486,7 +499,7 @@ func AddWorkspaceTeam(id, role, workspaceID string, client astrov1.APIClient) (T
 	}
 	var team astrov1.Team
 	if id == "" {
-		teams, err := GetOrgTeams(client)
+		teams, err := GetOrgTeams(ctx, client)
 		if err != nil {
 			return TeamInfo{}, err
 		}
@@ -512,7 +525,10 @@ func AddWorkspaceTeam(id, role, workspaceID string, client astrov1.APIClient) (T
 		WorkspaceRoles:   upsertTeamWorkspaceRole(team.WorkspaceRoles, workspaceID, role),
 		DeploymentRoles:  team.DeploymentRoles,
 	}
-	if err := updateTeamRoles(client, ctx.Organization, team.Id, req); err != nil {
+	if err := pagination.Interrupted(ctx); err != nil {
+		return TeamInfo{}, err
+	}
+	if err := updateTeamRoles(client, cfg.Organization, team.Id, req); err != nil {
 		return TeamInfo{}, err
 	}
 	info := Info(&team)
@@ -532,17 +548,15 @@ func pickFailed(err error) error {
 }
 
 // GetOrgTeams returns a list of all organization teams.
-//
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func GetOrgTeams(client astrov1.APIClient) ([]astrov1.Team, error) {
-	return listTeams(httpContext.Background(), client, nil, nil, 0)
+func GetOrgTeams(ctx httpContext.Context, client astrov1.APIClient) ([]astrov1.Team, error) {
+	return listTeams(ctx, client, nil, nil, 0)
 }
 
 // Delete deletes the team with id, or the one picked when id is "", and
 // returns which team it deleted, asking first unless force. Declined, it is
 // input.ErrAborted, and nothing is deleted.
-func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemoval, error) {
-	ctx, err := context.GetCurrentContext()
+func Delete(ctx httpContext.Context, id string, force bool, client astrov1.APIClient) (*OrganizationRemoval, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +570,7 @@ func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemov
 
 	var team astrov1.Team
 	if id == "" {
-		teams, err := GetOrgTeams(client)
+		teams, err := GetOrgTeams(ctx, client)
 		if err != nil {
 			return nil, err
 		}
@@ -588,7 +602,10 @@ func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemov
 		}
 	}
 	teamID := team.Id
-	resp, err := client.DeleteTeamWithResponse(httpContext.Background(), ctx.Organization, teamID)
+	if err := pagination.Interrupted(ctx); err != nil {
+		return nil, err
+	}
+	resp, err := client.DeleteTeamWithResponse(httpContext.Background(), cfg.Organization, teamID)
 	if err != nil {
 		return nil, err
 	}
@@ -596,7 +613,7 @@ func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemov
 	if err != nil {
 		return nil, err
 	}
-	return &OrganizationRemoval{ID: team.Id, Name: team.Name, OrganizationID: ctx.Organization, Action: Deleted}, nil
+	return &OrganizationRemoval{ID: team.Id, Name: team.Name, OrganizationID: cfg.Organization, Action: Deleted}, nil
 }
 
 // listTeamMembers fetches the members of a team using the paginated v1
@@ -633,15 +650,15 @@ func listTeamMembers(ctx httpContext.Context, client astrov1.APIClient, orgID, t
 // is "", from the team with teamID, or the one picked when it is "", and
 // returns which user it removed from which team. A team that is IdP-managed,
 // where the person declines to go on, is input.ErrAborted.
-func RemoveUser(teamID, teamMemberID string, force bool, client astrov1.APIClient) (*Membership, error) {
-	ctx, err := context.GetCurrentContext()
+func RemoveUser(ctx httpContext.Context, teamID, teamMemberID string, force bool, client astrov1.APIClient) (*Membership, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
 
 	var team astrov1.Team
 	if teamID == "" {
-		teams, err := GetOrgTeams(client)
+		teams, err := GetOrgTeams(ctx, client)
 		if err != nil {
 			return nil, err
 		}
@@ -667,7 +684,7 @@ func RemoveUser(teamID, teamMemberID string, force bool, client astrov1.APIClien
 		}
 	}
 	teamID = team.Id
-	teamMembers, err := listTeamMembers(httpContext.Background(), client, ctx.Organization, teamID, 0)
+	teamMembers, err := listTeamMembers(ctx, client, cfg.Organization, teamID, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -693,7 +710,10 @@ func RemoveUser(teamID, teamMemberID string, force bool, client astrov1.APIClien
 	}
 	userID := teamMemberSelection.UserId
 
-	resp, err := client.RemoveTeamMemberWithResponse(httpContext.Background(), ctx.Organization, teamID, userID)
+	if err := pagination.Interrupted(ctx); err != nil {
+		return nil, err
+	}
+	resp, err := client.RemoveTeamMemberWithResponse(httpContext.Background(), cfg.Organization, teamID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -708,15 +728,15 @@ func RemoveUser(teamID, teamMemberID string, force bool, client astrov1.APIClien
 // is "", to the team with teamID, or the one picked when it is "", and
 // returns which user it added to which team. A team that is IdP-managed,
 // where the person declines to go on, is input.ErrAborted.
-func AddUser(teamID, userID string, force bool, client astrov1.APIClient) (*Membership, error) {
-	ctx, err := context.GetCurrentContext()
+func AddUser(ctx httpContext.Context, teamID, userID string, force bool, client astrov1.APIClient) (*Membership, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
 
 	var team astrov1.Team
 	if teamID == "" {
-		teams, err := GetOrgTeams(client)
+		teams, err := GetOrgTeams(ctx, client)
 		if err != nil {
 			return nil, err
 		}
@@ -750,7 +770,7 @@ func AddUser(teamID, userID string, force bool, client astrov1.APIClient) (*Memb
 
 	var userSelection astrov1.User
 	if userID == "" {
-		users, err := user.GetOrgUsers(client)
+		users, err := user.GetOrgUsers(ctx, client)
 		if err != nil {
 			return nil, err
 		}
@@ -762,7 +782,7 @@ func AddUser(teamID, userID string, force bool, client astrov1.APIClient) (*Memb
 			return nil, err
 		}
 	} else {
-		userSelection, err = user.GetUser(client, userID)
+		userSelection, err = user.GetUser(ctx, client, userID)
 		if err != nil {
 			return nil, err
 		}
@@ -776,7 +796,10 @@ func AddUser(teamID, userID string, force bool, client astrov1.APIClient) (*Memb
 		MemberIds: []string{userID},
 	}
 
-	resp, err := client.AddTeamMembersWithResponse(httpContext.Background(), ctx.Organization, teamID, addTeamMembersRequest)
+	if err := pagination.Interrupted(ctx); err != nil {
+		return nil, err
+	}
+	resp, err := client.AddTeamMembersWithResponse(httpContext.Background(), cfg.Organization, teamID, addTeamMembersRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -852,24 +875,23 @@ func ListTeamUsers(ctx httpContext.Context, teamID string, limit int, client ast
 	return list, nil
 }
 
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func GetDeploymentTeams(client astrov1.APIClient, deploymentID string, _ int) ([]astrov1.Team, error) {
+func GetDeploymentTeams(ctx httpContext.Context, client astrov1.APIClient, deploymentID string, _ int) ([]astrov1.Team, error) {
 	dID := deploymentID
-	return listTeams(httpContext.Background(), client, nil, &dID, 0)
+	return listTeams(ctx, client, nil, &dID, 0)
 }
 
 // AddDeploymentTeam gives the Organization's team with id, or the one picked
 // when id is "", role on the Deployment with deploymentID, and returns the
 // team with that role.
-func AddDeploymentTeam(id, role, deploymentID string, client astrov1.APIClient) (TeamInfo, error) {
-	ctx, err := context.GetCurrentContext()
+func AddDeploymentTeam(ctx httpContext.Context, id, role, deploymentID string, client astrov1.APIClient) (TeamInfo, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return TeamInfo{}, err
 	}
 
 	var team astrov1.Team
 	if id == "" {
-		teams, err := GetOrgTeams(client)
+		teams, err := GetOrgTeams(ctx, client)
 		if err != nil {
 			return TeamInfo{}, err
 		}
@@ -889,37 +911,37 @@ func AddDeploymentTeam(id, role, deploymentID string, client astrov1.APIClient) 
 			return TeamInfo{}, ErrTeamNotFound
 		}
 	}
-	return setDeploymentTeamRole(client, ctx.Organization, deploymentID, role, &team)
+	return setDeploymentTeamRole(ctx, client, cfg.Organization, deploymentID, role, &team)
 }
 
 // UpdateDeploymentTeamRole sets the role on the Deployment of the team with
 // id, or of the Deployment's team picked when id is "", and returns the team
 // with that role.
-func UpdateDeploymentTeamRole(id, role, deploymentID string, client astrov1.APIClient) (TeamInfo, error) {
-	ctx, err := context.GetCurrentContext()
+func UpdateDeploymentTeamRole(ctx httpContext.Context, id, role, deploymentID string, client astrov1.APIClient) (TeamInfo, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return TeamInfo{}, err
 	}
-	team, err := deploymentTeam(id, deploymentID, client)
+	team, err := deploymentTeam(ctx, id, deploymentID, client)
 	if err != nil {
 		return TeamInfo{}, err
 	}
-	return setDeploymentTeamRole(client, ctx.Organization, deploymentID, role, &team)
+	return setDeploymentTeamRole(ctx, client, cfg.Organization, deploymentID, role, &team)
 }
 
 // RemoveDeploymentTeam removes the role on the Deployment of the team with
 // id, or of the Deployment's team picked when id is "", and returns which
 // team it removed from which Deployment.
-func RemoveDeploymentTeam(id, deploymentID string, client astrov1.APIClient) (DeploymentRemoval, error) {
-	ctx, err := context.GetCurrentContext()
+func RemoveDeploymentTeam(ctx httpContext.Context, id, deploymentID string, client astrov1.APIClient) (DeploymentRemoval, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return DeploymentRemoval{}, err
 	}
-	team, err := deploymentTeam(id, deploymentID, client)
+	team, err := deploymentTeam(ctx, id, deploymentID, client)
 	if err != nil {
 		return DeploymentRemoval{}, err
 	}
-	if _, err := setDeploymentTeamRole(client, ctx.Organization, deploymentID, "", &team); err != nil {
+	if _, err := setDeploymentTeamRole(ctx, client, cfg.Organization, deploymentID, "", &team); err != nil {
 		return DeploymentRemoval{}, err
 	}
 	return DeploymentRemoval{ID: team.Id, Name: team.Name, DeploymentID: deploymentID, Action: Removed}, nil
@@ -927,9 +949,9 @@ func RemoveDeploymentTeam(id, deploymentID string, client astrov1.APIClient) (De
 
 // deploymentTeam returns the team with id, or the Deployment's team picked
 // when id is "".
-func deploymentTeam(id, deploymentID string, client astrov1.APIClient) (astrov1.Team, error) {
+func deploymentTeam(ctx httpContext.Context, id, deploymentID string, client astrov1.APIClient) (astrov1.Team, error) {
 	if id == "" {
-		teams, err := GetDeploymentTeams(client, deploymentID, teamPaginationLimit)
+		teams, err := GetDeploymentTeams(ctx, client, deploymentID, teamPaginationLimit)
 		if err != nil {
 			return astrov1.Team{}, err
 		}
@@ -951,7 +973,10 @@ func deploymentTeam(id, deploymentID string, client astrov1.APIClient) (astrov1.
 // setDeploymentTeamRole sets team's role on deploymentID to role, or removes
 // it when role is "", keeping every other role it holds, and returns the team
 // with that role.
-func setDeploymentTeamRole(client astrov1.APIClient, orgID, deploymentID, role string, team *astrov1.Team) (TeamInfo, error) {
+func setDeploymentTeamRole(ctx httpContext.Context, client astrov1.APIClient, orgID, deploymentID, role string, team *astrov1.Team) (TeamInfo, error) {
+	if err := pagination.Interrupted(ctx); err != nil {
+		return TeamInfo{}, err
+	}
 	req := astrov1.UpdateTeamRolesRequest{
 		OrganizationRole: teamOrgRole(*team),
 		WorkspaceRoles:   team.WorkspaceRoles,

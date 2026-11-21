@@ -5,6 +5,7 @@ package astro
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
@@ -36,10 +38,13 @@ var deploymentOutput cliout.Format
 // shape (its NAMESPACE is the Deployment's namespace, where inspect's
 // release_name is N/A outside hybrid), and building the shape costs reads
 // text has no use for, so text mode hands Emit the shape's zero value.
-func emitDeployment(r cliout.Renderer, d *astrov1.Deployment, text func(io.Writer) error) error {
+func emitDeployment(ctx context.Context, r cliout.Renderer, d *astrov1.Deployment, text func(io.Writer) error) error {
 	var published inspect.FormattedDeployment
 	if r.Format == cliout.FormatJSON {
-		current, err := deployment.GetDeploymentByID("", d.Id, astroV1Client)
+		// The Deployment exists whether or not the run was interrupted while
+		// it waited, and a script needs it either way: this read is not
+		// canceled with the run.
+		current, err := deployment.GetDeploymentByID(context.WithoutCancel(pagination.Background(ctx)), "", d.Id, astroV1Client)
 		if err != nil {
 			return err
 		}
@@ -54,8 +59,8 @@ func emitDeployment(r cliout.Renderer, d *astrov1.Deployment, text func(io.Write
 // setting was already as asked) has already
 // said so in text, and prints no table; in json it publishes the Deployment
 // as it is, which is what the run left.
-func emitUpdated(r cliout.Renderer, res *deployment.UpdateResult) error {
-	return emitDeployment(r, &res.Deployment, func(w io.Writer) error {
+func emitUpdated(ctx context.Context, r cliout.Renderer, res *deployment.UpdateResult) error {
+	return emitDeployment(ctx, r, &res.Deployment, func(w io.Writer) error {
 		if !res.Updated {
 			return nil
 		}

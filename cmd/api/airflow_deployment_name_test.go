@@ -41,7 +41,7 @@ func astroLookups(t *testing.T, deployments ...astrov1.Deployment) (listed *[]st
 
 	origByID, origList := deployment.GetDeploymentByID, deployment.ListDeployments
 	t.Cleanup(func() { deployment.GetDeploymentByID, deployment.ListDeployments = origByID, origList })
-	deployment.GetDeploymentByID = func(_, id string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+	deployment.GetDeploymentByID = func(_ context.Context, _, id string, _ astrov1.APIClient) (astrov1.Deployment, error) {
 		for i := range deployments {
 			if deployments[i].Id == id {
 				return deployments[i], nil
@@ -186,7 +186,7 @@ func TestDeploymentNameUnderAnotherOrganization(t *testing.T) {
 	assert.Equal(t, []string{"project-org/" + projectWS}, *listed)
 
 	var asked string
-	deployment.GetDeploymentByID = func(orgID, id string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+	deployment.GetDeploymentByID = func(_ context.Context, orgID, id string, _ astrov1.APIClient) (astrov1.Deployment, error) {
 		asked = orgID
 		return astroDeployment(id, "etl-prod", orgID, "ws-other"), nil
 	}
@@ -243,7 +243,7 @@ func (l locatorAt) BaseURL(context.Context, instances.Instance) (string, error) 
 func TestDeploymentALinkCarriesIsThatLink(t *testing.T) {
 	const linkedID = "clinked00000000000000000b"
 	listed := astroLookups(t, astroDeployment(linkedID, "orders-prod", "test-org", projectWS))
-	deployment.GetDeploymentByID = func(_, id string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+	deployment.GetDeploymentByID = func(_ context.Context, _, id string, _ astrov1.APIClient) (astrov1.Deployment, error) {
 		t.Errorf("fetched %s by id: the link's own lookup reads it", id)
 		return astrov1.Deployment{}, errors.New("unexpected")
 	}

@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"runtime"
@@ -136,7 +137,7 @@ func TestVariableModify(t *testing.T) {
 			},
 		}
 
-		res, err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
+		res, err := VariableModify(context.Background(), "test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.NoError(t, err)
 		// test-key-2 is already on the Deployment and this call passes
 		// updateVars=false, so it is skipped. The old test read as an update
@@ -172,7 +173,7 @@ func TestVariableModify(t *testing.T) {
 			},
 		}
 
-		res, err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, true, mockV1Client)
+		res, err := VariableModify(context.Background(), "test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, true, mockV1Client)
 		assert.NoError(t, err)
 		assert.Equal(t, []VariableOutcome{{Kind: VariableUpdated, Key: "test-key-2"}}, res.Outcomes)
 		mockV1Client.AssertExpectations(t)
@@ -181,7 +182,7 @@ func TestVariableModify(t *testing.T) {
 	t.Run("list deployment failure", func(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errMock).Times(1)
 
-		_, err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
+		_, err := VariableModify(context.Background(), "test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.ErrorIs(t, err, errMock)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -189,12 +190,12 @@ func TestVariableModify(t *testing.T) {
 	t.Run("invalid deployment", func(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 
-		_, err := VariableModify("test-invalid-id", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
+		_, err := VariableModify(context.Background(), "test-invalid-id", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.ErrorIs(t, err, errInvalidDeployment)
 
 		defer testUtil.MockUserInput(t, "0")()
 
-		_, err = VariableModify("", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
+		_, err = VariableModify(context.Background(), "", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.ErrorIs(t, err, ErrInvalidDeploymentKey)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -206,13 +207,13 @@ func TestVariableModify(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(6)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(2)
 
-		res, err := VariableModify("test-id-1", "", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
+		res, err := VariableModify(context.Background(), "test-id-1", "", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(res.InvalidInputs()))
 		assert.Equal(t, VariableInvalid, res.Outcomes[0].Kind)
 		assert.Contains(t, res.Outcomes[0].Reason, "no key given")
 
-		res, err = VariableModify("test-id-1", "test-key-2", "", ws, "", "", []string{}, false, false, false, mockV1Client)
+		res, err = VariableModify(context.Background(), "test-id-1", "test-key-2", "", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(res.InvalidInputs()))
 		assert.Equal(t, "test-key-2", res.Outcomes[0].Key)
@@ -227,7 +228,7 @@ func TestVariableModify(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
 
-		_, err := VariableModify("test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
+		_, err := VariableModify(context.Background(), "test-id-1", "test-key-2", "test-value-2", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.ErrorIs(t, err, errMock)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -241,7 +242,7 @@ func TestVariableModify(t *testing.T) {
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
-		res, err := VariableModify("test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockV1Client)
+		res, err := VariableModify(context.Background(), "test-id-2", "", "", ws, "", "", []string{}, false, false, false, mockV1Client)
 		assert.NoError(t, err)
 		assert.Empty(t, res.Variables)
 		mockV1Client.AssertExpectations(t)

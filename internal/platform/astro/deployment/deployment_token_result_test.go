@@ -120,7 +120,7 @@ func TestUpdateTokenResult(t *testing.T) {
 	}, nil)
 	m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "t1", mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
 
-	got, err := UpdateToken("t1", "", "uno", "", "DEPLOYMENT_MEMBER", deploymentID, ownTokens, noPicking(t), m)
+	got, err := UpdateToken(context.Background(), "t1", "", "uno", "", "DEPLOYMENT_MEMBER", deploymentID, ownTokens, noPicking(t), m)
 	require.NoError(t, err)
 	assert.Equal(t, "one", got.PreviousName, "the text names the token as it was")
 	assert.Equal(t, "uno", got.Token.Name)
@@ -200,7 +200,7 @@ func TestUpdateTokenOfABroaderToken(t *testing.T) {
 		t.Run(string(scope)+": changes its role on the Deployment and nothing else", func(t *testing.T) {
 			m := resultClient(t, tok)
 			m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "t2", mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
-			got, err := UpdateToken("t2", "", "", "", "DEPLOYMENT_ADMIN", deploymentID, nil, noPicking(t), m)
+			got, err := UpdateToken(context.Background(), "t2", "", "", "", "DEPLOYMENT_ADMIN", deploymentID, nil, noPicking(t), m)
 			require.NoError(t, err)
 			assert.Equal(t, "DEPLOYMENT_ADMIN", got.Token.Role)
 			assert.Equal(t, string(scope), got.Token.Scope)
@@ -209,7 +209,7 @@ func TestUpdateTokenOfABroaderToken(t *testing.T) {
 
 		t.Run(string(scope)+": is not renamed from a Deployment, and nothing is sent", func(t *testing.T) {
 			m := resultClient(t, tok)
-			_, err := UpdateToken("t2", "", "uno", "", "DEPLOYMENT_ADMIN", deploymentID, nil, noPicking(t), m)
+			_, err := UpdateToken(context.Background(), "t2", "", "uno", "", "DEPLOYMENT_ADMIN", deploymentID, nil, noPicking(t), m)
 			require.ErrorIs(t, err, ErrBroaderTokenNotRenamed)
 			assert.True(t, usageMarked(err), "a rename of a broader token from a Deployment is a usage error")
 			m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -217,7 +217,7 @@ func TestUpdateTokenOfABroaderToken(t *testing.T) {
 
 		t.Run(string(scope)+": refuses a role it already holds", func(t *testing.T) {
 			m := resultClient(t, tok)
-			_, err := UpdateToken("t2", "", "", "", "DEPLOYMENT_MEMBER", deploymentID, nil, noPicking(t), m)
+			_, err := UpdateToken(context.Background(), "t2", "", "", "", "DEPLOYMENT_MEMBER", deploymentID, nil, noPicking(t), m)
 			if scope == astrov1.ApiTokenScopeWORKSPACE {
 				require.ErrorIs(t, err, errWorkspaceTokenInDeployment)
 			} else {
@@ -277,7 +277,7 @@ func TestAddTokenWorksOutTheScope(t *testing.T) {
 	t.Run("by ID, a Workspace token", func(t *testing.T) {
 		m := addClient(t, nil, nil, ws)
 		setsRole(m, "w1")
-		got, err := AddToken("w1", "", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
+		got, err := AddToken(context.Background(), "w1", "", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
 		require.NoError(t, err)
 		assert.Equal(t, "WORKSPACE", got.Scope)
 		assert.Equal(t, "DEPLOYMENT_ADMIN", got.Role)
@@ -286,7 +286,7 @@ func TestAddTokenWorksOutTheScope(t *testing.T) {
 	t.Run("by ID, an Organization token", func(t *testing.T) {
 		m := addClient(t, nil, nil, org)
 		setsRole(m, "o1")
-		got, err := AddToken("o1", "", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
+		got, err := AddToken(context.Background(), "o1", "", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
 		require.NoError(t, err)
 		assert.Equal(t, "ORGANIZATION", got.Scope)
 	})
@@ -294,13 +294,13 @@ func TestAddTokenWorksOutTheScope(t *testing.T) {
 	t.Run("by name, a Workspace token is found in the Workspace and an Organization token in the Organization", func(t *testing.T) {
 		m := addClient(t, []astrov1.ApiToken{ws}, []astrov1.ApiToken{org})
 		setsRole(m, "w1")
-		got, err := AddToken("", "ws-token", "DEPLOYMENT_ADMIN", "ws-id", deploymentID, nil, noPicking(t), m)
+		got, err := AddToken(context.Background(), "", "ws-token", "DEPLOYMENT_ADMIN", "ws-id", deploymentID, nil, noPicking(t), m)
 		require.NoError(t, err)
 		assert.Equal(t, "WORKSPACE", got.Scope)
 
 		m = addClient(t, []astrov1.ApiToken{ws}, []astrov1.ApiToken{org})
 		setsRole(m, "o1")
-		got, err = AddToken("", "org-token", "DEPLOYMENT_ADMIN", "ws-id", deploymentID, nil, noPicking(t), m)
+		got, err = AddToken(context.Background(), "", "org-token", "DEPLOYMENT_ADMIN", "ws-id", deploymentID, nil, noPicking(t), m)
 		require.NoError(t, err)
 		assert.Equal(t, "ORGANIZATION", got.Scope)
 	})
@@ -315,7 +315,7 @@ func TestAddTokenWorksOutTheScope(t *testing.T) {
 		}
 		m := addClient(t, []astrov1.ApiToken{wsSame}, []astrov1.ApiToken{orgSame})
 		setsRole(m, "o2")
-		got, err := AddToken("", "same", "DEPLOYMENT_ADMIN", "ws-id", deploymentID, nil, pick, m)
+		got, err := AddToken(context.Background(), "", "same", "DEPLOYMENT_ADMIN", "ws-id", deploymentID, nil, pick, m)
 		require.NoError(t, err)
 		assert.Equal(t, "ORGANIZATION", got.Scope, "the second of the two offered, the Workspace's first")
 		require.Len(t, offered, 2)
@@ -330,7 +330,7 @@ func TestAddTokenWorksOutTheScope(t *testing.T) {
 		}
 		m := addClient(t, []astrov1.ApiToken{ws}, []astrov1.ApiToken{org})
 		setsRole(m, "w1")
-		got, err := AddToken("", "", "DEPLOYMENT_ADMIN", "ws-id", deploymentID, nil, pick, m)
+		got, err := AddToken(context.Background(), "", "", "DEPLOYMENT_ADMIN", "ws-id", deploymentID, nil, pick, m)
 		require.NoError(t, err)
 		assert.Equal(t, "WORKSPACE", got.Scope)
 		assert.Len(t, offered, 2)
@@ -338,39 +338,39 @@ func TestAddTokenWorksOutTheScope(t *testing.T) {
 
 	t.Run("with no Workspace to look in, a name is looked for among the Organization's alone", func(t *testing.T) {
 		m := addClient(t, []astrov1.ApiToken{ws}, []astrov1.ApiToken{org})
-		_, err := AddToken("", "ws-token", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
+		_, err := AddToken(context.Background(), "", "ws-token", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
 		require.ErrorIs(t, err, ErrTokenNotFound)
 
 		setsRole(m, "o1")
-		got, err := AddToken("", "org-token", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
+		got, err := AddToken(context.Background(), "", "org-token", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
 		require.NoError(t, err)
 		assert.Equal(t, "ORGANIZATION", got.Scope)
 	})
 
 	t.Run("a blank role is refused before anything is looked up", func(t *testing.T) {
 		m := addClient(t, nil, nil, ws)
-		_, err := AddToken("w1", "", "", "", deploymentID, nil, noPicking(t), m)
+		_, err := AddToken(context.Background(), "w1", "", "", "", deploymentID, nil, noPicking(t), m)
 		require.ErrorIs(t, err, errRoleRequired)
 		assert.True(t, usageMarked(err))
 	})
 
 	t.Run("a Deployment token is refused as a usage error, and nothing is sent", func(t *testing.T) {
 		m := addClient(t, nil, nil, own)
-		_, err := AddToken("d1", "", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
+		_, err := AddToken(context.Background(), "d1", "", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
 		require.ErrorIs(t, err, errDeploymentScopedAdd)
 		assert.True(t, usageMarked(err))
 	})
 
 	t.Run("a command that takes one kind refuses the other", func(t *testing.T) {
 		m := addClient(t, nil, nil, org)
-		_, err := AddToken("o1", "", "DEPLOYMENT_ADMIN", "", deploymentID, []DeploymentTokenType{DeploymentTokenTypeWORKSPACE}, noPicking(t), m)
+		_, err := AddToken(context.Background(), "o1", "", "DEPLOYMENT_ADMIN", "", deploymentID, []DeploymentTokenType{DeploymentTokenTypeWORKSPACE}, noPicking(t), m)
 		require.ErrorIs(t, err, errWrongTokenTypeSelected)
 	})
 
 	t.Run("a role the token holds already is refused for what it is", func(t *testing.T) {
 		held := resultToken("w1", "ws-token", astrov1.ApiTokenScopeWORKSPACE, "DEPLOYMENT_ADMIN")
 		m := addClient(t, nil, nil, held)
-		_, err := AddToken("w1", "", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
+		_, err := AddToken(context.Background(), "w1", "", "DEPLOYMENT_ADMIN", "", deploymentID, nil, noPicking(t), m)
 		require.ErrorIs(t, err, errWorkspaceTokenInDeployment)
 	})
 }
@@ -387,7 +387,7 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 			heading, offered = h, tokens
 			return 1, nil
 		}
-		got, err := FindToken("", "", deploymentID, nil, pick, resultClient(t, a, b))
+		got, err := FindToken(context.Background(), "", "", deploymentID, nil, pick, resultClient(t, a, b))
 		require.NoError(t, err)
 		assert.Equal(t, "t2", got.Id)
 		assert.Empty(t, heading, "the picker asks the plain choice in its own words")
@@ -401,7 +401,7 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 			heading = h
 			return 0, nil
 		}
-		got, err := FindToken("", "same", deploymentID, nil, pick, resultClient(t, a, b))
+		got, err := FindToken(context.Background(), "", "same", deploymentID, nil, pick, resultClient(t, a, b))
 		require.NoError(t, err)
 		assert.Equal(t, "t1", got.Id)
 		assert.Equal(t, "\nSeveral API tokens are named same. Select an API token:", heading)
@@ -410,13 +410,13 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 	t.Run("a picker's refusal is the error", func(t *testing.T) {
 		refused := errors.New("cannot ask")
 		pick := func(string, []apitoken.Token) (int, error) { return 0, refused }
-		_, err := FindToken("", "", deploymentID, nil, pick, resultClient(t, a, b))
+		_, err := FindToken(context.Background(), "", "", deploymentID, nil, pick, resultClient(t, a, b))
 		assert.ErrorIs(t, err, refused)
 	})
 
 	t.Run("a pick out of range is an error, not a panic", func(t *testing.T) {
 		pick := func(string, []apitoken.Token) (int, error) { return 5, nil }
-		_, err := FindToken("", "", deploymentID, nil, pick, resultClient(t, a, b))
+		_, err := FindToken(context.Background(), "", "", deploymentID, nil, pick, resultClient(t, a, b))
 		assert.Error(t, err)
 	})
 }

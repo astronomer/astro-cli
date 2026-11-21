@@ -67,7 +67,7 @@ func deploymentClone(cmd *cobra.Command, out io.Writer, format cliout.Format) er
 	if err != nil && !util.IsCUID(cloneSource) {
 		return fmt.Errorf("could not find a valid Workspace: %w", err)
 	}
-	src, err := deployment.CloneSource(cloneSource, ws, deployment.WithWorkspaceSource(astroV1Client, ws, t.WorkspaceSource))
+	src, err := deployment.CloneSource(cmd.Context(), cloneSource, ws, deployment.WithWorkspaceSource(astroV1Client, ws, t.WorkspaceSource))
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func deploymentClone(cmd *cobra.Command, out io.Writer, format cliout.Format) er
 	// The Deployment exists even when the --wait for it failed, so it is
 	// published either way.
 	r := cliout.Renderer{Format: format, Out: out, Err: cmd.ErrOrStderr()}
-	if emitErr := emitDeployment(r, &d, func(w io.Writer) error { return deployment.WriteCreated(w, d.WorkspaceId, &d) }); emitErr != nil {
+	if emitErr := emitDeployment(cmd.Context(), r, &d, func(w io.Writer) error { return deployment.WriteCreated(w, d.WorkspaceId, &d) }); emitErr != nil {
 		if err != nil {
 			return err
 		}

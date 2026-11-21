@@ -348,7 +348,7 @@ func (s *Suite) TestUpdateToken() {
 
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil).Once()
 		mockClient.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, "token1", apitokentest.RenamesTo("renamed", "new description")).Return(&UpdateWorkspaceAPITokenResponseOK, nil).Once()
-		got, err := UpdateToken("token1", "", "renamed", "new description", "", "", ownTokens, pickIndex(1), mockClient)
+		got, err := UpdateToken(context.Background(), "token1", "", "renamed", "new description", "", "", ownTokens, pickIndex(1), mockClient)
 		s.NoError(err)
 		s.Equal(iamAPIWorkspaceToken.Name, got.PreviousName)
 	})
@@ -361,7 +361,7 @@ func (s *Suite) TestUpdateToken() {
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, "token2").Return(apitokentest.GotAs(&GetAPITokensResponseOKWorkspaceToken, "token2"), nil).Once()
 		// A new name alone keeps the description the token has.
 		mockClient.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, "token2", apitokentest.RenamesTo("renamed", iamAPIWorkspaceToken.Description)).Return(&UpdateWorkspaceAPITokenResponseOK, nil).Once()
-		_, err := UpdateToken("", "", "renamed", "", "", "", ownTokens, pickIndex(1), mockClient)
+		_, err := UpdateToken(context.Background(), "", "", "renamed", "", "", "", ownTokens, pickIndex(1), mockClient)
 		s.NoError(err)
 	})
 
@@ -373,7 +373,7 @@ func (s *Suite) TestUpdateToken() {
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, "token1").Return(apitokentest.GotAs(&GetAPITokensResponseOKWorkspaceToken, "token1"), nil).Once()
 		mockClient.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "token1", mock.Anything).Return(&UpdateWorkspaceAPITokenRolesResponseOK, nil).Once()
 		mockClient.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, "token1", apitokentest.RenamesTo("renamed", iamAPIWorkspaceToken.Description)).Return(&UpdateWorkspaceAPITokenResponseOK, nil).Once()
-		got, err := UpdateToken("", "Token 1", "renamed", "", "WORKSPACE_MEMBER", "", ownTokens, pickIndex(1), mockClient)
+		got, err := UpdateToken(context.Background(), "", "Token 1", "renamed", "", "WORKSPACE_MEMBER", "", ownTokens, pickIndex(1), mockClient)
 		s.NoError(err)
 		s.Equal("WORKSPACE_MEMBER", got.Token.Role)
 	})
@@ -385,7 +385,7 @@ func (s *Suite) TestUpdateToken() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil).Once()
-		got, err := UpdateToken("token1", "", "", "", "", "", ownTokens, pickIndex(1), mockClient)
+		got, err := UpdateToken(context.Background(), "token1", "", "", "", "", "", ownTokens, pickIndex(1), mockClient)
 		s.NoError(err)
 		s.Equal(iamAPIWorkspaceToken.Name, got.Token.Name)
 		s.Equal(iamAPIWorkspaceToken.Name, got.PreviousName)
@@ -395,7 +395,7 @@ func (s *Suite) TestUpdateToken() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseError, nil)
-		_, err := UpdateToken("", "", "", "", "", "", ownTokens, pickIndex(1), mockClient)
+		_, err := UpdateToken(context.Background(), "", "", "", "", "", "", ownTokens, pickIndex(1), mockClient)
 		s.ErrorContains(err, "failed to list tokens")
 	})
 
@@ -403,7 +403,7 @@ func (s *Suite) TestUpdateToken() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseError, nil)
-		_, err := UpdateToken("", "invalid name", "", "", "", "", ownTokens, pickIndex(1), mockClient)
+		_, err := UpdateToken(context.Background(), "", "invalid name", "", "", "", "", ownTokens, pickIndex(1), mockClient)
 		s.ErrorContains(err, "failed to list tokens")
 	})
 
@@ -411,7 +411,7 @@ func (s *Suite) TestUpdateToken() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseError, nil)
-		_, err := UpdateToken("tokenId", "", "", "", "", "", ownTokens, pickIndex(1), mockClient)
+		_, err := UpdateToken(context.Background(), "tokenId", "", "", "", "", "", ownTokens, pickIndex(1), mockClient)
 		s.ErrorContains(err, "failed to get token")
 	})
 
@@ -421,14 +421,14 @@ func (s *Suite) TestUpdateToken() {
 		mockClient.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseError, nil)
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil)
 
-		_, err := UpdateToken("token3", "", "renamed", "", "", "", ownTokens, pickIndex(1), mockClient)
+		_, err := UpdateToken(context.Background(), "token3", "", "renamed", "", "", "", ownTokens, pickIndex(1), mockClient)
 		s.Equal("failed to update workspace token", err.Error())
 	})
 
 	s.Run("error path when there is no context", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := UpdateToken("token1", "", "", "", "", "", ownTokens, pickIndex(1), mockClient)
+		_, err := UpdateToken(context.Background(), "token1", "", "", "", "", "", ownTokens, pickIndex(1), mockClient)
 		s.Error(err)
 	})
 
@@ -437,7 +437,7 @@ func (s *Suite) TestUpdateToken() {
 		// No call is registered: the role is refused before any request.
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 
-		_, err := UpdateToken("token1", "", "", "", "Invalid Role", "", ownTokens, pickIndex(1), mockClient)
+		_, err := UpdateToken(context.Background(), "token1", "", "", "", "Invalid Role", "", ownTokens, pickIndex(1), mockClient)
 		s.Equal(user.ErrInvalidWorkspaceRole.Error(), err.Error())
 	})
 
@@ -448,7 +448,7 @@ func (s *Suite) TestUpdateToken() {
 		mockClient.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenRolesResponseOK, nil)
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil)
 
-		_, err := UpdateToken("", apiToken1.Name, "", "", "WORKSPACE_MEMBER", "", ownTokens, pickIndex(1), mockClient)
+		_, err := UpdateToken(context.Background(), "", apiToken1.Name, "", "", "WORKSPACE_MEMBER", "", ownTokens, pickIndex(1), mockClient)
 		s.NoError(err)
 	})
 }
@@ -628,7 +628,7 @@ func (s *Suite) TestUpsertOrgTokenWorkspaceRole() {
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil).Once()
 		mockClient.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
-		got, err := UpsertOrgTokenWorkspaceRole("", "", "", "", "create", pickIndex(1), mockClient)
+		got, err := UpsertOrgTokenWorkspaceRole(context.Background(), "", "", "", "", "create", pickIndex(1), mockClient)
 		s.NoError(err)
 		s.Equal("token1", got.Name)
 	})
@@ -636,7 +636,7 @@ func (s *Suite) TestUpsertOrgTokenWorkspaceRole() {
 	s.Run("error on ListApiTokensWithResponse (create)", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseError, nil).Once()
-		_, err := UpsertOrgTokenWorkspaceRole("", "", "", "", "create", pickIndex(1), mockClient)
+		_, err := UpsertOrgTokenWorkspaceRole(context.Background(), "", "", "", "", "create", pickIndex(1), mockClient)
 		s.ErrorContains(err, "failed to list tokens")
 	})
 
@@ -645,7 +645,7 @@ func (s *Suite) TestUpsertOrgTokenWorkspaceRole() {
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Once()
 		mockClient.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
-		got, err := UpsertOrgTokenWorkspaceRole("", "", "", "", "update", pickIndex(0), mockClient)
+		got, err := UpsertOrgTokenWorkspaceRole(context.Background(), "", "", "", "", "update", pickIndex(0), mockClient)
 		s.NoError(err)
 		s.Equal("token1", got.Name)
 	})
@@ -653,7 +653,7 @@ func (s *Suite) TestUpsertOrgTokenWorkspaceRole() {
 	s.Run("error on ListApiTokensWithResponse (update)", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseError, nil).Once()
-		_, err := UpsertOrgTokenWorkspaceRole("", "", "", "", "update", pickIndex(1), mockClient)
+		_, err := UpsertOrgTokenWorkspaceRole(context.Background(), "", "", "", "", "update", pickIndex(1), mockClient)
 		s.ErrorContains(err, "failed to list tokens")
 	})
 
@@ -661,7 +661,7 @@ func (s *Suite) TestUpsertOrgTokenWorkspaceRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil).Once()
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseError, nil).Once()
-		_, err := UpsertOrgTokenWorkspaceRole("", "", "", "", "create", pickIndex(1), mockClient)
+		_, err := UpsertOrgTokenWorkspaceRole(context.Background(), "", "", "", "", "create", pickIndex(1), mockClient)
 		s.ErrorContains(err, "failed to get token")
 	})
 
@@ -670,7 +670,7 @@ func (s *Suite) TestUpsertOrgTokenWorkspaceRole() {
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil).Once()
 		mockClient.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseError, nil).Once()
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
-		_, err := UpsertOrgTokenWorkspaceRole("", "", "", "", "create", pickIndex(1), mockClient)
+		_, err := UpsertOrgTokenWorkspaceRole(context.Background(), "", "", "", "", "create", pickIndex(1), mockClient)
 		s.ErrorContains(err, "failed to update token")
 	})
 
@@ -678,7 +678,7 @@ func (s *Suite) TestUpsertOrgTokenWorkspaceRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
-		got, err := UpsertOrgTokenWorkspaceRole("token-id", "", "", "", "create", pickIndex(1), mockClient)
+		got, err := UpsertOrgTokenWorkspaceRole(context.Background(), "token-id", "", "", "", "create", pickIndex(1), mockClient)
 		s.NoError(err)
 		s.Equal("token1", got.Name)
 	})
@@ -686,7 +686,7 @@ func (s *Suite) TestUpsertOrgTokenWorkspaceRole() {
 	s.Run("error on GetApiTokenWithResponse with token id passed in", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseError, nil).Once()
-		_, err := UpsertOrgTokenWorkspaceRole("token-id", "", "", "", "create", pickIndex(1), mockClient)
+		_, err := UpsertOrgTokenWorkspaceRole(context.Background(), "token-id", "", "", "", "create", pickIndex(1), mockClient)
 		s.ErrorContains(err, "failed to get token")
 	})
 
@@ -702,7 +702,7 @@ func (s *Suite) TestRemoveOrgTokenWorkspaceRole() {
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Once()
 		mockClient.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
-		got, err := RemoveOrgTokenWorkspaceRole("", "", "", pickIndex(0), mockClient)
+		got, err := RemoveOrgTokenWorkspaceRole(context.Background(), "", "", "", pickIndex(0), mockClient)
 		s.NoError(err)
 		s.Equal("token1", got.Name)
 	})
@@ -710,7 +710,7 @@ func (s *Suite) TestRemoveOrgTokenWorkspaceRole() {
 	s.Run("error on ListApiTokensWithResponse", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseError, nil).Once()
-		_, err := RemoveOrgTokenWorkspaceRole("", "", "", pickIndex(1), mockClient)
+		_, err := RemoveOrgTokenWorkspaceRole(context.Background(), "", "", "", pickIndex(1), mockClient)
 		s.ErrorContains(err, "failed to list tokens")
 	})
 
@@ -718,7 +718,7 @@ func (s *Suite) TestRemoveOrgTokenWorkspaceRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Once()
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseError, nil).Once()
-		_, err := RemoveOrgTokenWorkspaceRole("", "", "", pickIndex(0), mockClient)
+		_, err := RemoveOrgTokenWorkspaceRole(context.Background(), "", "", "", pickIndex(0), mockClient)
 		s.ErrorContains(err, "failed to get token")
 	})
 
@@ -727,7 +727,7 @@ func (s *Suite) TestRemoveOrgTokenWorkspaceRole() {
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspaceAPITokensResponseOK, nil).Once()
 		mockClient.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseError, nil).Once()
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
-		_, err := RemoveOrgTokenWorkspaceRole("", "", "", pickIndex(0), mockClient)
+		_, err := RemoveOrgTokenWorkspaceRole(context.Background(), "", "", "", pickIndex(0), mockClient)
 		s.ErrorContains(err, "failed to update token")
 	})
 
@@ -735,7 +735,7 @@ func (s *Suite) TestRemoveOrgTokenWorkspaceRole() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil).Once()
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKOrganizationToken, nil).Once()
-		got, err := RemoveOrgTokenWorkspaceRole("token-id", "", "", pickIndex(1), mockClient)
+		got, err := RemoveOrgTokenWorkspaceRole(context.Background(), "token-id", "", "", pickIndex(1), mockClient)
 		s.NoError(err)
 		s.Equal("token1", got.Name)
 	})
@@ -743,7 +743,7 @@ func (s *Suite) TestRemoveOrgTokenWorkspaceRole() {
 	s.Run("error on GetApiTokenWithResponse with token id passed in", func() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseError, nil).Once()
-		_, err := RemoveOrgTokenWorkspaceRole("token-id", "", "", pickIndex(1), mockClient)
+		_, err := RemoveOrgTokenWorkspaceRole(context.Background(), "token-id", "", "", pickIndex(1), mockClient)
 		s.ErrorContains(err, "failed to get token")
 	})
 }

@@ -1007,7 +1007,7 @@ func uploadBundleDirectory(ctx httpContext.Context, localDir string, plan *bundl
 // one named.
 func resolveDeployment(ctx httpContext.Context, pathDeploymentID, wsID, deploymentID string, use Use, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
 	if pathDeploymentID != "" {
-		return GetDeploymentByID("", pathDeploymentID, ctxClient{APIClient: astroV1Client, ctx: pagination.Background(ctx)})
+		return GetDeploymentByID(ctx, "", pathDeploymentID, astroV1Client)
 	}
 	return GetDeploymentContext(ctx, wsID, deploymentID, "", use, nil, astroV1Client)
 }

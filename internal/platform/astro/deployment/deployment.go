@@ -904,7 +904,7 @@ func pollStatus(ctx context.Context, orgID, token, deploymentID string, sleepTim
 		case <-timeout:
 			return astrov1.Deployment{}, &WaitTimeoutError{Err: missing, DeploymentID: deploymentID}
 		case <-ticker.C:
-			currentDeployment, err := GetDeploymentByID(orgID, deploymentID, ctxClient{APIClient: astroV1Client, ctx: ctx})
+			currentDeployment, err := GetDeploymentByID(ctx, orgID, deploymentID, astroV1Client)
 			if err != nil {
 				return astrov1.Deployment{}, err
 			}
@@ -918,18 +918,6 @@ func pollStatus(ctx context.Context, orgID, token, deploymentID string, sleepTim
 			missing = errAirflowNotAnswering
 		}
 	}
-}
-
-// ctxClient is a client whose Deployment reads run under ctx whatever context
-// they are handed, so a wait's in-flight read, and its retries, end with the
-// run's interrupt.
-type ctxClient struct {
-	astrov1.APIClient
-	ctx context.Context //nolint:containedctx // a wrapper bound to one wait
-}
-
-func (c ctxClient) GetDeploymentWithResponse(_ context.Context, orgID, deploymentID string, editors ...astrov1.RequestEditorFn) (*astrov1.GetDeploymentResponse, error) {
-	return c.APIClient.GetDeploymentWithResponse(c.ctx, orgID, deploymentID, editors...)
 }
 
 // airflowProbeTimeout bounds one airflowAnswering request. A request that
@@ -1852,7 +1840,6 @@ func listDeploymentsUpTo(ctx context.Context, ws, orgID string, limit int, astro
 	})
 }
 
-//nolint:dupl // the duplication is acceptable here
 var GetClusterByID = func(orgID, clusterID string, astroV1Client astrov1.APIClient) (astrov1.Cluster, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
@@ -1876,8 +1863,7 @@ var GetClusterByID = func(orgID, clusterID string, astroV1Client astrov1.APIClie
 	return cluster, nil
 }
 
-//nolint:dupl // the duplication is acceptable here
-var GetDeploymentByID = func(orgID, deploymentID string, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+var GetDeploymentByID = func(ctx context.Context, orgID, deploymentID string, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1886,7 +1872,7 @@ var GetDeploymentByID = func(orgID, deploymentID string, astroV1Client astrov1.A
 		orgID = c.Organization
 	}
 
-	resp, err := astroV1Client.GetDeploymentWithResponse(context.Background(), orgID, deploymentID)
+	resp, err := astroV1Client.GetDeploymentWithResponse(pagination.Background(ctx), orgID, deploymentID)
 	if err != nil {
 		return astrov1.Deployment{}, err
 	}
@@ -2278,7 +2264,7 @@ func GetDeploymentContext(ctx context.Context, ws, deploymentID, deploymentName 
 		}
 		id = picked.Id
 	}
-	return GetDeploymentByID("", id, astroV1Client)
+	return GetDeploymentByID(ctx, "", id, astroV1Client)
 }
 
 // deploymentSelectionProcess is the Deployment, of those in ws that filter

@@ -1,6 +1,8 @@
 package workspacetoken
 
 import (
+	"context"
+
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 )
@@ -18,7 +20,7 @@ func findAndRotate(id, name string, client astrov1.APIClient) error {
 	if err != nil {
 		return err
 	}
-	tok, err := FindToken(id, name, ws, org, []TokenType{TokenTypeWORKSPACE}, pickIndex(1), client)
+	tok, err := FindToken(context.Background(), id, name, ws, org, []TokenType{TokenTypeWORKSPACE}, pickIndex(1), client)
 	if err != nil {
 		return err
 	}
@@ -34,7 +36,7 @@ func findAndDelete(id, name string, client astrov1.APIClient) error {
 	if err != nil {
 		return err
 	}
-	tok, err := FindToken(id, name, ws, org, nil, pickIndex(1), client)
+	tok, err := FindToken(context.Background(), id, name, ws, org, nil, pickIndex(1), client)
 	if err != nil {
 		return err
 	}

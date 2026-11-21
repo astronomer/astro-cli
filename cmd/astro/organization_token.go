@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
@@ -30,10 +31,10 @@ func listOrganizationToken(ctx context.Context, out, errOut io.Writer, limit int
 	return renderTokenList(organizationTokenOutput, out, errOut, tokens, organizationRoleHeader)
 }
 
-func listOrganizationTokenRoles(args []string, out, errOut io.Writer) error {
+func listOrganizationTokenRoles(ctx context.Context, args []string, out, errOut io.Writer) error {
 	tokenArg(args, &tokenID)
 	// roles takes no --name: only the token ID answers its picker.
-	roles, err := organization.ListTokenRoles(tokenID, organizationTokenPicker("", "Select the Organization API token to list roles for:"), astroV1Client)
+	roles, err := organization.ListTokenRoles(ctx, tokenID, organizationTokenPicker("", "Select the Organization API token to list roles for:"), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -73,9 +74,9 @@ func createOrganizationToken(out, errOut io.Writer) error {
 	return renderTokenSecret(organizationTokenOutput, out, errOut, &created, "Organization", "Created", tokenName)
 }
 
-func updateOrganizationToken(args []string, out, errOut io.Writer) error {
+func updateOrganizationToken(ctx context.Context, args []string, out, errOut io.Writer) error {
 	tokenArg(args, &tokenID)
-	res, err := organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole,
+	res, err := organization.UpdateToken(ctx, tokenID, name, tokenName, tokenDescription, tokenRole,
 		organizationTokenPicker("--name", "Select the Organization API token to update:"), astroV1Client)
 	if err != nil {
 		return err
@@ -83,10 +84,10 @@ func updateOrganizationToken(args []string, out, errOut io.Writer) error {
 	return renderTokenLine(organizationTokenOutput, out, errOut, res.Token, fmt.Sprintf("Updated Organization API token %s", res.PreviousName))
 }
 
-func rotateOrganizationToken(args []string, out, errOut io.Writer) error {
+func rotateOrganizationToken(ctx context.Context, args []string, out, errOut io.Writer) error {
 	tokenArg(args, &tokenID)
 	pick := organizationTokenPicker("--name", "Select the Organization API token to rotate:")
-	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)
+	token, err := organization.FindCurrentToken(ctx, tokenID, name, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -97,6 +98,9 @@ func rotateOrganizationToken(args []string, out, errOut io.Writer) error {
 			return err
 		}
 	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return err
+	}
 	rotated, err := organization.RotateToken(token, astroV1Client)
 	if err != nil {
 		return err
@@ -105,10 +109,10 @@ func rotateOrganizationToken(args []string, out, errOut io.Writer) error {
 	return renderTokenSecret(organizationTokenOutput, out, errOut, &rotated, "Organization", "Rotated", token.Name)
 }
 
-func deleteOrganizationToken(args []string, out, errOut io.Writer) error {
+func deleteOrganizationToken(ctx context.Context, args []string, out, errOut io.Writer) error {
 	tokenArg(args, &tokenID)
 	pick := organizationTokenPicker("--name", "Select the Organization API token to delete:")
-	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)
+	token, err := organization.FindCurrentToken(ctx, tokenID, name, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -117,6 +121,9 @@ func deleteOrganizationToken(args []string, out, errOut io.Writer) error {
 			fmt.Sprintf("\nDelete API token %s?", ansi.Bold(token.Name))); err != nil {
 			return err
 		}
+	}
+	if err := pagination.Interrupted(ctx); err != nil {
+		return err
 	}
 	removal, err := organization.DeleteToken(token, astroV1Client)
 	if err != nil {

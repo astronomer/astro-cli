@@ -3,6 +3,7 @@ package deployment
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"slices"
@@ -11,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
@@ -70,12 +72,13 @@ func toVariableInfo(vars []astrov1.DeploymentEnvironmentVariable) []VariableInfo
 // still updated with the ones that were usable, and the caller decides what to
 // do about the rest. Only a failure to reach the Deployment is an error.
 func VariableModify(
+	ctx context.Context,
 	deploymentID, variableKey, variableValue, ws, envFile, deploymentName string,
 	variableList []string,
 	useEnvFile, makeSecret, updateVars bool,
 	astroV1Client astrov1.APIClient,
 ) (*VariableModifyResult, error) {
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToChange, nil, astroV1Client)
+	currentDeployment, err := GetDeploymentContext(ctx, ws, deploymentID, deploymentName, ToChange, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +145,9 @@ func VariableModify(
 			return nil, err
 		}
 	}
-	updated, err := GetDeploymentByID("", currentDeployment.Id, astroV1Client)
+	// The variables are saved by now: the read that reports them is not
+	// canceled with the run, so a saved variable is not reported as a failure.
+	updated, err := GetDeploymentByID(context.WithoutCancel(pagination.Background(ctx)), "", currentDeployment.Id, astroV1Client)
 	if err != nil {
 		return nil, err
 	}

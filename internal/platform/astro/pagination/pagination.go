@@ -4,6 +4,7 @@ package pagination
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -88,4 +89,21 @@ func Find[T any](ctx context.Context, what string, fetch FetchPage[T], pred func
 		}
 	}
 	return nil, fmt.Errorf("aborted listing %s after %d pages", what, MaxListPages)
+}
+
+// Interrupted is the cancellation of ctx, nil while the run goes on and for a
+// nil ctx. A lookup asks it before the change it was made for.
+func Interrupted(ctx context.Context) error {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Err()
+}
+
+// IsInterrupt reports whether err is the run's cancellation, which a lookup
+// returns as it is rather than reword with advice. Only Canceled: a Ctrl-C,
+// SIGTERM or SIGHUP always cancels, while DeadlineExceeded is also an ordinary
+// HTTP timeout, which keeps its explanation.
+func IsInterrupt(err error) bool {
+	return errors.Is(err, context.Canceled)
 }
