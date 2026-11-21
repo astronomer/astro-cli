@@ -516,7 +516,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&cloneSource, "clone", "", cloneFlagUsage)
 	cmd.Flags().BoolVar(&waitForStatus, "wait", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
-	cmd.Flags().BoolVar(&cleanOutput, "clean-output", false, "Print only the Deployment's YAML or JSON, with no other output")
+	addInertCleanOutputFlag(cmd)
 	cmd.Flags().StringVar(&workloadIdentity, "workload-identity", "", "The Workload Identity to use for the Deployment")
 	if organization.IsOrgHosted() {
 		cmd.Flags().StringVar(&deploymentType, "type", standard, "The type of the Deployment: standard or dedicated")
@@ -566,7 +566,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&cicdEnforcement, "cicd-enforcement", "", "Whether deploys to the Deployment must use an API key or token, which forces them through CI/CD: enable or disable")
 	addDeploymentFlag(cmd.Flags(), "Deployment to update: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName, withhold: true}, oneXDeploymentName)
 	cmd.Flags().StringVar(&dagDeploy, "dag-deploy", "", "Enable or disable Dag-only deploys for the Deployment")
-	cmd.Flags().BoolVar(&cleanOutput, "clean-output", false, "Print only the Deployment's YAML or JSON, with no other output")
+	addInertCleanOutputFlag(cmd)
 	cmd.Flags().StringVar(&workloadIdentity, "workload-identity", "", "The Workload Identity to use for the Deployment")
 	if organization.IsOrgHosted() {
 		cmd.Flags().StringVar(&schedulerSize, "scheduler-size", "", "The size of Scheduler for the Deployment. Possible values can be small, medium, large, extra_large")
@@ -836,9 +836,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 	workspaceID = ws
 
-	// clean output
-	deployment.CleanOutput = cleanOutput
-
 	// Get latest runtime version
 	if runtimeVersion == "" {
 		airflowVersionClient := airflowversions.NewClient(httpClient, false, false)
@@ -956,9 +953,6 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-
-	// clean output
-	deployment.CleanOutput = cleanOutput
 
 	// check if executor is valid
 	if executor != "" && !deployment.IsValidExecutor(executor, runtimeVersion, deploymentType) {
@@ -1827,4 +1821,13 @@ func getOverrideUntil(until, forDuration string) (*time.Time, error) {
 func fromCsv(s string) *[]string {
 	ss := strings.Split(strings.TrimSpace(s), ",")
 	return &ss
+}
+
+// addInertCleanOutputFlag keeps 1.x's --clean-output on a command where it no
+// longer changes anything, hidden so help doesn't offer it: create and update
+// print their result on stdout and the rest on stderr, so there is no other
+// output for it to drop. A 1.x script that passes it keeps working.
+func addInertCleanOutputFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("clean-output", false, "Has no effect; accepted so Astro CLI 1.x scripts keep working")
+	_ = cmd.Flags().MarkHidden("clean-output") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 }

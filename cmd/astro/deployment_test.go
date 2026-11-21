@@ -422,6 +422,22 @@ func TestDeploymentRootCommand(t *testing.T) {
 	assert.Contains(t, buf.String(), "deployment")
 }
 
+// --clean-output changes nothing on create and update, whose stdout is already
+// only the result, so help hides it there; it still parses for 1.x scripts and
+// leaves inspect's setting alone. On inspect it stays listed.
+func TestCleanOutputIsHiddenWhereItDoesNothing(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	for _, c := range []*cobra.Command{newDeploymentCreateCmd(io.Discard), newDeploymentUpdateCmd(io.Discard)} {
+		f := c.Flags().Lookup("clean-output")
+		require.NotNil(t, f, "%s keeps the 1.x flag", c.Name())
+		assert.True(t, f.Hidden, "%s hides it", c.Name())
+		require.NoError(t, c.Flags().Parse([]string{"--clean-output"}))
+	}
+	assert.False(t, cleanOutput, "an inert flag doesn't set inspect's --clean-output")
+	inspect := newDeploymentInspectCmd(io.Discard)
+	assert.False(t, inspect.Flags().Lookup("clean-output").Hidden, "inspect lists it")
+}
+
 func TestDeploymentList(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 

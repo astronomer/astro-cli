@@ -45,7 +45,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 	cliout.AddOutputFlag(cmd, &outputFormat, formatYAML)
 	cmd.PersistentFlags().Lookup("output").Usage += " (text prints the deployment as YAML, the same as yaml)"
 	cmd.Flags().StringVar(&requestedField, "key", "", "Print only this key of the configuration, such as configuration.cluster_id")
-	cmd.Flags().BoolVar(&cleanOutput, "clean-output", false, "Print only the Deployment's YAML or JSON, with no other output")
+	cmd.Flags().BoolVar(&cleanOutput, "clean-output", false, "Don't say which Deployment was picked when the Workspace has only one. Stdout holds only the Deployment either way")
 	cmd.Flags().BoolVar(&showWorkloadIdentity, "show-workload-identity", false, "Include the workload identity configured for the Deployment in the output")
 	return cmd
 }
