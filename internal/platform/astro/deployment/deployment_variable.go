@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
 // VariableList returns a Deployment's environment variables, optionally
@@ -177,17 +179,17 @@ func readLines(path string) ([]string, error) {
 
 // writeVarToFile appends the variables to envFile, secrets by key only.
 //
-// A single failed write used to print to stderr and carry on, which left a
-// half-written file and a zero exit. It now stops at the first failure and
-// names the variable, so the caller can tell a complete file from a partial
-// one.
+// The file is rebuilt in memory and published through a temp file and a
+// rename, so a failure leaves it as it was rather than half-appended, and it
+// is written 0600: a .env holds the value of every non-secret variable and is
+// the user's alone until they choose to share it.
 func writeVarToFile(environmentVariablesObjects []astrov1.DeploymentEnvironmentVariable, envFile string) error {
-	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd // the value is clear from context
-	if err != nil {
+	existing, err := fsatomic.ReadFile(envFile)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	defer f.Close()
-
+	var buf bytes.Buffer
+	buf.Write(existing)
 	for _, variable := range environmentVariablesObjects {
 		var value string
 		if variable.IsSecret {
@@ -195,11 +197,9 @@ func writeVarToFile(environmentVariablesObjects []astrov1.DeploymentEnvironmentV
 		} else if variable.Value != nil {
 			value = *variable.Value
 		}
-		if _, err := f.WriteString("\n" + variable.Key + "=" + value); err != nil {
-			return errors.Wrapf(err, "writing variable %s", variable.Key)
-		}
+		buf.WriteString("\n" + variable.Key + "=" + value)
 	}
-	return nil
+	return fsatomic.WriteFile(envFile, buf.Bytes(), 0o600) //nolint:mnd // the value is clear from context
 }
 
 // addVariable records one input against the Deployment's existing keys and

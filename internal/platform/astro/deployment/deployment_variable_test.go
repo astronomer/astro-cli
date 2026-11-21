@@ -3,6 +3,7 @@ package deployment
 import (
 	"net/http"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -400,4 +401,31 @@ func TestAddVariablesFromFileDoesNotEchoValues(t *testing.T) {
 	for _, o := range res.Outcomes {
 		assert.NotContains(t, o.Input+o.Key+o.Reason, "hunter2")
 	}
+}
+
+// An existing .env keeps what it held and gains the variables after it, and
+// the file is the user's alone: 0600, not world-readable.
+func TestWriteVarToFileAppendsPrivately(t *testing.T) {
+	path := t.TempDir() + "/.env"
+	require.NoError(t, os.WriteFile(path, []byte("KEEP=1"), 0o644))
+	err := writeVarToFile([]astrov1.DeploymentEnvironmentVariable{
+		{Key: "A", Value: &testValue1},
+		{Key: "S", IsSecret: true},
+	}, path)
+	require.NoError(t, err)
+	got, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "KEEP=1\nA="+testValue1+"\nS= # secret", string(got))
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
+}
+
+// A failure to publish leaves the earlier file as it was.
+func TestWriteVarToFileLeavesTheFileOnFailure(t *testing.T) {
+	// A directory where the file should go cannot be read as one.
+	err := writeVarToFile([]astrov1.DeploymentEnvironmentVariable{{Key: "A", Value: &testValue1}}, t.TempDir())
+	assert.Error(t, err)
 }

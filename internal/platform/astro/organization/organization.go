@@ -313,11 +313,26 @@ func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, 
 	// default-name write (fsatomic sets it on the file, whatever the umask),
 	// and by os.WriteFile to an --output-file it creates; one that already
 	// exists keeps the mode its owner gave it.
-	filePerms := 0o600
-	if defaultName {
-		err = fsatomic.WriteFile(filePath, body, os.FileMode(filePerms))
+	//
+	// An --output-file that is a regular file, or not there yet, is published
+	// atomically too, so a failed export leaves the earlier one intact. One
+	// that is a symlink, a device or a pipe (/dev/stdout, say) is written
+	// through as given, since a rename onto it would replace it.
+	filePerms := os.FileMode(0o600) //nolint:mnd // owner-only, as the comment above says
+	atomic := defaultName
+	if !atomic {
+		switch info, statErr := os.Lstat(filePath); {
+		case errors.Is(statErr, os.ErrNotExist):
+			atomic = true
+		case statErr == nil && info.Mode().IsRegular():
+			atomic = true
+			filePerms = info.Mode().Perm()
+		}
+	}
+	if atomic {
+		err = fsatomic.WriteFile(filePath, body, filePerms)
 	} else {
-		err = os.WriteFile(filePath, body, os.FileMode(filePerms))
+		err = os.WriteFile(filePath, body, filePerms)
 	}
 	if err != nil {
 		return nil, err

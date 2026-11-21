@@ -95,6 +95,7 @@ var (
 	taskLogBucket              *string
 	taskLogURLPattern          *string
 	deploymentListOutput       cliout.Format
+	deploymentListLimit        int
 	deploymentUserOutput       cliout.Format
 	deploymentTeamOutput       cliout.Format
 
@@ -445,9 +446,13 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
   # List them as JSON
   astro deployment list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := checkListLimit(cmd, "limit", deploymentListLimit); err != nil {
+				return err
+			}
 			return deploymentList(cmd, out)
 		},
 	}
+	addListLimitFlag(cmd, &deploymentListLimit, "Deployments")
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 	markWorkspaceChoice(cmd.Flags().Lookup("all"))
 	addDeploymentWorkspaceFlag(cmd.Flags())
@@ -786,10 +791,13 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 		}
 	}
 
-	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out})
+	return deployment.ListWithFormat(ws, allDeployments, deploymentListLimit, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out})
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
+	if err := checkListLimit(cmd, "log-count", logCount); err != nil {
+		return err
+	}
 	// Get release name from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]

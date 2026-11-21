@@ -111,7 +111,7 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	if errors.As(err, &exit) || errors.As(err, new(jsonShown)) {
 		return err
 	}
-	if wantsJSON(cmd, args, err) {
+	if wantsJSON(cmd, args, err) || unknownCommandAsksJSON(cmd, args, err) {
 		EmitError(stdout, err, ExitCode(ctx, err), kinds.Of(err))
 		return err
 	}
@@ -241,6 +241,18 @@ func wantsJSON(cmd *cobra.Command, args []string, err error) bool {
 		return f.Value.String() == string(FormatJSON)
 	}
 	return ArgsAskForJSON(args, f.Shorthand)
+}
+
+// unknownCommandAsksJSON is wantsJSON for a word that names no command at the
+// root, where cobra stops before any command with an --output flag is found
+// (the root has none), so there is no parsed flag to read: `astro bogus -o
+// json` reads the arguments for it, as a usage error that stops flag parsing
+// does.
+func unknownCommandAsksJSON(cmd *cobra.Command, args []string, err error) bool {
+	if cmd.Flag("output") != nil || !IsUsage(err) || !strings.HasPrefix(err.Error(), "unknown command ") {
+		return false
+	}
+	return ArgsAskForJSON(args, "o")
 }
 
 // ArgsAskForJSON finds --output json in raw arguments, in each spelling pflag

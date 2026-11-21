@@ -195,6 +195,18 @@ func New(cfg Config) *Runtime {
 	}
 }
 
+// SetHealthTimeout changes how long the next start waits for Airflow, as
+// Config.HealthTimeout does at construction, for a caller that learns the wait
+// after the Runtime is built (a flag on the start command). A non-positive d
+// keeps the current wait.
+func (r *Runtime) SetHealthTimeout(d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	r.docker.SetHealthTimeout(d)
+	r.standalone.SetHealthTimeout(d)
+}
+
 func (r *Runtime) Start(ctx context.Context, p Plan, cb Callbacks) (Airflow, error) {
 	if p.Mode == "" {
 		// The plan leaves Mode empty when the command asked for no specific
