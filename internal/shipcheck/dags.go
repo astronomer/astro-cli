@@ -51,7 +51,10 @@ func CheckDags(dir string, warn func(string)) error {
 
 // dagsErr refuses a Dags upload that would carry credentials, in the words a
 // Dags upload calls for: it reads no ignore file, so the way out is to move
-// the files, not to ignore them. nil when there are none.
+// the files, not to ignore them, or, for one git does not track, to commit it
+// when it is meant to ship (a committed file ships, as in an image). A file
+// behind a link out of the project is refused committed or not, so it is only
+// told to move. nil when there are none.
 func (r *Report) dagsErr() error {
 	var why []string
 	if n := len(r.Secrets); n > 0 {
@@ -66,8 +69,12 @@ func (r *Report) dagsErr() error {
 		return nil
 	}
 	it := agree(len(r.Secrets)+len(r.Outside), "it", "them")
-	return fmt.Errorf("refusing to upload the Dags: %s, and the upload would carry %s to the Deployment. Move %s out of %s/, and try again",
-		strings.Join(why, "; "), it, it, dagsDir)
+	way := fmt.Sprintf("Move %s out of %s/", it, dagsDir)
+	if n := len(r.Secrets); n > 0 {
+		way += fmt.Sprintf(", or commit the untracked %s if %s meant to ship", agree(n, "one", "ones"), agree(n, "it is", "they are"))
+	}
+	return fmt.Errorf("refusing to upload the Dags: %s, and the upload would carry %s to the Deployment. %s, and try again",
+		strings.Join(why, "; "), it, way)
 }
 
 // dagsFiles lists what a Dags-only upload of the project at dir carries, as
@@ -97,7 +104,9 @@ func dagsFiles(dir string) (files, links []string, err error) {
 			return err
 		}
 		if d.IsDir() {
-			if d.Name() == "__pycache__" {
+			// Below the root only, as the uploads skip it (fileutil's
+			// skipPycache): a dags/ that is itself named so is still walked.
+			if p != root && d.Name() == "__pycache__" {
 				return filepath.SkipDir
 			}
 			return nil

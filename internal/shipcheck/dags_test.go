@@ -29,7 +29,7 @@ func TestCheckDagsRefusesAnUntrackedCredential(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "refusing to upload the Dags")
 	assert.Contains(t, err.Error(), "dags/settings.env")
-	assert.Contains(t, err.Error(), "Move it out of dags/")
+	assert.Contains(t, err.Error(), "Move it out of dags/, or commit the untracked one if it is meant to ship")
 	assert.NotContains(t, err.Error(), "ca.pem", "a committed file ships, as in an image")
 	assert.NotContains(t, err.Error(), ".dockerignore", "a Dags upload reads no ignore file")
 }
@@ -75,4 +75,30 @@ func TestCheckDagsRefusesACredentialBehindALinkedDagsDirectory(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "dags/service-key.pem")
 	assert.Contains(t, err.Error(), "reached through a link out of the project")
+	assert.NotContains(t, err.Error(), "commit", "a file behind a link out of the project is refused committed or not")
+}
+
+// A dags/ linked to a directory that is itself named __pycache__ is walked,
+// as the uploads walk it: only a cache below the root is left out.
+func TestCheckDagsWalksADagsDirectoryNamedLikeACache(t *testing.T) {
+	dir, shared := t.TempDir(), t.TempDir()
+	cache := filepath.Join(shared, "__pycache__")
+	writeFiles(t, cache, map[string]string{"service-key.pem": "k"})
+	if err := os.Symlink(cache, filepath.Join(dir, "dags")); err != nil {
+		t.Skipf("symlinks unavailable here: %v", err)
+	}
+
+	err := CheckDags(dir, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "dags/service-key.pem")
+}
+
+// Outside a git work tree there is nothing to ask, as for an image: a file
+// that looks like credentials under dags/ uploads, and nothing is warned.
+func TestCheckDagsOutsideGitAsksNothing(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"dags/etl.py": "import x\n", "dags/settings.env": "TOKEN=x\n"})
+	var warned []string
+	require.NoError(t, CheckDags(dir, func(w string) { warned = append(warned, w) }))
+	assert.Empty(t, warned)
 }
