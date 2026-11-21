@@ -75,6 +75,66 @@ func (e BasicSubjectProfileSubjectType) Valid() bool {
 	}
 }
 
+// Defines values for BundleType.
+const (
+	BundleTypeDEPLOY BundleType = "DEPLOY"
+	BundleTypeFILE   BundleType = "FILE"
+)
+
+// Valid indicates whether the value is a known member of the BundleType enum.
+func (e BundleType) Valid() bool {
+	switch e {
+	case BundleTypeDEPLOY:
+		return true
+	case BundleTypeFILE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BundleVersionAction.
+const (
+	BundleVersionActionDELETEDIRECTORY    BundleVersionAction = "DELETE_DIRECTORY"
+	BundleVersionActionDELETEFILE         BundleVersionAction = "DELETE_FILE"
+	BundleVersionActionDEPLOY             BundleVersionAction = "DEPLOY"
+	BundleVersionActionDUPLICATEDIRECTORY BundleVersionAction = "DUPLICATE_DIRECTORY"
+	BundleVersionActionDUPLICATEFILE      BundleVersionAction = "DUPLICATE_FILE"
+	BundleVersionActionMOVEDIRECTORY      BundleVersionAction = "MOVE_DIRECTORY"
+	BundleVersionActionMOVEFILE           BundleVersionAction = "MOVE_FILE"
+	BundleVersionActionROLLBACK           BundleVersionAction = "ROLLBACK"
+	BundleVersionActionWRITEDIRECTORY     BundleVersionAction = "WRITE_DIRECTORY"
+	BundleVersionActionWRITEFILE          BundleVersionAction = "WRITE_FILE"
+)
+
+// Valid indicates whether the value is a known member of the BundleVersionAction enum.
+func (e BundleVersionAction) Valid() bool {
+	switch e {
+	case BundleVersionActionDELETEDIRECTORY:
+		return true
+	case BundleVersionActionDELETEFILE:
+		return true
+	case BundleVersionActionDEPLOY:
+		return true
+	case BundleVersionActionDUPLICATEDIRECTORY:
+		return true
+	case BundleVersionActionDUPLICATEFILE:
+		return true
+	case BundleVersionActionMOVEDIRECTORY:
+		return true
+	case BundleVersionActionMOVEFILE:
+		return true
+	case BundleVersionActionROLLBACK:
+		return true
+	case BundleVersionActionWRITEDIRECTORY:
+		return true
+	case BundleVersionActionWRITEFILE:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateAstroIdeSessionPermission.
 const (
 	CreateAstroIdeSessionPermissionREADONLY  CreateAstroIdeSessionPermission = "READ_ONLY"
@@ -114,12 +174,15 @@ func (e CreateAstroIdeSessionRequestPermission) Valid() bool {
 // Defines values for CreateBundleRequestType.
 const (
 	CreateBundleRequestTypeDEPLOY CreateBundleRequestType = "DEPLOY"
+	CreateBundleRequestTypeFILE   CreateBundleRequestType = "FILE"
 )
 
 // Valid indicates whether the value is a known member of the CreateBundleRequestType enum.
 func (e CreateBundleRequestType) Valid() bool {
 	switch e {
 	case CreateBundleRequestTypeDEPLOY:
+		return true
+	case CreateBundleRequestTypeFILE:
 		return true
 	default:
 		return false
@@ -291,12 +354,36 @@ func (e DeployStepStatus) Valid() bool {
 // Defines values for DeploymentBundleType.
 const (
 	DeploymentBundleTypeDEPLOY DeploymentBundleType = "DEPLOY"
+	DeploymentBundleTypeFILE   DeploymentBundleType = "FILE"
 )
 
 // Valid indicates whether the value is a known member of the DeploymentBundleType enum.
 func (e DeploymentBundleType) Valid() bool {
 	switch e {
 	case DeploymentBundleTypeDEPLOY:
+		return true
+	case DeploymentBundleTypeFILE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MoveBundlePathRequestIfExists.
+const (
+	MoveBundlePathRequestIfExistsFAIL    MoveBundlePathRequestIfExists = "FAIL"
+	MoveBundlePathRequestIfExistsMERGE   MoveBundlePathRequestIfExists = "MERGE"
+	MoveBundlePathRequestIfExistsREPLACE MoveBundlePathRequestIfExists = "REPLACE"
+)
+
+// Valid indicates whether the value is a known member of the MoveBundlePathRequestIfExists enum.
+func (e MoveBundlePathRequestIfExists) Valid() bool {
+	switch e {
+	case MoveBundlePathRequestIfExistsFAIL:
+		return true
+	case MoveBundlePathRequestIfExistsMERGE:
+		return true
+	case MoveBundlePathRequestIfExistsREPLACE:
 		return true
 	default:
 		return false
@@ -342,12 +429,36 @@ func (e UpdateAstroIdeSessionRequestPermission) Valid() bool {
 // Defines values for ListBundlesParamsType.
 const (
 	DEPLOY ListBundlesParamsType = "DEPLOY"
+	FILE   ListBundlesParamsType = "FILE"
 )
 
 // Valid indicates whether the value is a known member of the ListBundlesParamsType enum.
 func (e ListBundlesParamsType) Valid() bool {
 	switch e {
 	case DEPLOY:
+		return true
+	case FILE:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WriteBundleDirectoryParamsIfExists.
+const (
+	WriteBundleDirectoryParamsIfExistsFAIL    WriteBundleDirectoryParamsIfExists = "FAIL"
+	WriteBundleDirectoryParamsIfExistsMERGE   WriteBundleDirectoryParamsIfExists = "MERGE"
+	WriteBundleDirectoryParamsIfExistsREPLACE WriteBundleDirectoryParamsIfExists = "REPLACE"
+)
+
+// Valid indicates whether the value is a known member of the WriteBundleDirectoryParamsIfExists enum.
+func (e WriteBundleDirectoryParamsIfExists) Valid() bool {
+	switch e {
+	case WriteBundleDirectoryParamsIfExistsFAIL:
+		return true
+	case WriteBundleDirectoryParamsIfExistsMERGE:
+		return true
+	case WriteBundleDirectoryParamsIfExistsREPLACE:
 		return true
 	default:
 		return false
@@ -575,11 +686,98 @@ type BasicSubjectProfileSubjectType string
 
 // Bundle defines model for Bundle.
 type Bundle struct {
-	BundleType     *string `json:"bundleType,omitempty"`
-	CurrentVersion *string `json:"currentVersion,omitempty"`
-	DeployId       *string `json:"deployId,omitempty"`
-	DesiredVersion *string `json:"desiredVersion,omitempty"`
-	MountPath      *string `json:"mountPath,omitempty"`
+	BundleName     *string    `json:"bundleName,omitempty"`
+	BundleType     *string    `json:"bundleType,omitempty"`
+	CurrentVersion *string    `json:"currentVersion,omitempty"`
+	DeployId       *string    `json:"deployId,omitempty"`
+	DesiredVersion *string    `json:"desiredVersion,omitempty"`
+	IsDagBundle    bool       `json:"isDagBundle"`
+	MountPath      *string    `json:"mountPath,omitempty"`
+	Type           BundleType `json:"type"`
+}
+
+// BundleType defines model for Bundle.Type.
+type BundleType string
+
+// BundleFile defines model for BundleFile.
+type BundleFile struct {
+	// Digest The sha256 digest of the file's content.
+	Digest string `json:"digest"`
+
+	// Path The file's path relative to the bundle root.
+	Path string `json:"path"`
+
+	// Size The file's size in bytes.
+	Size int `json:"size"`
+}
+
+// BundleFileList defines model for BundleFileList.
+type BundleFileList struct {
+	// Directories The immediate subdirectories of the listed directory. Empty for a recursive listing.
+	Directories []string `json:"directories"`
+
+	// Files The files in the listing.
+	Files []BundleFile `json:"files"`
+
+	// Path The directory listed, empty for the bundle root.
+	Path string `json:"path"`
+
+	// Version The bundle version the listing was read from. Absent for a bundle that has never been written to.
+	Version *string `json:"version,omitempty"`
+}
+
+// BundleVersion defines model for BundleVersion.
+type BundleVersion struct {
+	// Action The operation that moved the bundle to this version.
+	Action BundleVersionAction `json:"action"`
+
+	// ActionPath FILE bundles only. The path the operation acted on.
+	ActionPath *string `json:"actionPath,omitempty"`
+
+	// CreatedAt The time the bundle moved to this version, in UTC.
+	CreatedAt time.Time `json:"createdAt"`
+
+	// CreatedById The subject that moved the bundle to this version.
+	CreatedById *string `json:"createdById,omitempty"`
+
+	// DeployId DEPLOY bundles only. The deploy that moved the bundle to this version.
+	DeployId *string `json:"deployId,omitempty"`
+
+	// Description DEPLOY bundles only. The description of the deploy that moved the bundle to this version.
+	Description *string `json:"description,omitempty"`
+
+	// FileCount FILE bundles only. The number of files in this version.
+	FileCount *int `json:"fileCount,omitempty"`
+
+	// Id The history entry's ID.
+	Id string `json:"id"`
+
+	// PreviousVersion The version the bundle was on before this one. Absent when the bundle had no version.
+	PreviousVersion *string `json:"previousVersion,omitempty"`
+
+	// TotalSize FILE bundles only. The total size in bytes of the files in this version.
+	TotalSize *int `json:"totalSize,omitempty"`
+
+	// Version The version the bundle moved to.
+	Version string `json:"version"`
+}
+
+// BundleVersionAction The operation that moved the bundle to this version.
+type BundleVersionAction string
+
+// BundleVersionsPaginated defines model for BundleVersionsPaginated.
+type BundleVersionsPaginated struct {
+	// Limit The maximum number of versions in one page.
+	Limit int `json:"limit"`
+
+	// Offset The offset of the current page.
+	Offset int `json:"offset"`
+
+	// TotalCount The total number of entries in the bundle's history.
+	TotalCount int `json:"totalCount"`
+
+	// Versions The versions in the current page, newest first.
+	Versions []BundleVersion `json:"versions"`
 }
 
 // BundlesPaginated defines model for BundlesPaginated.
@@ -629,29 +827,29 @@ type CreateAstroIdeSessionRequestPermission string
 
 // CreateBundleRequest defines model for CreateBundleRequest.
 type CreateBundleRequest struct {
-	// DagBundleIds Non-DAG bundles only. The DAG bundles this non-DAG bundle is served alongside. Defaults to the main DAG bundle when omitted.
+	// DagBundleIds Non-Dag bundles only. The Dag bundles this non-Dag bundle is served alongside. Defaults to the main Dag bundle when omitted.
 	DagBundleIds *[]string `json:"dagBundleIds,omitempty"`
 
 	// Description Free-form description for the bundle.
 	Description *string `json:"description,omitempty"`
 
-	// IsDagBundle True to create a DAG bundle (with name); false to create a non-DAG bundle (with nonDagMountPath).
+	// IsDagBundle True to create a Dag bundle (with name); false to create a non-Dag bundle (with nonDagMountPath).
 	IsDagBundle *bool `json:"isDagBundle,omitempty"`
 
-	// Name DAG bundles only. The user-facing name. Lowercase alphanumerics, dashes, and underscores; may not be "main".
+	// Name Dag bundles only. The user-facing name. Lowercase alphanumerics, dashes, and underscores; may not be "main".
 	Name *string `json:"name,omitempty"`
 
-	// NonDagBundleType Non-DAG bundles only. Free-form descriptor for the bundle (e.g. "dbt").
+	// NonDagBundleType Non-Dag bundles only. Free-form descriptor for the bundle (e.g. "dbt").
 	NonDagBundleType *string `json:"nonDagBundleType,omitempty"`
 
-	// NonDagMountPath Non-DAG bundles only. The absolute path the bundle is mounted at on Airflow component pods.
+	// NonDagMountPath Non-Dag bundles only. The absolute path the bundle is mounted at on Airflow component pods.
 	NonDagMountPath *string `json:"nonDagMountPath,omitempty"`
 
-	// Type The bundle's type. Currently always DEPLOY.
+	// Type The bundle's type. DEPLOY for a bundle written by a deploy, FILE for one whose files are written through the bundle file API. A file bundle must be a Dag bundle.
 	Type CreateBundleRequestType `json:"type"`
 }
 
-// CreateBundleRequestType The bundle's type. Currently always DEPLOY.
+// CreateBundleRequestType The bundle's type. DEPLOY for a bundle written by a deploy, FILE for one whose files are written through the bundle file API. A file bundle must be a Dag bundle.
 type CreateBundleRequestType string
 
 // CreateDeployGitRequest defines model for CreateDeployGitRequest.
@@ -695,6 +893,7 @@ type Deploy struct {
 	Bundles            *[]Bundle            `json:"bundles,omitempty"`
 	CreatedAt          time.Time            `json:"createdAt"`
 	CreatedBySubject   *BasicSubjectProfile `json:"createdBySubject,omitempty"`
+	DagBundleId        *string              `json:"dagBundleId,omitempty"`
 	DagTarballVersion  *string              `json:"dagTarballVersion,omitempty"`
 	DagsUploadUrl      *string              `json:"dagsUploadUrl,omitempty"`
 	DeploymentId       string               `json:"deploymentId"`
@@ -811,11 +1010,14 @@ type DeploymentBundle struct {
 	// CurrentVersion The tarball version most recently reported as running on the deployment. Lags desiredVersion until the new version has rolled out.
 	CurrentVersion *string `json:"currentVersion,omitempty"`
 
-	// DagBundleIds For non-DAG bundles, the ids of the DAG bundles this non-DAG bundle is served alongside. A non-DAG bundle is associated with at least one DAG bundle.
+	// DagBundleIds For non-Dag bundles, the ids of the Dag bundles this non-Dag bundle is served alongside. A non-Dag bundle is associated with at least one Dag bundle.
 	DagBundleIds *[]string `json:"dagBundleIds,omitempty"`
 
 	// DeletionIsPending True when a delete request has been accepted but the bundle has not yet been pruned from the deployment.
 	DeletionIsPending *bool `json:"deletionIsPending,omitempty"`
+
+	// Description Free-form description for the bundle.
+	Description *string `json:"description,omitempty"`
 
 	// DesiredVersion The tarball version the deployment is configured to run. Absent until the first deploy finalize.
 	DesiredVersion *string `json:"desiredVersion,omitempty"`
@@ -823,40 +1025,50 @@ type DeploymentBundle struct {
 	// Id The bundle's ID.
 	Id string `json:"id"`
 
-	// IsDagBundle True when this bundle carries DAGs; false for a non-DAG payload (dbt project, includes, etc.).
+	// IsDagBundle True when this bundle carries Dags; false for a non-Dag payload (dbt project, includes, etc.).
 	IsDagBundle *bool `json:"isDagBundle,omitempty"`
 
-	// Name DAG bundles only. The user-facing name (e.g. "main").
+	// IsDefault True for the deployment's default Dag bundle.
+	IsDefault bool `json:"isDefault"`
+
+	// LastDeployId The id of the deploy that last changed this bundle. Absent until the bundle has been deployed.
+	LastDeployId *string `json:"lastDeployId,omitempty"`
+
+	// Name Dag bundles only. The user-facing name (e.g. "main").
 	Name *string `json:"name,omitempty"`
 
-	// NonDagBundleType Non-DAG bundles only. Free-form descriptor captured at first deploy (e.g. "dbt").
+	// NonDagBundleType Non-Dag bundles only. Free-form descriptor captured at first deploy (e.g. "dbt").
 	NonDagBundleType *string `json:"nonDagBundleType,omitempty"`
 
-	// NonDagMountPath Non-DAG bundles only. The path the bundle is mounted at on Airflow component pods.
+	// NonDagMountPath Non-Dag bundles only. The path the bundle is mounted at on Airflow component pods.
 	NonDagMountPath *string `json:"nonDagMountPath,omitempty"`
 
-	// Type The bundle's type. Currently always DEPLOY.
+	// Type The bundle's type. DEPLOY for a bundle written by a deploy, FILE for one whose files are written through the bundle file API.
 	Type DeploymentBundleType `json:"type"`
 
 	// UpdatedAt The time when the bundle was last updated in UTC.
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// DeploymentBundleType The bundle's type. Currently always DEPLOY.
+// DeploymentBundleType The bundle's type. DEPLOY for a bundle written by a deploy, FILE for one whose files are written through the bundle file API.
 type DeploymentBundleType string
 
 // DeploysPaginated defines model for DeploysPaginated.
 type DeploysPaginated struct {
-	Deploys    []Deploy `json:"deploys"`
-	Limit      int      `json:"limit"`
-	Offset     int      `json:"offset"`
-	TotalCount int      `json:"totalCount"`
+	Deploys []Deploy `json:"deploys"`
+	Limit   int      `json:"limit"`
+
+	// NextPageToken Cursor mode (AIP-158) fields. NextPageToken is empty string on the last page (per spec — do not use omitempty). PageSize echoes the effective page size when the caller opted into cursor mode.
+	NextPageToken     string `json:"nextPageToken"`
+	Offset            int    `json:"offset"`
+	PageSize          int    `json:"pageSize"`
+	PreviousPageToken string `json:"previousPageToken"`
+	TotalCount        int    `json:"totalCount"`
 }
 
 // Error defines model for Error.
 type Error struct {
-	// FieldErrors FieldErrors carries one entry per failed request-validation constraint.
-	// Only present on 400 responses caused by request binding/validation.
+	// FieldErrors FieldErrors carries one entry per failed request-validation constraint. Only present on 400 responses caused by request binding/validation.
 	FieldErrors *[]FieldValidationError `json:"fieldErrors,omitempty"`
 	Message     string                  `json:"message"`
 	RequestId   string                  `json:"requestId"`
@@ -875,6 +1087,33 @@ type ImportAstroIdeSession struct {
 	Edit AstroIdeSessionEdit `json:"edit"`
 }
 
+// MoveBundlePathRequest defines model for MoveBundlePathRequest.
+type MoveBundlePathRequest struct {
+	// ExpectedVersion Apply the change only while the bundle is still at this version.
+	ExpectedVersion *string `json:"expectedVersion,omitempty"`
+
+	// FromPath The path to move or copy from, relative to the bundle root.
+	FromPath string `json:"fromPath"`
+
+	// IfExists What to do when something is already at toPath: fail, the default; replace it; or, for a directory, merge into it, replacing files at the same paths.
+	IfExists *MoveBundlePathRequestIfExists `json:"ifExists,omitempty"`
+
+	// ToPath The path to move or copy to, relative to the bundle root. Empty is the root, for a directory only.
+	ToPath *string `json:"toPath,omitempty"`
+}
+
+// MoveBundlePathRequestIfExists What to do when something is already at toPath: fail, the default; replace it; or, for a directory, merge into it, replacing files at the same paths.
+type MoveBundlePathRequestIfExists string
+
+// RollbackBundleRequest defines model for RollbackBundleRequest.
+type RollbackBundleRequest struct {
+	// Description Free-form description recorded on the rollback.
+	Description *string `json:"description,omitempty"`
+
+	// Version The earlier version of the bundle to roll back to.
+	Version string `json:"version"`
+}
+
 // SaveAstroIdeSession defines model for SaveAstroIdeSession.
 type SaveAstroIdeSession struct {
 	Version AstroIdeProjectVersion `json:"version"`
@@ -888,7 +1127,7 @@ type SaveAstroIdeSessionRequest struct {
 
 // TriggerGitDeployRequest defines model for TriggerGitDeployRequest.
 type TriggerGitDeployRequest struct {
-	// BeforeSha The commit before the deploy commit for inferring the deploy type. Can be multiple commits prior to the deploy commit. If not provided uses the parent commit where there is exactly one, otherwise infers an image deploy.
+	// BeforeSha The commit before the deploy commit for inferring the deploy type. Can be multiple commits prior to the deploy commit. If not provided uses the commit of the Deployment's last successful Git deploy, and infers an image deploy where there is no such commit to compare against.
 	BeforeSha *string `json:"beforeSha,omitempty"`
 
 	// DeployType The type of deploy to trigger. If omitted then the deploy type will be inferred
@@ -911,7 +1150,7 @@ type UpdateAstroIdeSessionRequestPermission string
 
 // UpdateBundleRequest defines model for UpdateBundleRequest.
 type UpdateBundleRequest struct {
-	// DagBundleIds Non-DAG bundles only. Wholesale-replaces the set of DAG bundles this non-DAG bundle is served alongside. Must be non-empty.
+	// DagBundleIds Non-Dag bundles only. Wholesale-replaces the set of Dag bundles this non-Dag bundle is served alongside. Must be non-empty.
 	DagBundleIds *[]string `json:"dagBundleIds,omitempty"`
 
 	// Description Free-form description. Updateable on any bundle.
@@ -920,7 +1159,7 @@ type UpdateBundleRequest struct {
 
 // ListBundlesParams defines parameters for ListBundles.
 type ListBundlesParams struct {
-	// IsDagBundle Filter on whether the bundle carries DAGs (true = DAG bundle, false = non-DAG).
+	// IsDagBundle Filter on whether the bundle carries Dags (true = Dag bundle, false = non-Dag).
 	IsDagBundle *bool `form:"isDagBundle,omitempty" json:"isDagBundle,omitempty"`
 
 	// Type Filter on bundle type.
@@ -936,6 +1175,87 @@ type ListBundlesParams struct {
 // ListBundlesParamsType defines parameters for ListBundles.
 type ListBundlesParamsType string
 
+// DeleteBundleDirectoryParams defines parameters for DeleteBundleDirectory.
+type DeleteBundleDirectoryParams struct {
+	// Path The directory to delete, relative to the bundle root. Defaults to the root.
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// ExpectedVersion Apply the delete only while the bundle is still at this version.
+	ExpectedVersion *string `form:"expectedVersion,omitempty" json:"expectedVersion,omitempty"`
+}
+
+// ReadBundleDirectoryParams defines parameters for ReadBundleDirectory.
+type ReadBundleDirectoryParams struct {
+	// Path The directory to read, relative to the bundle root. Defaults to the whole bundle.
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// Version Read an earlier version of the bundle instead of its current one.
+	Version *string `form:"version,omitempty" json:"version,omitempty"`
+}
+
+// WriteBundleDirectoryParams defines parameters for WriteBundleDirectory.
+type WriteBundleDirectoryParams struct {
+	// Path The directory to write, relative to the bundle root. Defaults to the root.
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// IfExists What to do when something is already at `path`. Defaults to FAIL.
+	IfExists *WriteBundleDirectoryParamsIfExists `form:"ifExists,omitempty" json:"ifExists,omitempty"`
+
+	// ExpectedVersion Apply the write only while the bundle is still at this version.
+	ExpectedVersion *string `form:"expectedVersion,omitempty" json:"expectedVersion,omitempty"`
+}
+
+// WriteBundleDirectoryParamsIfExists defines parameters for WriteBundleDirectory.
+type WriteBundleDirectoryParamsIfExists string
+
+// DeleteBundleFileParams defines parameters for DeleteBundleFile.
+type DeleteBundleFileParams struct {
+	// Path The file's path relative to the bundle root.
+	Path string `form:"path" json:"path"`
+
+	// ExpectedVersion Apply the delete only while the bundle is still at this version.
+	ExpectedVersion *string `form:"expectedVersion,omitempty" json:"expectedVersion,omitempty"`
+}
+
+// ListBundleFilesParams defines parameters for ListBundleFiles.
+type ListBundleFilesParams struct {
+	// Path The directory to list, relative to the bundle root. Defaults to the root.
+	Path *string `form:"path,omitempty" json:"path,omitempty"`
+
+	// Recursive List the whole subtree instead of one directory level.
+	Recursive *bool `form:"recursive,omitempty" json:"recursive,omitempty"`
+
+	// Version List an earlier version of the bundle instead of its current one.
+	Version *string `form:"version,omitempty" json:"version,omitempty"`
+}
+
+// WriteBundleFileParams defines parameters for WriteBundleFile.
+type WriteBundleFileParams struct {
+	// Path The file's path relative to the bundle root.
+	Path string `form:"path" json:"path"`
+
+	// ExpectedVersion Apply the write only while the bundle is still at this version.
+	ExpectedVersion *string `form:"expectedVersion,omitempty" json:"expectedVersion,omitempty"`
+}
+
+// ReadBundleFileParams defines parameters for ReadBundleFile.
+type ReadBundleFileParams struct {
+	// Path The file's path relative to the bundle root.
+	Path string `form:"path" json:"path"`
+
+	// Version Read an earlier version of the bundle instead of its current one.
+	Version *string `form:"version,omitempty" json:"version,omitempty"`
+}
+
+// ListBundleVersionsParams defines parameters for ListBundleVersions.
+type ListBundleVersionsParams struct {
+	// Offset The number of results to skip before returning values.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+
+	// Limit The maximum number of results to return.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListDeploysParams defines parameters for ListDeploys.
 type ListDeploysParams struct {
 	// Offset offset for pagination
@@ -949,6 +1269,9 @@ type ListDeploysParams struct {
 
 	// SubjectId ID of the subject for the deploys
 	SubjectId *string `form:"subjectId,omitempty" json:"subjectId,omitempty"`
+
+	// IncludeDagBundles whether to include Dag bundles alongside non-Dag bundles in each deploy's bundle list
+	IncludeDagBundles *bool `form:"includeDagBundles,omitempty" json:"includeDagBundles,omitempty"`
 }
 
 // GetDeployDiffParams defines parameters for GetDeployDiff.
@@ -964,6 +1287,9 @@ type GetDeployDiffParams struct {
 type GetDeployParams struct {
 	// IncludeSteps whether to include the deploy steps
 	IncludeSteps *bool `form:"includeSteps,omitempty" json:"includeSteps,omitempty"`
+
+	// IncludeDagBundles whether to include Dag bundles alongside non-Dag bundles in the deploy's bundle list
+	IncludeDagBundles *bool `form:"includeDagBundles,omitempty" json:"includeDagBundles,omitempty"`
 }
 
 // ListDeployStepsParams defines parameters for ListDeploySteps.
@@ -1055,6 +1381,21 @@ type CreateBundleJSONRequestBody = CreateBundleRequest
 
 // UpdateBundleJSONRequestBody defines body for UpdateBundle for application/json ContentType.
 type UpdateBundleJSONRequestBody = UpdateBundleRequest
+
+// DuplicateBundleDirectoryJSONRequestBody defines body for DuplicateBundleDirectory for application/json ContentType.
+type DuplicateBundleDirectoryJSONRequestBody = MoveBundlePathRequest
+
+// MoveBundleDirectoryJSONRequestBody defines body for MoveBundleDirectory for application/json ContentType.
+type MoveBundleDirectoryJSONRequestBody = MoveBundlePathRequest
+
+// DuplicateBundleFileJSONRequestBody defines body for DuplicateBundleFile for application/json ContentType.
+type DuplicateBundleFileJSONRequestBody = MoveBundlePathRequest
+
+// MoveBundleFileJSONRequestBody defines body for MoveBundleFile for application/json ContentType.
+type MoveBundleFileJSONRequestBody = MoveBundlePathRequest
+
+// RollbackBundleJSONRequestBody defines body for RollbackBundle for application/json ContentType.
+type RollbackBundleJSONRequestBody = RollbackBundleRequest
 
 // TriggerGitDeployJSONRequestBody defines body for TriggerGitDeploy for application/json ContentType.
 type TriggerGitDeployJSONRequestBody = TriggerGitDeployRequest
@@ -1165,6 +1506,55 @@ type ClientInterface interface {
 	UpdateBundleWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateBundle(ctx context.Context, organizationId string, deploymentId string, bundleId string, body UpdateBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBundleDirectory request
+	DeleteBundleDirectory(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *DeleteBundleDirectoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReadBundleDirectory request
+	ReadBundleDirectory(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ReadBundleDirectoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// WriteBundleDirectoryWithBody request with any body
+	WriteBundleDirectoryWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *WriteBundleDirectoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DuplicateBundleDirectoryWithBody request with any body
+	DuplicateBundleDirectoryWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DuplicateBundleDirectory(ctx context.Context, organizationId string, deploymentId string, bundleId string, body DuplicateBundleDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveBundleDirectoryWithBody request with any body
+	MoveBundleDirectoryWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	MoveBundleDirectory(ctx context.Context, organizationId string, deploymentId string, bundleId string, body MoveBundleDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBundleFile request
+	DeleteBundleFile(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *DeleteBundleFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListBundleFiles request
+	ListBundleFiles(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ListBundleFilesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// WriteBundleFileWithBody request with any body
+	WriteBundleFileWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *WriteBundleFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ReadBundleFile request
+	ReadBundleFile(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ReadBundleFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DuplicateBundleFileWithBody request with any body
+	DuplicateBundleFileWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	DuplicateBundleFile(ctx context.Context, organizationId string, deploymentId string, bundleId string, body DuplicateBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveBundleFileWithBody request with any body
+	MoveBundleFileWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	MoveBundleFile(ctx context.Context, organizationId string, deploymentId string, bundleId string, body MoveBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RollbackBundleWithBody request with any body
+	RollbackBundleWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	RollbackBundle(ctx context.Context, organizationId string, deploymentId string, bundleId string, body RollbackBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListBundleVersions request
+	ListBundleVersions(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ListBundleVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// TriggerGitDeployWithBody request with any body
 	TriggerGitDeployWithBody(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1304,6 +1694,222 @@ func (c *Client) UpdateBundleWithBody(ctx context.Context, organizationId string
 
 func (c *Client) UpdateBundle(ctx context.Context, organizationId string, deploymentId string, bundleId string, body UpdateBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateBundleRequest(c.Server, organizationId, deploymentId, bundleId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteBundleDirectory(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *DeleteBundleDirectoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBundleDirectoryRequest(c.Server, organizationId, deploymentId, bundleId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ReadBundleDirectory(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ReadBundleDirectoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReadBundleDirectoryRequest(c.Server, organizationId, deploymentId, bundleId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) WriteBundleDirectoryWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *WriteBundleDirectoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewWriteBundleDirectoryRequestWithBody(c.Server, organizationId, deploymentId, bundleId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DuplicateBundleDirectoryWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDuplicateBundleDirectoryRequestWithBody(c.Server, organizationId, deploymentId, bundleId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DuplicateBundleDirectory(ctx context.Context, organizationId string, deploymentId string, bundleId string, body DuplicateBundleDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDuplicateBundleDirectoryRequest(c.Server, organizationId, deploymentId, bundleId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MoveBundleDirectoryWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMoveBundleDirectoryRequestWithBody(c.Server, organizationId, deploymentId, bundleId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MoveBundleDirectory(ctx context.Context, organizationId string, deploymentId string, bundleId string, body MoveBundleDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMoveBundleDirectoryRequest(c.Server, organizationId, deploymentId, bundleId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteBundleFile(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *DeleteBundleFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBundleFileRequest(c.Server, organizationId, deploymentId, bundleId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListBundleFiles(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ListBundleFilesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListBundleFilesRequest(c.Server, organizationId, deploymentId, bundleId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) WriteBundleFileWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *WriteBundleFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewWriteBundleFileRequestWithBody(c.Server, organizationId, deploymentId, bundleId, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ReadBundleFile(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ReadBundleFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewReadBundleFileRequest(c.Server, organizationId, deploymentId, bundleId, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DuplicateBundleFileWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDuplicateBundleFileRequestWithBody(c.Server, organizationId, deploymentId, bundleId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DuplicateBundleFile(ctx context.Context, organizationId string, deploymentId string, bundleId string, body DuplicateBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDuplicateBundleFileRequest(c.Server, organizationId, deploymentId, bundleId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MoveBundleFileWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMoveBundleFileRequestWithBody(c.Server, organizationId, deploymentId, bundleId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) MoveBundleFile(ctx context.Context, organizationId string, deploymentId string, bundleId string, body MoveBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMoveBundleFileRequest(c.Server, organizationId, deploymentId, bundleId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RollbackBundleWithBody(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRollbackBundleRequestWithBody(c.Server, organizationId, deploymentId, bundleId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RollbackBundle(ctx context.Context, organizationId string, deploymentId string, bundleId string, body RollbackBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRollbackBundleRequest(c.Server, organizationId, deploymentId, bundleId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListBundleVersions(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ListBundleVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListBundleVersionsRequest(c.Server, organizationId, deploymentId, bundleId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1912,6 +2518,1023 @@ func NewUpdateBundleRequestWithBody(server string, organizationId string, deploy
 	return req, nil
 }
 
+// NewDeleteBundleDirectoryRequest generates requests for DeleteBundleDirectory
+func NewDeleteBundleDirectoryRequest(server string, organizationId string, deploymentId string, bundleId string, params *DeleteBundleDirectoryParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/directories", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ExpectedVersion != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "expectedVersion", *params.ExpectedVersion, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewReadBundleDirectoryRequest generates requests for ReadBundleDirectory
+func NewReadBundleDirectoryRequest(server string, organizationId string, deploymentId string, bundleId string, params *ReadBundleDirectoryParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/directories/content", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Version != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "version", *params.Version, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewWriteBundleDirectoryRequestWithBody generates requests for WriteBundleDirectory with any type of body
+func NewWriteBundleDirectoryRequestWithBody(server string, organizationId string, deploymentId string, bundleId string, params *WriteBundleDirectoryParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/directories/content", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IfExists != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "ifExists", *params.IfExists, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.ExpectedVersion != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "expectedVersion", *params.ExpectedVersion, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDuplicateBundleDirectoryRequest calls the generic DuplicateBundleDirectory builder with application/json body
+func NewDuplicateBundleDirectoryRequest(server string, organizationId string, deploymentId string, bundleId string, body DuplicateBundleDirectoryJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDuplicateBundleDirectoryRequestWithBody(server, organizationId, deploymentId, bundleId, "application/json", bodyReader)
+}
+
+// NewDuplicateBundleDirectoryRequestWithBody generates requests for DuplicateBundleDirectory with any type of body
+func NewDuplicateBundleDirectoryRequestWithBody(server string, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/directories/duplicate", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewMoveBundleDirectoryRequest calls the generic MoveBundleDirectory builder with application/json body
+func NewMoveBundleDirectoryRequest(server string, organizationId string, deploymentId string, bundleId string, body MoveBundleDirectoryJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMoveBundleDirectoryRequestWithBody(server, organizationId, deploymentId, bundleId, "application/json", bodyReader)
+}
+
+// NewMoveBundleDirectoryRequestWithBody generates requests for MoveBundleDirectory with any type of body
+func NewMoveBundleDirectoryRequestWithBody(server string, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/directories/move", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteBundleFileRequest generates requests for DeleteBundleFile
+func NewDeleteBundleFileRequest(server string, organizationId string, deploymentId string, bundleId string, params *DeleteBundleFileParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/files", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.ExpectedVersion != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "expectedVersion", *params.ExpectedVersion, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListBundleFilesRequest generates requests for ListBundleFiles
+func NewListBundleFilesRequest(server string, organizationId string, deploymentId string, bundleId string, params *ListBundleFilesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/files", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Path != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", *params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Recursive != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "recursive", *params.Recursive, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Version != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "version", *params.Version, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewWriteBundleFileRequestWithBody generates requests for WriteBundleFile with any type of body
+func NewWriteBundleFileRequestWithBody(server string, organizationId string, deploymentId string, bundleId string, params *WriteBundleFileParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/files", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.ExpectedVersion != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "expectedVersion", *params.ExpectedVersion, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewReadBundleFileRequest generates requests for ReadBundleFile
+func NewReadBundleFileRequest(server string, organizationId string, deploymentId string, bundleId string, params *ReadBundleFileParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/files/content", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.Version != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "version", *params.Version, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDuplicateBundleFileRequest calls the generic DuplicateBundleFile builder with application/json body
+func NewDuplicateBundleFileRequest(server string, organizationId string, deploymentId string, bundleId string, body DuplicateBundleFileJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDuplicateBundleFileRequestWithBody(server, organizationId, deploymentId, bundleId, "application/json", bodyReader)
+}
+
+// NewDuplicateBundleFileRequestWithBody generates requests for DuplicateBundleFile with any type of body
+func NewDuplicateBundleFileRequestWithBody(server string, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/files/duplicate", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewMoveBundleFileRequest calls the generic MoveBundleFile builder with application/json body
+func NewMoveBundleFileRequest(server string, organizationId string, deploymentId string, bundleId string, body MoveBundleFileJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMoveBundleFileRequestWithBody(server, organizationId, deploymentId, bundleId, "application/json", bodyReader)
+}
+
+// NewMoveBundleFileRequestWithBody generates requests for MoveBundleFile with any type of body
+func NewMoveBundleFileRequestWithBody(server string, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/files/move", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRollbackBundleRequest calls the generic RollbackBundle builder with application/json body
+func NewRollbackBundleRequest(server string, organizationId string, deploymentId string, bundleId string, body RollbackBundleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRollbackBundleRequestWithBody(server, organizationId, deploymentId, bundleId, "application/json", bodyReader)
+}
+
+// NewRollbackBundleRequestWithBody generates requests for RollbackBundle with any type of body
+func NewRollbackBundleRequestWithBody(server string, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/rollback", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListBundleVersionsRequest generates requests for ListBundleVersions
+func NewListBundleVersionsRequest(server string, organizationId string, deploymentId string, bundleId string, params *ListBundleVersionsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "organizationId", organizationId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "deploymentId", deploymentId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "bundleId", bundleId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/organizations/%s/deployments/%s/bundles/%s/versions", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewTriggerGitDeployRequest calls the generic TriggerGitDeploy builder with application/json body
 func NewTriggerGitDeployRequest(server string, organizationId string, deploymentId string, body TriggerGitDeployJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -2053,6 +3676,22 @@ func NewListDeploysRequest(server string, organizationId string, deploymentId st
 		if params.SubjectId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "subjectId", *params.SubjectId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeDagBundles != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "includeDagBundles", *params.IncludeDagBundles, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -2248,6 +3887,22 @@ func NewGetDeployRequest(server string, organizationId string, deploymentId stri
 		if params.IncludeSteps != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "includeSteps", *params.IncludeSteps, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeDagBundles != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "includeDagBundles", *params.IncludeDagBundles, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
 				return nil, err
 			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
 				return nil, err
@@ -3315,6 +4970,55 @@ type ClientWithResponsesInterface interface {
 
 	UpdateBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body UpdateBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateBundleResponse, error)
 
+	// DeleteBundleDirectoryWithResponse request
+	DeleteBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *DeleteBundleDirectoryParams, reqEditors ...RequestEditorFn) (*DeleteBundleDirectoryResponse, error)
+
+	// ReadBundleDirectoryWithResponse request
+	ReadBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ReadBundleDirectoryParams, reqEditors ...RequestEditorFn) (*ReadBundleDirectoryResponse, error)
+
+	// WriteBundleDirectoryWithBodyWithResponse request with any body
+	WriteBundleDirectoryWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *WriteBundleDirectoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*WriteBundleDirectoryResponse, error)
+
+	// DuplicateBundleDirectoryWithBodyWithResponse request with any body
+	DuplicateBundleDirectoryWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DuplicateBundleDirectoryResponse, error)
+
+	DuplicateBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body DuplicateBundleDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*DuplicateBundleDirectoryResponse, error)
+
+	// MoveBundleDirectoryWithBodyWithResponse request with any body
+	MoveBundleDirectoryWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MoveBundleDirectoryResponse, error)
+
+	MoveBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body MoveBundleDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveBundleDirectoryResponse, error)
+
+	// DeleteBundleFileWithResponse request
+	DeleteBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *DeleteBundleFileParams, reqEditors ...RequestEditorFn) (*DeleteBundleFileResponse, error)
+
+	// ListBundleFilesWithResponse request
+	ListBundleFilesWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ListBundleFilesParams, reqEditors ...RequestEditorFn) (*ListBundleFilesResponse, error)
+
+	// WriteBundleFileWithBodyWithResponse request with any body
+	WriteBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *WriteBundleFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*WriteBundleFileResponse, error)
+
+	// ReadBundleFileWithResponse request
+	ReadBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ReadBundleFileParams, reqEditors ...RequestEditorFn) (*ReadBundleFileResponse, error)
+
+	// DuplicateBundleFileWithBodyWithResponse request with any body
+	DuplicateBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DuplicateBundleFileResponse, error)
+
+	DuplicateBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body DuplicateBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*DuplicateBundleFileResponse, error)
+
+	// MoveBundleFileWithBodyWithResponse request with any body
+	MoveBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MoveBundleFileResponse, error)
+
+	MoveBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body MoveBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveBundleFileResponse, error)
+
+	// RollbackBundleWithBodyWithResponse request with any body
+	RollbackBundleWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RollbackBundleResponse, error)
+
+	RollbackBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body RollbackBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*RollbackBundleResponse, error)
+
+	// ListBundleVersionsWithResponse request
+	ListBundleVersionsWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ListBundleVersionsParams, reqEditors ...RequestEditorFn) (*ListBundleVersionsResponse, error)
+
 	// TriggerGitDeployWithBodyWithResponse request with any body
 	TriggerGitDeployWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*TriggerGitDeployResponse, error)
 
@@ -3507,6 +5211,354 @@ func (r UpdateBundleResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UpdateBundleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteBundleDirectoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BundleVersion
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON409      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteBundleDirectoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteBundleDirectoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ReadBundleDirectoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ReadBundleDirectoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReadBundleDirectoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type WriteBundleDirectoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BundleVersion
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON409      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r WriteBundleDirectoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r WriteBundleDirectoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DuplicateBundleDirectoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BundleVersion
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON409      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DuplicateBundleDirectoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DuplicateBundleDirectoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type MoveBundleDirectoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BundleVersion
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON409      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r MoveBundleDirectoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MoveBundleDirectoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DeleteBundleFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BundleVersion
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON409      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteBundleFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteBundleFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListBundleFilesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BundleFileList
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListBundleFilesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListBundleFilesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type WriteBundleFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BundleVersion
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON409      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r WriteBundleFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r WriteBundleFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ReadBundleFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r ReadBundleFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ReadBundleFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DuplicateBundleFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BundleVersion
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON409      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DuplicateBundleFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DuplicateBundleFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type MoveBundleFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BundleVersion
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON409      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r MoveBundleFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MoveBundleFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RollbackBundleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DeploymentBundle
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON409      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r RollbackBundleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RollbackBundleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListBundleVersionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *BundleVersionsPaginated
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListBundleVersionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListBundleVersionsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3901,6 +5953,7 @@ type SaveAstroIdeSessionResponse struct {
 	JSON200      *SaveAstroIdeSession
 	JSON401      *Error
 	JSON403      *Error
+	JSON409      *Error
 	JSON500      *Error
 }
 
@@ -4004,6 +6057,163 @@ func (c *ClientWithResponses) UpdateBundleWithResponse(ctx context.Context, orga
 		return nil, err
 	}
 	return ParseUpdateBundleResponse(rsp)
+}
+
+// DeleteBundleDirectoryWithResponse request returning *DeleteBundleDirectoryResponse
+func (c *ClientWithResponses) DeleteBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *DeleteBundleDirectoryParams, reqEditors ...RequestEditorFn) (*DeleteBundleDirectoryResponse, error) {
+	rsp, err := c.DeleteBundleDirectory(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBundleDirectoryResponse(rsp)
+}
+
+// ReadBundleDirectoryWithResponse request returning *ReadBundleDirectoryResponse
+func (c *ClientWithResponses) ReadBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ReadBundleDirectoryParams, reqEditors ...RequestEditorFn) (*ReadBundleDirectoryResponse, error) {
+	rsp, err := c.ReadBundleDirectory(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReadBundleDirectoryResponse(rsp)
+}
+
+// WriteBundleDirectoryWithBodyWithResponse request with arbitrary body returning *WriteBundleDirectoryResponse
+func (c *ClientWithResponses) WriteBundleDirectoryWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *WriteBundleDirectoryParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*WriteBundleDirectoryResponse, error) {
+	rsp, err := c.WriteBundleDirectoryWithBody(ctx, organizationId, deploymentId, bundleId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseWriteBundleDirectoryResponse(rsp)
+}
+
+// DuplicateBundleDirectoryWithBodyWithResponse request with arbitrary body returning *DuplicateBundleDirectoryResponse
+func (c *ClientWithResponses) DuplicateBundleDirectoryWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DuplicateBundleDirectoryResponse, error) {
+	rsp, err := c.DuplicateBundleDirectoryWithBody(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDuplicateBundleDirectoryResponse(rsp)
+}
+
+func (c *ClientWithResponses) DuplicateBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body DuplicateBundleDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*DuplicateBundleDirectoryResponse, error) {
+	rsp, err := c.DuplicateBundleDirectory(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDuplicateBundleDirectoryResponse(rsp)
+}
+
+// MoveBundleDirectoryWithBodyWithResponse request with arbitrary body returning *MoveBundleDirectoryResponse
+func (c *ClientWithResponses) MoveBundleDirectoryWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MoveBundleDirectoryResponse, error) {
+	rsp, err := c.MoveBundleDirectoryWithBody(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMoveBundleDirectoryResponse(rsp)
+}
+
+func (c *ClientWithResponses) MoveBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body MoveBundleDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveBundleDirectoryResponse, error) {
+	rsp, err := c.MoveBundleDirectory(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMoveBundleDirectoryResponse(rsp)
+}
+
+// DeleteBundleFileWithResponse request returning *DeleteBundleFileResponse
+func (c *ClientWithResponses) DeleteBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *DeleteBundleFileParams, reqEditors ...RequestEditorFn) (*DeleteBundleFileResponse, error) {
+	rsp, err := c.DeleteBundleFile(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBundleFileResponse(rsp)
+}
+
+// ListBundleFilesWithResponse request returning *ListBundleFilesResponse
+func (c *ClientWithResponses) ListBundleFilesWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ListBundleFilesParams, reqEditors ...RequestEditorFn) (*ListBundleFilesResponse, error) {
+	rsp, err := c.ListBundleFiles(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListBundleFilesResponse(rsp)
+}
+
+// WriteBundleFileWithBodyWithResponse request with arbitrary body returning *WriteBundleFileResponse
+func (c *ClientWithResponses) WriteBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *WriteBundleFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*WriteBundleFileResponse, error) {
+	rsp, err := c.WriteBundleFileWithBody(ctx, organizationId, deploymentId, bundleId, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseWriteBundleFileResponse(rsp)
+}
+
+// ReadBundleFileWithResponse request returning *ReadBundleFileResponse
+func (c *ClientWithResponses) ReadBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ReadBundleFileParams, reqEditors ...RequestEditorFn) (*ReadBundleFileResponse, error) {
+	rsp, err := c.ReadBundleFile(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseReadBundleFileResponse(rsp)
+}
+
+// DuplicateBundleFileWithBodyWithResponse request with arbitrary body returning *DuplicateBundleFileResponse
+func (c *ClientWithResponses) DuplicateBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DuplicateBundleFileResponse, error) {
+	rsp, err := c.DuplicateBundleFileWithBody(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDuplicateBundleFileResponse(rsp)
+}
+
+func (c *ClientWithResponses) DuplicateBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body DuplicateBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*DuplicateBundleFileResponse, error) {
+	rsp, err := c.DuplicateBundleFile(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDuplicateBundleFileResponse(rsp)
+}
+
+// MoveBundleFileWithBodyWithResponse request with arbitrary body returning *MoveBundleFileResponse
+func (c *ClientWithResponses) MoveBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MoveBundleFileResponse, error) {
+	rsp, err := c.MoveBundleFileWithBody(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMoveBundleFileResponse(rsp)
+}
+
+func (c *ClientWithResponses) MoveBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body MoveBundleFileJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveBundleFileResponse, error) {
+	rsp, err := c.MoveBundleFile(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMoveBundleFileResponse(rsp)
+}
+
+// RollbackBundleWithBodyWithResponse request with arbitrary body returning *RollbackBundleResponse
+func (c *ClientWithResponses) RollbackBundleWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RollbackBundleResponse, error) {
+	rsp, err := c.RollbackBundleWithBody(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRollbackBundleResponse(rsp)
+}
+
+func (c *ClientWithResponses) RollbackBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body RollbackBundleJSONRequestBody, reqEditors ...RequestEditorFn) (*RollbackBundleResponse, error) {
+	rsp, err := c.RollbackBundle(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRollbackBundleResponse(rsp)
+}
+
+// ListBundleVersionsWithResponse request returning *ListBundleVersionsResponse
+func (c *ClientWithResponses) ListBundleVersionsWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *ListBundleVersionsParams, reqEditors ...RequestEditorFn) (*ListBundleVersionsResponse, error) {
+	rsp, err := c.ListBundleVersions(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListBundleVersionsResponse(rsp)
 }
 
 // TriggerGitDeployWithBodyWithResponse request with arbitrary body returning *TriggerGitDeployResponse
@@ -4460,6 +6670,772 @@ func ParseUpdateBundleResponse(rsp *http.Response) (*UpdateBundleResponse, error
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest DeploymentBundle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteBundleDirectoryResponse parses an HTTP response from a DeleteBundleDirectoryWithResponse call
+func ParseDeleteBundleDirectoryResponse(rsp *http.Response) (*DeleteBundleDirectoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteBundleDirectoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundleVersion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseReadBundleDirectoryResponse parses an HTTP response from a ReadBundleDirectoryWithResponse call
+func ParseReadBundleDirectoryResponse(rsp *http.Response) (*ReadBundleDirectoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReadBundleDirectoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseWriteBundleDirectoryResponse parses an HTTP response from a WriteBundleDirectoryWithResponse call
+func ParseWriteBundleDirectoryResponse(rsp *http.Response) (*WriteBundleDirectoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &WriteBundleDirectoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundleVersion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDuplicateBundleDirectoryResponse parses an HTTP response from a DuplicateBundleDirectoryWithResponse call
+func ParseDuplicateBundleDirectoryResponse(rsp *http.Response) (*DuplicateBundleDirectoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DuplicateBundleDirectoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundleVersion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMoveBundleDirectoryResponse parses an HTTP response from a MoveBundleDirectoryWithResponse call
+func ParseMoveBundleDirectoryResponse(rsp *http.Response) (*MoveBundleDirectoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MoveBundleDirectoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundleVersion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteBundleFileResponse parses an HTTP response from a DeleteBundleFileWithResponse call
+func ParseDeleteBundleFileResponse(rsp *http.Response) (*DeleteBundleFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteBundleFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundleVersion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListBundleFilesResponse parses an HTTP response from a ListBundleFilesWithResponse call
+func ParseListBundleFilesResponse(rsp *http.Response) (*ListBundleFilesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListBundleFilesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundleFileList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseWriteBundleFileResponse parses an HTTP response from a WriteBundleFileWithResponse call
+func ParseWriteBundleFileResponse(rsp *http.Response) (*WriteBundleFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &WriteBundleFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundleVersion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseReadBundleFileResponse parses an HTTP response from a ReadBundleFileWithResponse call
+func ParseReadBundleFileResponse(rsp *http.Response) (*ReadBundleFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ReadBundleFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseDuplicateBundleFileResponse parses an HTTP response from a DuplicateBundleFileWithResponse call
+func ParseDuplicateBundleFileResponse(rsp *http.Response) (*DuplicateBundleFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DuplicateBundleFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundleVersion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMoveBundleFileResponse parses an HTTP response from a MoveBundleFileWithResponse call
+func ParseMoveBundleFileResponse(rsp *http.Response) (*MoveBundleFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MoveBundleFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundleVersion
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRollbackBundleResponse parses an HTTP response from a RollbackBundleWithResponse call
+func ParseRollbackBundleResponse(rsp *http.Response) (*RollbackBundleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RollbackBundleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeploymentBundle
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListBundleVersionsResponse parses an HTTP response from a ListBundleVersionsWithResponse call
+func ParseListBundleVersionsResponse(rsp *http.Response) (*ListBundleVersionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListBundleVersionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BundleVersionsPaginated
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5287,6 +8263,13 @@ func ParseSaveAstroIdeSessionResponse(rsp *http.Response) (*SaveAstroIdeSessionR
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
