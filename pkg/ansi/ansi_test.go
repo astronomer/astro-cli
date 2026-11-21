@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/logrusorgru/aurora"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -70,7 +71,7 @@ func (s *Suite) TestForStderrFollowsStderrNotStdout() {
 }
 
 // NO_COLOR, set and not empty, turns color off on a terminal and over
-// ForceColors; only an explicit CLICOLOR_FORCE wins over it.
+// ForceColors, and over FORCE_COLOR and CLICOLOR_FORCE.
 func (s *Suite) TestNoColorTurnsColorOff() {
 	for _, v := range []string{cliColorForce, "CLICOLOR", "NO_COLOR"} {
 		s.T().Setenv(v, "")
@@ -86,7 +87,72 @@ func (s *Suite) TestNoColorTurnsColorOff() {
 	s.Equal("x", ForStderr().Red("x"), "NO_COLOR turns color off")
 
 	s.T().Setenv(cliColorForce, "1")
-	s.Contains(ForStderr().Red("x"), "\x1b[", "CLICOLOR_FORCE wins over NO_COLOR")
+	s.Equal("x", ForStderr().Red("x"), "NO_COLOR wins over CLICOLOR_FORCE")
+
+	s.T().Setenv(forceColor, "1")
+	s.Equal("x", ForStderr().Red("x"), "NO_COLOR wins over FORCE_COLOR")
+}
+
+// The precedence, highest first: --no-color, NO_COLOR, FORCE_COLOR and
+// CLICOLOR_FORCE, CLICOLOR=0, then the stream, which TERM=dumb is not.
+func TestShouldColorPrecedence(t *testing.T) {
+	tests := []struct {
+		name     string
+		env      map[string]string
+		terminal bool
+		want     bool
+	}{
+		{"terminal", nil, true, true},
+		{"pipe", nil, false, false},
+		{"dumb terminal", map[string]string{"TERM": "dumb"}, true, false},
+		{"FORCE_COLOR on a pipe", map[string]string{"FORCE_COLOR": "1"}, false, true},
+		{"FORCE_COLOR=0 on a terminal", map[string]string{"FORCE_COLOR": "0"}, true, false},
+		{"FORCE_COLOR on a dumb terminal", map[string]string{"FORCE_COLOR": "1", "TERM": "dumb"}, true, true},
+		{"CLICOLOR_FORCE on a pipe", map[string]string{"CLICOLOR_FORCE": "1"}, false, true},
+		{"CLICOLOR_FORCE=0 on a terminal", map[string]string{"CLICOLOR_FORCE": "0"}, true, false},
+		{"CLICOLOR=0 on a terminal", map[string]string{"CLICOLOR": "0"}, true, false},
+		{"CLICOLOR_FORCE over CLICOLOR=0", map[string]string{"CLICOLOR_FORCE": "1", "CLICOLOR": "0"}, false, true},
+		{"NO_COLOR on a terminal", map[string]string{"NO_COLOR": "1"}, true, false},
+		{"empty NO_COLOR is unset", map[string]string{"NO_COLOR": ""}, true, true},
+		{"NO_COLOR over CLICOLOR_FORCE", map[string]string{"NO_COLOR": "1", "CLICOLOR_FORCE": "1"}, false, false},
+		{"NO_COLOR over FORCE_COLOR", map[string]string{"NO_COLOR": "1", "FORCE_COLOR": "1"}, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, v := range []string{cliColorForce, forceColor, "CLICOLOR", "NO_COLOR", "TERM"} {
+				t.Setenv(v, "")
+			}
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			if got := shouldColor(func() bool { return tt.terminal }); got != tt.want {
+				t.Errorf("shouldColor = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// --no-color beats every environment variable and the terminal, and applies as
+// soon as the flag is parsed.
+func TestNoColorFlagBeatsTheEnvironment(t *testing.T) {
+	t.Setenv(forceColor, "1")
+	t.Setenv(cliColorForce, "1")
+	prev := noColorFlag
+	t.Cleanup(func() { noColorFlag = prev; color = Color() })
+	fs := pflag.NewFlagSet("t", pflag.ContinueOnError)
+	AddNoColorFlag(fs)
+	if !shouldColor(func() bool { return true }) {
+		t.Fatal("FORCE_COLOR should color before the flag")
+	}
+	if err := fs.Parse([]string{"--no-color"}); err != nil {
+		t.Fatal(err)
+	}
+	if shouldColor(func() bool { return true }) {
+		t.Error("--no-color did not turn color off")
+	}
+	if Bold("x") != "x" {
+		t.Errorf("Bold after --no-color = %q", Bold("x"))
+	}
 }
 
 // A styled name is text, not a format, and reaches the terminal without what

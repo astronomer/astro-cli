@@ -176,7 +176,7 @@ func (f *failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
 // A local build asks the network nothing. Before, an empty version did not
 // contain "SNAPSHOT", so every command fetched the release list and then failed
 // to parse "" against it.
-func TestCompareVersionsSkipsTheNetworkForALocalBuild(t *testing.T) {
+func TestNewerReleaseSkipsTheNetworkForALocalBuild(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		curr    string
@@ -192,7 +192,7 @@ func TestCompareVersionsSkipsTheNetworkForALocalBuild(t *testing.T) {
 				withDerived(t, tc.derived)
 			}
 			tr := &failingTransport{}
-			if err := CompareVersions(context.Background(), &http.Client{Transport: tr}, filepath.Join(t.TempDir(), "release-check.json")); err != nil {
+			if _, err := NewerRelease(context.Background(), &http.Client{Transport: tr}, filepath.Join(t.TempDir(), "release-check.json")); err != nil {
 				t.Errorf("a local build must not report an upgrade-check error: %v", err)
 			}
 			if tr.used {
@@ -205,14 +205,14 @@ func TestCompareVersionsSkipsTheNetworkForALocalBuild(t *testing.T) {
 // The other side of that rule: an install straight from source at a real
 // version is a release, and it does get told when a newer one exists. Gating
 // this on the linker flag alone would have excluded it forever.
-func TestCompareVersionsChecksAnInstallFromSource(t *testing.T) {
+func TestNewerReleaseChecksAnInstallFromSource(t *testing.T) {
 	withCurrVersion(t, "")
 	withDerived(t, "1.45.0")
 
 	tr := &failingTransport{}
 	// The error is the transport refusing; what is being asserted is that the
 	// check got as far as asking.
-	if err := CompareVersions(context.Background(), &http.Client{Transport: tr}, filepath.Join(t.TempDir(), "release-check.json")); err == nil {
+	if _, err := NewerRelease(context.Background(), &http.Client{Transport: tr}, filepath.Join(t.TempDir(), "release-check.json")); err == nil {
 		t.Error("expected the failing transport's error to surface")
 	}
 	if !tr.used {

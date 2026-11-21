@@ -69,6 +69,12 @@ func Refusal(json bool, flag *pflag.Flag) string {
 	if asked {
 		return ""
 	}
+	return ciRefusal()
+}
+
+// ciRefusal is the part of the rule that reads the environment for a CI
+// system.
+func ciRefusal() string {
 	switch {
 	case truthy(os.Getenv("CI")):
 		return reasonCI
@@ -79,6 +85,11 @@ func Refusal(json bool, flag *pflag.Flag) string {
 	}
 	return ""
 }
+
+// InCI reports whether the environment says this run is in a CI system, by the
+// same rule that keeps such a run from asking questions (CI truthy, Jenkins,
+// Azure Pipelines), whatever flags the command line carries.
+func InCI() bool { return ciRefusal() != "" }
 
 // truthy is a CI value that says CI is on: anything but empty, "0" or "false".
 func truthy(v string) bool {
