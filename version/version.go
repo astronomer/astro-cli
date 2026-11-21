@@ -314,6 +314,26 @@ func readReleaseCheck(cachePath string, major uint64, now time.Time) (*semver.Ve
 	return latest, err == nil
 }
 
+// cachedNewerRelease is NewerRelease answered from the file alone: ok is false
+// when the answer needs the network (no usable entry from the last day).
+func cachedNewerRelease(cachePath string, now time.Time) (newer *semver.Version, ok bool) {
+	if !Released() {
+		return nil, true
+	}
+	currentSemver, err := semver.NewVersion(Current())
+	if err != nil {
+		return nil, true
+	}
+	latest, ok := readReleaseCheck(cachePath, currentSemver.Major(), now)
+	if !ok {
+		return nil, false
+	}
+	if latest != nil && currentSemver.LessThan(latest) {
+		return latest, true
+	}
+	return nil, true
+}
+
 // NewerRelease returns the newest release of the running major when it is
 // newer than this build, and nil when there is none, asking the release list at
 // most once a day: the answer is kept in cachePath.

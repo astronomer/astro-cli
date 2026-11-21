@@ -54,6 +54,13 @@ func StartUpdateCheck(ctx context.Context, client *http.Client, cachePath string
 		return nil
 	}
 	c := &UpdateCheck{cachePath: cachePath, result: make(chan *semver.Version, 1)}
+	// A fresh cached answer needs no network: it is in hand before the command
+	// starts, so even the fastest command shows the notice. Only a day whose
+	// cache is stale races the lookup against the command.
+	if latest, ok := cachedNewerRelease(cachePath, now); ok {
+		c.result <- latest
+		return c
+	}
 	go func() {
 		// A lookup that fails says nothing: the notice is a courtesy.
 		latest, err := NewerRelease(ctx, client, cachePath)

@@ -65,6 +65,10 @@ func emitWatch() cliouttest.Watch {
 // emitted.
 func TestMain(m *testing.M) {
 	finish := testenv.Isolate()
+	// Opening a browser is refused over SSH (input.CanOpenBrowser): a run
+	// over the developer's own SSH session must not change what these tests see.
+	os.Unsetenv("SSH_CONNECTION")
+	os.Unsetenv("SSH_TTY")
 	watching := emitWatch().Arm()
 	os.Exit(finish(watching.Finish(m.Run())))
 }

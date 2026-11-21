@@ -2,7 +2,6 @@ package input
 
 import (
 	"os"
-	"testing"
 )
 
 // CanOpenBrowser reports whether this run may open the user's browser for
@@ -17,8 +16,7 @@ func CanOpenBrowser() bool {
 	if !CanAsk() {
 		return false
 	}
-	// A test of a command is not run over the SSH session of whoever runs it.
-	return testing.Testing() || !overSSH(os.Getenv)
+	return !overSSH(os.Getenv)
 }
 
 // overSSH reports whether getenv says this process runs in an SSH session.
