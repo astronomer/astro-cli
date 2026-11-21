@@ -253,6 +253,10 @@ func watchDirs(ctx context.Context, dir string) (names <-chan string, addDir fun
 	return out, fsw.Add, closeWatch, nil
 }
 
+// maxQueuedNames is how many distinct names forward holds for a busy reader
+// before it holds rescanAll in their place.
+const maxQueuedNames = 4096
+
 // forward turns fsnotify's events into project-relative names on out, until
 // ctx is done or fsnotify closes.
 //
@@ -261,15 +265,27 @@ func watchDirs(ctx context.Context, dir string) (names <-chan string, addDir fun
 // leaving the events in the operating system's queue, which overflows. An
 // overflow, if one happens anyway, is reported as rescanAll, since which
 // files it lost edits to is not known.
+//
+// The queue is bounded too. A burst of files during a restart (a branch
+// checked out, a .venv made in the project) would otherwise hold every path
+// until the reader came back; past maxQueuedNames the queue becomes rescanAll
+// alone, which stands in for every file a watch acts on, and a name that comes
+// while it waits adds nothing to it.
 func forward(ctx context.Context, dir string, events <-chan fsnotify.Event, errs <-chan error, out chan<- string) {
 	defer close(out)
 	var queue []string
 	queued := map[string]bool{}
 	push := func(name string) {
-		if !queued[name] {
-			queued[name] = true
-			queue = append(queue, name)
+		if queued[name] || queued[rescanAll] {
+			return
 		}
+		if len(queue) >= maxQueuedNames {
+			queue = []string{rescanAll}
+			queued = map[string]bool{rescanAll: true}
+			return
+		}
+		queued[name] = true
+		queue = append(queue, name)
 	}
 	for {
 		// A nil channel is never ready, so nothing is sent while the queue
