@@ -362,18 +362,64 @@ func (f *fakeDeployer) DeployImage(in *ImageDeploy) (ImageResult, error) {
 // (Deployer.DagsSource): a key behind a dags/ linked out of the project is
 // refused before a Deployment is asked for or anything is uploaded.
 func TestRun_DagsOnlyIsHeldToItsUpload(t *testing.T) {
-	dir, shared := t.TempDir(), t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(shared, "etl.py"), []byte("import x\n"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(shared, "service-key.pem"), []byte("k"), 0o600))
-	if err := os.Symlink(shared, filepath.Join(dir, "dags")); err != nil {
-		t.Skipf("symlinks unavailable here: %v", err)
-	}
+	dir := projectWithAKeyBehindDags(t)
 	d := &fakeDeployer{}
 	_, err := Run(Request{ProjectDir: dir, DagsOnly: true}, d)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "refusing to upload the Dags")
 	assert.Contains(t, err.Error(), "dags/service-key.pem")
 	assert.Zero(t, d.deploys, "nothing is uploaded")
+	assert.Zero(t, d.resolves, "no Deployment is asked for")
+}
+
+// projectWithAKeyBehindDags is a project whose dags/ is linked out of it to a
+// directory holding a key, which the Dags check refuses.
+func projectWithAKeyBehindDags(t *testing.T) string {
+	t.Helper()
+	dir, shared := t.TempDir(), t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(shared, "etl.py"), []byte("import x\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(shared, "service-key.pem"), []byte("k"), 0o600))
+	if err := os.Symlink(shared, filepath.Join(dir, "dags")); err != nil {
+		t.Skipf("symlinks unavailable here: %v", err)
+	}
+	return dir
+}
+
+// Every deploy that uploads the Dags is held to the check, not only --dags:
+// an image deploy's Dags are a separate upload no .dockerignore applies to,
+// and a prebuilt --image-name ships them with no survey at all. A deploy that
+// uploads no Dags is not checked for them.
+func TestCheckDagsCoversEveryDeployThatUploadsThem(t *testing.T) {
+	dir := projectWithAKeyBehindDags(t)
+	for name, tc := range map[string]struct {
+		req     Request
+		checked bool
+	}{
+		"--dags":                    {Request{ProjectDir: dir, DagsOnly: true}, true},
+		"image and Dags":            {Request{ProjectDir: dir}, true},
+		"--image-name in a project": {Request{ProjectDir: dir, ImageName: "img:1"}, true},
+		"--image":                   {Request{ProjectDir: dir, Image: true}, false},
+		"an image with no Dags":     {Request{ProjectDir: dir, ImageName: "img:1", ImageAlone: true}, false},
+		"no project":                {Request{ImageName: "img:1"}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := checkDags(tc.req, &fakeDeployer{}, nil)
+			if !tc.checked {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "dags/service-key.pem")
+		})
+	}
+
+	// Through Run, an image deploy is refused before a Deployment is asked
+	// for or anything is built or uploaded.
+	d := &fakeDeployer{}
+	_, err := Run(Request{ProjectDir: dir, ImageName: "img:1"}, d)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refusing to upload the Dags")
+	assert.Zero(t, d.imgDeploys, "nothing is deployed")
 	assert.Zero(t, d.resolves, "no Deployment is asked for")
 }
 

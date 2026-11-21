@@ -391,7 +391,7 @@ func Run(req Request, d Deployer) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err := checkDags(req, d); err != nil {
+	if err := checkDags(req, d, survey); err != nil {
 		return Result{}, err
 	}
 
@@ -453,13 +453,26 @@ func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.Proje
 	})
 }
 
-// checkDags holds a Dags-only deploy to the credential check an image deploy
-// has, over the files the transport's upload carries (Deployer.DagsSource).
-func checkDags(req Request, d Deployer) error {
-	if !req.DagsOnly || req.ProjectDir == "" {
+// checkDags holds every deploy that uploads the project's Dags to the
+// credential check an image deploy has, over the files the transport's upload
+// carries (Deployer.DagsSource): a Dags-only one, and the Dags half of an
+// image deploy, whose tarball is a separate upload that no .dockerignore
+// applies to and that a prebuilt --image-name ships unsurveyed. Only an
+// image-only deploy (--image, or an image deployed with no project's Dags)
+// uploads none.
+//
+// An image deploy's survey has already warned about what git could not answer
+// for in the project, so its Dags check refuses without repeating those
+// warnings.
+func checkDags(req Request, d Deployer, survey *imagebuild.ProjectSurvey) error {
+	if req.ProjectDir == "" || req.Image || req.ImageAlone {
 		return nil
 	}
-	return shipcheck.CheckDags(req.ProjectDir, d.DagsSource(req.ProjectDir, req.NoDagsBaseDir), req.Warn)
+	warn := req.Warn
+	if survey != nil {
+		warn = nil
+	}
+	return shipcheck.CheckDags(req.ProjectDir, d.DagsSource(req.ProjectDir, req.NoDagsBaseDir), warn)
 }
 
 // deploySettings is the project's [tool.astro.deploy], or its defaults for a
