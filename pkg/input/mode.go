@@ -141,12 +141,18 @@ func terminalRefusal() string {
 	return ""
 }
 
+// forceTerminalWriters is the test seam ForceTerminalWriters sets.
+var forceTerminalWriters atomic.Bool
+
 // IsTerminalWriter reports whether w is a terminal: a console, or a Cygwin or
 // MSYS pty. The guard a text renderer writes through (TerminalWriter) answers
 // for the terminal behind it. It is the one test the CLI makes of where its
 // output is going, for what only a person should see (a table's padding, a
 // relative time) and what a script should get plain.
 func IsTerminalWriter(w io.Writer) bool {
+	if forceTerminalWriters.Load() {
+		return true
+	}
 	if tw, ok := w.(*TerminalWriter); ok {
 		w = tw.W
 	}

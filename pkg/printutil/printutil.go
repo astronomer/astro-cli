@@ -3,6 +3,8 @@ package printutil
 import (
 	"fmt"
 	"io"
+	"os"
+	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/input"
 )
@@ -79,20 +81,48 @@ func (t *Table) AddRow(values []string, color bool) {
 	t.Rows = append(t.Rows, r)
 }
 
-// Print header __as well as__ rows
+// Print header __as well as__ rows.
+//
+// To a terminal the columns are padded, as they have always been. To anything
+// else (a pipe, a file) a script is reading, so the layout is plain: one tab
+// between cells (see printPlain), and the messages go to stderr.
 func (t *Table) Print(out io.Writer) error {
+	plain := !input.IsTerminalWriter(out)
+	// The messages are for a person. To a terminal they follow the table as
+	// they always have; to a pipe they go to stderr, and stdout is the table.
+	msgTo := out
+	if plain {
+		msgTo = os.Stderr
+	}
 	if len(t.Rows) == 0 && t.NoResultsMsg != "" {
-		fmt.Fprintln(out, t.NoResultsMsg)
+		fmt.Fprintln(msgTo, t.NoResultsMsg)
+		if plain {
+			fmt.Fprintln(out, strings.Join(t.Header, "\t"))
+		}
 		return nil
 	}
 
-	t.PrintHeader(out)
-	t.PrintRows(out)
+	if plain {
+		t.printPlain(out)
+	} else {
+		t.PrintHeader(out)
+		t.PrintRows(out)
+	}
 
 	if t.SuccessMsg != "" {
-		fmt.Fprintln(out, t.SuccessMsg)
+		fmt.Fprintln(msgTo, t.SuccessMsg)
 	}
 	return nil
+}
+
+// printPlain is the table for a script: the header and each row as its cells
+// joined by one tab, with no padding, no leading space, no truncation and no
+// color.
+func (t *Table) printPlain(out io.Writer) {
+	fmt.Fprintln(out, strings.Join(t.Header, "\t"))
+	for _, r := range t.Rows {
+		fmt.Fprintln(out, strings.Join(r.Raw, "\t"))
+	}
 }
 
 // PrintHeader prints header

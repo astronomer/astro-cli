@@ -9,3 +9,11 @@ func SetTerminals(stdin, stderr bool) (restore func()) {
 	prev := terminals.Swap(&[2]bool{stdin, stderr})
 	return func() { terminals.Store(prev) }
 }
+
+// ForceTerminalWriters makes IsTerminalWriter say yes for every writer, so a
+// test of the layout a person reads (a table's padding and color) can write
+// to a buffer. It returns a function that puts the real test back.
+func ForceTerminalWriters() (restore func()) {
+	forceTerminalWriters.Store(true)
+	return func() { forceTerminalWriters.Store(false) }
+}

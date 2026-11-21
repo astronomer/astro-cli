@@ -7,13 +7,14 @@ import (
 	"io"
 	"os"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/userstate"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
+	"github.com/astronomer/astro-cli/pkg/texttable"
 )
 
 // NewUseCmd builds `astro use` for the root, wired with its own deps.
@@ -259,7 +260,8 @@ func renderUseListing(w io.Writer, res useListing, mark string) error {
 	}
 	marks := linkMarks(defaultName, res.Current, mark)
 	var table bytes.Buffer
-	tw := tabwriter.NewWriter(&table, 0, 0, 2, ' ', 0)
+	terminal := input.IsTerminalWriter(w)
+	tw := texttable.Columns(&table, terminal)
 	fmt.Fprintln(tw, "\tNAME\tKIND\tDEPLOYMENT, ENVIRONMENT OR URL\t")
 	for _, row := range res.Deployments {
 		marker := ""
@@ -273,7 +275,12 @@ func renderUseListing(w io.Writer, res useListing, mark string) error {
 		return err
 	}
 	for line := range strings.Lines(table.String()) {
-		if _, err := fmt.Fprintln(w, strings.TrimRight(line, " \n")); err != nil {
+		// Piped, the cells are tab-separated: only the padding's spaces go.
+		trimmed := strings.TrimRight(line, " \n")
+		if !terminal {
+			trimmed = strings.TrimRight(line, "\n")
+		}
+		if _, err := fmt.Fprintln(w, trimmed); err != nil {
 			return err
 		}
 	}

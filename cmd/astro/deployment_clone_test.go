@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // `astro deployment create --clone`. The request it builds from each kind of
@@ -184,6 +185,7 @@ func TestDeploymentCloneIntoAnotherWorkspace(t *testing.T) {
 // In text the run prints what a plain create prints: the new Deployment's row
 // and where to reach it.
 func TestDeploymentCloneText(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	m := cloneMock(t, nil, cloneMade())
 	r := execDeploymentRun(t, m, "", "create", "--clone", cloneSourceID, "--name", "etl-preview")
 	require.NoError(t, r.err)

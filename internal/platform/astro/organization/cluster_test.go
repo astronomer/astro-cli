@@ -9,6 +9,7 @@ import (
 
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -106,6 +107,7 @@ func (s *Suite) TestListClusters() {
 }
 
 func (s *Suite) TestListClustersWithFormat() {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	s.Run("text output", func() {

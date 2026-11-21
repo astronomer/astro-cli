@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/internal/userstate"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -454,6 +455,7 @@ func TestBareUseMarksAnEnvChosenRow(t *testing.T) {
 // variable's mark must not hide that it is the default, in the picker or in
 // the listing, which would then disagree with its own JSON.
 func TestBareUseKeepsTheDefaultMarkOnAnEnvChosenDefault(t *testing.T) {
+	defer input.ForceTerminalWriters()()       // pins the layout a person reads; the piped form has its own test
 	dir := instanceProject(t, twoLinkManifest) // dev is the default
 	t.Setenv(instances.EnvVar, "dev")
 	const both = "default, from " + instances.EnvVar
@@ -495,5 +497,18 @@ func TestBareUseWithJSONAtATerminalReports(t *testing.T) {
 	}
 	if state, _ := userstate.Load(dir); state.Instance != "" {
 		t.Errorf("json run pinned %q", state.Instance)
+	}
+}
+
+// Piped, the listing is its cells separated by tabs, with no padding.
+func TestUseListingIsTabSeparatedWhenPiped(t *testing.T) {
+	var out strings.Builder
+	res := useListing{Deployments: []useLinkRow{{Name: "dev", Kind: "deployment", Where: "dep-1", Default: true}}}
+	if err := renderUseListing(&out, res, ""); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
+	if len(lines) != 2 || lines[0] != "\tNAME\tKIND\tDEPLOYMENT, ENVIRONMENT OR URL\t" || !strings.HasPrefix(lines[1], "\tdev\tdeployment\tdep-1\t") {
+		t.Errorf("listing = %q", out.String())
 	}
 }
