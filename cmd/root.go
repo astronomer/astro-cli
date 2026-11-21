@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	"github.com/astronomer/astro-cli/internal/telemetry"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -142,6 +143,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// find which command a line runs.
 	addVerbosityFlag(rootCmd.PersistentFlags())
 	input.AddFlag(rootCmd.PersistentFlags())
+	ansi.AddNoColorFlag(rootCmd.PersistentFlags())
 
 	rootCmd.AddCommand(
 		newLoginCommand(astroV1Client, o.out),

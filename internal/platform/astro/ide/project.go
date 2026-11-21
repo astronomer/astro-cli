@@ -259,14 +259,20 @@ func saveSessionAndCleanup(client astrov1alpha1.APIClient, organizationID, works
 	return updateSessionPermission(client, organizationID, workspaceID, projectID, sessionID, astrov1alpha1.UpdateAstroIdeSessionRequestPermissionREADONLY)
 }
 
-// OpenInBrowser opens an exported project's URL in the default browser, and
-// says where to go when it cannot. It does nothing for a project with no URL.
-func OpenInBrowser(url string, out io.Writer) {
+// OpenInBrowser shows an exported project's URL, on out, and opens it in the
+// default browser when open says to. It does nothing for a project with no
+// URL.
+func OpenInBrowser(url string, open bool, out io.Writer) {
 	if url == "" {
 		return
 	}
-	if err := openURL(url); err != nil {
+	switch {
+	case !open:
+		fmt.Fprintf(out, "Open the project at %s\n", url)
+	case openURL(url) != nil:
 		fmt.Fprintf(out, "Could not open the browser. Open this link: %s\n", url)
+	default:
+		fmt.Fprintf(out, "Opened the project in your browser: %s\n", url)
 	}
 }
 

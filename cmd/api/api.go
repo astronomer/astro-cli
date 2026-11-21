@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -16,8 +15,6 @@ func NewAPICmd() *cobra.Command {
 
 // NewAPICmdWithOutput creates the parent 'astro api' command with a custom output writer.
 func NewAPICmdWithOutput(out io.Writer) *cobra.Command {
-	var noColor bool
-
 	cmd := &cobra.Command{
 		Use:   "api",
 		Short: "Make authenticated API requests to Astronomer services",
@@ -31,6 +28,8 @@ Available subcommands:
   registry  Query the Airflow Provider Registry
 
 Use "astro api [command] --help" for more information about a command.`,
+		// --no-color is the root's global flag (ansi.AddNoColorFlag), parsed
+		// before this runs.
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Cobra does not chain PersistentPreRun hooks: defining one
 			// on a child command silently replaces the parent's. Walk up
@@ -43,17 +42,11 @@ Use "astro api [command] --help" for more information about a command.`,
 				}
 			}
 
-			if noColor {
-				color.NoColor = true
-			}
-
 			return nil
 		},
 		// No Run: `astro api` is a group, so cobra prints its help, with no
 		// pre-run, when it is run bare.
 	}
-
-	cmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colorized output")
 
 	cmd.AddCommand(NewAirflowCmd(out))
 	cmd.AddCommand(NewCloudCmd(out))

@@ -24,6 +24,10 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	origArgs := os.Args
 	os.Args = []string{"astro"}
+	// No run in this package looks up the latest release in the background:
+	// that is a request to the network, and one still in flight when a test
+	// ends reads state the next test replaces.
+	os.Setenv("NO_UPDATE_NOTIFIER", "1")
 	finish := testenv.Isolate()
 	watching := emitWatch().Arm()
 	code := m.Run()

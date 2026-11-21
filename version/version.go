@@ -16,7 +16,6 @@ import (
 
 	semver "github.com/Masterminds/semver/v3"
 
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
@@ -242,6 +241,30 @@ type releaseCheck struct {
 	CheckedAt time.Time `json:"checked_at"`
 	Major     uint64    `json:"major"`
 	Latest    string    `json:"latest"`
+	// NoticeShownAt is when the upgrade notice was last printed, so it is
+	// printed once a day and not on every command while the CLI is outdated.
+	// It rides in this file and survives a refresh of the answer.
+	NoticeShownAt time.Time `json:"notice_shown_at,omitzero"`
+}
+
+// readCheckFile reads the whole cache file, whatever its age.
+func readCheckFile(cachePath string) (releaseCheck, bool) {
+	var c releaseCheck
+	b, err := os.ReadFile(cachePath)
+	if err != nil || json.Unmarshal(b, &c) != nil {
+		return releaseCheck{}, false
+	}
+	return c, true
+}
+
+func writeCheckFile(cachePath string, check releaseCheck) {
+	if b, err := json.Marshal(check); err == nil {
+		// Published as every file the CLI picks the name of is (fsatomic): a
+		// new file renamed into place, so an entry already at the name, a
+		// symlink among them, is replaced rather than written through.
+		_ = os.MkdirAll(filepath.Dir(cachePath), releaseCheckDirPerm) //nolint:errcheck // a cache that cannot be written is asked for again next time
+		_ = fsatomic.WriteFile(cachePath, b, releaseCheckFilePerm)    //nolint:errcheck // as above
+	}
 }
 
 // latestReleaseCached is getLatestRelease behind a file at cachePath, and
@@ -254,6 +277,9 @@ func latestReleaseCached(ctx context.Context, client *http.Client, url, cachePat
 
 	latest, err := getLatestRelease(ctx, client, url, major)
 	check := releaseCheck{CheckedAt: now, Major: major}
+	if old, ok := readCheckFile(cachePath); ok {
+		check.NoticeShownAt = old.NoticeShownAt
+	}
 	switch {
 	case errors.Is(err, errNoReleaseForMajor):
 	case err != nil:
@@ -261,13 +287,7 @@ func latestReleaseCached(ctx context.Context, client *http.Client, url, cachePat
 	default:
 		check.Latest = latest.String()
 	}
-	if b, err := json.Marshal(check); err == nil {
-		// Published as every file the CLI picks the name of is (fsatomic): a
-		// new file renamed into place, so an entry already at the name, a
-		// symlink among them, is replaced rather than written through.
-		_ = os.MkdirAll(filepath.Dir(cachePath), releaseCheckDirPerm) //nolint:errcheck // a cache that cannot be written is asked for again next time
-		_ = fsatomic.WriteFile(cachePath, b, releaseCheckFilePerm)    //nolint:errcheck // as above
-	}
+	writeCheckFile(cachePath, check)
 	return latest, nil
 }
 
@@ -294,34 +314,29 @@ func readReleaseCheck(cachePath string, major uint64, now time.Time) (*semver.Ve
 	return latest, err == nil
 }
 
-// CompareVersions tells the user on stderr when a newer release of the running
-// major exists, asking the release list at most once a day: the answer is kept
-// in cachePath.
-func CompareVersions(ctx context.Context, client *http.Client, cachePath string) error {
+// NewerRelease returns the newest release of the running major when it is
+// newer than this build, and nil when there is none, asking the release list at
+// most once a day: the answer is kept in cachePath.
+func NewerRelease(ctx context.Context, client *http.Client, cachePath string) (*semver.Version, error) {
 	// Only a release has a version worth comparing. A snapshot, and anything we
 	// could not identify, is a local build: there is nothing for it to upgrade
 	// to, and asking costs a request on every command.
 	if !Released() {
-		return nil
+		return nil, nil
 	}
 
 	currentSemver, err := semver.NewVersion(Current())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Only suggest upgrades within the running major, so a new major stays opt-in
 	latestSemver, err := latestReleaseCached(ctx, client, astroCLIReleaseURL, cachePath, currentSemver.Major(), time.Now())
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	// Compare the versions and print a message to the user if the current version is outdated
 	if latestSemver != nil && currentSemver.LessThan(latestSemver) {
-		fmt.Fprintf(os.Stderr, "\nA newer version of Astro CLI is available: %s\nTo update, see https://www.astronomer.io/docs/astro/cli/upgrade-cli\n\n", latestSemver)
-		fmt.Fprint(os.Stderr, ansi.ForStderr().Cyan("\nRelease notes: https://www.astronomer.io/docs/astro/cli/release-notes\n\n"))
-		fmt.Fprintf(os.Stderr, "To stop seeing this message, run 'astro config set --global upgrade_message false' or redirect stderr with '2>/dev/null'\n\n")
+		return latestSemver, nil
 	}
-
-	return nil
+	return nil, nil
 }
