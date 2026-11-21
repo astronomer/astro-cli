@@ -38,7 +38,11 @@ type Signaled struct {
 func (s *Signaled) Error() string { return "interrupted by " + s.Name }
 
 // SignalExitCode is the shell's status for a process ended by signal n.
-func SignalExitCode(n int) int { return 128 + n }
+func SignalExitCode(n int) int { return signalExitBase + n }
+
+// signalExitBase is what a shell adds to a signal's number for the status of a
+// process that signal ended.
+const signalExitBase = 128
 
 // ExitCode is the process exit status for the error Execute returned.
 //
