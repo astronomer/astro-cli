@@ -17,6 +17,7 @@ var (
 	filesYes             bool
 	filesNoDelete        bool
 	filesDryRun          bool
+	filesWatch           bool
 	filesFilter          deployment.BundleFilterOptions
 	filesIfExists        string
 	filesVersion         string
@@ -210,6 +211,8 @@ func newBundleFilesSyncCmd(out io.Writer) *cobra.Command {
 
 A sync into a bundle creates one new bundle version, and fails if the bundle changes between the sync reading it and writing it. A sync from a bundle asks before it deletes local files, unless --yes, and fails if the bundle path holds no files.
 
+--watch keeps a sync into a bundle running until you press Ctrl+C. Each time the files under SRC stop changing for 2 seconds, or 10 seconds after a change while they keep changing, it syncs them again, creating one new bundle version. Files it cannot read or that break the bundle limits are reported, and nothing is synced until they change. A write that fails is tried again 10 seconds later. It stops if anything else changes the bundle or the API refuses a write, and it watches at most 1024 directories. Under --output json, each sync it makes is one line of the stream.
+
 A sync skips version control, OS, Python, Node and editor files and .env files, and whatever .gitignore files ignore, and never deletes them. --include, --exclude, --no-default-excludes and --no-gitignore change that. A symbolic link under the local directory that is not skipped fails the sync.`,
 		Example: `  # Upload what changed, deleting the files you removed locally
   astro bundle files sync ./dags my-files:dags --deployment <id>
@@ -220,6 +223,9 @@ A sync skips version control, OS, Python, Node and editor files and .env files, 
   # Check what a sync would change, then apply exactly that
   astro bundle files sync ./dags my-files:dags --dry-run --deployment <id>
   astro bundle files sync ./dags my-files:dags --expected-version <version> --deployment <id>
+
+  # Keep uploading what changes while you edit
+  astro bundle files sync ./dags my-files:dags --watch --deployment <id>
 
   # Download the whole bundle as it was at an earlier version
   astro bundle files sync my-files: ./my-files --version <version> --deployment <id>`,
@@ -232,6 +238,7 @@ A sync skips version control, OS, Python, Node and editor files and .env files, 
 				NoDelete:        filesNoDelete,
 				Yes:             filesYes,
 				DryRun:          filesDryRun,
+				Watch:           filesWatch,
 				Version:         filesVersion,
 				ExpectedVersion: filesExpectedVersion,
 				Filter:          filesFilter,
@@ -242,6 +249,7 @@ A sync skips version control, OS, Python, Node and editor files and .env files, 
 	cmd.Flags().BoolVar(&filesNoDelete, "no-delete", false, "Keep the files only DST holds instead of deleting them")
 	cmd.Flags().BoolVarP(&filesYes, "yes", "y", false, "Delete local files without asking, in a sync from a bundle")
 	cmd.Flags().BoolVar(&filesDryRun, "dry-run", false, "Print the changes without making them")
+	cmd.Flags().BoolVar(&filesWatch, "watch", false, "Keep running, and sync into the bundle again each time the files under SRC change")
 	cmd.Flags().StringVar(&filesVersion, "version", "", "Sync from an earlier version of the bundle instead of its current one")
 	cmd.Flags().StringVar(&filesExpectedVersion, "expected-version", "", "Sync into the bundle only if it is still at this version")
 	addBundleFilesFilterFlags(cmd)

@@ -13,7 +13,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrov1alpha1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1/mocks"
 )
@@ -259,5 +261,28 @@ func TestBundleFilesRemoveCmd(t *testing.T) {
 		_, err := execBundleCmd("files", "rm", "--recursive", "--yes", "my-files", "--deployment", "test-id-1")
 		assert.EqualError(t, err, "my-files names no path in a bundle: write BUNDLE:PATH, or BUNDLE: for every file in the bundle")
 		mockAlpha.AssertNotCalled(t, "DeleteBundleDirectoryWithResponse")
+	})
+}
+
+func TestBundleFilesSyncWatchCmd(t *testing.T) {
+	t.Run("refuses --watch with --dry-run, or in a sync from a bundle, before asking the API", func(t *testing.T) {
+		mockAlpha := setupBundleFilesCmdMocks(t)
+
+		_, err := execBundleCmd("files", "sync", t.TempDir(), "my-files:dags", "--watch", "--dry-run", "--deployment", "test-id-1")
+		assert.EqualError(t, err, "--watch and --dry-run cannot be used together")
+		assert.True(t, cliout.IsUsage(err))
+
+		_, err = execBundleCmd("files", "sync", "my-files:dags", t.TempDir(), "--watch", "--deployment", "test-id-1")
+		assert.EqualError(t, err, "--watch applies only when syncing to a bundle")
+		assert.True(t, cliout.IsUsage(err))
+		mockAlpha.AssertNotCalled(t, "ListBundleFilesWithResponse")
+	})
+
+	// -w is --workspace everywhere, so --watch never takes it.
+	t.Run("--watch has no short option", func(t *testing.T) {
+		root := newBundleRootCmd(&bytes.Buffer{})
+		sync, _, err := root.Find([]string{"files", "sync"})
+		require.NoError(t, err)
+		assert.Equal(t, "", sync.Flags().Lookup("watch").Shorthand)
 	})
 }
