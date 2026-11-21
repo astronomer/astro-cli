@@ -168,10 +168,10 @@ jobs:
 
       # Every step from here to the tests carries the same guard: Actions
       # has no way to end a job early, only to skip its steps.
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         if: ${{ steps.gate.outputs.skip != 'true' }}
 
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         if: ${{ steps.gate.outputs.skip != 'true' }}
         with:
           go-version-file: go.mod
@@ -188,7 +188,7 @@ jobs:
       # caches (see ci.yaml), and a nightly that also saved would race it for
       # the same key and win by being later, with objects built from whatever
       # trunk looked like hours ago.
-      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         if: ${{ steps.gate.outputs.skip != 'true' }}
         with:
           path: |
@@ -209,7 +209,7 @@ jobs:
         shell: bash
         run: echo "UV_CACHE_DIR=$RUNNER_TEMP/uv-cache" >> "$GITHUB_ENV"
 
-      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         if: ${{ steps.gate.outputs.skip != 'true' }}
         with:
           path: ${{ env.UV_CACHE_DIR }}
