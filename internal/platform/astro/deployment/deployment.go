@@ -876,6 +876,8 @@ func HealthPollIn(ctx context.Context, progress io.Writer, orgID, token, deploym
 // have an Airflow that answers, and errAirflowNotAnswering is the timeout when
 // that was all that was missing.
 func pollStatus(ctx context.Context, orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient, timedOut error, statuses ...astrov1.DeploymentStatus) (astrov1.Deployment, error) {
+	// A command run without ExecuteContext has no context at all.
+	ctx = cmp.Or(ctx, context.Background())
 	stopped := func() error {
 		return &StoppedWaitingError{Err: ctx.Err(), DeploymentID: deploymentID}
 	}

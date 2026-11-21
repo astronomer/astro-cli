@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/signal"
 	"syscall"
 	"testing"
 	"time"
@@ -26,6 +27,9 @@ func TestSignalsCancelAndSetTheExitStatus(t *testing.T) {
 		{syscall.SIGHUP, 129},
 	} {
 		t.Run(tc.sig.String(), func(t *testing.T) {
+			if tc.sig == syscall.SIGHUP && signal.Ignored(syscall.SIGHUP) {
+				t.Skip("this process started with SIGHUP ignored (nohup, or a background job), which the CLI keeps ignored")
+			}
 			ctx := signalContext()
 			if err := syscall.Kill(os.Getpid(), tc.sig); err != nil {
 				t.Fatalf("raise %v: %v", tc.sig, err)
@@ -42,5 +46,20 @@ func TestSignalsCancelAndSetTheExitStatus(t *testing.T) {
 				t.Errorf("ctx.Err() = %v, want context.Canceled", ctx.Err())
 			}
 		})
+	}
+}
+
+// A process started under nohup has SIGHUP ignored; the run must keep going.
+func TestIgnoredSIGHUPIsLeftIgnored(t *testing.T) {
+	signal.Ignore(syscall.SIGHUP)
+	t.Cleanup(func() { signal.Reset(syscall.SIGHUP) })
+	ctx := signalContext()
+	if err := syscall.Kill(os.Getpid(), syscall.SIGHUP); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ctx.Done():
+		t.Fatal("SIGHUP canceled a run that started with it ignored")
+	case <-time.After(300 * time.Millisecond):
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,4 +36,14 @@ func TestExecCommanderCancelSendsSIGTERM(t *testing.T) {
 		t.Fatal("the command did not stop after cancel")
 	}
 	assert.FileExists(t, term, "the command was terminated, not killed")
+}
+
+// A command that exits 0 while a background child still holds its output is a
+// success, not an ErrWaitDelay failure, on a run nobody canceled.
+func TestExecCommanderIgnoresWaitDelayWhenNotCanceled(t *testing.T) {
+	var out strings.Builder
+	err := execCommander{}.Run(context.Background(), t.TempDir(), os.Environ(), rt.Stdio{Out: &out},
+		"sh", "-c", "sleep 8 & echo done")
+	require.NoError(t, err)
+	assert.Contains(t, out.String(), "done")
 }

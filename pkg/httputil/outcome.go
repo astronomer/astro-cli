@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -50,11 +51,15 @@ func OutcomeUnknown(err error) bool {
 // unknownOutcomeText says that the change may have been applied and which
 // command shows the state.
 func unknownOutcomeText(path string) string {
-	return "the change may have been applied; check it with " + stateCommand(path) + " before running this again"
+	if cmd := stateCommand(path); cmd != "" {
+		return "the change may have been applied; check it with " + cmd + " before running this again"
+	}
+	return "the change may have been applied; check its state before running this again"
 }
 
 // stateCommand is the command that shows what the API path's resource looks
-// like now. The path is one of the Astro API's, under /organizations/{id}.
+// like now, or "" when the path names no resource the CLI can show. The path
+// is one of the Astro API's, under /organizations/{id}.
 func stateCommand(path string) string {
 	segs := strings.Split(strings.Trim(path, "/"), "/")
 	// Drop everything up to and including the organization ID.
@@ -64,7 +69,7 @@ func stateCommand(path string) string {
 			break
 		}
 	}
-	const fallback = "the matching list or inspect command"
+	const fallback = ""
 	if len(segs) == 0 {
 		return fallback
 	}
@@ -97,13 +102,22 @@ func markOutcomeUnknown(req *http.Request, err error) error {
 	if err == nil || !isMutation(req.Method) {
 		return err
 	}
-	// The retrying transport hands over the bare failure; IsTransportError
-	// reads the *url.Error an http.Client wraps it in.
-	probe := error(&url.Error{Op: req.Method, URL: req.URL.String(), Err: err})
-	if !IsTransportError(probe) || notSent(err) {
+	// The failure without any *url.Error the retrying transport left on it, so
+	// the client's own wrapping adds the URL once.
+	inner := err
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		inner = urlErr.Err
+	}
+	// IsTransportError reads the *url.Error an http.Client wraps a failure in.
+	// A request canceled or timed out once it was sent is as unknown as one
+	// whose connection broke: the server may have acted before it heard.
+	probe := error(&url.Error{Op: req.Method, URL: req.URL.String(), Err: inner})
+	ended := errors.Is(inner, context.Canceled) || errors.Is(inner, context.DeadlineExceeded)
+	if (!IsTransportError(probe) && !ended) || notSent(inner) {
 		return err
 	}
-	return &OutcomeUnknownError{Method: req.Method, Path: req.URL.Path, Err: err}
+	return &OutcomeUnknownError{Method: req.Method, Path: req.URL.Path, Err: inner}
 }
 
 // notSent reports that err happened before the request left: the connection
@@ -139,8 +153,10 @@ func methodOfTransportError(err error) (string, bool) {
 type outcomeTransport struct{ next http.RoundTripper }
 
 func (t outcomeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// A request whose context had already ended was never sent.
+	sendable := req.Context().Err() == nil
 	resp, err := t.next.RoundTrip(req)
-	if err != nil {
+	if err != nil && sendable {
 		err = markOutcomeUnknown(req, err)
 	}
 	return resp, err

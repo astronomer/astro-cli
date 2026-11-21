@@ -119,7 +119,12 @@ func signalContext() context.Context {
 	// stop cleanly, and the start rollback has to run for it too. Windows
 	// defines the constant and never delivers it, so registering it is harmless
 	// there.
-	signals := []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGHUP}
+	signals := []os.Signal{os.Interrupt, syscall.SIGTERM}
+	// Not when the process started with SIGHUP ignored (nohup): catching it
+	// would end a run the user meant to outlive its terminal.
+	if !signal.Ignored(syscall.SIGHUP) {
+		signals = append(signals, syscall.SIGHUP)
+	}
 	signal.Notify(sigs, signals...)
 	// No defer to stop listening: every failing path out of main ends in
 	// os.Exit, so it would not run. The only moment it is needed is after the

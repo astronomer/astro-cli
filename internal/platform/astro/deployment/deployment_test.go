@@ -3030,6 +3030,12 @@ func (s *Suite) TestUpdateDeploymentHibernationOverrideWaits() {
 		s.Contains(err.Error(), "astro deployment inspect test-id-1")
 	})
 
+	s.Run("a nil context waits as with Background", func() {
+		reports(astrov1.DeploymentStatusHEALTHY)
+		var nilCtx stdcontext.Context
+		s.NotPanics(func() { _ = overrideIn(nilCtx, true, time.Second) })
+	})
+
 	s.Run("an interrupt ends the wait and says the Deployment continues", func() {
 		reports(astrov1.DeploymentStatusHEALTHY)
 		ctx, cancel := stdcontext.WithCancel(stdcontext.Background())

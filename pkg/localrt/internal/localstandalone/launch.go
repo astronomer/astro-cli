@@ -4,6 +4,7 @@ package localstandalone
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os/exec"
 	"syscall"
@@ -52,6 +53,12 @@ func (execCommander) Run(ctx context.Context, dir string, env []string, s rt.Std
 	// CLI's, so its names would say nothing a debug reader is after.
 	lg := localshared.StartCommand(ctx, nil, name, args...)
 	err := cmd.Run()
+	// ErrWaitDelay means the command itself exited 0 but a background child
+	// kept its output open past the delay. On a run nobody canceled that is
+	// success; the delay exists for the canceled path.
+	if errors.Is(err, exec.ErrWaitDelay) && ctx.Err() == nil {
+		err = nil
+	}
 	lg.End(err, nil)
 	return err
 }
