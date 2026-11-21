@@ -144,7 +144,17 @@ func readLines(path string) (lines []string, trailingNewline bool, err error) {
 // writeLines writes the lines back atomically at 0600, creating the parent
 // directory when needed. addTrailingNewline controls whether the file ends
 // in a newline (a freshly appended key always gets one).
+//
+// A .env that is a symlink is written through it, to the file it points at,
+// as readLines read it: the link is the user's (a dotfile manager's, or one
+// env file shared by several projects). The atomic publish renames onto the
+// path it is given, so given the link's it would replace the link with a copy
+// of its target's contents, and the next edit of the real file would never
+// reach the project. A link that cannot be resolved is written where it is.
 func writeLines(path string, lines []string, addTrailingNewline bool) error {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil { //nolint:mnd // standard directory mode
 		return err
 	}

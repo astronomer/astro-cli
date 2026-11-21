@@ -190,3 +190,51 @@ func TestSetQuotesADollar(t *testing.T) {
 		}
 	}
 }
+
+// A .env that is a symlink is the user's (a dotfile manager's, one env file
+// several projects share): a set or a delete edits the file it points at,
+// keeping its other lines, and leaves the link in place rather than
+// replacing it with a copy of the target.
+func TestASymlinkedDotenvIsWrittenThrough(t *testing.T) {
+	project, shared := t.TempDir(), t.TempDir()
+	target := filepath.Join(shared, "team.env")
+	if err := os.WriteFile(target, []byte("# shared\nKEEP=1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(project, ".env")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlinks unavailable here: %v", err)
+	}
+	s := &Store{Path: link, Scope: ScopeProject}
+
+	if _, err := s.Set(KindEnv, "ADDED", "2"); err != nil {
+		t.Fatal(err)
+	}
+	assertLinkTo(t, link, target)
+	if got := readFile(t, target); got != "# shared\nKEEP=1\nADDED=2\n" {
+		t.Errorf("target after set = %q, want its lines kept and ADDED appended", got)
+	}
+
+	if ok, err := s.Delete(KindEnv, "KEEP"); err != nil || !ok {
+		t.Fatalf("delete KEEP: ok=%v err=%v", ok, err)
+	}
+	assertLinkTo(t, link, target)
+	if got := readFile(t, target); got != "# shared\nADDED=2\n" {
+		t.Errorf("target after delete = %q", got)
+	}
+}
+
+// assertLinkTo fails unless link is still a symlink naming target.
+func assertLinkTo(t *testing.T, link, target string) {
+	t.Helper()
+	info, err := os.Lstat(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("%s is no longer a symlink: the write replaced it with a copy", link)
+	}
+	if got, err := os.Readlink(link); err != nil || got != target {
+		t.Errorf("%s points at %q (%v), want %q", link, got, err, target)
+	}
+}
