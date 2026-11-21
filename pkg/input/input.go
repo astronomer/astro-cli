@@ -42,7 +42,7 @@ func Text(promptText string, opts ...Option) (string, error) {
 	}
 	reader := stdin()
 	if promptText != "" {
-		fmt.Fprint(os.Stderr, promptText)
+		writeShown(os.Stderr, promptText)
 	}
 	// A read that ends is the answer so far, as it always was, unless it ends
 	// with nothing: that is nobody answering, refused naming the flag like a
@@ -71,7 +71,7 @@ func Confirm(promptText string, opts ...Option) (bool, error) {
 		return false, err
 	}
 	reader := stdin()
-	fmt.Fprintf(os.Stderr, "%s (y/n) ", promptText)
+	writeShown(os.Stderr, promptText+" (y/n) ")
 
 	text, err := ReadLine(reader, os.Stderr)
 	if errors.Is(err, ErrInterrupted) {
@@ -108,7 +108,7 @@ func Password(promptText string, opts ...Option) (string, error) {
 	if err := MayAsk(promptText, opts...); err != nil {
 		return "", err
 	}
-	fmt.Fprint(os.Stderr, promptText)
+	writeShown(os.Stderr, promptText)
 	password, err := HiddenValue(os.Stdin, os.Stderr)
 	fmt.Fprint(os.Stderr, "\n")
 	if err != nil {

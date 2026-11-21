@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	astroinput "github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -479,6 +480,18 @@ func TestInspectRemoteExecutionAPIURL(t *testing.T) {
 		out, err := run(t, withRemoteExecution, "yaml", "metadata.remote_execution_api_url")
 		require.NoError(t, err)
 		assert.Equal(t, remoteAPIURL+"\n", out)
+	})
+	t.Run("--key prints a value exactly to a pipe and as text to a terminal", func(t *testing.T) {
+		spoofed := newSourceDeployment()
+		spoofed.RemoteExecution = &astrov1.DeploymentRemoteExecution{Enabled: true, RemoteApiUrl: "https://x\x1b]0;title\x07"}
+		out, err := run(t, spoofed, "yaml", "metadata.remote_execution_api_url")
+		require.NoError(t, err)
+		assert.Equal(t, "https://x\x1b]0;title\x07\n", out, "a pipe gets the value as it is")
+
+		defer astroinput.ForceTerminalWriters()()
+		out, err = run(t, spoofed, "yaml", "metadata.remote_execution_api_url")
+		require.NoError(t, err)
+		assert.Equal(t, "https://x\n", out)
 	})
 	t.Run("a deployment without remote execution has no url key", func(t *testing.T) {
 		for _, format := range []string{"yaml", "json"} {
