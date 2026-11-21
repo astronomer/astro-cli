@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -192,6 +193,34 @@ func (s *Suite) TestLatestReleaseCachedAsksOnceADay() {
 		s.Equal(tc.want, latest, tc.name)
 		s.Equal(tc.wantAsked, asked, tc.name)
 	}
+}
+
+// The cache file is the CLI's own name: an entry already there, a symlink
+// among them, is replaced by the new file, not written through to whatever
+// it points at.
+func (s *Suite) TestLatestReleaseCachedReplacesASymlinkAtItsPath() {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"available_releases": [{"version": "1.45.0"}]}`))
+	}))
+	defer ts.Close()
+
+	dir := s.T().TempDir()
+	other := filepath.Join(dir, "other.txt")
+	s.Require().NoError(os.WriteFile(other, []byte("keep me"), 0o600))
+	cachePath := filepath.Join(dir, "release-check.json")
+	if err := os.Symlink(other, cachePath); err != nil {
+		s.T().Skipf("symlinks unavailable here: %v", err)
+	}
+
+	_, err := latestReleaseCached(context.Background(), &http.Client{}, ts.URL, cachePath, 1, time.Now())
+	s.Require().NoError(err)
+
+	got, err := os.ReadFile(other)
+	s.Require().NoError(err)
+	s.Equal("keep me", string(got), "the cache write went through the symlink")
+	info, err := os.Lstat(cachePath)
+	s.Require().NoError(err)
+	s.True(info.Mode().IsRegular(), "the cache is a file of its own")
 }
 
 // A failure is not an answer: it is not cached, so the next command asks again.
