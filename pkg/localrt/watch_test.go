@@ -3,6 +3,7 @@ package localrt
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -572,6 +573,33 @@ func TestForwardQueuesWhileTheReaderIsBusy(t *testing.T) {
 		t.Fatalf("each name is queued once, got another: %q", n)
 	case <-time.After(50 * time.Millisecond):
 	}
+}
+
+// A burst of distinct names while the reader is busy does not grow the queue
+// without end: past the bound it becomes one rescanAll, which stands in for
+// every file, and names that come while that waits add nothing. Once it is
+// read, names queue again.
+func TestForwardCollapsesALongQueueToARescan(t *testing.T) {
+	dir := t.TempDir()
+	events := make(chan fsnotify.Event)
+	errs := make(chan error)
+	out := make(chan string)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go forward(ctx, dir, events, errs, out)
+
+	for i := range maxQueuedNames + 100 {
+		events <- fsnotify.Event{Name: filepath.Join(dir, "dags", fmt.Sprintf("f%d.py", i)), Op: fsnotify.Create}
+	}
+	require.Equal(t, rescanAll, <-out)
+	select {
+	case n := <-out:
+		t.Fatalf("the queue held more than the rescan: %q", n)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	events <- fsnotify.Event{Name: filepath.Join(dir, manifest.Marker), Op: fsnotify.Write}
+	require.Equal(t, manifest.Marker, <-out, "a name after the rescan was read queues as before")
 }
 
 // settingsFile is a caller's own watched file: one its start reads, which the
