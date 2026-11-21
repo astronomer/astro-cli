@@ -8,29 +8,27 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
-// addListLimitFlag registers --limit on a list command: the most results
-// wanted in all, with paging stopping once they are in hand. Left off, a list
-// pages through everything. What is kept is the first rows in the order the
-// command lists them, so a limited run returns the same ones every time.
+// addListLimit makes cmd a list command with --limit: the most results wanted
+// in all, with paging stopping once they are in hand. Left off, a list pages
+// through everything. What is kept is the first rows in the order the command
+// lists them, so a limited run returns the same ones every time.
+//
+// It sets cmd.RunE, which reads and validates --limit before anything else (a
+// value below 1 is a usage error before the API is asked; one that is not an
+// integer is refused by the flag parser) and then calls run with it, 0 when the
+// flag is left off. The flag, its help and its validation live here and
+// nowhere else, so a list command cannot register one and forget the other.
 //
 // what is the plural noun the help names, and may carry a note on the order
 // ("bundles, in the order the API returns them") where the API takes no sort.
-func addListLimitFlag(cmd *cobra.Command, target *int, what string) {
-	cmd.Flags().IntVar(target, "limit", 0, "Show at most this many "+what+"; at least 1 (default: all of them)")
-}
-
-// addListLimit is addListLimitFlag for a command that keeps the value to
-// itself: it registers --limit and returns the reader the command's RunE calls
-// first, which is 0 when the flag is left off and a usage error when it is
-// below 1.
-func addListLimit(cmd *cobra.Command, what string) func() (int, error) {
+func addListLimit(cmd *cobra.Command, what string, run func(cmd *cobra.Command, limit int) error) {
 	var n int
-	addListLimitFlag(cmd, &n, what)
-	return func() (int, error) {
+	cmd.Flags().IntVar(&n, "limit", 0, "Show at most this many "+what+"; at least 1 (default: all of them)")
+	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
 		if err := checkListLimit(cmd, "limit", n); err != nil {
-			return 0, err
+			return err
 		}
-		return n, nil
+		return run(cmd, n)
 	}
 }
 

@@ -97,7 +97,6 @@ var (
 	taskLogBucket              *string
 	taskLogURLPattern          *string
 	deploymentListOutput       cliout.Format
-	deploymentListLimit        int
 	deploymentUserOutput       cliout.Format
 	deploymentTeamOutput       cliout.Format
 
@@ -192,9 +191,7 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl // each list command is its own cobra literal; they differ in help and in what they call
 func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -205,15 +202,10 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 
   # List them as JSON
   astro deployment team list --deployment <DEPLOYMENT_ID> -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return listDeploymentTeam(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
-	readLimit = addListLimit(cmd, "teams")
+	addListLimit(cmd, "teams", func(cmd *cobra.Command, limit int) error {
+		return listDeploymentTeam(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -390,9 +382,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl // each list command is its own cobra literal; they differ in help and in what they call
 func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -403,15 +393,10 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 
   # List them as JSON
   astro deployment user list --deployment <DEPLOYMENT_ID> -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return listDeploymentUser(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
-	readLimit = addListLimit(cmd, "users")
+	addListLimit(cmd, "users", func(cmd *cobra.Command, limit int) error {
+		return listDeploymentUser(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -461,14 +446,10 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 
   # List them as JSON
   astro deployment list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := checkListLimit(cmd, "limit", deploymentListLimit); err != nil {
-				return err
-			}
-			return deploymentList(cmd, out)
-		},
 	}
-	addListLimitFlag(cmd, &deploymentListLimit, "Deployments")
+	addListLimit(cmd, "Deployments", func(cmd *cobra.Command, limit int) error {
+		return deploymentList(cmd, out, limit)
+	})
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 	markWorkspaceChoice(cmd.Flags().Lookup("all"))
 	addDeploymentWorkspaceFlag(cmd.Flags())
@@ -797,7 +778,7 @@ func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func deploymentList(cmd *cobra.Command, out io.Writer) error {
+func deploymentList(cmd *cobra.Command, out io.Writer, limit int) error {
 	// --all lists every workspace's, so it needs no workspace: an org-scoped
 	// token has none to find.
 	ws := ""
@@ -808,7 +789,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 		}
 	}
 
-	return deployment.ListWithFormat(cmd.Context(), ws, allDeployments, deploymentListLimit, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out, Err: cmd.ErrOrStderr()})
+	return deployment.ListWithFormat(cmd.Context(), ws, allDeployments, limit, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1282,7 +1263,6 @@ func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentTokenListCmd(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -1290,16 +1270,11 @@ func newDeploymentTokenListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all API tokens with a role in a Deployment, including Deployment-scoped tokens and any Organization or Workspace tokens that have been granted a Deployment role.",
 		Example: `  # List the API tokens with a role in a Deployment
   astro deployment token list --deployment <DEPLOYMENT_ID>`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return listDeploymentToken(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
 	addOneXWorkspaceIDNoOp(cmd.Flags())
-	readLimit = addListLimit(cmd, "API tokens")
+	addListLimit(cmd, "API tokens", func(cmd *cobra.Command, limit int) error {
+		return listDeploymentToken(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -1674,43 +1649,31 @@ func removeWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out i
 }
 
 func newListOrganizationTokensInDeployment(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all Organization API tokens in a Deployment",
 		Long:  "List all Organization API tokens in a Deployment",
 		Example: `  # List the Organization tokens with a role in a Deployment
   astro deployment token organization-token list --deployment <DEPLOYMENT_ID>`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return listOrganizationTokensInDeployment(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
-	readLimit = addListLimit(cmd, "Organization API tokens")
+	addListLimit(cmd, "Organization API tokens", func(cmd *cobra.Command, limit int) error {
+		return listOrganizationTokensInDeployment(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
 func newListWorkspaceTokensInDeployment(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all Workspace API tokens in a Deployment",
 		Long:  "List all Workspace API tokens in a Deployment",
 		Example: `  # List the Workspace tokens with a role in a Deployment
   astro deployment token workspace-token list --deployment <DEPLOYMENT_ID>`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return listWorkspaceTokensInDeployment(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
 	addOneXWorkspaceIDNoOp(cmd.Flags())
-	readLimit = addListLimit(cmd, "Workspace API tokens")
+	addListLimit(cmd, "Workspace API tokens", func(cmd *cobra.Command, limit int) error {
+		return listWorkspaceTokensInDeployment(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 

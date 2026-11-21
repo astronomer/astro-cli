@@ -100,7 +100,16 @@ func (s *Suite) TestListData() {
 
 		_, err := ListData(context.Background(), mockClient, 0)
 		s.Error(err)
+		s.Contains(err.Error(), "cannot connect to Astronomer")
 		mockClient.AssertExpectations(s.T())
+	})
+
+	s.Run("an interrupt is returned as it is, not as a failure to connect", func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := ListData(ctx, new(astrov1_mocks.ClientWithResponsesInterface), 0)
+		s.ErrorIs(err, context.Canceled)
+		s.NotContains(err.Error(), "cannot connect")
 	})
 }
 

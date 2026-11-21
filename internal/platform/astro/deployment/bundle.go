@@ -304,7 +304,7 @@ func nonEmpty(s string) *string {
 // listBundlesData fetches every bundle configured on a deployment, paging through
 // all results.
 func listBundlesData(ctx httpContext.Context, wsID, deploymentID string, limit int, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) (*BundleList, error) {
-	dep, err := GetDeployment(wsID, deploymentID, "", ToRead, nil, astroV1Client)
+	dep, err := GetDeploymentContext(ctx, wsID, deploymentID, "", ToRead, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}

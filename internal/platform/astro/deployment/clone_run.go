@@ -41,7 +41,7 @@ func CloneSource(ref, ws string, astroV1Client astrov1.APIClient) (astrov1.Deplo
 // in organization orgID ("" for the current context's). A name is not
 // unique, so a caller decides what none, or several, means.
 func DeploymentsNamed(name, ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
-	deployments, err := ListDeployments(ws, orgID, astroV1Client)
+	deployments, err := ListDeployments(context.Background(), ws, orgID, astroV1Client)
 	if err != nil {
 		return nil, err
 	}

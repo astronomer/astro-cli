@@ -1810,8 +1810,8 @@ var coreDeleteDeploymentHibernationOverride = func(orgID, deploymentID string, a
 
 // ListDeployments returns every Deployment in the given Workspace (or the whole
 // Organization when ws is empty), paging through the API as needed.
-var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
-	return listDeploymentsUpTo(context.Background(), ws, orgID, 0, astroV1Client)
+var ListDeployments = func(ctx context.Context, ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
+	return listDeploymentsUpTo(ctx, ws, orgID, 0, astroV1Client)
 }
 
 // listDeploymentsUpTo is ListDeployments that stops paging after limit
@@ -2231,6 +2231,13 @@ func mayAutoSelect() bool {
 // creates a Deployment: a workspace with none to pick from is a
 // *NoDeploymentsError.
 func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFilter func(deployment astrov1.Deployment) bool, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+	return GetDeploymentContext(context.Background(), ws, deploymentID, deploymentName, use, selectionFilter, astroV1Client)
+}
+
+// GetDeploymentContext is GetDeployment that stops listing the Workspace's
+// Deployments when ctx is canceled, and says so as the cancellation, not as a
+// Deployment that was not found.
+func GetDeploymentContext(ctx context.Context, ws, deploymentID, deploymentName string, use Use, selectionFilter func(deployment astrov1.Deployment) bool, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
 	// One the caller already fetched by its id (see WithFetched) is that
 	// Deployment: nothing is listed or read again.
 	if d, ok := fetchedFor(astroV1Client, ws, deploymentID); ok {
@@ -2240,8 +2247,11 @@ func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFi
 		return d, nil
 	}
 	src := sourceFor(astroV1Client, ws)
-	deployments, err := ListDeployments(ws, "", astroV1Client)
+	deployments, err := ListDeployments(ctx, ws, "", astroV1Client)
 	if err != nil {
+		if ctx.Err() != nil {
+			return astrov1.Deployment{}, ctx.Err()
+		}
 		return astrov1.Deployment{}, &NotFoundError{Workspace: ws, Source: src, Err: err}
 	}
 

@@ -265,8 +265,7 @@ func (s *Suite) TestListBundlesWithFormat() {
 		mockV1Alpha1Client.AssertExpectations(s.T())
 	})
 
-	s.Run("a canceled context lists nothing", func() {
-		s.mockGetDeployment()
+	s.Run("a canceled context stops the Deployment lookup before the list, as the cancellation", func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		err := ListBundlesWithFormat(ctx, ws, testBundleDeploymentID, 0, testUtil.Renderer{Out: &bytes.Buffer{}}, mockV1Client, new(astrov1alpha1_mocks.ClientWithResponsesInterface))

@@ -454,7 +454,7 @@ func lookupDeployment(override, orgID, ref string, project *manifest.Astro, ctx 
 	if override != "" && override != wsOrg {
 		return astrov1.Deployment{}, fmt.Errorf("%q is not a Deployment id, and its name is looked up in workspace %s, which is not in --organization-id %s: pass -d with the Deployment id", ref, ws, override)
 	}
-	deps, err := deployment.ListDeployments(ws, wsOrg, client)
+	deps, err := deployment.ListDeployments(context.Background(), ws, wsOrg, client)
 	if err != nil {
 		return astrov1.Deployment{}, &astrosession.WorkspaceError{
 			Workspace: ws, Source: run.WorkspaceSource, Err: err,

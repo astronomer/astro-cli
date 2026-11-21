@@ -354,7 +354,7 @@ func (s *Suite) TestListDeploymentsPaginates() {
 	mockClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page1, nil).Once()
 	mockClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page2, nil).Once()
 
-	got, err := ListDeployments("", "test-org", mockClient)
+	got, err := ListDeployments(stdcontext.Background(), "", "test-org", mockClient)
 	s.NoError(err)
 	s.Len(got, 2)
 	s.Equal("deployment-page1", got[0].Id)
@@ -385,7 +385,7 @@ func (s *Suite) TestListDeploymentsPaginatesOverHTTP() {
 	client, err := astrov1.NewClientWithResponses(ts.URL)
 	s.Require().NoError(err)
 
-	got, err := ListDeployments("", "test-org", client)
+	got, err := ListDeployments(stdcontext.Background(), "", "test-org", client)
 	s.NoError(err)
 	s.Len(got, 2)
 	s.Equal("dep-1", got[0].Id)

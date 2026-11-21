@@ -1321,6 +1321,16 @@ func (s *Suite) TestListTeamUsers() {
 		s.Empty(got.Members)
 	})
 
+	s.Run("the run's context reaches the team lookup, so an interrupt stops it there", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
+		mockClient.On("GetTeamWithResponse", ctx, mock.Anything, mock.Anything).Return(nil, context.Canceled).Once()
+		_, err := ListTeamUsers(ctx, team1.Id, 0, mockClient)
+		s.ErrorIs(err, context.Canceled)
+	})
+
 	s.Run("error path when GetTeamWithResponse returns an error", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())

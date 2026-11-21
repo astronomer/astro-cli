@@ -1382,7 +1382,9 @@ func TestDeployManifestPickerNeverCreatesADeployment(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	orig := deployment.ListDeployments
 	t.Cleanup(func() { deployment.ListDeployments = orig })
-	deployment.ListDeployments = func(string, string, astrov1.APIClient) ([]astrov1.Deployment, error) { return nil, nil }
+	deployment.ListDeployments = func(context.Context, string, string, astrov1.APIClient) ([]astrov1.Deployment, error) {
+		return nil, nil
+	}
 
 	d := manifestDeployer{login: &deployLogin{current: true, client: new(astrov1_mocks.ClientWithResponsesInterface)}}
 	_, err := d.ResolveUnlinked("clw-ws")
@@ -1397,7 +1399,7 @@ func TestDeployManifestListDeploymentsGivesUp(t *testing.T) {
 	release := make(chan struct{})
 	t.Cleanup(func() { close(release) })
 	origList, origTimeout := deployment.ListDeployments, listDeploymentsTimeout
-	deployment.ListDeployments = func(string, string, astrov1.APIClient) ([]astrov1.Deployment, error) {
+	deployment.ListDeployments = func(context.Context, string, string, astrov1.APIClient) ([]astrov1.Deployment, error) {
 		<-release
 		return nil, nil
 	}

@@ -110,11 +110,16 @@ func orDefault(s, def string) string {
 }
 
 func GetTeam(client astrov1.APIClient, teamID string) (team astrov1.Team, err error) {
-	ctx, err := context.GetCurrentContext()
+	return getTeam(httpContext.Background(), client, teamID)
+}
+
+// getTeam is GetTeam that stops when ctx is canceled.
+func getTeam(ctx httpContext.Context, client astrov1.APIClient, teamID string) (team astrov1.Team, err error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return team, err
 	}
-	resp, err := client.GetTeamWithResponse(httpContext.Background(), ctx.Organization, teamID)
+	resp, err := client.GetTeamWithResponse(pagination.Background(ctx), cfg.Organization, teamID)
 	if err != nil {
 		return team, err
 	}
@@ -418,9 +423,9 @@ func selectTeam(teams []astrov1.Team) (astrov1.Team, error) {
 
 // listTeams paginates through GET /teams with optional workspaceId/deploymentId
 // filters. It keeps the first limit teams (all when limit is below 1) and stops
-// when ctx is canceled. Pages are sorted by name, then id, so an offset cannot
-// skip or repeat a team where two pages meet and a limited list is the first
-// rows of the full one.
+// when ctx is canceled. Pages are sorted by name, which is the
+// stable order the API offers (its team sorts have no id tiebreaker), so a
+// limited list is the first rows of the full one.
 func listTeams(ctx httpContext.Context, client astrov1.APIClient, workspaceID, deploymentID *string, limit int) ([]astrov1.Team, error) {
 	cfg, err := context.GetCurrentContext()
 	if err != nil {
@@ -803,7 +808,7 @@ func ListTeamUsers(ctx httpContext.Context, teamID string, limit int, client ast
 	}
 	var team astrov1.Team
 	if teamID == "" {
-		teams, err := GetOrgTeams(client)
+		teams, err := listTeams(ctx, client, nil, nil, 0)
 		if err != nil {
 			return MemberList{}, err
 		}
@@ -815,7 +820,7 @@ func ListTeamUsers(ctx httpContext.Context, teamID string, limit int, client ast
 			return MemberList{}, pickFailed(err)
 		}
 	} else {
-		team, err = GetTeam(client, teamID)
+		team, err = getTeam(ctx, client, teamID)
 		if err != nil {
 			return MemberList{}, err
 		}

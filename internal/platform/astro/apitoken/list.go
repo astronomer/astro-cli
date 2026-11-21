@@ -12,8 +12,8 @@ import (
 const pageSize = 100
 
 // Fetch pages through the Organization's API tokens that filters selects (the
-// Workspace, Deployment or Organization-only filter it carries), in name order
-// so an offset cannot skip or repeat a token where two pages meet. It stops
+// Workspace, Deployment or Organization-only filter it carries), in name order,
+// the stable order the API offers (its token sorts have no id tiebreaker). It stops
 // after limit tokens (every one when limit is below 1) and when ctx is
 // canceled. Offset, Limit and Sorts of filters are set here.
 //

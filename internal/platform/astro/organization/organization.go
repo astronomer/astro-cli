@@ -51,8 +51,8 @@ var organizationTableConfig = output.BuildTableConfig(
 // organizationPager fetches one page of Organizations at a time for the
 // pagination helpers.
 //
-// Pages are sorted by name, so an offset cannot skip or repeat an Organization
-// where two pages meet, and a limited list is the first rows of the full one.
+// Pages are sorted by name, the stable order the API offers, so a limited list
+// is the first rows of the full one.
 func organizationPager(ctx http_context.Context, astroV1Client astrov1.APIClient, limit int) pagination.FetchPage[astrov1.Organization] {
 	sorts := []astrov1.ListOrganizationsParamsSorts{astrov1.ListOrganizationsParamsSortsNameAsc}
 	return func(offset int) ([]astrov1.Organization, int, error) {
@@ -113,6 +113,10 @@ func ListData(ctx http_context.Context, astroV1Client astrov1.APIClient, limit i
 	}
 	or, err := listOrganizationsUpTo(ctx, astroV1Client, limit)
 	if err != nil {
+		// An interrupt is not a failure to connect.
+		if errors.Is(err, http_context.Canceled) || errors.Is(err, http_context.DeadlineExceeded) {
+			return nil, err
+		}
 		return nil, fmt.Errorf(AstronomerConnectionErrMsg+"%w", err)
 	}
 

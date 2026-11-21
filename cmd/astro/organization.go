@@ -77,9 +77,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl // each list command is its own cobra literal; they differ in help and in what they call
 func newOrganizationListCmd(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -87,16 +85,11 @@ func newOrganizationListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all Astro Organizations you have access to.",
 		Example: `  astro organization list
   astro organization list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return organizationList(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
 	cliout.AddOutputFlag(cmd, &organizationListOutput)
-	readLimit = addListLimit(cmd, "Organizations")
+	addListLimit(cmd, "Organizations", func(cmd *cobra.Command, limit int) error {
+		return organizationList(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -219,9 +212,7 @@ func newOrganizationUserInviteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl // each list command is its own cobra literal; they differ in help and in what they call
 func newOrganizationUserListCmd(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -229,15 +220,10 @@ func newOrganizationUserListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all users and their Organization-level roles.",
 		Example: `  astro organization user list
   astro organization user list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return listUsers(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
-	readLimit = addListLimit(cmd, "users")
+	addListLimit(cmd, "users", func(cmd *cobra.Command, limit int) error {
+		return listUsers(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -398,9 +384,7 @@ func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl // each list command is its own cobra literal; they differ in help and in what they call
 func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -408,15 +392,10 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all the teams in your Astro Organization",
 		Example: `  astro organization team list
   astro organization team list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return listTeams(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
-	readLimit = addListLimit(cmd, "teams")
+	addListLimit(cmd, "teams", func(cmd *cobra.Command, limit int) error {
+		return listTeams(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -644,7 +623,6 @@ func addTeamUser(out io.Writer) error {
 }
 
 func newTeamListUsersCmd(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Lists users in an Astro Team",
@@ -656,16 +634,11 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
   # Choose the team from a list
   astro organization team user list
 `,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return listUsersCmd(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
 	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's id \"\" ")
-	readLimit = addListLimit(cmd, "members")
+	addListLimit(cmd, "members", func(cmd *cobra.Command, limit int) error {
+		return listUsersCmd(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -707,9 +680,7 @@ func newOrganizationTokenRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl // each list command is its own cobra literal; they differ in help and in what they call
 func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -722,15 +693,10 @@ func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
   # List the tokens in another Organization
   astro organization token list --organization-id <ORGANIZATION_ID>
 `,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return listOrganizationToken(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
-	readLimit = addListLimit(cmd, "API tokens")
+	addListLimit(cmd, "API tokens", func(cmd *cobra.Command, limit int) error {
+		return listOrganizationToken(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -882,7 +848,6 @@ func newOrganizationRoleRootCmd(out io.Writer) *cobra.Command {
 }
 
 func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -898,17 +863,12 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
   # List the roles as JSON
   astro organization role list -o json
 `,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return listRoles(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
 	cmd.Flags().BoolVar(&shouldIncludeDefaultRoles, "include-default-roles", false, "Should include default roles in response")
 
-	readLimit = addListLimit(cmd, "custom roles")
+	addListLimit(cmd, "custom roles", func(cmd *cobra.Command, limit int) error {
+		return listRoles(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -934,9 +894,7 @@ func newOrganizationClusterRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-//nolint:dupl // each list command is its own cobra literal; they differ in help and in what they call
 func newOrganizationClusterListCmd(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -944,16 +902,11 @@ func newOrganizationClusterListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all the clusters in your Astro Organization. Only Dedicated and Hybrid clusters are listed. Standard Deployments run on clusters that Astronomer manages, so an Organization with only Standard Deployments has no clusters to list.",
 		Example: `  astro organization cluster list
   astro organization cluster list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			return listClusters(cmd.Context(), out, cmd.ErrOrStderr(), limit)
-		},
 	}
 	cliout.AddOutputFlag(cmd, &organizationClusterListOutput)
-	readLimit = addListLimit(cmd, "clusters")
+	addListLimit(cmd, "clusters", func(cmd *cobra.Command, limit int) error {
+		return listClusters(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 

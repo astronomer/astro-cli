@@ -72,7 +72,6 @@ func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
-	var readLimit func() (int, error)
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -80,20 +79,15 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 		Long:    "List every Dag and non-Dag bundle registered on an Astro Deployment.",
 		Example: `  astro deployment bundle list --deployment <id>
   astro deployment bundle list --deployment <id> -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			limit, err := readLimit()
-			if err != nil {
-				return err
-			}
-			defer strayStdoutToStderr(bundleOutput)()
-			ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
-			if err != nil {
-				return err
-			}
-			return deployment.ListBundlesWithFormat(cmd.Context(), ws, deploymentID, limit, cliout.Renderer{Format: bundleOutput, Err: cmd.ErrOrStderr(), Out: out}, client, astroV1Alpha1Client)
-		},
 	}
-	readLimit = addListLimit(cmd, "bundles, in the order the API returns them")
+	addListLimit(cmd, "bundles, in the order the API returns them", func(cmd *cobra.Command, limit int) error {
+		defer strayStdoutToStderr(bundleOutput)()
+		ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
+		if err != nil {
+			return err
+		}
+		return deployment.ListBundlesWithFormat(cmd.Context(), ws, deploymentID, limit, cliout.Renderer{Format: bundleOutput, Err: cmd.ErrOrStderr(), Out: out}, client, astroV1Alpha1Client)
+	})
 	return cmd
 }
 

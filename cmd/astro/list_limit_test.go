@@ -18,19 +18,15 @@ import (
 // that is met stops the paging: the workspace list asks for one row only.
 func TestWorkspaceListLimit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	defer func() { workspaceListLimit = 0 }()
 
 	for _, bad := range []string{"0", "-3"} {
-		workspaceListLimit = 0
 		_, err := execWorkspaceCmd("list", "--limit", bad)
 		require.Error(t, err, bad)
 		assert.True(t, cliout.IsUsage(err), "--limit %s: %v", bad, err)
 	}
-	workspaceListLimit = 0
 	_, err := execWorkspaceCmd("list", "--limit", "many")
 	require.Error(t, err)
 
-	workspaceListLimit = 0
 	mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 	astroV1Client = mockClient
@@ -40,13 +36,25 @@ func TestWorkspaceListLimit(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-func TestCheckListLimitLeavesAnUnsetFlagAlone(t *testing.T) {
-	var n int
+func TestAddListLimitValidatesBeforeRunning(t *testing.T) {
+	var got []int
 	cmd := &cobra.Command{Use: "x"}
-	addListLimitFlag(cmd, &n, "things")
-	require.NoError(t, checkListLimit(cmd, "limit", n), "left off, the flag is not checked")
+	addListLimit(cmd, "things", func(_ *cobra.Command, limit int) error {
+		got = append(got, limit)
+		return nil
+	})
+	require.NoError(t, cmd.ParseFlags(nil))
+	require.NoError(t, cmd.RunE(cmd, nil))
 	require.NoError(t, cmd.ParseFlags([]string{"--limit", "5"}))
-	require.NoError(t, checkListLimit(cmd, "limit", n))
+	require.NoError(t, cmd.RunE(cmd, nil))
+	assert.Equal(t, []int{0, 5}, got, "left off is 0, which pages through everything")
+	assert.Contains(t, cmd.Flags().Lookup("limit").Usage, "at least 1")
+	assert.Contains(t, cmd.Flags().Lookup("limit").Usage, "default: all")
+
+	require.NoError(t, cmd.ParseFlags([]string{"--limit", "0"}))
+	err := cmd.RunE(cmd, nil)
+	assert.True(t, cliout.IsUsage(err))
+	assert.Equal(t, []int{0, 5}, got, "a refused limit runs nothing")
 }
 
 // --basic-token - reads the token from a pipe, so it never reaches argv.

@@ -720,7 +720,7 @@ func (d manifestDeployer) ListDeployments(workspaceID string) ([]manifestdeploy.
 	done := make(chan listed, 1)
 	list, org, client := deployment.ListDeployments, d.login.context.Organization, d.login.client
 	go func() {
-		deps, err := list(workspaceID, org, client)
+		deps, err := list(context.Background(), workspaceID, org, client)
 		done <- listed{deps, err}
 	}()
 	var res listed
