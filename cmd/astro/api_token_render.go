@@ -90,7 +90,7 @@ func renderTokenSecret(format cliout.Format, out, errOut io.Writer, t *apitoken.
 	}
 	// The receipt follows the secret, and only when the secret was written.
 	if format != cliout.FormatJSON {
-		fmt.Fprintf(errOut, "\n%s %s API token %s\n", verb, kind, name)
+		fmt.Fprintf(errOut, "\n%s %s API token %s\n", verb, kind, input.Plain(name))
 		fmt.Fprintln(errOut, "Copy this API token for your records.")
 		fmt.Fprintln(errOut, "This API token value is not shown again.")
 	}

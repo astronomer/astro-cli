@@ -76,6 +76,18 @@ const esc = 0x1b
 // would have made them a sequence, so nothing is held without bound.
 const maxHeldEscape = 64 << 10
 
+// writeShown writes a prompt to w, a terminal, as TerminalWriter has it: the
+// CLI's own styling (a bold name) is kept, and anything else a terminal would
+// act on rather than show is dropped. A prompt quotes names from elsewhere (a
+// Deployment's, a token's), and every question goes through here, so no caller
+// has to remember. A failed write to the terminal still reads the answer, as a
+// prompt always has, so its error goes nowhere.
+func writeShown(w io.Writer, s string) {
+	tw := &TerminalWriter{W: w}
+	io.WriteString(tw, s) //nolint:errcheck // a failed write to the terminal still reads the answer
+	tw.Flush()            //nolint:errcheck // as above
+}
+
 // TerminalWriter writes what it is given to W as Terminal has it, as it
 // arrives: a command's rendering can be long, or can stream, so nothing waits
 // for the end. An escape sequence or a UTF-8 character that one Write splits

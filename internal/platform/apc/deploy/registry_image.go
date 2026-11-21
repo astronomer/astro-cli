@@ -9,6 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
@@ -65,7 +66,7 @@ func deployRegistryImage(client houston.ClientInterface, in *ManifestImage, prog
 		return ManifestImageResult{}, err
 	}
 
-	fmt.Fprintf(progress, houstonDeploymentPrompt, t.release)
+	fmt.Fprintf(progress, houstonDeploymentPrompt, input.Plain(t.release))
 	fmt.Fprintf(progress, "Pointing the Deployment at %s, already in its registry. Nothing is built or pushed.\n", in.ImageName)
 	req := houston.UpdateDeploymentImageRequest{ReleaseName: t.release, Image: in.ImageName, RuntimeVersion: in.RuntimeVersion, DeployRevisionDescription: in.Description}
 	if _, err := houston.Call(client.UpdateDeploymentImage)(req); err != nil {

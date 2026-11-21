@@ -338,7 +338,12 @@ func (l *List) render(out io.Writer) {
 	tab.Render(tb)
 	tb.Flush() //nolint:errcheck // a bytes.Buffer does not fail
 
-	b := bufio.NewWriter(out)
+	// The table's cells are already shown as input.Cell has them (texttable);
+	// the title and the prompt, which can quote a name too, go through
+	// input.TerminalWriter, which keeps the highlight, the CLI's own styling.
+	tw := &input.TerminalWriter{W: out}
+	defer tw.Flush() //nolint:errcheck // a failed write to the terminal still reads the answer
+	b := bufio.NewWriter(tw)
 	if l.Title != "" {
 		fmt.Fprintln(b, l.Title)
 	}

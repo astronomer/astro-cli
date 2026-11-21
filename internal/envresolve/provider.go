@@ -1,6 +1,10 @@
 package envresolve
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/astronomer/astro-cli/pkg/input"
+)
 
 // Provider is one source in the resolution chain. It answers a single
 // question — "do you hold a value under this Airflow env-var key?" — and
@@ -94,7 +98,13 @@ func SkippedNote(p Provider, workspace string) string {
 	if len(keys) == 0 {
 		return ""
 	}
-	return "Workspace " + workspace + " holds " + strings.Join(keys, ", ") +
+	// The keys are the ones that are not names, so they are shown as plain
+	// text: what they hold is printed, not acted on.
+	shown := make([]string, len(keys))
+	for i, k := range keys {
+		shown[i] = input.Plain(k)
+	}
+	return "Workspace " + input.Plain(workspace) + " holds " + strings.Join(shown, ", ") +
 		", which cannot be environment variable names, so Airflow does not get them. Rename them in the Workspace to use them."
 }
 

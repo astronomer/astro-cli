@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
@@ -219,7 +220,7 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 		return ManifestImageResult{}, err
 	}
 
-	fmt.Fprintf(progress, houstonDeploymentPrompt, t.release)
+	fmt.Fprintf(progress, houstonDeploymentPrompt, input.Plain(t.release))
 	c, _ := config.GetCurrentContext() //nolint:errcheck // the target lookup has already read it
 	pushed, err := pushManifestImage(ctx, client, &c, t, engine, &pushedImage{local: localImage, named: in.ImageName, runtime: runtimeVersion}, in.Description, in.ShaAsTag, progress)
 	if err != nil {

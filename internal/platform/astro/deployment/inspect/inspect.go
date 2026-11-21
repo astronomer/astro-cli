@@ -12,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 )
 
@@ -137,8 +138,16 @@ func Print(wsID, deploymentName, deploymentID string, astroV1Client astrov1.APIC
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(out, value)
-		return nil
+		// --key is what scripts and deploy-action read, so a file or a pipe
+		// gets the value exactly; a terminal gets it through
+		// input.TerminalWriter, as a command's rendered result is shown.
+		if !input.IsTerminalWriter(out) {
+			fmt.Fprintln(out, value)
+			return nil
+		}
+		tw := &input.TerminalWriter{W: out}
+		fmt.Fprintln(tw, value)
+		return tw.Flush()
 	}
 	// print the entire deployment
 	formatted, err := formatDeployment(printableDeployment)
