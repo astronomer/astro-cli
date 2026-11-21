@@ -45,7 +45,7 @@ var (
 // `airflow standalone` and structlog write (a raw line begins
 // "\x1b[33mdag-processor\x1b[0m | " rather than "dag-processor | "), any
 // other escape sequence such as an OSC, and the other control and invisible
-// characters, by termtext.Lines: the rules the CLI's own text filters use,
+// characters, by termtext.Lines, the rules the CLI's own text filters are built on,
 // which the docker engine applies to its lines too.
 //
 // It runs before anything else reads the line, because everything else assumed

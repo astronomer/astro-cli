@@ -3,8 +3,8 @@
 // is given it: the escape sequences and control characters a terminal acts on
 // rather than shows, and the invisible characters that reorder or hide text.
 // It is one set of rules for every caller, the CLI's pkg/input and the local
-// runtime's log lines alike, so what one shows as text the other does too. It
-// has no dependencies.
+// runtime's log lines alike, so the two cannot drift apart. It has no
+// dependencies outside its tests.
 package termtext
 
 import (
@@ -54,9 +54,22 @@ var removed = regexp.MustCompile(escapePattern + "|" +
 // Text with nothing to remove, the usual case, is returned as it is, without
 // allocating.
 func Strip(s string, keepSpace bool) string {
-	return drop(withoutEscapes(s), func(r rune) bool {
-		return (unicode.IsControl(r) && !(keepSpace && unicode.IsSpace(r))) || Misleading(r)
-	})
+	if printable(s, keepSpace) {
+		return s
+	}
+	if keepSpace {
+		return drop(withoutEscapes(s), goneKeepingSpace)
+	}
+	return drop(withoutEscapes(s), gone)
+}
+
+// gone is a rune Strip removes: a control character or a Misleading one.
+func gone(r rune) bool { return unicode.IsControl(r) || Misleading(r) }
+
+// goneKeepingSpace is gone, but for the white space among the control
+// characters.
+func goneKeepingSpace(r rune) bool {
+	return (unicode.IsControl(r) && !unicode.IsSpace(r)) || Misleading(r)
 }
 
 // Lines is text as a multi-line value shows it: without escapes, control
@@ -69,10 +82,30 @@ func Strip(s string, keepSpace bool) string {
 // Text with nothing to remove, the usual case, is returned as it is, without
 // allocating.
 func Lines(s string) string {
+	if printable(s, true) {
+		return s
+	}
 	if strings.Contains(s, "\r\n") {
 		s = strings.ReplaceAll(s, "\r\n", "\n")
 	}
-	return drop(withoutEscapes(s), func(r rune) bool { return Shown(r) == -1 })
+	return drop(withoutEscapes(s), notShown)
+}
+
+// notShown is a rune Lines removes (Shown).
+func notShown(r rune) bool { return Shown(r) == -1 }
+
+// printable reports whether s is printable ASCII, with tabs and line breaks
+// too when lines is set: text with nothing in it for Strip or Lines to remove,
+// the usual log line, found with one pass over its bytes and no rune decoding.
+func printable(s string, lines bool) bool {
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if b >= 0x20 && b < 0x7f || lines && (b == '\t' || b == '\n') {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // Shown is r as Lines shows it: a line break and a tab as they are, and a

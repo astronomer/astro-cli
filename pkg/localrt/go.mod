@@ -19,7 +19,7 @@ require (
 )
 
 // The rules for what a terminal is given of a log line, shared with the
-// CLI's own text filters (pkg/input). A leaf with no requires of its own.
+// CLI's own text filters (pkg/input). A leaf: its one require is test-only.
 require github.com/astronomer/astro-cli/pkg/termtext v0.0.0-00010101000000-000000000000
 
 require (
