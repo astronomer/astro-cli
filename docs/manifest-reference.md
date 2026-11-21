@@ -381,6 +381,16 @@ Anything else is an error: an unknown method, a field the method does not take, 
 
 On an Astro link only: the repository `astro remote deploy --deployment <name>` pushes the client image to, for a Deployment whose remote agents pull from somewhere other than the project's [`client-registry`](#client-registry). Unset, the link takes the project's. An error on any other kind of link, which has no remote agents.
 
+### `dag-bundle`
+
+On an Astro link only: the named Dag bundle `astro deploy` ships the project's Dags to on this link's Deployment, instead of the Deployment's default bundle. A Dag bundle belongs to one Deployment, so there is no project-wide value to inherit, unlike [`client-registry`](#client-registry-1). `astro deploy --dag-bundle` overrides it for one run. It applies to a deploy that ships Dags (`--dags`, or the full deploy), is not read by `--image`, and the bundle must already exist on the Deployment as a bundle deploys write to (see [A named Dag bundle](deploy.md#a-named-dag-bundle)). An error on any other kind of link, which has no named Dag bundles. A build of the CLI that predates the key warns that it is unknown and deploys to the default bundle, so a teammate on an older CLI ships to a different bundle than the file says.
+
+```toml
+[tool.astro.deployments.prod]
+deployment = 'your-prod-deployment-id'
+dag-bundle = 'nightly'
+```
+
 ### `default`
 
 Marks the project's default link. At most one link in the file may set it; two or more is an error. A project with a single link treats it as the default without the mark, and adding a second link writes the mark onto that first one, so the default does not vanish because a link was added; `astro link add` says so, and reports the link as `kept_default` under `--output json`. `astro link default NAME` moves it. `astro link default --unset` writes `default = false` on the link that was the default, which no later save marks again.

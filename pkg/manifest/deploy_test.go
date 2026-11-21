@@ -100,3 +100,45 @@ func TestAnUnknownDeployKey(t *testing.T) {
 		t.Errorf("got %+v", ve.Problems)
 	}
 }
+
+// A link's dag-bundle is its own: there is no project-wide value, and only
+// astro links have one.
+func TestLinkDagBundle(t *testing.T) {
+	m, err := Parse([]byte(deployBase + `
+[tool.astro.deployments.dev]
+deployment = 'dep-dev'
+
+[tool.astro.deployments.prod]
+deployment = 'dep-prod'
+dag-bundle = ' nightly '
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{"dev": "", "prod": "nightly"} {
+		if got := m.Astro.Deployments[name].DagBundle; got != want {
+			t.Errorf("%s: got %q, want %q", name, got, want)
+		}
+	}
+}
+
+func TestLinkDagBundleOfTheWrongShape(t *testing.T) {
+	for name, tc := range map[string]struct {
+		link string
+		code ProblemCode
+	}{
+		"not a string":     {"deployment = 'd'\ndag-bundle = 1\n", CodeExpectedString},
+		"empty":            {"deployment = 'd'\ndag-bundle = ''\n", CodeEmptyString},
+		"blank":            {"deployment = 'd'\ndag-bundle = '   '\n", CodeEmptyString},
+		"on an mwaa link":  {"target = 'mwaa'\nenvironment = 'orders'\ndag-bundle = 'nightly'\n", CodeDagBundleOnNonAstroLink},
+		"a 1.x style typo": {"deployment = 'd'\ndag_bundle = 'nightly'\n", CodeUnknownKey},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := Parse([]byte(deployBase + "\n[tool.astro.deployments.x]\n" + tc.link))
+			ve := validationError(t, err)
+			if len(ve.Problems) != 1 || ve.Problems[0].Code != tc.code {
+				t.Errorf("want %s, got %+v", tc.code, ve.Problems)
+			}
+		})
+	}
+}
