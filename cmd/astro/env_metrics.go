@@ -34,7 +34,6 @@ func newEnvMetricsExportRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage metrics exports",
 		Long:    "Manage metrics exports on Astro, scoped to a Workspace or a Deployment.",
 		Example: envMetricsExamples,
-		Args:    cliout.UndeclaredArgs,
 		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
@@ -66,27 +65,25 @@ func newEnvMetricsListCmd(out io.Writer) *cobra.Command {
 }
 
 func newEnvMetricsGetCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "get <ID_OR_KEY>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "get",
 		Short: "Show a metrics export",
-		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvMetricsGet(cmd, out, args[0])
 		},
 		Example: `  # Show a metrics export by its key
   astro env metrics-export get prom_main`,
-	}
+	}, cliout.Required("ID_OR_KEY"))
 	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
 }
 
 func newEnvMetricsSetCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "set <ID_OR_KEY>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "set",
 		Short: "Set a metrics export",
 		Long: "Set a metrics export, creating it if it does not exist. Pass --no-create to fail " +
 			"instead. Creating one needs --endpoint and --exporter-type.",
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvMetricsSet(cmd, out, args[0])
 		},
@@ -96,7 +93,7 @@ func newEnvMetricsSetCmd(out io.Writer) *cobra.Command {
 
   # Replace the labels on one that must already exist
   astro env metrics-export set prom_main --label env=prod --label team=data --no-create`,
-	}
+	}, cliout.Required("ID_OR_KEY"))
 	metricsCommonFlags(cmd)
 	cmd.Flags().BoolVar(&envMetricsNoCreate, "no-create", false, "Fail if the metrics export does not exist, instead of creating it")
 	addAutoLinkFlag(cmd)
@@ -104,17 +101,16 @@ func newEnvMetricsSetCmd(out io.Writer) *cobra.Command {
 }
 
 func newEnvMetricsDeleteCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete <ID_OR_KEY>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete a metrics export",
-		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvDelete(cmd, out, "metrics export", args[0], env.DeleteMetricsExport)
 		},
 		Example: `  # Delete a metrics export without the confirmation prompt
   astro env metrics-export delete prom_main --yes`,
-	}
+	}, cliout.Required("ID_OR_KEY"))
 	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
 	return cmd
 }

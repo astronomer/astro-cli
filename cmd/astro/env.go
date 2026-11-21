@@ -148,7 +148,6 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 		Short:   "List every environment object in the scope",
 		Long: "List every environment object in the scope, grouped by kind. Values are not " +
 			"shown; use a kind's own list to see them.",
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvList(cmd, out)
 		},
@@ -204,7 +203,6 @@ func newEnvRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "env",
 		Aliases: []string{"environment"},
-		Args:    cliout.UndeclaredArgs,
 		RunE:    cliout.GroupHelp,
 		Short:   "Manage environment objects on Astro",
 		Long: `Manage environment objects on Astro: environment variables, connections, Airflow variables, and metrics exports, scoped to a workspace or a deployment.

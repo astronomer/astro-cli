@@ -48,19 +48,18 @@ var deployExample = `  # Build this project and deploy it, picking the Deploymen
     --remote --runtime-version <RUNTIME_VERSION>`
 
 func NewDeployCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "deploy [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "deploy",
 		Short: "Deploy an image or Dags to a Deployment",
 		Long: "Deploy a pyproject.toml project ([tool.astro]) to an Astro Private Cloud Deployment. Run it at the project's root: it builds the project into an image, Airflow 2 or Airflow 3, and pushes it to the Deployment, with the project's Dags inside the image for an image Deployment and uploaded beside it for a Dag-only one. " +
 			"Name the Deployment by a link of the project (target = 'apc', written by astro link add) or by its id; an interactive deploy that names none asks, with the project's default link preselected. " +
 			"With --image-name it deploys an image built on this machine instead of building one, from the project's root or from any directory outside a project; with --remote as well, it points the Deployment at an image already in a registry, pushing nothing. " +
 			"A project in the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml) deploys with Astro CLI 1.x only.",
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deployAirflow(cmd, args, out)
 		},
 		Example: deployExample,
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	// --force answered 1.x's uncommitted-changes check, which v2's deploy
 	// does not make. It stays, accepted, hidden and read by nothing, as on
 	// Astro, because astronomer/deploy-action passes --force on every deploy.

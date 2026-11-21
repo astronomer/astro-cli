@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
@@ -95,7 +96,6 @@ func newDagsListCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List the Dags on this Airflow",
-		Args:  cobra.NoArgs,
 		Example: afExample(q.t,
 			"List the Dags", "dags list",
 			"Only the paused ones, as JSON", "dags list --paused -o json",
@@ -174,17 +174,16 @@ func renderDAGTable(w io.Writer, rows []dagRow) error {
 }
 
 func newDagsGetCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "get <DAG_ID>",
+	return cliout.Args(&cobra.Command{
+		Use:   "get",
 		Short: "Show one Dag's schedule, owners, tags, and file",
-		Args:  cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Show one Dag", "dags get <DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runDagsGet(cmd.Context(), args[0])
 		},
-	}
+	}, cliout.Required("DAG_ID"))
 }
 
 func (q *query) runDagsGet(ctx context.Context, dagID string) error {
@@ -218,19 +217,18 @@ func dagFields(row dagRow) []field {
 }
 
 func newDagsSourceCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "source <DAG_ID>",
+	return cliout.Args(&cobra.Command{
+		Use:   "source",
 		Short: "Print a Dag's source file",
 		Long: "Print the Python source Airflow parsed for this Dag. The source comes from Airflow, so it can " +
 			"differ from your checkout.",
-		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Print the source Airflow parsed for a Dag", "dags source <DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runDagsSource(cmd.Context(), args[0])
 		},
-	}
+	}, cliout.Required("DAG_ID"))
 }
 
 // dagSource is a DAG file as this surface reports it.
@@ -257,12 +255,11 @@ func (q *query) runDagsSource(ctx context.Context, dagID string) error {
 
 func newDagsStatsCmd(q *query) *cobra.Command {
 	var dagIDs []string
-	cmd := &cobra.Command{
-		Use:   "stats [DAG_ID]...",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "stats",
 		Short: "Count each Dag's runs by state",
 		Long: "Count the runs of each Dag by state, for the Dags given as arguments or with --dag-id. With none " +
 			"given, count every Dag. On Airflow 2 this lists the Dags first, because its endpoint needs ids.",
-		Args: cobra.ArbitraryArgs,
 		Example: afExample(q.t,
 			"Count every Dag's runs by state", "dags stats",
 			"Only these two Dags", "dags stats <DAG_ID> <OTHER_DAG_ID>",
@@ -270,7 +267,7 @@ func newDagsStatsCmd(q *query) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runDagsStats(cmd.Context(), slices.Compact(slices.Sorted(slices.Values(append(dagIDs, args...)))))
 		},
-	}
+	}, cliout.Arg{Name: "DAG_ID", Optional: true, Repeated: true})
 	cmd.Flags().StringSliceVar(&dagIDs, "dag-id", nil, "Count only these Dags, the same as naming them as arguments (repeatable)")
 	return cmd
 }
@@ -363,31 +360,29 @@ func upperAll(values []string) []string {
 }
 
 func newDagsPauseCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "pause <DAG_ID>",
+	return cliout.Args(&cobra.Command{
+		Use:   "pause",
 		Short: "Stop the scheduler from creating new runs of a Dag",
-		Args:  cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Stop the scheduler from creating runs of a Dag", "dags pause <DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runSetPaused(cmd.Context(), args[0], (*airflowapi.Client).PauseDAG)
 		},
-	}
+	}, cliout.Required("DAG_ID"))
 }
 
 func newDagsUnpauseCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "unpause <DAG_ID>",
+	return cliout.Args(&cobra.Command{
+		Use:   "unpause",
 		Short: "Let the scheduler create runs of a Dag again",
-		Args:  cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Let the scheduler create runs of a Dag again", "dags unpause <DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runSetPaused(cmd.Context(), args[0], (*airflowapi.Client).UnpauseDAG)
 		},
-	}
+	}, cliout.Required("DAG_ID"))
 }
 
 // runSetPaused backs both pause and unpause, which differ only in the call they

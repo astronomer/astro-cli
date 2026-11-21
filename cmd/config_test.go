@@ -163,7 +163,7 @@ func (s *CmdSuite) TestConfigListIgnoresA1xProjectConfig() {
 func (s *CmdSuite) TestConfigSetWithNoArgumentsReportsArity() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	_, err := executeCommand("config", "set")
-	s.ErrorIs(err, errInvalidSetArgs)
+	s.EqualError(err, "astro config set requires SETTING_NAME and VALUE")
 	s.True(cliout.IsUsage(err), "the wrong number of arguments is a usage error, exit 2")
 }
 
@@ -173,7 +173,7 @@ func (s *CmdSuite) TestConfigSetCommandFailure() {
 	s.Error(err)
 
 	_, err = executeCommand("config", "set", "test", "--global")
-	s.ErrorIs(err, errInvalidSetArgs)
+	s.EqualError(err, "astro config set requires VALUE")
 	s.True(cliout.IsUsage(err), "the wrong number of arguments is a usage error, exit 2")
 }
 
@@ -186,7 +186,8 @@ func (s *CmdSuite) TestConfigSetWithOneArgumentOutsideAProjectIsAUsageError() {
 
 	for _, args := range [][]string{{"config", "set", "webserver.port"}, {"config", "set", "a", "b", "c"}} {
 		_, err := executeCommand(args...)
-		s.ErrorIs(err, errInvalidSetArgs, args)
+		var argsErr *cliout.ArgsError
+		s.ErrorAs(err, &argsErr, args)
 		s.True(cliout.IsUsage(err), "the wrong number of arguments is a usage error, exit 2: %v", args)
 		s.Equal(2, cliout.ExitCode(context.Background(), err), args)
 	}

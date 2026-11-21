@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
@@ -83,11 +84,10 @@ func newRunsListCmd(q *query) *cobra.Command {
 		startDateGTE string
 		startDateLTE string
 	}
-	cmd := &cobra.Command{
-		Use:   "list [DAG_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "list",
 		Short: "List runs, most recent first",
 		Long:  "List runs, most recent first: those of one Dag when it is named, every Dag's otherwise.",
-		Args:  cobra.MaximumNArgs(1),
 		Example: afExample(q.t,
 			"The latest runs of every Dag", "runs list",
 			"The failed runs of one Dag", "runs list <DAG_ID> -s failed",
@@ -113,7 +113,7 @@ func newRunsListCmd(q *query) *cobra.Command {
 				StartDateTo:   to,
 			})
 		},
-	}
+	}, cliout.Optional("DAG_ID"))
 	// Most recent first without being asked: a bare `astro af runs list` is nearly
 	// always "what just happened", and Airflow's own default order is not that.
 	addListFlags(cmd, &list, "-start_date")
@@ -171,17 +171,16 @@ func renderRunTable(w io.Writer, rows []runRow) error {
 }
 
 func newRunsGetCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "get <DAG_ID> <RUN_ID>",
+	return cliout.Args(&cobra.Command{
+		Use:   "get",
 		Short: "Show one run's state, timing, and configuration",
-		Args:  cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"Show one run", "runs get <DAG_ID> <RUN_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runRunsGet(cmd.Context(), args[0], args[1])
 		},
-	}
+	}, cliout.Required("DAG_ID"), cliout.Required("RUN_ID"))
 }
 
 // newRunsTasksCmd answers the question a failed run raises: which task, and in
@@ -192,17 +191,16 @@ func newRunsGetCmd(q *query) *cobra.Command {
 // read something.
 func newRunsTasksCmd(q *query) *cobra.Command {
 	var f listFlags
-	cmd := &cobra.Command{
-		Use:   "tasks <DAG_ID> <RUN_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "tasks",
 		Short: "List what each task in a run did, and how it ended",
-		Args:  cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"List what each task in a run did", "runs tasks <DAG_ID> <RUN_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runRunsTasks(cmd.Context(), args[0], args[1], f)
 		},
-	}
+	}, cliout.Required("DAG_ID"), cliout.Required("RUN_ID"))
 	addListFlags(cmd, &f, "")
 	return cmd
 }
@@ -317,14 +315,13 @@ func (f *triggerFlags) options() (airflowapi.TriggerDAGRunOptions, error) {
 
 func newRunsTriggerCmd(q *query) *cobra.Command {
 	var opts triggerFlags
-	cmd := &cobra.Command{
-		Use:   "trigger <DAG_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "trigger",
 		Short: "Start a run of a Dag",
 		Long: "Start a run of a Dag. Airflow names and dates the run unless you pass --run-id or --logical-date.\n\n" +
 			"A paused Dag is unpaused first, because a run triggered on a paused Dag is never " +
 			"scheduled. The unpause is announced on stderr. Pass " +
 			"--no-auto-unpause to fail instead.",
-		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Start a run, unpausing the Dag if it is paused", "runs trigger <DAG_ID>",
 			"With a run configuration", "runs trigger <DAG_ID> --conf '{\"date\": \"2026-01-01\"}'",
@@ -337,7 +334,7 @@ func newRunsTriggerCmd(q *query) *cobra.Command {
 			}
 			return q.runRunsTrigger(cmd.Context(), args[0], trigger, !opts.noAutoUnpause)
 		},
-	}
+	}, cliout.Required("DAG_ID"))
 	opts.register(cmd)
 	return cmd
 }
@@ -410,12 +407,11 @@ func (q *query) ensureUnpaused(ctx context.Context, client *airflowapi.Client, d
 
 func newRunsDeleteCmd(q *query) *cobra.Command {
 	var yes bool
-	cmd := &cobra.Command{
-		Use:     "delete <DAG_ID> <RUN_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete a run and its task instances",
 		Long:    "Delete a run and everything Airflow recorded about it. This cannot be undone.",
-		Args:    cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"Delete a run, after a confirmation prompt", "runs delete <DAG_ID> <RUN_ID>",
 			"Without the prompt", "runs delete <DAG_ID> <RUN_ID> --yes",
@@ -423,7 +419,7 @@ func newRunsDeleteCmd(q *query) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runRunsDelete(cmd.Context(), args[0], args[1], yes)
 		},
-	}
+	}, cliout.Required("DAG_ID"), cliout.Required("RUN_ID"))
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip the confirmation prompt")
 	return cmd
 }
@@ -459,12 +455,11 @@ func newRunsClearCmd(q *query) *cobra.Command {
 		dryRun bool
 		yes    bool
 	}
-	cmd := &cobra.Command{
-		Use:   "clear <DAG_ID> <RUN_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "clear",
 		Short: "Clear a run so its tasks run again",
 		Long: "Reset a run's task instances so the scheduler runs them again. Pass --dry-run to see what would " +
 			"be cleared without clearing it.",
-		Args: cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"See what clearing a run would reset, and change nothing", "runs clear <DAG_ID> <RUN_ID> --dry-run",
 			"Clear it without the prompt", "runs clear <DAG_ID> <RUN_ID> --yes",
@@ -472,7 +467,7 @@ func newRunsClearCmd(q *query) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runRunsClear(cmd.Context(), args[0], args[1], opts.dryRun, opts.yes)
 		},
-	}
+	}, cliout.Required("DAG_ID"), cliout.Required("RUN_ID"))
 	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "Report what would be cleared and change nothing")
 	cmd.Flags().BoolVarP(&opts.yes, "yes", "y", false, "Skip the confirmation prompt")
 	return cmd

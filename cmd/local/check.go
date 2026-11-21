@@ -59,7 +59,6 @@ func newCheckCmd(c *cli) *cobra.Command {
 			"  astro local check --strict\n\n" +
 			"  # Check against the Airflow MWAA and Composer run, before uploading\n" +
 			"  astro local check --target mwaa,composer",
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if len(targets) == 0 {
 				return c.runCheck(cmd.Context(), strict)

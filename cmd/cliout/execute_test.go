@@ -38,7 +38,6 @@ func testTree(fail error) *cobra.Command {
 	group := &cobra.Command{Use: "thing"}
 	leaf := &cobra.Command{
 		Use:  "list",
-		Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error { return fail },
 	}
 	AddOutputFlag(leaf, &output)
@@ -377,7 +376,7 @@ func TestAMisinvokedSilencedCommandStillPointsAtHelp(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			root := testTree(nil)
 			// A group with a RunE of its own, as astro local is.
-			runner := &cobra.Command{Use: "runner", Args: cobra.ArbitraryArgs, RunE: GroupHelp}
+			runner := &cobra.Command{Use: "runner", RunE: GroupHelp}
 			runner.AddCommand(&cobra.Command{Use: "start", RunE: func(*cobra.Command, []string) error { return nil }})
 			root.AddCommand(runner)
 			// Every command below the root silenced, as astro local silences

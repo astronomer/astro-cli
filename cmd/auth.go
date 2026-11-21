@@ -206,11 +206,10 @@ func newAuthRootCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Comma
 }
 
 func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "login [BASEDOMAIN]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "login",
 		Short: "Log in to Astronomer",
 		Long:  "Authenticate to Astro or APC. A saved login for the domain that still works is reused without a browser; use --force to log in again. Without a saved account for astronomer.io, the browser opens the sign-up screen; use --signin for an existing account.",
-		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return login(args, astroV1Client, out)
 		},
@@ -225,7 +224,7 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 
   # Log in to an APC installation with a token, as in CI/CD
   astro auth login <BASEDOMAIN> --token-login <TOKEN>`,
-	}
+	}, cliout.Optional("BASEDOMAIN"))
 
 	cmd.Flags().BoolVar(&shouldDisplayLoginLink, "login-link", false, "Get login link to login on a separate device for cloud CLI login")
 	cmd.Flags().StringVar(&token, "token-login", "", "Login with a token, with no browser or prompt: for Astro and APC, such as in CI/CD")
@@ -241,21 +240,19 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 }
 
 func newAuthLogoutCommand(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
+	return cliout.Args(&cobra.Command{
 		Use:   "logout",
 		Short: "Log out of Astronomer",
 		Long:  "Log out of Astronomer",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return logout(args, out)
 		},
-		Args: cobra.MaximumNArgs(1),
 		Example: `  # Log out of the current context
   astro auth logout
 
   # Log out of another context
   astro auth logout <DOMAIN>`,
-	}
-	return cmd
+	}, cliout.Optional("DOMAIN"))
 }
 
 func newAuthTokenCommand(out io.Writer) *cobra.Command {
@@ -268,7 +265,6 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
 		Use:   "token",
 		Short: "Print the authentication token",
 		Long:  "Print the current authentication token to standard output, for use in scripts and CI/CD pipelines.",
-		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return printAuthToken(tokenDomain, forceRenew, cliout.Renderer{Format: output, Out: out})
 		},

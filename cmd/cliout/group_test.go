@@ -27,7 +27,6 @@ func newGroupTree(withRunE bool) *cobra.Command {
 	root := &cobra.Command{Use: "astro"}
 	group := &cobra.Command{Use: "thing", Short: "Manage things"}
 	if withRunE {
-		group.Args = cobra.ArbitraryArgs
 		group.RunE = GroupHelp
 	}
 	AddOutputFlag(group, &output)

@@ -37,7 +37,6 @@ func RemovedCommand(use string, aliases []string, short string, run func(cmd *co
 		Aliases:            aliases,
 		Short:              short,
 		Hidden:             true,
-		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
 		Annotations:        map[string]string{RemovedCommandAnnotation: "true"},
 		// Its own, so cobra never picks a group's on its way up (`astro env`
@@ -61,7 +60,7 @@ func RemovedCommand(use string, aliases []string, short string, run func(cmd *co
 		},
 	}
 	AddOutputFlag(cmd, new(Format))
-	return cmd
+	return AnyWords(cmd, "a removed command refuses whatever it was given with what replaced it")
 }
 
 // RemovedAlias builds the stub for a 1.x alias v2 took away from cmd, to be

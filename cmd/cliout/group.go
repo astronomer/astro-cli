@@ -197,12 +197,25 @@ func helpAsked(cmd *cobra.Command) bool {
 // root's --version.
 const ArgvPassthroughAnnotation = "argv-passthrough"
 
-// UndeclaredArgs is the check a command gets when it declares none. Cobra's own
-// default accepts any words, so a stray argument ran the command anyway (and
-// past a pre-run login that failed for an unrelated reason). A group that runs
-// refuses a word that names none of its subcommands. A leaf takes the
-// positionals its Use line documents, [NAME] or <NAME>, and none otherwise; a
-// documented positional ending in ... takes any number.
+// Passthrough marks cmd, whose last declared argument and everything after it
+// belong to a program it runs (`astro local run pytest --version`), so nothing
+// after the first of them is the CLI's to read: not a flag, and not the
+// root's --version. Flags before it still are.
+func Passthrough(cmd *cobra.Command) *cobra.Command {
+	if cmd.Annotations == nil {
+		cmd.Annotations = map[string]string{}
+	}
+	cmd.Annotations[ArgvPassthroughAnnotation] = "true"
+	cmd.Flags().SetInterspersed(false)
+	return cmd
+}
+
+// UndeclaredArgs is the check a command gets when it declares no positionals
+// (Args). Cobra's own default accepts any words, so a stray argument ran the
+// command anyway (and past a pre-run login that failed for an unrelated
+// reason). A group that runs refuses a word that names none of its
+// subcommands. A leaf takes no arguments, and says so, rather than calling the
+// word an unknown command it has none of.
 func UndeclaredArgs(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
@@ -210,44 +223,5 @@ func UndeclaredArgs(cmd *cobra.Command, args []string) error {
 	if cmd.HasSubCommands() {
 		return UnknownSubcommand(cmd, args[0])
 	}
-	documented := 0
-	for _, word := range strings.Fields(cmd.Use)[1:] {
-		if !strings.HasPrefix(word, "[") && !strings.HasPrefix(word, "<") {
-			continue
-		}
-		// [flags], [--opt] and [command] are not positionals of this command.
-		if strings.HasPrefix(word, "[-") || strings.HasPrefix(word, "<-") || slices.Contains([]string{"[flags]", "[options]", "[command]"}, word) {
-			continue
-		}
-		if strings.HasSuffix(strings.Trim(word, "]>"), "...") {
-			return nil
-		}
-		documented++
-	}
-	if len(args) <= documented {
-		return nil
-	}
-	return UnexpectedArgument(cmd, args[documented], "at most", documented)
-}
-
-// UnexpectedArgument is the usage error for a stray argument to a leaf, which
-// has no subcommands to mistype and so is not told it is an unknown command.
-// How many it takes reads as "takes no arguments" for none, else "takes <how>
-// <n> argument(s)" with how "at most" or "exactly".
-func UnexpectedArgument(cmd *cobra.Command, arg, how string, n int) error {
-	return unexpectedArgument(cmd, arg, takesWords(how, n))
-}
-
-func takesWords(how string, n int) string {
-	switch {
-	case n == 0:
-		return "takes no arguments"
-	case n == 1:
-		return "takes " + how + " 1 argument"
-	}
-	return fmt.Sprintf("takes %s %d arguments", how, n)
-}
-
-func unexpectedArgument(cmd *cobra.Command, arg, takes string) error {
-	return misinvoked(fmt.Errorf("unexpected argument %q: %s %s", arg, cmd.CommandPath(), takes))
+	return misinvoked(&ArgsError{Command: cmd.CommandPath(), Unexpected: args[0]})
 }

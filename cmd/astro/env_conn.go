@@ -36,7 +36,6 @@ func newEnvConnRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage connections",
 		Long:    "Manage connections on Astro, scoped to a Workspace or a Deployment.",
 		Example: envConnExamples,
-		Args:    cliout.UndeclaredArgs,
 		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
@@ -72,28 +71,26 @@ func newEnvConnListCmd(out io.Writer) *cobra.Command {
 }
 
 func newEnvConnGetCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "get <ID_OR_KEY>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "get",
 		Short: "Show a connection",
-		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvConnGet(cmd, out, args[0])
 		},
 		Example: `  # Show a connection by its key
   astro env connection get db_main`,
-	}
+	}, cliout.Required("ID_OR_KEY"))
 	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
 }
 
 func newEnvConnSetCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "set <ID_OR_KEY>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "set",
 		Short: "Set a connection",
 		Long: "Set a connection, creating it if it does not exist. Pass --no-create to fail " +
 			"if it does not exist. Give the full connection with --value, as a URI or JSON, or field by field with " +
 			"--type, --host and the rest.",
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvConnSet(cmd, out, args[0])
 		},
@@ -103,7 +100,7 @@ func newEnvConnSetCmd(out io.Writer) *cobra.Command {
 
   # Set it field by field
   astro env connection set db_main --type postgres --host db.example.com --login admin --port 5432`,
-	}
+	}, cliout.Required("ID_OR_KEY"))
 	connFlags(cmd)
 	cmd.Flags().BoolVar(&envConnNoCreate, "no-create", false, "Fail if the connection does not exist, instead of creating it")
 	addAutoLinkFlag(cmd)
@@ -128,17 +125,16 @@ func newEnvConnSetCmd(out io.Writer) *cobra.Command {
 var connFieldFlagNames = []string{"type", "host", "login", "password", "schema", "port", "extra"}
 
 func newEnvConnDeleteCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete <ID_OR_KEY>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete a connection",
-		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvDelete(cmd, out, "connection", args[0], env.DeleteConn)
 		},
 		Example: `  # Delete a connection without the confirmation prompt
   astro env connection delete db_main --yes`,
-	}
+	}, cliout.Required("ID_OR_KEY"))
 	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
 	return cmd
 }

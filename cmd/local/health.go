@@ -28,7 +28,6 @@ func newHealthCmd(d Deps, t target) *cobra.Command {
 			"produce a report; overall_status holds the verdict.\n\nEach part is also its own command: " +
 			t.suggest("version") + ", " + t.suggest("dags errors") + ", " + t.suggest("dags warnings") + ", and " +
 			t.suggest("dags stats") + ". The configuration it runs with is " + t.suggest("config") + ".",
-		Args: cobra.NoArgs,
 		Example: afExample(t,
 			"Check whether an Airflow is in good shape", "health",
 			"As JSON, for a script or an agent", "health -o json",

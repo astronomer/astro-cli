@@ -615,9 +615,13 @@ var (
 	quotedName    = regexp.MustCompile(`"([^"]+)"`)
 	oneRequired   = regexp.MustCompile(`at least one of the flags in the group \[(\S+)`)
 	// argCount is an error about how many arguments a command got, in cobra's
-	// words ("accepts 1 arg(s), received 0") or a command's own ("must
-	// specify exactly two arguments").
+	// words ("accepts 1 arg(s), received 0"), the CLI's own for a stray one
+	// ("unexpected argument "x": astro version takes no arguments") or a
+	// command's own ("must specify exactly two arguments").
 	argCount = regexp.MustCompile(`(?i)\b(accepts|requires|expects|takes|must specify|received|exactly|at least|at most)\b[^.\n]*\b(arg\(s\)|args?\b|arguments?\b)`)
+	// missingArg is the CLI's refusal of a line that leaves out a declared
+	// argument, which names it ("astro af dags get requires DAG_ID").
+	missingArg = regexp.MustCompile(`^astro [a-z0-9 -]+ requires [A-Z][A-Z0-9_=.]*(?:(?:, | and )[A-Z][A-Z0-9_=.]*)*$`)
 	// flagValue is pflag refusing a flag's value: about a flag, not about
 	// arguments, so no positional answers it.
 	flagValue = regexp.MustCompile(`^invalid argument "`)
@@ -641,7 +645,7 @@ var whichArgument = []string{
 // value ("invalid argument ... for --flag") is not one, and argCount does
 // not read it as one (TestRunForJSONReadsTheRefusalsItAnswers).
 func isArityRefusal(msg string) bool {
-	if !argCount.MatchString(msg) {
+	if !argCount.MatchString(msg) && !missingArg.MatchString(msg) {
 		return false
 	}
 	for _, part := range whichArgument {
@@ -710,7 +714,7 @@ func runForJSON(t *testing.T, p *project, c cliCommand) *result {
 			}
 		case oneRequired.MatchString(e.Error):
 			addFlag(oneRequired.FindStringSubmatch(e.Error)[1])
-		case argCount.MatchString(e.Error):
+		case argCount.MatchString(e.Error), missingArg.MatchString(e.Error):
 			// Positionals before the flags placeholders answered: a command
 			// that stops at its first argument would otherwise pass the
 			// flags on.
@@ -841,6 +845,9 @@ func TestRunForJSONReadsTheRefusalsItAnswers(t *testing.T) {
 		"accepts 1 arg(s), received 0":                                "args",
 		"requires at least 1 arg(s), only received 0":                 "args",
 		"accepts between 1 and 2 arg(s), received 3":                  "args",
+		"astro af dags get requires DAG_ID":                           "args",
+		"astro af tasks logs requires DAG_ID, RUN_ID and TASK_ID":     "args",
+		`unexpected argument "x": astro version takes no arguments`:   "args",
 		"must specify exactly two arguments (key value) when setting": "args",
 		`invalid argument "e2e" for "--port" flag: strconv.ParseInt`:  "flag value",
 		`invalid argument "e2e" for "-n, --count" flag: parse error`:  "flag value",
@@ -857,7 +864,7 @@ func TestRunForJSONReadsTheRefusalsItAnswers(t *testing.T) {
 			got = "required"
 		case oneRequired.MatchString(msg):
 			got = "one of"
-		case argCount.MatchString(msg):
+		case argCount.MatchString(msg), missingArg.MatchString(msg):
 			got = "args"
 		}
 		if got != want {
@@ -876,6 +883,7 @@ func TestRunForJSONReadsTheRefusalsItAnswers(t *testing.T) {
 	// Which refusals must exit 2: the count, not which arguments.
 	for msg, want := range map[string]bool{
 		"accepts 1 arg(s), received 0":                                                                        true,
+		"astro af dags get requires DAG_ID":                                                                   true,
 		"requires at least 1 arg(s), only received 0":                                                         true,
 		"must specify exactly two arguments (key value) when setting a":                                       true,
 		"expects exactly one argument, the deployment ID":                                                     true,

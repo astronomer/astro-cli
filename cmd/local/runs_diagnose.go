@@ -9,24 +9,25 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 func newRunsDiagnoseCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "diagnose <DAG_ID> <RUN_ID>",
+	return cliout.Args(&cobra.Command{
+		Use:   "diagnose",
 		Short: "Show a run, every task instance in it, and which of them failed",
 		Long: "Read one run and every task instance in it, count the instances by state, and pick out the ones " +
 			"that failed or never ran because something upstream failed. Start here when a run " +
 			"did not succeed.\n\nThe command fails if Airflow does not know the run. If the task listing " +
 			"fails, the error is reported in its place beside the run.",
-		Args: cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"Find out why a run did not succeed", "runs diagnose <DAG_ID> <RUN_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runRunsDiagnose(cmd.Context(), args[0], args[1])
 		},
-	}
+	}, cliout.Required("DAG_ID"), cliout.Required("RUN_ID"))
 }
 
 // runDiagnosis is what `runs diagnose` reports.

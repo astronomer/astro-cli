@@ -106,8 +106,8 @@ type envLinkResult struct {
 func newEnvLinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	var thisCheckout, everywhere bool
 	noun := localenv.Noun(k.kind)
-	cmd := &cobra.Command{
-		Use:   "link " + k.arg + " [DIR...]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "link",
 		Short: "Limit a global " + k.label + " in the vault to specific projects",
 		Long: "Link a global " + k.label + " in the encrypted vault to projects, so it reaches " +
 			"those projects and no others. With no link, it reaches every project.\n\n" +
@@ -133,11 +133,10 @@ func newEnvLinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 
   # auto-link it to every project again
   astro local env ` + noun + ` link ` + exampleName(k.kind) + ` --auto-link`,
-		Args: cobra.MinimumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return c.runEnvLink(scope, k.kind, args[0], args[1:], thisCheckout, everywhere)
 		},
-	}
+	}, cliout.Required(k.arg), cliout.Arg{Name: "DIR", Optional: true, Repeated: true})
 	cmd.Flags().BoolVar(&thisCheckout, "this-checkout", false, "Link each checkout's own path instead of its project, so a worktree does not share the value with its main project")
 	cmd.Flags().BoolVar(&everywhere, "auto-link", false, "Remove the links, so it is auto-linked to every project")
 	cmd.MarkFlagsMutuallyExclusive("this-checkout", "auto-link")
@@ -146,8 +145,8 @@ func newEnvLinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 
 func newEnvUnlinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	noun := localenv.Noun(k.kind)
-	return &cobra.Command{
-		Use:   "unlink " + k.arg + " [DIR...]",
+	return cliout.Args(&cobra.Command{
+		Use:   "unlink",
 		Short: "Stop a global " + k.label + " in the vault reaching specific projects",
 		Long: "Unlink a global " + k.label + " in the encrypted vault from projects. Each DIR " +
 			"is a project directory, or a linked path that no longer exists; the default " +
@@ -162,11 +161,10 @@ func newEnvUnlinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 
   # drop a project that was moved away
   astro local env ` + noun + ` unlink ` + exampleName(k.kind) + ` /Users/me/old-etl`,
-		Args: cobra.MinimumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return c.runEnvUnlink(scope, k.kind, args[0], args[1:])
 		},
-	}
+	}, cliout.Required(k.arg), cliout.Arg{Name: "DIR", Optional: true, Repeated: true})
 }
 
 // exampleName is a plausible global name of each kind, for the examples.

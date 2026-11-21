@@ -209,15 +209,6 @@ func TestVersionFlagOnPassthroughAndJSON(t *testing.T) {
 	assert.JSONEq(t, `{"version":"`+version.Current()+`"}`, json)
 }
 
-// Use tokens that are not positionals do not make a leaf take arguments.
-func TestUndeclaredArgsIgnoresFlagTokens(t *testing.T) {
-	for _, use := range []string{"x [flags]", "x [--opt]", "x [command]", "x [options]"} {
-		assert.Error(t, cliout.UndeclaredArgs(&cobra.Command{Use: use}, []string{"a"}), use)
-	}
-	assert.NoError(t, cliout.UndeclaredArgs(&cobra.Command{Use: "x [NAME] [flags]"}, []string{"a"}))
-	assert.Error(t, cliout.UndeclaredArgs(&cobra.Command{Use: "x [NAME] [flags]"}, []string{"a", "b"}))
-}
-
 // A command that sets its own SuggestFor words is suggested for them even
 // when another is nearer.
 func TestSuggestForWinsOverDistance(t *testing.T) {

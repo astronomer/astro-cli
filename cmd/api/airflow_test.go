@@ -32,7 +32,7 @@ func TestNewAirflowCmd(t *testing.T) {
 	out := new(bytes.Buffer)
 	cmd := NewAirflowCmd(out)
 
-	assert.Equal(t, "airflow <ENDPOINT_OR_OPERATION_ID>", cmd.Use)
+	assert.Equal(t, "airflow [ENDPOINT_OR_OPERATION_ID]", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
 	assert.NotEmpty(t, cmd.Example)

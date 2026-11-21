@@ -194,9 +194,9 @@ func newUpgradeCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade",
 		Short: "Move this project to a new version of what it runs",
-		Args:  cobra.ArbitraryArgs,
 		RunE:  helpOrUnknownSubcommand,
 	}
+	cliout.AnyWords(cmd, "its RunE names the verb a removed form became before it refuses an unknown word (helpOrUnknownSubcommand)")
 	cmd.AddCommand(newUpgradeAirflowCmd(c), newUpgradeRuntimeCmd(c))
 	return cmd
 }
@@ -205,8 +205,8 @@ const flagPython = "python"
 
 func newUpgradeRuntimeCmd(c *cli) *cobra.Command {
 	var python string
-	cmd := &cobra.Command{
-		Use:   "runtime [VERSION]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "runtime",
 		Short: "Move this project to an Astro Runtime version",
 		Long: "Set this project's Astro Runtime version in pyproject.toml ([tool.astro] runtime). If that version ships an Airflow that the " +
 			"apache-airflow requirement does not cover, the requirement moves too. Older versions " +
@@ -226,7 +226,6 @@ func newUpgradeRuntimeCmd(c *cli) *cobra.Command {
 			"  astro local upgrade runtime 3.3-5\n\n" +
 			"  # Move to a runtime version and run it on Python 3.12\n" +
 			"  astro local upgrade runtime 3.3-10 --python 3.12",
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			build := ""
 			if len(args) == 1 {
@@ -234,7 +233,7 @@ func newUpgradeRuntimeCmd(c *cli) *cobra.Command {
 			}
 			return c.runUpgradeRuntime(cmd.Context(), build, python)
 		},
-	}
+	}, cliout.Optional("VERSION"))
 	cmd.Flags().StringVar(&python, flagPython, "", "Python version to run, like 3.12. Default: the project's pinned Python, else the runtime version's default")
 	return cmd
 }
@@ -466,8 +465,8 @@ func renderRuntimeUpgrade(w io.Writer, res runtimeUpgrade) error {
 
 func newUpgradeAirflowCmd(c *cli) *cobra.Command {
 	var withOtto bool
-	cmd := &cobra.Command{
-		Use:   "airflow [VERSION]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "airflow",
 		Short: "Move this project to a new Airflow version",
 		Long: "Set this project's Airflow version in pyproject.toml: the apache-airflow requirement, " +
 			"plus requires-python and the runtime pin if they have to move. With no version, use the " +
@@ -481,7 +480,6 @@ func newUpgradeAirflowCmd(c *cli) *cobra.Command {
 			"  astro local upgrade airflow 3.1\n\n" +
 			"  # Upgrade, then start Otto to update the Dags and providers for it\n" +
 			"  astro local upgrade airflow --with-otto",
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := ""
 			if len(args) == 1 {
@@ -489,7 +487,7 @@ func newUpgradeAirflowCmd(c *cli) *cobra.Command {
 			}
 			return c.runUpgradeAirflow(cmd.Context(), version, withOtto)
 		},
-	}
+	}, cliout.Optional("VERSION"))
 	cmd.Flags().BoolVar(&withOtto, flagWithOtto, false, "Start Otto afterwards to update Dags and providers for the new version")
 	return cmd
 }

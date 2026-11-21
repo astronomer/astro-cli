@@ -97,25 +97,24 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 }
 
 func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete <WORKSPACE_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete an APC Workspace",
 		Long:    "Delete an APC Workspace. This cannot be undone; it asks for confirmation unless --yes is given.",
 		Example: workspaceDeleteExample,
-		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceDelete(out, args)
 		},
-	}
+	}, cliout.Required("WORKSPACE_ID"))
 	addYesFlag(cmd, "Don't ask for confirmation before deleting the Workspace")
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
 	return cmd
 }
 
 func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "switch [WORKSPACE_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "switch",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different APC Workspace",
 		Long:    "Switch to a different APC Workspace. Without a Workspace ID, it shows a list to choose from.",
@@ -124,11 +123,10 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 
   # Choose a Workspace from a list
   astro workspace switch`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSwitch(out, args)
 		},
-	}
+	}, cliout.Optional("WORKSPACE_ID"))
 
 	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
 		cmd.Flags().BoolVar(&workspacePaginated, "paginated", false, "Page through the Workspace list")
@@ -139,18 +137,17 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 }
 
 func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "update <WORKSPACE_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update an APC Workspace",
 		Long:    "Update a Workspace's name or description.",
 		Example: `  # Change a Workspace's name and description
   astro workspace update <WORKSPACE_ID> --name my-new-name --description "My new description"`,
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUpdate(out, args)
 		},
-	}
+	}, cliout.Required("WORKSPACE_ID"))
 
 	cmd.Flags().StringVarP(&workspaceUpdateLabel, "name", "n", "", "New name for the Workspace")
 	utils.AddAlias(cmd.Flags(), "label", "name")

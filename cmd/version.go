@@ -24,7 +24,6 @@ func newVersionCommand() *cobra.Command {
 		Use:   "version",
 		Short: "Print the Astro CLI version",
 		Long:  `Print the Astro CLI version.`,
-		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cliout.Renderer{Format: output, Out: cmd.OutOrStdout()}.Emit(
 				versionOutput{Version: version.Current()},

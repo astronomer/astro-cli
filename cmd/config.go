@@ -150,35 +150,27 @@ func newConfigRootCmd(out io.Writer) *cobra.Command {
 }
 
 func newConfigGetCmd(_ io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "get <SETTING_NAME>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "get",
 		Short:   "Get a CLI setting",
 		Long:    "Print the value of a CLI setting.",
-		Args:    cobra.ExactArgs(1),
 		Example: configGetExample,
 		RunE:    configGet,
-	}
+	}, cliout.Required("SETTING_NAME"))
 	return cmd
 }
 
 func newConfigSetCmd(_ io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "set <SETTING_NAME> <VALUE>",
+	// Cobra checks Args before the group's PersistentPreRunE, so a wrong
+	// count is refused here, as a usage error, before ensureGlobalFlag or
+	// refuseRemovedConfigKey can read args[0] and fail some other way.
+	return cliout.Args(&cobra.Command{
+		Use:     "set",
 		Short:   "Set a CLI setting",
 		Long:    "Set the value of a CLI setting.",
 		Example: configSetExample,
-		// Cobra checks Args before the group's PersistentPreRunE, so a wrong
-		// count is refused here, as a usage error, before ensureGlobalFlag or
-		// refuseRemovedConfigKey can read args[0] and fail some other way.
-		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) != 2 {
-				return cliout.Usage(errInvalidSetArgs)
-			}
-			return nil
-		},
-		RunE: configSet,
-	}
-	return cmd
+		RunE:    configSet,
+	}, cliout.Required("SETTING_NAME"), cliout.Required("VALUE"))
 }
 
 func newConfigListCmd(out io.Writer) *cobra.Command {
@@ -186,7 +178,6 @@ func newConfigListCmd(out io.Writer) *cobra.Command {
 		Use:   "list",
 		Short: "List CLI settings",
 		Long:  "List every CLI setting with its value and where the value comes from: global, or default when the global config does not set it. --global changes nothing",
-		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return configList(cliout.Renderer{Format: configOutput, Out: out})
 		},

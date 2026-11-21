@@ -270,7 +270,7 @@ func TestDeploymentArgumentOrFlag(t *testing.T) {
 			assert.Equal(t, "--deployment cannot be empty", err.Error(), label)
 		}
 		_, err = reach(t, with(args, "dep-a", "dep-b")...)
-		assert.EqualError(t, err, "accepts at most 1 arg(s), received 2", label)
+		assert.EqualError(t, err, `unexpected argument "dep-b": astro `+label+` takes at most 1 argument`, label)
 	}
 }
 

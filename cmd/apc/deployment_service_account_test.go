@@ -44,7 +44,7 @@ func (s *Suite) TestDeploymentSaDeleteWoKeyIdCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	_, err := execDeploymentCmd("service-account", "delete", "--deployment-id=1234")
 	s.Error(err)
-	s.EqualError(err, "accepts 1 arg(s), received 0")
+	s.EqualError(err, "deployment service-account delete requires SERVICE_ACCOUNT_ID")
 }
 
 func (s *Suite) TestDeploymentSaDeleteWoDeploymentIdCommand() {

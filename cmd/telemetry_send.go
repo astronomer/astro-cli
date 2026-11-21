@@ -14,7 +14,6 @@ func newTelemetrySendCmd() *cobra.Command {
 		Hidden:        true,
 		SilenceErrors: true,
 		Annotations:   map[string]string{telemetry.SkipPreRunAnnotation: "true"},
-		Args:          cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return telemetry.SendEvent()
 		},

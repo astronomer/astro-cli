@@ -127,28 +127,3 @@ func TestHelpSearchIgnoresTheBinaryName(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, stdout, "astro deployment list\t")
 }
-
-func TestHelpArgumentsHandleEveryUseLineInBothTrees(t *testing.T) {
-	for _, tree := range rootsUnderTest(t) {
-		for _, c := range visibleCommands(tree.root) {
-			for _, a := range helpArguments(c.Use) {
-				assert.NotEmpty(t, a.Name, "%s: %s", tree.name, c.Use)
-				assert.False(t, strings.ContainsAny(a.Name, " |<>[]"), "%s: %s -> %q", tree.name, c.Use, a.Name)
-				assert.False(t, strings.HasPrefix(a.Name, "-"), "%s: %s", tree.name, c.Use)
-			}
-		}
-	}
-}
-
-func TestHelpArgumentsNestedAndOddTokens(t *testing.T) {
-	for use, want := range map[string][]helpArg{
-		"add [NAME [-- COMMAND...]]": {{"NAME", false, false}, {"COMMAND", false, true}},
-		"set [a|b]":                  {{"a", false, false}},
-		"x [--flag value] <ID>":      {{"ID", true, false}},
-		"x [flags] [command]":        {},
-		"run COMMAND":                {{"COMMAND", true, false}},
-		"run -- COMMAND...":          {{"COMMAND", true, true}},
-	} {
-		assert.Equal(t, want, helpArguments(use), use)
-	}
-}

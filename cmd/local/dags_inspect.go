@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/texttable"
 )
@@ -28,7 +29,6 @@ func newDagsErrorsCmd(q *query) *cobra.Command {
 		Long: "List the import errors on this Airflow: each Dag file the Dag processor could not parse, with the " +
 			"traceback it raised. A Dag missing from dags list is usually here.\n\nThe command succeeds " +
 			"whether or not there are errors.",
-		Args: cobra.NoArgs,
 		Example: afExample(q.t,
 			"List the Dag files that failed to parse", "dags errors",
 			"As JSON, tracebacks included", "dags errors -o json",
@@ -96,7 +96,6 @@ func newDagsWarningsCmd(q *query) *cobra.Command {
 		Short: "List what the scheduler warns about in Dags that did parse",
 		Long: "List the Dag warnings on this Airflow: problems the scheduler noticed in Dags that parsed, such as " +
 			"a pool that does not exist or a deprecated argument. Unlike import errors, these Dags still run.",
-		Args: cobra.NoArgs,
 		Example: afExample(q.t,
 			"List what the scheduler warns about", "dags warnings",
 		),
@@ -128,14 +127,13 @@ func renderDAGWarningTable(w io.Writer, rows []dagWarningRow) error {
 }
 
 func newDagsExploreCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "explore <DAG_ID>",
+	return cliout.Args(&cobra.Command{
+		Use:   "explore",
 		Short: "Show one Dag's definition, its tasks, and its source together",
 		Long: "Read one Dag in a single command: what " + q.t.suggest("dags get") + " shows, the tasks as " +
 			q.t.suggest("tasks list") + " shows them, and the source Airflow parsed.\n\nEach part is read separately. " +
 			"A part that fails is reported in its place and the command continues. The command fails only when none " +
 			"of the three could be read, as happens with a Dag id Airflow does not know.",
-		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Read a Dag's definition, tasks, and source in one go", "dags explore <DAG_ID>",
 			"As JSON, for a script or an agent", "dags explore <DAG_ID> -o json",
@@ -143,7 +141,7 @@ func newDagsExploreCmd(q *query) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runDagsExplore(cmd.Context(), args[0])
 		},
-	}
+	}, cliout.Required("DAG_ID"))
 }
 
 // dagExploration is what `dags explore` reports: the three reads, each beside

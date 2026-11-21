@@ -122,15 +122,27 @@ func TestHelpJSONSubcommandsFollowHelpOrder(t *testing.T) {
 	assert.NotEmpty(t, got)
 }
 
-func TestHelpJSONArgumentsComeFromTheUseLine(t *testing.T) {
-	for use, want := range map[string][]helpArg{
-		"get <DAG_ID> <RUN_ID>":      {{"DAG_ID", true, false}, {"RUN_ID", true, false}},
-		"add [NAME] [-- COMMAND...]": {{"NAME", false, false}, {"COMMAND", false, true}},
-		"rm <NAME...> [flags]":       {{"NAME", true, true}},
-		"list":                       {},
+func TestHelpJSONArgumentsComeFromTheDeclaration(t *testing.T) {
+	dash := cliout.Arg{Name: "COMMAND", Optional: true, Repeated: true, AfterDash: true}
+	for want, tc := range map[string]struct {
+		args []cliout.Arg
+		doc  []helpArg
+	}{
+		"get <DAG_ID> <RUN_ID>":      {[]cliout.Arg{cliout.Required("DAG_ID"), cliout.Required("RUN_ID")}, []helpArg{{"DAG_ID", true, false, false}, {"RUN_ID", true, false, false}}},
+		"get [NAME] [-- COMMAND...]": {[]cliout.Arg{cliout.Optional("NAME"), dash}, []helpArg{{"NAME", false, false, false}, {"COMMAND", false, true, true}}},
+		"get <NAME>...":              {[]cliout.Arg{{Name: "NAME", Repeated: true}}, []helpArg{{"NAME", true, true, false}}},
+		"get":                        {nil, []helpArg{}},
 	} {
-		assert.Equal(t, want, helpArguments(use), use)
+		c := cliout.Args(&cobra.Command{Use: "get"}, tc.args...)
+		assert.Equal(t, want, c.Use)
+		assert.Equal(t, tc.doc, helpArguments(c), want)
+		assert.Equal(t, "root "+want, describeCommand(withParent(c)).Usage, want)
 	}
+}
+
+func withParent(c *cobra.Command) *cobra.Command {
+	(&cobra.Command{Use: "root"}).AddCommand(c)
+	return c
 }
 
 func TestHelpJSONLeavesOutHiddenFlagsAndCommands(t *testing.T) {

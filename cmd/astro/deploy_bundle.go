@@ -53,8 +53,8 @@ type deployBundleOptions struct {
 func newDeployBundleCmd() *cobra.Command {
 	o := &deployBundleOptions{}
 	types := strings.Join(astrodeploy.BundleTypeNames(), ", ")
-	cmd := &cobra.Command{
-		Use:   manifestdeploy.BundleCommand + " [PATH]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   manifestdeploy.BundleCommand,
 		Short: "Deploy a non-Dag bundle (for example a dbt project) to a Deployment",
 		Long: "Deploy a non-Dag bundle (for example a dbt project) to a Deployment on Astro. " +
 			"The bundle is a directory of its own, outside any Astro project: PATH, or the current directory. " +
@@ -68,7 +68,6 @@ func newDeployBundleCmd() *cobra.Command {
 			"This deploys the bundle's files; astro deploy deploys the project and its Dags. " +
 			"To list or change the bundles a Deployment has registered, use astro deployment bundle. " +
 			"A project link called bundle is not reachable as astro deploy bundle: deploy the project to it with astro deploy --deployment bundle.",
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDeployBundle(cmd, args, o)
 		},
@@ -90,7 +89,7 @@ func newDeployBundleCmd() *cobra.Command {
 
   # Remove the dbt project in the current directory from a Deployment
   astro deploy bundle --delete --deployment <DEPLOYMENT_ID>`,
-	}
+	}, cliout.Optional("PATH"))
 	f := cmd.Flags()
 	f.StringVar(&o.mountPath, "mount-path", "", "Path the bundle is mounted at in Airflow, for reference by Dags. Default: the type's, "+astrodeploy.DbtDefaultMountPathPrefix+"<project name> for a dbt project")
 	f.StringVar(&o.bundleType, "type", "", "Type of the bundle: "+types+", or any other label, which has no defaults. Default: detected from PATH, else none")

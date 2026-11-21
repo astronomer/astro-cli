@@ -20,8 +20,8 @@ func newHelpCommand() *cobra.Command {
 		format cliout.Format
 		all    bool
 	)
-	helpCmd := &cobra.Command{
-		Use:   helpName + " [command]",
+	helpCmd := cliout.Args(&cobra.Command{
+		Use:   helpName,
 		Short: "Help about any command",
 		Long: `Help provides help for any command in the application.
 Simply type astro help [path to command] for full details.
@@ -31,7 +31,6 @@ With --output json, a command's help is one JSON document, for scripts and codin
   astro help deployment list --output json
   astro help search "create deployment"
   astro help --all --output json`,
-		Args: cobra.ArbitraryArgs,
 		// Help needs no login, version check or tracking.
 		Annotations: map[string]string{telemetry.SkipPreRunAnnotation: "true"},
 		ValidArgsFunction: func(c *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
@@ -52,7 +51,7 @@ With --output json, a command's help is one JSON document, for scripts and codin
 		RunE: func(c *cobra.Command, args []string) error {
 			return runHelp(c, args, all, format)
 		},
-	}
+	}, cliout.Arg{Name: "COMMAND", Optional: true, Repeated: true})
 	cliout.AddOutputFlag(helpCmd, &format)
 	helpCmd.Flags().BoolVar(&all, "all", false, "List every command")
 	return helpCmd

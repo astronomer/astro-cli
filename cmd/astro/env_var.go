@@ -38,7 +38,6 @@ func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage environment variables",
 		Long:    "Manage environment variables on Astro, scoped to a Workspace or a Deployment.",
 		Example: envVarExamples,
-		Args:    cliout.UndeclaredArgs,
 		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
@@ -100,10 +99,9 @@ func newEnvVarExportCmd(out io.Writer) *cobra.Command {
 }
 
 func newEnvVarGetCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "get <ID_OR_KEY>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "get",
 		Short: "Show an environment variable",
-		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvVarGet(cmd, out, args[0])
 		},
@@ -112,18 +110,17 @@ func newEnvVarGetCmd(out io.Writer) *cobra.Command {
 
   # Show one on a Deployment, as a KEY=VALUE line
   astro env variable get API_TOKEN --deployment <DEPLOYMENT_ID> -o dotenv`,
-	}
+	}, cliout.Required("ID_OR_KEY"))
 	cliout.AddOutputFlag(cmd, &envOutput, formatDotenv)
 	return cmd
 }
 
 func newEnvVarSetCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "set [ID_OR_KEY]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "set",
 		Short: "Set an environment variable",
 		Long: "Set an environment variable, creating it if it does not exist. Pass --no-create " +
 			"to fail instead, or --from-file to set many from a dotenv file.",
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if envVarFromFile != "" {
 				if len(args) > 0 {
@@ -141,7 +138,7 @@ func newEnvVarSetCmd(out io.Writer) *cobra.Command {
 
   # Set many from a dotenv file
   astro env variable set --from-file .env`,
-	}
+	}, cliout.Optional("ID_OR_KEY"))
 	cmd.Flags().StringVar(&envVarValue, "value", "", "The value; omit it to read from stdin or be prompted with echo off")
 	cmd.Flags().BoolVar(&envVarSecret, "secret", false, "Mark the variable secret when it is created; to change it later, delete and re-create it")
 	cmd.Flags().BoolVar(&envVarNoCreate, "no-create", false, "Fail if the variable does not exist, instead of creating it")
@@ -152,11 +149,10 @@ func newEnvVarSetCmd(out io.Writer) *cobra.Command {
 }
 
 func newEnvVarDeleteCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete <ID_OR_KEY>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete an environment variable",
-		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvDelete(cmd, out, "environment variable", args[0], env.DeleteVar)
 		},
@@ -165,7 +161,7 @@ func newEnvVarDeleteCmd(out io.Writer) *cobra.Command {
 
   # Delete it without the confirmation prompt
   astro env variable delete API_TOKEN --yes`,
-	}
+	}, cliout.Required("ID_OR_KEY"))
 	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
 	return cmd
 }

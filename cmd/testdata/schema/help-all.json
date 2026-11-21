@@ -19,7 +19,8 @@
         {
           "name": "x",
           "required": true,
-          "repeated": true
+          "repeated": true,
+          "after_dash": true
         }
       ],
       "flags": [

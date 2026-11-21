@@ -29,8 +29,8 @@ func newTeamCmd(out io.Writer) *cobra.Command {
 
 func newTeamGetCmd(out io.Writer) *cobra.Command {
 	var usersEnabled, rolesEnabled, all bool
-	cmd := &cobra.Command{
-		Use:     "get <TEAM_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "get",
 		Aliases: []string{"g"},
 		Short:   "Get a team in the APC platform",
 		Long:    "Get a team in the APC platform",
@@ -39,7 +39,6 @@ func newTeamGetCmd(out io.Writer) *cobra.Command {
 
   # Show a team with its users and roles
   astro team get <TEAM_ID> --all`,
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r := cliout.Renderer{Format: accessOutput, Out: out, Err: cmd.ErrOrStderr()}
 			d, err := teams.Get(args[0], usersEnabled || all, houstonClient)
@@ -48,7 +47,7 @@ func newTeamGetCmd(out io.Writer) *cobra.Command {
 			}
 			return renderTeamDetail(r, &d, rolesEnabled || all)
 		},
-	}
+	}, cliout.Required("TEAM_ID"))
 	cmd.Flags().BoolVar(&usersEnabled, "users", false, "Get user details of the team")
 	cmd.Flags().BoolVar(&rolesEnabled, "roles", false, "Get role details of the team")
 	cmd.Flags().BoolVarP(&all, "all", "a", false, "Use all of the filters")
@@ -69,7 +68,6 @@ func newTeamListCmd(out io.Writer) *cobra.Command {
 
   # List teams a page at a time
   astro team list --paginated --page-size 20`,
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listTeam(out, paginated, pageSize)
 		},
@@ -82,14 +80,13 @@ func newTeamListCmd(out io.Writer) *cobra.Command {
 
 func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	var teamRole string
-	cmd := &cobra.Command{
-		Use:     "update <TEAM_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "update",
 		Aliases: []string{"u"},
 		Short:   "Update a team in the APC platform",
 		Long:    "Update a team in the APC platform",
 		Example: `  # Give a team the system editor role
   astro team update <TEAM_ID> --role SYSTEM_EDITOR`,
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r := cliout.Renderer{Format: accessOutput, Out: out, Err: cmd.ErrOrStderr()}
 			change, err := teams.Update(args[0], teamRole, houstonClient)
@@ -98,7 +95,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 			}
 			return renderTeamUpdated(r, &change)
 		},
-	}
+	}, cliout.Required("TEAM_ID"))
 	cmd.Flags().StringVar(&teamRole, "role", "", "Role assigned to the team, one of: SYSTEM_VIEWER, SYSTEM_EDITOR, SYSTEM_ADMIN, NONE")
 	_ = cmd.MarkFlagRequired("role") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)

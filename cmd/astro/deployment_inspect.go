@@ -21,8 +21,8 @@ var (
 const formatYAML cliout.Format = "yaml"
 
 func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "inspect [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "inspect",
 		Aliases: []string{"in"},
 		Short:   "Inspect a Deployment configuration",
 		Long:    "Inspect an Astro Deployment configuration. This command returns the Deployment's configuration as YAML (the default) or JSON, which includes information about resources, such as cluster ID, region, and Airflow API URL, as well as scheduler and worker queue configurations.",
@@ -37,7 +37,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentInspect(cmd, args, out)
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	addDeploymentFlag(cmd.Flags(), "Deployment to inspect: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
 	cliout.AddOutputFlag(cmd, &outputFormat, formatYAML)

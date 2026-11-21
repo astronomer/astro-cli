@@ -52,8 +52,8 @@ func NewAirflowCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd := &cobra.Command{
-		Use:   "airflow <ENDPOINT_OR_OPERATION_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "airflow",
 		Short: "Make requests to the Airflow REST API",
 		Long: `Make HTTP requests to the Airflow REST API.
 
@@ -117,7 +117,6 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 
   # This project's local Airflow
   astro local api /dags`,
-		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			opts.RequestMethodPassed = cmd.Flags().Changed("method")
 			opts.CredentialsExplicit = cmd.Flags().Changed("username") || cmd.Flags().Changed("password")
@@ -130,7 +129,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 			opts.RequestPath = args[0]
 			return runAirflow(opts)
 		},
-	}
+	}, cliout.Optional("ENDPOINT_OR_OPERATION_ID"))
 
 	// Airflow-specific flags (persistent so they're inherited by subcommands)
 	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, else an Astro Deployment id or name")
@@ -456,8 +455,8 @@ func NewAirflowListCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Command
 	var refresh bool
 	var format cliout.Format
 
-	cmd := &cobra.Command{
-		Use:     "ls [FILTER]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "ls",
 		Aliases: []string{"list"},
 		Short:   "List available Airflow API endpoints",
 		Long: `List all available endpoints from the Airflow API.
@@ -475,7 +474,6 @@ You can optionally provide a filter to search for specific endpoints, as an argu
 
   # Show verbose output with descriptions
   astro api airflow ls --verbose`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			filter, err := apirequest.ListFilter(args, filterFlag)
 			if err != nil {
@@ -502,7 +500,7 @@ You can optionally provide a filter to search for specific endpoints, as an argu
 
 			return runList(listOpts)
 		},
-	}
+	}, cliout.Optional("FILTER"))
 
 	cmd.Flags().StringVar(&filterFlag, "filter", "", "Only list endpoints matching this, the same as the positional filter")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
@@ -527,7 +525,6 @@ It is the document ls and describe work from: the published specification for th
 
   # Every path it declares
   astro api airflow spec | jq '.paths | keys'`,
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 			target, err := resolveAirflowTarget(ctx, parentOpts)
@@ -559,8 +556,8 @@ func NewAirflowDescribeCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Com
 	var verbose bool
 	var format cliout.Format
 
-	cmd := &cobra.Command{
-		Use:   "describe <ENDPOINT>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "describe",
 		Short: "Describe an Airflow API endpoint's request and response schema",
 		Long: `Show detailed information about an Airflow API endpoint, including:
 - Path and query parameters
@@ -576,7 +573,6 @@ The endpoint can be specified as a path or as an operation ID.`,
 
   # Describe by operation ID
   astro api airflow describe get_dag`,
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := loadAirflowSpec(cmd.Context(), parentOpts); err != nil {
 				return err
@@ -595,7 +591,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 
 			return runDescribe(descOpts)
 		},
-	}
+	}, cliout.Required("ENDPOINT"))
 
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")

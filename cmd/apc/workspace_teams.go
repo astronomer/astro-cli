@@ -47,16 +47,15 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 }
 
 func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the Deployment twin differs in its flags and its role
-	cmd := &cobra.Command{
-		Use:     "add [TEAM_ID]",
+	cmd := cliout.CheckArgs(cliout.Args(&cobra.Command{
+		Use:     "add",
 		Short:   "Add a Team to a Workspace",
 		Long:    "Add a Team to a Workspace, named by its id as the argument or with --team-id",
-		Args:    argOrFlag("team-id", "team"),
 		Example: workspaceTeamAddExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceTeamAdd(out, args)
 		},
-	}
+	}, cliout.Optional("TEAM_ID")), argOrFlag("team-id", "team"))
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team ID to be assigned to Workspace")
 	// A persistent flag is not among the command's own flags, where
 	// MarkFlagRequired looks, so marking it so failed, unseen, and a run
@@ -68,33 +67,31 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the
 }
 
 func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "update <TEAM_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "update",
 		Short:   "Update a Team inside a Workspace",
 		Long:    "Update a Team inside a Workspace",
 		Example: workspaceTeamUpdateExample,
-		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceTeamUpdate(out, args)
 		},
-	}
+	}, cliout.Required("TEAM_ID"))
 	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "Workspace role assigned to team")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
 
 func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "remove <TEAM_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a Team from a Workspace",
 		Long:    "Remove a Team from a Workspace",
 		Example: workspaceTeamRemoveExample,
-		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceTeamRm(cmd, out, args)
 		},
-	}
+	}, cliout.Required("TEAM_ID"))
 	addAccessOutputFlag(cmd)
 	return cmd
 }

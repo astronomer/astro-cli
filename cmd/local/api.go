@@ -44,8 +44,8 @@ import (
 // the version it detects so it can also resolve operation ids.
 func newAPICmd(c *cli) *cobra.Command {
 	var opts apiOptions
-	cmd := &cobra.Command{
-		Use:   "api <ENDPOINT>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "api",
 		Short: "Make one request to this machine's Airflow API",
 		Long: "Send a request to the Airflow running on this machine and print the response unchanged.\n\n" +
 			"The endpoint is a path relative to the API base: /dags (or dags) reaches /api/v2/dags on " +
@@ -78,11 +78,10 @@ func newAPICmd(c *cli) *cobra.Command {
 			"  # List endpoints that mention variables, and print the spec\n" +
 			"  astro local api ls --filter variable\n" +
 			"  astro local api spec | jq '.paths | keys'",
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return c.runAPI(cmd.Context(), args[0], opts)
 		},
-	}
+	}, cliout.Required("ENDPOINT"))
 	cmd.Flags().StringVarP(&opts.method, "method", "X", http.MethodGet, "HTTP method")
 	cmd.Flags().StringVar(&opts.body, "body", "", "JSON request body, or - to read it from stdin")
 	cmd.Flags().StringVar(&opts.input, "input", "", "File holding the JSON request body, or - to read it from stdin")
@@ -243,8 +242,8 @@ func writeExchange(r cliout.Renderer, resp airflowapi.Response) error {
 func newAPIListCmd(c *cli) *cobra.Command {
 	var filterFlag string
 	var verbose bool
-	cmd := &cobra.Command{
-		Use:     "ls [FILTER]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "ls",
 		Aliases: []string{"list"},
 		Short:   "List the endpoints this machine's Airflow serves",
 		Long: "List the API endpoints the Airflow running on this machine serves, read from its OpenAPI " +
@@ -255,7 +254,6 @@ func newAPIListCmd(c *cli) *cobra.Command {
 		Example: "  astro local api ls\n" +
 			"  astro local api ls --filter variable\n" +
 			"  astro local api ls dagRun --verbose",
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			filter, err := apirequest.ListFilter(args, filterFlag)
 			if err != nil {
@@ -273,7 +271,7 @@ func newAPIListCmd(c *cli) *cobra.Command {
 				return nil
 			})
 		},
-	}
+	}, cliout.Optional("FILTER"))
 	cmd.Flags().StringVar(&filterFlag, "filter", "", "Only list endpoints matching this, the same as the positional filter")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show each endpoint's operation id, summary, tags and path parameters")
 	return cmd
@@ -290,7 +288,6 @@ func newAPISpecCmd(c *cli) *cobra.Command {
 			"is converted and printed as JSON, so the output pipes into jq either way.",
 		Example: "  astro local api spec\n" +
 			"  astro local api spec | jq '.paths | keys'",
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			r := c.renderer()
 			raw, _, err := c.machineSpec(cmd.Context())

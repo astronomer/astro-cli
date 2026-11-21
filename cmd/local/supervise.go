@@ -3,6 +3,7 @@ package local
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -16,7 +17,6 @@ func newSuperviseCmd(_ Deps) *cobra.Command {
 		Use:                localrt.SuperviseSubcommand,
 		Short:              "Run the local Airflow supervisor (internal)",
 		Hidden:             true,
-		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
 		SilenceErrors:      true,
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -24,5 +24,5 @@ func newSuperviseCmd(_ Deps) *cobra.Command {
 		},
 	}
 	markSkipPreRun(cmd)
-	return cmd
+	return cliout.AnyWords(cmd, "the engine spawns it with a machine-built command line that the supervise package parses")
 }

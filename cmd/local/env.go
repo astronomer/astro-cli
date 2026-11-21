@@ -161,9 +161,9 @@ func newEnvCmd(c *cli) *cobra.Command {
 			"vault, global vault, the linked Workspace's Environment Manager, a declaration's " +
 			"default. Every source reaches Airflow, whether or not the project declares the value. " +
 			"A Workspace that cannot be read is skipped with a note.",
-		Args: cobra.ArbitraryArgs,
 		RunE: helpOrUnknownSubcommand,
 	}
+	cliout.AnyWords(cmd, "its RunE names the verb a removed form became before it refuses an unknown word (helpOrUnknownSubcommand)")
 	cmd.PersistentFlags().BoolVar(&scope.project, "project", false, "Act on the project's values (the default inside a project)")
 	cmd.PersistentFlags().BoolVar(&scope.global, "global", false, "Act on the global values every linked project gets (the default outside a project)")
 	for _, k := range envKinds() {
@@ -246,7 +246,7 @@ func envKinds() []envKind {
 		{
 			aliases: []string{"var", "variables", "vars"},
 			kind:    localenv.KindEnv,
-			arg:     "<NAME>",
+			arg:     "NAME",
 			article: "an",
 			label:   "environment variable",
 			example: `
@@ -268,7 +268,7 @@ func envKinds() []envKind {
 		{
 			aliases: []string{"conn", "connections"},
 			kind:    localenv.KindConn,
-			arg:     "<CONN_ID>",
+			arg:     "CONN_ID",
 			article: "a",
 			label:   "connection",
 			example: `
@@ -290,7 +290,7 @@ func envKinds() []envKind {
 		{
 			aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},
 			kind:    localenv.KindVar,
-			arg:     "<KEY>",
+			arg:     "KEY",
 			article: "an",
 			label:   "Airflow variable",
 			example: `
@@ -322,7 +322,6 @@ func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Short:   "Manage " + k.label + "s",
 		Long:    "Manage " + k.label + "s for local Airflow.",
 		Example: k.example,
-		Args:    cobra.ArbitraryArgs,
 		RunE:    helpOrUnknownSubcommand,
 	}
 	// Reads, then the write, then the destructive one — the same order
@@ -331,6 +330,7 @@ func newEnvKindCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	// tree has no counterpart for, follow them, and then the two that decide
 	// which projects a global vault entry reaches. TestEnvVerbOrderMatchesTheCloudTree
 	// pins it.
+	cliout.AnyWords(cmd, "its RunE names the verb a removed form became before it refuses an unknown word (helpOrUnknownSubcommand)")
 	cmd.AddCommand(
 		newEnvListCmd(c, scope, k.kind, "List "+k.label+"s and where each resolves from"),
 		newEnvGetCmd(c, scope, k),
@@ -378,12 +378,11 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
   echo "$PASSWORD" | ` + cmdLine + ` ` + name + ` --stdin \
     --type postgres --host db.example.com --login admin`
 	}
-	cmd := &cobra.Command{
-		Use:     "set " + k.arg,
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "set",
 		Short:   "Set " + k.article + " " + k.label,
 		Long:    long,
 		Example: example,
-		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := readStoreFlags(cmd, c.d.Stderr, scope); err != nil {
 				return err
@@ -400,7 +399,7 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			}
 			return c.runEnvSet(route, k.kind, args[0], value, in.everywhere, in.replaceSecret)
 		},
-	}
+	}, cliout.Required(k.arg))
 	addStoreFlags(cmd, scope, plainSetHelp)
 	cmd.Flags().BoolVar(&in.stdin, "stdin", false, "Read the value from stdin instead of prompting")
 	cmd.Flags().BoolVar(&in.replaceSecret, "replace-secret", false, "With --plain, overwrite a value stored encrypted with a plain one")
@@ -502,29 +501,28 @@ func connValueFromFields(f *connFields, password string) (string, error) {
 }
 
 func newEnvGetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "get " + k.arg,
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "get",
 		Short: "Show " + k.article + " " + k.label + " and where it resolves from",
 		Example: "  # Show its value and where it resolves from\n" +
 			"  astro local env " + localenv.Noun(k.kind) + " get " + exampleName(k.kind) + "\n\n" +
 			"  # The global value\n" +
 			"  astro local env " + localenv.Noun(k.kind) + " get " + exampleName(k.kind) + " --global",
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := readStoreFlags(cmd, c.d.Stderr, scope); err != nil {
 				return err
 			}
 			return c.runEnvGet(scope, k.kind, args[0])
 		},
-	}
+	}, cliout.Required(k.arg))
 	addStoreFlags(cmd, scope, plainNarrowHelp)
 	return cmd
 }
 
 func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	var undeclare bool
-	cmd := &cobra.Command{
-		Use:     "delete " + k.arg,
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete " + k.article + " " + k.label,
 		Long: "Delete " + k.article + " " + k.label + "'s value.\n\n" +
@@ -538,14 +536,13 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			"  astro local env " + localenv.Noun(k.kind) + " delete " + exampleName(k.kind) + "\n\n" +
 			"  # Also remove its declaration from pyproject.toml\n" +
 			"  astro local env " + localenv.Noun(k.kind) + " delete " + exampleName(k.kind) + " --undeclare",
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := readStoreFlags(cmd, c.d.Stderr, scope); err != nil {
 				return err
 			}
 			return c.runEnvDelete(scope, k.kind, args[0], undeclare)
 		},
-	}
+	}, cliout.Required(k.arg))
 	addStoreFlags(cmd, scope, plainNarrowHelp)
 	cmd.Flags().BoolVar(&undeclare, "undeclare", false, "Also remove the name's declaration from the current project's pyproject.toml")
 	return cmd
@@ -587,7 +584,6 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 			"  " + cmdLine + " -o wide\n\n" +
 			"  # Also every known project's .env, and globals not linked to this project\n" +
 			"  " + cmdLine + " --all",
-		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return c.runEnvList(scope, all, only)
 		},

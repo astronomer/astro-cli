@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 )
 
@@ -42,9 +43,9 @@ func VersionMatchCmds(rootCmd *cobra.Command, parent []string) {
 // adds it, not that the word does not exist. The error names the command, what
 // it needs, and what is connected.
 func removeCmd(c *cobra.Command, cmdName string, r houston.VersionRestrictions) {
-	c.Hidden = true              // out of the help; the error below is the only way to meet it
-	c.Args = cobra.ArbitraryArgs // clear any Args validator (e.g. cobra.ExactArgs) so a missing positional does not error before RunE below
-	c.Run = nil                  // cobra prefers RunE over Run when both are set; this command has only the one below
+	c.Hidden = true // out of the help; the error below is the only way to meet it
+	cliout.AnyWords(c, "whatever it was given, the version refusal below is what it says")
+	c.Run = nil // cobra prefers RunE over Run when both are set; this command has only the one below
 	c.RunE = func(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%s needs Astro Private Cloud %s; this platform reports %s", cmdName, versionNeeded(r), houstonVersion)
 	}

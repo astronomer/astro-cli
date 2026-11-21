@@ -49,8 +49,8 @@ func newPackageCmd(c *cli) *cobra.Command {
 		contextDir   string
 		buildSecrets []string
 	}
-	cmd := &cobra.Command{
-		Use:   "package [TARGET]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "package",
 		Short: "Build a platform's deployable artifact without shipping it",
 		Long: "Build the artifact that an Airflow platform consumes, for CI or to give a " +
 			"prebuilt image to astro deploy --image-name.\n\n" +
@@ -62,7 +62,6 @@ func newPackageCmd(c *cli) *cobra.Command {
 			"  astro package mwaa --save dist/mwaa.zip\n\n" +
 			"  # Write the image's build context, to build it with docker or podman yourself\n" +
 			"  astro package --context-dir ./build",
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := pack.TargetAstro
 			if len(args) == 1 {
@@ -77,7 +76,7 @@ func newPackageCmd(c *cli) *cobra.Command {
 				buildSecrets: opts.buildSecrets,
 			})
 		},
-	}
+	}, cliout.Optional("TARGET"))
 	cmd.Flags().StringVar(&opts.save, "save", "", "Also write the artifact to this path (a .tar for image targets, a .zip for bucket targets)")
 	cmd.Flags().StringVar(&opts.tag, "tag", "", "Image reference for image targets (default astro-package/<name>:<runtime>-<hash>)")
 	cmd.Flags().StringVar(&opts.platform, "platform", defaultPackagePlatform, "Build platform for image targets")
