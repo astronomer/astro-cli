@@ -3,7 +3,10 @@ package cliout
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -251,9 +254,50 @@ func markUsageErrors(root *cobra.Command) {
 			validate = UndeclaredArgs
 		}
 		c.Args = func(cmd *cobra.Command, args []string) error {
-			return misinvoked(validate(cmd, args))
+			return misinvoked(leafArgsError(cmd, args, validate(cmd, args)))
 		}
 	})
+}
+
+// Cobra's refusals of a stray argument, from NoArgs, MaximumNArgs, ExactArgs
+// and RangeArgs. TestCobraArgsMessagesAreRecognized pins their wording, so a
+// cobra upgrade that rewords one fails there.
+var (
+	cobraCounts = []struct {
+		re  *regexp.Regexp
+		how string
+	}{
+		{regexp.MustCompile(`^accepts at most (\d+) arg\(s\), received \d+$`), "at most"},
+		{regexp.MustCompile(`^accepts (\d+) arg\(s\), received \d+$`), "exactly"},
+	}
+	cobraRange = regexp.MustCompile(`^accepts between (\d+) and (\d+) arg\(s\), received \d+$`)
+)
+
+// leafArgsError rewords cobra's own refusal of a stray argument (NoArgs reads
+// as an unknown command, which a leaf has none of) the way UndeclaredArgs
+// words it. Any other error, and any command with subcommands, is unchanged.
+func leafArgsError(cmd *cobra.Command, args []string, err error) error {
+	if err == nil || cmd.HasSubCommands() || len(args) == 0 {
+		return err
+	}
+	if err.Error() == fmt.Sprintf("unknown command %q for %q", args[0], cmd.CommandPath()) {
+		return UnexpectedArgument(cmd, args[0], "at most", 0)
+	}
+	for _, c := range cobraCounts {
+		if m := c.re.FindStringSubmatch(err.Error()); m != nil {
+			if n, convErr := strconv.Atoi(m[1]); convErr == nil && n < len(args) {
+				return UnexpectedArgument(cmd, args[n], c.how, n)
+			}
+		}
+	}
+	if m := cobraRange.FindStringSubmatch(err.Error()); m != nil {
+		lo, loErr := strconv.Atoi(m[1])
+		hi, hiErr := strconv.Atoi(m[2])
+		if loErr == nil && hiErr == nil && hi < len(args) {
+			return unexpectedArgument(cmd, args[hi], fmt.Sprintf("takes %d to %d arguments", lo, hi))
+		}
+	}
+	return err
 }
 
 func walk(cmd *cobra.Command, fn func(*cobra.Command)) {

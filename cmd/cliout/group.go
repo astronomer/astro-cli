@@ -224,8 +224,30 @@ func UndeclaredArgs(cmd *cobra.Command, args []string) error {
 		}
 		documented++
 	}
-	if documented == 0 {
-		return cobra.NoArgs(cmd, args)
+	if len(args) <= documented {
+		return nil
 	}
-	return cobra.MaximumNArgs(documented)(cmd, args)
+	return UnexpectedArgument(cmd, args[documented], "at most", documented)
+}
+
+// UnexpectedArgument is the usage error for a stray argument to a leaf, which
+// has no subcommands to mistype and so is not told it is an unknown command.
+// How many it takes reads as "takes no arguments" for none, else "takes <how>
+// <n> argument(s)" with how "at most" or "exactly".
+func UnexpectedArgument(cmd *cobra.Command, arg, how string, n int) error {
+	return unexpectedArgument(cmd, arg, takesWords(how, n))
+}
+
+func takesWords(how string, n int) string {
+	switch {
+	case n == 0:
+		return "takes no arguments"
+	case n == 1:
+		return "takes " + how + " 1 argument"
+	}
+	return fmt.Sprintf("takes %s %d arguments", how, n)
+}
+
+func unexpectedArgument(cmd *cobra.Command, arg, takes string) error {
+	return misinvoked(fmt.Errorf("unexpected argument %q: %s %s", arg, cmd.CommandPath(), takes))
 }

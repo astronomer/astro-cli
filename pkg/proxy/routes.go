@@ -23,6 +23,8 @@ const (
 	lockTimeout = 30 * time.Second
 	FilePermRW  = 0o600 // owner read/write
 	DirPermRWX  = 0o755 // owner rwx, group/other rx
+	// homeDirPermRWX is for ~/.astro itself when this package creates it.
+	homeDirPermRWX = 0o700
 )
 
 // Route.Mode wire values. localrt.Mode carries the same strings in the
@@ -66,6 +68,10 @@ type Route struct {
 type Store struct {
 	dir string
 
+	// homeConfigDir is the directory dir lives in, when the caller says so
+	// (WithHomeConfigDir).
+	homeConfigDir string
+
 	// routeAlive decides whether a route survives pruning. When nil the
 	// Store uses defaultRouteAlive (docker kept, others PID-checked). The CLI
 	// injects a record-aware predicate through WithRouteLiveness so a route
@@ -86,6 +92,12 @@ type Store struct {
 // StoreOption configures a Store at construction.
 type StoreOption func(*Store)
 
+// WithHomeConfigDir names the home config directory the store's directory
+// lives in, which the store makes owner-only if it has to create it.
+func WithHomeConfigDir(dir string) StoreOption {
+	return func(s *Store) { s.homeConfigDir = dir }
+}
+
 // WithRouteLiveness sets the predicate that decides whether a route survives
 // pruning. It replaces the default PID check for every prune this Store does
 // (AddRoute, RemoveRoute, ListRoutes).
@@ -100,6 +112,30 @@ func NewStore(dir string, opts ...StoreOption) *Store {
 		opt(s)
 	}
 	return s
+}
+
+// mkdirStoreDir creates a store directory. The store lives in <home>/.astro
+// (the place 1.x keeps it), and whichever writer creates that directory first
+// decides its mode, so a missing .astro is made owner-only (it holds login
+// tokens) before the store directory is made. An existing directory keeps its
+// mode.
+//
+// The home config directory is the one WithHomeConfigDir names. A store built
+// without it takes the store directory's parent for it when that is called
+// .astro, which is what every home config directory is called.
+func (s *Store) mkdirStoreDir() error {
+	home := s.homeConfigDir
+	if home == "" {
+		if parent := filepath.Dir(s.dir); filepath.Base(parent) == ".astro" {
+			home = parent
+		}
+	}
+	if home != "" {
+		if err := os.MkdirAll(home, homeDirPermRWX); err != nil {
+			return err
+		}
+	}
+	return os.MkdirAll(s.dir, DirPermRWX)
 }
 
 // Dir returns the store's directory.
@@ -192,7 +228,7 @@ func (s *Store) ReadRoutes() ([]Route, error) {
 
 // WriteRoutes writes routes to the routes file atomically using a temp file + rename.
 func (s *Store) WriteRoutes(routes []Route) error {
-	if err := os.MkdirAll(s.dir, DirPermRWX); err != nil {
+	if err := s.mkdirStoreDir(); err != nil {
 		return fmt.Errorf("creating proxy directory: %w", err)
 	}
 
