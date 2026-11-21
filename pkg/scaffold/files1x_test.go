@@ -144,6 +144,29 @@ func TestParseRequirements(t *testing.T) {
 	}
 }
 
+// TestParseRequirementsNotesMaskURLUserinfo pins that a note echoing a
+// requirements line shows a URL's user:password part as "***", while the
+// dependency lines carried into the manifest are untouched.
+func TestParseRequirementsNotesMaskURLUserinfo(t *testing.T) {
+	in := strings.Join([]string{
+		"pandas==2.1.0",
+		"--extra-index-url https://u:p@host/simple",
+		"-e git+https://u:p@host/repo.git#egg=pkg",
+		"https://u:p@host/pkg.whl",
+		"git+https://u:p@host/repo.git@main",
+		"pandas @ https://u:p@host/pandas.whl \\  ",
+	}, "\n") + "\n"
+
+	deps, notes := parseRequirements([]byte(in))
+
+	assert.Equal(t, []string{"pandas==2.1.0"}, deps)
+	require.Len(t, notes, 5, "notes: %v", notes)
+	for _, note := range notes {
+		assert.Contains(t, note, "://***@")
+		assert.NotContains(t, note, "u:p@")
+	}
+}
+
 func TestParsePackages(t *testing.T) {
 	got := parsePackages([]byte("# needed by psycopg2\nlibpq-dev\n\ngcc  # for the C extension\n"))
 	assert.Equal(t, []string{"libpq-dev", "gcc"}, got)
