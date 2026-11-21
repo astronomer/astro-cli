@@ -269,7 +269,7 @@ func (q *query) open(ctx context.Context) (cliout.Renderer, *airflowapi.Client, 
 	r := q.renderer()
 	client, err := q.t.open(ctx, q.cli)
 	if err != nil {
-		return r, nil, err
+		return cliout.Renderer{}, nil, err
 	}
 	return r, client, nil
 }

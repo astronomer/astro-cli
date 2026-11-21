@@ -23,7 +23,8 @@ var rendererErrAllowed = map[string]string{
 		"the writer the error goes to; there is no command in hand",
 }
 
-// Every cliout.Renderer literal under cmd/ sets Err, except what
+// Every cliout.Renderer literal under cmd/ sets Err (an empty one, the zero value
+// returned beside an error, writes nothing), except what
 // rendererErrAllowed names.
 func TestEveryRendererLiteralSetsErr(t *testing.T) {
 	root := repoRoot(t)
@@ -41,7 +42,7 @@ func TestEveryRendererLiteralSetsErr(t *testing.T) {
 		inCliout := f.Name.Name == "cliout"
 		ast.Inspect(f, func(n ast.Node) bool {
 			lit, ok := n.(*ast.CompositeLit)
-			if !ok || !isRendererType(lit.Type, inCliout) || hasErrKey(lit) {
+			if !ok || !isRendererType(lit.Type, inCliout) || len(lit.Elts) == 0 || hasErrKey(lit) {
 				return true
 			}
 			if _, ok := rendererErrAllowed[file]; ok {

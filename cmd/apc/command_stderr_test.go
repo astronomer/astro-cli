@@ -32,6 +32,7 @@ func TestSuccessNoticeLeavesByTheCommandsStderr(t *testing.T) {
 
 	process, err := os.Create(filepath.Join(t.TempDir(), "stderr"))
 	require.NoError(t, err)
+	// This swaps the process's stderr, so the test must not run in parallel.
 	prevStderr := os.Stderr
 	os.Stderr = process
 	t.Cleanup(func() { os.Stderr = prevStderr })
@@ -39,7 +40,6 @@ func TestSuccessNoticeLeavesByTheCommandsStderr(t *testing.T) {
 	var out, errOut bytes.Buffer
 	require.NoError(t, workspaceUserAdd(&out, &errOut))
 
-	os.Stderr = prevStderr
 	require.NoError(t, process.Close())
 	leaked, err := os.ReadFile(process.Name())
 	require.NoError(t, err)
