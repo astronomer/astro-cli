@@ -104,6 +104,7 @@ func TestDeployManifestToANamedLink(t *testing.T) {
 	}, got)
 	require.Len(t, *asked, 1)
 	in := (*asked)[0]
+	assert.NotNil(t, in.Context, "the run's context reaches the image deploy, so an interrupt stops it")
 	assert.Equal(t, "dep-stage", in.DeploymentID)
 	assert.Equal(t, "ws-stage", in.WorkspaceID)
 	assert.True(t, in.IncludeDags)

@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -40,13 +41,16 @@ const (
 // It reads the cluster config only to place the Deployment's DAGs: one it
 // cannot read does not stop the deploy, as it never did, and the Deployment
 // is then placed by its own type alone.
-func deployRegistryImage(client houston.ClientInterface, in *ManifestImage, progress io.Writer, warn func(string)) (ManifestImageResult, error) {
+func deployRegistryImage(ctx context.Context, client houston.ClientInterface, in *ManifestImage, progress io.Writer, warn func(string)) (ManifestImageResult, error) {
 	if in.RuntimeVersion == "" {
 		return ManifestImageResult{}, ErrRuntimeVersionNotPassedForRemoteImage
 	}
-	t, err := lookUpDeployment(client, in.WorkspaceID, in.DeploymentID)
+	t, err := lookUpDeployment(ctx, client, in.WorkspaceID, in.DeploymentID)
 	if err != nil {
 		return ManifestImageResult{}, hintLinkOutsideAProject(in, err)
+	}
+	if err := ctx.Err(); err != nil {
+		return ManifestImageResult{}, err
 	}
 	t.appConfig, err = houston.Call(client.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: t.info.ClusterID, WorkspaceUUID: t.workspace, DeploymentUUID: in.DeploymentID})
 	if err != nil {
@@ -66,6 +70,9 @@ func deployRegistryImage(client houston.ClientInterface, in *ManifestImage, prog
 		return ManifestImageResult{}, err
 	}
 
+	if err := ctx.Err(); err != nil {
+		return ManifestImageResult{}, err
+	}
 	fmt.Fprintf(progress, houstonDeploymentPrompt, input.Plain(t.release))
 	fmt.Fprintf(progress, "Pointing the Deployment at %s, already in its registry. Nothing is built or pushed.\n", in.ImageName)
 	req := houston.UpdateDeploymentImageRequest{ReleaseName: t.release, Image: in.ImageName, RuntimeVersion: in.RuntimeVersion, DeployRevisionDescription: in.Description}
@@ -81,7 +88,7 @@ func deployRegistryImage(client houston.ClientInterface, in *ManifestImage, prog
 		URL:             getAirflowUILink(in.DeploymentID, t.info.Urls),
 		Airflow3Upgrade: upgrade,
 	}
-	err = dagsAfterImage(client, in, t, &res, progress, warn)
+	err = dagsAfterImage(ctx, client, in, t, &res, progress, warn)
 	return res, err
 }
 

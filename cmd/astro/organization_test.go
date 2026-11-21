@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -195,7 +196,7 @@ func TestOrganizationSwitch(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		origOrgSwitch := orgSwitch
-		orgSwitch = func(orgName string, astroV1Client astrov1.APIClient, out io.Writer) (*organization.Switched, error) {
+		orgSwitch = func(_ context.Context, orgName string, astroV1Client astrov1.APIClient, out io.Writer) (*organization.Switched, error) {
 			return &organization.Switched{Changed: true}, nil
 		}
 		defer func() { orgSwitch = origOrgSwitch }()
@@ -223,7 +224,7 @@ func TestOrganizationSwitch(t *testing.T) {
 		expectedErr := fmt.Errorf("org switch failed")
 
 		origOrgSwitch := orgSwitch
-		orgSwitch = func(orgName string, astroV1Client astrov1.APIClient, out io.Writer) (*organization.Switched, error) {
+		orgSwitch = func(_ context.Context, orgName string, astroV1Client astrov1.APIClient, out io.Writer) (*organization.Switched, error) {
 			return nil, expectedErr
 		}
 		defer func() { orgSwitch = origOrgSwitch }()

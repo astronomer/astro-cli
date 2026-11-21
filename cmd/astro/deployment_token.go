@@ -55,8 +55,8 @@ func runDeploymentTokenCreate(format cliout.Format, out, errOut io.Writer) error
 	return renderTokenSecret(format, out, errOut, &created, "Deployment", "Created", tokenName)
 }
 
-func runDeploymentTokenUpdate(format cliout.Format, out io.Writer) error {
-	res, err := deployment.UpdateToken(tokenID, name, tokenName, tokenDescription, deploymentTokenUpdateRole, deploymentID, nil, tokenPicker(), astroV1Client)
+func runDeploymentTokenUpdate(ctx context.Context, format cliout.Format, out io.Writer) error {
+	res, err := deployment.UpdateToken(ctx, tokenID, name, tokenName, tokenDescription, deploymentTokenUpdateRole, deploymentID, nil, tokenPicker(), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -67,9 +67,9 @@ func runDeploymentTokenUpdate(format cliout.Format, out io.Writer) error {
 	return renderTokenLine(format, out, res.Token, line)
 }
 
-func runDeploymentTokenRotate(format cliout.Format, out, errOut io.Writer) error {
+func runDeploymentTokenRotate(ctx context.Context, format cliout.Format, out, errOut io.Writer) error {
 	tokenTypes := []deployment.DeploymentTokenType{deployment.DeploymentTokenTypeDEPLOYMENT}
-	token, err := deployment.FindToken(tokenID, name, deploymentID, tokenTypes, tokenPicker(), astroV1Client)
+	token, err := deployment.FindToken(ctx, tokenID, name, deploymentID, tokenTypes, tokenPicker(), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func runDeploymentTokenDelete(cmd *cobra.Command, format cliout.Format, out io.W
 	// so that one of a broader scope is refused with what to use instead, not
 	// reported as missing; a token picked is offered only among the ones this
 	// can delete.
-	token, err := deployment.FindToken(tokenID, name, deploymentID, offeredDeploymentTokens(deployment.DeploymentTokenTypeDEPLOYMENT), tokenPicker(), astroV1Client)
+	token, err := deployment.FindToken(cmd.Context(), tokenID, name, deploymentID, offeredDeploymentTokens(deployment.DeploymentTokenTypeDEPLOYMENT), tokenPicker(), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func runDeploymentTokenDelete(cmd *cobra.Command, format cliout.Format, out io.W
 // Organization token, away. The Deployment's own tokens have no role to take,
 // and are refused with delete.
 func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out io.Writer) error {
-	token, err := deployment.FindToken(tokenID, name, deploymentID,
+	token, err := deployment.FindToken(cmd.Context(), tokenID, name, deploymentID,
 		offeredDeploymentTokens(deployment.DeploymentTokenTypeWORKSPACE, deployment.DeploymentTokenTypeORGANIZATION), tokenPicker(), astroV1Client)
 	if err != nil {
 		return err
@@ -151,7 +151,7 @@ func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out 
 // runDeploymentTokenAdd runs `deployment token add`: it gives a Workspace or
 // an Organization token a role on the Deployment, which of the two it is being
 // found out from the token (deployment.AddToken).
-func runDeploymentTokenAdd(args []string, out io.Writer) error {
+func runDeploymentTokenAdd(ctx context.Context, args []string, out io.Writer) error {
 	id := ""
 	if len(args) > 0 {
 		id = strings.ToLower(args[0])
@@ -162,7 +162,7 @@ func runDeploymentTokenAdd(args []string, out io.Writer) error {
 	// the Organization's alone, and says so when that finds nothing.
 	ws, wsErr := "", error(nil)
 	if id == "" {
-		ws, wsErr = tokenSearchWorkspace(id)
+		ws, wsErr = tokenSearchWorkspace(ctx, id)
 		// A Workspace the run named itself is not quietly left out.
 		if wsErr != nil && workspaceID != "" {
 			return wsErr
@@ -176,7 +176,7 @@ func runDeploymentTokenAdd(args []string, out io.Writer) error {
 		tokenRole = answer
 	}
 	pick := newTokenPicker(tokenHeader(deploymentRoleHeader), tokenRow, errInvalidDeploymentTokenKey, "--name", "Select the Workspace or Organization API token to add to the Deployment:")
-	token, err := deployment.AddToken(id, name, tokenRole, ws, deploymentID, nil, pick, astroV1Client)
+	token, err := deployment.AddToken(ctx, id, name, tokenRole, ws, deploymentID, nil, pick, astroV1Client)
 	if err != nil {
 		if wsErr != nil && errors.Is(err, deployment.ErrTokenNotFound) {
 			return fmt.Errorf("%w; no Workspace token was looked for: %w", err, wsErr)
@@ -199,7 +199,7 @@ const (
 // setTokenDeploymentRole runs `deployment token {workspace,organization}-token
 // {add,update}`: it gives a token of kind a role on the Deployment, asking
 // for the role when --role named none.
-func setTokenDeploymentRole(args []string, out io.Writer, kind, operation string) error {
+func setTokenDeploymentRole(ctx context.Context, args []string, out io.Writer, kind, operation string) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -216,7 +216,7 @@ func setTokenDeploymentRole(args []string, out io.Writer, kind, operation string
 	ws := ""
 	if kind == tokenKindWorkspace && operation == tokenRoleAdd {
 		var err error
-		if ws, err = tokenSearchWorkspace(workspaceTokenID); err != nil {
+		if ws, err = tokenSearchWorkspace(ctx, workspaceTokenID); err != nil {
 			return err
 		}
 	}
@@ -231,14 +231,14 @@ func setTokenDeploymentRole(args []string, out io.Writer, kind, operation string
 		}
 		tokenRole = answer
 	}
-	return runDeploymentTokenUpsert(deploymentTokenOutput, out, kind, operation, ws)
+	return runDeploymentTokenUpsert(ctx, deploymentTokenOutput, out, kind, operation, ws)
 }
 
 // runDeploymentTokenUpsert adds or updates the Deployment role of a Workspace
 // or Organization token. An add picks among the Workspace's or the
 // Organization's tokens, with that family's picker; an update among the
 // Deployment's.
-func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operation, ws string) error {
+func runDeploymentTokenUpsert(ctx context.Context, format cliout.Format, out io.Writer, kind, operation, ws string) error {
 	var (
 		token apitoken.Token
 		err   error
@@ -250,13 +250,13 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 		if operation == tokenRoleAdd {
 			pick = workspaceTokenPicker("Select the Workspace API token to add to the Deployment:")
 		}
-		token, err = deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, name, tokenRole, ws, deploymentID, operation, pick, astroV1Client)
+		token, err = deployment.UpsertWorkspaceTokenDeploymentRole(ctx, workspaceTokenID, name, tokenRole, ws, deploymentID, operation, pick, astroV1Client)
 	} else {
 		pick := deploymentTokenPicker()
 		if operation == tokenRoleAdd {
 			pick = organizationTokenPicker("--name", "Select the Organization API token to add to the Deployment:")
 		}
-		token, err = deployment.UpsertOrgTokenDeploymentRole(orgTokenID, name, tokenRole, deploymentID, operation, pick, astroV1Client)
+		token, err = deployment.UpsertOrgTokenDeploymentRole(ctx, orgTokenID, name, tokenRole, deploymentID, operation, pick, astroV1Client)
 	}
 	if err != nil {
 		return err
@@ -276,7 +276,7 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 // refused (astrosession.WorkspaceDisagreeError), like any other. A token given
 // by ID (tokenID) is read wherever it is, so no Workspace is looked for and
 // the Deployment is not read.
-func tokenSearchWorkspace(tokenID string) (string, error) {
+func tokenSearchWorkspace(ctx context.Context, tokenID string) (string, error) {
 	if workspaceID != "" {
 		if err := astrosession.CheckWorkspace(workspaceID, astrosession.SourceFlag); err != nil {
 			return "", err
@@ -286,7 +286,7 @@ func tokenSearchWorkspace(tokenID string) (string, error) {
 	if tokenID != "" {
 		return "", nil
 	}
-	d, err := deployment.GetDeploymentByID("", deploymentID, astroV1Client)
+	d, err := deployment.GetDeploymentByID(ctx, "", deploymentID, astroV1Client)
 	if err != nil {
 		return "", fmt.Errorf("could not read Deployment %s to find the Workspace its Workspace tokens are in; pass --workspace: %w", deploymentID, err)
 	}
@@ -326,10 +326,10 @@ func runDeploymentTokenRemove(cmd *cobra.Command, format cliout.Format, out io.W
 		if wsErr != nil {
 			return wsErr
 		}
-		removal, err = deployment.RemoveWorkspaceTokenDeploymentRole(workspaceTokenID, name, ws, deploymentID, pick, astroV1Client)
+		removal, err = deployment.RemoveWorkspaceTokenDeploymentRole(cmd.Context(), workspaceTokenID, name, ws, deploymentID, pick, astroV1Client)
 	} else {
 		pick := deploymentTokenPicker()
-		removal, err = deployment.RemoveOrgTokenDeploymentRole(orgTokenID, name, deploymentID, pick, astroV1Client)
+		removal, err = deployment.RemoveOrgTokenDeploymentRole(cmd.Context(), orgTokenID, name, deploymentID, pick, astroV1Client)
 	}
 	if err != nil {
 		return err

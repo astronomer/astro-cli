@@ -16,15 +16,15 @@ import (
 // name, looked up in Workspace ws. A name more than one Deployment there
 // shares is refused with their ids rather than settled by taking one, and
 // nothing is ever asked.
-func CloneSource(ref, ws string, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+func CloneSource(ctx context.Context, ref, ws string, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
 	if util.IsCUID(ref) {
-		return GetDeploymentByID("", ref, astroV1Client)
+		return GetDeploymentByID(ctx, "", ref, astroV1Client)
 	}
 	if ws == "" {
 		return astrov1.Deployment{}, fmt.Errorf("no Workspace to look up the Deployment named %q in: pass --workspace, or its id to --clone", ref)
 	}
 	src := sourceFor(astroV1Client, ws)
-	named, err := DeploymentsNamed(ref, ws, "", astroV1Client)
+	named, err := DeploymentsNamed(ctx, ref, ws, "", astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, err
 	}
@@ -32,7 +32,7 @@ func CloneSource(ref, ws string, astroV1Client astrov1.APIClient) (astrov1.Deplo
 	case 0:
 		return astrov1.Deployment{}, fmt.Errorf("%w. Pass its id to --clone to copy one from another workspace", &NameError{Name: ref, Workspace: ws, Source: src, Flag: "--clone"})
 	case 1:
-		return GetDeploymentByID("", named[0].Id, astroV1Client)
+		return GetDeploymentByID(ctx, "", named[0].Id, astroV1Client)
 	}
 	return astrov1.Deployment{}, &NameError{Name: ref, Workspace: ws, Source: src, Matches: named, Flag: "--clone"}
 }
@@ -40,10 +40,8 @@ func CloneSource(ref, ws string, astroV1Client astrov1.APIClient) (astrov1.Deplo
 // DeploymentsNamed is every Deployment in workspace ws called name, listed
 // in organization orgID ("" for the current context's). A name is not
 // unique, so a caller decides what none, or several, means.
-//
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func DeploymentsNamed(name, ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
-	deployments, err := ListDeployments(context.Background(), ws, orgID, astroV1Client)
+func DeploymentsNamed(ctx context.Context, name, ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
+	deployments, err := ListDeployments(ctx, ws, orgID, astroV1Client)
 	if err != nil {
 		return nil, err
 	}

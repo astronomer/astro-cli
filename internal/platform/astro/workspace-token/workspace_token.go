@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	workspaceService "github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	"github.com/astronomer/astro-cli/internal/usageerr"
@@ -154,7 +155,7 @@ func CreateToken(name, description, role, workspaceID string, expiration int, cl
 // the API refuses leaves the token as it was; the name and description are
 // sent only when one is given, and never for an Organization token
 // (ErrOrgTokenNotRenamed).
-func UpdateToken(id, name, newName, description, role, workspaceID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
+func UpdateToken(ctx httpContext.Context, id, name, newName, description, role, workspaceID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
 	if role != "" {
 		if err := user.IsWorkspaceRoleValid(role); err != nil {
 			return apitoken.Update{}, err
@@ -176,7 +177,7 @@ func UpdateToken(id, name, newName, description, role, workspaceID string, token
 		tokenTypes = []TokenType{TokenTypeWORKSPACE, TokenTypeORGANIZATION}
 	}
 
-	token, err := FindTokenIn(id, name, workspaceID, organizationID, tokenTypes, pick, client)
+	token, err := FindTokenIn(ctx, id, name, workspaceID, organizationID, tokenTypes, pick, client)
 	if err != nil {
 		return apitoken.Update{}, err
 	}
@@ -328,10 +329,8 @@ func setWorkspaceRole(token *astrov1.ApiToken, workspaceID, role, organizationID
 // TokensOf lists the tokens with a role in the Workspace, as the API has them,
 // of the scopes in tokenTypes (all of them when it is empty), for a command in
 // another family that picks among them.
-//
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func TokensOf(workspaceID string, tokenTypes []TokenType, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
-	return getWorkspaceTokens(httpContext.Background(), workspaceID, tokenTypes, 0, client)
+func TokensOf(ctx httpContext.Context, workspaceID string, tokenTypes []TokenType, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
+	return getWorkspaceTokens(ctx, workspaceID, tokenTypes, 0, client)
 }
 
 // getWorkspaceTokens lists tokens with a role in the given workspace, then filters client-side
@@ -392,8 +391,8 @@ func getWorkspaceToken(id, name, workspaceID string, tokens []astrov1.ApiToken, 
 	return token, nil
 }
 
-func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
-	resp, err := client.GetApiTokenWithResponse(httpContext.Background(), orgID, id)
+func getTokenByID(ctx httpContext.Context, id, orgID string, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
+	resp, err := client.GetApiTokenWithResponse(pagination.Background(ctx), orgID, id)
 	if err != nil {
 		return astrov1.ApiToken{}, err
 	}
@@ -408,9 +407,7 @@ func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.Api
 // person picks through pick. tokenTypes, when not empty, are the scopes the
 // command may act on. The Workspace is the current one when workspaceID is
 // "", and the tokens offered are shown with their role on it.
-//
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
+func FindToken(ctx httpContext.Context, id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
 	if id == "" {
 		// Resolved here, not only in the list, so the roles offered are the
 		// ones on the Workspace listed.
@@ -418,7 +415,7 @@ func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenT
 		if err != nil {
 			return token, err
 		}
-		tokens, err := getWorkspaceTokens(httpContext.Background(), workspaceID, tokenTypes, 0, client)
+		tokens, err := getWorkspaceTokens(ctx, workspaceID, tokenTypes, 0, client)
 		if err != nil {
 			return token, err
 		}
@@ -426,12 +423,12 @@ func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenT
 		if err != nil {
 			return token, err
 		}
-		token, err = getTokenByID(tokenFromList.Id, organizationID, client)
+		token, err = getTokenByID(ctx, tokenFromList.Id, organizationID, client)
 		if err != nil {
 			return token, err
 		}
 	} else {
-		token, err = getTokenByID(id, organizationID, client)
+		token, err = getTokenByID(ctx, id, organizationID, client)
 		if err != nil {
 			return token, err
 		}
@@ -455,15 +452,13 @@ func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenT
 // Workspace's own tokens, and Organization tokens with a role in it, are its to
 // change. A run with no Workspace (an Organization token's, given an ID) has
 // none to check against.
-//
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func FindTokenIn(id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (astrov1.ApiToken, error) {
+func FindTokenIn(ctx httpContext.Context, id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (astrov1.ApiToken, error) {
 	if id == "" || workspaceID == "" {
-		return FindToken(id, name, workspaceID, organizationID, tokenTypes, pick, client)
+		return FindToken(ctx, id, name, workspaceID, organizationID, tokenTypes, pick, client)
 	}
 	// By ID, the role is checked before the type, as on a Deployment, so a
 	// foreign token gets the same message whichever command names it.
-	token, err := FindToken(id, name, workspaceID, organizationID, nil, pick, client)
+	token, err := FindToken(ctx, id, name, workspaceID, organizationID, nil, pick, client)
 	if err != nil {
 		return token, err
 	}
@@ -478,13 +473,13 @@ func FindTokenIn(id, name, workspaceID, organizationID string, tokenTypes []Toke
 
 // RemoveOrgTokenWorkspaceRole removes the workspace-scope role from an
 // Organization token, found among the Workspace's through pick.
-func RemoveOrgTokenWorkspaceRole(id, name, workspaceID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.WorkspaceRemoval, error) {
+func RemoveOrgTokenWorkspaceRole(ctx httpContext.Context, id, name, workspaceID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.WorkspaceRemoval, error) {
 	workspaceID, organizationID, err := target(workspaceID)
 	if err != nil {
 		return apitoken.WorkspaceRemoval{}, err
 	}
 	tokenTypes := []TokenType{TokenTypeORGANIZATION}
-	token, err := FindToken(id, name, workspaceID, organizationID, tokenTypes, pick, client)
+	token, err := FindToken(ctx, id, name, workspaceID, organizationID, tokenTypes, pick, client)
 	if err != nil {
 		return apitoken.WorkspaceRemoval{}, err
 	}
@@ -499,17 +494,17 @@ func RemoveOrgTokenWorkspaceRole(id, name, workspaceID string, pick apitoken.Pic
 // finds the token among the Organization's, an update among the Workspace's
 // Organization tokens; either asks through pick, which the caller chooses to
 // suit.
-func UpsertOrgTokenWorkspaceRole(id, name, role, workspaceID, operation string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
+func UpsertOrgTokenWorkspaceRole(ctx httpContext.Context, id, name, role, workspaceID, operation string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
 	workspaceID, organizationID, err := target(workspaceID)
 	if err != nil {
 		return apitoken.Token{}, err
 	}
 	var token astrov1.ApiToken
 	if operation == "create" {
-		token, err = organization.FindToken(id, name, organizationID, pick, client)
+		token, err = organization.FindToken(ctx, id, name, organizationID, pick, client)
 	} else {
 		tokenTypes := []TokenType{TokenTypeORGANIZATION}
-		token, err = FindToken(id, name, workspaceID, organizationID, tokenTypes, pick, client)
+		token, err = FindToken(ctx, id, name, workspaceID, organizationID, tokenTypes, pick, client)
 	}
 	if err != nil {
 		return apitoken.Token{}, err

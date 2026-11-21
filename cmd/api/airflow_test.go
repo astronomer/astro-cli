@@ -615,7 +615,7 @@ func TestResolveAirflowTarget_DeploymentID(t *testing.T) {
 
 	orig := deployment.GetDeploymentByID
 	t.Cleanup(func() { deployment.GetDeploymentByID = orig })
-	deployment.GetDeploymentByID = func(orgID, deploymentID string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+	deployment.GetDeploymentByID = func(_ context.Context, orgID, deploymentID string, _ astrov1.APIClient) (astrov1.Deployment, error) {
 		assert.Equal(t, "test-org", orgID)
 		assert.Equal(t, testDeploymentID, deploymentID)
 		return astrov1.Deployment{Id: deploymentID, WebServerAirflowApiUrl: "deployment.airflow.astronomer.io/api/v2"}, nil

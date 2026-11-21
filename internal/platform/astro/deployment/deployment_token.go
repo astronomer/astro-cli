@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	workspaceService "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
 	"github.com/astronomer/astro-cli/internal/usageerr"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -85,7 +86,7 @@ func CreateToken(name, description, role, deploymentID string, expiration int, c
 	if name == "" {
 		return apitoken.Token{}, errInvalidTokenName
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.Token{}, err
 	}
@@ -101,7 +102,7 @@ func CreateToken(name, description, role, deploymentID string, expiration int, c
 	if expiration != 0 {
 		req.TokenExpiryPeriodInDays = &expiration
 	}
-	resp, err := client.CreateApiTokenWithResponse(httpContext.Background(), ctx.Organization, req)
+	resp, err := client.CreateApiTokenWithResponse(httpContext.Background(), cfg.Organization, req)
 	if err != nil {
 		return apitoken.Token{}, err
 	}
@@ -124,14 +125,14 @@ func CreateToken(name, description, role, deploymentID string, expiration int, c
 // description, so a role the API refuses leaves the token as it was; the name
 // and description are sent only when one is given, and never for a token of a
 // broader scope (ErrBroaderTokenNotRenamed).
-func UpdateToken(id, name, newName, description, role, deploymentID string, tokenTypes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
-	ctx, err := context.GetCurrentContext()
+func UpdateToken(ctx httpContext.Context, id, name, newName, description, role, deploymentID string, tokenTypes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.Update{}, err
 	}
-	organizationID := ctx.Organization
+	organizationID := cfg.Organization
 
-	token, err := FindToken(id, name, deploymentID, tokenTypes, pick, client)
+	token, err := FindToken(ctx, id, name, deploymentID, tokenTypes, pick, client)
 	if err != nil {
 		return apitoken.Update{}, err
 	}
@@ -212,11 +213,11 @@ func updateNameAndDescription(token *astrov1.ApiToken, newName, description, org
 // RotateToken rotates the secret of token, which FindToken found, and returns
 // it with the new secret.
 func RotateToken(token astrov1.ApiToken, deploymentID string, client astrov1.APIClient) (apitoken.Token, error) { //nolint:gocritic // ApiToken is what FindToken returns
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.Token{}, err
 	}
-	resp, err := client.RotateApiTokenWithResponse(httpContext.Background(), ctx.Organization, token.Id)
+	resp, err := client.RotateApiTokenWithResponse(httpContext.Background(), cfg.Organization, token.Id)
 	if err != nil {
 		return apitoken.Token{}, err
 	}
@@ -238,11 +239,11 @@ func DeleteToken(token astrov1.ApiToken, deploymentID string, client astrov1.API
 	if string(token.Scope) != deploymentEntity {
 		return apitoken.DeploymentRemoval{}, errNotDeploymentScoped
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
-	resp, err := client.DeleteApiTokenWithResponse(httpContext.Background(), ctx.Organization, token.Id)
+	resp, err := client.DeleteApiTokenWithResponse(httpContext.Background(), cfg.Organization, token.Id)
 	if err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
@@ -260,11 +261,11 @@ func RemoveToken(token astrov1.ApiToken, deploymentID string, client astrov1.API
 	if string(token.Scope) == deploymentEntity {
 		return apitoken.DeploymentRemoval{}, errDeploymentScoped
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
-	if err := setDeploymentRole(&token, deploymentID, "", ctx.Organization, client); err != nil {
+	if err := setDeploymentRole(&token, deploymentID, "", cfg.Organization, client); err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
 	return apitoken.DeploymentRemoval{ID: token.Id, Name: token.Name, Scope: string(token.Scope), DeploymentID: deploymentID, Action: apitoken.Removed}, nil
@@ -278,11 +279,11 @@ func RemoveToken(token astrov1.ApiToken, deploymentID string, client astrov1.API
 // Workspace's out. scopes, when not empty, are the scopes the command may act
 // on; none means both. A Deployment token already has its role: UpdateToken
 // changes it.
-func AddToken(id, name, role, workspaceID, deploymentID string, scopes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
+func AddToken(ctx httpContext.Context, id, name, role, workspaceID, deploymentID string, scopes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
 	if role == "" {
 		return apitoken.Token{}, usageerr.Usage(errRoleRequired)
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.Token{}, err
 	}
@@ -291,9 +292,9 @@ func AddToken(id, name, role, workspaceID, deploymentID string, scopes []Deploym
 	}
 	var token astrov1.ApiToken
 	if id != "" {
-		token, err = getTokenByID(id, ctx.Organization, client)
+		token, err = getTokenByID(ctx, id, cfg.Organization, client)
 	} else {
-		token, err = pickTokenToAdd(name, workspaceID, deploymentID, scopes, pick, client)
+		token, err = pickTokenToAdd(ctx, name, workspaceID, deploymentID, scopes, pick, client)
 	}
 	if err != nil {
 		return apitoken.Token{}, err
@@ -310,7 +311,7 @@ func AddToken(id, name, role, workspaceID, deploymentID string, scopes []Deploym
 		}
 		return apitoken.Token{}, errOrgTokenInDeployment
 	}
-	if err := setDeploymentRole(&token, deploymentID, role, ctx.Organization, client); err != nil {
+	if err := setDeploymentRole(&token, deploymentID, role, cfg.Organization, client); err != nil {
 		return apitoken.Token{}, err
 	}
 	return apitoken.FromAPI(&token, role), nil
@@ -320,17 +321,17 @@ func AddToken(id, name, role, workspaceID, deploymentID string, scopes []Deploym
 // the tokens that can be added to a Deployment: the Organization's and those
 // of workspaceID, as scopes allows. A name that two of them share is the
 // picker's to settle.
-func pickTokenToAdd(name, workspaceID, deploymentID string, scopes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (astrov1.ApiToken, error) {
+func pickTokenToAdd(ctx httpContext.Context, name, workspaceID, deploymentID string, scopes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (astrov1.ApiToken, error) {
 	var candidates []astrov1.ApiToken
 	if workspaceID != "" && slices.Contains(scopes, DeploymentTokenTypeWORKSPACE) {
-		tokens, err := workspaceService.TokensOf(workspaceID, []workspaceService.TokenType{workspaceService.TokenTypeWORKSPACE}, client)
+		tokens, err := workspaceService.TokensOf(ctx, workspaceID, []workspaceService.TokenType{workspaceService.TokenTypeWORKSPACE}, client)
 		if err != nil {
 			return astrov1.ApiToken{}, err
 		}
 		candidates = append(candidates, tokens...)
 	}
 	if slices.Contains(scopes, DeploymentTokenTypeORGANIZATION) {
-		tokens, err := organization.ScopedTokens(client)
+		tokens, err := organization.ScopedTokens(ctx, client)
 		if err != nil {
 			return astrov1.ApiToken{}, err
 		}
@@ -340,11 +341,11 @@ func pickTokenToAdd(name, workspaceID, deploymentID string, scopes []DeploymentT
 	if err != nil {
 		return astrov1.ApiToken{}, err
 	}
-	ctx, err := context.GetCurrentContext()
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return astrov1.ApiToken{}, err
 	}
-	return getTokenByID(found.Id, ctx.Organization, client)
+	return getTokenByID(ctx, found.Id, cfg.Organization, client)
 }
 
 // setDeploymentRole gives token role on deploymentID, or takes its role there
@@ -414,8 +415,8 @@ func getDeploymentToken(id, name, deploymentID string, tokens []astrov1.ApiToken
 	return token, nil
 }
 
-func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
-	resp, err := client.GetApiTokenWithResponse(httpContext.Background(), orgID, id)
+func getTokenByID(ctx httpContext.Context, id, orgID string, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
+	resp, err := client.GetApiTokenWithResponse(pagination.Background(ctx), orgID, id)
 	if err != nil {
 		return astrov1.ApiToken{}, err
 	}
@@ -429,16 +430,14 @@ func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.Api
 // named name among the tokens with a role on the Deployment, else the one a
 // person picks through pick. tokenTypes, when not empty, are the scopes the
 // command may act on.
-//
-// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
-func FindToken(id, name, deploymentID string, tokenTypes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
-	ctx, err := context.GetCurrentContext()
+func FindToken(ctx httpContext.Context, id, name, deploymentID string, tokenTypes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return token, err
 	}
-	organizationID := ctx.Organization
+	organizationID := cfg.Organization
 	if id == "" {
-		tokens, err := getDeploymentTokens(httpContext.Background(), deploymentID, tokenTypes, 0, client)
+		tokens, err := getDeploymentTokens(ctx, deploymentID, tokenTypes, 0, client)
 		if err != nil {
 			return token, err
 		}
@@ -446,12 +445,12 @@ func FindToken(id, name, deploymentID string, tokenTypes []DeploymentTokenType, 
 		if err != nil {
 			return token, err
 		}
-		token, err = getTokenByID(tokenFromList.Id, organizationID, client)
+		token, err = getTokenByID(ctx, tokenFromList.Id, organizationID, client)
 		if err != nil {
 			return token, err
 		}
 	} else {
-		token, err = getTokenByID(id, organizationID, client)
+		token, err = getTokenByID(ctx, id, organizationID, client)
 		if err != nil {
 			return token, err
 		}
@@ -475,17 +474,17 @@ func FindToken(id, name, deploymentID string, tokenTypes []DeploymentTokenType, 
 }
 
 // RemoveOrgTokenDeploymentRole removes the deployment-scope role from an Organization token.
-func RemoveOrgTokenDeploymentRole(id, name, deploymentID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.DeploymentRemoval, error) {
-	ctx, err := context.GetCurrentContext()
+func RemoveOrgTokenDeploymentRole(ctx httpContext.Context, id, name, deploymentID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.DeploymentRemoval, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
 	tokenTypes := []DeploymentTokenType{DeploymentTokenTypeORGANIZATION}
-	token, err := FindToken(id, name, deploymentID, tokenTypes, pick, client)
+	token, err := FindToken(ctx, id, name, deploymentID, tokenTypes, pick, client)
 	if err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
-	if err := setDeploymentRole(&token, deploymentID, "", ctx.Organization, client); err != nil {
+	if err := setDeploymentRole(&token, deploymentID, "", cfg.Organization, client); err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
 	return apitoken.DeploymentRemoval{ID: token.Id, Name: token.Name, Scope: string(token.Scope), DeploymentID: deploymentID, Action: apitoken.Removed}, nil
@@ -494,14 +493,14 @@ func RemoveOrgTokenDeploymentRole(id, name, deploymentID string, pick apitoken.P
 // RemoveWorkspaceTokenDeploymentRole removes the deployment-scope role from a
 // Workspace token. A token named by neither id nor name is picked, through
 // pick, from the Workspace's tokens.
-func RemoveWorkspaceTokenDeploymentRole(id, name, workspaceID, deploymentID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.DeploymentRemoval, error) {
-	ctx, err := context.GetCurrentContext()
+func RemoveWorkspaceTokenDeploymentRole(ctx httpContext.Context, id, name, workspaceID, deploymentID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.DeploymentRemoval, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
-	organizationID := ctx.Organization
+	organizationID := cfg.Organization
 	wsTypes := []workspaceService.TokenType{workspaceService.TokenTypeWORKSPACE}
-	token, err := workspaceService.FindToken(id, name, workspaceID, organizationID, wsTypes, pick, client)
+	token, err := workspaceService.FindToken(ctx, id, name, workspaceID, organizationID, wsTypes, pick, client)
 	if err != nil {
 		return apitoken.DeploymentRemoval{}, err
 	}
@@ -515,17 +514,17 @@ func RemoveWorkspaceTokenDeploymentRole(id, name, workspaceID, deploymentID stri
 // Workspace token, and returns the token with that role. An add ("create")
 // finds the token among the Workspace's, an update among the Deployment's;
 // either asks through pick, which the caller chooses to suit.
-func UpsertWorkspaceTokenDeploymentRole(id, name, role, workspaceID, deploymentID, operation string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
-	ctx, err := context.GetCurrentContext()
+func UpsertWorkspaceTokenDeploymentRole(ctx httpContext.Context, id, name, role, workspaceID, deploymentID, operation string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.Token{}, err
 	}
 	var token astrov1.ApiToken
 	if operation == "create" {
 		wsTypes := []workspaceService.TokenType{workspaceService.TokenTypeWORKSPACE}
-		token, err = workspaceService.FindToken(id, name, workspaceID, ctx.Organization, wsTypes, pick, client)
+		token, err = workspaceService.FindToken(ctx, id, name, workspaceID, cfg.Organization, wsTypes, pick, client)
 	} else {
-		token, err = FindToken(id, name, deploymentID, []DeploymentTokenType{DeploymentTokenTypeWORKSPACE}, pick, client)
+		token, err = FindToken(ctx, id, name, deploymentID, []DeploymentTokenType{DeploymentTokenTypeWORKSPACE}, pick, client)
 	}
 	if err != nil {
 		return apitoken.Token{}, err
@@ -534,7 +533,7 @@ func UpsertWorkspaceTokenDeploymentRole(id, name, role, workspaceID, deploymentI
 	if deploymentRoleOf(&token, deploymentID) == role {
 		return apitoken.Token{}, errWorkspaceTokenInDeployment
 	}
-	if err := setDeploymentRole(&token, deploymentID, role, ctx.Organization, client); err != nil {
+	if err := setDeploymentRole(&token, deploymentID, role, cfg.Organization, client); err != nil {
 		return apitoken.Token{}, err
 	}
 	return apitoken.FromAPI(&token, role), nil
@@ -544,16 +543,16 @@ func UpsertWorkspaceTokenDeploymentRole(id, name, role, workspaceID, deploymentI
 // Organization token, and returns the token with that role. An add ("create")
 // finds the token among the Organization's, an update among the Deployment's;
 // either asks through pick, which the caller chooses to suit.
-func UpsertOrgTokenDeploymentRole(id, name, role, deploymentID, operation string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
-	ctx, err := context.GetCurrentContext()
+func UpsertOrgTokenDeploymentRole(ctx httpContext.Context, id, name, role, deploymentID, operation string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Token, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.Token{}, err
 	}
 	var token astrov1.ApiToken
 	if operation == "create" {
-		token, err = organization.FindToken(id, name, ctx.Organization, pick, client)
+		token, err = organization.FindToken(ctx, id, name, cfg.Organization, pick, client)
 	} else {
-		token, err = FindToken(id, name, deploymentID, []DeploymentTokenType{DeploymentTokenTypeORGANIZATION}, pick, client)
+		token, err = FindToken(ctx, id, name, deploymentID, []DeploymentTokenType{DeploymentTokenTypeORGANIZATION}, pick, client)
 	}
 	if err != nil {
 		return apitoken.Token{}, err
@@ -562,7 +561,7 @@ func UpsertOrgTokenDeploymentRole(id, name, role, deploymentID, operation string
 	if deploymentRoleOf(&token, deploymentID) == role {
 		return apitoken.Token{}, errOrgTokenInDeployment
 	}
-	if err := setDeploymentRole(&token, deploymentID, role, ctx.Organization, client); err != nil {
+	if err := setDeploymentRole(&token, deploymentID, role, cfg.Organization, client); err != nil {
 		return apitoken.Token{}, err
 	}
 	return apitoken.FromAPI(&token, role), nil

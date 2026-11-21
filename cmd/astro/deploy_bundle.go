@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -348,7 +349,7 @@ func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Form
 			return "", nil, login, err
 		}
 		ws := run.Workspace
-		dep, err := deploymentNamed(name, ws, run.WorkspaceSource, &login)
+		dep, err := deploymentNamed(cmd.Context(), name, ws, run.WorkspaceSource, &login)
 		if err != nil {
 			return "", nil, login, err
 		}
@@ -389,11 +390,11 @@ func bundleTarget(cmd *cobra.Command, name, workspace string, format cliout.Form
 // deploymentNamed is the one Deployment called name in workspace ws, listed
 // under login. None, or more than one, is an error that says so, naming the
 // ids of the ones that share the name.
-func deploymentNamed(name, ws string, src astrosession.Source, login *deployLogin) (*astrov1.Deployment, error) {
+func deploymentNamed(ctx context.Context, name, ws string, src astrosession.Source, login *deployLogin) (*astrov1.Deployment, error) {
 	if ws == "" {
 		return nil, cliout.Usage(fmt.Errorf("--deployment %s is not a link of the project here or a Deployment id, and there is no Workspace to look it up by name in: pass --workspace, or the Deployment id", name))
 	}
-	found, err := deployment.DeploymentsNamed(name, ws, login.context.Organization, deployment.WithWorkspaceSource(login.client, ws, src))
+	found, err := deployment.DeploymentsNamed(ctx, name, ws, login.context.Organization, deployment.WithWorkspaceSource(login.client, ws, src))
 	if err != nil {
 		return nil, err
 	}

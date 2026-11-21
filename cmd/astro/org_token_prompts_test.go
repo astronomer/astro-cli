@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -77,10 +78,10 @@ func TestAnOrganizationTokenIsRefusedBeforeAnyQuestion(t *testing.T) {
 		"workspace user remove":     func() error { return removeWorkspaceUser(cmd, nil, &out) },
 		"workspace token add":       func() error { return addOrgTokenToWorkspace(cmd, nil, &out) },
 		"workspace token create":    func() error { return createWorkspaceToken(cmd, &out) },
-		"workspace token update":    func() error { return updateWorkspaceToken(nil, &out) },
+		"workspace token update":    func() error { return updateWorkspaceToken(context.Background(), nil, &out) },
 		"organization-token add":    func() error { return addOrgTokenWorkspaceRole(cmd, nil, &out) },
 		"organization-token update": func() error { return updateOrgTokenWorkspaceRole(cmd, nil, &out) },
-		"organization-token remove": func() error { return removeOrganizationTokenWorkspaceRole(nil, &out) },
+		"organization-token remove": func() error { return removeOrganizationTokenWorkspaceRole(context.Background(), nil, &out) },
 		"workspace token remove of an Organization token by ID": func() error {
 			tokenID = "token-id"
 			defer func() { tokenID = "" }()
@@ -117,7 +118,7 @@ func TestWorkspaceTokenCommandsUnderAnOrganizationToken(t *testing.T) {
 
 	_, err := workspacetoken.CreateToken("x", "", "WORKSPACE_MEMBER", "", 0, nil)
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
-	_, err = workspacetoken.UpdateToken("id", "", "new", "", "WORKSPACE_MEMBER", "", nil, nil, nil)
+	_, err = workspacetoken.UpdateToken(context.Background(), "id", "", "new", "", "WORKSPACE_MEMBER", "", nil, nil, nil)
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
 
 	target, org, err := workspacetoken.Scope("")

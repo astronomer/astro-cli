@@ -285,7 +285,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 // returns the runtimes the deployment offers, which a generated build starts
 // from and the image's runtime is checked against.
 func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDeployInput, astroV1Client astrov1.APIClient) (astrov1.Deployment, offeredReleases, error) {
-	dep, err := deployment.GetDeploymentByID(c.Organization, in.DeploymentID, astroV1Client)
+	dep, err := deployment.GetDeploymentByID(ctx, c.Organization, in.DeploymentID, astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, nil, err
 	}
