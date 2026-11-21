@@ -179,7 +179,7 @@ func newConfigListCmd(out io.Writer) *cobra.Command {
 		Short: "List CLI settings",
 		Long:  "List every CLI setting with its value and where the value comes from: global, or default when the global config does not set it. --global changes nothing",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return configList(cliout.Renderer{Format: configOutput, Out: out})
+			return configList(cliout.Renderer{Format: configOutput, Out: out, Err: cmd.ErrOrStderr()})
 		},
 		Example: `  # List every setting, with where its value comes from
   astro config list`,
@@ -245,7 +245,7 @@ func configGet(cmd *cobra.Command, args []string) error {
 	}
 
 	setting := configSetting{Key: cfg.Path, Value: cfg.GetHomeString(), Scope: globalScope, Set: cfg.HomeScope() == globalScope}
-	return cliout.Renderer{Format: configOutput, Out: cmd.OutOrStdout()}.Emit(&setting, cliout.Text(func(b *bufio.Writer) {
+	return cliout.Renderer{Format: configOutput, Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr()}.Emit(&setting, cliout.Text(func(b *bufio.Writer) {
 		fmt.Fprintf(b, "%s: %s\n", setting.Key, setting.Value)
 	}))
 }
@@ -266,7 +266,7 @@ func configSet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return cliout.Renderer{Format: configOutput, Out: cmd.OutOrStdout()}.Emit(&setting, cliout.Text(func(b *bufio.Writer) {
+	return cliout.Renderer{Format: configOutput, Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr()}.Emit(&setting, cliout.Text(func(b *bufio.Writer) {
 		fmt.Fprintf(b, configSetSuccessMsg+"\n", setting.Key, setting.Value)
 	}))
 }

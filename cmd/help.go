@@ -108,7 +108,7 @@ func installHelp(rootCmd *cobra.Command, platform, platformVersion string) {
 			// A failed write ends the help: the text page is not a fallback
 			// for a document the reader asked for, and the help func has no
 			// way to return the error, so it is told on stderr.
-			if err := (cliout.Renderer{Format: cliout.FormatJSON, Out: c.OutOrStdout()}).Emit(describeCommand(c), nil); err != nil {
+			if err := (cliout.Renderer{Format: cliout.FormatJSON, Out: c.OutOrStdout(), Err: c.ErrOrStderr()}).Emit(describeCommand(c), nil); err != nil {
 				c.PrintErrln(cliout.ErrorLabel(c.ErrOrStderr()), err)
 			}
 			return

@@ -54,7 +54,7 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command {
 		Long:    "Create a service account in the APC platform",
 		Example: workspaceSaCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceSaCreate(out)
+			return workspaceSaCreate(out, cmd.ErrOrStderr())
 		},
 	}
 	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
@@ -77,7 +77,7 @@ func newWorkspaceSaListCmd(out io.Writer) *cobra.Command {
 		Long:    "List service accounts inside a Workspace",
 		Example: workspaceSaListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceSaList(out)
+			return workspaceSaList(out, cmd.ErrOrStderr())
 		},
 	}
 	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
@@ -97,7 +97,7 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
   # Delete it without the confirmation, from a script
   astro workspace service-account delete <SERVICE_ACCOUNT_ID> --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceSaDelete(out, args)
+			return workspaceSaDelete(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Required("SERVICE_ACCOUNT_ID"))
 	addYesFlag(cmd, "Don't ask for confirmation before deleting the service account")
@@ -106,8 +106,8 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func workspaceSaCreate(out io.Writer) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func workspaceSaCreate(out, errOut io.Writer) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	if workspaceSAName == "" {
 		return errServiceAccountNameEmpty
 	}
@@ -126,8 +126,8 @@ func workspaceSaCreate(out io.Writer) error {
 	return renderServiceAccountCreated(r, &created)
 }
 
-func workspaceSaList(out io.Writer) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func workspaceSaList(out, errOut io.Writer) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
@@ -140,8 +140,8 @@ func workspaceSaList(out io.Writer) error {
 	return renderServiceAccountList(r, sas)
 }
 
-func workspaceSaDelete(out io.Writer, args []string) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func workspaceSaDelete(out, errOut io.Writer, args []string) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err

@@ -55,7 +55,7 @@ func runDeploymentTokenCreate(format cliout.Format, out, errOut io.Writer) error
 	return renderTokenSecret(format, out, errOut, &created, "Deployment", "Created", tokenName)
 }
 
-func runDeploymentTokenUpdate(format cliout.Format, out io.Writer) error {
+func runDeploymentTokenUpdate(format cliout.Format, out, errOut io.Writer) error {
 	res, err := deployment.UpdateToken(tokenID, name, tokenName, tokenDescription, deploymentTokenUpdateRole, deploymentID, nil, tokenPicker(), astroV1Client)
 	if err != nil {
 		return err
@@ -64,7 +64,7 @@ func runDeploymentTokenUpdate(format cliout.Format, out io.Writer) error {
 	if res.Token.Scope != string(deployment.DeploymentTokenTypeDEPLOYMENT) {
 		line = fmt.Sprintf("Updated %s API token %s in the Deployment", scopeNoun(astrov1.ApiTokenScope(res.Token.Scope)), res.PreviousName)
 	}
-	return renderTokenLine(format, out, res.Token, line)
+	return renderTokenLine(format, out, errOut, res.Token, line)
 }
 
 func runDeploymentTokenRotate(format cliout.Format, out, errOut io.Writer) error {
@@ -98,7 +98,7 @@ func offeredDeploymentTokens(scopes ...deployment.DeploymentTokenType) []deploym
 	return nil
 }
 
-func runDeploymentTokenDelete(cmd *cobra.Command, format cliout.Format, out io.Writer) error {
+func runDeploymentTokenDelete(cmd *cobra.Command, format cliout.Format, out, errOut io.Writer) error {
 	// A token named is found among every token with a role on the Deployment,
 	// so that one of a broader scope is refused with what to use instead, not
 	// reported as missing; a token picked is offered only among the ones this
@@ -120,14 +120,14 @@ func runDeploymentTokenDelete(cmd *cobra.Command, format cliout.Format, out io.W
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(format, out, removal, fmt.Sprintf("Deleted Deployment API token %s", removal.Name))
+	return renderTokenLine(format, out, errOut, removal, fmt.Sprintf("Deleted Deployment API token %s", removal.Name))
 }
 
 // runDeploymentTokenRemoveRole runs `deployment token remove`: it takes the
 // Deployment role of a token of a broader scope, a Workspace or an
 // Organization token, away. The Deployment's own tokens have no role to take,
 // and are refused with delete.
-func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out io.Writer) error {
+func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out, errOut io.Writer) error {
 	token, err := deployment.FindToken(tokenID, name, deploymentID,
 		offeredDeploymentTokens(deployment.DeploymentTokenTypeWORKSPACE, deployment.DeploymentTokenTypeORGANIZATION), tokenPicker(), astroV1Client)
 	if err != nil {
@@ -145,13 +145,13 @@ func runDeploymentTokenRemoveRole(cmd *cobra.Command, format cliout.Format, out 
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(format, out, removal, fmt.Sprintf("Removed %s API token %s from the Deployment", scopeNoun(astrov1.ApiTokenScope(removal.Scope)), removal.Name))
+	return renderTokenLine(format, out, errOut, removal, fmt.Sprintf("Removed %s API token %s from the Deployment", scopeNoun(astrov1.ApiTokenScope(removal.Scope)), removal.Name))
 }
 
 // runDeploymentTokenAdd runs `deployment token add`: it gives a Workspace or
 // an Organization token a role on the Deployment, which of the two it is being
 // found out from the token (deployment.AddToken).
-func runDeploymentTokenAdd(args []string, out io.Writer) error {
+func runDeploymentTokenAdd(args []string, out, errOut io.Writer) error {
 	id := ""
 	if len(args) > 0 {
 		id = strings.ToLower(args[0])
@@ -183,7 +183,7 @@ func runDeploymentTokenAdd(args []string, out io.Writer) error {
 		}
 		return err
 	}
-	return renderTokenLine(deploymentTokenOutput, out, token, fmt.Sprintf("Added %s API token %s to the Deployment", scopeNoun(astrov1.ApiTokenScope(token.Scope)), token.Name))
+	return renderTokenLine(deploymentTokenOutput, out, errOut, token, fmt.Sprintf("Added %s API token %s to the Deployment", scopeNoun(astrov1.ApiTokenScope(token.Scope)), token.Name))
 }
 
 // The kinds of token whose role on a Deployment the workspace-token and
@@ -199,7 +199,7 @@ const (
 // setTokenDeploymentRole runs `deployment token {workspace,organization}-token
 // {add,update}`: it gives a token of kind a role on the Deployment, asking
 // for the role when --role named none.
-func setTokenDeploymentRole(args []string, out io.Writer, kind, operation string) error {
+func setTokenDeploymentRole(args []string, out, errOut io.Writer, kind, operation string) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -231,14 +231,14 @@ func setTokenDeploymentRole(args []string, out io.Writer, kind, operation string
 		}
 		tokenRole = answer
 	}
-	return runDeploymentTokenUpsert(deploymentTokenOutput, out, kind, operation, ws)
+	return runDeploymentTokenUpsert(deploymentTokenOutput, out, errOut, kind, operation, ws)
 }
 
 // runDeploymentTokenUpsert adds or updates the Deployment role of a Workspace
 // or Organization token. An add picks among the Workspace's or the
 // Organization's tokens, with that family's picker; an update among the
 // Deployment's.
-func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operation, ws string) error {
+func runDeploymentTokenUpsert(format cliout.Format, out, errOut io.Writer, kind, operation, ws string) error {
 	var (
 		token apitoken.Token
 		err   error
@@ -261,7 +261,7 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(format, out, token, fmt.Sprintf("Set the Deployment role for %s API token %s", kind, token.Name))
+	return renderTokenLine(format, out, errOut, token, fmt.Sprintf("Set the Deployment role for %s API token %s", kind, token.Name))
 }
 
 // tokenSearchWorkspace is the Workspace an add looks for a Workspace token
@@ -315,7 +315,7 @@ func workspaceTokenWorkspace(cmd *cobra.Command, id string) (string, error) {
 
 // runDeploymentTokenRemove removes the Deployment role of a Workspace or
 // Organization token.
-func runDeploymentTokenRemove(cmd *cobra.Command, format cliout.Format, out io.Writer, kind string) error {
+func runDeploymentTokenRemove(cmd *cobra.Command, format cliout.Format, out, errOut io.Writer, kind string) error {
 	var (
 		removal apitoken.DeploymentRemoval
 		err     error
@@ -334,5 +334,5 @@ func runDeploymentTokenRemove(cmd *cobra.Command, format cliout.Format, out io.W
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(format, out, removal, fmt.Sprintf("Removed %s API token %s from the Deployment", kind, removal.Name))
+	return renderTokenLine(format, out, errOut, removal, fmt.Sprintf("Removed %s API token %s from the Deployment", kind, removal.Name))
 }

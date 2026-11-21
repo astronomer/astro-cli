@@ -57,7 +57,7 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // th
 		Long:    "Add a team to a Deployment, named by its id as the argument or with --team-id",
 		Example: deploymentTeamAddExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentTeamAdd(out, args)
+			return deploymentTeamAdd(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Optional("TEAM_ID")), argOrFlag("team-id", "team"))
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team to add to the Deployment")
@@ -78,7 +78,7 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 		Long:    "Remove a team from a Deployment",
 		Example: deploymentTeamRemoveExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentTeamRemove(out, args)
+			return deploymentTeamRemove(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Required("TEAM_ID"))
 	addAccessOutputFlag(cmd)
@@ -92,7 +92,7 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 		Long:    "Update a team's role for a Deployment",
 		Example: deploymentTeamUpdateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentTeamUpdate(out, args)
+			return deploymentTeamUpdate(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Required("TEAM_ID"))
 	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "Deployment role to give the team: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR or DEPLOYMENT_ADMIN")
@@ -108,15 +108,15 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 		Long:    "List Teams inside an APC Deployment",
 		Example: deploymentTeamsListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentTeamsList(out, args)
+			return deploymentTeamsList(out, cmd.ErrOrStderr(), args)
 		},
 	}
 	addAccessOutputFlag(cmd)
 	return cmd
 }
 
-func deploymentTeamsList(out io.Writer, _ []string) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func deploymentTeamsList(out, errOut io.Writer, _ []string) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	ts, err := deployment.ListTeamRoles(deploymentID, houstonClient)
 	// The text has always refused a Deployment Houston lists no team for.
 	// A list is [] when it is empty, so json publishes that: Houston
@@ -131,8 +131,8 @@ func deploymentTeamsList(out io.Writer, _ []string) error {
 	return renderDeploymentTeamList(r, deploymentID, ts)
 }
 
-func deploymentTeamAdd(out io.Writer, _ []string) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func deploymentTeamAdd(out, errOut io.Writer, _ []string) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	if err := validateDeploymentRole(deploymentRole); err != nil {
 		return fmt.Errorf("could not find a valid role: %w", err)
 	}
@@ -144,16 +144,16 @@ func deploymentTeamAdd(out io.Writer, _ []string) error {
 	return renderDeploymentTeamChange(r, deploymentID, teamID, role, true)
 }
 
-func deploymentTeamRemove(out io.Writer, args []string) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func deploymentTeamRemove(out, errOut io.Writer, args []string) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	if err := deployment.RemoveTeam(deploymentID, args[0], houstonClient); err != nil {
 		return err
 	}
 	return renderDeploymentTeamRemoval(r, deploymentID, args[0])
 }
 
-func deploymentTeamUpdate(out io.Writer, args []string) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func deploymentTeamUpdate(out, errOut io.Writer, args []string) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	if err := validateDeploymentRole(deploymentRole); err != nil {
 		return fmt.Errorf("could not find a valid role: %w", err)
 	}

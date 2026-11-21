@@ -12,6 +12,7 @@ import (
 // ListOptions holds options for the list command.
 type ListOptions struct {
 	Out       io.Writer
+	ErrOut    io.Writer // the command's stderr, where notices go; nil means os.Stderr
 	specCache *openapi.Cache
 	Filter    string
 	Verbose   bool
@@ -43,7 +44,7 @@ func runList(opts *ListOptions) error {
 
 	// The (possibly empty) list goes under "endpoints". The rows are built
 	// only under json: text draws from the endpoints themselves.
-	r := cliout.Renderer{Format: opts.Format, Out: opts.Out}
+	r := cliout.Renderer{Format: opts.Format, Out: opts.Out, Err: opts.ErrOut}
 	return r.Emit(cliout.Lazy(func() any { return apirequest.NewEndpointList(apirequest.Rows(endpoints)) }),
 		func(w io.Writer) error {
 			apirequest.WriteEndpoints(w, endpoints, opts.Filter, opts.Verbose)
