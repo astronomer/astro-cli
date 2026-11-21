@@ -312,14 +312,19 @@ func flagSections(c *cobra.Command, width int) []string {
 		}
 		groups[group].AddFlag(f)
 	})
+	type section struct {
+		title string
+		rows  []flagRow
+	}
+	var titled []section
 	if set := groups[""]; set != nil {
-		sections = append(sections, "Flags:\n"+flagUsages(set, width))
+		titled = append(titled, section{"Flags:", flagRows(set)})
 	}
 	for _, group := range definitionOrder(c, order) {
 		if group == "" {
 			continue
 		}
-		sections = append(sections, group+" Flags:\n"+flagUsages(groups[group], width))
+		titled = append(titled, section{group + " Flags:", flagRows(groups[group])})
 	}
 
 	inherited := pflag.NewFlagSet("inherited", pflag.ContinueOnError)
@@ -330,7 +335,18 @@ func flagSections(c *cobra.Command, width int) []string {
 		inherited.AddFlag(f)
 	})
 	if inherited.HasFlags() {
-		sections = append(sections, "Global Flags:\n"+flagUsages(inherited, width))
+		titled = append(titled, section{"Global Flags:", flagRows(inherited)})
+	}
+
+	// One description column for every flag section, so the page reads as one
+	// list under several headings rather than a column that moves with each.
+	var all []flagRow
+	for _, sec := range titled {
+		all = append(all, sec.rows...)
+	}
+	column := flagColumn(all)
+	for _, sec := range titled {
+		sections = append(sections, sec.title+"\n"+renderFlagRows(sec.rows, column, width))
 	}
 	return sections
 }
@@ -365,8 +381,11 @@ func definitionOrder(c *cobra.Command, groups []string) []string {
 	return ordered
 }
 
-// flagUsages lists a set's flags in two columns: the flag and its value, then
-// its description wrapped under itself.
+// flagRow is one flag as help lists it: the flag and its value, then its
+// description.
+type flagRow struct{ left, usage string }
+
+// flagRows renders a set's visible flags into rows.
 //
 // pflag's own wrapping (FlagUsagesWrapped) gives up at the first word wider
 // than the room left — a URL, usually — and prints the rest of the description
@@ -374,10 +393,8 @@ func definitionOrder(c *cobra.Command, groups []string) []string {
 // unwrapped, and split back into the two columns pflag joined: that keeps its
 // spelling of value names, defaults and deprecations, which this does not
 // restate.
-func flagUsages(set *pflag.FlagSet, width int) string {
-	type row struct{ left, usage string }
-	var rows []row
-	column := 0
+func flagRows(set *pflag.FlagSet) []flagRow {
+	var rows []flagRow
 	set.VisitAll(func(f *pflag.Flag) {
 		if f.Hidden {
 			return
@@ -385,17 +402,41 @@ func flagUsages(set *pflag.FlagSet, width int) string {
 		one := pflag.NewFlagSet("", pflag.ContinueOnError)
 		one.AddFlag(f)
 		left, usage := splitFlagUsage(one.FlagUsagesWrapped(0))
-		rows = append(rows, row{left, usage})
-		column = max(column, len(left))
+		rows = append(rows, flagRow{left, usage})
 	})
+	return rows
+}
+
+// flagColumn is the width of the flag column for rows: the widest flag, but
+// no wider than helpNameColumnMax. A flag past the cap takes a line of its
+// own rather than pushing every description to the right.
+func flagColumn(rows []flagRow) int {
+	column := 0
+	for _, r := range rows {
+		if len(r.left) <= helpNameColumnMax {
+			column = max(column, len(r.left))
+		}
+	}
+	return column
+}
+
+// renderFlagRows lists rows in two columns: the flag padded to column, then
+// its description wrapped under itself. A flag wider than column puts its
+// description on the next line, at the same indent as the rest.
+func renderFlagRows(rows []flagRow, column, width int) string {
 	const gap = 3
+	hang := column + gap
 	var lines []string
 	for _, r := range rows {
 		var parts []string
 		for _, line := range strings.Split(r.usage, "\n") {
-			parts = append(parts, wrapHanging(line, width, column+gap))
+			parts = append(parts, wrapHanging(line, width, hang))
 		}
-		desc := strings.Join(parts, "\n"+strings.Repeat(" ", column+gap))
+		desc := strings.Join(parts, "\n"+strings.Repeat(" ", hang))
+		if len(r.left) > column {
+			lines = append(lines, r.left+"\n"+strings.Repeat(" ", hang)+desc)
+			continue
+		}
 		lines = append(lines, r.left+strings.Repeat(" ", column-len(r.left)+gap)+desc)
 	}
 	return strings.Join(lines, "\n")
