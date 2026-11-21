@@ -346,6 +346,21 @@ func (s *BundleSuite) TestValidateBundleSymlinks() {
 		assert.NoError(t, err)
 	})
 
+	// A bundle directory that is itself a link is checked as the directory it
+	// leads to, which is what the tarball carries, not refused as a link out
+	// of itself; a link in it out of where it leads still is.
+	t.Run("Bundle Directory That Is A Link", func(t *testing.T) {
+		shared := setup(t, map[string]string{"etl.py": "import x"}, map[string]string{"alias.py": "etl.py"})
+		bundlePath := filepath.Join(t.TempDir(), "dags")
+		require.NoError(t, os.Symlink(shared, bundlePath))
+		assert.NoError(t, ValidateBundleSymlinks(bundlePath))
+
+		require.NoError(t, os.Symlink(filepath.Join("..", "elsewhere.py"), filepath.Join(shared, "out.py")))
+		err := ValidateBundleSymlinks(bundlePath)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "which is outside the bundle directory")
+	})
+
 	// Case 2: Valid - Symlink inside directory
 	t.Run("Valid - Symlink Inside", func(t *testing.T) {
 		bundlePath := setup(t,

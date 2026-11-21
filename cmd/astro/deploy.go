@@ -27,6 +27,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -808,6 +809,11 @@ func projectGitMetadataOffNote(m *manifest.Manifest, imageName string) string {
 // gitMetadataOffText says why a deploy recorded no commit, in the words of
 // the uncommitted-changes note.
 const gitMetadataOffText = "deploy.git_metadata is false in your global config, so this deploy records no git commit"
+
+// DagsSource is what DeployDags uploads of the project.
+func (d manifestDeployer) DagsSource(projectDir string, noDagsBaseDir bool) fileutil.TarSource {
+	return astrodeploy.DagsSource(projectDir, noDagsBaseDir)
+}
 
 // DeployDags ships the project's dags/ through the dags-only transport.
 func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
