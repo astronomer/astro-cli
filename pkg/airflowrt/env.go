@@ -124,15 +124,6 @@ func LoadDotenvFile(path string) ([]DotenvEntry, []DotenvProblem, error) {
 	return entries, problems, nil
 }
 
-// StripQuotes removes matching surrounding single or double quotes from a
-// value. It does not decode escapes; ParseDotenv is the .env reader.
-func StripQuotes(s string) string {
-	if len(s) >= 2 && ((s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'')) {
-		return s[1 : len(s)-1]
-	}
-	return s
-}
-
 // proxyEnvKeys lists environment variable names that indicate a proxy is configured.
 var proxyEnvKeys = []string{
 	"HTTP_PROXY", "http_proxy",
