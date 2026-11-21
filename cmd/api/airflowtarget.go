@@ -207,7 +207,7 @@ func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*
 	if instance, ok := linked(name); ok && util.IsCUID(name) {
 		return linkTarget(ctx, opts, &instance, m.Astro.LoginDomain())
 	}
-	baseURL, token, id, err := resolveDeploymentAirflowURL(opts, name, &project)
+	baseURL, token, id, err := resolveDeploymentAirflowURL(ctx, opts, name, &project)
 	if err != nil {
 		// A name that matched no link is far more often a typo than a
 		// Deployment, so the names it could have been travel with the failure
@@ -381,7 +381,7 @@ func (o *AirflowOptions) httpTarget(name, hostRoot, authorization string) (*airf
 // the organization, -O's or the context's; anything else is a Deployment name,
 // looked up in project's [tool.astro] workspace (the zero Astro outside a
 // project), else the context's, through instancelocate.NamedDeployment.
-func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string, project *manifest.Astro) (baseURL, authToken, id string, err error) {
+func resolveDeploymentAirflowURL(reqCtx context.Context, opts *AirflowOptions, ref string, project *manifest.Astro) (baseURL, authToken, id string, err error) {
 	if !astrocontext.IsCloudContext() {
 		return "", "", "", fmt.Errorf("no Deployment link %q, and reaching a Deployment by ID or name needs an Astro context; run astro login", ref)
 	}
@@ -402,7 +402,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string, project *mani
 		return "", "", "", errors.New("Organization ID not set; use --organization-id or run astro organization switch")
 	}
 
-	dep, err := lookupDeployment(opts.OrganizationID, orgID, ref, project, &ctx, astrov1.NewV1Client(httputil.NewHTTPClient()))
+	dep, err := lookupDeployment(reqCtx, opts.OrganizationID, orgID, ref, project, &ctx, astrov1.NewV1Client(httputil.NewHTTPClient()))
 	if err != nil {
 		return "", "", "", err
 	}
@@ -426,7 +426,7 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string, project *mani
 // -O for another organization than that one is refused for a name rather
 // than obeyed or dropped: the workspace is not one of that organization's,
 // so listing it there would answer from nowhere the caller meant.
-func lookupDeployment(override, orgID, ref string, project *manifest.Astro, ctx *config.Context, client astrov1.APIClient) (astrov1.Deployment, error) {
+func lookupDeployment(reqCtx context.Context, override, orgID, ref string, project *manifest.Astro, ctx *config.Context, client astrov1.APIClient) (astrov1.Deployment, error) {
 	if util.IsCUID(ref) {
 		dep, err := deployment.GetDeploymentByID(orgID, ref, client)
 		if err != nil {
@@ -454,7 +454,7 @@ func lookupDeployment(override, orgID, ref string, project *manifest.Astro, ctx 
 	if override != "" && override != wsOrg {
 		return astrov1.Deployment{}, fmt.Errorf("%q is not a Deployment id, and its name is looked up in workspace %s, which is not in --organization-id %s: pass -d with the Deployment id", ref, ws, override)
 	}
-	deps, err := deployment.ListDeployments(ws, wsOrg, client)
+	deps, err := deployment.ListDeployments(reqCtx, ws, wsOrg, client)
 	if err != nil {
 		return astrov1.Deployment{}, &astrosession.WorkspaceError{
 			Workspace: ws, Source: run.WorkspaceSource, Err: err,

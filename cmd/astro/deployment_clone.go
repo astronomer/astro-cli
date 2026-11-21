@@ -90,7 +90,7 @@ func deploymentClone(cmd *cobra.Command, out io.Writer, format cliout.Format) er
 	}
 	// The Deployment exists even when the --wait for it failed, so it is
 	// published either way.
-	r := cliout.Renderer{Format: format, Out: out}
+	r := cliout.Renderer{Format: format, Out: out, Err: cmd.ErrOrStderr()}
 	if emitErr := emitDeployment(r, &d, func(w io.Writer) error { return deployment.WriteCreated(w, d.WorkspaceId, &d) }); emitErr != nil {
 		if err != nil {
 			return err

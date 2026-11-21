@@ -50,7 +50,7 @@ func astroLookups(t *testing.T, deployments ...astrov1.Deployment) (listed *[]st
 		return astrov1.Deployment{}, errors.New("deployment not found")
 	}
 	listed = new([]string)
-	deployment.ListDeployments = func(ws, orgID string, _ astrov1.APIClient) ([]astrov1.Deployment, error) {
+	deployment.ListDeployments = func(_ context.Context, ws, orgID string, _ astrov1.APIClient) ([]astrov1.Deployment, error) {
 		*listed = append(*listed, orgID+"/"+ws)
 		var in []astrov1.Deployment
 		for i := range deployments {

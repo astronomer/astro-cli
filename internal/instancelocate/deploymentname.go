@@ -141,7 +141,7 @@ func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace, proje
 // bearer for the same reason astroDeployment puts it on its call.
 func (l *locator) listDeployments(ctx context.Context, token, org, ws string, src astrosession.Source) ([]astrov1.Deployment, error) {
 	limit := 1000
-	return pagination.Collect("deployments", func(offset int) ([]astrov1.Deployment, int, error) {
+	return pagination.Collect(ctx, "deployments", func(offset int) ([]astrov1.Deployment, int, error) {
 		params := &astrov1.ListDeploymentsParams{Limit: &limit, Offset: &offset, WorkspaceIds: &[]string{ws}}
 		resp, err := l.deployments.ListDeploymentsWithResponse(ctx, org, params, bearer(token))
 		if err != nil {

@@ -151,7 +151,7 @@ func workspaceTeamUpdate(out io.Writer, args []string) error {
 }
 
 func workspaceTeamRm(cmd *cobra.Command, out io.Writer, args []string) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: cmd.ErrOrStderr()}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("could not find a valid Workspace: %w", err)

@@ -354,7 +354,7 @@ func (s *Suite) TestListDeploymentsPaginates() {
 	mockClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page1, nil).Once()
 	mockClient.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page2, nil).Once()
 
-	got, err := ListDeployments("", "test-org", mockClient)
+	got, err := ListDeployments(stdcontext.Background(), "", "test-org", mockClient)
 	s.NoError(err)
 	s.Len(got, 2)
 	s.Equal("deployment-page1", got[0].Id)
@@ -385,7 +385,7 @@ func (s *Suite) TestListDeploymentsPaginatesOverHTTP() {
 	client, err := astrov1.NewClientWithResponses(ts.URL)
 	s.Require().NoError(err)
 
-	got, err := ListDeployments("", "test-org", client)
+	got, err := ListDeployments(stdcontext.Background(), "", "test-org", client)
 	s.NoError(err)
 	s.Len(got, 2)
 	s.Equal("dep-1", got[0].Id)
@@ -396,13 +396,33 @@ func (s *Suite) TestListDeploymentsPaginatesOverHTTP() {
 	s.Equal([]string{"1000", "1000"}, seenLimits)
 }
 
+// A lookup with no context reads as Background, and a failed list is a
+// Deployment that was not found, not a panic on the nil context.
+func (s *Suite) TestGetDeploymentContextAcceptsANilContext() {
+	orig := ListDeployments
+	defer func() { ListDeployments = orig }()
+	ListDeployments = func(ctx stdcontext.Context, _, _ string, _ astrov1.APIClient) ([]astrov1.Deployment, error) {
+		s.NotNil(ctx, "the list is handed a context")
+		return nil, errors.New("boom")
+	}
+	//nolint:staticcheck // a nil context is the case under test
+	_, err := GetDeploymentContext(nil, "ws", "dep", "", ToRead, nil, mockV1Client)
+	var notFound *NotFoundError
+	s.ErrorAs(err, &notFound)
+
+	ctx, cancel := stdcontext.WithCancel(stdcontext.Background())
+	cancel()
+	_, err = GetDeploymentContext(ctx, "ws", "dep", "", ToRead, nil, mockV1Client)
+	s.ErrorIs(err, stdcontext.Canceled)
+}
+
 func (s *Suite) TestListData() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	s.Run("returns structured deployment data", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		data, err := listData(ws, false, 0, mockV1Client)
+		data, err := listData(stdcontext.Background(), ws, false, 0, mockV1Client)
 		s.NoError(err)
 		s.Len(data.Deployments, 2)
 		s.Contains([]string{data.Deployments[0].DeploymentID, data.Deployments[1].DeploymentID}, "test-id-1")
@@ -412,7 +432,7 @@ func (s *Suite) TestListData() {
 	s.Run("returns error on failure", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
-		_, err := listData(ws, false, 0, mockV1Client)
+		_, err := listData(stdcontext.Background(), ws, false, 0, mockV1Client)
 		s.ErrorIs(err, errMock)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -420,7 +440,7 @@ func (s *Suite) TestListData() {
 	s.Run("empty result", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 
-		data, err := listData(ws, false, 0, mockV1Client)
+		data, err := listData(stdcontext.Background(), ws, false, 0, mockV1Client)
 		s.NoError(err)
 		s.Empty(data.Deployments)
 		mockV1Client.AssertExpectations(s.T())
@@ -434,7 +454,7 @@ func (s *Suite) TestListWithFormat() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(ws, false, 0, mockV1Client, testUtil.Renderer{JSON: true, Out: buf})
+		err := ListWithFormat(stdcontext.Background(), ws, false, 0, mockV1Client, testUtil.Renderer{JSON: true, Out: buf})
 		s.NoError(err)
 
 		var result DeploymentList
@@ -447,7 +467,7 @@ func (s *Suite) TestListWithFormat() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(ws, false, 0, mockV1Client, testUtil.Renderer{Out: buf})
+		err := ListWithFormat(stdcontext.Background(), ws, false, 0, mockV1Client, testUtil.Renderer{Out: buf})
 		s.NoError(err)
 		s.Contains(buf.String(), "test-id-1")
 		mockV1Client.AssertExpectations(s.T())

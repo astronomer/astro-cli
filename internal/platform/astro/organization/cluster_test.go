@@ -2,6 +2,7 @@ package organization
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -115,7 +116,7 @@ func (s *Suite) TestListClustersWithFormat() {
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockClusterListResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListClustersWithFormat(mockV1Client, testUtil.Renderer{Out: buf})
+		err := ListClustersWithFormat(context.Background(), mockV1Client, 0, testUtil.Renderer{Out: buf})
 		s.NoError(err)
 		s.Contains(buf.String(), "test-cluster")
 		s.Contains(buf.String(), "us-east-1")
@@ -128,7 +129,7 @@ func (s *Suite) TestListClustersWithFormat() {
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockClusterListResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListClustersWithFormat(mockV1Client, testUtil.Renderer{JSON: true, Out: buf})
+		err := ListClustersWithFormat(context.Background(), mockV1Client, 0, testUtil.Renderer{JSON: true, Out: buf})
 		s.NoError(err)
 
 		var result ClusterList
@@ -149,7 +150,7 @@ func (s *Suite) TestListClustersWithFormat() {
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListClustersWithFormat(mockV1Client, testUtil.Renderer{Out: buf})
+		err := ListClustersWithFormat(context.Background(), mockV1Client, 0, testUtil.Renderer{Out: buf})
 		s.NoError(err)
 		s.Contains(buf.String(), noClustersMsg)
 		mockV1Client.AssertExpectations(s.T())
@@ -160,7 +161,7 @@ func (s *Suite) TestListClustersWithFormat() {
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListClustersWithFormat(mockV1Client, testUtil.Renderer{Out: buf})
+		err := ListClustersWithFormat(context.Background(), mockV1Client, 0, testUtil.Renderer{Out: buf})
 		s.ErrorIs(err, errNetwork)
 		mockV1Client.AssertExpectations(s.T())
 	})

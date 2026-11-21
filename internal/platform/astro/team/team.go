@@ -11,6 +11,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -109,11 +110,16 @@ func orDefault(s, def string) string {
 }
 
 func GetTeam(client astrov1.APIClient, teamID string) (team astrov1.Team, err error) {
-	ctx, err := context.GetCurrentContext()
+	return getTeam(httpContext.Background(), client, teamID)
+}
+
+// getTeam is GetTeam that stops when ctx is canceled.
+func getTeam(ctx httpContext.Context, client astrov1.APIClient, teamID string) (team astrov1.Team, err error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return team, err
 	}
-	resp, err := client.GetTeamWithResponse(httpContext.Background(), ctx.Organization, teamID)
+	resp, err := client.GetTeamWithResponse(pagination.Background(ctx), cfg.Organization, teamID)
 	if err != nil {
 		return team, err
 	}
@@ -415,45 +421,51 @@ func selectTeam(teams []astrov1.Team) (astrov1.Team, error) {
 	return teams[i], nil
 }
 
-// listTeams paginates through GET /teams with optional workspaceId/deploymentId filters.
-func listTeams(client astrov1.APIClient, workspaceID, deploymentID *string) ([]astrov1.Team, error) {
-	ctx, err := context.GetCurrentContext()
+// listTeams paginates through GET /teams with optional workspaceId/deploymentId
+// filters. It keeps the first limit teams (all when limit is below 1) and stops
+// when ctx is canceled. Pages are sorted by name, which is the
+// stable order the API offers (its team sorts have no id tiebreaker), so a
+// limited list is the first rows of the full one.
+func listTeams(ctx httpContext.Context, client astrov1.APIClient, workspaceID, deploymentID *string, limit int) ([]astrov1.Team, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
-	var teams []astrov1.Team
-	offset := 0
-	for {
+	sorts := []astrov1.ListTeamsParamsSorts{astrov1.ListTeamsParamsSortsNameAsc}
+	return pagination.CollectUpTo(ctx, "teams", limit, func(offset int) ([]astrov1.Team, int, error) {
+		pageSize := teamPaginationLimit
+		if limit > 0 {
+			pageSize = min(pageSize, limit-offset)
+		}
 		params := &astrov1.ListTeamsParams{
 			Offset:       &offset,
-			Limit:        &teamPaginationLimit,
+			Limit:        &pageSize,
+			Sorts:        &sorts,
 			WorkspaceId:  workspaceID,
 			DeploymentId: deploymentID,
 		}
-		resp, err := client.ListTeamsWithResponse(httpContext.Background(), ctx.Organization, params)
+		resp, err := client.ListTeamsWithResponse(pagination.Background(ctx), cfg.Organization, params)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
-		teams = append(teams, resp.JSON200.Teams...)
-
-		if resp.JSON200.TotalCount <= offset+teamPaginationLimit {
-			break
+		if resp.JSON200 == nil {
+			return nil, 0, errors.New("list teams returned an empty response body")
 		}
-		offset += teamPaginationLimit
-	}
-	return teams, nil
+		return resp.JSON200.Teams, resp.JSON200.TotalCount, nil
+	})
 }
 
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func GetWorkspaceTeams(client astrov1.APIClient, workspaceID string, _ int) ([]astrov1.Team, error) {
 	workspaceID, err := astrosession.RequireWorkspace(workspaceID)
 	if err != nil {
 		return nil, err
 	}
 	wsID := workspaceID
-	return listTeams(client, &wsID, nil)
+	return listTeams(httpContext.Background(), client, &wsID, nil, 0)
 }
 
 // AddWorkspaceTeam gives the Organization's team with id, or the one picked
@@ -520,8 +532,10 @@ func pickFailed(err error) error {
 }
 
 // GetOrgTeams returns a list of all organization teams.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func GetOrgTeams(client astrov1.APIClient) ([]astrov1.Team, error) {
-	return listTeams(client, nil, nil)
+	return listTeams(httpContext.Background(), client, nil, nil, 0)
 }
 
 // Delete deletes the team with id, or the one picked when id is "", and
@@ -585,29 +599,34 @@ func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemov
 	return &OrganizationRemoval{ID: team.Id, Name: team.Name, OrganizationID: ctx.Organization, Action: Deleted}, nil
 }
 
-// listTeamMembers fetches all members for a team using the paginated v1 endpoint.
-func listTeamMembers(client astrov1.APIClient, orgID, teamID string) ([]astrov1.TeamMember, error) {
-	var members []astrov1.TeamMember
-	offset := 0
-	for {
+// listTeamMembers fetches the members of a team using the paginated v1
+// endpoint: the first limit of them (all when limit is below 1), by user name
+// then user id so an offset cannot skip or repeat a member where two pages
+// meet, stopping when ctx is canceled.
+func listTeamMembers(ctx httpContext.Context, client astrov1.APIClient, orgID, teamID string, limit int) ([]astrov1.TeamMember, error) {
+	sorts := []astrov1.ListTeamMembersParamsSorts{astrov1.ListTeamMembersParamsSortsUsernameAsc, astrov1.ListTeamMembersParamsSortsUserIdAsc}
+	return pagination.CollectUpTo(ctx, "team members", limit, func(offset int) ([]astrov1.TeamMember, int, error) {
+		pageSize := teamPaginationLimit
+		if limit > 0 {
+			pageSize = min(pageSize, limit-offset)
+		}
 		params := &astrov1.ListTeamMembersParams{
 			Offset: &offset,
-			Limit:  &teamPaginationLimit,
+			Limit:  &pageSize,
+			Sorts:  &sorts,
 		}
-		resp, err := client.ListTeamMembersWithResponse(httpContext.Background(), orgID, teamID, params)
+		resp, err := client.ListTeamMembersWithResponse(pagination.Background(ctx), orgID, teamID, params)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
-		members = append(members, resp.JSON200.TeamMembers...)
-		if resp.JSON200.TotalCount <= offset+teamPaginationLimit {
-			break
+		if resp.JSON200 == nil {
+			return nil, 0, errors.New("list team members returned an empty response body")
 		}
-		offset += teamPaginationLimit
-	}
-	return members, nil
+		return resp.JSON200.TeamMembers, resp.JSON200.TotalCount, nil
+	})
 }
 
 // RemoveUser removes the member with teamMemberID, or the one picked when it
@@ -648,7 +667,7 @@ func RemoveUser(teamID, teamMemberID string, force bool, client astrov1.APIClien
 		}
 	}
 	teamID = team.Id
-	teamMembers, err := listTeamMembers(client, ctx.Organization, teamID)
+	teamMembers, err := listTeamMembers(httpContext.Background(), client, ctx.Organization, teamID, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -791,14 +810,14 @@ func selectTeamMember(teamMembers []astrov1.TeamMember) (astrov1.TeamMember, err
 
 // ListTeamUsers returns the members of the team with teamID, or of the one
 // picked when it is "".
-func ListTeamUsers(teamID string, client astrov1.APIClient) (MemberList, error) {
-	ctx, err := context.GetCurrentContext()
+func ListTeamUsers(ctx httpContext.Context, teamID string, limit int, client astrov1.APIClient) (MemberList, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return MemberList{}, err
 	}
 	var team astrov1.Team
 	if teamID == "" {
-		teams, err := GetOrgTeams(client)
+		teams, err := listTeams(ctx, client, nil, nil, 0)
 		if err != nil {
 			return MemberList{}, err
 		}
@@ -810,7 +829,7 @@ func ListTeamUsers(teamID string, client astrov1.APIClient) (MemberList, error) 
 			return MemberList{}, pickFailed(err)
 		}
 	} else {
-		team, err = GetTeam(client, teamID)
+		team, err = getTeam(ctx, client, teamID)
 		if err != nil {
 			return MemberList{}, err
 		}
@@ -818,7 +837,7 @@ func ListTeamUsers(teamID string, client astrov1.APIClient) (MemberList, error) 
 			return MemberList{}, ErrTeamNotFound
 		}
 	}
-	members, err := listTeamMembers(client, ctx.Organization, team.Id)
+	members, err := listTeamMembers(ctx, client, cfg.Organization, team.Id, limit)
 	if err != nil {
 		return MemberList{}, err
 	}
@@ -833,9 +852,10 @@ func ListTeamUsers(teamID string, client astrov1.APIClient) (MemberList, error) 
 	return list, nil
 }
 
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func GetDeploymentTeams(client astrov1.APIClient, deploymentID string, _ int) ([]astrov1.Team, error) {
 	dID := deploymentID
-	return listTeams(client, nil, &dID)
+	return listTeams(httpContext.Background(), client, nil, &dID, 0)
 }
 
 // AddDeploymentTeam gives the Organization's team with id, or the one picked
@@ -972,8 +992,9 @@ func roleInWorkspace(team astrov1.Team, workspaceID string) string { //nolint:go
 }
 
 // ListDeploymentTeamsData returns deployment team list data for structured output
-func ListDeploymentTeamsData(client astrov1.APIClient, deploymentID string) (*TeamList, error) {
-	teams, err := GetDeploymentTeams(client, deploymentID, teamPaginationLimit)
+func ListDeploymentTeamsData(ctx httpContext.Context, client astrov1.APIClient, deploymentID string, limit int) (*TeamList, error) {
+	dID := deploymentID
+	teams, err := listTeams(ctx, client, nil, &dID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1014,22 +1035,23 @@ func roleTeamTableConfig(role func(TeamInfo) string) *output.TableConfig {
 var deploymentTeamTableConfig = roleTeamTableConfig(func(t TeamInfo) string { return t.DeploymentRole })
 
 // ListDeploymentTeamsWithFormat lists deployment teams with the specified output format
-func ListDeploymentTeamsWithFormat(client astrov1.APIClient, deploymentID string, r output.Emitter) error {
+func ListDeploymentTeamsWithFormat(ctx httpContext.Context, client astrov1.APIClient, deploymentID string, limit int, r output.Emitter) error {
 	return output.PrintData(
-		func() (*TeamList, error) { return ListDeploymentTeamsData(client, deploymentID) },
+		func() (*TeamList, error) { return ListDeploymentTeamsData(ctx, client, deploymentID, limit) },
 		deploymentTeamTableConfig, r,
 	)
 }
 
 // ListWorkspaceTeamsData returns workspace team list data for structured output
-func ListWorkspaceTeamsData(client astrov1.APIClient, workspaceID string) (*TeamList, error) {
+func ListWorkspaceTeamsData(ctx httpContext.Context, client astrov1.APIClient, workspaceID string, limit int) (*TeamList, error) {
 	// The roles shown are the ones on the Workspace listed, which is the
 	// current one when workspaceID is "".
 	workspaceID, err := astrosession.RequireWorkspace(workspaceID)
 	if err != nil {
 		return nil, err
 	}
-	teams, err := GetWorkspaceTeams(client, workspaceID, teamPaginationLimit)
+	wsID := workspaceID
+	teams, err := listTeams(ctx, client, &wsID, nil, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1055,16 +1077,16 @@ func ListWorkspaceTeamsData(client astrov1.APIClient, workspaceID string) (*Team
 var workspaceTeamTableConfig = roleTeamTableConfig(func(t TeamInfo) string { return t.WorkspaceRole })
 
 // ListWorkspaceTeamsWithFormat lists workspace teams with the specified output format
-func ListWorkspaceTeamsWithFormat(client astrov1.APIClient, workspaceID string, r output.Emitter) error {
+func ListWorkspaceTeamsWithFormat(ctx httpContext.Context, client astrov1.APIClient, workspaceID string, limit int, r output.Emitter) error {
 	return output.PrintData(
-		func() (*TeamList, error) { return ListWorkspaceTeamsData(client, workspaceID) },
+		func() (*TeamList, error) { return ListWorkspaceTeamsData(ctx, client, workspaceID, limit) },
 		workspaceTeamTableConfig, r,
 	)
 }
 
 // ListOrgTeamsData returns organization team list data for structured output
-func ListOrgTeamsData(client astrov1.APIClient) (*TeamList, error) {
-	teams, err := GetOrgTeams(client)
+func ListOrgTeamsData(ctx httpContext.Context, client astrov1.APIClient, limit int) (*TeamList, error) {
+	teams, err := listTeams(ctx, client, nil, nil, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1101,9 +1123,9 @@ var orgTeamTableConfig = output.BuildTableConfig(
 )
 
 // ListOrgTeamsWithFormat lists organization teams with the specified output format
-func ListOrgTeamsWithFormat(client astrov1.APIClient, r output.Emitter) error {
+func ListOrgTeamsWithFormat(ctx httpContext.Context, client astrov1.APIClient, limit int, r output.Emitter) error {
 	return output.PrintData(
-		func() (*TeamList, error) { return ListOrgTeamsData(client) },
+		func() (*TeamList, error) { return ListOrgTeamsData(ctx, client, limit) },
 		orgTeamTableConfig, r,
 	)
 }

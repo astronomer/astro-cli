@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -96,7 +97,6 @@ var (
 	taskLogBucket              *string
 	taskLogURLPattern          *string
 	deploymentListOutput       cliout.Format
-	deploymentListLimit        int
 	deploymentUserOutput       cliout.Format
 	deploymentTeamOutput       cliout.Format
 
@@ -202,10 +202,10 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 
   # List them as JSON
   astro deployment team list --deployment <DEPLOYMENT_ID> -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listDeploymentTeam(out)
-		},
 	}
+	addListLimit(cmd, "teams", "", func(cmd *cobra.Command, limit int) error {
+		return listDeploymentTeam(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -224,12 +224,12 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listDeploymentTeam(out io.Writer) error {
+func listDeploymentTeam(ctx context.Context, out, errOut io.Writer, limit int) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
 
-	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: deploymentTeamOutput, Out: out})
+	return team.ListDeploymentTeamsWithFormat(ctx, astroV1Client, deploymentID, limit, cliout.Renderer{Format: deploymentTeamOutput, Out: out, Err: errOut})
 }
 
 func removeDeploymentTeam(args []string, out io.Writer) error {
@@ -393,10 +393,10 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 
   # List them as JSON
   astro deployment user list --deployment <DEPLOYMENT_ID> -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listDeploymentUser(out)
-		},
 	}
+	addListLimit(cmd, "users", "", func(cmd *cobra.Command, limit int) error {
+		return listDeploymentUser(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -446,14 +446,10 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 
   # List them as JSON
   astro deployment list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := checkListLimit(cmd, "limit", deploymentListLimit); err != nil {
-				return err
-			}
-			return deploymentList(cmd, out)
-		},
 	}
-	addListLimitFlag(cmd, &deploymentListLimit, "Deployments")
+	addListLimit(cmd, "Deployments", "", func(cmd *cobra.Command, limit int) error {
+		return deploymentList(cmd, out, limit)
+	})
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 	markWorkspaceChoice(cmd.Flags().Lookup("all"))
 	addDeploymentWorkspaceFlag(cmd.Flags())
@@ -782,7 +778,7 @@ func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func deploymentList(cmd *cobra.Command, out io.Writer) error {
+func deploymentList(cmd *cobra.Command, out io.Writer, limit int) error {
 	// --all lists every workspace's, so it needs no workspace: an org-scoped
 	// token has none to find.
 	ws := ""
@@ -793,7 +789,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 		}
 	}
 
-	return deployment.ListWithFormat(ws, allDeployments, deploymentListLimit, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out})
+	return deployment.ListWithFormat(cmd.Context(), ws, allDeployments, limit, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -815,7 +811,7 @@ func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return emitLogs(cmd, cliout.Renderer{Format: deploymentLogsOutput, Out: out}, res)
+	return emitLogs(cmd, cliout.Renderer{Format: deploymentLogsOutput, Out: out, Err: cmd.ErrOrStderr()}, res)
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
@@ -931,7 +927,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 	// The Deployment exists even when the --wait for it failed, so it is
 	// published either way.
-	r := cliout.Renderer{Format: format, Out: out}
+	r := cliout.Renderer{Format: format, Out: out, Err: cmd.ErrOrStderr()}
 	if emitErr := emitDeployment(r, &d, func(w io.Writer) error { return deployment.WriteCreated(w, workspaceID, &d) }); emitErr != nil {
 		if err != nil {
 			return err
@@ -990,7 +986,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return emitUpdated(cliout.Renderer{Format: deploymentOutput, Out: out}, &res)
+	return emitUpdated(cliout.Renderer{Format: deploymentOutput, Out: out, Err: cmd.ErrOrStderr()}, &res)
 }
 
 // normalizeSchedulerSizeFlag refuses a --scheduler-size that is not a size,
@@ -1025,7 +1021,7 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return emitRemoval(cliout.Renderer{Format: deploymentOutput, Out: out}, removal)
+	return emitRemoval(cliout.Renderer{Format: deploymentOutput, Out: out, Err: cmd.ErrOrStderr()}, removal)
 }
 
 func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -1040,7 +1036,7 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return emitVariableList(cmd, cliout.Renderer{Format: deploymentVariableOutput, Out: out}, vars)
+	return emitVariableList(cmd, cliout.Renderer{Format: deploymentVariableOutput, Out: out, Err: cmd.ErrOrStderr()}, vars)
 }
 
 func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1067,7 +1063,7 @@ func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, 
 	if err != nil {
 		return err
 	}
-	return emitVariableModify(cliout.Renderer{Format: deploymentVariableOutput, Out: out}, res)
+	return emitVariableModify(cliout.Renderer{Format: deploymentVariableOutput, Out: out, Err: cmd.ErrOrStderr()}, res)
 }
 
 // openDeploymentUI opens a Deployment's Airflow UI; tests replace it.
@@ -1091,7 +1087,7 @@ func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
 	// the line instead.
 	attempted := deploymentOutput == cliout.FormatText && !deploymentNoOpen && input.CanOpenBrowser()
 	opened := attempted && openDeploymentUI(res.URL)
-	return emitDeploymentUI(cliout.Renderer{Format: deploymentOutput, Out: out}, res, uiOpening{attempted: attempted, opened: opened})
+	return emitDeploymentUI(cliout.Renderer{Format: deploymentOutput, Out: out, Err: cmd.ErrOrStderr()}, res, uiOpening{attempted: attempted, opened: opened})
 }
 
 func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Writer, isHibernating bool) error {
@@ -1113,7 +1109,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 		return cliout.Usage(errors.New("cannot use --wait-time with --wait=false"))
 	}
 
-	r := cliout.Renderer{Format: format, Out: out}
+	r := cliout.Renderer{Format: format, Out: out, Err: cmd.ErrOrStderr()}
 	action := "wake up"
 	if isHibernating {
 		action = "hibernate"
@@ -1175,12 +1171,12 @@ func addDeploymentUser(args []string, out io.Writer) error {
 	return renderLines(deploymentUserOutput, out, &u, fmt.Sprintf("Added user %s to the Deployment with role %s", u.Email, u.DeploymentRole))
 }
 
-func listDeploymentUser(out io.Writer) error {
+func listDeploymentUser(ctx context.Context, out, errOut io.Writer, limit int) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
 
-	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: deploymentUserOutput, Out: out})
+	return user.ListDeploymentUsersWithFormat(ctx, astroV1Client, deploymentID, limit, cliout.Renderer{Format: deploymentUserOutput, Out: out, Err: errOut})
 }
 
 func updateDeploymentUser(args []string, out io.Writer) error {
@@ -1274,11 +1270,11 @@ func newDeploymentTokenListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all API tokens with a role in a Deployment, including Deployment-scoped tokens and any Organization or Workspace tokens that have been granted a Deployment role.",
 		Example: `  # List the API tokens with a role in a Deployment
   astro deployment token list --deployment <DEPLOYMENT_ID>`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listDeploymentToken(out)
-		},
 	}
 	addOneXWorkspaceIDNoOp(cmd.Flags())
+	addListLimit(cmd, "API tokens", "", func(cmd *cobra.Command, limit int) error {
+		return listDeploymentToken(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -1659,10 +1655,10 @@ func newListOrganizationTokensInDeployment(out io.Writer) *cobra.Command {
 		Long:  "List all Organization API tokens in a Deployment",
 		Example: `  # List the Organization tokens with a role in a Deployment
   astro deployment token organization-token list --deployment <DEPLOYMENT_ID>`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listOrganizationTokensInDeployment(out)
-		},
 	}
+	addListLimit(cmd, "Organization API tokens", "The scope filter runs locally, so every page is read before the limit applies", func(cmd *cobra.Command, limit int) error {
+		return listOrganizationTokensInDeployment(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -1673,37 +1669,37 @@ func newListWorkspaceTokensInDeployment(out io.Writer) *cobra.Command {
 		Long:  "List all Workspace API tokens in a Deployment",
 		Example: `  # List the Workspace tokens with a role in a Deployment
   astro deployment token workspace-token list --deployment <DEPLOYMENT_ID>`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listWorkspaceTokensInDeployment(out)
-		},
 	}
 	addOneXWorkspaceIDNoOp(cmd.Flags())
+	addListLimit(cmd, "Workspace API tokens", "The scope filter runs locally, so every page is read before the limit applies", func(cmd *cobra.Command, limit int) error {
+		return listWorkspaceTokensInDeployment(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
-func listOrganizationTokensInDeployment(out io.Writer) error {
+func listOrganizationTokensInDeployment(ctx context.Context, out, errOut io.Writer, limit int) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
 	// if an id was provided in the args we use it
 
-	return runDeploymentTokenList(deploymentTokenOutput, out, deployment.DeploymentTokenTypeORGANIZATION)
+	return runDeploymentTokenList(ctx, limit, deploymentTokenOutput, out, errOut, deployment.DeploymentTokenTypeORGANIZATION)
 }
 
-func listWorkspaceTokensInDeployment(out io.Writer) error {
+func listWorkspaceTokensInDeployment(ctx context.Context, out, errOut io.Writer, limit int) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
 	// if an id was provided in the args we use it
 
-	return runDeploymentTokenList(deploymentTokenOutput, out, deployment.DeploymentTokenTypeWORKSPACE)
+	return runDeploymentTokenList(ctx, limit, deploymentTokenOutput, out, errOut, deployment.DeploymentTokenTypeWORKSPACE)
 }
 
-func listDeploymentToken(out io.Writer) error {
+func listDeploymentToken(ctx context.Context, out, errOut io.Writer, limit int) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	return runDeploymentTokenList(deploymentTokenOutput, out)
+	return runDeploymentTokenList(ctx, limit, deploymentTokenOutput, out, errOut)
 }
 
 func createDeploymentToken(out, errOut io.Writer) error {

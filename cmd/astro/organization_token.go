@@ -6,6 +6,7 @@ package astro
 // json.
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -21,12 +22,12 @@ import (
 // family, registered once on its group.
 var organizationTokenOutput cliout.Format
 
-func listOrganizationToken(out io.Writer) error {
-	tokens, err := organization.ListTokens(astroV1Client)
+func listOrganizationToken(ctx context.Context, out, errOut io.Writer, limit int) error {
+	tokens, err := organization.ListTokens(ctx, astroV1Client, limit)
 	if err != nil {
 		return err
 	}
-	return renderTokenList(organizationTokenOutput, out, tokens, organizationRoleHeader)
+	return renderTokenList(organizationTokenOutput, out, errOut, tokens, organizationRoleHeader)
 }
 
 func listOrganizationTokenRoles(args []string, out io.Writer) error {

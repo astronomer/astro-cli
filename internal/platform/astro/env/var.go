@@ -12,8 +12,8 @@ import (
 const objectTypeVar = astrov1.ENVIRONMENTVARIABLE
 
 // ListVars returns ENVIRONMENT_VARIABLE objects for the given scope.
-func ListVars(scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
-	return listObjects(scope, objectTypeVar, resolveLinked, includeSecrets, astroV1Client)
+func ListVars(ctx httpcontext.Context, scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
+	return listObjects(ctx, scope, objectTypeVar, resolveLinked, includeSecrets, astroV1Client)
 }
 
 // GetVar fetches a single env var by ID or key.

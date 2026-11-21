@@ -31,7 +31,6 @@ type TokenType string
 const (
 	TokenTypeWORKSPACE    TokenType = "WORKSPACE"
 	TokenTypeORGANIZATION TokenType = "ORGANIZATION"
-	tokenPaginationLim              = 100
 )
 
 var (
@@ -95,12 +94,12 @@ func target(workspaceID string) (wsID, organizationID string, err error) {
 // ListTokens lists tokens with a role in the Workspace ("" is the current
 // one), each with its role there. tokenTypes, when not empty, keeps only those
 // scopes. The list is empty, never nil, when there are none.
-func ListTokens(client astrov1.APIClient, workspaceID string, tokenTypes []TokenType) ([]apitoken.Token, error) {
+func ListTokens(ctx httpContext.Context, client astrov1.APIClient, workspaceID string, tokenTypes []TokenType, limit int) ([]apitoken.Token, error) {
 	workspaceID, _, err := target(workspaceID)
 	if err != nil {
 		return nil, err
 	}
-	apiTokens, err := getWorkspaceTokens(workspaceID, tokenTypes, client)
+	apiTokens, err := getWorkspaceTokens(ctx, workspaceID, tokenTypes, limit, client)
 	if err != nil {
 		return nil, err
 	}
@@ -329,54 +328,21 @@ func setWorkspaceRole(token *astrov1.ApiToken, workspaceID, role, organizationID
 // TokensOf lists the tokens with a role in the Workspace, as the API has them,
 // of the scopes in tokenTypes (all of them when it is empty), for a command in
 // another family that picks among them.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func TokensOf(workspaceID string, tokenTypes []TokenType, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
-	return getWorkspaceTokens(workspaceID, tokenTypes, client)
+	return getWorkspaceTokens(httpContext.Background(), workspaceID, tokenTypes, 0, client)
 }
 
 // getWorkspaceTokens lists tokens with a role in the given workspace, then filters client-side
-// by token scope if tokenTypes is not empty.
-func getWorkspaceTokens(workspaceID string, tokenTypes []TokenType, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
+// by token scope if tokenTypes is not empty. It keeps the first limit of them in name order
+// (all when limit is below 1) and stops when ctx is canceled.
+func getWorkspaceTokens(ctx httpContext.Context, workspaceID string, tokenTypes []TokenType, limit int, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
 	workspaceID, organizationID, err := target(workspaceID)
 	if err != nil {
 		return nil, err
 	}
-	wsID := workspaceID
-	limit := tokenPaginationLim
-	var tokens []astrov1.ApiToken
-	offset := 0
-	for {
-		params := &astrov1.ListApiTokensParams{
-			WorkspaceId: &wsID,
-			Offset:      &offset,
-			Limit:       &limit,
-		}
-		resp, err := client.ListApiTokensWithResponse(httpContext.Background(), organizationID, params)
-		if err != nil {
-			return nil, err
-		}
-		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-			return nil, err
-		}
-		tokens = append(tokens, resp.JSON200.Tokens...)
-		if resp.JSON200.TotalCount <= offset+limit {
-			break
-		}
-		offset += limit
-	}
-	if len(tokenTypes) == 0 {
-		return tokens, nil
-	}
-	allowed := map[string]struct{}{}
-	for _, t := range tokenTypes {
-		allowed[string(t)] = struct{}{}
-	}
-	filtered := tokens[:0]
-	for i := range tokens {
-		if _, ok := allowed[string(tokens[i].Scope)]; ok {
-			filtered = append(filtered, tokens[i])
-		}
-	}
-	return filtered, nil
+	return apitoken.Fetch(ctx, client, organizationID, astrov1.ListApiTokensParams{WorkspaceId: &workspaceID}, limit, apitoken.OfScopes(tokenTypes))
 }
 
 // getWorkspaceToken picks the token id or name means from tokens, offering
@@ -442,6 +408,8 @@ func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.Api
 // person picks through pick. tokenTypes, when not empty, are the scopes the
 // command may act on. The Workspace is the current one when workspaceID is
 // "", and the tokens offered are shown with their role on it.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
 	if id == "" {
 		// Resolved here, not only in the list, so the roles offered are the
@@ -450,7 +418,7 @@ func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenT
 		if err != nil {
 			return token, err
 		}
-		tokens, err := getWorkspaceTokens(workspaceID, tokenTypes, client)
+		tokens, err := getWorkspaceTokens(httpContext.Background(), workspaceID, tokenTypes, 0, client)
 		if err != nil {
 			return token, err
 		}
@@ -487,6 +455,8 @@ func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenT
 // Workspace's own tokens, and Organization tokens with a role in it, are its to
 // change. A run with no Workspace (an Organization token's, given an ID) has
 // none to check against.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func FindTokenIn(id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (astrov1.ApiToken, error) {
 	if id == "" || workspaceID == "" {
 		return FindToken(id, name, workspaceID, organizationID, tokenTypes, pick, client)

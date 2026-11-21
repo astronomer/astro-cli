@@ -29,8 +29,8 @@ type ConnInput struct {
 }
 
 // ListConns returns CONNECTION objects for the given scope.
-func ListConns(scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
-	return listObjects(scope, objectTypeConn, resolveLinked, includeSecrets, astroV1Client)
+func ListConns(ctx httpcontext.Context, scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
+	return listObjects(ctx, scope, objectTypeConn, resolveLinked, includeSecrets, astroV1Client)
 }
 
 // GetConn fetches a single connection by ID or key.

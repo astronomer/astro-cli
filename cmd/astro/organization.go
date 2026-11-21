@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -84,11 +85,11 @@ func newOrganizationListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all Astro Organizations you have access to.",
 		Example: `  astro organization list
   astro organization list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return organizationList(out)
-		},
 	}
 	cliout.AddOutputFlag(cmd, &organizationListOutput)
+	addListLimit(cmd, "Organizations", "", func(cmd *cobra.Command, limit int) error {
+		return organizationList(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -219,10 +220,10 @@ func newOrganizationUserListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all users and their Organization-level roles.",
 		Example: `  astro organization user list
   astro organization user list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listUsers(out)
-		},
 	}
+	addListLimit(cmd, "users", "", func(cmd *cobra.Command, limit int) error {
+		return listUsers(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -245,8 +246,8 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func organizationList(out io.Writer) error {
-	return organization.ListWithFormat(astroV1Client, cliout.Renderer{Format: organizationListOutput, Out: out})
+func organizationList(ctx context.Context, out, errOut io.Writer, limit int) error {
+	return organization.ListWithFormat(ctx, astroV1Client, limit, cliout.Renderer{Format: organizationListOutput, Out: out, Err: errOut})
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -264,7 +265,7 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		return err
 	}
 	res := &organization.SwitchResult{Organization: switched.Organization}
-	r := cliout.Renderer{Format: format, Out: out}
+	r := cliout.Renderer{Format: format, Out: out, Err: cmd.ErrOrStderr()}
 
 	if workspaceID != "" {
 		ws, err := wsSwitch(workspaceID, astroV1Client, asks)
@@ -302,7 +303,7 @@ func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return emitAuditLogExport(cliout.Renderer{Format: auditLogsOutput, Out: out}, export)
+	return emitAuditLogExport(cliout.Renderer{Format: auditLogsOutput, Out: out, Err: cmd.ErrOrStderr()}, export)
 }
 
 func userInvite(args []string, out io.Writer) error {
@@ -328,8 +329,8 @@ func userInvite(args []string, out io.Writer) error {
 	return renderLines(organizationUserOutput, out, &inv, fmt.Sprintf("invite for %s with role %s created", inv.Email, inv.Role))
 }
 
-func listUsers(out io.Writer) error {
-	return user.ListOrgUsersWithFormat(astroV1Client, cliout.Renderer{Format: organizationUserOutput, Out: out})
+func listUsers(ctx context.Context, out, errOut io.Writer, limit int) error {
+	return user.ListOrgUsersWithFormat(ctx, astroV1Client, limit, cliout.Renderer{Format: organizationUserOutput, Out: out, Err: errOut})
 }
 
 func userUpdate(args []string, out io.Writer) error {
@@ -391,15 +392,15 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all the teams in your Astro Organization",
 		Example: `  astro organization team list
   astro organization team list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listTeams(out)
-		},
 	}
+	addListLimit(cmd, "teams", "", func(cmd *cobra.Command, limit int) error {
+		return listTeams(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
-func listTeams(out io.Writer) error {
-	return team.ListOrgTeamsWithFormat(astroV1Client, cliout.Renderer{Format: organizationTeamOutput, Out: out})
+func listTeams(ctx context.Context, out, errOut io.Writer, limit int) error {
+	return team.ListOrgTeamsWithFormat(ctx, astroV1Client, limit, cliout.Renderer{Format: organizationTeamOutput, Out: out, Err: errOut})
 }
 
 func newTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -633,25 +634,25 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
   # Choose the team from a list
   astro organization team user list
 `,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listUsersCmd(out)
-		},
 	}
 	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's id \"\" ")
+	addListLimit(cmd, "members", "", func(cmd *cobra.Command, limit int) error {
+		return listUsersCmd(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
-func listUsersCmd(out io.Writer) error {
+func listUsersCmd(ctx context.Context, out, errOut io.Writer, limit int) error {
 	if teamID == "" {
 		if err := mayPick("a team", teamIDFlag); err != nil {
 			return err
 		}
 	}
-	list, err := team.ListTeamUsers(teamID, astroV1Client)
+	list, err := team.ListTeamUsers(ctx, teamID, limit, astroV1Client)
 	if err != nil {
 		return err
 	}
-	return renderTeamMembers(organizationTeamOutput, out, &list)
+	return renderTeamMembers(organizationTeamOutput, out, errOut, &list)
 }
 
 // org tokens
@@ -692,10 +693,10 @@ func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
   # List the tokens in another Organization
   astro organization token list --organization-id <ORGANIZATION_ID>
 `,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listOrganizationToken(out)
-		},
 	}
+	addListLimit(cmd, "API tokens", "", func(cmd *cobra.Command, limit int) error {
+		return listOrganizationToken(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -862,21 +863,21 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
   # List the roles as JSON
   astro organization role list -o json
 `,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listRoles(out)
-		},
 	}
 	cmd.Flags().BoolVar(&shouldIncludeDefaultRoles, "include-default-roles", false, "Should include default roles in response")
 
+	addListLimit(cmd, "custom roles", "Default roles shown with --include-default-roles are not counted against the limit", func(cmd *cobra.Command, limit int) error {
+		return listRoles(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
-func listRoles(out io.Writer) error {
-	roles, err := roleClient.ListData(astroV1Client, shouldIncludeDefaultRoles)
+func listRoles(ctx context.Context, out, errOut io.Writer, limit int) error {
+	roles, err := roleClient.ListData(ctx, astroV1Client, shouldIncludeDefaultRoles, limit)
 	if err != nil {
 		return err
 	}
-	return emitRoles(cliout.Renderer{Format: organizationRoleOutput, Out: out}, roles)
+	return emitRoles(cliout.Renderer{Format: organizationRoleOutput, Out: out, Err: errOut}, roles)
 }
 
 func newOrganizationClusterRootCmd(out io.Writer) *cobra.Command {
@@ -901,14 +902,14 @@ func newOrganizationClusterListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all the clusters in your Astro Organization. Only Dedicated and Hybrid clusters are listed. Standard Deployments run on clusters that Astronomer manages, so an Organization with only Standard Deployments has no clusters to list.",
 		Example: `  astro organization cluster list
   astro organization cluster list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listClusters(out)
-		},
 	}
 	cliout.AddOutputFlag(cmd, &organizationClusterListOutput)
+	addListLimit(cmd, "clusters", "", func(cmd *cobra.Command, limit int) error {
+		return listClusters(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
-func listClusters(out io.Writer) error {
-	return organization.ListClustersWithFormat(astroV1Client, cliout.Renderer{Format: organizationClusterListOutput, Out: out})
+func listClusters(ctx context.Context, out, errOut io.Writer, limit int) error {
+	return organization.ListClustersWithFormat(ctx, astroV1Client, limit, cliout.Renderer{Format: organizationClusterListOutput, Out: out, Err: errOut})
 }

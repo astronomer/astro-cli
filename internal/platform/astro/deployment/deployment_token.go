@@ -29,7 +29,6 @@ const (
 	DeploymentTokenTypeDEPLOYMENT   DeploymentTokenType = "DEPLOYMENT"
 	DeploymentTokenTypeWORKSPACE    DeploymentTokenType = "WORKSPACE"
 	DeploymentTokenTypeORGANIZATION DeploymentTokenType = "ORGANIZATION"
-	deploymentTokenPaginationLim                        = 100
 )
 
 var (
@@ -72,8 +71,8 @@ func deploymentRoleReader(deploymentID string) func(*astrov1.ApiToken) string {
 // ListTokens lists tokens with a role in the given deployment. tokenTypes, when
 // not empty, keeps only those scopes. The list is empty, never nil, when there
 // are none.
-func ListTokens(client astrov1.APIClient, deploymentID string, tokenTypes []DeploymentTokenType) ([]apitoken.Token, error) {
-	apiTokens, err := getDeploymentTokens(deploymentID, tokenTypes, client)
+func ListTokens(ctx httpContext.Context, client astrov1.APIClient, deploymentID string, tokenTypes []DeploymentTokenType, limit int) ([]apitoken.Token, error) {
+	apiTokens, err := getDeploymentTokens(ctx, deploymentID, tokenTypes, limit, client)
 	if err != nil {
 		return nil, err
 	}
@@ -360,48 +359,13 @@ func setDeploymentRole(token *astrov1.ApiToken, deploymentID, role, organization
 }
 
 // getDeploymentTokens lists tokens with a role in the given deployment, filtered client-side by scope.
-func getDeploymentTokens(deploymentID string, tokenTypes []DeploymentTokenType, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
-	ctx, err := context.GetCurrentContext()
+// It keeps the first limit of them in name order (all when limit is below 1) and stops when ctx is canceled.
+func getDeploymentTokens(ctx httpContext.Context, deploymentID string, tokenTypes []DeploymentTokenType, limit int, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
-	depID := deploymentID
-	limit := deploymentTokenPaginationLim
-	var tokens []astrov1.ApiToken
-	offset := 0
-	for {
-		params := &astrov1.ListApiTokensParams{
-			DeploymentId: &depID,
-			Offset:       &offset,
-			Limit:        &limit,
-		}
-		resp, err := client.ListApiTokensWithResponse(httpContext.Background(), ctx.Organization, params)
-		if err != nil {
-			return nil, err
-		}
-		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-			return nil, err
-		}
-		tokens = append(tokens, resp.JSON200.Tokens...)
-		if resp.JSON200.TotalCount <= offset+limit {
-			break
-		}
-		offset += limit
-	}
-	if len(tokenTypes) == 0 {
-		return tokens, nil
-	}
-	allowed := map[string]struct{}{}
-	for _, t := range tokenTypes {
-		allowed[string(t)] = struct{}{}
-	}
-	filtered := tokens[:0]
-	for i := range tokens {
-		if _, ok := allowed[string(tokens[i].Scope)]; ok {
-			filtered = append(filtered, tokens[i])
-		}
-	}
-	return filtered, nil
+	return apitoken.Fetch(ctx, client, cfg.Organization, astrov1.ListApiTokensParams{DeploymentId: &deploymentID}, limit, apitoken.OfScopes(tokenTypes))
 }
 
 func getDeploymentToken(id, name, deploymentID string, tokens []astrov1.ApiToken, pick apitoken.Picker) (token astrov1.ApiToken, err error) {
@@ -465,6 +429,8 @@ func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.Api
 // named name among the tokens with a role on the Deployment, else the one a
 // person picks through pick. tokenTypes, when not empty, are the scopes the
 // command may act on.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func FindToken(id, name, deploymentID string, tokenTypes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -472,7 +438,7 @@ func FindToken(id, name, deploymentID string, tokenTypes []DeploymentTokenType, 
 	}
 	organizationID := ctx.Organization
 	if id == "" {
-		tokens, err := getDeploymentTokens(deploymentID, tokenTypes, client)
+		tokens, err := getDeploymentTokens(httpContext.Background(), deploymentID, tokenTypes, 0, client)
 		if err != nil {
 			return token, err
 		}

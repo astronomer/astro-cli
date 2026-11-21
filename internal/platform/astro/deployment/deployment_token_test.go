@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -272,7 +273,7 @@ func (s *Suite) TestListTokens() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Once()
-		_, err := ListTokens(mockClient, "", nil)
+		_, err := ListTokens(context.Background(), mockClient, "", nil, 0)
 		s.NoError(err)
 	})
 
@@ -281,7 +282,7 @@ func (s *Suite) TestListTokens() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Once()
 
-		_, err := ListTokens(mockClient, "otherDeployment", nil)
+		_, err := ListTokens(context.Background(), mockClient, "otherDeployment", nil, 0)
 
 		s.NoError(err)
 	})
@@ -290,14 +291,14 @@ func (s *Suite) TestListTokens() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseError, nil).Once()
-		_, err := ListTokens(mockClient, "otherDeployment", nil)
+		_, err := ListTokens(context.Background(), mockClient, "otherDeployment", nil, 0)
 		s.ErrorContains(err, "failed to list tokens")
 	})
 
 	s.Run("error getting current context", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := ListTokens(mockClient, "", nil)
+		_, err := ListTokens(context.Background(), mockClient, "", nil, 0)
 
 		s.Error(err)
 	})

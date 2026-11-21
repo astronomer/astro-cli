@@ -48,7 +48,7 @@ func TestTokenListPipedHasTimestampsAndTabs(t *testing.T) {
 	created := time.Date(2026, 11, 18, 22, 57, 8, 0, time.FixedZone("x", 3600))
 	var out bytes.Buffer
 	tokens := []apitoken.Token{{ID: "tok", Name: "n", Scope: "WORKSPACE", Role: "r", CreatedAt: created, CreatedBy: "by", Kind: "DIRECT_ACCESS"}}
-	require.NoError(t, renderTokenList(cliout.FormatText, &out, tokens, workspaceRoleHeader))
+	require.NoError(t, renderTokenList(cliout.FormatText, &out, nil, tokens, workspaceRoleHeader))
 	assert.Equal(t, "ID\tNAME\tDESCRIPTION\tSCOPE\tWORKSPACE ROLE\tCREATED\tCREATED BY\tKIND\n"+
 		"tok\tn\t\tWORKSPACE\tr\t2026-11-18T21:57:08Z\tby\tDIRECT_ACCESS\n", out.String())
 }

@@ -138,7 +138,7 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 	if err != nil {
 		return err
 	}
-	return emitWorkerQueue(cliout.Renderer{Format: format, Out: out}, res, ws)
+	return emitWorkerQueue(cliout.Renderer{Format: format, Out: out, Err: cmd.ErrOrStderr()}, res, ws)
 }
 
 func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -154,5 +154,5 @@ func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	return emitWorkerQueue(cliout.Renderer{Format: format, Out: out}, res, ws)
+	return emitWorkerQueue(cliout.Renderer{Format: format, Out: out, Err: cmd.ErrOrStderr()}, res, ws)
 }

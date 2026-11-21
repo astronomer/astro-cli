@@ -1,6 +1,7 @@
 package env
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -69,7 +70,7 @@ func (s *Suite) TestListVars() {
 			},
 		}, nil).Once()
 
-		objs, err := ListVars(Scope{WorkspaceID: workspaceID}, true, false, mc)
+		objs, err := ListVars(context.Background(), Scope{WorkspaceID: workspaceID}, true, false, mc)
 		s.NoError(err)
 		s.Len(objs, 1)
 		s.Equal("FOO", objs[0].ObjectKey)
@@ -94,20 +95,20 @@ func (s *Suite) TestListVars() {
 			JSON200:      &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: nil},
 		}, nil).Once()
 
-		_, err := ListVars(Scope{DeploymentID: deploymentID}, false, true, mc)
+		_, err := ListVars(context.Background(), Scope{DeploymentID: deploymentID}, false, true, mc)
 		s.NoError(err)
 		mc.AssertExpectations(s.T())
 	})
 
 	s.Run("rejects empty scope", func() {
 		mc := new(astrov1_mocks.ClientWithResponsesInterface)
-		_, err := ListVars(Scope{}, true, false, mc)
+		_, err := ListVars(context.Background(), Scope{}, true, false, mc)
 		s.ErrorIs(err, ErrScopeNotSpecified)
 	})
 
 	s.Run("rejects ambiguous scope", func() {
 		mc := new(astrov1_mocks.ClientWithResponsesInterface)
-		_, err := ListVars(Scope{WorkspaceID: "ws", DeploymentID: "dep"}, true, false, mc)
+		_, err := ListVars(context.Background(), Scope{WorkspaceID: "ws", DeploymentID: "dep"}, true, false, mc)
 		s.ErrorIs(err, ErrScopeAmbiguous)
 	})
 }

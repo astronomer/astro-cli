@@ -1,6 +1,7 @@
 package organization
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -327,7 +328,7 @@ func (s *Suite) TestListTokens() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseOK, nil)
-		got, err := ListTokens(mockClient)
+		got, err := ListTokens(context.Background(), mockClient, 0)
 		s.NoError(err)
 		s.Require().Len(got, 2)
 		s.Equal("token1", got[0].ID)
@@ -343,7 +344,7 @@ func (s *Suite) TestListTokens() {
 			HTTPResponse: &http.Response{StatusCode: 200},
 			JSON200:      &astrov1.ApiTokensPaginated{Tokens: []astrov1.ApiToken{}},
 		}, nil)
-		got, err := ListTokens(mockClient)
+		got, err := ListTokens(context.Background(), mockClient, 0)
 		s.NoError(err)
 		s.NotNil(got)
 		s.Empty(got)
@@ -353,14 +354,14 @@ func (s *Suite) TestListTokens() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListOrganizationAPITokensResponseError, nil)
-		_, err := ListTokens(mockClient)
+		_, err := ListTokens(context.Background(), mockClient, 0)
 		s.ErrorContains(err, "failed to list tokens")
 	})
 
 	s.Run("error getting current context", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := ListTokens(mockClient)
+		_, err := ListTokens(context.Background(), mockClient, 0)
 		s.Error(err)
 	})
 }
