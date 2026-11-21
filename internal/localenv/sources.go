@@ -2,6 +2,7 @@ package localenv
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -142,10 +143,54 @@ func (s Sources) DotenvWarnings(schema *envschema.Schema) []envschema.Violation 
 			Section: envschema.SectionConnection,
 			Key:     airflowenv.ConnIDForEnvKey(key),
 			Reason: "its value in .env (" + key + ") is not valid JSON, " +
-				"so Airflow will report the connection as not defined",
+				"so Airflow will report the connection as not defined: " + jsonFault(v),
 		})
 	}
 	return out
+}
+
+// jsonFault says where and how v, which json.Valid rejected, stops being JSON,
+// in terms a .env author can act on. It never quotes v: encoding/json's own
+// message names the byte it stopped on, and in a connection that byte can be
+// part of a password (airflowenv.DecodeConnValue keeps its errors free of the
+// payload for the same reason). A control character is named by kind, since
+// that names no secret and is the case worth explaining: a newline or tab
+// inside a JSON string has to be an escape, and which spelling of the escape
+// a .env needs depends on its quotes.
+func jsonFault(v string) string {
+	var x any
+	var se *json.SyntaxError
+	if err := json.Unmarshal([]byte(v), &x); !errors.As(err, &se) {
+		return "it does not parse"
+	}
+	if se.Offset >= int64(len(v)) {
+		return "it ends before the JSON does (an unclosed brace, bracket or string)"
+	}
+	at := se.Offset // 1-based position of the byte it stopped on
+	switch c := v[at-1]; {
+	case c < firstPrintableASCII:
+		return fmt.Sprintf("character %d is a raw %s inside a string. JSON needs it as an escape: "+
+			`write \n (or \t) in a single-quoted or unquoted value, \\n in a double-quoted one`, at, controlName(c))
+	default:
+		return fmt.Sprintf("it breaks at character %d", at)
+	}
+}
+
+// firstPrintableASCII is the space: every byte below it is a control
+// character, which JSON does not allow raw inside a string.
+const firstPrintableASCII = 0x20
+
+func controlName(c byte) string {
+	switch c {
+	case '\n':
+		return "newline"
+	case '\r':
+		return "carriage return"
+	case '\t':
+		return "tab"
+	default:
+		return "control character"
+	}
 }
 
 // Providers is the ordered resolution chain:

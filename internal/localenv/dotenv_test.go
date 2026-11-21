@@ -119,6 +119,53 @@ func TestDotenvWarnings(t *testing.T) {
 	}
 }
 
+func TestJSONFault(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"{\"k\": \"a\nb\"}", "character 9 is a raw newline inside a string"},
+		{"{\"k\": \"a\tb\"}", "character 9 is a raw tab inside a string"},
+		{"{\"k\": \"a\x01b\"}", "character 9 is a raw control character inside a string"},
+		{`{"k": 1`, "it ends before the JSON does"},
+		{`{"k" 1}`, "it breaks at character 6"},
+	}
+	for _, tc := range cases {
+		if got := jsonFault(tc.in); !strings.HasPrefix(got, tc.want) {
+			t.Errorf("jsonFault(%q) = %q, want it to start %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+// The shape that started this: a double-quoted connection whose inner quotes
+// are escaped, and whose private key keeps JSON's \n with one backslash.
+// Double quotes turn that \n into a real newline, which JSON does not allow
+// in a string. The warning says so, says how to write it, and quotes none of
+// the value.
+func TestDotenvWarningsExplainARawNewlineInAConnection(t *testing.T) {
+	dir := t.TempDir()
+	line := `AIRFLOW_CONN_GCP="{\"conn_type\": \"google_cloud_platform\", \"extra\": {\"keyfile_dict\": {\"private_key\": \"-----BEGIN-----\nSECRETBYTES\n-----END-----\n\"}}}"` + "\n"
+	if err := os.WriteFile(filepath.Join(dir, EnvFileName), []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	src, err := LoadSources(nil, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := src.DotenvWarnings(nil)
+	if len(got) != 1 {
+		t.Fatalf("want one warning, got %+v", got)
+	}
+	r := got[0].Reason
+	for _, want := range []string{"raw newline inside a string", `\\n in a double-quoted one`, "not defined"} {
+		if !strings.Contains(r, want) {
+			t.Errorf("reason %q is missing %q", r, want)
+		}
+	}
+	for _, secret := range []string{"SECRETBYTES", "BEGIN"} {
+		if strings.Contains(r, secret) {
+			t.Errorf("reason quotes the value (%q): %q", secret, r)
+		}
+	}
+}
+
 // A set whose assignment an earlier open quote would take in is refused, and
 // the file is left as it was, rather than reported done and never read back.
 func TestMergeSetRefusesWhatWouldNotReadBack(t *testing.T) {
