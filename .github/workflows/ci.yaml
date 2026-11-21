@@ -14,14 +14,14 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
 
       - name: Cache prek tools
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ~/.cache/prek
           key: prek-v1-${{ hashFiles('prek.toml') }}
@@ -86,9 +86,9 @@ jobs:
   lint-goos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
           cache: false
@@ -99,7 +99,7 @@ jobs:
           echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
           echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             ${{ steps.go-env.outputs.build }}
@@ -115,7 +115,7 @@ jobs:
       # Runs even when the lint above failed: the objects were compiled by the
       # time this is reached and are no less valid for a finding having been
       # reported against them.
-      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         if: ${{ !cancelled() && github.event_name == 'push' }}
         with:
           path: |
@@ -131,7 +131,7 @@ jobs:
   bump-default-airflow-rule:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: The jq rule agrees with the Go rule on the fixture
         run: |
@@ -150,13 +150,13 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       # setup-go's own cache key is the same for every Linux job here, and only
       # the first job to finish writes it — that is `lint`, whose build cache
       # holds no -race or -cover objects. This job then rebuilt the whole tree
       # from cold every run. Keep a cache of its own instead.
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
           cache: false
@@ -193,7 +193,7 @@ jobs:
       # then the only edit, and a branch added there is covered rather than
       # silently skipped. `github.event.repository.default_branch` is
       # name-agnostic too, but it can disagree with the trigger; this cannot.
-      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             ${{ steps.go-env.outputs.build }}
@@ -256,7 +256,7 @@ jobs:
       # XDG_CACHE_HOME is unset on the runner — and if a runner image ever set
       # it, this would cache an empty directory and every tier-1 case would
       # download from cold with no failing step to say so.
-      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ${{ env.UV_CACHE_DIR }}
           # Keyed on the file that pins the Airflow tier 1 installs, so a bump
@@ -278,7 +278,7 @@ jobs:
       - name: Run e2e tests (tiers 0 and 1)
         run: make test-e2e ASTRO_E2E_MAX_TIER=1
 
-      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         if: ${{ !cancelled() && github.event_name == 'push' }}
         with:
           path: ${{ env.UV_CACHE_DIR }}
@@ -292,7 +292,7 @@ jobs:
       # failure — while discarding them means every pull request opened after a
       # red trunk push restores the run before it and recompiles the difference,
       # until the next green one.
-      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         if: ${{ !cancelled() && github.event_name == 'push' }}
         with:
           path: |
@@ -315,12 +315,12 @@ jobs:
   test-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       # cache: false and a cache of this job's own, for the reasons written out
       # in the `test` job above. setup-go's built-in cache has the same
       # write-once key problem, and here it was the only cache in the job.
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
           cache: false
@@ -335,7 +335,7 @@ jobs:
       # for why, and for the numbers. Saving here costs 507s, against the 306s
       # of recompiling it avoids, so a key that rotated on every commit would
       # be slower than the bug it fixed.
-      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             ${{ steps.go-env.outputs.build }}
@@ -396,7 +396,7 @@ jobs:
       # the -race ones the tests above built. Runs after a failure too, for the
       # reason given on the same step in the `test` job — and it matters more
       # here, where saving costs 507s and the recompile it avoids costs 306s.
-      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         if: ${{ !cancelled() && github.event_name == 'push' }}
         with:
           path: |
