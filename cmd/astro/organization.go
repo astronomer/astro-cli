@@ -732,7 +732,7 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
     --expiration 365 --clean-output
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createOrganizationToken(out)
+			return createOrganizationToken(out, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -782,7 +782,7 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
   astro organization token rotate --name "My Token" --yes --clean-output
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return rotateOrganizationToken(args, out)
+			return rotateOrganizationToken(args, out, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")

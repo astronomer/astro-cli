@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/texttable"
 )
 
 // The three `dags` verbs here answer "what is wrong with the DAGs on this
@@ -56,8 +57,8 @@ func (q *query) runDagsErrors(ctx context.Context, opts airflowapi.ListOptions) 
 // line, and the frames are the part someone fixing the file reads.
 func renderImportErrors(w io.Writer, rows []importErrorRow) error {
 	if len(rows) == 0 {
-		_, err := fmt.Fprintln(w, "No import errors on this Airflow.")
-		return err
+		texttable.Say(w, "No import errors on this Airflow.")
+		return nil
 	}
 	for i, row := range rows {
 		if i > 0 {

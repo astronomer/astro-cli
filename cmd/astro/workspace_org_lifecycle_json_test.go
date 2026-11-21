@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // What `astro workspace create|update|delete|switch`, `astro organization
@@ -169,6 +170,7 @@ func lacks(s string) func(t *testing.T, out string) {
 // What each command prints in text: the same messages, in the same order, as
 // before it gained --output.
 func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	prod, dev := lifecycleWorkspaces()
 	both := []astrov1.Workspace{prod, dev}
 	staging := astrov1.Workspace{Id: "ws-staging", Name: "Staging"}

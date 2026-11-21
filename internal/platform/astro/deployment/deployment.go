@@ -730,11 +730,11 @@ const (
 
 func validateHybridResources(schedulerAU, schedulerReplicas int, _ astrov1.DeploymentOptions) bool { //nolint:gocritic // intentional in this shell code
 	if schedulerAU > hybridSchedulerAuMax || schedulerAU < hybridSchedulerAuMin {
-		fmt.Printf("\nScheduler AUs must be between %d and %d\n", hybridSchedulerAuMin, hybridSchedulerAuMax)
+		fmt.Fprintf(os.Stderr, "\nScheduler AUs must be between %d and %d\n", hybridSchedulerAuMin, hybridSchedulerAuMax)
 		return false
 	}
 	if schedulerReplicas > hybridSchedulerReplicasMax || schedulerReplicas < hybridSchedulerReplicasMin {
-		fmt.Printf("\nScheduler Replicas must be between %d and %d\n", hybridSchedulerReplicasMin, hybridSchedulerReplicasMax)
+		fmt.Fprintf(os.Stderr, "\nScheduler Replicas must be between %d and %d\n", hybridSchedulerReplicasMin, hybridSchedulerReplicasMax)
 		return false
 	}
 	return true

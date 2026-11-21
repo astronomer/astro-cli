@@ -14,6 +14,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/checks"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // stubParser is the check seam under test: it returns a canned report (or
@@ -972,6 +973,7 @@ func TestCheckPrintsNoTracebackForASingleLineMessage(t *testing.T) {
 // A tab in an exception message would open a new tabwriter column and shift
 // every row under it.
 func TestCheckKeepsTheTableAlignedAroundATab(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	d, out := checkDeps(t)
 	d.Checks = stubParser{report: checks.ParseReport{
 		ImportErrors: []checks.ReportImportErr{

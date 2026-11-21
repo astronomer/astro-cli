@@ -430,14 +430,13 @@ func TestDeployManifestTextUnchanged(t *testing.T) {
 	out, errOut, err := execDeployIO("", "prod")
 	require.NoError(t, err)
 
-	// stdout is this command's own output: the progress line, the summary, the
-	// URL — and nothing else.
-	want := "Building the project image. This can take a few minutes…\n" +
-		"Deployed image (tag deploy-2026-07-23T18-40) and Dags (version 3-1690000000) to prod (Deployment clx-dep).\n" +
+	// stdout is the result: the summary and the URL, nothing else.
+	want := "Deployed image (tag deploy-2026-07-23T18-40) and Dags (version 3-1690000000) to prod (Deployment clx-dep).\n" +
 		"Deployment: https://cloud.astronomer.io/deployments/clx-dep\n"
 	assert.Equal(t, want, out)
-	// The target goes on stderr, the way every resolving command announces one.
-	assert.Equal(t, "→ prod (astro deployment clx-dep)\n", errOut)
+	// The target and the progress go on stderr, the way every resolving
+	// command announces one.
+	assert.Equal(t, "→ prod (astro deployment clx-dep)\nBuilding the project image. This can take a few minutes…\n", errOut)
 }
 
 // A deploy to a Deployment with DAG deploys off uploads no DAGs: they are
@@ -527,7 +526,8 @@ func TestDeployManifestAnnouncesBeforeItBuilds(t *testing.T) {
 	// The prompt comes first, the announce line after it — nothing is claimed
 	// about a target before there is one.
 	assert.Less(t, strings.Index(errOut, "Deploy to which deployment?"), strings.Index(errOut, "→ prod"))
-	assert.Contains(t, out, "Building the project image")
+	assert.Contains(t, errOut, "Building the project image")
+	assert.NotContains(t, out, "Building the project image", "progress is not the result")
 }
 
 // A deployment named by id has no link name to show, so the line carries the id
@@ -537,7 +537,7 @@ func TestDeployManifestAnnouncesAnIDWithNoLinkName(t *testing.T) {
 
 	out, errOut, err := execDeployIO("", "--deployment", "clx-not-a-link")
 	require.NoError(t, err)
-	assert.Equal(t, "→ clx-not-a-link\n", errOut)
+	assert.Equal(t, "→ clx-not-a-link\nBuilding the project image. This can take a few minutes…\n", errOut)
 	assert.Contains(t, out, "to Deployment clx-not-a-link.")
 }
 

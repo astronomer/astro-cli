@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/git"
@@ -343,8 +344,7 @@ func UploadBundle(bundlePath, uploadURL string, opts BundleUpload) (string, erro
 	}
 	defer func() {
 		if err := os.RemoveAll(tarDir); err != nil {
-			fmt.Println("\nCould not delete archived file: ", err.Error())
-			fmt.Println("\nDelete the archived file manually: " + tarDir)
+			ansi.Warn(os.Stderr, "Could not delete archived file: "+err.Error()+". Delete it manually: "+tarDir)
 		}
 	}()
 	tarGzFilePath := filepath.Join(tarDir, "bundle.tar.gz")
@@ -417,7 +417,7 @@ func finalizeBundleDeploy(organizationID, deploymentID, deployID, tarballVersion
 // Returns nil and empty string if the repository has uncommitted changes or if git metadata cannot be retrieved.
 func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrov1.CreateDeployGitRequest, commitMessage string) {
 	if git.HasUncommittedChanges(bundlePath) {
-		fmt.Println("Local repository has uncommitted changes, skipping Git metadata retrieval")
+		ansi.Warn(os.Stderr, "Local repository has uncommitted changes, skipping Git metadata retrieval")
 		return nil, ""
 	}
 	return readHeadGitMetadata(bundlePath)

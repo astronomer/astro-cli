@@ -69,7 +69,7 @@ func TestRotateAndDeleteAWorkspaceTokenByIDNeedNoWorkspace(t *testing.T) {
 	}{
 		"rotate": {
 			run: func(cmd *cobra.Command, out *bytes.Buffer) error {
-				return rotateWorkspaceToken([]string{"token-id"}, out)
+				return rotateWorkspaceToken([]string{"token-id"}, out, cmd.ErrOrStderr())
 			},
 			endpoint: "RotateApiTokenWithResponse",
 			want:     "new-secret",

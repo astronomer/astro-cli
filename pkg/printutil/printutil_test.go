@@ -276,3 +276,25 @@ func (s *Suite) TestTableAddRowCleansCells() {
 	s.NotContains(buf.String(), "\x07")
 	s.Equal([]string{"prod", "a b"}, tab.Rows[0].Raw)
 }
+
+// Printed to anything but a terminal, a table is one tab between cells: no
+// padding, no leading space, no color. Its messages go to stderr, so stdout
+// is the table alone.
+func (s *Suite) TestTablePrintIsPlainWhenNotATerminal() {
+	tab := Table{
+		DynamicPadding: true,
+		Header:         []string{"KEY", "VALUE"},
+		NoResultsMsg:   "nothing",
+		SuccessMsg:     "done",
+		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+	}
+	var empty bytes.Buffer
+	s.NoError(tab.Print(&empty))
+	s.Equal("KEY\tVALUE\n", empty.String(), "the empty message is not on stdout")
+
+	tab.AddRow([]string{"A", "1"}, true)
+	tab.AddRow([]string{"LONGER_KEY", ""}, false)
+	var buf bytes.Buffer
+	s.NoError(tab.Print(&buf))
+	s.Equal("KEY\tVALUE\nA\t1\nLONGER_KEY\t\n", buf.String(), "no color, no padding, no success message")
+}

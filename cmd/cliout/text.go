@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"io"
 
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/texttable"
 )
 
@@ -45,3 +46,16 @@ func Text(render func(b *bufio.Writer)) func(io.Writer) error {
 // the CLI's tables have always had. It is texttable.Table, which lives in
 // pkg/ so a picker below cmd/ (pkg/picker) draws its rows the same way.
 type Table = texttable.Table
+
+// TableText is Emit's text renderer for a table: the aligned layout on a
+// terminal, and one tab between cells, with nothing else, anywhere a script
+// may be reading. A table's Empty message goes to stderr either way.
+func TableText(t *Table) func(io.Writer) error {
+	return func(w io.Writer) error {
+		t.Plain = !IsTerminal(w)
+		if t.EmptyTo == nil {
+			t.EmptyTo = input.NoticesFor(w)
+		}
+		return WriteText(w, t.Render)
+	}
+}

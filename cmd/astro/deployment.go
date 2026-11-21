@@ -1301,7 +1301,7 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
   astro deployment token create --name my-token --role DEPLOYMENT_ADMIN \
     --deployment <DEPLOYMENT_ID> --expiration 30 --clean-output`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createDeploymentToken(out)
+			return createDeploymentToken(out, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -1360,7 +1360,7 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
   # Rotate it without asking for confirmation
   astro deployment token rotate <TOKEN_ID> --deployment <DEPLOYMENT_ID> --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return rotateDeploymentToken(args, out)
+			return rotateDeploymentToken(args, out, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
@@ -1730,7 +1730,7 @@ func listDeploymentToken(out io.Writer) error {
 	return runDeploymentTokenList(deploymentTokenOutput, out)
 }
 
-func createDeploymentToken(out io.Writer) error {
+func createDeploymentToken(out, errOut io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1755,7 +1755,7 @@ func createDeploymentToken(out io.Writer) error {
 		tokenRole = answer
 	}
 
-	return runDeploymentTokenCreate(deploymentTokenOutput, out)
+	return runDeploymentTokenCreate(deploymentTokenOutput, out, errOut)
 }
 
 func updateDeploymentToken(args []string, out io.Writer) error {
@@ -1774,7 +1774,7 @@ func updateDeploymentToken(args []string, out io.Writer) error {
 	return runDeploymentTokenUpdate(deploymentTokenOutput, out)
 }
 
-func rotateDeploymentToken(args []string, out io.Writer) error {
+func rotateDeploymentToken(args []string, out, errOut io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1786,7 +1786,7 @@ func rotateDeploymentToken(args []string, out io.Writer) error {
 		// make sure the id is lowercase
 		tokenID = strings.ToLower(args[0])
 	}
-	return runDeploymentTokenRotate(deploymentTokenOutput, out)
+	return runDeploymentTokenRotate(deploymentTokenOutput, out, errOut)
 }
 
 func deleteDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {

@@ -57,10 +57,10 @@ func TestDeployClientImageReturnsWhatItPushed(t *testing.T) {
 
 			r, w, err := os.Pipe()
 			require.NoError(t, err)
-			prev := os.Stdout
-			os.Stdout = w
+			prevOut, prevErr := os.Stdout, os.Stderr
+			os.Stdout, os.Stderr = w, w
 			got, err := DeployClientImage(tc.in, nil)
-			os.Stdout = prev
+			os.Stdout, os.Stderr = prevOut, prevErr
 			require.NoError(t, w.Close())
 			out, readErr := io.ReadAll(r)
 			require.NoError(t, readErr)
