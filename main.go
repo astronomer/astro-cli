@@ -27,6 +27,7 @@ import (
 
 func main() {
 	pauseGCForStartup()
+	keepRunningOnClosedStdout()
 	// Before anything builds a request: every client that names no transport
 	// reads http.DefaultTransport, which this replaces when
 	// ASTRO_HTTP_UNIX_SOCKET is set.
@@ -126,7 +127,6 @@ func signalContext() context.Context {
 		signals = append(signals, syscall.SIGHUP)
 	}
 	signal.Notify(sigs, signals...)
-	watchClosedStdout()
 	// No defer to stop listening: every failing path out of main ends in
 	// os.Exit, so it would not run. The only moment it is needed is after the
 	// first signal, which is where it happens.

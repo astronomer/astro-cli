@@ -127,7 +127,9 @@ func dagsFrom(deploymentInfo *houston.Deployment, appConfig *houston.AppConfig) 
 // questions.
 type Options struct {
 	// Context ends the DAG upload when the run is interrupted; nil is
-	// context.Background().
+	// context.Background(). The upload and its retries stop at once. The
+	// Houston calls before it take no context, so an interrupt is honored
+	// between them, at best effort: a call already sent runs to its end.
 	Context context.Context
 	// Progress is where the deploy's progress goes: its notes, the image
 	// push and the DAG upload. nil is os.Stdout, where it has always gone; a
