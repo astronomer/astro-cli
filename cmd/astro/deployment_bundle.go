@@ -92,8 +92,8 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "update [BUNDLE_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "update",
 		Short: "Update a bundle on an Astro Deployment",
 		Long:  "Update a bundle's description or, for a non-Dag bundle, the Dag bundles it is served alongside. Identify the bundle by its ID argument, its Dag bundle --name, or its non-Dag --mount-path.",
 		Example: `  # Update a bundle's description, identified by ID
@@ -108,7 +108,6 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 
   # Print the bundle as the update left it
   astro deployment bundle update <bundle-id> --deployment <id> --description "my bundle" -o json`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
 			ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
@@ -121,7 +120,7 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 			}
 			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), client, astroV1Alpha1Client)
 		},
-	}
+	}, cliout.Optional("BUNDLE_ID"))
 	cmd.Flags().StringVarP(&bundleName, "name", "n", "", "Identify the Dag bundle to update by name, instead of by ID")
 	cmd.Flags().StringVar(&bundleMountPath, "mount-path", "", "Identify the non-Dag bundle to update by mount path, instead of by ID")
 	cmd.Flags().StringVar(&bundleDescription, "description", "", "New description for the bundle")
@@ -130,8 +129,8 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete [BUNDLE_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete a bundle from an Astro Deployment",
 		Long:    "Delete a Dag or non-Dag bundle from an Astro Deployment. Identify the bundle by its ID argument, its Dag bundle --name, or its non-Dag --mount-path.",
@@ -146,7 +145,6 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 
   # Print what was deleted; under -o json there is no question, so pass --yes
   astro deployment bundle delete <bundle-id> --deployment <id> --yes -o json`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			defer strayStdoutToStderr(bundleOutput)()
 			ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
@@ -159,7 +157,7 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 			}
 			return deployment.DeleteBundle(bundleID, bundleName, bundleMountPath, ws, deploymentID, forceBundleDelete, cliout.Renderer{Format: bundleOutput, Out: out}, client, astroV1Alpha1Client)
 		},
-	}
+	}, cliout.Optional("BUNDLE_ID"))
 	cmd.Flags().StringVarP(&bundleName, "name", "n", "", "Identify the Dag bundle to delete by name, instead of by ID")
 	cmd.Flags().StringVar(&bundleMountPath, "mount-path", "", "Identify the non-Dag bundle to delete by mount path, instead of by ID")
 	cmd.Flags().BoolVarP(&forceBundleDelete, "yes", "y", false, "Don't ask for confirmation before deleting the bundle")

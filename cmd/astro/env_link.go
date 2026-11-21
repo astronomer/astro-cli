@@ -165,7 +165,6 @@ func newEnvLinkRootCmd(out io.Writer, n *linkNoun) *cobra.Command {
 		Long: fmt.Sprintf("Control which Deployments a Workspace %s reaches, and give a Deployment "+
 			"its own values. Identify the %s with --%s-key or --%s-id.", n.what, n.what, n.noun, n.noun),
 		Example: n.examples,
-		Args:    cliout.UndeclaredArgs,
 		RunE:    cliout.GroupHelp,
 	}
 	f := &linkFlags{}

@@ -31,7 +31,6 @@ func newEnvAirflowVarRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Airflow variables",
 		Long:    "Manage Airflow variables on Astro, scoped to a Workspace or a Deployment.",
 		Example: envAirflowVarExamples,
-		Args:    cliout.UndeclaredArgs,
 		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
@@ -67,27 +66,25 @@ func newEnvAirflowVarListCmd(out io.Writer) *cobra.Command {
 }
 
 func newEnvAirflowVarGetCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "get <ID_OR_KEY>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "get",
 		Short: "Show an Airflow variable",
-		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvAirflowVarGet(cmd, out, args[0])
 		},
 		Example: `  # Show an Airflow variable by its key
   astro env airflow-variable get region`,
-	}
+	}, cliout.Required("ID_OR_KEY"))
 	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
 }
 
 func newEnvAirflowVarSetCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "set [ID_OR_KEY]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "set",
 		Short: "Set an Airflow variable",
 		Long: "Set an Airflow variable, creating it if it does not exist. Pass --no-create to " +
 			"fail instead, or --from-file to set many from a dotenv file.",
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if envVarFromFile != "" {
 				if len(args) > 0 {
@@ -105,7 +102,7 @@ func newEnvAirflowVarSetCmd(out io.Writer) *cobra.Command {
 
   # Set many from a dotenv file
   astro env airflow-variable set --from-file vars.env`,
-	}
+	}, cliout.Optional("ID_OR_KEY"))
 	cmd.Flags().StringVar(&envVarValue, "value", "", "The value; omit it to read from stdin or be prompted with echo off")
 	cmd.Flags().BoolVar(&envVarSecret, "secret", false, "Mark the variable secret when it is created")
 	cmd.Flags().BoolVar(&envVarNoCreate, "no-create", false, "Fail if the variable does not exist, instead of creating it")
@@ -116,17 +113,16 @@ func newEnvAirflowVarSetCmd(out io.Writer) *cobra.Command {
 }
 
 func newEnvAirflowVarDeleteCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete <ID_OR_KEY>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete an Airflow variable",
-		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvDelete(cmd, out, "Airflow variable", args[0], env.DeleteAirflowVar)
 		},
 		Example: `  # Delete an Airflow variable without the confirmation prompt
   astro env airflow-variable delete region --yes`,
-	}
+	}, cliout.Required("ID_OR_KEY"))
 	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
 	return cmd
 }

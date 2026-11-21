@@ -74,14 +74,13 @@ const (
 )
 
 func NewDeployCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "deploy [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "deploy",
 		Short:   "Ship this project's code to a Deployment",
 		Long:    "Build this project into an image and push it, with its Dags, to a Deployment on Astro. Run it from the root of a project with a pyproject.toml ([tool.astro]), or from anywhere with --image-name to deploy a prebuilt image. A project in the Astro CLI 1.x layout needs astro init first, or Astro CLI 1.x.\n\nWith Remote Execution, this updates only the API Server and Scheduler; use astro remote deploy for the rest.",
-		Args:    cobra.MaximumNArgs(1),
 		RunE:    deploy,
 		Example: deployExample,
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	// --force answered 1.x's checks (uncommitted changes, an empty dags
 	// directory), which v2's deploy does not make. It stays, accepted and
 	// read by nothing, because astronomer/deploy-action passes it on every

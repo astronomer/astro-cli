@@ -210,8 +210,8 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "remove [TEAM_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a team from an Astro Deployment",
 		Long:    "Remove a team's role from a Deployment. Team members lose Deployment access unless they have access through another team or a direct user role assignment.",
@@ -220,7 +220,7 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeDeploymentTeam(args, out)
 		},
-	}
+	}, cliout.Optional("TEAM_ID"))
 	return cmd
 }
 
@@ -255,8 +255,8 @@ func removeDeploymentTeam(args []string, out io.Writer) error {
 }
 
 func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "add [TEAM_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "add",
 		Short: "Add a team to an Astro Deployment with a specific role",
 		Long:  "Add a team to an Astro Deployment with a specific role: DEPLOYMENT_ADMIN or a custom role name.",
 		Example: `  # Add a team to a Deployment as an admin
@@ -267,7 +267,7 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addDeploymentTeam(args, out)
 		},
-	}
+	}, cliout.Optional("TEAM_ID"))
 	addDeploymentFlag(cmd.Flags(), "Deployment to add the team to: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID)
 	cmd.Flags().StringVar(&addDeploymentRole, "role", "DEPLOYMENT_ADMIN", "The role for the "+
 		"new team: DEPLOYMENT_ADMIN or a custom role name")
@@ -296,8 +296,8 @@ func addDeploymentTeam(args []string, out io.Writer) error {
 }
 
 func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "update [TEAM_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update the role of a team in an Astro Deployment",
 		Long:    "Update the role of a team in an Astro Deployment to DEPLOYMENT_ADMIN or a custom role name.",
@@ -306,7 +306,7 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateDeploymentTeam(args, out)
 		},
-	}
+	}, cliout.Optional("TEAM_ID"))
 	cmd.Flags().StringVar(&updateDeploymentRole, "role", "", "The new role for the "+
 		"team: DEPLOYMENT_ADMIN or a custom role name")
 	return cmd
@@ -364,8 +364,8 @@ func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "add [EMAIL]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "add",
 		Short: "Add a user to an Astro Deployment with a specific role",
 		Long:  "Add a user to an Astro Deployment with a specific role: DEPLOYMENT_ADMIN or a custom role name.",
 		Example: `  # Add a user to a Deployment as an admin
@@ -376,7 +376,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addDeploymentUser(args, out)
 		},
-	}
+	}, cliout.Optional("EMAIL"))
 	cmd.Flags().StringVar(&addDeploymentRole, "role", "DEPLOYMENT_ADMIN", "The role for the "+
 		"new user: DEPLOYMENT_ADMIN or a custom role name")
 	return cmd
@@ -401,8 +401,8 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "update [EMAIL]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update the role of a user in an Astro Deployment",
 		Long:    "Update the role of a user in an Astro Deployment to DEPLOYMENT_ADMIN or a custom role name.",
@@ -411,15 +411,15 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateDeploymentUser(args, out)
 		},
-	}
+	}, cliout.Optional("EMAIL"))
 	cmd.Flags().StringVar(&updateDeploymentRole, "role", "", "The new role for the "+
 		"user: DEPLOYMENT_ADMIN or a custom role name")
 	return cmd
 }
 
 func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "remove [EMAIL]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a user from an Astro Deployment",
 		Long:    "Remove a user's direct role from a Deployment. The user may retain access through team membership.",
@@ -428,7 +428,7 @@ func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeDeploymentUser(args, out)
 		},
-	}
+	}, cliout.Optional("EMAIL"))
 	return cmd
 }
 
@@ -462,8 +462,8 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentLogsCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "logs [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "logs",
 		Aliases: []string{"l"},
 		Short:   "Show an Astro Deployment's logs",
 		Long:    "Show an Astro Deployment's logs, from every component unless flags such as --scheduler or --component pick some. Use flags to determine what log level to show. Only the last 24 hours of logs are searched; older logs are not available through this command.",
@@ -476,7 +476,7 @@ func newDeploymentLogsCmd(out io.Writer) *cobra.Command {
   # Show logs that contain a phrase
   astro deployment logs --deployment my-deployment --keyword "task failed"`,
 		RunE: func(cmd *cobra.Command, args []string) error { return deploymentLogs(cmd, args, out) },
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	cmd.Flags().BoolVar(&warnLogs, "warn", false, "Show logs with a log level of 'warning'")
 	cmd.Flags().BoolVar(&errorLogs, "error", false, "Show logs with a log level of 'error'")
 	cmd.Flags().BoolVar(&infoLogs, "info", false, "Show logs with a log level of 'info'")
@@ -544,8 +544,8 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "update [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update an Astro Deployment",
 		Long:    "Update the configuration for an Astro Deployment. All flags are optional",
@@ -557,7 +557,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentUpdate(cmd, args, out)
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	cmd.Flags().StringVarP(&label, "name", "n", "", "Update the Deployment's name. If the new name contains a space, specify the entire name within quotes \"\" ")
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace the Deployment is located in", oneXWorkspaceID)
 	cmd.Flags().StringVar(&description, "description", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
@@ -588,8 +588,8 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete an Astro Deployment",
 		Long:    "Permanently delete a Deployment and all of its data including Dags, task logs, Airflow metadata, environment variables, connections, API tokens, and alerts. Running tasks are terminated without waiting. Cluster resources are deallocated asynchronously. This action cannot be undone.",
@@ -599,7 +599,7 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
   # Delete one by name, without asking for confirmation
   astro deployment delete --deployment my-deployment --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error { return deploymentDelete(cmd, args, out) },
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting the Deployment")
 	addDeploymentFlag(cmd.Flags(), "Deployment to delete: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
@@ -631,7 +631,6 @@ func newDeploymentVariableListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Short:   "List a Deployment's variables",
 		Long:    "List the keys and values for a Deployment's variables and save them to an environment file",
-		Args:    cobra.NoArgs,
 		Example: deploymentVariableListExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentVariableList(cmd, args, out)
@@ -647,8 +646,8 @@ func newDeploymentVariableListCmd(out io.Writer) *cobra.Command {
 
 //nolint:dupl // the duplication is acceptable here
 func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "create [KEY_VALUE...]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "create",
 		Short: "Create Deployment-level environment variables",
 		Long:  "Create Deployment-level environment variables by supplying either KEY=VALUE pairs or an environment file with a list of keys and values",
 		// Args:    cobra.NoArgs,
@@ -656,7 +655,7 @@ func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentVariableCreate(cmd, args, out)
 		},
-	}
+	}, cliout.Arg{Name: "KEY_VALUE", Optional: true, Repeated: true})
 	cmd.Flags().StringVar(&variableKey, "key", "", "Key for the new variable")
 	cmd.Flags().StringVar(&variableValue, "value", "", "Value for the new variable")
 	cmd.Flags().BoolVar(&useEnvFile, "load", false, "Create environment variables loaded from an environment file")
@@ -671,15 +670,15 @@ func newDeploymentVariableCreateCmd(out io.Writer) *cobra.Command {
 
 //nolint:dupl // the duplication is acceptable here
 func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "update [KEY_VALUE...]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "update",
 		Short:   "Update Deployment-level environment variables",
 		Long:    "Update Deployment-level environment variables by supplying either KEY=VALUE pairs or an environment file with a list of keys and values, variables that don't already exist will be created",
 		Example: deploymentVariableUpdateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentVariableUpdate(cmd, args, out)
 		},
-	}
+	}, cliout.Arg{Name: "KEY_VALUE", Optional: true, Repeated: true})
 	cmd.Flags().StringVar(&variableKey, "key", "", "Key of the variable to update")
 	cmd.Flags().StringVar(&variableValue, "value", "", "Value of the variable to update")
 	cmd.Flags().BoolVar(&useEnvFile, "load", false, "Update environment variables loaded from an environment file")
@@ -694,8 +693,8 @@ func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 
 //nolint:dupl // the duplication is acceptable here
 func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "hibernate [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "hibernate",
 		Aliases: []string{"hb"},
 		Short:   "Hibernate an Astro development Deployment",
 		Long:    "Hibernate an Astro development Deployment for a set amount of time. Overrides any existing hibernation schedule and sets the Deployment to hibernate for a specific duration or until a specific time. Use the '--remove-override' flag to remove any existing override and resume the regular hibernation schedule.",
@@ -710,7 +709,7 @@ func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentOverrideHibernation(cmd, args, out, true)
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	addDeploymentFlag(cmd.Flags(), "Deployment to hibernate: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName, withhold: true}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
 	cmd.Flags().StringVar(&until, "until", "", "Specify the hibernation period using an end date and time. Example value: 2021-01-01T00:00:00Z")
@@ -727,8 +726,8 @@ func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
 
 //nolint:dupl // the duplication is acceptable here
 func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "wake-up [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "wake-up",
 		Aliases: []string{"wu"},
 		Short:   "Wake up an Astro development Deployment",
 		Long:    "Wake up an Astro development Deployment from hibernation. Overrides any existing hibernation schedule and sets the Deployment to run for a specific duration or until a specific time. Use the '--remove-override' flag to remove any existing override and resume the regular hibernation schedule.",
@@ -743,7 +742,7 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentOverrideHibernation(cmd, args, out, false)
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	addDeploymentFlag(cmd.Flags(), "Deployment to wake up: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName, withhold: true}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
 	cmd.Flags().StringVar(&until, "until", "", "Specify the awake period using an end date. Example value: 2021-01-01T00:00:00Z")
@@ -759,8 +758,8 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "open [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "open",
 		Short: "Open a Deployment's Airflow UI in your browser",
 		Long:  "Open the Airflow UI of an Astro Deployment in your default browser. The CLI always prints the Airflow UI URL, and opens nothing with --no-open, under --output json, in CI, over SSH, or when there is no terminal. Under --output json the result carries the URL.",
 		Example: `  # Open a Deployment's Airflow UI
@@ -774,7 +773,7 @@ func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentOpen(cmd, args, out)
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	addDeploymentFlag(cmd.Flags(), "Deployment whose Airflow UI to open: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
 	cmd.Flags().BoolVar(&deploymentNoOpen, "no-open", false, "Print the Airflow UI URL without opening the browser")
@@ -1312,8 +1311,8 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "update [TOKEN_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update a Deployment, Workspace or Organization API token in a Deployment",
 		Long:    "Update an API token that has a role on a Deployment. A Deployment token can change its name, description and role. A Workspace or Organization token can change only its role on this Deployment: its name and description are changed where the token lives. Identify the token by its ID (positional argument) or current name (--name). Only what you pass changes: without --role the token keeps its role, and a --role the token already holds is refused before anything changes.",
@@ -1329,7 +1328,7 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateDeploymentToken(args, out)
 		},
-	}
+	}, cliout.Optional("TOKEN_ID"))
 	cmd.Flags().StringVar(&name, "name", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVar(&tokenName, "new-name", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVar(&tokenDescription, "description", "", "Updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
@@ -1343,8 +1342,8 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "rotate [TOKEN_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "rotate",
 		Aliases: []string{"ro"},
 		Short:   "Rotate a Deployment API token",
 		Long:    "Rotate a Deployment API token, generating a new token value and invalidating the old one. The new value is displayed only once. You can only rotate Deployment-scoped tokens from this command. Use the Workspace or Organization token rotate commands for other scopes.",
@@ -1356,7 +1355,7 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return rotateDeploymentToken(args, out, cmd.ErrOrStderr())
 		},
-	}
+	}, cliout.Optional("TOKEN_ID"))
 	addInertCleanOutputFlag(cmd)
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceRotate, "yes", "y", false, "Don't ask for confirmation before rotating the Deployment API token")
@@ -1366,8 +1365,8 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete [TOKEN_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete a Deployment API token",
 		Long:    "Permanently revoke one of the Deployment's own API tokens. All access the token grants is immediately revoked. A Workspace or Organization token that has a role on the Deployment is not the Deployment's to delete: astro deployment token remove takes its role off the Deployment.",
@@ -1379,7 +1378,7 @@ func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deleteDeploymentToken(cmd, args, out)
 		},
-	}
+	}, cliout.Optional("TOKEN_ID"))
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting the API token")
 
@@ -1388,8 +1387,8 @@ func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentTokenRemoveCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "remove [TOKEN_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "remove",
 		Short: "Remove a Workspace or Organization API token from a Deployment",
 		Long:  "Remove a Workspace or Organization API token's role on a Deployment. The token continues to work at other scopes. Which of the two it is, is worked out from the token. The Deployment's own tokens have no role to remove: astro deployment token delete deletes them. Name the token by its ID or with --name.",
 		Example: `  # Remove a token's role on a Deployment
@@ -1400,15 +1399,15 @@ func newDeploymentTokenRemoveCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeDeploymentToken(cmd, args, out)
 		},
-	}
+	}, cliout.Optional("TOKEN_ID"))
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the Workspace or Organization API token to be removed from the Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before removing the API token from the Deployment")
 	return cmd
 }
 
 func newDeploymentTokenAddCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "add [TOKEN_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "add",
 		Short: "Add a Workspace or Organization API token to a Deployment",
 		Long:  "Add a Workspace or Organization API token to a Deployment with a role: DEPLOYMENT_ADMIN or a custom role name. Which of the two it is, is worked out from the token. Name the token by its ID or with --name; a Workspace token named with --name is looked for in --workspace.",
 		Example: `  # Give a token admin access to a Deployment
@@ -1419,7 +1418,7 @@ func newDeploymentTokenAddCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addDeploymentToken(args, out)
 		},
-	}
+	}, cliout.Optional("TOKEN_ID"))
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the Workspace or Organization API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to grant to the "+
 		"API token: DEPLOYMENT_ADMIN or a custom role name")
@@ -1480,8 +1479,8 @@ func newWorkspaceTokenManageCmd(out io.Writer) *cobra.Command {
 }
 
 func newAddOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "add [ORG_TOKEN_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "add",
 		Short: "Add an Organization API token to a Deployment",
 		Long:  "Add an Organization API token to a Deployment with a role: DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --name.",
 		Example: `  # Give an Organization token admin access to a Deployment
@@ -1494,7 +1493,7 @@ func newAddOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addOrgTokenToDeploymentRole(args, out)
 		},
-	}
+	}, cliout.Optional("ORG_TOKEN_ID"))
 	addTokenNameFlag(cmd, "The name of the Organization API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to add to the "+
 		"Organization API token: DEPLOYMENT_ADMIN or a custom role name")
@@ -1502,8 +1501,8 @@ func newAddOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 }
 
 func newUpdateOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "update [ORG_TOKEN_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "update",
 		Short: "Update an Organization API token's Deployment Role",
 		Long:  "Update an Organization API token's Deployment Role to DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --name.",
 		Example: `  # Change an Organization token's role in a Deployment
@@ -1516,7 +1515,7 @@ func newUpdateOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateOrgTokenToDeploymentRole(args, out)
 		},
-	}
+	}, cliout.Optional("ORG_TOKEN_ID"))
 	addTokenNameFlag(cmd, "The name of the Organization API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to update the "+
 		"Organization API token to: DEPLOYMENT_ADMIN or a custom role name")
@@ -1524,8 +1523,8 @@ func newUpdateOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 }
 
 func newAddWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "add [WORKSPACE_TOKEN_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "add",
 		Short: "Add a Workspace API token's Deployment Role",
 		Long:  "Add a Workspace API token to a Deployment with a role: DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --name.",
 		Example: `  # Give a Workspace token admin access to a Deployment
@@ -1538,7 +1537,7 @@ func newAddWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addWorkspaceTokenDeploymentRole(args, out)
 		},
-	}
+	}, cliout.Optional("WORKSPACE_TOKEN_ID"))
 	addTokenNameFlag(cmd, "The name of the WORKSPACE API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "workspace-token-name")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to grant to the "+
 		"Workspace API token: DEPLOYMENT_ADMIN or a custom role name")
@@ -1547,8 +1546,8 @@ func newAddWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 }
 
 func newUpdateWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "update [WORKSPACE_TOKEN_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "update",
 		Short: "Update a Workspace API token's Deployment Role",
 		Long:  "Update a Workspace API token's Deployment Role to DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --name.",
 		Example: `  # Change a Workspace token's role in a Deployment
@@ -1561,7 +1560,7 @@ func newUpdateWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceTokenDeploymentRole(args, out)
 		},
-	}
+	}, cliout.Optional("WORKSPACE_TOKEN_ID"))
 	addTokenNameFlag(cmd, "The name of the WORKSPACE API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "workspace-token-name")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The Deployment role to grant to the "+
 		"Workspace API token: DEPLOYMENT_ADMIN or a custom role name")
@@ -1586,8 +1585,8 @@ func updateWorkspaceTokenDeploymentRole(args []string, out io.Writer) error {
 }
 
 func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "remove [ORG_TOKEN_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove an Organization API token's Deployment Role",
 		Long:    "Remove an Organization API token's Deployment Role. Name the token by its ID or with --name.",
@@ -1600,14 +1599,14 @@ func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeOrgTokenFromDeploymentRole(cmd, args, out)
 		},
-	}
+	}, cliout.Optional("ORG_TOKEN_ID"))
 	addTokenNameFlag(cmd, "The name of the Organization API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "org-token-name")
 	return cmd
 }
 
 func newRemoveWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "remove [WORKSPACE_TOKEN_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a Workspace API token's Deployment Role",
 		Long:    "Remove a Workspace API token's Deployment Role. Name the token by its ID or with --name.",
@@ -1620,7 +1619,7 @@ func newRemoveWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeWorkspaceTokenDeploymentRole(cmd, args, out)
 		},
-	}
+	}, cliout.Optional("WORKSPACE_TOKEN_ID"))
 	addTokenNameFlag(cmd, "The name of the WORKSPACE API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ", "workspace-token-name")
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace the token is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)", oneXWorkspaceID)
 	return cmd
