@@ -16,16 +16,28 @@ import (
 // (cmd.ErrOrStderr()), so that cmd.SetErr and a test capture it. A Renderer
 // built without Err sends them around the command.
 //
-// rendererErrAllowed is what may build a Renderer without Err because there
-// is no command to take it from. Each says why.
+// The test covers exactly two kinds of literal in non-test code under cmd/:
+//   - a cliout.Renderer, which must set Err (an empty one, the zero value
+//     returned beside an error, writes nothing and is skipped);
+//   - an options struct that hands its ErrOut to a Renderer (cmd/api's
+//     ListOptions and DescribeOptions, listed in errOutOptions), which must
+//     set ErrOut.
+//
+// It does not cover os.Stderr written to directly, or a Renderer built some
+// other way than by a literal.
+//
+// rendererErrAllowed is what may build one without it because there is no
+// command to take it from. Each says why.
 var rendererErrAllowed = map[string]string{
 	"cmd/cliout/errors.go": "EmitError writes the one json error object and no notice, and takes only " +
 		"the writer the error goes to; there is no command in hand",
 }
 
-// Every cliout.Renderer literal under cmd/ sets Err (an empty one, the zero value
-// returned beside an error, writes nothing), except what
-// rendererErrAllowed names.
+// errOutOptions are the options structs whose ErrOut becomes a Renderer's Err.
+var errOutOptions = map[string]bool{"ListOptions": true, "DescribeOptions": true}
+
+// Every cliout.Renderer literal under cmd/ sets Err, and every errOutOptions
+// literal sets ErrOut, except what rendererErrAllowed names.
 func TestEveryRendererLiteralSetsErr(t *testing.T) {
 	root := repoRoot(t)
 	var problems []string
@@ -42,7 +54,19 @@ func TestEveryRendererLiteralSetsErr(t *testing.T) {
 		inCliout := f.Name.Name == "cliout"
 		ast.Inspect(f, func(n ast.Node) bool {
 			lit, ok := n.(*ast.CompositeLit)
-			if !ok || !isRendererType(lit.Type, inCliout) || len(lit.Elts) == 0 || hasErrKey(lit) {
+			if !ok {
+				return true
+			}
+			switch {
+			case isRendererType(lit.Type, inCliout):
+				if len(lit.Elts) == 0 || hasKey(lit, "Err") {
+					return true
+				}
+			case isErrOutOptions(lit.Type):
+				if hasKey(lit, "ErrOut") {
+					return true
+				}
+			default:
 				return true
 			}
 			if _, ok := rendererErrAllowed[file]; ok {
@@ -55,17 +79,22 @@ func TestEveryRendererLiteralSetsErr(t *testing.T) {
 	}
 	sort.Strings(problems)
 	if len(problems) > 0 {
-		t.Errorf("%d cliout.Renderer literals leave Err unset:\n\t%s\n\n"+
-			"Set Err to the command's stderr (cmd.ErrOrStderr(), threaded as an errOut io.Writer "+
+		t.Errorf("%d literals leave the command's stderr unset (Renderer.Err, or ErrOut on an options struct):\n\t%s\n\n"+
+			"Set it to the command's stderr (cmd.ErrOrStderr(), threaded as an errOut io.Writer "+
 			"through the functions between the command and the renderer), so the notices it prints "+
 			"follow cmd.SetErr. If there is genuinely no command, add the file to rendererErrAllowed "+
 			"in internal/archlint/renderer_err_test.go and say why.", len(problems), strings.Join(problems, "\n\t"))
 	}
 	for file := range rendererErrAllowed {
 		if !used[file] {
-			t.Errorf("rendererErrAllowed names %s, which builds no Renderer without Err; remove the entry", file)
+			t.Errorf("rendererErrAllowed names %s, which builds no literal without it; remove the entry", file)
 		}
 	}
+}
+
+func isErrOutOptions(typ ast.Expr) bool {
+	id, ok := typ.(*ast.Ident)
+	return ok && errOutOptions[id.Name]
 }
 
 // isRendererType reports whether a composite literal's type is cliout.Renderer
@@ -81,13 +110,13 @@ func isRendererType(typ ast.Expr, inCliout bool) bool {
 	return false
 }
 
-func hasErrKey(lit *ast.CompositeLit) bool {
+func hasKey(lit *ast.CompositeLit, name string) bool {
 	for _, elt := range lit.Elts {
 		kv, ok := elt.(*ast.KeyValueExpr)
 		if !ok {
 			continue
 		}
-		if k, ok := kv.Key.(*ast.Ident); ok && k.Name == "Err" {
+		if k, ok := kv.Key.(*ast.Ident); ok && k.Name == name {
 			return true
 		}
 	}

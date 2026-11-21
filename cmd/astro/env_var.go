@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -183,7 +182,7 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
 		return err
 	}
 	if envIncludeSecrets {
-		cliout.Warn(os.Stderr, includeSecretsWarning)
+		cliout.Warn(cmd.ErrOrStderr(), includeSecretsWarning)
 	}
 	if f == formatDotenv {
 		return emitDotenv(objs, out)

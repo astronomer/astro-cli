@@ -2,7 +2,6 @@ package astro
 
 import (
 	"bytes"
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -20,15 +19,29 @@ import (
 )
 
 func execEnvCmd(args ...string) (string, error) {
+	out, _, err := runEnvCmd(false, args...)
+	return out, err
+}
+
+// execEnvCmdStreams is execEnvCmd with the command's stderr kept apart from
+// its stdout, as a run reports them.
+func execEnvCmdStreams(args ...string) (stdout, stderr string, err error) {
+	return runEnvCmd(true, args...)
+}
+
+func runEnvCmd(apart bool, args ...string) (stdout, stderr string, err error) {
 	// The env tree falls back to coalesceWorkspace, which reads the package's
 	// workspaceID before the context. Another tree's --workspace-id sets it
 	// and nothing here registers that flag to reset it, so under -shuffle a
 	// run would inherit the Workspace of whichever test ran before it.
 	workspaceID = ""
-	buf := new(bytes.Buffer)
+	buf, errBuf := new(bytes.Buffer), new(bytes.Buffer)
 	cmd := newEnvRootCmd(buf)
 	cmd.SetOut(buf)
-	cmd.SetErr(buf)
+	if !apart {
+		errBuf = buf
+	}
+	cmd.SetErr(errBuf)
 	// cliout.Execute turns this on for the root of a real run, which keeps cobra's
 	// usage block out of every command's error.
 	cmd.SilenceUsage = true
@@ -36,10 +49,14 @@ func execEnvCmd(args ...string) (string, error) {
 	cmd.PersistentFlags().StringVar(&verbosity, "verbosity", "", "")
 	cmd.SetArgs(args)
 	testUtil.SetupOSArgsForGinkgo()
-	_, err := cmd.ExecuteC()
+	_, err = cmd.ExecuteC()
 	// The tests spell flags as 1.x did where that is what they test, and say
 	// nothing of the deprecation warning that costs.
-	return withoutDeprecations(buf.String()), err
+	stderr = withoutDeprecations(errBuf.String())
+	if !apart {
+		stderr = ""
+	}
+	return withoutDeprecations(buf.String()), stderr, err
 }
 
 // expectAbsent mocks the key lookup `set` makes before it decides whether to
@@ -194,12 +211,6 @@ func TestEnvVarExportIncludeSecretsWarnsToStderr(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	defer resetEnvFlags()
 
-	// Capture os.Stderr so we can assert on the warning text without polluting test output.
-	origStderr := os.Stderr
-	r, w, _ := os.Pipe()
-	os.Stderr = w
-	defer func() { os.Stderr = origStderr }()
-
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
@@ -209,13 +220,11 @@ func TestEnvVarExportIncludeSecretsWarnsToStderr(t *testing.T) {
 	}, nil).Once()
 	astroV1Client = mc
 
-	_, err := execEnvCmd("var", "list", "--workspace-id", "ws-test", "--include-secrets")
+	_, stderr, err := execEnvCmdStreams("var", "list", "--workspace-id", "ws-test", "--include-secrets")
 	assert.NoError(t, err)
 
-	w.Close()
-	stderrBytes, _ := io.ReadAll(r)
-	assert.Contains(t, string(stderrBytes), "include-secrets")
-	assert.Contains(t, string(stderrBytes), "sensitive")
+	assert.Contains(t, stderr, "include-secrets")
+	assert.Contains(t, stderr, "sensitive")
 	mc.AssertExpectations(t)
 }
 

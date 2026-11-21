@@ -16,6 +16,10 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
+// Per-command coverage comes from the archlint guard
+// (TestEveryRendererLiteralSetsErr); this test only proves the plumbing end to
+// end for one command.
+//
 // A table's success line, to a pipe, is a notice for the person: it goes to
 // the command's own stderr (what cmd.SetErr binds), the table alone stays on
 // stdout, and nothing reaches the process's stderr.
