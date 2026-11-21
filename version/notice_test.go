@@ -40,7 +40,7 @@ func waitFor(t *testing.T, c *UpdateCheck) {
 	}
 }
 
-// An outdated release prints two lines, after the lookup is in, once a day.
+// An outdated release prints three lines, after the lookup is in, once a day.
 func TestUpdateNoticePrintsOnceADay(t *testing.T) {
 	withCurrVersion(t, "1.40.0")
 	srv := &releaseServer{version: "1.45.0"}
@@ -56,8 +56,8 @@ func TestUpdateNoticePrintsOnceADay(t *testing.T) {
 	if !strings.Contains(got, "Astro CLI 1.45.0 is available. You have 1.40.0.") || !strings.Contains(got, upgradeURL) {
 		t.Errorf("notice = %q", got)
 	}
-	if lines := strings.Count(strings.TrimSpace(got), "\n") + 1; lines != 2 {
-		t.Errorf("notice has %d lines, want 2: %q", lines, got)
+	if lines := strings.Count(strings.TrimSpace(got), "\n") + 1; lines != 3 {
+		t.Errorf("notice has %d lines, want 3: %q", lines, got)
 	}
 
 	// An hour later: shown today, so nothing starts and nothing prints.

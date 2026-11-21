@@ -46,3 +46,52 @@ func TestUpdateNoticeFromAFreshCacheNeedsNoNetwork(t *testing.T) {
 		t.Errorf("a stale cache printed %q before the network answered", out.String())
 	}
 }
+
+// A lookup still in flight is waited for, but only for the grace: a transport
+// that never answers delays Print by about that long, and no more.
+func TestUpdateNoticeWaitIsBounded(t *testing.T) {
+	withCurrVersion(t, "1.40.0")
+	cachePath := filepath.Join(t.TempDir(), "release-check.json")
+	srv := &releaseServer{version: "1.45.0", gate: make(chan struct{})}
+	now := time.Now()
+	check := StartUpdateCheck(context.Background(), &http.Client{Transport: srv}, cachePath, now)
+	t.Cleanup(func() {
+		close(srv.gate)
+		select {
+		case <-check.result:
+		case <-time.After(5 * time.Second):
+			t.Error("the lookup never finished")
+		}
+	})
+	if check.grace != lookupGrace {
+		t.Fatalf("a stale-cache lookup waits %v, want %v", check.grace, lookupGrace)
+	}
+	check.grace = 50 * time.Millisecond
+
+	var out bytes.Buffer
+	start := time.Now()
+	check.Print(&out, now)
+	if elapsed := time.Since(start); elapsed < 40*time.Millisecond || elapsed > 2*time.Second {
+		t.Errorf("Print took %v, want about the 50ms grace", elapsed)
+	}
+	if out.Len() != 0 {
+		t.Errorf("printed %q with no answer", out.String())
+	}
+}
+
+// An answer that lands inside the grace is shown.
+func TestUpdateNoticeShowsAnAnswerThatLandsInTheGrace(t *testing.T) {
+	withCurrVersion(t, "1.40.0")
+	cachePath := filepath.Join(t.TempDir(), "release-check.json")
+	srv := &releaseServer{version: "1.45.0", gate: make(chan struct{})}
+	now := time.Now()
+	check := StartUpdateCheck(context.Background(), &http.Client{Transport: srv}, cachePath, now)
+	check.grace = 5 * time.Second
+	time.AfterFunc(20*time.Millisecond, func() { close(srv.gate) })
+
+	var out bytes.Buffer
+	check.Print(&out, now)
+	if !strings.Contains(out.String(), "Astro CLI 1.45.0 is available") {
+		t.Errorf("notice = %q", out.String())
+	}
+}

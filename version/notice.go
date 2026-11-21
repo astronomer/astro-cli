@@ -10,6 +10,7 @@ import (
 	semver "github.com/Masterminds/semver/v3"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 // noticeInterval is how long after the upgrade notice was printed it stays
@@ -44,7 +45,15 @@ func recordNoticeShown(cachePath string, now time.Time) {
 type UpdateCheck struct {
 	cachePath string
 	result    chan *semver.Version
+	// grace is how long Print waits for a lookup still in flight; zero for an
+	// answer that is already in hand.
+	grace time.Duration
 }
+
+// lookupGrace bounds the wait for a lookup that a stale cache sent to the
+// network. A run of fast commands would otherwise kill the lookup at exit every
+// time, so the cache would never refresh and each run would waste a request.
+const lookupGrace = 300 * time.Millisecond
 
 // StartUpdateCheck looks for a newer release in the background and returns at
 // once. It returns nil, and asks nothing, when the notice was printed within
@@ -65,29 +74,43 @@ func StartUpdateCheck(ctx context.Context, client *http.Client, cachePath string
 		// A lookup that fails says nothing: the notice is a courtesy.
 		latest, err := NewerRelease(ctx, client, cachePath)
 		if err != nil {
+			logger.Debugf("Error comparing CLI versions: %v", err)
 			latest = nil
 		}
 		c.result <- latest
 	}()
+	c.grace = lookupGrace
 	return c
 }
 
 // Print writes the upgrade notice to w when the lookup has already found a
-// newer release, and records that it did. A lookup still running is skipped,
-// never waited for, so a command's exit is not delayed by the network. Safe on
-// a nil check.
+// newer release, and records that it did. A lookup still running is waited for
+// at most lookupGrace and then skipped, so a command's exit is never held up
+// by the network for long. Safe on a nil check.
 func (c *UpdateCheck) Print(w io.Writer, now time.Time) {
 	if c == nil {
 		return
 	}
+	var latest *semver.Version
 	select {
-	case latest := <-c.result:
-		if latest == nil {
+	case latest = <-c.result:
+	default:
+		if c.grace <= 0 {
 			return
 		}
-		fmt.Fprintf(w, "\nAstro CLI %s is available. You have %s.\n", latest, Current())
-		fmt.Fprintf(w, "Upgrade: %s\n", ansi.ForStderr().Cyan(upgradeURL))
-		recordNoticeShown(c.cachePath, now)
-	default:
+		timer := time.NewTimer(c.grace)
+		defer timer.Stop()
+		select {
+		case latest = <-c.result:
+		case <-timer.C:
+			return
+		}
 	}
+	if latest == nil {
+		return
+	}
+	fmt.Fprintf(w, "\nAstro CLI %s is available. You have %s.\n", latest, Current())
+	fmt.Fprintf(w, "Upgrade: %s\n", ansi.ForStderr().Cyan(upgradeURL))
+	fmt.Fprintln(w, "Turn this off: astro config set --global upgrade_message false")
+	recordNoticeShown(c.cachePath, now)
 }
