@@ -243,8 +243,25 @@ func DeleteBundle(input *DeleteBundleInput) (BundleDelete, error) {
 	return res, nil
 }
 
-// ValidateBundleSymlinks checks if any symlinks within the bundlePath point outside of it
+// bundleExcludes are the entries UploadBundle leaves out of the tarball.
+var bundleExcludes = []string{".git/"}
+
+// DagsSource is what a Dags upload of the project at projectDir tars
+// (UploadBundle, as uploadDeployDags calls it): its dags/, each entry under
+// dags/ unless noDagsBaseDir (--no-dags-base-dir).
+func DagsSource(projectDir string, noDagsBaseDir bool) fileutil.TarSource {
+	return fileutil.GzSource(filepath.Join(projectDir, "dags"), !noDagsBaseDir, bundleExcludes)
+}
+
+// ValidateBundleSymlinks checks if any symlinks within the bundlePath point outside of it.
+// A bundlePath that is itself a link is checked as the directory it leads
+// to, which is what the tarball is written from (fileutil.TarGz).
 func ValidateBundleSymlinks(bundlePath string) error {
+	if info, err := os.Lstat(bundlePath); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		if resolved, err := filepath.EvalSymlinks(bundlePath); err == nil {
+			bundlePath = resolved
+		}
+	}
 	absBundlePath, err := filepath.Abs(bundlePath)
 	if err != nil {
 		return fmt.Errorf("could not get absolute path for bundle directory: %w", err)
@@ -343,7 +360,7 @@ func UploadBundle(bundlePath, uploadURL string, opts BundleUpload) (string, erro
 	}
 
 	// Generate the gzipped bundle tarball
-	err = fileutil.TarGz(bundlePath, tarGzFilePath, opts.PrependBaseDir, []string{".git/"}, overlay)
+	err = fileutil.TarGz(bundlePath, tarGzFilePath, opts.PrependBaseDir, bundleExcludes, overlay)
 	if err != nil {
 		return "", err
 	}

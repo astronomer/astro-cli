@@ -197,16 +197,33 @@ func TestOpenInBrowser(t *testing.T) {
 	}
 
 	var out strings.Builder
-	OpenInBrowser("", &out)
+	OpenInBrowser("", true, &out)
 	if len(opened) != 0 || out.Len() != 0 {
 		t.Errorf("a project with no URL opened %v and said %q", opened, out.String())
 	}
 
-	OpenInBrowser("https://ide.example/p", &out)
+	OpenInBrowser("https://ide.example/p", true, &out)
 	if len(opened) != 1 || opened[0] != "https://ide.example/p" {
 		t.Errorf("opened %v", opened)
 	}
 	if want := "Could not open the browser. Open this link: https://ide.example/p\n"; out.String() != want {
+		t.Errorf("said %q, want %q", out.String(), want)
+	}
+
+	// Told not to open, it opens nothing and still prints the URL.
+	out.Reset()
+	OpenInBrowser("https://ide.example/p", false, &out)
+	if len(opened) != 1 {
+		t.Errorf("opened %v with open false", opened)
+	}
+	if want := "Open the project at https://ide.example/p\n"; out.String() != want {
+		t.Errorf("said %q, want %q", out.String(), want)
+	}
+
+	out.Reset()
+	openURL = func(string) error { return nil }
+	OpenInBrowser("https://ide.example/p", true, &out)
+	if want := "Opened the project in your browser: https://ide.example/p\n"; out.String() != want {
 		t.Errorf("said %q, want %q", out.String(), want)
 	}
 }

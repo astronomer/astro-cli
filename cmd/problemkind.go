@@ -124,6 +124,7 @@ var problemKinds = append(append(cliout.Kinds{}, local.ProblemKinds...), cloudKi
 func Execute(ctx context.Context) error {
 	root, args := NewRootCmd(), os.Args[1:]
 	err := execute(ctx, root, args, os.Stdout)
+	PrintUpdateNotice()
 	if cliout.IsUsage(err) {
 		trackUnknownCommand(root, args)
 	}
