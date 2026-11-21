@@ -27,6 +27,27 @@ func initRepo(t *testing.T, dir, ignore string) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(ignore), 0o600))
 }
 
+// --context-dir writes the context of the image the target would build, so
+// it is held to the same check: a gitignored credential refuses it before a
+// file is written, and its warnings come with the result.
+func TestAstroContextRefusesGitignoredCredentials(t *testing.T) {
+	req := testRequest(t)
+	initRepo(t, req.ProjectDir, "certs/\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(req.ProjectDir, "certs"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "certs", "prod.pem"), []byte("k"), 0o600))
+	req.ContextDir = filepath.Join(t.TempDir(), "build")
+
+	_, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
+	require.ErrorContains(t, err, "certs/prod.pem looks like credentials")
+	assert.NoDirExists(t, req.ContextDir, "no context is written")
+
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".dockerignore"), []byte("certs/\n**/.git\n"), 0o600))
+	res, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, KindContext, res.Kind)
+	assert.NoFileExists(t, filepath.Join(req.ContextDir, "certs", "prod.pem"))
+}
+
 // A packaged image is pushed to a registry as a deploy's is: a gitignored
 // file it would carry that looks like a credential stops it before the build,
 // for a generated build and a declared Dockerfile's alike, and other
