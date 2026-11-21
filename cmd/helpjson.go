@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -50,7 +49,7 @@ type helpListing struct {
 	Summary string `json:"summary"`
 }
 
-// helpArg is a positional argument read from the command's Use line.
+// helpArg is a positional argument the command declared (cliout.Args).
 type helpArg struct {
 	Name     string `json:"name"`
 	Required bool   `json:"required"`
@@ -94,7 +93,7 @@ func describeCommand(c *cobra.Command) helpDocument {
 		Aliases:     append([]string{}, c.Aliases...),
 		Deprecated:  c.Deprecated,
 		Subcommands: []helpListing{},
-		Arguments:   helpArguments(c.Use),
+		Arguments:   helpArguments(c),
 		Flags:       helpFlags(c),
 		Examples:    strings.Trim(c.Example, "\n"),
 	}
@@ -104,78 +103,14 @@ func describeCommand(c *cobra.Command) helpDocument {
 	return doc
 }
 
-var upperWord = regexp.MustCompile(`^[A-Z][A-Z0-9_]*(\.{3})?$`)
-
-// helpArguments reads the positional arguments out of a Use line. A <NAME> is
-// required, a [NAME] optional (so is everything nested in brackets), and a
-// trailing "..." repeats. A bare UPPER_CASE word is required. Not arguments:
-// [flags], [command], a "--" that opens a passthrough tail, and a bracketed
-// flag with its value ([--flag value]). A bracketed alternative [a|b] names
-// its first.
-func helpArguments(use string) []helpArg {
+// helpArguments is the positionals c declared (cliout.Args), none for a command
+// that declared none.
+func helpArguments(c *cobra.Command) []helpArg {
 	args := []helpArg{}
-	_, rest, _ := strings.Cut(use, " ")
-	var walk func(tokens []string, optional bool)
-	walk = func(tokens []string, optional bool) {
-		for _, tok := range tokens {
-			switch {
-			case tok == "--":
-			case strings.HasPrefix(tok, "["):
-				inner := splitUseTokens(strings.TrimSuffix(strings.TrimPrefix(tok, "["), "]"))
-				if len(inner) > 0 && strings.HasPrefix(inner[0], "-") && inner[0] != "--" {
-					continue
-				}
-				walk(inner, true)
-			case strings.HasPrefix(tok, "-"):
-			case strings.HasPrefix(tok, "<"):
-				addUseArg(&args, strings.Trim(tok, "<>"), !optional)
-			case upperWord.MatchString(tok), optional && !strings.ContainsAny(tok, "<>[]"):
-				addUseArg(&args, tok, !optional)
-			}
-		}
+	for _, a := range cliout.DeclaredArgs(c) {
+		args = append(args, helpArg{Name: a.Name, Required: !a.Optional, Repeated: a.Repeated})
 	}
-	walk(splitUseTokens(rest), false)
 	return args
-}
-
-func addUseArg(args *[]helpArg, name string, required bool) {
-	name, _, _ = strings.Cut(strings.TrimSpace(name), "|")
-	repeated := strings.HasSuffix(name, "...")
-	name = strings.TrimSpace(strings.TrimSuffix(name, "..."))
-	if name == "" || name == "flags" || name == "command" || strings.ContainsAny(name, " <>[]") {
-		return
-	}
-	*args = append(*args, helpArg{Name: name, Required: required, Repeated: repeated})
-}
-
-// splitUseTokens splits s on whitespace outside brackets, so a bracketed
-// group, nested ones included, is one token.
-func splitUseTokens(s string) []string {
-	var tokens []string
-	depth, start := 0, -1
-	for i, r := range s {
-		switch {
-		case r == '[' || r == '<':
-			depth++
-		case r == ']' || r == '>':
-			depth = max(depth-1, 0)
-		}
-		space := r == ' ' || r == '\t'
-		if space && depth == 0 {
-			if start >= 0 {
-				tokens = append(tokens, s[start:i])
-				start = -1
-			}
-			continue
-		}
-		if start < 0 {
-			start = i
-		}
-	}
-	if start >= 0 {
-		tokens = append(tokens, s[start:])
-	}
-	return tokens
 }
 
 // helpFlags lists c's visible flags the way its page does: its own, plain

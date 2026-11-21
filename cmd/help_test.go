@@ -319,28 +319,6 @@ func TestExampleWidthMeasuresEachLineAsPrinted(t *testing.T) {
 	assert.Contains(t, checkExampleWidth(&cobra.Command{Example: "  # " + strings.Repeat("x", helpMaxWidth)}), "104 columns")
 }
 
-func TestUseSpellsAPassthroughOneWay(t *testing.T) {
-	for _, tc := range []struct {
-		use string
-		ok  bool
-	}{
-		{"add [NAME] [-- COMMAND...]", true},
-		{"run [-- ARGS...]", true},
-		{"add [-- COMMAND...] [NAME]", false},
-		{"add [-- command...]", false},
-		{"add [-- COMMAND]", false},
-		{"add -- COMMAND...", false},
-		{"add [--COMMAND...]", false},
-	} {
-		got := checkUse(&cobra.Command{Use: tc.use})
-		if tc.ok {
-			assert.Empty(t, got, tc.use)
-		} else {
-			assert.NotEmpty(t, got, tc.use)
-		}
-	}
-}
-
 func TestRootRowCatchesAShortThatWraps(t *testing.T) {
 	run := func(*cobra.Command, []string) {}
 	root := &cobra.Command{Use: "astro"}

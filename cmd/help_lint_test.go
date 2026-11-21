@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // The help style guide, enforced. Each rule is a function that names what is
@@ -69,10 +72,9 @@ var helpRules = []helpRule{
 	},
 	{
 		name: "use",
-		why: "A positional argument in Use is <UPPER_SNAKE> when required and [UPPER_SNAKE] when optional, " +
-			"with ... inside or after the brackets of one that repeats, so every page spells an argument the same way. " +
-			"astro af set the convention: astro af runs get <DAG_ID> <RUN_ID>. Arguments handed on after `--` " +
-			"are spelled `[-- COMMAND...]`, last.",
+		why: "A positional argument is named UPPER_SNAKE, so every page spells an argument the same way. " +
+			"astro af set the convention: astro af runs get <DAG_ID> <RUN_ID>. cliout.Args writes the brackets, " +
+			"the ... of a repeated one and the `[-- COMMAND...]` of what is handed on after `--`.",
 		check: checkUse,
 	},
 	{
@@ -238,31 +240,24 @@ func startsCapitalized(s string) bool {
 	return unicode.IsUpper(r) || unicode.IsDigit(r) || strings.ContainsRune("-`\"'(", r)
 }
 
-var (
-	useRequired = regexp.MustCompile(`^<[A-Z][A-Z0-9]*(_[A-Z0-9]+)*>(\.{3})?$`)
-	useOptional = regexp.MustCompile(`^\[[A-Z][A-Z0-9]*(_[A-Z0-9]+)*(\.{3})?\](\.{3})?$`)
-	// usePassthrough is the one spelling of "everything after -- is handed on
-	// as it is": `[-- COMMAND...]`, an optional repeating argument behind the
-	// `--` that ends flag parsing. It is the last thing in Use.
-	usePassthrough = regexp.MustCompile(` \[-- [A-Z][A-Z0-9]*(_[A-Z0-9]+)*\.{3}\]$`)
-)
+// useName is how an argument is named: UPPER_SNAKE.
+var useName = regexp.MustCompile(`^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$`)
 
+// checkUse holds the names of the positionals a command declared to the one
+// spelling. cliout.Args writes the rest of the Use line (<NAME> required,
+// [NAME] optional, ... for a repeated one, [-- NAME...] after a dash), so there
+// is only the name left to get wrong.
 func checkUse(cmd *cobra.Command) string {
-	fields := strings.Fields(usePassthrough.ReplaceAllString(cmd.Use, ""))
 	var bad []string
-	for _, f := range fields[min(1, len(fields)):] {
-		// [flags] and [command] are cobra's own, and it appends them itself.
-		if f == "[flags]" || f == "[command]" {
-			continue
-		}
-		if !useRequired.MatchString(f) && !useOptional.MatchString(f) {
-			bad = append(bad, f)
+	for _, a := range cliout.DeclaredArgs(cmd) {
+		if !useName.MatchString(a.Name) {
+			bad = append(bad, a.Name)
 		}
 	}
 	if len(bad) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("Use %q spells %s outside <ARG> / [ARG]", cmd.Use, strings.Join(bad, ", "))
+	return fmt.Sprintf("Use %q names %s outside UPPER_SNAKE", cmd.Use, strings.Join(bad, ", "))
 }
 
 // checkExampleRuns resolves each astro command line in cmd's examples against
@@ -398,7 +393,13 @@ func resolveExample(root *cobra.Command, args []string) string {
 	if positional := flags.Args(); len(positional) > 0 && target.HasAvailableSubCommands() && target.Args == nil {
 		return fmt.Sprintf("%q has no subcommand %q", target.CommandPath(), positional[0])
 	}
-	if err := target.ValidateArgs(flags.Args()); err != nil {
+	// The words after a -- belong to the argument a command declares for
+	// them, which a check of a copy of its flags cannot tell from the rest.
+	words := flags.Args()
+	if dash := flags.ArgsLenAtDash(); dash >= 0 && dash <= len(words) && slices.ContainsFunc(cliout.DeclaredArgs(target), func(a cliout.Arg) bool { return a.AfterDash }) {
+		words = words[:dash]
+	}
+	if err := target.ValidateArgs(words); err != nil {
 		return err.Error()
 	}
 	return ""
