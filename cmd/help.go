@@ -101,7 +101,18 @@ func installHelp(rootCmd *cobra.Command, platform, platformVersion string) {
 		_, err := io.WriteString(c.OutOrStderr(), usageText(c, helpWidth()))
 		return err
 	})
-	rootCmd.SetHelpFunc(func(c *cobra.Command, _ []string) {
+	rootCmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		// Cobra hands the help func the line as typed. A line that asks for
+		// --output json gets the command's document, whatever else is on it.
+		if cliout.ArgsAskForJSON(args, "o") {
+			// A failed write ends the help: the text page is not a fallback
+			// for a document the reader asked for, and the help func has no
+			// way to return the error, so it is told on stderr.
+			if err := (cliout.Renderer{Format: cliout.FormatJSON, Out: c.OutOrStdout()}).Emit(describeCommand(c), nil); err != nil {
+				c.PrintErrln(cliout.ErrorLabel(c.ErrOrStderr()), err)
+			}
+			return
+		}
 		addHelpFlag(c)
 		io.WriteString(c.OutOrStdout(), helpPage(c, platform, platformVersion, helpWidth())) //nolint:errcheck // cobra's help func has nowhere to return an error, and cobra's own drops it too
 	})
@@ -217,17 +228,7 @@ func usageText(c *cobra.Command, width int) string {
 // command declares, in declaration order, then the ungrouped ones, then the
 // help topics (commands that only group others and run nothing).
 func commandSections(c *cobra.Command, width int) []string {
-	var available, topics []*cobra.Command
-	for _, sub := range c.Commands() {
-		switch {
-		// IsAvailableCommand turns down cobra's own help command, which
-		// cobra's template lists by name; so does this.
-		case sub.IsAvailableCommand() || sub.Name() == helpName:
-			available = append(available, sub)
-		case sub.IsAdditionalHelpTopicCommand():
-			topics = append(topics, sub)
-		}
-	}
+	available, topics := listedCommands(c)
 	if len(available) == 0 && len(topics) == 0 {
 		return nil
 	}
@@ -251,15 +252,7 @@ func commandSections(c *cobra.Command, width int) []string {
 		sections = append(sections, b.String())
 	}
 
-	grouped := map[string][]*cobra.Command{}
-	var ungrouped []*cobra.Command
-	for _, sub := range available {
-		if sub.GroupID != "" && c.ContainsGroup(sub.GroupID) {
-			grouped[sub.GroupID] = append(grouped[sub.GroupID], sub)
-		} else {
-			ungrouped = append(ungrouped, sub)
-		}
-	}
+	grouped, ungrouped := splitByGroup(c, available)
 	for _, g := range c.Groups() {
 		section(g.Title, grouped[g.ID])
 	}
@@ -270,6 +263,47 @@ func commandSections(c *cobra.Command, width int) []string {
 	section(ungroupedTitle, ungrouped)
 	section("Additional help topics:", topics)
 	return sections
+}
+
+// listedCommands is the children a page lists: the available ones, which
+// include the help command (IsAvailableCommand turns down cobra's own, which
+// cobra's template lists by name; so does this), and the help topics.
+func listedCommands(c *cobra.Command) (available, topics []*cobra.Command) {
+	for _, sub := range c.Commands() {
+		switch {
+		case sub.IsAvailableCommand() || sub.Name() == helpName:
+			available = append(available, sub)
+		case sub.IsAdditionalHelpTopicCommand():
+			topics = append(topics, sub)
+		}
+	}
+	return available, topics
+}
+
+// splitByGroup sorts available into the groups c declares and the rest.
+func splitByGroup(c *cobra.Command, available []*cobra.Command) (grouped map[string][]*cobra.Command, ungrouped []*cobra.Command) {
+	grouped = map[string][]*cobra.Command{}
+	for _, sub := range available {
+		if sub.GroupID != "" && c.ContainsGroup(sub.GroupID) {
+			grouped[sub.GroupID] = append(grouped[sub.GroupID], sub)
+		} else {
+			ungrouped = append(ungrouped, sub)
+		}
+	}
+	return grouped, ungrouped
+}
+
+// listedInOrder is listedCommands in the order a page reads them: each group
+// in declaration order, then the ungrouped ones, then the topics.
+func listedInOrder(c *cobra.Command) []*cobra.Command {
+	available, topics := listedCommands(c)
+	grouped, ungrouped := splitByGroup(c, available)
+	var out []*cobra.Command
+	for _, g := range c.Groups() {
+		out = append(out, grouped[g.ID]...)
+	}
+	out = append(out, ungrouped...)
+	return append(out, topics...)
 }
 
 // commandRow is one line of a command list: its spellings padded to the

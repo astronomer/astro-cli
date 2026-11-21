@@ -603,7 +603,6 @@ func TestRemovedFlagsGiveWayToHelp(t *testing.T) {
 		{"deployment", "list", "--json", "--help"},
 		{"deployment", "list", "--help", "--json"},
 		{"deployment", "list", "--json", "-h"},
-		{"deployment", "list", "--json", "-h", "-o", "json"},
 		{"deployment", "list", "--json", "--help=true"},
 		{"deployment", "list", "--json", "-h=true"},
 		{"deployment", "delete", "dep-id", "-f", "-h"},
