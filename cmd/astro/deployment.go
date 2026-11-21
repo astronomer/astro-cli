@@ -209,7 +209,7 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove",
+		Use:     "remove [TEAM_ID]",
 		Aliases: []string{"rm"},
 		Short:   "Remove a team from an Astro Deployment",
 		Long:    "Remove a team's role from a Deployment. Team members lose Deployment access unless they have access through another team or a direct user role assignment.",
@@ -417,7 +417,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove",
+		Use:     "remove [EMAIL]",
 		Aliases: []string{"rm"},
 		Short:   "Remove a user from an Astro Deployment",
 		Long:    "Remove a user's direct role from a Deployment. The user may retain access through team membership.",

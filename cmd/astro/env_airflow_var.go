@@ -31,7 +31,7 @@ func newEnvAirflowVarRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Airflow variables",
 		Long:    "Manage Airflow variables on Astro, scoped to a Workspace or a Deployment.",
 		Example: envAirflowVarExamples,
-		Args:    cobra.ArbitraryArgs,
+		Args:    cliout.UndeclaredArgs,
 		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)

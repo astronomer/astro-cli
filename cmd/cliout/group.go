@@ -65,7 +65,28 @@ func SubcommandSuggestions(cmd *cobra.Command, arg string) []string {
 	own := cmd.SuggestionsMinimumDistance
 	defer func() { cmd.SuggestionsMinimumDistance = own }()
 	cmd.SuggestionsMinimumDistance = distance
-	return cmd.SuggestionsFor(arg)
+	return closestOne(arg, cmd.SuggestionsFor(arg))
+}
+
+// closestOne narrows cobra's candidates to the one nearest arg by EditDistance,
+// or to none when two are equally near: a refusal that offers two guesses
+// is not helping, and a wrong one costs another error.
+func closestOne(arg string, candidates []string) []string {
+	var best []string
+	nearest := -1
+	for _, c := range candidates {
+		d := EditDistance(strings.ToLower(arg), strings.ToLower(c))
+		switch {
+		case nearest < 0 || d < nearest:
+			nearest, best = d, []string{c}
+		case d == nearest:
+			best = append(best, c)
+		}
+	}
+	if len(best) != 1 {
+		return nil
+	}
+	return best
 }
 
 // suggestionDistance is how far a suggestion for something typed on cmd may
@@ -154,4 +175,39 @@ func bareGroups(root, target *cobra.Command) (refused func(ran *cobra.Command) e
 func helpAsked(cmd *cobra.Command) bool {
 	f := cmd.Flags().Lookup("help")
 	return f != nil && f.Changed
+}
+
+// ArgvPassthroughAnnotation marks a command whose arguments after the first
+// operand belong to a program it runs (`astro local run pytest --version`), so
+// nothing after that operand is the CLI's to read: not a flag, and not the
+// root's --version.
+const ArgvPassthroughAnnotation = "argv-passthrough"
+
+// UndeclaredArgs is the check a command gets when it declares none. Cobra's own
+// default accepts any words, so a stray argument ran the command anyway (and
+// past a pre-run login that failed for an unrelated reason). A group that runs
+// refuses a word that names none of its subcommands. A leaf takes the
+// positionals its Use line documents, [NAME] or <NAME>, and none otherwise; a
+// documented positional ending in ... takes any number.
+func UndeclaredArgs(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	if cmd.HasSubCommands() {
+		return UnknownSubcommand(cmd, args[0])
+	}
+	documented := 0
+	for _, word := range strings.Fields(cmd.Use)[1:] {
+		if !strings.HasPrefix(word, "[") && !strings.HasPrefix(word, "<") {
+			continue
+		}
+		if strings.HasSuffix(strings.Trim(word, "]>"), "...") {
+			return nil
+		}
+		documented++
+	}
+	if documented == 0 {
+		return cobra.NoArgs(cmd, args)
+	}
+	return cobra.MaximumNArgs(documented)(cmd, args)
 }

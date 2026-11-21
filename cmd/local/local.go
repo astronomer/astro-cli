@@ -1195,6 +1195,7 @@ func newRunCmd(c *cli) *cobra.Command {
 	// Everything after the first positional belongs to the wrapped
 	// command, not to us.
 	cmd.Flags().SetInterspersed(false)
+	cmd.Annotations = map[string]string{cliout.ArgvPassthroughAnnotation: "true"}
 	cmd.Flags().BoolVar(&withWorkspace, flagWithWorkspace, false, withWorkspaceHelp)
 	cmd.Flags().BoolVar(&noSync, flagNoSync, false, noSyncHelp)
 	return cmd

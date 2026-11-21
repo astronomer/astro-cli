@@ -56,6 +56,7 @@ func newContextListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List all contexts",
 		Long:    "List the Astro and APC contexts saved on this machine.",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			list, err := context.List()
 			if err != nil {

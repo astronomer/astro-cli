@@ -34,7 +34,7 @@ func newEnvMetricsExportRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage metrics exports",
 		Long:    "Manage metrics exports on Astro, scoped to a Workspace or a Deployment.",
 		Example: envMetricsExamples,
-		Args:    cobra.ArbitraryArgs,
+		Args:    cliout.UndeclaredArgs,
 		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)

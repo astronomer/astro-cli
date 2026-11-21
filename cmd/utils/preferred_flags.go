@@ -115,7 +115,8 @@ func ApplyAliases(fs *pflag.FlagSet) error {
 // BeforeArgs runs hook on every runnable command in tree once its flags are
 // parsed, ahead of its argument check and of every pre-run: the one point
 // cobra offers before a parent's persistent pre-run reads the flags. It wraps
-// the command's Args, keeping the check it had.
+// the command's Args, keeping the check it had. A command that declared none
+// takes no arguments (cliout.UndeclaredArgs).
 func BeforeArgs(tree *cobra.Command, hook func(*cobra.Command, []string) error) {
 	if tree.Runnable() {
 		check := tree.Args
@@ -124,7 +125,7 @@ func BeforeArgs(tree *cobra.Command, hook func(*cobra.Command, []string) error) 
 				return err
 			}
 			if check == nil {
-				return cobra.ArbitraryArgs(cmd, args)
+				return cliout.UndeclaredArgs(cmd, args)
 			}
 			return check(cmd, args)
 		}

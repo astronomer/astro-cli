@@ -210,7 +210,13 @@ func markUsageErrors(root *cobra.Command) {
 		nameRemovedAlias(c)
 		validate := c.Args
 		if validate == nil {
-			return
+			if !c.Runnable() {
+				return
+			}
+			// Cobra's own default accepts any words after a command that
+			// runs: a leaf takes none, and a group refuses a word that is
+			// none of its subcommands (UndeclaredArgs).
+			validate = UndeclaredArgs
 		}
 		c.Args = func(cmd *cobra.Command, args []string) error {
 			return misinvoked(validate(cmd, args))

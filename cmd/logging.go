@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -56,8 +58,11 @@ func addVerbosityFlag(fs *pflag.FlagSet) {
 // The level is the first of --verbosity, ASTRO_VERBOSITY and the verbosity
 // setting that is set, or warn. A flag is only consulted when it was given
 // (pflag's Changed), so `--verbosity warn` wins over a setting of debug.
-// A bad value in the environment or the setting does not stop the command: it
-// is reported, and the next source decides.
+// A bad ASTRO_VERBOSITY stops the command as a bad --verbosity does, as a usage
+// error naming the variable: it was set on purpose, and a typo would otherwise
+// leave the run quieter or louder than asked. A bad verbosity setting, written
+// to a file some time ago, does not: it is reported, and the next source
+// decides.
 func SetupLogging(cmd *cobra.Command, _ []string) error {
 	logger.SetOutput(logOutput())
 	if f := cmd.Root().PersistentFlags().Lookup(verbosityFlag); f != nil && f.Changed {
@@ -66,6 +71,11 @@ func SetupLogging(cmd *cobra.Command, _ []string) error {
 	}
 	level := logger.DefaultLevel
 	var bad []string
+	if raw := os.Getenv(verbosityEnv); raw != "" {
+		if _, err := logger.ParseLevel(raw); err != nil {
+			return cliout.Usage(fmt.Errorf("%s: %w", verbosityEnv, err))
+		}
+	}
 	for _, src := range []struct{ name, value string }{
 		{verbosityEnv, os.Getenv(verbosityEnv)},
 		{"the verbosity setting", config.CFG.Verbosity.GetString()},
