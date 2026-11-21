@@ -71,12 +71,13 @@ func toVariableInfo(vars []astrov1.DeploymentEnvironmentVariable) []VariableInfo
 // still updated with the ones that were usable, and the caller decides what to
 // do about the rest. Only a failure to reach the Deployment is an error.
 func VariableModify(
+	ctx context.Context,
 	deploymentID, variableKey, variableValue, ws, envFile, deploymentName string,
 	variableList []string,
 	useEnvFile, makeSecret, updateVars bool,
 	astroV1Client astrov1.APIClient,
 ) (*VariableModifyResult, error) {
-	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, ToChange, nil, astroV1Client)
+	currentDeployment, err := GetDeploymentContext(ctx, ws, deploymentID, deploymentName, ToChange, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +144,7 @@ func VariableModify(
 			return nil, err
 		}
 	}
-	updated, err := GetDeploymentByID(context.Background(), "", currentDeployment.Id, astroV1Client)
+	updated, err := GetDeploymentByID(ctx, "", currentDeployment.Id, astroV1Client)
 	if err != nil {
 		return nil, err
 	}

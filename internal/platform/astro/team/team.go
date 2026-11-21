@@ -664,7 +664,7 @@ func RemoveUser(ctx httpContext.Context, teamID, teamMemberID string, force bool
 		}
 	}
 	teamID = team.Id
-	teamMembers, err := listTeamMembers(httpContext.Background(), client, cfg.Organization, teamID, 0)
+	teamMembers, err := listTeamMembers(ctx, client, cfg.Organization, teamID, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -759,7 +759,7 @@ func AddUser(ctx httpContext.Context, teamID, userID string, force bool, client 
 			return nil, err
 		}
 	} else {
-		userSelection, err = user.GetUser(client, userID)
+		userSelection, err = user.GetUser(ctx, client, userID)
 		if err != nil {
 			return nil, err
 		}

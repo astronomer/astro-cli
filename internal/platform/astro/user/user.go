@@ -315,7 +315,7 @@ func AddWorkspaceUser(ctx httpContext.Context, email, role, workspaceID string, 
 	if err != nil {
 		return UserInfo{}, err
 	}
-	return setWorkspaceRole(client, cfg.Organization, workspaceID, email, role, users, "organization")
+	return setWorkspaceRole(ctx, client, cfg.Organization, workspaceID, email, role, users, "organization")
 }
 
 // UpdateWorkspaceUserRole sets the role on the Workspace of its user with
@@ -338,17 +338,17 @@ func UpdateWorkspaceUserRole(ctx httpContext.Context, email, role, workspaceID s
 	if err != nil {
 		return UserInfo{}, err
 	}
-	return setWorkspaceRole(client, cfg.Organization, workspaceID, email, role, users, "workspace")
+	return setWorkspaceRole(ctx, client, cfg.Organization, workspaceID, email, role, users, "workspace")
 }
 
 // setWorkspaceRole finds the user among users, by email or through the
 // picker, and sets its role on workspaceID, keeping every other role it holds.
-func setWorkspaceRole(client astrov1.APIClient, orgID, workspaceID, email, role string, users []astrov1.User, roleEntity string) (UserInfo, error) {
+func setWorkspaceRole(ctx httpContext.Context, client astrov1.APIClient, orgID, workspaceID, email, role string, users []astrov1.User, roleEntity string) (UserInfo, error) {
 	found, err := findUser(email, users, roleEntity, workspaceID)
 	if err != nil {
 		return UserInfo{}, err
 	}
-	current, err := GetUser(client, found.Id)
+	current, err := GetUser(ctx, client, found.Id)
 	if err != nil {
 		return UserInfo{}, err
 	}
@@ -427,7 +427,7 @@ func RemoveWorkspaceUser(ctx httpContext.Context, email, workspaceID string, cli
 	if err != nil {
 		return WorkspaceRemoval{}, err
 	}
-	current, err := GetUser(client, found.Id)
+	current, err := GetUser(ctx, client, found.Id)
 	if err != nil {
 		return WorkspaceRemoval{}, err
 	}
@@ -465,13 +465,13 @@ func findUser(email string, users []astrov1.User, roleEntity, scopeID string) (a
 	return found, nil
 }
 
-func GetUser(client astrov1.APIClient, userID string) (user astrov1.User, err error) {
+func GetUser(ctx httpContext.Context, client astrov1.APIClient, userID string) (user astrov1.User, err error) {
 	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return user, err
 	}
 
-	resp, err := client.GetUserWithResponse(httpContext.Background(), cfg.Organization, userID)
+	resp, err := client.GetUserWithResponse(pagination.Background(ctx), cfg.Organization, userID)
 	if err != nil {
 		return user, err
 	}
@@ -494,7 +494,7 @@ func AddDeploymentUser(ctx httpContext.Context, email, role, deploymentID string
 	if err != nil {
 		return UserInfo{}, err
 	}
-	return setDeploymentRole(client, cfg.Organization, deploymentID, email, role, users, "organization")
+	return setDeploymentRole(ctx, client, cfg.Organization, deploymentID, email, role, users, "organization")
 }
 
 // UpdateDeploymentUserRole sets the role on the Deployment of its user with
@@ -509,7 +509,7 @@ func UpdateDeploymentUserRole(ctx httpContext.Context, email, role, deploymentID
 	if err != nil {
 		return UserInfo{}, err
 	}
-	return setDeploymentRole(client, cfg.Organization, deploymentID, email, role, users, roleEntityDeployment)
+	return setDeploymentRole(ctx, client, cfg.Organization, deploymentID, email, role, users, roleEntityDeployment)
 }
 
 // RemoveDeploymentUser removes the role on the Deployment of its user with
@@ -524,7 +524,7 @@ func RemoveDeploymentUser(ctx httpContext.Context, email, deploymentID string, c
 	if err != nil {
 		return DeploymentRemoval{}, err
 	}
-	found, err := putDeploymentRole(client, cfg.Organization, deploymentID, email, "", users, roleEntityDeployment)
+	found, err := putDeploymentRole(ctx, client, cfg.Organization, deploymentID, email, "", users, roleEntityDeployment)
 	if err != nil {
 		return DeploymentRemoval{}, err
 	}
@@ -533,8 +533,8 @@ func RemoveDeploymentUser(ctx httpContext.Context, email, deploymentID string, c
 
 // setDeploymentRole finds the user among users, by email or through the
 // picker, sets its role on deploymentID, and returns it with that role.
-func setDeploymentRole(client astrov1.APIClient, orgID, deploymentID, email, role string, users []astrov1.User, roleEntity string) (UserInfo, error) {
-	found, err := putDeploymentRole(client, orgID, deploymentID, email, role, users, roleEntity)
+func setDeploymentRole(ctx httpContext.Context, client astrov1.APIClient, orgID, deploymentID, email, role string, users []astrov1.User, roleEntity string) (UserInfo, error) {
+	found, err := putDeploymentRole(ctx, client, orgID, deploymentID, email, role, users, roleEntity)
 	if err != nil {
 		return UserInfo{}, err
 	}
@@ -548,7 +548,7 @@ func setDeploymentRole(client astrov1.APIClient, orgID, deploymentID, email, rol
 // putDeploymentRole finds the user among users, by email or through the
 // picker, and sets its role on deploymentID to role, or removes it when role
 // is "", keeping every other role it holds. It returns the user found.
-func putDeploymentRole(client astrov1.APIClient, orgID, deploymentID, email, role string, users []astrov1.User, roleEntity string) (astrov1.User, error) {
+func putDeploymentRole(ctx httpContext.Context, client astrov1.APIClient, orgID, deploymentID, email, role string, users []astrov1.User, roleEntity string) (astrov1.User, error) {
 	// The picker shows each user's role on the Deployment when choosing among
 	// its users; adding one chooses among the Organization's, which have none.
 	scopeID := ""
@@ -559,7 +559,7 @@ func putDeploymentRole(client astrov1.APIClient, orgID, deploymentID, email, rol
 	if err != nil {
 		return astrov1.User{}, err
 	}
-	current, err := GetUser(client, found.Id)
+	current, err := GetUser(ctx, client, found.Id)
 	if err != nil {
 		return astrov1.User{}, err
 	}

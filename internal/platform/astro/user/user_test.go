@@ -647,7 +647,7 @@ func TestGetUser(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(t)
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseOK, nil).Once()
-		_, err := GetUser(mockClient, user1.Id)
+		_, err := GetUser(context.Background(), mockClient, user1.Id)
 		assert.NoError(t, err)
 	})
 
@@ -656,7 +656,7 @@ func TestGetUser(t *testing.T) {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(t)
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetUserWithResponseError, nil).Once()
 
-		_, err := GetUser(mockClient, user1.Id)
+		_, err := GetUser(context.Background(), mockClient, user1.Id)
 		assert.EqualError(t, err, "failed to get user")
 	})
 
@@ -665,7 +665,7 @@ func TestGetUser(t *testing.T) {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(t)
 		mockClient.On("GetUserWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 
-		_, err := GetUser(mockClient, user1.Id)
+		_, err := GetUser(context.Background(), mockClient, user1.Id)
 		assert.EqualError(t, err, "network error")
 	})
 
@@ -674,7 +674,7 @@ func TestGetUser(t *testing.T) {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(t)
-		_, err := GetUser(mockClient, user1.Id)
+		_, err := GetUser(context.Background(), mockClient, user1.Id)
 		assert.Error(t, err)
 		assert.Equal(t, expectedOutMessage, out.String())
 	})

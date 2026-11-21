@@ -1056,7 +1056,7 @@ func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, 
 		return err
 	}
 
-	res, err := deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile,
+	res, err := deployment.VariableModify(cmd.Context(), deploymentID, variableKey, variableValue, ws, envFile,
 		deploymentName, args, useEnvFile, makeSecret, update, client)
 	if err != nil {
 		return err
