@@ -20,17 +20,17 @@ func TestArgsWritesTheUseLineFromTheDeclaration(t *testing.T) {
 		"get <NAME>":                 leafWith("get", Required("NAME")),
 		"get [NAME]":                 leafWith("get", Optional("NAME")),
 		"get <A> [B]":                leafWith("get", Required("A"), Optional("B")),
-		"rm <NAME...>":               leafWith("rm", Arg{Name: "NAME", Repeated: true}),
+		"rm <NAME>...":               leafWith("rm", Arg{Name: "NAME", Repeated: true}),
 		"rm [NAME...]":               leafWith("rm", Arg{Name: "NAME", Optional: true, Repeated: true}),
 		"add [NAME] [-- COMMAND...]": leafWith("add", Optional("NAME"), Arg{Name: "COMMAND", Optional: true, Repeated: true, AfterDash: true}),
-		"run -- <COMMAND...>":        leafWith("run", Arg{Name: "COMMAND", Repeated: true, AfterDash: true}),
+		"run -- <COMMAND>...":        leafWith("run", Arg{Name: "COMMAND", Repeated: true, AfterDash: true}),
 	} {
 		assert.Equal(t, want, cmd.Use)
 	}
 }
 
 func TestArgsDeclarationReadsBack(t *testing.T) {
-	declared := []Arg{Required("A"), Optional("B"), {Name: "C", Optional: true, Repeated: true}}
+	declared := []Arg{Required("A"), Optional("B"), {Name: "C", Optional: true, Repeated: true}, {Name: "KEY=VALUE", Repeated: true, AfterDash: true}}
 	cmd := leafWith("x", declared...)
 	assert.Equal(t, declared, DeclaredArgs(cmd))
 	assert.Empty(t, DeclaredArgs(&cobra.Command{Use: "y"}))
@@ -44,6 +44,7 @@ func TestArgsRefusesWhatNoLineCouldSatisfy(t *testing.T) {
 		"a dash that is not last":            func() { leafWith("x", Arg{Name: "A", AfterDash: true}, Optional("B")) },
 		"a name that is not a placeholder":   func() { leafWith("x", Required("<A>")) },
 		"an empty name":                      func() { leafWith("x", Required("")) },
+		"a colon, which the annotation uses": func() { leafWith("x", Required("A:B")) },
 	} {
 		assert.Panics(t, build, name)
 	}
@@ -191,14 +192,28 @@ func TestCheckArgsRunsAfterTheCount(t *testing.T) {
 	assert.Panics(t, func() { CheckArgs(&cobra.Command{Use: "y"}, nil) })
 }
 
+func TestCheckArgsBeforeSpeaksAheadOfTheCount(t *testing.T) {
+	cmd := CheckArgsBefore(leafWith("logs", Optional("ID")), func(_ *cobra.Command, args []string) error {
+		if len(args) > 0 && args[0] == "triggerer" {
+			return Usage(errors.New(`"triggerer" names a component, not an ID`))
+		}
+		return nil
+	})
+	root := &cobra.Command{Use: "root"}
+	root.AddCommand(cmd)
+	assert.EqualError(t, execTree(context.Background(), root, "logs", "triggerer", "dep-1").err, `"triggerer" names a component, not an ID`)
+	assert.EqualError(t, execTree(context.Background(), root, "logs", "dep-1", "dep-2").err, `unexpected argument "dep-2": root logs takes at most 1 argument`)
+	assert.NoError(t, execTree(context.Background(), root, "logs", "dep-1").err)
+}
+
 func TestAnyWordsNeedsAReasonAndIsReadable(t *testing.T) {
 	assert.Panics(t, func() { AnyWords(&cobra.Command{Use: "x"}, "") })
 	cmd := AnyWords(&cobra.Command{Use: "x"}, "its RunE reads them")
-	why, ok := AcceptsAnyWords(cmd)
-	assert.True(t, ok)
-	assert.Equal(t, "its RunE reads them", why)
-	_, ok = AcceptsAnyWords(&cobra.Command{Use: "y"})
-	assert.False(t, ok)
+	assert.Equal(t, "its RunE reads them", cmd.Annotations[AnyWordsAnnotation])
+	assert.NoError(t, cmd.Args(cmd, []string{"any", "words"}))
+	declared := AnyWords(leafWith("z", Required("A")), "it reads them now")
+	assert.Equal(t, "z", declared.Use, "a declaration it had is gone with its Use text")
+	assert.Empty(t, DeclaredArgs(declared))
 }
 
 func TestPassthroughStopsFlagParsingAtTheFirstWord(t *testing.T) {

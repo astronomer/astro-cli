@@ -1,7 +1,6 @@
 package cliout
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -23,17 +22,17 @@ import (
 // Arg is one positional argument of a command.
 type Arg struct {
 	// Name is the placeholder help shows: DEPLOYMENT_ID, KEY=VALUE.
-	Name string `json:"name"`
+	Name string
 	// Optional is whether the command runs without it. An optional argument
 	// follows every required one.
-	Optional bool `json:"optional,omitempty"`
+	Optional bool
 	// Repeated is whether it takes one or more words (any number when
 	// Optional). Nothing can follow a repeated argument but the words after --.
-	Repeated bool `json:"repeated,omitempty"`
+	Repeated bool
 	// AfterDash is whether it is what follows a "--" on the line, as the
 	// command `astro link add NAME -- COMMAND...` hands on. It is the last
 	// argument declared.
-	AfterDash bool `json:"after_dash,omitempty"`
+	AfterDash bool
 }
 
 // Required is a required argument named name.
@@ -42,7 +41,7 @@ func Required(name string) Arg { return Arg{Name: name} }
 // Optional is an optional argument named name.
 func Optional(name string) Arg { return Arg{Name: name, Optional: true} }
 
-// ArgsAnnotation holds a command's declaration, JSON encoded, for DeclaredArgs.
+// ArgsAnnotation holds a command's declaration, for DeclaredArgs.
 const ArgsAnnotation = "astro.args"
 
 // AnyWordsAnnotation marks a command that accepts any words after it, with
@@ -65,14 +64,10 @@ func Args(cmd *cobra.Command, args ...Arg) *cobra.Command {
 	if len(args) > 0 {
 		cmd.Use += " " + useLine(args)
 	}
-	encoded, err := json.Marshal(args)
-	if err != nil {
-		panic(err)
-	}
 	if cmd.Annotations == nil {
 		cmd.Annotations = map[string]string{}
 	}
-	cmd.Annotations[ArgsAnnotation] = string(encoded)
+	cmd.Annotations[ArgsAnnotation] = encodeArgs(args)
 	cmd.Args = func(cmd *cobra.Command, words []string) error {
 		return validateArgs(cmd, args, words)
 	}
@@ -96,6 +91,25 @@ func CheckArgs(cmd *cobra.Command, check cobra.PositionalArgs) *cobra.Command {
 	return cmd
 }
 
+// CheckArgsBefore is CheckArgs for a check whose message says more than the
+// count's would, so it is read first: a word that names something else than
+// what the command takes (`logs triggerer dep-1`, where a Deployment goes)
+// is told so, rather than called a stray argument. It runs on whatever
+// number of words the line has, none included.
+func CheckArgsBefore(cmd *cobra.Command, check cobra.PositionalArgs) *cobra.Command {
+	counted := cmd.Args
+	if counted == nil {
+		panic("cliout.CheckArgsBefore: " + cmd.Use + " declares no arguments; call Args first")
+	}
+	cmd.Args = func(cmd *cobra.Command, words []string) error {
+		if err := check(cmd, words); err != nil {
+			return err
+		}
+		return counted(cmd, words)
+	}
+	return cmd
+}
+
 // AnyWords is for the command that reads the words after it itself and so
 // takes any number of them: a group whose RunE names the replacement of a
 // removed verb, a stub that only says what replaced it, an internal command
@@ -109,6 +123,10 @@ func AnyWords(cmd *cobra.Command, why string) *cobra.Command {
 		cmd.Annotations = map[string]string{}
 	}
 	cmd.Annotations[AnyWordsAnnotation] = why
+	if _, declared := cmd.Annotations[ArgsAnnotation]; declared {
+		delete(cmd.Annotations, ArgsAnnotation)
+		cmd.Use = cmd.Name()
+	}
 	cmd.Args = cobra.ArbitraryArgs
 	return cmd
 }
@@ -129,42 +147,63 @@ func Passthrough(cmd *cobra.Command) *cobra.Command {
 // DeclaredArgs is the positionals cmd declared with Args, in order, and none
 // for a command that declared none.
 func DeclaredArgs(cmd *cobra.Command) []Arg {
-	var args []Arg
-	if encoded := cmd.Annotations[ArgsAnnotation]; encoded != "" {
-		if err := json.Unmarshal([]byte(encoded), &args); err != nil {
-			panic(err)
+	return decodeArgs(cmd.Annotations[ArgsAnnotation])
+}
+
+// encodeArgs writes a declaration as the annotation holds it: one word per
+// argument, NAME:flags, where flags are o (optional), r (repeated) and d
+// (after a dash). A name holds no space or colon (checkDeclaration).
+func encodeArgs(args []Arg) string {
+	words := make([]string, 0, len(args))
+	for _, a := range args {
+		flags := ""
+		if a.Optional {
+			flags += "o"
 		}
+		if a.Repeated {
+			flags += "r"
+		}
+		if a.AfterDash {
+			flags += "d"
+		}
+		words = append(words, a.Name+":"+flags)
+	}
+	return strings.Join(words, " ")
+}
+
+func decodeArgs(encoded string) []Arg {
+	var args []Arg
+	for _, word := range strings.Fields(encoded) {
+		name, flags, _ := strings.Cut(word, ":")
+		args = append(args, Arg{
+			Name:      name,
+			Optional:  strings.Contains(flags, "o"),
+			Repeated:  strings.Contains(flags, "r"),
+			AfterDash: strings.Contains(flags, "d"),
+		})
 	}
 	return args
 }
 
-// AcceptsAnyWords reports whether cmd was declared with AnyWords, and why.
-func AcceptsAnyWords(cmd *cobra.Command) (why string, ok bool) {
-	why, ok = cmd.Annotations[AnyWordsAnnotation]
-	return why, ok
-}
-
-// UseLine is the positional part of a Use line for args: <NAME> required,
-// [NAME] optional, a trailing ... for a repeated one, and [-- NAME...] for
-// what follows a dash.
-func UseLine(args []Arg) string { return useLine(args) }
-
+// useLine is the positional part of a Use line for args: <NAME> required,
+// [NAME] optional, ... after the name of a repeated one ([NAME...] when
+// optional, <NAME>... when required), and [-- NAME...] for what follows a dash.
 func useLine(args []Arg) string {
 	words := make([]string, 0, len(args))
 	for _, a := range args {
-		name := a.Name
+		dots := ""
 		if a.Repeated {
-			name += "..."
+			dots = "..."
 		}
 		switch {
 		case a.AfterDash && a.Optional:
-			words = append(words, "[-- "+name+"]")
+			words = append(words, "[-- "+a.Name+dots+"]")
 		case a.AfterDash:
-			words = append(words, "-- <"+name+">")
+			words = append(words, "-- <"+a.Name+">"+dots)
 		case a.Optional:
-			words = append(words, "["+name+"]")
+			words = append(words, "["+a.Name+dots+"]")
 		default:
-			words = append(words, "<"+name+">")
+			words = append(words, "<"+a.Name+">"+dots)
 		}
 	}
 	return strings.Join(words, " ")
@@ -175,7 +214,7 @@ func checkDeclaration(args []Arg) error {
 	seenOptional, seenRepeated := false, false
 	for i, a := range args {
 		switch {
-		case a.Name == "" || strings.ContainsAny(a.Name, " <>[]") || strings.HasSuffix(a.Name, "..."):
+		case a.Name == "" || strings.ContainsAny(a.Name, " <>[]:") || strings.HasSuffix(a.Name, "..."):
 			return fmt.Errorf("argument %d has the name %q, which is not a bare placeholder", i+1, a.Name)
 		case a.AfterDash && i != len(args)-1:
 			return fmt.Errorf("%s follows --, so it is the last argument", a.Name)
