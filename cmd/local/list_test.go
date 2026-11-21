@@ -112,6 +112,7 @@ func TestListTextTableShowsColumns(t *testing.T) {
 }
 
 func TestListDefaultHidesStale(t *testing.T) {
+	notices := captureNotices(t)
 	d, out := testDeps(t)
 	d.Runtime = stubRuntime{list: []localrt.Status{
 		{ProjectPath: "/proj/b", Mode: localrt.ModeStandalone, State: localrt.StateStopped, Port: 8081},
@@ -119,8 +120,11 @@ func TestListDefaultHidesStale(t *testing.T) {
 	if err := execute(t, d, "local", "list"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "No local Airflow found") {
-		t.Errorf("default list should hide the stale record:\n%s", out.String())
+	if !strings.Contains(notices.String(), "No local Airflow found") {
+		t.Errorf("default list should hide the stale record and say so:\n%s", notices.String())
+	}
+	if want := "PROJECT\tHOSTNAME\tMODE\tSTATE\tPORT\tUPTIME\n"; out.String() != want {
+		t.Errorf("stdout = %q, want the header alone, %q", out.String(), want)
 	}
 }
 

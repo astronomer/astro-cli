@@ -79,11 +79,11 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		description = utils.GetDefaultDeployDescription(isDagOnlyDeploy)
 	}
 
-	// The deploy's progress goes to stdout in text, as APC's deploy always
-	// has, and to stderr under json, where stdout carries the result. The
-	// question goes to stderr either way.
-	progress := cliout.NotesTo(cmd, deployOutput, out)
+	// The deploy's progress (the build, the push, what it is deploying) goes
+	// to stderr in both formats, with the question: stdout carries the
+	// result alone, the summary line in text and the object under json.
 	errOut := cmd.ErrOrStderr()
+	progress := errOut
 	// Every warning goes to stderr, led by a yellow "Warning:", as Astro's
 	// deploy does, and into the result's warnings for -o json; notes go to
 	// stderr too. In text they print once, after the deploy's progress (the

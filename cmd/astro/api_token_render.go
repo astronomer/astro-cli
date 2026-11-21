@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -47,10 +48,17 @@ func refuseCleanOutputWithJSON(format cliout.Format) error {
 // renderTokenList renders a token list, its role column headed roleHeader.
 func renderTokenList(format cliout.Format, out io.Writer, tokens []apitoken.Token, roleHeader string) error {
 	tab := &cliout.Table{Header: tokenHeader(roleHeader)}
+	// A person reads "3 days ago"; a script gets the moment, as the other
+	// tables print one.
+	plain := !cliout.IsTerminal(out)
 	for i := range tokens {
-		tab.AddRow(tokenRow(&tokens[i])...)
+		row := tokenRow(&tokens[i])
+		if plain {
+			row[createdColumn] = createdAtText(tokens[i].CreatedAt)
+		}
+		tab.AddRow(row...)
 	}
-	return cliout.Renderer{Format: format, Out: out}.Emit(apitoken.List{Tokens: tokens}, cliout.Text(tab.Render))
+	return cliout.Renderer{Format: format, Out: out}.Emit(apitoken.List{Tokens: tokens}, cliout.TableText(tab))
 }
 
 // tokenHeader and tokenRow lay a token out, for a list and for a picker.
@@ -61,28 +69,39 @@ func tokenHeader(roleHeader string) []string {
 	return []string{"ID", "NAME", "DESCRIPTION", "SCOPE", roleHeader, "CREATED", "CREATED BY", "KIND"}
 }
 
+// createdColumn is where tokenRow puts the CREATED cell.
+const createdColumn = 5
+
+// createdAtText is a creation time as a script reads it: RFC 3339, in UTC.
+func createdAtText(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
+}
+
 func tokenRow(t *apitoken.Token) []string {
 	return []string{t.ID, t.Name, t.Description, t.Scope, t.Role, apitoken.TimeAgo(t.CreatedAt), t.CreatedBy, apitoken.KindText(t)}
 }
 
 // renderTokenSecret renders a token that carries its secret: the new one, or
 // the rotated one. kind (Deployment, Workspace, Organization), verb and name
-// complete the text's first line; clean prints the bare secret instead, for a
-// script.
+// complete the receipt's first line.
+//
+// In text, stdout is the secret and a newline, so `$(astro ... create)` and a
+// pipe get exactly the value; the receipt and the warning that the value is
+// not shown again are for the person, on stderr. clean prints the bare
+// secret and no receipt at all, which is what --clean-output has always done.
 func renderTokenSecret(format cliout.Format, out io.Writer, t *apitoken.Token, kind, verb, name string, clean bool) error {
+	if format != cliout.FormatJSON && !clean {
+		fmt.Fprintf(os.Stderr, "\n%s %s API token %s\n", verb, kind, name)
+		fmt.Fprintln(os.Stderr, "Copy this API token for your records.")
+		fmt.Fprintln(os.Stderr, "This API token value is not shown again.")
+	}
 	return cliout.Renderer{Format: format, Out: out}.Emit(t, cliout.Text(func(b *bufio.Writer) {
-		if clean {
-			if t.Token != "" {
-				fmt.Fprintln(b, t.Token)
-			}
-			return
-		}
-		fmt.Fprintf(b, "\n%s %s API token %s\n", verb, kind, name)
-		fmt.Fprintln(b, "Copy this API token for your records.")
 		if t.Token != "" {
-			fmt.Fprintln(b, "\n"+t.Token)
+			fmt.Fprintln(b, t.Token)
 		}
-		fmt.Fprintln(b, "\nThis API token value is not shown again.")
 	}))
 }
 

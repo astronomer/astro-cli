@@ -1,11 +1,15 @@
 package astro
 
 import (
+	"bytes"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 )
 
@@ -35,4 +39,27 @@ func TestTokenTablesKeepTheirColumnsAndAddKindLast(t *testing.T) {
 	assert.Equal(t, []string{"id", "n", "d", "WORKSPACE", "r"}, row[:5])
 	assert.Equal(t, "by", row[6])
 	assert.Equal(t, "DIRECT_ACCESS", row[7])
+}
+
+// Piped, a token list gives a script the creation moment, not "3 days ago",
+// and one tab between cells.
+func TestTokenListPipedHasTimestampsAndTabs(t *testing.T) {
+	created := time.Date(2026, 11, 18, 22, 57, 8, 0, time.FixedZone("x", 3600))
+	var out bytes.Buffer
+	tokens := []apitoken.Token{{ID: "tok", Name: "n", Scope: "WORKSPACE", Role: "r", CreatedAt: created, CreatedBy: "by", Kind: "DIRECT_ACCESS"}}
+	require.NoError(t, renderTokenList(cliout.FormatText, &out, tokens, workspaceRoleHeader))
+	assert.Equal(t, "ID\tNAME\tDESCRIPTION\tSCOPE\tWORKSPACE ROLE\tCREATED\tCREATED BY\tKIND\n"+
+		"tok\tn\t\tWORKSPACE\tr\t2026-11-18T21:57:08Z\tby\tDIRECT_ACCESS\n", out.String())
+}
+
+// A create's stdout is the secret and a newline, never the receipt.
+func TestTokenSecretIsAloneOnStdout(t *testing.T) {
+	var out bytes.Buffer
+	tok := &apitoken.Token{Name: "ci", Token: "s3cret"}
+	require.NoError(t, renderTokenSecret(cliout.FormatText, &out, tok, "Workspace", "Created", "ci", false))
+	assert.Equal(t, "s3cret\n", out.String())
+
+	out.Reset()
+	require.NoError(t, renderTokenSecret(cliout.FormatText, &out, tok, "Workspace", "Created", "ci", true))
+	assert.Equal(t, "s3cret\n", out.String(), "--clean-output is the same bytes")
 }

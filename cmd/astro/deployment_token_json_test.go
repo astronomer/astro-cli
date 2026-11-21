@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -248,6 +249,9 @@ func tableRows(t *testing.T, out, first string) []map[string]string {
 		if f := strings.Fields(header); len(f) == 0 || f[0] != first {
 			continue
 		}
+		if strings.Contains(header, "\t") {
+			return plainTableRows(header, lines[i+1:])
+		}
 		spans := headerCell.FindAllStringIndex(header, -1)
 		rows := []map[string]string{}
 		for _, line := range lines[i+1:] {
@@ -272,6 +276,33 @@ func tableRows(t *testing.T, out, first string) []map[string]string {
 	}
 	t.Fatalf("no table headed %q in:\n%s", first, out)
 	return nil
+}
+
+// plainTableRows reads a table whose cells are separated by one tab, which is
+// what a table printed to a pipe is. A CREATED cell there is a timestamp; it
+// is turned back into the "3 hours ago" the tests' fixtures are written in,
+// and TestTokenListIsMachineReadableWhenPiped pins the timestamp itself.
+func plainTableRows(header string, lines []string) []map[string]string {
+	titles := strings.Split(header, "\t")
+	rows := []map[string]string{}
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			break
+		}
+		row := map[string]string{}
+		for c, cell := range strings.Split(line, "\t") {
+			if c < len(titles) && titles[c] == "CREATED" {
+				if at, err := time.Parse(time.RFC3339, cell); err == nil {
+					cell = apitoken.TimeAgo(at)
+				}
+			}
+			if c < len(titles) {
+				row[titles[c]] = cell
+			}
+		}
+		rows = append(rows, row)
+	}
+	return rows
 }
 
 // requireInOrder fails unless each of parts appears in out, each after the
@@ -323,8 +354,8 @@ func TestDeploymentTokenText(t *testing.T) {
 			requireInOrder(t, out,
 				verb+" Deployment API token ci-deploy",
 				"Copy this API token for your records.",
-				tokSecret,
-				"This API token value is not shown again.")
+				"This API token value is not shown again.",
+				tokSecret)
 			requireLine(t, out, tokSecret)
 		}
 	}

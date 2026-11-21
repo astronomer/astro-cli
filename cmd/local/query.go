@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/texttable"
 )
 
 // query is one Airflow-facing command family: the cli it renders through, and
@@ -432,11 +433,11 @@ func emitDetail[T any](r cliout.Renderer, v T, fields func(T) []field) error {
 // rendered; a cell that is empty shows as a dash so a short row still lines up
 // with the header above it.
 func renderTable[T any](w io.Writer, rows []T, empty string, headers []string, cells func(T) []string) error {
+	terminal := input.IsTerminalWriter(w)
 	if len(rows) == 0 {
-		_, err := fmt.Fprintln(w, empty)
-		return err
+		return texttable.SayEmpty(w, terminal, empty, headers)
 	}
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	tw := texttable.Columns(w, terminal)
 	fmt.Fprintln(tw, strings.Join(headers, "\t"))
 	for _, row := range rows {
 		// Copy before filling blanks: cells may hand back a slice the row

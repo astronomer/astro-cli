@@ -9,6 +9,8 @@ package texttable
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"text/tabwriter"
 
@@ -38,9 +40,18 @@ const gap = 5
 type Table struct {
 	// Header is the first row. It sets the number of columns.
 	Header []string
-	// Empty is printed, alone, when the table has no rows. Left "", an empty
-	// table prints its header row and nothing under it.
+	// Empty is said, on EmptyTo, when the table has no rows. Left "", an
+	// empty table prints its header row and nothing under it. It is a message
+	// for a person, so it never goes to the stream a script reads: that gets
+	// the header alone when Plain, and nothing when drawn for a terminal.
 	Empty string
+	// EmptyTo is where Empty is said. Nil is os.Stderr.
+	EmptyTo io.Writer
+	// Plain lays the table out for a script: the cells of a line joined by one
+	// tab, with no leading space and no padding. Left false, the table is the
+	// aligned layout a person reads. cliout.TableText sets it from the
+	// destination.
+	Plain bool
 
 	rows [][]string
 }
@@ -62,7 +73,21 @@ func (t *Table) AddRow(cells ...string) {
 // the caller checks (cmd/cliout's WriteText and Text do).
 func (t *Table) Render(b *bufio.Writer) {
 	if len(t.rows) == 0 && t.Empty != "" {
-		fmt.Fprintln(b, t.Empty)
+		to := t.EmptyTo
+		if to == nil {
+			to = os.Stderr
+		}
+		fmt.Fprintln(to, t.Empty)
+		if t.Plain {
+			fmt.Fprintln(b, strings.Join(t.Header, "\t"))
+		}
+		return
+	}
+	if t.Plain {
+		fmt.Fprintln(b, strings.Join(t.Header, "\t"))
+		for _, row := range t.rows {
+			fmt.Fprintln(b, strings.Join(row, "\t"))
+		}
 		return
 	}
 	// Every cell, the last included, ends in a tab, so every column is padded
@@ -78,4 +103,53 @@ func (t *Table) Render(b *bufio.Writer) {
 
 func writeLine(tw *tabwriter.Writer, cells []string) {
 	fmt.Fprintln(tw, " "+strings.Join(cells, "\t")+"\t")
+}
+
+// Columns lays out lines whose cells are separated by tabs, for a renderer
+// that writes its own rows (fmt.Fprintln(c, "A\tB")) instead of building a
+// Table. To a terminal, the cells are aligned in columns two spaces apart, as
+// text/tabwriter does with its padding of 2. To anything else, a pipe or a
+// file a script reads, the tabs are left as they are: one tab between cells,
+// no padding. Flush ends the writing and reports the one error that matters.
+//
+// terminal is whether the destination is one (input.IsTerminalWriter).
+func Columns(w io.Writer, terminal bool) interface {
+	io.Writer
+	Flush() error
+} {
+	if terminal {
+		return tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	}
+	return &plainColumns{w: w}
+}
+
+type plainColumns struct{ w io.Writer }
+
+func (p *plainColumns) Write(b []byte) (int, error) { return p.w.Write(b) }
+func (p *plainColumns) Flush() error                { return nil }
+
+// Notices is where SayEmpty says an empty list's message. Nil is os.Stderr; a
+// test sets it to read what a person would have been told.
+var Notices io.Writer
+
+// Say tells a person something about a listing, on stderr (or Notices), where
+// a script reading stdout does not see it.
+func Say(message string) {
+	var to io.Writer = os.Stderr
+	if Notices != nil {
+		to = Notices
+	}
+	fmt.Fprintln(to, message)
+}
+
+// SayEmpty says an empty list's message, which is for a person: on stderr. A
+// script's stdout, when w is not a terminal, keeps the header line alone;
+// a terminal's keeps nothing, as the message is what a person came for.
+func SayEmpty(w io.Writer, terminal bool, message string, header []string) error {
+	Say(message)
+	if terminal {
+		return nil
+	}
+	_, err := fmt.Fprintln(w, strings.Join(header, "\t"))
+	return err
 }

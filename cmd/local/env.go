@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -25,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/texttable"
 )
 
 // The --plain help, one per verb because set stores and get/delete narrow.
@@ -1359,7 +1359,7 @@ const formatWide cliout.Format = "wide"
 // Rows are in listOrder, so the declared values come first and the ones that
 // need attention lead each group. The JSON keeps the listing's own order.
 func renderEnvList(w io.Writer, items []localenv.ListItem, inProject, wide bool) error {
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	tw := texttable.Columns(w, input.IsTerminalWriter(w))
 	// The KIND cell names the subcommand that manages the value, the same as
 	// every other user-facing string in this tree. The JSON `kind` field keeps
 	// env/conn/var, because that one is a wire contract; this one is a table a

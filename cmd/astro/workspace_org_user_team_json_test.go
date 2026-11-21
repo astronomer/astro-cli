@@ -328,7 +328,7 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 		{name: "user remove from a team with no members", root: newOrganizationCmd, client: with(noMembers), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-ada"}, check: empty, wantErr: "no team members found in team"},
 		{name: "user list", root: newOrganizationCmd, client: with(teams), args: []string{"organization", "team", "user", "list", "--team-id", "team-eng"}, check: listsRows("ID", adaMemberRow)},
 		{name: "user list empty", root: newOrganizationCmd, client: with(noMembers), args: []string{"organization", "team", "user", "list", "--team-id", "team-eng"}, check: func(t *testing.T, out string) {
-			assert.Equal(t, "The selected team has no members\n", out)
+			assert.Equal(t, "The selected team has no members\nID\tFullName\tEmail\n", out, "the message is on stderr, the header alone on stdout")
 		}},
 		{
 			name: "user list through the picker", root: newOrganizationCmd, client: with(teams), answers: "1\n",

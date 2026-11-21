@@ -46,7 +46,7 @@ func listOrganizationTokenRoles(args []string, out io.Writer) error {
 	for _, r := range roles {
 		tab.AddRow(r.EntityType, r.EntityID, r.Role)
 	}
-	return cliout.Renderer{Format: organizationTokenOutput, Out: out}.Emit(apitoken.RoleList{Roles: roles}, cliout.Text(tab.Render))
+	return cliout.Renderer{Format: organizationTokenOutput, Out: out}.Emit(apitoken.RoleList{Roles: roles}, cliout.TableText(tab))
 }
 
 func createOrganizationToken(out io.Writer) error {

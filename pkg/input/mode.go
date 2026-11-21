@@ -1,11 +1,13 @@
 package input
 
 import (
+	"io"
 	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 
@@ -137,4 +139,17 @@ func terminalRefusal() string {
 		return reasonStderr
 	}
 	return ""
+}
+
+// IsTerminalWriter reports whether w is a terminal: a console, or a Cygwin or
+// MSYS pty. The guard a text renderer writes through (TerminalWriter) answers
+// for the terminal behind it. It is the one test the CLI makes of where its
+// output is going, for what only a person should see (a table's padding, a
+// relative time) and what a script should get plain.
+func IsTerminalWriter(w io.Writer) bool {
+	if tw, ok := w.(*TerminalWriter); ok {
+		w = tw.W
+	}
+	f, ok := w.(*os.File)
+	return ok && (isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd()))
 }

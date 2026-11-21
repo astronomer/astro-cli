@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -28,6 +27,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/texttable"
 )
 
 // Command-name and replacement strings that appear in more than one place
@@ -1058,13 +1058,16 @@ func buildListRows(statuses []localrt.Status, all bool, now time.Time) []listRow
 	return rows
 }
 
+// listHeader is the columns of `astro local list`.
+var listHeader = []string{"PROJECT", "HOSTNAME", "MODE", "STATE", "PORT", "UPTIME"}
+
 func renderListTable(w io.Writer, rows []listRow) error {
+	terminal := input.IsTerminalWriter(w)
 	if len(rows) == 0 {
-		_, err := fmt.Fprintln(w, "No local Airflow found.")
-		return err
+		return texttable.SayEmpty(w, terminal, "No local Airflow found.", listHeader)
 	}
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "PROJECT\tHOSTNAME\tMODE\tSTATE\tPORT\tUPTIME")
+	tw := texttable.Columns(w, terminal)
+	fmt.Fprintln(tw, strings.Join(listHeader, "\t"))
 	for _, row := range rows {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			row.Project, dash(row.Hostname), row.Mode, row.State, dash(omitZero(row.Port)), dash(row.Uptime))

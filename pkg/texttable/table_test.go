@@ -34,11 +34,31 @@ func TestTableKeepsTheCLIsLayout(t *testing.T) {
 		render(t, tab))
 }
 
+// An empty table's message is for a person, so it goes to EmptyTo and never
+// to the table's own stream; with no message the header is printed.
 func TestTableWithNoRows(t *testing.T) {
-	assert.Equal(t, "Nothing here\n", render(t, &Table{Header: []string{"A"}, Empty: "Nothing here"}),
-		"Empty replaces the table")
+	var said bytes.Buffer
+	assert.Empty(t, render(t, &Table{Header: []string{"A"}, Empty: "Nothing here", EmptyTo: &said}),
+		"the message is not on the table's stream, which a terminal reader sees as nothing")
+	assert.Equal(t, "Nothing here\n", said.String())
+
+	said.Reset()
+	assert.Equal(t, "A\tB\n", render(t, &Table{Header: []string{"A", "B"}, Empty: "Nothing here", EmptyTo: &said, Plain: true}),
+		"a script gets the header alone")
+	assert.Equal(t, "Nothing here\n", said.String())
+
 	assert.Equal(t, " A     B     \n", render(t, &Table{Header: []string{"A", "B"}}),
 		"with no Empty, the header alone")
+}
+
+// Plain is the layout for a script: one tab between cells, nothing before the
+// first or after the last, no padding, no clamping of a long cell.
+func TestTablePlainJoinsCellsWithOneTab(t *testing.T) {
+	long := strings.Repeat("x", 200)
+	tab := &Table{Header: []string{"KEY", "VALUE", "SCOPE"}, Plain: true}
+	tab.AddRow("A", "1", "global")
+	tab.AddRow("LONGER_KEY", long, "")
+	assert.Equal(t, "KEY\tVALUE\tSCOPE\nA\t1\tglobal\nLONGER_KEY\t"+long+"\t\n", render(t, tab))
 }
 
 // A tab or a line break in a cell would open a column or split the row; each
@@ -85,4 +105,34 @@ func TestTableCellsCarryNoEscapes(t *testing.T) {
 	out := render(t, tab)
 	assert.NotContains(t, out, "\x1b")
 	assert.Contains(t, out, "prod  two")
+}
+
+// Columns aligns for a terminal and leaves the tabs alone anywhere else.
+func TestColumnsAlignOnlyForATerminal(t *testing.T) {
+	write := func(terminal bool) string {
+		var out bytes.Buffer
+		c := Columns(&out, terminal)
+		_, _ = c.Write([]byte("A\tB\nLONG\tC\n"))
+		require.NoError(t, c.Flush())
+		return out.String()
+	}
+	assert.Equal(t, "A     B\nLONG  C\n", write(true))
+	assert.Equal(t, "A\tB\nLONG\tC\n", write(false))
+}
+
+// An empty list's sentence is told, not printed: a script's stdout keeps the
+// header alone, a terminal's keeps nothing.
+func TestSayEmptyKeepsTheSentenceOffStdout(t *testing.T) {
+	var told bytes.Buffer
+	Notices = &told
+	t.Cleanup(func() { Notices = nil })
+
+	var out bytes.Buffer
+	require.NoError(t, SayEmpty(&out, false, "No things.", []string{"A", "B"}))
+	assert.Equal(t, "A\tB\n", out.String())
+	assert.Equal(t, "No things.\n", told.String())
+
+	out.Reset()
+	require.NoError(t, SayEmpty(&out, true, "No things.", []string{"A", "B"}))
+	assert.Empty(t, out.String())
 }

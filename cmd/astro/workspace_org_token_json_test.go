@@ -167,8 +167,8 @@ func secretShown(kind, verb, name string) func(t *testing.T, out string) {
 		requireInOrder(t, out,
 			verb+" "+kind+" API token "+name,
 			"Copy this API token for your records.",
-			tokSecret,
-			"This API token value is not shown again.")
+			"This API token value is not shown again.",
+			tokSecret)
 		requireLine(t, out, tokSecret)
 	}
 }
