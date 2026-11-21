@@ -270,11 +270,11 @@ func extractTarGz(src, dst string) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, dirPerm); err != nil {
+			if err := config.MkdirAllUnder(target, dirPerm); err != nil {
 				return fmt.Errorf("creating directory %s: %w", name, err)
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), dirPerm); err != nil {
+			if err := config.MkdirAllUnder(filepath.Dir(target), dirPerm); err != nil {
 				return fmt.Errorf("creating parent dir for %s: %w", name, err)
 			}
 			out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode))
@@ -307,13 +307,13 @@ func extractZip(src, dst string) error {
 		target := filepath.Join(dst, name)
 
 		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(target, dirPerm); err != nil {
+			if err := config.MkdirAllUnder(target, dirPerm); err != nil {
 				return fmt.Errorf("creating directory %s: %w", name, err)
 			}
 			continue
 		}
 
-		if err := os.MkdirAll(filepath.Dir(target), dirPerm); err != nil {
+		if err := config.MkdirAllUnder(filepath.Dir(target), dirPerm); err != nil {
 			return fmt.Errorf("creating parent dir for %s: %w", name, err)
 		}
 		rc, err := f.Open()

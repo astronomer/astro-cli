@@ -263,9 +263,14 @@ func markUsageErrors(root *cobra.Command) {
 // and RangeArgs. TestCobraArgsMessagesAreRecognized pins their wording, so a
 // cobra upgrade that rewords one fails there.
 var (
-	cobraAtMost = regexp.MustCompile(`^accepts at most (\d+) arg\(s\), received \d+$`)
-	cobraExact  = regexp.MustCompile(`^accepts (\d+) arg\(s\), received \d+$`)
-	cobraRange  = regexp.MustCompile(`^accepts between (\d+) and (\d+) arg\(s\), received \d+$`)
+	cobraCounts = []struct {
+		re  *regexp.Regexp
+		how string
+	}{
+		{regexp.MustCompile(`^accepts at most (\d+) arg\(s\), received \d+$`), "at most"},
+		{regexp.MustCompile(`^accepts (\d+) arg\(s\), received \d+$`), "exactly"},
+	}
+	cobraRange = regexp.MustCompile(`^accepts between (\d+) and (\d+) arg\(s\), received \d+$`)
 )
 
 // leafArgsError rewords cobra's own refusal of a stray argument (NoArgs reads
@@ -278,10 +283,10 @@ func leafArgsError(cmd *cobra.Command, args []string, err error) error {
 	if err.Error() == fmt.Sprintf("unknown command %q for %q", args[0], cmd.CommandPath()) {
 		return UnexpectedArgument(cmd, args[0], "at most", 0)
 	}
-	for re, how := range map[*regexp.Regexp]string{cobraAtMost: "at most", cobraExact: "exactly"} {
-		if m := re.FindStringSubmatch(err.Error()); m != nil {
+	for _, c := range cobraCounts {
+		if m := c.re.FindStringSubmatch(err.Error()); m != nil {
 			if n, convErr := strconv.Atoi(m[1]); convErr == nil && n < len(args) {
-				return UnexpectedArgument(cmd, args[n], how, n)
+				return UnexpectedArgument(cmd, args[n], c.how, n)
 			}
 		}
 	}

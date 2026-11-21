@@ -111,15 +111,19 @@ func mergeNames(a, b []string) []string {
 func mergePairs(renamedA, currentA, renamedB, currentB []string) (renamed, current []string) {
 	renamed, current = slices.Clone(renamedA), slices.Clone(currentA)
 	for i, r := range renamedB {
+		cur := ""
+		if i < len(currentB) {
+			cur = currentB[i]
+		}
 		dup := false
 		for j := range renamed {
-			if renamed[j] == r && current[j] == currentB[i] {
+			if renamed[j] == r && j < len(current) && current[j] == cur {
 				dup = true
 				break
 			}
 		}
 		if !dup {
-			renamed, current = append(renamed, r), append(current, currentB[i])
+			renamed, current = append(renamed, r), append(current, cur)
 		}
 	}
 	return renamed, current
