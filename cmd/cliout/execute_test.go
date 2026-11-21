@@ -230,7 +230,7 @@ func TestATextUsageErrorPointsAtHelp(t *testing.T) {
 		},
 		"wrong argument count": {
 			[]string{"thing", "list", "extra"},
-			"Error: unknown command \"extra\" for \"astro thing list\"\nRun astro thing list --help for usage.\n",
+			"Error: unexpected argument \"extra\": astro thing list takes no arguments\nRun astro thing list --help for usage.\n",
 		},
 		"missing required flag": {
 			[]string{"thing", "create"},
@@ -353,7 +353,7 @@ func TestAMisinvokedSilencedCommandStillPointsAtHelp(t *testing.T) {
 		},
 		"wrong argument count": {
 			[]string{"thing", "list", "extra"},
-			"Error: unknown command \"extra\" for \"astro thing list\"\nRun astro thing list --help for usage.\n",
+			"Error: unexpected argument \"extra\": astro thing list takes no arguments\nRun astro thing list --help for usage.\n",
 		},
 		"bad --output value": {
 			[]string{"thing", "list", "-o", "yaml"},

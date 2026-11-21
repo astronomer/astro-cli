@@ -330,7 +330,7 @@ func LockLoginRenewal() (unlock func()) {
 // the renewal or go ahead unlocked.
 func LockLoginRenewalFor(attempts int) (unlock func(), contended bool) {
 	noop := func() {}
-	if err := os.MkdirAll(HomeConfigPath, dirPerm); err != nil {
+	if err := os.MkdirAll(HomeConfigPath, homeDirPerm); err != nil {
 		return noop, false
 	}
 	for range attempts {

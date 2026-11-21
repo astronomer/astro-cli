@@ -3,7 +3,10 @@ package cliout
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -251,9 +254,31 @@ func markUsageErrors(root *cobra.Command) {
 			validate = UndeclaredArgs
 		}
 		c.Args = func(cmd *cobra.Command, args []string) error {
-			return misinvoked(validate(cmd, args))
+			return misinvoked(leafArgsError(cmd, args, validate(cmd, args)))
 		}
 	})
+}
+
+// cobraAtMost is cobra.MaximumNArgs's refusal, "accepts at most N arg(s),
+// received M".
+var cobraAtMost = regexp.MustCompile(`^accepts at most (\d+) arg\(s\), received \d+$`)
+
+// leafArgsError rewords cobra's own refusal of a stray argument (NoArgs reads
+// as an unknown command, which a leaf has none of) the way UndeclaredArgs
+// words it. Any other error, and any command with subcommands, is unchanged.
+func leafArgsError(cmd *cobra.Command, args []string, err error) error {
+	if err == nil || cmd.HasSubCommands() || len(args) == 0 {
+		return err
+	}
+	if err.Error() == fmt.Sprintf("unknown command %q for %q", args[0], cmd.CommandPath()) {
+		return UnexpectedArgument(cmd, args[0], 0)
+	}
+	if m := cobraAtMost.FindStringSubmatch(err.Error()); m != nil {
+		if n, convErr := strconv.Atoi(m[1]); convErr == nil && n < len(args) {
+			return UnexpectedArgument(cmd, args[n], n)
+		}
+	}
+	return err
 }
 
 func walk(cmd *cobra.Command, fn func(*cobra.Command)) {

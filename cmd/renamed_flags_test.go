@@ -136,3 +136,29 @@ func TestNothingHidesTheDeprecationWarning(t *testing.T) {
 	assert.Contains(t, stderr, "--workspace-id is deprecated: use --workspace")
 	assert.Equal(t, []renamedFlagEvent{{"astro deployment list", []string{"--workspace-id"}, []string{"--workspace"}}}, *got)
 }
+
+// --clean-output is accepted and does nothing; a run that passes it is
+// recorded, the flag's name only, and says nothing on stderr, so the event can
+// tell us when it is safe to remove.
+func TestInertCleanOutputIsRecordedWithoutAWarning(t *testing.T) {
+	var gotCmd []string
+	var gotFlags [][]string
+	orig := utils.RecordInertFlags
+	utils.RecordInertFlags = func(cmd *cobra.Command, flags []string) {
+		gotCmd, gotFlags = append(gotCmd, cmd.CommandPath()), append(gotFlags, flags)
+	}
+	t.Cleanup(func() { utils.RecordInertFlags = orig })
+
+	root, _ := disarmedTree(t, astroTree)
+	_, stderr, err := executeRoot(root, "deployment", "inspect", "dep", "--clean-output")
+	require.ErrorIs(t, err, errRan)
+	assert.NotContains(t, stderr, "deprecated")
+	assert.Equal(t, []string{"astro deployment inspect"}, gotCmd)
+	assert.Equal(t, [][]string{{"--clean-output"}}, gotFlags)
+
+	gotCmd, gotFlags = nil, nil
+	root, _ = disarmedTree(t, astroTree)
+	_, _, err = executeRoot(root, "deployment", "inspect", "dep")
+	require.ErrorIs(t, err, errRan)
+	assert.Empty(t, gotCmd, "a run that does not pass it records nothing")
+}

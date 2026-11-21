@@ -181,7 +181,7 @@ func downloadAndInstall() error {
 	}
 
 	binDir := BinDir()
-	if err := os.MkdirAll(binDir, dirPerm); err != nil {
+	if err := config.MkdirAllUnder(binDir, dirPerm); err != nil {
 		return fmt.Errorf("creating bin directory: %w", err)
 	}
 

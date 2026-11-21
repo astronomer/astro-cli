@@ -25,7 +25,7 @@ func logFilePath() string {
 // Otto is unaffected — it writes through its own pino logger.
 func redirectCLILogs() (io.Closer, error) {
 	path := logFilePath()
-	if err := os.MkdirAll(filepath.Dir(path), dirPerm); err != nil {
+	if err := config.MkdirAllUnder(filepath.Dir(path), dirPerm); err != nil {
 		return nil, fmt.Errorf("creating log dir: %w", err)
 	}
 	rotateIfLarge(path, maxLogSize)

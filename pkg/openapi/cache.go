@@ -369,7 +369,7 @@ func (c *Cache) saveCache() error {
 
 	// Ensure directory exists
 	dir := filepath.Dir(c.cachePath)
-	if err := os.MkdirAll(dir, dirPermissions); err != nil {
+	if err := config.MkdirAllUnder(dir, dirPermissions); err != nil {
 		return err
 	}
 

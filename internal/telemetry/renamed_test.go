@@ -41,3 +41,18 @@ func TestRenamedFlagsWaitForTheirCommand(t *testing.T) {
 	RecordRenamedFlags(cmd, nil, nil)
 	assert.Nil(t, queuedRenamedFlags, "a run that gave no 1.x spelling queues nothing")
 }
+
+// An inert flag rides the same queue, beside any renamed ones.
+func TestInertFlagsAreQueuedWithTheRenamedOnes(t *testing.T) {
+	t.Cleanup(func() { queuedRenamedFlags = nil })
+	cmd := &cobra.Command{Use: "inspect"}
+	RecordInertFlags(cmd, []string{"--clean-output"})
+	RecordRenamedFlags(cmd, []string{"--deployment-name"}, []string{"--deployment"})
+	q := takeRenamedFlags(cmd)
+	if assert.NotNil(t, q) {
+		assert.Equal(t, []string{"--clean-output"}, q.inert)
+		assert.Equal(t, []string{"--deployment-name"}, q.renamed)
+	}
+	RecordInertFlags(cmd, nil)
+	assert.Nil(t, queuedRenamedFlags)
+}

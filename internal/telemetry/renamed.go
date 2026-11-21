@@ -16,6 +16,8 @@ const EventRenamedFlag = "CLI Renamed Flag"
 type renamedFlags struct {
 	cmd              *cobra.Command
 	renamed, current []string
+	// inert are 1.x flags v2 still accepts that do nothing now, by name.
+	inert []string
 }
 
 // queuedRenamedFlags is what this run queued; a process runs one command.
@@ -34,7 +36,19 @@ var queuedRenamedFlags *renamedFlags
 // shown the first-run notice, as TrackRemovedCommand does, since showing the
 // notice is a write.
 func RecordRenamedFlags(cmd *cobra.Command, renamed, current []string) {
-	if len(renamed) == 0 {
+	queueRenamed(cmd, renamed, current, nil)
+}
+
+// RecordInertFlags notes the 1.x flags cmd was given that v2 accepts and
+// ignores (--clean-output), by name as typed and nothing else, so we know when
+// nobody passes one any more and it can go. It rides the renamed-flag event
+// (RecordRenamedFlags), as the property inert_flags.
+func RecordInertFlags(cmd *cobra.Command, inert []string) {
+	queueRenamed(cmd, nil, nil, inert)
+}
+
+func queueRenamed(cmd *cobra.Command, renamed, current, inert []string) {
+	if len(renamed) == 0 && len(inert) == 0 {
 		return
 	}
 	// A run that gives a deprecated command its hidden flag aliases records
@@ -42,8 +56,9 @@ func RecordRenamedFlags(cmd *cobra.Command, renamed, current []string) {
 	// argument checks run): one event holds both.
 	if q := queuedRenamedFlags; q != nil && q.cmd == cmd {
 		renamed, current = append(slices.Clone(q.renamed), renamed...), append(slices.Clone(q.current), current...)
+		inert = append(slices.Clone(q.inert), inert...)
 	}
-	queuedRenamedFlags = &renamedFlags{cmd: cmd, renamed: renamed, current: current}
+	queuedRenamedFlags = &renamedFlags{cmd: cmd, renamed: renamed, current: current, inert: inert}
 	if cmd.Annotations[SkipPreRunAnnotation] == "true" {
 		if !noticeShown() {
 			queuedRenamedFlags = nil
@@ -61,8 +76,13 @@ func sendRenamedFlags(cmd *cobra.Command) {
 		return
 	}
 	properties := buildCommandProperties(cmd)
-	properties["renamed_flags"] = q.renamed
-	properties["current_flags"] = q.current
+	if len(q.renamed) > 0 {
+		properties["renamed_flags"] = q.renamed
+		properties["current_flags"] = q.current
+	}
+	if len(q.inert) > 0 {
+		properties["inert_flags"] = q.inert
+	}
 	track(EventRenamedFlag, properties)
 }
 

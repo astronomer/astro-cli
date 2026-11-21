@@ -224,8 +224,19 @@ func UndeclaredArgs(cmd *cobra.Command, args []string) error {
 		}
 		documented++
 	}
-	if documented == 0 {
-		return cobra.NoArgs(cmd, args)
+	if len(args) <= documented {
+		return nil
 	}
-	return cobra.MaximumNArgs(documented)(cmd, args)
+	return UnexpectedArgument(cmd, args[documented], documented)
+}
+
+// UnexpectedArgument is the usage error for a stray argument to a leaf that
+// takes at most atMost positionals. A leaf has no subcommands to mistype, so it
+// is not called an unknown command.
+func UnexpectedArgument(cmd *cobra.Command, arg string, atMost int) error {
+	takes := "takes no arguments"
+	if atMost > 0 {
+		takes = fmt.Sprintf("takes at most %d", atMost)
+	}
+	return misinvoked(fmt.Errorf("unexpected argument %q: %s %s", arg, cmd.CommandPath(), takes))
 }
