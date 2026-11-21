@@ -19,7 +19,7 @@ func TestNormalizeAPIErrorCarriesTheStatus(t *testing.T) {
 	assert.False(t, errors.Is(jsonErr, ErrorRequest))
 
 	bare := NormalizeAPIError(&http.Response{StatusCode: http.StatusBadGateway}, []byte("<html>"))
-	assert.EqualError(t, bare, "request failed, status 502")
+	assert.EqualError(t, bare, "request failed: the Astro API sent no error message (HTTP 502)")
 	assert.True(t, errors.Is(bare, ErrorRequest))
 	assert.True(t, HasStatus(fmt.Errorf("listing: %w", bare), http.StatusBadGateway), "a wrapped error lost its status")
 

@@ -116,6 +116,7 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 		Registry:       target.registry,
 		RegistrySource: target.source,
 		ErrOut:         cmd.ErrOrStderr(),
+		Context:        cmd.Context(),
 	}
 
 	res, err := deployClientImage(deployInput, astroV1Client)

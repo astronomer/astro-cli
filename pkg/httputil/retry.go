@@ -24,8 +24,10 @@ var (
 var rateLimitWaitCap = 10 * time.Second
 
 // WithRateLimitRetries returns a client that resends a request the Astro API
-// refuses with 429 Too Many Requests. The API limits the requests each token
-// makes per second, which CI jobs sharing a token can briefly exceed.
+// refuses with 429 Too Many Requests, and a read (GET or HEAD) that failed in
+// transit or got a 502, 503 or 504, a few times with a growing wait that
+// honors Retry-After. The API limits the requests each token makes per second,
+// which CI jobs sharing a token can briefly exceed.
 func WithRateLimitRetries(c *http.Client) *http.Client {
 	retrying := retryablehttp.NewClient()
 	// Not c itself: retryablehttp closes its client's idle connections after
@@ -43,18 +45,57 @@ func WithRateLimitRetries(c *http.Client) *http.Client {
 	retrying.Backoff = func(lo, hi time.Duration, attempt int, resp *http.Response) time.Duration {
 		return min(retryablehttp.RateLimitLinearJitterBackoff(lo, hi, attempt, resp), rateLimitWaitCap)
 	}
-	retrying.CheckRetry = retryRateLimited
+	retrying.CheckRetry = retryTransient
 	retrying.ErrorHandler = retryablehttp.PassthroughErrorHandler
 	retrying.Logger = nil
-	return retrying.StandardClient()
+	std := retrying.StandardClient()
+	// A write that fails in transit may have been applied; its error says so.
+	std.Transport = outcomeTransport{next: std.Transport}
+	return std
 }
 
-// retryRateLimited resends only a 429, which the API refuses before acting on
-// the request, so a write is never repeated. A request whose context ends
-// needs nothing here: retryablehttp stops waiting for a retry when it does,
-// and an error alongside a response would leave the response unclosed.
-func retryRateLimited(_ httpContext.Context, resp *http.Response, err error) (bool, error) {
-	return err == nil && resp.StatusCode == http.StatusTooManyRequests, nil
+// retryTransient decides whether to resend a request.
+//
+// A 429 is resent for every method: the API refuses it before acting on the
+// request, so a write is never repeated. A read (GET or HEAD) is also resent
+// when it failed in transit or the server answered 502, 503 or 504, which
+// say only that it could not take the request now. Any other method is never
+// resent for those: the server may have acted on it before failing, so the
+// outcome is unknown and repeating it could apply the change twice.
+//
+// A request whose context ends needs nothing more here: retryablehttp stops
+// waiting for a retry when it does, and an error alongside a response would
+// leave the response unclosed.
+func retryTransient(ctx httpContext.Context, resp *http.Response, err error) (bool, error) {
+	if ctx.Err() != nil {
+		return false, nil
+	}
+	if err == nil && resp.StatusCode == http.StatusTooManyRequests {
+		return true, nil
+	}
+	if !isRead(resp, err) {
+		return false, nil
+	}
+	if err != nil {
+		return IsTransportError(err), nil
+	}
+	switch resp.StatusCode {
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true, nil
+	}
+	return false, nil
+}
+
+// isRead reports whether the request that produced resp, or err, was a GET or
+// HEAD. A transport error carries its method in the *url.Error's Op.
+func isRead(resp *http.Response, err error) bool {
+	if resp != nil && resp.Request != nil {
+		return resp.Request.Method == http.MethodGet || resp.Request.Method == http.MethodHead
+	}
+	if m, ok := methodOfTransportError(err); ok {
+		return m == http.MethodGet || m == http.MethodHead
+	}
+	return false
 }
 
 // keepIdleTransport sends through the wrapped client's transport, read per

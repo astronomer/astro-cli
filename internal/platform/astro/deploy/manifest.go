@@ -1,6 +1,8 @@
 package deploy
 
 import (
+	"cmp"
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -16,6 +18,9 @@ import (
 // The deployment is already chosen; this uses the dags transport (create
 // deploy, upload the tarball, finalize) against the project's dags/ directory.
 type ManifestDagDeployInput struct {
+	// Context ends the wait for the Deployment when the run is interrupted;
+	// nil is context.Background().
+	Context context.Context
 	// Login is the Astro login the deploy runs under, whose host the
 	// Deployment lives on; nil is the current context.
 	Login *config.Context
@@ -128,7 +133,7 @@ func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClie
 	}
 
 	if in.Wait {
-		if err := deployment.HealthPollIn(in.Progress, dep.OrganizationId, c.Token, dep.Id, dagOnlyDeploySleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
+		if err := deployment.HealthPollIn(cmp.Or(in.Context, context.Background()), in.Progress, dep.OrganizationId, c.Token, dep.Id, dagOnlyDeploySleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
 			return ManifestDagDeployResult{}, err
 		}
 	}

@@ -362,7 +362,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration, progress io.Writer) (astrov1.Deployment, error) { //nolint:gocognit,gocyclo,gocritic,staticcheck // v1 complexity, refactor tracked separately
+func Create(ctx context.Context, name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration, progress io.Writer) (astrov1.Deployment, error) { //nolint:gocognit,gocyclo,gocritic,staticcheck // v1 complexity, refactor tracked separately
 	var organizationID string
 	var currentWorkspace astrov1.Workspace
 
@@ -634,7 +634,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		// The Deployment exists whether or not it becomes healthy in time, so
 		// it is returned with the error: the caller still reports what was
 		// made.
-		if err := HealthPoll(progress, d.Id, SleepTime, TickNum, int(waitTimeForDeployment.Seconds()), astroV1Client); err != nil {
+		if err := HealthPoll(ctx, progress, d.Id, SleepTime, TickNum, int(waitTimeForDeployment.Seconds()), astroV1Client); err != nil {
 			return d, err
 		}
 	}
@@ -849,19 +849,19 @@ func progressTo(w io.Writer) io.Writer {
 
 // HealthPoll waits for the Deployment to become healthy, writing its progress
 // to progress (stderr when nil).
-func HealthPoll(progress io.Writer, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
-	return HealthPollIn(progress, "", "", deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client)
+func HealthPoll(ctx context.Context, progress io.Writer, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
+	return HealthPollIn(ctx, progress, "", "", deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client)
 }
 
 // HealthPollIn is HealthPoll for a Deployment in orgID, which need not be the
 // current context's, with token authorizing the check that its Airflow
 // answers. An empty orgID or token is the current context's.
-func HealthPollIn(progress io.Writer, orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
+func HealthPollIn(ctx context.Context, progress io.Writer, orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
 	progress = progressTo(progress)
 	fmt.Fprintf(progress, "\nWaiting for the Deployment to become healthy…\n\nThis may take a few minutes\n")
 	// considering hibernating as healthy state, since hibernation can only happen when the deployment is healthy.
 	// This covers for the case when the deployment is created and straight away goes into hibernation.
-	d, err := pollStatus(orgID, token, deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client, ErrTimedOut,
+	d, err := pollStatus(ctx, orgID, token, deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client, ErrTimedOut,
 		astrov1.DeploymentStatusHEALTHY, astrov1.DeploymentStatusHIBERNATING)
 	if err != nil {
 		return err
@@ -875,16 +875,29 @@ func HealthPollIn(progress io.Writer, orgID, token, deploymentID string, sleepTi
 // timeoutNum seconds pass first. A Deployment reporting HEALTHY also has to
 // have an Airflow that answers, and errAirflowNotAnswering is the timeout when
 // that was all that was missing.
-func pollStatus(orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient, timedOut error, statuses ...astrov1.DeploymentStatus) (astrov1.Deployment, error) {
-	time.Sleep(time.Duration(sleepTime) * time.Second)
+func pollStatus(ctx context.Context, orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient, timedOut error, statuses ...astrov1.DeploymentStatus) (astrov1.Deployment, error) {
+	stopped := func() error {
+		return &StoppedWaitingError{Err: ctx.Err(), DeploymentID: deploymentID}
+	}
+	// The wait ends with the run's interrupt, wherever it is. Only the wait:
+	// the Deployment's work goes on in Astro, which the error says.
+	pause := time.NewTimer(time.Duration(sleepTime) * time.Second)
+	defer pause.Stop()
+	select {
+	case <-pause.C:
+	case <-ctx.Done():
+		return astrov1.Deployment{}, stopped()
+	}
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Second)
 	defer ticker.Stop()
 	missing := timedOut
 	for {
 		select {
+		case <-ctx.Done():
+			return astrov1.Deployment{}, stopped()
 		case <-timeout:
-			return astrov1.Deployment{}, missing
+			return astrov1.Deployment{}, &WaitTimeoutError{Err: missing, DeploymentID: deploymentID}
 		case <-ticker.C:
 			currentDeployment, err := GetDeploymentByID(orgID, deploymentID, astroV1Client)
 			if err != nil {
@@ -1674,14 +1687,14 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 // override asked for: hibernating, or healthy again. Unlike HealthPoll it
 // has no initial sleep, which would be longer than a whole wake-up.
 // Its progress goes to progress (stderr when nil).
-func WaitForHibernationOverride(progress io.Writer, deploymentID string, isHibernating bool, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
+func WaitForHibernationOverride(ctx context.Context, progress io.Writer, deploymentID string, isHibernating bool, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
 	progress = progressTo(progress)
 	status, timedOut, waiting, done := astrov1.DeploymentStatusHEALTHY, ErrTimedOut, "wake up", "awake"
 	if isHibernating {
 		status, timedOut, waiting, done = astrov1.DeploymentStatusHIBERNATING, ErrTimedOutHibernating, "hibernate", "hibernating"
 	}
 	fmt.Fprintf(progress, "\nWaiting for the Deployment to %s…\n", waiting)
-	d, err := pollStatus("", "", deploymentID, 0, TickNum, int(waitTime.Seconds()), astroV1Client, timedOut, status)
+	d, err := pollStatus(ctx, "", "", deploymentID, 0, TickNum, int(waitTime.Seconds()), astroV1Client, timedOut, status)
 	if err != nil {
 		return err
 	}

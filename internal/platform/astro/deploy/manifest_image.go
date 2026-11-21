@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -26,6 +27,9 @@ import (
 // the manifest fields or adopted from a prebuilt local image (ImageName); a
 // "both" deploy (IncludeDags) also ships the dags/ tarball.
 type ManifestImageDeployInput struct {
+	// Context ends the deploy (the build, the push, the wait) when the run is
+	// interrupted; nil is context.Background().
+	Context context.Context
 	// ResolveInstall resolves what a generated image installs from the
 	// project's lock, into req.Install (imageinstall.Fill), with its warnings
 	// through warn. nil installs the manifest's dependencies as written.
@@ -137,7 +141,7 @@ var (
 //
 //nolint:gocritic // value input keeps this seam symmetric with DeployManifestDags
 func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIClient) (ManifestImageDeployResult, error) {
-	ctx := context.Background()
+	ctx := cmp.Or(in.Context, context.Background())
 
 	cmd := newImageBuildCommander()
 	resolve := in.Engine
@@ -255,7 +259,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	}
 
 	if in.Wait {
-		if err := deployment.HealthPollIn(in.Progress, dep.OrganizationId, c.Token, dep.Id, sleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
+		if err := deployment.HealthPollIn(ctx, in.Progress, dep.OrganizationId, c.Token, dep.Id, sleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
 			return ManifestImageDeployResult{}, err
 		}
 	}
