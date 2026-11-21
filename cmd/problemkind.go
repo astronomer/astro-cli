@@ -163,7 +163,7 @@ func execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	// subcommands (`completion bogus`) is refused like any other group's.
 	root.InitDefaultHelpCmd()
 	root.InitDefaultCompletionCmd()
-	if shown, err := printHelpJSONIfAsked(root, args, stdout); shown {
+	if shown, err := printHelpJSONIfAsked(ctx, root, args, stdout); shown {
 		return err
 	}
 	acceptRemovedFlags(root, args)

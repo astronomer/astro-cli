@@ -2,11 +2,14 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // A line with positional words or flag values still gets the document: the
@@ -89,6 +92,34 @@ func TestHelpJSONGivesWayToRemovedFlags(t *testing.T) {
 			assert.Equal(t, target.CommandPath(), decodeHelpDocument(t, stdout).Path)
 		})
 	}
+}
+
+// Only the output flag is taken off the line, so Find resolves the command
+// that was typed: -ofoo is not a format, and is left where it is.
+func TestHelpJSONDoesNotStripWhatIsNotTheOutputFlag(t *testing.T) {
+	stdout, _, err := runHelpLine(t, "deployment", "create", "--name", "-ofoo", "--help", "-o", "json")
+	require.NoError(t, err)
+	assert.Equal(t, "astro deployment create", decodeHelpDocument(t, stdout).Path)
+
+	assert.Equal(t, []string{"a", "-ofoo"}, cliout.StripOutputFlag([]string{"a", "-o", "json", "-ofoo", "--output=json"}, "o"))
+	assert.Equal(t, []string{"a"}, cliout.StripOutputFlag([]string{"a", "-ojson", "-o=text", "--output", "yaml"}, "o"))
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("closed pipe") }
+
+func TestHelpJSONWriteFailureIsAnError(t *testing.T) {
+	root, _ := disarmedTree(t, astroTree)
+	shown, err := printHelpJSONIfAsked(t.Context(), root, []string{"deployment", "list", "--help", "-o", "json"}, failingWriter{})
+	assert.True(t, shown)
+	require.Error(t, err)
+}
+
+func TestHelpSearchOfTheBinaryNameAlone(t *testing.T) {
+	root, _ := disarmedTree(t, astroTree)
+	assert.Len(t, searchCommands(root, "astro", searchLimit), searchLimit)
+	assert.Len(t, searchCommands(root, "ASTRO", 3), 3)
 }
 
 func TestHelpSearchIgnoresTheBinaryName(t *testing.T) {

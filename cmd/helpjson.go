@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -281,14 +282,19 @@ func searchCommands(root *cobra.Command, query string, limit int) []helpSearchRe
 	words := strings.Fields(strings.ToLower(query))
 	// `astro help search astro deployment list`: the binary's name is not a
 	// word of the command.
-	if len(words) > 0 && words[0] == strings.ToLower(root.Name()) {
+	// A query of the name alone matches every command.
+	if len(words) > 1 && words[0] == strings.ToLower(root.Name()) {
 		words = words[1:]
 	}
 	results := []helpSearchResult{}
 	if len(words) == 0 {
 		return results
 	}
+	matchAll := len(words) == 1 && words[0] == strings.ToLower(root.Name())
 	holds := func(text string) bool {
+		if matchAll {
+			return true
+		}
 		text = strings.ToLower(text)
 		for _, w := range words {
 			if !strings.Contains(text, w) {
@@ -384,7 +390,7 @@ func runHelp(c *cobra.Command, args []string, all bool, format cliout.Format) er
 // not run here (no login, a project that does not parse) still describes
 // itself. A line that names something that is not a command is left to the
 // usual failure.
-func printHelpJSONIfAsked(root *cobra.Command, args []string, out io.Writer) (bool, error) {
+func printHelpJSONIfAsked(ctx context.Context, root *cobra.Command, args []string, out io.Writer) (bool, error) {
 	if isShellCompletion(args) || !hasHelpFlag(args) || !cliout.ArgsAskForJSON(args, "o") {
 		return false, nil
 	}
@@ -397,5 +403,11 @@ func printHelpJSONIfAsked(root *cobra.Command, args []string, out io.Writer) (bo
 			return false, nil
 		}
 	}
-	return true, cliout.Renderer{Format: cliout.FormatJSON, Out: out}.Emit(describeCommand(target), nil)
+	err = cliout.Renderer{Format: cliout.FormatJSON, Out: out}.Emit(describeCommand(target), nil)
+	if err != nil {
+		// Reported as any command's failure is: the error object, and the
+		// exit status the error maps to.
+		cliout.EmitError(out, err, cliout.ExitCode(ctx, err), problemKinds.Of(err))
+	}
+	return true, err
 }

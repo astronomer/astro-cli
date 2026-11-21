@@ -347,7 +347,12 @@ func outputFlagAt(args []string, i int, shorthand string) (n int, value string) 
 	case short != "" && strings.HasPrefix(a, short+"="):
 		return 1, strings.TrimPrefix(a, short+"=")
 	case short != "" && strings.HasPrefix(a, short) && !strings.HasPrefix(a, "--"):
-		return 1, strings.TrimPrefix(a, short)
+		// -ojson is the flag with its value; -ofoo may be other shorthands
+		// in a group, so it is the flag only when the rest is a format.
+		switch v := strings.TrimPrefix(a, short); v {
+		case "text", "json", "yaml":
+			return 1, v
+		}
 	}
 	return 0, ""
 }
