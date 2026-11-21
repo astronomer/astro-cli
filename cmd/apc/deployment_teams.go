@@ -51,16 +51,15 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the Workspace twin differs in its flags and its role
-	cmd := &cobra.Command{
-		Use:     "add [TEAM_ID]",
+	cmd := cliout.CheckArgs(cliout.Args(&cobra.Command{
+		Use:     "add",
 		Short:   "Add a team to a Deployment",
 		Long:    "Add a team to a Deployment, named by its id as the argument or with --team-id",
-		Args:    argOrFlag("team-id", "team"),
 		Example: deploymentTeamAddExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentTeamAdd(out, args)
 		},
-	}
+	}, cliout.Optional("TEAM_ID")), argOrFlag("team-id", "team"))
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team to add to the Deployment")
 	// A persistent flag is not among the command's own flags, where
 	// MarkFlagRequired looks, so marking it so failed, unseen, and a run
@@ -72,32 +71,30 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // th
 }
 
 func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "remove <TEAM_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a team from a Deployment",
 		Long:    "Remove a team from a Deployment",
-		Args:    cobra.ExactArgs(1),
 		Example: deploymentTeamRemoveExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentTeamRemove(out, args)
 		},
-	}
+	}, cliout.Required("TEAM_ID"))
 	addAccessOutputFlag(cmd)
 	return cmd
 }
 
 func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "update <TEAM_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "update",
 		Short:   "Update a team's role for a Deployment",
 		Long:    "Update a team's role for a Deployment",
-		Args:    cobra.ExactArgs(1),
 		Example: deploymentTeamUpdateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentTeamUpdate(out, args)
 		},
-	}
+	}, cliout.Required("TEAM_ID"))
 	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "Deployment role to give the team: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR or DEPLOYMENT_ADMIN")
 	addAccessOutputFlag(cmd)
 	return cmd

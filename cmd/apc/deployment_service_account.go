@@ -100,17 +100,16 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete <SERVICE_ACCOUNT_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete a service account in the APC platform",
 		Long:    "Delete a service account in the APC platform. This cannot be undone; it asks for confirmation unless --yes is given.",
 		Example: deploymentSaDeleteExample,
-		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentSaDelete(args, out)
 		},
-	}
+	}, cliout.Required("SERVICE_ACCOUNT_ID"))
 	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, "d", true)
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addYesFlag(cmd, "Don't ask for confirmation before deleting the service account")

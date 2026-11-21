@@ -298,8 +298,8 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "delete [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete a Deployment",
 		Long:    "Delete a Deployment. Name it by its ID or with --deployment, which also takes a link name from the project's manifest.",
@@ -311,11 +311,10 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 
   # Delete it without the confirmation, from a script
   astro deployment delete <DEPLOYMENT_ID> --yes`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentDelete(cmd, out)
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	addDeploymentArgFlag(cmd)
 	addYesFlag(cmd, "Delete without asking for confirmation")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
@@ -323,8 +322,8 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "hibernate [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "hibernate",
 		Aliases: []string{"hb"},
 		Short:   "Hibernate an APC Deployment",
 		Long: "Hibernate an APC Deployment. Overrides its hibernation schedule, if it has one, and holds it hibernating until you wake it up, " +
@@ -341,18 +340,17 @@ func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
 
   # Hibernate the one a link of this project names
   astro deployment hibernate --deployment <LINK_NAME>`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentHibernate(cmd, true, out)
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	addHibernationFlags(cmd, "hibernation", "hibernating")
 	return cmd
 }
 
 func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "wake-up [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "wake-up",
 		Aliases: []string{"wu"},
 		Short:   "Wake up an APC Deployment",
 		Long: "Wake up an APC Deployment from hibernation. Overrides its hibernation schedule, if it has one, and holds it awake until you hibernate it, " +
@@ -369,11 +367,10 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 
   # Wake up the one a link of this project names
   astro deployment wake-up --deployment <LINK_NAME>`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentHibernate(cmd, false, out)
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	addHibernationFlags(cmd, "awake period", "waking up")
 	return cmd
 }
@@ -471,17 +468,16 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 
   # Read its Dags from an NFS volume
   astro deployment update <DEPLOYMENT_ID> --dag-deployment-type=volume --nfs-location=<IP>:/<PATH>`
-	cmd := &cobra.Command{
-		Use:     "update [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "update",
 		Aliases: []string{"up"},
 		Short:   "Update a Deployment",
 		Long:    "Update a Deployment. Name it by its ID or with --deployment, which also takes a link name from the project's manifest.",
 		Example: example,
-		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentUpdate(cmd, dagDeploymentType, nfsLocation, out)
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	addDeploymentArgFlagWithoutLetter(cmd) // 1.x gave -d to --description here
 
 	addYesFlag(cmd, SkipUserPromptMsgForUpdateDeployment)

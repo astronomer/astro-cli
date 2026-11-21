@@ -42,11 +42,10 @@ func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 }
 
 func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "add [EMAIL]",
+	cmd := cliout.CheckArgs(cliout.Args(&cobra.Command{
+		Use:   "add",
 		Short: "Add a User to a Workspace",
 		Long:  "Add a User to a Workspace, named by their email as the argument or with --email",
-		Args:  argOrFlag("email", "email"),
 		Example: `  # Add a user to the current Workspace as a viewer
   astro workspace user add user@company.com
 
@@ -56,7 +55,7 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserAdd(out)
 		},
-	}
+	}, cliout.Optional("EMAIL")), argOrFlag("email", "email"))
 	cmd.Flags().StringVar(&workspaceUserWsRole, "role", houston.WorkspaceViewerRole, "Role assigned to user")
 	cmd.Flags().StringVar(&workspaceUserCreateEmail, "email", "", "Email of the user to add to this Workspace")
 	_ = cmd.MarkFlagRequired("email") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
@@ -65,35 +64,33 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 }
 
 func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "update <EMAIL>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "update",
 		Short: "Update a User's Role for a Workspace",
 		Long:  "Update a User's Role for a Workspace",
 		Example: `  # Make a user an admin of the current Workspace
   astro workspace user update user@company.com --role WORKSPACE_ADMIN`,
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserUpdate(out, args)
 		},
-	}
+	}, cliout.Required("EMAIL"))
 	cmd.Flags().StringVar(&workspaceUserWsRole, "role", houston.WorkspaceViewerRole, "Role assigned to user")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
 
 func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "remove <EMAIL>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a User from a Workspace",
 		Long:    "Remove a User from a Workspace",
 		Example: `  # Remove a user from the current Workspace
   astro workspace user remove user@company.com`,
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserRemove(out, args)
 		},
-	}
+	}, cliout.Required("EMAIL"))
 	addAccessOutputFlag(cmd)
 	return cmd
 }

@@ -77,8 +77,8 @@ func logComponentFlag(component string) string {
 // subcommand per component, still runs, hidden (newComponentLogsCmd).
 func newLogsCmd(out io.Writer) *cobra.Command {
 	triggerer := appConfig != nil && appConfig.Flags.TriggererEnabled
-	cmd := &cobra.Command{
-		Use:     "logs [DEPLOYMENT_ID]",
+	cmd := cliout.CheckArgsBefore(cliout.Args(&cobra.Command{
+		Use:     "logs",
 		Aliases: []string{"log", "l"},
 		Short:   "Show a Deployment's logs",
 		Long:    "Show a Deployment's logs from every component, or only from those picked with flags such as --scheduler or --component. Name the Deployment by its ID or with --deployment, which also takes a link name from the project's manifest.\n\n--follow streams the logs of one component as they arrive.",
@@ -93,7 +93,6 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 
   # Show the logs of the Deployment a link of this project names
   astro deployment logs --deployment <LINK_NAME>`,
-		Args: logsArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			components, err := pickLogComponents(triggerer)
 			if err != nil {
@@ -101,7 +100,7 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 			}
 			return showLogs(cmd, components, out)
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT_ID")), logsArgs)
 	addDeploymentArgFlag(cmd)
 	addLogsFlags(cmd, false)
 	cmd.Flags().BoolVar(&logsWebserver, "webserver", false, "Show logs from the webserver")
@@ -125,13 +124,12 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 // --search, while help shows astro deployment logs, whose flags pick the
 // component.
 func newComponentLogsCmd(out io.Writer, use string, aliases []string, component string) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     use + " [DEPLOYMENT_ID]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     use,
 		Aliases: aliases,
 		Hidden:  true,
 		Short:   "Stream logs from an Airflow " + use,
 		Long:    "1.x's spelling of astro deployment logs --" + use + ", kept for scripts written for Astro CLI 1.x",
-		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// The subcommand is a spelling 1.x had, as typed (its alias, too):
 			// astro deployment logs --scheduler is what to type now.
@@ -143,7 +141,7 @@ func newComponentLogsCmd(out io.Writer, use string, aliases []string, component 
 			cliout.WarnDeprecated(cmd.ErrOrStderr(), logs+" "+typed, "use "+logs+" --"+logComponentFlag(component))
 			return showLogs(cmd, []string{component}, out)
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT_ID"))
 	addDeploymentArgFlag(cmd)
 	addLogsFlags(cmd, true)
 	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
@@ -165,7 +163,8 @@ func addLogsFlags(cmd *cobra.Command, oneX bool) {
 // logsArgs refuses a component named where the Deployment goes, as 1.x's
 // layout and an earlier v2's logs triggerer named one: taken for a Deployment
 // id, it would ask Houston about a Deployment called triggerer. Otherwise it
-// takes at most the Deployment.
+// leaves the count to the declaration, which it is read ahead of
+// (cliout.CheckArgsBefore) so that the first word's own message is the one told.
 func logsArgs(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		if c, ok := logComponentNames[strings.ToLower(args[0])]; ok {
@@ -173,7 +172,7 @@ func logsArgs(cmd *cobra.Command, args []string) error {
 			return cliout.Usage(fmt.Errorf("%q names a component, not a Deployment: pick it with --%s, as in %s <DEPLOYMENT_ID> --%s", args[0], flag, cmd.CommandPath(), flag))
 		}
 	}
-	return cobra.MaximumNArgs(1)(cmd, args)
+	return nil
 }
 
 // pickLogComponents is the components the flags name, in Houston's

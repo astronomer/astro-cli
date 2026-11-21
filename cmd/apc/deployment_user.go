@@ -70,16 +70,15 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "add [EMAIL]",
+	cmd := cliout.CheckArgs(cliout.Args(&cobra.Command{
+		Use:     "add",
 		Short:   "Add a user to a Deployment",
 		Long:    "Add a user to a Deployment, named by their email as the argument or with --email",
-		Args:    argOrFlag("email", "email"),
 		Example: deploymentUserCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentUserAdd(out)
 		},
-	}
+	}, cliout.Optional("EMAIL")), argOrFlag("email", "email"))
 	cmd.PersistentFlags().StringVar(&deploymentUserRole, "role", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
 	cmd.Flags().StringVar(&deploymentUserEmail, "email", "", "Email of the user to add to the Deployment")
 
@@ -90,32 +89,30 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "remove <EMAIL>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Remove a user from a Deployment",
 		Long:    "Remove a user from a Deployment",
-		Args:    cobra.ExactArgs(1),
 		Example: deploymentUserRemoveExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentUserRemove(out, args)
 		},
-	}
+	}, cliout.Required("EMAIL"))
 	addAccessOutputFlag(cmd)
 	return cmd
 }
 
 func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "update <EMAIL>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "update",
 		Short:   "Update a user's role for a Deployment",
 		Long:    "Update a user's role for a Deployment",
-		Args:    cobra.ExactArgs(1),
 		Example: deploymentUserUpdateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentUserUpdate(out, args)
 		},
-	}
+	}, cliout.Required("EMAIL"))
 	cmd.PersistentFlags().StringVar(&deploymentUserRole, "role", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
 	addAccessOutputFlag(cmd)
 	return cmd
