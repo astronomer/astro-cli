@@ -204,3 +204,27 @@ func TestUnreachableProviderOnRefreshOffersNoLogin(t *testing.T) {
 	require.ErrorIs(t, err, ErrLoginRenewal)
 	assert.Zero(t, logins.Load(), "the refresh token was never refused")
 }
+
+// A token endpoint that answers with a redirect is a failed refresh: the
+// request is not repeated at the address the redirect names.
+func TestRefreshDoesNotFollowARedirect(t *testing.T) {
+	for _, status := range []int{http.StatusTemporaryRedirect, http.StatusPermanentRedirect} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			var reached atomic.Int32
+			target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				reached.Add(1)
+				_, _ = w.Write([]byte(`{"access_token":"access-value","expires_in":60}`))
+			}))
+			defer target.Close()
+			idp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, target.URL+"/oauth/token", status)
+			}))
+			defer idp.Close()
+
+			_, err := refresh("refresh-value", auth.Config{ClientID: "client-id", DomainURL: idp.URL + "/"})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "redirect")
+			assert.Zero(t, reached.Load(), "the redirect target received a request")
+		})
+	}
+}
