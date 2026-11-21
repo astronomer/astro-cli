@@ -76,7 +76,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy [DEPLOYMENT_ID]",
 		Short:   "Ship this project's code to a Deployment",
-		Long:    "Build this project into an image and push it, with its Dags, to a Deployment on Astro. Run it from the root of a project with a pyproject.toml ([tool.astro]). A project in the Astro CLI 1.x layout needs astro init first, or Astro CLI 1.x.\n\nWith Remote Execution, this updates only the API Server and Scheduler; use astro remote deploy for the rest.",
+		Long:    "Build this project into an image and push it, with its Dags, to a Deployment on Astro. Run it from the root of a project with a pyproject.toml ([tool.astro]), or from anywhere with --image-name to deploy a prebuilt image. A project in the Astro CLI 1.x layout needs astro init first, or Astro CLI 1.x.\n\nWith Remote Execution, this updates only the API Server and Scheduler; use astro remote deploy for the rest.",
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    deploy,
 		Example: deployExample,
