@@ -313,6 +313,80 @@ func (_m *ClientWithResponsesInterface) CreateDeployWithResponse(ctx context.Con
 	return r0, r1
 }
 
+// DeleteBundleDirectoryWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, params, reqEditors
+func (_m *ClientWithResponsesInterface) DeleteBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *astrov1alpha1.DeleteBundleDirectoryParams, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DeleteBundleDirectoryResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteBundleDirectoryWithResponse")
+	}
+
+	var r0 *astrov1alpha1.DeleteBundleDirectoryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.DeleteBundleDirectoryParams, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DeleteBundleDirectoryResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.DeleteBundleDirectoryParams, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.DeleteBundleDirectoryResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.DeleteBundleDirectoryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, *astrov1alpha1.DeleteBundleDirectoryParams, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DeleteBundleFileWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, params, reqEditors
+func (_m *ClientWithResponsesInterface) DeleteBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *astrov1alpha1.DeleteBundleFileParams, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DeleteBundleFileResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteBundleFileWithResponse")
+	}
+
+	var r0 *astrov1alpha1.DeleteBundleFileResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.DeleteBundleFileParams, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DeleteBundleFileResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.DeleteBundleFileParams, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.DeleteBundleFileResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.DeleteBundleFileResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, *astrov1alpha1.DeleteBundleFileParams, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DeleteBundleWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, reqEditors
 func (_m *ClientWithResponsesInterface) DeleteBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DeleteBundleResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -343,6 +417,154 @@ func (_m *ClientWithResponsesInterface) DeleteBundleWithResponse(ctx context.Con
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, ...astrov1alpha1.RequestEditorFn) error); ok {
 		r1 = rf(ctx, organizationId, deploymentId, bundleId, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DuplicateBundleDirectoryWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) DuplicateBundleDirectoryWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DuplicateBundleDirectoryResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DuplicateBundleDirectoryWithBodyWithResponse")
+	}
+
+	var r0 *astrov1alpha1.DuplicateBundleDirectoryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DuplicateBundleDirectoryResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.DuplicateBundleDirectoryResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.DuplicateBundleDirectoryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DuplicateBundleDirectoryWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, body, reqEditors
+func (_m *ClientWithResponsesInterface) DuplicateBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body astrov1alpha1.MoveBundlePathRequest, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DuplicateBundleDirectoryResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DuplicateBundleDirectoryWithResponse")
+	}
+
+	var r0 *astrov1alpha1.DuplicateBundleDirectoryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DuplicateBundleDirectoryResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.DuplicateBundleDirectoryResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.DuplicateBundleDirectoryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DuplicateBundleFileWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) DuplicateBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DuplicateBundleFileResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DuplicateBundleFileWithBodyWithResponse")
+	}
+
+	var r0 *astrov1alpha1.DuplicateBundleFileResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DuplicateBundleFileResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.DuplicateBundleFileResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.DuplicateBundleFileResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DuplicateBundleFileWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, body, reqEditors
+func (_m *ClientWithResponsesInterface) DuplicateBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body astrov1alpha1.MoveBundlePathRequest, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DuplicateBundleFileResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DuplicateBundleFileWithResponse")
+	}
+
+	var r0 *astrov1alpha1.DuplicateBundleFileResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.DuplicateBundleFileResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.DuplicateBundleFileResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.DuplicateBundleFileResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -683,6 +905,80 @@ func (_m *ClientWithResponsesInterface) ListAstroIdeProjectsWithResponse(ctx con
 	return r0, r1
 }
 
+// ListBundleFilesWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ListBundleFilesWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *astrov1alpha1.ListBundleFilesParams, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.ListBundleFilesResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListBundleFilesWithResponse")
+	}
+
+	var r0 *astrov1alpha1.ListBundleFilesResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.ListBundleFilesParams, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.ListBundleFilesResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.ListBundleFilesParams, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.ListBundleFilesResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.ListBundleFilesResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, *astrov1alpha1.ListBundleFilesParams, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListBundleVersionsWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ListBundleVersionsWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *astrov1alpha1.ListBundleVersionsParams, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.ListBundleVersionsResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListBundleVersionsWithResponse")
+	}
+
+	var r0 *astrov1alpha1.ListBundleVersionsResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.ListBundleVersionsParams, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.ListBundleVersionsResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.ListBundleVersionsParams, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.ListBundleVersionsResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.ListBundleVersionsResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, *astrov1alpha1.ListBundleVersionsParams, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListBundlesWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, params, reqEditors
 func (_m *ClientWithResponsesInterface) ListBundlesWithResponse(ctx context.Context, organizationId string, deploymentId string, params *astrov1alpha1.ListBundlesParams, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.ListBundlesResponse, error) {
 	_va := make([]interface{}, len(reqEditors))
@@ -824,6 +1120,302 @@ func (_m *ClientWithResponsesInterface) ListDeploysWithResponse(ctx context.Cont
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, *astrov1alpha1.ListDeploysParams, ...astrov1alpha1.RequestEditorFn) error); ok {
 		r1 = rf(ctx, organizationId, deploymentId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MoveBundleDirectoryWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) MoveBundleDirectoryWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.MoveBundleDirectoryResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MoveBundleDirectoryWithBodyWithResponse")
+	}
+
+	var r0 *astrov1alpha1.MoveBundleDirectoryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.MoveBundleDirectoryResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.MoveBundleDirectoryResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.MoveBundleDirectoryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MoveBundleDirectoryWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, body, reqEditors
+func (_m *ClientWithResponsesInterface) MoveBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body astrov1alpha1.MoveBundlePathRequest, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.MoveBundleDirectoryResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MoveBundleDirectoryWithResponse")
+	}
+
+	var r0 *astrov1alpha1.MoveBundleDirectoryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.MoveBundleDirectoryResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.MoveBundleDirectoryResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.MoveBundleDirectoryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MoveBundleFileWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) MoveBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.MoveBundleFileResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MoveBundleFileWithBodyWithResponse")
+	}
+
+	var r0 *astrov1alpha1.MoveBundleFileResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.MoveBundleFileResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.MoveBundleFileResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.MoveBundleFileResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MoveBundleFileWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, body, reqEditors
+func (_m *ClientWithResponsesInterface) MoveBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body astrov1alpha1.MoveBundlePathRequest, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.MoveBundleFileResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MoveBundleFileWithResponse")
+	}
+
+	var r0 *astrov1alpha1.MoveBundleFileResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.MoveBundleFileResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.MoveBundleFileResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.MoveBundleFileResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astrov1alpha1.MoveBundlePathRequest, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReadBundleDirectoryWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ReadBundleDirectoryWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *astrov1alpha1.ReadBundleDirectoryParams, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.ReadBundleDirectoryResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReadBundleDirectoryWithResponse")
+	}
+
+	var r0 *astrov1alpha1.ReadBundleDirectoryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.ReadBundleDirectoryParams, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.ReadBundleDirectoryResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.ReadBundleDirectoryParams, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.ReadBundleDirectoryResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.ReadBundleDirectoryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, *astrov1alpha1.ReadBundleDirectoryParams, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ReadBundleFileWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, params, reqEditors
+func (_m *ClientWithResponsesInterface) ReadBundleFileWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *astrov1alpha1.ReadBundleFileParams, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.ReadBundleFileResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, params)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ReadBundleFileWithResponse")
+	}
+
+	var r0 *astrov1alpha1.ReadBundleFileResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.ReadBundleFileParams, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.ReadBundleFileResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.ReadBundleFileParams, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.ReadBundleFileResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.ReadBundleFileResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, *astrov1alpha1.ReadBundleFileParams, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, params, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// RollbackBundleWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) RollbackBundleWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, contentType string, body io.Reader, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.RollbackBundleResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RollbackBundleWithBodyWithResponse")
+	}
+
+	var r0 *astrov1alpha1.RollbackBundleResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.RollbackBundleResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.RollbackBundleResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.RollbackBundleResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, string, io.Reader, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// RollbackBundleWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, body, reqEditors
+func (_m *ClientWithResponsesInterface) RollbackBundleWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, body astrov1alpha1.RollbackBundleRequest, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.RollbackBundleResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RollbackBundleWithResponse")
+	}
+
+	var r0 *astrov1alpha1.RollbackBundleResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrov1alpha1.RollbackBundleRequest, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.RollbackBundleResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, astrov1alpha1.RollbackBundleRequest, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.RollbackBundleResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.RollbackBundleResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astrov1alpha1.RollbackBundleRequest, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1120,6 +1712,80 @@ func (_m *ClientWithResponsesInterface) UpdateBundleWithResponse(ctx context.Con
 
 	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, astrov1alpha1.UpdateBundleRequest, ...astrov1alpha1.RequestEditorFn) error); ok {
 		r1 = rf(ctx, organizationId, deploymentId, bundleId, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// WriteBundleDirectoryWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, params, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) WriteBundleDirectoryWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *astrov1alpha1.WriteBundleDirectoryParams, contentType string, body io.Reader, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.WriteBundleDirectoryResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, params, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WriteBundleDirectoryWithBodyWithResponse")
+	}
+
+	var r0 *astrov1alpha1.WriteBundleDirectoryResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.WriteBundleDirectoryParams, string, io.Reader, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.WriteBundleDirectoryResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, params, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.WriteBundleDirectoryParams, string, io.Reader, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.WriteBundleDirectoryResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, params, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.WriteBundleDirectoryResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, *astrov1alpha1.WriteBundleDirectoryParams, string, io.Reader, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, params, contentType, body, reqEditors...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// WriteBundleFileWithBodyWithResponse provides a mock function with given fields: ctx, organizationId, deploymentId, bundleId, params, contentType, body, reqEditors
+func (_m *ClientWithResponsesInterface) WriteBundleFileWithBodyWithResponse(ctx context.Context, organizationId string, deploymentId string, bundleId string, params *astrov1alpha1.WriteBundleFileParams, contentType string, body io.Reader, reqEditors ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.WriteBundleFileResponse, error) {
+	_va := make([]interface{}, len(reqEditors))
+	for _i := range reqEditors {
+		_va[_i] = reqEditors[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, organizationId, deploymentId, bundleId, params, contentType, body)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WriteBundleFileWithBodyWithResponse")
+	}
+
+	var r0 *astrov1alpha1.WriteBundleFileResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.WriteBundleFileParams, string, io.Reader, ...astrov1alpha1.RequestEditorFn) (*astrov1alpha1.WriteBundleFileResponse, error)); ok {
+		return rf(ctx, organizationId, deploymentId, bundleId, params, contentType, body, reqEditors...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string, *astrov1alpha1.WriteBundleFileParams, string, io.Reader, ...astrov1alpha1.RequestEditorFn) *astrov1alpha1.WriteBundleFileResponse); ok {
+		r0 = rf(ctx, organizationId, deploymentId, bundleId, params, contentType, body, reqEditors...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*astrov1alpha1.WriteBundleFileResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, string, *astrov1alpha1.WriteBundleFileParams, string, io.Reader, ...astrov1alpha1.RequestEditorFn) error); ok {
+		r1 = rf(ctx, organizationId, deploymentId, bundleId, params, contentType, body, reqEditors...)
 	} else {
 		r1 = ret.Error(1)
 	}

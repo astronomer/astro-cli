@@ -300,6 +300,11 @@ jobs:
             ${{ steps.go-env.outputs.mod }}
           key: go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-${{ github.sha }}
 
+      - name: Drop generated code from the coverage profile
+        run: |
+          grep -v -E '/(api\.gen\.go|mocks/[^:]*):' coverage.txt > coverage.filtered.txt
+          mv coverage.filtered.txt coverage.txt
+
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2
         continue-on-error: true
