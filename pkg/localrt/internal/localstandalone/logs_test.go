@@ -166,6 +166,17 @@ func TestLogsWriterStripsEscapesToo(t *testing.T) {
 	assert.Contains(t, buf.String(), "scheduler  | 2026-07-21T10:00:01.000000Z one")
 }
 
+func TestLogsWriterStripsOSCToo(t *testing.T) {
+	af, _ := logsFixture(t, []string{
+		"scheduler  | 2026-07-21T10:00:01.000000Z one\x1b]52;c;aGk=\x07 two",
+	})
+
+	var buf bytes.Buffer
+	require.NoError(t, af.Logs(context.Background(), rt.LogOptions{Writer: &buf}))
+	assert.NotContains(t, buf.String(), "\x1b")
+	assert.Contains(t, buf.String(), "scheduler  | 2026-07-21T10:00:01.000000Z one two")
+}
+
 func TestLogsWriterGetsRawLines(t *testing.T) {
 	af, _ := logsFixture(t, testLogLines()[:1])
 

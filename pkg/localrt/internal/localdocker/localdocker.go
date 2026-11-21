@@ -980,6 +980,8 @@ func (a *airflow) Logs(ctx context.Context, opts rt.LogOptions) error {
 	args = append(args, opts.Components...)
 
 	w := &rt.LineWriter{Emit: func(line string) {
+		// Escapes are dropped for both sinks, as the standalone engine does.
+		line = rt.StripEscapes(line)
 		l := parseLogLine(line, a.eng.now)
 		if opts.OnLine != nil {
 			opts.OnLine(l)
