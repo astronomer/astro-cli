@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // query is one Airflow-facing command family: the cli it renders through, and
@@ -96,12 +97,25 @@ func (t *deploymentTarget) note() string {
 func (t *deploymentTarget) suggest(command string) string {
 	switch {
 	case t.f.url != "":
-		return "astro " + afName + " " + command + " --url " + t.f.url
+		return "astro " + afName + " " + command + " --url " + shellWords(t.f.url)
 	case t.f.deployment != "":
-		return "astro " + afName + " " + command + " -d " + t.f.deployment
+		return "astro " + afName + " " + command + " -d " + shellWords(t.f.deployment)
 	default:
 		return "astro " + afName + " " + command
 	}
+}
+
+// shellWords is words as the arguments of a command printed to run, each one
+// word (scaffold.ShellQuote): unchanged when it is safe bare, as a Dag id or
+// an ordinary run id is, and quoted otherwise. A run id follows Airflow's
+// allowed_run_id_pattern, which a deployment can widen, and a value spliced in
+// bare that holds a space or a quote would paste as other words than it reads.
+func shellWords(words ...string) string {
+	quoted := make([]string, len(words))
+	for i, w := range words {
+		quoted[i] = scaffold.ShellQuote(w)
+	}
+	return strings.Join(quoted, " ")
 }
 
 // localForm is this family under `astro local`, the spelling that needs no
