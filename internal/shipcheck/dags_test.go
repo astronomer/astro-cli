@@ -107,6 +107,18 @@ func TestCheckDagsWalksADagsDirectoryNamedLikeACache(t *testing.T) {
 	assert.Contains(t, err.Error(), "dags/service-key.pem")
 }
 
+// A dags/ that cannot be resolved for a reason other than not being there (a
+// link to itself) fails the check rather than passing it unread.
+func TestCheckDagsFailsOnADagsDirectoryItCannotResolve(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Symlink("dags", filepath.Join(dir, "dags")); err != nil {
+		t.Skipf("symlinks unavailable here: %v", err)
+	}
+	err := CheckDags(dir, uploadOf(dir), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "reading the project's Dags")
+}
+
 // Outside a git work tree there is nothing to ask, as for an image: a file
 // that looks like credentials under dags/ uploads, and nothing is warned.
 func TestCheckDagsOutsideGitAsksNothing(t *testing.T) {

@@ -85,7 +85,9 @@ func (r *Report) dagsErr() error {
 // as the directory it leads to, and listed in links, so Check can tell where
 // it leads; a link inside it is carried as a link rather than the file it
 // points at, and so is not listed. A src.Dir that is not there, or a link that
-// leads nowhere, carries nothing.
+// leads nowhere, carries nothing; one that cannot be resolved otherwise (a
+// link loop, a directory it cannot search) fails the check rather than pass
+// it unread.
 func dagsFiles(dir string, src fileutil.TarSource) (files, links []string, err error) {
 	rel, err := filepath.Rel(dir, src.Dir)
 	if err != nil || !filepath.IsLocal(rel) {
@@ -100,8 +102,11 @@ func dagsFiles(dir string, src fileutil.TarSource) (files, links []string, err e
 		return nil, nil, err
 	}
 	root, err := filepath.EvalSymlinks(src.Dir)
-	if err != nil {
+	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
 	}
 	if info.Mode()&fs.ModeSymlink != 0 {
 		links = []string{rel}

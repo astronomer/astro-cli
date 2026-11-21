@@ -810,12 +810,12 @@ func projectGitMetadataOffNote(m *manifest.Manifest, imageName string) string {
 // the uncommitted-changes note.
 const gitMetadataOffText = "deploy.git_metadata is false in your global config, so this deploy records no git commit"
 
-// DeployDags ships the project's dags/ through the dags-only transport.
 // DagsSource is what DeployDags uploads of the project.
 func (d manifestDeployer) DagsSource(projectDir string, noDagsBaseDir bool) fileutil.TarSource {
 	return astrodeploy.DagsSource(projectDir, noDagsBaseDir)
 }
 
+// DeployDags ships the project's dags/ through the dags-only transport.
 func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
 	res, err := astrodeploy.DeployManifestDags(astrodeploy.ManifestDagDeployInput{
 		Login:         &d.login.context,

@@ -381,6 +381,15 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 	return ""
 }
 
+// dagsBaseDir is the directory every path in a Dags upload sits under.
+const dagsBaseDir = "dags"
+
+// DagsSource is what DagsOnlyDeploy tars of the project at projectDir: its
+// dags/, each entry under dags/ whatever the directory resolves to.
+func DagsSource(projectDir string) fileutil.TarSource {
+	return fileutil.TarSource{Dir: filepath.Join(projectDir, "dags"), BaseDir: dagsBaseDir}
+}
+
 // DagsOnlyDeploy uploads the project's DAGs to a Deployment, settled before
 // it is called and held to the workspace, and returns that Deployment, on a
 // failure too.
@@ -394,15 +403,6 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 // found, and making it fails if
 // that directory has gone, so one removed meanwhile is not uploaded as no
 // DAGs either.
-// dagsBaseDir is the directory every path in a Dags upload sits under.
-const dagsBaseDir = "dags"
-
-// DagsSource is what DagsOnlyDeploy tars of the project at projectDir: its
-// dags/, each entry under dags/ whatever the directory resolves to.
-func DagsSource(projectDir string) fileutil.TarSource {
-	return fileutil.TarSource{Dir: filepath.Join(projectDir, "dags"), BaseDir: dagsBaseDir}
-}
-
 func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, opts Options) (string, error) {
 	deployments, err := workspaceDeploymentsVar(houstonClient, wsID, deploymentID)
 	if err != nil {

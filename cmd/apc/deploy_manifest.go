@@ -295,16 +295,16 @@ func (d *apcManifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeplo
 	return manifestdeploy.Deployment{ID: deps[i].ID, Name: deps[i].Label, WorkspaceID: firstNonEmpty(deps[i].Workspace.ID, workspaceID)}, nil
 }
 
-// DeployDags uploads the project's DAGs to a Deployment that takes DAG-only
-// deploys, refusing one that does not. A dags directory with no DAGs in it
-// is warned about rather than asked about, as on Astro: the upload goes
-// ahead.
 // DagsSource is what DeployDags uploads of the project: APC puts every
 // path under dags/, so --no-dags-base-dir changes nothing.
 func (d *apcManifestDeployer) DagsSource(projectDir string, _ bool) fileutil.TarSource {
 	return deploy.DagsSource(projectDir)
 }
 
+// DeployDags uploads the project's DAGs to a Deployment that takes DAG-only
+// deploys, refusing one that does not. A dags directory with no DAGs in it
+// is warned about rather than asked about, as on Astro: the upload goes
+// ahead.
 func (d *apcManifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
 	opts := deploy.Options{Progress: d.progress, WarnEmptyDags: d.warn}
 	if _, err := DagsOnlyDeploy(d.client, in.WorkspaceID, in.DeploymentID, in.ProjectDir, nil, true, in.Description, opts); err != nil {
