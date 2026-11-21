@@ -66,7 +66,6 @@ func newTelemetryEnableCmd(out io.Writer) *cobra.Command {
 		Use:   "enable",
 		Short: "Enable anonymous telemetry",
 		Long:  "Enable anonymous telemetry collection for the Astro CLI.",
-		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runTelemetry(out, telemetryEnable)
 		},
@@ -81,7 +80,6 @@ func newTelemetryDisableCmd(out io.Writer) *cobra.Command {
 		Use:   "disable",
 		Short: "Disable anonymous telemetry",
 		Long:  "Disable anonymous telemetry collection for the Astro CLI.",
-		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runTelemetry(out, telemetryDisable)
 		},

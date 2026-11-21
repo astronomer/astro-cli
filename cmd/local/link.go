@@ -88,7 +88,6 @@ func NewLinkCmd(d Deps) *cobra.Command {
 		Example: "  astro link add                              # pick a Deployment to link\n" +
 			"  astro link add prod --deployment clx123abc\n" +
 			"  astro link default prod",
-		Args: cobra.NoArgs,
 	}
 	cmd.AddCommand(newLinkAddCmd(c), newLinkRemoveCmd(c), newLinkDefaultCmd(c))
 	cliout.AddOutputFlag(cmd, &c.output)
@@ -108,8 +107,8 @@ type linkAddInput struct {
 
 func newLinkAddCmd(c *cli) *cobra.Command {
 	in := &linkAddInput{}
-	cmd := &cobra.Command{
-		Use:   "add [NAME] [-- COMMAND...]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "add",
 		Short: "Link a Deployment to this project",
 		Long: "Link a Deployment to this project as NAME. With no --deployment, it asks " +
 			"which Astro Deployment to link. With no NAME, the link is named after the Deployment: lowercased, with " +
@@ -126,25 +125,21 @@ func newLinkAddCmd(c *cli) *cobra.Command {
 			"  astro link add staging --url https://airflow.example.com --auth token --token-env AIRFLOW_TOKEN\n" +
 			"  astro link add custom --url https://airflow.example.com \\\n" +
 			"    --auth exec -- my-token-tool --profile prod",
-		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// The declaration has held the words before -- to one NAME and
+			// left the rest, after it, as the exec command.
 			name, command := "", []string(nil)
-			switch dash := cmd.ArgsLenAtDash(); {
-			case dash > 1:
-				return errors.New("add takes one NAME before --: the rest is the exec command")
-			case dash >= 0:
+			dash := cmd.ArgsLenAtDash()
+			if dash >= 0 {
 				command = args[dash:]
-				if dash == 1 {
-					name = args[0]
-				}
-			case len(args) > 1:
-				return fmt.Errorf("add takes one NAME, not %d: put an exec command after --", len(args))
-			case len(args) == 1:
+				args = args[:dash]
+			}
+			if len(args) == 1 {
 				name = args[0]
 			}
 			return c.runLinkAdd(cmd, in, name, command)
 		},
-	}
+	}, cliout.Optional("NAME"), cliout.Arg{Name: "COMMAND", Optional: true, Repeated: true, AfterDash: true})
 	f := cmd.Flags()
 	f.StringVarP(&in.deployment, flagLinkDeployment, "d", "", "Deployment ID (Astro's, or Astro Private Cloud's under an APC context)")
 	f.StringVarP(&in.workspace, flagLinkWorkspace, "w", "", "Workspace the Deployment is in (default: this project's, or the APC context's)")
@@ -165,13 +160,12 @@ func newLinkAddCmd(c *cli) *cobra.Command {
 }
 
 func newLinkRemoveCmd(c *cli) *cobra.Command {
-	return &cobra.Command{
-		Use:     "remove [NAME]",
+	return cliout.Args(&cobra.Command{
+		Use:     "remove",
 		Aliases: []string{"rm"},
 		Short:   "Unlink a Deployment from this project",
 		Long:    "Unlink a Deployment from this project. With no NAME, it asks which one. Without a terminal (or in CI, or with --non-interactive or --output json), it fails instead.",
 		Example: "  astro link remove prod",
-		Args:    cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) == 1 {
 				return c.runLinkRemove(args[0])
@@ -182,19 +176,18 @@ func newLinkRemoveCmd(c *cli) *cobra.Command {
 			}
 			return c.runLinkRemove(name)
 		},
-	}
+	}, cliout.Optional("NAME"))
 }
 
 func newLinkDefaultCmd(c *cli) *cobra.Command {
 	var unset bool
-	cmd := &cobra.Command{
-		Use:   "default [NAME]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "default",
 		Short: "Choose the Deployment commands use by default",
 		Long: "Choose the linked Deployment that commands use when you don't name one. astro deploy still " +
 			"asks, with it preselected. With no NAME, this command asks which one. Without a terminal (or in CI, or with --non-interactive or --output json), it fails instead.",
 		Example: "  astro link default prod\n" +
 			"  astro link default --unset",
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			switch {
 			case unset && len(args) > 0:
@@ -210,7 +203,7 @@ func newLinkDefaultCmd(c *cli) *cobra.Command {
 			}
 			return c.runLinkDefault(name)
 		},
-	}
+	}, cliout.Optional("NAME"))
 	cmd.Flags().BoolVar(&unset, flagLinkUnset, false, "Clear the default")
 	return cmd
 }

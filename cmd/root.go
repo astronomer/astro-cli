@@ -117,12 +117,6 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 		// The ASCII banner above this is drawn by the help func (rootBanner),
 		// not kept here, because Long is wrapped and the art is not prose.
 		Long: "The Astro CLI is the command line interface for data orchestration. Use it with Astro, with APC, or to run Airflow locally.",
-		// Declaring any Args keeps cobra from refusing an unknown word itself,
-		// with its own pair of suggestions, as it does for a root with none.
-		// The word reaches the group refusal every other group gets
-		// (cliout.UnknownSubcommand), which suggests the one command it is
-		// clearly close to.
-		Args: cobra.ArbitraryArgs,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// A removed command's stub only says what replaced it: it needs no
 			// login and checks no version, but it is logged and recorded.
@@ -147,6 +141,12 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// Defined ahead of the commands rather than with the rest of the root's
 	// setup below: apcCmd.NeedsPlatform reads the root's persistent flags to
 	// find which command a line runs.
+	// Declaring how the root takes words keeps cobra from refusing an unknown
+	// one itself, with its own pair of suggestions, as it does for a root with
+	// no Args. The word reaches the group refusal every other group gets
+	// (cliout.UnknownSubcommand), which suggests the one command it is clearly
+	// close to.
+	cliout.AnyWords(rootCmd, "an unknown word reaches the group refusal, cliout.UnknownSubcommand")
 	addVerbosityFlag(rootCmd.PersistentFlags())
 	addVersionFlag(rootCmd.PersistentFlags())
 	input.AddFlag(rootCmd.PersistentFlags())

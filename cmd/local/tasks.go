@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
@@ -33,9 +34,9 @@ func newTasksCmd(d Deps, t target) *cobra.Command {
 	)
 }
 
-// taskInstanceArgs is how many names address one task instance: the DAG, the
+// taskInstance is the names that address one task instance: the DAG, the
 // run, and the task.
-const taskInstanceArgs = 3
+var taskInstance = []cliout.Arg{cliout.Required("DAG_ID"), cliout.Required("RUN_ID"), cliout.Required("TASK_ID")}
 
 // taskRow is a task's definition — what the DAG says, not what a run did.
 type taskRow struct {
@@ -116,17 +117,16 @@ func newTaskInstanceRow(t airflowapi.TaskInstance) taskInstanceRow {
 }
 
 func newTasksListCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "list <DAG_ID>",
+	return cliout.Args(&cobra.Command{
+		Use:   "list",
 		Short: "List the tasks a Dag defines",
-		Args:  cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"List the tasks a Dag defines", "tasks list <DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runTasksList(cmd.Context(), args[0])
 		},
-	}
+	}, cliout.Required("DAG_ID"))
 }
 
 func (q *query) runTasksList(ctx context.Context, dagID string) error {
@@ -151,17 +151,16 @@ func renderTaskTable(w io.Writer, rows []taskRow) error {
 }
 
 func newTasksGetCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "get <DAG_ID> <TASK_ID>",
+	return cliout.Args(&cobra.Command{
+		Use:   "get",
 		Short: "Show one task's definition",
-		Args:  cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"Show one task's definition", "tasks get <DAG_ID> <TASK_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runTasksGet(cmd.Context(), args[0], args[1])
 		},
-	}
+	}, cliout.Required("DAG_ID"), cliout.Required("TASK_ID"))
 }
 
 func (q *query) runTasksGet(ctx context.Context, dagID, taskID string) error {
@@ -198,10 +197,9 @@ func taskFields(row taskRow) []field {
 
 func newTasksInstanceCmd(q *query) *cobra.Command {
 	var mapIndex int
-	cmd := &cobra.Command{
-		Use:   "instance <DAG_ID> <RUN_ID> <TASK_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "instance",
 		Short: "Show what one run of a task did",
-		Args:  cobra.ExactArgs(taskInstanceArgs),
 		Example: afExample(q.t,
 			"Show what a task did in one run", "tasks instance <DAG_ID> <RUN_ID> <TASK_ID>",
 			"One expansion of a mapped task", "tasks instance <DAG_ID> <RUN_ID> <TASK_ID> --map-index 2",
@@ -209,7 +207,7 @@ func newTasksInstanceCmd(q *query) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runTasksInstance(cmd.Context(), args[0], args[1], args[2], mapIndex)
 		},
-	}
+	}, taskInstance...)
 	cmd.Flags().IntVarP(&mapIndex, "map-index", "m", -1, "Which expansion of a mapped task to show (-1 for an unmapped task)")
 	return cmd
 }
@@ -299,12 +297,11 @@ func newTasksLogsCmd(q *query) *cobra.Command {
 		try      int
 		mapIndex int
 	}
-	cmd := &cobra.Command{
-		Use:   "logs <DAG_ID> <RUN_ID> <TASK_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "logs",
 		Short: "Print one try's log for a task instance",
 		Long: "Print the full log Airflow holds for one try of a task instance.\n\nThe content is printed as " +
 			"Airflow sent it. Airflow 3 serves structured entries and Airflow 2 serves one string.",
-		Args: cobra.ExactArgs(taskInstanceArgs),
 		Example: afExample(q.t,
 			"Print the log of a task's first try", "tasks logs <DAG_ID> <RUN_ID> <TASK_ID>",
 			"The log of its second try", "tasks logs <DAG_ID> <RUN_ID> <TASK_ID> --try 2",
@@ -322,7 +319,7 @@ func newTasksLogsCmd(q *query) *cobra.Command {
 			}
 			return q.runTasksLogs(cmd.Context(), args[0], args[1], args[2], o)
 		},
-	}
+	}, taskInstance...)
 	cmd.Flags().IntVar(&opts.try, "try", 1, "Which attempt to read, counting from 1")
 	cmd.Flags().IntVarP(&opts.mapIndex, "map-index", "m", -1, "Which expansion of a mapped task to read (-1 for an unmapped task)")
 	return cmd
@@ -373,14 +370,13 @@ func newTasksClearCmd(q *query) *cobra.Command {
 		noResetDAGRuns bool
 		yes            bool
 	}
-	cmd := &cobra.Command{
-		Use:   "clear <DAG_ID> <RUN_ID> <TASK_ID>...",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "clear",
 		Short: "Clear task instances so they run again",
 		Long: "Reset the named task instances in one run so the scheduler runs them again. Pass --dry-run to see " +
 			"what would be cleared without clearing it.\n\nThe affected runs go back to the queued state so the scheduler " +
 			"picks the cleared tasks up. A run left in a final state would never start them. " +
 			"--no-reset-dagruns leaves the run's state alone.",
-		Args: cobra.MinimumNArgs(taskInstanceArgs),
 		Example: afExample(q.t,
 			"See what clearing a task would reset, and change nothing", "tasks clear <DAG_ID> <RUN_ID> <TASK_ID> --dry-run",
 			"Clear a task and everything downstream of it, without the prompt", "tasks clear <DAG_ID> <RUN_ID> <TASK_ID> --downstream --yes",
@@ -396,7 +392,7 @@ func newTasksClearCmd(q *query) *cobra.Command {
 				ResetDAGRuns:      !opts.noResetDAGRuns,
 			}, opts.yes)
 		},
-	}
+	}, cliout.Required("DAG_ID"), cliout.Required("RUN_ID"), cliout.Arg{Name: "TASK_ID", Repeated: true})
 	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "Report what would be cleared and change nothing")
 	cmd.Flags().BoolVar(&opts.onlyFailed, "only-failed", false, "Skip task instances that did not fail")
 	cmd.Flags().BoolVar(&opts.downstream, "downstream", false, "Also clear tasks downstream of these")

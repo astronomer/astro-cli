@@ -27,8 +27,8 @@ func newTasksWaitCmd(q *query) *cobra.Command {
 		until    string
 	}
 	var timing waitFlags
-	cmd := &cobra.Command{
-		Use:   "wait <DAG_ID> <RUN_ID> <TASK_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "wait",
 		Short: "Wait for a task instance to reach a state",
 		Long: "Check on one task instance every --poll-interval until it reaches the state --until names " +
 			"(success by default), or --timeout passes. The wait ends early if the instance settles " +
@@ -41,7 +41,6 @@ func newTasksWaitCmd(q *query) *cobra.Command {
 			"Exit status: 0 when the task reached the state, " + strconv.Itoa(exitRunFailed) + " when it cannot " +
 			"reach it (or the command itself failed), " + strconv.Itoa(exitWaitTimeout) + " when the wait timed " +
 			"out. Stopping the wait does not stop the task.",
-		Args: cobra.ExactArgs(taskInstanceArgs),
 		Example: afExample(q.t,
 			"Wait for a task to succeed", "tasks wait <DAG_ID> <RUN_ID> <TASK_ID>",
 			"Wait until a task is waiting for a human answer", "tasks wait <DAG_ID> <RUN_ID> <TASK_ID> --until awaiting_input",
@@ -59,7 +58,7 @@ func newTasksWaitCmd(q *query) *cobra.Command {
 			target := taskTarget{taskID: args[2], mapIndex: opts.mapIndex, state: state}
 			return q.runTasksWait(cmd.Context(), args[0], args[1], target, wait)
 		},
-	}
+	}, taskInstance...)
 	cmd.Flags().IntVarP(&opts.mapIndex, "map-index", "m", -1, "Which expansion of a mapped task to wait on (-1 for an unmapped task)")
 	cmd.Flags().StringVar(&opts.until, "until", defaultWaitState, "The state to wait for")
 	timing.register(cmd)

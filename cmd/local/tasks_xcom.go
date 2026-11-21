@@ -9,6 +9,8 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // defaultXComKey is the key a task's return value is pushed under, which is
@@ -32,8 +34,8 @@ func newTasksXComCmd(q *query) *cobra.Command {
 		mapIndex int
 		key      string
 	}
-	cmd := &cobra.Command{
-		Use:   "xcom <DAG_ID> <RUN_ID> <TASK_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "xcom",
 		Short: "Print the value a task instance pushed to XCom",
 		Long: "Print the value one task instance pushed to XCom: by default its return value, or the value " +
 			"under --key. Text output is the value alone: a string as is, and anything else as indented " +
@@ -42,7 +44,6 @@ func newTasksXComCmd(q *query) *cobra.Command {
 			"datetime, arrives as a string. Airflow 3.0 and Airflow 2.10 and later deserialize only with " +
 			"[api] enable_xcom_deserialize_support on. Without it, and on older Airflow 2, the value " +
 			"arrives as Airflow stores it.",
-		Args: cobra.ExactArgs(taskInstanceArgs),
 		Example: afExample(q.t,
 			"Print what a task returned", "tasks xcom <DAG_ID> <RUN_ID> <TASK_ID>",
 			"One expansion of a mapped task", "tasks xcom <DAG_ID> <RUN_ID> <TASK_ID> --map-index 2",
@@ -56,7 +57,7 @@ func newTasksXComCmd(q *query) *cobra.Command {
 			}
 			return q.runTasksXCom(cmd.Context(), args[0], args[1], args[2], opts.key, opts.mapIndex)
 		},
-	}
+	}, taskInstance...)
 	cmd.Flags().IntVarP(&opts.mapIndex, "map-index", "m", -1, "Which expansion of a mapped task to read (-1 for an unmapped task)")
 	cmd.Flags().StringVar(&opts.key, "key", defaultXComKey, "The XCom key to read")
 	return cmd

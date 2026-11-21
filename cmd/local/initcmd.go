@@ -31,8 +31,8 @@ func NewInitCmd(d Deps) *cobra.Command {
 
 func newInitCmd(c *cli) *cobra.Command {
 	var opts scaffold.Options
-	cmd := &cobra.Command{
-		Use:   "init [DIRECTORY]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "init",
 		Short: "Make a directory an Astro project",
 		Long: "Create a pyproject.toml-based Astro project in the given directory (default: the current one).\n\n" +
 			"A directory with no pyproject.toml is scaffolded. In a directory that has one, init adds a [tool.astro] section and leaves the rest of the file alone. Use this in an existing Airflow repo.\n\n" +
@@ -44,7 +44,6 @@ func newInitCmd(c *cli) *cobra.Command {
 			"  astro init\n\n" +
 			"  # Create a new project in its own directory, pinned to Airflow 3.1\n" +
 			"  astro init my-project --airflow-version 3.1",
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := "."
 			if len(args) == 1 {
@@ -52,7 +51,7 @@ func newInitCmd(c *cli) *cobra.Command {
 			}
 			return c.runInit(cmd.Context(), dir, opts)
 		},
-	}
+	}, cliout.Optional("DIRECTORY"))
 	cmd.Flags().StringVar(&opts.AirflowVersion, "airflow-version", "",
 		"Airflow version to pin in the manifest (default: the pin already in the manifest, else the newest supported Airflow series)")
 	cmd.Flags().StringVarP(&opts.Name, "name", "n", "", "Project name (default: the directory name)")

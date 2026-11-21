@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/otto"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 )
@@ -45,8 +46,8 @@ func printAstroSubcommands(w io.Writer) {
 }
 
 func newOttoCmd(astroV1Client astrov1.APIClient) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:                "otto [ARGS]...",
+	cmd := cliout.Args(&cobra.Command{
+		Use:                "otto",
 		Short:              "Start the Otto AI agent",
 		Long:               "Start the Otto AI agent for AI-assisted Airflow development and operations. All flags and arguments are forwarded directly to Otto.",
 		DisableFlagParsing: true,
@@ -55,7 +56,7 @@ func newOttoCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 		},
 		Example: `  # Start Otto
   astro otto`,
-	}
+	}, cliout.Arg{Name: "ARGS", Optional: true, Repeated: true})
 
 	return cmd
 }

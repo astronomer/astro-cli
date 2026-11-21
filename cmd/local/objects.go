@@ -107,7 +107,6 @@ func newConnectionsListCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List the connections on this Airflow",
-		Args:  cobra.NoArgs,
 		Example: afExample(q.t,
 			"List the connections", "connections list",
 		),
@@ -144,17 +143,16 @@ func renderConnectionTable(w io.Writer, rows []connectionListRow) error {
 }
 
 func newConnectionsGetCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "get <CONN_ID>",
+	return cliout.Args(&cobra.Command{
+		Use:   "get",
 		Short: "Show one connection, without its password",
-		Args:  cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Show one connection, without its password", "connections get <CONN_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runConnectionsGet(cmd.Context(), args[0])
 		},
-	}
+	}, cliout.Required("CONN_ID"))
 }
 
 func (q *query) runConnectionsGet(ctx context.Context, id string) error {
@@ -216,7 +214,6 @@ func newVariablesListCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List the Variable keys on this Airflow, without their values",
-		Args:  cobra.NoArgs,
 		Example: afExample(q.t,
 			"List the Variable keys", "variables list",
 		),
@@ -253,19 +250,18 @@ func renderVariableTable(w io.Writer, rows []variableListRow) error {
 }
 
 func newVariablesGetCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "get <KEY>",
+	return cliout.Args(&cobra.Command{
+		Use:   "get",
 		Short: "Show one Variable and its value",
 		Long: "Print one Variable's value. Airflow masks the values of Variables whose keys look sensitive, and " +
 			"the output shows what Airflow returns.",
-		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Print one Variable's value", "variables get <KEY>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runVariablesGet(cmd.Context(), args[0])
 		},
-	}
+	}, cliout.Required("KEY"))
 }
 
 func (q *query) runVariablesGet(ctx context.Context, key string) error {
@@ -341,7 +337,6 @@ func newPoolsListCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List the pools on this Airflow",
-		Args:  cobra.NoArgs,
 		Example: afExample(q.t,
 			"List the pools and their slots", "pools list",
 		),
@@ -380,17 +375,16 @@ func renderPoolTable(w io.Writer, rows []poolRow) error {
 }
 
 func newPoolsGetCmd(q *query) *cobra.Command {
-	return &cobra.Command{
-		Use:   "get <NAME>",
+	return cliout.Args(&cobra.Command{
+		Use:   "get",
 		Short: "Show one pool's slots and how they are used",
-		Args:  cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Show one pool", "pools get <NAME>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runPoolsGet(cmd.Context(), args[0])
 		},
-	}
+	}, cliout.Required("NAME"))
 }
 
 func (q *query) runPoolsGet(ctx context.Context, name string) error {

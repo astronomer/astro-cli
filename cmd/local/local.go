@@ -125,7 +125,6 @@ func NewLocalCmd(d Deps) *cobra.Command {
 		Use:   "local",
 		Short: "Run Apache Airflow locally from your project",
 		Long:  "Run and manage a local Apache Airflow for the current project. Works offline, no account needed.",
-		Args:  cobra.ArbitraryArgs,
 		// A bare `astro local` prints help and succeeds; an unknown subcommand
 		// fails. Without a RunE cobra treats this non-runnable parent as a help
 		// request and exits 0 even on a typo (it returns flag.ErrHelp before it
@@ -165,7 +164,7 @@ func NewLocalCmd(d Deps) *cobra.Command {
 	// reads a deployment, and neither can ever be the other.
 	cmd.AddCommand(newAfCmd(d, func() target { return machineTarget{} }))
 	markSkipPreRun(cmd)
-	return cmd
+	return cliout.AnyWords(cmd, "its RunE names where an astro dev word went before it refuses an unknown one")
 }
 
 func newStartCmd(c *cli) *cobra.Command {
@@ -203,7 +202,6 @@ func newStartCmd(c *cli) *cobra.Command {
 			"  astro local start --port 8081\n\n" +
 			"  # Wait up to ten minutes for Airflow, on a slow machine\n" +
 			"  astro local start --timeout 10m",
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if cmd.Flags().Changed("timeout") {
 				c.d.Runtime.SetHealthTimeout(opts.timeout)
@@ -715,7 +713,6 @@ func newStopCmd(c *cli) *cobra.Command {
 			"  astro local stop\n\n" +
 			"  # Also remove its derived runtime state\n" +
 			"  astro local stop --clean",
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runStop(cmd.Context(), localrt.StopOptions{Force: opts.force, Clean: opts.clean})
 		},
@@ -761,7 +758,6 @@ func newRestartCmd(c *cli) *cobra.Command {
 		Short: "Restart local Airflow for this project",
 		Example: "  # Stop and start Airflow for this project\n" +
 			"  astro local restart",
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runRestart(cmd.Context(), force, allowMissing, buildSecrets)
 		},
@@ -894,7 +890,6 @@ func newStatusCmd(c *cli) *cobra.Command {
 			"  astro local status\n\n" +
 			"  # As JSON, for a script\n" +
 			"  astro local status -o json",
-		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return c.runStatus()
 		},
@@ -970,7 +965,6 @@ func newListCmd(c *cli) *cobra.Command {
 			"  astro local list --all\n\n" +
 			"  # Remove the stale records\n" +
 			"  astro local list --clean",
-		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return c.runList(opts.all, opts.clean)
 		},
@@ -1144,7 +1138,6 @@ func newLogsCmd(c *cli) *cobra.Command {
 			"  astro local logs\n\n" +
 			"  # Follow the scheduler's log, starting from its last 100 lines\n" +
 			"  astro local logs --component scheduler --tail 100 --follow",
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runLogs(cmd.Context(), opts.follow, opts.tail, opts.components)
 		},
@@ -1182,8 +1175,8 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 
 func newRunCmd(c *cli) *cobra.Command {
 	var withWorkspace, noSync bool
-	cmd := &cobra.Command{
-		Use:   nameRun + " <COMMAND> [ARGS...]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   nameRun,
 		Short: "Run a command inside this project's Airflow environment",
 		Long: "Run a command inside this project's Airflow environment.\n\n" +
 			"With Airflow running, the command attaches to it and shares its port and metadata database. " +
@@ -1197,15 +1190,13 @@ func newRunCmd(c *cli) *cobra.Command {
 			"  astro local run airflow dags list\n\n" +
 			"  # Use the existing virtualenv without updating it\n" +
 			"  astro local run --" + flagNoSync + " pytest",
-		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return c.runExec(cmd.Context(), args, withWorkspace, noSync)
 		},
-	}
+	}, cliout.Required("COMMAND"), cliout.Arg{Name: "ARGS", Optional: true, Repeated: true})
 	// Everything after the first positional belongs to the wrapped
 	// command, not to us.
-	cmd.Flags().SetInterspersed(false)
-	cmd.Annotations = map[string]string{cliout.ArgvPassthroughAnnotation: "true"}
+	cliout.Passthrough(cmd)
 	cmd.Flags().BoolVar(&withWorkspace, flagWithWorkspace, false, withWorkspaceHelp)
 	cmd.Flags().BoolVar(&noSync, flagNoSync, false, noSyncHelp)
 	return cmd
@@ -1348,7 +1339,6 @@ func newShellCmd(c *cli) *cobra.Command {
 		Short: "Open a shell inside this project's Airflow environment",
 		Example: "  # Open a shell with the project's environment\n" +
 			"  astro local shell",
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runShell(cmd.Context(), withWorkspace, noSync)
 		},
@@ -1382,7 +1372,6 @@ func newOpenCmd(c *cli) *cobra.Command {
 			"  astro local open\n\n" +
 			"  # Print its URL instead\n" +
 			"  astro local open --no-open",
-		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return c.runOpen(printURL || noOpen || !input.CanOpenBrowser())
 		},
@@ -1436,7 +1425,6 @@ func newResetCmd(c *cli) *cobra.Command {
 			"  astro local reset\n\n" +
 			"  # Without the prompt\n" +
 			"  astro local reset --yes",
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runReset(cmd.Context(), yes)
 		},

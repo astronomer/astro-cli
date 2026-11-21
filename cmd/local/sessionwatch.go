@@ -20,7 +20,6 @@ func newSessionWatchCmd(d Deps) *cobra.Command {
 		Use:           localrt.SessionWatchSubcommand,
 		Short:         "Watch a session and stop its docker Airflow when it ends (internal)",
 		Hidden:        true,
-		Args:          cobra.NoArgs,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// WatchAndStop is not on the Runtime seam, so this builds its

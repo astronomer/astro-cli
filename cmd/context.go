@@ -56,7 +56,6 @@ func newContextListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List all contexts",
 		Long:    "List the Astro and APC contexts saved on this machine.",
-		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			list, err := context.List()
 			if err != nil {
@@ -89,21 +88,20 @@ func emitContextList(r cliout.Renderer, list *context.InfoList) error {
 
 func newContextSwitchCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
 	var output cliout.Format
-	cmd := &cobra.Command{
-		Use:     "switch [DOMAIN]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "switch",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different context",
 		Long:    "Switch to a different context. With no domain, pick one from the contexts saved on this machine. For Astro, the saved login for the domain is refreshed when possible. It does not open a browser.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return switchContext(cmd, args, astroV1Client, cliout.Renderer{Format: output, Out: out})
 		},
-		Args: cobra.MaximumNArgs(1),
 		Example: `  # Pick a context from the ones saved on this machine
   astro context switch
 
   # Switch to Astro
   astro context switch astronomer.io`,
-	}
+	}, cliout.Optional("DOMAIN"))
 	cliout.AddOutputFlag(cmd, &output)
 	return cmd
 }
@@ -228,8 +226,8 @@ func noteDomainOverride(errOut io.Writer, domain string) {
 
 func newContextDeleteCmd() *cobra.Command {
 	var output cliout.Format
-	cmd := &cobra.Command{
-		Use:     "delete <DOMAIN>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "delete",
 		Aliases: []string{"rm"},
 		Short:   "Delete a context",
 		Long:    "Delete a context saved on this machine.",
@@ -243,13 +241,12 @@ func newContextDeleteCmd() *cobra.Command {
 				fmt.Fprintf(b, "Deleted context: %s\n", removal.Domain)
 			}))
 		},
-		Args: cobra.ExactArgs(1),
 		Example: `  # Delete a saved context
   astro context delete <DOMAIN>
 
   # Delete the current context without the confirmation prompt
   astro context delete <DOMAIN> --yes`,
-	}
+	}, cliout.Required("DOMAIN"))
 
 	cmd.Flags().BoolVarP(&noPrompt, "yes", "y", false, "Don't ask for confirmation before deleting the current context")
 	cliout.AddOutputFlag(cmd, &output)

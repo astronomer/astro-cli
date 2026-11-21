@@ -21,9 +21,10 @@ func walk(cmd *cobra.Command, fn func(*cobra.Command)) {
 	}
 }
 
-// Every core command validates its args, carries the skip-pre-run annotation,
-// and can reach an --output flag — the issue's day-one rules, checked
-// structurally.
+// Every core command carries the skip-pre-run annotation and can reach an
+// --output flag — the issue's day-one rules, checked structurally. Its
+// arguments are held to the declaration in cmd's TestEveryCommandDeclares...:
+// a command that declares none takes none.
 //
 // The annotation stops the shell root's PersistentPreRunE: no logging setup, no
 // platform pre-run, no telemetry hook, so no network work. It does not stop
@@ -40,9 +41,6 @@ func TestTreeInvariants(t *testing.T) {
 	d, _ := testDeps(t)
 	for _, top := range AddCmds(d) {
 		walk(top, func(cmd *cobra.Command) {
-			if cmd.Args == nil {
-				t.Errorf("%s has no Args validator", cmd.CommandPath())
-			}
 			if cmd.Annotations[skipPreRunAnnotation] != "true" && !cliout.IsRemovedCommand(cmd) {
 				t.Errorf("%s is missing the skip-pre-run annotation", cmd.CommandPath())
 			}

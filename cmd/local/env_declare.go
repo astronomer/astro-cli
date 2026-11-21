@@ -117,16 +117,15 @@ func newEnvDeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	}
 	example += "  # Resolve it from the Workspace when no local file sets it\n" +
 		"  " + cmdLine + " --source workspace"
-	cmd := &cobra.Command{
-		Use:     "declare " + k.arg,
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "declare",
 		Short:   "Declare " + k.article + " " + k.label + " in pyproject.toml",
 		Long:    long,
 		Example: example,
-		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return c.runEnvDeclare(cmd, scope, in, k.kind, args[0])
 		},
-	}
+	}, cliout.Required(k.arg))
 	f := cmd.Flags()
 	f.StringVar(&in.description, flagDeclDescription, "", "Prose for whoever has to supply the value; an empty string removes it")
 	f.BoolVar(&in.optional, flagDeclOptional, false, "Do not require it at start; --optional=false requires it again")
@@ -145,18 +144,17 @@ func newEnvDeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 }
 
 func newEnvUndeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
-	return &cobra.Command{
-		Use:   "undeclare " + k.arg,
+	return cliout.Args(&cobra.Command{
+		Use:   "undeclare",
 		Short: "Remove " + k.article + " " + k.label + "'s declaration from pyproject.toml",
 		Long: "Remove " + k.article + " " + k.label + "'s declaration from the project's pyproject.toml.\n\n" +
 			"Values already set for it stay where they are: use delete to remove one.",
 		Example: "  # Remove the declaration, keeping any value already set\n" +
 			"  astro local env " + localenv.Noun(k.kind) + " undeclare " + exampleName(k.kind),
-		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return c.runEnvUndeclare(scope, k.kind, args[0])
 		},
-	}
+	}, cliout.Required(k.arg))
 }
 
 // annotationFlags are declare's flags other than --source. Any of them turns a

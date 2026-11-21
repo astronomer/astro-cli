@@ -34,8 +34,8 @@ func NewUseCmd(d Deps) *cobra.Command {
 // current one marked.
 func newUseCmd(c *cli) *cobra.Command {
 	var unset bool
-	cmd := &cobra.Command{
-		Use:   "use [DEPLOYMENT]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "use",
 		Short: "Select the Deployment this project's commands act on",
 		Long: "Select which linked Deployment this project's commands act on. Your selection is saved on your " +
 			"machine, not in the repo, so it affects only you.\n\n" +
@@ -45,7 +45,6 @@ func newUseCmd(c *cli) *cobra.Command {
 			"  astro use prod       # select prod\n" +
 			"  astro use --unset    # clear your selection\n" +
 			"  astro use -o json    # show what this project resolves to, and why",
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			switch {
 			case unset && len(args) > 0:
@@ -60,7 +59,7 @@ func newUseCmd(c *cli) *cobra.Command {
 				return c.runUseShow()
 			}
 		},
-	}
+	}, cliout.Optional("DEPLOYMENT"))
 	cmd.Flags().BoolVar(&unset, "unset", false, "Clear your selection")
 	return cmd
 }

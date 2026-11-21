@@ -41,8 +41,8 @@ func NewRegistryCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd := &cobra.Command{
-		Use:   "registry <ENDPOINT_OR_OPERATION_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "registry",
 		Short: "Make requests to the Airflow Provider Registry API",
 		Long: `Make HTTP requests to the Airflow Provider Registry API.
 
@@ -81,7 +81,6 @@ Use "astro api registry ls" to discover all available endpoints and operation ID
 
   # Override registry URL
   astro api registry --registry-url https://custom.example.com /providers.json`,
-		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			opts.RequestMethodPassed = cmd.Flags().Changed("method")
 			return nil
@@ -93,10 +92,10 @@ Use "astro api registry ls" to discover all available endpoints and operation ID
 			opts.RequestPath = args[0]
 			return runRegistry(opts)
 		},
-	}
+	}, cliout.Optional("ENDPOINT_OR_OPERATION_ID"))
 	// The registry is public: no Astro login, so none is checked, and a lookup
 	// that fails for the login's organization cannot stop it.
-	cmd.Annotations = map[string]string{astroCmd.NoLoginAnnotation: "true"}
+	cmd.Annotations[astroCmd.NoLoginAnnotation] = "true"
 
 	// Registry-specific persistent flags
 	cmd.PersistentFlags().StringVar(&opts.RegistryURL, "registry-url", "", "Override the registry base URL (env: ASTRO_REGISTRY_URL)")
@@ -216,8 +215,8 @@ func NewRegistryListCmd(out io.Writer, parentOpts *RegistryOptions) *cobra.Comma
 	var refresh bool
 	var format cliout.Format
 
-	cmd := &cobra.Command{
-		Use:     "ls [FILTER]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "ls",
 		Aliases: []string{"list"},
 		Short:   "List available registry API endpoints",
 		Long: `List all available endpoints from the Airflow Provider Registry API.
@@ -231,7 +230,6 @@ You can optionally provide a filter to search for specific endpoints. The filter
 
   # Show verbose output with descriptions
   astro api registry ls --verbose`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var filter string
 			if len(args) > 0 {
@@ -250,7 +248,7 @@ You can optionally provide a filter to search for specific endpoints. The filter
 			}
 			return runList(listOpts)
 		},
-	}
+	}, cliout.Optional("FILTER"))
 
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")
@@ -266,8 +264,8 @@ func NewRegistryDescribeCmd(out io.Writer, parentOpts *RegistryOptions) *cobra.C
 	var verbose bool
 	var format cliout.Format
 
-	cmd := &cobra.Command{
-		Use:   "describe <ENDPOINT>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "describe",
 		Short: "Describe a registry API endpoint's request and response schema",
 		Long: `Show detailed information about a registry API endpoint, including:
 - Path parameters
@@ -279,7 +277,6 @@ The endpoint can be specified as a path or as an operation ID.`,
 
   # Describe by operation ID
   astro api registry describe getProviderModulesLatest`,
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			initRegistrySpecCache(parentOpts)
 
@@ -294,7 +291,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 			}
 			return runDescribe(descOpts)
 		},
-	}
+	}, cliout.Required("ENDPOINT"))
 
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")

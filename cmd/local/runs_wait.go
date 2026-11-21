@@ -54,8 +54,8 @@ func runFinished(state string) bool {
 func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 	var opts triggerFlags
 	var timing waitFlags
-	cmd := &cobra.Command{
-		Use:   "trigger-wait <DAG_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "trigger-wait",
 		Short: "Start a run of a Dag and wait for it to finish",
 		Long: "Start a run of a Dag, as " + q.t.suggest("runs trigger") + " does, then check on it every --poll-interval until it " +
 			"succeeds, fails, or --timeout passes. A failed run is reported with the task instances that failed " +
@@ -67,7 +67,6 @@ func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 			"it does not stop it.\n\n" +
 			"A paused Dag is unpaused first, as " + q.t.suggest("runs trigger") + " does. Otherwise the wait would last until the timeout " +
 			"for a run that is never scheduled.",
-		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
 			"Start a run and wait for it to finish", "runs trigger-wait <DAG_ID>",
 			"Give up waiting after ten minutes", "runs trigger-wait <DAG_ID> --timeout 10m",
@@ -83,7 +82,7 @@ func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 			}
 			return q.runRunsTriggerWait(cmd.Context(), args[0], trigger, !opts.noAutoUnpause, wait)
 		},
-	}
+	}, cliout.Required("DAG_ID"))
 	opts.register(cmd)
 	timing.register(cmd)
 	return cmd
@@ -374,8 +373,8 @@ func (q *query) renderFailedTasks(w io.Writer, dagID, runID string, failed []tas
 
 func newRunsWaitCmd(q *query) *cobra.Command {
 	var timing waitFlags
-	cmd := &cobra.Command{
-		Use:   "wait <DAG_ID> <RUN_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "wait",
 		Short: "Wait for a run already going to finish",
 		Long: "Check on a run every --poll-interval until it succeeds, fails, or --timeout passes, and report it " +
 			"as " + q.t.suggest("runs trigger-wait") + " does. Use it for a run that is already going, such as a " +
@@ -384,7 +383,6 @@ func newRunsWaitCmd(q *query) *cobra.Command {
 			"Exit status: 0 when the run succeeded, " + strconv.Itoa(exitRunFailed) + " when it failed (or the " +
 			"command itself did), " + strconv.Itoa(exitWaitTimeout) + " when the wait timed out. Stopping the " +
 			"wait does not stop the run.",
-		Args: cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"Wait for a run to finish", "runs wait <DAG_ID> <RUN_ID>",
 			"Give up waiting after ten minutes", "runs wait <DAG_ID> <RUN_ID> --timeout 10m",
@@ -396,7 +394,7 @@ func newRunsWaitCmd(q *query) *cobra.Command {
 			}
 			return q.runRunsWait(cmd.Context(), args[0], args[1], wait)
 		},
-	}
+	}, cliout.Required("DAG_ID"), cliout.Required("RUN_ID"))
 	timing.register(cmd)
 	return cmd
 }

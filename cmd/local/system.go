@@ -35,7 +35,6 @@ func newVersionCmd(d Deps, t target) *cobra.Command {
 			Use:   "version",
 			Short: "Show an Airflow's version and API generation",
 			Long:  "Show the version " + t.which() + " reports, and which generation of its REST API this CLI talks to.",
-			Args:  cobra.NoArgs,
 			Example: afExample(t,
 				"Show the Airflow version", "version",
 			),
@@ -71,7 +70,6 @@ func newProvidersCmd(d Deps, t target) *cobra.Command {
 			Short: "List the provider packages an Airflow has installed",
 			Long: "List every provider distribution installed on " + t.which() + ", with its version. Use it " +
 				"when a Dag imports a provider and the Airflow runs a different version than the project pins.",
-			Args: cobra.NoArgs,
 			Example: afExample(t,
 				"List the installed providers and their versions", "providers",
 			),
@@ -127,7 +125,6 @@ func newPluginsCmd(d Deps, t target) *cobra.Command {
 			Short: "List the plugins an Airflow loaded, and what each contributes",
 			Long: "List the plugins " + t.which() + " loaded: where each came from, and what it adds: macros, " +
 				"listeners, timetables, UI views and apps. A plugin missing here did not load.",
-			Args: cobra.NoArgs,
 			Example: afExample(t,
 				"List the plugins Airflow loaded", "plugins",
 			),
@@ -189,7 +186,6 @@ func newConfigCmd(d Deps, t target) *cobra.Command {
 				"sensitive values.\n\nAirflow serves its configuration only when [api] " +
 				"expose_config (Airflow 3) or [webserver] expose_config (Airflow 2) is on. Both default to off, and " +
 				"the command is refused until one is on.",
-			Args: cobra.NoArgs,
 			Example: afExample(t,
 				"Show the configuration", "config",
 				"Only the scheduler section", "config --section scheduler",

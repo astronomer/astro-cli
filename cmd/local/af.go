@@ -38,7 +38,6 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 		Long: "Query and control an Airflow: its Dags, runs, tasks, assets, connections, variables, pools, and health, " +
 			"and its version, providers, plugins, and configuration.\n\n" +
 			"These commands act on " + newTarget().which() + ".",
-		Args: cobra.ArbitraryArgs,
 		// A bare `astro af` prints help and succeeds; an unknown subcommand
 		// fails. The same shape `astro local` and every family parent use:
 		// without a RunE cobra treats a non-runnable parent as a help request
@@ -69,5 +68,5 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 	// no leaf reads, and the run would resolve as if nothing had been said.
 	cmd.AddCommand(queryFamilies(d, newTarget)...)
 	markSkipPreRun(cmd)
-	return cmd
+	return cliout.AnyWords(cmd, "its RunE names where an astro dev word went before it refuses an unknown one")
 }

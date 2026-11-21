@@ -42,8 +42,8 @@ func NewCloudCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd := &cobra.Command{
-		Use:   "cloud <ENDPOINT_OR_OPERATION_ID>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "cloud",
 		Short: "Make authenticated requests to the Astro Cloud API",
 		Long: `Make authenticated HTTP requests to the Astro Cloud API (api.astronomer.io).
 
@@ -99,7 +99,6 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 
   # Use the Labs API, which adds experimental endpoints
   astro api cloud ls --labs`,
-		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			opts.RequestMethodPassed = cmd.Flags().Changed("method")
 			return nil
@@ -112,7 +111,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 			opts.RequestPath = args[0]
 			return runCloud(opts)
 		},
-	}
+	}, cliout.Optional("ENDPOINT_OR_OPERATION_ID"))
 
 	// Request flags
 	cmd.Flags().StringVarP(&opts.RequestMethod, "method", "X", "GET", "HTTP method for the request")
@@ -479,8 +478,8 @@ func NewCloudListCmd(out io.Writer, parentOpts *CloudOptions) *cobra.Command {
 	var refresh bool
 	var format cliout.Format
 
-	cmd := &cobra.Command{
-		Use:     "ls [FILTER]",
+	cmd := cliout.Args(&cobra.Command{
+		Use:     "ls",
 		Aliases: []string{"list"},
 		Short:   "List available Astro Cloud API endpoints",
 		Long: `List all available endpoints from the Astro Cloud API.
@@ -497,7 +496,6 @@ You can optionally provide a filter to search for specific endpoints. The filter
 
   # Show verbose output with descriptions
   astro api cloud ls --verbose`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var filter string
 			if len(args) > 0 {
@@ -527,7 +525,7 @@ You can optionally provide a filter to search for specific endpoints. The filter
 			}
 			return runList(listOpts)
 		},
-	}
+	}, cliout.Optional("FILTER"))
 
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")
@@ -544,8 +542,8 @@ func NewCloudDescribeCmd(out io.Writer, parentOpts *CloudOptions) *cobra.Command
 	var verbose bool
 	var format cliout.Format
 
-	cmd := &cobra.Command{
-		Use:   "describe <ENDPOINT>",
+	cmd := cliout.Args(&cobra.Command{
+		Use:   "describe",
 		Short: "Describe an Astro Cloud API endpoint's request and response schema",
 		Long: `Show detailed information about an Astro Cloud API endpoint, including:
 - Path and query parameters
@@ -561,7 +559,6 @@ The endpoint can be specified as a path or as an operation ID.`,
 
   # Describe by operation ID
   astro api cloud describe CreateDeployment`,
-		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !context.IsCloudContext() {
 				return fmt.Errorf("astro api cloud needs an Astro context; run astro login")
@@ -587,7 +584,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 			}
 			return runDescribe(descOpts)
 		},
-	}
+	}, cliout.Required("ENDPOINT"))
 
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Refresh the OpenAPI specification cache")
