@@ -127,8 +127,32 @@ func TestAWatchEndsOnAWriteError(t *testing.T) {
 	require.ErrorIs(t, err, errWrite)
 }
 
-// A stop that failed is not hidden by the write error.
+// A stop that failed is not hidden by the write error, nor the write error by it.
 func TestAWriteErrorDoesNotHideAFailedStopOfTheWatch(t *testing.T) {
 	err := watchWithBrokenStdout(t, &streamingAirflow{stopErr: errors.New("compose down failed")})
 	require.ErrorContains(t, err, "compose down failed")
+	require.ErrorIs(t, err, errWrite, "the cause is not lost")
+}
+
+// cancelingStdout interrupts the run, as Ctrl-C does, and then fails.
+type cancelingStdout struct{ interrupt func() }
+
+func (w cancelingStdout) Write([]byte) (int, error) {
+	w.interrupt()
+	return 0, errWrite
+}
+
+// An interrupt of the run is what a follow returns, so the exit is 128+n and
+// not the write error's.
+func TestLogsFollowReturnsTheInterruptOverAWriteError(t *testing.T) {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	d := projectDeps(t)
+	d.Stdout = cancelingStdout{interrupt: func() { cancel(&cliout.Signaled{Name: "interrupt", Number: 2}) }}
+	d.Runtime = logRuntime{af: &streamingAirflow{}}
+
+	c := &cli{d: d, output: cliout.FormatJSON}
+	err := c.runLogs(ctx, true, 0, nil)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.NotErrorIs(t, err, errWrite)
+	assert.Equal(t, 130, cliout.ExitCode(ctx, err))
 }

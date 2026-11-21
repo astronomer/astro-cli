@@ -206,7 +206,7 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataGenericProviderLeavesOutCreden
 		return req.Git != nil && req.Git.RemoteUrl != nil && *req.Git.RemoteUrl == "https://gitlab.example/team/project.git"
 	})
 	mockUpdateDeploy(s.mockV1Client, "version-id")
-	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+	azureUploader = func(_ context.Context, sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
 	}
 

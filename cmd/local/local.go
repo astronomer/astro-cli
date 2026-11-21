@@ -322,13 +322,14 @@ func (c *cli) runWatch(ctx context.Context, built *plan.Built, allowMissing bool
 	}
 	// The watch ended because its output could not be written, and its own
 	// cancellation is how it said so. That write error is the command's error
-	// only when nothing else went wrong: a watch that failed for its own
-	// reasons, or a stop that failed, is reported too.
+	// alone only when nothing else went wrong: a watch that failed for its own
+	// reasons, or a stop that failed, is reported with it, so the cause is not
+	// lost.
 	if errors.Is(err, context.Canceled) {
 		err = nil
 	}
 	if joined := errors.Join(err, serr); joined != nil {
-		return joined
+		return errors.Join(werr, joined)
 	}
 	return werr
 }
@@ -1196,7 +1197,8 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 	}
 	// A line that cannot be written ends the stream: a follow would otherwise
 	// run on, writing to nobody.
-	ctx, stop := context.WithCancel(ctx)
+	parent := ctx
+	ctx, stop := context.WithCancel(parent)
 	defer stop()
 	var (
 		mu      sync.Mutex
@@ -1225,6 +1227,11 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 	// A failure of the stream itself is the result, and the canceled context
 	// our own stop left is not one: the write error says why it ended. Both
 	// are said when both happened.
+	// An interrupt of the run is the result whatever else came with it: the
+	// exit is 128+n, not the write error's.
+	if perr := parent.Err(); perr != nil {
+		return perr
+	}
 	if logErr != nil && !errors.Is(logErr, context.Canceled) {
 		return errors.Join(logErr, emitErr)
 	}
