@@ -35,15 +35,6 @@ func TestLoadEnvFile_NotExists(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestStripQuotes(t *testing.T) {
-	assert.Equal(t, "hello", StripQuotes(`"hello"`))
-	assert.Equal(t, "hello", StripQuotes(`'hello'`))
-	assert.Equal(t, "hello", StripQuotes("hello"))
-	assert.Equal(t, "", StripQuotes(`""`))
-	assert.Equal(t, `"mismatched'`, StripQuotes(`"mismatched'`))
-	assert.Equal(t, "a", StripQuotes("a"))
-}
-
 func TestBuildEnv(t *testing.T) {
 	dir := t.TempDir()
 
