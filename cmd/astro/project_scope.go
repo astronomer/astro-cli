@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -323,7 +324,8 @@ func projectNote(ctx context.Context, pick projectPick, contextWorkspace string,
 	return fmt.Sprintf("using %s from pyproject.toml", what)
 }
 
-// workspaceLabel is the workspace's name, or its id when the name cannot be read.
+// workspaceLabel is the workspace's name, as plain text on one line
+// (input.Plain), or its id when the name cannot be read.
 // It is looked up under org, the organization the manifest names, else the
 // current one.
 func workspaceLabel(ctx context.Context, id, org string) string {
@@ -335,5 +337,5 @@ func workspaceLabel(ctx context.Context, id, org string) string {
 	if err != nil || resp.JSON200 == nil || resp.JSON200.Name == "" {
 		return id
 	}
-	return resp.JSON200.Name
+	return input.Plain(resp.JSON200.Name)
 }

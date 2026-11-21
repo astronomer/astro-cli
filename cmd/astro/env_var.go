@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 const envVarExamples = `
@@ -189,9 +190,25 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
 		cliout.Warn(os.Stderr, includeSecretsWarning)
 	}
 	if f == formatDotenv {
-		return env.WriteVarDotenv(objs, envIncludeSecrets, out)
+		return emitDotenv(objs, out)
 	}
 	return env.WriteVarList(objs, envIncludeSecrets, cliout.Renderer{Format: f, Out: out})
+}
+
+// emitDotenv writes objs as dotenv lines. To a terminal they go through
+// input.TerminalWriter, as cliout.Renderer's text does, so a value's escapes
+// are shown rather than acted on; to a file or a pipe (--export > .env) the
+// bytes are exactly the ones a later load reads back.
+func emitDotenv(objs []astrov1.EnvironmentObject, out io.Writer) error {
+	if !input.IsTerminalWriter(out) {
+		return env.WriteVarDotenv(objs, envIncludeSecrets, out)
+	}
+	tw := &input.TerminalWriter{W: out}
+	err := env.WriteVarDotenv(objs, envIncludeSecrets, tw)
+	if ferr := tw.Flush(); err == nil {
+		err = ferr
+	}
+	return err
 }
 
 func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -205,7 +222,7 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 		return err
 	}
 	if envOutput == formatDotenv && obj != nil {
-		return env.WriteVarDotenv([]astrov1.EnvironmentObject{*obj}, envIncludeSecrets, out)
+		return emitDotenv([]astrov1.EnvironmentObject{*obj}, out)
 	}
 	return env.WriteVar(obj, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
 }
