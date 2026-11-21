@@ -85,7 +85,6 @@ type helpSearchDocument struct {
 
 // describeCommand builds the document for c.
 func describeCommand(c *cobra.Command) helpDocument {
-	addHelpFlag(c)
 	doc := helpDocument{
 		Path:        c.CommandPath(),
 		Summary:     c.Short,
@@ -104,28 +103,78 @@ func describeCommand(c *cobra.Command) helpDocument {
 	return doc
 }
 
-var useArgument = regexp.MustCompile(`<([^<>]+)>|\[([^\[\]]+)\]`)
+var upperWord = regexp.MustCompile(`^[A-Z][A-Z0-9_]*(\.{3})?$`)
 
-// helpArguments reads the positional arguments out of a Use line: <NAME> is
-// required, [NAME] optional, and a trailing "..." repeats. The [flags] marker
-// and the "--" that opens a passthrough tail are not arguments.
+// helpArguments reads the positional arguments out of a Use line. A <NAME> is
+// required, a [NAME] optional (so is everything nested in brackets), and a
+// trailing "..." repeats. A bare UPPER_CASE word is required. Not arguments:
+// [flags], [command], a "--" that opens a passthrough tail, and a bracketed
+// flag with its value ([--flag value]). A bracketed alternative [a|b] names
+// its first.
 func helpArguments(use string) []helpArg {
 	args := []helpArg{}
 	_, rest, _ := strings.Cut(use, " ")
-	for _, m := range useArgument.FindAllStringSubmatch(rest, -1) {
-		name, required := m[1], true
-		if name == "" {
-			name, required = m[2], false
+	var walk func(tokens []string, optional bool)
+	walk = func(tokens []string, optional bool) {
+		for _, tok := range tokens {
+			switch {
+			case tok == "--":
+			case strings.HasPrefix(tok, "["):
+				inner := splitUseTokens(strings.TrimSuffix(strings.TrimPrefix(tok, "["), "]"))
+				if len(inner) > 0 && strings.HasPrefix(inner[0], "-") && inner[0] != "--" {
+					continue
+				}
+				walk(inner, true)
+			case strings.HasPrefix(tok, "-"):
+			case strings.HasPrefix(tok, "<"):
+				addUseArg(&args, strings.Trim(tok, "<>"), !optional)
+			case upperWord.MatchString(tok), optional && !strings.ContainsAny(tok, "<>[]"):
+				addUseArg(&args, tok, !optional)
+			}
 		}
-		name = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(name), "--"))
-		repeated := strings.HasSuffix(name, "...")
-		name = strings.TrimSpace(strings.TrimSuffix(name, "..."))
-		if name == "" || name == "flags" {
+	}
+	walk(splitUseTokens(rest), false)
+	return args
+}
+
+func addUseArg(args *[]helpArg, name string, required bool) {
+	name, _, _ = strings.Cut(strings.TrimSpace(name), "|")
+	repeated := strings.HasSuffix(name, "...")
+	name = strings.TrimSpace(strings.TrimSuffix(name, "..."))
+	if name == "" || name == "flags" || name == "command" || strings.ContainsAny(name, " <>[]") {
+		return
+	}
+	*args = append(*args, helpArg{Name: name, Required: required, Repeated: repeated})
+}
+
+// splitUseTokens splits s on whitespace outside brackets, so a bracketed
+// group, nested ones included, is one token.
+func splitUseTokens(s string) []string {
+	var tokens []string
+	depth, start := 0, -1
+	for i, r := range s {
+		switch {
+		case r == '[' || r == '<':
+			depth++
+		case r == ']' || r == '>':
+			depth = max(depth-1, 0)
+		}
+		space := r == ' ' || r == '\t'
+		if space && depth == 0 {
+			if start >= 0 {
+				tokens = append(tokens, s[start:i])
+				start = -1
+			}
 			continue
 		}
-		args = append(args, helpArg{Name: name, Required: required, Repeated: repeated})
+		if start < 0 {
+			start = i
+		}
 	}
-	return args
+	if start >= 0 {
+		tokens = append(tokens, s[start:])
+	}
+	return tokens
 }
 
 // helpFlags lists c's visible flags the way its page does: its own, plain
@@ -135,7 +184,14 @@ func helpFlags(c *cobra.Command) []helpFlag {
 	flags := []helpFlag{}
 	groups := map[string][]*pflag.Flag{}
 	var order []string
-	c.LocalFlags().VisitAll(func(f *pflag.Flag) {
+	// The -h/--help flag is added to a command as a page is drawn
+	// (addHelpFlag); described here as if it were, without adding it.
+	local := pflag.NewFlagSet(c.Name(), pflag.ContinueOnError)
+	local.AddFlagSet(c.LocalFlags())
+	if !hasHelpFlagDeclared(c) {
+		local.BoolP(helpName, "h", false, helpFlagUsage)
+	}
+	local.VisitAll(func(f *pflag.Flag) {
 		if f.Hidden {
 			return
 		}
@@ -168,13 +224,31 @@ func helpFlags(c *cobra.Command) []helpFlag {
 	return flags
 }
 
+// hasHelpFlagDeclared is whether c has a help flag of its own or an ancestor's
+// persistent one, as addHelpFlag looks.
+func hasHelpFlagDeclared(c *cobra.Command) bool {
+	if c.Flags().Lookup(helpName) != nil {
+		return true
+	}
+	for p := c; p != nil; p = p.Parent() {
+		if p.PersistentFlags().Lookup(helpName) != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func describeFlag(f *pflag.Flag, group string) helpFlag {
+	usage := f.Usage
+	if f.Name == helpName {
+		usage = helpFlagUsage
+	}
 	return helpFlag{
 		Name:        f.Name,
 		Shorthand:   f.Shorthand,
 		Type:        f.Value.Type(),
 		Default:     f.DefValue,
-		Description: f.Usage,
+		Description: usage,
 		Group:       group,
 	}
 }
@@ -205,6 +279,11 @@ func describeAll(root *cobra.Command) helpAllDocument {
 // order the pages list them.
 func searchCommands(root *cobra.Command, query string, limit int) []helpSearchResult {
 	words := strings.Fields(strings.ToLower(query))
+	// `astro help search astro deployment list`: the binary's name is not a
+	// word of the command.
+	if len(words) > 0 && words[0] == strings.ToLower(root.Name()) {
+		words = words[1:]
+	}
 	results := []helpSearchResult{}
 	if len(words) == 0 {
 		return results
@@ -309,7 +388,7 @@ func printHelpJSONIfAsked(root *cobra.Command, args []string, out io.Writer) (bo
 	if isShellCompletion(args) || !hasHelpFlag(args) || !cliout.ArgsAskForJSON(args, "o") {
 		return false, nil
 	}
-	target, rest, err := root.Find(withoutOutputFlag(withoutHelpFlags(args)))
+	target, rest, err := root.Find(cliout.StripOutputFlag(withoutHelpFlags(args), "o"))
 	if err != nil {
 		return false, nil
 	}
@@ -319,23 +398,4 @@ func printHelpJSONIfAsked(root *cobra.Command, args []string, out io.Writer) (bo
 		}
 	}
 	return true, cliout.Renderer{Format: cliout.FormatJSON, Out: out}.Emit(describeCommand(target), nil)
-}
-
-// withoutOutputFlag drops -o/--output and its value from args.
-func withoutOutputFlag(args []string) []string {
-	kept := make([]string, 0, len(args))
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		if a == "--" {
-			return append(kept, args[i:]...)
-		}
-		switch {
-		case a == "-o" || a == "--output":
-			i++
-		case strings.HasPrefix(a, "--output="), strings.HasPrefix(a, "-o"):
-		default:
-			kept = append(kept, a)
-		}
-	}
-	return kept
 }

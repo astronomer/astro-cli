@@ -298,33 +298,58 @@ func unknownCommandAsksJSON(cmd *cobra.Command, args []string, err error) bool {
 // off (a removed command's stub) reads its --output with it, so it agrees
 // with Execute on every spelling.
 func ArgsAskForJSON(args []string, shorthand string) bool {
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--" {
+			return false
+		}
+		n, value := outputFlagAt(args, i, shorthand)
+		if n > 0 && value == string(FormatJSON) {
+			return true
+		}
+	}
+	return false
+}
+
+// StripOutputFlag is args without --output and its value, in every spelling
+// ArgsAskForJSON reads, up to the "--" that ends flags.
+func StripOutputFlag(args []string, shorthand string) []string {
+	kept := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--" {
+			return append(kept, args[i:]...)
+		}
+		if n, _ := outputFlagAt(args, i, shorthand); n > 0 {
+			i += n - 1
+			continue
+		}
+		kept = append(kept, args[i])
+	}
+	return kept
+}
+
+// outputFlagAt reports whether args[i] is the --output flag, in each spelling
+// pflag accepts, with how many words it takes (0 when it is not) and its value.
+func outputFlagAt(args []string, i int, shorthand string) (n int, value string) {
 	long := "--output"
 	short := ""
 	if shorthand != "" {
 		short = "-" + shorthand
 	}
-	for i, a := range args {
-		if a == "--" {
-			return false
+	a := args[i]
+	switch {
+	case a == long || (short != "" && a == short):
+		if i+1 < len(args) {
+			return 2, args[i+1]
 		}
-		value, ok := "", false
-		switch {
-		case a == long || (short != "" && a == short):
-			if i+1 < len(args) {
-				value, ok = args[i+1], true
-			}
-		case strings.HasPrefix(a, long+"="):
-			value, ok = strings.TrimPrefix(a, long+"="), true
-		case short != "" && strings.HasPrefix(a, short+"="):
-			value, ok = strings.TrimPrefix(a, short+"="), true
-		case short != "" && strings.HasPrefix(a, short) && !strings.HasPrefix(a, "--"):
-			value, ok = strings.TrimPrefix(a, short), true
-		}
-		if ok && value == string(FormatJSON) {
-			return true
-		}
+		return 1, ""
+	case strings.HasPrefix(a, long+"="):
+		return 1, strings.TrimPrefix(a, long+"=")
+	case short != "" && strings.HasPrefix(a, short+"="):
+		return 1, strings.TrimPrefix(a, short+"=")
+	case short != "" && strings.HasPrefix(a, short) && !strings.HasPrefix(a, "--"):
+		return 1, strings.TrimPrefix(a, short)
 	}
-	return false
+	return 0, ""
 }
 
 // stderrIsTerminal reports whether w is a terminal. A variable so a test can

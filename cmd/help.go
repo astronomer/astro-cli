@@ -101,7 +101,14 @@ func installHelp(rootCmd *cobra.Command, platform, platformVersion string) {
 		_, err := io.WriteString(c.OutOrStderr(), usageText(c, helpWidth()))
 		return err
 	})
-	rootCmd.SetHelpFunc(func(c *cobra.Command, _ []string) {
+	rootCmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		// Cobra hands the help func the line as typed. A line that asks for
+		// --output json gets the command's document, whatever else is on it.
+		if cliout.ArgsAskForJSON(args, "o") {
+			if err := (cliout.Renderer{Format: cliout.FormatJSON, Out: c.OutOrStdout()}).Emit(describeCommand(c), nil); err == nil {
+				return
+			}
+		}
 		addHelpFlag(c)
 		io.WriteString(c.OutOrStdout(), helpPage(c, platform, platformVersion, helpWidth())) //nolint:errcheck // cobra's help func has nowhere to return an error, and cobra's own drops it too
 	})
