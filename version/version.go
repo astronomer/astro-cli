@@ -17,6 +17,7 @@ import (
 	semver "github.com/Masterminds/semver/v3"
 
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
 // CurrVersion is stamped in at link time by the Makefile and by goreleaser, and
@@ -261,8 +262,11 @@ func latestReleaseCached(ctx context.Context, client *http.Client, url, cachePat
 		check.Latest = latest.String()
 	}
 	if b, err := json.Marshal(check); err == nil {
+		// Published as every file the CLI picks the name of is (fsatomic): a
+		// new file renamed into place, so an entry already at the name, a
+		// symlink among them, is replaced rather than written through.
 		_ = os.MkdirAll(filepath.Dir(cachePath), releaseCheckDirPerm) //nolint:errcheck // a cache that cannot be written is asked for again next time
-		_ = os.WriteFile(cachePath, b, releaseCheckFilePerm)          //nolint:errcheck // as above
+		_ = fsatomic.WriteFile(cachePath, b, releaseCheckFilePerm)    //nolint:errcheck // as above
 	}
 	return latest, nil
 }
