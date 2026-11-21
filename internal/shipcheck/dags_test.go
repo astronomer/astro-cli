@@ -131,25 +131,45 @@ func TestCheckDagsOutsideGitAsksNothing(t *testing.T) {
 
 // What is checked is what the upload's own TarSource carries: an entry its
 // excludes leave out is not held against it, and the same entry is when the
-// upload carries it (Astro excludes .git/ only from a bundle with no dags/
-// prefix, since the excludes match the name in the tarball).
+// upload carries it (the excludes match the name in the tarball, so one
+// written without the dags/ prefix matches only a bundle without it).
 func TestCheckDagsChecksWhatItsSourceCarries(t *testing.T) {
 	needsGit(t)
 	dir := t.TempDir()
 	gitRun(t, dir, "init", "-q")
 	writeFiles(t, dir, map[string]string{
-		".gitignore":           "*.pem\n",
-		"dags/etl.py":          "import x\n",
-		"dags/.git/deploy.pem": "k",
+		".gitignore":            "*.pem\n",
+		"dags/etl.py":           "import x\n",
+		"dags/certs/deploy.pem": "k",
 	})
 	gitRun(t, dir, "add", ".gitignore", "dags/etl.py")
 
 	dags := filepath.Join(dir, "dags")
-	excluded := fileutil.GzSource(dags, false, []string{".git/"})
+	excluded := fileutil.GzSource(dags, false, []string{"certs/"})
 	assert.NoError(t, CheckDags(dir, excluded, nil), "an entry the upload leaves out")
 
-	carried := fileutil.GzSource(dags, true, []string{".git/"})
+	carried := fileutil.GzSource(dags, true, []string{"certs/"})
 	err := CheckDags(dir, carried, nil)
 	require.Error(t, err, "the same entry, carried")
-	assert.Contains(t, err.Error(), "dags/.git/deploy.pem")
+	assert.Contains(t, err.Error(), "dags/certs/deploy.pem")
+}
+
+// Git metadata under dags/, at any depth, is not uploaded, so it is not held
+// against the upload either: a nested checkout's .git/config, remote URL and
+// all, stays behind, on Astro and Astro Private Cloud alike.
+func TestCheckDagsLeavesGitMetadataBehind(t *testing.T) {
+	needsGit(t)
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q")
+	writeFiles(t, dir, map[string]string{
+		".gitignore":                 "*.pem\n",
+		"dags/etl.py":                "import x\n",
+		"dags/.git/deploy.pem":       "k",
+		"dags/vendored/.git/key.pem": "k",
+	})
+	gitRun(t, dir, "add", ".gitignore", "dags/etl.py")
+	for _, prefixed := range []bool{true, false} {
+		assert.NoError(t, CheckDags(dir, fileutil.GzSource(filepath.Join(dir, "dags"), prefixed, nil), nil))
+	}
+	assert.NoError(t, CheckDags(dir, uploadOf(dir), nil))
 }

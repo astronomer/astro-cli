@@ -254,14 +254,11 @@ func DeleteBundle(input *DeleteBundleInput) (BundleDelete, error) {
 	return res, nil
 }
 
-// bundleExcludes are the entries UploadBundle leaves out of the tarball.
-var bundleExcludes = []string{".git/"}
-
 // DagsSource is what a Dags upload of the project at projectDir tars
 // (UploadBundle, as uploadDeployDags calls it): its dags/, each entry under
 // dags/ unless noDagsBaseDir (--no-dags-base-dir).
 func DagsSource(projectDir string, noDagsBaseDir bool) fileutil.TarSource {
-	return fileutil.GzSource(filepath.Join(projectDir, "dags"), !noDagsBaseDir, bundleExcludes)
+	return fileutil.GzSource(filepath.Join(projectDir, "dags"), !noDagsBaseDir, nil)
 }
 
 // remoteWithoutCredentials is a git remote URL as a deploy records it: an
@@ -394,7 +391,7 @@ func UploadBundle(ctx context.Context, bundlePath, uploadURL string, opts Bundle
 	}
 
 	// Generate the gzipped bundle tarball
-	err = fileutil.TarGz(bundlePath, tarGzFilePath, opts.PrependBaseDir, bundleExcludes, overlay)
+	err = fileutil.TarGz(bundlePath, tarGzFilePath, opts.PrependBaseDir, nil, overlay)
 	if err != nil {
 		return "", err
 	}
