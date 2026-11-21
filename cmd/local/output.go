@@ -46,7 +46,7 @@ type event struct {
 
 // callbacks bridges localrt progress into the renderer. A start's write errors
 // are dropped: callbacks have no error channel, a start is a change that
-// finishes whatever happens to its output, and a broken pipe surfaces on the
+// finishes whatever happens to its output, and a write error surfaces on the
 // command's own final write.
 func (c *cli) callbacks(r cliout.Renderer) localrt.Callbacks {
 	return c.callbacksFailing(r, nil)

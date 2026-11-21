@@ -271,11 +271,8 @@ func (c *cli) runWatch(ctx context.Context, built *plan.Built, allowMissing bool
 	if r.Format == cliout.FormatText {
 		fmt.Fprintf(c.d.Stderr, "Watching %s and %s for changes. Press Ctrl-C to stop Airflow and exit.\n", manifest.Marker, ".env")
 	}
-	// A watch line that cannot be written (the reader of stdout left) ends the
-	// watch, which would otherwise run on, writing to nobody. The write error
-	// is then the command's error, so the run ends as a closed stdout does.
-	// In text mode the progress goes to stderr, so a closed stdout is noticed
-	// only when a line meant for stdout (a watch event's) is written.
+	// A watch line that cannot be written ends the watch, which would otherwise
+	// run on, writing to nobody. The write error is then the command's error.
 	wctx, stopWatch := context.WithCancel(ctx)
 	defer stopWatch()
 	var writeMu sync.Mutex
@@ -325,15 +322,10 @@ func (c *cli) runWatch(ctx context.Context, built *plan.Built, allowMissing bool
 	}
 	// The watch ended because its output could not be written, and its own
 	// cancellation is how it said so. That write error is the command's error
-	// (a closed stdout, exit 0) only when nothing else went wrong: a watch that
-	// failed for its own reasons, or a stop that failed, is reported as usual.
+	// only when nothing else went wrong: a watch that failed for its own
+	// reasons, or a stop that failed, is reported too.
 	if errors.Is(err, context.Canceled) {
 		err = nil
-	}
-	// The stop's own closing line fails the same way when stdout is closed;
-	// that is the write error again, not a failed stop.
-	if cliout.ClosedStdout(serr) {
-		serr = nil
 	}
 	if joined := errors.Join(err, serr); joined != nil {
 		return joined
@@ -1202,8 +1194,8 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 	if err != nil {
 		return err
 	}
-	// A line that cannot be written (the reader of stdout left) ends the
-	// stream: a follow would otherwise run on, writing to nobody.
+	// A line that cannot be written ends the stream: a follow would otherwise
+	// run on, writing to nobody.
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
 	var (
@@ -1232,13 +1224,9 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 	defer mu.Unlock()
 	// A failure of the stream itself is the result, and the canceled context
 	// our own stop left is not one: the write error says why it ended. Both
-	// are said when both happened, the write error as text, so that it does
-	// not turn the failure into a closed stdout.
+	// are said when both happened.
 	if logErr != nil && !errors.Is(logErr, context.Canceled) {
-		if emitErr != nil {
-			return fmt.Errorf("%w (and writing the logs failed: %v)", logErr, emitErr)
-		}
-		return logErr
+		return errors.Join(logErr, emitErr)
 	}
 	if emitErr != nil {
 		return emitErr

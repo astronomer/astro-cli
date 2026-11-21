@@ -40,8 +40,7 @@ func trackSetupFailure(preRun func(*cobra.Command, []string) error) func(*cobra.
 	return func(cmd *cobra.Command, args []string) error {
 		err := preRun(cmd, args)
 		// An interrupt is the person ending the run, not a failure of setup.
-		// Nor is a stdout reader that went away (`| head -1`).
-		if err != nil && !errors.Is(err, input.ErrInterrupted) && !cliout.ClosedStdout(err) {
+		if err != nil && !errors.Is(err, input.ErrInterrupted) {
 			telemetry.TrackSetupFailure(cmd, string(problemKinds.Of(err)))
 		}
 		return err

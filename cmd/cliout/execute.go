@@ -51,14 +51,6 @@ const signalExitBase = 128
 // foreground process group, so what usually comes back is an exec error from
 // `docker compose` dying. If the context is done, the error is a consequence
 // of that.
-//
-// A run ends 0, and reports nothing, when the error the command returned is
-// itself a failed write to a stdout whose reader has gone (`| head -1`:
-// ClosedStdout), and the context was not canceled: the reader has what it
-// wanted. Every other error is reported and exits as it normally would,
-// whether or not stdout is closed: a canceled context, an API error, an
-// unknown outcome, a setup failure. The command's own code (ExitError) and an
-// interrupt (128+n) are never replaced.
 func ExitCode(ctx context.Context, err error) int {
 	if err == nil {
 		return 0
@@ -82,11 +74,6 @@ func ExitCode(ctx context.Context, err error) int {
 	if IsUsage(err) {
 		return ExitUsage
 	}
-	// The reader of stdout went away (`| head -1`): the command's work was
-	// done or was only a read, and it is the write that failed.
-	if ClosedStdout(err) {
-		return 0
-	}
 	return ExitFailure
 }
 
@@ -100,8 +87,6 @@ func ExitCode(ctx context.Context, err error) int {
 //     when one is clearly close (UsageNoHelp drops the pointer: see the
 //     text-mode branch below). Never the usage block
 //     itself: cobra's automatic usage is off for every command;
-//   - a write to a stdout whose reader has gone (`| head -1`) reports nothing
-//     and exits 0 (ExitCode says when it does not);
 //   - a command that already reported its failure — an ExitError, or an error
 //     marked JSONShown — gets nothing added in either mode.
 //
@@ -151,12 +136,6 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 
 	var exit *ExitError
 	if errors.As(err, &exit) || errors.As(err, new(jsonShown)) {
-		return err
-	}
-	// Nowhere to report to: stdout is closed, and a message on stderr would
-	// be noise for a reader that stopped listening on purpose. ExitCode
-	// makes it 0.
-	if ctx.Err() == nil && ClosedStdout(err) {
 		return err
 	}
 	if wantsJSON(cmd, args, err) || unknownCommandAsksJSON(cmd, args, err) {

@@ -3,10 +3,8 @@ package local
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
 	"time"
 
@@ -20,12 +18,12 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
-// closedStdout is what os.Stdout returns once its reader has gone.
-type closedStdout struct{}
+var errWrite = errors.New("write failed")
 
-func (closedStdout) Write([]byte) (int, error) {
-	return 0, &fs.PathError{Op: "write", Path: os.Stdout.Name(), Err: syscall.EPIPE}
-}
+// brokenStdout is an output that cannot be written to.
+type brokenStdout struct{}
+
+func (brokenStdout) Write([]byte) (int, error) { return 0, errWrite }
 
 // streamingAirflow follows logs until its context ends, a line at a time.
 type streamingAirflow struct {
@@ -72,48 +70,43 @@ func projectDeps(t *testing.T) Deps {
 	return d
 }
 
-// A follow stops on the first line it cannot write: the run ends with that
-// write error, which is a closed stdout (exit 0), instead of streaming to
-// nobody.
-func TestLogsFollowStopsWhenStdoutIsClosed(t *testing.T) {
+// A follow stops on the first line it cannot write, and says why, instead of
+// streaming to nobody.
+func TestLogsFollowStopsOnAWriteError(t *testing.T) {
 	af := &streamingAirflow{}
 	d := projectDeps(t)
-	d.Stdout = closedStdout{}
+	d.Stdout = brokenStdout{}
 	d.Runtime = logRuntime{af: af}
 
 	err := execute(t, d, "local", "logs", "-f", "-o", "json")
-	require.Error(t, err)
-	assert.True(t, cliout.ClosedStdout(err), "%v", err)
-	assert.Equal(t, 0, cliout.ExitCode(context.Background(), err))
+	require.ErrorIs(t, err, errWrite)
+	assert.Equal(t, cliout.ExitFailure, cliout.ExitCode(context.Background(), err))
 	assert.Equal(t, 1, af.lines, "the stream ended at the first write that failed")
 }
 
-// A watch line that cannot be written ends the watch the same way.
-func TestAWatchEventThatCannotBeWrittenEndsTheWatch(t *testing.T) {
-	var failed error
-	reportWatch(cliout.Renderer{Format: cliout.FormatJSON, Out: closedStdout{}}, localrt.WatchEvent{Kind: localrt.WatchUnreadable, Files: []string{manifest.Marker}, Err: errors.New("x")},
-		func(err error) { failed = err })
-	require.Error(t, failed)
-	assert.True(t, cliout.ClosedStdout(failed))
-}
-
-// The stream's own failure is not turned into a closed stdout by the write
-// error that came with it.
-func TestALogsFailureIsReportedWhenStdoutIsClosedToo(t *testing.T) {
+// The stream's own failure is said too, whatever happened to the output.
+func TestALogsFailureIsReportedWithAWriteError(t *testing.T) {
 	d := projectDeps(t)
-	d.Stdout = closedStdout{}
+	d.Stdout = brokenStdout{}
 	d.Runtime = logRuntime{af: &streamingAirflow{logErr: errors.New("the log file vanished")}}
 
 	err := execute(t, d, "local", "logs", "-f", "-o", "json")
 	require.ErrorContains(t, err, "the log file vanished")
-	assert.False(t, cliout.ClosedStdout(err), "%v", err)
-	assert.Equal(t, cliout.ExitFailure, cliout.ExitCode(context.Background(), err))
+	require.ErrorIs(t, err, errWrite)
 }
 
-func watchWithClosedStdout(t *testing.T, af *streamingAirflow) error {
+// A watch line that cannot be written reports the write error to its caller.
+func TestAWatchEventThatCannotBeWrittenIsReported(t *testing.T) {
+	var failed error
+	reportWatch(cliout.Renderer{Format: cliout.FormatJSON, Out: brokenStdout{}}, localrt.WatchEvent{Kind: localrt.WatchUnreadable, Files: []string{manifest.Marker}, Err: errors.New("x")},
+		func(err error) { failed = err })
+	require.ErrorIs(t, failed, errWrite)
+}
+
+func watchWithBrokenStdout(t *testing.T, af *streamingAirflow) error {
 	t.Helper()
 	d := projectDeps(t)
-	d.Stdout = closedStdout{}
+	d.Stdout = brokenStdout{}
 	d.Runtime = logRuntime{af: af}
 	d.Watch = func(ctx context.Context, o localrt.WatchOptions) error {
 		o.OnEvent(localrt.WatchEvent{Kind: localrt.WatchUnreadable, Files: []string{manifest.Marker}, Err: errors.New("x")})
@@ -127,18 +120,15 @@ func watchWithClosedStdout(t *testing.T, af *streamingAirflow) error {
 	}, false, nil)
 }
 
-// A watch whose output cannot be written ends, and stops what it started: the
-// write error is the command's, a closed stdout.
-func TestAWatchWithAClosedStdoutEndsAsAClosedStdout(t *testing.T) {
-	err := watchWithClosedStdout(t, &streamingAirflow{})
-	require.Error(t, err)
-	assert.True(t, cliout.ClosedStdout(err), "%v", err)
+// A watch whose output cannot be written ends, and the write error is its
+// error.
+func TestAWatchEndsOnAWriteError(t *testing.T) {
+	err := watchWithBrokenStdout(t, &streamingAirflow{})
+	require.ErrorIs(t, err, errWrite)
 }
 
-// ... but not at the price of a stop that failed, which is reported.
-func TestAClosedStdoutDoesNotHideAFailedStopOfTheWatch(t *testing.T) {
-	err := watchWithClosedStdout(t, &streamingAirflow{stopErr: errors.New("compose down failed")})
+// A stop that failed is not hidden by the write error.
+func TestAWriteErrorDoesNotHideAFailedStopOfTheWatch(t *testing.T) {
+	err := watchWithBrokenStdout(t, &streamingAirflow{stopErr: errors.New("compose down failed")})
 	require.ErrorContains(t, err, "compose down failed")
-	assert.False(t, cliout.ClosedStdout(err), "%v", err)
-	assert.Equal(t, cliout.ExitFailure, cliout.ExitCode(context.Background(), err))
 }
