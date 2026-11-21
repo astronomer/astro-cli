@@ -138,79 +138,92 @@ func TestPublishThenWaitReportsBothFailures(t *testing.T) {
 	assert.Equal(t, cliout.ExitFailure, cliout.ExitCode(context.Background(), err))
 }
 
-// remote deploy's closing lines, as v2 printed them when the push succeeded.
-const remoteDeployTail = "Pushed client image to registry.example.com/agents/client:deploy-2026-10-07T14-53\n" +
-	"\n--------------------------------\n" +
-	"The client image is in your private registry.\n" +
-	"Next, update the agent component to use the new client image.\n" +
-	"Update the helm chart values.yaml or your CI/CD pipeline to use it.\n" +
-	"If you are using Astronomer provided Agent Helm chart, you would need to update the image field for each of the workers, dagProcessor, and triggerer component sections to the new image: registry.example.com/agents/client:deploy-2026-10-07T14-53\n" +
-	"Once you have updated the helm chart values.yaml file, you can run 'helm upgrade' or update via your CI/CD pipeline to update the agent components\n"
+// deploy agent's closing lines, when the push succeeded.
+const deployAgentTail = "Pushed agent image to registry.example.com/agents/client:deploy-2026-10-07T14-53\n" +
+	"Next, set image: in your agent Helm chart's values.yaml to registry.example.com/agents/client:deploy-2026-10-07T14-53 and run helm upgrade, or have your CI/CD pipeline do it.\n"
 
-// stubClientDeploy stands in for the build and the push, printing one of the
+// stubAgentDeploy stands in for the build and the push, printing one of the
 // progress lines the real one prints on the way.
-func stubClientDeploy(t *testing.T, res *astrodeploy.ClientDeploy, err error) {
+func stubAgentDeploy(t *testing.T, res *astrodeploy.AgentDeploy, err error) {
 	t.Helper()
-	prev := deployClientImage
-	deployClientImage = func(astrodeploy.InputClientDeploy, astrov1.APIClient) (astrodeploy.ClientDeploy, error) {
-		fmt.Println("Pushing client image to configured remote registry")
+	prev := deployAgentImage
+	deployAgentImage = func(astrodeploy.InputAgentDeploy, astrov1.APIClient) (astrodeploy.AgentDeploy, error) {
+		fmt.Println("Pushing agent image to the agent registry")
 		return *res, err
 	}
-	t.Cleanup(func() { deployClientImage = prev })
+	t.Cleanup(func() { deployAgentImage = prev })
 }
 
-func execRemoteRun(t *testing.T, args ...string) tokenRun {
+// execAgentRun runs astro followed by args in a project that sets
+// agent-registry; args begin with the command path, deploy agent or 1.x's
+// remote deploy.
+func execAgentRun(t *testing.T, args ...string) tokenRun {
 	t.Helper()
-	// remote deploy runs in a project.
+	// deploy agent runs in a project.
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.deploy]\nclient-registry = \"registry.example.com/agents/client\"\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.deploy]\nagent-registry = \"registry.example.com/agents/client\"\n"), 0o600))
 	prev := config.WorkingPath
 	config.WorkingPath = dir
 	t.Cleanup(func() { config.WorkingPath = prev })
-	return execAstroCmd(t, nil, "", newRemoteRootCmd, append([]string{"remote"}, args...)...)
+	newRoot := NewDeployCmd
+	if args[0] == "remote" {
+		newRoot = newRemoteRootCmd
+	}
+	return execAstroCmd(t, nil, "", func(out io.Writer) *cobra.Command {
+		c := newRoot()
+		c.SetOut(out)
+		return c
+	}, args...)
 }
 
-func TestRemoteDeployOutput(t *testing.T) {
-	pushed := astrodeploy.ClientDeploy{
+func TestDeployAgentOutput(t *testing.T) {
+	pushed := astrodeploy.AgentDeploy{
 		Image:     "registry.example.com/agents/client:deploy-2026-10-07T14-53",
 		Registry:  "registry.example.com/agents/client",
 		Tag:       "deploy-2026-10-07T14-53",
 		Platforms: []string{"linux/amd64", "linux/arm64"},
-		RuntimeCheck: &astrodeploy.ClientRuntimeCheck{
-			DeploymentID: dbtTestDeploymentID, ClientRuntimeVersion: "3.1-1", DeploymentRuntimeVersion: "3.1-2",
+		RuntimeCheck: &astrodeploy.AgentRuntimeCheck{
+			DeploymentID: dbtTestDeploymentID, AgentRuntimeVersion: "3.1-1", DeploymentRuntimeVersion: "3.1-2",
 		},
 	}
 	t.Run("text", func(t *testing.T) {
-		stubClientDeploy(t, &pushed, nil)
-		r := execRemoteRun(t, "deploy")
+		stubAgentDeploy(t, &pushed, nil)
+		r := execAgentRun(t, "deploy", "agent")
 		require.NoError(t, r.err, "stderr:\n%s", r.stderr)
-		assert.Equal(t, "Pushing client image to configured remote registry\n"+remoteDeployTail, r.stdout)
+		assert.Equal(t, "Pushing agent image to the agent registry\n"+deployAgentTail, r.stdout)
+	})
+	t.Run("1.x's remote deploy, which still pushes and says what to type", func(t *testing.T) {
+		stubAgentDeploy(t, &pushed, nil)
+		r := execAgentRun(t, "remote", "deploy", "--deployment-id", dbtTestDeploymentID)
+		require.NoError(t, r.err, "stderr:\n%s", r.stderr)
+		assert.Equal(t, "Pushing agent image to the agent registry\n"+deployAgentTail, r.stdout)
+		assert.Contains(t, r.stderr, "remote deploy is deprecated: use astro deploy agent")
 	})
 	t.Run("json", func(t *testing.T) {
-		stubClientDeploy(t, &pushed, nil)
-		r := execRemoteRun(t, "deploy", "-o", "json")
+		stubAgentDeploy(t, &pushed, nil)
+		r := execAgentRun(t, "deploy", "agent", "-o", "json")
 		require.NoError(t, r.err, "stderr:\n%s", r.stderr)
-		var got remoteDeployJSON
+		var got deployAgentJSON
 		decodeOne(t, r.stdout, &got)
 		assert.Equal(t, "registry.example.com/agents/client:deploy-2026-10-07T14-53", got.Image)
 		assert.Equal(t, "deploy-2026-10-07T14-53", got.Tag)
 		assert.Equal(t, []string{"linux/amd64", "linux/arm64"}, got.Platforms)
 		require.NotNil(t, got.RuntimeCheck)
-		assert.Equal(t, remoteRuntimeCheckJSON{Deployment: dbtTestDeploymentID, ClientRuntimeVersion: "3.1-1", DeploymentRuntimeVersion: "3.1-2"}, *got.RuntimeCheck)
+		assert.Equal(t, agentRuntimeCheckJSON{Deployment: dbtTestDeploymentID, AgentRuntimeVersion: "3.1-1", DeploymentRuntimeVersion: "3.1-2"}, *got.RuntimeCheck)
 	})
 	t.Run("json, a prebuilt image", func(t *testing.T) {
-		stubClientDeploy(t, &astrodeploy.ClientDeploy{Image: "r/c:deploy-x", Registry: "r/c", Tag: "deploy-x", SourceImage: "local:1"}, nil)
-		r := execRemoteRun(t, "deploy", "--image-name", "local:1", "-o", "json")
+		stubAgentDeploy(t, &astrodeploy.AgentDeploy{Image: "r/c:deploy-x", Registry: "r/c", Tag: "deploy-x", SourceImage: "local:1"}, nil)
+		r := execAgentRun(t, "deploy", "agent", "--image-name", "local:1", "-o", "json")
 		require.NoError(t, r.err, "stderr:\n%s", r.stderr)
-		var got remoteDeployJSON
+		var got deployAgentJSON
 		fields := decodeOne(t, r.stdout, &got)
 		assert.Equal(t, "local:1", got.SourceImage)
 		assert.JSONEq(t, "[]", string(fields["platforms"]))
 		assert.NotContains(t, fields, "runtime_check")
 	})
 	t.Run("json, the push failing", func(t *testing.T) {
-		stubClientDeploy(t, &astrodeploy.ClientDeploy{}, errors.New("failed to push client image: denied"))
-		r := execRemoteRun(t, "deploy", "-o", "json")
+		stubAgentDeploy(t, &astrodeploy.AgentDeploy{}, errors.New("failed to push agent image: denied"))
+		r := execAgentRun(t, "deploy", "agent", "-o", "json")
 		require.Error(t, r.err)
 		assert.Equal(t, cliout.ExitFailure, r.code)
 		var got errorJSON

@@ -4,7 +4,7 @@ import "strings"
 
 // nearMiss is the key in known that name most likely misspells, or "" when
 // none is close: the same key once case and the _/- separators are set aside
-// (client_registry for client-registry), or, for a key longer than shortKey,
+// (agent_registry for agent-registry), or, for a key longer than shortKey,
 // one edit away, a swap of two neighbors counting as one (defalt for default,
 // workspce for workspace). The first in known wins.
 //

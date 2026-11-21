@@ -19,28 +19,28 @@ func TestDeployDefaults(t *testing.T) {
 }
 
 func TestDeploySettings(t *testing.T) {
-	m, err := Parse([]byte(deployBase + "\n[tool.astro.deploy]\nclient-registry = 'quay.io/acme/client'\ncosmos-boost = true\ngit-metadata = false\nsha-as-tag = true\n"))
+	m, err := Parse([]byte(deployBase + "\n[tool.astro.deploy]\nagent-registry = 'quay.io/acme/client'\ncosmos-boost = true\ngit-metadata = false\nsha-as-tag = true\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (Deploy{ClientRegistry: "quay.io/acme/client", CosmosBoost: true, ShaAsTag: true}); m.Astro.Deploy != want {
+	if want := (Deploy{AgentRegistry: "quay.io/acme/client", CosmosBoost: true, ShaAsTag: true}); m.Astro.Deploy != want {
 		t.Errorf("got %+v, want %+v", m.Astro.Deploy, want)
 	}
 }
 
-// A link's client registry is its own, else the project's; only astro links
+// A link's agent registry is its own, else the project's; only astro links
 // have one.
-func TestLinkClientRegistry(t *testing.T) {
+func TestLinkAgentRegistry(t *testing.T) {
 	m, err := Parse([]byte(deployBase + `
 [tool.astro.deploy]
-client-registry = 'quay.io/acme/client'
+agent-registry = 'quay.io/acme/client'
 
 [tool.astro.deployments.dev]
 deployment = 'dep-dev'
 
 [tool.astro.deployments.prod]
 deployment = 'dep-prod'
-client-registry = '123.dkr.ecr.us-east-1.amazonaws.com/acme-prod'
+agent-registry = '123.dkr.ecr.us-east-1.amazonaws.com/acme-prod'
 
 [tool.astro.deployments.aws]
 target = 'mwaa'
@@ -54,7 +54,7 @@ environment = 'orders'
 		"prod": "123.dkr.ecr.us-east-1.amazonaws.com/acme-prod",
 		"aws":  "",
 	} {
-		if got := m.Astro.Deployments[name].ClientRegistry; got != want {
+		if got := m.Astro.Deployments[name].AgentRegistry; got != want {
 			t.Errorf("%s: got %q, want %q", name, got, want)
 		}
 	}
@@ -67,8 +67,8 @@ func TestDeploySettingsOfTheWrongShape(t *testing.T) {
 		wantKey string
 		code    ProblemCode
 	}{
-		"a registry that is not a string": {"client-registry = 1\n", "tool.astro.deploy.client-registry", CodeExpectedString},
-		"an empty registry":               {"client-registry = ''\n", "tool.astro.deploy.client-registry", CodeEmptyString},
+		"a registry that is not a string": {"agent-registry = 1\n", "tool.astro.deploy.agent-registry", CodeExpectedString},
+		"an empty registry":               {"agent-registry = ''\n", "tool.astro.deploy.agent-registry", CodeEmptyString},
 		"git-metadata that is not a bool": {"git-metadata = 'no'\n", "tool.astro.deploy.git-metadata", CodeExpectedBool},
 		"sha-as-tag that is not a bool":   {"sha-as-tag = 1\n", "tool.astro.deploy.sha-as-tag", CodeExpectedBool},
 		"cosmos-boost that is not a bool": {"cosmos-boost = 'yes'\n", "tool.astro.deploy.cosmos-boost", CodeExpectedBool},

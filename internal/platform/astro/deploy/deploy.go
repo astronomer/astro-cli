@@ -58,17 +58,17 @@ type deploymentInfo struct {
 	isRemoteExecutionEnabled bool
 }
 
-// InputClientDeploy contains inputs for client image deployments
-type InputClientDeploy struct {
+// InputAgentDeploy contains inputs for agent image deployments
+type InputAgentDeploy struct {
 	Path         string
 	ImageName    string
 	Platform     string
 	BuildSecrets []string
 	DeploymentID string
 	// Registry is the repository (registry[:port]/repository, no tag) the
-	// client image is pushed to: the one the Deployment's remote agents pull
-	// from. The command resolves it (--registry, the link's client-registry,
-	// [tool.astro.deploy] client-registry), and RegistrySource names where it
+	// agent image is pushed to: the one the Deployment's remote agents pull
+	// from. The command resolves it (--registry, the link's agent-registry,
+	// [tool.astro.deploy] agent-registry), and RegistrySource names where it
 	// came from, for an error about the value.
 	Registry       string
 	RegistrySource string
@@ -204,17 +204,17 @@ func createDeploy(organizationID, deploymentID string, request astrov1.CreateDep
 	return resp.JSON200, err
 }
 
-// ClientBuildContext represents a prepared build context for client deployment
-type ClientBuildContext struct {
+// AgentBuildContext represents a prepared build context for the agent image build
+type AgentBuildContext struct {
 	// TempDir is the temporary directory containing the build context
 	TempDir string
 	// CleanupFunc should be called to clean up the temporary directory
 	CleanupFunc func()
 }
 
-// prepareClientBuildContext creates a temporary build context with client dependency files
+// prepareAgentBuildContext creates a temporary build context with the requirements-client.txt and packages-client.txt dependency files
 // This avoids modifying the original project files, preventing race conditions with concurrent deployments.
-func prepareClientBuildContext(sourcePath string) (*ClientBuildContext, error) {
+func prepareAgentBuildContext(sourcePath string) (*AgentBuildContext, error) {
 	// Create a temporary directory for the build context
 	tempBuildDir, err := os.MkdirTemp("", "astro-client-build-*")
 	if err != nil {
@@ -227,7 +227,7 @@ func prepareClientBuildContext(sourcePath string) (*ClientBuildContext, error) {
 	}
 
 	// Always return cleanup function if we created a temp directory, even on error
-	buildContext := &ClientBuildContext{
+	buildContext := &AgentBuildContext{
 		TempDir:     tempBuildDir,
 		CleanupFunc: cleanup,
 	}
@@ -346,38 +346,38 @@ func setupClientDependencyFiles(buildDir string) error {
 	return nil
 }
 
-// ClientDeploy is what a client image deploy pushed, and where.
-type ClientDeploy struct {
+// AgentDeploy is what an agent image deploy pushed, and where.
+type AgentDeploy struct {
 	// Image is the full reference pushed, Registry:Tag.
 	Image    string
 	Registry string
 	Tag      string
 	// SourceImage is the local image pushed in place of a build
-	// (InputClientDeploy.ImageName); empty when the deploy built one.
+	// (InputAgentDeploy.ImageName); empty when the deploy built one.
 	SourceImage string
 	// Platforms are the platforms the image was built for; empty for the
 	// host's, or when nothing was built.
 	Platforms []string
 	// RuntimeCheck is the runtime version check against a Deployment, nil
 	// when no Deployment was named.
-	RuntimeCheck *ClientRuntimeCheck
+	RuntimeCheck *AgentRuntimeCheck
 }
 
-// ClientRuntimeCheck is the client image's runtime version checked against a
+// AgentRuntimeCheck is the agent image's runtime version checked against a
 // Deployment's: the client's is not newer.
-type ClientRuntimeCheck struct {
+type AgentRuntimeCheck struct {
 	DeploymentID             string
-	ClientRuntimeVersion     string
+	AgentRuntimeVersion      string
 	DeploymentRuntimeVersion string
 }
 
-// DeployClientImage builds the client image (or tags the local one named)
-// and pushes it to the remote client registry. It does not report the result:
-// its caller renders the ClientDeploy it returns.
-func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) (ClientDeploy, error) { //nolint:gocritic // intentional in this shell code
+// DeployAgentImage builds the agent image (or tags the local one named)
+// and pushes it to the remote agent registry. It does not report the result:
+// its caller renders the AgentDeploy it returns.
+func DeployAgentImage(deployInput InputAgentDeploy, astroV1Client astrov1.APIClient) (AgentDeploy, error) { //nolint:gocritic // intentional in this shell code
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return ClientDeploy{}, errors.Wrap(err, "could not get current context")
+		return AgentDeploy{}, errors.Wrap(err, "could not get current context")
 	}
 
 	// The registry is checked before anything calls the API, so a value with
@@ -386,16 +386,16 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 	// error.
 	registryEndpoint := deployInput.Registry
 	if registryEndpoint == "" {
-		return ClientDeploy{}, errors.New("no client registry to push to: pass --registry <registry>/<repository>")
+		return AgentDeploy{}, errors.New("no agent registry to push to: pass --registry <registry>/<repository>")
 	}
 	if err := config.ValidateRegistryEndpoint(registryEndpoint); err != nil {
-		return ClientDeploy{}, fmt.Errorf("%s is not a usable registry endpoint: %w", deployInput.RegistrySource, err)
+		return AgentDeploy{}, fmt.Errorf("%s is not a usable registry endpoint: %w", deployInput.RegistrySource, err)
 	}
 
 	// Validate deployment runtime version if deployment ID is provided
-	check, err := validateClientImageRuntimeVersion(deployInput, astroV1Client)
+	check, err := validateAgentImageRuntimeVersion(deployInput, astroV1Client)
 	if err != nil {
-		return ClientDeploy{}, err
+		return AgentDeploy{}, err
 	}
 
 	// Use consistent deploy-<timestamp> tagging mechanism like regular deploys
@@ -410,7 +410,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 	ctx := httpContext.Background()
 	engine, err := clientImageEngine()
 	if err != nil {
-		return ClientDeploy{}, err
+		return AgentDeploy{}, err
 	}
 
 	// Use empty slice to let Docker build for host platform by default
@@ -420,7 +420,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		fmt.Println("Using provided image:", deployInput.ImageName)
 		err := engine.Tag(ctx, deployInput.ImageName, remoteImage)
 		if err != nil {
-			return ClientDeploy{}, fmt.Errorf("could not tag local image: %w", err)
+			return AgentDeploy{}, fmt.Errorf("could not tag local image: %w", err)
 		}
 	} else {
 		// Authenticate with the base image registry before building
@@ -451,11 +451,11 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 				fmt.Println("Could not authenticate with the Astronomer registry for the base agent image in Dockerfile.client.")
 				fmt.Println("Your token may have expired, or you may lack permission to pull the base agent image.")
 				fmt.Println("Run astro login to refresh your credentials, or check that ASTRO_API_TOKEN holds a valid token, then try again.")
-				return ClientDeploy{}, fmt.Errorf("could not authenticate with registry %s: %w", baseImageRegistry, err)
+				return AgentDeploy{}, fmt.Errorf("could not authenticate with registry %s: %w", baseImageRegistry, err)
 			}
 		}
 
-		// Build the client image from the current directory
+		// Build the agent image from the current directory
 		// Determine target platforms for client deploy
 		if deployInput.Platform != "" {
 			// Parse comma-separated platforms from --platform flag
@@ -464,41 +464,41 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			for i, platform := range targetPlatforms {
 				targetPlatforms[i] = strings.TrimSpace(platform)
 			}
-			fmt.Printf("Building client image for platforms: %s\n", strings.Join(targetPlatforms, ", "))
+			fmt.Printf("Building agent image for platforms: %s\n", strings.Join(targetPlatforms, ", "))
 		} else {
-			fmt.Println("Building client image for host platform")
+			fmt.Println("Building agent image for host platform")
 		}
 
 		// Prepare build context with client dependency files
-		buildContext, err := prepareClientBuildContext(deployInput.Path)
+		buildContext, err := prepareAgentBuildContext(deployInput.Path)
 		if buildContext != nil && buildContext.CleanupFunc != nil {
 			defer buildContext.CleanupFunc()
 		}
 		if err != nil {
-			return ClientDeploy{}, fmt.Errorf("could not prepare client build context: %w", err)
+			return AgentDeploy{}, fmt.Errorf("could not prepare client build context: %w", err)
 		}
 
 		// Build the image from the prepared context, tagged as it is pushed
-		err = buildClientImage(deployInput.Path, buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets, engine)
+		err = buildAgentImage(deployInput.Path, buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets, engine)
 		if err != nil {
-			return ClientDeploy{}, fmt.Errorf("could not build client image: %w", err)
+			return AgentDeploy{}, fmt.Errorf("could not build agent image: %w", err)
 		}
 	}
 
 	// Push the image to the remote registry (assumes docker login was done externally)
-	fmt.Println("Pushing client image to configured remote registry")
+	fmt.Println("Pushing agent image to the agent registry")
 	_, err = engine.Push(ctx, imagebuild.PushRequest{Image: remoteImage, Out: os.Stdout})
 	if err != nil {
 		if errors.Is(err, imagebuild.ErrPushForbidden) {
 			fmt.Printf("\n--------------------------------\n")
-			fmt.Printf("Could not push client image to %s\n", registryEndpoint)
-			fmt.Println("Your registry token may have expired, or you may lack permission to push the client image.")
+			fmt.Printf("Could not push agent image to %s\n", registryEndpoint)
+			fmt.Println("Your registry token may have expired, or you may lack permission to push the agent image.")
 			fmt.Printf("Run docker login %s, then try again\n\n", registryEndpoint)
 		}
-		return ClientDeploy{}, fmt.Errorf("could not push client image: %w", deploybuild.ExplainPush(err))
+		return AgentDeploy{}, fmt.Errorf("could not push agent image: %w", deploybuild.ExplainPush(err))
 	}
 
-	return ClientDeploy{
+	return AgentDeploy{
 		Image:        remoteImage,
 		Registry:     registryEndpoint,
 		Tag:          imageTag,
@@ -508,9 +508,9 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 	}, nil
 }
 
-// validateClientImageRuntimeVersion validates that the client image runtime version
+// validateAgentImageRuntimeVersion validates that the agent image runtime version
 // is not newer than the deployment runtime version
-func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) (*ClientRuntimeCheck, error) { //nolint:gocritic // intentional in this shell code
+func validateAgentImageRuntimeVersion(deployInput InputAgentDeploy, astroV1Client astrov1.APIClient) (*AgentRuntimeCheck, error) { //nolint:gocritic // intentional in this shell code
 	// Skip validation if no deployment ID provided
 	if deployInput.DeploymentID == "" {
 		return nil, nil
@@ -528,10 +528,10 @@ func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Cli
 		return nil, errors.Wrap(err, "could not get Deployment information")
 	}
 
-	// Parse Dockerfile.client to get client image runtime version
+	// Parse Dockerfile.client to get agent image runtime version
 	dockerfileClientPath := filepath.Join(deployInput.Path, "Dockerfile.client")
 	if _, err := os.Stat(dockerfileClientPath); os.IsNotExist(err) {
-		return nil, errors.New("Dockerfile.client is required for client image runtime version validation")
+		return nil, errors.New("Dockerfile.client is required for agent image runtime version validation")
 	}
 
 	cmds, err := docker.ParseFile(dockerfileClientPath)
@@ -547,23 +547,23 @@ func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Cli
 	// Extract runtime version from the base image tag
 	clientRuntimeVersion, err := extractRuntimeVersionFromImage(baseImage)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not extract runtime version from client image %s", baseImage)
+		return nil, errors.Wrapf(err, "could not extract runtime version from agent image %s", baseImage)
 	}
 
 	// Compare versions
 	if airflowversions.CompareRuntimeVersions(clientRuntimeVersion, deployInfo.currentVersion) > 0 {
-		return nil, fmt.Errorf(`client image runtime version validation failed: the client image is based on Astro Runtime %s, which is newer than the Deployment's runtime version %s
+		return nil, fmt.Errorf(`agent image runtime version validation failed: the agent image is based on Astro Runtime %s, which is newer than the Deployment's runtime version %s
 
 Either set the base image in Dockerfile.client to runtime version %s or earlier, or upgrade the Deployment to runtime version %s or later`,
 			clientRuntimeVersion, deployInfo.currentVersion, deployInfo.currentVersion, clientRuntimeVersion)
 	}
 
-	fmt.Printf("Client image runtime version %s is compatible with Deployment runtime version %s\n",
+	fmt.Printf("Agent image runtime version %s is compatible with Deployment runtime version %s\n",
 		clientRuntimeVersion, deployInfo.currentVersion)
 
-	return &ClientRuntimeCheck{
+	return &AgentRuntimeCheck{
 		DeploymentID:             deployInput.DeploymentID,
-		ClientRuntimeVersion:     clientRuntimeVersion,
+		AgentRuntimeVersion:      clientRuntimeVersion,
 		DeploymentRuntimeVersion: deployInfo.currentVersion,
 	}, nil
 }

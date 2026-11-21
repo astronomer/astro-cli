@@ -19,16 +19,16 @@ import (
 	"github.com/astronomer/astro-cli/pkg/spinner"
 )
 
-// clientDockerfile is the remote-execution client image's Dockerfile, at the
+// clientDockerfile is the Remote Execution agent image's Dockerfile, at the
 // root of the project and so of the build context copied from it.
 const clientDockerfile = "Dockerfile.client"
 
-// errClientBuild is a client image build that ran and failed; the build's
+// errAgentBuild is an agent image build that ran and failed; the build's
 // output is printed above it.
-var errClientBuild = errors.New("could not build the image; see the build logs for details")
+var errAgentBuild = errors.New("could not build the image; see the build logs for details")
 
-// clientBuildRequest is the build of the client image: Dockerfile.client run
-// against contextDir, the copy of the project prepareClientBuildContext made,
+// agentBuildRequest is the build of the agent image: Dockerfile.client run
+// against contextDir, the copy of the project prepareAgentBuildContext made,
 // tagged tag, for platforms (none is the host's), on the engine binary bin
 // with its connection env, with the build's stdout and stderr raw to out and
 // errOut. Under podman it is built in docker format, as the 1.x image handler
@@ -38,7 +38,7 @@ var errClientBuild = errors.New("could not build the image; see the build logs f
 // the secrets go to it as given, so docker resolves a relative secret source
 // against the copy of the project as it always has, whatever form the spec
 // takes.
-func clientBuildRequest(contextDir, tag string, platforms, secrets []string, bin string, env []string, out, errOut io.Writer) imagebuild.Request {
+func agentBuildRequest(contextDir, tag string, platforms, secrets []string, bin string, env []string, out, errOut io.Writer) imagebuild.Request {
 	req := imagebuild.Request{
 		Dockerfile: filepath.Join(contextDir, clientDockerfile),
 		Context:    contextDir,
@@ -57,7 +57,7 @@ func clientBuildRequest(contextDir, tag string, platforms, secrets []string, bin
 	return req
 }
 
-// buildClientImage builds the client image of the project at projectDir from
+// buildAgentImage builds the agent image of the project at projectDir from
 // contextDir, its copy, with pkg/imagebuild. It shows the spinner the 1.x
 // image handler showed and keeps the build's output for a failure; at debug
 // level the output streams instead, stdout to stdout and stderr to stderr.
@@ -65,7 +65,7 @@ func clientBuildRequest(contextDir, tag string, platforms, secrets []string, bin
 // It builds on engine, the one the registry login before the build and the
 // push after it run on: an image built on one engine and pushed from another
 // is not there to push.
-func buildClientImage(projectDir, contextDir, tag string, platforms, secrets []string, engine imagebuild.Engine) error {
+func buildAgentImage(projectDir, contextDir, tag string, platforms, secrets []string, engine imagebuild.Engine) error {
 	s := spinner.NewSpinner("Building project image…")
 	debug := logger.Enabled(slog.LevelDebug)
 	if !debug {
@@ -87,18 +87,18 @@ func buildClientImage(projectDir, contextDir, tag string, platforms, secrets []s
 		// pointed it at stderr.
 		out, errOut = os.Stdout, os.Stderr
 	}
-	req := clientBuildRequest(contextDir, tag, platforms, secrets, engine.Bin, engine.Env, out, errOut)
+	req := agentBuildRequest(contextDir, tag, platforms, secrets, engine.Bin, engine.Env, out, errOut)
 	_, err = imagebuild.New(engine.Cmd, buildNow).Build(context.Background(), req, localrt.Callbacks{})
 	switch {
 	case err == nil:
 		spinner.StopWithCheckmark(s, "Updated project image")
 		return nil
 	case errors.Is(err, imagebuild.ErrDockerfileBuild):
-		logger.Debugf("client image build: %v", err)
+		logger.Debugf("agent image build: %v", err)
 		s.FinalMSG = ""
 		s.Stop()
 		fmt.Println(strings.TrimSpace(buf.String()) + "\n")
-		return errClientBuild
+		return errAgentBuild
 	default:
 		return clientDockerfileError(err, projectDir, req.Dockerfile)
 	}
@@ -132,7 +132,7 @@ func clientImageEngine() (imagebuild.Engine, error) {
 	return imagebuild.Engine{Cmd: newImageBuildCommander(), Bin: bin, Env: env}, nil
 }
 
-// loginBaseImageRegistry logs engine in to the registry the client image's
+// loginBaseImageRegistry logs engine in to the registry the agent image's
 // base comes from, as the CLI user with the Astro token. Without a token there
 // is nothing to log in with, and the build is left to the credential the
 // engine already holds.

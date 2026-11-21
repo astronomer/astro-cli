@@ -282,7 +282,7 @@ type Request struct {
 	Platform string
 	// Format is the image format podman builds (its --format: "docker" or
 	// "oci"). Empty passes no --format, which is the only thing to pass to
-	// docker, whose build has no such flag. The remote-execution client image
+	// docker, whose build has no such flag. The Remote Execution agent image
 	// is built in docker format under podman, as the Astro CLI 1.x built it.
 	Format string
 	// Bin is the container CLI to shell out to; Env reaches its daemon.

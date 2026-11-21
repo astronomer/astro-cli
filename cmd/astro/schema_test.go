@@ -157,8 +157,8 @@ var publishedPayloads = []cliouttest.Case{
 	// removed.
 	{Name: "deploy-bundle", Value: bundleDeployJSON{}},
 	{Name: "deploy-bundle-delete", Value: bundleDeleteJSON{}},
-	// astro remote deploy: the client image it pushed.
-	{Name: "remote-deploy", Value: remoteDeployJSON{}},
+	// astro deploy agent: the agent image it pushed.
+	{Name: "deploy-agent", Value: deployAgentJSON{}},
 
 	// astro deployment inspect -o json. Its keys predate the CLI's json rules
 	// and are snake_case already; astronomer/deploy-action reads them, so
@@ -244,7 +244,7 @@ func TestEveryGoldenHasACase(t *testing.T) {
 // delete's removal, hibernate's override, the worker-queue result and the
 // log entry (6); the bundle a bundle create or update leaves and what a
 // bundle delete did (2); astro deploy bundle's deploy and delete results and the
-// remote deploy's pushed image (3); the Workspace a create, update or switch
+// deploy agent's pushed image (3); the Workspace a create, update or switch
 // publishes and what a Workspace delete did, what an Organization switch left
 // current, the role list and the file an audit-log export wrote (5); the
 // Astro IDE project list and what an import or an export moved (3); and the

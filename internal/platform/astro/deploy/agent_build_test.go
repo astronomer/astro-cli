@@ -21,10 +21,10 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-// withClientBuild resolves the container engine to bin, with a podman
+// withAgentBuild resolves the container engine to bin, with a podman
 // connection env for podman, and gives every image action a fake runner, for
 // one test: the client build, the login and the push all run on it.
-func withClientBuild(t *testing.T, bin string) *fakeImageCmd {
+func withAgentBuild(t *testing.T, bin string) *fakeImageCmd {
 	t.Helper()
 	var env []string
 	if bin == "podman" {
@@ -36,7 +36,7 @@ func withClientBuild(t *testing.T, bin string) *fakeImageCmd {
 // podmanEnv is the connection env a podman engine resolves with in tests.
 var podmanEnv = []string{"CONTAINER_HOST=unix:///run/podman/podman.sock"}
 
-// clientEngine is the engine the client deploy resolves, which withClientBuild
+// clientEngine is the engine the client deploy resolves, which withAgentBuild
 // has faked.
 func clientEngine(t *testing.T) imagebuild.Engine {
 	t.Helper()
@@ -77,10 +77,10 @@ const agentBase = "images.astronomer.cloud/baseimages/astro-remote-execution-age
 // for, with the build secrets and the engine binary and connection env as
 // given, as the 1.x image handler built it, and the build's output raw to the
 // writers given. Podman builds it in docker format, as that handler did.
-func TestClientBuildRequest(t *testing.T) {
+func TestAgentBuildRequest(t *testing.T) {
 	ctx := t.TempDir()
 	var out, errOut bytes.Buffer
-	req := clientBuildRequest(ctx, "registry.example.com/agents/client:deploy-1", []string{"linux/amd64", "linux/arm64"}, []string{"id=aws,src=creds"}, "podman", podmanEnv, &out, &errOut)
+	req := agentBuildRequest(ctx, "registry.example.com/agents/client:deploy-1", []string{"linux/amd64", "linux/arm64"}, []string{"id=aws,src=creds"}, "podman", podmanEnv, &out, &errOut)
 	assert.Equal(t, imagebuild.Request{
 		Dockerfile: filepath.Join(ctx, "Dockerfile.client"),
 		Context:    ctx,
@@ -96,7 +96,7 @@ func TestClientBuildRequest(t *testing.T) {
 	}, req)
 	assert.True(t, req.FromDeclaredDockerfile())
 
-	docker := clientBuildRequest(ctx, "t", nil, nil, "docker", nil, nil, nil)
+	docker := agentBuildRequest(ctx, "t", nil, nil, "docker", nil, nil, nil)
 	assert.Empty(t, docker.Format, "docker build takes no --format")
 	assert.Empty(t, docker.Platform, "no platforms builds for the host")
 	assert.Nil(t, docker.Secrets)
@@ -110,7 +110,7 @@ func TestClientBuildRequest(t *testing.T) {
 // and this is the same build, run in the same directory: the same file,
 // context, tag and platforms, and the secrets exactly as given, so docker
 // reads every form of them, a relative source included, as it did.
-func TestBuildClientImageCommand(t *testing.T) {
+func TestBuildAgentImageCommand(t *testing.T) {
 	abs := filepath.Join(t.TempDir(), "creds")
 	for _, tc := range []struct {
 		name, bin, base string
@@ -146,8 +146,8 @@ func TestBuildClientImageCommand(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			project, ctx := clientProject(t, tc.base)
-			cmd := withClientBuild(t, tc.bin)
-			require.NoError(t, buildClientImage(project, ctx, "reg/client:deploy-1", tc.platforms, tc.secrets, clientEngine(t)))
+			cmd := withAgentBuild(t, tc.bin)
+			require.NoError(t, buildAgentImage(project, ctx, "reg/client:deploy-1", tc.platforms, tc.secrets, clientEngine(t)))
 			assert.Equal(t, []string{tc.want(ctx)}, cmd.calls)
 			assert.Equal(t, []string{ctx}, cmd.dirs, "run in the build context")
 		})
@@ -170,11 +170,11 @@ func TestDeployClientImageRunsOnOneEngine(t *testing.T) {
 			require.NoError(t, err)
 			c.Token = "ctx-token"
 			require.NoError(t, c.SetContext())
-			cmd := withClientBuild(t, bin)
+			cmd := withAgentBuild(t, bin)
 
-			var got ClientDeploy
+			var got AgentDeploy
 			captureStdout(t, func() {
-				got, err = DeployClientImage(InputClientDeploy{Registry: "registry.example.com/agents/client", RegistrySource: "--registry", Path: dir}, nil)
+				got, err = DeployAgentImage(InputAgentDeploy{Registry: "registry.example.com/agents/client", RegistrySource: "--registry", Path: dir}, nil)
 			})
 			require.NoError(t, err)
 
@@ -215,11 +215,11 @@ func TestDeployClientImageLogsInOnlyToAnAstronomerRegistry(t *testing.T) {
 	require.NoError(t, c.SetContext())
 	require.NoError(t, config.CFG.RemoteBaseImageRegistry.SetHomeString("images.astronomer.cloud.attacker.example"))
 	t.Cleanup(func() { _ = config.CFG.RemoteBaseImageRegistry.SetHomeString("images.astronomer.cloud") })
-	cmd := withClientBuild(t, "docker")
+	cmd := withAgentBuild(t, "docker")
 
 	var errOut bytes.Buffer
 	captureStdout(t, func() {
-		_, err = DeployClientImage(InputClientDeploy{Registry: "registry.example.com/agents/client", RegistrySource: "--registry", Path: dir, ErrOut: &errOut}, nil)
+		_, err = DeployAgentImage(InputAgentDeploy{Registry: "registry.example.com/agents/client", RegistrySource: "--registry", Path: dir, ErrOut: &errOut}, nil)
 	})
 	require.NoError(t, err)
 
@@ -232,31 +232,31 @@ func TestDeployClientImageLogsInOnlyToAnAstronomerRegistry(t *testing.T) {
 
 // A failed build prints the build's output as it came, blank lines and all,
 // then the error the 1.x image handler returned.
-func TestBuildClientImageFailurePrintsTheBuildOutput(t *testing.T) {
+func TestBuildAgentImageFailurePrintsTheBuildOutput(t *testing.T) {
 	project, ctx := clientProject(t, agentBase)
-	cmd := withClientBuild(t, "docker")
+	cmd := withAgentBuild(t, "docker")
 	cmd.buildOut = "#5 RUN pip install\n\n#5 ERROR: pip install failed\n"
 	cmd.buildErr = errors.New("exit status 1")
 
 	var err error
-	out := captureStdout(t, func() { err = buildClientImage(project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t)) })
-	require.ErrorIs(t, err, errClientBuild)
+	out := captureStdout(t, func() { err = buildAgentImage(project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t)) })
+	require.ErrorIs(t, err, errAgentBuild)
 	assert.Equal(t, "could not build the image; see the build logs for details", err.Error())
 	assert.Contains(t, out, "#5 RUN pip install\n\n#5 ERROR: pip install failed\n")
 }
 
 // At debug level the build streams, stdout to stdout and stderr to stderr,
 // as the 1.x image handler streamed it.
-func TestBuildClientImageStreamsAtDebug(t *testing.T) {
+func TestBuildAgentImageStreamsAtDebug(t *testing.T) {
 	project, ctx := clientProject(t, agentBase)
-	cmd := withClientBuild(t, "docker")
+	cmd := withAgentBuild(t, "docker")
 	cmd.buildOut = "to stdout\n"
 	prev := logger.GetLevel()
 	logger.SetLevel(slog.LevelDebug)
 	t.Cleanup(func() { logger.SetLevel(prev) })
 
 	var err error
-	out := captureStdout(t, func() { err = buildClientImage(project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t)) })
+	out := captureStdout(t, func() { err = buildAgentImage(project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t)) })
 	require.NoError(t, err)
 	assert.Contains(t, out, "to stdout\n")
 	require.Len(t, cmd.stdios, 1)
@@ -267,7 +267,7 @@ func TestBuildClientImageStreamsAtDebug(t *testing.T) {
 // A Dockerfile.client that is missing, or is not a file, is named as the
 // project's, not by its path in the temporary build context, and nothing is
 // built.
-func TestBuildClientImageNeedsDockerfileClient(t *testing.T) {
+func TestBuildAgentImageNeedsDockerfileClient(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		setup func(t *testing.T, ctx string)
@@ -282,8 +282,8 @@ func TestBuildClientImageNeedsDockerfileClient(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			project, ctx := t.TempDir(), t.TempDir()
 			tc.setup(t, ctx)
-			cmd := withClientBuild(t, "docker")
-			err := buildClientImage(project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t))
+			cmd := withAgentBuild(t, "docker")
+			err := buildAgentImage(project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t))
 			require.Error(t, err)
 			want := tc.want
 			if strings.Contains(want, "%s") {
@@ -314,11 +314,11 @@ func TestClientDockerfileError(t *testing.T) {
 
 // A relative context is made absolute before the build, so the Dockerfile,
 // the context and the directory the build runs in are the same place.
-func TestBuildClientImageWithARelativeContext(t *testing.T) {
+func TestBuildAgentImageWithARelativeContext(t *testing.T) {
 	project, ctx := clientProject(t, agentBase)
 	t.Chdir(filepath.Dir(ctx))
-	cmd := withClientBuild(t, "docker")
-	require.NoError(t, buildClientImage(project, filepath.Base(ctx), "reg/client:deploy-1", nil, nil, clientEngine(t)))
+	cmd := withAgentBuild(t, "docker")
+	require.NoError(t, buildAgentImage(project, filepath.Base(ctx), "reg/client:deploy-1", nil, nil, clientEngine(t)))
 	abs, err := filepath.Abs(filepath.Base(ctx))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"docker build --tag reg/client:deploy-1 --file " + filepath.Join(abs, "Dockerfile.client") + " " + abs}, cmd.calls)

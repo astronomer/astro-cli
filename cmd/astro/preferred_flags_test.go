@@ -223,7 +223,7 @@ var aliasTrees = map[string]func() *cobra.Command{
 	"workspace":    func() *cobra.Command { return newWorkspaceCmd(new(bytes.Buffer)) },
 	"organization": func() *cobra.Command { return newOrganizationCmd(new(bytes.Buffer)) },
 	"deploy":       NewDeployCmd,
-	"remote":       func() *cobra.Command { return newRemoteRootCmd(new(bytes.Buffer)) },
+	"remote":       newRemoteRootCmd,
 }
 
 // aliasValue is a value of the kind each 1.x spelling took, and aliasOther a

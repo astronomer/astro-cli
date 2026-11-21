@@ -8,7 +8,7 @@
   ],
   "runtime_check": {
     "deployment": "x",
-    "client_runtime_version": "x",
+    "agent_runtime_version": "x",
     "deployment_runtime_version": "x"
   }
 }
