@@ -245,13 +245,13 @@ func (q *query) awaitRun(ctx context.Context, client *airflowapi.Client, run air
 		case <-ctx.Done():
 			timer.Stop()
 			return run, false, fmt.Errorf("stopped waiting for %s run %s, which is still %s: %w. Check on it with %s",
-				run.DAGID, run.DAGRunID, run.State, ctx.Err(), q.t.suggest("runs get "+run.DAGID+" "+run.DAGRunID))
+				run.DAGID, run.DAGRunID, run.State, ctx.Err(), q.t.suggest("runs get "+shellWords(run.DAGID, run.DAGRunID)))
 		case <-timer.C:
 		}
 		next, err := client.GetDAGRun(ctx, run.DAGID, run.DAGRunID)
 		if err != nil {
 			return run, false, fmt.Errorf("could not check on %s run %s, which was triggered and may still be running: %w. "+
-				"Check on it with %s", run.DAGID, run.DAGRunID, err, q.t.suggest("runs get "+run.DAGID+" "+run.DAGRunID))
+				"Check on it with %s", run.DAGID, run.DAGRunID, err, q.t.suggest("runs get "+shellWords(run.DAGID, run.DAGRunID)))
 		}
 		// Keep the ids the trigger answered with: they address the run, and a
 		// body that omitted one would otherwise point the next check nowhere.
@@ -274,7 +274,7 @@ func (q *query) renderWaitedRun(w io.Writer, result waitedRun) error {
 		_, err := fmt.Fprintf(w, "%s run %s is still %s after %s; stopped waiting, and the run is still going\n"+
 			"check on it with %s\n",
 			result.DAGID, result.RunID, result.State, formatDuration(result.ElapsedSeconds),
-			q.t.suggest("runs get "+result.DAGID+" "+result.RunID))
+			q.t.suggest("runs get "+shellWords(result.DAGID, result.RunID)))
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "%s run %s: %s%s\n",
@@ -291,7 +291,7 @@ func (q *query) renderWaitedRun(w io.Writer, result waitedRun) error {
 // succeed. A listing that fails costs only this part of the report: the run's
 // own state is the answer to "did it work", and it is already in hand.
 func (q *query) failedTasks(ctx context.Context, client *airflowapi.Client, dagID, runID string) []taskInstanceRow {
-	instances, err := allTaskInstances(ctx, client, dagID, runID, q.t.suggest("runs tasks "+dagID+" "+runID))
+	instances, err := allTaskInstances(ctx, client, dagID, runID, q.t.suggest("runs tasks "+shellWords(dagID, runID)))
 	if err != nil {
 		// The error can carry Airflow's own message; shown as text
 		// (input.Lines), its line breaks kept.
@@ -362,7 +362,7 @@ func (q *query) renderFailedTasks(w io.Writer, dagID, runID string, failed []tas
 		if row.State != stateFailed {
 			continue
 		}
-		command := "tasks logs " + dagID + " " + runID + " " + row.TaskID + " --try " + strconv.Itoa(max(row.TryNumber, 1))
+		command := "tasks logs " + shellWords(dagID, runID, row.TaskID) + " --try " + strconv.Itoa(max(row.TryNumber, 1))
 		if row.MapIndex >= 0 {
 			command += " -m " + strconv.Itoa(row.MapIndex)
 		}

@@ -1,6 +1,7 @@
 package local
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -8,6 +9,44 @@ import (
 // oscState is a state an Airflow could answer with that carries a clipboard
 // write (OSC 52) and a screen clear, as it appears inside a JSON string.
 const oscState = `running\u001b]52;c;aGk=\u0007\u001b[2J`
+
+// A value spliced into a printed command is one word of it: a safe one bare,
+// as an ordinary run id is, anything else quoted.
+func TestShellWordsQuotesOnlyWhatNeedsIt(t *testing.T) {
+	if got := shellWords("orders_etl", "manual__2024-05-01T00:00:00+00:00"); got != "orders_etl manual__2024-05-01T00:00:00+00:00" {
+		t.Errorf("safe words = %q, want them bare", got)
+	}
+	got := shellWords("orders_etl", "my run; rm -rf ~")
+	if runtime.GOOS == "windows" {
+		if got != `orders_etl "my run; rm -rf ~"` {
+			t.Errorf("windows = %q", got)
+		}
+		return
+	}
+	if got != `orders_etl 'my run; rm -rf ~'` {
+		t.Errorf("a run id with a space and shell syntax = %q, want it one quoted word", got)
+	}
+}
+
+// A failed task's log command quotes a task id that is not safe bare, so it
+// pastes as the one argument it is.
+func TestTriggerWaitQuotesAnUnsafeTaskIDInItsLogCommand(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the single-quoted form is POSIX; TestShellWordsQuotesOnlyWhatNeedsIt covers Windows")
+	}
+	stub, prefix := waitStub(t, false, "failed")
+	stub.route("GET", prefix+"/dags/orders_etl/dagRuns/manual__1/taskInstances", `{"task_instances":[
+		{"task_id":"trans form","dag_id":"orders_etl","dag_run_id":"manual__1","state":"failed","try_number":1,"map_index":-1}
+	],"total_entries":1}`)
+
+	out, _, err := runQuery(t, stub, append([]string{"runs", "trigger-wait", "orders_etl"}, fast...)...)
+	if code := exitCode(t, err); code != exitRunFailed {
+		t.Fatalf("exit = %d, want %d", code, exitRunFailed)
+	}
+	if want := "tasks logs orders_etl manual__1 'trans form' --try 1"; !strings.Contains(out, want) {
+		t.Errorf("text is missing %q:\n%s", want, out)
+	}
+}
 
 // assertNoTerminalControl fails when a wait's stderr carries the escape
 // sequences oscState holds: its progress lines go straight to stderr, past

@@ -152,7 +152,7 @@ func (q *query) runTasksWait(ctx context.Context, dagID, runID string, target ta
 // is announced once the first check has shown there is one.
 func (q *query) awaitTask(ctx context.Context, client *airflowapi.Client, dagID, runID string, target taskTarget, wait waitOptions) (waitedTask, error) {
 	result := waitedTask{DAGID: dagID, RunID: runID, TaskID: target.taskID, MapIndex: target.mapIndex, Until: target.state}
-	check := q.t.suggest("runs tasks " + dagID + " " + runID)
+	check := q.t.suggest("runs tasks " + shellWords(dagID, runID))
 	deadline := time.Now().Add(wait.timeout)
 	announced := false
 	last := "\x00"
