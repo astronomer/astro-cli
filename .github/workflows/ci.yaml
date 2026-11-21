@@ -322,7 +322,9 @@ jobs:
       # coverage dirs and the e2e binary onto it; runs have failed with "not
       # enough space on the disk". D: is the runner's larger scratch drive, so
       # the disposable directories go there: GOCACHE (restored below from the
-      # path `go env` reports, so caching follows), GOTMPDIR and TEMP/TMP. An
+      # path `go env` reports, so caching follows) and TEMP/TMP, which is also where
+      # the go tool puts its link temp files. GOTMPDIR is left unset: tests that
+      # check their paths against TEMP reject a second temp root. An
       # image without a D: keeps the defaults rather than failing.
       - name: Move build scratch off the C drive
         shell: pwsh
@@ -330,9 +332,8 @@ jobs:
           Get-PSDrive -PSProvider FileSystem | Format-Table Name, @{n='FreeGB';e={[math]::Round($_.Free/1GB,1)}}, @{n='UsedGB';e={[math]::Round($_.Used/1GB,1)}}
           if (Test-Path 'D:\') {
             $root = 'D:\astro-ci'
-            foreach ($d in 'gocache','gotmp','tmp') { New-Item -ItemType Directory -Force -Path "$root\$d" | Out-Null }
+            foreach ($d in 'gocache','tmp') { New-Item -ItemType Directory -Force -Path "$root\$d" | Out-Null }
             "GOCACHE=$root\gocache" >> $env:GITHUB_ENV
-            "GOTMPDIR=$root\gotmp" >> $env:GITHUB_ENV
             "TEMP=$root\tmp" >> $env:GITHUB_ENV
             "TMP=$root\tmp" >> $env:GITHUB_ENV
             Write-Host "build scratch on $root"
