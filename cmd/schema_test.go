@@ -48,6 +48,12 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "telemetry", Value: telemetryState{}},
 	// astro auth token. expires_at is absent when the login does not say.
 	{Name: "auth-token", Value: authToken{}},
+	// astro <path> --help -o json and astro help <path> -o json: one command.
+	// help --all -o json: every visible command, each as the one command.
+	// help search <query> -o json: the matches.
+	{Name: "help", Value: helpDocument{}},
+	{Name: "help-all", Value: helpAllDocument{}},
+	{Name: "help-search", Value: helpSearchDocument{}},
 }
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
@@ -71,12 +77,13 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Nine shapes reach Emit in this package's tests today: the
+// would be silent. Twelve shapes reach Emit in this package's tests today: the
 // version, the context list, the one context and a context's removal, a
 // config setting and the config list, the telemetry state, the auth token,
-// and the error object.
+// the help of a command, of every command and a search of them, and the
+// error object.
 // Raise it as conversions land; lower it only saying why.
-const minWatchedPayloads = 9
+const minWatchedPayloads = 12
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where.

@@ -1,0 +1,34 @@
+{
+  "path": "x",
+  "summary": "x",
+  "description": "x",
+  "usage": "x",
+  "aliases": [
+    "x"
+  ],
+  "deprecated": "x",
+  "subcommands": [
+    {
+      "name": "x",
+      "summary": "x"
+    }
+  ],
+  "arguments": [
+    {
+      "name": "x",
+      "required": true,
+      "repeated": true
+    }
+  ],
+  "flags": [
+    {
+      "name": "x",
+      "shorthand": "x",
+      "type": "x",
+      "default": "x",
+      "description": "x",
+      "group": "x"
+    }
+  ],
+  "examples": "x"
+}

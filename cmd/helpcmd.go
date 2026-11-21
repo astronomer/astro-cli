@@ -16,11 +16,21 @@ import (
 // error naming the first word that matched nothing, with the nearest command
 // it could be, and a pointer to the help of the command it was looked up under.
 func newHelpCommand() *cobra.Command {
-	return &cobra.Command{
+	var (
+		format cliout.Format
+		all    bool
+	)
+	helpCmd := &cobra.Command{
 		Use:   helpName + " [command]",
 		Short: "Help about any command",
 		Long: `Help provides help for any command in the application.
-Simply type astro help [path to command] for full details.`,
+Simply type astro help [path to command] for full details.
+
+With --output json, a command's help is one JSON document, for scripts and coding agents. astro help search <QUERY> lists the commands that match every word of the query, up to 10. astro help --all lists every command, one per line with its summary, or with --output json every command's help in one document.`,
+		Example: `  astro help deployment list
+  astro help deployment list --output json
+  astro help search "create deployment"
+  astro help --all --output json`,
 		Args: cobra.ArbitraryArgs,
 		// Help needs no login, version check or tracking.
 		Annotations: map[string]string{telemetry.SkipPreRunAnnotation: "true"},
@@ -40,17 +50,12 @@ Simply type astro help [path to command] for full details.`,
 			return completions, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(c *cobra.Command, args []string) error {
-			target := c.Root()
-			for _, word := range args {
-				next := childNamed(target, word)
-				if next == nil {
-					return cliout.PointAtHelpOf(cliout.UnknownSubcommand(target, word), target)
-				}
-				target = next
-			}
-			return target.Help()
+			return runHelp(c, args, all, format)
 		},
 	}
+	cliout.AddOutputFlag(helpCmd, &format)
+	helpCmd.Flags().BoolVar(&all, "all", false, "List every command")
+	return helpCmd
 }
 
 // childNamed is the subcommand of parent that word names, by name or alias.
