@@ -73,7 +73,7 @@ func RetryRateLimited(ctx httpContext.Context, send func() (*http.Response, erro
 			return resp, err
 		}
 		wait := min(retryablehttp.RateLimitLinearJitterBackoff(rateLimitWaitMin, rateLimitWaitMax, attempt, resp), rateLimitWaitCap)
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, rateLimitDrainBytes))
+		io.Copy(io.Discard, io.LimitReader(resp.Body, rateLimitDrainBytes)) //nolint:errcheck // draining a body to reuse its connection
 		resp.Body.Close()
 		timer := time.NewTimer(wait)
 		select {

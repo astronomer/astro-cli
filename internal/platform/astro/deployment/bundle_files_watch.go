@@ -69,12 +69,11 @@ func (t *bundleSyncTarget) resync(ctx httpContext.Context, src string, filter *l
 // left with one whose outcome the run does not know; a second interrupt ends
 // the process.
 func (t *bundleSyncTarget) watch(ctx httpContext.Context, src string, filterOpts BundleFilterOptions, filter *localFileFilter, deleteExtras bool, out BundleOutput, astroV1Alpha1StreamClient astrov1alpha1.ClientInterface) error {
-
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return errors.Wrapf(err, "failed to watch %s", src)
 	}
-	defer watcher.Close()
+	defer watcher.Close() //nolint:errcheck // a watcher; nothing is flushed by closing it
 	err = watchLocalDirs(watcher, src, src, filter)
 	if err != nil {
 		return errors.Wrapf(err, "failed to watch %s", src)

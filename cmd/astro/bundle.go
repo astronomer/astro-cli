@@ -88,7 +88,7 @@ func newBundleCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&bundleDescription, "description", "", "Description for the bundle")
 	cmd.Flags().StringSliceVar(&bundleDagBundleIDs, "dag-bundle-ids", nil, "Dag bundle IDs a non-Dag bundle is served alongside. Only valid with --mount-path")
 	// File bundles are not announced yet, as on 1.x main.
-	_ = cmd.Flags().MarkHidden("type")
+	cmd.Flags().MarkHidden("type") //nolint:errcheck // the flag is defined just above
 	return cmd
 }
 
@@ -202,7 +202,7 @@ func newBundleRollbackCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&bundleVersion, "version", "", "The version to roll the bundle back to")
 	cmd.Flags().StringVar(&bundleDescription, "description", "", "Description recorded on the rollback")
 	cmd.Flags().BoolVarP(&forceBundleRollback, "yes", "y", false, "Don't ask for confirmation before rolling the bundle back")
-	_ = cmd.MarkFlagRequired("version")
+	cmd.MarkFlagRequired("version") //nolint:errcheck // the flag is defined just above
 	return cmd
 }
 

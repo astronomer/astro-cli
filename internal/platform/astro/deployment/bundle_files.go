@@ -602,7 +602,7 @@ func copyFromBundle(ctx httpContext.Context, src BundlePath, dst string, opts *B
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer root.Close() //nolint:errcheck // a directory handle; nothing is flushed by closing it
 	err = writeLocalFile(ctx, root, filepath.Base(dst), content)
 	if err != nil {
 		return err
@@ -983,7 +983,7 @@ func newPipedBody(write func(io.Writer) error) *pipedBody {
 
 // Close stops the write, if the request did not read all of it, and returns the error the write failed with.
 func (b *pipedBody) Close() error {
-	b.PipeReader.Close()
+	b.PipeReader.Close() //nolint:errcheck // closing a pipe reader always succeeds
 	return b.wait()
 }
 
@@ -1140,13 +1140,13 @@ func unpackBundleDirectory(ctx httpContext.Context, archive io.Reader, localDir 
 	if err != nil {
 		return 0, err
 	}
-	defer root.Close()
+	defer root.Close() //nolint:errcheck // a directory handle; nothing is flushed by closing it
 
 	gzipReader, err := gzip.NewReader(archive)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to read the bundle directory")
 	}
-	defer gzipReader.Close()
+	defer gzipReader.Close() //nolint:errcheck // a reader; the tar's own errors are what matter
 
 	tarReader := tar.NewReader(gzipReader)
 	// Each file written, by its path in lower case, to catch two that a case-insensitive file system would make one.
@@ -1230,7 +1230,7 @@ func writeLocalFile(ctx httpContext.Context, root *os.Root, name string, content
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(file, ctxReader{ctx: ctx, r: content}) //nolint:gosec // the server bounds a bundle's size
+	_, err = io.Copy(file, ctxReader{ctx: ctx, r: content})
 	closeErr := file.Close()
 	if err == nil {
 		err = closeErr
@@ -1239,7 +1239,7 @@ func writeLocalFile(ctx httpContext.Context, root *os.Root, name string, content
 		err = root.Rename(temp, name)
 	}
 	if err != nil {
-		_ = root.Remove(temp)
+		root.Remove(temp) //nolint:errcheck // best effort: the write's own error is what is returned
 		return err
 	}
 	return nil

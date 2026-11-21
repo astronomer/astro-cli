@@ -154,7 +154,7 @@ func TestRetryRateLimited(t *testing.T) {
 		assert.Equal(t, 1, calls)
 
 		calls = 0
-		_, err = RetryRateLimited(context.Background(), func() (*http.Response, error) { //nolint:bodyclose
+		_, err = RetryRateLimited(context.Background(), func() (*http.Response, error) { //nolint:bodyclose // the error answer has no body
 			calls++
 			return nil, io.ErrUnexpectedEOF
 		})
@@ -168,7 +168,7 @@ func TestRetryRateLimited(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 		calls := 0
-		_, err := RetryRateLimited(ctx, sends(&calls, http.StatusTooManyRequests)) //nolint:bodyclose
+		_, err := RetryRateLimited(ctx, sends(&calls, http.StatusTooManyRequests)) //nolint:bodyclose // canceled before any answer
 		assert.ErrorIs(t, err, context.DeadlineExceeded)
 		assert.Equal(t, 1, calls)
 	})
