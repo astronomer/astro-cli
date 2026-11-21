@@ -2970,6 +2970,21 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 	})
 }
 
+// A Deployment's name is printed as text: escapes, control characters and
+// line breaks in it are not passed to the terminal.
+func (s *Suite) TestWaitForHibernationOverridePrintsTheNamePlain() {
+	origTick, origGet := TickNum, GetDeploymentByID
+	TickNum = 1
+	s.T().Cleanup(func() { TickNum, GetDeploymentByID = origTick, origGet })
+	GetDeploymentByID = func(_, _ string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+		return astrov1.Deployment{Id: "test-id-1", Name: "prod\x1b[2J\x1b]0;title\x07\nfake line", Status: astrov1.DeploymentStatusHIBERNATING}, nil
+	}
+	var out bytes.Buffer
+	s.Require().NoError(WaitForHibernationOverride(&out, "test-id-1", true, time.Minute, nil))
+	s.Contains(out.String(), "Deployment prod fake line is now hibernating\n")
+	s.NotContains(out.String(), "\x1b")
+}
+
 func (s *Suite) TestUpdateDeploymentHibernationOverrideWaits() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	origTick, origGet := TickNum, GetDeploymentByID

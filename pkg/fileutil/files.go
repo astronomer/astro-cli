@@ -106,11 +106,19 @@ const extraFileMode = 0o644
 // prependBaseDir, changed by overlay. A source that is not there makes an
 // empty tarball, not an error.
 func TarGz(source, target string, prependBaseDir bool, excludePathPrefixes []string, overlay TarOverlay) error {
-	baseDir := ""
+	src := GzSource(source, prependBaseDir, excludePathPrefixes)
+	return writeTar(src.Dir, target, src.BaseDir, src.Excludes, overlay, true, false)
+}
+
+// GzSource is the TarSource TarGz writes with the same arguments: with
+// prependBaseDir, each entry under source's own name, the name it is given by
+// (a dags/ that is a link is still "dags").
+func GzSource(source string, prependBaseDir bool, excludePathPrefixes []string) TarSource {
+	src := TarSource{Dir: source, Excludes: excludePathPrefixes}
 	if prependBaseDir {
-		baseDir = filepath.Base(source)
+		src.BaseDir = filepath.Base(source)
 	}
-	return writeTar(source, target, baseDir, excludePathPrefixes, overlay, true, false)
+	return src
 }
 
 // TarDir writes the directory source to the tarball target, each path in it
@@ -181,9 +189,82 @@ func writeTar(source, target, baseDir string, excludePathPrefixes []string, over
 	return addToTar(tarball, source, target, baseDir, excludePathPrefixes, overlay, mustExist)
 }
 
+// TarSource is a directory as a tarball of it is written (TarDir, TarGz): Dir,
+// each entry's name under BaseDir ("" for none), and the entries whose name
+// starts with one of Excludes left out. A caller that both writes the tarball
+// and looks at what it carries (WalkTar) builds one TarSource for both, so the
+// two cannot disagree on a file.
+type TarSource struct {
+	Dir      string
+	BaseDir  string
+	Excludes []string
+}
+
+// WalkTar calls visit with each entry a tarball of src carries from disk, as
+// TarDir and TarGz write it: its path on disk, its name in the tarball, and
+// what Lstat says of it. A link in src is an entry of its own, as the tarball
+// carries it, not the file it points at; a Dir that is itself a link is
+// walked as the directory it points at. A Dir that is not there carries
+// nothing. It is the same walk the tarball is written from (walkTar).
+func WalkTar(src TarSource, visit func(path, name string, info os.FileInfo) error) error {
+	return walkTar(src.Dir, "", src.BaseDir, src.Excludes, TarOverlay{}, false, visit)
+}
+
 // addToTar writes the directory source into tarball, as writeTar says.
 func addToTar(tarball *tar.Writer, source, target, baseDir string, excludePathPrefixes []string, overlay TarOverlay, mustExist bool) error {
-	sourceInfo, err := os.Stat(source)
+	err := walkTar(source, target, baseDir, excludePathPrefixes, overlay, mustExist, func(path, name string, info os.FileInfo) error {
+		var link string
+		if info.Mode()&os.ModeSymlink == os.ModeSymlink {
+			var err error
+			if link, err = os.Readlink(path); err != nil {
+				return err
+			}
+		}
+
+		header, err := tar.FileInfoHeader(info, link)
+		if err != nil {
+			return err
+		}
+		header.Name = name
+		logger.Debugf("Adding to tarball: %s", header.Name)
+
+		if err := tarball.WriteHeader(header); err != nil {
+			return err
+		}
+
+		if !info.Mode().IsRegular() { // nothing more to do for non-regular
+			return nil
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		_, err = io.Copy(tarball, file)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	return addExtrasToTar(tarball, baseDir, overlay.Extra)
+}
+
+// walkTar calls visit with each entry of source a tarball carries: every
+// file and link the walk reaches, under its name in the tarball (tarEntryName),
+// but not the tarball itself (target, when it sits in source), and not a
+// directory, which the tarball does not hold as an entry of its own. A source
+// that is a link is walked as the directory it points at: filepath.Walk does
+// not descend through a link at its root, so a dags/ that was a link went
+// into the tarball as that one link, to a path on the machine that wrote it,
+// and none of its files did. A source that is not there is an error with
+// mustExist, and carries nothing without it.
+func walkTar(source, target, baseDir string, excludePathPrefixes []string, overlay TarOverlay, mustExist bool, visit func(path, name string, info os.FileInfo) error) error {
+	root := source
+	if resolved, err := filepath.EvalSymlinks(source); err == nil {
+		root = resolved
+	}
+	sourceInfo, err := os.Stat(root)
 	if err != nil {
 		if mustExist {
 			return err
@@ -195,59 +276,35 @@ func addToTar(tarball *tar.Writer, source, target, baseDir string, excludePathPr
 		return errors.New("source is not a directory")
 	}
 
-	err = filepath.Walk(source,
+	// The tarball is compared by its path as the walk spells it, which is
+	// root's: a target written into a source given through a link is still
+	// recognized.
+	if target != "" {
+		if dir, err := filepath.EvalSymlinks(filepath.Dir(target)); err == nil {
+			target = filepath.Join(dir, filepath.Base(target))
+		}
+	}
+
+	return filepath.Walk(root,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 
 			if info.IsDir() {
-				return tarDir(path, source, info, overlay)
+				return tarDir(path, root, info, overlay)
 			}
 
 			if path == target {
 				return nil
 			}
 
-			var link string
-			if info.Mode()&os.ModeSymlink == os.ModeSymlink {
-				if link, err = os.Readlink(path); err != nil {
-					return err
-				}
-			}
-
-			header, err := tar.FileInfoHeader(info, link)
-			if err != nil {
-				return err
-			}
-
-			headerName, ok, err := tarEntryName(path, source, baseDir, excludePathPrefixes, overlay, info)
+			name, ok, err := tarEntryName(path, root, baseDir, excludePathPrefixes, overlay, info)
 			if err != nil || !ok {
 				return err
 			}
-			header.Name = headerName
-			logger.Debugf("Adding to tarball: %s", header.Name)
-
-			if err := tarball.WriteHeader(header); err != nil {
-				return err
-			}
-
-			if !info.Mode().IsRegular() { // nothing more to do for non-regular
-				return nil
-			}
-
-			file, err := os.Open(path)
-			if err != nil {
-				return err
-			}
-			defer file.Close()
-			_, err = io.Copy(tarball, file)
-			return err
+			return visit(path, name, info)
 		})
-	if err != nil {
-		return err
-	}
-	return addExtrasToTar(tarball, baseDir, overlay.Extra)
 }
 
 // tarDir decides whether the walk descends into the directory at dir:

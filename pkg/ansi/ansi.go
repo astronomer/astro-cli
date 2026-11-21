@@ -2,8 +2,11 @@ package ansi
 
 import (
 	"os"
+	"strconv"
 
+	fatihcolor "github.com/fatih/color"
 	"github.com/logrusorgru/aurora"
+	"github.com/spf13/pflag"
 
 	"github.com/astronomer/astro-cli/pkg/input"
 )
@@ -17,7 +20,10 @@ var EnvironmentOverrideColors = true
 
 var color = Color()
 
-const cliColorForce = "CLICOLOR_FORCE"
+const (
+	cliColorForce = "CLICOLOR_FORCE"
+	forceColor    = "FORCE_COLOR"
+)
 
 // Bold returns bolded text if the writer supports colors.
 //
@@ -50,24 +56,70 @@ func shouldUseColors() bool {
 	return shouldColor(IsOutputTerminal)
 }
 
-// shouldColor decides colors for a stream, by the environment's override and
-// otherwise by whether the stream is a terminal.
-func shouldColor(isTerminal func() bool) bool {
-	if EnvironmentOverrideColors {
-		force, ok := os.LookupEnv(cliColorForce)
+// noColorFlag is set by --no-color; see SetNoColor.
+var noColorFlag bool
 
-		if ok && force != "0" {
-			return true
-		}
-		if ok && force == "0" {
+// SetNoColor turns color off for the rest of the run, over every environment
+// variable: it is what --no-color does, and it takes effect when the flag is
+// parsed, before the command (or its error) prints anything.
+func SetNoColor() {
+	noColorFlag = true
+	color = Color()
+	fatihcolor.NoColor = true
+}
+
+// NoColorFlag is the name of the global flag that turns color off.
+const NoColorFlag = "no-color"
+
+type noColorValue struct{}
+
+func (noColorValue) String() string   { return strconv.FormatBool(noColorFlag) }
+func (noColorValue) Type() string     { return "bool" }
+func (noColorValue) IsBoolFlag() bool { return true }
+func (noColorValue) Set(v string) error {
+	on, err := strconv.ParseBool(v)
+	if err != nil {
+		return err
+	}
+	if on {
+		SetNoColor()
+	}
+	return nil
+}
+
+// AddNoColorFlag registers the global --no-color flag on fs, the root's
+// persistent flags. The flag turns color off as soon as it is parsed, so it
+// also covers an error raised before the command runs.
+func AddNoColorFlag(fs *pflag.FlagSet) {
+	f := fs.VarPF(noColorValue{}, NoColorFlag, "", "Disable colored output. NO_COLOR does the same")
+	f.NoOptDefVal = "true"
+}
+
+// shouldColor decides colors for a stream. In order: --no-color; a non-empty
+// NO_COLOR (no-color.org), which beats everything below it; FORCE_COLOR and
+// CLICOLOR_FORCE, where "0" means off and anything else non-empty means on;
+// CLICOLOR=0; then whether the stream is a terminal, which TERM=dumb is not.
+func shouldColor(isTerminal func() bool) bool {
+	if noColorFlag {
+		return false
+	}
+	if EnvironmentOverrideColors {
+		if os.Getenv("NO_COLOR") != "" {
 			return false
+		}
+		for _, name := range []string{forceColor, cliColorForce} {
+			switch os.Getenv(name) {
+			case "":
+			case "0":
+				return false
+			default:
+				return true
+			}
 		}
 		if os.Getenv("CLICOLOR") == "0" {
 			return false
 		}
-		// NO_COLOR, set and not empty, turns color off for every stream
-		// (no-color.org); only an explicit CLICOLOR_FORCE, above, wins over it.
-		if os.Getenv("NO_COLOR") != "" {
+		if os.Getenv("TERM") == "dumb" && !ForceColors {
 			return false
 		}
 	}

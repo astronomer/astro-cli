@@ -411,7 +411,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 	}
 	// A note, so progress: stdout is the Deployment the create made.
-	fmt.Fprintf(progressTo(progress), "Current Workspace: %s\n\n", currentWorkspace.Name)
+	fmt.Fprintf(progressTo(progress), "Current Workspace: %s\n\n", input.Plain(currentWorkspace.Name))
 
 	// name input
 	if name == "" {
@@ -866,7 +866,7 @@ func HealthPollIn(progress io.Writer, orgID, token, deploymentID string, sleepTi
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(progress, "Deployment %s is now healthy\n", d.Name)
+	fmt.Fprintf(progress, "Deployment %s is now healthy\n", input.Plain(d.Name))
 	return nil
 }
 
@@ -1401,7 +1401,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	if !force {
 		if confirmWithUser {
 			if err := input.ConfirmOrAbort(
-				fmt.Sprintf("\nUpdate Deployment %s?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+				fmt.Sprintf("\nUpdate Deployment %s?", ansi.ForStderr().Bold(input.Plain(currentDeployment.Name))), input.AnsweredBy("--yes")); err != nil {
 				return UpdateResult{}, err
 			}
 		}
@@ -1592,7 +1592,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 	// The name is shown as it is, unescaped, so what is shown is what to type.
 	if !forceDelete {
 		typed, err := input.Text(
-			fmt.Sprintf("\nThis permanently deletes the Deployment %s and all of its data.\n", ansi.ForStderr().Bold(currentDeployment.Name))+
+			fmt.Sprintf("\nThis permanently deletes the Deployment %s and all of its data.\n", ansi.ForStderr().Bold(input.Plain(currentDeployment.Name)))+
 				`To confirm, type the Deployment name "`+currentDeployment.Name+`": `,
 			input.About("the Deployment's name, to confirm the delete"), input.AnsweredBy("--yes"))
 		if err != nil {
@@ -1642,7 +1642,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		if err := input.ConfirmOrAbort(
-			fmt.Sprintf("\nOverride to %s for Deployment %s?", ansi.ForStderr().Bold(action), ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+			fmt.Sprintf("\nOverride to %s for Deployment %s?", ansi.ForStderr().Bold(action), ansi.ForStderr().Bold(input.Plain(currentDeployment.Name))), input.AnsweredBy("--yes")); err != nil {
 			return nil, err
 		}
 	}
@@ -1685,7 +1685,7 @@ func WaitForHibernationOverride(progress io.Writer, deploymentID string, isHiber
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(progress, "Deployment %s is now %s\n", d.Name, done)
+	fmt.Fprintf(progress, "Deployment %s is now %s\n", input.Plain(d.Name), done)
 	return nil
 }
 
@@ -1707,7 +1707,7 @@ func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		if err := input.ConfirmOrAbort(
-			fmt.Sprintf("\nRemove the hibernation override for Deployment %s and resume its schedule?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+			fmt.Sprintf("\nRemove the hibernation override for Deployment %s and resume its schedule?", ansi.ForStderr().Bold(input.Plain(currentDeployment.Name))), input.AnsweredBy("--yes")); err != nil {
 			return nil, err
 		}
 	}
@@ -2245,7 +2245,7 @@ func deploymentSelectionProcess(ws string, src astrosession.Source, deployments 
 		if use == ToRead {
 			if !CleanOutput {
 				fmt.Fprintf(os.Stderr, "Using the only Deployment found:\n\n Deployment Name: %s\n Deployment ID: %s\n",
-					ansi.ForStderr().Bold(deployments[0].Name), ansi.ForStderr().Bold(deployments[0].Id))
+					ansi.ForStderr().Bold(input.Plain(deployments[0].Name)), ansi.ForStderr().Bold(input.Plain(deployments[0].Id)))
 			}
 			return deployments[0], nil
 		}

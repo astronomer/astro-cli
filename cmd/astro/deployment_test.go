@@ -1476,6 +1476,25 @@ func TestDeploymentOpen(t *testing.T) {
 		})
 	}
 
+	t.Run("with --no-open, prints the URL and opens nothing", func(t *testing.T) {
+		openDeploymentUI = func(string) bool {
+			t.Error("opened a browser with --no-open")
+			return true
+		}
+		t.Cleanup(func() { deploymentNoOpen = false })
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		astroV1Client = mockV1Client
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+
+		out, err := execDeploymentCmd("open", "test-id-1", "--no-open")
+		require.NoError(t, err)
+		assert.Contains(t, out, "https://test-url")
+		assert.NotContains(t, out, "Opened")
+		assert.NotContains(t, out, "Could not open")
+		mockV1Client.AssertExpectations(t)
+	})
+
 	t.Run("under --output json, publishes the URL and opens nothing", func(t *testing.T) {
 		openDeploymentUI = func(string) bool {
 			t.Error("opened a browser under --output json")

@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/picker"
@@ -292,6 +293,12 @@ func (d *apcManifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeplo
 		return manifestdeploy.Deployment{}, err
 	}
 	return manifestdeploy.Deployment{ID: deps[i].ID, Name: deps[i].Label, WorkspaceID: firstNonEmpty(deps[i].Workspace.ID, workspaceID)}, nil
+}
+
+// DagsSource is what DeployDags uploads of the project: APC puts every
+// path under dags/, so --no-dags-base-dir changes nothing.
+func (d *apcManifestDeployer) DagsSource(projectDir string, _ bool) fileutil.TarSource {
+	return deploy.DagsSource(projectDir)
 }
 
 // DeployDags uploads the project's DAGs to a Deployment that takes DAG-only

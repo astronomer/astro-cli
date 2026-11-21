@@ -31,6 +31,10 @@ func TestMain(m *testing.M) {
 	// A helper process (TestForcedRenewalHelper, TestCheckTokenHelper) keeps the home its parent made:
 	// Isolate sees the parent's marker and changes nothing.
 	finish := testenv.Isolate()
+	// Opening a browser is refused over SSH (input.CanOpenBrowser): a run
+	// over the developer's own SSH session must not change what these tests see.
+	os.Unsetenv("SSH_CONNECTION")
+	os.Unsetenv("SSH_TTY")
 
 	// A login reads its auth config from api.<domain>, which no unit test may
 	// reach. The identity provider it names is under .test, which never

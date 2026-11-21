@@ -75,8 +75,9 @@ func TestNewAPICmdWithOutput_SubcommandRegistration(t *testing.T) {
 }
 
 func TestNewAPICmdWithOutput_Flags(t *testing.T) {
+	// --no-color is the root's global flag, not one of `astro api`'s own.
 	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer))
-	assert.NotNil(t, apiCmd.PersistentFlags().Lookup("no-color"))
+	assert.Nil(t, apiCmd.PersistentFlags().Lookup("no-color"))
 }
 
 // `astro api` is a group with no run of its own: run bare, cobra prints its

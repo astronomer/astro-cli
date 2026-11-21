@@ -464,7 +464,19 @@ func composeFiles(generated, projectPath string) []string {
 
 // generateCompose renders the compose file for a plan with all ports and
 // the image already resolved.
+//
+// Each mount is written in Compose's long syntax, its source and target
+// quoted as every other value in the file is, so a project path is read as
+// written: in the short "host:container:z" form a ":" in it splits the entry,
+// a " #" starts a comment, and a "$" is interpolated. A path with a line break
+// is refused, since a quoted scalar folds the break into a space and would
+// mount another path.
 func generateCompose(in composeInput) (string, error) {
+	for _, m := range in.Mounts {
+		if strings.ContainsAny(m.Host, "\r\n") {
+			return "", fmt.Errorf("cannot mount %q into the containers: its path has a line break, which a Compose file cannot carry. Move the project to a path without one", m.Host)
+		}
+	}
 	tmpl, err := template.New("compose").Funcs(template.FuncMap{"quote": quoteYAML, "secretRef": secretInterpolation}).Parse(composeTemplate)
 	if err != nil {
 		return "", fmt.Errorf("parsing compose template: %w", err)

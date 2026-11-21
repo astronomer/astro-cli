@@ -90,13 +90,20 @@ func emitRemoval(r cliout.Renderer, removal *deployment.Removal) error {
 // the command's verb, "hibernate" or "wake up".
 // emitDeploymentUI publishes `deployment open`'s result. In text it says
 // whether the browser opened, and gives the URL to visit when it did not.
-func emitDeploymentUI(r cliout.Renderer, res *deployment.UIResult, opened bool) error {
+// uiOpening is what `deployment open` did about the browser: whether it tried,
+// and whether that worked.
+type uiOpening struct{ attempted, opened bool }
+
+func emitDeploymentUI(r cliout.Renderer, res *deployment.UIResult, o uiOpening) error {
 	return r.Emit(res, cliout.Text(func(b *bufio.Writer) {
-		if opened {
+		switch {
+		case o.opened:
 			fmt.Fprintf(b, "Opened the Airflow UI for Deployment %s: %s\n", ansi.Bold(res.Name), res.URL)
-			return
+		case o.attempted:
+			fmt.Fprintf(b, "Could not open the Airflow UI; open this link: %s\n", res.URL)
+		default:
+			fmt.Fprintf(b, "Airflow UI for Deployment %s: %s\n", ansi.Bold(res.Name), res.URL)
 		}
-		fmt.Fprintf(b, "Could not open the Airflow UI; open this link: %s\n", res.URL)
 	}))
 }
 

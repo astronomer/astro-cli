@@ -1364,20 +1364,23 @@ func (c *cli) stdio() localrt.Stdio {
 }
 
 func newOpenCmd(c *cli) *cobra.Command {
-	var printURL bool
+	var printURL, noOpen bool
 	cmd := &cobra.Command{
 		Use:   "open",
 		Short: "Open this project's Airflow UI in the browser",
+		Long: "Open this project's Airflow UI in the browser. With --print or --no-open, in CI, over SSH, " +
+			"under --output json, or with no terminal, it prints the URL on stdout and opens nothing.",
 		Example: "  # Open the Airflow UI\n" +
 			"  astro local open\n\n" +
 			"  # Print its URL instead\n" +
-			"  astro local open --print",
+			"  astro local open --no-open",
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return c.runOpen(printURL)
+			return c.runOpen(printURL || noOpen || !input.CanOpenBrowser())
 		},
 	}
 	cmd.Flags().BoolVar(&printURL, "print", false, "Print the URL instead of opening the browser")
+	cmd.Flags().BoolVar(&noOpen, "no-open", false, "Print the URL without opening the browser, like --print")
 	return cmd
 }
 
@@ -1408,7 +1411,11 @@ func (c *cli) runOpen(printURL bool) error {
 			return werr
 		})
 	}
-	return c.d.OpenURL(url)
+	fmt.Fprintf(c.d.Stderr, "Opening %s…\n", url)
+	if err := c.d.OpenURL(url); err != nil {
+		return fmt.Errorf("could not open the browser: %w; open %s", err, url)
+	}
+	return nil
 }
 
 func newResetCmd(c *cli) *cobra.Command {

@@ -80,6 +80,7 @@ var (
 	forDuration                string
 	removeOverride             bool
 	forceOverride              bool
+	deploymentNoOpen           bool
 	logApiserver               bool
 	logWebserver               bool
 	logScheduler               bool
@@ -756,7 +757,7 @@ func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "open [DEPLOYMENT_ID]",
 		Short: "Open a Deployment's Airflow UI in your browser",
-		Long:  "Open the Airflow UI of an Astro Deployment in your default browser. If the browser cannot be opened, the CLI prints the Airflow UI URL instead. Under --output json nothing is opened: the result carries the URL.",
+		Long:  "Open the Airflow UI of an Astro Deployment in your default browser. The CLI always prints the Airflow UI URL, and opens nothing with --no-open, under --output json, in CI, over SSH, or when there is no terminal. Under --output json the result carries the URL.",
 		Example: `  # Open a Deployment's Airflow UI
   astro deployment open <DEPLOYMENT_ID>
 
@@ -771,6 +772,7 @@ func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
 	}
 	addDeploymentFlag(cmd.Flags(), "Deployment whose Airflow UI to open: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
+	cmd.Flags().BoolVar(&deploymentNoOpen, "no-open", false, "Print the Airflow UI URL without opening the browser")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -1082,10 +1084,12 @@ func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// A person is shown the UI in a browser; a run under json reads its url
-	// from the result instead.
-	opened := deploymentOutput == cliout.FormatText && openDeploymentUI(res.URL)
-	return emitDeploymentUI(cliout.Renderer{Format: deploymentOutput, Out: out}, res, opened)
+	// A person at a terminal is shown the UI in a browser; a run under json,
+	// in CI or over SSH, or with --no-open, reads its url from the result or
+	// the line instead.
+	attempted := deploymentOutput == cliout.FormatText && !deploymentNoOpen && input.CanOpenBrowser()
+	opened := attempted && openDeploymentUI(res.URL)
+	return emitDeploymentUI(cliout.Renderer{Format: deploymentOutput, Out: out}, res, uiOpening{attempted: attempted, opened: opened})
 }
 
 func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Writer, isHibernating bool) error {
