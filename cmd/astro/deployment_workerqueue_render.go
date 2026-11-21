@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/workerqueue"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 var (
@@ -40,7 +41,7 @@ func emitLogs(cmd *cobra.Command, r cliout.Renderer, res *deployment.LogsResult)
 		if r.Format == cliout.FormatJSON {
 			w = cmd.ErrOrStderr()
 		}
-		_, err := fmt.Fprintf(w, "No matching logs have been recorded in the past %d hours for Deployment %s\n", res.Hours, res.DeploymentName)
+		_, err := fmt.Fprintf(w, "No matching logs have been recorded in the past %d hours for Deployment %s\n", res.Hours, input.Plain(res.DeploymentName))
 		return err
 	}
 	for i := range res.Entries {
