@@ -4,6 +4,7 @@ package pagination
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -97,4 +98,10 @@ func Interrupted(ctx context.Context) error {
 		return nil
 	}
 	return ctx.Err()
+}
+
+// IsInterrupt reports whether err is the run's cancellation or its deadline,
+// which a lookup returns as it is rather than reword with advice.
+func IsInterrupt(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }

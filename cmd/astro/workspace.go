@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
@@ -1034,7 +1035,7 @@ func deploymentWorkspace(cmd *cobra.Command, id, msg string) (ws string, client 
 		d, err := deployment.GetDeploymentByID(cmd.Context(), "", id, astroV1Client)
 		if err != nil {
 			// An interrupt is not a failed lookup.
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			if pagination.IsInterrupt(err) {
 				return "", astroV1Client, err
 			}
 			return "", astroV1Client, fmt.Errorf("no Workspace is selected, so Deployment %s was fetched by its id, which failed (pass --workspace to look it up in a Workspace instead): %w", id, err)

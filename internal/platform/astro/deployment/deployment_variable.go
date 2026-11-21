@@ -144,7 +144,9 @@ func VariableModify(
 			return nil, err
 		}
 	}
-	updated, err := GetDeploymentByID(ctx, "", currentDeployment.Id, astroV1Client)
+	// The variables are saved by now: the read that reports them is not
+	// canceled with the run, so a saved variable is not reported as a failure.
+	updated, err := GetDeploymentByID(context.WithoutCancel(ctx), "", currentDeployment.Id, astroV1Client)
 	if err != nil {
 		return nil, err
 	}

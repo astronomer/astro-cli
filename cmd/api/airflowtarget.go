@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/awsauth"
 	"github.com/astronomer/astro-cli/pkg/googleauth"
@@ -209,6 +210,9 @@ func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*
 	}
 	baseURL, token, id, err := resolveDeploymentAirflowURL(ctx, opts, name, &project)
 	if err != nil {
+		if pagination.IsInterrupt(err) {
+			return nil, err
+		}
 		// A name that matched no link is far more often a typo than a
 		// Deployment, so the names it could have been travel with the failure
 		// — first, when no Deployment had the name either, since the likeliest
@@ -430,6 +434,9 @@ func lookupDeployment(reqCtx context.Context, override, orgID, ref string, proje
 	if util.IsCUID(ref) {
 		dep, err := deployment.GetDeploymentByID(reqCtx, orgID, ref, client)
 		if err != nil {
+			if pagination.IsInterrupt(err) {
+				return astrov1.Deployment{}, err
+			}
 			return astrov1.Deployment{}, fmt.Errorf("fetching deployment: %w", err)
 		}
 		return dep, nil
@@ -456,6 +463,9 @@ func lookupDeployment(reqCtx context.Context, override, orgID, ref string, proje
 	}
 	deps, err := deployment.ListDeployments(reqCtx, ws, wsOrg, client)
 	if err != nil {
+		if pagination.IsInterrupt(err) {
+			return astrov1.Deployment{}, err
+		}
 		return astrov1.Deployment{}, &astrosession.WorkspaceError{
 			Workspace: ws, Source: run.WorkspaceSource, Err: err,
 			Before: "listing the Deployments in ",

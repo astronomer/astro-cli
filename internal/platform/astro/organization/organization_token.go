@@ -312,10 +312,7 @@ func UpdateToken(ctx httpContext.Context, id, name, newName, description, role s
 	// says that it did, with the token as it now is.
 	updated := token
 	if newName != "" || description != "" {
-		if err := pagination.Interrupted(ctx); err != nil {
-			return apitoken.Update{}, err
-		}
-		updated, err = updateNameAndDescription(&token, newName, description, cfg.Organization, client)
+		updated, err = updateNameAndDescription(ctx, &token, newName, description, cfg.Organization, client)
 		if err != nil {
 			if role != "" {
 				return apitoken.Update{Token: apitoken.FromAPI(&token, newRole), PreviousName: token.Name}, apitoken.RenameFailedAfterRole(role, err)
@@ -370,7 +367,12 @@ func DeleteToken(token astrov1.ApiToken, client astrov1.APIClient) (apitoken.Org
 // updateNameAndDescription sends token's new name and description, keeping
 // its own for whichever is "", and returns the token as the update left it:
 // the API's answer, or what was asked for when it gave none.
-func updateNameAndDescription(token *astrov1.ApiToken, newName, description, organizationID string, client astrov1.APIClient) (astrov1.ApiToken, error) {
+func updateNameAndDescription(ctx httpContext.Context, token *astrov1.ApiToken, newName, description, organizationID string, client astrov1.APIClient) (astrov1.ApiToken, error) {
+	// An interrupt after the role was written is an error the caller reports
+	// beside the role that changed.
+	if err := pagination.Interrupted(ctx); err != nil {
+		return astrov1.ApiToken{}, err
+	}
 	updateReq := astrov1.UpdateApiTokenJSONRequestBody{Name: token.Name}
 	if newName != "" {
 		updateReq.Name = newName

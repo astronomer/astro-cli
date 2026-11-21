@@ -318,10 +318,7 @@ func UpdateTeam(ctx httpContext.Context, id, name, description, role string, for
 	// role-only update is one call.
 	after := team
 	if name != "" || description != "" {
-		if err := pagination.Interrupted(ctx); err != nil {
-			return nil, err
-		}
-		after, err = renameTeam(&team, name, description, cfg.Organization, client)
+		after, err = renameTeam(ctx, &team, name, description, cfg.Organization, client)
 		if err != nil {
 			if role == "" {
 				return nil, err
@@ -344,7 +341,12 @@ func UpdateTeam(ctx httpContext.Context, id, name, description, role string, for
 // renameTeam sends team's new name and description, keeping its own for
 // whichever is "", and returns the team as the update left it: the API's
 // answer, or what was asked for when it gave none.
-func renameTeam(team *astrov1.Team, name, description, orgID string, client astrov1.APIClient) (astrov1.Team, error) {
+func renameTeam(ctx httpContext.Context, team *astrov1.Team, name, description, orgID string, client astrov1.APIClient) (astrov1.Team, error) {
+	// An interrupt after the role was written is an error the caller reports
+	// beside the role that changed.
+	if err := pagination.Interrupted(ctx); err != nil {
+		return astrov1.Team{}, err
+	}
 	req := astrov1.UpdateTeamJSONRequestBody{Name: team.Name, Description: team.Description}
 	if name != "" {
 		req.Name = name
@@ -909,7 +911,7 @@ func AddDeploymentTeam(ctx httpContext.Context, id, role, deploymentID string, c
 			return TeamInfo{}, ErrTeamNotFound
 		}
 	}
-	return setDeploymentTeamRole(client, cfg.Organization, deploymentID, role, &team)
+	return setDeploymentTeamRole(ctx, client, cfg.Organization, deploymentID, role, &team)
 }
 
 // UpdateDeploymentTeamRole sets the role on the Deployment of the team with
@@ -924,7 +926,7 @@ func UpdateDeploymentTeamRole(ctx httpContext.Context, id, role, deploymentID st
 	if err != nil {
 		return TeamInfo{}, err
 	}
-	return setDeploymentTeamRole(client, cfg.Organization, deploymentID, role, &team)
+	return setDeploymentTeamRole(ctx, client, cfg.Organization, deploymentID, role, &team)
 }
 
 // RemoveDeploymentTeam removes the role on the Deployment of the team with
@@ -939,7 +941,7 @@ func RemoveDeploymentTeam(ctx httpContext.Context, id, deploymentID string, clie
 	if err != nil {
 		return DeploymentRemoval{}, err
 	}
-	if _, err := setDeploymentTeamRole(client, cfg.Organization, deploymentID, "", &team); err != nil {
+	if _, err := setDeploymentTeamRole(ctx, client, cfg.Organization, deploymentID, "", &team); err != nil {
 		return DeploymentRemoval{}, err
 	}
 	return DeploymentRemoval{ID: team.Id, Name: team.Name, DeploymentID: deploymentID, Action: Removed}, nil
@@ -971,7 +973,10 @@ func deploymentTeam(ctx httpContext.Context, id, deploymentID string, client ast
 // setDeploymentTeamRole sets team's role on deploymentID to role, or removes
 // it when role is "", keeping every other role it holds, and returns the team
 // with that role.
-func setDeploymentTeamRole(client astrov1.APIClient, orgID, deploymentID, role string, team *astrov1.Team) (TeamInfo, error) {
+func setDeploymentTeamRole(ctx httpContext.Context, client astrov1.APIClient, orgID, deploymentID, role string, team *astrov1.Team) (TeamInfo, error) {
+	if err := pagination.Interrupted(ctx); err != nil {
+		return TeamInfo{}, err
+	}
 	req := astrov1.UpdateTeamRolesRequest{
 		OrganizationRole: teamOrgRole(*team),
 		WorkspaceRoles:   team.WorkspaceRoles,

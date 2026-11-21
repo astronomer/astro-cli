@@ -298,7 +298,7 @@ func tokenSearchWorkspace(ctx context.Context, tokenID string) (string, error) {
 	}
 	d, err := deployment.GetDeploymentByID(ctx, "", deploymentID, astroV1Client)
 	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		if pagination.IsInterrupt(err) {
 			return "", err
 		}
 		return "", fmt.Errorf("could not read Deployment %s to find the Workspace its Workspace tokens are in; pass --workspace: %w", deploymentID, err)
