@@ -38,3 +38,14 @@ func currentContextEditor() RequestEditorFn {
 		return ctx.Token, ctx.GetPublicRESTAPIURL("v1alpha1"), nil
 	})
 }
+
+// NewV1Alpha1ClientForLogin creates a v1alpha1 API client bound to one stored
+// login — its token and its host's v1alpha1 base URL — rather than to whichever
+// login the current-context pointer names at request time, as
+// astrov1.NewV1ClientForLogin does for v1.
+func NewV1Alpha1ClientForLogin(c *httputil.HTTPClient, token, baseURL string) *ClientWithResponses {
+	cl, _ := NewClientWithResponses("", WithHTTPClient(httputil.WithRateLimitRetries(c.HTTPClient)), WithRequestEditorFn(httputil.NewRequestEditorFn(func() (string, string, error) { //nolint:errcheck // same construction as NewV1Alpha1Client, which cannot fail with a base URL supplied per request
+		return token, baseURL, nil
+	})))
+	return cl
+}

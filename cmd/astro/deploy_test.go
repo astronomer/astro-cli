@@ -235,7 +235,7 @@ func TestDeployRefusesFlagsThatCannotAllApply(t *testing.T) {
 // passes --force, and a pyproject.toml project's deploy always took both.
 func TestDeployDropsThe1xOnlyFlags(t *testing.T) {
 	cmd := NewDeployCmd()
-	for _, name := range []string{"save", "pytest", "parse", "test", "env", "dags-path", "dag-bundle-name", "deployment-name", "non-dags", "non-dags-mount-path", "non-dags-local-path", "non-dags-bundle-type"} {
+	for _, name := range []string{"save", "pytest", "parse", "test", "env", "dags-path", "deployment-name", "non-dags", "non-dags-mount-path", "non-dags-local-path", "non-dags-bundle-type"} {
 		assert.Nil(t, cmd.Flags().Lookup(name), "--%s", name)
 	}
 	for _, letter := range []string{"s", "t", "e", "n"} {

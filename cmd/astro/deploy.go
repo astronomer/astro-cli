@@ -23,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/imageinstall"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -45,6 +46,7 @@ var (
 	image              bool
 	imageName          string
 	deployDescription  string
+	deployDagBundle    string
 	noDagsBaseDir      bool
 	manifestDeployment string
 	manifestWorkspace  string
@@ -57,6 +59,9 @@ var (
 
   # Deploy only the Dags
   astro deploy <DEPLOYMENT_ID> --dags
+
+  # Deploy only the Dags, to a named Dag bundle on the Deployment
+  astro deploy <DEPLOYMENT_ID> --dags --dag-bundle <BUNDLE_NAME>
 
   # Deploy an image built on this machine, from any directory
   astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>
@@ -108,12 +113,20 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&deployOutput, "output", "o", string(cliout.FormatText), "Output format: text or json")
 	cmd.Flags().StringVar(&deployDescription, "description", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
+	// A named Dag bundle is a Dag-side choice, like --dags, so it sits in that
+	// help section. --dag-bundle-name is 1.x's spelling: v2's flags name the
+	// thing, not its field (--deployment, --workspace), and the Dag bundle's
+	// name is what `astro deployment bundle create --name` set.
+	cmd.Flags().StringVar(&deployDagBundle, "dag-bundle", "", "Ship the Dags to this named Dag bundle on the Deployment instead of its default bundle. The bundle must already exist and be one deploys write (astro deployment bundle create --name). Needs Airflow 3 and Dag deploys; not valid with --image. Default: the link's dag-bundle in pyproject.toml, else the default bundle")
+	utils.RefuseEmpty(cmd.Flags().Lookup("dag-bundle"))
+	utils.AddAlias(cmd.Flags(), "dag-bundle-name", "dag-bundle")
 
 	annotateDeployFlag(cmd, "image", deployGroupImage)
 	annotateDeployFlag(cmd, imageNameFlag, deployGroupImage)
 	annotateDeployFlag(cmd, "build-secret", deployGroupImage)
 	annotateDeployFlag(cmd, "dags", deployGroupDAG)
 	annotateDeployFlag(cmd, "no-dags-base-dir", deployGroupDAG)
+	annotateDeployFlag(cmd, "dag-bundle", deployGroupDAG)
 	orderDeployFlagGroups(cmd)
 	// astro deploy bundle is the subcommand, so the word bundle is never a
 	// Deployment argument: a link of that name is reached with --deployment.
@@ -166,6 +179,14 @@ func deploy(cmd *cobra.Command, args []string) error {
 func refuseFlagCombinations(cmd *cobra.Command, inProject bool) error {
 	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
 		return cliout.Usage(errors.New("cannot use --wait-time with --wait=false"))
+	}
+	if deployDagBundle != "" {
+		switch {
+		case image:
+			return cliout.Usage(errors.New("cannot use --dag-bundle with --image: an image-only deploy ships no Dags, so there is no bundle to ship them to"))
+		case imageName != "" && !inProject:
+			return cliout.Usage(errors.New("cannot use --dag-bundle with --image-name outside a pyproject.toml project: the image ships alone, with no Dags"))
+		}
 	}
 	if cmd.Flags().Changed("no-dags-base-dir") {
 		switch {
@@ -330,6 +351,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		Wait:          waitForDeploy,
 		WaitTime:      waitTime,
 		NoDagsBaseDir: noDagsBaseDir,
+		DagBundle:     deployDagBundle,
 		Interactive:   interactive,
 		// Astro CLI 1.x's resolution, so a CI job setting BUILD_SECRET_INPUT
 		// keeps working across the version boundary rather than silently
@@ -395,12 +417,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		return manifestDeployErr(cmd, err)
 	}
 
-	if res.Git.Uncommitted {
-		recap.Note("the project has uncommitted changes, so this deploy records no git commit")
-	}
-	if note := projectGitMetadataOffNote(m, imageName); note != "" {
-		recap.Note(note)
-	}
+	deployNotes(recap, m, &res)
 	if !inProject {
 		w := imageAloneWarning(&res, imageName)
 		warnings = append(warnings, w)
@@ -408,6 +425,35 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	}
 	recap.Flush()
 	return renderManifestDeploy(out, format, &res, warnings)
+}
+
+// deployNotes gives the notes a finished deploy has: no commit recorded, and a
+// link's dag-bundle that a deploy shipping no Dags did not use.
+func deployNotes(recap *cliout.Recap, m *manifest.Manifest, res *manifestdeploy.Result) {
+	if res.Git.Uncommitted {
+		recap.Note("the project has uncommitted changes, so this deploy records no git commit")
+	}
+	if note := projectGitMetadataOffNote(m, imageName); note != "" {
+		recap.Note(note)
+	}
+	if note := skippedLinkDagBundleNote(m, res.LinkName, image); note != "" {
+		recap.Note(note)
+	}
+}
+
+// skippedLinkDagBundleNote is the note a deploy that ships no Dags (--image)
+// gives when the link it deployed to sets a dag-bundle in pyproject.toml: the
+// setting applies to the Dags, so it was not used. "" when nothing was skipped.
+// A deploy outside a project has no manifest (m nil) and no link.
+func skippedLinkDagBundleNote(m *manifest.Manifest, link string, imageOnly bool) string {
+	if m == nil || link == "" || !imageOnly {
+		return ""
+	}
+	bundle := m.Astro.Deployments[link].DagBundle
+	if bundle == "" {
+		return ""
+	}
+	return fmt.Sprintf("dag-bundle = %q under [tool.astro.deployments.%s] in pyproject.toml was not used: --image ships no Dags", bundle, link)
 }
 
 // onceEngine memoizes an engine resolver, so a deploy resolves its engine
@@ -494,6 +540,9 @@ type deployJSON struct {
 	Type             string `json:"type"`
 	ImageTag         string `json:"image_tag,omitempty"`
 	DagBundleVersion string `json:"dag_bundle_version,omitempty"`
+	// DagBundle is the named Dag bundle the Dags were shipped to, omitted when
+	// they went to the Deployment's default bundle.
+	DagBundle string `json:"dag_bundle,omitempty"`
 	// DagsInImage is set on an image-and-dag deploy to a Deployment with DAG
 	// deploys off, which uploads no DAGs: the Deployment runs those inside
 	// the image.
@@ -568,6 +617,7 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 		Type:             res.Type,
 		ImageTag:         res.ImageTag,
 		DagBundleVersion: res.DagTarballVersion,
+		DagBundle:        res.DagBundle,
 		DagsInImage:      res.DagsInImage,
 		RemoteExecution:  res.RemoteExecution,
 		RuntimeVersion:   res.RuntimeVersion,
@@ -580,7 +630,7 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 		target := deployTargetName(res)
 		switch res.Type {
 		case "dag-only":
-			fmt.Fprintf(b, "Deployed Dags (version %s) to %s.\n", res.DagTarballVersion, target)
+			fmt.Fprintf(b, "Deployed Dags (version %s) to %s%s.\n", res.DagTarballVersion, inDagBundle(res), target)
 		case "image-only":
 			fmt.Fprintf(b, "Deployed image (tag %s) to %s.\n", res.ImageTag, target)
 		case "image-and-dag":
@@ -594,12 +644,21 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 			}
 			fallthrough
 		default:
-			fmt.Fprintf(b, "Deployed image (tag %s) and Dags (version %s) to %s.\n", res.ImageTag, res.DagTarballVersion, target)
+			fmt.Fprintf(b, "Deployed image (tag %s) and Dags (version %s) to %s%s.\n", res.ImageTag, res.DagTarballVersion, inDagBundle(res), target)
 		}
 		if res.URL != "" {
 			fmt.Fprintf(b, "Deployment: %s\n", res.URL)
 		}
 	}))
+}
+
+// inDagBundle is what the summary line adds when the Dags went to a named Dag
+// bundle: "Dag bundle nightly on ", nothing for the default bundle.
+func inDagBundle(res *manifestdeploy.Result) string {
+	if res.DagBundle == "" {
+		return ""
+	}
+	return "Dag bundle " + res.DagBundle + " on "
 }
 
 // deployTargetName is what the summary line calls where the code went: the link
@@ -632,6 +691,9 @@ func manifestDeployErr(cmd *cobra.Command, err error) error {
 type deployLogin struct {
 	context config.Context
 	client  astrov1.APIClient
+	// alpha is the v1alpha1 client for the same login, which a deploy to a
+	// named Dag bundle goes through: only that API takes the bundle's name.
+	alpha astrov1alpha1.APIClient
 	// current reports the login is the current context's, which the
 	// workspace-level deployment picker assumes.
 	current bool
@@ -660,7 +722,7 @@ func (l *deployLogin) selection() *config.Context {
 func loginForDeploy(ctx context.Context, domain string) (deployLogin, error) {
 	current, _ := config.GetCurrentContext() //nolint:errcheck // with no context, the transport reports it as it always has
 	if domain == "" || manifest.NormalizeDomain(current.Domain) == domain {
-		return deployLogin{context: current, client: astroV1Client, current: true}, nil
+		return deployLogin{context: current, client: astroV1Client, alpha: astroV1Alpha1Client, current: true}, nil
 	}
 	token, err := astrosession.BearerFor(ctx, domain)
 	if err != nil {
@@ -682,6 +744,7 @@ func loginForDeploy(ctx context.Context, domain string) (deployLogin, error) {
 	return deployLogin{
 		context: login,
 		client:  astrov1.NewV1ClientForLogin(httputil.NewHTTPClient(), token, login.GetPublicRESTAPIURL("v1")),
+		alpha:   astrov1alpha1.NewV1Alpha1ClientForLogin(httputil.NewHTTPClient(), token, login.GetPublicRESTAPIURL("v1alpha1")),
 	}, nil
 }
 
@@ -833,6 +896,7 @@ func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdepl
 		GitMetadata:   gitMetadataAllowed(in.GitMetadata),
 		CosmosBoost:   in.CosmosBoost,
 		Progress:      d.errOut,
+		DagBundle:     d.dagBundle(in.DagBundle, in.DagBundleLink),
 	}, d.login.client)
 	if err != nil {
 		return manifestdeploy.DagResult{}, err
@@ -844,6 +908,15 @@ func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdepl
 		URL:               res.URL,
 		Git:               toManifestDeployGit(res.Git),
 	}, nil
+}
+
+// dagBundle is the named Dag bundle a deploy ships to, with the client that
+// reaches it under the deploy's login; nil for the Deployment's default bundle.
+func (d manifestDeployer) dagBundle(name, link string) *astrodeploy.DagBundle {
+	if name == "" {
+		return nil
+	}
+	return &astrodeploy.DagBundle{Name: name, Client: d.login.alpha, Link: link}
 }
 
 func toManifestDeployGit(g astrodeploy.ManifestDeployGit) manifestdeploy.Git {
@@ -887,6 +960,7 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		CosmosBoost:    in.CosmosBoost,
 		Progress:       d.errOut,
 		ResolveInstall: imageinstall.Fill,
+		DagBundle:      d.dagBundle(in.DagBundle, in.DagBundleLink),
 	}, d.login.client)
 	if err != nil {
 		return manifestdeploy.ImageResult{}, err

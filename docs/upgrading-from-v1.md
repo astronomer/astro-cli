@@ -141,7 +141,7 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `--deployment-name`, `-n` | the argument, or `--deployment`, either taking a link name or a Deployment id | `astro deploy` |
 | `--save`, `-s` | name the Deployment on each deploy; link it with `astro link add` (an `apc` link under an Astro Private Cloud context) and mark it `default = true` to preselect it | `astro deploy` |
 | `--dags-path` | `astro deploy --dags` from the project, which ships its `dags/` | `astro deploy` |
-| `--dag-bundle-name` | no replacement yet: use Astro CLI 1.x | `astro deploy` |
+| `--dag-bundle-name` | `--dag-bundle`, kept as a hidden alias of it; or `dag-bundle` on the Deployment's link in `[tool.astro.deployments]` | `astro deploy` |
 | `--no-cache` | no replacement: the build uses the container engine's cache; clear it with `docker builder prune` to build from nothing | `astro deploy` on Astro Private Cloud |
 | `--non-dags` | `astro deploy bundle [PATH]`, which detects a dbt project and gives it a mount path | `astro deploy` |
 | `--non-dags-local-path` | the PATH argument of `astro deploy bundle` | `astro deploy` |

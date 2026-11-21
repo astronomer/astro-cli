@@ -10,6 +10,7 @@ tool (
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/astronomer/astro-cli/pkg/telemetry v0.0.0
+	github.com/astronomer/astro-cli/pkg/termtext v0.0.0-00010101000000-000000000000
 	github.com/briandowns/spinner v1.23.1
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
@@ -171,6 +172,8 @@ replace github.com/astronomer/astro-cli/pkg/container => ./pkg/container
 replace github.com/astronomer/astro-cli/pkg/astroauth => ./pkg/astroauth
 
 replace github.com/astronomer/astro-cli/pkg/telemetry => ./pkg/telemetry
+
+replace github.com/astronomer/astro-cli/pkg/termtext => ./pkg/termtext
 
 replace github.com/astronomer/astro-cli/pkg/localrt => ./pkg/localrt
 

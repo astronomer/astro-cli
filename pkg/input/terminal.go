@@ -5,8 +5,9 @@ import (
 	"io"
 	"regexp"
 	"strings"
-	"unicode"
 	"unicode/utf8"
+
+	"github.com/astronomer/astro-cli/pkg/termtext"
 )
 
 // sgr is a Select Graphic Rendition sequence, ESC [ params m: color, bold,
@@ -20,16 +21,16 @@ var sgr = regexp.MustCompile("^\x1b\\[[0-9;:]*m$")
 // know whether the stream ends styled.
 var sgrAny = regexp.MustCompile("\x1b\\[[0-9;:]*m")
 
-// ansiEscapeAtStart is ansiEscape anchored at the start of its input, for
+// escapeAtStart is termtext.Escape anchored at the start of its input, for
 // TerminalWriter to tell a complete sequence from one a later write finishes.
-var ansiEscapeAtStart = regexp.MustCompile("^(?:" + ansiEscape.String() + ")")
+var escapeAtStart = regexp.MustCompile("^(?:" + termtext.Escape.String() + ")")
 
 // Terminal is text as a terminal is given it: with the SGR styling it carries
 // (sgr), and without anything else a terminal acts on rather than shows. That
 // means other escape sequences (a clipboard write or a title (OSC), a cursor
 // move or a screen clear (CSI), a device control string), a lone ESC, any other
 // control character (a bell, a backspace, a carriage return that would let a
-// later part of a line overwrite an earlier one) and misleadingRune
+// later part of a line overwrite an earlier one) and termtext.Misleading
 // characters. Line breaks and tabs stay, and a CRLF line break becomes a
 // newline.
 //
@@ -41,7 +42,7 @@ func Terminal(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	last := 0
-	for _, m := range ansiEscape.FindAllStringIndex(s, -1) {
+	for _, m := range termtext.Escape.FindAllStringIndex(s, -1) {
 		b.WriteString(terminalText(s[last:m[0]]))
 		if seq := s[m[0]:m[1]]; sgr.MatchString(seq) {
 			b.WriteString(seq)
@@ -53,19 +54,9 @@ func Terminal(s string) string {
 }
 
 // terminalText is a stretch of Terminal's input between escape sequences:
-// control characters but a line break and a tab, and misleadingRune
-// characters, removed.
-func terminalText(s string) string {
-	return strings.Map(func(r rune) rune {
-		if r == '\n' || r == '\t' {
-			return r
-		}
-		if unicode.IsControl(r) || misleadingRune(r) {
-			return -1
-		}
-		return r
-	}, s)
-}
+// control characters but a line break and a tab, and termtext.Misleading
+// characters, removed (termtext.Shown).
+func terminalText(s string) string { return strings.Map(termtext.Shown, s) }
 
 // esc is the byte every escape sequence starts with.
 const esc = 0x1b
@@ -165,7 +156,7 @@ func heldFrom(buf []byte) int {
 			break
 		}
 		j += i
-		if m := ansiEscapeAtStart.FindIndex(buf[j:]); m != nil {
+		if m := escapeAtStart.FindIndex(buf[j:]); m != nil {
 			i = j + m[1]
 			continue
 		}
@@ -190,7 +181,7 @@ func heldFrom(buf []byte) int {
 // couldContinue reports whether seq, which starts with ESC and is not a whole
 // sequence, could become one with more bytes: an ESC alone, or the start of a
 // CSI, an OSC or a device control string that has not reached its end. Any
-// other ESC is not the start of a sequence ansiEscape knows, and is released
+// other ESC is not the start of a sequence termtext.Escape knows, and is released
 // for Terminal to drop.
 func couldContinue(seq []byte) bool {
 	if len(seq) == 1 {

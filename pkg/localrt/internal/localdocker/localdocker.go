@@ -32,6 +32,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/proxy"
+	"github.com/astronomer/astro-cli/pkg/termtext"
 )
 
 const (
@@ -980,8 +981,9 @@ func (a *airflow) Logs(ctx context.Context, opts rt.LogOptions) error {
 	args = append(args, opts.Components...)
 
 	w := &rt.LineWriter{Emit: func(line string) {
-		// Escapes are dropped for both sinks, as the standalone engine does.
-		line = rt.StripEscapes(line)
+		// What a terminal would act on is dropped for both sinks, by the
+		// rules the standalone engine and the CLI use (termtext.Lines).
+		line = termtext.Lines(line)
 		l := parseLogLine(line, a.eng.now)
 		if opts.OnLine != nil {
 			opts.OnLine(l)

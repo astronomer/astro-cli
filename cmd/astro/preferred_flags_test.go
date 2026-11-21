@@ -231,11 +231,11 @@ var aliasTrees = map[string]func() *cobra.Command{
 var (
 	aliasValue = map[string]string{
 		"deployment-id": unlinkedDep, "deployment-name": "my-dep", "workspace-id": projectWS,
-		"org-token-name": "my-org-token", "workspace-token-name": "my-ws-token",
+		"org-token-name": "my-org-token", "workspace-token-name": "my-ws-token", "dag-bundle-name": "nightly",
 	}
 	aliasOther = map[string]string{
 		"deployment-id": otherDep, "deployment-name": "other-dep", "workspace-id": "clotherworkspace000000001",
-		"org-token-name": "other-org-token", "workspace-token-name": "other-ws-token",
+		"org-token-name": "other-org-token", "workspace-token-name": "other-ws-token", "dag-bundle-name": "weekly",
 	}
 )
 
@@ -278,12 +278,13 @@ func aliasUses(t *testing.T) []aliasUse {
 // its Deployment id and name, an id standing for its argument, its workspace,
 // and, on a token command that takes its token by --name (whose 1.x spellings
 // were --org-token-name and --workspace-token-name), that name.
-type resolvedSpellings struct{ id, name, arg, workspace, tokenName string }
+type resolvedSpellings struct{ id, name, arg, workspace, tokenName, dagBundle string }
 
 func resolveSpellings(t *testing.T, u *aliasUse, args ...string) (resolvedSpellings, error) {
 	t.Helper()
 	t.Cleanup(func() {
 		deploymentID, deploymentName, workspaceID = "", "", ""
+		deployDagBundle = ""
 		resetEnvFlags()
 	})
 	cmd, _, err := aliasTrees[u.tree]().Find(u.path)
@@ -307,6 +308,9 @@ func resolveSpellings(t *testing.T, u *aliasUse, args ...string) (resolvedSpelli
 	}
 	if u.preferred == "name" {
 		r.tokenName = cmd.Flags().Lookup("name").Value.String()
+	}
+	if u.preferred == "dag-bundle" {
+		r.dagBundle = cmd.Flags().Lookup("dag-bundle").Value.String()
 	}
 	return r, nil
 }

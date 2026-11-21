@@ -52,13 +52,12 @@ const (
 	// Astro CLI 1.x, flags and all.
 	errDeploySaveRemoved = "astro deploy asks which Deployment to deploy to unless you name one, as the argument or with --deployment. " +
 		"To preselect one in that list, link it with astro link add and mark it default = true under [tool.astro.deployments]"
-	errDeployPytestRemoved     = "run your tests before deploying, with uv run pytest && astro deploy"
-	errDeployTestRemoved       = "run your tests before deploying, with uv run pytest <path> && astro deploy"
-	errDeployEnvRemoved        = "astro deploy runs no tests, so it reads no test env file. Run your tests with uv run pytest before deploying"
-	errDeployParseRemoved      = "check your Dags before deploying, with astro local check && astro deploy"
-	errDeployDagsPathRemoved   = "astro deploy --dags ships the project's dags directory, so run it from the project"
-	errDeployBundleNameRemoved = "deploying to a named Dag bundle is not supported yet. Use Astro CLI 1.x for it"
-	errDeployNameRemoved       = "name the Deployment as the argument or with --deployment, which take a link name or a Deployment id"
+	errDeployPytestRemoved   = "run your tests before deploying, with uv run pytest && astro deploy"
+	errDeployTestRemoved     = "run your tests before deploying, with uv run pytest <path> && astro deploy"
+	errDeployEnvRemoved      = "astro deploy runs no tests, so it reads no test env file. Run your tests with uv run pytest before deploying"
+	errDeployParseRemoved    = "check your Dags before deploying, with astro local check && astro deploy"
+	errDeployDagsPathRemoved = "astro deploy --dags ships the project's dags directory, so run it from the project"
+	errDeployNameRemoved     = "name the Deployment as the argument or with --deployment, which take a link name or a Deployment id"
 	// astro deploy --non-dags became astro deploy bundle, a subcommand of
 	// its own with the bundle's directory as its argument.
 	errDeployNonDagsRemoved = "use astro deploy bundle [PATH] --deployment <Deployment id, name or link name>, " +
@@ -236,7 +235,6 @@ var removedFlags = []removedFlag{
 	{name: "env", under: []string{"deploy"}, reason: says(errDeployEnvRemoved)},
 	{name: "parse", under: []string{"deploy"}, reason: says(errDeployParseRemoved)},
 	{name: "dags-path", under: []string{"deploy"}, reason: says(errDeployDagsPathRemoved)},
-	{name: "dag-bundle-name", under: []string{"deploy"}, reason: says(errDeployBundleNameRemoved)},
 	{name: "deployment-name", under: []string{"deploy"}, reason: says(errDeployNameRemoved)},
 	{name: "no-cache", under: []string{"deploy"}, reason: says(errAPCDeployNoCache)},
 	{name: "non-dags", under: []string{"deploy"}, reason: says(errDeployNonDagsRemoved)},
