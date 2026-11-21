@@ -82,6 +82,7 @@ var coreBelowCmd = []string{
 	"pkg/airflowrt",
 	"pkg/picker",
 	"pkg/texttable",
+	"pkg/termtext",
 }
 
 // coreConfigReaders lists the core packages that read config/ on purpose. Each
