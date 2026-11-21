@@ -678,7 +678,12 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 	}
 
 	// A bound, since a renewal holds the login-renewal lock while it waits.
-	client := &http.Client{Timeout: refreshTimeout}
+	// A token endpoint never redirects, and a followed 307 or 308 would send
+	// the form, refresh token included, to the address it names.
+	client := &http.Client{
+		Timeout:       refreshTimeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
 
 	r, err := http.NewRequestWithContext(http_context.Background(), http.MethodPost, addr, strings.NewReader(data.Encode())) // URL-encoded payload
 	if err != nil {
@@ -697,6 +702,10 @@ func refresh(refreshToken string, authConfig auth.Config) (TokenResponse, error)
 	// offered a browser login for it.
 	if res.StatusCode >= http.StatusInternalServerError || res.StatusCode == http.StatusTooManyRequests {
 		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: %w", httputil.NewTransientStatusError(res.StatusCode))
+	}
+
+	if res.StatusCode >= http.StatusMultipleChoices && res.StatusCode < http.StatusBadRequest {
+		return TokenResponse{}, fmt.Errorf("cannot get a new access token from the refresh token: the token endpoint answered with a redirect (%d), which is not followed", res.StatusCode)
 	}
 
 	var tokenRes TokenResponse
