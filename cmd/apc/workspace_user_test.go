@@ -77,17 +77,17 @@ func (s *Suite) TestWorkspaceUserAdd() {
 	// success case
 	buf := new(bytes.Buffer)
 	workspaceUserWsRole = houston.WorkspaceAdminRole
-	err := workspaceUserAdd(buf)
+	err := workspaceUserAdd(buf, io.Discard)
 	s.NoError(err)
 
 	// houston error case
 	houstonMock.On("AddWorkspaceUser", mock.Anything).Return(nil, errMockHouston).Once()
-	err = workspaceUserAdd(buf)
+	err = workspaceUserAdd(buf, io.Discard)
 	s.ErrorIs(err, errMockHouston)
 
 	// invalid role case
 	workspaceUserWsRole = "invalid-role"
-	err = workspaceUserAdd(buf)
+	err = workspaceUserAdd(buf, io.Discard)
 	s.Error(err)
 	s.Contains(err.Error(), "could not find a valid role")
 
@@ -115,17 +115,17 @@ func (s *Suite) TestWorkspaceUserUpdate() {
 	// success case
 	buf := new(bytes.Buffer)
 	workspaceUserWsRole = houston.WorkspaceAdminRole
-	err := workspaceUserUpdate(buf, []string{mockEmail})
+	err := workspaceUserUpdate(buf, io.Discard, []string{mockEmail})
 	s.NoError(err)
 
 	// houston error case
 	houstonMock.On("UpdateWorkspaceUserRole", mock.Anything).Return("", errMockHouston).Once()
-	err = workspaceUserUpdate(buf, []string{mockEmail})
+	err = workspaceUserUpdate(buf, io.Discard, []string{mockEmail})
 	s.ErrorIs(err, errMockHouston)
 
 	// invalid role case
 	workspaceUserWsRole = "invalid-role"
-	err = workspaceUserUpdate(buf, []string{mockEmail})
+	err = workspaceUserUpdate(buf, io.Discard, []string{mockEmail})
 	s.Error(err)
 	s.Contains(err.Error(), "could not find a valid role")
 
@@ -159,7 +159,7 @@ func (s *Suite) TestWorkspaceUserList() {
 	defer func() { houstonClient = currentClient }()
 
 	buf := new(bytes.Buffer)
-	err = workspaceUserList(buf)
+	err = workspaceUserList(buf, io.Discard)
 	s.NoError(err)
 	content := buf.String()
 	s.Contains(content, mockResponse[0].Username)
@@ -209,7 +209,7 @@ func (s *Suite) TestWorkspaceUserListPaginated() {
 		os.Stdin = r
 
 		paginated = true
-		err = workspaceUserList(buf)
+		err = workspaceUserList(buf, io.Discard)
 		s.NoError(err)
 		content := buf.String()
 		s.Contains(content, mockResponse[0].Username)
@@ -259,7 +259,7 @@ func (s *Suite) TestWorkspaceUserListPaginated() {
 
 		paginated = true
 		pageSize = -10
-		err = workspaceUserList(buf)
+		err = workspaceUserList(buf, io.Discard)
 		s.NoError(err)
 		content := buf.String()
 		s.Contains(content, mockResponse[0].Username)

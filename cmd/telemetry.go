@@ -50,7 +50,7 @@ While you are logged in, events are linked to your Astro organization so we can 
 
 No personally identifiable information is collected. You can opt out at any time using 'astro telemetry disable' or by setting the ASTRO_TELEMETRY_DISABLED=1 environment variable.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runTelemetry(out, telemetryStatus)
+			return runTelemetry(out, cmd.ErrOrStderr(), telemetryStatus)
 		},
 	}
 	cliout.AddOutputFlag(cmd, &telemetryOutput)
@@ -67,7 +67,7 @@ func newTelemetryEnableCmd(out io.Writer) *cobra.Command {
 		Short: "Enable anonymous telemetry",
 		Long:  "Enable anonymous telemetry collection for the Astro CLI.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runTelemetry(out, telemetryEnable)
+			return runTelemetry(out, cmd.ErrOrStderr(), telemetryEnable)
 		},
 		Example: `  # Turn telemetry back on
   astro telemetry enable`,
@@ -81,7 +81,7 @@ func newTelemetryDisableCmd(out io.Writer) *cobra.Command {
 		Short: "Disable anonymous telemetry",
 		Long:  "Disable anonymous telemetry collection for the Astro CLI.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runTelemetry(out, telemetryDisable)
+			return runTelemetry(out, cmd.ErrOrStderr(), telemetryDisable)
 		},
 		Example: `  # Stop sending anonymous telemetry
   astro telemetry disable`,
@@ -91,13 +91,13 @@ func newTelemetryDisableCmd(out io.Writer) *cobra.Command {
 
 // runTelemetry runs one of the telemetry commands, which returns the line text
 // prints, and publishes the state it left.
-func runTelemetry(out io.Writer, run func() (string, error)) error {
+func runTelemetry(out, errOut io.Writer, run func() (string, error)) error {
 	line, err := run()
 	if err != nil {
 		return err
 	}
 	state := currentTelemetryState()
-	return cliout.Renderer{Format: telemetryOutput, Out: out}.Emit(&state, cliout.Text(func(b *bufio.Writer) {
+	return cliout.Renderer{Format: telemetryOutput, Out: out, Err: errOut}.Emit(&state, cliout.Text(func(b *bufio.Writer) {
 		fmt.Fprintln(b, line)
 	}))
 }

@@ -50,8 +50,8 @@ func mayPick(what, answeredBy string) error {
 // renderLines renders v as lines of text, or as itself in json. Each line is
 // printed as input.Lines has it: the lines name a team, a user or an email as
 // the API returned it, and a terminal would act on an escape in one.
-func renderLines(format cliout.Format, out io.Writer, v any, lines ...string) error {
-	return cliout.Renderer{Format: format, Out: out}.Emit(v, cliout.Text(func(b *bufio.Writer) {
+func renderLines(format cliout.Format, out, errOut io.Writer, v any, lines ...string) error {
+	return cliout.Renderer{Format: format, Out: out, Err: errOut}.Emit(v, cliout.Text(func(b *bufio.Writer) {
 		for _, l := range lines {
 			fmt.Fprintln(b, input.Lines(l))
 		}
@@ -60,7 +60,7 @@ func renderLines(format cliout.Format, out io.Writer, v any, lines ...string) er
 
 // renderTeamUpdate renders what an organization team update did, naming the
 // team as it now is. A declined question is err, input.ErrAborted.
-func renderTeamUpdate(format cliout.Format, out io.Writer, upd *team.Update, err error) error {
+func renderTeamUpdate(format cliout.Format, out, errOut io.Writer, upd *team.Update, err error) error {
 	if err != nil {
 		return err
 	}
@@ -68,12 +68,12 @@ func renderTeamUpdate(format cliout.Format, out io.Writer, upd *team.Update, err
 	if upd.RoleChanged {
 		lines = append(lines, fmt.Sprintf("Updated team %s to %s", upd.Team.Name, upd.Team.OrgRole))
 	}
-	return renderLines(format, out, &upd.Team, lines...)
+	return renderLines(format, out, errOut, &upd.Team, lines...)
 }
 
 // renderMembership renders a team user add or remove, naming the user by
 // email, or by ID when it has none.
-func renderMembership(format cliout.Format, out io.Writer, m *team.Membership) error {
+func renderMembership(format cliout.Format, out, errOut io.Writer, m *team.Membership) error {
 	verb := "Added"
 	prep := "to"
 	if m.Action == team.Removed {
@@ -84,7 +84,7 @@ func renderMembership(format cliout.Format, out io.Writer, m *team.Membership) e
 	if who == "" {
 		who = m.UserID
 	}
-	return renderLines(format, out, m, fmt.Sprintf("%s user %s %s team %s", verb, who, prep, m.TeamName))
+	return renderLines(format, out, errOut, m, fmt.Sprintf("%s user %s %s team %s", verb, who, prep, m.TeamName))
 }
 
 // teamLabel is how the text of a workspace team command names t: by name, or

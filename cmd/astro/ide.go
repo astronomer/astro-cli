@@ -56,7 +56,7 @@ func newIDEListProjectCmd(out io.Writer) *cobra.Command {
 		Short:   "List all Astro IDE projects in your Workspace",
 		Long:    "List all Astro IDE projects in your Workspace and optionally select one for future commands.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listIDEProjects(out)
+			return listIDEProjects(out, cmd.ErrOrStderr())
 		},
 		Example: `  # List all IDE projects in your workspace
   astro ide project list`,
@@ -112,12 +112,12 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listIDEProjects(out io.Writer) error {
+func listIDEProjects(out, errOut io.Writer) error {
 	list, err := ide.List(astroV1Alpha1Client)
 	if err != nil {
 		return err
 	}
-	return emitIDEProjects(cliout.Renderer{Format: ideProjectOutput, Out: out}, list)
+	return emitIDEProjects(cliout.Renderer{Format: ideProjectOutput, Out: out, Err: errOut}, list)
 }
 
 func importIDEProject(cmd *cobra.Command, out io.Writer) error {

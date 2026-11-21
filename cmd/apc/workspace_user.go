@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -53,7 +52,7 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
   astro workspace user add user@company.com --role WORKSPACE_EDITOR \
     --workspace <WORKSPACE_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceUserAdd(out)
+			return workspaceUserAdd(out, cmd.ErrOrStderr())
 		},
 	}, cliout.Optional("EMAIL")), argOrFlag("email", "email"))
 	cmd.Flags().StringVar(&workspaceUserWsRole, "role", houston.WorkspaceViewerRole, "Role assigned to user")
@@ -71,7 +70,7 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
 		Example: `  # Make a user an admin of the current Workspace
   astro workspace user update user@company.com --role WORKSPACE_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceUserUpdate(out, args)
+			return workspaceUserUpdate(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Required("EMAIL"))
 	cmd.Flags().StringVar(&workspaceUserWsRole, "role", houston.WorkspaceViewerRole, "Role assigned to user")
@@ -88,7 +87,7 @@ func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
 		Example: `  # Remove a user from the current Workspace
   astro workspace user remove user@company.com`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceUserRemove(out, args)
+			return workspaceUserRemove(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Required("EMAIL"))
 	addAccessOutputFlag(cmd)
@@ -107,7 +106,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
   # List the users in another Workspace
   astro workspace user list --workspace <WORKSPACE_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceUserList(out)
+			return workspaceUserList(out, cmd.ErrOrStderr())
 		},
 	}
 	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
@@ -118,8 +117,8 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func workspaceUserAdd(out io.Writer) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func workspaceUserAdd(out, errOut io.Writer) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("could not find a valid Workspace: %w", err)
@@ -136,8 +135,8 @@ func workspaceUserAdd(out io.Writer) error {
 	return renderWorkspaceUserAdded(r, w, workspaceUserCreateEmail, &added)
 }
 
-func workspaceUserUpdate(out io.Writer, args []string) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func workspaceUserUpdate(out, errOut io.Writer, args []string) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("could not find a valid Workspace: %w", err)
@@ -154,8 +153,8 @@ func workspaceUserUpdate(out io.Writer, args []string) error {
 	return renderWorkspaceUserUpdated(r, args[0], &change)
 }
 
-func workspaceUserRemove(out io.Writer, args []string) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func workspaceUserRemove(out, errOut io.Writer, args []string) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("could not find a valid Workspace: %w", err)
@@ -180,8 +179,8 @@ func workspaceUserRemove(out io.Writer, args []string) error {
 // through a list by asking which page to show next, and json asks nothing.
 var errListPaginatedUnderJSON = errors.New("--paginated asks which page to show next and cannot be used with --output json; leave it out to print the full list")
 
-func workspaceUserList(out io.Writer) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func workspaceUserList(out, errOut io.Writer) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	if paginated && r.Format == cliout.FormatJSON {
 		return cliout.Usage(errListPaginatedUnderJSON)
 	}
@@ -199,7 +198,7 @@ func workspaceUserList(out io.Writer) error {
 		}
 
 		if !(pageSize > 0 && pageSize <= defaultWorkspaceUserPageSize) {
-			cliout.Warn(os.Stderr, fmt.Sprintf("page size can be at most %d; using %d", defaultWorkspaceUserPageSize, defaultWorkspaceUserPageSize))
+			cliout.Warn(errOut, fmt.Sprintf("page size can be at most %d; using %d", defaultWorkspaceUserPageSize, defaultWorkspaceUserPageSize))
 			pageSize = defaultWorkspaceUserPageSize
 		}
 

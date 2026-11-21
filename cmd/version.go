@@ -25,7 +25,7 @@ func newVersionCommand() *cobra.Command {
 		Short: "Print the Astro CLI version",
 		Long:  `Print the Astro CLI version.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cliout.Renderer{Format: output, Out: cmd.OutOrStdout()}.Emit(
+			return cliout.Renderer{Format: output, Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr()}.Emit(
 				versionOutput{Version: version.Current()},
 				version.PrintVersion,
 			)
@@ -54,7 +54,7 @@ func addVersionFlag(fs *pflag.FlagSet) {
 // asks for help is left to cobra. A command that reads its own arguments
 // (flag parsing off), a flag that takes the word --version as its value, and
 // anything after "--" are not asks.
-func printVersionIfAsked(root *cobra.Command, args []string, out io.Writer) (bool, error) {
+func printVersionIfAsked(root *cobra.Command, args []string, out, errOut io.Writer) (bool, error) {
 	if isShellCompletion(args) || hasHelpFlag(args) {
 		return false, nil
 	}
@@ -69,7 +69,7 @@ func printVersionIfAsked(root *cobra.Command, args []string, out io.Writer) (boo
 	if cliout.ArgsAskForJSON(args, "o") {
 		format = cliout.FormatJSON
 	}
-	return true, cliout.Renderer{Format: format, Out: out}.Emit(versionOutput{Version: version.Current()}, version.PrintVersion)
+	return true, cliout.Renderer{Format: format, Out: out, Err: errOut}.Emit(versionOutput{Version: version.Current()}, version.PrintVersion)
 }
 
 func hasVersionFlag(cmd *cobra.Command, args []string) bool {

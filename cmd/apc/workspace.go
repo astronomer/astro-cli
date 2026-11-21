@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -68,7 +67,7 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 		Long:    "List APC Workspaces",
 		Example: `  astro workspace list`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceList(out)
+			return workspaceList(out, cmd.ErrOrStderr())
 		},
 	}
 	cliout.AddOutputFlag(cmd, &workspaceOutput)
@@ -84,7 +83,7 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 		Example: `  # Create a Workspace with a name and a description
   astro workspace create --name my-workspace --description "Production pipelines"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceCreate(out)
+			return workspaceCreate(out, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().StringVarP(&workspaceCreateLabel, "name", "n", "", "Name of the new Workspace")
@@ -104,7 +103,7 @@ func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 		Long:    "Delete an APC Workspace. This cannot be undone; it asks for confirmation unless --yes is given.",
 		Example: workspaceDeleteExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceDelete(out, args)
+			return workspaceDelete(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Required("WORKSPACE_ID"))
 	addYesFlag(cmd, "Don't ask for confirmation before deleting the Workspace")
@@ -124,7 +123,7 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
   # Choose a Workspace from a list
   astro workspace switch`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceSwitch(out, args)
+			return workspaceSwitch(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Optional("WORKSPACE_ID"))
 
@@ -145,7 +144,7 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 		Example: `  # Change a Workspace's name and description
   astro workspace update <WORKSPACE_ID> --name my-new-name --description "My new description"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return workspaceUpdate(out, args)
+			return workspaceUpdate(out, cmd.ErrOrStderr(), args)
 		},
 	}, cliout.Required("WORKSPACE_ID"))
 
@@ -157,8 +156,8 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func workspaceCreate(out io.Writer) error {
-	r := cliout.Renderer{Format: workspaceOutput, Out: out}
+func workspaceCreate(out, errOut io.Writer) error {
+	r := cliout.Renderer{Format: workspaceOutput, Out: out, Err: errOut}
 	if workspaceCreateLabel == "" {
 		return errCreateWorkspaceMissingLabel
 	}
@@ -174,8 +173,8 @@ func workspaceCreate(out io.Writer) error {
 	return emitWorkspace(r, w, "\n Created Workspace")
 }
 
-func workspaceList(out io.Writer) error {
-	r := cliout.Renderer{Format: workspaceOutput, Out: out}
+func workspaceList(out, errOut io.Writer) error {
+	r := cliout.Renderer{Format: workspaceOutput, Out: out, Err: errOut}
 	ws, err := workspace.List(houstonClient)
 	if err != nil {
 		return err
@@ -189,8 +188,8 @@ func workspaceList(out io.Writer) error {
 	return emitWorkspaceList(r, ws, c.Workspace)
 }
 
-func workspaceDelete(out io.Writer, args []string) error {
-	r := cliout.Renderer{Format: workspaceOutput, Out: out}
+func workspaceDelete(out, errOut io.Writer, args []string) error {
+	r := cliout.Renderer{Format: workspaceOutput, Out: out, Err: errOut}
 
 	if err := confirm(fmt.Sprintf("\nDelete Workspace %s? This cannot be undone.", args[0])); err != nil {
 		return err
@@ -202,8 +201,8 @@ func workspaceDelete(out io.Writer, args []string) error {
 	return emitWorkspaceRemoval(r, args[0], w)
 }
 
-func workspaceUpdate(out io.Writer, args []string) error {
-	r := cliout.Renderer{Format: workspaceOutput, Out: out}
+func workspaceUpdate(out, errOut io.Writer, args []string) error {
+	r := cliout.Renderer{Format: workspaceOutput, Out: out, Err: errOut}
 	argsMap := map[string]string{}
 	if workspaceUpdateDescription != "" {
 		argsMap["description"] = workspaceUpdateDescription
@@ -223,8 +222,8 @@ func workspaceUpdate(out io.Writer, args []string) error {
 	return emitWorkspace(r, w, "\n Updated Workspace")
 }
 
-func workspaceSwitch(out io.Writer, args []string) error {
-	r := cliout.Renderer{Format: workspaceOutput, Out: out}
+func workspaceSwitch(out, errOut io.Writer, args []string) error {
+	r := cliout.Renderer{Format: workspaceOutput, Out: out, Err: errOut}
 
 	id := ""
 
@@ -261,7 +260,7 @@ func workspaceSwitch(out io.Writer, args []string) error {
 		}
 	}
 	if capped {
-		cliout.Warn(os.Stderr, fmt.Sprintf("page size can be at most %d; using %d", defaultPageSize, defaultPageSize))
+		cliout.Warn(errOut, fmt.Sprintf("page size can be at most %d; using %d", defaultPageSize, defaultPageSize))
 	}
 
 	w, quit, err := workspace.Switch(id, workspacePageSize, houstonVersion, houstonClient)

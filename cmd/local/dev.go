@@ -91,7 +91,7 @@ func (c *cli) runDevRemoved(cmd *cobra.Command, args []string) error {
 		// would derive it, with the mapping besides.
 		err := cliout.Usage(errors.New(payload.Error))
 		payload.Code, payload.Kind = cliout.ExitCode(cmd.Context(), err), ProblemKinds.Of(err)
-		r := cliout.Renderer{Format: cliout.FormatJSON, Out: c.d.Stdout, Style: c.d.JSONStyle}
+		r := cliout.Renderer{Format: cliout.FormatJSON, Out: c.d.Stdout, Err: c.d.Stderr, Style: c.d.JSONStyle}
 		if err := r.Emit(payload, func(w io.Writer) error {
 			_, werr := fmt.Fprintln(w, renderDevRemoved(payload))
 			return werr

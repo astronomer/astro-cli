@@ -1322,7 +1322,7 @@ func (c *cli) environment(ctx context.Context, withWorkspace, noSync bool) (loca
 		})
 	}
 	// On stderr: stdout belongs to the command being run.
-	stderr := cliout.Renderer{Format: cliout.FormatText, Out: c.d.Stderr}
+	stderr := cliout.Renderer{Format: cliout.FormatText, Out: c.d.Stderr, Err: c.d.Stderr}
 	warnWorkspaceUnread(stderr, built.WorkspaceNote)
 	noteWorkspaceRefused(stderr, built.WorkspaceRefusal)
 	warnWithout(stderr, "running", local)

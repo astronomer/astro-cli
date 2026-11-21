@@ -3,7 +3,6 @@ package apc
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -69,7 +68,7 @@ func newTeamListCmd(out io.Writer) *cobra.Command {
   # List teams a page at a time
   astro team list --paginated --page-size 20`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listTeam(out, paginated, pageSize)
+			return listTeam(out, cmd.ErrOrStderr(), paginated, pageSize)
 		},
 	}
 	cmd.Flags().BoolVar(&paginated, "paginated", false, "Page through the team list")
@@ -102,8 +101,8 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listTeam(out io.Writer, paginated bool, pageSize int) error {
-	r := cliout.Renderer{Format: accessOutput, Out: out}
+func listTeam(out, errOut io.Writer, paginated bool, pageSize int) error {
+	r := cliout.Renderer{Format: accessOutput, Out: out, Err: errOut}
 	if paginated && r.Format == cliout.FormatJSON {
 		return cliout.Usage(errListPaginatedUnderJSON)
 	}
@@ -116,7 +115,7 @@ func listTeam(out io.Writer, paginated bool, pageSize int) error {
 		}
 
 		if !(pageSize > 0 && pageSize <= teams.ListTeamLimit) {
-			cliout.Warn(os.Stderr, fmt.Sprintf("page size can be at most %d; using %d", teams.ListTeamLimit, teams.ListTeamLimit))
+			cliout.Warn(errOut, fmt.Sprintf("page size can be at most %d; using %d", teams.ListTeamLimit, teams.ListTeamLimit))
 			pageSize = teams.ListTeamLimit
 		}
 
