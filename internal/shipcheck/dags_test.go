@@ -7,7 +7,21 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
+
+// uploadOf is a Dags upload of the project at dir, as Astro Private Cloud's
+// tars it: dags/, every entry under dags/.
+func uploadOf(dir string) fileutil.TarSource {
+	return fileutil.TarSource{Dir: filepath.Join(dir, "dags"), BaseDir: "dags"}
+}
+
+// checkNoDags checks a project with no dags/.
+func checkNoDags(t *testing.T) error {
+	dir := t.TempDir()
+	return CheckDags(dir, uploadOf(dir), nil)
+}
 
 // A Dags-only upload is held to an image's credential check: a file under
 // dags/ that looks like credentials and that git does not track is refused,
@@ -25,7 +39,7 @@ func TestCheckDagsRefusesAnUntrackedCredential(t *testing.T) {
 	gitRun(t, dir, "add", ".gitignore", "dags/etl.py")
 	gitRun(t, dir, "add", "-f", "dags/ca.pem")
 
-	err := CheckDags(dir, nil)
+	err := CheckDags(dir, uploadOf(dir), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "refusing to upload the Dags")
 	assert.Contains(t, err.Error(), "dags/settings.env")
@@ -51,9 +65,9 @@ func TestCheckDagsLooksOnlyAtWhatTheUploadCarries(t *testing.T) {
 	if err := os.Symlink(filepath.Join("..", ".env"), filepath.Join(dir, "dags", "local.env")); err != nil {
 		t.Skipf("symlinks unavailable here: %v", err)
 	}
-	assert.NoError(t, CheckDags(dir, nil))
+	assert.NoError(t, CheckDags(dir, uploadOf(dir), nil))
 
-	assert.NoError(t, CheckDags(t.TempDir(), nil), "no dags/ is nothing to upload")
+	assert.NoError(t, checkNoDags(t), "no dags/ is nothing to upload")
 }
 
 // A dags/ that is a link out of the project uploads what it leads to, so a
@@ -71,7 +85,7 @@ func TestCheckDagsRefusesACredentialBehindALinkedDagsDirectory(t *testing.T) {
 		t.Skipf("symlinks unavailable here: %v", err)
 	}
 
-	err := CheckDags(dir, nil)
+	err := CheckDags(dir, uploadOf(dir), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "dags/service-key.pem")
 	assert.Contains(t, err.Error(), "reached through a link out of the project")
@@ -88,7 +102,7 @@ func TestCheckDagsWalksADagsDirectoryNamedLikeACache(t *testing.T) {
 		t.Skipf("symlinks unavailable here: %v", err)
 	}
 
-	err := CheckDags(dir, nil)
+	err := CheckDags(dir, uploadOf(dir), nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "dags/service-key.pem")
 }
@@ -99,6 +113,31 @@ func TestCheckDagsOutsideGitAsksNothing(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{"dags/etl.py": "import x\n", "dags/settings.env": "TOKEN=x\n"})
 	var warned []string
-	require.NoError(t, CheckDags(dir, func(w string) { warned = append(warned, w) }))
+	require.NoError(t, CheckDags(dir, uploadOf(dir), func(w string) { warned = append(warned, w) }))
 	assert.Empty(t, warned)
+}
+
+// What is checked is what the upload's own TarSource carries: an entry its
+// excludes leave out is not held against it, and the same entry is when the
+// upload carries it (Astro excludes .git/ only from a bundle with no dags/
+// prefix, since the excludes match the name in the tarball).
+func TestCheckDagsChecksWhatItsSourceCarries(t *testing.T) {
+	needsGit(t)
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q")
+	writeFiles(t, dir, map[string]string{
+		".gitignore":           "*.pem\n",
+		"dags/etl.py":          "import x\n",
+		"dags/.git/deploy.pem": "k",
+	})
+	gitRun(t, dir, "add", ".gitignore", "dags/etl.py")
+
+	dags := filepath.Join(dir, "dags")
+	excluded := fileutil.GzSource(dags, false, []string{".git/"})
+	assert.NoError(t, CheckDags(dir, excluded, nil), "an entry the upload leaves out")
+
+	carried := fileutil.GzSource(dags, true, []string{".git/"})
+	err := CheckDags(dir, carried, nil)
+	require.Error(t, err, "the same entry, carried")
+	assert.Contains(t, err.Error(), "dags/.git/deploy.pem")
 }

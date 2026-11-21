@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 )
 
@@ -25,12 +26,13 @@ const dagsDir = "dags"
 // uploads dags/ as it is, so without this a stray .env or key file there
 // reached the Deployment with no word said.
 //
-// The files are the ones both uploads walk (dagsFiles). A project with no
+// src is the upload's own TarSource, and the files are the ones its tarball
+// carries (dagsFiles): what is checked is what is uploaded. A project with no
 // dags/ is checked for nothing: the upload says so itself.
-func CheckDags(dir string, warn func(string)) error {
-	files, links, err := dagsFiles(dir)
+func CheckDags(dir string, src fileutil.TarSource, warn func(string)) error {
+	files, links, err := dagsFiles(dir, src)
 	if err != nil {
-		return fmt.Errorf("reading the project's %s/: %w", dagsDir, err)
+		return fmt.Errorf("reading the project's Dags: %w", err)
 	}
 	if len(files) == 0 {
 		return nil
@@ -77,48 +79,42 @@ func (r *Report) dagsErr() error {
 		strings.Join(why, "; "), it, way)
 }
 
-// dagsFiles lists what a Dags-only upload of the project at dir carries, as
-// project-relative slash paths under dags/, as both uploads walk it: a dags/
-// that is a symlink is followed (and listed in links, so Check can tell where
-// it leads), a link inside it is carried as a link rather than the file it
-// points at and so is not listed, and bytecode caches are left out. A dags/
-// that is missing, or a link that leads nowhere, carries nothing.
-func dagsFiles(dir string) (files, links []string, err error) {
-	top := filepath.Join(dir, dagsDir)
-	info, err := os.Lstat(top)
+// dagsFiles lists the files a tarball of src carries (fileutil.WalkTar, the
+// walk the upload writes it from), as project-relative slash paths under
+// src.Dir, which is in the project at dir. A src.Dir that is a link is walked
+// as the directory it leads to, and listed in links, so Check can tell where
+// it leads; a link inside it is carried as a link rather than the file it
+// points at, and so is not listed. A src.Dir that is not there, or a link that
+// leads nowhere, carries nothing.
+func dagsFiles(dir string, src fileutil.TarSource) (files, links []string, err error) {
+	rel, err := filepath.Rel(dir, src.Dir)
+	if err != nil || !filepath.IsLocal(rel) {
+		return nil, nil, fmt.Errorf("%s is not in the project", src.Dir)
+	}
+	rel = filepath.ToSlash(rel)
+	info, err := os.Lstat(src.Dir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil, nil
 	}
 	if err != nil {
 		return nil, nil, err
 	}
-	root := top
-	if info.Mode()&fs.ModeSymlink != 0 {
-		if root, err = filepath.EvalSymlinks(top); err != nil {
-			return nil, nil, nil
-		}
-		links = []string{dagsDir}
+	root, err := filepath.EvalSymlinks(src.Dir)
+	if err != nil {
+		return nil, nil, nil
 	}
-	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+	if info.Mode()&fs.ModeSymlink != 0 {
+		links = []string{rel}
+	}
+	err = fileutil.WalkTar(src, func(p, _ string, info os.FileInfo) error {
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		inside, err := filepath.Rel(root, p)
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
-			// Below the root only, as the uploads skip it (fileutil's
-			// skipPycache): a dags/ that is itself named so is still walked.
-			if p != root && d.Name() == "__pycache__" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !d.Type().IsRegular() {
-			return nil
-		}
-		rel, err := filepath.Rel(root, p)
-		if err != nil {
-			return err
-		}
-		files = append(files, path.Join(dagsDir, filepath.ToSlash(rel)))
+		files = append(files, path.Join(rel, filepath.ToSlash(inside)))
 		return nil
 	})
 	return files, links, err

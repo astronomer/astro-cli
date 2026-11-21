@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
@@ -343,10 +344,37 @@ func (f *fakeDeployer) DeployDags(in *DagDeploy) (DagResult, error) {
 	return f.dag, f.dagErr
 }
 
+func (f *fakeDeployer) DagsSource(projectDir string, noDagsBaseDir bool) fileutil.TarSource {
+	src := fileutil.TarSource{Dir: filepath.Join(projectDir, "dags")}
+	if !noDagsBaseDir {
+		src.BaseDir = "dags"
+	}
+	return src
+}
+
 func (f *fakeDeployer) DeployImage(in *ImageDeploy) (ImageResult, error) {
 	f.imgDeploys++
 	f.imgInput = *in
 	return f.img, f.imgErr
+}
+
+// A Dags-only deploy is held to what the transport's upload carries
+// (Deployer.DagsSource): a key behind a dags/ linked out of the project is
+// refused before a Deployment is asked for or anything is uploaded.
+func TestRun_DagsOnlyIsHeldToItsUpload(t *testing.T) {
+	dir, shared := t.TempDir(), t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(shared, "etl.py"), []byte("import x\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(shared, "service-key.pem"), []byte("k"), 0o600))
+	if err := os.Symlink(shared, filepath.Join(dir, "dags")); err != nil {
+		t.Skipf("symlinks unavailable here: %v", err)
+	}
+	d := &fakeDeployer{}
+	_, err := Run(Request{ProjectDir: dir, DagsOnly: true}, d)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refusing to upload the Dags")
+	assert.Contains(t, err.Error(), "dags/service-key.pem")
+	assert.Zero(t, d.deploys, "nothing is uploaded")
+	assert.Zero(t, d.resolves, "no Deployment is asked for")
 }
 
 func TestRun_DagsWithImageSourceRejected(t *testing.T) {

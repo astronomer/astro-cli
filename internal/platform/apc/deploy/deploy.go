@@ -394,6 +394,15 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 // found, and making it fails if
 // that directory has gone, so one removed meanwhile is not uploaded as no
 // DAGs either.
+// dagsBaseDir is the directory every path in a Dags upload sits under.
+const dagsBaseDir = "dags"
+
+// DagsSource is what DagsOnlyDeploy tars of the project at projectDir: its
+// dags/, each entry under dags/ whatever the directory resolves to.
+func DagsSource(projectDir string) fileutil.TarSource {
+	return fileutil.TarSource{Dir: filepath.Join(projectDir, "dags"), BaseDir: dagsBaseDir}
+}
+
 func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, opts Options) (string, error) {
 	deployments, err := workspaceDeploymentsVar(houstonClient, wsID, deploymentID)
 	if err != nil {
@@ -454,7 +463,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	// whatever the directory resolved to is called. It fails on a directory
 	// gone since it was found, the question above included, rather than
 	// making a bundle without it.
-	err = fileutil.TarDir(dagsPath, dagsTarPath, "dags")
+	err = fileutil.TarDir(dagsPath, dagsTarPath, dagsBaseDir)
 	if cleanUpFiles {
 		defer os.Remove(dagsTarPath) //nolint:errcheck // best-effort cleanup
 	}

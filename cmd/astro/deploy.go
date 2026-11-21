@@ -27,6 +27,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -810,6 +811,11 @@ func projectGitMetadataOffNote(m *manifest.Manifest, imageName string) string {
 const gitMetadataOffText = "deploy.git_metadata is false in your global config, so this deploy records no git commit"
 
 // DeployDags ships the project's dags/ through the dags-only transport.
+// DagsSource is what DeployDags uploads of the project.
+func (d manifestDeployer) DagsSource(projectDir string, noDagsBaseDir bool) fileutil.TarSource {
+	return astrodeploy.DagsSource(projectDir, noDagsBaseDir)
+}
+
 func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
 	res, err := astrodeploy.DeployManifestDags(astrodeploy.ManifestDagDeployInput{
 		Login:         &d.login.context,
