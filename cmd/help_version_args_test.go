@@ -160,7 +160,7 @@ func TestStrayWordsAreUsageErrorsBeforeTheLogin(t *testing.T) {
 		{[]string{"env", "bogus"}, `unknown command "bogus" for "astro env"`},
 		{[]string{"env", "variable", "bogus"}, `unknown command "bogus" for "astro env variable"`},
 		{[]string{"context", "list", "extra"}, `unexpected argument "extra": astro context list takes no arguments`},
-		{[]string{"deployment", "delete", "a", "b"}, `unexpected argument "b": astro deployment delete takes at most 1`},
+		{[]string{"deployment", "delete", "a", "b"}, `unexpected argument "b": astro deployment delete takes at most 1 argument`},
 	} {
 		run := runLine(t, tc.args...)
 		assert.Equal(t, 2, run.code, tc.args)

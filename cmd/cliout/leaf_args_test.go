@@ -23,5 +23,30 @@ func TestLeafStrayArgumentIsNotAnUnknownCommand(t *testing.T) {
 		assert.Equal(t, "Error: unexpected argument \"extra\": astro version takes no arguments\nRun astro version --help for usage.\n", r.stderr, name)
 	}
 	one := &cobra.Command{Use: "get [NAME]", RunE: func(*cobra.Command, []string) error { return nil }}
-	assert.EqualError(t, UndeclaredArgs(one, []string{"a", "b"}), `unexpected argument "b": get takes at most 1`)
+	assert.EqualError(t, UndeclaredArgs(one, []string{"a", "b"}), `unexpected argument "b": get takes at most 1 argument`)
+}
+
+// leafArgsError reads cobra's English, so the messages it reads are pinned: a
+// cobra upgrade that rewords one fails here, not by quietly bringing back
+// "unknown command" for a stray argument.
+func TestCobraArgsMessagesAreRecognized(t *testing.T) {
+	cmd := &cobra.Command{Use: "x"}
+	for name, tc := range map[string]struct {
+		validate cobra.PositionalArgs
+		args     []string
+		want     string
+	}{
+		"NoArgs":         {cobra.NoArgs, []string{"a"}, `unexpected argument "a": x takes no arguments`},
+		"MaximumNArgs 1": {cobra.MaximumNArgs(1), []string{"a", "b"}, `unexpected argument "b": x takes at most 1 argument`},
+		"MaximumNArgs 2": {cobra.MaximumNArgs(2), []string{"a", "b", "c"}, `unexpected argument "c": x takes at most 2 arguments`},
+		"ExactArgs":      {cobra.ExactArgs(2), []string{"a", "b", "c"}, `unexpected argument "c": x takes exactly 2 arguments`},
+		"RangeArgs":      {cobra.RangeArgs(1, 2), []string{"a", "b", "c"}, `unexpected argument "c": x takes 1 to 2 arguments`},
+	} {
+		err := tc.validate(cmd, tc.args)
+		require.Error(t, err, name)
+		assert.EqualError(t, leafArgsError(cmd, tc.args, err), tc.want, name)
+	}
+	// Too few is not a stray argument, so cobra's own message stays.
+	err := cobra.ExactArgs(2)(cmd, []string{"a"})
+	assert.Equal(t, err, leafArgsError(cmd, []string{"a"}, err))
 }

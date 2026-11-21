@@ -227,16 +227,27 @@ func UndeclaredArgs(cmd *cobra.Command, args []string) error {
 	if len(args) <= documented {
 		return nil
 	}
-	return UnexpectedArgument(cmd, args[documented], documented)
+	return UnexpectedArgument(cmd, args[documented], "at most", documented)
 }
 
-// UnexpectedArgument is the usage error for a stray argument to a leaf that
-// takes at most atMost positionals. A leaf has no subcommands to mistype, so it
-// is not called an unknown command.
-func UnexpectedArgument(cmd *cobra.Command, arg string, atMost int) error {
-	takes := "takes no arguments"
-	if atMost > 0 {
-		takes = fmt.Sprintf("takes at most %d", atMost)
+// UnexpectedArgument is the usage error for a stray argument to a leaf, which
+// has no subcommands to mistype and so is not told it is an unknown command.
+// How many it takes reads as "takes no arguments" for none, else "takes <how>
+// <n> argument(s)" with how "at most" or "exactly".
+func UnexpectedArgument(cmd *cobra.Command, arg, how string, n int) error {
+	return unexpectedArgument(cmd, arg, takesWords(how, n))
+}
+
+func takesWords(how string, n int) string {
+	switch {
+	case n == 0:
+		return "takes no arguments"
+	case n == 1:
+		return "takes " + how + " 1 argument"
 	}
+	return fmt.Sprintf("takes %s %d arguments", how, n)
+}
+
+func unexpectedArgument(cmd *cobra.Command, arg, takes string) error {
 	return misinvoked(fmt.Errorf("unexpected argument %q: %s %s", arg, cmd.CommandPath(), takes))
 }

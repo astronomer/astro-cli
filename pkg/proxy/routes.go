@@ -23,7 +23,23 @@ const (
 	lockTimeout = 30 * time.Second
 	FilePermRW  = 0o600 // owner read/write
 	DirPermRWX  = 0o755 // owner rwx, group/other rx
+	// homeDirPermRWX is for ~/.astro itself when this package creates it.
+	homeDirPermRWX = 0o700
 )
+
+// mkdirStoreDir creates a store directory. The store lives in <home>/.astro
+// (the place 1.x keeps it), and whichever writer creates that directory first
+// decides its mode, so a missing .astro is made owner-only (it holds login
+// tokens) before the store directory is made. An existing directory keeps its
+// mode.
+func mkdirStoreDir(dir string) error {
+	if parent := filepath.Dir(dir); filepath.Base(parent) == ".astro" {
+		if err := os.MkdirAll(parent, homeDirPermRWX); err != nil {
+			return err
+		}
+	}
+	return os.MkdirAll(dir, DirPermRWX)
+}
 
 // Route.Mode wire values. localrt.Mode carries the same strings in the
 // state record; changing one breaks tools already in the field.
@@ -192,7 +208,7 @@ func (s *Store) ReadRoutes() ([]Route, error) {
 
 // WriteRoutes writes routes to the routes file atomically using a temp file + rename.
 func (s *Store) WriteRoutes(routes []Route) error {
-	if err := os.MkdirAll(s.dir, DirPermRWX); err != nil {
+	if err := mkdirStoreDir(s.dir); err != nil {
 		return fmt.Errorf("creating proxy directory: %w", err)
 	}
 

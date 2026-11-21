@@ -21,7 +21,7 @@ import (
 // mandatory, which would matter for a file anyone read or wrote; this one is
 // only ever locked.
 func (s *Store) AcquireLock() (*os.File, error) {
-	if err := os.MkdirAll(s.dir, DirPermRWX); err != nil {
+	if err := mkdirStoreDir(s.dir); err != nil {
 		return nil, fmt.Errorf("creating proxy directory: %w", err)
 	}
 

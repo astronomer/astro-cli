@@ -47,11 +47,14 @@ func TestInertFlagsAreQueuedWithTheRenamedOnes(t *testing.T) {
 	t.Cleanup(func() { queuedRenamedFlags = nil })
 	cmd := &cobra.Command{Use: "inspect"}
 	RecordInertFlags(cmd, []string{"--clean-output"})
+	RecordInertFlags(cmd, []string{"--clean-output"})
+	RecordRenamedFlags(cmd, []string{"--deployment-name"}, []string{"--deployment"})
 	RecordRenamedFlags(cmd, []string{"--deployment-name"}, []string{"--deployment"})
 	q := takeRenamedFlags(cmd)
 	if assert.NotNil(t, q) {
 		assert.Equal(t, []string{"--clean-output"}, q.inert)
-		assert.Equal(t, []string{"--deployment-name"}, q.renamed)
+		assert.Equal(t, []string{"--deployment-name"}, q.renamed, "no flag is counted twice")
+		assert.Equal(t, []string{"--deployment"}, q.current)
 	}
 	RecordInertFlags(cmd, nil)
 	assert.Nil(t, queuedRenamedFlags)

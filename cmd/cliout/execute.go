@@ -259,9 +259,14 @@ func markUsageErrors(root *cobra.Command) {
 	})
 }
 
-// cobraAtMost is cobra.MaximumNArgs's refusal, "accepts at most N arg(s),
-// received M".
-var cobraAtMost = regexp.MustCompile(`^accepts at most (\d+) arg\(s\), received \d+$`)
+// Cobra's refusals of a stray argument, from NoArgs, MaximumNArgs, ExactArgs
+// and RangeArgs. TestCobraArgsMessagesAreRecognized pins their wording, so a
+// cobra upgrade that rewords one fails there.
+var (
+	cobraAtMost = regexp.MustCompile(`^accepts at most (\d+) arg\(s\), received \d+$`)
+	cobraExact  = regexp.MustCompile(`^accepts (\d+) arg\(s\), received \d+$`)
+	cobraRange  = regexp.MustCompile(`^accepts between (\d+) and (\d+) arg\(s\), received \d+$`)
+)
 
 // leafArgsError rewords cobra's own refusal of a stray argument (NoArgs reads
 // as an unknown command, which a leaf has none of) the way UndeclaredArgs
@@ -271,11 +276,20 @@ func leafArgsError(cmd *cobra.Command, args []string, err error) error {
 		return err
 	}
 	if err.Error() == fmt.Sprintf("unknown command %q for %q", args[0], cmd.CommandPath()) {
-		return UnexpectedArgument(cmd, args[0], 0)
+		return UnexpectedArgument(cmd, args[0], "at most", 0)
 	}
-	if m := cobraAtMost.FindStringSubmatch(err.Error()); m != nil {
-		if n, convErr := strconv.Atoi(m[1]); convErr == nil && n < len(args) {
-			return UnexpectedArgument(cmd, args[n], n)
+	for re, how := range map[*regexp.Regexp]string{cobraAtMost: "at most", cobraExact: "exactly"} {
+		if m := re.FindStringSubmatch(err.Error()); m != nil {
+			if n, convErr := strconv.Atoi(m[1]); convErr == nil && n < len(args) {
+				return UnexpectedArgument(cmd, args[n], how, n)
+			}
+		}
+	}
+	if m := cobraRange.FindStringSubmatch(err.Error()); m != nil {
+		lo, loErr := strconv.Atoi(m[1])
+		hi, hiErr := strconv.Atoi(m[2])
+		if loErr == nil && hiErr == nil && hi < len(args) {
+			return unexpectedArgument(cmd, args[hi], fmt.Sprintf("takes %d to %d arguments", lo, hi))
 		}
 	}
 	return err

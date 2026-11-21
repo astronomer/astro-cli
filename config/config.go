@@ -331,12 +331,19 @@ func configDirPerm(dir string) os.FileMode {
 // so when dir is inside it, the home directory is made owner-only before dir is
 // made at perm. Anywhere else it is plain os.MkdirAll.
 func MkdirAllUnder(dir string, perm os.FileMode) error {
-	if rel, err := filepath.Rel(HomeConfigPath, dir); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
-		if err := os.MkdirAll(HomeConfigPath, homeDirPerm); err != nil {
+	if HomeConfigPath == "" {
+		return os.MkdirAll(dir, perm)
+	}
+	home, clean := filepath.Clean(HomeConfigPath), filepath.Clean(dir)
+	if clean == home {
+		return os.MkdirAll(home, homeDirPerm)
+	}
+	if rel, err := filepath.Rel(home, clean); err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		if err := os.MkdirAll(home, homeDirPerm); err != nil {
 			return err
 		}
 	}
-	return os.MkdirAll(dir, perm)
+	return os.MkdirAll(clean, perm)
 }
 
 // lockConfig takes file's exclusive lock, the `<file>.lock` sidecar Astro CLI

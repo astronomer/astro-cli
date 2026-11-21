@@ -336,7 +336,7 @@ var startDaemon = func(d *Daemon, port string) (string, error) {
 	if d.Exe == "" {
 		return "", errors.New("no executable to run the proxy daemon with")
 	}
-	if err := os.MkdirAll(d.Store.Dir(), DirPermRWX); err != nil {
+	if err := mkdirStoreDir(d.Store.Dir()); err != nil {
 		return "", fmt.Errorf("creating proxy directory: %w", err)
 	}
 

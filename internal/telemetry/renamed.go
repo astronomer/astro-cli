@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"maps"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -23,6 +24,12 @@ type renamedFlags struct {
 // queuedRenamedFlags is what this run queued; a process runs one command.
 var queuedRenamedFlags *renamedFlags
 
+// EventInertFlag is the event type for a run that passed a 1.x flag v2 still
+// accepts and ignores (--clean-output). It is not EventRenamedFlag: that
+// event's counts decide when a hidden alias can go, and an inert flag is no
+// alias.
+const EventInertFlag = "CLI Inert Flag"
+
 // RecordRenamedFlags notes the 1.x spellings cmd was given, renamed (as
 // named: --workspace-id) beside current, the flags they stand for
 // (--workspace), once the run has accepted them. The events are what tell us
@@ -41,8 +48,8 @@ func RecordRenamedFlags(cmd *cobra.Command, renamed, current []string) {
 
 // RecordInertFlags notes the 1.x flags cmd was given that v2 accepts and
 // ignores (--clean-output), by name as typed and nothing else, so we know when
-// nobody passes one any more and it can go. It rides the renamed-flag event
-// (RecordRenamedFlags), as the property inert_flags.
+// nobody passes one any more and it can go. It is queued, and sent, as
+// RecordRenamedFlags's are, but as its own event (EventInertFlag).
 func RecordInertFlags(cmd *cobra.Command, inert []string) {
 	queueRenamed(cmd, nil, nil, inert)
 }
@@ -55,8 +62,8 @@ func queueRenamed(cmd *cobra.Command, renamed, current, inert []string) {
 	// twice (the flags and the command's own path, in whichever order the
 	// argument checks run): one event holds both.
 	if q := queuedRenamedFlags; q != nil && q.cmd == cmd {
-		renamed, current = append(slices.Clone(q.renamed), renamed...), append(slices.Clone(q.current), current...)
-		inert = append(slices.Clone(q.inert), inert...)
+		renamed, current = mergePairs(q.renamed, q.current, renamed, current)
+		inert = mergeNames(q.inert, inert)
 	}
 	queuedRenamedFlags = &renamedFlags{cmd: cmd, renamed: renamed, current: current, inert: inert}
 	if cmd.Annotations[SkipPreRunAnnotation] == "true" {
@@ -77,13 +84,45 @@ func sendRenamedFlags(cmd *cobra.Command) {
 	}
 	properties := buildCommandProperties(cmd)
 	if len(q.renamed) > 0 {
-		properties["renamed_flags"] = q.renamed
-		properties["current_flags"] = q.current
+		renamedProperties := maps.Clone(properties)
+		renamedProperties["renamed_flags"] = q.renamed
+		renamedProperties["current_flags"] = q.current
+		track(EventRenamedFlag, renamedProperties)
 	}
 	if len(q.inert) > 0 {
-		properties["inert_flags"] = q.inert
+		properties["flags"] = q.inert
+		track(EventInertFlag, properties)
 	}
-	track(EventRenamedFlag, properties)
+}
+
+// mergeNames is a followed by the names of b that a lacks.
+func mergeNames(a, b []string) []string {
+	out := slices.Clone(a)
+	for _, n := range b {
+		if !slices.Contains(out, n) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// mergePairs is the (renamed, current) pairs of a followed by those of b that
+// a lacks, kept in step.
+func mergePairs(renamedA, currentA, renamedB, currentB []string) (renamed, current []string) {
+	renamed, current = slices.Clone(renamedA), slices.Clone(currentA)
+	for i, r := range renamedB {
+		dup := false
+		for j := range renamed {
+			if renamed[j] == r && current[j] == currentB[i] {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			renamed, current = append(renamed, r), append(current, currentB[i])
+		}
+	}
+	return renamed, current
 }
 
 // takeRenamedFlags empties the queue, returning what it held for cmd.
