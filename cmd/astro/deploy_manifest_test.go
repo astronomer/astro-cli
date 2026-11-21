@@ -56,6 +56,7 @@ func resetDeployFlagVars() {
 	workspaceID = ""
 	deploymentName = ""
 	deployDescription = ""
+	deployDagBundle = ""
 	deployOutput = string(cliout.FormatText)
 }
 

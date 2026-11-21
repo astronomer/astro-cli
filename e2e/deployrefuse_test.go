@@ -26,9 +26,9 @@ func TestDeployRefusesThe1xOnlyFlags(t *testing.T) {
 
 	parent := manifestProjectForDeploy(t)
 
-	// The eight, written out rather than imported. Importing the messages from
+	// The seven, written out rather than imported. Importing the messages from
 	// cmd would make this a test that the CLI agrees with itself; the point
-	// is that somebody decided these are the eight and said why.
+	// is that somebody decided these are the seven and said why.
 	for _, tc := range []struct {
 		args []string
 		// says is a fragment of the guidance, not the whole sentence: the
@@ -38,7 +38,6 @@ func TestDeployRefusesThe1xOnlyFlags(t *testing.T) {
 		{[]string{"--pytest"}, "run your tests before deploying"},
 		{[]string{"--parse"}, "check your Dags before deploying"},
 		{[]string{"--dags-path", "somewhere"}, "ships the project's dags directory"},
-		{[]string{"--dag-bundle-name", "bundle"}, "named Dag bundle is not supported yet"},
 		{[]string{"--test", "tests/"}, "run your tests before deploying"},
 		{[]string{"--env", ".env.test"}, "runs no tests"},
 		{[]string{"--save"}, "asks which Deployment to deploy to"},
