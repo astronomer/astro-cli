@@ -38,24 +38,13 @@ var (
 	reUvicorn = regexp.MustCompile(`^INFO:\s+[\d.]+:\d+\s+-\s+"(\w+)\s+(\S+)\s+HTTP/[\d.]+"\s+(\d+)\s+\w+$`)
 	// reMultiSpace collapses runs of spaces.
 	reMultiSpace = regexp.MustCompile(`\s{2,}`)
-	// reANSI matches an ANSI CSI escape sequence. `airflow standalone` colors
-	// the component name it prefixes each line with, and structlog colors the
-	// body, so a raw line begins "\x1b[33mdag-processor\x1b[0m | " rather than
-	// "dag-processor | ".
-	// `[ -/]` is ECMA-48's intermediate-byte range (0x20-0x2F) and `[@-~]` its
-	// final-byte range, so the span reads as punctuation only because that is
-	// what those code points are.
-	reANSI = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]") //nolint:gocritic // badRegexp: a deliberate code-point range, see above
 )
 
-// escape is ESC, the byte every CSI sequence opens with and the cheapest
-// thing to look for before running the expression at all.
-const escape = '\x1b'
-
-// stripANSI removes the CSI escape sequences from a log line — the colors
-// Airflow writes, which is the only form it emits. Other escape shapes (an OSC
-// title, a charset selector) would survive; widening the pattern for sequences
-// nothing here produces would be guessing at a problem.
+// stripANSI removes terminal escape sequences from a log line: the colors
+// `airflow standalone` and structlog write (a raw line begins
+// "\x1b[33mdag-processor\x1b[0m | " rather than "dag-processor | "), and any
+// other sequence such as an OSC. rt.StripEscapes holds the pattern, so the
+// docker engine drops the same ones.
 //
 // It runs before anything else reads the line, because everything else assumed
 // they were not there. The component prefix match is the visible casualty —
@@ -72,12 +61,7 @@ const escape = '\x1b'
 // every line of the capped log file on every `astro local logs`, and an
 // uncoloured line — every line the older fixtures carry — should not pay for a
 // full pattern match and an allocation to learn there was nothing to strip.
-func stripANSI(s string) string {
-	if !strings.ContainsRune(s, escape) {
-		return s
-	}
-	return reANSI.ReplaceAllString(s, "")
-}
+func stripANSI(s string) string { return rt.StripEscapes(s) }
 
 // logComponents are the process names `airflow standalone` multiplexes;
 // anything else (uv output, tracebacks, banners) is "system".

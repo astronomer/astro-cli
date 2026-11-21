@@ -1,6 +1,7 @@
 package localdocker
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -705,6 +706,39 @@ func TestLogsStreamsParsedLines(t *testing.T) {
 	assert.Equal(t, "api-server", lines[1].Component)
 	assert.Equal(t, "system", lines[2].Component)
 	assert.Equal(t, "some engine banner", lines[2].Text)
+}
+
+// Writer mode drops terminal escapes, as the standalone engine does, so the
+// same container output prints the same text whichever engine ran it.
+func TestLogsWriterStripsEscapes(t *testing.T) {
+	logOutput := "scheduler-1  | 2026-07-21T10:00:00.500Z \x1b[1mone\x1b[0m\x1b]52;c;aGk=\x07 two\n"
+
+	cmd := &fakeCmd{}
+	e := testEngine(t, cmd)
+	af, name := startProject(t, e, testPlan(t))
+	cmd.output = func(call string) ([]byte, error) {
+		if strings.Contains(call, workingDirLabel) {
+			return []byte(name + "\n"), nil
+		}
+		return nil, nil
+	}
+	cmd.run = func(call string, s rt.Stdio) error {
+		if strings.Contains(call, "logs") {
+			_, err := s.Out.Write([]byte(logOutput))
+			return err
+		}
+		return nil
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, af.Logs(context.Background(), rt.LogOptions{Writer: &buf}))
+	assert.NotContains(t, buf.String(), "\x1b", "an escape must not reach the caller's writer")
+	assert.Contains(t, buf.String(), "scheduler-1  | 2026-07-21T10:00:00.500Z one two")
+
+	var lines []rt.LogLine
+	require.NoError(t, af.Logs(context.Background(), rt.LogOptions{OnLine: func(l rt.LogLine) { lines = append(lines, l) }}))
+	require.Len(t, lines, 1)
+	assert.Equal(t, "one two", lines[0].Text)
 }
 
 func TestLogsRequiresExactlyOneSink(t *testing.T) {
