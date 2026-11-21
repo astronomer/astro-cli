@@ -80,12 +80,14 @@ func stateCommand(path string) string {
 		}
 		return "astro deployment list"
 	case "workspaces":
-		return "astro workspace list"
+		if len(segs) == 1 {
+			return "astro workspace list"
+		}
 	case "teams":
 		return "astro organization team list"
 	case "tokens":
 		return "astro organization token list"
-	case "users", "invites":
+	case "users":
 		return "astro organization user list"
 	case "clusters":
 		return "astro organization cluster list"

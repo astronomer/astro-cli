@@ -221,8 +221,9 @@ type Commit struct {
 // deployment is already resolved; the transport reads its runtime version and
 // type from the server.
 type DagDeploy struct {
-	// Context ends the deploy's long steps (the build, the push, the wait for
-	// the Deployment) when the run is interrupted; nil is context.Background().
+	// Context ends the wait for the Deployment when the run is interrupted;
+	// the create, upload and finalize requests of a Dags deploy are not
+	// interrupt-aware. nil is context.Background().
 	Context       context.Context
 	DeploymentID  string
 	WorkspaceID   string

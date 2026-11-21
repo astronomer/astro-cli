@@ -910,7 +910,7 @@ func pollStatus(ctx context.Context, orgID, token, deploymentID string, sleepTim
 		case <-timeout:
 			return astrov1.Deployment{}, &WaitTimeoutError{Err: missing, DeploymentID: deploymentID}
 		case <-ticker.C:
-			currentDeployment, err := GetDeploymentByID(orgID, deploymentID, astroV1Client)
+			currentDeployment, err := GetDeploymentByID(orgID, deploymentID, ctxClient{APIClient: astroV1Client, ctx: ctx})
 			if err != nil {
 				return astrov1.Deployment{}, err
 			}
@@ -918,12 +918,24 @@ func pollStatus(ctx context.Context, orgID, token, deploymentID string, sleepTim
 			if !slices.Contains(statuses, currentDeployment.Status) {
 				continue
 			}
-			if currentDeployment.Status != astrov1.DeploymentStatusHEALTHY || airflowAnswering(currentDeployment, token) {
+			if currentDeployment.Status != astrov1.DeploymentStatusHEALTHY || airflowAnswering(ctx, currentDeployment, token) {
 				return currentDeployment, nil
 			}
 			missing = errAirflowNotAnswering
 		}
 	}
+}
+
+// ctxClient is a client whose Deployment reads run under ctx whatever context
+// they are handed, so a wait's in-flight read, and its retries, end with the
+// run's interrupt.
+type ctxClient struct {
+	astrov1.APIClient
+	ctx context.Context //nolint:containedctx // a wrapper bound to one wait
+}
+
+func (c ctxClient) GetDeploymentWithResponse(_ context.Context, orgID, deploymentID string, editors ...astrov1.RequestEditorFn) (*astrov1.GetDeploymentResponse, error) {
+	return c.APIClient.GetDeploymentWithResponse(c.ctx, orgID, deploymentID, editors...)
 }
 
 // airflowProbeTimeout bounds one airflowAnswering request. A request that
@@ -935,7 +947,7 @@ const airflowProbeTimeout = 10 * time.Second
 // behind it. Astro reports a Deployment HEALTHY some seconds before that
 // after a wake-up. A Deployment with no Airflow API URL has nothing to probe.
 // An empty token is the current context's.
-var airflowAnswering = func(d astrov1.Deployment, token string) bool {
+var airflowAnswering = func(parent context.Context, d astrov1.Deployment, token string) bool {
 	apiURL := d.WebServerAirflowApiUrl
 	if apiURL == "" {
 		return true
@@ -943,7 +955,7 @@ var airflowAnswering = func(d astrov1.Deployment, token string) bool {
 	if !strings.HasPrefix(apiURL, "http://") && !strings.HasPrefix(apiURL, "https://") {
 		apiURL = "https://" + apiURL
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), airflowProbeTimeout)
+	ctx, cancel := context.WithTimeout(parent, airflowProbeTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(apiURL, "/")+"/version", http.NoBody)
 	if err != nil {

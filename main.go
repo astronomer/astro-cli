@@ -131,8 +131,11 @@ func signalContext() context.Context {
 	// first signal, which is where it happens.
 	go func() {
 		sig := <-sigs
+		// Stop only this channel: other packages hold handlers of their own
+		// (a hidden prompt restoring terminal echo, the login flow, the proxy),
+		// which a signal.Reset would remove. Once no handler is left the
+		// default behavior returns by itself, so a second signal still exits.
 		signal.Stop(sigs)
-		signal.Reset(signals...)
 		// The cause records which signal, so the exit status is 128+n.
 		cause := &cliout.Signaled{Name: sig.String()}
 		if n, ok := sig.(syscall.Signal); ok {

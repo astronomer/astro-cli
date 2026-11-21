@@ -55,7 +55,9 @@ func (execCommander) Run(ctx context.Context, dir string, env []string, s rt.Std
 	err := cmd.Run()
 	// ErrWaitDelay means the command itself exited 0 but a background child
 	// kept its output open past the delay. On a run nobody canceled that is
-	// success; the delay exists for the canceled path.
+	// success. The child is cut off from the CLI's stdout and stderr after
+	// WaitDelay (5s) once the command has exited: whatever it prints later is
+	// lost, though the child itself keeps running.
 	if errors.Is(err, exec.ErrWaitDelay) && ctx.Err() == nil {
 		err = nil
 	}
