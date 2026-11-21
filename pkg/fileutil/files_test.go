@@ -1022,6 +1022,30 @@ func (s *Suite) TestDefaultPermissions() {
 // A source that is itself a link is written as the directory it leads to,
 // under the name it is given by: a dags/ linked to a shared checkout uploads
 // its Dags, not one link to a path on this machine.
+// Git metadata stays out of a tarball at any depth below the source, with or
+// without a base dir: a checkout's .git directory, a nested one, and the .git
+// file a linked worktree or a submodule has in its place. Files merely named
+// like it (.gitignore, .github/) ship.
+func (s *Suite) TestTarLeavesGitMetadataOut() {
+	dir := s.T().TempDir()
+	writeTestFile(s.T(), filepath.Join(dir, "etl.py"), "import x\n")
+	writeTestFile(s.T(), filepath.Join(dir, ".gitignore"), "x\n")
+	writeTestFile(s.T(), filepath.Join(dir, ".github", "ci.yml"), "x\n")
+	writeTestFile(s.T(), filepath.Join(dir, ".git", "config"), "x")
+	writeTestFile(s.T(), filepath.Join(dir, "vendored", ".git", "config"), "x")
+	writeTestFile(s.T(), filepath.Join(dir, "vendored", "lib.py"), "x\n")
+	writeTestFile(s.T(), filepath.Join(dir, "sub", ".git"), "gitdir: ../.git/modules/sub\n")
+	for _, prepend := range []bool{true, false} {
+		target := filepath.Join(s.T().TempDir(), "bundle.tar.gz")
+		s.Require().NoError(TarGz(dir, target, prepend, nil, TarOverlay{}))
+		base := ""
+		if prepend {
+			base = filepath.Base(dir) + "/"
+		}
+		s.Equal([]string{base + ".github/ci.yml", base + ".gitignore", base + "etl.py", base + "vendored/lib.py"}, tarNames(s.T(), target), "prepend=%v", prepend)
+	}
+}
+
 func (s *Suite) TestTarGzWalksASourceThatIsALink() {
 	shared, project := s.T().TempDir(), s.T().TempDir()
 	writeTestFile(s.T(), filepath.Join(shared, "etl.py"), "import x\n")

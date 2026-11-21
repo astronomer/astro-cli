@@ -308,6 +308,11 @@ func walkTar(source, target, baseDir string, excludePathPrefixes []string, overl
 			if path == target {
 				return nil
 			}
+			// A .git file (a linked worktree's, a submodule's) is git
+			// metadata as the directory is (skipLeftOut).
+			if info.Name() == gitDir {
+				return nil
+			}
 
 			name, ok, err := tarEntryName(path, root, baseDir, excludePathPrefixes, overlay, info)
 			if err != nil || !ok {
@@ -334,7 +339,7 @@ func tarDir(dir, source string, info os.FileInfo, overlay TarOverlay) error {
 			return filepath.SkipDir
 		}
 	}
-	return skipPycache(info, dir, source)
+	return skipLeftOut(info, dir, source)
 }
 
 // tarEntryName is the name file goes into the tarball under, or false when
@@ -405,15 +410,22 @@ func addExtrasToTar(tarball *tar.Writer, baseDir string, extra map[string][]byte
 	return nil
 }
 
-// skipPycache keeps bytecode caches out of a tarball. Only the directory is
-// skipped: a sourceless .pyc outside __pycache__ is importable, so it ships.
-func skipPycache(info os.FileInfo, dirPath, source string) error {
-	if info.Name() == "__pycache__" && dirPath != source {
+// skipLeftOut keeps what no upload carries out of a tarball, at any depth
+// below source: bytecode caches, and git metadata, whose config can hold a
+// remote URL with credentials in it and which the image a deploy builds leaves
+// out too. Only a __pycache__ directory is skipped: a sourceless .pyc outside
+// one is importable, so it ships. source itself is walked whatever it is named.
+func skipLeftOut(info os.FileInfo, dirPath, source string) error {
+	if dirPath != source && (info.Name() == "__pycache__" || info.Name() == gitDir) {
 		logger.Debugf("Excluding tarball path: %s", dirPath)
 		return filepath.SkipDir
 	}
 	return nil
 }
+
+// gitDir is git's metadata: the directory of a checkout, or the file a linked
+// worktree or a submodule has in its place.
+const gitDir = ".git"
 
 func ReadFileToString(filename string) (string, error) {
 	data, err := os.ReadFile(filename)
