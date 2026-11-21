@@ -63,7 +63,7 @@ func checkDagBundle(ctx context.Context, dep *astrov1.Deployment, bundle DagBund
 		return bundle.explain(err)
 	}
 	if found.Type == astrov1alpha1.DeploymentBundleTypeFILE {
-		return bundle.explain(fmt.Errorf("bundle %q on Deployment %s is a file bundle, whose files are written by 'astro bundle files'. A deploy cannot write to it: name a Dag bundle created for deploys, or create one with 'astro deployment bundle create --name'", bundle.Name, dep.Id))
+		return bundle.explain(fmt.Errorf("bundle %q on Deployment %s is a file bundle, whose files are written by 'astro bundle files'. A deploy cannot write to it: name a Dag bundle created for deploys, or create one with 'astro bundle create --name'", bundle.Name, dep.Id))
 	}
 	return nil
 }

@@ -34,7 +34,7 @@ func FindDagBundle(ctx httpContext.Context, orgID, deploymentID, name string, cl
 		}
 	}
 	if found == nil {
-		return nil, fmt.Errorf("no Dag bundle named %q on Deployment %s. Create it with 'astro deployment bundle create --name %s', or list the Deployment's bundles with 'astro deployment bundle list'", name, deploymentID, name)
+		return nil, fmt.Errorf("no Dag bundle named %q on Deployment %s. Create it with 'astro bundle create --name %s', or list the Deployment's bundles with 'astro bundle list'", name, deploymentID, name)
 	}
 	return found, nil
 }

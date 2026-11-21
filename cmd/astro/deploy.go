@@ -116,8 +116,8 @@ func NewDeployCmd() *cobra.Command {
 	// A named Dag bundle is a Dag-side choice, like --dags, so it sits in that
 	// help section. --dag-bundle-name is 1.x's spelling: v2's flags name the
 	// thing, not its field (--deployment, --workspace), and the Dag bundle's
-	// name is what `astro deployment bundle create --name` set.
-	cmd.Flags().StringVar(&deployDagBundle, "dag-bundle", "", "Ship the Dags to this named Dag bundle on the Deployment instead of its default bundle. The bundle must already exist and be one deploys write (astro deployment bundle create --name). Needs Airflow 3 and Dag deploys; not valid with --image. Default: the link's dag-bundle in pyproject.toml, else the default bundle")
+	// name is what `astro bundle create --name` set.
+	cmd.Flags().StringVar(&deployDagBundle, "dag-bundle", "", "Ship the Dags to this named Dag bundle on the Deployment instead of its default bundle. The bundle must already exist and be one deploys write (astro bundle create --name). Needs Airflow 3 and Dag deploys; not valid with --image. Default: the link's dag-bundle in pyproject.toml, else the default bundle")
 	utils.RefuseEmpty(cmd.Flags().Lookup("dag-bundle"))
 	utils.AddAlias(cmd.Flags(), "dag-bundle-name", "dag-bundle")
 

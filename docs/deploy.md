@@ -154,7 +154,7 @@ An image a deploy or `astro package astro` builds is pushed to a registry, so be
 
 `--dag-bundle <name>` ships the Dags to a named Dag bundle on the Deployment instead of its default one, on a Dags-only deploy or on a full one (the image and its Dags): `astro deploy prod --dags --dag-bundle nightly`. 1.x spelled it `--dag-bundle-name`, which still works as a hidden alias (a run using it is told to type `--dag-bundle` and the rename is recorded, as for every renamed flag). A project can declare the bundle once, on the Deployment's link: `dag-bundle = 'nightly'` under `[tool.astro.deployments.prod]` (see [`dag-bundle`](manifest-reference.md#dag-bundle)), and `--dag-bundle` overrides it for one run. A Dag bundle belongs to one Deployment, so the setting is the link's and there is no project-wide one.
 
-The bundle has to exist already: `astro deployment bundle create --name nightly` makes one. 1.x left every check to the server; the deploy now reads the Deployment's bundles first, before anything is built or uploaded, and refuses:
+The bundle has to exist already: `astro bundle create --name nightly` makes one. 1.x left every check to the server; the deploy now reads the Deployment's bundles first, before anything is built or uploaded, and refuses:
 
 - a name no Dag bundle on the Deployment has (a bundle being deleted does not count), saying how to create one;
 - a bundle written by `astro bundle files`, which a deploy does not write to (the API tells the two kinds apart);

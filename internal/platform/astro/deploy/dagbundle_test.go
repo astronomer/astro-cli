@@ -114,7 +114,7 @@ func TestDeployManifestDags_DagBundleRefusals(t *testing.T) {
 		dagOn   bool
 		want    string
 	}{
-		"no bundle by that name":     {nil, true, `no Dag bundle named "nightly" on Deployment test-deployment-id. Create it with 'astro deployment bundle create --name nightly'`},
+		"no bundle by that name":     {nil, true, `no Dag bundle named "nightly" on Deployment test-deployment-id. Create it with 'astro bundle create --name nightly'`},
 		"only another bundle's name": {[]astrov1alpha1.DeploymentBundle{bundleOn("b2", "weekly", true, astrov1alpha1.DeploymentBundleTypeDEPLOY)}, true, `no Dag bundle named "nightly"`},
 		"a non-Dag bundle":           {[]astrov1alpha1.DeploymentBundle{bundleOn("b3", "", false, astrov1alpha1.DeploymentBundleTypeDEPLOY)}, true, `no Dag bundle named "nightly"`},
 		"one being deleted":          {[]astrov1alpha1.DeploymentBundle{pending}, true, `no Dag bundle named "nightly"`},
