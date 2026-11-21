@@ -7,6 +7,7 @@ package astro
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 
@@ -47,10 +48,14 @@ func strayStdoutToStderr(format cliout.Format) (restore func()) {
 const maskedSecret = "****"
 
 // renderVariables prints the variable table, or says there are none.
-func renderVariables(b *bufio.Writer, vars []deployment.VariableInfo, empty string) {
+//
+// plain is a table for a script (see cliout.Table): the list command sets it
+// when its output is not a terminal. The empty message goes to stderr.
+func renderVariables(b *bufio.Writer, vars []deployment.VariableInfo, empty string, plain bool) {
 	table := cliout.Table{
 		Header: []string{"#", "KEY", "VALUE", "SECRET"},
-		Empty:  "\n" + empty,
+		Empty:  empty,
+		Plain:  plain,
 	}
 	for i, v := range vars {
 		value := v.Value
@@ -123,7 +128,7 @@ func renderVariableModify(b *bufio.Writer, res *deployment.VariableModifyResult)
 	if len(res.Variables) > 0 {
 		fmt.Fprintln(b, "\nUpdated list of your Deployment's variables:")
 	}
-	renderVariables(b, res.Variables, "No variables for this Deployment")
+	renderVariables(b, res.Variables, "No variables for this Deployment", false)
 }
 
 // emitVariableList publishes `variable list`'s result: {"variables": [...]} in
@@ -140,9 +145,11 @@ func emitVariableList(cmd *cobra.Command, r cliout.Renderer, vars *deployment.De
 		}
 		fmt.Fprintf(notice, "\nThe following environment variables were saved to the file %s,\nsecret environment variables were saved only with a key:\n\n", envFile)
 	}
-	return r.Emit(vars, cliout.Text(func(b *bufio.Writer) {
-		renderVariables(b, vars.Variables, "No variables found")
-	}))
+	return r.Emit(vars, func(w io.Writer) error {
+		return cliout.WriteText(w, func(b *bufio.Writer) {
+			renderVariables(b, vars.Variables, "No variables found", !cliout.IsTerminal(w))
+		})
+	})
 }
 
 // emitVariableModify publishes a create or update run's result and picks its

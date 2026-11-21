@@ -14,13 +14,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"slices"
 	"strings"
 	"sync/atomic"
 
 	"github.com/fatih/color"
-	"github.com/mattn/go-isatty"
 	jsoncolor "github.com/neilotoole/jsoncolor"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -306,15 +304,7 @@ func StyleFor(w io.Writer) Style {
 // IsTerminal reports whether w is a terminal: the test StyleFor makes, and the
 // one a command makes before it cleans text from elsewhere (input.Lines) that a
 // terminal would act on, leaving what goes to a file or a pipe as it came.
-func IsTerminal(w io.Writer) bool {
-	// A text renderer writes to the guard Renderer puts in front of a
-	// terminal; asked about it, the answer is the terminal's.
-	if tw, ok := w.(*input.TerminalWriter); ok {
-		w = tw.W
-	}
-	f, ok := w.(*os.File)
-	return ok && (isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd()))
-}
+func IsTerminal(w io.Writer) bool { return input.IsTerminalWriter(w) }
 
 // Emit writes v, a command's result. In json mode it is laid out by
 // r.Style (see StyleFor); in text mode Emit calls text, which must render v
@@ -428,7 +418,7 @@ func (r Renderer) text(text func(w io.Writer) error) error {
 			"prevents it.")
 	}
 	if !textToTerminal(r.Out) {
-		return text(r.Out)
+		return text(input.WithNotices(r.Out, r.Err))
 	}
 	// To a terminal, the rendering goes through input.TerminalWriter: its SGR
 	// styling (the CLI's own colors and bold) is kept, and anything else a
@@ -438,7 +428,7 @@ func (r Renderer) text(text func(w io.Writer) error) error {
 	// through, so no command has to remember. To a file or a pipe the bytes
 	// are left exactly as rendered.
 	tw := &input.TerminalWriter{W: r.Out}
-	err := text(tw)
+	err := text(input.WithNotices(tw, r.Err))
 	if ferr := tw.Flush(); err == nil {
 		err = ferr
 	}

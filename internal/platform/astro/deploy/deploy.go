@@ -417,11 +417,15 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		return ClientDeploy{}, err
 	}
 
+	// What the deploy is doing (its steps, what it could not do) goes to
+	// stderr: stdout is the deploy's result.
+	progress := deployInput.progress()
+
 	// Use empty slice to let Docker build for host platform by default
 	targetPlatforms := []string{}
 	if deployInput.ImageName != "" {
 		// Use the provided local image (tag will be ignored, remote tag is always timestamp-based)
-		fmt.Println("Using provided image:", deployInput.ImageName)
+		fmt.Fprintln(progress, "Using provided image:", deployInput.ImageName)
 		err := engine.Tag(ctx, deployInput.ImageName, remoteImage)
 		if err != nil {
 			return ClientDeploy{}, fmt.Errorf("could not tag local image: %w", err)
@@ -449,12 +453,12 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			if err != nil {
 				ansi.Warn(errOut, "could not read Dockerfile.client, so astro assumes its base image is on images.astronomer.cloud and logs in to that registry")
 			}
-			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)
+			fmt.Fprintf(progress, "Authenticating with base image registry: %s\n", baseImageRegistry)
 			err := loginBaseImageRegistry(ctx, engine, baseImageRegistry, c.Token)
 			if err != nil {
-				fmt.Println("Could not authenticate with the Astronomer registry for the base agent image in Dockerfile.client.")
-				fmt.Println("Your token may have expired, or you may lack permission to pull the base agent image.")
-				fmt.Println("Run astro login to refresh your credentials, or check that ASTRO_API_TOKEN holds a valid token, then try again.")
+				fmt.Fprintln(progress, "Could not authenticate with the Astronomer registry for the base agent image in Dockerfile.client.")
+				fmt.Fprintln(progress, "Your token may have expired, or you may lack permission to pull the base agent image.")
+				fmt.Fprintln(progress, "Run astro login to refresh your credentials, or check that ASTRO_API_TOKEN holds a valid token, then try again.")
 				return ClientDeploy{}, fmt.Errorf("could not authenticate with registry %s: %w", baseImageRegistry, err)
 			}
 		}
@@ -468,9 +472,9 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			for i, platform := range targetPlatforms {
 				targetPlatforms[i] = strings.TrimSpace(platform)
 			}
-			fmt.Printf("Building client image for platforms: %s\n", strings.Join(targetPlatforms, ", "))
+			fmt.Fprintf(progress, "Building client image for platforms: %s\n", strings.Join(targetPlatforms, ", "))
 		} else {
-			fmt.Println("Building client image for host platform")
+			fmt.Fprintln(progress, "Building client image for host platform")
 		}
 
 		// Prepare build context with client dependency files
@@ -490,14 +494,14 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 	}
 
 	// Push the image to the remote registry (assumes docker login was done externally)
-	fmt.Println("Pushing client image to configured remote registry")
-	_, err = engine.Push(ctx, imagebuild.PushRequest{Image: remoteImage, Out: os.Stdout})
+	fmt.Fprintln(progress, "Pushing client image to configured remote registry")
+	_, err = engine.Push(ctx, imagebuild.PushRequest{Image: remoteImage, Out: progress})
 	if err != nil {
 		if errors.Is(err, imagebuild.ErrPushForbidden) {
-			fmt.Printf("\n--------------------------------\n")
-			fmt.Printf("Could not push client image to %s\n", registryEndpoint)
-			fmt.Println("Your registry token may have expired, or you may lack permission to push the client image.")
-			fmt.Printf("Run docker login %s, then try again\n\n", registryEndpoint)
+			fmt.Fprintf(progress, "\n--------------------------------\n")
+			fmt.Fprintf(progress, "Could not push client image to %s\n", registryEndpoint)
+			fmt.Fprintln(progress, "Your registry token may have expired, or you may lack permission to push the client image.")
+			fmt.Fprintf(progress, "Run docker login %s, then try again\n\n", registryEndpoint)
 		}
 		return ClientDeploy{}, fmt.Errorf("could not push client image: %w", deploybuild.ExplainPush(err))
 	}
@@ -510,6 +514,15 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		Platforms:    targetPlatforms,
 		RuntimeCheck: check,
 	}, nil
+}
+
+// progress is where the deploy says what it is doing: the command's error
+// writer, stderr when none was given.
+func (i *InputClientDeploy) progress() io.Writer {
+	if i.ErrOut != nil {
+		return i.ErrOut
+	}
+	return os.Stderr
 }
 
 // validateClientImageRuntimeVersion validates that the client image runtime version
@@ -562,7 +575,7 @@ Either set the base image in Dockerfile.client to runtime version %s or earlier,
 			clientRuntimeVersion, deployInfo.currentVersion, deployInfo.currentVersion, clientRuntimeVersion)
 	}
 
-	fmt.Printf("Client image runtime version %s is compatible with Deployment runtime version %s\n",
+	fmt.Fprintf(deployInput.progress(), "Client image runtime version %s is compatible with Deployment runtime version %s\n",
 		clientRuntimeVersion, deployInfo.currentVersion)
 
 	return &ClientRuntimeCheck{

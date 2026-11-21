@@ -23,6 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // apiFailure is the error an Astro API call returns for status, built by the
@@ -56,7 +57,7 @@ var cloudSamples = map[cliout.ProblemKind][]error{
 	},
 	KindForbidden:      {apiFailure(http.StatusForbidden)},
 	KindNotFound:       {apiFailure(http.StatusNotFound)},
-	KindConflict:       {apiFailure(http.StatusConflict)},
+	KindConflict:       {apiFailure(http.StatusConflict), fmt.Errorf("/proj %w; edit its pyproject.toml", scaffold.ErrAlreadyAstroProject)},
 	KindAPIUnavailable: {apiFailure(http.StatusInternalServerError), apiFailure(http.StatusServiceUnavailable)},
 	KindOutcomeUnknown: {
 		postFailure(http.StatusBadGateway, "/v1/organizations/org/deployments"),

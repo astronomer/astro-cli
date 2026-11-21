@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/astronomer/astro-cli/pkg/input"
 )
@@ -49,7 +50,7 @@ func PromptPaginatedOption(previousCursorID, nextCursorID string, take, totalRec
 		if found {
 			return value, nil
 		}
-		fmt.Print("\nInvalid option")
+		fmt.Fprint(os.Stderr, "\nInvalid option")
 	}
 }
 

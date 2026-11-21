@@ -375,6 +375,11 @@ func foregroundRemoved(cmd *cobra.Command, _ string) string {
 }
 
 func waitRemoved(cmd *cobra.Command, _ string) string {
+	// restart has no --timeout: only start does.
+	if strings.HasSuffix(cmd.CommandPath(), "start") {
+		return "pass --timeout, a Go duration, instead, as in " + cmd.CommandPath() + " --timeout 10m, " +
+			"or set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable"
+	}
 	return "set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable to a Go duration instead, as in " +
 		"ASTRO_LOCAL_HEALTH_TIMEOUT=10m " + cmd.CommandPath()
 }
@@ -709,12 +714,6 @@ func findV1Flag(flags []v1Flag, typed string, isShorthand bool) *v1Flag {
 	return nil
 }
 
-// isRemovedFlagErr reports whether err is a run refused for a removed flag.
-func isRemovedFlagErr(err error) bool {
-	var removed *removedFlagErr
-	return errors.As(err, &removed)
-}
-
 // acceptRemovedFlags keeps a removed 1.x flag from standing in the way of a
 // run that asks for help or for shell completions, which cobra answers only
 // once the flags parse.
@@ -746,15 +745,26 @@ func acceptRemovedFlags(root *cobra.Command, args []string) {
 	refuse := root.FlagErrorFunc()
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		err = refuse(cmd, err)
-		if !isRemovedFlagErr(err) {
+		if err == nil || errors.Is(err, pflag.ErrHelp) {
 			return err
 		}
+		// Help wins over any flag error: a run that asks for help gets it
+		// whether the flag was removed, unknown or given a bad value.
 		// The value, not Changed: --help=false asks for nothing.
 		if help := cmd.Flags().Lookup("help"); askedForHelp || (help != nil && help.Value.String() == "true") {
 			return pflag.ErrHelp
 		}
 		return err
 	})
+	if !askedForHelp {
+		return
+	}
+	// A command can carry a flag error func of its own (every command with an
+	// -o has one, which refuses a bad format before asking its parent), and
+	// cobra asks the nearest one only. Help outranks them all.
+	for c := helpTarget(root, args); c != nil; c = c.Parent() {
+		c.SetFlagErrorFunc(func(*cobra.Command, error) error { return pflag.ErrHelp })
+	}
 }
 
 // acceptForCompletion readies the tree for a completion request whose words

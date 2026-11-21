@@ -402,7 +402,7 @@ func (s *Suite) TestListData() {
 	s.Run("returns structured deployment data", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		data, err := listData(ws, false, mockV1Client)
+		data, err := listData(ws, false, 0, mockV1Client)
 		s.NoError(err)
 		s.Len(data.Deployments, 2)
 		s.Contains([]string{data.Deployments[0].DeploymentID, data.Deployments[1].DeploymentID}, "test-id-1")
@@ -412,7 +412,7 @@ func (s *Suite) TestListData() {
 	s.Run("returns error on failure", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
-		_, err := listData(ws, false, mockV1Client)
+		_, err := listData(ws, false, 0, mockV1Client)
 		s.ErrorIs(err, errMock)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -420,7 +420,7 @@ func (s *Suite) TestListData() {
 	s.Run("empty result", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 
-		data, err := listData(ws, false, mockV1Client)
+		data, err := listData(ws, false, 0, mockV1Client)
 		s.NoError(err)
 		s.Empty(data.Deployments)
 		mockV1Client.AssertExpectations(s.T())
@@ -434,7 +434,7 @@ func (s *Suite) TestListWithFormat() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(ws, false, mockV1Client, testUtil.Renderer{JSON: true, Out: buf})
+		err := ListWithFormat(ws, false, 0, mockV1Client, testUtil.Renderer{JSON: true, Out: buf})
 		s.NoError(err)
 
 		var result DeploymentList
@@ -447,7 +447,7 @@ func (s *Suite) TestListWithFormat() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(ws, false, mockV1Client, testUtil.Renderer{Out: buf})
+		err := ListWithFormat(ws, false, 0, mockV1Client, testUtil.Renderer{Out: buf})
 		s.NoError(err)
 		s.Contains(buf.String(), "test-id-1")
 		mockV1Client.AssertExpectations(s.T())
@@ -2969,6 +2969,21 @@ func (s *Suite) TestUpdateDeploymentHibernationOverride() {
 		s.ErrorIs(err, errInvalidDeployment)
 		mockV1Client.AssertExpectations(s.T())
 	})
+}
+
+// A Deployment's name is printed as text: escapes, control characters and
+// line breaks in it are not passed to the terminal.
+func (s *Suite) TestWaitForHibernationOverridePrintsTheNamePlain() {
+	origTick, origGet := TickNum, GetDeploymentByID
+	TickNum = 1
+	s.T().Cleanup(func() { TickNum, GetDeploymentByID = origTick, origGet })
+	GetDeploymentByID = func(_, _ string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+		return astrov1.Deployment{Id: "test-id-1", Name: "prod\x1b[2J\x1b]0;title\x07\nfake line", Status: astrov1.DeploymentStatusHIBERNATING}, nil
+	}
+	var out bytes.Buffer
+	s.Require().NoError(WaitForHibernationOverride(stdcontext.Background(), &out, "test-id-1", true, time.Minute, nil))
+	s.Contains(out.String(), "Deployment prod fake line is now hibernating\n")
+	s.NotContains(out.String(), "\x1b")
 }
 
 func (s *Suite) TestUpdateDeploymentHibernationOverrideWaits() {

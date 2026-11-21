@@ -17,6 +17,13 @@ type FetchPage[T any] func(offset int) (items []T, total int, err error)
 // total is reached, erroring if MaxListPages is exceeded. what names the entity
 // being listed, for the error message (e.g. "workspaces").
 func Collect[T any](what string, fetch FetchPage[T]) ([]T, error) {
+	return CollectUpTo(what, 0, fetch)
+}
+
+// CollectUpTo is Collect for a caller that wants at most limit items: it stops
+// paging once it has them and returns exactly limit, in the order the API
+// gave. A limit below 1 means every item.
+func CollectUpTo[T any](what string, limit int, fetch FetchPage[T]) ([]T, error) {
 	var all []T
 	offset := 0
 	for page := 0; page < MaxListPages; page++ {
@@ -25,6 +32,9 @@ func Collect[T any](what string, fetch FetchPage[T]) ([]T, error) {
 			return nil, err
 		}
 		all = append(all, items...)
+		if limit > 0 && len(all) >= limit {
+			return all[:limit], nil
+		}
 		if len(items) == 0 || len(all) >= total {
 			return all, nil
 		}

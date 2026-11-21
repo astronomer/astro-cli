@@ -205,7 +205,11 @@ func deploymentToInfo(d *astrov1.Deployment, includeWorkspaceName bool) Deployme
 }
 
 // listData returns deployment list data for structured output
-func listData(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient) (*DeploymentList, error) {
+//
+// limit, when above zero, is the most Deployments wanted: paging stops once
+// that many are in hand, taken in the API's name order (descending, as they
+// are listed), so a limited list is the same first rows every time.
+func listData(ws string, fromAllWorkspaces bool, limit int, astroV1Client astrov1.APIClient) (*DeploymentList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
@@ -214,7 +218,12 @@ func listData(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient
 	if fromAllWorkspaces {
 		ws = ""
 	}
-	deployments, err := ListDeployments(ws, c.Organization, astroV1Client)
+	var deployments []astrov1.Deployment
+	if limit > 0 {
+		deployments, err = listDeploymentsUpTo(ws, c.Organization, limit, astroV1Client)
+	} else {
+		deployments, err = ListDeployments(ws, c.Organization, astroV1Client)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -233,9 +242,9 @@ func listData(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient
 }
 
 // ListWithFormat lists deployments with the specified output format
-func ListWithFormat(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient, r output.Emitter) error {
+func ListWithFormat(ws string, fromAllWorkspaces bool, limit int, astroV1Client astrov1.APIClient, r output.Emitter) error {
 	return output.PrintData(
-		func() (*DeploymentList, error) { return listData(ws, fromAllWorkspaces, astroV1Client) },
+		func() (*DeploymentList, error) { return listData(ws, fromAllWorkspaces, limit, astroV1Client) },
 		deploymentTableConfig(fromAllWorkspaces, ws), r,
 	)
 }
@@ -411,7 +420,7 @@ func Create(ctx context.Context, name, workspaceID, description, clusterID, runt
 		}
 	}
 	// A note, so progress: stdout is the Deployment the create made.
-	fmt.Fprintf(progressTo(progress), "Current Workspace: %s\n\n", currentWorkspace.Name)
+	fmt.Fprintf(progressTo(progress), "Current Workspace: %s\n\n", input.Plain(currentWorkspace.Name))
 
 	// name input
 	if name == "" {
@@ -721,11 +730,11 @@ const (
 
 func validateHybridResources(schedulerAU, schedulerReplicas int, _ astrov1.DeploymentOptions) bool { //nolint:gocritic // intentional in this shell code
 	if schedulerAU > hybridSchedulerAuMax || schedulerAU < hybridSchedulerAuMin {
-		fmt.Printf("\nScheduler AUs must be between %d and %d\n", hybridSchedulerAuMin, hybridSchedulerAuMax)
+		fmt.Fprintf(os.Stderr, "\nScheduler AUs must be between %d and %d\n", hybridSchedulerAuMin, hybridSchedulerAuMax)
 		return false
 	}
 	if schedulerReplicas > hybridSchedulerReplicasMax || schedulerReplicas < hybridSchedulerReplicasMin {
-		fmt.Printf("\nScheduler Replicas must be between %d and %d\n", hybridSchedulerReplicasMin, hybridSchedulerReplicasMax)
+		fmt.Fprintf(os.Stderr, "\nScheduler Replicas must be between %d and %d\n", hybridSchedulerReplicasMin, hybridSchedulerReplicasMax)
 		return false
 	}
 	return true
@@ -866,7 +875,7 @@ func HealthPollIn(ctx context.Context, progress io.Writer, orgID, token, deploym
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(progress, "Deployment %s is now healthy\n", d.Name)
+	fmt.Fprintf(progress, "Deployment %s is now healthy\n", input.Plain(d.Name))
 	return nil
 }
 
@@ -1416,7 +1425,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	if !force {
 		if confirmWithUser {
 			if err := input.ConfirmOrAbort(
-				fmt.Sprintf("\nUpdate Deployment %s?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+				fmt.Sprintf("\nUpdate Deployment %s?", ansi.ForStderr().Bold(input.Plain(currentDeployment.Name))), input.AnsweredBy("--yes")); err != nil {
 				return UpdateResult{}, err
 			}
 		}
@@ -1607,7 +1616,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 	// The name is shown as it is, unescaped, so what is shown is what to type.
 	if !forceDelete {
 		typed, err := input.Text(
-			fmt.Sprintf("\nThis permanently deletes the Deployment %s and all of its data.\n", ansi.ForStderr().Bold(currentDeployment.Name))+
+			fmt.Sprintf("\nThis permanently deletes the Deployment %s and all of its data.\n", ansi.ForStderr().Bold(input.Plain(currentDeployment.Name)))+
 				`To confirm, type the Deployment name "`+currentDeployment.Name+`": `,
 			input.About("the Deployment's name, to confirm the delete"), input.AnsweredBy("--yes"))
 		if err != nil {
@@ -1657,7 +1666,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		if err := input.ConfirmOrAbort(
-			fmt.Sprintf("\nOverride to %s for Deployment %s?", ansi.ForStderr().Bold(action), ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+			fmt.Sprintf("\nOverride to %s for Deployment %s?", ansi.ForStderr().Bold(action), ansi.ForStderr().Bold(input.Plain(currentDeployment.Name))), input.AnsweredBy("--yes")); err != nil {
 			return nil, err
 		}
 	}
@@ -1700,7 +1709,7 @@ func WaitForHibernationOverride(ctx context.Context, progress io.Writer, deploym
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(progress, "Deployment %s is now %s\n", d.Name, done)
+	fmt.Fprintf(progress, "Deployment %s is now %s\n", input.Plain(d.Name), done)
 	return nil
 }
 
@@ -1722,7 +1731,7 @@ func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		if err := input.ConfirmOrAbort(
-			fmt.Sprintf("\nRemove the hibernation override for Deployment %s and resume its schedule?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+			fmt.Sprintf("\nRemove the hibernation override for Deployment %s and resume its schedule?", ansi.ForStderr().Bold(input.Plain(currentDeployment.Name))), input.AnsweredBy("--yes")); err != nil {
 			return nil, err
 		}
 	}
@@ -1796,6 +1805,14 @@ var coreDeleteDeploymentHibernationOverride = func(orgID, deploymentID string, a
 // ListDeployments returns every Deployment in the given Workspace (or the whole
 // Organization when ws is empty), paging through the API as needed.
 var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
+	return listDeploymentsUpTo(ws, orgID, 0, astroV1Client)
+}
+
+// listDeploymentsUpTo is ListDeployments that stops paging after limit
+// Deployments (every one when limit is below 1). Both ask the API for name
+// order, descending as `deployment list` shows them, so a limited read keeps
+// the first rows of the full one.
+func listDeploymentsUpTo(ws, orgID string, limit int, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1803,8 +1820,18 @@ var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([
 		}
 		orgID = c.Organization
 	}
-	return pagination.Collect("deployments", func(offset int) ([]astrov1.Deployment, int, error) {
-		params := &astrov1.ListDeploymentsParams{Limit: &listLimit, Offset: &offset}
+	return pagination.CollectUpTo("deployments", limit, func(offset int) ([]astrov1.Deployment, int, error) {
+		pageSize := listLimit
+		// Name order, descending as `deployment list` shows them, with or
+		// without a limit, so a limited list is the first rows of the full one.
+		params := &astrov1.ListDeploymentsParams{
+			Limit:  &pageSize,
+			Offset: &offset,
+			Sorts:  &[]astrov1.ListDeploymentsParamsSorts{astrov1.ListDeploymentsParamsSortsNameDesc},
+		}
+		if limit > 0 {
+			pageSize = min(pageSize, limit-offset)
+		}
 		if ws != "" {
 			params.WorkspaceIds = &[]string{ws}
 		}
@@ -2260,7 +2287,7 @@ func deploymentSelectionProcess(ws string, src astrosession.Source, deployments 
 		if use == ToRead {
 			if !CleanOutput {
 				fmt.Fprintf(os.Stderr, "Using the only Deployment found:\n\n Deployment Name: %s\n Deployment ID: %s\n",
-					ansi.ForStderr().Bold(deployments[0].Name), ansi.ForStderr().Bold(deployments[0].Id))
+					ansi.ForStderr().Bold(input.Plain(deployments[0].Name)), ansi.ForStderr().Bold(input.Plain(deployments[0].Id)))
 			}
 			return deployments[0], nil
 		}

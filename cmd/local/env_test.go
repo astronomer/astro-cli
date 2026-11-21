@@ -389,16 +389,17 @@ func TestEnvListNotes(t *testing.T) {
 	if err := renderEnvList(&out, items, true, false); err != nil {
 		t.Fatal(err)
 	}
+	// Into a builder, which is no terminal: one tab between cells, as a pipe.
 	want := "" +
-		"KIND      NAME                        SOURCE        STATUS\n" +
-		"variable  API_URL                                   declared but missing\n" +
-		"variable  LOG_LEVEL                                 declared but not set (optional)\n" +
-		"variable  TOKEN                                     not linked to this project\n" +
-		"variable  DECLARED                    .env          \n" +
-		"variable  ELSEWHERE                   .env          not declared (in /projects/other)\n" +
-		"variable  GLOBALONLY                  global vault  not declared\n" +
-		"variable  LEFTOVER                    .env          not declared\n" +
-		"variable  AIRFLOW__CORE__PARALLELISM  global vault  not linked to this project\n"
+		"KIND\tNAME\tSOURCE\tSTATUS\n" +
+		"variable\tAPI_URL\t\tdeclared but missing\n" +
+		"variable\tLOG_LEVEL\t\tdeclared but not set (optional)\n" +
+		"variable\tTOKEN\t\tnot linked to this project\n" +
+		"variable\tDECLARED\t.env\t\n" +
+		"variable\tELSEWHERE\t.env\tnot declared (in /projects/other)\n" +
+		"variable\tGLOBALONLY\tglobal vault\tnot declared\n" +
+		"variable\tLEFTOVER\t.env\tnot declared\n" +
+		"variable\tAIRFLOW__CORE__PARALLELISM\tglobal vault\tnot linked to this project\n"
 	if out.String() != want {
 		t.Errorf("list =\n%s\nwant\n%s", out.String(), want)
 	}
@@ -408,15 +409,15 @@ func TestEnvListNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	want = "" +
-		"KIND      NAME                        SOURCE        STATUS                             REQUIRED  SECRET  DESCRIPTION\n" +
-		"variable  API_URL                                   declared but missing               yes       yes     Where the API lives\n" +
-		"variable  LOG_LEVEL                                 declared but not set (optional)                      \n" +
-		"variable  TOKEN                                     not linked to this project                           \n" +
-		"variable  DECLARED                    .env                                             yes               \n" +
-		"variable  ELSEWHERE                   .env          not declared (in /projects/other)                    \n" +
-		"variable  GLOBALONLY                  global vault  not declared                                         \n" +
-		"variable  LEFTOVER                    .env          not declared                                         \n" +
-		"variable  AIRFLOW__CORE__PARALLELISM  global vault  not linked to this project                           \n"
+		"KIND\tNAME\tSOURCE\tSTATUS\tREQUIRED\tSECRET\tDESCRIPTION\n" +
+		"variable\tAPI_URL\t\tdeclared but missing\tyes\tyes\tWhere the API lives\n" +
+		"variable\tLOG_LEVEL\t\tdeclared but not set (optional)\t\t\t\n" +
+		"variable\tTOKEN\t\tnot linked to this project\t\t\t\n" +
+		"variable\tDECLARED\t.env\t\tyes\t\t\n" +
+		"variable\tELSEWHERE\t.env\tnot declared (in /projects/other)\t\t\t\n" +
+		"variable\tGLOBALONLY\tglobal vault\tnot declared\t\t\t\n" +
+		"variable\tLEFTOVER\t.env\tnot declared\t\t\t\n" +
+		"variable\tAIRFLOW__CORE__PARALLELISM\tglobal vault\tnot linked to this project\t\t\t\n"
 	if out.String() != want {
 		t.Errorf("list -o wide =\n%s\nwant\n%s", out.String(), want)
 	}
@@ -451,9 +452,9 @@ func TestEnvListNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	want = "" +
-		"KIND      NAME        SOURCE        STATUS\n" +
-		"variable  TOKEN       global vault  linked to other projects\n" +
-		"variable  GLOBALONLY  global vault  \n"
+		"KIND\tNAME\tSOURCE\tSTATUS\n" +
+		"variable\tTOKEN\tglobal vault\tlinked to other projects\n" +
+		"variable\tGLOBALONLY\tglobal vault\t\n"
 	if out.String() != want {
 		t.Errorf("list outside a project =\n%s\nwant\n%s", out.String(), want)
 	}

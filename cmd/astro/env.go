@@ -204,7 +204,7 @@ func newEnvRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "env",
 		Aliases: []string{"environment"},
-		Args:    cobra.ArbitraryArgs,
+		Args:    cliout.UndeclaredArgs,
 		RunE:    cliout.GroupHelp,
 		Short:   "Manage environment objects on Astro",
 		Long: `Manage environment objects on Astro: environment variables, connections, Airflow variables, and metrics exports, scoped to a workspace or a deployment.

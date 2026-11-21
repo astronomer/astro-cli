@@ -2,11 +2,13 @@ package local
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // The kinds a core command can fail with. The mechanism they plug into — the
@@ -110,4 +112,45 @@ var ProblemKinds = cliout.Kinds{
 	{Kind: KindDeploymentDeploying, Match: cliout.Sentinel(instancelocate.ErrDeploymentDeploying)},
 	{Kind: KindDeploymentUnhealthy, Match: cliout.Sentinel(instancelocate.ErrDeploymentUnhealthy)},
 	{Kind: KindAirflowUnavailable, Match: cliout.Sentinel(instancelocate.ErrAirflowUnavailable)},
+}
+
+// errNotFound and errExists mark the two predictable failures of a command
+// that names something in the project or the vault: it is not there, or it is
+// already there. They publish no kind of their own. The root's not_found and
+// conflict (the Astro API's 404 and 409) also claim them through IsNotFound
+// and IsConflict, so one name means one thing wherever the CLI is run.
+var (
+	errNotFound = errors.New("not found")
+	errExists   = errors.New("already exists")
+)
+
+// markedError is an error whose text is its own and which also answers
+// errors.Is for one marker, so a message can say what the user needs to hear
+// and still be classified.
+type markedError struct {
+	msg    string
+	marker error
+}
+
+func (e *markedError) Error() string        { return e.msg }
+func (e *markedError) Is(target error) bool { return target == e.marker }
+
+func notFoundf(format string, args ...any) error {
+	return &markedError{msg: fmt.Sprintf(format, args...), marker: errNotFound}
+}
+
+func existsf(format string, args ...any) error {
+	return &markedError{msg: fmt.Sprintf(format, args...), marker: errExists}
+}
+
+// IsNotFound reports whether err is a local command's "no such variable, link
+// or the like" refusal.
+func IsNotFound(err error) bool {
+	return errors.Is(err, errNotFound) || errors.Is(err, errValueNotSet)
+}
+
+// IsConflict reports whether err is a local command's refusal because the
+// thing it would create is already there.
+func IsConflict(err error) bool {
+	return errors.Is(err, errExists) || errors.Is(err, scaffold.ErrAlreadyAstroProject)
 }

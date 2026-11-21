@@ -169,7 +169,8 @@ func TestFlagUsagesWrapsPastAWordWiderThanTheRoom(t *testing.T) {
 		"Secret to expose to the build. See "+url+". Repeat to specify multiple secrets.")
 	cmd.Flags().String("format", "text", "Output format")
 
-	got := flagUsages(cmd.Flags(), 60)
+	rows := flagRows(cmd.Flags())
+	got := renderFlagRows(rows, flagColumn(rows), 60)
 	for _, line := range strings.Split(got, "\n") {
 		if !strings.Contains(line, url) {
 			assert.LessOrEqual(t, len(line), 60, "%q", line)
@@ -179,6 +180,33 @@ func TestFlagUsagesWrapsPastAWordWiderThanTheRoom(t *testing.T) {
 	assert.Contains(t, words, "Repeat to specify multiple secrets.", "the words after the URL are kept")
 	assert.Contains(t, words, `Output format (default "text")`, "pflag's default is kept")
 	assert.Contains(t, got, "--build-secret stringArray")
+}
+
+// Every flag section of a command starts its descriptions at one column, so
+// the sections read as one list; a flag past the cap puts its description on
+// the next line, at that column.
+func TestFlagSectionsShareOneDescriptionColumn(t *testing.T) {
+	root := &cobra.Command{Use: "astro"}
+	root.PersistentFlags().Bool("non-interactive", false, "Never prompt")
+	cmd := &cobra.Command{Use: "deploy", Run: func(*cobra.Command, []string) {}}
+	root.AddCommand(cmd)
+	cmd.Flags().String("description", "", "Add a description")
+	cmd.Flags().Bool("dags", false, "Push only Dags")
+	cmd.Flags().StringArray("build-secret-with-a-long-name", nil, "Secret to expose")
+	require.NoError(t, cmd.Flags().SetAnnotation("dags", flagGroupAnnotation, []string{"Dag"}))
+	require.NoError(t, cmd.Flags().SetAnnotation("build-secret-with-a-long-name", flagGroupAnnotation, []string{"Image"}))
+
+	page := strings.Join(flagSections(cmd, 100), "\n\n")
+	starts := map[int]bool{}
+	for _, line := range strings.Split(page, "\n") {
+		for _, desc := range []string{"Add a description", "Push only Dags", "Secret to expose", "Never prompt"} {
+			if i := strings.Index(line, desc); i >= 0 {
+				starts[i] = true
+			}
+		}
+	}
+	assert.Len(t, starts, 1, "every description starts at one column:\n%s", page)
+	assert.Contains(t, page, "--build-secret-with-a-long-name stringArray\n", "a flag past the cap takes its own line")
 }
 
 // TestExampleRunsCatchesWhatCobraWouldRefuse proves the example-runs rule is

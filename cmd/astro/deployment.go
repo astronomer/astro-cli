@@ -80,6 +80,7 @@ var (
 	forDuration                string
 	removeOverride             bool
 	forceOverride              bool
+	deploymentNoOpen           bool
 	logApiserver               bool
 	logWebserver               bool
 	logScheduler               bool
@@ -95,6 +96,7 @@ var (
 	taskLogBucket              *string
 	taskLogURLPattern          *string
 	deploymentListOutput       cliout.Format
+	deploymentListLimit        int
 	deploymentUserOutput       cliout.Format
 	deploymentTeamOutput       cliout.Format
 
@@ -209,7 +211,7 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove",
+		Use:     "remove [TEAM_ID]",
 		Aliases: []string{"rm"},
 		Short:   "Remove a team from an Astro Deployment",
 		Long:    "Remove a team's role from a Deployment. Team members lose Deployment access unless they have access through another team or a direct user role assignment.",
@@ -417,7 +419,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove",
+		Use:     "remove [EMAIL]",
 		Aliases: []string{"rm"},
 		Short:   "Remove a user from an Astro Deployment",
 		Long:    "Remove a user's direct role from a Deployment. The user may retain access through team membership.",
@@ -445,9 +447,13 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
   # List them as JSON
   astro deployment list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := checkListLimit(cmd, "limit", deploymentListLimit); err != nil {
+				return err
+			}
 			return deploymentList(cmd, out)
 		},
 	}
+	addListLimitFlag(cmd, &deploymentListLimit, "Deployments")
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 	markWorkspaceChoice(cmd.Flags().Lookup("all"))
 	addDeploymentWorkspaceFlag(cmd.Flags())
@@ -756,7 +762,7 @@ func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "open [DEPLOYMENT_ID]",
 		Short: "Open a Deployment's Airflow UI in your browser",
-		Long:  "Open the Airflow UI of an Astro Deployment in your default browser. If the browser cannot be opened, the CLI prints the Airflow UI URL instead. Under --output json nothing is opened: the result carries the URL.",
+		Long:  "Open the Airflow UI of an Astro Deployment in your default browser. The CLI always prints the Airflow UI URL, and opens nothing with --no-open, under --output json, in CI, over SSH, or when there is no terminal. Under --output json the result carries the URL.",
 		Example: `  # Open a Deployment's Airflow UI
   astro deployment open <DEPLOYMENT_ID>
 
@@ -771,6 +777,7 @@ func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
 	}
 	addDeploymentFlag(cmd.Flags(), "Deployment whose Airflow UI to open: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
+	cmd.Flags().BoolVar(&deploymentNoOpen, "no-open", false, "Print the Airflow UI URL without opening the browser")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -786,10 +793,13 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 		}
 	}
 
-	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out})
+	return deployment.ListWithFormat(ws, allDeployments, deploymentListLimit, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out})
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
+	if err := checkListLimit(cmd, "log-count", logCount); err != nil {
+		return err
+	}
 	// Get release name from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
@@ -1082,10 +1092,12 @@ func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// A person is shown the UI in a browser; a run under json reads its url
-	// from the result instead.
-	opened := deploymentOutput == cliout.FormatText && openDeploymentUI(res.URL)
-	return emitDeploymentUI(cliout.Renderer{Format: deploymentOutput, Out: out}, res, opened)
+	// A person at a terminal is shown the UI in a browser; a run under json,
+	// in CI or over SSH, or with --no-open, reads its url from the result or
+	// the line instead.
+	attempted := deploymentOutput == cliout.FormatText && !deploymentNoOpen && input.CanOpenBrowser()
+	opened := attempted && openDeploymentUI(res.URL)
+	return emitDeploymentUI(cliout.Renderer{Format: deploymentOutput, Out: out}, res, uiOpening{attempted: attempted, opened: opened})
 }
 
 func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Writer, isHibernating bool) error {
@@ -1289,7 +1301,7 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
   astro deployment token create --name my-token --role DEPLOYMENT_ADMIN \
     --deployment <DEPLOYMENT_ID> --expiration 30 --clean-output`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createDeploymentToken(out)
+			return createDeploymentToken(out, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
@@ -1348,7 +1360,7 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
   # Rotate it without asking for confirmation
   astro deployment token rotate <TOKEN_ID> --deployment <DEPLOYMENT_ID> --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return rotateDeploymentToken(args, out)
+			return rotateDeploymentToken(args, out, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
@@ -1718,7 +1730,7 @@ func listDeploymentToken(out io.Writer) error {
 	return runDeploymentTokenList(deploymentTokenOutput, out)
 }
 
-func createDeploymentToken(out io.Writer) error {
+func createDeploymentToken(out, errOut io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1743,7 +1755,7 @@ func createDeploymentToken(out io.Writer) error {
 		tokenRole = answer
 	}
 
-	return runDeploymentTokenCreate(deploymentTokenOutput, out)
+	return runDeploymentTokenCreate(deploymentTokenOutput, out, errOut)
 }
 
 func updateDeploymentToken(args []string, out io.Writer) error {
@@ -1762,7 +1774,7 @@ func updateDeploymentToken(args []string, out io.Writer) error {
 	return runDeploymentTokenUpdate(deploymentTokenOutput, out)
 }
 
-func rotateDeploymentToken(args []string, out io.Writer) error {
+func rotateDeploymentToken(args []string, out, errOut io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
@@ -1774,7 +1786,7 @@ func rotateDeploymentToken(args []string, out io.Writer) error {
 		// make sure the id is lowercase
 		tokenID = strings.ToLower(args[0])
 	}
-	return runDeploymentTokenRotate(deploymentTokenOutput, out)
+	return runDeploymentTokenRotate(deploymentTokenOutput, out, errOut)
 }
 
 func deleteDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {

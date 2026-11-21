@@ -163,7 +163,7 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `--no-browser`, `-n` | drop it: a start opens no browser; `astro local open` does | `astro local start`, `astro start` |
 | `-p` | `--port` | `astro local start`, `astro start` |
 | `--standalone` | drop it: standalone is the default mode | `astro local start`, `astro start` |
-| `--wait` | the `ASTRO_LOCAL_HEALTH_TIMEOUT` environment variable, a Go duration: `ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro local start` | `astro local start` / `restart`, `astro start` |
+| `--wait` | `--timeout`, a Go duration, on `astro local start` (`astro local start --timeout 10m`), or the `ASTRO_LOCAL_HEALTH_TIMEOUT` environment variable, which `restart` takes too | `astro local start` / `restart`, `astro start` |
 | `--foreground`, `-f` | drop it: a start returns once Airflow is up and leaves it running; `astro local logs -f` follows it. `astro local start --watch` stays in the foreground to apply edits to `pyproject.toml` and `.env`, and stops Airflow on Ctrl-C | `astro local start` / `restart`, `astro start` |
 | `--compose-file` | a `docker-compose.override.yml` at the project root, which Docker mode merges over the compose file it writes | `astro local start` / `restart`, `astro start` |
 | `--settings-file`, `-s` | the connections, variables and pools `pyproject.toml` declares (`[tool.astro.env]`, `[tool.astro.pools]`), which `astro init` carries from `airflow_settings.yaml` | `astro local start` / `restart`, `astro start` |

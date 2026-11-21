@@ -95,8 +95,12 @@ var cloudKinds = cliout.Kinds{
 			httputil.HasStatus(err, http.StatusUnauthorized)
 	}},
 	{Kind: KindForbidden, Match: status(http.StatusForbidden)},
-	{Kind: KindNotFound, Match: status(http.StatusNotFound)},
-	{Kind: KindConflict, Match: status(http.StatusConflict)},
+	{Kind: KindNotFound, Match: func(err error) bool {
+		return httputil.HasStatus(err, http.StatusNotFound) || local.IsNotFound(err)
+	}},
+	{Kind: KindConflict, Match: func(err error) bool {
+		return httputil.HasStatus(err, http.StatusConflict) || local.IsConflict(err)
+	}},
 	// Before api_unavailable: a 5xx to a write is the more specific answer.
 	{Kind: KindOutcomeUnknown, Match: httputil.OutcomeUnknown},
 	{Kind: KindAPIUnavailable, Match: func(err error) bool {
@@ -140,6 +144,7 @@ var problemKinds = append(append(cliout.Kinds{}, local.ProblemKinds...), cloudKi
 func Execute(ctx context.Context) error {
 	root, args := NewRootCmd(), os.Args[1:]
 	err := execute(ctx, root, args, os.Stdout)
+	PrintUpdateNotice()
 	if cliout.IsUsage(err) {
 		trackUnknownCommand(root, args)
 	}
@@ -150,6 +155,14 @@ func Execute(ctx context.Context) error {
 // run that asks for help or completions past a removed 1.x flag
 // (acceptRemovedFlags).
 func execute(ctx context.Context, root *cobra.Command, args []string, stdout io.Writer) error {
+	if shown, err := printVersionIfAsked(root, args, stdout); shown {
+		return err
+	}
+	// Cobra adds these two as it executes. Added first, a line that names
+	// them resolves before it runs, so a group's word that is none of its
+	// subcommands (`completion bogus`) is refused like any other group's.
+	root.InitDefaultHelpCmd()
+	root.InitDefaultCompletionCmd()
 	acceptRemovedFlags(root, args)
 	for c := helpTarget(root, args); c != nil; c = c.Parent() {
 		addHelpFlag(c)

@@ -46,12 +46,12 @@ func runDeploymentTokenList(format cliout.Format, out io.Writer, tokenTypes ...d
 	return renderTokenList(format, out, tokens, deploymentRoleHeader)
 }
 
-func runDeploymentTokenCreate(format cliout.Format, out io.Writer) error {
+func runDeploymentTokenCreate(format cliout.Format, out, errOut io.Writer) error {
 	created, err := deployment.CreateToken(tokenName, tokenDescription, tokenRole, deploymentID, tokenExpiration, astroV1Client)
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(format, out, &created, "Deployment", "Created", tokenName, cleanTokenOutput)
+	return renderTokenSecret(format, out, errOut, &created, "Deployment", "Created", tokenName, cleanTokenOutput)
 }
 
 func runDeploymentTokenUpdate(format cliout.Format, out io.Writer) error {
@@ -66,7 +66,7 @@ func runDeploymentTokenUpdate(format cliout.Format, out io.Writer) error {
 	return renderTokenLine(format, out, res.Token, line)
 }
 
-func runDeploymentTokenRotate(format cliout.Format, out io.Writer) error {
+func runDeploymentTokenRotate(format cliout.Format, out, errOut io.Writer) error {
 	tokenTypes := []deployment.DeploymentTokenType{deployment.DeploymentTokenTypeDEPLOYMENT}
 	token, err := deployment.FindToken(tokenID, name, deploymentID, tokenTypes, tokenPicker(), astroV1Client)
 	if err != nil {
@@ -83,7 +83,7 @@ func runDeploymentTokenRotate(format cliout.Format, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(format, out, &rotated, "Deployment", "Rotated", token.Name, cleanTokenOutput)
+	return renderTokenSecret(format, out, errOut, &rotated, "Deployment", "Rotated", token.Name, cleanTokenOutput)
 }
 
 // offeredDeploymentTokens is the scopes a delete or a remove looks among: the

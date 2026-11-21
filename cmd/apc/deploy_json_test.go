@@ -220,8 +220,9 @@ func TestDeployJSON(t *testing.T) {
 
 		run = runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-		assert.Equal(t, "Deploying prebuilt image img:1…\nDeploying: rel-ac\n"+
-			"Deployed image registry/rel-ac/airflow:deploy-2 to Deployment dep-ac, with the Dags inside the image.\nDeployment: https://airflow\n", run.stdout)
+		// stdout is the result; what the deploy is doing goes to stderr.
+		assert.Equal(t, "Deployed image registry/rel-ac/airflow:deploy-2 to Deployment dep-ac, with the Dags inside the image.\nDeployment: https://airflow\n", run.stdout)
+		assert.Contains(t, run.stderr, "Deploying prebuilt image img:1…\nDeploying: rel-ac\n")
 		assert.Equal(t, 1, strings.Count(run.stderr, "Warning: "+inImageWarning+"\n"), run.stderr)
 	})
 

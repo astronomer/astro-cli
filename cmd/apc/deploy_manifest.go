@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/picker"
@@ -79,11 +80,11 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		description = utils.GetDefaultDeployDescription(isDagOnlyDeploy)
 	}
 
-	// The deploy's progress goes to stdout in text, as APC's deploy always
-	// has, and to stderr under json, where stdout carries the result. The
-	// question goes to stderr either way.
-	progress := cliout.NotesTo(cmd, deployOutput, out)
+	// The deploy's progress (the build, the push, what it is deploying) goes
+	// to stderr in both formats, with the question: stdout carries the
+	// result alone, the summary line in text and the object under json.
 	errOut := cmd.ErrOrStderr()
+	progress := errOut
 	// Every warning goes to stderr, led by a yellow "Warning:", as Astro's
 	// deploy does, and into the result's warnings for -o json; notes go to
 	// stderr too. In text they print once, after the deploy's progress (the
@@ -292,6 +293,12 @@ func (d *apcManifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeplo
 		return manifestdeploy.Deployment{}, err
 	}
 	return manifestdeploy.Deployment{ID: deps[i].ID, Name: deps[i].Label, WorkspaceID: firstNonEmpty(deps[i].Workspace.ID, workspaceID)}, nil
+}
+
+// DagsSource is what DeployDags uploads of the project: APC puts every
+// path under dags/, so --no-dags-base-dir changes nothing.
+func (d *apcManifestDeployer) DagsSource(projectDir string, _ bool) fileutil.TarSource {
+	return deploy.DagsSource(projectDir)
 }
 
 // DeployDags uploads the project's DAGs to a Deployment that takes DAG-only

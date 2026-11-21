@@ -71,6 +71,23 @@ func TestTasksWaitUntilAMappedTaskIsAwaitingInput(t *testing.T) {
 	}
 }
 
+// The state waited for is announced as plain text, as the states Airflow
+// reports are: an escape in --until does not reach the terminal.
+func TestTasksWaitAnnouncesTheStatePlain(t *testing.T) {
+	stub := taskWaitStub(t, "running")
+	stub.route(http.MethodGet, loadInstancePath, instanceBody("load", -1, "running"))
+
+	_, errOut, _ := runQuery(t, stub,
+		"tasks", "wait", "orders_etl", "manual__1", "load",
+		"--until", "awaiting\x1b[2J_input", "--poll-interval", "5ms", "--timeout", "100ms")
+	if !strings.Contains(errOut, "for load in orders_etl run manual__1 to be awaiting_input\n") {
+		t.Errorf("stderr is missing the announcement:\n%q", errOut)
+	}
+	if strings.Contains(errOut, "\x1b") {
+		t.Errorf("stderr carries an escape:\n%q", errOut)
+	}
+}
+
 // A mapped task has no single instance once it expands, so a wait on it
 // without an expansion would last until the run ended; it is refused instead.
 func TestTasksWaitNeedsTheExpansionOfAMappedTask(t *testing.T) {

@@ -36,7 +36,7 @@ func newEnvConnRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage connections",
 		Long:    "Manage connections on Astro, scoped to a Workspace or a Deployment.",
 		Example: envConnExamples,
-		Args:    cobra.ArbitraryArgs,
+		Args:    cliout.UndeclaredArgs,
 		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)

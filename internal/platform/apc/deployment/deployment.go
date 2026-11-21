@@ -828,8 +828,8 @@ var SelectDeployment = func(deployments []houston.Deployment, message string) (h
 	}
 
 	if len(deployments) == 1 {
-		fmt.Println("Only one Deployment found. Using it by default:\n" +
-			fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label)) +
+		fmt.Fprintln(os.Stderr, "Only one Deployment found. Using it by default:\n"+
+			fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Label))+
 			fmt.Sprintf("\n Deployment ID: %s\n", ansi.Bold(deployments[0].ID)))
 
 		return deployments[0], nil

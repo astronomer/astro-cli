@@ -106,7 +106,7 @@ func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(workspaceTokenOutput, out, &created, "Workspace", "Created", tokenName, cleanTokenOutput)
+	return renderTokenSecret(workspaceTokenOutput, out, cmd.ErrOrStderr(), &created, "Workspace", "Created", tokenName, cleanTokenOutput)
 }
 
 func updateWorkspaceToken(args []string, out io.Writer) error {
@@ -126,7 +126,7 @@ func updateWorkspaceToken(args []string, out io.Writer) error {
 	return renderTokenLine(workspaceTokenOutput, out, res.Token, line)
 }
 
-func rotateWorkspaceToken(args []string, out io.Writer) error {
+func rotateWorkspaceToken(args []string, out, errOut io.Writer) error {
 	if err := refuseCleanOutputWithJSON(workspaceTokenOutput); err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func rotateWorkspaceToken(args []string, out io.Writer) error {
 		return err
 	}
 	// Named as found, which a rotate by ID knows only after the lookup.
-	return renderTokenSecret(workspaceTokenOutput, out, &rotated, "Workspace", "Rotated", token.Name, cleanTokenOutput)
+	return renderTokenSecret(workspaceTokenOutput, out, errOut, &rotated, "Workspace", "Rotated", token.Name, cleanTokenOutput)
 }
 
 func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {

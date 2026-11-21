@@ -70,6 +70,21 @@ func captureStdout(t *testing.T, f func()) string {
 	return string(out)
 }
 
+// captureStderr is captureStdout for stderr: where a deploy's progress goes.
+func captureStderr(t *testing.T, f func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	prev := os.Stderr
+	os.Stderr = w
+	f()
+	os.Stderr = prev
+	require.NoError(t, w.Close())
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	return string(out)
+}
+
 const agentBase = "images.astronomer.cloud/baseimages/astro-remote-execution-agent:3.1-1-python-3.12-astro-agent-1.1.0"
 
 // The request is a declared-Dockerfile build of Dockerfile.client over the
@@ -239,7 +254,7 @@ func TestBuildClientImageFailurePrintsTheBuildOutput(t *testing.T) {
 	cmd.buildErr = errors.New("exit status 1")
 
 	var err error
-	out := captureStdout(t, func() {
+	out := captureStderr(t, func() {
 		err = buildClientImage(t.Context(), project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t))
 	})
 	require.ErrorIs(t, err, errClientBuild)
@@ -247,8 +262,8 @@ func TestBuildClientImageFailurePrintsTheBuildOutput(t *testing.T) {
 	assert.Contains(t, out, "#5 RUN pip install\n\n#5 ERROR: pip install failed\n")
 }
 
-// At debug level the build streams, stdout to stdout and stderr to stderr,
-// as the 1.x image handler streamed it.
+// At debug level the build streams, both of its streams to stderr: a build's
+// output is progress, and stdout is for the result.
 func TestBuildClientImageStreamsAtDebug(t *testing.T) {
 	project, ctx := clientProject(t, agentBase)
 	cmd := withClientBuild(t, "docker")
@@ -258,14 +273,14 @@ func TestBuildClientImageStreamsAtDebug(t *testing.T) {
 	t.Cleanup(func() { logger.SetLevel(prev) })
 
 	var err error
-	out := captureStdout(t, func() {
+	out := captureStderr(t, func() {
 		err = buildClientImage(t.Context(), project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t))
 	})
 	require.NoError(t, err)
 	assert.Contains(t, out, "to stdout\n")
 	require.Len(t, cmd.stdios, 1)
-	assert.Equal(t, os.Stderr, cmd.stdios[0].Err, "stderr goes to stderr")
-	assert.NotEqual(t, cmd.stdios[0].Out, cmd.stdios[0].Err, "the two streams stay apart")
+	assert.NotEqual(t, os.Stdout, cmd.stdios[0].Out, "the build's stdout is not this command's")
+	assert.NotEqual(t, os.Stdout, cmd.stdios[0].Err)
 }
 
 // A Dockerfile.client that is missing, or is not a file, is named as the

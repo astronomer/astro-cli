@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -30,6 +31,7 @@ func text(t *testing.T, data *testList, cfg *TableConfig) (string, error) {
 }
 
 func TestPrintTable(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	data := &testList{
 		Items: []testItem{
 			{Name: "alpha", ID: "id-1", IsCurrent: false},

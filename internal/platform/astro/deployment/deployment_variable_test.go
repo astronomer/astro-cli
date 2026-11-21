@@ -3,6 +3,7 @@ package deployment
 import (
 	"net/http"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -400,4 +401,66 @@ func TestAddVariablesFromFileDoesNotEchoValues(t *testing.T) {
 	for _, o := range res.Outcomes {
 		assert.NotContains(t, o.Input+o.Key+o.Reason, "hunter2")
 	}
+}
+
+// An existing .env keeps what it held and gains the variables after it, and
+// keeps the mode its owner gave it.
+func TestWriteVarToFileKeepsAnExistingMode(t *testing.T) {
+	path := t.TempDir() + "/.env"
+	require.NoError(t, os.WriteFile(path, []byte("KEEP=1"), 0o644))
+	err := writeVarToFile([]astrov1.DeploymentEnvironmentVariable{
+		{Key: "A", Value: &testValue1},
+		{Key: "S", IsSecret: true},
+	}, path)
+	require.NoError(t, err)
+	got, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "KEEP=1\nA="+testValue1+"\nS= # secret", string(got))
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+	}
+}
+
+// A .env this run creates is the user's alone: 0600.
+func TestWriteVarToFileCreatesPrivately(t *testing.T) {
+	path := t.TempDir() + "/.env"
+	require.NoError(t, writeVarToFile([]astrov1.DeploymentEnvironmentVariable{{Key: "A", Value: &testValue1}}, path))
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
+}
+
+// A symlinked .env is written through, not replaced by a file of its own.
+func TestWriteVarToFileWritesThroughASymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	dir := t.TempDir()
+	target := dir + "/real.env"
+	link := dir + "/.env"
+	require.NoError(t, os.WriteFile(target, []byte("KEEP=1"), 0o640))
+	require.NoError(t, os.Symlink(target, link))
+
+	require.NoError(t, writeVarToFile([]astrov1.DeploymentEnvironmentVariable{{Key: "A", Value: &testValue1}}, link))
+
+	info, err := os.Lstat(link)
+	require.NoError(t, err)
+	assert.NotZero(t, info.Mode()&os.ModeSymlink, "the link is still a link")
+	got, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, "KEEP=1\nA="+testValue1, string(got))
+	tinfo, err := os.Stat(target)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o640), tinfo.Mode().Perm())
+}
+
+// A failure to publish leaves the earlier file as it was.
+func TestWriteVarToFileLeavesTheFileOnFailure(t *testing.T) {
+	// A directory where the file should go cannot be read as one.
+	err := writeVarToFile([]astrov1.DeploymentEnvironmentVariable{{Key: "A", Value: &testValue1}}, t.TempDir())
+	assert.Error(t, err)
 }

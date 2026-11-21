@@ -112,9 +112,9 @@ func TestATextFailurePrintsNoUsageBlock(t *testing.T) {
 			"Error: unknown flag: --workspac\nDid you mean --workspace?\nRun astro deployment list --help for usage.\n",
 		},
 		{
-			[]string{"--version"},
+			[]string{"--bogus"},
 			2,
-			"Error: unknown flag: --version\nRun astro --help for usage.\n",
+			"Error: unknown flag: --bogus\nRun astro --help for usage.\n",
 		},
 	} {
 		r := p.run(c.args...)

@@ -3,6 +3,7 @@ package astro
 import (
 	"errors"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -11,10 +12,12 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/ide"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 var (
 	ideProjectID     string
+	ideNoOpen        bool
 	ideSessionID     string
 	ideImportYes     bool
 	ideProjectOutput cliout.Format
@@ -52,6 +55,7 @@ func newIDEListProjectCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List all Astro IDE projects in your Workspace",
 		Long:    "List all Astro IDE projects in your Workspace and optionally select one for future commands.",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listIDEProjects(out)
 		},
@@ -67,6 +71,7 @@ func newIDEImportProjectCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"i"},
 		Short:   "Import a project from Astro IDE",
 		Long:    "Import a project from Astro IDE to your local directory.",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return importIDEProject(cmd, out)
 		},
@@ -91,6 +96,7 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"e"},
 		Short:   "Export a project to Astro IDE",
 		Long:    "Export a project from your local directory to Astro IDE.",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return exportProject(cmd, out)
 		},
@@ -105,6 +111,7 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&ideProjectID, "project-id", "", "Project ID to export")
 	cmd.Flags().BoolVar(&force, "force", false, "Force export to overwrite project lock")
+	cmd.Flags().BoolVar(&ideNoOpen, "no-open", false, "Print the Astro IDE URL without opening the browser")
 	return cmd
 }
 
@@ -153,10 +160,12 @@ func exportProject(cmd *cobra.Command, out io.Writer) error {
 	if err := emitIDEExport(cliout.Renderer{Format: format, Out: out}, res); err != nil {
 		return err
 	}
-	// A person is shown the project in a browser; a run under json reads its
-	// url from the result instead.
+	// A person at a terminal is shown the project in a browser; a run under
+	// json reads its url from the result instead. The url is printed on
+	// stderr either way (--no-open, CI and SSH included), so stdout stays the
+	// result.
 	if format == cliout.FormatText {
-		ide.OpenInBrowser(res.URL, out)
+		ide.OpenInBrowser(res.URL, !ideNoOpen && input.CanOpenBrowser(), os.Stderr)
 	}
 	return nil
 }

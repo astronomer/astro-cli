@@ -132,7 +132,7 @@ func DeprecateCommand(cmd *cobra.Command, replacement func(cmd *cobra.Command) s
 	cmd.Annotations[DeprecatedCommandAnnotation] = "true"
 	check := cmd.Args
 	if check == nil {
-		check = cobra.ArbitraryArgs
+		check = UndeclaredArgs
 	}
 	cmd.Args = func(c *cobra.Command, args []string) error {
 		instead := replacement(c)

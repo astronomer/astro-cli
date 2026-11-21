@@ -247,6 +247,9 @@ type Runtime interface {
 	// project that is already stopped — which is the state its record is
 	// removed in, and the one someone resetting a bad database is usually in.
 	Reset(ctx context.Context, projectPath string) (localrt.ResetReport, error)
+	// SetHealthTimeout sets how long the next start waits for Airflow, for
+	// `astro local start --timeout`. A non-positive d changes nothing.
+	SetHealthTimeout(d time.Duration)
 }
 
 // NewDeps builds the production Deps. Call it once, from main.
@@ -392,6 +395,7 @@ func (r homelessRuntime) ReadStatus(string) (localrt.Status, error) {
 }
 func (r homelessRuntime) List() ([]localrt.Status, error)       { return nil, r.err }
 func (r homelessRuntime) PruneStale() ([]localrt.Status, error) { return nil, r.err }
+func (homelessRuntime) SetHealthTimeout(time.Duration)          {}
 func (r homelessRuntime) Reset(context.Context, string) (localrt.ResetReport, error) {
 	return localrt.ResetReport{}, r.err
 }
@@ -418,7 +422,7 @@ func adviseHealthTimeout(err error) error {
 	if !errors.Is(err, localrt.ErrHealthTimeout) && !errors.Is(err, localrt.ErrStartTimedOut) {
 		return err
 	}
-	return fmt.Errorf("%w; set %s (e.g. 10m) to wait longer", err, healthTimeoutEnv)
+	return fmt.Errorf("%w; pass --timeout (e.g. 10m) to astro local start, or set %s, to wait longer", err, healthTimeoutEnv)
 }
 
 // adviseDatabaseNewer names the ways out of a metadata database the project's

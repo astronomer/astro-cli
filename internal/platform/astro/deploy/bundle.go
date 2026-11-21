@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/git"
@@ -243,8 +244,25 @@ func DeleteBundle(input *DeleteBundleInput) (BundleDelete, error) {
 	return res, nil
 }
 
-// ValidateBundleSymlinks checks if any symlinks within the bundlePath point outside of it
+// bundleExcludes are the entries UploadBundle leaves out of the tarball.
+var bundleExcludes = []string{".git/"}
+
+// DagsSource is what a Dags upload of the project at projectDir tars
+// (UploadBundle, as uploadDeployDags calls it): its dags/, each entry under
+// dags/ unless noDagsBaseDir (--no-dags-base-dir).
+func DagsSource(projectDir string, noDagsBaseDir bool) fileutil.TarSource {
+	return fileutil.GzSource(filepath.Join(projectDir, "dags"), !noDagsBaseDir, bundleExcludes)
+}
+
+// ValidateBundleSymlinks checks if any symlinks within the bundlePath point outside of it.
+// A bundlePath that is itself a link is checked as the directory it leads
+// to, which is what the tarball is written from (fileutil.TarGz).
 func ValidateBundleSymlinks(bundlePath string) error {
+	if info, err := os.Lstat(bundlePath); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		if resolved, err := filepath.EvalSymlinks(bundlePath); err == nil {
+			bundlePath = resolved
+		}
+	}
 	absBundlePath, err := filepath.Abs(bundlePath)
 	if err != nil {
 		return fmt.Errorf("could not get absolute path for bundle directory: %w", err)
@@ -326,8 +344,7 @@ func UploadBundle(bundlePath, uploadURL string, opts BundleUpload) (string, erro
 	}
 	defer func() {
 		if err := os.RemoveAll(tarDir); err != nil {
-			fmt.Println("\nCould not delete archived file: ", err.Error())
-			fmt.Println("\nDelete the archived file manually: " + tarDir)
+			ansi.Warn(os.Stderr, "Could not delete archived file: "+err.Error()+". Delete it manually: "+tarDir)
 		}
 	}()
 	tarGzFilePath := filepath.Join(tarDir, "bundle.tar.gz")
@@ -343,7 +360,7 @@ func UploadBundle(bundlePath, uploadURL string, opts BundleUpload) (string, erro
 	}
 
 	// Generate the gzipped bundle tarball
-	err = fileutil.TarGz(bundlePath, tarGzFilePath, opts.PrependBaseDir, []string{".git/"}, overlay)
+	err = fileutil.TarGz(bundlePath, tarGzFilePath, opts.PrependBaseDir, bundleExcludes, overlay)
 	if err != nil {
 		return "", err
 	}
@@ -400,7 +417,7 @@ func finalizeBundleDeploy(organizationID, deploymentID, deployID, tarballVersion
 // Returns nil and empty string if the repository has uncommitted changes or if git metadata cannot be retrieved.
 func retrieveLocalGitMetadata(bundlePath string) (deployGit *astrov1.CreateDeployGitRequest, commitMessage string) {
 	if git.HasUncommittedChanges(bundlePath) {
-		fmt.Println("Local repository has uncommitted changes, skipping Git metadata retrieval")
+		ansi.Warn(os.Stderr, "Local repository has uncommitted changes, skipping Git metadata retrieval")
 		return nil, ""
 	}
 	return readHeadGitMetadata(bundlePath)

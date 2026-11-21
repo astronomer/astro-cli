@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -19,8 +18,10 @@ import (
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/checks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/texttable"
 )
 
 // loadCheckedManifest loads the project's manifest the way every run path
@@ -463,7 +464,7 @@ func renderFindingsTable(w io.Writer, findings []checks.Finding, budget *int) er
 	if len(findings) == 0 {
 		return nil
 	}
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	tw := texttable.Columns(w, input.IsTerminalWriter(w))
 	fmt.Fprintln(tw, "SEVERITY\tCHECK\tLOCATION\tDETAIL")
 	for i := range findings {
 		f := &findings[i]

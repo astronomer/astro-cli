@@ -83,9 +83,8 @@ func buildClientImage(ctx context.Context, projectDir, contextDir, tag string, p
 	var buf bytes.Buffer
 	var out, errOut io.Writer = &buf, &buf
 	if debug {
-		// os.Stdout as it is now: under --output json the command has
-		// pointed it at stderr.
-		out, errOut = os.Stdout, os.Stderr
+		// The build's output is progress, not a result: stderr.
+		out, errOut = os.Stderr, os.Stderr
 	}
 	req := clientBuildRequest(contextDir, tag, platforms, secrets, engine.Bin, engine.Env, out, errOut)
 	_, err = imagebuild.New(engine.Cmd, buildNow).Build(ctx, req, localrt.Callbacks{})
@@ -97,7 +96,7 @@ func buildClientImage(ctx context.Context, projectDir, contextDir, tag string, p
 		logger.Debugf("client image build: %v", err)
 		s.FinalMSG = ""
 		s.Stop()
-		fmt.Println(strings.TrimSpace(buf.String()) + "\n")
+		fmt.Fprintln(os.Stderr, strings.TrimSpace(buf.String())+"\n")
 		return errClientBuild
 	default:
 		return clientDockerfileError(err, projectDir, req.Dockerfile)

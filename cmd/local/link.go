@@ -431,7 +431,7 @@ func keptDefaultNote(w io.Writer, kept string) error {
 // did not pass --replace. An empty name is not checked: it is not known yet.
 func refuseExisting(m *manifest.Manifest, name string, replace bool) error {
 	if _, exists := m.Astro.Deployments[name]; name != "" && exists && !replace {
-		return fmt.Errorf("a link named %s already exists: pass --%s to overwrite it, or astro link remove %s first", name, flagLinkReplace, name)
+		return existsf("a link named %s already exists: pass --%s to overwrite it, or astro link remove %s first", name, flagLinkReplace, name)
 	}
 	return nil
 }
@@ -732,7 +732,7 @@ func (c *cli) runLinkRemove(name string) error {
 		return err
 	}
 	if !removed {
-		return fmt.Errorf("no link named %s in %s", name, path)
+		return notFoundf("no link named %s in %s", name, path)
 	}
 	// The pin is per user and outside the repo, so the writer cannot see it.
 	// Left pointing at a link that is gone, it fails every command until
@@ -755,7 +755,7 @@ func (c *cli) runLinkDefault(name string) error {
 	}
 	if name != "" {
 		if _, ok := m.Astro.Deployments[name]; !ok {
-			return fmt.Errorf("no link named %s in %s", name, path)
+			return notFoundf("no link named %s in %s", name, path)
 		}
 	}
 	changed, err := watchManifest(dir, func(wrap func(run func() error) error) error {

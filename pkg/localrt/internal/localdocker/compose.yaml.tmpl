@@ -99,7 +99,11 @@ services:
 {{- if .Mounts}}
     volumes:
 {{- range .Mounts}}
-      - {{.Host}}:{{.Container}}:z
+      - type: bind
+        source: {{quote .Host}}
+        target: {{quote .Container}}
+        bind:
+          selinux: z
 {{- end}}
 {{- end}}
 {{- end}}

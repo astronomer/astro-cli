@@ -20,6 +20,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	"github.com/astronomer/astro-cli/internal/telemetry"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -116,6 +117,12 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 		// The ASCII banner above this is drawn by the help func (rootBanner),
 		// not kept here, because Long is wrapped and the art is not prose.
 		Long: "The Astro CLI is the command line interface for data orchestration. Use it with Astro, with APC, or to run Airflow locally.",
+		// Declaring any Args keeps cobra from refusing an unknown word itself,
+		// with its own pair of suggestions, as it does for a root with none.
+		// The word reaches the group refusal every other group gets
+		// (cliout.UnknownSubcommand), which suggests the one command it is
+		// clearly close to.
+		Args: cobra.ArbitraryArgs,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// A removed command's stub only says what replaced it: it needs no
 			// login and checks no version, but it is logged and recorded.
@@ -141,7 +148,9 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// setup below: apcCmd.NeedsPlatform reads the root's persistent flags to
 	// find which command a line runs.
 	addVerbosityFlag(rootCmd.PersistentFlags())
+	addVersionFlag(rootCmd.PersistentFlags())
 	input.AddFlag(rootCmd.PersistentFlags())
+	ansi.AddNoColorFlag(rootCmd.PersistentFlags())
 
 	rootCmd.AddCommand(
 		newLoginCommand(astroV1Client, o.out),
@@ -316,6 +325,7 @@ func groupCommands(rootCmd *cobra.Command) {
 		cmd.GroupID = commandGroup[cmd.Name()]
 	}
 	rootCmd.AddCommand(subs...)
+	rootCmd.SetHelpCommand(newHelpCommand())
 	rootCmd.SetHelpCommandGroupID(groupCLI)
 	rootCmd.SetCompletionCommandGroupID(groupCLI)
 }
