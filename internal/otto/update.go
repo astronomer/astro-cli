@@ -120,7 +120,7 @@ func writeUpdateState(state updateState) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(BinDir(), dirPerm); err != nil {
+	if err := config.MkdirAllUnder(BinDir(), dirPerm); err != nil {
 		return err
 	}
 	return os.WriteFile(filepath.Join(BinDir(), updateStateFile), data, stateFilePerm)

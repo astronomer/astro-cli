@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -263,6 +264,28 @@ func DagsSource(projectDir string, noDagsBaseDir bool) fileutil.TarSource {
 	return fileutil.GzSource(filepath.Join(projectDir, "dags"), !noDagsBaseDir, bundleExcludes)
 }
 
+// remoteWithoutCredentials is a git remote URL as a deploy records it: an
+// http(s) remote without its userinfo (a token, or user:token, that a clone
+// URL can carry), and any other URL without a password. An ssh login (the git
+// of ssh://git@host/...) stays, and an SCP-like git@host:path, which is not a
+// URL, is recorded as it is.
+func remoteWithoutCredentials(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.User == nil {
+		return raw
+	}
+	switch {
+	case u.Scheme == "http" || u.Scheme == "https":
+		u.User = nil
+	default:
+		if _, hasPassword := u.User.Password(); !hasPassword {
+			return raw
+		}
+		u.User = url.User(u.User.Username())
+	}
+	return u.String()
+}
+
 // ValidateBundleSymlinks checks if any symlinks within the bundlePath point outside of it.
 // A bundlePath that is itself a link is checked as the directory it leads
 // to, which is what the tarball is written from (fileutil.TarGz).
@@ -498,7 +521,8 @@ func readHeadGitMetadata(bundlePath string) (deployGit *astrov1.CreateDeployGitR
 		deployGit.CommitUrl = &commitURL
 	} else {
 		deployGit.Provider = astrov1.CreateDeployGitRequestProviderGENERIC
-		deployGit.RemoteUrl = &remoteURL
+		recorded := remoteWithoutCredentials(remoteURL)
+		deployGit.RemoteUrl = &recorded
 	}
 
 	logger.Debugf("Retrieved Git metadata: %+v", deployGit)

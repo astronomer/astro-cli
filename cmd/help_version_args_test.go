@@ -152,15 +152,15 @@ func TestStrayWordsAreUsageErrorsBeforeTheLogin(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"version", "extra"}, `unknown command "extra" for "astro version"`},
+		{[]string{"version", "extra"}, `unexpected argument "extra": astro version takes no arguments`},
 		{[]string{"telemetry", "bogus"}, `unknown command "bogus" for "astro telemetry"`},
-		{[]string{"telemetry", "enable", "extra"}, `unknown command "extra" for "astro telemetry enable"`},
+		{[]string{"telemetry", "enable", "extra"}, `unexpected argument "extra": astro telemetry enable takes no arguments`},
 		{[]string{"completion", "bogus"}, `unknown command "bogus" for "astro completion"`},
-		{[]string{"deployment", "list", "extra"}, `unknown command "extra" for "astro deployment list"`},
+		{[]string{"deployment", "list", "extra"}, `unexpected argument "extra": astro deployment list takes no arguments`},
 		{[]string{"env", "bogus"}, `unknown command "bogus" for "astro env"`},
 		{[]string{"env", "variable", "bogus"}, `unknown command "bogus" for "astro env variable"`},
-		{[]string{"context", "list", "extra"}, `unknown command "extra" for "astro context list"`},
-		{[]string{"deployment", "delete", "a", "b"}, "accepts at most 1 arg(s), received 2"},
+		{[]string{"context", "list", "extra"}, `unexpected argument "extra": astro context list takes no arguments`},
+		{[]string{"deployment", "delete", "a", "b"}, `unexpected argument "b": astro deployment delete takes at most 1 argument`},
 	} {
 		run := runLine(t, tc.args...)
 		assert.Equal(t, 2, run.code, tc.args)

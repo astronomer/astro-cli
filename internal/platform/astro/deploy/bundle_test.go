@@ -180,6 +180,41 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataRetrieved() {
 	s.mockV1Client.AssertExpectations(s.T())
 }
 
+// A remote's credentials are not recorded with the deploy: an http(s)
+// remote's userinfo is dropped, another URL's password is, and an ssh login
+// and an SCP-like remote stay as they are.
+func TestRemoteWithoutCredentials(t *testing.T) {
+	for raw, want := range map[string]string{
+		"https://someuser:notreal@gitlab.example/g/r.git": "https://gitlab.example/g/r.git",
+		"https://notreal@gitlab.example/g/r.git":          "https://gitlab.example/g/r.git",
+		"http://user:pw@git.internal:8080/r.git":          "http://git.internal:8080/r.git",
+		"ssh://git:pw@git.internal/r.git":                 "ssh://git@git.internal/r.git",
+		"ssh://git@git.internal/r.git":                    "ssh://git@git.internal/r.git",
+		"git@gitlab.com:team/project.git":                 "git@gitlab.com:team/project.git",
+		"https://gitlab.example/g/r.git":                  "https://gitlab.example/g/r.git",
+	} {
+		assert.Equal(t, want, remoteWithoutCredentials(raw), raw)
+	}
+}
+
+func (s *BundleSuite) TestBundleDeploy_GitMetadataGenericProviderLeavesOutCredentials() {
+	gitPath := s.createTestGitRepositoryWithRemote(false, "https://someuser:notreal@gitlab.example/team/project.git")
+	defer os.RemoveAll(gitPath)
+
+	mockGetDeployment(s.mockV1Client, true, false)
+	mockCreateDeployMatch(s.mockV1Client, "http://bundle-upload-url", func(req astrov1.CreateDeployRequest) bool {
+		return req.Git != nil && req.Git.RemoteUrl != nil && *req.Git.RemoteUrl == "https://gitlab.example/team/project.git"
+	})
+	mockUpdateDeploy(s.mockV1Client, "version-id")
+	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+		return "version-id", nil
+	}
+
+	_, err := DeployBundle(&DeployBundleInput{BundlePath: gitPath, AstroV1Client: s.mockV1Client})
+	assert.NoError(s.T(), err)
+	s.mockV1Client.AssertExpectations(s.T())
+}
+
 func (s *BundleSuite) TestBundleDeploy_GitMetadataGenericProvider() {
 	gitPath := s.createTestGitRepositoryWithRemote(false, "git@gitlab.com:team/project.git")
 	defer os.RemoveAll(gitPath)

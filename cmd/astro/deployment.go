@@ -466,7 +466,7 @@ func newDeploymentLogsCmd(out io.Writer) *cobra.Command {
 		Use:     "logs [DEPLOYMENT_ID]",
 		Aliases: []string{"l"},
 		Short:   "Show an Astro Deployment's logs",
-		Long:    "Show an Astro Deployment's logs, from every component unless flags such as --scheduler or --component pick some. Use flags to determine what log level to show.",
+		Long:    "Show an Astro Deployment's logs, from every component unless flags such as --scheduler or --component pick some. Use flags to determine what log level to show. Only the last 24 hours of logs are searched; older logs are not available through this command.",
 		Example: `  # Show a Deployment's logs
   astro deployment logs <DEPLOYMENT_ID>
 
@@ -481,7 +481,7 @@ func newDeploymentLogsCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&errorLogs, "error", false, "Show logs with a log level of 'error'")
 	cmd.Flags().BoolVar(&infoLogs, "info", false, "Show logs with a log level of 'info'")
 	cmd.Flags().StringVar(&logsKeyword, "keyword", "", "Show logs that contain this exact keyword or phrase")
-	cmd.Flags().IntVar(&logCount, "log-count", logCount, "Number of logs to show")
+	cmd.Flags().IntVar(&logCount, "log-count", logCount, "Maximum number of logs to show, from the last 24 hours")
 	addDeploymentFlag(cmd.Flags(), "Deployment to show logs of: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
 	addDeploymentWorkspaceFlagWithoutLetter(cmd.Flags())
 	cmd.Flags().BoolVar(&logWebserver, "webserver", false, "Show logs from the webserver")

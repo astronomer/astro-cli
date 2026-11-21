@@ -7,6 +7,7 @@ import (
 	iofs "io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -143,8 +144,12 @@ var (
 	// developer's home every time a test wrote config through a MemMapFs.
 	configFs afero.Fs = afero.NewOsFs()
 	// createConfigPath dir path, file path
-	dirPerm  os.FileMode = 0o775
-	filePerm os.FileMode = 0o600
+	dirPerm os.FileMode = 0o775
+	// homeDirPerm is the home config directory's: it holds the login tokens,
+	// so only its owner gets in. Only a directory this build creates; one that
+	// exists keeps the mode its owner gave it.
+	homeDirPerm os.FileMode = 0o700
+	filePerm    os.FileMode = 0o600
 )
 
 // InitConfig initializes the config files
@@ -312,13 +317,42 @@ const (
 	lockRetryInterval = 100 * time.Millisecond
 )
 
+// configDirPerm is the mode a config directory is created with: owner-only
+// for the home one, and the usual for a project's.
+func configDirPerm(dir string) os.FileMode {
+	if filepath.Clean(dir) == filepath.Clean(HomeConfigPath) {
+		return homeDirPerm
+	}
+	return dirPerm
+}
+
+// MkdirAllUnder is os.MkdirAll for a directory that may live under the home
+// config directory. Whichever command creates ~/.astro first decides its mode,
+// so when dir is inside it, the home directory is made owner-only before dir is
+// made at perm. Anywhere else it is plain os.MkdirAll.
+func MkdirAllUnder(dir string, perm os.FileMode) error {
+	if HomeConfigPath == "" {
+		return os.MkdirAll(dir, perm)
+	}
+	home, clean := filepath.Clean(HomeConfigPath), filepath.Clean(dir)
+	if clean == home {
+		return os.MkdirAll(home, homeDirPerm)
+	}
+	if rel, err := filepath.Rel(home, clean); err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		if err := os.MkdirAll(home, homeDirPerm); err != nil {
+			return err
+		}
+	}
+	return os.MkdirAll(clean, perm)
+}
+
 // lockConfig takes file's exclusive lock, the `<file>.lock` sidecar Astro CLI
 // 1.x takes too, and returns the func that releases it.
 func lockConfig(file string) (unlock func(), err error) {
 	// flock.Lock opens the sidecar file, which fails with ENOENT if the parent
 	// dir hasn't been created yet, and the lock is held before the write — so
 	// create it upfront.
-	if err := os.MkdirAll(filepath.Dir(file), dirPerm); err != nil {
+	if err := os.MkdirAll(filepath.Dir(file), configDirPerm(filepath.Dir(file))); err != nil {
 		return nil, fmt.Errorf("creating config dir: %w", err)
 	}
 

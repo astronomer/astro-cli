@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -528,10 +529,20 @@ func localFileMatcher() gitignore.Matcher {
 	return gitignore.NewMatcher(patterns)
 }
 
+// inGitDir reports whether relPath is the project's .git directory or under
+// it, as goos's filesystem names it: on macOS and Windows, which ignore case
+// (and on Windows trailing dots and spaces), .GIT is that directory too. It
+// is the rule an import refuses git metadata by (foldFor), so an export never
+// carries what an import of it would refuse.
+func inGitDir(relPath, goos string) bool {
+	first, _, _ := strings.Cut(relPath, string(filepath.Separator))
+	return foldFor(goos)(first) == ".git"
+}
+
 // shouldSkipArchiveEntry determines whether a path should be skipped.
 func shouldSkipArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.Matcher) bool {
 	// Always skip the .git directory
-	if relPath == ".git" || strings.HasPrefix(relPath, ".git"+string(filepath.Separator)) {
+	if inGitDir(relPath, runtime.GOOS) {
 		return true
 	}
 

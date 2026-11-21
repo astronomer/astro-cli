@@ -312,7 +312,7 @@ func ensureLauncherBin() string {
 		logger.Debugf("otto: clearing %s: %v", dir, err)
 		return ""
 	}
-	if err := os.MkdirAll(dir, dirPerm); err != nil {
+	if err := config.MkdirAllUnder(dir, dirPerm); err != nil {
 		logger.Debugf("otto: creating %s: %v", dir, err)
 		return ""
 	}

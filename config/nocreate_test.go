@@ -127,6 +127,9 @@ func (s *Suite) TestFirstWriteCreatesTheHomeConfig() {
 		info, statErr := os.Stat(file)
 		s.NoError(statErr)
 		s.Equal(filePerm, info.Mode().Perm(), "the home config holds the API token")
+		dirInfo, dirErr := os.Stat(filepath.Dir(file))
+		s.NoError(dirErr)
+		s.Equal(homeDirPerm, dirInfo.Mode().Perm(), "the home config directory is owner-only")
 	}
 
 	// And it reads back, so a later process sees the value.

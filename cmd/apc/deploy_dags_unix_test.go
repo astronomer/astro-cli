@@ -17,7 +17,9 @@ import (
 )
 
 // A dags directory the deploy cannot look at fails the deploy: it is not
-// skipped with a notice as a missing one is, and the exit is not 0.
+// skipped with a notice as a missing one is, and the exit is not 0. It fails
+// before anything is deployed, when the Dags the deploy would upload are
+// checked, so the image is not shipped without them.
 func TestDeployFailsOnADagsDirectoryItCannotRead(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores the directory modes this failure is injected with")
@@ -25,7 +27,7 @@ func TestDeployFailsOnADagsDirectoryItCannotRead(t *testing.T) {
 	project := inProject(t, true)
 
 	// The image already in a registry needs no container engine, so the
-	// real image deploy runs, and the DAG upload after it.
+	// real image deploy would run, and the DAG upload after it.
 	realImageDeploy(t)
 	dags := filepath.Join(project, "dags")
 	require.NoError(t, os.Chmod(dags, 0o000))
@@ -35,8 +37,6 @@ func TestDeployFailsOnADagsDirectoryItCannotRead(t *testing.T) {
 	assert.NotEqual(t, 0, run.code)
 	require.ErrorIs(t, run.err, syscall.EACCES)
 	assert.NotErrorIs(t, run.err, deploy.ErrNoDagsDirectory)
-	var after *deploy.DagsAfterImageError
-	assert.ErrorAs(t, run.err, &after, "the image was deployed, and the error says so")
-	api.AssertCalled(t, "UpdateDeploymentImage", mock.Anything)
+	api.AssertNotCalled(t, "UpdateDeploymentImage", mock.Anything)
 	assert.NotContains(t, run.stdout, `"deployment"`, "no result for a deploy that failed")
 }

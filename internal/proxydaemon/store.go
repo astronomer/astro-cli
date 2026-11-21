@@ -46,5 +46,7 @@ func Dir() (string, error) {
 // Routes returns the route store rooted at dir. Stores are cheap; building one
 // per call keeps this free of package-level state.
 func Routes(dir string) *pkgproxy.Store {
-	return pkgproxy.NewStore(dir)
+	// dir is <home config>/proxy (Dir), so its parent is the home config
+	// directory, which the store makes owner-only if it creates it.
+	return pkgproxy.NewStore(dir, pkgproxy.WithHomeConfigDir(filepath.Dir(dir)))
 }

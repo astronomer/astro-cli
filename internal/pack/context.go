@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/internal/shipcheck"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -20,6 +21,13 @@ func writeContext(req Request, breq imagebuild.Request, name string) (Result, er
 	if breq.FromDeclaredDockerfile() {
 		return Result{}, fmt.Errorf("the project declares its own Dockerfile (%s), so the project is its build context: build it with docker build -f %s %s",
 			req.Manifest.Astro.Dockerfile, req.Manifest.Astro.Dockerfile, req.ProjectDir)
+	}
+	// The context builds the image the target would, which can go on to a
+	// registry or to astro deploy --image-name, so it is held to the same
+	// check of what it carries before a file is written (shipcheck.Survey).
+	// A generated build reads no engine's ignore file, so no engine is asked.
+	if _, err := shipcheck.Survey(req.ProjectDir, "", false, req.Warn); err != nil {
+		return Result{}, err
 	}
 	dir, err := filepath.Abs(req.ContextDir)
 	if err != nil {
