@@ -76,7 +76,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy [DEPLOYMENT_ID]",
 		Short:   "Ship this project's code to a Deployment",
-		Long:    "Deploy your project to a Deployment on Astro. Run it in a project with a pyproject.toml ([tool.astro]): it builds the project into a Docker image and pushes that image, with the project's Dags, to Astronomer. A project in the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml) is converted with astro init, or deployed with Astro CLI 1.x. With --image-name it deploys an image built on this machine, from any directory. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use astro remote deploy instead. It does not include any metadata associated with your local Airflow environment. To deploy a dbt project or another non-Dag bundle, use astro deploy bundle.",
+		Long:    "Build this project into an image and push it, with its Dags, to a Deployment on Astro. Run it from the root of a project with a pyproject.toml ([tool.astro]), or from anywhere with --image-name to deploy a prebuilt image. A project in the Astro CLI 1.x layout needs astro init first, or Astro CLI 1.x.\n\nWith Remote Execution, this updates only the API Server and Scheduler; use astro remote deploy for the rest.",
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    deploy,
 		Example: deployExample,
