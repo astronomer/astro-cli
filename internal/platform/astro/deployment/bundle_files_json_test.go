@@ -106,6 +106,36 @@ func (s *Suite) TestBundleFilesPublishTheirResults() {
 		s.NotContains(out.String(), "Skipped 1 paths")
 	})
 
+	s.Run("sync publishes what a dry run would change", func() {
+		out, notes := &bytes.Buffer{}, &bytes.Buffer{}
+		fromDir := s.T().TempDir()
+		writeLocalFiles(s, fromDir, map[string]string{"same.py": "same", "changed.py": "new", "added.py": "added"})
+		mockV1Alpha1Client := s.mockBundleLookup()
+		mockSyncListing(mockV1Alpha1Client, "", map[string]string{"same.py": "same", "changed.py": "old", "extra.py": "extra"})
+
+		err := SyncBundleFiles(context.Background(), fromDir, "my-files:dags", &BundleSyncOptions{DryRun: true}, ws, testBundleDeploymentID, jsonBundleOut(out, notes), mockV1Client, mockV1Alpha1Client, s.streamClient())
+		s.NoError(err)
+		var got BundleSyncResult
+		s.NoError(json.Unmarshal(out.Bytes(), &got))
+		s.Equal(BundleSyncResult{
+			Source: fromDir, Destination: "my-files:dags", Direction: "upload", DryRun: true,
+			Version: "v1", Added: []string{"added.py"}, Updated: []string{"changed.py"}, Deleted: []string{"extra.py"},
+		}, got)
+		s.False(got.Changed)
+	})
+
+	s.Run("sync publishes [] for the changes it has none of", func() {
+		out, notes := &bytes.Buffer{}, &bytes.Buffer{}
+		fromDir := s.T().TempDir()
+		writeLocalFiles(s, fromDir, map[string]string{"same.py": "same"})
+		mockV1Alpha1Client := s.mockBundleLookup()
+		mockSyncListing(mockV1Alpha1Client, "", map[string]string{"same.py": "same"})
+
+		err := SyncBundleFiles(context.Background(), fromDir, "my-files:dags", &BundleSyncOptions{}, ws, testBundleDeploymentID, jsonBundleOut(out, notes), mockV1Client, mockV1Alpha1Client, s.streamClient())
+		s.NoError(err)
+		s.Contains(out.String(), `"added":[],"updated":[],"deleted":[]`)
+		s.Contains(out.String(), `"changed":false`)
+	})
 }
 
 func (s *Suite) TestBundleFilesStopWithTheContext() {
@@ -120,6 +150,8 @@ func (s *Suite) TestBundleFilesStopWithTheContext() {
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 
 		err := CopyBundleFiles(canceled, fromDir, "my-files:dags", &BundleCopyOptions{Recursive: true}, ws, testBundleDeploymentID, bundleOut(out), mockV1Client, mockV1Alpha1Client, s.streamClient())
+		s.ErrorIs(err, context.Canceled)
+		err = SyncBundleFiles(canceled, fromDir, "my-files:dags", &BundleSyncOptions{}, ws, testBundleDeploymentID, bundleOut(out), mockV1Client, mockV1Alpha1Client, s.streamClient())
 		s.ErrorIs(err, context.Canceled)
 		mockV1Alpha1Client.AssertNotCalled(s.T(), "ListBundleFilesWithResponse")
 	})

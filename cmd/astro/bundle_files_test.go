@@ -2,6 +2,8 @@ package astro
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"net/http"
 	"os"
@@ -141,6 +143,61 @@ func TestBundleFilesCopyCmd(t *testing.T) {
 
 		_, err := execBundleCmd("files", "cp", "my-files:dags/a.py", "--deployment", "test-id-1")
 		assert.Error(t, err)
+	})
+}
+
+func TestBundleFilesSyncCmd(t *testing.T) {
+	t.Run("deletes by default, and passes --dry-run and the filter flags", func(t *testing.T) {
+		mockAlpha := setupBundleFilesCmdMocks(t)
+		fromDir := t.TempDir()
+		assert.NoError(t, os.WriteFile(filepath.Join(fromDir, "a.py"), []byte("x"), 0o600))
+		assert.NoError(t, os.WriteFile(filepath.Join(fromDir, "b.py"), []byte("x"), 0o600))
+		mockAlpha.On("ListBundleFilesWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1", mock.Anything).Return(&astrov1alpha1.ListBundleFilesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200: &astrov1alpha1.BundleFileList{
+				Path:        "dags",
+				Directories: []string{},
+				Files:       []astrov1alpha1.BundleFile{{Path: "dags/old.py", Digest: "sha256:aaa", Size: 1}},
+				Version:     new("v1"),
+			},
+		}, nil).Once()
+
+		out, err := execBundleCmd("files", "sync", fromDir, "my-files:dags", "--dry-run", "--exclude", "b.py", "--deployment", "test-id-1")
+		assert.NoError(t, err)
+		assert.Contains(t, out, "add     my-files:dags/a.py")
+		assert.Contains(t, out, "delete  my-files:dags/old.py")
+		assert.NotContains(t, out, "b.py")
+		assert.Contains(t, out, "1 added, 0 updated, 1 deleted; nothing was changed")
+		mockAlpha.AssertExpectations(t)
+	})
+
+	t.Run("deletes local files without asking with --yes", func(t *testing.T) {
+		mockAlpha := setupBundleFilesCmdMocks(t)
+		toDir := t.TempDir()
+		assert.NoError(t, os.WriteFile(filepath.Join(toDir, "a.py"), []byte("x"), 0o600))
+		assert.NoError(t, os.WriteFile(filepath.Join(toDir, "extra.py"), []byte("x"), 0o600))
+		digest := sha256.Sum256([]byte("x"))
+		mockAlpha.On("ListBundleFilesWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1", mock.Anything).Return(&astrov1alpha1.ListBundleFilesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200: &astrov1alpha1.BundleFileList{
+				Path:        "dags",
+				Directories: []string{},
+				Files:       []astrov1alpha1.BundleFile{{Path: "dags/a.py", Digest: "sha256:" + hex.EncodeToString(digest[:]), Size: 1}},
+				Version:     new("v1"),
+			},
+		}, nil).Once()
+
+		out, err := execBundleCmd("files", "sync", "my-files:dags", toDir, "--yes", "--deployment", "test-id-1")
+		assert.NoError(t, err)
+		assert.Contains(t, out, "0 added, 0 updated, 1 deleted")
+		assert.NoFileExists(t, filepath.Join(toDir, "extra.py"))
+	})
+
+	t.Run("refuses --yes for a sync into a bundle", func(t *testing.T) {
+		setupBundleFilesCmdMocks(t)
+
+		_, err := execBundleCmd("files", "sync", t.TempDir(), "my-files:dags", "--yes", "--deployment", "test-id-1")
+		assert.EqualError(t, err, "--yes applies only when syncing from a bundle")
 	})
 }
 

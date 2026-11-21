@@ -179,10 +179,11 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "deployment-bundle-removal", Value: deployment.BundleRemoval{}},
 	// astro bundle rollback: the version the bundle was returned to.
 	{Name: "bundle-rollback", Value: deployment.BundleRollback{}},
-	// astro bundle files ls, cp, mv and rm: a listing, and what a copy, move or
-	// removal did.
+	// astro bundle files ls, cp, mv, rm and sync: a listing, what a copy, move or
+	// removal did, and what a sync changed (or would, with --dry-run).
 	{Name: "bundle-file-listing", Value: deployment.BundleFileListing{}},
 	{Name: "bundle-file-change", Value: deployment.BundleFileChange{}},
+	{Name: "bundle-sync", Value: deployment.BundleSyncResult{}},
 	// astro deployment hibernate and wake-up: the override the Deployment now
 	// has, which is null after --remove-override.
 	{Name: "deployment-hibernation", Value: deployment.HibernationResult{}},
