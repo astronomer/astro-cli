@@ -40,7 +40,7 @@ var podmanEnv = []string{"CONTAINER_HOST=unix:///run/podman/podman.sock"}
 // has faked.
 func clientEngine(t *testing.T) imagebuild.Engine {
 	t.Helper()
-	engine, err := clientImageEngine()
+	engine, err := agentImageEngine()
 	require.NoError(t, err)
 	return engine
 }

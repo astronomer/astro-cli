@@ -216,7 +216,7 @@ type AgentBuildContext struct {
 // This avoids modifying the original project files, preventing race conditions with concurrent deployments.
 func prepareAgentBuildContext(sourcePath string) (*AgentBuildContext, error) {
 	// Create a temporary directory for the build context
-	tempBuildDir, err := os.MkdirTemp("", "astro-client-build-*")
+	tempBuildDir, err := os.MkdirTemp("", "astro-agent-build-*")
 	if err != nil {
 		return nil, fmt.Errorf("could not create temporary build directory: %w", err)
 	}
@@ -242,7 +242,7 @@ func prepareAgentBuildContext(sourcePath string) (*AgentBuildContext, error) {
 	// Build a skip predicate from the project's .dockerignore so excluded
 	// paths (e.g. infra/ with terragrunt provider-cache symlinks) are not
 	// copied into the build context. This mirrors what the Docker builder does
-	// for in-place builds; the client deploy copies the context first, so it
+	// for in-place builds; the agent deploy copies the context first, so it
 	// must honor .dockerignore itself.
 	skip, err := dockerignoreSkipFunc(sourcePath)
 	if err != nil {
@@ -264,9 +264,9 @@ func prepareAgentBuildContext(sourcePath string) (*AgentBuildContext, error) {
 	return buildContext, nil
 }
 
-// alwaysIncludedBuildFiles are never excluded from the client build context,
+// alwaysIncludedBuildFiles are never excluded from the agent build context,
 // even if a user's .dockerignore would match them. The Docker builder applies
-// the same special-casing to the Dockerfile and .dockerignore, and the client
+// the same special-casing to the Dockerfile and .dockerignore, and the agent
 // deploy additionally needs its client dependency files.
 var alwaysIncludedBuildFiles = map[string]bool{
 	"Dockerfile.client":       true,
@@ -364,7 +364,7 @@ type AgentDeploy struct {
 }
 
 // AgentRuntimeCheck is the agent image's runtime version checked against a
-// Deployment's: the client's is not newer.
+// Deployment's: the agent image's is not newer.
 type AgentRuntimeCheck struct {
 	DeploymentID             string
 	AgentRuntimeVersion      string
@@ -408,7 +408,7 @@ func DeployAgentImage(deployInput InputAgentDeploy, astroV1Client astrov1.APICli
 	// One engine tags or builds the image, logs in and pushes it: an image
 	// built on one engine is not there for another to push.
 	ctx := httpContext.Background()
-	engine, err := clientImageEngine()
+	engine, err := agentImageEngine()
 	if err != nil {
 		return AgentDeploy{}, err
 	}
@@ -456,7 +456,7 @@ func DeployAgentImage(deployInput InputAgentDeploy, astroV1Client astrov1.APICli
 		}
 
 		// Build the agent image from the current directory
-		// Determine target platforms for client deploy
+		// Determine target platforms for the agent image
 		if deployInput.Platform != "" {
 			// Parse comma-separated platforms from --platform flag
 			targetPlatforms = strings.Split(deployInput.Platform, ",")
@@ -475,7 +475,7 @@ func DeployAgentImage(deployInput InputAgentDeploy, astroV1Client astrov1.APICli
 			defer buildContext.CleanupFunc()
 		}
 		if err != nil {
-			return AgentDeploy{}, fmt.Errorf("could not prepare client build context: %w", err)
+			return AgentDeploy{}, fmt.Errorf("could not prepare the agent image build context: %w", err)
 		}
 
 		// Build the image from the prepared context, tagged as it is pushed
@@ -545,25 +545,25 @@ func validateAgentImageRuntimeVersion(deployInput InputAgentDeploy, astroV1Clien
 	}
 
 	// Extract runtime version from the base image tag
-	clientRuntimeVersion, err := extractRuntimeVersionFromImage(baseImage)
+	agentRuntimeVersion, err := extractRuntimeVersionFromImage(baseImage)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not extract runtime version from agent image %s", baseImage)
 	}
 
 	// Compare versions
-	if airflowversions.CompareRuntimeVersions(clientRuntimeVersion, deployInfo.currentVersion) > 0 {
+	if airflowversions.CompareRuntimeVersions(agentRuntimeVersion, deployInfo.currentVersion) > 0 {
 		return nil, fmt.Errorf(`agent image runtime version validation failed: the agent image is based on Astro Runtime %s, which is newer than the Deployment's runtime version %s
 
 Either set the base image in Dockerfile.client to runtime version %s or earlier, or upgrade the Deployment to runtime version %s or later`,
-			clientRuntimeVersion, deployInfo.currentVersion, deployInfo.currentVersion, clientRuntimeVersion)
+			agentRuntimeVersion, deployInfo.currentVersion, deployInfo.currentVersion, agentRuntimeVersion)
 	}
 
 	fmt.Printf("Agent image runtime version %s is compatible with Deployment runtime version %s\n",
-		clientRuntimeVersion, deployInfo.currentVersion)
+		agentRuntimeVersion, deployInfo.currentVersion)
 
 	return &AgentRuntimeCheck{
 		DeploymentID:             deployInput.DeploymentID,
-		AgentRuntimeVersion:      clientRuntimeVersion,
+		AgentRuntimeVersion:      agentRuntimeVersion,
 		DeploymentRuntimeVersion: deployInfo.currentVersion,
 	}, nil
 }

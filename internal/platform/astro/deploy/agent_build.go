@@ -121,10 +121,10 @@ func clientDockerfileError(err error, projectDir, dockerfile string) error {
 	return fmt.Errorf("the %s in the project at %s could not be read: %w", clientDockerfile, projectDir, pe.Err)
 }
 
-// clientImageEngine is the engine a client deploy builds, logs in and pushes
+// agentImageEngine is the engine an agent deploy builds, logs in and pushes
 // on: the one the manifest deploy resolves (ResolveContainerEngine), over the
 // build runner.
-func clientImageEngine() (imagebuild.Engine, error) {
+func agentImageEngine() (imagebuild.Engine, error) {
 	bin, env, err := ResolveContainerEngine()
 	if err != nil {
 		return imagebuild.Engine{}, err

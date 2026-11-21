@@ -1186,8 +1186,8 @@ url = "https://deployments.astro.corp.example/ckdep-apc/airflow"
 		wantKeys: []string{"tool.astro.deployments.prod-apc.url"},
 	},
 	{
-		// Only an Astro Deployment runs remote agents, which pull the client
-		// image astro deploy agent pushes.
+		// Only an Astro Deployment runs Remote Execution agents, which pull the
+		// agent image astro deploy agent pushes.
 		name:      "agent-registry on an mwaa link",
 		wantCodes: []ProblemCode{CodeAgentRegistryOnNonAstroLink},
 		content: `

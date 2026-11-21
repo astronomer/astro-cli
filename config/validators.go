@@ -8,8 +8,8 @@ import (
 )
 
 // ValidateRegistryEndpoint checks a registry endpoint is a repository a deploy
-// can push to: registry[:port]/repository, with no tag or digest. astro remote
-// deploy checks the agent registry with it, wherever the value came from.
+// can push to: registry[:port]/repository, with no tag or digest. astro deploy
+// agent checks the agent registry with it, wherever the value came from.
 func ValidateRegistryEndpoint(endpoint string) error {
 	if endpoint == "" {
 		return fmt.Errorf("registry endpoint cannot be empty")

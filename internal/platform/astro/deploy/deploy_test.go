@@ -343,7 +343,7 @@ func TestPrepareClientBuildContext(t *testing.T) {
 
 		// Verify build context was created
 		assert.NotEqual(t, tempDir, buildContext.TempDir)
-		assert.Contains(t, buildContext.TempDir, "astro-client-build-")
+		assert.Contains(t, buildContext.TempDir, "astro-agent-build-")
 
 		// Verify that in the temp build directory, the client files are used as regular files
 		requirementsContent, err := os.ReadFile(filepath.Join(buildContext.TempDir, "requirements.txt"))
