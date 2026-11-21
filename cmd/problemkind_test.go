@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -31,6 +32,12 @@ func apiFailure(status int) error {
 	return httputil.NormalizeAPIError(&http.Response{StatusCode: status}, []byte(`{"message":"refused"}`))
 }
 
+// postFailure is the error a write to path gets for status.
+func postFailure(status int, path string) error {
+	req, _ := http.NewRequest(http.MethodPost, "https://api.astronomer.io"+path, http.NoBody)
+	return httputil.NormalizeAPIError(&http.Response{StatusCode: status, Request: req}, []byte(`{"message":"upstream"}`))
+}
+
 // cloudSamples is one real error per cloud kind; every test below works from
 // it, and a kind with no sample fails.
 var cloudSamples = map[cliout.ProblemKind][]error{
@@ -48,10 +55,20 @@ var cloudSamples = map[cliout.ProblemKind][]error{
 		// A login a run under --output json may not start, as Login words it.
 		fmt.Errorf("%w; with --output json it cannot — run astro login first", astroAuth.ErrLoginNeeded),
 	},
-	KindForbidden:            {apiFailure(http.StatusForbidden)},
-	KindNotFound:             {apiFailure(http.StatusNotFound)},
-	KindConflict:             {apiFailure(http.StatusConflict), fmt.Errorf("/proj %w; edit its pyproject.toml", scaffold.ErrAlreadyAstroProject)},
-	KindAPIUnavailable:       {apiFailure(http.StatusInternalServerError), apiFailure(http.StatusServiceUnavailable)},
+	KindForbidden:      {apiFailure(http.StatusForbidden)},
+	KindNotFound:       {apiFailure(http.StatusNotFound)},
+	KindConflict:       {apiFailure(http.StatusConflict), fmt.Errorf("/proj %w; edit its pyproject.toml", scaffold.ErrAlreadyAstroProject)},
+	KindAPIUnavailable: {apiFailure(http.StatusInternalServerError), apiFailure(http.StatusServiceUnavailable)},
+	KindOutcomeUnknown: {
+		postFailure(http.StatusBadGateway, "/v1/organizations/org/deployments"),
+		postFailure(http.StatusInternalServerError, "/v1/organizations/org/workspaces/ws"),
+		// A connection that broke after a write was sent.
+		&httputil.OutcomeUnknownError{Method: http.MethodPost, Path: "/v1/organizations/org/teams", Err: io.ErrUnexpectedEOF},
+	},
+	KindTimeout: {
+		&deployment.WaitTimeoutError{Err: deployment.ErrTimedOut, DeploymentID: "dep"},
+		&deployment.WaitTimeoutError{Err: deployment.ErrTimedOutHibernating, DeploymentID: "dep"},
+	},
 	KindNoDeployments:        {&deployment.NoDeploymentsError{Workspace: "ws"}},
 	KindNoEligibleDeployment: {&deployment.NoneEligibleError{Workspace: "ws"}},
 }
@@ -81,7 +98,7 @@ func TestAnUnnamedStatusHasNoKind(t *testing.T) {
 }
 
 func TestCloudKindOrderIsPinned(t *testing.T) {
-	want := []cliout.ProblemKind{KindUnauthenticated, KindForbidden, KindNotFound, KindConflict, KindAPIUnavailable, KindNoDeployments, KindNoEligibleDeployment}
+	want := []cliout.ProblemKind{KindUnauthenticated, KindForbidden, KindNotFound, KindConflict, KindOutcomeUnknown, KindAPIUnavailable, KindTimeout, KindNoDeployments, KindNoEligibleDeployment}
 	if len(cloudKinds) != len(want) {
 		t.Fatalf("%d kinds in the table, %d pinned here", len(cloudKinds), len(want))
 	}

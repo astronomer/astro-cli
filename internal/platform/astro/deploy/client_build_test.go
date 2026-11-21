@@ -162,7 +162,7 @@ func TestBuildClientImageCommand(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			project, ctx := clientProject(t, tc.base)
 			cmd := withClientBuild(t, tc.bin)
-			require.NoError(t, buildClientImage(project, ctx, "reg/client:deploy-1", tc.platforms, tc.secrets, clientEngine(t)))
+			require.NoError(t, buildClientImage(t.Context(), project, ctx, "reg/client:deploy-1", tc.platforms, tc.secrets, clientEngine(t)))
 			assert.Equal(t, []string{tc.want(ctx)}, cmd.calls)
 			assert.Equal(t, []string{ctx}, cmd.dirs, "run in the build context")
 		})
@@ -254,7 +254,9 @@ func TestBuildClientImageFailurePrintsTheBuildOutput(t *testing.T) {
 	cmd.buildErr = errors.New("exit status 1")
 
 	var err error
-	out := captureStderr(t, func() { err = buildClientImage(project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t)) })
+	out := captureStderr(t, func() {
+		err = buildClientImage(t.Context(), project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t))
+	})
 	require.ErrorIs(t, err, errClientBuild)
 	assert.Equal(t, "could not build the image; see the build logs for details", err.Error())
 	assert.Contains(t, out, "#5 RUN pip install\n\n#5 ERROR: pip install failed\n")
@@ -271,7 +273,9 @@ func TestBuildClientImageStreamsAtDebug(t *testing.T) {
 	t.Cleanup(func() { logger.SetLevel(prev) })
 
 	var err error
-	out := captureStderr(t, func() { err = buildClientImage(project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t)) })
+	out := captureStderr(t, func() {
+		err = buildClientImage(t.Context(), project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t))
+	})
 	require.NoError(t, err)
 	assert.Contains(t, out, "to stdout\n")
 	require.Len(t, cmd.stdios, 1)
@@ -298,7 +302,7 @@ func TestBuildClientImageNeedsDockerfileClient(t *testing.T) {
 			project, ctx := t.TempDir(), t.TempDir()
 			tc.setup(t, ctx)
 			cmd := withClientBuild(t, "docker")
-			err := buildClientImage(project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t))
+			err := buildClientImage(t.Context(), project, ctx, "reg/client:deploy-1", nil, nil, clientEngine(t))
 			require.Error(t, err)
 			want := tc.want
 			if strings.Contains(want, "%s") {
@@ -333,7 +337,7 @@ func TestBuildClientImageWithARelativeContext(t *testing.T) {
 	project, ctx := clientProject(t, agentBase)
 	t.Chdir(filepath.Dir(ctx))
 	cmd := withClientBuild(t, "docker")
-	require.NoError(t, buildClientImage(project, filepath.Base(ctx), "reg/client:deploy-1", nil, nil, clientEngine(t)))
+	require.NoError(t, buildClientImage(t.Context(), project, filepath.Base(ctx), "reg/client:deploy-1", nil, nil, clientEngine(t)))
 	abs, err := filepath.Abs(filepath.Base(ctx))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"docker build --tag reg/client:deploy-1 --file " + filepath.Join(abs, "Dockerfile.client") + " " + abs}, cmd.calls)

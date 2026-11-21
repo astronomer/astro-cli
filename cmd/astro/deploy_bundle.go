@@ -290,9 +290,9 @@ func resolveBundle(cmd *cobra.Command, path string, o *deployBundleOptions) (res
 func bundleWait(cmd *cobra.Command, login *deployLogin, deploymentID string, waitTime time.Duration) func() error {
 	return func() error {
 		if login.current {
-			return waitForBundle(cmd.ErrOrStderr(), deploymentID, waitTime, login.client)
+			return waitForBundle(cmd.Context(), cmd.ErrOrStderr(), deploymentID, waitTime, login.client)
 		}
-		return astrodeploy.WaitForBundleIn(cmd.ErrOrStderr(), &login.context, deploymentID, waitTime, login.client)
+		return astrodeploy.WaitForBundleIn(cmd.Context(), cmd.ErrOrStderr(), &login.context, deploymentID, waitTime, login.client)
 	}
 }
 

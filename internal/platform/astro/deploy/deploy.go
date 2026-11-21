@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"cmp"
 	httpContext "context"
 	"fmt"
 	"io"
@@ -75,6 +76,9 @@ type InputClientDeploy struct {
 	// ErrOut is the command's error writer, which the deploy's warnings go
 	// to; nil is stderr.
 	ErrOut io.Writer
+	// Context ends the build, the registry login, the tag and the push when
+	// the run is interrupted; nil is context.Background().
+	Context httpContext.Context
 }
 
 // includeMonitoringDag reports whether a DAG upload carries the monitoring DAG,
@@ -407,7 +411,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 
 	// One engine tags or builds the image, logs in and pushes it: an image
 	// built on one engine is not there for another to push.
-	ctx := httpContext.Background()
+	ctx := cmp.Or(deployInput.Context, httpContext.Background())
 	engine, err := clientImageEngine()
 	if err != nil {
 		return ClientDeploy{}, err
@@ -483,7 +487,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		}
 
 		// Build the image from the prepared context, tagged as it is pushed
-		err = buildClientImage(deployInput.Path, buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets, engine)
+		err = buildClientImage(ctx, deployInput.Path, buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets, engine)
 		if err != nil {
 			return ClientDeploy{}, fmt.Errorf("could not build client image: %w", err)
 		}

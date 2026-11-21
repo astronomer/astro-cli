@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -55,7 +56,7 @@ func DeploymentsNamed(name, ws, orgID string, astroV1Client astrov1.APIClient) (
 //
 // The Deployment exists whether or not it becomes healthy in time, so a wait
 // that runs out returns it with the error, as Create does.
-func Clone(src *astrov1.Deployment, name, workspaceID string, description *string, wait bool, waitTime time.Duration, astroV1Client astrov1.APIClient, progress io.Writer) (astrov1.Deployment, []clone.Note, error) {
+func Clone(ctx context.Context, src *astrov1.Deployment, name, workspaceID string, description *string, wait bool, waitTime time.Duration, astroV1Client astrov1.APIClient, progress io.Writer) (astrov1.Deployment, []clone.Note, error) {
 	req, notes, err := clone.Request(src, name, workspaceID, description)
 	if err != nil {
 		return astrov1.Deployment{}, nil, err
@@ -65,7 +66,7 @@ func Clone(src *astrov1.Deployment, name, workspaceID string, description *strin
 		return astrov1.Deployment{}, notes, err
 	}
 	if wait {
-		if err := HealthPoll(progress, d.Id, SleepTime, TickNum, int(waitTime.Seconds()), astroV1Client); err != nil {
+		if err := HealthPoll(ctx, progress, d.Id, SleepTime, TickNum, int(waitTime.Seconds()), astroV1Client); err != nil {
 			return d, notes, err
 		}
 	}

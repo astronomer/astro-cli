@@ -113,14 +113,35 @@ func pauseGCForStartup() {
 // default means the first interrupt asks for a clean stop and the second takes
 // one.
 func signalContext() context.Context {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	// No defer for stop: every failing path out of main ends in os.Exit, so it
-	// would not run, and a defer that cannot fire reads as cleanup that happens.
-	// The only moment it is needed is after the first signal, which is where it
-	// is called; the process exiting takes care of the rest.
+	ctx, cancel := context.WithCancelCause(context.Background())
+	sigs := make(chan os.Signal, 1)
+	// SIGHUP is a closed terminal or a dropped ssh session: the same request to
+	// stop cleanly, and the start rollback has to run for it too. Windows
+	// defines the constant and never delivers it, so registering it is harmless
+	// there.
+	signals := []os.Signal{os.Interrupt, syscall.SIGTERM}
+	// Not when the process started with SIGHUP ignored (nohup): catching it
+	// would end a run the user meant to outlive its terminal.
+	if !signal.Ignored(syscall.SIGHUP) {
+		signals = append(signals, syscall.SIGHUP)
+	}
+	signal.Notify(sigs, signals...)
+	// No defer to stop listening: every failing path out of main ends in
+	// os.Exit, so it would not run. The only moment it is needed is after the
+	// first signal, which is where it happens.
 	go func() {
-		<-ctx.Done()
-		stop()
+		sig := <-sigs
+		// Stop only this channel: other packages hold handlers of their own
+		// (a hidden prompt restoring terminal echo, the login flow, the proxy),
+		// which a signal.Reset would remove. Once no handler is left the
+		// default behavior returns by itself, so a second signal still exits.
+		signal.Stop(sigs)
+		// The cause records which signal, so the exit status is 128+n.
+		cause := &cliout.Signaled{Name: sig.String()}
+		if n, ok := sig.(syscall.Signal); ok {
+			cause.Number = int(n)
+		}
+		cancel(cause)
 	}()
 	return ctx
 }

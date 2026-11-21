@@ -43,8 +43,18 @@ const (
 	KindConflict cliout.ProblemKind = "conflict"
 	// KindAPIUnavailable: the API failed on its side (5xx), or the organization
 	// lookup of an API token got no answer at all. Transient as far as the CLI
-	// can tell; try again.
+	// can tell; try again. A 5xx to a request that changes state is
+	// KindOutcomeUnknown instead.
 	KindAPIUnavailable cliout.ProblemKind = "api_unavailable"
+	// KindOutcomeUnknown: a request that changes state failed after it may
+	// have reached the API, with a 5xx answer or a connection that broke once
+	// the request was sent. The change may have been applied. Look at the state
+	// (the error names the command) before running it again.
+	KindOutcomeUnknown cliout.ProblemKind = "outcome_unknown"
+	// KindTimeout: a command that waits for remote work gave up waiting at
+	// its --wait limit. The work continues; it was not canceled. The error
+	// names the Deployment and the command that shows its state.
+	KindTimeout cliout.ProblemKind = "timeout"
 	// KindNoDeployments: a command that needed a Deployment picked found
 	// none in the workspace (deployment.NoDeploymentsError). Nothing is
 	// created in its place; create one with astro deployment create.
@@ -91,6 +101,8 @@ var cloudKinds = cliout.Kinds{
 	{Kind: KindConflict, Match: func(err error) bool {
 		return httputil.HasStatus(err, http.StatusConflict) || local.IsConflict(err)
 	}},
+	// Before api_unavailable: a 5xx to a write is the more specific answer.
+	{Kind: KindOutcomeUnknown, Match: httputil.OutcomeUnknown},
 	{Kind: KindAPIUnavailable, Match: func(err error) bool {
 		var se *httputil.StatusError
 		if errors.As(err, &se) && se.StatusCode >= http.StatusInternalServerError {
@@ -98,6 +110,10 @@ var cloudKinds = cliout.Kinds{
 		}
 		// The organization lookup of an API token that never got an answer.
 		return errors.Is(err, astroCmd.ErrAPITokenOrganization) && httputil.IsTransportError(err)
+	}},
+	{Kind: KindTimeout, Match: func(err error) bool {
+		var timedOut *deployment.WaitTimeoutError
+		return errors.As(err, &timedOut)
 	}},
 	{Kind: KindNoDeployments, Match: func(err error) bool {
 		var none *deployment.NoDeploymentsError

@@ -925,7 +925,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 			return fmt.Errorf("%s is %w", cloudProvider, errInvalidCloudProvider)
 		}
 	}
-	d, err := deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment, cmd.ErrOrStderr())
+	d, err := deployment.Create(cmd.Context(), label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment, cmd.ErrOrStderr())
 	if d.Id == "" {
 		return err
 	}
@@ -1143,7 +1143,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 	if !waitForStatus {
 		return nil
 	}
-	return failedAfterResult(cmd, format, deployment.WaitForHibernationOverride(cmd.ErrOrStderr(), res.DeploymentID, isHibernating, waitTimeForDeployment, astroV1Client))
+	return failedAfterResult(cmd, format, deployment.WaitForHibernationOverride(cmd.Context(), cmd.ErrOrStderr(), res.DeploymentID, isHibernating, waitTimeForDeployment, astroV1Client))
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.

@@ -147,6 +147,14 @@ func TestExitCode(t *testing.T) {
 	assert.Equal(t, ExitInterrupted, ExitCode(bg, fmt.Errorf("reading the value: %w", input.ErrInterrupted)))
 }
 
+func TestExitCodeNamesTheSignalThatCanceledTheRun(t *testing.T) {
+	for n, want := range map[int]int{2: 130, 15: 143, 1: 129} {
+		ctx, cancel := context.WithCancelCause(context.Background())
+		cancel(&Signaled{Number: n, Name: "signal"})
+		assert.Equal(t, want, ExitCode(ctx, errBoom))
+	}
+}
+
 func TestAJSONFailureIsOneObjectOnStdout(t *testing.T) {
 	r := execTree(context.Background(), testTree(fmt.Errorf("listing: %w", errBoom)), "thing", "list", "-o", "json")
 	require.Error(t, r.err)

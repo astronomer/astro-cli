@@ -1336,7 +1336,7 @@ func (c *cli) runExec(ctx context.Context, argv []string, withWorkspace, noSync 
 	if errors.As(err, &exitErr) {
 		// The wrapped command failed and has already written its own output;
 		// carry its exit code out so a caller sees the real status, not 1.
-		return &cliout.ExitError{Code: exitErr.ExitCode()}
+		return &cliout.ExitError{Code: childExitCode(exitErr)}
 	}
 	return err
 }

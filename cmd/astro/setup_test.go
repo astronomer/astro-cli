@@ -408,7 +408,7 @@ func TestCheckAPIToken(t *testing.T) {
 
 		_, err := checkAPIToken(mockV1Client)
 		assert.ErrorIs(t, err, ErrAPITokenOrganization)
-		assert.ErrorContains(t, err, "status 429")
+		assert.ErrorContains(t, err, "HTTP 429")
 	})
 
 	t.Run("an organization list it can't use is an error, not a panic", func(t *testing.T) {

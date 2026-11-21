@@ -327,6 +327,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		ImageAlone:    !inProject,
 		ImageName:     imageName,
 		Description:   deployDescription,
+		Context:       cmd.Context(),
 		Wait:          waitForDeploy,
 		WaitTime:      waitTime,
 		NoDagsBaseDir: noDagsBaseDir,
@@ -818,6 +819,7 @@ func (d manifestDeployer) DagsSource(projectDir string, noDagsBaseDir bool) file
 // DeployDags ships the project's dags/ through the dags-only transport.
 func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
 	res, err := astrodeploy.DeployManifestDags(astrodeploy.ManifestDagDeployInput{
+		Context:       in.Context,
 		Login:         &d.login.context,
 		ProjectDir:    in.ProjectDir,
 		DeploymentID:  in.DeploymentID,
@@ -859,8 +861,9 @@ func toManifestDeployGit(g astrodeploy.ManifestDeployGit) manifestdeploy.Git {
 // cloud/deploy transport.
 func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestdeploy.ImageResult, error) {
 	res, err := astrodeploy.DeployManifestImage(astrodeploy.ManifestImageDeployInput{
-		Login: &d.login.context,
-		Build: in.Build,
+		Context: in.Context,
+		Login:   &d.login.context,
+		Build:   in.Build,
 		Catalog: func() *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(in.Build.AirflowVersion)(context.Background())
 		},

@@ -34,6 +34,16 @@ type StatusError struct {
 	StatusCode int
 	msg        string
 	wrapped    error
+	// method and path are the request's, when the response carried it. A 5xx
+	// to a request that changes state leaves its outcome unknown
+	// (OutcomeUnknown).
+	method, path string
+}
+
+// outcomeUnknown reports a 5xx answer to a request that changes state: the
+// server may have acted before it failed.
+func (e *StatusError) outcomeUnknown() bool {
+	return e.StatusCode >= http.StatusInternalServerError && isMutation(e.method)
 }
 
 func (e *StatusError) Error() string { return e.msg }
@@ -46,23 +56,42 @@ func HasStatus(err error, status int) bool {
 	return errors.As(err, &se) && se.StatusCode == status
 }
 
+// NormalizeAPIError returns the StatusError for a response that is not a
+// success, and nil for one that is. A 5xx answer to a request that changes
+// state says so in its text: the change may have been applied.
 func NormalizeAPIError(httpResp *http.Response, body []byte) error {
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
-		var decode apiError
-		err := json.NewDecoder(bytes.NewReader(body)).Decode(&decode)
-		if err != nil {
-			return &StatusError{
-				StatusCode: httpResp.StatusCode,
-				msg:        fmt.Sprintf("%s, status %d", ErrorRequest, httpResp.StatusCode),
-				wrapped:    ErrorRequest,
-			}
-		}
-		if pr, ok := unlinkedPRPreview(httpResp, decode.Message); ok {
-			return &StatusError{StatusCode: httpResp.StatusCode, msg: fmt.Sprintf("you're logged in to PR previews, but %s has no user for you yet. Run astro login %s to create it, then run the command again", pr, pr)}
-		}
-		return &StatusError{StatusCode: httpResp.StatusCode, msg: decode.Message}
+	if httpResp.StatusCode == http.StatusOK || httpResp.StatusCode == http.StatusNoContent {
+		return nil
 	}
-	return nil
+	se := statusError(httpResp, body)
+	if se.outcomeUnknown() {
+		se.msg += "; " + unknownOutcomeText(se.path)
+	}
+	return se
+}
+
+func statusError(httpResp *http.Response, body []byte) *StatusError {
+	se := &StatusError{StatusCode: httpResp.StatusCode}
+	if httpResp.Request != nil {
+		se.method = httpResp.Request.Method
+		if httpResp.Request.URL != nil {
+			se.path = httpResp.Request.URL.Path
+		}
+	}
+	var decode apiError
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&decode); err != nil {
+		// No message from the API, most often a proxy's error page. The
+		// status is the detail, after the fact that nothing explained it.
+		se.msg = fmt.Sprintf("%s: the Astro API sent no error message (HTTP %d)", ErrorRequest, httpResp.StatusCode)
+		se.wrapped = ErrorRequest
+		return se
+	}
+	if pr, ok := unlinkedPRPreview(httpResp, decode.Message); ok {
+		se.msg = fmt.Sprintf("you're logged in to PR previews, but %s has no user for you yet. Run astro login %s to create it, then run the command again", pr, pr)
+		return se
+	}
+	se.msg = decode.Message
+	return se
 }
 
 // unlinkedPRPreview reports the PR preview that refused a request because the

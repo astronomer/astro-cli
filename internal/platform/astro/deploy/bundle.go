@@ -166,14 +166,14 @@ func deploymentFor(orgID, id string, read *astrov1.Deployment, astroV1Client ast
 // WaitForBundle waits up to waitTime for the Deployment to become healthy
 // after a bundle deploy or delete, writing its progress to progress (nil is
 // stderr).
-func WaitForBundle(progress io.Writer, deploymentID string, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
-	return deployment.HealthPoll(progress, deploymentID, dagOnlyDeploySleepTime, tickNum, int(waitTime.Seconds()), astroV1Client)
+func WaitForBundle(ctx context.Context, progress io.Writer, deploymentID string, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
+	return deployment.HealthPoll(ctx, progress, deploymentID, dagOnlyDeploySleepTime, tickNum, int(waitTime.Seconds()), astroV1Client)
 }
 
 // WaitForBundleIn is WaitForBundle under login, for a Deployment on a host
 // other than the current context's.
-func WaitForBundleIn(progress io.Writer, login *config.Context, deploymentID string, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
-	return deployment.HealthPollIn(progress, login.Organization, login.Token, deploymentID, dagOnlyDeploySleepTime, tickNum, int(waitTime.Seconds()), astroV1Client)
+func WaitForBundleIn(ctx context.Context, progress io.Writer, login *config.Context, deploymentID string, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
+	return deployment.HealthPollIn(ctx, progress, login.Organization, login.Token, deploymentID, dagOnlyDeploySleepTime, tickNum, int(waitTime.Seconds()), astroV1Client)
 }
 
 type DeleteBundleInput struct {
