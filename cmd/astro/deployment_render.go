@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
@@ -43,7 +44,7 @@ func emitDeployment(ctx context.Context, r cliout.Renderer, d *astrov1.Deploymen
 		// The Deployment exists whether or not the run was interrupted while
 		// it waited, and a script needs it either way: this read is not
 		// canceled with the run.
-		current, err := deployment.GetDeploymentByID(context.WithoutCancel(ctx), "", d.Id, astroV1Client)
+		current, err := deployment.GetDeploymentByID(context.WithoutCancel(pagination.Background(ctx)), "", d.Id, astroV1Client)
 		if err != nil {
 			return err
 		}

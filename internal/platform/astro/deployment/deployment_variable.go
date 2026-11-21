@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/fsatomic"
 )
 
@@ -146,7 +147,7 @@ func VariableModify(
 	}
 	// The variables are saved by now: the read that reports them is not
 	// canceled with the run, so a saved variable is not reported as a failure.
-	updated, err := GetDeploymentByID(context.WithoutCancel(ctx), "", currentDeployment.Id, astroV1Client)
+	updated, err := GetDeploymentByID(context.WithoutCancel(pagination.Background(ctx)), "", currentDeployment.Id, astroV1Client)
 	if err != nil {
 		return nil, err
 	}

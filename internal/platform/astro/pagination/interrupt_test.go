@@ -11,7 +11,8 @@ import (
 
 func TestIsInterruptAndInterrupted(t *testing.T) {
 	assert.True(t, IsInterrupt(context.Canceled))
-	assert.True(t, IsInterrupt(fmt.Errorf("listing: %w", context.DeadlineExceeded)))
+	assert.True(t, IsInterrupt(fmt.Errorf("listing: %w", context.Canceled)))
+	assert.False(t, IsInterrupt(context.DeadlineExceeded), "a timeout keeps its explanation")
 	assert.False(t, IsInterrupt(errors.New("boom")))
 	assert.False(t, IsInterrupt(nil))
 

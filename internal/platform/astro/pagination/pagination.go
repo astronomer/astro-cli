@@ -100,8 +100,10 @@ func Interrupted(ctx context.Context) error {
 	return ctx.Err()
 }
 
-// IsInterrupt reports whether err is the run's cancellation or its deadline,
-// which a lookup returns as it is rather than reword with advice.
+// IsInterrupt reports whether err is the run's cancellation, which a lookup
+// returns as it is rather than reword with advice. Only Canceled: a Ctrl-C,
+// SIGTERM or SIGHUP always cancels, while DeadlineExceeded is also an ordinary
+// HTTP timeout, which keeps its explanation.
 func IsInterrupt(err error) bool {
-	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+	return errors.Is(err, context.Canceled)
 }
