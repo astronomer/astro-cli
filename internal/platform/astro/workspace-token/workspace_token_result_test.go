@@ -1,6 +1,7 @@
 package workspacetoken
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -70,7 +71,7 @@ func TestListTokensResult(t *testing.T) {
 		ws := resultToken("t1", "one", astrov1.ApiTokenScopeWORKSPACE, "WORKSPACE_MEMBER")
 		org := resultToken("t2", "two", astrov1.ApiTokenScopeORGANIZATION, "WORKSPACE_OWNER")
 		org.Token = &token
-		got, err := ListTokens(resultClient(t, ws, org), "", nil)
+		got, err := ListTokens(context.Background(), resultClient(t, ws, org), "", nil, 0)
 		require.NoError(t, err)
 		assert.Equal(t, []apitoken.Token{
 			{ID: "t1", Name: "one", Description: "about one", Scope: "WORKSPACE", Role: "WORKSPACE_MEMBER", CreatedAt: resultCreated, CreatedBy: fullName1},
@@ -81,7 +82,7 @@ func TestListTokensResult(t *testing.T) {
 	t.Run("filtered by scope", func(t *testing.T) {
 		ws := resultToken("t1", "one", astrov1.ApiTokenScopeWORKSPACE, "WORKSPACE_MEMBER")
 		org := resultToken("t2", "two", astrov1.ApiTokenScopeORGANIZATION, "WORKSPACE_OWNER")
-		got, err := ListTokens(resultClient(t, ws, org), "", []TokenType{TokenTypeORGANIZATION})
+		got, err := ListTokens(context.Background(), resultClient(t, ws, org), "", []TokenType{TokenTypeORGANIZATION}, 0)
 		require.NoError(t, err)
 		require.Len(t, got, 1)
 		assert.Equal(t, "t2", got[0].ID)
@@ -89,14 +90,14 @@ func TestListTokensResult(t *testing.T) {
 
 	t.Run("the role is read on the Workspace named", func(t *testing.T) {
 		ws := resultToken("t1", "one", astrov1.ApiTokenScopeWORKSPACE, "WORKSPACE_MEMBER")
-		got, err := ListTokens(resultClient(t, ws), "another-workspace", nil)
+		got, err := ListTokens(context.Background(), resultClient(t, ws), "another-workspace", nil, 0)
 		require.NoError(t, err)
 		require.Len(t, got, 1)
 		assert.Empty(t, got[0].Role, "no role on another Workspace")
 	})
 
 	t.Run("none is empty, not nil", func(t *testing.T) {
-		got, err := ListTokens(resultClient(t), "", nil)
+		got, err := ListTokens(context.Background(), resultClient(t), "", nil, 0)
 		require.NoError(t, err)
 		assert.NotNil(t, got)
 		assert.Empty(t, got)

@@ -38,7 +38,7 @@ func newUserCreateCmd(out io.Writer) *cobra.Command {
 		Long:    "Create a user in the APC platform. The user receives an invite at the email address.",
 		Example: createUserExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			r := cliout.Renderer{Format: accessOutput, Out: out}
+			r := cliout.Renderer{Format: accessOutput, Out: out, Err: cmd.ErrOrStderr()}
 			created, err := user.Create(userEmail, userPassword, houstonClient)
 			if err != nil {
 				return err

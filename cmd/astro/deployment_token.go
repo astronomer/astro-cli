@@ -6,6 +6,7 @@ package astro
 // helpers the three token families share (api_token_render.go).
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -38,12 +39,12 @@ func tokenPicker() apitoken.Picker {
 	return deploymentTokenPicker()
 }
 
-func runDeploymentTokenList(format cliout.Format, out io.Writer, tokenTypes ...deployment.DeploymentTokenType) error {
-	tokens, err := deployment.ListTokens(astroV1Client, deploymentID, tokenTypes)
+func runDeploymentTokenList(ctx context.Context, limit int, format cliout.Format, out, errOut io.Writer, tokenTypes ...deployment.DeploymentTokenType) error {
+	tokens, err := deployment.ListTokens(ctx, astroV1Client, deploymentID, tokenTypes, limit)
 	if err != nil {
 		return err
 	}
-	return renderTokenList(format, out, tokens, deploymentRoleHeader)
+	return renderTokenList(format, out, errOut, tokens, deploymentRoleHeader)
 }
 
 func runDeploymentTokenCreate(format cliout.Format, out, errOut io.Writer) error {

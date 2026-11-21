@@ -97,10 +97,10 @@ func teamLabel(t *team.TeamInfo) string {
 }
 
 // renderTeamMembers renders a team's members.
-func renderTeamMembers(format cliout.Format, out io.Writer, list *team.MemberList) error {
+func renderTeamMembers(format cliout.Format, out, errOut io.Writer, list *team.MemberList) error {
 	tab := &cliout.Table{Header: []string{"ID", "FullName", "Email"}, Empty: "The selected team has no members"}
 	for _, m := range list.Members {
 		tab.AddRow(m.ID, m.FullName, m.Email)
 	}
-	return cliout.Renderer{Format: format, Out: out}.Emit(list, cliout.TableText(tab))
+	return cliout.Renderer{Format: format, Out: out, Err: errOut}.Emit(list, cliout.TableText(tab))
 }

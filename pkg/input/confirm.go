@@ -45,7 +45,7 @@ func (q *Confirmation) Ask() error {
 	if choices == "" {
 		choices = " (y/n) "
 	}
-	fmt.Fprint(q.Out, q.Question+choices) //nolint:errcheck // a failed write to the terminal still reads the answer
+	writeShown(q.Out, q.Question+choices)
 	line, err := ReadLine(Reader(q.In), q.Out)
 	if errors.Is(err, ErrInterrupted) {
 		return err // ReadLine ended the line

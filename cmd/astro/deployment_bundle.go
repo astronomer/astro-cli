@@ -60,7 +60,7 @@ func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), client, astroV1Alpha1Client)
+			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out, Err: cmd.ErrOrStderr()}, cmd.ErrOrStderr(), client, astroV1Alpha1Client)
 		},
 	}
 	cmd.Flags().StringVarP(&bundleName, "name", "n", "", "Name of the Dag bundle to create. Mutually exclusive with --mount-path")
@@ -79,15 +79,15 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 		Long:    "List every Dag and non-Dag bundle registered on an Astro Deployment.",
 		Example: `  astro deployment bundle list --deployment <id>
   astro deployment bundle list --deployment <id> -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			defer strayStdoutToStderr(bundleOutput)()
-			ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
-			if err != nil {
-				return err
-			}
-			return deployment.ListBundlesWithFormat(ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, client, astroV1Alpha1Client)
-		},
 	}
+	addListLimit(cmd, "bundles", "Bundles are listed in the order the API returns them", func(cmd *cobra.Command, limit int) error {
+		defer strayStdoutToStderr(bundleOutput)()
+		ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
+		if err != nil {
+			return err
+		}
+		return deployment.ListBundlesWithFormat(cmd.Context(), ws, deploymentID, limit, cliout.Renderer{Format: bundleOutput, Err: cmd.ErrOrStderr(), Out: out}, client, astroV1Alpha1Client)
+	})
 	return cmd
 }
 
@@ -118,7 +118,7 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 			if len(args) > 0 {
 				bundleID = args[0]
 			}
-			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, cmd.ErrOrStderr(), client, astroV1Alpha1Client)
+			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out, Err: cmd.ErrOrStderr()}, cmd.ErrOrStderr(), client, astroV1Alpha1Client)
 		},
 	}, cliout.Optional("BUNDLE_ID"))
 	cmd.Flags().StringVarP(&bundleName, "name", "n", "", "Identify the Dag bundle to update by name, instead of by ID")
@@ -155,7 +155,7 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 			if len(args) > 0 {
 				bundleID = args[0]
 			}
-			return deployment.DeleteBundle(bundleID, bundleName, bundleMountPath, ws, deploymentID, forceBundleDelete, cliout.Renderer{Format: bundleOutput, Out: out}, client, astroV1Alpha1Client)
+			return deployment.DeleteBundle(bundleID, bundleName, bundleMountPath, ws, deploymentID, forceBundleDelete, cliout.Renderer{Format: bundleOutput, Out: out, Err: cmd.ErrOrStderr()}, client, astroV1Alpha1Client)
 		},
 	}, cliout.Optional("BUNDLE_ID"))
 	cmd.Flags().StringVarP(&bundleName, "name", "n", "", "Identify the Dag bundle to delete by name, instead of by ID")

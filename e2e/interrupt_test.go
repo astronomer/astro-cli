@@ -79,15 +79,16 @@ func (p *project) background(args ...string) *session {
 	return s
 }
 
-// awaitStdout blocks until the running command has printed want, so a case can
+// awaitOutput blocks until the running command has printed want, on stdout or
+// stderr (a start's progress is on stderr), so a case can
 // interrupt it in a known phase rather than at whatever moment the scheduler
 // happened to reach.
-func (s *session) awaitStdout(want string, within time.Duration) {
+func (s *session) awaitOutput(want string, within time.Duration) {
 	s.t.Helper()
 	deadline := time.After(within)
 	for {
 		s.mu.Lock()
-		got := s.stdout.String()
+		got := s.stdout.String() + s.stderr.String()
 		s.mu.Unlock()
 		if strings.Contains(got, want) {
 			return
@@ -200,7 +201,7 @@ func TestInterruptDuringTheSyncLeavesNothingBehind(t *testing.T) {
 	// uv has spoken, so the sync is under way and there is something to
 	// interrupt. Interrupting before this raced the process to its first
 	// instruction and tested nothing.
-	s.awaitStdout("[uv]", 90*time.Second)
+	s.awaitOutput("[uv]", 90*time.Second)
 	s.interrupt()
 	r := s.wait(60 * time.Second)
 
@@ -266,7 +267,7 @@ func TestAStartAfterAnInterruptedSyncSucceeds(t *testing.T) {
 	p.run("init", "--name", "resumed").requireSuccess()
 
 	s := p.background("local", "start")
-	s.awaitStdout("[uv]", 90*time.Second)
+	s.awaitOutput("[uv]", 90*time.Second)
 	s.interrupt()
 	s.wait(60 * time.Second)
 

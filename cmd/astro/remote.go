@@ -123,7 +123,7 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return cliout.Renderer{Format: remoteOutput, Out: cmd.OutOrStdout()}.Emit(newRemoteDeployJSON(&res), renderRemoteDeploy(res.Image))
+	return cliout.Renderer{Format: remoteOutput, Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr()}.Emit(newRemoteDeployJSON(&res), renderRemoteDeploy(res.Image))
 }
 
 // projectClientRegistry names [tool.astro.deploy] client-registry as the

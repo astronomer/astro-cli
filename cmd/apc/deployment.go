@@ -625,7 +625,7 @@ func addDeploymentNameFlag(cmd *cobra.Command, to *string, usage, shorthand stri
 }
 
 func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
-	r := cliout.Renderer{Format: deploymentOutput, Out: out}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out, Err: cmd.ErrOrStderr()}
 
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -717,7 +717,7 @@ var hibernationNow = time.Now
 // of a Deployment's hibernation schedule: hibernate holds it hibernating, and
 // wake-up (hibernate false) awake.
 func deploymentHibernate(cmd *cobra.Command, hibernate bool, out io.Writer) error {
-	r := cliout.Renderer{Format: deploymentOutput, Out: out}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out, Err: cmd.ErrOrStderr()}
 	if err := requireDeployment(cmd); err != nil {
 		return err
 	}
@@ -790,7 +790,7 @@ func hibernationEnd(until, forDuration string) (func() *time.Time, error) {
 }
 
 func deploymentDelete(cmd *cobra.Command, out io.Writer) error {
-	r := cliout.Renderer{Format: deploymentOutput, Out: out}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out, Err: cmd.ErrOrStderr()}
 	if err := requireDeployment(cmd); err != nil {
 		return err
 	}
@@ -903,7 +903,7 @@ func dagDeploymentQuestion(current, next string) string {
 }
 
 func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string, out io.Writer) error {
-	r := cliout.Renderer{Format: deploymentOutput, Out: out}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out, Err: cmd.ErrOrStderr()}
 	if err := requireDeployment(cmd); err != nil {
 		return err
 	}

@@ -133,14 +133,14 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	objs, err := env.ListAirflowVars(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
+	objs, err := env.ListAirflowVars(cmd.Context(), scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
 	if envIncludeSecrets {
 		cliout.Warn(os.Stderr, includeSecretsWarning)
 	}
-	return env.WriteAirflowVarList(objs, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
+	return env.WriteAirflowVarList(objs, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -153,7 +153,7 @@ func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	if err != nil {
 		return err
 	}
-	return env.WriteAirflowVar(obj, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
+	return env.WriteAirflowVar(obj, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
@@ -161,7 +161,7 @@ func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	r := cliout.Renderer{Format: envOutput, Out: out}
+	r := cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()}
 	return runFromFileSet(cmd, r, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, fromFileFns{env.CreateAirflowVar, env.UpdateAirflowVar, env.GetAirflowVar})
 }
 
@@ -170,7 +170,7 @@ func runEnvAirflowVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	if err != nil {
 		return err
 	}
-	r := cliout.Renderer{Format: envOutput, Out: out}
+	r := cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()}
 
 	value, err := readSetValue(cmd, "value", envVarValue, fmt.Sprintf("new value for %s", idOrKey))
 	if err != nil {

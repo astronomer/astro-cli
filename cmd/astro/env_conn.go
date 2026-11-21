@@ -156,14 +156,14 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	objs, err := env.ListConns(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
+	objs, err := env.ListConns(cmd.Context(), scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
 	if envIncludeSecrets {
 		cliout.Warn(os.Stderr, includeSecretsWarning)
 	}
-	return env.WriteConnList(objs, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
+	return env.WriteConnList(objs, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -176,7 +176,7 @@ func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteConn(obj, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
+	return env.WriteConn(obj, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 // runEnvConnSet upserts. Update is tried first and a not-found falls through
@@ -213,7 +213,7 @@ func runEnvConnSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	r := cliout.Renderer{Format: envOutput, Out: out}
+	r := cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()}
 
 	in, err := buildConnInput(cmd, idOrKey)
 	if err != nil {

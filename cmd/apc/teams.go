@@ -40,7 +40,7 @@ func newTeamGetCmd(out io.Writer) *cobra.Command {
   # Show a team with its users and roles
   astro team get <TEAM_ID> --all`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			r := cliout.Renderer{Format: accessOutput, Out: out}
+			r := cliout.Renderer{Format: accessOutput, Out: out, Err: cmd.ErrOrStderr()}
 			d, err := teams.Get(args[0], usersEnabled || all, houstonClient)
 			if err != nil {
 				return err
@@ -88,7 +88,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 		Example: `  # Give a team the system editor role
   astro team update <TEAM_ID> --role SYSTEM_EDITOR`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			r := cliout.Renderer{Format: accessOutput, Out: out}
+			r := cliout.Renderer{Format: accessOutput, Out: out, Err: cmd.ErrOrStderr()}
 			change, err := teams.Update(args[0], teamRole, houstonClient)
 			if err != nil {
 				return err

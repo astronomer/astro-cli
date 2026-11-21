@@ -5,6 +5,7 @@ package astro
 // role, are you sure) and decides how the answer looks, in text and in json.
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -52,22 +53,22 @@ func tokenArg(args []string, id *string) {
 	}
 }
 
-func listWorkspaceToken(out io.Writer) error {
-	return runWorkspaceTokenList(out, nil)
+func listWorkspaceToken(ctx context.Context, out, errOut io.Writer, limit int) error {
+	return runWorkspaceTokenList(ctx, out, errOut, nil, limit)
 }
 
 // listOrganizationTokensInWorkspace lists the Organization tokens with a role
 // on the Workspace.
-func listOrganizationTokensInWorkspace(out io.Writer) error {
-	return runWorkspaceTokenList(out, []workspacetoken.TokenType{workspacetoken.TokenTypeORGANIZATION})
+func listOrganizationTokensInWorkspace(ctx context.Context, out, errOut io.Writer, limit int) error {
+	return runWorkspaceTokenList(ctx, out, errOut, []workspacetoken.TokenType{workspacetoken.TokenTypeORGANIZATION}, limit)
 }
 
-func runWorkspaceTokenList(out io.Writer, tokenTypes []workspacetoken.TokenType) error {
-	tokens, err := workspacetoken.ListTokens(astroV1Client, workspaceID, tokenTypes)
+func runWorkspaceTokenList(ctx context.Context, out, errOut io.Writer, tokenTypes []workspacetoken.TokenType, limit int) error {
+	tokens, err := workspacetoken.ListTokens(ctx, astroV1Client, workspaceID, tokenTypes, limit)
 	if err != nil {
 		return err
 	}
-	return renderTokenList(workspaceTokenOutput, out, tokens, workspaceRoleHeader)
+	return renderTokenList(workspaceTokenOutput, out, errOut, tokens, workspaceRoleHeader)
 }
 
 func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {

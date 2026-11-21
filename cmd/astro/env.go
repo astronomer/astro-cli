@@ -192,11 +192,11 @@ func runEnvList(cmd *cobra.Command, out io.Writer) error {
 	// -o dotenv never gets here: the flag refuses it while parsing, with
 	// env.ErrInventoryHasNoValues (newEnvListCmd).
 
-	items, err := env.ListInventory(scope, envResolveLinked, astroV1Client)
+	items, err := env.ListInventory(cmd.Context(), scope, envResolveLinked, astroV1Client)
 	if err != nil {
 		return err
 	}
-	return env.WriteInventory(items, cliout.Renderer{Format: envOutput, Out: out})
+	return env.WriteInventory(items, cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 func newEnvRootCmd(out io.Writer) *cobra.Command {

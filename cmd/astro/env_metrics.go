@@ -134,14 +134,14 @@ func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 
-	objs, err := env.ListMetricsExports(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
+	objs, err := env.ListMetricsExports(cmd.Context(), scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
 	if envIncludeSecrets {
 		cliout.Warn(os.Stderr, includeSecretsWarning)
 	}
-	return env.WriteMetricsExportList(objs, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
+	return env.WriteMetricsExportList(objs, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -154,7 +154,7 @@ func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteMetricsExport(obj, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
+	return env.WriteMetricsExport(obj, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 // runEnvMetricsSet upserts, with one asymmetry the other nouns do not have:
@@ -171,7 +171,7 @@ func runEnvMetricsSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	r := cliout.Renderer{Format: envOutput, Out: out}
+	r := cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()}
 
 	in, err := buildMetricsInput(cmd)
 	if err != nil {

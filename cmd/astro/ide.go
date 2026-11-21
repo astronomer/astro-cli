@@ -135,7 +135,7 @@ func importIDEProject(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return emitIDEImport(cliout.Renderer{Format: ideProjectOutput, Out: out}, res)
+	return emitIDEImport(cliout.Renderer{Format: ideProjectOutput, Out: out, Err: cmd.ErrOrStderr()}, res)
 }
 
 func exportProject(cmd *cobra.Command, out io.Writer) error {
@@ -154,7 +154,7 @@ func exportProject(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if err := emitIDEExport(cliout.Renderer{Format: format, Out: out}, res); err != nil {
+	if err := emitIDEExport(cliout.Renderer{Format: format, Out: out, Err: cmd.ErrOrStderr()}, res); err != nil {
 		return err
 	}
 	// A person at a terminal is shown the project in a browser; a run under

@@ -84,42 +84,24 @@ func AddOrgTokenToWorkspace(id, name, role, workspaceID string, pick apitoken.Pi
 	return apitoken.FromAPI(&token, role), nil
 }
 
-// listOrgScopedAPITokens returns only ORGANIZATION-scoped tokens (paginated).
-func listOrgScopedAPITokens(client astrov1.APIClient) ([]astrov1.ApiToken, error) {
-	ctx, err := context.GetCurrentContext()
+// listOrgScopedAPITokens returns only ORGANIZATION-scoped tokens (paginated),
+// the first limit of them in name order (all when limit is below 1), stopping
+// when ctx is canceled.
+func listOrgScopedAPITokens(ctx httpContext.Context, client astrov1.APIClient, limit int) ([]astrov1.ApiToken, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
 	only := true
-	limit := tokenPaginationLim
-	var tokens []astrov1.ApiToken
-	offset := 0
-	for {
-		params := &astrov1.ListApiTokensParams{
-			IncludeOnlyOrganizationTokens: &only,
-			Offset:                        &offset,
-			Limit:                         &limit,
-		}
-		resp, err := client.ListApiTokensWithResponse(httpContext.Background(), ctx.Organization, params)
-		if err != nil {
-			return nil, err
-		}
-		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-			return nil, err
-		}
-		tokens = append(tokens, resp.JSON200.Tokens...)
-		if resp.JSON200.TotalCount <= offset+limit {
-			break
-		}
-		offset += limit
-	}
-	return tokens, nil
+	return apitoken.Fetch(ctx, client, cfg.Organization, astrov1.ListApiTokensParams{IncludeOnlyOrganizationTokens: &only}, limit, nil)
 }
 
 // ScopedTokens lists the Organization-scoped API tokens, as the API has them,
 // for a command in another family that picks among them.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func ScopedTokens(client astrov1.APIClient) ([]astrov1.ApiToken, error) {
-	return listOrgScopedAPITokens(client)
+	return listOrgScopedAPITokens(httpContext.Background(), client, 0)
 }
 
 // getOrganizationToken picks the token id or name means from tokens, offering
@@ -170,8 +152,8 @@ func getOrganizationToken(id, name string, tokens []astrov1.ApiToken, pick apito
 
 // ListTokens lists the Organization-scoped API tokens, each with its
 // Organization role. The list is empty, never nil, when there are none.
-func ListTokens(client astrov1.APIClient) ([]apitoken.Token, error) {
-	apiTokens, err := listOrgScopedAPITokens(client)
+func ListTokens(ctx httpContext.Context, client astrov1.APIClient, limit int) ([]apitoken.Token, error) {
+	apiTokens, err := listOrgScopedAPITokens(ctx, client, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -193,9 +175,11 @@ func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.Api
 // FindToken finds the Organization token a command means: the one with id,
 // else the one named name, else the one a person picks through pick. A token
 // of another scope is refused.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func FindToken(id, name, organization string, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
 	if id == "" {
-		tokens, err := listOrgScopedAPITokens(client)
+		tokens, err := listOrgScopedAPITokens(httpContext.Background(), client, 0)
 		if err != nil {
 			return token, err
 		}

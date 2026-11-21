@@ -66,6 +66,6 @@ func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
 	if format == formatYAML {
 		format = cliout.FormatText
 	}
-	r := cliout.Renderer{Format: format, Out: out}
+	r := cliout.Renderer{Format: format, Out: out, Err: cmd.ErrOrStderr()}
 	return inspect.Print(wsID, deploymentName, deploymentID, client, out, r, requestedField, showWorkloadIdentity)
 }

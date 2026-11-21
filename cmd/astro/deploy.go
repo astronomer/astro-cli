@@ -389,7 +389,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 				fmt.Fprintln(errOut, "Building the project image. This can take a few minutes…")
 			}
 		},
-	}, manifestdeploy.BeforeAsking(newManifestDeployer(&login, cmd.InOrStdin(), errOut), recap.Flush))
+	}, manifestdeploy.BeforeAsking(newManifestDeployer(withContext(&login, cmd.Context()), cmd.InOrStdin(), errOut), recap.Flush))
 	if err != nil {
 		recap.Flush()
 		return manifestDeployErr(cmd, err)
@@ -635,6 +635,9 @@ type deployLogin struct {
 	// current reports the login is the current context's, which the
 	// workspace-level deployment picker assumes.
 	current bool
+	// ctx is the run's context, which the Deployment lookup behind the deploy
+	// prompt stops on; nil (a test) is Background.
+	ctx context.Context
 }
 
 // selection is the login whose Workspace the run's selection is read from,
@@ -709,8 +712,8 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, default
 // the prompt to offer the ones the project does not link yet.
 //
 // The prompt waits on it, so it gives up after listDeploymentsTimeout and the
-// prompt offers the links alone. The list takes no context to cancel, so a
-// call that times out finishes in the background and is dropped.
+// prompt offers the links alone. A call that times out is left running until
+// the run's context is canceled and its answer is dropped.
 func (d manifestDeployer) ListDeployments(workspaceID string) ([]manifestdeploy.Deployment, error) {
 	type listed struct {
 		deps []astrov1.Deployment
@@ -718,8 +721,9 @@ func (d manifestDeployer) ListDeployments(workspaceID string) ([]manifestdeploy.
 	}
 	done := make(chan listed, 1)
 	list, org, client := deployment.ListDeployments, d.login.context.Organization, d.login.client
+	ctx := d.login.ctx
 	go func() {
-		deps, err := list(workspaceID, org, client)
+		deps, err := list(ctx, workspaceID, org, client)
 		done <- listed{deps, err}
 	}()
 	var res listed
@@ -918,4 +922,11 @@ func refuseBuildSecret(cmd *cobra.Command, m *manifest.Manifest) error {
 		return util.CheckGeneratedBuildSecrets(buildSecrets)
 	}
 	return nil
+}
+
+// withContext is login with the run's context, for the lookups the deploy
+// prompt makes.
+func withContext(login *deployLogin, ctx context.Context) *deployLogin {
+	login.ctx = ctx
+	return login
 }

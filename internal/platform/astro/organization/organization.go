@@ -50,11 +50,18 @@ var organizationTableConfig = output.BuildTableConfig(
 
 // organizationPager fetches one page of Organizations at a time for the
 // pagination helpers.
-func organizationPager(astroV1Client astrov1.APIClient) pagination.FetchPage[astrov1.Organization] {
+//
+// Pages are sorted by name, the stable order the API offers, so a limited list
+// is the first rows of the full one.
+func organizationPager(ctx http_context.Context, astroV1Client astrov1.APIClient, limit int) pagination.FetchPage[astrov1.Organization] {
+	sorts := []astrov1.ListOrganizationsParamsSorts{astrov1.ListOrganizationsParamsSortsNameAsc}
 	return func(offset int) ([]astrov1.Organization, int, error) {
 		pageSize := 100
-		params := &astrov1.ListOrganizationsParams{Limit: &pageSize, Offset: &offset}
-		resp, err := astroV1Client.ListOrganizationsWithResponse(http_context.Background(), params)
+		if limit > 0 {
+			pageSize = min(pageSize, limit-offset)
+		}
+		params := &astrov1.ListOrganizationsParams{Limit: &pageSize, Offset: &offset, Sorts: &sorts}
+		resp, err := astroV1Client.ListOrganizationsWithResponse(pagination.Background(ctx), params)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -68,7 +75,14 @@ func organizationPager(astroV1Client astrov1.APIClient) pagination.FetchPage[ast
 // ListOrganizations returns every Organization the caller has access to, paging
 // through the API as needed.
 func ListOrganizations(astroV1Client astrov1.APIClient) ([]astrov1.Organization, error) {
-	return pagination.Collect("organizations", organizationPager(astroV1Client))
+	return listOrganizationsUpTo(http_context.Background(), astroV1Client, 0)
+}
+
+// listOrganizationsUpTo is ListOrganizations that stops paging after limit
+// Organizations (every one when limit is below 1), in name order, and stops
+// when ctx is canceled.
+func listOrganizationsUpTo(ctx http_context.Context, astroV1Client astrov1.APIClient, limit int) ([]astrov1.Organization, error) {
+	return pagination.CollectUpTo(ctx, "organizations", limit, organizationPager(ctx, astroV1Client, limit))
 }
 
 func GetOrganization(orgID string, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
@@ -86,19 +100,23 @@ func GetOrganization(orgID string, astroV1Client astrov1.APIClient) (*astrov1.Or
 // findOrganizationByName pages through Organizations and returns as soon as it
 // finds a name match, so a match on an early page avoids fetching later pages.
 func findOrganizationByName(name string, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
-	return pagination.Find("organizations", organizationPager(astroV1Client), func(o astrov1.Organization) bool {
+	return pagination.Find(http_context.Background(), "organizations", organizationPager(http_context.Background(), astroV1Client, 0), func(o astrov1.Organization) bool {
 		return o.Name == name
 	})
 }
 
 // ListData returns organization list data for structured output
-func ListData(astroV1Client astrov1.APIClient) (*OrganizationList, error) {
+func ListData(ctx http_context.Context, astroV1Client astrov1.APIClient, limit int) (*OrganizationList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
-	or, err := ListOrganizations(astroV1Client)
+	or, err := listOrganizationsUpTo(ctx, astroV1Client, limit)
 	if err != nil {
+		// An interrupt is not a failure to connect.
+		if errors.Is(err, http_context.Canceled) || errors.Is(err, http_context.DeadlineExceeded) {
+			return nil, err
+		}
 		return nil, fmt.Errorf(AstronomerConnectionErrMsg+"%w", err)
 	}
 
@@ -119,9 +137,9 @@ func ListData(astroV1Client astrov1.APIClient) (*OrganizationList, error) {
 }
 
 // ListWithFormat lists organizations with the specified output format
-func ListWithFormat(astroV1Client astrov1.APIClient, r output.Emitter) error {
+func ListWithFormat(ctx http_context.Context, astroV1Client astrov1.APIClient, limit int, r output.Emitter) error {
 	return output.PrintData(
-		func() (*OrganizationList, error) { return ListData(astroV1Client) },
+		func() (*OrganizationList, error) { return ListData(ctx, astroV1Client, limit) },
 		organizationTableConfig, r,
 	)
 }

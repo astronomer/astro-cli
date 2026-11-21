@@ -12,8 +12,8 @@ import (
 const objectTypeAirflowVar = astrov1.AIRFLOWVARIABLE
 
 // ListAirflowVars returns AIRFLOW_VARIABLE objects for the given scope.
-func ListAirflowVars(scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
-	return listObjects(scope, objectTypeAirflowVar, resolveLinked, includeSecrets, astroV1Client)
+func ListAirflowVars(ctx httpcontext.Context, scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
+	return listObjects(ctx, scope, objectTypeAirflowVar, resolveLinked, includeSecrets, astroV1Client)
 }
 
 // GetAirflowVar fetches a single Airflow variable by ID or key.

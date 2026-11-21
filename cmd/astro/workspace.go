@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -41,7 +42,6 @@ var (
 	tokenExpiration            int
 	validWorkspaceRoles        []string
 	workspaceListOutput        cliout.Format
-	workspaceListLimit         int
 )
 
 const (
@@ -83,14 +83,10 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all Astro Workspaces you have access to in your current Organization. Use 'astro organization switch' to change Organizations.",
 		Example: `  astro workspace list
   astro workspace list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := checkListLimit(cmd, "limit", workspaceListLimit); err != nil {
-				return err
-			}
-			return workspaceList(out)
-		},
 	}
-	addListLimitFlag(cmd, &workspaceListLimit, "Workspaces")
+	addListLimit(cmd, "Workspaces", "", func(cmd *cobra.Command, limit int) error {
+		return workspaceList(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	cliout.AddOutputFlag(cmd, &workspaceListOutput)
 	return cmd
 }
@@ -249,10 +245,10 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro workspace user list
   astro workspace user list --workspace <WORKSPACE_ID>
   astro workspace user list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listWorkspaceUser(out)
-		},
 	}
+	addListLimit(cmd, "users", "", func(cmd *cobra.Command, limit int) error {
+		return listWorkspaceUser(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -330,10 +326,10 @@ func newWorkspaceTokenListCmd(out io.Writer) *cobra.Command {
   # List the tokens in another Workspace
   astro workspace token list --workspace <WORKSPACE_ID>
 `,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listWorkspaceToken(out)
-		},
 	}
+	addListLimit(cmd, "API tokens", "", func(cmd *cobra.Command, limit int) error {
+		return listWorkspaceToken(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -364,11 +360,11 @@ func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro workspace team list
   astro workspace team list --workspace <WORKSPACE_ID>
   astro workspace team list -o json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listWorkspaceTeam(out)
-		},
 	}
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
+	addListLimit(cmd, "teams", "", func(cmd *cobra.Command, limit int) error {
+		return listWorkspaceTeam(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -601,10 +597,10 @@ func newListOrganizationTokensInWorkspace(out io.Writer) *cobra.Command {
 
   # List the Organization tokens in another Workspace
   astro workspace token organization-token list --workspace <WORKSPACE_ID>`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return listOrganizationTokensInWorkspace(out)
-		},
 	}
+	addListLimit(cmd, "Organization API tokens", "The scope filter runs locally, so every page is read before the limit applies", func(cmd *cobra.Command, limit int) error {
+		return listOrganizationTokensInWorkspace(cmd.Context(), out, cmd.ErrOrStderr(), limit)
+	})
 	return cmd
 }
 
@@ -629,8 +625,8 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func listWorkspaceTeam(out io.Writer) error {
-	return team.ListWorkspaceTeamsWithFormat(astroV1Client, workspaceID, cliout.Renderer{Format: workspaceTeamOutput, Out: out})
+func listWorkspaceTeam(ctx context.Context, out, errOut io.Writer, limit int) error {
+	return team.ListWorkspaceTeamsWithFormat(ctx, astroV1Client, workspaceID, limit, cliout.Renderer{Format: workspaceTeamOutput, Out: out, Err: errOut})
 }
 
 func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -756,8 +752,8 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	return renderLines(workspaceTeamOutput, out, &t, fmt.Sprintf("Updated Workspace team %s to %s", teamLabel(&t), t.WorkspaceRole))
 }
 
-func workspaceList(out io.Writer) error {
-	return workspace.ListWithFormat(astroV1Client, workspaceListLimit, cliout.Renderer{Format: workspaceListOutput, Out: out})
+func workspaceList(ctx context.Context, out, errOut io.Writer, limit int) error {
+	return workspace.ListWithFormat(ctx, astroV1Client, limit, cliout.Renderer{Format: workspaceListOutput, Out: out, Err: errOut})
 }
 
 func workspaceSwitch(out io.Writer, args []string) error {
@@ -801,7 +797,7 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 		return err
 	}
 	// The line names the Workspace as it was called before the update.
-	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, &res.Workspace, fmt.Sprintf("Updated Workspace %s", res.PreviousName))
+	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out, Err: cmd.ErrOrStderr()}, &res.Workspace, fmt.Sprintf("Updated Workspace %s", res.PreviousName))
 }
 
 func workspaceDelete(out io.Writer, args []string) error {
@@ -842,8 +838,8 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	return renderLines(workspaceUserOutput, out, &u, fmt.Sprintf("Added user %s to the Workspace with role %s", u.Email, u.WorkspaceRole))
 }
 
-func listWorkspaceUser(out io.Writer) error {
-	return user.ListWorkspaceUsersWithFormat(astroV1Client, workspaceID, cliout.Renderer{Format: workspaceUserOutput, Out: out})
+func listWorkspaceUser(ctx context.Context, out, errOut io.Writer, limit int) error {
+	return user.ListWorkspaceUsersWithFormat(ctx, astroV1Client, workspaceID, limit, cliout.Renderer{Format: workspaceUserOutput, Out: out, Err: errOut})
 }
 
 func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {

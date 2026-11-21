@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"os"
@@ -144,7 +145,7 @@ func TestDeployManifestImage_DagDeployOnIgnoresTheDagRule(t *testing.T) {
 	mockCreateImageDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
 	orig := azureUploader
-	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
+	azureUploader = func(context.Context, string, io.Reader) (string, error) { return "tarball-v1", nil }
 	t.Cleanup(func() { azureUploader = orig })
 	withImageSeams(t, "3.1-2")
 

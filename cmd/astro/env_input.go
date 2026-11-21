@@ -202,7 +202,7 @@ func runEnvDelete(cmd *cobra.Command, out io.Writer, noun, idOrKey string, del f
 	if err != nil {
 		return err
 	}
-	r := cliout.Renderer{Format: envOutput, Out: out}
+	r := cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()}
 
 	if !envYes {
 		if err := input.ConfirmOrAbort(fmt.Sprintf("Delete %s %q?", noun, idOrKey), input.AnsweredBy("--yes")); err != nil {
