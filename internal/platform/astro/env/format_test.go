@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -273,6 +274,7 @@ func (s *Suite) TestWriteVarLinksTableClampsValues() {
 // variable link table does, so it is not mistaken for a real empty one,
 // which still prints as empty.
 func (s *Suite) TestAirflowVarLinksTableMarksAHiddenOverride() {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	for _, c := range []struct {
 		name         string
 		secret       bool
@@ -303,4 +305,23 @@ func (s *Suite) TestAirflowVarLinksTableMarksAHiddenOverride() {
 			s.NotContains(buf.String(), c.wantNotFound, c.name)
 		}
 	}
+}
+
+// Piped, a link table is tab-separated: no padding for a script to strip.
+func (s *Suite) TestAirflowVarLinksTableIsTabSeparatedWhenPiped() {
+	id := "id1"
+	obj := &astrov1.EnvironmentObject{
+		Id: &id, ObjectKey: "A",
+		AirflowVariable: &astrov1.EnvironmentObjectAirflowVariable{Value: "eu"},
+		Links: &[]astrov1.EnvironmentObjectLink{{
+			ScopeEntityId:            "dep1",
+			AirflowVariableOverrides: &astrov1.EnvironmentObjectAirflowVariableOverrides{Value: "eu"},
+		}},
+	}
+	report, err := newLinksReport(linkKinds[LinkAirflowVariable], obj, true)
+	s.Require().NoError(err)
+	var buf bytes.Buffer
+	s.NoError(WriteLinks(report, textTo(&buf)))
+	s.Contains(buf.String(), "dep1\tvalue=eu")
+	s.NotContains(buf.String(), "dep1 ")
 }

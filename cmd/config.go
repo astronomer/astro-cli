@@ -14,7 +14,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
@@ -295,14 +294,9 @@ func configList(r cliout.Renderer) error {
 		setting.Set = setting.Scope != "default"
 		list.Settings = append(list.Settings, setting)
 	}
-	return r.Emit(&list, func(w io.Writer) error {
-		tab := printutil.Table{
-			DynamicPadding: true,
-			Header:         []string{"KEY", "VALUE", "SCOPE"},
-		}
-		for _, s := range list.Settings {
-			tab.AddRow([]string{s.Key, s.Value, s.Scope}, false)
-		}
-		return tab.Print(w)
-	})
+	tab := &cliout.Table{Header: []string{"KEY", "VALUE", "SCOPE"}}
+	for _, s := range list.Settings {
+		tab.AddRow(s.Key, s.Value, s.Scope)
+	}
+	return r.Emit(&list, cliout.TableText(tab))
 }

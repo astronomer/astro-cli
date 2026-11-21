@@ -31,11 +31,11 @@ func resetTokenCommandFlags(t *testing.T) {
 		workspaceTokenOutput = prevOutput
 		updateWorkspaceRole, addWorkspaceRole, tokenRole, tokenID, orgTokenID, workspaceTokenID = "", "", "", "", "", ""
 		deploymentID, tokenName = "", ""
-		forceDelete, forceRotate, cleanTokenOutput = false, false, false
+		forceDelete, forceRotate = false, false
 	})
 	updateWorkspaceRole, addWorkspaceRole, tokenRole, tokenID, orgTokenID, workspaceTokenID = "", "", "", "", "", ""
 	deploymentID, tokenName = "", ""
-	forceDelete, forceRotate, cleanTokenOutput = false, false, false
+	forceDelete, forceRotate = false, false
 	workspaceTokenOutput = cliout.FormatText
 }
 
@@ -69,7 +69,7 @@ func TestRotateAndDeleteAWorkspaceTokenByIDNeedNoWorkspace(t *testing.T) {
 	}{
 		"rotate": {
 			run: func(cmd *cobra.Command, out *bytes.Buffer) error {
-				return rotateWorkspaceToken([]string{"token-id"}, out)
+				return rotateWorkspaceToken([]string{"token-id"}, out, cmd.ErrOrStderr())
 			},
 			endpoint: "RotateApiTokenWithResponse",
 			want:     "new-secret",

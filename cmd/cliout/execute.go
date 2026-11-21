@@ -24,6 +24,26 @@ const (
 	ExitInterrupted = 130
 )
 
+// Signaled is the cancellation cause of a context canceled by a signal. It
+// records which one, so the process can exit 128+n as a shell reports a
+// process ended by that signal: 130 for SIGINT, 143 for SIGTERM, 129 for
+// SIGHUP.
+type Signaled struct {
+	// Number is the signal's number (2 for SIGINT, 15 for SIGTERM).
+	Number int
+	// Name is the signal's name, for the cause's text.
+	Name string
+}
+
+func (s *Signaled) Error() string { return "interrupted by " + s.Name }
+
+// SignalExitCode is the shell's status for a process ended by signal n.
+func SignalExitCode(n int) int { return signalExitBase + n }
+
+// signalExitBase is what a shell adds to a signal's number for the status of a
+// process that signal ended.
+const signalExitBase = 128
+
 // ExitCode is the process exit status for the error Execute returned.
 //
 // Interrupted is keyed on the context alone, not on the error's identity. A
@@ -37,7 +57,14 @@ func ExitCode(ctx context.Context, err error) int {
 	}
 	// A prompt reads Ctrl-C from a raw terminal as a keypress, not a signal,
 	// so it cancels nothing; it says so with input.ErrInterrupted instead.
-	if ctx.Err() != nil || errors.Is(err, input.ErrInterrupted) {
+	if ctx.Err() != nil {
+		var sig *Signaled
+		if errors.As(context.Cause(ctx), &sig) && sig.Number > 0 {
+			return SignalExitCode(sig.Number)
+		}
+		return ExitInterrupted
+	}
+	if errors.Is(err, input.ErrInterrupted) {
 		return ExitInterrupted
 	}
 	var exit *ExitError
@@ -111,7 +138,7 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	if errors.As(err, &exit) || errors.As(err, new(jsonShown)) {
 		return err
 	}
-	if wantsJSON(cmd, args, err) {
+	if wantsJSON(cmd, args, err) || unknownCommandAsksJSON(cmd, args, err) {
 		EmitError(stdout, err, ExitCode(ctx, err), kinds.Of(err))
 		return err
 	}
@@ -147,7 +174,12 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	if flag := suggestFlag(cmd, err); flag != "" {
 		root.PrintErrf("Did you mean %s?\n", flag)
 	}
-	root.PrintErrf("Run %s --help for usage.\n", cmd.CommandPath())
+	pointAt := cmd
+	var u *usageError
+	if errors.As(err, &u) && u.pointAt != nil {
+		pointAt = u.pointAt
+	}
+	root.PrintErrf("Run %s --help for usage.\n", pointAt.CommandPath())
 	return err
 }
 
@@ -210,7 +242,13 @@ func markUsageErrors(root *cobra.Command) {
 		nameRemovedAlias(c)
 		validate := c.Args
 		if validate == nil {
-			return
+			if !c.Runnable() {
+				return
+			}
+			// Cobra's own default accepts any words after a command that
+			// runs: a leaf takes none, and a group refuses a word that is
+			// none of its subcommands (UndeclaredArgs).
+			validate = UndeclaredArgs
 		}
 		c.Args = func(cmd *cobra.Command, args []string) error {
 			return misinvoked(validate(cmd, args))
@@ -241,6 +279,18 @@ func wantsJSON(cmd *cobra.Command, args []string, err error) bool {
 		return f.Value.String() == string(FormatJSON)
 	}
 	return ArgsAskForJSON(args, f.Shorthand)
+}
+
+// unknownCommandAsksJSON is wantsJSON for a word that names no command at the
+// root, where cobra stops before any command with an --output flag is found
+// (the root has none), so there is no parsed flag to read: `astro bogus -o
+// json` reads the arguments for it, as a usage error that stops flag parsing
+// does.
+func unknownCommandAsksJSON(cmd *cobra.Command, args []string, err error) bool {
+	if cmd.Flag("output") != nil || !IsUsage(err) || !strings.HasPrefix(err.Error(), "unknown command ") {
+		return false
+	}
+	return ArgsAskForJSON(args, "o")
 }
 
 // ArgsAskForJSON finds --output json in raw arguments, in each spelling pflag

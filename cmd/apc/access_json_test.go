@@ -10,6 +10,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -399,6 +400,7 @@ func TestTeamJSON(t *testing.T) {
 }
 
 func TestWorkspaceAndDeploymentTeamJSON(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	data := houston.Team{ID: "team-1", Name: "Data", RoleBindings: []houston.RoleBinding{
 		{Role: houston.WorkspaceAdminRole, Workspace: houston.Workspace{ID: accessWorkspaceID}},
 		{Role: houston.DeploymentEditorRole, Deployment: houston.Deployment{ID: "dep-1"}},

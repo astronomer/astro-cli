@@ -290,7 +290,7 @@ func TestDeployClientImage(t *testing.T) {
 		cmd.errs = map[string]error{"push": errors.New("denied: 403 Forbidden")}
 
 		var err error
-		out := captureStdout(t, func() {
+		out := captureStderr(t, func() {
 			_, err = DeployAgentImage(InputAgentDeploy{Registry: testAgentRegistry, RegistrySource: "--registry", Path: dir}, nil)
 		})
 		require.ErrorIs(t, err, imagebuild.ErrPushForbidden)

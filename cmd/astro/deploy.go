@@ -330,6 +330,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		ImageAlone:    !inProject,
 		ImageName:     imageName,
 		Description:   deployDescription,
+		Context:       cmd.Context(),
 		Wait:          waitForDeploy,
 		WaitTime:      waitTime,
 		NoDagsBaseDir: noDagsBaseDir,
@@ -384,12 +385,12 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 			}
 			announceDeployTarget(errOut, target)
 			if !dags && imageName != "" {
-				fmt.Fprintf(out, "Deploying prebuilt image %s…\n", imageName)
+				fmt.Fprintf(errOut, "Deploying prebuilt image %s…\n", imageName)
 			}
 		},
 		OnBuild: func() {
 			if format == cliout.FormatText {
-				fmt.Fprintln(out, "Building the project image. This can take a few minutes…")
+				fmt.Fprintln(errOut, "Building the project image. This can take a few minutes…")
 			}
 		},
 	}, manifestdeploy.BeforeAsking(newManifestDeployer(&login, cmd.InOrStdin(), errOut), recap.Flush))
@@ -821,6 +822,7 @@ func (d manifestDeployer) DagsSource(projectDir string, noDagsBaseDir bool) file
 // DeployDags ships the project's dags/ through the dags-only transport.
 func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
 	res, err := astrodeploy.DeployManifestDags(astrodeploy.ManifestDagDeployInput{
+		Context:       in.Context,
 		Login:         &d.login.context,
 		ProjectDir:    in.ProjectDir,
 		DeploymentID:  in.DeploymentID,
@@ -862,8 +864,9 @@ func toManifestDeployGit(g astrodeploy.ManifestDeployGit) manifestdeploy.Git {
 // cloud/deploy transport.
 func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestdeploy.ImageResult, error) {
 	res, err := astrodeploy.DeployManifestImage(astrodeploy.ManifestImageDeployInput{
-		Login: &d.login.context,
-		Build: in.Build,
+		Context: in.Context,
+		Login:   &d.login.context,
+		Build:   in.Build,
 		Catalog: func() *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(in.Build.AirflowVersion)(context.Background())
 		},

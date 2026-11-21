@@ -37,11 +37,11 @@ var (
 	tokenID                    string
 	orgTokenID                 string
 	workspaceTokenID           string
-	cleanTokenOutput           bool
 	forceRotate                bool
 	tokenExpiration            int
 	validWorkspaceRoles        []string
 	workspaceListOutput        cliout.Format
+	workspaceListLimit         int
 )
 
 const (
@@ -84,9 +84,13 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro workspace list
   astro workspace list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := checkListLimit(cmd, "limit", workspaceListLimit); err != nil {
+				return err
+			}
 			return workspaceList(out)
 		},
 	}
+	addListLimitFlag(cmd, &workspaceListLimit, "Workspaces")
 	cliout.AddOutputFlag(cmd, &workspaceListOutput)
 	return cmd
 }
@@ -381,16 +385,16 @@ func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
   # Create a member token
   astro workspace token create --name "My Token" --role WORKSPACE_MEMBER
 
-  # Create an operator token that expires in 30 days, printing only the token
+  # Create an operator token that expires in 30 days
   astro workspace token create --name "CI Token" --role WORKSPACE_OPERATOR \
-    --expiration 30 --clean-output
+    --expiration 30
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createWorkspaceToken(cmd, out)
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	addInertCleanOutputFlag(cmd)
 	cmd.Flags().StringVar(&tokenDescription, "description", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The role for the "+
 		"token. Possible values are "+allowedWorkspaceRoleNamesProse)
@@ -437,14 +441,14 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
   # Rotate a token by its ID
   astro workspace token rotate <TOKEN_ID>
 
-  # Rotate a token by its name without confirming, printing only the new token
-  astro workspace token rotate --name "My Token" --yes --clean-output
+  # Rotate a token by its name without confirming
+  astro workspace token rotate --name "My Token" --yes
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return rotateWorkspaceToken(args, out)
+			return rotateWorkspaceToken(args, out, cmd.ErrOrStderr())
 		},
 	}
-	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	addInertCleanOutputFlag(cmd)
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceRotate, "yes", "y", false, "Don't ask for confirmation before rotating the Workspace API token")
 
@@ -756,7 +760,7 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 }
 
 func workspaceList(out io.Writer) error {
-	return workspace.ListWithFormat(astroV1Client, cliout.Renderer{Format: workspaceListOutput, Out: out})
+	return workspace.ListWithFormat(astroV1Client, workspaceListLimit, cliout.Renderer{Format: workspaceListOutput, Out: out})
 }
 
 func workspaceSwitch(out io.Writer, args []string) error {

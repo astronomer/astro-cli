@@ -147,6 +147,14 @@ func TestExitCode(t *testing.T) {
 	assert.Equal(t, ExitInterrupted, ExitCode(bg, fmt.Errorf("reading the value: %w", input.ErrInterrupted)))
 }
 
+func TestExitCodeNamesTheSignalThatCanceledTheRun(t *testing.T) {
+	for n, want := range map[int]int{2: 130, 15: 143, 1: 129} {
+		ctx, cancel := context.WithCancelCause(context.Background())
+		cancel(&Signaled{Number: n, Name: "signal"})
+		assert.Equal(t, want, ExitCode(ctx, errBoom))
+	}
+}
+
 func TestAJSONFailureIsOneObjectOnStdout(t *testing.T) {
 	r := execTree(context.Background(), testTree(fmt.Errorf("listing: %w", errBoom)), "thing", "list", "-o", "json")
 	require.Error(t, r.err)
@@ -559,6 +567,27 @@ func TestTheRootsOwnFlagErrorFuncStillRuns(t *testing.T) {
 func TestAnUnknownRootCommandPointsAtHelp(t *testing.T) {
 	r := execTree(context.Background(), testTree(nil), "bogus")
 	assert.Equal(t, "Error: unknown command \"bogus\" for \"astro\"\nRun astro --help for usage.\n", r.stderr)
+}
+
+// A word that names no command has no parsed --output to read, so a json run
+// is recognized from the arguments, in every spelling pflag accepts.
+func TestAnUnknownRootCommandUnderJSONIsAnErrorObject(t *testing.T) {
+	for _, args := range [][]string{
+		{"bogus", "-o", "json"}, {"bogus", "--output", "json"}, {"bogus", "-ojson"}, {"--output=json", "bogus"},
+	} {
+		r := execTree(context.Background(), testTree(nil), args...)
+		require.Error(t, r.err, args)
+		obj := decodeOne(t, r.stdout)
+		assert.Equal(t, KindUsage, obj.Kind, args)
+		assert.Equal(t, ExitUsage, obj.Code, args)
+		assert.Empty(t, r.stderr, args)
+	}
+	// Text, or an argument after "--", stays prose with nothing on stdout.
+	for _, args := range [][]string{{"bogus"}, {"bogus", "-o", "text"}, {"bogus", "--", "-o", "json"}} {
+		r := execTree(context.Background(), testTree(nil), args...)
+		assert.Empty(t, r.stdout, args)
+		assert.Contains(t, r.stderr, "unknown command", args)
+	}
 }
 
 // The root failing itself points at the root's help, and Execute puts the

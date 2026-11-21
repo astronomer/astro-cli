@@ -135,6 +135,7 @@ func deployAgent(cmd *cobra.Command, args []string) error {
 		Registry:       target.registry,
 		RegistrySource: target.source,
 		ErrOut:         cmd.ErrOrStderr(),
+		Context:        cmd.Context(),
 	}
 
 	res, err := deployAgentImage(deployInput, astroV1Client)

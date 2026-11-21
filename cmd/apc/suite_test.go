@@ -6,11 +6,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 type Suite struct {
 	suite.Suite
+	restoreTerminal func()
 }
 
 func TestSoftware(t *testing.T) {
@@ -18,6 +20,8 @@ func TestSoftware(t *testing.T) {
 }
 
 func (s *Suite) SetupSuite() {
+	// The suite pins the layout a person reads; the piped form has its own tests.
+	s.restoreTerminal = input.ForceTerminalWriters()
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 }
 
@@ -32,6 +36,7 @@ func (s *Suite) SetupSubTest() {
 }
 
 func (s *Suite) TearDownSuite() {
+	s.restoreTerminal()
 	DagsOnlyDeploy = deploy.DagsOnlyDeploy
 }
 

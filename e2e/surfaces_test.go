@@ -140,9 +140,11 @@ func TestUseTextMarksTheCurrentDeployment(t *testing.T) {
 	// an empty listing. The marked row is what proves rows reached the writer.
 	marked := false
 	for _, line := range strings.Split(out, "\n") {
-		// The default's mark is the one word every list of links uses: no
-		// arrow, and not the manifest's own `default = true`.
-		if strings.HasPrefix(line, "*") && strings.Contains(line, "prod") && strings.HasSuffix(strings.TrimSpace(line), "default") {
+		// Piped, the row is tab-separated and its last cell, LABEL, says it
+		// is current and why: the default's word is the one every list of
+		// links uses, no arrow, and not the manifest's own `default = true`.
+		cells := strings.Split(line, "\t")
+		if len(cells) == 4 && cells[0] == "prod" && strings.HasPrefix(cells[3], "current") && strings.HasSuffix(cells[3], "default") {
 			marked = true
 		}
 	}

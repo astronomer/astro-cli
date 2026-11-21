@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"slices"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -28,6 +27,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/texttable"
 )
 
 // Command-name and replacement strings that appear in more than one place
@@ -176,17 +176,17 @@ func newStartCmd(c *cli) *cobra.Command {
 		allowMissing    bool
 		watch           bool
 		buildSecrets    []string
+		timeout         time.Duration
 	}
 	cmd := &cobra.Command{
 		Use:   nameStart,
 		Short: "Start local Airflow for this project",
-		// The wait is the one thing about a start somebody needs to change and
-		// cannot from a flag, and until now the only way to find that out was
-		// to hit it. A slow link or a cold image pull outlasts five minutes
-		// with nothing wrong.
+		// A slow link or a cold image pull outlasts five minutes with nothing
+		// wrong, and until now the only way to find that out was to hit it.
 		Long: "Start local Airflow for this project.\n\n" +
-			"A start waits up to five minutes for Airflow to answer. Set " +
-			"ASTRO_LOCAL_HEALTH_TIMEOUT to a Go duration (10m, 90s) to change that.\n\n" +
+			"A start waits up to five minutes for Airflow to answer. Pass --timeout, or set " +
+			"ASTRO_LOCAL_HEALTH_TIMEOUT, to a Go duration (10m, 90s) to change that; the flag wins " +
+			"when both are given.\n\n" +
 			"With --watch, start stays in the foreground and applies edits to pyproject.toml and .env. " +
 			"A package added to the dependencies is installed into the running Airflow. " +
 			"Any other change that Airflow reads only at start (a re-pinned package, the Airflow " +
@@ -202,9 +202,12 @@ func newStartCmd(c *cli) *cobra.Command {
 			"  # On another port\n" +
 			"  astro local start --port 8081\n\n" +
 			"  # Wait up to ten minutes for Airflow, on a slow machine\n" +
-			"  ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro local start",
+			"  astro local start --timeout 10m",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if cmd.Flags().Changed("timeout") {
+				c.d.Runtime.SetHealthTimeout(opts.timeout)
+			}
 			mode := localrt.Mode("")
 			if opts.docker {
 				mode = localrt.ModeDocker
@@ -226,7 +229,10 @@ func newStartCmd(c *cli) *cobra.Command {
 	}
 	// Refused before anything starts, rather than after a start it would
 	// then have to undo.
-	cmd.PreRunE = func(*cobra.Command, []string) error {
+	cmd.PreRunE = func(cmd *cobra.Command, _ []string) error {
+		if cmd.Flags().Changed("timeout") && opts.timeout <= 0 {
+			return cliout.Usage(fmt.Errorf("--timeout must be a positive duration with a unit, like 10m or 90s; got %s", opts.timeout))
+		}
 		if opts.watch && c.d.Watch == nil {
 			return errWatchUnavailable
 		}
@@ -237,6 +243,7 @@ func newStartCmd(c *cli) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.stopWithSession, "stop-with-session", false, "Stop Airflow when this process exits instead of leaving it running")
 	cmd.Flags().BoolVar(&opts.allowMissing, "allow-missing", false, "Start even if required environment values have no source, warning about each")
 	cmd.Flags().BoolVar(&opts.watch, "watch", false, "Stay in the foreground, apply edits to pyproject.toml and .env to the running Airflow, and stop it on Ctrl-C")
+	cmd.Flags().DurationVar(&opts.timeout, "timeout", 0, "How long to wait for Airflow to answer, as a Go duration like 10m or 90s (default 5m, or "+healthTimeoutEnv+" when set)")
 	addBuildSecretFlag(cmd, &opts.buildSecrets)
 	return cmd
 }
@@ -1058,13 +1065,16 @@ func buildListRows(statuses []localrt.Status, all bool, now time.Time) []listRow
 	return rows
 }
 
+// listHeader is the columns of `astro local list`.
+var listHeader = []string{"PROJECT", "HOSTNAME", "MODE", "STATE", "PORT", "UPTIME"}
+
 func renderListTable(w io.Writer, rows []listRow) error {
+	terminal := input.IsTerminalWriter(w)
 	if len(rows) == 0 {
-		_, err := fmt.Fprintln(w, "No local Airflow found.")
-		return err
+		return texttable.SayEmpty(w, terminal, "No local Airflow found.", listHeader)
 	}
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "PROJECT\tHOSTNAME\tMODE\tSTATE\tPORT\tUPTIME")
+	tw := texttable.Columns(w, terminal)
+	fmt.Fprintln(tw, strings.Join(listHeader, "\t"))
 	for _, row := range rows {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			row.Project, dash(row.Hostname), row.Mode, row.State, dash(omitZero(row.Port)), dash(row.Uptime))
@@ -1195,6 +1205,7 @@ func newRunCmd(c *cli) *cobra.Command {
 	// Everything after the first positional belongs to the wrapped
 	// command, not to us.
 	cmd.Flags().SetInterspersed(false)
+	cmd.Annotations = map[string]string{cliout.ArgvPassthroughAnnotation: "true"}
 	cmd.Flags().BoolVar(&withWorkspace, flagWithWorkspace, false, withWorkspaceHelp)
 	cmd.Flags().BoolVar(&noSync, flagNoSync, false, noSyncHelp)
 	return cmd
@@ -1325,7 +1336,7 @@ func (c *cli) runExec(ctx context.Context, argv []string, withWorkspace, noSync 
 	if errors.As(err, &exitErr) {
 		// The wrapped command failed and has already written its own output;
 		// carry its exit code out so a caller sees the real status, not 1.
-		return &cliout.ExitError{Code: exitErr.ExitCode()}
+		return &cliout.ExitError{Code: childExitCode(exitErr)}
 	}
 	return err
 }
@@ -1361,20 +1372,23 @@ func (c *cli) stdio() localrt.Stdio {
 }
 
 func newOpenCmd(c *cli) *cobra.Command {
-	var printURL bool
+	var printURL, noOpen bool
 	cmd := &cobra.Command{
 		Use:   "open",
 		Short: "Open this project's Airflow UI in the browser",
+		Long: "Open this project's Airflow UI in the browser. With --print or --no-open, in CI, over SSH, " +
+			"under --output json, or with no terminal, it prints the URL on stdout and opens nothing.",
 		Example: "  # Open the Airflow UI\n" +
 			"  astro local open\n\n" +
 			"  # Print its URL instead\n" +
-			"  astro local open --print",
+			"  astro local open --no-open",
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return c.runOpen(printURL)
+			return c.runOpen(printURL || noOpen || !input.CanOpenBrowser())
 		},
 	}
 	cmd.Flags().BoolVar(&printURL, "print", false, "Print the URL instead of opening the browser")
+	cmd.Flags().BoolVar(&noOpen, "no-open", false, "Print the URL without opening the browser, like --print")
 	return cmd
 }
 
@@ -1405,7 +1419,11 @@ func (c *cli) runOpen(printURL bool) error {
 			return werr
 		})
 	}
-	return c.d.OpenURL(url)
+	fmt.Fprintf(c.d.Stderr, "Opening %s…\n", url)
+	if err := c.d.OpenURL(url); err != nil {
+		return fmt.Errorf("could not open the browser: %w; open %s", err, url)
+	}
+	return nil
 }
 
 func newResetCmd(c *cli) *cobra.Command {

@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"cmp"
 	httpContext "context"
 	"fmt"
 	"io"
@@ -75,6 +76,9 @@ type InputAgentDeploy struct {
 	// ErrOut is the command's error writer, which the deploy's warnings go
 	// to; nil is stderr.
 	ErrOut io.Writer
+	// Context ends the build, the registry login, the tag and the push when
+	// the run is interrupted; nil is context.Background().
+	Context httpContext.Context
 }
 
 // includeMonitoringDag reports whether a DAG upload carries the monitoring DAG,
@@ -407,17 +411,21 @@ func DeployAgentImage(deployInput InputAgentDeploy, astroV1Client astrov1.APICli
 
 	// One engine tags or builds the image, logs in and pushes it: an image
 	// built on one engine is not there for another to push.
-	ctx := httpContext.Background()
+	ctx := cmp.Or(deployInput.Context, httpContext.Background())
 	engine, err := agentImageEngine()
 	if err != nil {
 		return AgentDeploy{}, err
 	}
 
+	// What the deploy is doing (its steps, what it could not do) goes to
+	// stderr: stdout is the deploy's result.
+	progress := deployInput.progress()
+
 	// Use empty slice to let Docker build for host platform by default
 	targetPlatforms := []string{}
 	if deployInput.ImageName != "" {
 		// Use the provided local image (tag will be ignored, remote tag is always timestamp-based)
-		fmt.Println("Using provided image:", deployInput.ImageName)
+		fmt.Fprintln(progress, "Using provided image:", deployInput.ImageName)
 		err := engine.Tag(ctx, deployInput.ImageName, remoteImage)
 		if err != nil {
 			return AgentDeploy{}, fmt.Errorf("could not tag local image: %w", err)
@@ -445,12 +453,12 @@ func DeployAgentImage(deployInput InputAgentDeploy, astroV1Client astrov1.APICli
 			if err != nil {
 				ansi.Warn(errOut, "could not read Dockerfile.client, so astro assumes its base image is on images.astronomer.cloud and logs in to that registry")
 			}
-			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)
+			fmt.Fprintf(progress, "Authenticating with base image registry: %s\n", baseImageRegistry)
 			err := loginBaseImageRegistry(ctx, engine, baseImageRegistry, c.Token)
 			if err != nil {
-				fmt.Println("Could not authenticate with the Astronomer registry for the base agent image in Dockerfile.client.")
-				fmt.Println("Your token may have expired, or you may lack permission to pull the base agent image.")
-				fmt.Println("Run astro login to refresh your credentials, or check that ASTRO_API_TOKEN holds a valid token, then try again.")
+				fmt.Fprintln(progress, "Could not authenticate with the Astronomer registry for the base agent image in Dockerfile.client.")
+				fmt.Fprintln(progress, "Your token may have expired, or you may lack permission to pull the base agent image.")
+				fmt.Fprintln(progress, "Run astro login to refresh your credentials, or check that ASTRO_API_TOKEN holds a valid token, then try again.")
 				return AgentDeploy{}, fmt.Errorf("could not authenticate with registry %s: %w", baseImageRegistry, err)
 			}
 		}
@@ -464,9 +472,9 @@ func DeployAgentImage(deployInput InputAgentDeploy, astroV1Client astrov1.APICli
 			for i, platform := range targetPlatforms {
 				targetPlatforms[i] = strings.TrimSpace(platform)
 			}
-			fmt.Printf("Building agent image for platforms: %s\n", strings.Join(targetPlatforms, ", "))
+			fmt.Fprintf(progress, "Building agent image for platforms: %s\n", strings.Join(targetPlatforms, ", "))
 		} else {
-			fmt.Println("Building agent image for host platform")
+			fmt.Fprintln(progress, "Building agent image for host platform")
 		}
 
 		// Prepare build context with client dependency files
@@ -479,21 +487,21 @@ func DeployAgentImage(deployInput InputAgentDeploy, astroV1Client astrov1.APICli
 		}
 
 		// Build the image from the prepared context, tagged as it is pushed
-		err = buildAgentImage(deployInput.Path, buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets, engine)
+		err = buildAgentImage(ctx, deployInput.Path, buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets, engine)
 		if err != nil {
 			return AgentDeploy{}, fmt.Errorf("could not build agent image: %w", err)
 		}
 	}
 
 	// Push the image to the remote registry (assumes docker login was done externally)
-	fmt.Println("Pushing agent image to the agent registry")
-	_, err = engine.Push(ctx, imagebuild.PushRequest{Image: remoteImage, Out: os.Stdout})
+	fmt.Fprintln(progress, "Pushing agent image to the agent registry")
+	_, err = engine.Push(ctx, imagebuild.PushRequest{Image: remoteImage, Out: progress})
 	if err != nil {
 		if errors.Is(err, imagebuild.ErrPushForbidden) {
-			fmt.Printf("\n--------------------------------\n")
-			fmt.Printf("Could not push agent image to %s\n", registryEndpoint)
-			fmt.Println("Your registry token may have expired, or you may lack permission to push the agent image.")
-			fmt.Printf("Run docker login %s, then try again\n\n", registryEndpoint)
+			fmt.Fprintf(progress, "\n--------------------------------\n")
+			fmt.Fprintf(progress, "Could not push agent image to %s\n", registryEndpoint)
+			fmt.Fprintln(progress, "Your registry token may have expired, or you may lack permission to push the agent image.")
+			fmt.Fprintf(progress, "Run docker login %s, then try again\n\n", registryEndpoint)
 		}
 		return AgentDeploy{}, fmt.Errorf("could not push agent image: %w", deploybuild.ExplainPush(err))
 	}
@@ -506,6 +514,15 @@ func DeployAgentImage(deployInput InputAgentDeploy, astroV1Client astrov1.APICli
 		Platforms:    targetPlatforms,
 		RuntimeCheck: check,
 	}, nil
+}
+
+// progress is where the deploy says what it is doing: the command's error
+// writer, stderr when none was given.
+func (i *InputAgentDeploy) progress() io.Writer {
+	if i.ErrOut != nil {
+		return i.ErrOut
+	}
+	return os.Stderr
 }
 
 // validateAgentImageRuntimeVersion validates that the agent image runtime version
@@ -558,7 +575,7 @@ Either set the base image in Dockerfile.client to runtime version %s or earlier,
 			agentRuntimeVersion, deployInfo.currentVersion, deployInfo.currentVersion, agentRuntimeVersion)
 	}
 
-	fmt.Printf("Agent image runtime version %s is compatible with Deployment runtime version %s\n",
+	fmt.Fprintf(deployInput.progress(), "Agent image runtime version %s is compatible with Deployment runtime version %s\n",
 		agentRuntimeVersion, deployInfo.currentVersion)
 
 	return &AgentRuntimeCheck{

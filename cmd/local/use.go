@@ -13,7 +13,9 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/userstate"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
+	"github.com/astronomer/astro-cli/pkg/texttable"
 )
 
 // NewUseCmd builds `astro use` for the root, wired with its own deps.
@@ -245,9 +247,9 @@ func (c *cli) runUseShow() error {
 // — and the same labels: the current row's when something other than your
 // selection made it current, and "default" on the project's default link.
 func renderUseListing(w io.Writer, res useListing, mark string) error {
+	terminal := input.IsTerminalWriter(w)
 	if len(res.Deployments) == 0 {
-		_, err := fmt.Fprintln(w, noLinks)
-		return err
+		return texttable.SayEmpty(w, terminal, noLinks, useListingPlainHeader)
 	}
 	// The label column is blank on every row but one, so tabwriter's padding
 	// leaves the rest ending in spaces; the table is built first and trimmed.
@@ -258,6 +260,9 @@ func renderUseListing(w io.Writer, res useListing, mark string) error {
 		}
 	}
 	marks := linkMarks(defaultName, res.Current, mark)
+	if !terminal {
+		return renderUseListingPlain(w, res, marks)
+	}
 	var table bytes.Buffer
 	tw := tabwriter.NewWriter(&table, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "\tNAME\tKIND\tDEPLOYMENT, ENVIRONMENT OR URL\t")
@@ -280,6 +285,31 @@ func renderUseListing(w io.Writer, res useListing, mark string) error {
 	if res.Reason != "" {
 		_, err := fmt.Fprintf(w, "\nNo Deployment is current: %s\n", res.Reason)
 		return err
+	}
+	return nil
+}
+
+// useListingPlainHeader is the columns of the listing a script reads: no
+// marker column, and the current row says so in its last cell.
+var useListingPlainHeader = []string{"NAME", "KIND", "DEPLOYMENT, ENVIRONMENT OR URL", "LABEL"}
+
+// renderUseListingPlain is the listing for a pipe: the header and a row per
+// link, one tab between cells.
+func renderUseListingPlain(w io.Writer, res useListing, marks map[string]string) error {
+	if _, err := fmt.Fprintln(w, strings.Join(useListingPlainHeader, "\t")); err != nil {
+		return err
+	}
+	for _, row := range res.Deployments {
+		label := marks[row.Name]
+		if row.Current {
+			label = strings.TrimSuffix("current, "+label, ", ")
+		}
+		if _, err := fmt.Fprintln(w, strings.Join([]string{row.Name, row.Kind, dash(row.Where), label}, "\t")); err != nil {
+			return err
+		}
+	}
+	if res.Reason != "" {
+		texttable.Say(w, "No Deployment is current: "+res.Reason)
 	}
 	return nil
 }

@@ -1,11 +1,13 @@
 package input
 
 import (
+	"io"
 	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 
@@ -69,6 +71,12 @@ func Refusal(json bool, flag *pflag.Flag) string {
 	if asked {
 		return ""
 	}
+	return ciRefusal()
+}
+
+// ciRefusal is the part of the rule that reads the environment for a CI
+// system.
+func ciRefusal() string {
 	switch {
 	case truthy(os.Getenv("CI")):
 		return reasonCI
@@ -79,6 +87,11 @@ func Refusal(json bool, flag *pflag.Flag) string {
 	}
 	return ""
 }
+
+// InCI reports whether the environment says this run is in a CI system, by the
+// same rule that keeps such a run from asking questions (CI truthy, Jenkins,
+// Azure Pipelines), whatever flags the command line carries.
+func InCI() bool { return ciRefusal() != "" }
 
 // truthy is a CI value that says CI is on: anything but empty, "0" or "false".
 func truthy(v string) bool {
@@ -137,4 +150,62 @@ func terminalRefusal() string {
 		return reasonStderr
 	}
 	return ""
+}
+
+// forceTerminalWriters is the test seam ForceTerminalWriters sets.
+var forceTerminalWriters atomic.Bool
+
+// IsTerminalWriter reports whether w is a terminal: a console, or a Cygwin or
+// MSYS pty. The guard a text renderer writes through (TerminalWriter) answers
+// for the terminal behind it. It is the one test the CLI makes of where its
+// output is going, for what only a person should see (a table's padding, a
+// relative time) and what a script should get plain.
+func IsTerminalWriter(w io.Writer) bool {
+	if forceTerminalWriters.Load() {
+		return true
+	}
+	for {
+		switch x := w.(type) {
+		case *TerminalWriter:
+			w = x.W
+			continue
+		case noticed:
+			w = x.Writer
+			continue
+		}
+		break
+	}
+	f, ok := w.(*os.File)
+	return ok && (isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd()))
+}
+
+// noticed is a writer that knows where the notices about what it carries go.
+type noticed struct {
+	io.Writer
+	to io.Writer
+}
+
+// WithNotices is w, carrying to as where a renderer's notices go (an empty
+// list's sentence, a table's success line): the command's stderr, handed down
+// the one writer a renderer already receives. A nil to is w itself.
+func WithNotices(w, to io.Writer) io.Writer {
+	if to == nil {
+		return w
+	}
+	return noticed{Writer: w, to: to}
+}
+
+// NoticesFor is where the notices of a rendering to w go: what WithNotices
+// gave it, else stderr.
+func NoticesFor(w io.Writer) io.Writer {
+	for {
+		switch x := w.(type) {
+		case noticed:
+			return x.to
+		case *TerminalWriter:
+			w = x.W
+			continue
+		}
+		return os.Stderr
+	}
 }

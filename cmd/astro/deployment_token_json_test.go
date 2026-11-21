@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -156,6 +157,18 @@ func (r tokenRun) terminal() string {
 	return r.asked + r.stdout
 }
 
+// terminalWithNotes is terminal with the command's own stderr (a token's
+// receipt) among the questions, minus deprecation warnings.
+func (r tokenRun) terminalWithNotes() string {
+	var notes strings.Builder
+	for line := range strings.Lines(r.stderr) {
+		if !strings.HasPrefix(line, "Warning: ") {
+			notes.WriteString(line)
+		}
+	}
+	return r.asked + notes.String() + r.stdout
+}
+
 // execTokenCmd runs `astro deployment <args>` the way execAstroCmd does.
 func execTokenCmd(t *testing.T, client astrov1.APIClient, answers string, args ...string) tokenRun {
 	t.Helper()
@@ -181,8 +194,6 @@ func execAstroCmd(t *testing.T, client astrov1.APIClient, answers string, newRoo
 	// what an earlier run left, and what this one leaves for the next test.
 	tokenID, orgTokenID, workspaceTokenID = "", "", ""
 	t.Cleanup(func() { tokenID, orgTokenID, workspaceTokenID = "", "", "" })
-	// --clean-output sets a package variable a later test reads without building the command.
-	t.Cleanup(func() { cleanTokenOutput = false })
 	// --workspace-id, and deploy when it resolves one, set the
 	// package's workspaceID, which coalesceWorkspace reads before the context.
 	// Clear what an earlier run left, and what this one leaves.
@@ -248,6 +259,9 @@ func tableRows(t *testing.T, out, first string) []map[string]string {
 		if f := strings.Fields(header); len(f) == 0 || f[0] != first {
 			continue
 		}
+		if strings.Contains(header, "\t") {
+			return plainTableRows(header, lines[i+1:])
+		}
 		spans := headerCell.FindAllStringIndex(header, -1)
 		rows := []map[string]string{}
 		for _, line := range lines[i+1:] {
@@ -272,6 +286,33 @@ func tableRows(t *testing.T, out, first string) []map[string]string {
 	}
 	t.Fatalf("no table headed %q in:\n%s", first, out)
 	return nil
+}
+
+// plainTableRows reads a table whose cells are separated by one tab, which is
+// what a table printed to a pipe is. A CREATED cell there is a timestamp; it
+// is turned back into the "3 hours ago" the tests' fixtures are written in,
+// and TestTokenListIsMachineReadableWhenPiped pins the timestamp itself.
+func plainTableRows(header string, lines []string) []map[string]string {
+	titles := strings.Split(header, "\t")
+	rows := []map[string]string{}
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			break
+		}
+		row := map[string]string{}
+		for c, cell := range strings.Split(line, "\t") {
+			if c < len(titles) && titles[c] == "CREATED" {
+				if at, err := time.Parse(time.RFC3339, cell); err == nil {
+					cell = apitoken.TimeAgo(at)
+				}
+			}
+			if c < len(titles) {
+				row[titles[c]] = cell
+			}
+		}
+		rows = append(rows, row)
+	}
+	return rows
 }
 
 // requireInOrder fails unless each of parts appears in out, each after the
@@ -323,8 +364,8 @@ func TestDeploymentTokenText(t *testing.T) {
 			requireInOrder(t, out,
 				verb+" Deployment API token ci-deploy",
 				"Copy this API token for your records.",
-				tokSecret,
-				"This API token value is not shown again.")
+				"This API token value is not shown again.",
+				tokSecret)
 			requireLine(t, out, tokSecret)
 		}
 	}
@@ -336,11 +377,6 @@ func TestDeploymentTokenText(t *testing.T) {
 			assert.Equal(t, append([]map[string]string{}, rows...), tableRows(t, out, "ID"))
 		}
 	}
-	// --clean-output exists to be captured whole as the token
-	// (`TOKEN=$(astro deployment token create ... --clean-output)`), so here
-	// the bytes are the contract: the secret and a newline, nothing else.
-	cleanOutput := func(t *testing.T, out string) { assert.Equal(t, tokSecret+"\n", out) }
-
 	cases := []struct {
 		name    string
 		client  func(t *testing.T) astrov1.APIClient
@@ -391,7 +427,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "create", d, "--name", "ci-deploy", "--role", "DEPLOYMENT_ADMIN", "--clean-output"},
-			check: cleanOutput,
+			check: secretShown("Created"),
 		},
 		{
 			name: "update",
@@ -482,7 +518,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				return m
 			},
 			args:  []string{"token", "rotate", "tok-dep", d, "--yes", "--clean-output"},
-			check: cleanOutput,
+			check: secretShown("Rotated"),
 		},
 		{
 			// The client mocks no rotate, so going on after "n" would panic.
@@ -673,7 +709,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				assert.Equal(t, 0, r.code)
 			}
 			noTokenQuestionOnStdout(t, r.stdout)
-			tc.check(t, r.terminal())
+			tc.check(t, r.terminalWithNotes())
 		})
 	}
 }
@@ -1092,15 +1128,13 @@ func TestDeploymentTokenJSONNeverAsks(t *testing.T) {
 	}
 }
 
-// --output takes text or json, and --clean-output is a text format of its own:
-// either mistake is a usage error, exit 2, before anything is asked or done.
+// --output takes text or json; anything else is a usage error, exit 2, before
+// anything is asked or done.
 func TestDeploymentTokenOutputUsage(t *testing.T) {
 	d := "--deployment=" + tokDeploymentID
 	for _, args := range [][]string{
 		{"token", "list", d, "-o", "yaml"},
 		{"token", "create", d, "-o", "yaml"},
-		{"token", "create", d, "--name", "n", "--role", "r", "--clean-output", "-o", "json"},
-		{"token", "rotate", "tok-dep", d, "--yes", "--clean-output", "-o", "json"},
 	} {
 		r := execTokenCmd(t, tokenMock(t), "", args...)
 		require.Error(t, r.err, args)

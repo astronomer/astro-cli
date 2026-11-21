@@ -402,11 +402,12 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	stopWatching := quitOnInterrupt()
 	defer stopWatching()
 
-	// A run that may not ask (CI, --non-interactive, no terminal on stdin or
-	// stderr: a coding agent's shell, `astro login </dev/null`) never answers the
-	// Press Enter gate below, so it takes the login-link path: it prints the link
-	// and waits for the browser's callback instead of blocking on stdin.
-	if !shouldDisplayLoginLink && input.CanAsk() {
+	// A run that may not open a browser (CI, --non-interactive, no terminal on
+	// stdin or stderr: a coding agent's shell, `astro login </dev/null`; or an
+	// SSH session) never answers the Press Enter gate below, so it takes the
+	// login-link path: it prints the link and waits for the browser's callback
+	// instead of blocking on stdin.
+	if !shouldDisplayLoginLink && input.CanOpenBrowser() {
 		action := "log in"
 		if signup {
 			action = "create your Astro account"

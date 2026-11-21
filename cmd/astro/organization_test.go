@@ -21,6 +21,7 @@ import (
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -115,6 +116,7 @@ func mockClusterListResponse(clusters []astrov1.Cluster) *astrov1.ListClustersRe
 }
 
 func TestOrganizationClusterList(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	clusters := []astrov1.Cluster{

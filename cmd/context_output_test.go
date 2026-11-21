@@ -45,6 +45,7 @@ func (s *CmdSuite) savedContexts() {
 }
 
 func (s *CmdSuite) TestContextListOutput() {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	s.Run("text is the table, the current context in green", func() {
 		s.savedContexts()
 		stdout, _, err := runContextCmd("list")
@@ -84,6 +85,7 @@ func (s *CmdSuite) TestContextListOutput() {
 }
 
 func (s *CmdSuite) TestContextSwitchOutput() {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	previous := cloudSwitch
 	s.T().Cleanup(func() { cloudSwitch = previous })
 	// An Astro switch that finds its login: the login check's notes, then the

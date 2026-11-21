@@ -719,7 +719,7 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create an API token in an Astro Organization",
-		Long:    "Create an Organization-scoped API token. The token value is displayed only once at creation and cannot be retrieved later; store it securely. Use --clean-output to print only the raw token value for scripts. Use --expiration to set a TTL in days (default: no expiration).",
+		Long:    "Create an Organization-scoped API token. The token value is displayed only once at creation and cannot be retrieved later; store it securely. Stdout holds only the token, so a script can capture it. Use --expiration to set a TTL in days (default: no expiration).",
 		Example: `
   # Create a token, choosing its name and role when prompted
   astro organization token create
@@ -727,16 +727,16 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
   # Create a member token
   astro organization token create --name "CI/CD Token" --role ORGANIZATION_MEMBER
 
-  # Create an owner token that expires in a year, printing only the token
+  # Create an owner token that expires in a year
   astro organization token create --name "Deploy Token" --role ORGANIZATION_OWNER \
-    --expiration 365 --clean-output
+    --expiration 365
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createOrganizationToken(out)
+			return createOrganizationToken(out, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	addInertCleanOutputFlag(cmd)
 	cmd.Flags().StringVar(&tokenDescription, "description", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
 	cmd.Flags().IntVar(&tokenExpiration, "expiration", 0, "Expiration of the token in days, from 1 to 3650. Without it, the token does not expire")
@@ -778,14 +778,14 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
   # Rotate a token by its ID
   astro organization token rotate <TOKEN_ID>
 
-  # Rotate a token by its name without confirming, printing only the new token
-  astro organization token rotate --name "My Token" --yes --clean-output
+  # Rotate a token by its name without confirming
+  astro organization token rotate --name "My Token" --yes
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return rotateOrganizationToken(args, out)
+			return rotateOrganizationToken(args, out, cmd.ErrOrStderr())
 		},
 	}
-	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	addInertCleanOutputFlag(cmd)
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceRotate, "yes", "y", false, "Don't ask for confirmation before rotating the Organization API token")
 

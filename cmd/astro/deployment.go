@@ -80,6 +80,7 @@ var (
 	forDuration                string
 	removeOverride             bool
 	forceOverride              bool
+	deploymentNoOpen           bool
 	logApiserver               bool
 	logWebserver               bool
 	logScheduler               bool
@@ -95,6 +96,7 @@ var (
 	taskLogBucket              *string
 	taskLogURLPattern          *string
 	deploymentListOutput       cliout.Format
+	deploymentListLimit        int
 	deploymentUserOutput       cliout.Format
 	deploymentTeamOutput       cliout.Format
 
@@ -209,7 +211,7 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove",
+		Use:     "remove [TEAM_ID]",
 		Aliases: []string{"rm"},
 		Short:   "Remove a team from an Astro Deployment",
 		Long:    "Remove a team's role from a Deployment. Team members lose Deployment access unless they have access through another team or a direct user role assignment.",
@@ -417,7 +419,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove",
+		Use:     "remove [EMAIL]",
 		Aliases: []string{"rm"},
 		Short:   "Remove a user from an Astro Deployment",
 		Long:    "Remove a user's direct role from a Deployment. The user may retain access through team membership.",
@@ -445,9 +447,13 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
   # List them as JSON
   astro deployment list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := checkListLimit(cmd, "limit", deploymentListLimit); err != nil {
+				return err
+			}
 			return deploymentList(cmd, out)
 		},
 	}
+	addListLimitFlag(cmd, &deploymentListLimit, "Deployments")
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 	markWorkspaceChoice(cmd.Flags().Lookup("all"))
 	addDeploymentWorkspaceFlag(cmd.Flags())
@@ -510,7 +516,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&cloneSource, "clone", "", cloneFlagUsage)
 	cmd.Flags().BoolVar(&waitForStatus, "wait", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
-	cmd.Flags().BoolVar(&cleanOutput, "clean-output", false, "Print only the Deployment's YAML or JSON, with no other output")
+	addInertCleanOutputFlag(cmd)
 	cmd.Flags().StringVar(&workloadIdentity, "workload-identity", "", "The Workload Identity to use for the Deployment")
 	if organization.IsOrgHosted() {
 		cmd.Flags().StringVar(&deploymentType, "type", standard, "The type of the Deployment: standard or dedicated")
@@ -560,7 +566,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&cicdEnforcement, "cicd-enforcement", "", "Whether deploys to the Deployment must use an API key or token, which forces them through CI/CD: enable or disable")
 	addDeploymentFlag(cmd.Flags(), "Deployment to update: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName, withhold: true}, oneXDeploymentName)
 	cmd.Flags().StringVar(&dagDeploy, "dag-deploy", "", "Enable or disable Dag-only deploys for the Deployment")
-	cmd.Flags().BoolVar(&cleanOutput, "clean-output", false, "Print only the Deployment's YAML or JSON, with no other output")
+	addInertCleanOutputFlag(cmd)
 	cmd.Flags().StringVar(&workloadIdentity, "workload-identity", "", "The Workload Identity to use for the Deployment")
 	if organization.IsOrgHosted() {
 		cmd.Flags().StringVar(&schedulerSize, "scheduler-size", "", "The size of Scheduler for the Deployment. Possible values can be small, medium, large, extra_large")
@@ -756,7 +762,7 @@ func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "open [DEPLOYMENT_ID]",
 		Short: "Open a Deployment's Airflow UI in your browser",
-		Long:  "Open the Airflow UI of an Astro Deployment in your default browser. If the browser cannot be opened, the CLI prints the Airflow UI URL instead. Under --output json nothing is opened: the result carries the URL.",
+		Long:  "Open the Airflow UI of an Astro Deployment in your default browser. The CLI always prints the Airflow UI URL, and opens nothing with --no-open, under --output json, in CI, over SSH, or when there is no terminal. Under --output json the result carries the URL.",
 		Example: `  # Open a Deployment's Airflow UI
   astro deployment open <DEPLOYMENT_ID>
 
@@ -771,6 +777,7 @@ func newDeploymentOpenCmd(out io.Writer) *cobra.Command {
 	}
 	addDeploymentFlag(cmd.Flags(), "Deployment whose Airflow UI to open: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName)
 	addDeploymentWorkspaceFlag(cmd.Flags())
+	cmd.Flags().BoolVar(&deploymentNoOpen, "no-open", false, "Print the Airflow UI URL without opening the browser")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -786,10 +793,13 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 		}
 	}
 
-	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out})
+	return deployment.ListWithFormat(ws, allDeployments, deploymentListLimit, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out})
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
+	if err := checkListLimit(cmd, "log-count", logCount); err != nil {
+		return err
+	}
 	// Get release name from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
@@ -825,9 +835,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		return wrapWorkspaceErr(err, "could not find a valid Workspace")
 	}
 	workspaceID = ws
-
-	// clean output
-	deployment.CleanOutput = cleanOutput
 
 	// Get latest runtime version
 	if runtimeVersion == "" {
@@ -918,7 +925,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 			return fmt.Errorf("%s is %w", cloudProvider, errInvalidCloudProvider)
 		}
 	}
-	d, err := deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment, cmd.ErrOrStderr())
+	d, err := deployment.Create(cmd.Context(), label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment, cmd.ErrOrStderr())
 	if d.Id == "" {
 		return err
 	}
@@ -946,9 +953,6 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-
-	// clean output
-	deployment.CleanOutput = cleanOutput
 
 	// check if executor is valid
 	if executor != "" && !deployment.IsValidExecutor(executor, runtimeVersion, deploymentType) {
@@ -1082,10 +1086,12 @@ func deploymentOpen(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// A person is shown the UI in a browser; a run under json reads its url
-	// from the result instead.
-	opened := deploymentOutput == cliout.FormatText && openDeploymentUI(res.URL)
-	return emitDeploymentUI(cliout.Renderer{Format: deploymentOutput, Out: out}, res, opened)
+	// A person at a terminal is shown the UI in a browser; a run under json,
+	// in CI or over SSH, or with --no-open, reads its url from the result or
+	// the line instead.
+	attempted := deploymentOutput == cliout.FormatText && !deploymentNoOpen && input.CanOpenBrowser()
+	opened := attempted && openDeploymentUI(res.URL)
+	return emitDeploymentUI(cliout.Renderer{Format: deploymentOutput, Out: out}, res, uiOpening{attempted: attempted, opened: opened})
 }
 
 func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Writer, isHibernating bool) error {
@@ -1137,7 +1143,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 	if !waitForStatus {
 		return nil
 	}
-	return failedAfterResult(cmd, format, deployment.WaitForHibernationOverride(cmd.ErrOrStderr(), res.DeploymentID, isHibernating, waitTimeForDeployment, astroV1Client))
+	return failedAfterResult(cmd, format, deployment.WaitForHibernationOverride(cmd.Context(), cmd.ErrOrStderr(), res.DeploymentID, isHibernating, waitTimeForDeployment, astroV1Client))
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.
@@ -1281,19 +1287,19 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create an API token in an Astro Deployment",
-		Long:    "Create a Deployment-scoped API token. The token value is displayed only once at creation and cannot be retrieved later; store it securely. Use --clean-output to print only the raw token value for scripts. Use --expiration to set a TTL in days (default: no expiration).",
+		Long:    "Create a Deployment-scoped API token. The token value is displayed only once at creation and cannot be retrieved later; store it securely. Stdout holds only the token, so a script can capture it. Use --expiration to set a TTL in days (default: no expiration).",
 		Example: `  # Create an admin token for a Deployment
   astro deployment token create --name my-token --role DEPLOYMENT_ADMIN --deployment <DEPLOYMENT_ID>
 
-  # Create one that expires in 30 days, and print only the token
+  # Create one that expires in 30 days
   astro deployment token create --name my-token --role DEPLOYMENT_ADMIN \
-    --deployment <DEPLOYMENT_ID> --expiration 30 --clean-output`,
+    --deployment <DEPLOYMENT_ID> --expiration 30`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return createDeploymentToken(out)
+			return createDeploymentToken(out, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().StringVarP(&tokenName, "name", "n", "", "The token's name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	addInertCleanOutputFlag(cmd)
 	cmd.Flags().StringVar(&tokenDescription, "description", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
 	cmd.Flags().StringVar(&tokenRole, "role", "", "The role for the "+
 		"token. Possible values are DEPLOYMENT_ADMIN or a custom role name")
@@ -1348,10 +1354,10 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
   # Rotate it without asking for confirmation
   astro deployment token rotate <TOKEN_ID> --deployment <DEPLOYMENT_ID> --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return rotateDeploymentToken(args, out)
+			return rotateDeploymentToken(args, out, cmd.ErrOrStderr())
 		},
 	}
-	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")
+	addInertCleanOutputFlag(cmd)
 	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceRotate, "yes", "y", false, "Don't ask for confirmation before rotating the Deployment API token")
 
@@ -1431,9 +1437,6 @@ func addDeploymentToken(args []string, out io.Writer) error {
 func removeDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
 	}
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
@@ -1627,9 +1630,6 @@ func removeOrgTokenFromDeploymentRole(cmd *cobra.Command, args []string, out io.
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
-	}
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
 		// make sure the id is lowercase
@@ -1642,9 +1642,6 @@ func removeOrgTokenFromDeploymentRole(cmd *cobra.Command, args []string, out io.
 func removeWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
 	}
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
@@ -1688,9 +1685,6 @@ func listOrganizationTokensInDeployment(out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
-	}
 	// if an id was provided in the args we use it
 
 	return runDeploymentTokenList(deploymentTokenOutput, out, deployment.DeploymentTokenTypeORGANIZATION)
@@ -1699,9 +1693,6 @@ func listOrganizationTokensInDeployment(out io.Writer) error {
 func listWorkspaceTokensInDeployment(out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
 	}
 	// if an id was provided in the args we use it
 
@@ -1712,18 +1703,12 @@ func listDeploymentToken(out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
-	}
 	return runDeploymentTokenList(deploymentTokenOutput, out)
 }
 
-func createDeploymentToken(out io.Writer) error {
+func createDeploymentToken(out, errOut io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
 	}
 	if tokenName == "" {
 		// no role was provided so ask the user for it
@@ -1743,15 +1728,12 @@ func createDeploymentToken(out io.Writer) error {
 		tokenRole = answer
 	}
 
-	return runDeploymentTokenCreate(deploymentTokenOutput, out)
+	return runDeploymentTokenCreate(deploymentTokenOutput, out, errOut)
 }
 
 func updateDeploymentToken(args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
 	}
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
@@ -1762,27 +1744,21 @@ func updateDeploymentToken(args []string, out io.Writer) error {
 	return runDeploymentTokenUpdate(deploymentTokenOutput, out)
 }
 
-func rotateDeploymentToken(args []string, out io.Writer) error {
+func rotateDeploymentToken(args []string, out, errOut io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
 	}
 	// if an id was provided in the args we use it
 	if len(args) > 0 {
 		// make sure the id is lowercase
 		tokenID = strings.ToLower(args[0])
 	}
-	return runDeploymentTokenRotate(deploymentTokenOutput, out)
+	return runDeploymentTokenRotate(deploymentTokenOutput, out, errOut)
 }
 
 func deleteDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
-		return err
 	}
 	// if an id was provided in the args we use it
 	if len(args) > 0 {

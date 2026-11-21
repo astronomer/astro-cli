@@ -589,6 +589,29 @@ func (s *Suite) TestExportAuditLogs() {
 		s.Equal(auditLogsBody, decompressed)
 		mockV1Client.AssertExpectations(s.T())
 	})
+	s.Run("an existing --output-file is replaced whole and keeps its mode", func() {
+		if runtime.GOOS == "windows" {
+			s.T().Skip("file modes are not meaningful on Windows")
+		}
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
+		mockV1Client.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
+
+		filePath := s.T().TempDir() + "/audit-logs.ndjson.gz"
+		s.Require().NoError(os.WriteFile(filePath, bytes.Repeat([]byte("old"), 10000), 0o640))
+		_, err := ExportAuditLogs(mockV1Client, "org1", filePath, 1)
+		s.Require().NoError(err)
+
+		info, err := os.Stat(filePath)
+		s.Require().NoError(err)
+		s.Equal(os.FileMode(0o640), info.Mode().Perm(), "the owner's mode on an existing file stands")
+		written, err := os.ReadFile(filePath)
+		s.Require().NoError(err)
+		s.Equal(byte(0x1f), written[0], "nothing of the old content is left")
+		entries, err := os.ReadDir(filepath.Dir(filePath))
+		s.Require().NoError(err)
+		s.Len(entries, 1, "the temp file the write went through is gone")
+	})
 	s.Run("already-gzipped body is not double-compressed", func() {
 		var buf bytes.Buffer
 		zw := gzip.NewWriter(&buf)

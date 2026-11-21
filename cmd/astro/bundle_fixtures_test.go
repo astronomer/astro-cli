@@ -98,7 +98,7 @@ func stubBundleWait(t *testing.T, err error) *[]string {
 	t.Helper()
 	var waited []string
 	prev := waitForBundle
-	waitForBundle = func(progress io.Writer, deploymentID string, _ time.Duration, _ astrov1.APIClient) error {
+	waitForBundle = func(_ context.Context, progress io.Writer, deploymentID string, _ time.Duration, _ astrov1.APIClient) error {
 		waited = append(waited, deploymentID)
 		fmt.Fprintln(progress, "Waiting for the Deployment to become healthy…")
 		return err

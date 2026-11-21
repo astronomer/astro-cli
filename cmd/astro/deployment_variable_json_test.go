@@ -264,7 +264,7 @@ func TestDeploymentVariableListTextUnchanged(t *testing.T) {
 	run := runVariableCmd(t, "variable", "list", "--deployment-id", "test-id-1", "--deployment-name", "test")
 
 	assert.Equal(t, 0, run.code)
-	assert.True(t, strings.HasPrefix(run.stdout, " #"), "the table heads stdout:\n%s", run.stdout)
+	assert.True(t, strings.HasPrefix(run.stdout, "#\tKEY\tVALUE\tSECRET\n"), "stdout is the table, one tab between cells:\n%s", run.stdout)
 	requireRow(t, run.stdout, "#", "KEY", "VALUE", "SECRET")
 	requireRow(t, run.stdout, "1", "test-key-1", "test-value-1", "false")
 	requireRow(t, run.stdout, "2", "SECRET_KEY", maskedSecret, "true")

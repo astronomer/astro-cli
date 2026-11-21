@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -162,6 +163,7 @@ func currentContextWorkspace(t *testing.T) string {
 // Text is what each command printed on v2 before it had -o, byte for byte:
 // recorded from v2 and compared on 17 runs when the family was converted.
 func TestWorkspaceTextIsUnchanged(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	const contextTable = " CLUSTER                             WORKSPACE                           \n" +
 		" astronomer_dev.com                  ckbv8pwbq00wk0760us7ktcgd           \n"
 	for _, tc := range []struct {

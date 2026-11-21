@@ -94,8 +94,16 @@ services:
       io.astronomer.docker.component: "airflow-scheduler"
     environment: *common-env
     volumes:
-      - /home/me/demo/dags:/usr/local/airflow/dags:z
-      - /home/me/demo/include:/usr/local/airflow/include:z
+      - type: bind
+        source: '/home/me/demo/dags'
+        target: '/usr/local/airflow/dags'
+        bind:
+          selinux: z
+      - type: bind
+        source: '/home/me/demo/include'
+        target: '/usr/local/airflow/include'
+        bind:
+          selinux: z
 
   webserver:
     # Wait for the migration to finish, not just to start: a component that
@@ -121,8 +129,16 @@ services:
     ports:
       - 127.0.0.1:8081:8080
     volumes:
-      - /home/me/demo/dags:/usr/local/airflow/dags:z
-      - /home/me/demo/include:/usr/local/airflow/include:z
+      - type: bind
+        source: '/home/me/demo/dags'
+        target: '/usr/local/airflow/dags'
+        bind:
+          selinux: z
+      - type: bind
+        source: '/home/me/demo/include'
+        target: '/usr/local/airflow/include'
+        bind:
+          selinux: z
 
   triggerer:
     # Wait for the migration to finish, not just to start: a component that
@@ -146,5 +162,13 @@ services:
       io.astronomer.docker.component: "airflow-triggerer"
     environment: *common-env
     volumes:
-      - /home/me/demo/dags:/usr/local/airflow/dags:z
-      - /home/me/demo/include:/usr/local/airflow/include:z
+      - type: bind
+        source: '/home/me/demo/dags'
+        target: '/usr/local/airflow/dags'
+        bind:
+          selinux: z
+      - type: bind
+        source: '/home/me/demo/include'
+        target: '/usr/local/airflow/include'
+        bind:
+          selinux: z

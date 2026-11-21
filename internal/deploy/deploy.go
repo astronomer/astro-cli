@@ -12,6 +12,7 @@
 package deploy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -32,6 +33,9 @@ import (
 // Request is the resolved input for a manifest deploy. cmd fills it from flags, args,
 // the manifest, and the current context, then hands it to Run.
 type Request struct {
+	// Context ends the deploy's long steps (the build, the push, the wait for
+	// the Deployment) when the run is interrupted; nil is context.Background().
+	Context context.Context
 	// ProjectDir is the project root (where dags/ and pyproject.toml live).
 	ProjectDir string
 	// Manifest is the loaded pyproject.toml: deployment links, the Airflow pin,
@@ -217,6 +221,10 @@ type Commit struct {
 // deployment is already resolved; the transport reads its runtime version and
 // type from the server.
 type DagDeploy struct {
+	// Context ends the wait for the Deployment when the run is interrupted;
+	// the create, upload and finalize requests of a Dags deploy are not
+	// interrupt-aware. nil is context.Background().
+	Context       context.Context
 	DeploymentID  string
 	WorkspaceID   string
 	ProjectDir    string
@@ -246,6 +254,9 @@ type DagResult struct {
 // local image; otherwise it builds from the manifest fields. IncludeDags marks a
 // "both" deploy, which also ships the dags/ tarball.
 type ImageDeploy struct {
+	// Context ends the deploy's long steps (the build, the push, the wait for
+	// the Deployment) when the run is interrupted; nil is context.Background().
+	Context      context.Context
 	DeploymentID string
 	WorkspaceID  string
 	// ShaAsTag is [tool.astro.deploy] sha-as-tag: an Astro Private Cloud
@@ -464,6 +475,7 @@ func deploySettings(m *manifest.Manifest) manifest.Deploy {
 func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 	settings := deploySettings(req.Manifest)
 	dag, err := d.DeployDags(&DagDeploy{
+		Context:       req.Context,
 		DeploymentID:  target.DeploymentID,
 		WorkspaceID:   target.WorkspaceID,
 		ProjectDir:    req.ProjectDir,
@@ -506,6 +518,7 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 	includeDags := !req.Image && !req.ImageAlone
 	settings := deploySettings(req.Manifest)
 	img, err := d.DeployImage(&ImageDeploy{
+		Context:         req.Context,
 		DeploymentID:    target.DeploymentID,
 		WorkspaceID:     target.WorkspaceID,
 		Build:           imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest),

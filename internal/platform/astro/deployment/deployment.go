@@ -46,7 +46,6 @@ var (
 	// Monkey patched to write unit tests
 	canCiCdDeploy = CanCiCdDeploy
 	parseToken    = util.ParseAPIToken
-	CleanOutput   = false
 
 	// mayAsk reports whether this run may ask which Deployment to pick (input.CanAsk).
 	// A var so a test can answer either way.
@@ -205,7 +204,11 @@ func deploymentToInfo(d *astrov1.Deployment, includeWorkspaceName bool) Deployme
 }
 
 // listData returns deployment list data for structured output
-func listData(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient) (*DeploymentList, error) {
+//
+// limit, when above zero, is the most Deployments wanted: paging stops once
+// that many are in hand, taken in the API's name order (descending, as they
+// are listed), so a limited list is the same first rows every time.
+func listData(ws string, fromAllWorkspaces bool, limit int, astroV1Client astrov1.APIClient) (*DeploymentList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
@@ -214,7 +217,12 @@ func listData(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient
 	if fromAllWorkspaces {
 		ws = ""
 	}
-	deployments, err := ListDeployments(ws, c.Organization, astroV1Client)
+	var deployments []astrov1.Deployment
+	if limit > 0 {
+		deployments, err = listDeploymentsUpTo(ws, c.Organization, limit, astroV1Client)
+	} else {
+		deployments, err = ListDeployments(ws, c.Organization, astroV1Client)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -233,9 +241,9 @@ func listData(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient
 }
 
 // ListWithFormat lists deployments with the specified output format
-func ListWithFormat(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient, r output.Emitter) error {
+func ListWithFormat(ws string, fromAllWorkspaces bool, limit int, astroV1Client astrov1.APIClient, r output.Emitter) error {
 	return output.PrintData(
-		func() (*DeploymentList, error) { return listData(ws, fromAllWorkspaces, astroV1Client) },
+		func() (*DeploymentList, error) { return listData(ws, fromAllWorkspaces, limit, astroV1Client) },
 		deploymentTableConfig(fromAllWorkspaces, ws), r,
 	)
 }
@@ -362,7 +370,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration, progress io.Writer) (astrov1.Deployment, error) { //nolint:gocognit,gocyclo,gocritic,staticcheck // v1 complexity, refactor tracked separately
+func Create(ctx context.Context, name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration, progress io.Writer) (astrov1.Deployment, error) { //nolint:gocognit,gocyclo,gocritic,staticcheck // v1 complexity, refactor tracked separately
 	var organizationID string
 	var currentWorkspace astrov1.Workspace
 
@@ -411,7 +419,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 	}
 	// A note, so progress: stdout is the Deployment the create made.
-	fmt.Fprintf(progressTo(progress), "Current Workspace: %s\n\n", currentWorkspace.Name)
+	fmt.Fprintf(progressTo(progress), "Current Workspace: %s\n\n", input.Plain(currentWorkspace.Name))
 
 	// name input
 	if name == "" {
@@ -634,7 +642,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		// The Deployment exists whether or not it becomes healthy in time, so
 		// it is returned with the error: the caller still reports what was
 		// made.
-		if err := HealthPoll(progress, d.Id, SleepTime, TickNum, int(waitTimeForDeployment.Seconds()), astroV1Client); err != nil {
+		if err := HealthPoll(ctx, progress, d.Id, SleepTime, TickNum, int(waitTimeForDeployment.Seconds()), astroV1Client); err != nil {
 			return d, err
 		}
 	}
@@ -721,11 +729,11 @@ const (
 
 func validateHybridResources(schedulerAU, schedulerReplicas int, _ astrov1.DeploymentOptions) bool { //nolint:gocritic // intentional in this shell code
 	if schedulerAU > hybridSchedulerAuMax || schedulerAU < hybridSchedulerAuMin {
-		fmt.Printf("\nScheduler AUs must be between %d and %d\n", hybridSchedulerAuMin, hybridSchedulerAuMax)
+		fmt.Fprintf(os.Stderr, "\nScheduler AUs must be between %d and %d\n", hybridSchedulerAuMin, hybridSchedulerAuMax)
 		return false
 	}
 	if schedulerReplicas > hybridSchedulerReplicasMax || schedulerReplicas < hybridSchedulerReplicasMin {
-		fmt.Printf("\nScheduler Replicas must be between %d and %d\n", hybridSchedulerReplicasMin, hybridSchedulerReplicasMax)
+		fmt.Fprintf(os.Stderr, "\nScheduler Replicas must be between %d and %d\n", hybridSchedulerReplicasMin, hybridSchedulerReplicasMax)
 		return false
 	}
 	return true
@@ -849,24 +857,24 @@ func progressTo(w io.Writer) io.Writer {
 
 // HealthPoll waits for the Deployment to become healthy, writing its progress
 // to progress (stderr when nil).
-func HealthPoll(progress io.Writer, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
-	return HealthPollIn(progress, "", "", deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client)
+func HealthPoll(ctx context.Context, progress io.Writer, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
+	return HealthPollIn(ctx, progress, "", "", deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client)
 }
 
 // HealthPollIn is HealthPoll for a Deployment in orgID, which need not be the
 // current context's, with token authorizing the check that its Airflow
 // answers. An empty orgID or token is the current context's.
-func HealthPollIn(progress io.Writer, orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
+func HealthPollIn(ctx context.Context, progress io.Writer, orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
 	progress = progressTo(progress)
 	fmt.Fprintf(progress, "\nWaiting for the Deployment to become healthy…\n\nThis may take a few minutes\n")
 	// considering hibernating as healthy state, since hibernation can only happen when the deployment is healthy.
 	// This covers for the case when the deployment is created and straight away goes into hibernation.
-	d, err := pollStatus(orgID, token, deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client, ErrTimedOut,
+	d, err := pollStatus(ctx, orgID, token, deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client, ErrTimedOut,
 		astrov1.DeploymentStatusHEALTHY, astrov1.DeploymentStatusHIBERNATING)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(progress, "Deployment %s is now healthy\n", d.Name)
+	fmt.Fprintf(progress, "Deployment %s is now healthy\n", input.Plain(d.Name))
 	return nil
 }
 
@@ -875,18 +883,33 @@ func HealthPollIn(progress io.Writer, orgID, token, deploymentID string, sleepTi
 // timeoutNum seconds pass first. A Deployment reporting HEALTHY also has to
 // have an Airflow that answers, and errAirflowNotAnswering is the timeout when
 // that was all that was missing.
-func pollStatus(orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient, timedOut error, statuses ...astrov1.DeploymentStatus) (astrov1.Deployment, error) {
-	time.Sleep(time.Duration(sleepTime) * time.Second)
+func pollStatus(ctx context.Context, orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient, timedOut error, statuses ...astrov1.DeploymentStatus) (astrov1.Deployment, error) {
+	// A command run without ExecuteContext has no context at all.
+	ctx = cmp.Or(ctx, context.Background())
+	stopped := func() error {
+		return &StoppedWaitingError{Err: ctx.Err(), DeploymentID: deploymentID}
+	}
+	// The wait ends with the run's interrupt, wherever it is. Only the wait:
+	// the Deployment's work goes on in Astro, which the error says.
+	pause := time.NewTimer(time.Duration(sleepTime) * time.Second)
+	defer pause.Stop()
+	select {
+	case <-pause.C:
+	case <-ctx.Done():
+		return astrov1.Deployment{}, stopped()
+	}
 	timeout := time.After(time.Duration(timeoutNum) * time.Second)
 	ticker := time.NewTicker(time.Duration(tickNum) * time.Second)
 	defer ticker.Stop()
 	missing := timedOut
 	for {
 		select {
+		case <-ctx.Done():
+			return astrov1.Deployment{}, stopped()
 		case <-timeout:
-			return astrov1.Deployment{}, missing
+			return astrov1.Deployment{}, &WaitTimeoutError{Err: missing, DeploymentID: deploymentID}
 		case <-ticker.C:
-			currentDeployment, err := GetDeploymentByID(orgID, deploymentID, astroV1Client)
+			currentDeployment, err := GetDeploymentByID(orgID, deploymentID, ctxClient{APIClient: astroV1Client, ctx: ctx})
 			if err != nil {
 				return astrov1.Deployment{}, err
 			}
@@ -894,12 +917,24 @@ func pollStatus(orgID, token, deploymentID string, sleepTime, tickNum, timeoutNu
 			if !slices.Contains(statuses, currentDeployment.Status) {
 				continue
 			}
-			if currentDeployment.Status != astrov1.DeploymentStatusHEALTHY || airflowAnswering(currentDeployment, token) {
+			if currentDeployment.Status != astrov1.DeploymentStatusHEALTHY || airflowAnswering(ctx, currentDeployment, token) {
 				return currentDeployment, nil
 			}
 			missing = errAirflowNotAnswering
 		}
 	}
+}
+
+// ctxClient is a client whose Deployment reads run under ctx whatever context
+// they are handed, so a wait's in-flight read, and its retries, end with the
+// run's interrupt.
+type ctxClient struct {
+	astrov1.APIClient
+	ctx context.Context //nolint:containedctx // a wrapper bound to one wait
+}
+
+func (c ctxClient) GetDeploymentWithResponse(_ context.Context, orgID, deploymentID string, editors ...astrov1.RequestEditorFn) (*astrov1.GetDeploymentResponse, error) {
+	return c.APIClient.GetDeploymentWithResponse(c.ctx, orgID, deploymentID, editors...)
 }
 
 // airflowProbeTimeout bounds one airflowAnswering request. A request that
@@ -911,7 +946,7 @@ const airflowProbeTimeout = 10 * time.Second
 // behind it. Astro reports a Deployment HEALTHY some seconds before that
 // after a wake-up. A Deployment with no Airflow API URL has nothing to probe.
 // An empty token is the current context's.
-var airflowAnswering = func(d astrov1.Deployment, token string) bool {
+var airflowAnswering = func(parent context.Context, d astrov1.Deployment, token string) bool {
 	apiURL := d.WebServerAirflowApiUrl
 	if apiURL == "" {
 		return true
@@ -919,7 +954,7 @@ var airflowAnswering = func(d astrov1.Deployment, token string) bool {
 	if !strings.HasPrefix(apiURL, "http://") && !strings.HasPrefix(apiURL, "https://") {
 		apiURL = "https://" + apiURL
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), airflowProbeTimeout)
+	ctx, cancel := context.WithTimeout(parent, airflowProbeTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(apiURL, "/")+"/version", http.NoBody)
 	if err != nil {
@@ -1401,7 +1436,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	if !force {
 		if confirmWithUser {
 			if err := input.ConfirmOrAbort(
-				fmt.Sprintf("\nUpdate Deployment %s?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+				fmt.Sprintf("\nUpdate Deployment %s?", ansi.ForStderr().Bold(input.Plain(currentDeployment.Name))), input.AnsweredBy("--yes")); err != nil {
 				return UpdateResult{}, err
 			}
 		}
@@ -1592,7 +1627,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 	// The name is shown as it is, unescaped, so what is shown is what to type.
 	if !forceDelete {
 		typed, err := input.Text(
-			fmt.Sprintf("\nThis permanently deletes the Deployment %s and all of its data.\n", ansi.ForStderr().Bold(currentDeployment.Name))+
+			fmt.Sprintf("\nThis permanently deletes the Deployment %s and all of its data.\n", ansi.ForStderr().Bold(input.Plain(currentDeployment.Name)))+
 				`To confirm, type the Deployment name "`+currentDeployment.Name+`": `,
 			input.About("the Deployment's name, to confirm the delete"), input.AnsweredBy("--yes"))
 		if err != nil {
@@ -1642,7 +1677,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		if err := input.ConfirmOrAbort(
-			fmt.Sprintf("\nOverride to %s for Deployment %s?", ansi.ForStderr().Bold(action), ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+			fmt.Sprintf("\nOverride to %s for Deployment %s?", ansi.ForStderr().Bold(action), ansi.ForStderr().Bold(input.Plain(currentDeployment.Name))), input.AnsweredBy("--yes")); err != nil {
 			return nil, err
 		}
 	}
@@ -1674,18 +1709,18 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 // override asked for: hibernating, or healthy again. Unlike HealthPoll it
 // has no initial sleep, which would be longer than a whole wake-up.
 // Its progress goes to progress (stderr when nil).
-func WaitForHibernationOverride(progress io.Writer, deploymentID string, isHibernating bool, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
+func WaitForHibernationOverride(ctx context.Context, progress io.Writer, deploymentID string, isHibernating bool, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
 	progress = progressTo(progress)
 	status, timedOut, waiting, done := astrov1.DeploymentStatusHEALTHY, ErrTimedOut, "wake up", "awake"
 	if isHibernating {
 		status, timedOut, waiting, done = astrov1.DeploymentStatusHIBERNATING, ErrTimedOutHibernating, "hibernate", "hibernating"
 	}
 	fmt.Fprintf(progress, "\nWaiting for the Deployment to %s…\n", waiting)
-	d, err := pollStatus("", "", deploymentID, 0, TickNum, int(waitTime.Seconds()), astroV1Client, timedOut, status)
+	d, err := pollStatus(ctx, "", "", deploymentID, 0, TickNum, int(waitTime.Seconds()), astroV1Client, timedOut, status)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(progress, "Deployment %s is now %s\n", d.Name, done)
+	fmt.Fprintf(progress, "Deployment %s is now %s\n", input.Plain(d.Name), done)
 	return nil
 }
 
@@ -1707,7 +1742,7 @@ func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		if err := input.ConfirmOrAbort(
-			fmt.Sprintf("\nRemove the hibernation override for Deployment %s and resume its schedule?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes")); err != nil {
+			fmt.Sprintf("\nRemove the hibernation override for Deployment %s and resume its schedule?", ansi.ForStderr().Bold(input.Plain(currentDeployment.Name))), input.AnsweredBy("--yes")); err != nil {
 			return nil, err
 		}
 	}
@@ -1781,6 +1816,14 @@ var coreDeleteDeploymentHibernationOverride = func(orgID, deploymentID string, a
 // ListDeployments returns every Deployment in the given Workspace (or the whole
 // Organization when ws is empty), paging through the API as needed.
 var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
+	return listDeploymentsUpTo(ws, orgID, 0, astroV1Client)
+}
+
+// listDeploymentsUpTo is ListDeployments that stops paging after limit
+// Deployments (every one when limit is below 1). Both ask the API for name
+// order, descending as `deployment list` shows them, so a limited read keeps
+// the first rows of the full one.
+func listDeploymentsUpTo(ws, orgID string, limit int, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1788,8 +1831,18 @@ var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([
 		}
 		orgID = c.Organization
 	}
-	return pagination.Collect("deployments", func(offset int) ([]astrov1.Deployment, int, error) {
-		params := &astrov1.ListDeploymentsParams{Limit: &listLimit, Offset: &offset}
+	return pagination.CollectUpTo("deployments", limit, func(offset int) ([]astrov1.Deployment, int, error) {
+		pageSize := listLimit
+		// Name order, descending as `deployment list` shows them, with or
+		// without a limit, so a limited list is the first rows of the full one.
+		params := &astrov1.ListDeploymentsParams{
+			Limit:  &pageSize,
+			Offset: &offset,
+			Sorts:  &[]astrov1.ListDeploymentsParamsSorts{astrov1.ListDeploymentsParamsSortsNameDesc},
+		}
+		if limit > 0 {
+			pageSize = min(pageSize, limit-offset)
+		}
 		if ws != "" {
 			params.WorkspaceIds = &[]string{ws}
 		}
@@ -2243,10 +2296,8 @@ func deploymentSelectionProcess(ws string, src astrosession.Source, deployments 
 	}
 	if len(deployments) == 1 && mayAutoSelect() {
 		if use == ToRead {
-			if !CleanOutput {
-				fmt.Fprintf(os.Stderr, "Using the only Deployment found:\n\n Deployment Name: %s\n Deployment ID: %s\n",
-					ansi.ForStderr().Bold(deployments[0].Name), ansi.ForStderr().Bold(deployments[0].Id))
-			}
+			fmt.Fprintf(os.Stderr, "Using the only Deployment found:\n\n Deployment Name: %s\n Deployment ID: %s\n",
+				ansi.ForStderr().Bold(input.Plain(deployments[0].Name)), ansi.ForStderr().Bold(input.Plain(deployments[0].Id)))
 			return deployments[0], nil
 		}
 		// 1.x took it here for every command. A change waits for someone to

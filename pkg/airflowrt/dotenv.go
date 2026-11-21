@@ -29,8 +29,6 @@ type DotenvProblem struct {
 	Skipped bool
 }
 
-func (p DotenvProblem) String() string { return fmt.Sprintf("line %d: %s", p.Line, p.Reason) }
-
 // ParseDotenv reads a .env file the way Docker Compose's env_file loader
 // does, which is what 1.x handed every .env to, so a file written for 1.x
 // means the same thing here:

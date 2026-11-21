@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/spf13/afero"
+
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 var err error
@@ -27,6 +29,7 @@ local:
 }
 
 func (s *Suite) TestPrintContext() {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`cloud:
   api:
@@ -61,6 +64,7 @@ contexts:
 }
 
 func (s *Suite) TestPrintContextNA() {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`cloud:
   api:

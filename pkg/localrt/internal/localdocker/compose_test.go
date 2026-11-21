@@ -14,6 +14,35 @@ import (
 
 var updateGolden = flag.Bool("update", false, "rewrite golden files")
 
+// volume is a bind mount in Compose's long syntax, as the file writes it.
+type volume struct {
+	Type   string `yaml:"type"`
+	Source string `yaml:"source"`
+	Target string `yaml:"target"`
+	Bind   struct {
+		SELinux string `yaml:"selinux"`
+	} `yaml:"bind"`
+	Short string `yaml:"-"`
+}
+
+// UnmarshalYAML also takes a volume in the short syntax (postgres's named
+// volume), into Short.
+func (v *volume) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		v.Short = node.Value
+		return nil
+	}
+	type long volume
+	return node.Decode((*long)(v))
+}
+
+// dagsVolume is the golden project's dags/ mount.
+var dagsVolume = func() volume {
+	v := volume{Type: "bind", Source: "/home/me/demo/dags", Target: "/usr/local/airflow/dags"}
+	v.Bind.SELinux = "z"
+	return v
+}()
+
 func goldenInput() composeInput {
 	return goldenInputFor(airflow3, "astrocrpublic.azurecr.io/runtime:3.1-2")
 }
@@ -74,7 +103,7 @@ func TestGenerateComposeAirflow2(t *testing.T) {
 			Command     []string          `yaml:"command"`
 			Ports       []string          `yaml:"ports"`
 			Environment map[string]string `yaml:"environment"`
-			Volumes     []string          `yaml:"volumes"`
+			Volumes     []volume          `yaml:"volumes"`
 		} `yaml:"services"`
 	}
 	require.NoError(t, yaml.Unmarshal([]byte(got), &doc))
@@ -85,7 +114,7 @@ func TestGenerateComposeAirflow2(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, []string{"airflow", "webserver"}, web.Command)
 	assert.Equal(t, []string{"127.0.0.1:8081:8080"}, web.Ports)
-	assert.Contains(t, web.Volumes, "/home/me/demo/dags:/usr/local/airflow/dags:z")
+	assert.Contains(t, web.Volumes, dagsVolume)
 
 	assert.Equal(t, "http://localhost:8081", web.Environment["AIRFLOW__WEBSERVER__BASE_URL"])
 	assert.Contains(t, web.Environment["AIRFLOW__API__AUTH_BACKENDS"], "basic_auth")
@@ -140,7 +169,7 @@ func TestGenerateComposeParses(t *testing.T) {
 			Image       string            `yaml:"image"`
 			Ports       []string          `yaml:"ports"`
 			Environment map[string]string `yaml:"environment"`
-			Volumes     []string          `yaml:"volumes"`
+			Volumes     []volume          `yaml:"volumes"`
 		} `yaml:"services"`
 	}
 	require.NoError(t, yaml.Unmarshal([]byte(got), &doc))
@@ -152,12 +181,12 @@ func TestGenerateComposeParses(t *testing.T) {
 	assert.Equal(t, "http://localhost:8081", api.Environment["AIRFLOW__API__BASE_URL"], "the host port must reach the env, not a hardcoded 8080")
 	assert.Equal(t, "True", api.Environment["AIRFLOW__CORE__LOAD_EXAMPLES"], "plan env overrides the baseline")
 	assert.Equal(t, "it's quoted", api.Environment["MY_SECRET"])
-	assert.Contains(t, api.Volumes, "/home/me/demo/dags:/usr/local/airflow/dags:z")
+	assert.Contains(t, api.Volumes, dagsVolume)
 
 	pg, ok := doc.Services["postgres"]
 	require.True(t, ok)
 	assert.Equal(t, []string{"127.0.0.1:15432:5432"}, pg.Ports)
-	assert.Contains(t, pg.Volumes, "postgres_data:/var/lib/postgresql/data")
+	assert.Contains(t, pg.Volumes, volume{Short: "postgres_data:/var/lib/postgresql/data"})
 
 	for _, svc := range []string{"db-migration", "scheduler", "dag-processor", "triggerer"} {
 		assert.Contains(t, doc.Services, svc)
@@ -190,6 +219,35 @@ func TestPassEnvDedupes(t *testing.T) {
 	env := []envVar{{Name: "MY_SECRET", Value: "'x'"}}
 	got := passEnv([]string{"MY_SECRET", "ZED", "ALPHA"}, nil, env)
 	assert.Equal(t, []string{"ALPHA", "ZED"}, got)
+}
+
+// A project path is mounted as written, whatever it holds: a " #", a ": ",
+// a quote or a "$" stays in the one volume entry it belongs to. One with a
+// line break is refused rather than folded into another path.
+func TestGenerateComposeMountsAPathAsWritten(t *testing.T) {
+	in := goldenInput()
+	host := "/home/me/it's: $HOME #2/dags"
+	in.Mounts = []mount{{Host: host, Container: "/usr/local/airflow/dags"}}
+	got, err := generateCompose(in)
+	require.NoError(t, err)
+
+	var doc struct {
+		Services map[string]struct {
+			Volumes []volume `yaml:"volumes"`
+		} `yaml:"services"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(got), &doc))
+	// Compose reads "$$" as a literal "$".
+	want := volume{Type: "bind", Source: strings.ReplaceAll(host, "$", "$$"), Target: "/usr/local/airflow/dags"}
+	want.Bind.SELinux = "z"
+	assert.Equal(t, []volume{want}, doc.Services["scheduler"].Volumes)
+
+	for _, brk := range []string{"\n", "\r"} {
+		in.Mounts = []mount{{Host: "/home/me/demo" + brk + "- /:/host #/dags", Container: "/usr/local/airflow/dags"}}
+		_, err := generateCompose(in)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "line break")
+	}
 }
 
 func TestGenerateComposeNoMounts(t *testing.T) {

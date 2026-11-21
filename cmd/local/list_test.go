@@ -1,6 +1,7 @@
 package local
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -119,8 +120,11 @@ func TestListDefaultHidesStale(t *testing.T) {
 	if err := execute(t, d, "local", "list"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "No local Airflow found") {
-		t.Errorf("default list should hide the stale record:\n%s", out.String())
+	if notices := d.Stderr.(*bytes.Buffer).String(); !strings.Contains(notices, "No local Airflow found") {
+		t.Errorf("default list should hide the stale record and say so:\n%s", notices)
+	}
+	if want := "PROJECT\tHOSTNAME\tMODE\tSTATE\tPORT\tUPTIME\n"; out.String() != want {
+		t.Errorf("stdout = %q, want the header alone, %q", out.String(), want)
 	}
 }
 

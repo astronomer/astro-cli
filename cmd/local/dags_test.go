@@ -133,7 +133,7 @@ func TestDagsStatsCountsRunsByState(t *testing.T) {
 	}
 	// The table is what it was when stats were a map: one column per state,
 	// sorted, whatever order Airflow sent them in.
-	if want := "DAG_ID      FAILED  SUCCESS\norders_etl  1       12\n"; out != want {
+	if want := "DAG_ID\tFAILED\tSUCCESS\norders_etl\t1\t12\n"; out != want {
 		t.Errorf("table = %q, want %q", out, want)
 	}
 
@@ -186,12 +186,13 @@ func TestDagsStatsWithNothingToCount(t *testing.T) {
 		t.Errorf("json = %v, want dags [] and total_entries 0", envelope)
 	}
 
-	out, _, err = runQuery(t, stub, "dags", "stats")
+	var notices string
+	out, notices, err = runQuery(t, stub, "dags", "stats")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "No Dag run statistics on this Airflow.") {
-		t.Errorf("text = %q", out)
+	if out != "DAG_ID\n" || !strings.Contains(notices, "No Dag run statistics on this Airflow.") {
+		t.Errorf("text = %q, notice = %q", out, notices)
 	}
 }
 

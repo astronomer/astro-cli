@@ -65,7 +65,7 @@ func agentBuildRequest(contextDir, tag string, platforms, secrets []string, bin 
 // It builds on engine, the one the registry login before the build and the
 // push after it run on: an image built on one engine and pushed from another
 // is not there to push.
-func buildAgentImage(projectDir, contextDir, tag string, platforms, secrets []string, engine imagebuild.Engine) error {
+func buildAgentImage(ctx context.Context, projectDir, contextDir, tag string, platforms, secrets []string, engine imagebuild.Engine) error {
 	s := spinner.NewSpinner("Building project image…")
 	debug := logger.Enabled(slog.LevelDebug)
 	if !debug {
@@ -83,12 +83,11 @@ func buildAgentImage(projectDir, contextDir, tag string, platforms, secrets []st
 	var buf bytes.Buffer
 	var out, errOut io.Writer = &buf, &buf
 	if debug {
-		// os.Stdout as it is now: under --output json the command has
-		// pointed it at stderr.
-		out, errOut = os.Stdout, os.Stderr
+		// The build's output is progress, not a result: stderr.
+		out, errOut = os.Stderr, os.Stderr
 	}
 	req := agentBuildRequest(contextDir, tag, platforms, secrets, engine.Bin, engine.Env, out, errOut)
-	_, err = imagebuild.New(engine.Cmd, buildNow).Build(context.Background(), req, localrt.Callbacks{})
+	_, err = imagebuild.New(engine.Cmd, buildNow).Build(ctx, req, localrt.Callbacks{})
 	switch {
 	case err == nil:
 		spinner.StopWithCheckmark(s, "Updated project image")
@@ -97,7 +96,7 @@ func buildAgentImage(projectDir, contextDir, tag string, platforms, secrets []st
 		logger.Debugf("agent image build: %v", err)
 		s.FinalMSG = ""
 		s.Stop()
-		fmt.Println(strings.TrimSpace(buf.String()) + "\n")
+		fmt.Fprintln(os.Stderr, strings.TrimSpace(buf.String())+"\n")
 		return errAgentBuild
 	default:
 		return clientDockerfileError(err, projectDir, req.Dockerfile)

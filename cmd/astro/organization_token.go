@@ -22,9 +22,6 @@ import (
 var organizationTokenOutput cliout.Format
 
 func listOrganizationToken(out io.Writer) error {
-	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
-		return err
-	}
 	tokens, err := organization.ListTokens(astroV1Client)
 	if err != nil {
 		return err
@@ -33,9 +30,6 @@ func listOrganizationToken(out io.Writer) error {
 }
 
 func listOrganizationTokenRoles(args []string, out io.Writer) error {
-	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
-		return err
-	}
 	tokenArg(args, &tokenID)
 	// roles takes no --name: only the token ID answers its picker.
 	roles, err := organization.ListTokenRoles(tokenID, organizationTokenPicker("", "Select the Organization API token to list roles for:"), astroV1Client)
@@ -46,13 +40,10 @@ func listOrganizationTokenRoles(args []string, out io.Writer) error {
 	for _, r := range roles {
 		tab.AddRow(r.EntityType, r.EntityID, r.Role)
 	}
-	return cliout.Renderer{Format: organizationTokenOutput, Out: out}.Emit(apitoken.RoleList{Roles: roles}, cliout.Text(tab.Render))
+	return cliout.Renderer{Format: organizationTokenOutput, Out: out}.Emit(apitoken.RoleList{Roles: roles}, cliout.TableText(tab))
 }
 
-func createOrganizationToken(out io.Writer) error {
-	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
-		return err
-	}
+func createOrganizationToken(out, errOut io.Writer) error {
 	if tokenName == "" {
 		// no role was provided so ask the user for it
 		answer, err := input.Text("Enter a name for the new Organization API token: ", input.AnsweredBy("--name"))
@@ -78,13 +69,10 @@ func createOrganizationToken(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(organizationTokenOutput, out, &created, "Organization", "Created", tokenName, cleanTokenOutput)
+	return renderTokenSecret(organizationTokenOutput, out, errOut, &created, "Organization", "Created", tokenName)
 }
 
 func updateOrganizationToken(args []string, out io.Writer) error {
-	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
-		return err
-	}
 	tokenArg(args, &tokenID)
 	res, err := organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole,
 		organizationTokenPicker("--name", "Select the Organization API token to update:"), astroV1Client)
@@ -94,10 +82,7 @@ func updateOrganizationToken(args []string, out io.Writer) error {
 	return renderTokenLine(organizationTokenOutput, out, res.Token, fmt.Sprintf("Updated Organization API token %s", res.PreviousName))
 }
 
-func rotateOrganizationToken(args []string, out io.Writer) error {
-	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
-		return err
-	}
+func rotateOrganizationToken(args []string, out, errOut io.Writer) error {
 	tokenArg(args, &tokenID)
 	pick := organizationTokenPicker("--name", "Select the Organization API token to rotate:")
 	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)
@@ -116,13 +101,10 @@ func rotateOrganizationToken(args []string, out io.Writer) error {
 		return err
 	}
 	// Named as found, which a rotate by ID knows only after the lookup.
-	return renderTokenSecret(organizationTokenOutput, out, &rotated, "Organization", "Rotated", token.Name, cleanTokenOutput)
+	return renderTokenSecret(organizationTokenOutput, out, errOut, &rotated, "Organization", "Rotated", token.Name)
 }
 
 func deleteOrganizationToken(args []string, out io.Writer) error {
-	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
-		return err
-	}
 	tokenArg(args, &tokenID)
 	pick := organizationTokenPicker("--name", "Select the Organization API token to delete:")
 	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)

@@ -102,5 +102,5 @@ func renderTeamMembers(format cliout.Format, out io.Writer, list *team.MemberLis
 	for _, m := range list.Members {
 		tab.AddRow(m.ID, m.FullName, m.Email)
 	}
-	return cliout.Renderer{Format: format, Out: out}.Emit(list, cliout.Text(tab.Render))
+	return cliout.Renderer{Format: format, Out: out}.Emit(list, cliout.TableText(tab))
 }
