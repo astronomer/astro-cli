@@ -550,6 +550,9 @@ func readIfPresent(path string) ([]byte, error) {
 // or quietly resolves differently. Each of those is reported and left in place.
 func parseRequirements(data []byte) (deps, notes []string) {
 	for _, line := range logicalLines(data) {
+		// A note echoes the line, so a URL's userinfo is masked in it; the
+		// dependency lines carried into the manifest are left as written.
+		shown := userinfoRe.ReplaceAllString(line, "://***@")
 		switch {
 		case line == "":
 			continue
@@ -558,23 +561,23 @@ func parseRequirements(data []byte) (deps, notes []string) {
 			// continuation had nothing to join to, or trailing whitespace broke
 			// it. Emitting it produced a dependency whose text ended in a
 			// backslash, which manifest.Parse accepts and uv then chokes on.
-			notes = append(notes, "requirements.txt: "+line+
+			notes = append(notes, "requirements.txt: "+shown+
 				" ends in a line continuation with nothing following it, so it was not migrated")
 		case strings.HasPrefix(line, "-"):
-			notes = append(notes, requirementOptionNote(line))
+			notes = append(notes, requirementOptionNote(shown))
 		case isBareURL(line):
 			// pip accepts a bare URL or VCS reference as a requirement; PEP 508
 			// needs it named ("pkg @ git+https://..."), and the name is not in
 			// the line to take.
-			notes = append(notes, "requirements.txt: "+line+
-				" is a bare URL, which [project.dependencies] cannot express: add it as 'name @ "+line+"'")
+			notes = append(notes, "requirements.txt: "+shown+
+				" is a bare URL, which [project.dependencies] cannot express: add it as 'name @ "+shown+"'")
 		case isLocalPath(line):
 			// pip installs a path as the project at that path. PEP 508 needs a
 			// name and a file:// URL, plus a [tool.uv.sources] entry to make it
 			// resolvable, and the name is in that directory's own metadata
 			// rather than in this line. Same substance as the -e form, which is
 			// already reported, so reporting only one of them was inconsistent.
-			notes = append(notes, "requirements.txt: "+line+
+			notes = append(notes, "requirements.txt: "+shown+
 				" is a local path, which [project.dependencies] cannot express: declare it under [tool.uv.sources]")
 		default:
 			deps = append(deps, line)
@@ -585,7 +588,8 @@ func parseRequirements(data []byte) (deps, notes []string) {
 
 // requirementOptionNote explains one pip option that cannot cross into a
 // manifest. The wording names the option rather than the whole line, so a long
-// --extra-index-url does not bury the reason.
+// --extra-index-url does not bury the reason. The caller passes the line with
+// any URL userinfo already masked.
 func requirementOptionNote(line string) string {
 	opt, _, _ := strings.Cut(line, "=")
 	opt, _, _ = strings.Cut(opt, " ")
