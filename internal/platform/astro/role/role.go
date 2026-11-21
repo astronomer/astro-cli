@@ -2,6 +2,7 @@ package role
 
 import (
 	httpContext "context"
+	"errors"
 
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -57,6 +58,9 @@ func GetOrgRoles(ctx httpContext.Context, client astrov1.APIClient, shouldInclud
 		}
 		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 			return nil, 0, err
+		}
+		if resp.JSON200 == nil {
+			return nil, 0, errors.New("list roles returned an empty response body")
 		}
 		if includeDefaultRoles && resp.JSON200.DefaultRoles != nil {
 			defaultRoles = *resp.JSON200.DefaultRoles

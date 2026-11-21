@@ -19,11 +19,16 @@ import (
 // flag is left off. The flag, its help and its validation live here and
 // nowhere else, so a list command cannot register one and forget the other.
 //
-// what is the plural noun the help names, and may carry a note on the order
-// ("bundles, in the order the API returns them") where the API takes no sort.
-func addListLimit(cmd *cobra.Command, what string, run func(cmd *cobra.Command, limit int) error) {
+// what is the plural noun the help names. note, when not empty, is a sentence
+// of its own the help adds: where the order is the API's own (it takes no
+// sort), what the limit does not count, or that a filter runs locally.
+func addListLimit(cmd *cobra.Command, what, note string, run func(cmd *cobra.Command, limit int) error) {
 	var n int
-	cmd.Flags().IntVar(&n, "limit", 0, "Show at most this many "+what+"; at least 1 (default: all of them)")
+	usage := "Show at most this many " + what + " (at least 1; default: all)"
+	if note != "" {
+		usage += ". " + note
+	}
+	cmd.Flags().IntVar(&n, "limit", 0, usage)
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
 		if err := checkListLimit(cmd, "limit", n); err != nil {
 			return err

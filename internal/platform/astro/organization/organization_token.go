@@ -98,6 +98,8 @@ func listOrgScopedAPITokens(ctx httpContext.Context, client astrov1.APIClient, l
 
 // ScopedTokens lists the Organization-scoped API tokens, as the API has them,
 // for a command in another family that picks among them.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func ScopedTokens(client astrov1.APIClient) ([]astrov1.ApiToken, error) {
 	return listOrgScopedAPITokens(httpContext.Background(), client, 0)
 }
@@ -173,6 +175,8 @@ func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.Api
 // FindToken finds the Organization token a command means: the one with id,
 // else the one named name, else the one a person picks through pick. A token
 // of another scope is refused.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func FindToken(id, name, organization string, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
 	if id == "" {
 		tokens, err := listOrgScopedAPITokens(httpContext.Background(), client, 0)

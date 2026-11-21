@@ -451,10 +451,14 @@ func listTeams(ctx httpContext.Context, client astrov1.APIClient, workspaceID, d
 		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 			return nil, 0, err
 		}
+		if resp.JSON200 == nil {
+			return nil, 0, errors.New("list teams returned an empty response body")
+		}
 		return resp.JSON200.Teams, resp.JSON200.TotalCount, nil
 	})
 }
 
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func GetWorkspaceTeams(client astrov1.APIClient, workspaceID string, _ int) ([]astrov1.Team, error) {
 	workspaceID, err := astrosession.RequireWorkspace(workspaceID)
 	if err != nil {
@@ -528,6 +532,8 @@ func pickFailed(err error) error {
 }
 
 // GetOrgTeams returns a list of all organization teams.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func GetOrgTeams(client astrov1.APIClient) ([]astrov1.Team, error) {
 	return listTeams(httpContext.Background(), client, nil, nil, 0)
 }
@@ -615,6 +621,9 @@ func listTeamMembers(ctx httpContext.Context, client astrov1.APIClient, orgID, t
 		}
 		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 			return nil, 0, err
+		}
+		if resp.JSON200 == nil {
+			return nil, 0, errors.New("list team members returned an empty response body")
 		}
 		return resp.JSON200.TeamMembers, resp.JSON200.TotalCount, nil
 	})
@@ -843,6 +852,7 @@ func ListTeamUsers(ctx httpContext.Context, teamID string, limit int, client ast
 	return list, nil
 }
 
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func GetDeploymentTeams(client astrov1.APIClient, deploymentID string, _ int) ([]astrov1.Team, error) {
 	dID := deploymentID
 	return listTeams(httpContext.Background(), client, nil, &dID, 0)

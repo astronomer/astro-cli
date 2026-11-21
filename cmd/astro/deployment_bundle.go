@@ -80,7 +80,7 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro deployment bundle list --deployment <id>
   astro deployment bundle list --deployment <id> -o json`,
 	}
-	addListLimit(cmd, "bundles, in the order the API returns them", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "bundles", "Bundles are listed in the order the API returns them", func(cmd *cobra.Command, limit int) error {
 		defer strayStdoutToStderr(bundleOutput)()
 		ws, client, err := deploymentWorkspace(cmd, deploymentID, "could not find a valid Workspace")
 		if err != nil {

@@ -203,7 +203,7 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
   # List them as JSON
   astro deployment team list --deployment <DEPLOYMENT_ID> -o json`,
 	}
-	addListLimit(cmd, "teams", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "teams", "", func(cmd *cobra.Command, limit int) error {
 		return listDeploymentTeam(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -394,7 +394,7 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
   # List them as JSON
   astro deployment user list --deployment <DEPLOYMENT_ID> -o json`,
 	}
-	addListLimit(cmd, "users", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "users", "", func(cmd *cobra.Command, limit int) error {
 		return listDeploymentUser(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -447,7 +447,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
   # List them as JSON
   astro deployment list -o json`,
 	}
-	addListLimit(cmd, "Deployments", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "Deployments", "", func(cmd *cobra.Command, limit int) error {
 		return deploymentList(cmd, out, limit)
 	})
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
@@ -1272,7 +1272,7 @@ func newDeploymentTokenListCmd(out io.Writer) *cobra.Command {
   astro deployment token list --deployment <DEPLOYMENT_ID>`,
 	}
 	addOneXWorkspaceIDNoOp(cmd.Flags())
-	addListLimit(cmd, "API tokens", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "API tokens", "", func(cmd *cobra.Command, limit int) error {
 		return listDeploymentToken(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -1656,7 +1656,7 @@ func newListOrganizationTokensInDeployment(out io.Writer) *cobra.Command {
 		Example: `  # List the Organization tokens with a role in a Deployment
   astro deployment token organization-token list --deployment <DEPLOYMENT_ID>`,
 	}
-	addListLimit(cmd, "Organization API tokens", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "Organization API tokens", "The scope filter runs locally, so every page is read before the limit applies", func(cmd *cobra.Command, limit int) error {
 		return listOrganizationTokensInDeployment(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -1671,7 +1671,7 @@ func newListWorkspaceTokensInDeployment(out io.Writer) *cobra.Command {
   astro deployment token workspace-token list --deployment <DEPLOYMENT_ID>`,
 	}
 	addOneXWorkspaceIDNoOp(cmd.Flags())
-	addListLimit(cmd, "Workspace API tokens", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "Workspace API tokens", "The scope filter runs locally, so every page is read before the limit applies", func(cmd *cobra.Command, limit int) error {
 		return listWorkspaceTokensInDeployment(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd

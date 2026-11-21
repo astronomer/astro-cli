@@ -103,6 +103,16 @@ func (s *Suite) TestListData() {
 		mockClient.AssertExpectations(s.T())
 	})
 
+	s.Run("a success with no body is an error, not an empty list", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.ListRolesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
+		}, nil).Once()
+		_, err := ListData(context.Background(), mockClient, false, 0)
+		s.ErrorContains(err, "empty response body")
+	})
+
 	s.Run("a canceled context lists nothing", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		ctx, cancel := context.WithCancel(context.Background())

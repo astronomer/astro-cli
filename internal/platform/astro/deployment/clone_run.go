@@ -40,6 +40,8 @@ func CloneSource(ref, ws string, astroV1Client astrov1.APIClient) (astrov1.Deplo
 // DeploymentsNamed is every Deployment in workspace ws called name, listed
 // in organization orgID ("" for the current context's). A name is not
 // unique, so a caller decides what none, or several, means.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func DeploymentsNamed(name, ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
 	deployments, err := ListDeployments(context.Background(), ws, orgID, astroV1Client)
 	if err != nil {

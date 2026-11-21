@@ -39,7 +39,7 @@ func TestWorkspaceListLimit(t *testing.T) {
 func TestAddListLimitValidatesBeforeRunning(t *testing.T) {
 	var got []int
 	cmd := &cobra.Command{Use: "x"}
-	addListLimit(cmd, "things", func(_ *cobra.Command, limit int) error {
+	addListLimit(cmd, "things", "", func(_ *cobra.Command, limit int) error {
 		got = append(got, limit)
 		return nil
 	})

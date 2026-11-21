@@ -84,7 +84,7 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro workspace list
   astro workspace list -o json`,
 	}
-	addListLimit(cmd, "Workspaces", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "Workspaces", "", func(cmd *cobra.Command, limit int) error {
 		return workspaceList(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	cliout.AddOutputFlag(cmd, &workspaceListOutput)
@@ -249,7 +249,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
   astro workspace user list --workspace <WORKSPACE_ID>
   astro workspace user list -o json`,
 	}
-	addListLimit(cmd, "users", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "users", "", func(cmd *cobra.Command, limit int) error {
 		return listWorkspaceUser(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -330,7 +330,7 @@ func newWorkspaceTokenListCmd(out io.Writer) *cobra.Command {
   astro workspace token list --workspace <WORKSPACE_ID>
 `,
 	}
-	addListLimit(cmd, "API tokens", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "API tokens", "", func(cmd *cobra.Command, limit int) error {
 		return listWorkspaceToken(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -365,7 +365,7 @@ func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
   astro workspace team list -o json`,
 	}
 	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
-	addListLimit(cmd, "teams", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "teams", "", func(cmd *cobra.Command, limit int) error {
 		return listWorkspaceTeam(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -601,7 +601,7 @@ func newListOrganizationTokensInWorkspace(out io.Writer) *cobra.Command {
   # List the Organization tokens in another Workspace
   astro workspace token organization-token list --workspace <WORKSPACE_ID>`,
 	}
-	addListLimit(cmd, "Organization API tokens", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "Organization API tokens", "The scope filter runs locally, so every page is read before the limit applies", func(cmd *cobra.Command, limit int) error {
 		return listOrganizationTokensInWorkspace(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd

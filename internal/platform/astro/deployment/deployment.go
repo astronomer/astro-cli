@@ -2238,6 +2238,7 @@ func GetDeployment(ws, deploymentID, deploymentName string, use Use, selectionFi
 // Deployments when ctx is canceled, and says so as the cancellation, not as a
 // Deployment that was not found.
 func GetDeploymentContext(ctx context.Context, ws, deploymentID, deploymentName string, use Use, selectionFilter func(deployment astrov1.Deployment) bool, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+	ctx = pagination.Background(ctx)
 	// One the caller already fetched by its id (see WithFetched) is that
 	// Deployment: nothing is listed or read again.
 	if d, ok := fetchedFor(astroV1Client, ws, deploymentID); ok {

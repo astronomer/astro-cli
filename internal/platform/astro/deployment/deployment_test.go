@@ -396,6 +396,26 @@ func (s *Suite) TestListDeploymentsPaginatesOverHTTP() {
 	s.Equal([]string{"1000", "1000"}, seenLimits)
 }
 
+// A lookup with no context reads as Background, and a failed list is a
+// Deployment that was not found, not a panic on the nil context.
+func (s *Suite) TestGetDeploymentContextAcceptsANilContext() {
+	orig := ListDeployments
+	defer func() { ListDeployments = orig }()
+	ListDeployments = func(ctx stdcontext.Context, _, _ string, _ astrov1.APIClient) ([]astrov1.Deployment, error) {
+		s.NotNil(ctx, "the list is handed a context")
+		return nil, errors.New("boom")
+	}
+	//nolint:staticcheck // a nil context is the case under test
+	_, err := GetDeploymentContext(nil, "ws", "dep", "", ToRead, nil, mockV1Client)
+	var notFound *NotFoundError
+	s.ErrorAs(err, &notFound)
+
+	ctx, cancel := stdcontext.WithCancel(stdcontext.Background())
+	cancel()
+	_, err = GetDeploymentContext(ctx, "ws", "dep", "", ToRead, nil, mockV1Client)
+	s.ErrorIs(err, stdcontext.Canceled)
+}
+
 func (s *Suite) TestListData() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 

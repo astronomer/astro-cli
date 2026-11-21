@@ -328,6 +328,8 @@ func setWorkspaceRole(token *astrov1.ApiToken, workspaceID, role, organizationID
 // TokensOf lists the tokens with a role in the Workspace, as the API has them,
 // of the scopes in tokenTypes (all of them when it is empty), for a command in
 // another family that picks among them.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func TokensOf(workspaceID string, tokenTypes []TokenType, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
 	return getWorkspaceTokens(httpContext.Background(), workspaceID, tokenTypes, 0, client)
 }
@@ -406,6 +408,8 @@ func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.Api
 // person picks through pick. tokenTypes, when not empty, are the scopes the
 // command may act on. The Workspace is the current one when workspaceID is
 // "", and the tokens offered are shown with their role on it.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
 	if id == "" {
 		// Resolved here, not only in the list, so the roles offered are the
@@ -451,6 +455,8 @@ func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenT
 // Workspace's own tokens, and Organization tokens with a role in it, are its to
 // change. A run with no Workspace (an Organization token's, given an ID) has
 // none to check against.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func FindTokenIn(id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (astrov1.ApiToken, error) {
 	if id == "" || workspaceID == "" {
 		return FindToken(id, name, workspaceID, organizationID, tokenTypes, pick, client)

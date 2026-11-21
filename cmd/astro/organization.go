@@ -87,7 +87,7 @@ func newOrganizationListCmd(out io.Writer) *cobra.Command {
   astro organization list -o json`,
 	}
 	cliout.AddOutputFlag(cmd, &organizationListOutput)
-	addListLimit(cmd, "Organizations", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "Organizations", "", func(cmd *cobra.Command, limit int) error {
 		return organizationList(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -221,7 +221,7 @@ func newOrganizationUserListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro organization user list
   astro organization user list -o json`,
 	}
-	addListLimit(cmd, "users", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "users", "", func(cmd *cobra.Command, limit int) error {
 		return listUsers(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -393,7 +393,7 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro organization team list
   astro organization team list -o json`,
 	}
-	addListLimit(cmd, "teams", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "teams", "", func(cmd *cobra.Command, limit int) error {
 		return listTeams(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -636,7 +636,7 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
 `,
 	}
 	cmd.Flags().StringVar(&teamID, "team-id", "", "The Team's id \"\" ")
-	addListLimit(cmd, "members", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "members", "", func(cmd *cobra.Command, limit int) error {
 		return listUsersCmd(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -694,7 +694,7 @@ func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
   astro organization token list --organization-id <ORGANIZATION_ID>
 `,
 	}
-	addListLimit(cmd, "API tokens", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "API tokens", "", func(cmd *cobra.Command, limit int) error {
 		return listOrganizationToken(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -866,7 +866,7 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&shouldIncludeDefaultRoles, "include-default-roles", false, "Should include default roles in response")
 
-	addListLimit(cmd, "custom roles", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "custom roles", "Default roles shown with --include-default-roles are not counted against the limit", func(cmd *cobra.Command, limit int) error {
 		return listRoles(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd
@@ -904,7 +904,7 @@ func newOrganizationClusterListCmd(out io.Writer) *cobra.Command {
   astro organization cluster list -o json`,
 	}
 	cliout.AddOutputFlag(cmd, &organizationClusterListOutput)
-	addListLimit(cmd, "clusters", func(cmd *cobra.Command, limit int) error {
+	addListLimit(cmd, "clusters", "", func(cmd *cobra.Command, limit int) error {
 		return listClusters(cmd.Context(), out, cmd.ErrOrStderr(), limit)
 	})
 	return cmd

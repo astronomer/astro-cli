@@ -212,6 +212,8 @@ func SelectUser(users []astrov1.User, roleEntity, scopeID string) (astrov1.User,
 }
 
 // GetOrgUsers returns a list of all organization users.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func GetOrgUsers(client astrov1.APIClient) ([]astrov1.User, error) {
 	return listUsers(httpContext.Background(), client, nil, nil, 0)
 }
@@ -246,6 +248,9 @@ func listUsers(ctx httpContext.Context, client astrov1.APIClient, workspaceID, d
 		}
 		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 			return nil, 0, err
+		}
+		if resp.JSON200 == nil {
+			return nil, 0, errors.New("list users returned an empty response body")
 		}
 		return resp.JSON200.Users, resp.JSON200.TotalCount, nil
 	})
@@ -395,6 +400,8 @@ func IsOrganizationRoleValid(role string) error {
 }
 
 // GetWorkspaceUsers returns users with a role in the given workspace.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func GetWorkspaceUsers(client astrov1.APIClient, workspaceID string, _ int) ([]astrov1.User, error) {
 	workspaceID, err := astrosession.RequireWorkspace(workspaceID)
 	if err != nil {
@@ -576,6 +583,8 @@ func putDeploymentRole(client astrov1.APIClient, orgID, deploymentID, email, rol
 }
 
 // GetDeploymentUsers returns users with a role in the given deployment.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func GetDeploymentUsers(client astrov1.APIClient, deploymentID string, _ int) ([]astrov1.User, error) {
 	dID := deploymentID
 	return listUsers(httpContext.Background(), client, nil, &dID, 0)

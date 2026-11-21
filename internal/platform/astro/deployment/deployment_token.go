@@ -429,6 +429,8 @@ func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.Api
 // named name among the tokens with a role on the Deployment, else the one a
 // person picks through pick. tokenTypes, when not empty, are the scopes the
 // command may act on.
+//
+// It pages with a background context: a single lookup on a mutating path, and threading the run's context through it is tracked as a follow-up.
 func FindToken(id, name, deploymentID string, tokenTypes []DeploymentTokenType, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
