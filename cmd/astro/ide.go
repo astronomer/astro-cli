@@ -55,6 +55,7 @@ func newIDEListProjectCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List all Astro IDE projects in your Workspace",
 		Long:    "List all Astro IDE projects in your Workspace and optionally select one for future commands.",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listIDEProjects(out)
 		},
@@ -70,6 +71,7 @@ func newIDEImportProjectCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"i"},
 		Short:   "Import a project from Astro IDE",
 		Long:    "Import a project from Astro IDE to your local directory.",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return importIDEProject(cmd, out)
 		},
@@ -94,6 +96,7 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"e"},
 		Short:   "Export a project to Astro IDE",
 		Long:    "Export a project from your local directory to Astro IDE.",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return exportProject(cmd, out)
 		},

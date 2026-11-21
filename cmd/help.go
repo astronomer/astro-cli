@@ -329,7 +329,7 @@ func flagSections(c *cobra.Command, width int) []string {
 
 	inherited := pflag.NewFlagSet("inherited", pflag.ContinueOnError)
 	c.InheritedFlags().VisitAll(func(f *pflag.Flag) {
-		if f.Hidden || f.Name == verbosityFlag {
+		if f.Hidden || f.Name == verbosityFlag || f.Name == versionFlag {
 			return
 		}
 		inherited.AddFlag(f)

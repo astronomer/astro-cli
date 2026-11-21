@@ -69,6 +69,7 @@ func newTeamListCmd(out io.Writer) *cobra.Command {
 
   # List teams a page at a time
   astro team list --paginated --page-size 20`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listTeam(out, paginated, pageSize)
 		},

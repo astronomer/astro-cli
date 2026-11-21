@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astronomer/astro-cli/internal/usageerr"
 )
 
@@ -97,6 +99,19 @@ type usageError struct {
 	beforeRun bool
 	// noHelp is UsageNoHelp: no pointer to the command's help follows.
 	noHelp bool
+	// pointAt is the command whose help the refusal points at when it is not
+	// the command that ran (`astro help x` points at the root's).
+	pointAt *cobra.Command
+}
+
+// PointAtHelpOf makes the pointer a usage error ends with name cmd's help
+// rather than the help of the command that returned it. Any other error is
+// returned as it is.
+func PointAtHelpOf(err error, cmd *cobra.Command) error {
+	if u, ok := err.(*usageError); ok { //nolint:errorlint // only the mark on the outside carries the pointer
+		u.pointAt = cmd
+	}
+	return err
 }
 
 func (e *usageError) Error() string { return e.err.Error() }

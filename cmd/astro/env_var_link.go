@@ -44,7 +44,7 @@ func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 			"its own value. Identify the variable with --variable-key or --variable-id.",
 		Example: envVarLinkExamples,
 
-		Args: cobra.ArbitraryArgs,
+		Args: cliout.UndeclaredArgs,
 		RunE: cliout.GroupHelp,
 	}
 	cmd.AddCommand(

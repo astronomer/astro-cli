@@ -37,7 +37,7 @@ func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage environment variables",
 		Long:    "Manage environment variables on Astro, scoped to a Workspace or a Deployment.",
 		Example: envVarExamples,
-		Args:    cobra.ArbitraryArgs,
+		Args:    cliout.UndeclaredArgs,
 		RunE:    cliout.GroupHelp,
 	}
 	cmd.SetOut(out)
