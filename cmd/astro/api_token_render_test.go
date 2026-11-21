@@ -57,19 +57,13 @@ func TestTokenListPipedHasTimestampsAndTabs(t *testing.T) {
 func TestTokenSecretIsAloneOnStdout(t *testing.T) {
 	var out, errOut bytes.Buffer
 	tok := &apitoken.Token{Name: "ci", Token: "s3cret"}
-	require.NoError(t, renderTokenSecret(cliout.FormatText, &out, &errOut, tok, "Workspace", "Created", "ci", false))
+	require.NoError(t, renderTokenSecret(cliout.FormatText, &out, &errOut, tok, "Workspace", "Created", "ci"))
 	assert.Equal(t, "s3cret\n", out.String())
 	assert.Equal(t, "\nCreated Workspace API token ci\nCopy this API token for your records.\nThis API token value is not shown again.\n", errOut.String())
 
-	out.Reset()
-	errOut.Reset()
-	require.NoError(t, renderTokenSecret(cliout.FormatText, &out, &errOut, tok, "Workspace", "Created", "ci", true))
-	assert.Equal(t, "s3cret\n", out.String(), "--clean-output is the same bytes")
-	assert.Empty(t, errOut.String(), "and no receipt")
-
 	// A secret that could not be written is not announced as given.
 	errOut.Reset()
-	require.Error(t, renderTokenSecret(cliout.FormatText, failingWriter{}, &errOut, tok, "Workspace", "Created", "ci", false))
+	require.Error(t, renderTokenSecret(cliout.FormatText, failingWriter{}, &errOut, tok, "Workspace", "Created", "ci"))
 	assert.Empty(t, errOut.String())
 }
 
