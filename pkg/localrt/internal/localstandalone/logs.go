@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/termtext"
 )
 
 // Standalone log parsing, lifted from Astro Desktop.
@@ -40,11 +41,12 @@ var (
 	reMultiSpace = regexp.MustCompile(`\s{2,}`)
 )
 
-// stripANSI removes terminal escape sequences from a log line: the colors
+// stripANSI removes what a terminal would act on from a log line: the colors
 // `airflow standalone` and structlog write (a raw line begins
-// "\x1b[33mdag-processor\x1b[0m | " rather than "dag-processor | "), and any
-// other sequence such as an OSC. rt.StripEscapes holds the pattern, so the
-// docker engine drops the same ones.
+// "\x1b[33mdag-processor\x1b[0m | " rather than "dag-processor | "), any
+// other escape sequence such as an OSC, and the other control and invisible
+// characters, by termtext.Lines, the rules the CLI's own text filters are built on,
+// which the docker engine applies to its lines too.
 //
 // It runs before anything else reads the line, because everything else assumed
 // they were not there. The component prefix match is the visible casualty —
@@ -57,11 +59,12 @@ var (
 // rewrites these lines for display (cleanLogMessage), the CLI renders its own
 // component label, and a color chosen for somebody else's terminal is not
 // something to pass through a documented JSON field.
-// The scan is guarded because parseLogMeta promises no regex work: it runs for
-// every line of the capped log file on every `astro local logs`, and an
-// uncoloured line — every line the older fixtures carry — should not pay for a
-// full pattern match and an allocation to learn there was nothing to strip.
-func stripANSI(s string) string { return rt.StripEscapes(s) }
+// termtext.Lines runs its pattern only on a line with an escape in it, because
+// parseLogMeta promises no regex work: it runs for every line of the capped log
+// file on every `astro local logs`, and an uncoloured line — every line the
+// older fixtures carry — should not pay for a full pattern match and an
+// allocation to learn there was nothing to strip.
+func stripANSI(s string) string { return termtext.Lines(s) }
 
 // logComponents are the process names `airflow standalone` multiplexes;
 // anything else (uv output, tracebacks, banners) is "system".

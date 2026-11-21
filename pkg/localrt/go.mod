@@ -18,6 +18,10 @@ require (
 	github.com/astronomer/astro-cli/pkg/uv v0.0.0-00010101000000-000000000000
 )
 
+// The rules for what a terminal is given of a log line, shared with the
+// CLI's own text filters (pkg/input). A leaf: its one require is test-only.
+require github.com/astronomer/astro-cli/pkg/termtext v0.0.0-00010101000000-000000000000
+
 require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/stretchr/testify v1.11.1
@@ -45,3 +49,5 @@ replace github.com/astronomer/astro-cli/pkg/proxy => ../proxy
 replace github.com/astronomer/astro-cli/pkg/uv => ../uv
 
 replace github.com/astronomer/astro-cli/pkg/testenv => ../testenv
+
+replace github.com/astronomer/astro-cli/pkg/termtext => ../termtext
