@@ -85,7 +85,7 @@ func (w Where) Loaded(dir string) *manifest.Manifest {
 }
 
 // Locate walks up from dir to the nearest project, the one rule astro
-// deploy, astro remote deploy, APC's deploy and the bundle deploys'
+// deploy, astro deploy agent, APC's deploy and the bundle deploys'
 // containment checks decide by, routing included. It is the astro dev stub's
 // walk (scaffold.Find1xProject), so the deploy refuses as 1.x exactly where
 // the local commands' advice says a 1.x project is. At each directory:

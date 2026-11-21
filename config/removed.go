@@ -24,8 +24,8 @@ var removedSettings = map[string]removedSetting{
 	"cosmos_boost.pre_deploy":                 {cosmosBoostMoved, []string{"false"}},
 	"apc.sha_as_tag":                          {shaAsTagMoved, []string{"false"}},
 	"sha_as_tag":                              {shaAsTagMoved, []string{"false"}},
-	"deploy.remote_execution.client_registry": {clientRegistryMoved, nil},
-	"remote.client_registry":                  {clientRegistryMoved, nil},
+	"deploy.remote_execution.client_registry": {agentRegistryMoved, nil},
+	"remote.client_registry":                  {agentRegistryMoved, nil},
 	"airflow.expose_port":                     {"astro local has no setting for the interfaces local Airflow listens on.", []string{"false"}},
 	"api-server.port":                         {portRemoved, []string{"8080"}},
 	"beta.remote_cmd":                         {"It was a beta flag, and nothing is gated on it any more.", []string{"false"}},
@@ -58,9 +58,9 @@ var removedSettings = map[string]removedSetting{
 }
 
 const (
-	cosmosBoostMoved    = "A project's deploys generate Cosmos Boost files with cosmos-boost = true under [tool.astro.deploy] in its pyproject.toml; astro deploy bundle takes --cosmos-boost."
-	shaAsTagMoved       = "A project's Astro Private Cloud deploys push by digest with sha-as-tag = true under [tool.astro.deploy] in its pyproject.toml."
-	clientRegistryMoved = "astro remote deploy pushes to client-registry under [tool.astro.deploy] in the project's pyproject.toml (a link can set its own), or to --registry."
+	cosmosBoostMoved   = "A project's deploys generate Cosmos Boost files with cosmos-boost = true under [tool.astro.deploy] in its pyproject.toml; astro deploy bundle takes --cosmos-boost."
+	shaAsTagMoved      = "A project's Astro Private Cloud deploys push by digest with sha-as-tag = true under [tool.astro.deploy] in its pyproject.toml."
+	agentRegistryMoved = "astro deploy agent pushes to agent-registry under [tool.astro.deploy] in the project's pyproject.toml (a link can set its own), or to --registry."
 	// portRemoved replaces 1.x's webserver.port and api-server.port.
 	portRemoved = "Pick the local Airflow port with astro local start --port <port>; without it a free port is chosen."
 	// postgresRemoved replaces every 1.x postgres.* setting: the metadata

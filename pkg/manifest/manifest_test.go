@@ -1186,10 +1186,10 @@ url = "https://deployments.astro.corp.example/ckdep-apc/airflow"
 		wantKeys: []string{"tool.astro.deployments.prod-apc.url"},
 	},
 	{
-		// Only an Astro Deployment runs remote agents, which pull the client
-		// image astro remote deploy pushes.
-		name:      "client-registry on an mwaa link",
-		wantCodes: []ProblemCode{CodeClientRegistryOnNonAstroLink},
+		// Only an Astro Deployment runs Remote Execution agents, which pull the
+		// agent image astro deploy agent pushes.
+		name:      "agent-registry on an mwaa link",
+		wantCodes: []ProblemCode{CodeAgentRegistryOnNonAstroLink},
 		content: `
 [project]
 name = "p"
@@ -1200,9 +1200,9 @@ dependencies = ["apache-airflow==3.1.*"]
 [tool.astro.deployments.aws]
 target = "mwaa"
 environment = "orders-prod"
-client-registry = "quay.io/acme/client"
+agent-registry = "quay.io/acme/client"
 `,
-		wantKeys: []string{"tool.astro.deployments.aws.client-registry"},
+		wantKeys: []string{"tool.astro.deployments.aws.agent-registry"},
 	},
 	{
 		// An astro link's host is [tool.astro] domain. A domain on the link

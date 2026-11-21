@@ -289,13 +289,13 @@ How the project's deploys behave, whoever runs them. These live in the project, 
 
 ```toml
 [tool.astro.deploy]
-client-registry = 'quay.io/acme/client'
+agent-registry = 'quay.io/acme/client'
 git-metadata = false
 ```
 
-### `client-registry`
+### `agent-registry`
 
-The image repository `astro remote deploy` pushes the Remote Execution client image to: `registry[:port]/repository`, with no tag, since the deploy adds its own. It is the repository the project's remote agents pull from, configured on their side. A link can set its own (see [`client-registry` on a link](#client-registry-1)), and `astro remote deploy --registry` overrides both for one run, which is also the only way to name one outside a project. `astro remote deploy` checks the value is a repository it can push to and names this key when it is not. Astro CLI 1.x kept this as `remote.client_registry`; `astro init` carries it here.
+The image repository `astro deploy agent` pushes the Remote Execution agent image to: `registry[:port]/repository`, with no tag, since the deploy adds its own. It is the repository the project's remote agents pull from, configured on their side. A link can set its own (see [`agent-registry` on a link](#agent-registry-1)), and `astro deploy agent --registry` overrides both for one run, which is also the only way to name one outside a project. `astro deploy agent` checks the value is a repository it can push to and names this key when it is not. Astro CLI 1.x kept this as `remote.client_registry`; `astro init` carries it here.
 
 ### `git-metadata`
 
@@ -377,9 +377,9 @@ Every field that carries a credential is a `*-env` name: it names the environmen
 
 Anything else is an error: an unknown method, a field the method does not take, a missing credential field, half a credential pair, both credential pairs at once.
 
-### `client-registry`
+### `agent-registry`
 
-On an Astro link only: the repository `astro remote deploy --deployment <name>` pushes the client image to, for a Deployment whose remote agents pull from somewhere other than the project's [`client-registry`](#client-registry). Unset, the link takes the project's. An error on any other kind of link, which has no remote agents.
+On an Astro link only: the repository `astro deploy agent --deployment <name>` pushes the agent image to, for a Deployment whose remote agents pull from somewhere other than the project's [`agent-registry`](#agent-registry). Unset, the link takes the project's. An error on any other kind of link, which has no remote agents.
 
 ### `default`
 

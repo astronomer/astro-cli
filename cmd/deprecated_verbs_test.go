@@ -50,6 +50,7 @@ var deprecatedVerbs = func() map[string]deprecatedVerb {
 	for _, link := range []string{"variable", "connection", "airflow-variable"} {
 		m["env "+link+" link delete"] = deprecatedVerb{instead: "env " + link + " link remove"}
 	}
+	m["remote deploy"] = deprecatedVerb{instead: "deploy agent"}
 	return m
 }()
 

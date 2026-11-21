@@ -62,7 +62,10 @@ var (
   astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>
 
   # Deploy a dbt project, or another non-Dag bundle, from its own directory
-  astro deploy bundle <PATH> --deployment <DEPLOYMENT_ID>`
+  astro deploy bundle <PATH> --deployment <DEPLOYMENT_ID>
+
+  # Push the image a Remote Execution Deployment's agents run
+  astro deploy agent --deployment <DEPLOYMENT_ID>`
 
 	buildSecrets = []string{}
 )
@@ -77,7 +80,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy [DEPLOYMENT_ID]",
 		Short:   "Ship this project's code to a Deployment",
-		Long:    "Build this project into an image and push it, with its Dags, to a Deployment on Astro. Run it from the root of a project with a pyproject.toml ([tool.astro]), or from anywhere with --image-name to deploy a prebuilt image. A project in the Astro CLI 1.x layout needs astro init first, or Astro CLI 1.x.\n\nWith Remote Execution, this updates only the API Server and Scheduler; use astro remote deploy for the rest.",
+		Long:    "Build this project into an image and push it, with its Dags, to a Deployment on Astro. Run it from the root of a project with a pyproject.toml ([tool.astro]), or from anywhere with --image-name to deploy a prebuilt image. A project in the Astro CLI 1.x layout needs astro init first, or Astro CLI 1.x.\n\nWith Remote Execution, this updates only the API Server and Scheduler; push the image its agents run with astro deploy agent.",
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    deploy,
 		Example: deployExample,
@@ -116,9 +119,9 @@ func NewDeployCmd() *cobra.Command {
 	annotateDeployFlag(cmd, "dags", deployGroupDAG)
 	annotateDeployFlag(cmd, "no-dags-base-dir", deployGroupDAG)
 	orderDeployFlagGroups(cmd)
-	// astro deploy bundle is the subcommand, so the word bundle is never a
-	// Deployment argument: a link of that name is reached with --deployment.
-	cmd.AddCommand(newDeployBundleCmd())
+	// astro deploy bundle and agent are subcommands, so neither word is ever a
+	// Deployment argument: a link of either name is reached with --deployment.
+	cmd.AddCommand(newDeployBundleCmd(), newDeployAgentCmd())
 	applyPreferredFlagsIn(cmd)
 	return cmd
 }

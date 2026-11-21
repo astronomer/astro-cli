@@ -581,7 +581,7 @@ func TestDeployManifestImage_RefusesAnAgentImage(t *testing.T) {
 				ImageName:    imageName,
 			}, client)
 			require.ErrorIs(t, err, errAgentImageInHostedDeploy)
-			assert.ErrorContains(t, err, "astro remote deploy")
+			assert.ErrorContains(t, err, "astro deploy agent")
 			assert.NotContains(t, err.Error(), "show_warnings", "the refusal does not steer users to the global switch")
 			client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			assert.False(t, hasImageCall(cmd.calls, "push"), "nothing is pushed, got %v", cmd.calls)

@@ -113,7 +113,7 @@ func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 		assert.Contains(t, stderr, "uncommitted changes", "the platform's note goes to stderr")
 	})
 	t.Run("remote deploy", func(t *testing.T) {
-		stubClientDeploy(t, &astrodeploy.ClientDeploy{Image: "r/c:deploy-x", Registry: "r/c", Tag: "deploy-x"}, nil)
+		stubAgentDeploy(t, &astrodeploy.AgentDeploy{Image: "r/c:deploy-x", Registry: "r/c", Tag: "deploy-x"}, nil)
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
 		prev := config.WorkingPath
@@ -122,7 +122,7 @@ func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 
 		stdout, stderr, err := execUnboundRoot(t, nil, "remote", "deploy", "--registry", "registry.example.com/agents/client", "-o", "json")
 		require.NoError(t, err, "stderr:\n%s", stderr)
-		var got remoteDeployJSON
+		var got deployAgentJSON
 		decodeOne(t, stdout, &got)
 		assert.Equal(t, "r/c:deploy-x", got.Image)
 		assert.NotContains(t, stderr, "r/c:deploy-x", "the result went to stderr")
