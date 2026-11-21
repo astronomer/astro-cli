@@ -100,9 +100,9 @@ func TestUploadBundleSlimManifest(t *testing.T) {
 	}
 }
 
-func TestUploadBundleSkipsPreDeployByDefault(t *testing.T) {
+func TestUploadBundleSkipsPreDeployWhenDisabled(t *testing.T) {
 	setupCosmosBoostEnv(t)
-	// cosmos_boost.pre_deploy defaults to false, so nothing may be produced.
+	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("false"))
 
 	bundleDir := writeDbtBundle(t)
 
@@ -114,7 +114,7 @@ func TestUploadBundleSkipsPreDeployByDefault(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NoFileExists(t, filepath.Join(bundleDir, cosmosBoostArtifact),
-		"opt-in gate is off by default; nothing may be written")
+		"gate is disabled; nothing may be written")
 }
 
 // TestDeployBundleDbtPathRunsPreDeployWhenEnabled drives the full
@@ -207,6 +207,7 @@ func TestUploadBundleFailsWhenStaleArtifactUnremovable(t *testing.T) {
 // in place, and removing it is `astro dbt cleanup`'s job.
 func TestUploadBundleIsANoOpWhenDisabled(t *testing.T) {
 	setupCosmosBoostEnv(t)
+	require.NoError(t, config.CFG.CosmosBoostPreDeploy.SetHomeString("false"))
 
 	bundleDir := writeDbtBundle(t)
 	leftover := filepath.Join(bundleDir, cosmosBoostArtifact)
