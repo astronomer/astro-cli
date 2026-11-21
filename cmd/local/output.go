@@ -48,6 +48,10 @@ type event struct {
 // dropped: callbacks have no error channel, and a broken pipe surfaces on
 // the command's own final write.
 func (c *cli) callbacks(r cliout.Renderer) localrt.Callbacks {
+	// In text the progress of a start goes to stderr, with the other notes: it
+	// comes before the work it reports on, and stdout carries the final status
+	// alone. In json the events are the stream on stdout.
+	progress := textWriter(r)
 	return localrt.Callbacks{
 		OnState: func(s localrt.State, err error) {
 			e := event{Event: "state", State: s}
@@ -55,19 +59,19 @@ func (c *cli) callbacks(r cliout.Renderer) localrt.Callbacks {
 				e.Error = err.Error()
 			}
 			//nolint:errcheck // see the comment above
-			r.EmitEvent(e, func(w io.Writer) error {
+			r.EmitEvent(e, func(io.Writer) error {
 				if err != nil {
-					_, werr := fmt.Fprintf(w, "airflow: %s (%s)\n", s, err)
+					_, werr := fmt.Fprintf(progress, "airflow: %s (%s)\n", s, err)
 					return werr
 				}
-				_, werr := fmt.Fprintf(w, "airflow: %s\n", s)
+				_, werr := fmt.Fprintf(progress, "airflow: %s\n", s)
 				return werr
 			})
 		},
 		OnLine: func(l localrt.LogLine) {
 			//nolint:errcheck // see the comment above
-			r.EmitEvent(logEvent(l), func(w io.Writer) error {
-				return renderLogLine(w, l)
+			r.EmitEvent(logEvent(l), func(io.Writer) error {
+				return renderLogLine(progress, l)
 			})
 		},
 	}

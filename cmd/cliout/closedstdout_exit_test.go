@@ -13,11 +13,15 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
-// A wrapped stdout writer reports the errno without the file's name; it is
-// still the reader that left. A socket's is not.
-func TestClosedStdoutReadsABareBrokenPipe(t *testing.T) {
-	assert.True(t, ClosedStdout(fmt.Errorf("render: %w", syscall.EPIPE)))
+// A bare broken pipe says nothing about which pipe: it is stdout's only once
+// SIGPIPE has canceled the run with ErrClosedStdout, which Go raises for fd 1
+// and 2 alone.
+func TestABareBrokenPipeIsStdoutsOnlyOnceSIGPIPESaidSo(t *testing.T) {
+	bare := fmt.Errorf("render: %w", syscall.EPIPE)
+	assert.False(t, ClosedStdout(bare))
 	assert.False(t, ClosedStdout(fmt.Errorf("upload: %w", &net.OpError{Op: "write", Err: syscall.EPIPE})))
+	assert.Equal(t, ExitFailure, ExitCode(context.Background(), bare))
+	assert.Equal(t, 0, ExitCode(cancelledByClosedStdout(), bare))
 }
 
 func cancelledByClosedStdout() context.Context {
@@ -29,7 +33,7 @@ func cancelledByClosedStdout() context.Context {
 // (a) A read whose stdout reader left exits 0, whether the run saw the write
 // fail or the cancellation, and says nothing.
 func TestAReadWithAClosedStdoutExitsZero(t *testing.T) {
-	assert.Equal(t, 0, ExitCode(context.Background(), fmt.Errorf("render: %w", syscall.EPIPE)))
+	assert.Equal(t, 0, ExitCode(context.Background(), stdoutWriteError(syscall.EPIPE)))
 	assert.Equal(t, 0, ExitCode(cancelledByClosedStdout(), context.Canceled))
 	assert.Equal(t, 0, ExitCode(cancelledByClosedStdout(), nil))
 	assert.True(t, EndedByClosedStdout(cancelledByClosedStdout(), context.Canceled))

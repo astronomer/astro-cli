@@ -363,7 +363,13 @@ func UploadBundle(ctx context.Context, bundlePath, uploadURL string, opts Bundle
 	// stale one must not ship), and with cosmosBoost on ([tool.astro.deploy]
 	// cosmos-boost for a project's Dags, --cosmos-boost for a bundle), fresh
 	// ones are generated into the bundle, best-effort (a missing one is safe).
-	overlay, err := cosmosboost.BundleOverlay(bundlePath, opts.CosmosBoost, nil, opts.ErrOut)
+	// Its progress line goes with its warnings, to stderr: the upload that
+	// follows is a change in flight, and stdout carries the result alone.
+	notes := opts.ErrOut
+	if notes == nil {
+		notes = os.Stderr
+	}
+	overlay, err := cosmosboost.BundleOverlay(bundlePath, opts.CosmosBoost, notes, notes)
 	if err != nil {
 		return "", err
 	}

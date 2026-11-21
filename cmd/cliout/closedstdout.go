@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io/fs"
-	"net"
 	"os"
 
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -17,24 +16,18 @@ import (
 // the exit status is not 128+n.
 var ErrClosedStdout = errors.New("stdout was closed by its reader")
 
-// ClosedStdout reports that err is a write to a pipe whose reader has gone: a
-// failed write to the process's stdout (`astro config list | head -1` once
-// head has its line), or any broken-pipe error that is not a network one.
+// ClosedStdout reports that err is a failed write to the process's stdout
+// because its reader has gone: a *fs.PathError for a write to os.Stdout whose
+// cause is a broken pipe (`astro config list | head -1` once head has its
+// line). It is also what Windows reports, which has no SIGPIPE.
 //
-// A network error is excluded: the same errno from a socket (a connection that
-// broke while an upload was in flight) is a failure of the request, which
-// ClosedStdout does not speak for.
+// Any other broken pipe is not stdout's: a child's stdin, a socket. Only a run
+// already canceled with ErrClosedStdout, which main does once SIGPIPE has
+// confirmed that fd 1 is the broken one (Go raises it for fd 1 and 2 alone),
+// counts those as stdout's too (closedStdoutRun).
 func ClosedStdout(err error) bool {
-	if err == nil || errors.As(err, new(*net.OpError)) {
-		return false
-	}
 	var pe *fs.PathError
-	if errors.As(err, &pe) && pe.Op == "write" && pe.Path == os.Stdout.Name() && isBrokenPipe(pe.Err) {
-		return true
-	}
-	// A wrapped stdout writer (a buffer, a tee) reports the errno without
-	// the file's name.
-	return isBrokenPipe(err)
+	return errors.As(err, &pe) && pe.Op == "write" && pe.Path == os.Stdout.Name() && isBrokenPipe(pe.Err)
 }
 
 // closedStdoutRun reports that the run ended because its stdout reader went
