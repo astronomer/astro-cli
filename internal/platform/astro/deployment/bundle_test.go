@@ -32,10 +32,10 @@ func (s *Suite) TestCreateBundle() {
 		out := &bytes.Buffer{}
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 
-		err := CreateBundle("", "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
+		err := CreateBundle("", "", "deploy", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
 		s.ErrorIs(err, errCreateBundleTarget)
 
-		err = CreateBundle("my-dags", "/mount", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
+		err = CreateBundle("my-dags", "/mount", "deploy", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
 		s.ErrorIs(err, errCreateBundleTarget)
 
 		mockV1Alpha1Client.AssertNotCalled(s.T(), "CreateBundleWithResponse")
@@ -52,7 +52,7 @@ func (s *Suite) TestCreateBundle() {
 			JSON200:      &astrov1alpha1.DeploymentBundle{Id: "bundle-1"},
 		}, nil).Once()
 
-		err := CreateBundle("my-dags", "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
+		err := CreateBundle("my-dags", "", "deploy", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "Created bundle bundle-1")
 		mockV1Alpha1Client.AssertExpectations(s.T())
@@ -72,7 +72,7 @@ func (s *Suite) TestCreateBundle() {
 			JSON200:      &astrov1alpha1.DeploymentBundle{Id: "bundle-2"},
 		}, nil).Once()
 
-		err := CreateBundle("", "/usr/local/airflow/dbt", "dbt", "my dbt project", []string{"dag-1"}, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
+		err := CreateBundle("", "/usr/local/airflow/dbt", "deploy", "dbt", "my dbt project", []string{"dag-1"}, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "Created bundle bundle-2")
 		mockV1Alpha1Client.AssertExpectations(s.T())
@@ -82,7 +82,7 @@ func (s *Suite) TestCreateBundle() {
 		out := &bytes.Buffer{}
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 
-		err := CreateBundle("my-dags", "", "dbt", "", []string{"dag-1"}, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
+		err := CreateBundle("my-dags", "", "deploy", "dbt", "", []string{"dag-1"}, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
 		s.ErrorIs(err, errDagBundleNonDagFlags)
 		mockV1Alpha1Client.AssertNotCalled(s.T(), "CreateBundleWithResponse")
 	})
@@ -93,7 +93,7 @@ func (s *Suite) TestCreateBundle() {
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 		mockV1Alpha1Client.On("CreateBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
-		err := CreateBundle("my-dags", "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
+		err := CreateBundle("my-dags", "", "deploy", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
 		s.ErrorIs(err, errMock)
 		mockV1Alpha1Client.AssertExpectations(s.T())
 	})
@@ -388,7 +388,7 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 			mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(listing(astrov1alpha1.DeploymentBundle{Id: "bundle-3", Name: &name, IsDagBundle: &isDag}), nil).Once()
 
-			err := CreateBundle(name, "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{JSON: asJSON, Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
+			err := CreateBundle(name, "", "deploy", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{JSON: asJSON, Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
 			s.NoError(err)
 			if asJSON {
 				var got BundleInfo
@@ -431,7 +431,7 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 			mockV1Alpha1Client.On("CreateBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(created, nil).Once()
 			mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(listing(), nil).Once()
 
-			err := CreateBundle(name, "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{JSON: asJSON, Out: out}, errOut, mockV1Client, mockV1Alpha1Client)
+			err := CreateBundle(name, "", "deploy", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{JSON: asJSON, Out: out}, errOut, mockV1Client, mockV1Alpha1Client)
 			s.NoError(err)
 			if !asJSON {
 				s.Equal("Created bundle my-dags on Deployment test-id-1\n", out.String(), "the warning stays out of the result's text")
@@ -486,7 +486,7 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 			astrov1alpha1.DeploymentBundle{Id: "new", Name: &name, IsDagBundle: &isDag, CreatedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
 		), nil).Once()
 
-		err := CreateBundle(name, "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
+		err := CreateBundle(name, "", "deploy", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Equal("Created bundle new on Deployment test-id-1\n", out.String())
 	})
@@ -501,7 +501,7 @@ func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
 			astrov1alpha1.DeploymentBundle{Id: "newer", Name: &name, IsDagBundle: &isDag, CreatedAt: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)},
 		), nil).Once()
 
-		err := CreateBundle(name, "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
+		err := CreateBundle(name, "", "deploy", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, io.Discard, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Equal("Created bundle newer on Deployment test-id-1\n", out.String())
 	})

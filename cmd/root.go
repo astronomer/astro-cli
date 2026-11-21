@@ -167,7 +167,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 
 	if isCloudCtx { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			astroCmd.AddCmds(astroV1Client, v1Alpha1Client, v1Alpha1Client, o.out)...,
+			astroCmd.AddCmds(astroV1Client, v1Alpha1Client, astrov1alpha1.NewV1Alpha1StreamClient(httputil.NewHTTPClient()), v1Alpha1Client, o.out)...,
 		)
 	} else { // Include all the commands to be exposed for APC users
 		// The APC commands take their flags, examples and some subcommands
@@ -276,7 +276,7 @@ var commandGroups = []struct {
 	{groupShip, "Ship:", []string{"package", "deploy", "remote"}},
 	{groupManage, "Manage Astro:", []string{
 		"login", "logout", "auth", "context",
-		"organization", "workspace", "deployment", "env",
+		"organization", "workspace", "deployment", "bundle", "env",
 		"user", "team", "ide",
 	}},
 	// help and completion are not listed: cobra injects them at execute time,

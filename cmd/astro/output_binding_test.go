@@ -64,7 +64,7 @@ func execUnboundRootWith(t *testing.T, client astrov1.APIClient, alpha astrov1al
 	gotOut, gotErr := read(outR), read(errR)
 
 	root := &cobra.Command{Use: "astro", SilenceErrors: true}
-	root.AddCommand(AddCmds(client, alpha, nil, os.Stdout)...)
+	root.AddCommand(AddCmds(client, alpha, nil, nil, os.Stdout)...)
 	err = cliout.Execute(context.Background(), root, args, os.Stdout, nil)
 
 	os.Stdout, os.Stderr = prevOut, prevErr

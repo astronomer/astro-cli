@@ -69,6 +69,8 @@ var publishedPayloads = []cliouttest.Case{
 	// UserList, and likewise the team lists.
 	{Name: "deployment-list", Value: deployment.DeploymentList{}},
 	{Name: "deployment-bundle-list", Value: deployment.BundleList{}},
+	// astro bundle versions list: a bundle's history, newest first.
+	{Name: "bundle-version-list", Value: deployment.BundleVersionList{}},
 	{Name: "workspace-list", Value: workspace.WorkspaceList{}},
 	{Name: "organization-list", Value: organization.OrganizationList{}},
 	{Name: "organization-cluster-list", Value: organization.ClusterList{}},
@@ -175,6 +177,13 @@ var publishedPayloads = []cliouttest.Case{
 	// it requested, which the API carries out in the background.
 	{Name: "deployment-bundle", Value: deployment.BundleResult{}},
 	{Name: "deployment-bundle-removal", Value: deployment.BundleRemoval{}},
+	// astro bundle rollback: the version the bundle was returned to.
+	{Name: "bundle-rollback", Value: deployment.BundleRollback{}},
+	// astro bundle files ls, cp, mv, rm and sync: a listing, what a copy, move or
+	// removal did, and what a sync changed (or would, with --dry-run).
+	{Name: "bundle-file-listing", Value: deployment.BundleFileListing{}},
+	{Name: "bundle-file-change", Value: deployment.BundleFileChange{}},
+	{Name: "bundle-sync", Value: deployment.BundleSyncResult{}},
 	// astro deployment hibernate and wake-up: the override the Deployment now
 	// has, which is null after --remove-override.
 	{Name: "deployment-hibernation", Value: deployment.HibernationResult{}},
