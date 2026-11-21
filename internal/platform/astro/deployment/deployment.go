@@ -208,7 +208,7 @@ func deploymentToInfo(d *astrov1.Deployment, includeWorkspaceName bool) Deployme
 // limit, when above zero, is the most Deployments wanted: paging stops once
 // that many are in hand, taken in the API's name order (descending, as they
 // are listed), so a limited list is the same first rows every time.
-func listData(ws string, fromAllWorkspaces bool, limit int, astroV1Client astrov1.APIClient) (*DeploymentList, error) {
+func listData(ctx context.Context, ws string, fromAllWorkspaces bool, limit int, astroV1Client astrov1.APIClient) (*DeploymentList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
@@ -217,12 +217,7 @@ func listData(ws string, fromAllWorkspaces bool, limit int, astroV1Client astrov
 	if fromAllWorkspaces {
 		ws = ""
 	}
-	var deployments []astrov1.Deployment
-	if limit > 0 {
-		deployments, err = listDeploymentsUpTo(ws, c.Organization, limit, astroV1Client)
-	} else {
-		deployments, err = ListDeployments(ws, c.Organization, astroV1Client)
-	}
+	deployments, err := listDeploymentsUpTo(ctx, ws, c.Organization, limit, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -241,9 +236,9 @@ func listData(ws string, fromAllWorkspaces bool, limit int, astroV1Client astrov
 }
 
 // ListWithFormat lists deployments with the specified output format
-func ListWithFormat(ws string, fromAllWorkspaces bool, limit int, astroV1Client astrov1.APIClient, r output.Emitter) error {
+func ListWithFormat(ctx context.Context, ws string, fromAllWorkspaces bool, limit int, astroV1Client astrov1.APIClient, r output.Emitter) error {
 	return output.PrintData(
-		func() (*DeploymentList, error) { return listData(ws, fromAllWorkspaces, limit, astroV1Client) },
+		func() (*DeploymentList, error) { return listData(ctx, ws, fromAllWorkspaces, limit, astroV1Client) },
 		deploymentTableConfig(fromAllWorkspaces, ws), r,
 	)
 }
@@ -1816,14 +1811,14 @@ var coreDeleteDeploymentHibernationOverride = func(orgID, deploymentID string, a
 // ListDeployments returns every Deployment in the given Workspace (or the whole
 // Organization when ws is empty), paging through the API as needed.
 var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
-	return listDeploymentsUpTo(ws, orgID, 0, astroV1Client)
+	return listDeploymentsUpTo(context.Background(), ws, orgID, 0, astroV1Client)
 }
 
 // listDeploymentsUpTo is ListDeployments that stops paging after limit
 // Deployments (every one when limit is below 1). Both ask the API for name
 // order, descending as `deployment list` shows them, so a limited read keeps
 // the first rows of the full one.
-func listDeploymentsUpTo(ws, orgID string, limit int, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
+func listDeploymentsUpTo(ctx context.Context, ws, orgID string, limit int, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1831,7 +1826,7 @@ func listDeploymentsUpTo(ws, orgID string, limit int, astroV1Client astrov1.APIC
 		}
 		orgID = c.Organization
 	}
-	return pagination.CollectUpTo("deployments", limit, func(offset int) ([]astrov1.Deployment, int, error) {
+	return pagination.CollectUpTo(ctx, "deployments", limit, func(offset int) ([]astrov1.Deployment, int, error) {
 		pageSize := listLimit
 		// Name order, descending as `deployment list` shows them, with or
 		// without a limit, so a limited list is the first rows of the full one.
@@ -1846,7 +1841,7 @@ func listDeploymentsUpTo(ws, orgID string, limit int, astroV1Client astrov1.APIC
 		if ws != "" {
 			params.WorkspaceIds = &[]string{ws}
 		}
-		resp, err := astroV1Client.ListDeploymentsWithResponse(context.Background(), orgID, params)
+		resp, err := astroV1Client.ListDeploymentsWithResponse(pagination.Background(ctx), orgID, params)
 		if err != nil {
 			return nil, 0, err
 		}

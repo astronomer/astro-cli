@@ -88,11 +88,11 @@ func TestAnOrganizationTokenDoesNotTakeTheSavedWorkspace(t *testing.T) {
 
 	// A command that reads the context for its workspace fails the same way,
 	// before it calls the API.
-	_, err = workspacetoken.ListTokens(nil, "", nil)
+	_, err = workspacetoken.ListTokens(context.Background(), nil, "", nil, 0)
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
-	_, err = user.ListWorkspaceUsersData(nil, "")
+	_, err = user.ListWorkspaceUsersData(context.Background(), nil, "", 0)
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
-	_, err = team.ListWorkspaceTeamsData(nil, "")
+	_, err = team.ListWorkspaceTeamsData(context.Background(), nil, "", 0)
 	require.ErrorIs(t, err, astrosession.ErrOrgTokenNoWorkspace)
 }
 

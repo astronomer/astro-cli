@@ -11,6 +11,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/picker"
@@ -212,40 +213,42 @@ func SelectUser(users []astrov1.User, roleEntity, scopeID string) (astrov1.User,
 
 // GetOrgUsers returns a list of all organization users.
 func GetOrgUsers(client astrov1.APIClient) ([]astrov1.User, error) {
-	return listUsers(client, nil, nil)
+	return listUsers(httpContext.Background(), client, nil, nil, 0)
 }
 
-// listUsers paginates through GET /users with optional workspaceId/deploymentId filters.
-func listUsers(client astrov1.APIClient, workspaceID, deploymentID *string) ([]astrov1.User, error) {
-	ctx, err := context.GetCurrentContext()
+// listUsers paginates through GET /users with optional workspaceId/deploymentId
+// filters. It keeps the first limit users (all when limit is below 1) and stops
+// when ctx is canceled. Pages are sorted by name, then id, so an offset cannot
+// skip or repeat a user where two pages meet and a limited list is the first
+// rows of the full one.
+func listUsers(ctx httpContext.Context, client astrov1.APIClient, workspaceID, deploymentID *string, limit int) ([]astrov1.User, error) {
+	cfg, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
 
-	var users []astrov1.User
-	offset := 0
-	for {
+	sorts := []astrov1.ListUsersParamsSorts{astrov1.ListUsersParamsSortsFullNameAsc, astrov1.ListUsersParamsSortsIdAsc}
+	return pagination.CollectUpTo(ctx, "users", limit, func(offset int) ([]astrov1.User, int, error) {
+		pageSize := userPaginationLimit
+		if limit > 0 {
+			pageSize = min(pageSize, limit-offset)
+		}
 		params := &astrov1.ListUsersParams{
 			Offset:       &offset,
-			Limit:        &userPaginationLimit,
+			Limit:        &pageSize,
+			Sorts:        &sorts,
 			WorkspaceId:  workspaceID,
 			DeploymentId: deploymentID,
 		}
-		resp, err := client.ListUsersWithResponse(httpContext.Background(), ctx.Organization, params)
+		resp, err := client.ListUsersWithResponse(pagination.Background(ctx), cfg.Organization, params)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
-		users = append(users, resp.JSON200.Users...)
-
-		if resp.JSON200.TotalCount <= offset+userPaginationLimit {
-			break
-		}
-		offset += userPaginationLimit
-	}
-	return users, nil
+		return resp.JSON200.Users, resp.JSON200.TotalCount, nil
+	})
 }
 
 // upsertWorkspaceRole returns a new workspace-role slice with the role for workspaceID
@@ -398,7 +401,7 @@ func GetWorkspaceUsers(client astrov1.APIClient, workspaceID string, _ int) ([]a
 		return nil, err
 	}
 	wsID := workspaceID
-	return listUsers(client, &wsID, nil)
+	return listUsers(httpContext.Background(), client, &wsID, nil, 0)
 }
 
 // RemoveWorkspaceUser removes the role on the Workspace of its user with
@@ -575,12 +578,13 @@ func putDeploymentRole(client astrov1.APIClient, orgID, deploymentID, email, rol
 // GetDeploymentUsers returns users with a role in the given deployment.
 func GetDeploymentUsers(client astrov1.APIClient, deploymentID string, _ int) ([]astrov1.User, error) {
 	dID := deploymentID
-	return listUsers(client, nil, &dID)
+	return listUsers(httpContext.Background(), client, nil, &dID, 0)
 }
 
 // ListDeploymentUsersData returns deployment user list data for structured output
-func ListDeploymentUsersData(client astrov1.APIClient, deploymentID string) (*UserList, error) {
-	users, err := GetDeploymentUsers(client, deploymentID, userPaginationLimit)
+func ListDeploymentUsersData(ctx httpContext.Context, client astrov1.APIClient, deploymentID string, limit int) (*UserList, error) {
+	dID := deploymentID
+	users, err := listUsers(ctx, client, nil, &dID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -618,22 +622,23 @@ func userTableConfigWithRoleColumn(roleHeader string, role func(UserInfo) string
 var deploymentUserTableConfig = userTableConfigWithRoleColumn("DEPLOYMENT ROLE", func(u UserInfo) string { return u.DeploymentRole })
 
 // ListDeploymentUsersWithFormat lists deployment users with the specified output format
-func ListDeploymentUsersWithFormat(client astrov1.APIClient, deploymentID string, r output.Emitter) error {
+func ListDeploymentUsersWithFormat(ctx httpContext.Context, client astrov1.APIClient, deploymentID string, limit int, r output.Emitter) error {
 	return output.PrintData(
-		func() (*UserList, error) { return ListDeploymentUsersData(client, deploymentID) },
+		func() (*UserList, error) { return ListDeploymentUsersData(ctx, client, deploymentID, limit) },
 		deploymentUserTableConfig, r,
 	)
 }
 
 // ListWorkspaceUsersData returns workspace user list data for structured output
-func ListWorkspaceUsersData(client astrov1.APIClient, workspaceID string) (*UserList, error) {
+func ListWorkspaceUsersData(ctx httpContext.Context, client astrov1.APIClient, workspaceID string, limit int) (*UserList, error) {
 	// The roles shown are the ones on the Workspace listed, which is the
 	// current one when workspaceID is "".
 	workspaceID, err := astrosession.RequireWorkspace(workspaceID)
 	if err != nil {
 		return nil, err
 	}
-	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
+	wsID := workspaceID
+	users, err := listUsers(ctx, client, &wsID, nil, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -655,16 +660,16 @@ func ListWorkspaceUsersData(client astrov1.APIClient, workspaceID string) (*User
 var workspaceUserTableConfig = userTableConfigWithRoleColumn("WORKSPACE ROLE", func(u UserInfo) string { return u.WorkspaceRole })
 
 // ListWorkspaceUsersWithFormat lists workspace users with the specified output format
-func ListWorkspaceUsersWithFormat(client astrov1.APIClient, workspaceID string, r output.Emitter) error {
+func ListWorkspaceUsersWithFormat(ctx httpContext.Context, client astrov1.APIClient, workspaceID string, limit int, r output.Emitter) error {
 	return output.PrintData(
-		func() (*UserList, error) { return ListWorkspaceUsersData(client, workspaceID) },
+		func() (*UserList, error) { return ListWorkspaceUsersData(ctx, client, workspaceID, limit) },
 		workspaceUserTableConfig, r,
 	)
 }
 
 // ListOrgUsersData returns organization user list data for structured output
-func ListOrgUsersData(client astrov1.APIClient) (*UserList, error) {
-	users, err := GetOrgUsers(client)
+func ListOrgUsersData(ctx httpContext.Context, client astrov1.APIClient, limit int) (*UserList, error) {
+	users, err := listUsers(ctx, client, nil, nil, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -690,9 +695,9 @@ func ListOrgUsersData(client astrov1.APIClient) (*UserList, error) {
 var orgUserTableConfig = userTableConfigWithRoleColumn("ORGANIZATION ROLE", func(u UserInfo) string { return u.OrgRole })
 
 // ListOrgUsersWithFormat lists organization users with the specified output format
-func ListOrgUsersWithFormat(client astrov1.APIClient, r output.Emitter) error {
+func ListOrgUsersWithFormat(ctx httpContext.Context, client astrov1.APIClient, limit int, r output.Emitter) error {
 	return output.PrintData(
-		func() (*UserList, error) { return ListOrgUsersData(client) },
+		func() (*UserList, error) { return ListOrgUsersData(ctx, client, limit) },
 		orgUserTableConfig, r,
 	)
 }

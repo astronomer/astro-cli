@@ -2,6 +2,7 @@ package user
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -360,7 +361,7 @@ func TestListOrgUsersData(t *testing.T) {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(t)
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, listUsersUnscoped()).Return(&ListOrgUsersResponseOK, nil).Once()
 
-		data, err := ListOrgUsersData(mockClient)
+		data, err := ListOrgUsersData(context.Background(), mockClient, 0)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, data.Users)
 		assert.Equal(t, "user 1", data.Users[0].FullName)
@@ -372,7 +373,7 @@ func TestListOrgUsersData(t *testing.T) {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(t)
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, listUsersUnscoped()).Return(nil, errorNetwork).Once()
 
-		_, err := ListOrgUsersData(mockClient)
+		_, err := ListOrgUsersData(context.Background(), mockClient, 0)
 		assert.Error(t, err)
 	})
 }
@@ -385,7 +386,7 @@ func TestListOrgUsersWithFormat(t *testing.T) {
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, listUsersUnscoped()).Return(&ListOrgUsersResponseOK, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListOrgUsersWithFormat(mockClient, testUtil.Renderer{JSON: true, Out: buf})
+		err := ListOrgUsersWithFormat(context.Background(), mockClient, 0, testUtil.Renderer{JSON: true, Out: buf})
 		assert.NoError(t, err)
 
 		var result UserList

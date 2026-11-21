@@ -3,6 +3,7 @@ package organization
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -84,7 +85,7 @@ func (s *Suite) TestListData() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
-		data, err := ListData(mockClient)
+		data, err := ListData(context.Background(), mockClient, 0)
 		s.NoError(err)
 		s.Len(data.Organizations, 2)
 		s.Equal("org1", data.Organizations[0].Name)
@@ -97,7 +98,7 @@ func (s *Suite) TestListData() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
 
-		_, err := ListData(mockClient)
+		_, err := ListData(context.Background(), mockClient, 0)
 		s.Error(err)
 		mockClient.AssertExpectations(s.T())
 	})
@@ -111,7 +112,7 @@ func (s *Suite) TestListWithFormat() {
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(mockClient, testUtil.Renderer{JSON: true, Out: buf})
+		err := ListWithFormat(context.Background(), mockClient, 0, testUtil.Renderer{JSON: true, Out: buf})
 		s.NoError(err)
 
 		var result OrganizationList
@@ -126,7 +127,7 @@ func (s *Suite) TestListWithFormat() {
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(mockClient, testUtil.Renderer{Out: buf})
+		err := ListWithFormat(context.Background(), mockClient, 0, testUtil.Renderer{Out: buf})
 		s.NoError(err)
 		s.Contains(buf.String(), "org1")
 		mockClient.AssertExpectations(s.T())

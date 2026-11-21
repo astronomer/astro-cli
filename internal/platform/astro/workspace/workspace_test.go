@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -123,7 +124,7 @@ func (s *Suite) TestListData() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
-		data, err := ListData(mockClient, 0)
+		data, err := ListData(context.Background(), mockClient, 0)
 		s.NoError(err)
 		s.Len(data.Workspaces, 1)
 		s.Equal("test-workspace", data.Workspaces[0].Name)
@@ -135,7 +136,7 @@ func (s *Suite) TestListData() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
-		_, err := ListData(mockClient, 0)
+		_, err := ListData(context.Background(), mockClient, 0)
 		s.ErrorIs(err, errMock)
 		mockClient.AssertExpectations(s.T())
 	})
@@ -147,7 +148,7 @@ func (s *Suite) TestListWithFormat() {
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(mockClient, 0, testUtil.Renderer{JSON: true, Out: buf})
+		err := ListWithFormat(context.Background(), mockClient, 0, testUtil.Renderer{JSON: true, Out: buf})
 		s.NoError(err)
 
 		var result WorkspaceList
@@ -162,7 +163,7 @@ func (s *Suite) TestListWithFormat() {
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(mockClient, 0, testUtil.Renderer{Out: buf})
+		err := ListWithFormat(context.Background(), mockClient, 0, testUtil.Renderer{Out: buf})
 		s.NoError(err)
 		s.Contains(buf.String(), "test-workspace")
 		mockClient.AssertExpectations(s.T())

@@ -181,7 +181,7 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
 		f = formatDotenv
 	}
 
-	objs, err := env.ListVars(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
+	objs, err := env.ListVars(cmd.Context(), scope, envResolveLinked, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -191,7 +191,7 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
 	if f == formatDotenv {
 		return env.WriteVarDotenv(objs, envIncludeSecrets, out)
 	}
-	return env.WriteVarList(objs, envIncludeSecrets, cliout.Renderer{Format: f, Out: out})
+	return env.WriteVarList(objs, envIncludeSecrets, cliout.Renderer{Format: f, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -207,7 +207,7 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if envOutput == formatDotenv && obj != nil {
 		return env.WriteVarDotenv([]astrov1.EnvironmentObject{*obj}, envIncludeSecrets, out)
 	}
-	return env.WriteVar(obj, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
+	return env.WriteVar(obj, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 func runEnvVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
@@ -215,7 +215,7 @@ func runEnvVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	r := cliout.Renderer{Format: envOutput, Out: out}
+	r := cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()}
 	return runFromFileSet(cmd, r, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, fromFileFns{env.CreateVar, env.UpdateVar, env.GetVar})
 }
 
@@ -224,7 +224,7 @@ func runEnvVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	r := cliout.Renderer{Format: envOutput, Out: out}
+	r := cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()}
 
 	value, err := readSetValue(cmd, "value", envVarValue, fmt.Sprintf("new value for %s", idOrKey))
 	if err != nil {

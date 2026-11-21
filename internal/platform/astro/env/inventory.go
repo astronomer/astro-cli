@@ -1,6 +1,7 @@
 package env
 
 import (
+	httpcontext "context"
 	"slices"
 	"strings"
 
@@ -40,7 +41,7 @@ type InventoryItem struct {
 // --help` lists the nouns.
 var inventoryKinds = []struct {
 	noun string
-	list func(Scope, bool, bool, astrov1.APIClient) ([]astrov1.EnvironmentObject, error)
+	list func(httpcontext.Context, Scope, bool, bool, astrov1.APIClient) ([]astrov1.EnvironmentObject, error)
 }{
 	{"variable", ListVars},
 	{"connection", ListConns},
@@ -93,10 +94,10 @@ func nounForObjectType(t astrov1.EnvironmentObjectObjectType) string {
 //
 // includeSecrets is not a parameter: no value is rendered, so asking the
 // platform to unmask one would fetch a secret with nowhere to put it.
-func ListInventory(scope Scope, resolveLinked bool, astroV1Client astrov1.APIClient) ([]InventoryItem, error) {
+func ListInventory(ctx httpcontext.Context, scope Scope, resolveLinked bool, astroV1Client astrov1.APIClient) ([]InventoryItem, error) {
 	var items []InventoryItem
 	for _, k := range inventoryKinds {
-		objs, err := k.list(scope, resolveLinked, false, astroV1Client)
+		objs, err := k.list(ctx, scope, resolveLinked, false, astroV1Client)
 		if err != nil {
 			return nil, err
 		}

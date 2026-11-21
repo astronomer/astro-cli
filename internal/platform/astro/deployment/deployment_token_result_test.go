@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"slices"
@@ -64,7 +65,7 @@ func TestListTokensResult(t *testing.T) {
 		org := resultToken("t2", "two", astrov1.ApiTokenScopeORGANIZATION, "DEPLOYMENT_MEMBER")
 		org.CreatedBy = &astrov1.BasicSubjectProfile{ApiTokenName: &fullName2}
 		org.Token = &token // a list must not pass a secret on
-		got, err := ListTokens(resultClient(t, dep, org), deploymentID, nil)
+		got, err := ListTokens(context.Background(), resultClient(t, dep, org), deploymentID, nil, 0)
 		require.NoError(t, err)
 		assert.Equal(t, []apitoken.Token{
 			{ID: "t1", Name: "one", Description: "about one", Scope: "DEPLOYMENT", Role: "DEPLOYMENT_ADMIN", CreatedAt: resultCreated, CreatedBy: fullName1},
@@ -75,14 +76,14 @@ func TestListTokensResult(t *testing.T) {
 	t.Run("filtered by scope", func(t *testing.T) {
 		dep := resultToken("t1", "one", astrov1.ApiTokenScopeDEPLOYMENT, "DEPLOYMENT_ADMIN")
 		org := resultToken("t2", "two", astrov1.ApiTokenScopeORGANIZATION, "DEPLOYMENT_MEMBER")
-		got, err := ListTokens(resultClient(t, dep, org), deploymentID, []DeploymentTokenType{DeploymentTokenTypeORGANIZATION})
+		got, err := ListTokens(context.Background(), resultClient(t, dep, org), deploymentID, []DeploymentTokenType{DeploymentTokenTypeORGANIZATION}, 0)
 		require.NoError(t, err)
 		require.Len(t, got, 1)
 		assert.Equal(t, "t2", got[0].ID)
 	})
 
 	t.Run("none is empty, not nil", func(t *testing.T) {
-		got, err := ListTokens(resultClient(t), deploymentID, nil)
+		got, err := ListTokens(context.Background(), resultClient(t), deploymentID, nil, 0)
 		require.NoError(t, err)
 		assert.NotNil(t, got)
 		assert.Empty(t, got)

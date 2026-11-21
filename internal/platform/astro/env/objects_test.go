@@ -1,6 +1,7 @@
 package env
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/lucsky/cuid"
@@ -51,7 +52,7 @@ func (s *Suite) TestListObjectsPaginates() {
 		},
 	}, nil).Once()
 
-	got, err := ListVars(Scope{WorkspaceID: workspaceID}, true, false, mc)
+	got, err := ListVars(context.Background(), Scope{WorkspaceID: workspaceID}, true, false, mc)
 	s.NoError(err)
 	s.Len(got, totalCount)
 	s.Equal("k2-2", got[len(got)-1].ObjectKey)
@@ -87,7 +88,7 @@ func (s *Suite) TestListObjectsReadsPastAShortPageAndStopsOnAnEmptyOne() {
 		JSON200:      &astrov1.EnvironmentObjectsPaginated{TotalCount: 9999},
 	}, nil).Once()
 
-	got, err := ListVars(Scope{WorkspaceID: workspaceID}, true, false, mc)
+	got, err := ListVars(context.Background(), Scope{WorkspaceID: workspaceID}, true, false, mc)
 	s.NoError(err)
 	s.Len(got, 1)
 	mc.AssertExpectations(s.T())
@@ -124,7 +125,7 @@ func (s *Suite) TestListObjectsReadsAWholeListWhenThePageSizeIsCapped() {
 		}, nil).Once()
 	}
 
-	got, err := ListVars(Scope{WorkspaceID: workspaceID}, true, false, mc)
+	got, err := ListVars(context.Background(), Scope{WorkspaceID: workspaceID}, true, false, mc)
 	s.NoError(err)
 	s.Len(got, total)
 	mc.AssertExpectations(s.T())
@@ -151,7 +152,7 @@ func (s *Suite) TestListObjectsReportsTheSecretsRefusalWhateverShapeItArrivesIn(
 					Body:         []byte(body),
 				}, nil).Once()
 
-			_, err := ListVars(Scope{WorkspaceID: cuid.New()}, true, true, mc)
+			_, err := ListVars(context.Background(), Scope{WorkspaceID: cuid.New()}, true, true, mc)
 			s.Error(err)
 			s.Contains(err.Error(), "Environment Secrets Fetching")
 			mc.AssertExpectations(s.T())

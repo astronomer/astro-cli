@@ -181,9 +181,9 @@ func TestDeploymentCoreText(t *testing.T) {
 				expectCreate(m, coreDeployment())
 				return m
 			},
-			args: createArgs,
-			check: tableThen("etl-prod",
-				"Created Deployment ", "etl-prod",
+			args:  createArgs,
+			check: tableThen("etl-prod"),
+			stderr: says("Created Deployment ", "etl-prod",
 				"Deployment can be accessed at the following URLs",
 				"Deployment Dashboard: ", coreDeploymentID,
 				"Airflow Dashboard: ", "etl-prod.astronomer.run/d1234"),
@@ -197,8 +197,9 @@ func TestDeploymentCoreText(t *testing.T) {
 				expectUpdate(m, updated)
 				return m
 			},
-			args:  []string{"update", coreDeploymentID, "--name", "etl-prod-2"},
-			check: tableThen("etl-prod-2", "Updated Deployment"),
+			args:   []string{"update", coreDeploymentID, "--name", "etl-prod-2"},
+			check:  tableThen("etl-prod-2"),
+			stderr: says("Updated Deployment"),
 		},
 		{
 			name:   "update to dag deploys it already has",

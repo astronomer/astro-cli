@@ -2,7 +2,10 @@
 // list endpoints of the Astro API, so callers don't each reimplement the loop.
 package pagination
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
 // MaxListPages caps a single paginated list call as a safety bound against a
 // server that mis-reports the total count.
@@ -12,21 +15,38 @@ const MaxListPages = 100
 // number of items available across all pages.
 type FetchPage[T any] func(offset int) (items []T, total int, err error)
 
+// Background returns ctx, or context.Background() when ctx is nil, so a
+// caller that runs without a command context (a unit test calling RunE
+// directly) pages as it always did. Every pager normalizes through it.
+func Background(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return ctx
+}
+
 // Collect pages through every item returned by fetch. It advances the offset by
 // the number of items returned and stops on an empty page or once the reported
 // total is reached, erroring if MaxListPages is exceeded. what names the entity
 // being listed, for the error message (e.g. "workspaces").
-func Collect[T any](what string, fetch FetchPage[T]) ([]T, error) {
-	return CollectUpTo(what, 0, fetch)
+func Collect[T any](ctx context.Context, what string, fetch FetchPage[T]) ([]T, error) {
+	return CollectUpTo(ctx, what, 0, fetch)
 }
 
 // CollectUpTo is Collect for a caller that wants at most limit items: it stops
 // paging once it has them and returns exactly limit, in the order the API
-// gave. A limit below 1 means every item.
-func CollectUpTo[T any](what string, limit int, fetch FetchPage[T]) ([]T, error) {
+// gave. A limit below 1 means every item. A canceled ctx stops the paging
+// between pages and returns its error, never the pages read so far: a partial
+// listing is not returned as if it were complete. fetch should send ctx on its
+// request so a page in flight stops too.
+func CollectUpTo[T any](ctx context.Context, what string, limit int, fetch FetchPage[T]) ([]T, error) {
+	ctx = Background(ctx)
 	var all []T
 	offset := 0
 	for page := 0; page < MaxListPages; page++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		items, total, err := fetch(offset)
 		if err != nil {
 			return nil, err
@@ -46,9 +66,13 @@ func CollectUpTo[T any](what string, limit int, fetch FetchPage[T]) ([]T, error)
 // Find pages through the items returned by fetch and returns the first one for
 // which pred is true, without fetching later pages once a match is found. It
 // returns (nil, nil) when no item matches.
-func Find[T any](what string, fetch FetchPage[T], pred func(T) bool) (*T, error) {
+func Find[T any](ctx context.Context, what string, fetch FetchPage[T], pred func(T) bool) (*T, error) {
+	ctx = Background(ctx)
 	scanned := 0
 	for page := 0; page < MaxListPages; page++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		items, total, err := fetch(scanned)
 		if err != nil {
 			return nil, err

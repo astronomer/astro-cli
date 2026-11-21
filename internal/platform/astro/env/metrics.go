@@ -29,8 +29,8 @@ type MetricsInput struct {
 }
 
 // ListMetricsExports returns METRICS_EXPORT objects for the given scope.
-func ListMetricsExports(scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
-	return listObjects(scope, objectTypeMetrics, resolveLinked, includeSecrets, astroV1Client)
+func ListMetricsExports(ctx httpcontext.Context, scope Scope, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
+	return listObjects(ctx, scope, objectTypeMetrics, resolveLinked, includeSecrets, astroV1Client)
 }
 
 // GetMetricsExport fetches a single metrics export by ID or key.

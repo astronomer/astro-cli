@@ -10,6 +10,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/internal/usageerr"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -302,13 +303,13 @@ func nonEmpty(s string) *string {
 
 // listBundlesData fetches every bundle configured on a deployment, paging through
 // all results.
-func listBundlesData(wsID, deploymentID string, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) (*BundleList, error) {
+func listBundlesData(ctx httpContext.Context, wsID, deploymentID string, limit int, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) (*BundleList, error) {
 	dep, err := GetDeployment(wsID, deploymentID, "", ToRead, nil, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
 
-	bundles, err := listAllBundles(dep.OrganizationId, dep.Id, astroV1Alpha1Client)
+	bundles, err := listBundlesUpTo(ctx, dep.OrganizationId, dep.Id, limit, astroV1Alpha1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -322,32 +323,34 @@ func listBundlesData(wsID, deploymentID string, astroV1Client astrov1.APIClient,
 
 // listAllBundles pages through every bundle on a deployment.
 func listAllBundles(orgID, deploymentID string, astroV1Alpha1Client astrov1alpha1.APIClient) ([]astrov1alpha1.DeploymentBundle, error) {
-	var bundles []astrov1alpha1.DeploymentBundle
-	limit := bundleListLimit
-	for {
-		offset := len(bundles)
-		params := &astrov1alpha1.ListBundlesParams{Limit: &limit, Offset: &offset}
-		resp, err := astroV1Alpha1Client.ListBundlesWithResponse(httpContext.Background(), orgID, deploymentID, params)
-		if err != nil {
-			return nil, err
+	return listBundlesUpTo(httpContext.Background(), orgID, deploymentID, 0, astroV1Alpha1Client)
+}
+
+// listBundlesUpTo pages through the bundles on a deployment, in the order the
+// API returns them (it takes no sort), and stops after limit of them (every one
+// when limit is below 1) or when ctx is canceled.
+func listBundlesUpTo(ctx httpContext.Context, orgID, deploymentID string, limit int, astroV1Alpha1Client astrov1alpha1.APIClient) ([]astrov1alpha1.DeploymentBundle, error) {
+	return pagination.CollectUpTo(ctx, "bundles", limit, func(offset int) ([]astrov1alpha1.DeploymentBundle, int, error) {
+		pageSize := bundleListLimit
+		if limit > 0 {
+			pageSize = min(pageSize, limit-offset)
 		}
-		err = astrov1alpha1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+		params := &astrov1alpha1.ListBundlesParams{Limit: &pageSize, Offset: &offset}
+		resp, err := astroV1Alpha1Client.ListBundlesWithResponse(pagination.Background(ctx), orgID, deploymentID, params)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
+		}
+		if err := astrov1alpha1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+			return nil, 0, err
 		}
 
 		// A success with no list in the body (a 204, or a body that is not
 		// one) says nothing about the bundles, so it is not taken for none.
 		if resp.JSON200 == nil {
-			return nil, errNoBundleList
+			return nil, 0, errNoBundleList
 		}
-		bundles = append(bundles, resp.JSON200.Bundles...)
-		if len(resp.JSON200.Bundles) == 0 || len(bundles) >= resp.JSON200.TotalCount {
-			break
-		}
-	}
-
-	return bundles, nil
+		return resp.JSON200.Bundles, resp.JSON200.TotalCount, nil
+	})
 }
 
 // validateBundleSelector requires exactly one of the bundle id, DAG bundle name,
@@ -433,10 +436,10 @@ func getBundle(orgID, deploymentID, bundleID string, astroV1Alpha1Client astrov1
 }
 
 // ListBundlesWithFormat prints every bundle on a deployment in the requested format.
-func ListBundlesWithFormat(wsID, deploymentID string, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+func ListBundlesWithFormat(ctx httpContext.Context, wsID, deploymentID string, limit int, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 	return output.PrintData(
 		func() (*BundleList, error) {
-			return listBundlesData(wsID, deploymentID, astroV1Client, astroV1Alpha1Client)
+			return listBundlesData(ctx, wsID, deploymentID, limit, astroV1Client, astroV1Alpha1Client)
 		},
 		bundleTableConfig(), r,
 	)

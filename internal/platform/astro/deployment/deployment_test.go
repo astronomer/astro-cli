@@ -402,7 +402,7 @@ func (s *Suite) TestListData() {
 	s.Run("returns structured deployment data", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
-		data, err := listData(ws, false, 0, mockV1Client)
+		data, err := listData(stdcontext.Background(), ws, false, 0, mockV1Client)
 		s.NoError(err)
 		s.Len(data.Deployments, 2)
 		s.Contains([]string{data.Deployments[0].DeploymentID, data.Deployments[1].DeploymentID}, "test-id-1")
@@ -412,7 +412,7 @@ func (s *Suite) TestListData() {
 	s.Run("returns error on failure", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
-		_, err := listData(ws, false, 0, mockV1Client)
+		_, err := listData(stdcontext.Background(), ws, false, 0, mockV1Client)
 		s.ErrorIs(err, errMock)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -420,7 +420,7 @@ func (s *Suite) TestListData() {
 	s.Run("empty result", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
 
-		data, err := listData(ws, false, 0, mockV1Client)
+		data, err := listData(stdcontext.Background(), ws, false, 0, mockV1Client)
 		s.NoError(err)
 		s.Empty(data.Deployments)
 		mockV1Client.AssertExpectations(s.T())
@@ -434,7 +434,7 @@ func (s *Suite) TestListWithFormat() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(ws, false, 0, mockV1Client, testUtil.Renderer{JSON: true, Out: buf})
+		err := ListWithFormat(stdcontext.Background(), ws, false, 0, mockV1Client, testUtil.Renderer{JSON: true, Out: buf})
 		s.NoError(err)
 
 		var result DeploymentList
@@ -447,7 +447,7 @@ func (s *Suite) TestListWithFormat() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(ws, false, 0, mockV1Client, testUtil.Renderer{Out: buf})
+		err := ListWithFormat(stdcontext.Background(), ws, false, 0, mockV1Client, testUtil.Renderer{Out: buf})
 		s.NoError(err)
 		s.Contains(buf.String(), "test-id-1")
 		mockV1Client.AssertExpectations(s.T())

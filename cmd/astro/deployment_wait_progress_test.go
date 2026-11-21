@@ -133,7 +133,7 @@ func TestDeploymentUpdateWarningsGoToStderr(t *testing.T) {
 			for _, w := range tc.warnings {
 				assert.NotContains(t, r.stdout, w)
 			}
-			requireInOrder(t, r.terminal(), tc.stdout...)
+			requireInOrder(t, r.terminalWithNotes(), tc.stdout...)
 			m.AssertExpectations(t)
 		})
 	}

@@ -32,7 +32,7 @@ const (
 )
 
 // renderTokenList renders a token list, its role column headed roleHeader.
-func renderTokenList(format cliout.Format, out io.Writer, tokens []apitoken.Token, roleHeader string) error {
+func renderTokenList(format cliout.Format, out, errOut io.Writer, tokens []apitoken.Token, roleHeader string) error {
 	tab := &cliout.Table{Header: tokenHeader(roleHeader)}
 	// A person reads "3 days ago"; a script gets the moment, as the other
 	// tables print one.
@@ -44,7 +44,7 @@ func renderTokenList(format cliout.Format, out io.Writer, tokens []apitoken.Toke
 		}
 		tab.AddRow(tokenRowCreated(&tokens[i], created)...)
 	}
-	return cliout.Renderer{Format: format, Out: out}.Emit(apitoken.List{Tokens: tokens}, cliout.TableText(tab))
+	return cliout.Renderer{Format: format, Out: out, Err: errOut}.Emit(apitoken.List{Tokens: tokens}, cliout.TableText(tab))
 }
 
 // tokenHeader and tokenRow lay a token out, for a list and for a picker.
@@ -81,7 +81,7 @@ func tokenRowCreated(t *apitoken.Token, created string) []string {
 // pipe get exactly the value; the receipt and the warning that the value is
 // not shown again are for the person, on stderr.
 func renderTokenSecret(format cliout.Format, out, errOut io.Writer, t *apitoken.Token, kind, verb, name string) error {
-	if err := (cliout.Renderer{Format: format, Out: out}).Emit(t, cliout.Text(func(b *bufio.Writer) {
+	if err := (cliout.Renderer{Format: format, Out: out, Err: errOut}).Emit(t, cliout.Text(func(b *bufio.Writer) {
 		if t.Token != "" {
 			fmt.Fprintln(b, t.Token)
 		}

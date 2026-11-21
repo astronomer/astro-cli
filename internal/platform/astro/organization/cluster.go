@@ -30,11 +30,21 @@ var clusterTableConfig = output.BuildTableConfig(
 // as needed. Pages are sorted by name so an offset cannot skip or repeat a
 // cluster where two pages meet.
 func ListClusters(organizationID string, astroV1Client astrov1.APIClient) ([]astrov1.Cluster, error) {
+	return listClustersUpTo(http_context.Background(), organizationID, 0, astroV1Client)
+}
+
+// listClustersUpTo is ListClusters that stops paging after limit clusters
+// (every one when limit is below 1), in name order, and stops when ctx is
+// canceled.
+func listClustersUpTo(ctx http_context.Context, organizationID string, limit int, astroV1Client astrov1.APIClient) ([]astrov1.Cluster, error) {
 	sorts := []astrov1.ListClustersParamsSorts{astrov1.ListClustersParamsSortsNameAsc}
-	return pagination.Collect("clusters", func(offset int) ([]astrov1.Cluster, int, error) {
+	return pagination.CollectUpTo(ctx, "clusters", limit, func(offset int) ([]astrov1.Cluster, int, error) {
 		pageSize := 1000
+		if limit > 0 {
+			pageSize = min(pageSize, limit-offset)
+		}
 		params := &astrov1.ListClustersParams{Limit: &pageSize, Offset: &offset, Sorts: &sorts}
-		resp, err := astroV1Client.ListClustersWithResponse(http_context.Background(), organizationID, params)
+		resp, err := astroV1Client.ListClustersWithResponse(pagination.Background(ctx), organizationID, params)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -49,13 +59,13 @@ func ListClusters(organizationID string, astroV1Client astrov1.APIClient) ([]ast
 }
 
 // ListClustersData returns cluster list data for structured output
-func ListClustersData(astroV1Client astrov1.APIClient) (*ClusterList, error) {
+func ListClustersData(ctx http_context.Context, astroV1Client astrov1.APIClient, limit int) (*ClusterList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
 
-	cs, err := ListClusters(c.Organization, astroV1Client)
+	cs, err := listClustersUpTo(ctx, c.Organization, limit, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -78,9 +88,9 @@ func ListClustersData(astroV1Client astrov1.APIClient) (*ClusterList, error) {
 }
 
 // ListClustersWithFormat lists the Organization's clusters with the specified output format
-func ListClustersWithFormat(astroV1Client astrov1.APIClient, r output.Emitter) error {
+func ListClustersWithFormat(ctx http_context.Context, astroV1Client astrov1.APIClient, limit int, r output.Emitter) error {
 	return output.PrintData(
-		func() (*ClusterList, error) { return ListClustersData(astroV1Client) },
+		func() (*ClusterList, error) { return ListClustersData(ctx, astroV1Client, limit) },
 		clusterTableConfig, r,
 	)
 }

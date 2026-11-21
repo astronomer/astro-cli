@@ -2,6 +2,7 @@ package team
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -281,7 +282,7 @@ func (s *Suite) TestListOrgTeamsData() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseOK, nil).Once()
 
-		data, err := ListOrgTeamsData(mockClient)
+		data, err := ListOrgTeamsData(context.Background(), mockClient, 0)
 		s.NoError(err)
 		s.NotEmpty(data.Teams)
 		s.Equal("team 1", data.Teams[0].Name)
@@ -293,7 +294,7 @@ func (s *Suite) TestListOrgTeamsData() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 
-		_, err := ListOrgTeamsData(mockClient)
+		_, err := ListOrgTeamsData(context.Background(), mockClient, 0)
 		s.Error(err)
 	})
 }
@@ -305,7 +306,7 @@ func (s *Suite) TestListOrgTeamsWithFormat() {
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseOK, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListOrgTeamsWithFormat(mockClient, testUtil.Renderer{JSON: true, Out: buf})
+		err := ListOrgTeamsWithFormat(context.Background(), mockClient, 0, testUtil.Renderer{JSON: true, Out: buf})
 		s.NoError(err)
 
 		var result TeamList
@@ -1304,7 +1305,7 @@ func (s *Suite) TestListTeamUsers() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
 		mockClient.On("ListTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamMembersResponseOK, nil).Once()
-		got, err := ListTeamUsers(team1.Id, mockClient)
+		got, err := ListTeamUsers(context.Background(), team1.Id, 0, mockClient)
 		s.NoError(err)
 		s.Equal([]Member{{ID: user1.Id, FullName: user1.FullName, Email: user1.Username}}, got.Members)
 	})
@@ -1314,7 +1315,7 @@ func (s *Suite) TestListTeamUsers() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseEmptyMembership, nil).Once()
 		mockClient.On("ListTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamMembersResponseEmpty, nil).Once()
-		got, err := ListTeamUsers(team1.Id, mockClient)
+		got, err := ListTeamUsers(context.Background(), team1.Id, 0, mockClient)
 		s.NoError(err)
 		s.NotNil(got.Members, "empty, not nil, so it publishes []")
 		s.Empty(got.Members)
@@ -1325,14 +1326,14 @@ func (s *Suite) TestListTeamUsers() {
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseError, nil).Once()
 
-		_, err := ListTeamUsers(team1.Id, mockClient)
+		_, err := ListTeamUsers(context.Background(), team1.Id, 0, mockClient)
 		s.EqualError(err, "failed to get team")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
 		mockClient := astrov1_mocks.NewClientWithResponsesInterface(s.T())
-		_, err := ListTeamUsers(team1.Id, mockClient)
+		_, err := ListTeamUsers(context.Background(), team1.Id, 0, mockClient)
 		s.Error(err)
 	})
 
@@ -1358,7 +1359,7 @@ func (s *Suite) TestListTeamUsers() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		got, err := ListTeamUsers("", mockClient)
+		got, err := ListTeamUsers(context.Background(), "", 0, mockClient)
 		s.NoError(err)
 		s.Len(got.Members, 1)
 	})

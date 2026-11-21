@@ -288,7 +288,7 @@ func runEnvLinkSet(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags)
 	if err != nil {
 		return err
 	}
-	r := cliout.Renderer{Format: envOutput, Out: out}
+	r := cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()}
 
 	idOrKey, err := f.idOrKey(n)
 	if err != nil {
@@ -321,7 +321,7 @@ func runEnvLinkRemove(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFla
 	if err != nil {
 		return err
 	}
-	r := cliout.Renderer{Format: envOutput, Out: out}
+	r := cliout.Renderer{Format: envOutput, Out: out, Err: cmd.ErrOrStderr()}
 
 	idOrKey, err := f.idOrKey(n)
 	if err != nil {
@@ -355,7 +355,7 @@ func runEnvLinkList(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags
 	if err != nil {
 		return err
 	}
-	return env.WriteLinks(report, cliout.Renderer{Format: f.output, Out: out})
+	return env.WriteLinks(report, cliout.Renderer{Format: f.output, Out: out, Err: cmd.ErrOrStderr()})
 }
 
 // article prefixes a noun with "a" or "an".

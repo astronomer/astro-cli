@@ -10,6 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/emfetch"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -63,7 +64,7 @@ func (s Scope) Validate() error {
 // without them, which is where this parts company with the other readers. These
 // callers render a list and have nowhere to say the values in it were withheld,
 // so a quietly structural listing would read as a complete one.
-func listObjects(scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
+func listObjects(ctx httpcontext.Context, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, resolveLinked, includeSecrets bool, astroV1Client astrov1.APIClient) ([]astrov1.EnvironmentObject, error) {
 	if err := scope.Validate(); err != nil {
 		return nil, err
 	}
@@ -72,7 +73,7 @@ func listObjects(scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObj
 		return nil, err
 	}
 
-	objs, err := emfetch.Paginate(httpcontext.Background(),
+	objs, err := emfetch.Paginate(pagination.Background(ctx),
 		func(ctx httpcontext.Context, offset, limit int) ([]astrov1.EnvironmentObject, int, error) {
 			params := buildListParams(scope, objectType, nil, resolveLinked, includeSecrets, limit)
 			params.Offset = &offset

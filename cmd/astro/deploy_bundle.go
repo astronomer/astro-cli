@@ -182,7 +182,7 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 		bundlePath = path
 	}
 	return publishThenWaitWith(cmd, o.output, o.wait, bundleWait(cmd, &login, res.DeploymentID, o.waitTime), func(waitErr error) error {
-		r := cliout.Renderer{Format: o.output, Out: out}
+		r := cliout.Renderer{Format: o.output, Out: out, Err: cmd.ErrOrStderr()}
 		return r.Emit(newBundleDeployJSON(&res, &b, bundlePath, o.wait, waitErr), renderBundleUploaded(res.BundleVersion))
 	})
 }
@@ -215,7 +215,7 @@ func deleteBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 		return err
 	}
 	return publishThenWaitWith(cmd, o.output, o.wait, bundleWait(cmd, &login, res.DeploymentID, o.waitTime), func(waitErr error) error {
-		r := cliout.Renderer{Format: o.output, Out: out}
+		r := cliout.Renderer{Format: o.output, Out: out, Err: cmd.ErrOrStderr()}
 		return r.Emit(newBundleDeleteJSON(&res, &b, o.wait, waitErr), renderBundleDeleted(res.MountPath))
 	})
 }

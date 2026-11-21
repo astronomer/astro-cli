@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -189,7 +190,7 @@ func (s *Suite) TestListBundlesWithFormat() {
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 		mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(listResponse, nil).Once()
 
-		err := ListBundlesWithFormat(ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
+		err := ListBundlesWithFormat(context.Background(), ws, testBundleDeploymentID, 0, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "BUNDLE ID")
 		s.Contains(out.String(), "bundle-1")
@@ -204,7 +205,7 @@ func (s *Suite) TestListBundlesWithFormat() {
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 		mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(listResponse, nil).Once()
 
-		err := ListBundlesWithFormat(ws, testBundleDeploymentID, testUtil.Renderer{JSON: true, Out: out}, mockV1Client, mockV1Alpha1Client)
+		err := ListBundlesWithFormat(context.Background(), ws, testBundleDeploymentID, 0, testUtil.Renderer{JSON: true, Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "bundles")
 		s.Contains(out.String(), "bundle-1")
@@ -237,11 +238,39 @@ func (s *Suite) TestListBundlesWithFormat() {
 			return p != nil && p.Offset != nil && *p.Offset == 1
 		})).Return(page2, nil).Once()
 
-		err := ListBundlesWithFormat(ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
+		err := ListBundlesWithFormat(context.Background(), ws, testBundleDeploymentID, 0, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "bundle-1")
 		s.Contains(out.String(), "bundle-2")
 		mockV1Alpha1Client.AssertExpectations(s.T())
+	})
+
+	s.Run("a limit asks for that many and stops paging", func() {
+		out := &bytes.Buffer{}
+		s.mockGetDeployment()
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+		mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(p *astrov1alpha1.ListBundlesParams) bool {
+			return p != nil && p.Limit != nil && *p.Limit == 1 && p.Offset != nil && *p.Offset == 0
+		})).Return(&astrov1alpha1.ListBundlesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200: &astrov1alpha1.BundlesPaginated{
+				TotalCount: 5,
+				Bundles:    []astrov1alpha1.DeploymentBundle{{Id: "bundle-1"}},
+			},
+		}, nil).Once()
+
+		err := ListBundlesWithFormat(context.Background(), ws, testBundleDeploymentID, 1, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
+		s.NoError(err)
+		s.Contains(out.String(), "bundle-1")
+		mockV1Alpha1Client.AssertExpectations(s.T())
+	})
+
+	s.Run("a canceled context lists nothing", func() {
+		s.mockGetDeployment()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err := ListBundlesWithFormat(ctx, ws, testBundleDeploymentID, 0, testUtil.Renderer{Out: &bytes.Buffer{}}, mockV1Client, new(astrov1alpha1_mocks.ClientWithResponsesInterface))
+		s.ErrorIs(err, context.Canceled)
 	})
 }
 
@@ -491,7 +520,7 @@ func (s *Suite) TestListBundlesWithNoListInTheResponse() {
 
 	var err error
 	s.NotPanics(func() {
-		err = ListBundlesWithFormat(ws, testBundleDeploymentID, testUtil.Renderer{Out: &bytes.Buffer{}}, mockV1Client, mockV1Alpha1Client)
+		err = ListBundlesWithFormat(context.Background(), ws, testBundleDeploymentID, 0, testUtil.Renderer{Out: &bytes.Buffer{}}, mockV1Client, mockV1Alpha1Client)
 	})
 	s.ErrorIs(err, errNoBundleList)
 }
