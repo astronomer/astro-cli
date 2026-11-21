@@ -375,6 +375,11 @@ func foregroundRemoved(cmd *cobra.Command, _ string) string {
 }
 
 func waitRemoved(cmd *cobra.Command, _ string) string {
+	// restart has no --timeout: only start does.
+	if strings.HasSuffix(cmd.CommandPath(), "start") {
+		return "pass --timeout, a Go duration, instead, as in " + cmd.CommandPath() + " --timeout 10m, " +
+			"or set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable"
+	}
 	return "set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable to a Go duration instead, as in " +
 		"ASTRO_LOCAL_HEALTH_TIMEOUT=10m " + cmd.CommandPath()
 }

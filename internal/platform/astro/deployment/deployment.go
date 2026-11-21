@@ -1794,9 +1794,9 @@ var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([
 }
 
 // listDeploymentsUpTo is ListDeployments that stops paging after limit
-// Deployments (every one when limit is below 1). A limited read asks the API
-// for name order, descending as `deployment list` shows them, so the rows it
-// keeps are stable; an unlimited one reads them all and needs no order.
+// Deployments (every one when limit is below 1). Both ask the API for name
+// order, descending as `deployment list` shows them, so a limited read keeps
+// the first rows of the full one.
 func listDeploymentsUpTo(ws, orgID string, limit int, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
@@ -1807,9 +1807,14 @@ func listDeploymentsUpTo(ws, orgID string, limit int, astroV1Client astrov1.APIC
 	}
 	return pagination.CollectUpTo("deployments", limit, func(offset int) ([]astrov1.Deployment, int, error) {
 		pageSize := listLimit
-		params := &astrov1.ListDeploymentsParams{Limit: &pageSize, Offset: &offset}
+		// Name order, descending as `deployment list` shows them, with or
+		// without a limit, so a limited list is the first rows of the full one.
+		params := &astrov1.ListDeploymentsParams{
+			Limit:  &pageSize,
+			Offset: &offset,
+			Sorts:  &[]astrov1.ListDeploymentsParamsSorts{astrov1.ListDeploymentsParamsSortsNameDesc},
+		}
 		if limit > 0 {
-			params.Sorts = &[]astrov1.ListDeploymentsParamsSorts{astrov1.ListDeploymentsParamsSortsNameDesc}
 			pageSize = min(pageSize, limit-offset)
 		}
 		if ws != "" {

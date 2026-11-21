@@ -206,7 +206,7 @@ func newStartCmd(c *cli) *cobra.Command {
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if cmd.Flags().Changed("timeout") {
-				setHealthTimeout(c.d.Runtime, opts.timeout)
+				c.d.Runtime.SetHealthTimeout(opts.timeout)
 			}
 			mode := localrt.Mode("")
 			if opts.docker {
@@ -246,14 +246,6 @@ func newStartCmd(c *cli) *cobra.Command {
 	cmd.Flags().DurationVar(&opts.timeout, "timeout", 0, "How long to wait for Airflow to answer, as a Go duration like 10m or 90s (default 5m, or "+healthTimeoutEnv+" when set)")
 	addBuildSecretFlag(cmd, &opts.buildSecrets)
 	return cmd
-}
-
-// setHealthTimeout applies a --timeout to the runtime the start will use. A
-// Runtime that has no such knob (a test's) is left alone.
-func setHealthTimeout(rt Runtime, d time.Duration) {
-	if s, ok := rt.(interface{ SetHealthTimeout(time.Duration) }); ok {
-		s.SetHealthTimeout(d)
-	}
 }
 
 // errWatchUnavailable is --watch on a Deps with no Watch.
