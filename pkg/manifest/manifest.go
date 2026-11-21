@@ -1501,7 +1501,13 @@ func (p *parser) linkDagBundle(key string, kind LinkKind, raw any) string {
 		}
 		return ""
 	}
-	return strings.TrimSpace(p.str(key+".dag-bundle", raw))
+	name := strings.TrimSpace(p.str(key+".dag-bundle", raw))
+	// Blank is as empty as "": trimmed to nothing it would deploy to the
+	// default bundle without a word.
+	if s, ok := raw.(string); ok && s != "" && name == "" {
+		p.add(CodeEmptyString, key+".dag-bundle", "must not be empty")
+	}
+	return name
 }
 
 // unknownKeys reports every key the table does not define: a problem when it

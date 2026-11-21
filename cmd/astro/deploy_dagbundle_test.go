@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -155,12 +156,14 @@ func TestDeployDagBundleFromTheLink(t *testing.T) {
 	out, err := execDeployCapture("prod", "--dags", "--output", "json")
 	require.NoError(t, err)
 	assert.Equal(t, "nightly", fake.dagInput.DagBundle)
+	assert.Equal(t, "prod", fake.dagInput.DagBundleLink, "a refusal names the link that set it")
 	assert.Equal(t, "nightly", decodeOneJSON(t, out)["dag_bundle"])
 
 	resetDeployFlagVars()
 	_, err = execDeployCapture("prod", "--dags", "--dag-bundle", "weekly")
 	require.NoError(t, err)
 	assert.Equal(t, "weekly", fake.dagInput.DagBundle)
+	assert.Empty(t, fake.dagInput.DagBundleLink, "the flag named it, not the link")
 
 	// A link with none ships to the default bundle.
 	resetDeployFlagVars()
@@ -179,4 +182,27 @@ func TestDeployImageIgnoresTheLinksDagBundle(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, fake.imgInput)
 	assert.Empty(t, fake.imgInput.DagBundle)
+}
+
+// A deploy that ships no Dags says, once and on stderr, that the link's
+// dag-bundle was not used. stdout stays the result alone, in json too.
+func TestDeployImageNotesTheLinksSkippedDagBundle(t *testing.T) {
+	const note = "dag-bundle = \"nightly\" under [tool.astro.deployments.prod] in pyproject.toml was not used: --image ships no Dags"
+	for _, args := range [][]string{{"prod", "--image"}, {"prod", "--image", "--output", "json"}} {
+		fake := &fakeCmdDeployer{img: manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "t1"}}
+		setupManifestDeployWith(t, fake, manifestWithBundleLink)
+		out, errOut, err := execDeployIO("", args...)
+		require.NoError(t, err)
+		assert.Equal(t, 1, strings.Count(errOut, note), "%v: %s", args, errOut)
+		assert.NotContains(t, out, "dag-bundle", "%v", args)
+	}
+
+	// No note for a link with none, nor for a deploy that ships Dags.
+	for _, args := range [][]string{{"dev", "--image"}, {"prod", "--dags"}} {
+		fake := &fakeCmdDeployer{img: manifestdeploy.ImageResult{WorkspaceID: "clw-ws"}, dag: bundleDagResult()}
+		setupManifestDeployWith(t, fake, manifestWithBundleLink)
+		_, errOut, err := execDeployIO("", args...)
+		require.NoError(t, err)
+		assert.NotContains(t, errOut, "was not used", "%v", args)
+	}
 }

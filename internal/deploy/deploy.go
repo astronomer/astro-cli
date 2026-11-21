@@ -249,8 +249,11 @@ type DagDeploy struct {
 	// upload carries Cosmos Boost files for its dbt projects.
 	CosmosBoost bool
 	// DagBundle is the named Dag bundle to ship the Dags to, "" for the
-	// Deployment's default one.
-	DagBundle string
+	// Deployment's default one. DagBundleLink is the manifest link it came
+	// from, "" when --dag-bundle named it, so a refusal can say where the
+	// name was set.
+	DagBundle     string
+	DagBundleLink string
 }
 
 // DagResult is what the transport reports after a dags-only deploy.
@@ -314,8 +317,9 @@ type ImageDeploy struct {
 	Wait          bool
 	WaitTime      time.Duration
 	// DagBundle is the named Dag bundle a "both" deploy ships the Dags to,
-	// "" for the Deployment's default one.
-	DagBundle string
+	// "" for the Deployment's default one. DagBundleLink is as on DagDeploy.
+	DagBundle     string
+	DagBundleLink string
 }
 
 // ImageResult is what the transport reports after an image deploy. A "both"
@@ -505,21 +509,31 @@ func deploySettings(m *manifest.Manifest) manifest.Deploy {
 // "" for the Deployment's default bundle. A deploy that ships no Dags has no
 // bundle, whatever a link says: --image leaves the running Dags alone, so
 // the setting that applies to the Dags has nothing to apply to.
-func dagBundleFor(req Request, target Target) string {
+//
+// link is the link the name came from, "" when --dag-bundle gave it.
+func dagBundleFor(req Request, target Target) (bundle, link string) {
 	if req.Image || req.ImageAlone {
-		return ""
+		return "", ""
 	}
 	if req.DagBundle != "" {
-		return req.DagBundle
+		return req.DagBundle, ""
 	}
 	if req.Manifest == nil || target.LinkName == "" {
-		return ""
+		return "", ""
 	}
-	return req.Manifest.Astro.Deployments[target.LinkName].DagBundle
+	if b := req.Manifest.Astro.Deployments[target.LinkName].DagBundle; b != "" {
+		return b, target.LinkName
+	}
+	return "", ""
 }
 
-// bundleShipped is bundle when the deploy uploaded Dags, "" when it did not.
-func bundleShipped(bundle string, shipped bool) string {
+// shippedBundle is the bundle a "both" deploy put its Dags in. A bundle is
+// only named for a deploy that ships Dags (dagBundleFor), and the transport
+// refuses one to a Deployment with Dag deploys off, so the Dags-in-image and
+// remote-execution cases cannot reach here with a bundle; DagsNotShipped is
+// the one way a deploy that named a bundle shipped none (an APC Deployment
+// that takes its Dags elsewhere).
+func shippedBundle(bundle string, shipped bool) string {
 	if shipped {
 		return bundle
 	}
@@ -529,9 +543,10 @@ func bundleShipped(bundle string, shipped bool) string {
 // runDagsOnly ships just the dags/ directory through the transport.
 func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 	settings := deploySettings(req.Manifest)
-	bundle := dagBundleFor(req, target)
+	bundle, bundleLink := dagBundleFor(req, target)
 	dag, err := d.DeployDags(&DagDeploy{
 		DagBundle:     bundle,
+		DagBundleLink: bundleLink,
 		Context:       req.Context,
 		DeploymentID:  target.DeploymentID,
 		WorkspaceID:   target.WorkspaceID,
@@ -575,9 +590,10 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 	// only the netrc secret, and checkImageSource has warned about the rest.
 	includeDags := !req.Image && !req.ImageAlone
 	settings := deploySettings(req.Manifest)
-	bundle := dagBundleFor(req, target)
+	bundle, bundleLink := dagBundleFor(req, target)
 	img, err := d.DeployImage(&ImageDeploy{
 		DagBundle:       bundle,
+		DagBundleLink:   bundleLink,
 		Context:         req.Context,
 		DeploymentID:    target.DeploymentID,
 		WorkspaceID:     target.WorkspaceID,
@@ -616,7 +632,7 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 		DagTarballVersion:      img.DagTarballVersion,
 		DagsInImage:            img.DagsInImage,
 		RemoteExecution:        img.RemoteExecution,
-		DagBundle:              bundleShipped(bundle, includeDags && !img.DagsNotShipped && !img.DagsInImage && !img.RemoteExecution),
+		DagBundle:              shippedBundle(bundle, !img.DagsNotShipped),
 		URL:                    img.URL,
 		LinkName:               target.LinkName,
 		Git:                    img.Git,

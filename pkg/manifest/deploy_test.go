@@ -129,6 +129,7 @@ func TestLinkDagBundleOfTheWrongShape(t *testing.T) {
 	}{
 		"not a string":     {"deployment = 'd'\ndag-bundle = 1\n", CodeExpectedString},
 		"empty":            {"deployment = 'd'\ndag-bundle = ''\n", CodeEmptyString},
+		"blank":            {"deployment = 'd'\ndag-bundle = '   '\n", CodeEmptyString},
 		"on an mwaa link":  {"target = 'mwaa'\nenvironment = 'orders'\ndag-bundle = 'nightly'\n", CodeDagBundleOnNonAstroLink},
 		"a 1.x style typo": {"deployment = 'd'\ndag_bundle = 'nightly'\n", CodeUnknownKey},
 	} {

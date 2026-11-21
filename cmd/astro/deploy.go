@@ -417,12 +417,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		return manifestDeployErr(cmd, err)
 	}
 
-	if res.Git.Uncommitted {
-		recap.Note("the project has uncommitted changes, so this deploy records no git commit")
-	}
-	if note := projectGitMetadataOffNote(m, imageName); note != "" {
-		recap.Note(note)
-	}
+	deployNotes(recap, m, &res)
 	if !inProject {
 		w := imageAloneWarning(&res, imageName)
 		warnings = append(warnings, w)
@@ -430,6 +425,35 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	}
 	recap.Flush()
 	return renderManifestDeploy(out, format, &res, warnings)
+}
+
+// deployNotes gives the notes a finished deploy has: no commit recorded, and a
+// link's dag-bundle that a deploy shipping no Dags did not use.
+func deployNotes(recap *cliout.Recap, m *manifest.Manifest, res *manifestdeploy.Result) {
+	if res.Git.Uncommitted {
+		recap.Note("the project has uncommitted changes, so this deploy records no git commit")
+	}
+	if note := projectGitMetadataOffNote(m, imageName); note != "" {
+		recap.Note(note)
+	}
+	if note := skippedLinkDagBundleNote(m, res.LinkName, image); note != "" {
+		recap.Note(note)
+	}
+}
+
+// skippedLinkDagBundleNote is the note a deploy that ships no Dags (--image)
+// gives when the link it deployed to sets a dag-bundle in pyproject.toml: the
+// setting applies to the Dags, so it was not used. "" when nothing was skipped.
+// A deploy outside a project has no manifest (m nil) and no link.
+func skippedLinkDagBundleNote(m *manifest.Manifest, link string, imageOnly bool) string {
+	if m == nil || link == "" || !imageOnly {
+		return ""
+	}
+	bundle := m.Astro.Deployments[link].DagBundle
+	if bundle == "" {
+		return ""
+	}
+	return fmt.Sprintf("dag-bundle = %q under [tool.astro.deployments.%s] in pyproject.toml was not used: --image ships no Dags", bundle, link)
 }
 
 // onceEngine memoizes an engine resolver, so a deploy resolves its engine
@@ -872,7 +896,7 @@ func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdepl
 		GitMetadata:   gitMetadataAllowed(in.GitMetadata),
 		CosmosBoost:   in.CosmosBoost,
 		Progress:      d.errOut,
-		DagBundle:     d.dagBundle(in.DagBundle),
+		DagBundle:     d.dagBundle(in.DagBundle, in.DagBundleLink),
 	}, d.login.client)
 	if err != nil {
 		return manifestdeploy.DagResult{}, err
@@ -888,11 +912,11 @@ func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdepl
 
 // dagBundle is the named Dag bundle a deploy ships to, with the client that
 // reaches it under the deploy's login; nil for the Deployment's default bundle.
-func (d manifestDeployer) dagBundle(name string) *astrodeploy.DagBundle {
+func (d manifestDeployer) dagBundle(name, link string) *astrodeploy.DagBundle {
 	if name == "" {
 		return nil
 	}
-	return &astrodeploy.DagBundle{Name: name, Client: d.login.alpha}
+	return &astrodeploy.DagBundle{Name: name, Client: d.login.alpha, Link: link}
 }
 
 func toManifestDeployGit(g astrodeploy.ManifestDeployGit) manifestdeploy.Git {
@@ -936,7 +960,7 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		CosmosBoost:    in.CosmosBoost,
 		Progress:       d.errOut,
 		ResolveInstall: imageinstall.Fill,
-		DagBundle:      d.dagBundle(in.DagBundle),
+		DagBundle:      d.dagBundle(in.DagBundle, in.DagBundleLink),
 	}, d.login.client)
 	if err != nil {
 		return manifestdeploy.ImageResult{}, err

@@ -224,8 +224,8 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	if err != nil {
 		return ManifestImageDeployResult{}, explainHibernating(err, &dep)
 	}
-	if created.ImageRepository == "" || created.ImageTag == "" {
-		return ManifestImageDeployResult{}, errors.New("no image repository or tag received from Astro")
+	if err := checkCreatedImageDeploy(created, in.DagBundle, dags.upload); err != nil {
+		return ManifestImageDeployResult{}, err
 	}
 
 	// Push the built/adopted image under the returned repository:tag with the
