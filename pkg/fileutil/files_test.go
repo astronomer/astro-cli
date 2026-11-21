@@ -1019,6 +1019,51 @@ func (s *Suite) TestDefaultPermissions() {
 	s.Equal(0o755, openPermissions)
 }
 
+// A source that is itself a link is written as the directory it leads to,
+// under the name it is given by: a dags/ linked to a shared checkout uploads
+// its Dags, not one link to a path on this machine.
+func (s *Suite) TestTarGzWalksASourceThatIsALink() {
+	shared, project := s.T().TempDir(), s.T().TempDir()
+	writeTestFile(s.T(), filepath.Join(shared, "etl.py"), "import x\n")
+	writeTestFile(s.T(), filepath.Join(shared, "sub", "helper.py"), "x = 1\n")
+	dags := filepath.Join(project, "dags")
+	if err := os.Symlink(shared, dags); err != nil {
+		s.T().Skipf("symlinks unavailable here: %v", err)
+	}
+	target := filepath.Join(s.T().TempDir(), "bundle.tar.gz")
+	s.Require().NoError(TarGz(dags, target, true, nil, TarOverlay{}))
+	s.Equal([]string{"dags/etl.py", "dags/sub/helper.py"}, tarNames(s.T(), target))
+}
+
+// WalkTar visits what the tarball of the same TarSource carries, and nothing
+// else: an excluded entry, a bytecode cache, and a link carried as a link.
+func (s *Suite) TestWalkTarVisitsWhatTheTarballCarries() {
+	dir := s.T().TempDir()
+	writeTestFile(s.T(), filepath.Join(dir, "etl.py"), "import x\n")
+	writeTestFile(s.T(), filepath.Join(dir, ".git", "config"), "x")
+	writeTestFile(s.T(), filepath.Join(dir, "__pycache__", "etl.pyc"), "x")
+	hasLink := os.Symlink("etl.py", filepath.Join(dir, "alias.py")) == nil
+	for _, prepend := range []bool{true, false} {
+		src := GzSource(dir, prepend, []string{".git/"})
+		target := filepath.Join(s.T().TempDir(), "bundle.tar.gz")
+		s.Require().NoError(TarGz(dir, target, prepend, []string{".git/"}, TarOverlay{}))
+		var walked []string
+		s.Require().NoError(WalkTar(src, func(_, name string, _ os.FileInfo) error {
+			walked = append(walked, name)
+			return nil
+		}))
+		sort.Strings(walked)
+		s.Equal(tarNames(s.T(), target), walked, "prepend=%v", prepend)
+		if hasLink {
+			s.Contains(walked, filepath.ToSlash(filepath.Join(src.BaseDir, "alias.py")))
+		}
+	}
+	s.NoError(WalkTar(TarSource{Dir: filepath.Join(dir, "missing")}, func(string, string, os.FileInfo) error {
+		s.Fail("a missing directory carries nothing")
+		return nil
+	}))
+}
+
 // tarNames lists the entries of the tarball at target, sorted.
 func tarNames(t *testing.T, target string) []string {
 	t.Helper()

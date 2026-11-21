@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/internal/deploybuild"
+	"github.com/astronomer/astro-cli/internal/shipcheck"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -341,6 +343,10 @@ type Deployer interface {
 	// DeployDags creates a DAG-only deploy, uploads the project's dags/
 	// directory, and finalizes.
 	DeployDags(*DagDeploy) (DagResult, error)
+	// DagsSource is what DeployDags tars of the project at projectDir, so
+	// what a Dags-only deploy is checked for (shipcheck.CheckDags) is what
+	// it uploads.
+	DagsSource(projectDir string, noDagsBaseDir bool) fileutil.TarSource
 	// DeployImage builds (or adopts) the project image, pushes it, and
 	// finalizes; a "both" deploy also uploads the dags. It requires Docker and
 	// returns a plain error when it is unreachable.
@@ -372,6 +378,9 @@ func Run(req Request, d Deployer) (Result, error) {
 	// should not first make someone pick where to ship it.
 	missingSecrets, survey, err := checkImageSource(req)
 	if err != nil {
+		return Result{}, err
+	}
+	if err := checkDags(req, d); err != nil {
 		return Result{}, err
 	}
 
@@ -431,6 +440,15 @@ func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.Proje
 		Warn:         req.Warn,
 		Engine:       req.Engine,
 	})
+}
+
+// checkDags holds a Dags-only deploy to the credential check an image deploy
+// has, over the files the transport's upload carries (Deployer.DagsSource).
+func checkDags(req Request, d Deployer) error {
+	if !req.DagsOnly || req.ProjectDir == "" {
+		return nil
+	}
+	return shipcheck.CheckDags(req.ProjectDir, d.DagsSource(req.ProjectDir, req.NoDagsBaseDir), req.Warn)
 }
 
 // deploySettings is the project's [tool.astro.deploy], or its defaults for a

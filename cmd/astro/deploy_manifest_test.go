@@ -25,6 +25,7 @@ import (
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/userstate"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -110,6 +111,10 @@ func (f *fakeCmdDeployer) ListDeployments(string) ([]manifestdeploy.Deployment, 
 
 func (f *fakeCmdDeployer) ResolveUnlinked(string) (manifestdeploy.Deployment, error) {
 	return manifestdeploy.Deployment{}, nil
+}
+
+func (f *fakeCmdDeployer) DagsSource(projectDir string, noDagsBaseDir bool) fileutil.TarSource {
+	return astrodeploy.DagsSource(projectDir, noDagsBaseDir)
 }
 
 func (f *fakeCmdDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {

@@ -52,7 +52,8 @@ type Source struct {
 //
 // A deploy that builds nothing from the manifest (Source.DagsOnly,
 // Source.ImageName) and one with no manifest are not held to any of it, and
-// get no survey.
+// get no survey. A Dags-only one is held instead to what its upload carries
+// (shipcheck.CheckDags, from the deploy, which knows the upload).
 func CheckSource(s *Source) (imagebuild.MissingSecrets, *imagebuild.ProjectSurvey, error) {
 	var missing imagebuild.MissingSecrets
 	if s.DagsOnly || s.ImageName != "" || s.Manifest == nil {
