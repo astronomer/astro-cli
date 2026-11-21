@@ -494,6 +494,11 @@ func UploadFile(args *UploadFileArguments) error {
 	currentUploadError := err
 
 	for i := 1; i <= args.MaxTries; i++ {
+		// Also what ends the loop after a backoff an interrupt cut short, before
+		// the body is rebuilt or the retry message printed.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		body, contentType, err := multipartBody(args, file)
 		if err != nil {
 			return err

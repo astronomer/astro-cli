@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	stdctx "context"
 	"errors"
 	"io"
 	"os"
@@ -40,11 +41,21 @@ func trackSetupFailure(preRun func(*cobra.Command, []string) error) func(*cobra.
 	return func(cmd *cobra.Command, args []string) error {
 		err := preRun(cmd, args)
 		// An interrupt is the person ending the run, not a failure of setup.
-		if err != nil && !errors.Is(err, input.ErrInterrupted) {
+		// Nor is a stdout reader that went away (`| head -1`).
+		if err != nil && !errors.Is(err, input.ErrInterrupted) && !cliout.EndedByClosedStdout(cmdContext(cmd), err) {
 			telemetry.TrackSetupFailure(cmd, string(problemKinds.Of(err)))
 		}
 		return err
 	}
+}
+
+// cmdContext is the command's context, Background for a command run without
+// one (a test calling its hooks directly).
+func cmdContext(cmd *cobra.Command) stdctx.Context {
+	if ctx := cmd.Context(); ctx != nil {
+		return ctx
+	}
+	return stdctx.Background()
 }
 
 // platformPreRun is the root pre-run's version check and login

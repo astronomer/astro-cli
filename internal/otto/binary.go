@@ -132,7 +132,7 @@ func EnsureBinary() error {
 		return err
 	}
 	if version == "" {
-		fmt.Println("Downloading Otto…")
+		fmt.Fprintln(os.Stderr, "Downloading Otto…")
 		return downloadAndInstall()
 	}
 	iv, err := semver.NewVersion(version)
@@ -141,7 +141,7 @@ func EnsureBinary() error {
 	}
 	minVer, _ := semver.NewVersion(MinVersion) //nolint:errcheck // error deliberately ignored in this shell code
 	if iv.LessThan(minVer) {
-		fmt.Printf("Otto %s is older than the minimum version %s; updating…\n", version, MinVersion)
+		fmt.Fprintf(os.Stderr, "Otto %s is older than the minimum version %s; updating…\n", version, MinVersion)
 		return downloadAndInstall()
 	}
 	return nil
@@ -149,7 +149,7 @@ func EnsureBinary() error {
 
 // Update downloads and installs the latest Otto binary.
 func Update() error {
-	fmt.Println("Updating Otto…")
+	fmt.Fprintln(os.Stderr, "Updating Otto…")
 	return downloadAndInstall()
 }
 

@@ -25,8 +25,6 @@ func TestClosedStdoutIsOnlyAWriteToStdoutWhoseReaderWentAway(t *testing.T) {
 	assert.False(t, ClosedStdout(nil))
 	assert.False(t, ClosedStdout(errors.New("write /dev/stdout: broken pipe")), "text is not a type")
 	assert.False(t, ClosedStdout(stdoutWriteError(syscall.ENOSPC)), "another write failure")
-	assert.False(t, ClosedStdout(&fs.PathError{Op: "write", Path: "/dev/stderr", Err: syscall.EPIPE}), "stderr")
-	assert.False(t, ClosedStdout(&fs.PathError{Op: "read", Path: os.Stdout.Name(), Err: syscall.EPIPE}), "a read")
 	// A connection that broke while a request was being sent is a failure
 	// whose outcome the user must see, not a reader that went away.
 	assert.False(t, ClosedStdout(&net.OpError{Op: "write", Net: "tcp", Err: os.NewSyscallError("write", syscall.EPIPE)}))

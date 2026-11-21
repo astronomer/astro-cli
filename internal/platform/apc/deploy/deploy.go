@@ -139,6 +139,15 @@ type Options struct {
 	WarnEmptyDags func(string)
 }
 
+// interrupted is the cancellation of the run, nil while it goes on. The
+// Houston client takes no context, so DagsOnlyDeploy asks between its steps.
+func (o Options) interrupted() error {
+	if o.Context == nil {
+		return nil
+	}
+	return o.Context.Err()
+}
+
 func (o Options) progress() io.Writer {
 	if o.Progress != nil {
 		return o.Progress
@@ -411,11 +420,17 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	if err != nil {
 		return deploymentID, err
 	}
+	if err := opts.interrupted(); err != nil {
+		return deploymentID, err
+	}
 
 	// Throw error if the feature is disabled at Deployment level
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
 		return deploymentID, fmt.Errorf("could not get the Deployment info: %w", err)
+	}
+	if err := opts.interrupted(); err != nil {
+		return deploymentID, err
 	}
 	appCfgWs := resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, deploymentInfo)
 	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: appCfgWs, DeploymentUUID: deploymentID})
@@ -428,6 +443,9 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	}
 	if !isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
 		return deploymentID, ErrDagOnlyDeployNotEnabledForDeployment
+	}
+	if err := opts.interrupted(); err != nil {
+		return deploymentID, err
 	}
 
 	uploadURL := ""
@@ -448,6 +466,9 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 		return deploymentID, err
 	}
 	if err := refuseDagsHoldingTarball(dagsDir, dagsPath, dagsParentPath); err != nil {
+		return deploymentID, err
+	}
+	if err := opts.interrupted(); err != nil {
 		return deploymentID, err
 	}
 	dagsTarPath := filepath.Join(dagsParentPath, "dags.tar")
