@@ -18,8 +18,8 @@ import (
 // The deployment is already chosen; this uses the dags transport (create
 // deploy, upload the tarball, finalize) against the project's dags/ directory.
 type ManifestDagDeployInput struct {
-	// Context ends the wait for the Deployment when the run is interrupted;
-	// nil is context.Background().
+	// Context ends the create, upload, finalize and wait when the run is
+	// interrupted; nil is context.Background().
 	Context context.Context
 	// Login is the Astro login the deploy runs under, whose host the
 	// Deployment lives on; nil is the current context.
@@ -93,6 +93,7 @@ func descriptionOrCommitMessage(description, commitMessage string) string {
 //
 //nolint:gocritic // value input keeps this seam symmetric with DeployManifestImage
 func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClient) (ManifestDagDeployResult, error) {
+	ctx := cmp.Or(in.Context, context.Background())
 	c, err := loginOrCurrent(in.Login)
 	if err != nil {
 		return ManifestDagDeployResult{}, err
@@ -114,7 +115,7 @@ func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClie
 
 	gitInfo, commitMessage := readManifestDeployGit(in.ProjectDir, in.GitMetadata)
 	description := descriptionOrCommitMessage(in.Description, commitMessage)
-	created, err := createDeploy(dep.OrganizationId, dep.Id, astrov1.CreateDeployRequest{
+	created, err := createDeploy(ctx, dep.OrganizationId, dep.Id, astrov1.CreateDeployRequest{
 		Description: &description,
 		Type:        astrov1.CreateDeployRequestTypeDAGONLY,
 		Git:         gitInfo.Commit,
@@ -123,17 +124,17 @@ func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClie
 		return ManifestDagDeployResult{}, explainHibernating(err, &dep)
 	}
 
-	tarballVersion, err := uploadDeployDags(&c, in.ProjectDir, in.DeploymentID, &dep, created, dagsUpload{NoDagsBaseDir: in.NoDagsBaseDir, CosmosBoost: in.CosmosBoost})
+	tarballVersion, err := uploadDeployDags(ctx, &c, in.ProjectDir, in.DeploymentID, &dep, created, dagsUpload{NoDagsBaseDir: in.NoDagsBaseDir, CosmosBoost: in.CosmosBoost})
 	if err != nil {
 		return ManifestDagDeployResult{}, err
 	}
 
-	if err := finalizeManifestDeploy(dep.OrganizationId, dep.Id, created.Id, tarballVersion, astroV1Client); err != nil {
+	if err := finalizeManifestDeploy(ctx, dep.OrganizationId, dep.Id, created.Id, tarballVersion, astroV1Client); err != nil {
 		return ManifestDagDeployResult{}, err
 	}
 
 	if in.Wait {
-		if err := deployment.HealthPollIn(cmp.Or(in.Context, context.Background()), in.Progress, dep.OrganizationId, c.Token, dep.Id, dagOnlyDeploySleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
+		if err := deployment.HealthPollIn(ctx, in.Progress, dep.OrganizationId, c.Token, dep.Id, dagOnlyDeploySleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
 			return ManifestDagDeployResult{}, err
 		}
 	}

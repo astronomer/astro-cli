@@ -27,6 +27,7 @@ import (
 
 func main() {
 	pauseGCForStartup()
+	keepRunningOnClosedStdout()
 	// Before anything builds a request: every client that names no transport
 	// reads http.DefaultTransport, which this replaces when
 	// ASTRO_HTTP_UNIX_SOCKET is set.

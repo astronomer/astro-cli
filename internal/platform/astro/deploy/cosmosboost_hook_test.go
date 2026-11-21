@@ -3,6 +3,7 @@ package deploy
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"io"
 	"io/fs"
@@ -56,7 +57,7 @@ func writeTreeFile(t *testing.T, root, rel, content string) string {
 func captureUploads(t *testing.T) func() map[string]string {
 	t.Helper()
 	var entries map[string]string
-	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+	azureUploader = func(_ context.Context, sasLink string, file io.Reader) (string, error) {
 		entries = map[string]string{}
 		gz, err := gzip.NewReader(file)
 		require.NoError(t, err)
@@ -100,7 +101,7 @@ func TestUploadBundleGeneratesSidecarsIntoTheBundle(t *testing.T) {
 	uploaded := captureUploads(t)
 	before := treeSnapshot(t, bundleDir)
 
-	_, err := UploadBundle(bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: true, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
+	_, err := UploadBundle(context.Background(), bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: true, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
 	require.NoError(t, err)
 
 	assert.Equal(t, before, treeSnapshot(t, bundleDir), "the deploy must not write into the project")
@@ -127,7 +128,7 @@ func TestUploadBundleSidecarPathsUnderTheDagsBaseDir(t *testing.T) {
 	writeTreeFile(t, dagsDir, "dbt/shop/dbt_project.yml", "name: shop\n")
 	uploaded := captureUploads(t)
 
-	_, err := UploadBundle(dagsDir, "http://upload-url", BundleUpload{PrependBaseDir: true, CosmosBoost: true, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
+	_, err := UploadBundle(context.Background(), dagsDir, "http://upload-url", BundleUpload{PrependBaseDir: true, CosmosBoost: true, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
 	require.NoError(t, err)
 
 	assert.Contains(t, uploaded(), "dags/dbt/shop/"+cosmosBoostArtifact)
@@ -157,7 +158,7 @@ func TestUploadBundleSlimManifest(t *testing.T) {
 			writeTreeFile(t, bundleDir, "target/manifest.json", `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`)
 			uploaded := captureUploads(t)
 
-			_, err := UploadBundle(bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: true, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
+			_, err := UploadBundle(context.Background(), bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: true, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
 			require.NoError(t, err)
 
 			assert.Contains(t, uploaded(), "target/.astro/dbt_metadata.json", "the manifest must still be stamped")
@@ -177,7 +178,7 @@ func TestUploadBundleSkipsPreDeployByDefault(t *testing.T) {
 	bundleDir := writeDbtBundle(t)
 	uploaded := captureUploads(t)
 
-	_, err := UploadBundle(bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: false, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
+	_, err := UploadBundle(context.Background(), bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: false, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
 	require.NoError(t, err)
 
 	assert.NotContains(t, uploaded(), cosmosBoostArtifact, "opt-in gate is off by default")
@@ -225,7 +226,7 @@ func TestUploadBundleLeavesOutStaleSidecars(t *testing.T) {
 		uploaded := captureUploads(t)
 		before := treeSnapshot(t, bundleDir)
 
-		_, err := UploadBundle(bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: enabled, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
+		_, err := UploadBundle(context.Background(), bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: enabled, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
 		require.NoError(t, err)
 
 		assert.Equal(t, before, treeSnapshot(t, bundleDir), "enabled=%v: the tree must not change", enabled)
@@ -250,7 +251,7 @@ func TestUploadBundleForeignSidecar(t *testing.T) {
 		writeTreeFile(t, bundleDir, cosmosBoostArtifact, foreignSidecar)
 		uploaded := captureUploads(t)
 
-		_, err := UploadBundle(bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: false, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
+		_, err := UploadBundle(context.Background(), bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: false, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
 		require.NoError(t, err)
 		assert.Equal(t, foreignSidecar, uploaded()[cosmosBoostArtifact])
 	})
@@ -260,7 +261,7 @@ func TestUploadBundleForeignSidecar(t *testing.T) {
 		foreign := writeTreeFile(t, bundleDir, cosmosBoostArtifact, foreignSidecar)
 		uploaded := captureUploads(t)
 
-		_, err := UploadBundle(bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: true, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
+		_, err := UploadBundle(context.Background(), bundleDir, "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: true, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "unrecognized producer")
@@ -278,7 +279,7 @@ func TestUploadBundleMissingDirIsUnchanged(t *testing.T) {
 		dagsDir := filepath.Join(t.TempDir(), "dags")
 		uploaded := captureUploads(t)
 
-		_, err := UploadBundle(dagsDir, "http://upload-url", BundleUpload{PrependBaseDir: true, CosmosBoost: enabled, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
+		_, err := UploadBundle(context.Background(), dagsDir, "http://upload-url", BundleUpload{PrependBaseDir: true, CosmosBoost: enabled, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
 		require.NoError(t, err, "enabled=%v", enabled)
 		assert.Empty(t, uploaded(), "enabled=%v", enabled)
 		assert.NoDirExists(t, dagsDir)
@@ -297,7 +298,7 @@ func TestUploadBundleFromTheWorkingDirectory(t *testing.T) {
 	t.Chdir(bundleDir)
 	uploaded := captureUploads(t)
 
-	_, err := UploadBundle(".", "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: true, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
+	_, err := UploadBundle(context.Background(), ".", "http://upload-url", BundleUpload{PrependBaseDir: false, CosmosBoost: true, RuntimeVersion: "0.0.0", ErrOut: io.Discard})
 	require.NoError(t, err)
 
 	names := make([]string, 0, len(uploaded()))

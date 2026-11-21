@@ -74,6 +74,11 @@ func ExitCode(ctx context.Context, err error) int {
 	if IsUsage(err) {
 		return ExitUsage
 	}
+	// The reader of stdout went away (`| head -1`): it has all it wanted, and
+	// whatever the command had sent before that finished as it did.
+	if ClosedStdout(err) {
+		return 0
+	}
 	return ExitFailure
 }
 
@@ -87,6 +92,8 @@ func ExitCode(ctx context.Context, err error) int {
 //     when one is clearly close (UsageNoHelp drops the pointer: see the
 //     text-mode branch below). Never the usage block
 //     itself: cobra's automatic usage is off for every command;
+//   - a write to a stdout whose reader has gone (`| head -1`) reports nothing
+//     and exits 0 (ClosedStdout);
 //   - a command that already reported its failure — an ExitError, or an error
 //     marked JSONShown — gets nothing added in either mode.
 //
@@ -136,6 +143,12 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 
 	var exit *ExitError
 	if errors.As(err, &exit) || errors.As(err, new(jsonShown)) {
+		return err
+	}
+	// Nowhere to report to: stdout is closed, and a message on stderr would
+	// be noise for a reader that stopped listening on purpose. ExitCode
+	// makes it 0.
+	if ClosedStdout(err) && ctx.Err() == nil {
 		return err
 	}
 	if wantsJSON(cmd, args, err) || unknownCommandAsksJSON(cmd, args, err) {

@@ -126,6 +126,9 @@ func dagsFrom(deploymentInfo *houston.Deployment, appConfig *houston.AppConfig) 
 // Options is what a deploy's caller decides about its output and its
 // questions.
 type Options struct {
+	// Context ends the DAG upload when the run is interrupted; nil is
+	// context.Background().
+	Context context.Context
 	// Progress is where the deploy's progress goes: its notes, the image
 	// push and the DAG upload. nil is os.Stdout, where it has always gone; a
 	// command whose stdout carries a result (--output json) sends it to
@@ -498,6 +501,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	}
 
 	uploadFileArgs := fileutil.UploadFileArguments{
+		Context:             opts.Context,
 		FilePath:            dagsTarGzPath,
 		TargetURL:           uploadURL,
 		FormFileFieldName:   "file",

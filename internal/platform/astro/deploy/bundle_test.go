@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"os"
@@ -64,7 +65,7 @@ func (s *BundleSuite) TestBundleDeploy_Success() {
 	mockCreateDeploy(s.mockV1Client, "http://bundle-upload-url", expectedDeploy)
 	mockUpdateDeploy(s.mockV1Client, "version-id")
 
-	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+	azureUploader = func(_ context.Context, sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
 	}
 
@@ -84,7 +85,7 @@ func (s *BundleSuite) TestBundleDeploy_UsesTheDeploymentItIsHanded() {
 	require.NoError(s.T(), os.Mkdir(bundlePath, 0o755))
 	mockCreateDeploy(s.mockV1Client, "http://bundle-upload-url", nil)
 	mockUpdateDeploy(s.mockV1Client, "version-id")
-	azureUploader = func(string, io.Reader) (string, error) { return "version-id", nil }
+	azureUploader = func(context.Context, string, io.Reader) (string, error) { return "version-id", nil }
 
 	res, err := DeployBundle(&DeployBundleInput{
 		BundlePath:    bundlePath,
@@ -166,7 +167,7 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataRetrieved() {
 	})
 	mockUpdateDeploy(s.mockV1Client, "version-id")
 
-	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+	azureUploader = func(_ context.Context, sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
 	}
 
@@ -205,7 +206,7 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataGenericProvider() {
 	})
 	mockUpdateDeploy(s.mockV1Client, "version-id")
 
-	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+	azureUploader = func(_ context.Context, sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
 	}
 
@@ -238,7 +239,7 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataOff() {
 	mockCreateDeploy(s.mockV1Client, "http://bundle-upload-url", expectedDeploy)
 	mockUpdateDeploy(s.mockV1Client, "version-id")
 
-	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+	azureUploader = func(_ context.Context, sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
 	}
 
@@ -268,7 +269,7 @@ func (s *BundleSuite) TestBundleDeploy_GitHasUncommittedChanges() {
 	mockCreateDeploy(s.mockV1Client, "http://bundle-upload-url", expectedDeploy)
 	mockUpdateDeploy(s.mockV1Client, "version-id")
 
-	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+	azureUploader = func(_ context.Context, sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
 	}
 
@@ -288,7 +289,7 @@ func (s *BundleSuite) TestBundleDeploy_BundleUploadUrlMissing() {
 
 	mockCreateDeploy(s.mockV1Client, "", nil)
 
-	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+	azureUploader = func(_ context.Context, sasLink string, file io.Reader) (string, error) {
 		return "version-id", nil
 	}
 

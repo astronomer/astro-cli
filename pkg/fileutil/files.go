@@ -33,6 +33,9 @@ var (
 )
 
 type UploadFileArguments struct {
+	// Context ends the upload, and the waits between its retries, when the run
+	// is interrupted; nil is context.Background().
+	Context             http_context.Context
 	FilePath            string
 	TargetURL           string
 	FormFileFieldName   string
@@ -44,6 +47,13 @@ type UploadFileArguments struct {
 	RetryDisplayMessage string
 	// Out is where the upload's progress lines go; nil is os.Stdout.
 	Out io.Writer
+}
+
+func (a *UploadFileArguments) ctx() http_context.Context {
+	if a.Context != nil {
+		return a.Context
+	}
+	return http_context.Background()
 }
 
 func (a *UploadFileArguments) out() io.Writer {
@@ -433,14 +443,47 @@ func FilesWithExtension(folderPath, ext string) ([]string, error) {
 	return files, err
 }
 
-func backOff(retryDelayInMS, backoffFactor int) int {
-	// exponential backoff
-	time.Sleep(time.Duration(retryDelayInMS) * time.Millisecond)
+// backOff waits retryDelayInMS, or until ctx ends, and returns the next
+// delay (exponential backoff).
+func backOff(ctx http_context.Context, retryDelayInMS, backoffFactor int) int {
+	t := time.NewTimer(time.Duration(retryDelayInMS) * time.Millisecond)
+	defer t.Stop()
+	select {
+	case <-t.C:
+	case <-ctx.Done():
+	}
 	retryDelayInMS *= backoffFactor
 	return retryDelayInMS
 }
 
+// multipartBody is the multipart/form-data request body of one upload try:
+// the file's content, and the description when there is one. It returns the
+// body's Content-Type.
+func multipartBody(args *UploadFileArguments, file io.Reader) (body *bytes.Buffer, contentType string, err error) {
+	body = &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	// Create a form field for the file
+	fileWriter, err := writer.CreateFormFile(args.FormFileFieldName, args.FilePath)
+	if err != nil {
+		return nil, "", fmt.Errorf("error creating form file: %w", err)
+	}
+	// Copy the file content into the form field
+	if _, err = ioCopy(fileWriter, file); err != nil {
+		return nil, "", fmt.Errorf("error copying file content: %w", err)
+	}
+	// Add the description field to the multipart request
+	if args.Description != "" {
+		if err = writer.WriteField("description", args.Description); err != nil {
+			return nil, "", fmt.Errorf("error adding description field: %w", err)
+		}
+	}
+	// Close the multipart writer to finalize the request
+	writer.Close() //nolint:errcheck // best-effort close
+	return body, writer.FormDataContentType(), nil
+}
+
 func UploadFile(args *UploadFileArguments) error {
+	ctx := args.ctx()
 	file, err := os.Open(args.FilePath)
 	if err != nil {
 		return fmt.Errorf("error opening file: %w", err)
@@ -451,37 +494,19 @@ func UploadFile(args *UploadFileArguments) error {
 	currentUploadError := err
 
 	for i := 1; i <= args.MaxTries; i++ {
-		// Create a new buffer to store the multipart/form-data request
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-		// Create a form field for the file
-		fileWriter, err := writer.CreateFormFile(args.FormFileFieldName, args.FilePath)
+		body, contentType, err := multipartBody(args, file)
 		if err != nil {
-			return fmt.Errorf("error creating form file: %w", err)
+			return err
 		}
-		// Copy the file content into the form field
-		_, err = ioCopy(fileWriter, file)
-		if err != nil {
-			return fmt.Errorf("error copying file content: %w", err)
-		}
-		// Add the description field to the multipart request
-		if args.Description != "" {
-			err = writer.WriteField("description", args.Description)
-			if err != nil {
-				return fmt.Errorf("error adding description field: %w", err)
-			}
-		}
-		// Close the multipart writer to finalize the request
-		writer.Close() //nolint:errcheck // best-effort close
 
 		headers := args.Headers
-		headers["Content-Type"] = writer.FormDataContentType()
+		headers["Content-Type"] = contentType
 		fmt.Fprintln(args.out(), args.RetryDisplayMessage)
-		req, err := newRequestWithContext(http_context.Background(), "POST", args.TargetURL, body)
+		req, err := newRequestWithContext(ctx, "POST", args.TargetURL, body)
 		if err != nil {
 			currentUploadError = err
 			if i < args.MaxTries {
-				retryDelayInMS = backOff(retryDelayInMS, args.BackoffFactor)
+				retryDelayInMS = backOff(ctx, retryDelayInMS, args.BackoffFactor)
 			}
 			continue
 		}
@@ -493,9 +518,13 @@ func UploadFile(args *UploadFileArguments) error {
 		response, err := client.Do(req)
 		if err != nil {
 			currentUploadError = err
+			// An interrupt ends the upload; it is no failure to retry.
+			if ctx.Err() != nil {
+				return err
+			}
 			// If we have a dial tcp error, we should retry with exponential backoff
 			if i < args.MaxTries {
-				retryDelayInMS = backOff(retryDelayInMS, args.BackoffFactor)
+				retryDelayInMS = backOff(ctx, retryDelayInMS, args.BackoffFactor)
 			}
 			continue
 		}
@@ -518,7 +547,7 @@ func UploadFile(args *UploadFileArguments) error {
 			break
 		}
 		if i < args.MaxTries {
-			retryDelayInMS = backOff(retryDelayInMS, args.BackoffFactor)
+			retryDelayInMS = backOff(ctx, retryDelayInMS, args.BackoffFactor)
 		}
 		// Reset the file pointer to the beginning of the file
 		_, err = file.Seek(0, io.SeekStart)

@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"os"
@@ -59,7 +60,7 @@ func dagDeployWithCapture(t *testing.T, in *ManifestDagDeployInput) (ManifestDag
 	uploadURL := "https://upload-url"
 	req := captureCreateDeploy(client, &astrov1.Deploy{Id: "test-deploy-id", DagsUploadUrl: &uploadURL})
 	mockFinalizeDeploy(client)
-	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
+	azureUploader = func(context.Context, string, io.Reader) (string, error) { return "tarball-v1", nil }
 
 	in.DeploymentID = "test-deployment-id"
 	res, err := DeployManifestDags(*in, client)

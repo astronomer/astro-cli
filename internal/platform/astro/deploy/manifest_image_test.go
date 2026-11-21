@@ -179,7 +179,7 @@ func TestDeployManifestImage_BuildAndImageAndDag(t *testing.T) {
 	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
-	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
+	azureUploader = func(context.Context, string, io.Reader) (string, error) { return "tarball-v1", nil }
 
 	cmd := withImageSeams(t, "3.1-2")
 
@@ -237,7 +237,7 @@ func TestDeployManifestImage_Airflow2(t *testing.T) {
 		mockDeploymentOptions(client, "12.6.0", "12.9.0")
 		mockCreateImageDeploy(client, "https://upload-url")
 		mockFinalizeDeploy(client)
-		azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
+		azureUploader = func(context.Context, string, io.Reader) (string, error) { return "tarball-v1", nil }
 		cmd := withImageSeams(t, "12.9.0")
 
 		res, err := DeployManifestImage(in(t), client)
@@ -794,7 +794,7 @@ func TestDeployManifestImage_UsesADeclaredDockerfile(t *testing.T) {
 	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
-	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
+	azureUploader = func(context.Context, string, io.Reader) (string, error) { return "tarball-v1", nil }
 
 	cmd := withImageSeams(t, "3.1-2")
 

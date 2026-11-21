@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -54,20 +55,26 @@ func mockManifestDeploymentAt(client *astrov1_mocks.ClientWithResponsesInterface
 	}, nil)
 }
 
-func mockCreateDagDeploy(client *astrov1_mocks.ClientWithResponsesInterface, uploadURL string) {
-	client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.CreateDeployResponse{
+func createdDeploy(uploadURL string) *astrov1.CreateDeployResponse {
+	return &astrov1.CreateDeployResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 		JSON200: &astrov1.Deploy{
 			Id:            "test-deploy-id",
 			DagsUploadUrl: &uploadURL,
 		},
-	}, nil)
+	}
+}
+
+func finalizedDeploy() *astrov1.FinalizeDeployResponse {
+	return &astrov1.FinalizeDeployResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}}
+}
+
+func mockCreateDagDeploy(client *astrov1_mocks.ClientWithResponsesInterface, uploadURL string) {
+	client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(createdDeploy(uploadURL), nil)
 }
 
 func mockFinalizeDeploy(client *astrov1_mocks.ClientWithResponsesInterface) {
-	client.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.FinalizeDeployResponse{
-		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
-	}, nil)
+	client.On("FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(finalizedDeploy(), nil)
 }
 
 func TestDeployManifestDags_Success(t *testing.T) {
@@ -78,7 +85,7 @@ func TestDeployManifestDags_Success(t *testing.T) {
 	mockCreateDagDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
 
-	azureUploader = func(sasLink string, file io.Reader) (string, error) {
+	azureUploader = func(_ context.Context, sasLink string, file io.Reader) (string, error) {
 		return "tarball-v1", nil
 	}
 
@@ -173,7 +180,7 @@ func TestDeployManifestDags_UsesTheLoginItIsHanded(t *testing.T) {
 	}, nil)
 	mockCreateDagDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
-	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
+	azureUploader = func(context.Context, string, io.Reader) (string, error) { return "tarball-v1", nil }
 
 	res, err := DeployManifestDags(ManifestDagDeployInput{
 		Login:        &config.Context{Domain: "astronomer.io", Organization: "prod-org", Token: "Bearer prod-token"},
@@ -217,7 +224,7 @@ func TestDeployManifestDags_WaitUsesTheLoginItIsHanded(t *testing.T) {
 	}, nil)
 	mockCreateDagDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
-	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
+	azureUploader = func(context.Context, string, io.Reader) (string, error) { return "tarball-v1", nil }
 
 	var progress bytes.Buffer
 	_, err := DeployManifestDags(ManifestDagDeployInput{
@@ -257,7 +264,7 @@ func TestDeployManifestDags_MonitoringDagFollowsTheLoginsOrg(t *testing.T) {
 	mockCreateDagDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
 	dir := manifestProjectDir(t)
-	azureUploader = func(string, io.Reader) (string, error) {
+	azureUploader = func(context.Context, string, io.Reader) (string, error) {
 		_, err := os.Stat(filepath.Join(dir, "dags", "astronomer_monitoring_dag.py"))
 		assert.True(t, os.IsNotExist(err), "a hosted org's deploy must not add the monitoring DAG")
 		return "tarball-v1", nil
@@ -323,7 +330,7 @@ func TestDeployManifestDags_MonitoringDagNeverWritesThroughASymlink(t *testing.T
 	if err := os.Symlink(outside, link); err != nil {
 		t.Skipf("cannot create a symlink here: %v", err)
 	}
-	azureUploader = func(string, io.Reader) (string, error) {
+	azureUploader = func(context.Context, string, io.Reader) (string, error) {
 		info, err := os.Lstat(link)
 		require.NoError(t, err, "the monitoring Dag is in the upload")
 		assert.True(t, info.Mode().IsRegular(), "the upload carries the monitoring Dag itself, not the link")

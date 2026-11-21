@@ -121,7 +121,7 @@ func writeMonitoringDag(path, content string) error {
 	return fsatomic.WriteFile(path, []byte(content), monitoringDagPerm)
 }
 
-func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, opts dagsUpload) (string, error) {
+func uploadDags(ctx httpContext.Context, dagsPath, dagsUploadURL, currentRuntimeVersion string, opts dagsUpload) (string, error) {
 	if opts.MonitoringDag {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
@@ -146,7 +146,7 @@ func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, opts dags
 
 	// By default, prepend dags/ directory prefix. Use --no-dags-base-dir to place files at bundle root
 	// (needed for some Airflow 3.x deployments where sys.path includes the bundle root, not dags/).
-	versionID, err := UploadBundle(dagsPath, dagsUploadURL, BundleUpload{
+	versionID, err := UploadBundle(ctx, dagsPath, dagsUploadURL, BundleUpload{
 		PrependBaseDir: !opts.NoDagsBaseDir,
 		CosmosBoost:    opts.CosmosBoost,
 		RuntimeVersion: currentRuntimeVersion,
@@ -196,8 +196,8 @@ func fetchDeploymentDetails(deploymentID, organizationID string, astroV1Client a
 	}, nil
 }
 
-func createDeploy(organizationID, deploymentID string, request astrov1.CreateDeployRequest, astroV1Client astrov1.APIClient) (*astrov1.Deploy, error) {
-	resp, err := astroV1Client.CreateDeployWithResponse(httpContext.Background(), organizationID, deploymentID, request)
+func createDeploy(ctx httpContext.Context, organizationID, deploymentID string, request astrov1.CreateDeployRequest, astroV1Client astrov1.APIClient) (*astrov1.Deploy, error) {
+	resp, err := astroV1Client.CreateDeployWithResponse(ctx, organizationID, deploymentID, request)
 	if err != nil {
 		return nil, err
 	}
