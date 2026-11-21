@@ -49,9 +49,10 @@ func TestCheckSourceChecksTheRuntimeBuild(t *testing.T) {
 }
 
 // A deploy that builds nothing from the manifest, and one with no manifest,
-// are checked for nothing: a Dockerfile FROM another Airflow, which an image
-// built from the manifest is refused for, goes through, and nothing is
-// surveyed or asked.
+// are not held to an image's checks: a Dockerfile FROM another Airflow, which
+// an image built from the manifest is refused for, goes through, and nothing
+// is surveyed or asked. (A Dags-only one is held to its upload's credential
+// check instead, which this project, with no dags/, passes.)
 func TestCheckSourceSkipsWhatBuildsNothing(t *testing.T) {
 	dir, m := sourceProject(t, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.3-8")
 	// Neither is meant to run; one that does fails the test.
@@ -80,6 +81,25 @@ func TestCheckSourceSkipsWhatBuildsNothing(t *testing.T) {
 
 	_, _, err := CheckSource(&Source{ProjectDir: dir, Manifest: m})
 	require.Error(t, err, "the same project is refused when its image is built")
+}
+
+// A Dags-only deploy, on Astro and Astro Private Cloud alike, is held to what
+// its upload carries (shipcheck.CheckDags): a key behind a dags/ linked out of
+// the project is refused before anything is asked or uploaded.
+func TestCheckSourceHoldsADagsOnlyDeployToItsUpload(t *testing.T) {
+	dir, m := sourceProject(t, "", "")
+	shared := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(shared, "etl.py"), []byte("import x\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(shared, "service-key.pem"), []byte("k"), 0o600))
+	if err := os.Symlink(shared, filepath.Join(dir, "dags")); err != nil {
+		t.Skipf("symlinks unavailable here: %v", err)
+	}
+
+	_, survey, err := CheckSource(&Source{ProjectDir: dir, Manifest: m, DagsOnly: true})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refusing to upload the Dags")
+	assert.Contains(t, err.Error(), "dags/service-key.pem")
+	assert.Nil(t, survey, "a Dags-only deploy builds no image to survey")
 }
 
 // A declared Dockerfile FROM another Airflow than the pin is refused.

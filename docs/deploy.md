@@ -127,7 +127,7 @@ An image deploy refuses a Remote Execution agent image, one that sets `ASTRO_AGE
 
 ### Gitignored files and credentials
 
-An image a deploy or `astro package astro` builds is pushed to a registry, so before either builds, `shipcheck.Survey` lists what the image would carry, once per command (`imagebuild.SurveyProject`: what a generated build copies, or a declared Dockerfile's context under its ignore file), and asks git about it. The same listing feeds the declared Dockerfile's local-files warning and, through the transport, the DAG check above. It runs for a generated build and a declared Dockerfile alike, and not for `--dags` or `--image-name`, which build nothing. A declared Dockerfile is held to a generated build's rule: everything in its build context counts as shipped, whatever the Dockerfile copies.
+An image a deploy or `astro package astro` builds is pushed to a registry, so before either builds, `shipcheck.Survey` lists what the image would carry, once per command (`imagebuild.SurveyProject`: what a generated build copies, or a declared Dockerfile's context under its ignore file), and asks git about it. The same listing feeds the declared Dockerfile's local-files warning and, through the transport, the DAG check above. It runs for a generated build and a declared Dockerfile alike, and not for `--image-name`, which builds nothing. `--dags` builds nothing either, and is held instead to the same credential check over what its upload carries (see [Dags-only deploys](#2-dags-only-deploys)). A declared Dockerfile is held to a generated build's rule: everything in its build context counts as shipped, whatever the Dockerfile copies.
 
 | what the image would carry | outcome |
 | --- | --- |
@@ -149,6 +149,8 @@ An image a deploy or `astro package astro` builds is pushed to a registry, so be
 ## 2. Dags-only deploys
 
 `astro deploy --dags` tars `<project>/dags`, uploads it to the URL the create-deploy call returns, and finalizes. It reads the Deployment's runtime version and type from the API, not from the manifest, because the DAGs must fit the image already running. That version decides symlink validation (Airflow 3), the monitoring DAG's Airflow major version, and whether files sit under `dags/` or at the bundle root (`--no-dags-base-dir`). It never builds an image and never needs Docker. A hibernating Deployment refuses the create-deploy call, before anything is uploaded, and the deploy says how to wake it, with kind `deployment_hibernating`, as an image deploy does before its build; a bundle deploy is refused the same way.
+
+**Credentials in `dags/`.** Before anything is asked or uploaded, on Astro and Astro Private Cloud alike, the files the upload would carry are held to an image's credential check (`shipcheck.CheckDags`, the rules in [Gitignored files and credentials](#gitignored-files-and-credentials)): a file under `dags/` that looks like a credential and that git does not track, or one behind a `dags/` linked out of the project, is **refused**, naming it, with `Move it out of dags/` (a Dags upload reads no ignore file, so moving is the way out). A committed one ships, as in an image. A link inside `dags/` is uploaded as a link, not the file it points at, and is not held against the upload; neither is a `__pycache__`.
 
 ## 3. Selecting the Deployment
 

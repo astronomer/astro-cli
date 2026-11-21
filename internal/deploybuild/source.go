@@ -52,10 +52,18 @@ type Source struct {
 //
 // A deploy that builds nothing from the manifest (Source.DagsOnly,
 // Source.ImageName) and one with no manifest are not held to any of it, and
-// get no survey.
+// get no survey. A Dags-only one is held instead to what its upload carries
+// (shipcheck.CheckDags), the same credential check, on Astro and Astro
+// Private Cloud alike.
 func CheckSource(s *Source) (imagebuild.MissingSecrets, *imagebuild.ProjectSurvey, error) {
 	var missing imagebuild.MissingSecrets
-	if s.DagsOnly || s.ImageName != "" || s.Manifest == nil {
+	if s.DagsOnly {
+		if s.ProjectDir == "" {
+			return missing, nil, nil
+		}
+		return missing, nil, shipcheck.CheckDags(s.ProjectDir, s.Warn)
+	}
+	if s.ImageName != "" || s.Manifest == nil {
 		return missing, nil, nil
 	}
 	if err := scaffold.CheckDockerfileAirflow(s.ProjectDir, s.Manifest); err != nil {
