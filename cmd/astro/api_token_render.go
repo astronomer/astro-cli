@@ -52,11 +52,11 @@ func renderTokenList(format cliout.Format, out io.Writer, tokens []apitoken.Toke
 	// tables print one.
 	plain := !cliout.IsTerminal(out)
 	for i := range tokens {
-		row := tokenRow(&tokens[i])
+		created := apitoken.TimeAgo(tokens[i].CreatedAt)
 		if plain {
-			row[createdColumn] = createdAtText(tokens[i].CreatedAt)
+			created = createdAtText(tokens[i].CreatedAt)
 		}
-		tab.AddRow(row...)
+		tab.AddRow(tokenRowCreated(&tokens[i], created)...)
 	}
 	return cliout.Renderer{Format: format, Out: out}.Emit(apitoken.List{Tokens: tokens}, cliout.TableText(tab))
 }
@@ -69,9 +69,6 @@ func tokenHeader(roleHeader string) []string {
 	return []string{"ID", "NAME", "DESCRIPTION", "SCOPE", roleHeader, "CREATED", "CREATED BY", "KIND"}
 }
 
-// createdColumn is where tokenRow puts the CREATED cell.
-const createdColumn = 5
-
 // createdAtText is a creation time as a script reads it: RFC 3339, in UTC.
 func createdAtText(t time.Time) string {
 	if t.IsZero() {
@@ -81,7 +78,13 @@ func createdAtText(t time.Time) string {
 }
 
 func tokenRow(t *apitoken.Token) []string {
-	return []string{t.ID, t.Name, t.Description, t.Scope, t.Role, apitoken.TimeAgo(t.CreatedAt), t.CreatedBy, apitoken.KindText(t)}
+	return tokenRowCreated(t, apitoken.TimeAgo(t.CreatedAt))
+}
+
+// tokenRowCreated is tokenRow with the CREATED cell given: "3 days ago" for a
+// person, a timestamp for a script.
+func tokenRowCreated(t *apitoken.Token, created string) []string {
+	return []string{t.ID, t.Name, t.Description, t.Scope, t.Role, created, t.CreatedBy, apitoken.KindText(t)}
 }
 
 // renderTokenSecret renders a token that carries its secret: the new one, or
@@ -92,17 +95,21 @@ func tokenRow(t *apitoken.Token) []string {
 // pipe get exactly the value; the receipt and the warning that the value is
 // not shown again are for the person, on stderr. clean prints the bare
 // secret and no receipt at all, which is what --clean-output has always done.
-func renderTokenSecret(format cliout.Format, out io.Writer, t *apitoken.Token, kind, verb, name string, clean bool) error {
-	if format != cliout.FormatJSON && !clean {
-		fmt.Fprintf(os.Stderr, "\n%s %s API token %s\n", verb, kind, name)
-		fmt.Fprintln(os.Stderr, "Copy this API token for your records.")
-		fmt.Fprintln(os.Stderr, "This API token value is not shown again.")
-	}
-	return cliout.Renderer{Format: format, Out: out}.Emit(t, cliout.Text(func(b *bufio.Writer) {
+func renderTokenSecret(format cliout.Format, out, errOut io.Writer, t *apitoken.Token, kind, verb, name string, clean bool) error {
+	if err := (cliout.Renderer{Format: format, Out: out}).Emit(t, cliout.Text(func(b *bufio.Writer) {
 		if t.Token != "" {
 			fmt.Fprintln(b, t.Token)
 		}
-	}))
+	})); err != nil {
+		return err
+	}
+	// The receipt follows the secret, and only when the secret was written.
+	if format != cliout.FormatJSON && !clean {
+		fmt.Fprintf(errOut, "\n%s %s API token %s\n", verb, kind, name)
+		fmt.Fprintln(errOut, "Copy this API token for your records.")
+		fmt.Fprintln(errOut, "This API token value is not shown again.")
+	}
+	return nil
 }
 
 // renderTokenLine renders v as one line of text, or as itself in json.

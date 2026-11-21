@@ -139,6 +139,7 @@ func lineOf(out, name string) string {
 // nothing else. The resolution rule is in the help, and a running local
 // Airflow is not something `astro use` can select, so neither is printed.
 func TestBareUseListsTheLinksAndMarksTheCurrentOne(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	dir := instanceProject(t, twoLinkManifest)
 	if err := savePin(dir, "prod"); err != nil {
 		t.Fatal(err)
@@ -164,6 +165,7 @@ func TestBareUseListsTheLinksAndMarksTheCurrentOne(t *testing.T) {
 // A row something other than your selection made current says what did, in
 // the picker's words.
 func TestBareUseLabelsARowItDidNotSelect(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	dir := instanceProject(t, twoLinkManifest)
 	d, out, _ := instanceDeps(t, dir)
 	if err := execute(t, d, "use"); err != nil {
@@ -186,6 +188,7 @@ func TestBareUseLabelsARowItDidNotSelect(t *testing.T) {
 // Several links and no default: nothing is current, and the listing says why
 // rather than leaving the reader to wonder where the * went.
 func TestBareUseSaysWhyNothingIsCurrent(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	dir := instanceProject(t, "\n[tool.astro.deployments.dev]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n\n[tool.astro.deployments.prod]\ndeployment = 'clm2xk9dq000108l7a2b3c4d6'\n")
 	d, out, _ := instanceDeps(t, dir)
 	if err := execute(t, d, "use"); err != nil {
@@ -290,13 +293,14 @@ func TestEveryListedNameIsSelectable(t *testing.T) {
 // A project with nothing linked says so rather than printing an empty table,
 // in text and in json.
 func TestBareUseSaysWhenNothingIsLinked(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	dir := instanceProject(t, "")
-	d, out, _ := instanceDeps(t, dir)
+	d, out, errOut := instanceDeps(t, dir)
 	if err := execute(t, d, "use"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), noLinks) {
-		t.Errorf("output does not explain the empty listing:\n%s", out)
+	if !strings.Contains(errOut.String(), noLinks) || strings.Contains(out.String(), noLinks) {
+		t.Errorf("stderr does not explain the empty listing, or stdout does:\n%s\n%s", errOut, out)
 	}
 
 	d, out, _ = instanceDeps(t, dir)
@@ -381,6 +385,7 @@ func TestBareUseAtATerminalPicksAndPins(t *testing.T) {
 // seen or would have nothing to offer: stdout piped away from a terminal
 // stdin, or a project that links nothing.
 func TestBareUseReportsWhenThePickerCannotHelp(t *testing.T) {
+	defer input.ForceTerminalWriters()() // pins the layout a person reads; the piped form has its own test
 	for name, tc := range map[string]struct {
 		links, want string
 		stdoutTTY   bool
@@ -390,14 +395,16 @@ func TestBareUseReportsWhenThePickerCannotHelp(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := instanceProject(t, tc.links)
-			d, out, _ := instanceDeps(t, dir)
+			d, out, errOut := instanceDeps(t, dir)
 			d.OutputTerminal = func() bool { return tc.stdoutTTY }
 			d.Stdin = strings.NewReader("2\n")
 			if err := execute(t, d, "use"); err != nil {
 				t.Fatal(err)
 			}
-			if !strings.Contains(out.String(), tc.want) || strings.Contains(out.String(), "Select the Deployment") {
-				t.Errorf("want the report:\n%s", out)
+			// The report is stdout's, except an empty listing's sentence, which is stderr's.
+			report := out.String() + errOut.String()
+			if !strings.Contains(report, tc.want) || strings.Contains(report, "Select the Deployment") {
+				t.Errorf("want the report:\n%s", report)
 			}
 		})
 	}
@@ -500,15 +507,21 @@ func TestBareUseWithJSONAtATerminalReports(t *testing.T) {
 	}
 }
 
-// Piped, the listing is its cells separated by tabs, with no padding.
+// Piped, the listing is its cells separated by tabs: no marker column and no
+// padding, with the current row said in its last cell.
 func TestUseListingIsTabSeparatedWhenPiped(t *testing.T) {
 	var out strings.Builder
-	res := useListing{Deployments: []useLinkRow{{Name: "dev", Kind: "deployment", Where: "dep-1", Default: true}}}
+	res := useListing{Current: "dev", Deployments: []useLinkRow{
+		{Name: "dev", Kind: "deployment", Where: "dep-1", Default: true, Current: true},
+		{Name: "prod", Kind: "deployment", Where: "dep-2"},
+	}}
 	if err := renderUseListing(&out, res, ""); err != nil {
 		t.Fatal(err)
 	}
-	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
-	if len(lines) != 2 || lines[0] != "\tNAME\tKIND\tDEPLOYMENT, ENVIRONMENT OR URL\t" || !strings.HasPrefix(lines[1], "\tdev\tdeployment\tdep-1\t") {
-		t.Errorf("listing = %q", out.String())
+	want := "NAME\tKIND\tDEPLOYMENT, ENVIRONMENT OR URL\tLABEL\n" +
+		"dev\tdeployment\tdep-1\tcurrent, default\n" +
+		"prod\tdeployment\tdep-2\t\n"
+	if out.String() != want {
+		t.Errorf("listing = %q, want %q", out.String(), want)
 	}
 }

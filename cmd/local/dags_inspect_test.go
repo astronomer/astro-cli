@@ -70,14 +70,13 @@ func TestDagsErrorsAndWarningsSayWhenThereAreNone(t *testing.T) {
 		"errors":   {"No import errors on this Airflow.", "import_errors"},
 		"warnings": {"No Dag warnings on this Airflow.", "dag_warnings"},
 	} {
-		notices := captureNotices(t)
-		out, _, err := runQuery(t, stub, "dags", args)
+		out, notices, err := runQuery(t, stub, "dags", args)
 		if err != nil {
 			t.Fatalf("dags %s: %v", args, err)
 		}
 		// The sentence is for a person, on stderr; stdout is the header alone.
-		if !strings.Contains(notices.String(), want.text) || strings.Contains(out, want.text) {
-			t.Errorf("dags %s printed %q and told %q, want the sentence %q told, not printed", args, out, notices.String(), want.text)
+		if !strings.Contains(notices, want.text) || strings.Contains(out, want.text) {
+			t.Errorf("dags %s printed %q and told %q, want the sentence %q told, not printed", args, out, notices, want.text)
 		}
 		// And json prints the object with an empty list and zero counts, so
 		// `jq '.import_errors | length'` reads 0 rather than failing on

@@ -45,7 +45,8 @@ type Table struct {
 	// for a person, so it never goes to the stream a script reads: that gets
 	// the header alone when Plain, and nothing when drawn for a terminal.
 	Empty string
-	// EmptyTo is where Empty is said. Nil is os.Stderr.
+	// EmptyTo is where Empty is said. Nil is the notices writer of the
+	// destination (cliout.TableText), else os.Stderr.
 	EmptyTo io.Writer
 	// Plain lays the table out for a script: the cells of a line joined by one
 	// tab, with no leading space and no padding. Left false, the table is the
@@ -128,25 +129,18 @@ type plainColumns struct{ w io.Writer }
 func (p *plainColumns) Write(b []byte) (int, error) { return p.w.Write(b) }
 func (p *plainColumns) Flush() error                { return nil }
 
-// Notices is where SayEmpty says an empty list's message. Nil is os.Stderr; a
-// test sets it to read what a person would have been told.
-var Notices io.Writer
-
-// Say tells a person something about a listing, on stderr (or Notices), where
-// a script reading stdout does not see it.
-func Say(message string) {
-	var to io.Writer = os.Stderr
-	if Notices != nil {
-		to = Notices
-	}
-	fmt.Fprintln(to, message)
+// Say tells a person something about a listing: on the notices writer of w
+// (see input.WithNotices), stderr when it carries none, where a script reading
+// stdout does not see it.
+func Say(w io.Writer, message string) {
+	fmt.Fprintln(input.NoticesFor(w), message)
 }
 
 // SayEmpty says an empty list's message, which is for a person: on stderr. A
 // script's stdout, when w is not a terminal, keeps the header line alone;
 // a terminal's keeps nothing, as the message is what a person came for.
 func SayEmpty(w io.Writer, terminal bool, message string, header []string) error {
-	Say(message)
+	Say(w, message)
 	if terminal {
 		return nil
 	}

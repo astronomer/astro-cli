@@ -153,9 +153,48 @@ func IsTerminalWriter(w io.Writer) bool {
 	if forceTerminalWriters.Load() {
 		return true
 	}
-	if tw, ok := w.(*TerminalWriter); ok {
-		w = tw.W
+	for {
+		switch x := w.(type) {
+		case *TerminalWriter:
+			w = x.W
+			continue
+		case noticed:
+			w = x.Writer
+			continue
+		}
+		break
 	}
 	f, ok := w.(*os.File)
 	return ok && (isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd()))
+}
+
+// noticed is a writer that knows where the notices about what it carries go.
+type noticed struct {
+	io.Writer
+	to io.Writer
+}
+
+// WithNotices is w, carrying to as where a renderer's notices go (an empty
+// list's sentence, a table's success line): the command's stderr, handed down
+// the one writer a renderer already receives. A nil to is w itself.
+func WithNotices(w, to io.Writer) io.Writer {
+	if to == nil {
+		return w
+	}
+	return noticed{Writer: w, to: to}
+}
+
+// NoticesFor is where the notices of a rendering to w go: what WithNotices
+// gave it, else stderr.
+func NoticesFor(w io.Writer) io.Writer {
+	for {
+		switch x := w.(type) {
+		case noticed:
+			return x.to
+		case *TerminalWriter:
+			w = x.W
+			continue
+		}
+		return os.Stderr
+	}
 }

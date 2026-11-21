@@ -441,7 +441,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
   astro workspace token rotate --name "My Token" --yes --clean-output
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return rotateWorkspaceToken(args, out)
+			return rotateWorkspaceToken(args, out, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().BoolVar(&cleanTokenOutput, "clean-output", false, "Print only the token as output. For use of the command in scripts")

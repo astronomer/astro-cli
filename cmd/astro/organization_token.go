@@ -49,7 +49,7 @@ func listOrganizationTokenRoles(args []string, out io.Writer) error {
 	return cliout.Renderer{Format: organizationTokenOutput, Out: out}.Emit(apitoken.RoleList{Roles: roles}, cliout.TableText(tab))
 }
 
-func createOrganizationToken(out io.Writer) error {
+func createOrganizationToken(out, errOut io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func createOrganizationToken(out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(organizationTokenOutput, out, &created, "Organization", "Created", tokenName, cleanTokenOutput)
+	return renderTokenSecret(organizationTokenOutput, out, errOut, &created, "Organization", "Created", tokenName, cleanTokenOutput)
 }
 
 func updateOrganizationToken(args []string, out io.Writer) error {
@@ -94,7 +94,7 @@ func updateOrganizationToken(args []string, out io.Writer) error {
 	return renderTokenLine(organizationTokenOutput, out, res.Token, fmt.Sprintf("Updated Organization API token %s", res.PreviousName))
 }
 
-func rotateOrganizationToken(args []string, out io.Writer) error {
+func rotateOrganizationToken(args []string, out, errOut io.Writer) error {
 	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
@@ -116,7 +116,7 @@ func rotateOrganizationToken(args []string, out io.Writer) error {
 		return err
 	}
 	// Named as found, which a rotate by ID knows only after the lookup.
-	return renderTokenSecret(organizationTokenOutput, out, &rotated, "Organization", "Rotated", token.Name, cleanTokenOutput)
+	return renderTokenSecret(organizationTokenOutput, out, errOut, &rotated, "Organization", "Rotated", token.Name, cleanTokenOutput)
 }
 
 func deleteOrganizationToken(args []string, out io.Writer) error {

@@ -57,7 +57,7 @@ func (q *query) runDagsErrors(ctx context.Context, opts airflowapi.ListOptions) 
 // line, and the frames are the part someone fixing the file reads.
 func renderImportErrors(w io.Writer, rows []importErrorRow) error {
 	if len(rows) == 0 {
-		texttable.Say("No import errors on this Airflow.")
+		texttable.Say(w, "No import errors on this Airflow.")
 		return nil
 	}
 	for i, row := range rows {

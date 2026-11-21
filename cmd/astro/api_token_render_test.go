@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -54,12 +55,25 @@ func TestTokenListPipedHasTimestampsAndTabs(t *testing.T) {
 
 // A create's stdout is the secret and a newline, never the receipt.
 func TestTokenSecretIsAloneOnStdout(t *testing.T) {
-	var out bytes.Buffer
+	var out, errOut bytes.Buffer
 	tok := &apitoken.Token{Name: "ci", Token: "s3cret"}
-	require.NoError(t, renderTokenSecret(cliout.FormatText, &out, tok, "Workspace", "Created", "ci", false))
+	require.NoError(t, renderTokenSecret(cliout.FormatText, &out, &errOut, tok, "Workspace", "Created", "ci", false))
 	assert.Equal(t, "s3cret\n", out.String())
+	assert.Equal(t, "\nCreated Workspace API token ci\nCopy this API token for your records.\nThis API token value is not shown again.\n", errOut.String())
 
 	out.Reset()
-	require.NoError(t, renderTokenSecret(cliout.FormatText, &out, tok, "Workspace", "Created", "ci", true))
+	errOut.Reset()
+	require.NoError(t, renderTokenSecret(cliout.FormatText, &out, &errOut, tok, "Workspace", "Created", "ci", true))
 	assert.Equal(t, "s3cret\n", out.String(), "--clean-output is the same bytes")
+	assert.Empty(t, errOut.String(), "and no receipt")
+
+	// A secret that could not be written is not announced as given.
+	errOut.Reset()
+	require.Error(t, renderTokenSecret(cliout.FormatText, failingWriter{}, &errOut, tok, "Workspace", "Created", "ci", false))
+	assert.Empty(t, errOut.String())
 }
+
+// failingWriter fails every write.
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("broken pipe") }

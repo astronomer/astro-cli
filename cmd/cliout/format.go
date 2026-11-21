@@ -418,7 +418,7 @@ func (r Renderer) text(text func(w io.Writer) error) error {
 			"prevents it.")
 	}
 	if !textToTerminal(r.Out) {
-		return text(r.Out)
+		return text(input.WithNotices(r.Out, r.Err))
 	}
 	// To a terminal, the rendering goes through input.TerminalWriter: its SGR
 	// styling (the CLI's own colors and bold) is kept, and anything else a
@@ -428,7 +428,7 @@ func (r Renderer) text(text func(w io.Writer) error) error {
 	// through, so no command has to remember. To a file or a pipe the bytes
 	// are left exactly as rendered.
 	tw := &input.TerminalWriter{W: r.Out}
-	err := text(tw)
+	err := text(input.WithNotices(tw, r.Err))
 	if ferr := tw.Flush(); err == nil {
 		err = ferr
 	}

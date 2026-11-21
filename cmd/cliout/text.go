@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"io"
 
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/texttable"
 )
 
@@ -52,6 +53,9 @@ type Table = texttable.Table
 func TableText(t *Table) func(io.Writer) error {
 	return func(w io.Writer) error {
 		t.Plain = !IsTerminal(w)
+		if t.EmptyTo == nil {
+			t.EmptyTo = input.NoticesFor(w)
+		}
 		return WriteText(w, t.Render)
 	}
 }

@@ -157,6 +157,18 @@ func (r tokenRun) terminal() string {
 	return r.asked + r.stdout
 }
 
+// terminalWithNotes is terminal with the command's own stderr (a token's
+// receipt) among the questions, minus deprecation warnings.
+func (r tokenRun) terminalWithNotes() string {
+	var notes strings.Builder
+	for line := range strings.Lines(r.stderr) {
+		if !strings.HasPrefix(line, "Warning: ") {
+			notes.WriteString(line)
+		}
+	}
+	return r.asked + notes.String() + r.stdout
+}
+
 // execTokenCmd runs `astro deployment <args>` the way execAstroCmd does.
 func execTokenCmd(t *testing.T, client astrov1.APIClient, answers string, args ...string) tokenRun {
 	t.Helper()
@@ -704,7 +716,7 @@ func TestDeploymentTokenText(t *testing.T) {
 				assert.Equal(t, 0, r.code)
 			}
 			noTokenQuestionOnStdout(t, r.stdout)
-			tc.check(t, r.terminal())
+			tc.check(t, r.terminalWithNotes())
 		})
 	}
 }

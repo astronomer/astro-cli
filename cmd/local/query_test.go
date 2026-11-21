@@ -346,13 +346,12 @@ func TestEmptyListingsSaySo(t *testing.T) {
 		{[]string{"dags", "list"}, "No Dags on this Airflow."},
 		{[]string{"pools", "list"}, "No pools on this Airflow."},
 	} {
-		notices := captureNotices(t)
-		out, _, err := runQuery(t, stub, tc.args...)
+		out, notices, err := runQuery(t, stub, tc.args...)
 		if err != nil {
 			t.Fatalf("%v: %v", tc.args, err)
 		}
-		if !strings.Contains(notices.String(), tc.want) || strings.Contains(out, tc.want) {
-			t.Errorf("%v printed %q and told %q, want %q told and not printed", tc.args, out, notices.String(), tc.want)
+		if !strings.Contains(notices, tc.want) || strings.Contains(out, tc.want) {
+			t.Errorf("%v printed %q and told %q, want %q told and not printed", tc.args, out, notices, tc.want)
 		}
 	}
 }

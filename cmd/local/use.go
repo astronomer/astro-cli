@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -246,9 +247,9 @@ func (c *cli) runUseShow() error {
 // — and the same labels: the current row's when something other than your
 // selection made it current, and "default" on the project's default link.
 func renderUseListing(w io.Writer, res useListing, mark string) error {
+	terminal := input.IsTerminalWriter(w)
 	if len(res.Deployments) == 0 {
-		_, err := fmt.Fprintln(w, noLinks)
-		return err
+		return texttable.SayEmpty(w, terminal, noLinks, useListingPlainHeader)
 	}
 	// The label column is blank on every row but one, so tabwriter's padding
 	// leaves the rest ending in spaces; the table is built first and trimmed.
@@ -259,9 +260,11 @@ func renderUseListing(w io.Writer, res useListing, mark string) error {
 		}
 	}
 	marks := linkMarks(defaultName, res.Current, mark)
+	if !terminal {
+		return renderUseListingPlain(w, res, marks)
+	}
 	var table bytes.Buffer
-	terminal := input.IsTerminalWriter(w)
-	tw := texttable.Columns(&table, terminal)
+	tw := tabwriter.NewWriter(&table, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "\tNAME\tKIND\tDEPLOYMENT, ENVIRONMENT OR URL\t")
 	for _, row := range res.Deployments {
 		marker := ""
@@ -275,18 +278,38 @@ func renderUseListing(w io.Writer, res useListing, mark string) error {
 		return err
 	}
 	for line := range strings.Lines(table.String()) {
-		// Piped, the cells are tab-separated: only the padding's spaces go.
-		trimmed := strings.TrimRight(line, " \n")
-		if !terminal {
-			trimmed = strings.TrimRight(line, "\n")
-		}
-		if _, err := fmt.Fprintln(w, trimmed); err != nil {
+		if _, err := fmt.Fprintln(w, strings.TrimRight(line, " \n")); err != nil {
 			return err
 		}
 	}
 	if res.Reason != "" {
 		_, err := fmt.Fprintf(w, "\nNo Deployment is current: %s\n", res.Reason)
 		return err
+	}
+	return nil
+}
+
+// useListingPlainHeader is the columns of the listing a script reads: no
+// marker column, and the current row says so in its last cell.
+var useListingPlainHeader = []string{"NAME", "KIND", "DEPLOYMENT, ENVIRONMENT OR URL", "LABEL"}
+
+// renderUseListingPlain is the listing for a pipe: the header and a row per
+// link, one tab between cells.
+func renderUseListingPlain(w io.Writer, res useListing, marks map[string]string) error {
+	if _, err := fmt.Fprintln(w, strings.Join(useListingPlainHeader, "\t")); err != nil {
+		return err
+	}
+	for _, row := range res.Deployments {
+		label := marks[row.Name]
+		if row.Current {
+			label = strings.TrimSuffix("current, "+label, ", ")
+		}
+		if _, err := fmt.Fprintln(w, strings.Join([]string{row.Name, row.Kind, dash(row.Where), label}, "\t")); err != nil {
+			return err
+		}
+	}
+	if res.Reason != "" {
+		texttable.Say(w, "No Deployment is current: "+res.Reason)
 	}
 	return nil
 }

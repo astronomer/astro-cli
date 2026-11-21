@@ -415,10 +415,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 
 	// What the deploy is doing (its steps, what it could not do) goes to
 	// stderr: stdout is the deploy's result.
-	progress := deployInput.ErrOut
-	if progress == nil {
-		progress = os.Stderr
-	}
+	progress := deployInput.progress()
 
 	// Use empty slice to let Docker build for host platform by default
 	targetPlatforms := []string{}
@@ -515,6 +512,15 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 	}, nil
 }
 
+// progress is where the deploy says what it is doing: the command's error
+// writer, stderr when none was given.
+func (i *InputClientDeploy) progress() io.Writer {
+	if i.ErrOut != nil {
+		return i.ErrOut
+	}
+	return os.Stderr
+}
+
 // validateClientImageRuntimeVersion validates that the client image runtime version
 // is not newer than the deployment runtime version
 func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) (*ClientRuntimeCheck, error) { //nolint:gocritic // intentional in this shell code
@@ -565,7 +571,7 @@ Either set the base image in Dockerfile.client to runtime version %s or earlier,
 			clientRuntimeVersion, deployInfo.currentVersion, deployInfo.currentVersion, clientRuntimeVersion)
 	}
 
-	fmt.Fprintf(os.Stderr, "Client image runtime version %s is compatible with Deployment runtime version %s\n",
+	fmt.Fprintf(deployInput.progress(), "Client image runtime version %s is compatible with Deployment runtime version %s\n",
 		clientRuntimeVersion, deployInfo.currentVersion)
 
 	return &ClientRuntimeCheck{

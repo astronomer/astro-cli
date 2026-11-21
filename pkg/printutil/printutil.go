@@ -3,7 +3,6 @@ package printutil
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -92,7 +91,7 @@ func (t *Table) Print(out io.Writer) error {
 	// they always have; to a pipe they go to stderr, and stdout is the table.
 	msgTo := out
 	if plain {
-		msgTo = os.Stderr
+		msgTo = input.NoticesFor(out)
 	}
 	if len(t.Rows) == 0 && t.NoResultsMsg != "" {
 		fmt.Fprintln(msgTo, t.NoResultsMsg)

@@ -50,10 +50,9 @@ func TestAssetsTriggersListsTheEventsBehindARun(t *testing.T) {
 	// A run nothing triggered says so.
 	stub := newAirflowStub(t)
 	stub.route(http.MethodGet, "/api/v2/dags/reports/dagRuns/manual__1/upstreamAssetEvents", `{"asset_events":[],"total_entries":0}`)
-	notices := captureNotices(t)
-	out, _, err := runQuery(t, stub, "assets", "triggers", "reports", "manual__1")
-	if err != nil || !strings.Contains(notices.String(), "No asset events started this run.") || strings.Contains(out, "No asset events") {
-		t.Errorf("out = %q, notice = %q, err = %v", out, notices.String(), err)
+	out, notices, err := runQuery(t, stub, "assets", "triggers", "reports", "manual__1")
+	if err != nil || !strings.Contains(notices, "No asset events started this run.") || strings.Contains(out, "No asset events") {
+		t.Errorf("out = %q, notice = %q, err = %v", out, notices, err)
 	}
 }
 

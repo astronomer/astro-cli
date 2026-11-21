@@ -145,7 +145,7 @@ func runTokenCases(t *testing.T, cases []tokenCase) {
 				assert.Equal(t, 0, r.code)
 			}
 			noTokenQuestionOnStdout(t, r.stdout)
-			tc.check(t, r.terminal())
+			tc.check(t, r.terminalWithNotes())
 		})
 	}
 }

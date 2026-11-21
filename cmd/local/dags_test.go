@@ -186,13 +186,13 @@ func TestDagsStatsWithNothingToCount(t *testing.T) {
 		t.Errorf("json = %v, want dags [] and total_entries 0", envelope)
 	}
 
-	notices := captureNotices(t)
-	out, _, err = runQuery(t, stub, "dags", "stats")
+	var notices string
+	out, notices, err = runQuery(t, stub, "dags", "stats")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out != "DAG_ID\n" || !strings.Contains(notices.String(), "No Dag run statistics on this Airflow.") {
-		t.Errorf("text = %q, notice = %q", out, notices.String())
+	if out != "DAG_ID\n" || !strings.Contains(notices, "No Dag run statistics on this Airflow.") {
+		t.Errorf("text = %q, notice = %q", out, notices)
 	}
 }
 

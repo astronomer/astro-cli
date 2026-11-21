@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 func render(t *testing.T, tab *Table) string {
@@ -123,16 +125,13 @@ func TestColumnsAlignOnlyForATerminal(t *testing.T) {
 // An empty list's sentence is told, not printed: a script's stdout keeps the
 // header alone, a terminal's keeps nothing.
 func TestSayEmptyKeepsTheSentenceOffStdout(t *testing.T) {
-	var told bytes.Buffer
-	Notices = &told
-	t.Cleanup(func() { Notices = nil })
-
-	var out bytes.Buffer
-	require.NoError(t, SayEmpty(&out, false, "No things.", []string{"A", "B"}))
+	var told, out bytes.Buffer
+	w := input.WithNotices(&out, &told)
+	require.NoError(t, SayEmpty(w, false, "No things.", []string{"A", "B"}))
 	assert.Equal(t, "A\tB\n", out.String())
 	assert.Equal(t, "No things.\n", told.String())
 
 	out.Reset()
-	require.NoError(t, SayEmpty(&out, true, "No things.", []string{"A", "B"}))
+	require.NoError(t, SayEmpty(w, true, "No things.", []string{"A", "B"}))
 	assert.Empty(t, out.String())
 }
