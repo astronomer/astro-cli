@@ -132,7 +132,7 @@ func (s *Suite) TestCreateProjectConfig() {
 	viperProject = viper.New()
 	defer os.RemoveAll("./test")
 	CreateProjectConfig("./test")
-	s.Equal("test/.astro/config.yaml", viperProject.ConfigFileUsed())
+	s.Equal(filepath.Join("test", ".astro", "config.yaml"), viperProject.ConfigFileUsed())
 }
 
 // TestSaveConfig_ConcurrentWritesProduceValidYAML stresses the file lock in

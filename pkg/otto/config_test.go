@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -154,6 +155,9 @@ func (s *ConfigSuite) TestDetectAirflow_NoRouteForProject() {
 }
 
 func (s *ConfigSuite) TestDetectAirflow_RouteExistsAndHealthy() {
+	if runtime.GOOS == "windows" {
+		s.T().Skip("the proxy cannot tell a live route from a stale one on Windows in 1.x: pkg/proxy IsPIDAlive always reports false there, so every route is pruned")
+	}
 	// Spin up a fake Airflow that answers the health endpoint, write a route
 	// pointing the CWD to its port, and verify DetectAirflow picks it up.
 	srv := s.startFakeAirflow(http.StatusOK)

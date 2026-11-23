@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -252,7 +253,12 @@ func (s *Suite) TestTar() {
 					break
 				}
 				require.NoError(s.T(), err)
-				require.True(s.T(), s.Contains(tt.expectPaths, header.Name))
+				// Tar entry names use "/" on every platform.
+				want := make([]string, len(tt.expectPaths))
+				for i, p := range tt.expectPaths {
+					want[i] = filepath.ToSlash(p)
+				}
+				require.True(s.T(), s.Contains(want, header.Name))
 				numIteratedFiles++
 			}
 			require.Equal(s.T(), len(tt.expectPaths), numIteratedFiles)
@@ -318,7 +324,7 @@ func (s *Suite) TestRead() {
 			name:         "error on read file content",
 			args:         args{path: "incorrect-file"},
 			expectedResp: nil,
-			errResp:      "no such file or directory",
+			errResp:      "open incorrect-file",
 		},
 	}
 	for _, tt := range tests {
@@ -358,7 +364,7 @@ func (s *Suite) TestReadFileToString() {
 			name:         "error on read file content",
 			args:         args{path: "incorrect-file"},
 			expectedResp: "",
-			errResp:      "no such file or directory",
+			errResp:      "open incorrect-file",
 		},
 	}
 	for _, tt := range tests {
@@ -509,7 +515,8 @@ func (s *Suite) TestRemoveLineFromFile() {
 func (s *Suite) TestGzipFile() {
 	s.Run("source file not found", func() {
 		err := GzipFile("non-existent-file.txt", "./zipped.txt.gz")
-		s.EqualError(err, "open non-existent-file.txt: no such file or directory")
+		s.ErrorIs(err, os.ErrNotExist)
+		s.ErrorContains(err, "open non-existent-file.txt")
 	})
 
 	s.Run("destination file error", func() {
@@ -521,7 +528,8 @@ func (s *Suite) TestGzipFile() {
 		defer os.Remove(srcFilePath)
 
 		err = GzipFile(srcFilePath, "/invalidPath/zipped.txt.gz")
-		s.EqualError(err, "open /invalidPath/zipped.txt.gz: no such file or directory")
+		s.ErrorIs(err, os.ErrNotExist)
+		s.ErrorContains(err, "open /invalidPath/zipped.txt.gz")
 	})
 
 	s.Run("successful gzip", func() {
@@ -642,7 +650,8 @@ func (s *Suite) TestUploadFile() {
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
 		err := UploadFile(&uploadFileArgs)
-		s.EqualError(err, "error opening file: open non-existent-file.txt: no such file or directory")
+		s.ErrorIs(err, os.ErrNotExist)
+		s.ErrorContains(err, "error opening file: open non-existent-file.txt")
 	})
 
 	s.Run("io copy throws an error", func() {
@@ -1019,6 +1028,9 @@ func (s *Suite) TestDefaultPermissions() {
 	s.Equal(0o755, openPermissions)
 
 	s.Run("CreateFile makes parent dirs 0o755", func() {
+		if runtime.GOOS == "windows" {
+			s.T().Skip("Windows has no POSIX permission bits; directories report 0o777")
+		}
 		root := s.T().TempDir()
 		target := filepath.Join(root, "nested", "child", "file.txt")
 		file, err := CreateFile(target)

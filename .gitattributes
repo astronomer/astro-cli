@@ -1,0 +1,18 @@
+# Files compiled into the binary with //go:embed must have the same bytes
+# whatever platform the binary was built on. Without this, a Windows checkout
+# (where git's core.autocrlf defaults to true) rewrites them to CRLF, and the
+# embed takes them as they are on disk. A Windows-built binary would then write
+# CRLF Dockerfiles, compose files and Python scripts into a Linux container,
+# and tests that compare the embedded files against LF literals fail.
+*.tmpl                              text eol=lf
+airflow/include/**                  text eol=lf
+pkg/airflowrt/include/**            text eol=lf
+pkg/airflowrt/standalone_scripts/** text eol=lf
+
+# Shell scripts run as-is in CI and the git hooks; CRLF breaks them with a
+# "bad interpreter" error.
+*.sh                                text eol=lf
+
+# Read verbatim into requests that tests compare against LF literals (the
+# git-sync ssh key, for one).
+cmd/apc/testfiles/**                text eol=lf

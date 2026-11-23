@@ -864,7 +864,7 @@ func (d *DockerCompose) versionTest(testHomeDirectory, currentVersion, deploymen
 	fmt.Println("\nComparing dependency versions between current and upgraded environment")
 	// pip freeze old Airflow image
 	fmt.Println("\nObtaining pip freeze for current version")
-	currentAirflowPipFreezeFile := d.airflowHome + "/" + testHomeDirectory + "/pip_freeze_" + currentVersion + ".txt"
+	currentAirflowPipFreezeFile := filepath.Join(d.airflowHome, testHomeDirectory, "pip_freeze_"+currentVersion+".txt")
 	err := d.imageHandler.CreatePipFreeze(deploymentImage, currentAirflowPipFreezeFile)
 	if err != nil {
 		return err

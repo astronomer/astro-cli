@@ -1,6 +1,8 @@
 package fileutil
 
 import (
+	"path/filepath"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,7 +38,7 @@ func (s *Suite) TestGetHomeDir() {
 	}{
 		{
 			name:         "basic case",
-			want:         "/",
+			want:         string(filepath.Separator),
 			errAssertion: assert.NoError,
 		},
 	}

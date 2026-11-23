@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -300,7 +301,7 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 	// invalid dockerfile test
 	dockerfile = "Dockerfile.invalid"
 	err := buildPushDockerImage(nil, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "")
-	s.EqualError(err, "failed to parse dockerfile: testfiles/Dockerfile.invalid: when using JSON array syntax, arrays must be comprised of strings only")
+	s.EqualError(err, "failed to parse dockerfile: "+filepath.Join("testfiles", "Dockerfile.invalid")+": when using JSON array syntax, arrays must be comprised of strings only")
 	dockerfile = "Dockerfile"
 
 	config.InitConfig(s.fsForDockerConfig)
@@ -1028,7 +1029,8 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 
 		s.houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil).Once()
 		err = DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, "./dags", nil, false, description)
-		s.EqualError(err, "open dags/dags.tar: no such file or directory")
+		s.ErrorIs(err, os.ErrNotExist)
+		s.ErrorContains(err, filepath.Join("dags", "dags.tar"))
 
 		// assert that no tar or gz file exists
 		_, err = os.Stat("./dags.tar")

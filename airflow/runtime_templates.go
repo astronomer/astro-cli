@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -134,7 +135,10 @@ func InitFromTemplate(templateDir, destDir string) error {
 // escape dest, either through an absolute path or a ../ sequence. entryName is
 // the original tar header name, used only to make the error clear.
 func containedPath(dest, relativePath, entryName string) (string, error) {
-	if filepath.IsAbs(relativePath) {
+	// Tar names use "/" on every platform. filepath.IsAbs alone misses a
+	// rooted name like "/etc/x" on Windows, where it is not absolute without a
+	// drive letter, so check it as a slash path too.
+	if path.IsAbs(relativePath) || filepath.IsAbs(relativePath) {
 		return "", fmt.Errorf("invalid tarball entry %q: absolute paths are not allowed", entryName)
 	}
 	targetPath := filepath.Join(dest, relativePath)

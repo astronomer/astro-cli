@@ -301,8 +301,13 @@ func CreateConfig(v *viper.Viper, fs afero.Fs, path, file string) error {
 		return fmt.Errorf("error creating config directory: %w", err)
 	}
 
-	_, err = fs.Create(file)
+	f, err := fs.Create(file)
 	if err != nil {
+		return fmt.Errorf("error creating config file: %w", err)
+	}
+	// Close it now: an open handle keeps the file locked on Windows, so
+	// nothing could remove or rename the project until the process exits.
+	if err := f.Close(); err != nil {
 		return fmt.Errorf("error creating config file: %w", err)
 	}
 	err = fs.Chmod(file, filePerm)
