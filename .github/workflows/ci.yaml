@@ -93,8 +93,35 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # bash, not the default pwsh: PowerShell splits a native argument at a
+      # dot, so `-test.v` reached go as `-test .v`, `./...` never became the
+      # package list, and the step built everything, tested nothing and passed.
+      #
+      # The check after it guards against that coming back in any form: it
+      # fails the step, naming them, when a package `go list` names has no
+      # result line (ok, FAIL, "no test files" or a bare coverage line).
       - name: Run unit tests
-        run: go test -count=1 -cover -covermode=atomic -test.v ./...
+        shell: bash
+        run: |
+          # Actions already runs bash with pipefail; set it here too so the
+          # exit status below is go test's, not tee's, however this is run.
+          set -o pipefail
+          status=0
+          log="${RUNNER_TEMP}/go-test.log"
+          go test -count=1 -cover -covermode=atomic ./... 2>&1 | tee "${log}" || status=$?
+          mod='github\.com/astronomer/astro-cli(/[^[:space:]]*)?'
+          go list ./... | LC_ALL=C sort -u > "${RUNNER_TEMP}/listed.txt"
+          sed -nE \
+            -e "s#^(ok|FAIL|\?)[[:space:]]+(${mod})([[:space:]].*)?\$#\2#p" \
+            -e "s#^[[:space:]]+(${mod})[[:space:]]+coverage:.*#\1#p" \
+            "${log}" | LC_ALL=C sort -u > "${RUNNER_TEMP}/reported.txt" || true
+          missing=$(LC_ALL=C comm -23 "${RUNNER_TEMP}/listed.txt" "${RUNNER_TEMP}/reported.txt")
+          echo "packages listed: $(wc -l < "${RUNNER_TEMP}/listed.txt"), reported: $(wc -l < "${RUNNER_TEMP}/reported.txt")"
+          if [ -n "${missing}" ]; then
+            echo "::error::go test reported no result for: $(tr '\n' ' ' <<< "${missing}")"
+            exit 1
+          fi
+          exit "${status}"
 
   detect-changes:
     if: github.event_name == 'pull_request'
