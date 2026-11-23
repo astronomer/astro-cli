@@ -50,7 +50,7 @@ func newCheckCmd(c *cli) *cobra.Command {
 		Use:   nameCheck,
 		Short: "Validate this project's Dags without starting Airflow",
 		Long: "Parse the project's Dags in its own environment and report import errors, duplicate Dag ids, and slow parses. Runs offline; starts no Airflow.\n\n" +
-			"It also checks [tool.astro.env] as astro local start does. A required value with no source on this machine is an error. A value that does not match its declaration is a warning. A source = 'workspace' value that nothing local holds is not checked, because the Environment Manager is not queried.\n\n" +
+			"It also checks [tool.astro.env] as astro local start does. A required value with no source on this machine is an error. A value that does not match its declaration is a warning. A value declared to come from a Workspace is not checked, because no Workspace is read.\n\n" +
 			"With --target, check the project against the Airflow a managed platform runs, before you upload. For mwaa and composer, the CLI picks the closest Airflow version the platform offers to the manifest's pin, builds a scratch venv with that Airflow and the project's dependencies, and parses the Dags in it. For mwaa it also resolves the dependencies against MWAA's published constraints file. A conflict fails the check. The step needs the network and is skipped offline.\n\n" +
 			"--target astro is the same as a plain check. The flag repeats and takes a comma list: --target mwaa --target composer or --target mwaa,composer.",
 		Example: "  # Parse the project's Dags and check its environment values\n" +

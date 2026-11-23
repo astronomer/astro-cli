@@ -1,6 +1,6 @@
 # Local environment values and the vault
 
-A local Airflow needs values to run: database passwords, API tokens, connection strings, plain settings. This page describes where `astro local` keeps them, the order it resolves them in, how they reach Airflow, and the `astro local env` commands that manage them. The manifest side, declaring what a project needs in `[tool.astro.env]`, is in the [manifest reference](manifest-reference.md#toolastroenv). Values read from a linked Astro workspace are in [workspace-link.md](workspace-link.md).
+A local Airflow needs values to run: database passwords, API tokens, connection strings, plain settings. This page describes where `astro local` keeps them, the order it resolves them in, how they reach Airflow, and the `astro local env` commands that manage them. The manifest side, declaring what a project needs in `[tool.astro.env]`, is in the [manifest reference](manifest-reference.md#toolastroenv). Values read from a workspace linked in Astro Desktop, which is experimental, are in [workspace-link.md](workspace-link.md).
 
 The CLI and Astro Desktop share all of this: the same stores, the same key grammar, the same precedence, the same link index. A value set in one is read by the other.
 
@@ -150,7 +150,7 @@ Removes a value, never a declaration. In a project it removes the name from both
 
 ### `declare` and `undeclare`
 
-Edit the project's `[tool.astro.env]`, so they refuse `--global` and take no `--plain`. They write through the same code Astro Desktop uses, which refuses a result that would not load and leaves the file as it was. `declare` changes only the annotations whose flags are passed: `--description`, `--optional` and `--source workspace|local` on every noun; `--type`, `--enum`, `--secret`, `--default` and `--no-default` on the variable nouns; `--type` (the `conn_type`) on `connection`. An env-form key is declared by its plain name (`AIRFLOW_VAR_REGION` declares `region`). The flag table is in the [manifest reference](manifest-reference.md#declaring-from-the-command-line).
+Edit the project's `[tool.astro.env]`, so they refuse `--global` and take no `--plain`. They write through the same code Astro Desktop uses, which refuses a result that would not load and leaves the file as it was. `declare` changes only the annotations whose flags are passed: `--description` and `--optional` on every noun; `--type`, `--enum`, `--secret`, `--default` and `--no-default` on the variable nouns; `--type` (the `conn_type`) on `connection`. An env-form key is declared by its plain name (`AIRFLOW_VAR_REGION` declares `region`). The flag table is in the [manifest reference](manifest-reference.md#declaring-from-the-command-line).
 
 ### `link` and `unlink`
 
@@ -228,7 +228,7 @@ The access and refresh tokens `astro login` saves live in the vault too, one ent
 - **Encrypted by default.** Only a value set with `--plain` is unencrypted: in the project's `.env`, or a global set with `--plain`.
 - **Plain values are protected by file permissions** (`.env` and vault files `0600`, the vault directory `0700`), the `.gitignore` guardrail, and full-disk encryption (FileVault, BitLocker, LUKS). An unlocked session can read them, as it can any dotfile, and backup or sync tools (iCloud, Dropbox, Time Machine) copy them in the clear.
 - **The keyring's limits are explicit.** A vault copied to another machine cannot be decrypted there; a headless machine with no keyring cannot use the encrypted vault, and a default set says so. CI should use the shell environment, which needs no keyring and outranks everything but the `.env`.
-- **The vault is local storage, not team sharing.** A machine-bound key cannot be shared. The team story is the workspace's Environment Manager values (see [workspace-link.md](workspace-link.md)), where rotation and access are handled server-side.
+- **The vault is local storage, not team sharing.** A machine-bound key cannot be shared.
 
 ## Using an external secrets tool
 

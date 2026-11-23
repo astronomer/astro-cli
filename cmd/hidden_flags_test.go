@@ -22,8 +22,16 @@ var hiddenFlagAllowed = map[string]string{
 	"deployment variable update --key":   "hidden in 1.x too, so the inventory of visible flags leaves it out",
 	"deployment variable update --value": "hidden in 1.x too, so the inventory of visible flags leaves it out",
 	"local env --secret":                 "deprecated in v2, so pflag hides it; --secret=false still means --plain",
-	"bundle create --type":               "file bundles are not announced yet, as on 1.x main, where astro bundle create hides --type",
-	"deployment bundle create --type":    "the old spelling of astro bundle create, which hides --type for the same reason",
+	// Values read from a linked Workspace are set up from Astro Desktop and
+	// are being redesigned; the flags keep working, unannounced, until the
+	// new model replaces them.
+	"local run --with-workspace":                  "workspace-sourced values are being redesigned; hidden until the new model ships",
+	"local shell --with-workspace":                "workspace-sourced values are being redesigned; hidden until the new model ships",
+	"local env variable declare --source":         "workspace-sourced values are being redesigned; hidden until the new model ships",
+	"local env connection declare --source":       "workspace-sourced values are being redesigned; hidden until the new model ships",
+	"local env airflow-variable declare --source": "workspace-sourced values are being redesigned; hidden until the new model ships",
+	"bundle create --type":                        "file bundles are not announced yet, as on 1.x main, where astro bundle create hides --type",
+	"deployment bundle create --type":             "the old spelling of astro bundle create, which hides --type for the same reason",
 	"env variable link --deployment-id": "1.x's link create had it, and link set took over; it shadows the noun's scope " +
 		"flag of that name, so it names the link target",
 	"env connection link --deployment-id":       "it shadows the noun's scope flag of that name, so it names the link target",

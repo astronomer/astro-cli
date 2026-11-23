@@ -46,7 +46,7 @@ On macOS and Linux each project gets its own address, such as `http://my-project
 
 ### Environment values and secrets
 
-`astro local env` manages the values a local Airflow needs: environment variables, connections and Airflow variables. A project declares what it needs in `[tool.astro.env]`. Values live in an encrypted vault whose key is in your OS keyring, or in `.env` with `--plain`. A teammate's first `astro local start` names any value they're missing. Values can also come from a linked Astro workspace. See [secrets.md](secrets.md) and [workspace-link.md](workspace-link.md).
+`astro local env` manages the values a local Airflow needs: environment variables, connections and Airflow variables. A project declares what it needs in `[tool.astro.env]`. Values live in an encrypted vault whose key is in your OS keyring, or in `.env` with `--plain`. A teammate's first `astro local start` names any value they're missing. See [secrets.md](secrets.md).
 
 `astro env` manages Astro's Environment Manager: workspace- and Deployment-level variables, connections, Airflow variables and metrics exports. A single `set` command creates or updates.
 
@@ -169,7 +169,7 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `--compose-file` | a `docker-compose.override.yml` at the project root, which Docker mode merges over the compose file it writes | `astro local start` / `restart`, `astro start` |
 | `--settings-file`, `-s` | the connections, variables and pools `pyproject.toml` declares (`[tool.astro.env]`, `[tool.astro.pools]`), which `astro init` carries from `airflow_settings.yaml` | `astro local start` / `restart`, `astro start` |
 | `--env`, `-e` | the `.env` at the project root, which `astro local env variable set <NAME> --plain` writes | `astro local start` / `restart` / `check`, `astro start` |
-| `--workspace-id`, `-w`; `--deployment-id`, `-d` | the workspace `pyproject.toml` names (`workspace` under `[tool.astro]`), whose Environment Manager a start reads; no Deployment's values are read | `astro local start` / `restart`, `astro start` |
+| `--workspace-id`, `-w`; `--deployment-id`, `-d` | `astro local env`, which sets the values a start reads; a start takes no Workspace on the command line and reads no Deployment's values | `astro local start` / `restart`, `astro start` |
 | `--image-name`, `-i` | the project's own build, from `pyproject.toml` or the Dockerfile `dockerfile` under `[tool.astro]` names; `astro package --tag` names the image it builds | `astro local start` / `restart` / `check`, `astro start`, `astro package` |
 | `--no-cache` | no replacement: standalone mode builds no image, and Docker mode's build uses the container engine's cache; clear it with `docker builder prune` to build from nothing | `astro local start` / `restart`, `astro start` |
 | `--no-cache` | no replacement: the build uses the container engine's cache; clear it with `docker builder prune` to build from nothing | `astro package` |
