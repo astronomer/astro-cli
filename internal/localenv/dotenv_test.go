@@ -120,17 +120,40 @@ func TestDotenvWarnings(t *testing.T) {
 }
 
 func TestJSONFault(t *testing.T) {
-	cases := []struct{ in, want string }{
-		{"{\"k\": \"a\nb\"}", "character 9 is a raw newline inside a string"},
-		{"{\"k\": \"a\tb\"}", "character 9 is a raw tab inside a string"},
-		{"{\"k\": \"a\x01b\"}", "character 9 is a raw control character inside a string"},
-		{`{"k": 1`, "it ends before the JSON does"},
-		{`{"k" 1}`, "it breaks at character 6"},
+	cases := []struct{ name, in, want string }{
+		{
+			"raw newline in a string", "{\"k\": \"a\nb\"}",
+			`character 9 of the value is a raw newline inside a JSON string. Write it as the escape \n, which a double-quoted .env value spells \\n`,
+		},
+		{
+			"raw tab in a string", "{\"k\": \"a\tb\"}",
+			`character 9 of the value is a raw tab inside a JSON string. Write it as the escape \t, which a double-quoted .env value spells \\t`,
+		},
+		{
+			"raw carriage return in a string", "{\"k\": \"a\rb\"}",
+			`character 9 of the value is a raw carriage return inside a JSON string. Write it as the escape \r, which a double-quoted .env value spells \\r`,
+		},
+		{
+			"other control character in a string", "{\"k\": \"a\x01b\"}",
+			`character 9 of the value is a raw control character inside a JSON string. Write it as the escape \u0001, which a double-quoted .env value spells \\u0001`,
+		},
+		// Positions count characters, not bytes: é is two bytes, one character.
+		{"position after non-ASCII", "{\"k\": \"éé\nb\"}", "character 10 of the value is a raw newline"},
+		{"cut short", `{"k": 1`, "the value ends before the JSON does"},
+		// An error on the last byte has a cut-short value's offset but is not one.
+		{"trailing comma", `{"k": 1,}`, "it breaks at character 9 of the value"},
+		{"misspelled literal", `{"k": tru}`, "it breaks at character 10 of the value"},
+		{"junk after the value", `{"k": 1}x`, "it breaks at character 9 of the value"},
+		{"missing colon", `{"k" 1}`, "it breaks at character 6 of the value"},
+		// A control byte between tokens is not inside a string.
+		{"control byte between tokens", "{\"k\": 1,\x0c\"j\": 2}", "it breaks at character 9 of the value"},
 	}
 	for _, tc := range cases {
-		if got := jsonFault(tc.in); !strings.HasPrefix(got, tc.want) {
-			t.Errorf("jsonFault(%q) = %q, want it to start %q", tc.in, got, tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if got := jsonFault(tc.in); !strings.HasPrefix(got, tc.want) {
+				t.Errorf("jsonFault(%q)\n got: %s\nwant prefix: %s", tc.in, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -154,7 +177,7 @@ func TestDotenvWarningsExplainARawNewlineInAConnection(t *testing.T) {
 		t.Fatalf("want one warning, got %+v", got)
 	}
 	r := got[0].Reason
-	for _, want := range []string{"raw newline inside a string", `\\n in a double-quoted one`, "not defined"} {
+	for _, want := range []string{"raw newline inside a JSON string", `double-quoted .env value spells \\n`, "not defined"} {
 		if !strings.Contains(r, want) {
 			t.Errorf("reason %q is missing %q", r, want)
 		}
