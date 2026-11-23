@@ -1055,12 +1055,14 @@ func (s *Suite) TestUploadBundleDirectory() {
 		s.Equal([]map[string]string{{"a.py": "a"}, {"a.py": "a"}}, sent)
 	})
 
-	s.Run("packs deletes, then files", func() {
+	s.Run("packs deletes, then copies, then moves, then files, each move or copy holding its source", func() {
 		fromDir := s.T().TempDir()
 		writeLocalFiles(s, fromDir, map[string]string{"foo": "now a file"})
 		plan := &bundleSyncPlan{
 			added:   []string{"foo"},
 			deleted: []string{"foo/bar.py"},
+			moved:   []bundleSyncEdit{{from: "old.py", to: "new.py"}},
+			copied:  []bundleSyncEdit{{from: "old.py", to: "copy.py"}},
 		}
 
 		var archive bytes.Buffer
@@ -1079,7 +1081,7 @@ func (s *Suite) TestUploadBundleDirectory() {
 			s.Require().NoError(err)
 			entries = append(entries, header.Name+"="+string(content))
 		}
-		s.Equal([]string{"__DEL__foo/bar.py=", "foo=now a file"}, entries)
+		s.Equal([]string{"__DEL__foo/bar.py=", "__CP__copy.py=old.py", "__MV__new.py=old.py", "foo=now a file"}, entries)
 	})
 }
 
