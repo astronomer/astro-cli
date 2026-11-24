@@ -119,6 +119,76 @@ func TestDotenvWarnings(t *testing.T) {
 	}
 }
 
+func TestJSONFault(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{
+			"raw newline in a string", "{\"k\": \"a\nb\"}",
+			`character 9 of the value is a raw newline inside a JSON string. Write it as the escape \n, which a double-quoted .env value spells \\n`,
+		},
+		{
+			"raw tab in a string", "{\"k\": \"a\tb\"}",
+			`character 9 of the value is a raw tab inside a JSON string. Write it as the escape \t, which a double-quoted .env value spells \\t`,
+		},
+		{
+			"raw carriage return in a string", "{\"k\": \"a\rb\"}",
+			`character 9 of the value is a raw carriage return inside a JSON string. Write it as the escape \r, which a double-quoted .env value spells \\r`,
+		},
+		{
+			"other control character in a string", "{\"k\": \"a\x01b\"}",
+			`character 9 of the value is a raw control character inside a JSON string. Write it as the escape \u0001, which a double-quoted .env value spells \\u0001`,
+		},
+		// Positions count characters, not bytes: é is two bytes, one character.
+		{"position after non-ASCII", "{\"k\": \"éé\nb\"}", "character 10 of the value is a raw newline"},
+		{"cut short", `{"k": 1`, "the value ends before the JSON does"},
+		// An error on the last byte has a cut-short value's offset but is not one.
+		{"trailing comma", `{"k": 1,}`, "it breaks at character 9 of the value"},
+		{"misspelled literal", `{"k": tru}`, "it breaks at character 10 of the value"},
+		{"junk after the value", `{"k": 1}x`, "it breaks at character 9 of the value"},
+		{"missing colon", `{"k" 1}`, "it breaks at character 6 of the value"},
+		// A control byte between tokens is not inside a string.
+		{"control byte between tokens", "{\"k\": 1,\x0c\"j\": 2}", "it breaks at character 9 of the value"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := jsonFault(tc.in); !strings.HasPrefix(got, tc.want) {
+				t.Errorf("jsonFault(%q)\n got: %s\nwant prefix: %s", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// The shape that started this: a double-quoted connection whose inner quotes
+// are escaped, and whose private key keeps JSON's \n with one backslash.
+// Double quotes turn that \n into a real newline, which JSON does not allow
+// in a string. The warning says so, says how to write it, and quotes none of
+// the value.
+func TestDotenvWarningsExplainARawNewlineInAConnection(t *testing.T) {
+	dir := t.TempDir()
+	line := `AIRFLOW_CONN_GCP="{\"conn_type\": \"google_cloud_platform\", \"extra\": {\"keyfile_dict\": {\"private_key\": \"-----BEGIN-----\nSECRETBYTES\n-----END-----\n\"}}}"` + "\n"
+	if err := os.WriteFile(filepath.Join(dir, EnvFileName), []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	src, err := LoadSources(nil, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := src.DotenvWarnings(nil)
+	if len(got) != 1 {
+		t.Fatalf("want one warning, got %+v", got)
+	}
+	r := got[0].Reason
+	for _, want := range []string{"raw newline inside a JSON string", `double-quoted .env value spells \\n`, "not defined"} {
+		if !strings.Contains(r, want) {
+			t.Errorf("reason %q is missing %q", r, want)
+		}
+	}
+	for _, secret := range []string{"SECRETBYTES", "BEGIN"} {
+		if strings.Contains(r, secret) {
+			t.Errorf("reason quotes the value (%q): %q", secret, r)
+		}
+	}
+}
+
 // A set whose assignment an earlier open quote would take in is refused, and
 // the file is left as it was, rather than reported done and never read back.
 func TestMergeSetRefusesWhatWouldNotReadBack(t *testing.T) {
