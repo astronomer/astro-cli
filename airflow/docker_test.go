@@ -2582,7 +2582,6 @@ func (s *Suite) TestUpgradeDockerfile() {
 		defer os.Remove(newDockerfilePath)
 
 		// Check for errors
-		s.Error(err)
-		s.Contains(err.Error(), "no such file or directory")
+		s.ErrorIs(err, os.ErrNotExist)
 	})
 }

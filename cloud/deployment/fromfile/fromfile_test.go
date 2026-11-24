@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -432,7 +433,8 @@ func (s *Suite) TestCreateOrUpdate() {
 
 	s.Run("returns an error if file does not exist", func() {
 		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, false, 0*time.Second, false)
-		s.ErrorContains(err, "open deployment.yaml: no such file or directory")
+		s.ErrorIs(err, os.ErrNotExist)
+		s.ErrorContains(err, "open deployment.yaml")
 	})
 	s.Run("returns an error if file exists but user provides incorrect path", func() {
 		filePath = "./2/deployment.yaml"
@@ -441,7 +443,8 @@ func (s *Suite) TestCreateOrUpdate() {
 		s.NoError(err)
 		defer afero.NewOsFs().RemoveAll("./2")
 		err = CreateOrUpdate("1/deployment.yaml", "create", nil, nil, false, 0*time.Second, false)
-		s.ErrorContains(err, "open 1/deployment.yaml: no such file or directory")
+		s.ErrorIs(err, os.ErrNotExist)
+		s.ErrorContains(err, "open 1/deployment.yaml")
 	})
 	s.Run("returns an error if file is empty", func() {
 		filePath = "./deployment.yaml"

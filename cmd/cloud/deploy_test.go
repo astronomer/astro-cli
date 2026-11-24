@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -334,6 +335,9 @@ func (s *NonDagsDeploySuite) TestRequiresMountPath() {
 }
 
 func (s *NonDagsDeploySuite) TestBundleTypeDefaultsToNone() {
+	if runtime.GOOS == "windows" {
+		s.T().Skip("config.IsProjectDir exempts the home directory by string comparison, and the runner's temp dir is spelled with the 8.3 short name (C:\\Users\\RUNNER~1), so walking up from it reaches home under a different spelling and its global .astro/config.yaml reads as a project")
+	}
 	var captured *cloud.DeployBundleInput
 	DeployBundle = func(deployInput *cloud.DeployBundleInput) error {
 		captured = deployInput
@@ -353,6 +357,9 @@ func (s *NonDagsDeploySuite) TestRejectsIncompatibleFlag() {
 }
 
 func (s *NonDagsDeploySuite) TestProvidedDeploymentId() {
+	if runtime.GOOS == "windows" {
+		s.T().Skip("config.IsProjectDir exempts the home directory by string comparison, and the runner's temp dir is spelled with the 8.3 short name (C:\\Users\\RUNNER~1), so walking up from it reaches home under a different spelling and its global .astro/config.yaml reads as a project")
+	}
 	var captured *cloud.DeployBundleInput
 	DeployBundle = func(deployInput *cloud.DeployBundleInput) error {
 		captured = deployInput

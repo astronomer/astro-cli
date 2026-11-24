@@ -636,16 +636,20 @@ func TestIsLocalSpec(t *testing.T) {
 // --- ResolveLocalPath --------------------------------------------------------
 
 func TestResolveLocalPath(t *testing.T) {
+	// A real absolute path for the platform: "/tmp/spec.json" is not
+	// absolute on Windows, which needs a drive letter.
+	abs := filepath.Join(t.TempDir(), "spec.json")
+
 	t.Run("absolute path unchanged", func(t *testing.T) {
-		got, err := ResolveLocalPath("/tmp/spec.json")
+		got, err := ResolveLocalPath(abs)
 		require.NoError(t, err)
-		assert.Equal(t, "/tmp/spec.json", got)
+		assert.Equal(t, abs, got)
 	})
 
 	t.Run("file:// stripped to absolute", func(t *testing.T) {
-		got, err := ResolveLocalPath("file:///tmp/spec.json")
+		got, err := ResolveLocalPath("file://" + filepath.ToSlash(abs))
 		require.NoError(t, err)
-		assert.Equal(t, "/tmp/spec.json", got)
+		assert.Equal(t, abs, got)
 	})
 
 	t.Run("tilde expands to home", func(t *testing.T) {
@@ -660,7 +664,7 @@ func TestResolveLocalPath(t *testing.T) {
 		got, err := ResolveLocalPath("spec.json")
 		require.NoError(t, err)
 		assert.True(t, filepath.IsAbs(got))
-		assert.True(t, strings.HasSuffix(got, "/spec.json"))
+		assert.True(t, strings.HasSuffix(got, string(filepath.Separator)+"spec.json"))
 	})
 }
 

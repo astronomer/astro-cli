@@ -3,6 +3,7 @@ package proxy
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 
@@ -32,6 +33,9 @@ func setupTestDir(t *testing.T) {
 // These tests verify the CLI wrappers delegate correctly after ensureInit.
 
 func TestRoutes_InitAndDelegate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the proxy cannot tell a live route from a stale one on Windows in 1.x: pkg/proxy IsPIDAlive always reports false there, so every route is pruned")
+	}
 	setupTestDir(t)
 
 	// AddRoute + ListRoutes
