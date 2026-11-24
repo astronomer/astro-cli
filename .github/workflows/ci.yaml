@@ -108,7 +108,7 @@ jobs:
           set -o pipefail
           status=0
           log="${RUNNER_TEMP}/go-test.log"
-          go test -count=1 -cover -covermode=atomic ./... 2>&1 | tee "${log}" || status=$?
+          go test -count=1 -v -cover -covermode=atomic ./... 2>&1 | tee "${log}" || status=$?
           mod='github\.com/astronomer/astro-cli(/[^[:space:]]*)?'
           go list ./... | LC_ALL=C sort -u > "${RUNNER_TEMP}/listed.txt"
           sed -nE \

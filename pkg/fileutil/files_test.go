@@ -332,6 +332,7 @@ func (s *Suite) TestRead() {
 			actualResp, actualErr := Read(tt.args.path)
 			if tt.errResp != "" && actualErr != nil {
 				s.Contains(actualErr.Error(), tt.errResp)
+				s.ErrorIs(actualErr, os.ErrNotExist)
 			} else {
 				s.NoError(actualErr)
 			}
@@ -372,6 +373,7 @@ func (s *Suite) TestReadFileToString() {
 			actualResp, actualErr := ReadFileToString(tt.args.path)
 			if tt.errResp != "" && actualErr != nil {
 				s.Contains(actualErr.Error(), tt.errResp)
+				s.ErrorIs(actualErr, os.ErrNotExist)
 			} else {
 				s.NoError(actualErr)
 			}
