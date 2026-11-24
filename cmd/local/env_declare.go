@@ -103,20 +103,16 @@ func newEnvDeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		long += "\n\n--secret keeps the value out of plain files: set stores it only in the " +
 			"vault. A secret name cannot have a default."
 	}
-	long += "\n\n--source workspace resolves the name from the Workspace's Environment Manager " +
-		"when no local file sets it. A name with a default cannot resolve from the Workspace."
 	cmdLine := "astro local env " + localenv.Noun(k.kind) + " declare " + exampleName(k.kind)
 	example := "  # Require it at start, with a note for whoever supplies it\n" +
 		"  " + cmdLine + " --description 'Ask the data team for it'\n\n"
 	if k.kind == localenv.KindConn {
 		example += "  # Expect a Postgres connection\n" +
-			"  " + cmdLine + " --type postgres\n\n"
+			"  " + cmdLine + " --type postgres"
 	} else {
 		example += "  # Keep its value only in the vault\n" +
-			"  " + cmdLine + " --secret\n\n"
+			"  " + cmdLine + " --secret"
 	}
-	example += "  # Resolve it from the Workspace when no local file sets it\n" +
-		"  " + cmdLine + " --source workspace"
 	cmd := cliout.Args(&cobra.Command{
 		Use:     "declare",
 		Short:   "Declare " + k.article + " " + k.label + " in pyproject.toml",
@@ -130,6 +126,9 @@ func newEnvDeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	f.StringVar(&in.description, flagDeclDescription, "", "Prose for whoever has to supply the value; an empty string removes it")
 	f.BoolVar(&in.optional, flagDeclOptional, false, "Do not require it at start; --optional=false requires it again")
 	f.StringVar(&in.source, flagDeclSource, "", "Where it resolves from when no local file sets it: workspace or local")
+	// Hidden while workspace-sourced values are redesigned; Astro Desktop
+	// sets them up, and the flag keeps working for anything that passes it.
+	f.MarkHidden(flagDeclSource) //nolint:errcheck // the flag is defined just above
 	if k.kind == localenv.KindConn {
 		f.StringVar(&in.typ, flagDeclType, "", "The expected connection type (e.g. postgres, http); an empty string removes it")
 		return cmd

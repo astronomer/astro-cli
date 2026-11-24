@@ -158,9 +158,9 @@ func newEnvCmd(c *cli) *cobra.Command {
 			"every project. Pass --plain to store one unencrypted: in the project's .env, " +
 			"or for a global, in the vault without encryption.\n\n" +
 			"At start, each value comes from the first of: project .env, shell env, project " +
-			"vault, global vault, the linked Workspace's Environment Manager, a declaration's " +
-			"default. Every source reaches Airflow, whether or not the project declares the value. " +
-			"A Workspace that cannot be read is skipped with a note.",
+			"vault, global vault, a declaration's default. Every source reaches Airflow, " +
+			"whether or not the project declares the value. A project linked to a Workspace " +
+			"in Astro Desktop also gets that Workspace's values, below both vaults.",
 		RunE: helpOrUnknownSubcommand,
 	}
 	cliout.AnyWords(cmd, "its RunE names the verb a removed form became before it refuses an unknown word (helpOrUnknownSubcommand)")
@@ -284,8 +284,8 @@ func envKinds() []envKind {
   astro local env connection list
   astro local env connection delete db_main
 
-  # declare it in pyproject.toml, resolved from the workspace when no file sets it
-  astro local env connection declare db_main --type postgres --source workspace`,
+  # declare it in pyproject.toml, so a start requires it
+  astro local env connection declare db_main --type postgres`,
 		},
 		{
 			aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},

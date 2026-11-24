@@ -58,6 +58,14 @@ const noSyncHelp = "With nothing running, use the project's virtualenv as it is 
 
 const withWorkspaceHelp = "With Airflow stopped, fetch the values declared to come from the Workspace from the Environment Manager, as a start does (needs network and astro login)"
 
+// addWithWorkspaceFlag registers --with-workspace, hidden: reading values from
+// a linked Workspace is set up from Astro Desktop and is being redesigned, so
+// the CLI keeps it working without advertising it.
+func addWithWorkspaceFlag(cmd *cobra.Command, to *bool) {
+	cmd.Flags().BoolVar(to, flagWithWorkspace, false, withWorkspaceHelp)
+	cmd.Flags().MarkHidden(flagWithWorkspace) //nolint:errcheck // the flag is defined just above
+}
+
 // cli carries one command family's invocation state: the deps and the value
 // of its --output flag. Built per family in the constructors below, never
 // stored in a package variable.
@@ -1258,7 +1266,7 @@ func newRunCmd(c *cli) *cobra.Command {
 	// Everything after the first positional belongs to the wrapped
 	// command, not to us.
 	cliout.Passthrough(cmd)
-	cmd.Flags().BoolVar(&withWorkspace, flagWithWorkspace, false, withWorkspaceHelp)
+	addWithWorkspaceFlag(cmd, &withWorkspace)
 	cmd.Flags().BoolVar(&noSync, flagNoSync, false, noSyncHelp)
 	return cmd
 }
@@ -1405,7 +1413,7 @@ func newShellCmd(c *cli) *cobra.Command {
 		},
 	}
 	cmd.Flags().String("shell", "", "Shell to launch instead of your login shell (not built yet)")
-	cmd.Flags().BoolVar(&withWorkspace, flagWithWorkspace, false, withWorkspaceHelp)
+	addWithWorkspaceFlag(cmd, &withWorkspace)
 	cmd.Flags().BoolVar(&noSync, flagNoSync, false, noSyncHelp)
 	return cmd
 }

@@ -502,13 +502,12 @@ SLACK_WEBHOOK = { optional = true, type = 'url' }
 
 ### Declaring from the command line
 
-`astro local env <noun> declare <name>` adds a declaration or changes one, and `undeclare <name>` removes it, for each of the three nouns (`variable`, `connection`, `airflow-variable`). Only the annotations you pass change; the rest of the declaration, and the comments around it, stay as they are. Astro Desktop edits declarations through the same writer, so both refuse a change the next `astro local start` would not load, and leave the file untouched when they do.
+`astro local env <noun> declare <name>` adds a declaration or changes one, and `undeclare <name>` removes it, for each of the three nouns (`variable`, `connection`, `airflow-variable`). Only the annotations you pass change; the rest of the declaration, and the comments around it, stay as they are. Astro Desktop edits declarations through the same writer, so both refuse a change the next `astro local start` would not load, and leave the file untouched when they do. `source = 'workspace'` is set from Astro Desktop, as the [workspace link](#workspace) is.
 
 | flag | annotation | nouns |
 | --- | --- | --- |
 | `--description <text>` | `description`; an empty string removes it | all |
 | `--optional`, `--optional=false` | `optional` | all |
-| `--source workspace`, `--source local` | `source`; `local` removes it | all |
 | `--type <type>` | `type` for the variable nouns; `conn_type` for `connection`, as with `connection set --type` | all |
 | `--enum a,b` | `enum`, and `type = 'enum'` unless `--type` says otherwise | `variable`, `airflow-variable` |
 | `--secret`, `--secret=false` | `secret` | `variable`, `airflow-variable` |
@@ -516,12 +515,12 @@ SLACK_WEBHOOK = { optional = true, type = 'url' }
 
 ```sh
 astro local env variable declare API_TOKEN --secret --description 'Token for the API'
-astro local env connection declare warehouse --type snowflake --source workspace
+astro local env connection declare warehouse --type snowflake
 astro local env airflow-variable declare batch_size --type int --default 500
 astro local env variable undeclare OLD_FLAG
 ```
 
-A name with a default is not given `--source workspace`, because a workspace-sourced name never falls back to its default; pass `--no-default` in the same command to drop it. An env-form key is declared by its plain name, so `airflow-variable declare AIRFLOW_VAR_REGION` declares `region`. `undeclare` removes only the declaration: a value already set for the name stays where it is, and `delete` removes it. The reverse holds too: `delete` removes only the value, and then says what the declaration leaves (another source supplying the name, an absent optional name, or a required one the next start will refuse without). `delete --undeclare` removes both, and edits only the current project's declaration, with `--global` too. `--output json` prints `{"kind", "name", "status", "manifest"}`, with `status` one of `declared`, `undeclared` or `unchanged`.
+An env-form key is declared by its plain name, so `airflow-variable declare AIRFLOW_VAR_REGION` declares `region`. `undeclare` removes only the declaration: a value already set for the name stays where it is, and `delete` removes it. The reverse holds too: `delete` removes only the value, and then says what the declaration leaves (another source supplying the name, an absent optional name, or a required one the next start will refuse without). `delete --undeclare` removes both, and edits only the current project's declaration, with `--global` too. `--output json` prints `{"kind", "name", "status", "manifest"}`, with `status` one of `declared`, `undeclared` or `unchanged`.
 
 ### Types are checked, and reported rather than enforced
 

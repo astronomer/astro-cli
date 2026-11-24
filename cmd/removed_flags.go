@@ -105,9 +105,9 @@ const (
 	errStartComposeFileRemoved = "Docker mode writes its own compose file, and merges a docker-compose.override.yml " +
 		"at the project root over it. Put your changes there"
 	errStartDeploymentIDRemoved = "a start reads no Deployment's values. " +
-		"It reads the Environment Manager of the Workspace that pyproject.toml names, with workspace = \"<workspace id>\" under [tool.astro]"
-	errStartWorkspaceIDRemoved = "a start reads the Environment Manager of the Workspace that pyproject.toml names, " +
-		"with workspace = \"<workspace id>\" under [tool.astro]"
+		"Set the values the project needs with astro local env"
+	errStartWorkspaceIDRemoved = "a start takes no Workspace on the command line. " +
+		"Set the values the project needs with astro local env"
 	errStartImageNameRemoved = "Docker mode builds the project's image itself, from pyproject.toml, " +
 		"or from the Dockerfile that dockerfile = \"<path>\" under [tool.astro] names"
 	errStartNoBrowserRemoved = "a start opens no browser; to open the Airflow UI, use astro local open"
