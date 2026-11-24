@@ -155,7 +155,7 @@ var publishedPayloads = []cliouttest.Case{
 	// astro deploy --output json, in a project with a manifest: the one
 	// object a finished deploy prints.
 	{Name: "deploy", Value: deployJSON{}},
-	// astro deploy bundle: what it deployed where. --delete: the bundle it
+	// astro bundle deploy: what it deployed where. --delete: the bundle it
 	// removed.
 	{Name: "deploy-bundle", Value: bundleDeployJSON{}},
 	{Name: "deploy-bundle-delete", Value: bundleDeleteJSON{}},
@@ -252,7 +252,7 @@ func TestEveryGoldenHasACase(t *testing.T) {
 // deployment inspect's deployment (which create and update publish too),
 // delete's removal, hibernate's override, the worker-queue result and the
 // log entry (6); the bundle a bundle create or update leaves and what a
-// bundle delete did (2); astro deploy bundle's deploy and delete results and the
+// bundle delete did (2); astro bundle deploy's deploy and delete results and the
 // remote deploy's pushed image (3); the Workspace a create, update or switch
 // publishes and what a Workspace delete did, what an Organization switch left
 // current, the role list and the file an audit-log export wrote (5); the
@@ -260,7 +260,7 @@ func TestEveryGoldenHasACase(t *testing.T) {
 // error object.
 // Raise it as conversions land; lower it only saying why. It went from 52
 // to 51 when astro dbt deploy, astro dbt delete and astro deploy --non-dags,
-// three shapes, became astro deploy bundle's two.
+// three shapes, became astro bundle deploy's two.
 const minWatchedPayloads = 51
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by

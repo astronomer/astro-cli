@@ -58,7 +58,7 @@ var removedSettings = map[string]removedSetting{
 }
 
 const (
-	cosmosBoostMoved    = "A project's deploys generate Cosmos Boost files with cosmos-boost = true under [tool.astro.deploy] in its pyproject.toml; astro deploy bundle takes --cosmos-boost."
+	cosmosBoostMoved    = "A project's deploys generate Cosmos Boost files with cosmos-boost = true under [tool.astro.deploy] in its pyproject.toml; astro bundle deploy takes --cosmos-boost."
 	shaAsTagMoved       = "A project's Astro Private Cloud deploys push by digest with sha-as-tag = true under [tool.astro.deploy] in its pyproject.toml."
 	clientRegistryMoved = "astro remote deploy pushes to client-registry under [tool.astro.deploy] in the project's pyproject.toml (a link can set its own), or to --registry."
 	// portRemoved replaces 1.x's webserver.port and api-server.port.

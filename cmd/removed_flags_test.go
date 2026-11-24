@@ -529,6 +529,7 @@ func TestRemovedFlagsLeaveOtherCommandsAlone(t *testing.T) {
 		{astroTree, []string{"deploy", "-d"}, "-d was removed in Astro CLI v2: use --dags"},
 		{astroTree, []string{"deploy", "-w"}, "-w was removed in Astro CLI v2: use --wait"},
 		{astroTree, []string{"deploy", "bundle", "-w"}, "-w was removed in Astro CLI v2: use --wait"},
+		{astroTree, []string{"bundle", "deploy", "-w"}, "-w was removed in Astro CLI v2: use --wait"},
 		{astroTree, []string{"deployment", "hibernate", "-n", "x"}, "-n was removed in Astro CLI v2: use --deployment"},
 		// APC's -n was --nfs-location, a flag 1.x registered only where the
 		// platform mounts NFS, and --name takes no letter there: a script that
@@ -543,7 +544,7 @@ func TestRemovedFlagsLeaveOtherCommandsAlone(t *testing.T) {
 		{astroTree, []string{"deployment", "token", "rotate", "-d", "cl123"}, errRan.Error()},
 		// The letters that moved to the table's flags work.
 		{astroTree, []string{"init", "-n", "my-project"}, errRan.Error()},
-		{astroTree, []string{"deploy", "bundle", "-d", "x"}, errRan.Error()},
+		{astroTree, []string{"bundle", "deploy", "-d", "x"}, errRan.Error()},
 		{apcTree, []string{"init", "-a", "3.1"}, "-a was removed in Astro CLI v2: use --airflow-version"},
 		// And still have, full stop.
 		{astroTree, []string{"local", "start", "--port", "8081", "--docker"}, errRan.Error()},

@@ -25,7 +25,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
-// The transport astro deploy bundle calls, vars so a test can stand in for
+// The transport astro bundle deploy calls, vars so a test can stand in for
 // the upload and the delete.
 var (
 	DeployBundle = astrodeploy.DeployBundle
@@ -36,7 +36,7 @@ var (
 // var so a test need not sit through the poll's sleeps.
 var waitForBundle = astrodeploy.WaitForBundle
 
-// deployBundleOptions are astro deploy bundle's flags.
+// deployBundleOptions are astro bundle deploy's flags.
 type deployBundleOptions struct {
 	mountPath   string
 	bundleType  string
@@ -51,11 +51,11 @@ type deployBundleOptions struct {
 	output      cliout.Format
 }
 
-func newDeployBundleCmd() *cobra.Command {
+func newBundleDeployCmd() *cobra.Command {
 	o := &deployBundleOptions{}
 	types := strings.Join(astrodeploy.BundleTypeNames(), ", ")
 	cmd := cliout.Args(&cobra.Command{
-		Use:   manifestdeploy.BundleCommand,
+		Use:   "deploy",
 		Short: "Deploy a non-Dag bundle (for example a dbt project) to a Deployment",
 		Long: "Deploy a non-Dag bundle (for example a dbt project) to a Deployment on Astro. " +
 			"The bundle is a directory of its own, outside any Astro project: PATH, or the current directory. " +
@@ -67,29 +67,35 @@ func newDeployBundleCmd() *cobra.Command {
 			"With --delete and no bundle at PATH, a mount path below a type's default directory says the type.\n\n" +
 			"--deployment takes a link name of the project in the current directory, a Deployment id, or the name of a Deployment in the Workspace. " +
 			"This deploys the bundle's files; astro deploy deploys the project and its Dags. " +
-			"To list or change the bundles a Deployment has registered, use astro deployment bundle. " +
-			"A project link called bundle is not reachable as astro deploy bundle: deploy the project to it with astro deploy --deployment bundle.",
+			"To list or change the bundles a Deployment has registered, use astro bundle list, update and delete.",
+		// A bundle is deployed from a directory outside any project, so it
+		// resolves the project and login itself (bundleTarget), as astro deploy
+		// does, instead of following the project here as astro bundle's other
+		// commands do: only the root's pre-run runs.
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return parentPreRun(cmd.Parent(), cmd, args)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDeployBundle(cmd, args, o)
 		},
 		Example: `  # Deploy the dbt project in the current directory, picking the Deployment from a list
-  astro deploy bundle
+  astro bundle deploy
 
   # Deploy a dbt project elsewhere to a given Deployment
-  astro deploy bundle <PATH> --deployment <DEPLOYMENT_ID>
+  astro bundle deploy <PATH> --deployment <DEPLOYMENT_ID>
 
   # Deploy it with Cosmos Boost, so Cosmos skips parsing the dbt project
-  astro deploy bundle <PATH> --deployment <DEPLOYMENT_ID> --cosmos-boost
+  astro bundle deploy <PATH> --deployment <DEPLOYMENT_ID> --cosmos-boost
 
   # Deploy it to a Deployment named analytics in a given Workspace
-  astro deploy bundle <PATH> --deployment analytics --workspace <WORKSPACE_ID>
+  astro bundle deploy <PATH> --deployment analytics --workspace <WORKSPACE_ID>
 
   # Deploy another kind of bundle, which needs a mount path
-  astro deploy bundle <PATH> --type <TYPE> --mount-path /usr/local/airflow/<NAME> \
+  astro bundle deploy <PATH> --type <TYPE> --mount-path /usr/local/airflow/<NAME> \
     --deployment <DEPLOYMENT_ID>
 
   # Remove the dbt project in the current directory from a Deployment
-  astro deploy bundle --delete --deployment <DEPLOYMENT_ID>`,
+  astro bundle deploy --delete --deployment <DEPLOYMENT_ID>`,
 	}, cliout.Optional("PATH"))
 	f := cmd.Flags()
 	f.StringVar(&o.mountPath, "mount-path", "", "Path the bundle is mounted at in Airflow, for reference by Dags. Default: the type's, "+astrodeploy.DbtDefaultMountPathPrefix+"<project name> for a dbt project")
@@ -413,7 +419,7 @@ func deploymentNamed(ctx context.Context, name, ws string, src astrosession.Sour
 // cannot be asked for one, in astro deploy's words for the same refusal.
 var errBundleNoTarget = errors.New("this deploy names no Deployment and this run cannot be asked: pass --deployment with a Deployment id, a Deployment name, or a link name")
 
-// bundleDeployJSON is what astro deploy bundle --output json publishes: the
+// bundleDeployJSON is what astro bundle deploy --output json publishes: the
 // bundle deployed and where. Its deployment, workspace and git keys are the
 // ones astro deploy's result uses for the same facts.
 type bundleDeployJSON struct {
@@ -456,7 +462,7 @@ func newBundleDeployJSON(res *astrodeploy.BundleDeploy, b *resolvedBundle, bundl
 	}
 }
 
-// bundleDeleteJSON is what astro deploy bundle --delete --output json
+// bundleDeleteJSON is what astro bundle deploy --delete --output json
 // publishes: the bundle it removed from the Deployment. Astro removes the
 // files as the Deployment takes the deploy, which a wait (waited, and
 // wait_error when it failed) watches for. workspace is the Deployment's,

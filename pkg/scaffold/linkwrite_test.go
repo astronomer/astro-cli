@@ -189,22 +189,14 @@ func TestSaveLinkRefusesAnInvalidLink(t *testing.T) {
 	}
 }
 
-// A new link cannot be called bundle, the word astro deploy bundle takes; one
-// already called that saves again.
-func TestSaveLinkRefusesANewBundleLink(t *testing.T) {
+// bundle is a link name like any other: astro deploy has no subcommand of
+// that name (a non-Dag bundle deploys with astro bundle deploy).
+func TestSaveLinkTakesABundleLink(t *testing.T) {
 	dir, path := linkProject(t, linkFixture)
-	err := SaveLink(dir, nil, Link{Name: BundleLinkName, Kind: manifest.KindAstro, Workspace: "W", Deployment: "d"})
-	require.ErrorIs(t, err, ErrBundleLinkName)
-	require.ErrorIs(t, err, ErrInvalidLink)
-	assert.Contains(t, err.Error(), "astro deploy bundle deploys a non-Dag bundle")
-	assert.Equal(t, linkFixture, readFile(t, path))
-
-	existing := linkFixture + "\n[tool.astro.deployments.bundle]\nworkspace = 'W'\ndeployment = 'old'\n"
-	dir, path = linkProject(t, existing)
-	require.NoError(t, SaveLink(dir, nil, Link{Name: BundleLinkName, Kind: manifest.KindAstro, Deployment: "new"}))
+	require.NoError(t, SaveLink(dir, nil, Link{Name: "bundle", Kind: manifest.KindAstro, Workspace: "W", Deployment: "d"}))
 	m, err := manifest.Load(path)
 	require.NoError(t, err)
-	assert.Equal(t, "new", m.Astro.Deployments[BundleLinkName].Deployment)
+	assert.Equal(t, "d", m.Astro.Deployments["bundle"].Deployment)
 }
 
 // A credential pasted where an env var name belongs is refused, and the error

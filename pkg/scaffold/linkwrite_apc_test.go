@@ -97,7 +97,6 @@ func TestSaveLinkRefusesAnIncompleteAPCLink(t *testing.T) {
 		"a domain of a scheme": func(l *Link) { l.Domain = "https://" },
 		"no deployment":        func(l *Link) { l.Deployment = "" },
 		"the reserved name":    func(l *Link) { l.Name = manifest.ReservedLinkName },
-		"the bundle name":      func(l *Link) { l.Name = BundleLinkName },
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir, path := linkProject(t, linkFixture)

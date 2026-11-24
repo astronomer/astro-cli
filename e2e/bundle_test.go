@@ -7,7 +7,8 @@ import (
 	"testing"
 )
 
-// `astro bundle` is the bundle commands' home, and `astro bundle files` is
+// `astro bundle` is the bundle commands' home, `astro bundle deploy`
+// (1.x's `astro dbt deploy`) among them, and `astro bundle files` is
 // not announced yet: the group runs and has a help page of its own, but the
 // bundle commands do not list it.
 //
@@ -18,7 +19,7 @@ func TestBundleHelpListsTheCommandsAndHidesFiles(t *testing.T) {
 	p := newProject(t)
 	out := p.run("bundle", "--help").requireSuccess().output()
 
-	for _, want := range []string{"create", "list", "update", "delete", "rollback", "versions"} {
+	for _, want := range []string{"deploy", "create", "list", "update", "delete", "rollback", "versions"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("astro bundle --help should list %q\n%s", want, out)
 		}

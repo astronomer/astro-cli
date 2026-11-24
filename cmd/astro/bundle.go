@@ -35,13 +35,14 @@ func newBundleRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "bundle",
 		Aliases: []string{"bundles"},
-		Short:   "Manage Dag and non-Dag bundles and their versions",
-		Long:    "Manage the bundles registered on an Astro Deployment and their versions. Dag bundles carry Dags; Astro CLI v2 does not deploy to a named Dag bundle yet. Non-Dag bundles mount other content (e.g. dbt projects) at a path, and 'astro deploy bundle' deploys them.",
+		Short:   "Deploy and manage Dag and non-Dag bundles and their versions",
+		Long:    "Manage the bundles registered on an Astro Deployment and their versions. Dag bundles carry Dags, which astro deploy --dag-bundle ships to one. Non-Dag bundles mount other content (e.g. dbt projects) at a path, and 'astro bundle deploy' deploys them.",
 	}
 	cmd.PersistentPreRunE = followProjectPreRun(cmd)
 	cmd.SetOut(out)
 	cliout.AddOutputFlag(cmd, &bundleOutput)
 	cmd.AddCommand(
+		newBundleDeployCmd(),
 		newBundleCreateCmd(out),
 		newBundleListCmd(out),
 		newBundleUpdateCmd(out),
