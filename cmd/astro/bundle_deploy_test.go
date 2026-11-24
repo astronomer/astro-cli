@@ -1,6 +1,8 @@
 package astro
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -17,13 +19,27 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/pkg/input"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-// execBundleRun runs astro deploy bundle with args under a root, as a user
+// execBundleRun runs astro bundle deploy with args under a root, as a user
 // runs it.
 func execBundleRun(t *testing.T, client astrov1.APIClient, answers string, args ...string) tokenRun {
 	t.Helper()
-	return execAstroCmd(t, client, answers, func(io.Writer) *cobra.Command { return NewDeployCmd() }, append([]string{"deploy", "bundle"}, args...)...)
+	return execAstroCmd(t, client, answers, newBundleRootCmd, append([]string{"bundle", "deploy"}, args...)...)
+}
+
+// execBundleDeployCapture is execDeployCapture for astro bundle deploy: the
+// command under a root, beside astro deploy, reported as the root reports it.
+func execBundleDeployCapture(args ...string) error {
+	defer func() { workspaceID = "" }() // see execDeployCmd
+	testUtil.SetupOSArgsForGinkgo()
+	root := deployUnderRoot()
+	var buf bytes.Buffer
+	root.AddCommand(newBundleRootCmd(&buf))
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	return cliout.Execute(context.Background(), root, append([]string{"bundle", "deploy"}, args...), &buf, nil)
 }
 
 // fakeDeployBundle stands in for the upload, recording what it was asked.
@@ -83,19 +99,22 @@ func plainBundle(t *testing.T) string {
 	return dir
 }
 
-// astro deploy bundle is the subcommand, and any other word after deploy is
-// still the Deployment the project deploys to.
+// A non-Dag bundle deploys with astro bundle deploy, and every word after
+// astro deploy, bundle included, is the Deployment the project deploys to.
 func TestDeployBundleRouting(t *testing.T) {
 	root := deployUnderRoot()
-	cmd, rest, err := root.Find([]string{"deploy", "bundle", "some/path"})
+	root.AddCommand(newBundleRootCmd(io.Discard))
+	cmd, rest, err := root.Find([]string{"bundle", "deploy", "some/path"})
 	require.NoError(t, err)
-	assert.Equal(t, "astro deploy bundle", cmd.CommandPath())
+	assert.Equal(t, "astro bundle deploy", cmd.CommandPath())
 	assert.Equal(t, []string{"some/path"}, rest)
 
-	cmd, rest, err = root.Find([]string{"deploy", "clx-dep"})
-	require.NoError(t, err)
-	assert.Equal(t, "astro deploy", cmd.CommandPath())
-	assert.Equal(t, []string{"clx-dep"}, rest)
+	for _, word := range []string{"clx-dep", "bundle"} {
+		cmd, rest, err = root.Find([]string{"deploy", word})
+		require.NoError(t, err)
+		assert.Equal(t, "astro deploy", cmd.CommandPath())
+		assert.Equal(t, []string{word}, rest)
+	}
 }
 
 // The type decides the defaults: a dbt project is detected and mounts below
@@ -433,11 +452,11 @@ func TestDeployBundleUsesTheManifestDomainsLogin(t *testing.T) {
 				setupDeployOnStage(t, manifestOnProd)
 				logInToProd(t)
 				deployed, deleted := fakeDeployBundle(t), fakeDeleteBundle(t)
-				args := []string{"bundle", t.TempDir(), "--deployment", target, "--mount-path", "/x"}
+				args := []string{t.TempDir(), "--deployment", target, "--mount-path", "/x"}
 				if del {
 					args = append(args, "--delete")
 				}
-				_, err := execDeployCapture(args...)
+				err := execBundleDeployCapture(args...)
 				require.NoError(t, err)
 				var login *config.Context
 				if del {
@@ -457,7 +476,7 @@ func TestDeployBundleUsesTheManifestDomainsLogin(t *testing.T) {
 		logInToProd(t)
 		interactiveDeploy(t)
 		noBundleTransport(t)
-		_, err := execDeployCapture("bundle", t.TempDir(), "--mount-path", "/x")
+		err := execBundleDeployCapture(t.TempDir(), "--mount-path", "/x")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "the Deployment picker lists only the current context's Deployments")
 		assert.Contains(t, err.Error(), "astro context switch astronomer.io")
@@ -467,7 +486,7 @@ func TestDeployBundleUsesTheManifestDomainsLogin(t *testing.T) {
 		setupDeployOnStage(t, manifestOnProd)
 		require.NoError(t, os.Remove(filepath.Join(config.WorkingPath, "pyproject.toml")))
 		captured := fakeDeployBundle(t)
-		_, err := execDeployCapture("bundle", t.TempDir(), "--deployment", bundleTestID, "--mount-path", "/x")
+		err := execBundleDeployCapture(t.TempDir(), "--deployment", bundleTestID, "--mount-path", "/x")
 		require.NoError(t, err)
 		assert.Nil(t, (*captured).Login, "the current context")
 	})

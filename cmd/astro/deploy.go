@@ -67,7 +67,7 @@ var (
   astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>
 
   # Deploy a dbt project, or another non-Dag bundle, from its own directory
-  astro deploy bundle <PATH> --deployment <DEPLOYMENT_ID>`
+  astro bundle deploy <PATH> --deployment <DEPLOYMENT_ID>`
 
 	buildSecrets = []string{}
 )
@@ -128,9 +128,6 @@ func NewDeployCmd() *cobra.Command {
 	annotateDeployFlag(cmd, "no-dags-base-dir", deployGroupDAG)
 	annotateDeployFlag(cmd, "dag-bundle", deployGroupDAG)
 	orderDeployFlagGroups(cmd)
-	// astro deploy bundle is the subcommand, so the word bundle is never a
-	// Deployment argument: a link of that name is reached with --deployment.
-	cmd.AddCommand(newDeployBundleCmd())
 	applyPreferredFlagsIn(cmd)
 	return cmd
 }

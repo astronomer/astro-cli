@@ -76,9 +76,9 @@ func execUnboundRootWith(t *testing.T, client astrov1.APIClient, alpha astrov1al
 // Under --output json the result is on stdout and nothing of it on stderr,
 // in the tree production builds.
 func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
-	t.Run("deploy bundle", func(t *testing.T) {
+	t.Run("bundle deploy", func(t *testing.T) {
 		project := dbtProject(t)
-		stdout, stderr, err := execUnboundRoot(t, dbtBundleMock(t, fakeBlobStore(t)), "deploy", "bundle", project, "--deployment", dbtTestDeploymentID, "-o", "json")
+		stdout, stderr, err := execUnboundRoot(t, dbtBundleMock(t, fakeBlobStore(t)), "bundle", "deploy", project, "--deployment", dbtTestDeploymentID, "-o", "json")
 		require.NoError(t, err, "stderr:\n%s", stderr)
 		var got bundleDeployJSON
 		decodeOne(t, stdout, &got)
@@ -89,7 +89,7 @@ func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 	// The bundle sits in a git checkout with uncommitted changes, so the
 	// platform code prints its note on the way: under json that goes to
 	// stderr, and stdout is the one result object.
-	t.Run("deploy bundle from a dirty checkout", func(t *testing.T) {
+	t.Run("bundle deploy from a dirty checkout", func(t *testing.T) {
 		if _, err := exec.LookPath("git"); err != nil {
 			t.Skip("needs git")
 		}
@@ -105,7 +105,7 @@ func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 		gitIn("commit", "-q", "-m", "first")
 		require.NoError(t, os.WriteFile(filepath.Join(bundle, "dbt_project.yml"), []byte("name: changed\n"), 0o600))
 
-		stdout, stderr, err := execUnboundRoot(t, dbtBundleMock(t, fakeBlobStore(t)), "deploy", "bundle", bundle, "--deployment", dbtTestDeploymentID, "--mount-path", "/usr/local/airflow/x", "--output", "json")
+		stdout, stderr, err := execUnboundRoot(t, dbtBundleMock(t, fakeBlobStore(t)), "bundle", "deploy", bundle, "--deployment", dbtTestDeploymentID, "--mount-path", "/usr/local/airflow/x", "--output", "json")
 		require.NoError(t, err, "stderr:\n%s", stderr)
 		var got bundleDeployJSON
 		decodeOne(t, stdout, &got)

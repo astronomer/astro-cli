@@ -58,13 +58,13 @@ const (
 	errDeployParseRemoved    = "check your Dags before deploying, with astro local check && astro deploy"
 	errDeployDagsPathRemoved = "astro deploy --dags ships the project's dags directory, so run it from the project"
 	errDeployNameRemoved     = "name the Deployment as the argument or with --deployment, which take a link name or a Deployment id"
-	// astro deploy --non-dags became astro deploy bundle, a subcommand of
-	// its own with the bundle's directory as its argument.
-	errDeployNonDagsRemoved = "use astro deploy bundle [PATH] --deployment <Deployment id, name or link name>, " +
+	// astro deploy --non-dags became astro bundle deploy, a command of its
+	// own with the bundle's directory as its argument.
+	errDeployNonDagsRemoved = "use astro bundle deploy [PATH] --deployment <Deployment id, name or link name>, " +
 		"which deploys a non-Dag bundle such as a dbt project from its directory"
-	errDeployNonDagsMountPathRemoved  = "use astro deploy bundle --mount-path"
-	errDeployNonDagsLocalPathRemoved  = "pass the bundle's directory as the argument, astro deploy bundle <PATH>"
-	errDeployNonDagsBundleTypeRemoved = "use astro deploy bundle --type, which detects a dbt project by itself"
+	errDeployNonDagsMountPathRemoved  = "use astro bundle deploy --mount-path"
+	errDeployNonDagsLocalPathRemoved  = "pass the bundle's directory as the argument, astro bundle deploy <PATH>"
+	errDeployNonDagsBundleTypeRemoved = "use astro bundle deploy --type, which detects a dbt project by itself"
 	// 1.x kept --build-secrets, hidden and deprecated, as an alias of the
 	// repeatable --build-secret that replaced it.
 	errBuildSecretsRemoved = "use --build-secret, once for each secret" //nolint:gosec // message text naming a flag, not a credential
@@ -242,11 +242,11 @@ var removedFlags = []removedFlag{
 	{name: "non-dags-local-path", under: []string{"deploy"}, reason: says(errDeployNonDagsLocalPathRemoved)},
 	{name: "non-dags-bundle-type", under: []string{"deploy"}, reason: says(errDeployNonDagsBundleTypeRemoved)},
 	{name: "build-secrets", needs: has("build-secret"), reason: says(errBuildSecretsRemoved)},
-	// -w was --wait on astro deploy, so -w is not --workspace there or on
-	// its subcommand astro deploy bundle (which has no 1.x spelling to find
-	// it by): an old astro deploy -w <ID> fails loudly, for as long as v2
-	// lives, instead of naming a Workspace.
-	{name: "wait", shorthand: "w", under: []string{"deploy"}, needs: has("wait"), v2Only: true, reason: says(errWaitShorthandRemoved)},
+	// -w was --wait on astro deploy and on astro dbt deploy, which astro
+	// bundle deploy replaced, so -w is not --workspace on either: an old
+	// astro deploy -w <ID> fails loudly, for as long as v2 lives, instead of
+	// naming a Workspace, and so does a dbt deploy rewritten with its -w.
+	{name: "wait", shorthand: "w", under: []string{"deploy", "bundle deploy"}, needs: has("wait"), v2Only: true, reason: says(errWaitShorthandRemoved)},
 	// APC's -n was --nfs-location, which 1.x registered only where the platform
 	// mounts NFS, so no inventory row could say so for every platform. --name
 	// takes no letter on these two commands, so it is never read as a name.
@@ -794,7 +794,7 @@ func acceptForCompletion(root *cobra.Command, args []string) {
 		}
 	}
 	// The letters v2 withholds for good, which no inventory row names on a
-	// command 1.x did not have (astro deploy bundle -w).
+	// command 1.x did not have (astro bundle deploy -w).
 	for i := range removedFlags {
 		if f := &removedFlags[i]; f.shorthand != "" && findRemovedShorthand(cmd, f.shorthand) == f {
 			addHiddenShorthand(cmd, &v1Flag{name: f.name, shorthand: f.shorthand, isBool: true})

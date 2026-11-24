@@ -806,7 +806,7 @@ func unlinkedDeployments(req Request, d Deployer, links map[string]manifest.Link
 		}
 		return deps[i].ID < deps[j].ID
 	})
-	taken := map[string]bool{manifest.ReservedLinkName: true, BundleCommand: true}
+	taken := map[string]bool{manifest.ReservedLinkName: true}
 	for name := range links {
 		taken[name] = true
 	}
@@ -836,7 +836,7 @@ func newLinkName(dep Deployment, taken map[string]bool) string {
 	// A name of digits alone would shadow a row number: the prompt matches
 	// names first, so a Deployment called "1" would take the answer "1" from
 	// whatever row 1 is.
-	if base == "" || base == manifest.ReservedLinkName || base == BundleCommand || isDigits(base) {
+	if base == "" || base == manifest.ReservedLinkName || isDigits(base) {
 		base = dep.ID
 	}
 	name := base
@@ -897,7 +897,7 @@ func listWorkspace(req Request) string {
 // on req.Domain for Astro Private Cloud, or a Deployment id. Only those
 // fields, the workspaces and OtherDomain are read. named is false when
 // neither names one. It is for a command that ships something other than the
-// project, such as astro deploy bundle, or that acts on a Deployment, such as
+// project, such as astro bundle deploy, or that acts on a Deployment, such as
 // APC's astro deployment logs, to name its Deployment the way a deploy does.
 func ResolveNamed(req Request) (target Target, named bool, err error) {
 	var links map[string]manifest.Link
@@ -964,14 +964,8 @@ func unlinkedTarget(req Request, d Deployer) (Target, error) {
 	if dep.WorkspaceID == "" {
 		dep.WorkspaceID = workspaceID
 	}
-	return linkedTarget(req, newLinkName(dep, map[string]bool{manifest.ReservedLinkName: true, BundleCommand: true}), dep), nil
+	return linkedTarget(req, newLinkName(dep, map[string]bool{manifest.ReservedLinkName: true}), dep), nil
 }
-
-// BundleCommand is the word astro deploy bundle is spelled with. astro
-// deploy reads it as that subcommand, never as a link name, so no link is
-// saved under it (scaffold.BundleLinkName): a link a deploy saves for a
-// picked Deployment is named otherwise.
-const BundleCommand = scaffold.BundleLinkName
 
 // DefaultMark is the word that marks a project's default link in a list of
 // links: the deploy prompt's "linked, default", and the `astro use` and `astro

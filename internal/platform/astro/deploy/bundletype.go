@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// BundleType is a kind of non-DAG bundle that astro deploy bundle knows by
+// BundleType is a kind of non-DAG bundle that astro bundle deploy knows by
 // its contents: how to tell a directory holds one, how to check it, what the
 // bundle is called, and where it mounts when the deploy names no mount path.
 // Adding a type is adding an entry to bundleTypes.

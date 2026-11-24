@@ -11,8 +11,9 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
-// -w was --wait on astro deploy, and means --workspace everywhere else, so
-// astro deploy and astro deploy bundle never give it to --workspace: an old
+// -w was --wait on astro deploy and astro dbt deploy, and means --workspace
+// everywhere else, so astro deploy and astro bundle deploy never give it to
+// --workspace: an old
 // astro deploy -w <ID> fails, saying so, in every spelling and in both
 // formats, for as long as v2 lives (the removedFlags entry with shorthand w).
 func TestDeployRefusesDashWAndNeverReadsItAsAWorkspace(t *testing.T) {
@@ -21,9 +22,9 @@ func TestDeployRefusesDashWAndNeverReadsItAsAWorkspace(t *testing.T) {
 			{"deploy", "-w"},
 			{"deploy", "-w", "cl123"},
 			{"deploy", "cl123", "-w"},
-			{"deploy", "bundle", "-w"},
-			{"deploy", "bundle", "./dbt", "-w"},
-			{"deploy", "bundle", "./dbt", "--deployment", "cl123", "-w"},
+			{"bundle", "deploy", "-w"},
+			{"bundle", "deploy", "./dbt", "-w"},
+			{"bundle", "deploy", "./dbt", "--deployment", "cl123", "-w"},
 		} {
 			for _, asJSON := range []bool{false, true} {
 				args := slices.Clone(line)
@@ -49,7 +50,7 @@ func TestDeployRefusesDashWAndNeverReadsItAsAWorkspace(t *testing.T) {
 		}
 		t.Run(tc.name+": --workspace is still there, without a letter", func(t *testing.T) {
 			root, _ := disarmedTree(t, tc)
-			for _, path := range [][]string{{"deploy"}, {"deploy", "bundle"}} {
+			for _, path := range [][]string{{"deploy"}, {"bundle", "deploy"}} {
 				cmd, _, err := root.Find(path)
 				require.NoError(t, err)
 				f := cmd.Flags().Lookup("workspace")

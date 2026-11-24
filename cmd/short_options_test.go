@@ -164,8 +164,8 @@ func mapsKeys[V any](m map[string]V) func(func(string) bool) {
 // letter is withheld without a line here (letterWas1xs), so only a command 1.x
 // did not have appears.
 var lettersWithheld = map[string]string{
-	"deploy|workspace":        "astro deploy -w was --wait in 1.x: -w is refused on astro deploy and astro deploy bundle in every tree, so an old astro deploy -w <ID> fails instead of naming a Workspace",
-	"deploy bundle|workspace": "see astro deploy: -w is refused on both",
+	"deploy|workspace":        "astro deploy -w was --wait in 1.x: -w is refused on astro deploy and astro bundle deploy in every tree, so an old astro deploy -w <ID> fails instead of naming a Workspace",
+	"bundle deploy|workspace": "astro dbt deploy -w, which this replaced, was --wait in 1.x: see astro deploy",
 }
 
 // sameMeaning reports whether Astro CLI 1.x's flag named v1 is the flag f of

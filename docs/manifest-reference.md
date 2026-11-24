@@ -303,7 +303,7 @@ Whether a deploy records the commit it ships: its SHA, branch and, for a GitHub 
 
 ### `cosmos-boost`
 
-Whether a deploy that uploads the project's Dags generates Cosmos Boost files for the dbt projects among them into the upload, so Cosmos skips parsing them at runtime. `false` unless set `true`. The files go into the upload only, never into the project. `astro deploy bundle`, which deploys a directory outside any project, takes `--cosmos-boost` instead. Astro CLI 1.x kept this as `cosmos_boost.pre_deploy`.
+Whether a deploy that uploads the project's Dags generates Cosmos Boost files for the dbt projects among them into the upload, so Cosmos skips parsing them at runtime. `false` unless set `true`. The files go into the upload only, never into the project. `astro bundle deploy`, which deploys a directory outside any project, takes `--cosmos-boost` instead. Astro CLI 1.x kept this as `cosmos_boost.pre_deploy`.
 
 ### `sha-as-tag`
 
