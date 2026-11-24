@@ -1,6 +1,8 @@
 package ide
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"errors"
 	"io"
 	"os"
@@ -160,6 +162,50 @@ func TestCreateAndExtractArchive_RespectsGitignoreAndAllowlist(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(outDir, ".test")); !os.IsNotExist(err) {
 		t.Errorf("expected .test to be excluded, got err=%v", err)
+	}
+}
+
+// The archive names entries with forward slashes on every platform, so an
+// export from Windows keeps its folders instead of uploading dags\x.py as
+// one top-level file name.
+func TestCreateTarGzArchiveUsesForwardSlashNames(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "dags/example.py", "print('hello')\n")
+	writeFile(t, root, "include/custom_functions/helpers.py", "x = 1\n")
+
+	archivePath := filepath.Join(t.TempDir(), "project.tar.gz")
+	if _, err := createTarGzArchive(root, archivePath, io.Discard); err != nil {
+		t.Fatalf("createTarGzArchive error: %v", err)
+	}
+
+	f, err := os.Open(archivePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gz.Close()
+
+	var names []string
+	tr := tar.NewReader(gz)
+	for {
+		h, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		names = append(names, h.Name)
+	}
+
+	for _, want := range []string{"dags", "dags/example.py", "include/custom_functions", "include/custom_functions/helpers.py"} {
+		if !slices.Contains(names, want) {
+			t.Errorf("expected tar entry %q, got %q", want, names)
+		}
 	}
 }
 
