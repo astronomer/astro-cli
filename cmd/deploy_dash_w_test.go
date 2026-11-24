@@ -13,9 +13,9 @@ import (
 
 // -w was --wait on astro deploy and astro dbt deploy, and means --workspace
 // everywhere else, so astro deploy and astro bundle deploy never give it to
-// --workspace: an old
-// astro deploy -w <ID> fails, saying so, in every spelling and in both
-// formats, for as long as v2 lives (the removedFlags entry with shorthand w).
+// --workspace: an old astro deploy -w <ID> fails, saying so, in every
+// spelling and in both formats, for as long as v2 lives (the removedFlags
+// entry with shorthand w).
 func TestDeployRefusesDashWAndNeverReadsItAsAWorkspace(t *testing.T) {
 	for _, tc := range []treeConfig{astroTree, astroHostedTree} {
 		for _, line := range [][]string{
