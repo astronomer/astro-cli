@@ -942,6 +942,8 @@ func putBundleDirectory(ctx httpContext.Context, pack func(io.Writer) error, par
 // sync adds, updates and deletes the ones that differ.
 type bundleSyncPlan struct {
 	added, updated, deleted []string
+	// moved and copied are files an upload places from content the bundle already holds, instead of sending it.
+	moved, copied []bundleSyncEdit
 }
 
 // bundleWriteError is a failed write to a bundle directory, with the status the API answered, or 0 if it did not answer.
@@ -1088,9 +1090,10 @@ func findBundleID(bundles []astrov1alpha1.DeploymentBundle, target BundlePath, d
 }
 
 // packBundleDirectory writes to archive a gzipped tar that applies plan, by
-// slash-separated paths relative to localDir: it deletes, then writes the files
-// added and updated. The deletes come first, so a file can take the place of a
-// directory.
+// slash-separated paths relative to localDir: it deletes, then copies, then
+// moves, then writes the files added and updated. The deletes come first, so a
+// file can take the place of a directory, and the copies read a file before a
+// move takes it away.
 func packBundleDirectory(ctx httpContext.Context, archive io.Writer, localDir string, plan *bundleSyncPlan) error {
 	gzipWriter := gzip.NewWriter(archive)
 	tarWriter := tar.NewWriter(gzipWriter)
@@ -1099,6 +1102,26 @@ func packBundleDirectory(ctx httpContext.Context, archive io.Writer, localDir st
 		if err != nil {
 			return err
 		}
+	}
+	// A move or a copy is an entry named for its destination, holding the path of its source.
+	writeEdits := func(prefix string, edits []bundleSyncEdit) error {
+		for _, e := range edits {
+			err := tarWriter.WriteHeader(&tar.Header{Name: prefix + e.to, Mode: 0o644, Size: int64(len(e.from)), Typeflag: tar.TypeReg})
+			if err == nil {
+				_, err = io.WriteString(tarWriter, e.from)
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	err := writeEdits(bundleCopyPrefix, plan.copied)
+	if err == nil {
+		err = writeEdits(bundleMovePrefix, plan.moved)
+	}
+	if err != nil {
+		return err
 	}
 	for _, relPath := range slices.Concat(plan.added, plan.updated) {
 		file, err := os.Open(filepath.Join(localDir, filepath.FromSlash(relPath)))
@@ -1120,7 +1143,7 @@ func packBundleDirectory(ctx httpContext.Context, archive io.Writer, localDir st
 			return closeErr
 		}
 	}
-	err := tarWriter.Close()
+	err = tarWriter.Close()
 	if err != nil {
 		return err
 	}

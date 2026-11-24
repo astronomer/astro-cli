@@ -207,7 +207,7 @@ func newBundleFilesSyncCmd(out io.Writer) *cobra.Command {
 	cmd := cliout.Args(&cobra.Command{
 		Use:   "sync",
 		Short: "Make a local directory and a file bundle directory match",
-		Long: `Make DST match SRC, where one is a local directory and the other a bundle directory, written BUNDLE:PATH or BUNDLE: for the whole bundle. Only the files whose content differs are transferred, and the files only DST holds are deleted unless --no-delete is set. The changes are printed, and --dry-run prints them without making them.
+		Long: `Make DST match SRC, where one is a local directory and the other a bundle directory, written BUNDLE:PATH or BUNDLE: for the whole bundle. Only the files whose content differs are transferred, and the files only DST holds are deleted unless --no-delete is set. An upload of content the bundle already holds at another path under DST moves or copies it there instead of sending it again, so a rename sends nothing. The changes are printed, and --dry-run prints them without making them.
 
 A sync into a bundle creates one new bundle version, and fails if the bundle changes between the sync reading it and writing it. A sync from a bundle asks before it deletes local files, unless --yes, and fails if the bundle path holds no files.
 

@@ -164,7 +164,7 @@ func planBundleSync(from, to map[string]string, deleteExtras bool) *bundleSyncPl
 }
 
 func (p *bundleSyncPlan) empty() bool {
-	return len(p.added) == 0 && len(p.updated) == 0 && len(p.deleted) == 0
+	return len(p.added) == 0 && len(p.updated) == 0 && len(p.deleted) == 0 && len(p.moved) == 0 && len(p.copied) == 0
 }
 
 func (p *bundleSyncPlan) print(out io.Writer, name func(relPath string) string) {
@@ -174,13 +174,23 @@ func (p *bundleSyncPlan) print(out io.Writer, name func(relPath string) string) 
 	for _, relPath := range p.updated {
 		fmt.Fprintf(out, "update  %s\n", name(relPath))
 	}
+	for _, e := range p.moved {
+		fmt.Fprintf(out, "move    %s -> %s\n", name(e.from), name(e.to))
+	}
+	for _, e := range p.copied {
+		fmt.Fprintf(out, "copy    %s -> %s\n", name(e.from), name(e.to))
+	}
 	for _, relPath := range p.deleted {
 		fmt.Fprintf(out, "delete  %s\n", name(relPath))
 	}
 }
 
 func (p *bundleSyncPlan) summary() string {
-	return fmt.Sprintf("%d added, %d updated, %d deleted", len(p.added), len(p.updated), len(p.deleted))
+	summary := fmt.Sprintf("%d added, %d updated, %d deleted", len(p.added), len(p.updated), len(p.deleted))
+	if len(p.moved) > 0 || len(p.copied) > 0 {
+		summary += fmt.Sprintf(", %d moved, %d copied", len(p.moved), len(p.copied))
+	}
+	return summary
 }
 
 // SyncBundleFiles makes DST match SRC, one a local directory and the other a bundle directory, transferring only the files that differ.
@@ -311,7 +321,9 @@ func (t *bundleSyncTarget) name(relPath string) string {
 
 // plan is what an upload of the local files with digests local changes in t.
 func (t *bundleSyncTarget) plan(local map[string]string, deleteExtras bool) *bundleSyncPlan {
-	return planBundleSync(local, t.digests, deleteExtras)
+	plan := planBundleSync(local, t.digests, deleteExtras)
+	reuseBundleContent(plan, local, t.digests)
+	return plan
 }
 
 // write applies plan from the local files under src as one merging write, which
@@ -325,6 +337,13 @@ func (t *bundleSyncTarget) write(ctx httpContext.Context, src string, local map[
 	}
 	for _, relPath := range plan.deleted {
 		delete(t.digests, relPath)
+	}
+	for _, e := range plan.moved {
+		delete(t.digests, e.from)
+		t.digests[e.to] = local[e.to]
+	}
+	for _, e := range plan.copied {
+		t.digests[e.to] = local[e.to]
 	}
 	for _, relPath := range slices.Concat(plan.added, plan.updated) {
 		t.digests[relPath] = local[relPath]
